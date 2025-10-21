@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -12,11 +13,42 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type syntaxFlowScanStream interface {
+	Send(response *ypb.SyntaxFlowScanResponse) error
+	Context() context.Context
+}
+
+type wrapperSyntaxFlowScanStream struct {
+	ctx       context.Context
+	root      ypb.Yak_SyntaxFlowScanServer
+	sendMutex *sync.Mutex
+}
+
+func newWrapperSyntaxFlowScanStream(ctx context.Context, stream ypb.Yak_SyntaxFlowScanServer) *wrapperSyntaxFlowScanStream {
+	return &wrapperSyntaxFlowScanStream{
+		root:      stream,
+		ctx:       ctx,
+		sendMutex: new(sync.Mutex),
+	}
+}
+
+func (w *wrapperSyntaxFlowScanStream) Send(r *ypb.SyntaxFlowScanResponse) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
+	return w.root.Send(r)
+}
+
+func (w *wrapperSyntaxFlowScanStream) Context() context.Context {
+	return w.ctx
+}
+
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	rawConfig, err := stream.Recv()
 	if err != nil {
 		return err
 	}
+
+	safeStream := newWrapperSyntaxFlowScanStream(stream.Context(), stream)
 
 	pause := atomic.Bool{}
 	go func() {
@@ -33,7 +65,6 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		}
 	}()
 
-	var mu sync.Mutex
 	sendExecResult := func(taskId, status string, execResult *ypb.ExecResult) error {
 		execResult.RuntimeID = taskId
 		ret := &ypb.SyntaxFlowScanResponse{
@@ -41,12 +72,10 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			Status:     status,
 			ExecResult: execResult,
 		}
-		mu.Lock()
-		defer mu.Unlock()
-		return stream.Send(ret)
+		return safeStream.Send(ret)
 	}
 
-	err = syntaxflow_scan.Scan(stream.Context(),
+	err = syntaxflow_scan.Scan(safeStream.Context(),
 		ssaconfig.WithScanRaw(rawConfig),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
@@ -66,7 +95,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		}),
 		syntaxflow_scan.WithScanResultCallback(func(sr *syntaxflow_scan.ScanResult) {
 			// 发送扫描结果
-			stream.Send(&ypb.SyntaxFlowScanResponse{
+			safeStream.Send(&ypb.SyntaxFlowScanResponse{
 				TaskID:   sr.TaskID,
 				Status:   sr.Status,
 				Result:   sr.Result.GetGRPCModelResult(),
