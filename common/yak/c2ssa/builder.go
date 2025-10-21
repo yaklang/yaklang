@@ -26,6 +26,10 @@ type SSABuilder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
+var (
+	globalTempDir string
+)
+
 func CreateBuilder() ssa.Builder {
 	builder := &SSABuilder{
 		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
@@ -36,6 +40,13 @@ func CreateBuilder() ssa.Builder {
 		ssa.WithLanguageBuilder(builder),
 	)
 	return builder
+}
+
+func CleanupTempHeaders() {
+	if globalTempDir != "" {
+		os.RemoveAll(globalTempDir)
+		globalTempDir = ""
+	}
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
@@ -104,7 +115,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
-	return filepath.Ext(path) == ".c"
+	return filepath.Ext(path) == ".c" || filepath.Ext(path) == ".h"
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
@@ -113,6 +124,73 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
+}
+
+func (s *SSABuilder) PreHandlerParseAST(globalFileSystem fi.FileSystem) {
+	if globalTempDir == "" {
+		tmpDir, err := os.MkdirTemp("", "c_headers_*")
+		if err == nil {
+			globalTempDir = tmpDir
+
+		}
+	}
+
+	var walkDir func(string) error
+	walkDir = func(dir string) error {
+		entries, err := globalFileSystem.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range entries {
+			filePath := globalFileSystem.Join(dir, entry.Name())
+
+			if entry.IsDir() {
+				walkDir(filePath)
+			} else if globalFileSystem.Ext(entry.Name()) == ".h" {
+				if content, err := globalFileSystem.ReadFile(filePath); err == nil {
+					relPath := strings.TrimPrefix(filePath, ".")
+					relPath = strings.TrimPrefix(relPath, string(globalFileSystem.GetSeparators()))
+					targetPath := filepath.Join(globalTempDir, relPath)
+					targetDir := filepath.Dir(targetPath)
+
+					os.MkdirAll(targetDir, 0755)
+					os.WriteFile(targetPath, content, 0644)
+				}
+			}
+		}
+		return nil
+	}
+	walkDir(".")
+
+	var copyIncludeDir func(string, string) error
+	copyIncludeDir = func(srcDir, dstDir string) error {
+		entries, err := globalFileSystem.ReadDir(srcDir)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range entries {
+			srcPath := globalFileSystem.Join(srcDir, entry.Name())
+			dstPath := filepath.Join(dstDir, entry.Name())
+
+			if entry.IsDir() {
+				os.MkdirAll(dstPath, 0755)
+				copyIncludeDir(srcPath, dstPath)
+			} else {
+				if content, err := globalFileSystem.ReadFile(srcPath); err == nil {
+					os.WriteFile(dstPath, content, 0644)
+				}
+			}
+		}
+		return nil
+	}
+
+	if exists, _ := globalFileSystem.Exists("include"); exists {
+		includeDir := filepath.Join(globalTempDir, "include")
+		os.MkdirAll(includeDir, 0755)
+		copyIncludeDir("include", includeDir)
+	}
 }
 
 func (s *SSABuilder) FilterParseAST(path string) bool {
@@ -138,17 +216,54 @@ type astbuilder struct {
 }
 
 func PreprocessCMacros(src string) (string, error) {
-	var preprocessorCmd string
-	var preprocessorArgs []string
-
 	/* TODO: 未来改进：
-	1. 将 gcc/clang 集成到项目中（可选）
-	2. 提供在不同平台上构建 gcc/clang 的脚本
-	3. 添加编译选项，让用户决定是否自动扩展宏
+	   1. 将 gcc/clang 集成到项目中（可选）
+	   2. 提供在不同平台上构建 gcc/clang 的脚本
+	   3. 添加编译选项，让用户决定是否自动扩展宏
+	   4. 支持用户指定额外的 include 路径（-I 选项）
 	*/
 
-	candidates := []string{"gcc", "clang", "cc"}
+	// Remove all preprocessor directives to avoid errors
+	lines := strings.Split(src, "\n")
+	cleanedLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		trimmedLower := strings.ToLower(trimmed)
 
+		// Skip ALL include directives (case-insensitive)
+		if strings.HasPrefix(trimmedLower, "#include") {
+			cleanedLines = append(cleanedLines, "/* removed include */")
+			continue
+		}
+		// Skip #error directives
+		if strings.HasPrefix(trimmedLower, "#error") {
+			cleanedLines = append(cleanedLines, "/* removed error */")
+			continue
+		}
+		// Skip #warning directives
+		if strings.HasPrefix(trimmedLower, "#warning") {
+			cleanedLines = append(cleanedLines, "/* removed warning */")
+			continue
+		}
+		// Skip ALL conditional compilation directives
+		if strings.HasPrefix(trimmedLower, "#if") ||
+			strings.HasPrefix(trimmedLower, "#elif") ||
+			strings.HasPrefix(trimmedLower, "#else") ||
+			strings.HasPrefix(trimmedLower, "#endif") {
+			cleanedLines = append(cleanedLines, "/* removed directive */")
+			continue
+		}
+		// Skip #pragma directives
+		if strings.HasPrefix(trimmedLower, "#pragma") {
+			cleanedLines = append(cleanedLines, "/* removed pragma */")
+			continue
+		}
+		cleanedLines = append(cleanedLines, line)
+	}
+	cleanedSrc := strings.Join(cleanedLines, "\n")
+
+	var preprocessorCmd string
+	candidates := []string{"gcc", "clang", "cc"}
 	for _, cmd := range candidates {
 		if _, err := exec.LookPath(cmd); err == nil {
 			preprocessorCmd = cmd
@@ -157,51 +272,66 @@ func PreprocessCMacros(src string) (string, error) {
 	}
 
 	if preprocessorCmd == "" {
-		return "", fmt.Errorf("C preprocessor not found: please install gcc, clang, or compatible C compiler (Platform: %s/%s)", runtime.GOOS, runtime.GOARCH)
+		return "", fmt.Errorf("c preprocessor not found: please install gcc, clang, or compatible C compiler (platform: %s/%s)", runtime.GOOS, runtime.GOARCH)
 	}
 
-	tmpFile, err := os.CreateTemp("", "c_preprocess_*.c")
+	tmpDir := globalTempDir
+	if tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
+
+	tmpFile, err := os.CreateTemp(tmpDir, "c_preprocess_*.c")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpFileName := tmpFile.Name()
 	defer os.Remove(tmpFileName)
 
-	if _, err := tmpFile.WriteString(src); err != nil {
+	if _, err := tmpFile.WriteString(cleanedSrc); err != nil {
 		tmpFile.Close()
 		return "", fmt.Errorf("failed to write source to temp file: %w", err)
 	}
 	tmpFile.Close()
 
-	preprocessorArgs = []string{
+	// Build preprocessor arguments with include paths
+	preprocessorArgs := []string{
 		"-E",
 		"-P",
 		"-nostdinc",
-		"-undef",
 		"-Wno-everything",
-		tmpFileName,
 	}
+
+	if globalTempDir != "" {
+		preprocessorArgs = append(preprocessorArgs, "-I", globalTempDir)
+	}
+
+	preprocessorArgs = append(preprocessorArgs, tmpFileName)
 
 	cmd := exec.Command(preprocessorCmd, preprocessorArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("preprocessor failed: %w\nOutput: %s", err, string(output))
+		// Truncate output to first 500 characters to reduce log noise
+		outputStr := string(output)
+		if len(outputStr) > 500 {
+			outputStr = outputStr[:500] + "... (truncated)"
+		}
+		return src, fmt.Errorf("preprocessor failed: %w\nOutput: %s", err, outputStr)
 	}
 
 	result := string(output)
-	lines := strings.Split(result, "\n")
-	cleanedLines := make([]string, 0, len(lines))
+	resultLines := strings.Split(result, "\n")
+	finalLines := make([]string, 0, len(resultLines))
 
-	for _, line := range lines {
+	for _, line := range resultLines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-			cleanedLines = append(cleanedLines, line)
+			finalLines = append(finalLines, line)
 		} else if strings.HasPrefix(trimmed, "#include") {
-			cleanedLines = append(cleanedLines, line)
+			finalLines = append(finalLines, line)
 		}
 	}
 
-	return strings.Join(cleanedLines, "\n"), nil
+	return strings.Join(finalLines, "\n"), nil
 }
 
 func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
@@ -687,5 +817,3 @@ var cBuildIn = map[string]any{
 	"println": func(args ...any) {},
 	"print":   func(args ...any) {},
 }
-
-var cBuildInSE = map[string]any{}
