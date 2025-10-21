@@ -172,6 +172,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		}
 
 		var variable *Variable
+		if _, ok := ToFunction(modify); ok {
+			continue
+		}
 		modifyScope := modify.GetBlock().ScopeTable
 
 		switch se.MemberCallKind {
