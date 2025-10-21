@@ -532,6 +532,10 @@ type MockMemoryTriageForTesting struct {
 	callCount                   int
 }
 
+func (m *MockMemoryTriageForTesting) SetInvoker(i aicommon.AIInvokeRuntime) {
+	
+}
+
 func (m *MockMemoryTriageForTesting) AddRawText(text string) ([]*aimem.MemoryEntity, error) {
 	return []*aimem.MemoryEntity{}, nil
 }
