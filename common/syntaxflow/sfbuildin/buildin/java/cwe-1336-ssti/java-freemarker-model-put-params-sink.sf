@@ -45,7 +45,7 @@ templateData.put("userInfo", cleanedInput);
 SOLUTION
 )
 
-getTemplate(,*?{!opcode: const} as $sink).process(,* as $params,);
+getTemplate?{<typeName>?{have:"freemarker"}}(,*?{!opcode: const} as $sink).process(,* as $params,);
 check $params;
 $params.put(,,* as $sink);
 check $sink then "Found Freemarker Process Using" else "No Freemarker Process Simple";
