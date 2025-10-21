@@ -245,14 +245,14 @@ func PreprocessCMacros(src string) (string, error) {
 			cleanedLines = append(cleanedLines, "/* removed warning */")
 			continue
 		}
-		// Skip ALL conditional compilation directives
-		if strings.HasPrefix(trimmedLower, "#if") ||
-			strings.HasPrefix(trimmedLower, "#elif") ||
-			strings.HasPrefix(trimmedLower, "#else") ||
-			strings.HasPrefix(trimmedLower, "#endif") {
-			cleanedLines = append(cleanedLines, "/* removed directive */")
-			continue
-		}
+		// // Skip ALL conditional compilation directives
+		// if strings.HasPrefix(trimmedLower, "#if") ||
+		// 	strings.HasPrefix(trimmedLower, "#elif") ||
+		// 	strings.HasPrefix(trimmedLower, "#else") ||
+		// 	strings.HasPrefix(trimmedLower, "#endif") {
+		// 	cleanedLines = append(cleanedLines, "/* removed directive */")
+		// 	continue
+		// }
 		// Skip #pragma directives
 		if strings.HasPrefix(trimmedLower, "#pragma") {
 			cleanedLines = append(cleanedLines, "/* removed pragma */")
