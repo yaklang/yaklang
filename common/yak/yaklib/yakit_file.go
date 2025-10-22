@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/yaklang/yaklang/common/utils"
+	"os"
 )
 
 type YakitFileAction struct {
@@ -69,8 +70,17 @@ func FileDeleteAction(isDir bool) *YakitFileAction {
 }
 
 func FileStatusAction(status any) *YakitFileAction {
-	statusMap := utils.UnSafeInterfaceToGeneralMap(status)
-
+	statusMap := make(map[string]any)
+	fileInfo, ok := status.(os.FileInfo)
+	if ok {
+		statusMap["name"] = fileInfo.Name()
+		statusMap["size"] = fileInfo.Size()
+		statusMap["mode"] = fileInfo.Mode().String()
+		statusMap["modTime"] = fileInfo.ModTime().String()
+		statusMap["isDir"] = fileInfo.IsDir()
+	} else {
+		statusMap = utils.UnSafeInterfaceToGeneralMap(status)
+	}
 	return &YakitFileAction{
 		Action: Status_Action,
 		Message: map[string]any{
