@@ -3,6 +3,7 @@ package ssadb
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -18,18 +19,43 @@ const (
 	irRelationCount = 5
 )
 
-var irTypeCache = utils.NewCacheEx[*IrType](
-	utils.WithCacheCapacity(irCacheCapacity),
-	utils.WithCacheTTL(irCacheTTL),
-)
-
-var irCodeCache = utils.NewCacheEx[*IrCode](
-	utils.WithCacheCapacity(irCacheCapacity),
-	utils.WithCacheTTL(irCacheTTL),
-)
+var irTypeSingleFlight singleflight.Group
+var initIrTypeOnce = sync.Once{}
+var irTypeCaches *utils.SafeMap[*utils.CacheExWithKey[int64, *IrType]]
 
 var irCodeSingleFlight singleflight.Group
-var irTypeSingleFlight singleflight.Group
+var initIrCodeOnce = sync.Once{}
+var irCodeCaches *utils.SafeMap[*utils.CacheExWithKey[int64, *IrCode]]
+
+func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
+	initIrTypeOnce.Do(func() {
+		irTypeCaches = utils.NewSafeMap[*utils.CacheExWithKey[int64, *IrType]]()
+	})
+	return irTypeCaches.GetOrLoad(progName, func() *utils.CacheExWithKey[int64, *IrType] {
+		return utils.NewCacheExWithKey[int64, *IrType](
+			utils.WithCacheCapacity(irCacheCapacity),
+			utils.WithCacheTTL(irCacheTTL),
+		)
+	})
+}
+
+func DeleteCache(progName string) {
+	irTypeCaches.Delete(progName)
+	irCodeCaches.Delete(progName)
+}
+
+func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {
+	initIrCodeOnce.Do(func() {
+		irCodeCaches = utils.NewSafeMap[*utils.CacheExWithKey[int64, *IrCode]]()
+	})
+
+	return irCodeCaches.GetOrLoad(progName, func() *utils.CacheExWithKey[int64, *IrCode] {
+		return utils.NewCacheExWithKey[int64, *IrCode](
+			utils.WithCacheCapacity(irCacheCapacity),
+			utils.WithCacheTTL(irCacheTTL),
+		)
+	})
+}
 
 func dbKey(programName string, id int64) string {
 	return fmt.Sprintf("%s_%d", programName, id)
@@ -40,22 +66,23 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 		return nil
 	}
 
-	key := dbKey(progName, id)
+	cache := GetIrCodeCache(progName)
 
 	// 先检查缓存
-	if ir, ok := irCodeCache.Get(key); ok {
+	if ir, ok := cache.Get(id); ok {
 		return ir
 	}
 
 	// 使用singleflight确保同时只有一个协程查询相同的key
+	key := dbKey(progName, id)
 	result, _, _ := irCodeSingleFlight.Do(key, func() (interface{}, error) {
 		// 再次检查缓存，防止在等待期间其他协程已经加载了数据
-		if ir, ok := irCodeCache.Get(key); ok {
+		if ir, ok := cache.Get(id); ok {
 			return ir, nil
 		}
 
 		ctx := context.Background()
-		itemsToCache := make(map[string]*IrCode)
+		itemsToCache := make(map[int64]*IrCode)
 		var ret *IrCode
 
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -65,7 +92,7 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 				if id < 0 {
 					return
 				}
-				if _, ok := irCodeCache.Get(dbKey(progName, id)); ok {
+				if _, ok := cache.Get(id); ok {
 					return
 				}
 				if _, ok := idsToLoad[id]; ok {
@@ -79,7 +106,7 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 			if ret == nil {
 				return nil
 			}
-			itemsToCache[dbKey(progName, ret.CodeID)] = ret
+			itemsToCache[ret.CodeID] = ret
 
 			// load user and function/block
 			for _, userId := range ret.Users {
@@ -98,14 +125,14 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
 			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "code_id", ids).Where("program_name = ?", progName)
 			for ir := range bizhelper.YieldModel[*IrCode](ctx, tx, bizhelper.WithYieldModel_Fast()) {
-				itemsToCache[dbKey(progName, ir.CodeID)] = ir
+				itemsToCache[ir.CodeID] = ir
 			}
 			return nil
 		})
 
 		// 更新缓存
-		for key, item := range itemsToCache {
-			irCodeCache.Set(key, item)
+		for id, item := range itemsToCache {
+			cache.Set(id, item)
 		}
 
 		return ret, nil
@@ -122,22 +149,23 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 		return nil
 	}
 
-	key := dbKey(progName, id)
+	cache := GetIrTypeCache(progName)
 
 	// 先检查缓存
-	if ir, ok := irTypeCache.Get(key); ok {
+	if ir, ok := cache.Get(id); ok {
 		return ir
 	}
 
 	// 使用singleflight确保同时只有一个协程查询相同的key
+	key := dbKey(progName, id)
 	result, _, _ := irTypeSingleFlight.Do(key, func() (interface{}, error) {
 		// 再次检查缓存，防止在等待期间其他协程已经加载了数据
-		if ir, ok := irTypeCache.Get(key); ok {
+		if ir, ok := cache.Get(id); ok {
 			return ir, nil
 		}
 
 		ctx := context.Background()
-		itemsToCache := make(map[string]*IrType)
+		itemsToCache := make(map[int64]*IrType)
 		var ret *IrType
 
 		utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -147,7 +175,7 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 				if id < 0 {
 					return
 				}
-				if _, ok := irTypeCache.Get(dbKey(progName, id)); ok {
+				if _, ok := cache.Get(id); ok {
 					return
 				}
 				if _, ok := idsToLoad[id]; ok {
@@ -161,7 +189,7 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 			if ret == nil {
 				return nil
 			}
-			itemsToCache[dbKey(progName, int64(ret.TypeId))] = ret
+			itemsToCache[int64(ret.TypeId)] = ret
 
 			// load [id-relation ... id ... id+relation]
 			for i := int64(1); i < irRelationCount; i++ {
@@ -173,14 +201,14 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
 			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "type_id", ids).Where("program_name = ?", progName)
 			for ir := range bizhelper.YieldModel[*IrType](ctx, tx, bizhelper.WithYieldModel_Fast()) {
-				itemsToCache[dbKey(progName, int64(ir.TypeId))] = ir
+				itemsToCache[int64(ir.TypeId)] = ir
 			}
 			return nil
 		})
 
 		// 更新缓存
-		for key, item := range itemsToCache {
-			irTypeCache.Set(key, item)
+		for id, item := range itemsToCache {
+			cache.Set(id, item)
 		}
 
 		return ret, nil

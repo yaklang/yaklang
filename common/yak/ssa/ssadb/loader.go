@@ -42,10 +42,10 @@ func yieldCodeWithCache(ctx context.Context, _ *gorm.DB, progName string, ids []
 	go func() {
 		defer close(outC)
 		idsToLoad := make([]int64, 0, len(ids))
+		cache := GetIrCodeCache(progName)
 		// 先从缓存加载
 		for _, id := range ids {
-			key := dbKey(progName, id)
-			if ir, ok := irCodeCache.Get(key); ok {
+			if ir, ok := cache.Get(id); ok {
 				outC <- ir
 			} else {
 				idsToLoad = append(idsToLoad, id)
@@ -61,8 +61,7 @@ func yieldCodeWithCache(ctx context.Context, _ *gorm.DB, progName string, ids []
 			bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
 		)
 		for ir := range ch {
-			key := dbKey(progName, ir.CodeID)
-			irCodeCache.Set(key, ir)
+			cache.Set(ir.CodeID, ir)
 			outC <- ir
 		}
 	}()
