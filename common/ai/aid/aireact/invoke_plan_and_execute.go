@@ -160,6 +160,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		r.UnregisterMirrorOfAIInputEvent(uid)
 	}()
 
+	hotpatchChan := r.config.hotpatchBroadcaster.Subscribe()
 	baseOpts := ConvertReActConfigToAIDConfigOptions(r.config)
 	baseOpts = append(baseOpts, aid.WithCoordinatorId(uid),
 		aid.WithTimelineInstance(r.config.timeline),
@@ -168,6 +169,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		aid.WithAgreeManual(),
 		aid.WithEventInputChan(inputChannel),
 		aid.WithAgreePolicy(r.config.reviewPolicy),
+		aid.WithHotpatchOptionChan(hotpatchChan),
 		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = uid
 			emitErr := r.config.Emit(e)
@@ -216,6 +218,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 		_ = result
 		r.AddToTimeline("forge output log", stdOut.String())
+		r.config.hotpatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	} else {
 		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
@@ -228,6 +231,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			log.Errorf("Plan execution failed: %v", err)
 			return utils.Errorf("plan execution failed: %v", err)
 		}
+		r.config.hotpatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	}
 }
