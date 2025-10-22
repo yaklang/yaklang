@@ -1,569 +1,480 @@
 # 快速实施指南 - Yaklang AI 优化
 
-## 立即可执行的改进（10分钟内完成）
+## 核心改进策略
 
-### 改进1：修改工具名称（最关键！）
+**新增 `grep_yaklang_samples` 工具，保留 `query_document`**
 
-#### 文件：`action_query_document.go`
+- 保留 `query_document` - 查询完整文档（深入理解用）
+- 新增 `grep_yaklang_samples` - 快速 grep 代码样例（日常优先用）
+- 两个工具并存，各司其职，AI 根据场景选择
 
-**改动位置1：工具名称（第16行）**
+---
+
+## 实施步骤概览
+
+| 步骤 | 任务 | 时间 | 优先级 |
+|------|------|------|--------|
+| 1 | 新增 grep_yaklang_samples action | 20分钟 | 高 |
+| 2 | 更新 code.go 注册新工具 | 5分钟 | 高 |
+| 3 | Prompt 文件已更新 | ✅ 完成 | 高 |
+| 4 | 测试验证 | 10分钟 | 高 |
+
+---
+
+## 步骤1：新增 grep_yaklang_samples Action
+
+### 新建文件：`action_grep_yaklang_samples.go`
+
+在 `loop_yaklangcode` 目录下创建新文件：
+
 ```go
-// 原来
-"query_document",
+package loop_yaklangcode
 
-// 改为
-"grep_yaklang_samples",
-```
+import (
+	"bytes"
+	"fmt"
 
-**改动位置2：工具描述（第17行）**
-```go
-// 原来
-"查询Yaklang代码文档和库函数。支持关键字搜索...",
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
+)
 
-// 改为（完整版本）
-`🔍 Grep Yaklang 代码样例库 - 你编写代码前的首要工具
+var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
+	return reactloops.WithRegisterLoopActionWithStreamField(
+		"grep_yaklang_samples",
+		`🔍 Grep Yaklang 代码样例库 - 快速搜索真实代码示例
 
 ⚠️ 核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
 
-【强制使用场景】- 必须先 grep：
-1. 编写任何新功能代码前
-2. 遇到 lint 错误（ExternLib don't has / SyntaxError）后
-3. 对某个库/函数不确定时
-4. 需要查看功能实现示例时
-
-【搜索参数】：
-• keywords - 关键词（如 "端口扫描", "HTTP请求"）
-• regexp - 正则表达式（如 "servicescan\\.Scan"）
-• lib_names - 库名（如 "servicescan", "poc", "str"）
-• lib_function_globs - 函数通配（如 "*Scan*", "*Split*"）
-
-记住：Yaklang 是 DSL！每个 API 都可能不同！先 grep 再写！`,
-```
-
-**改动位置3：参数名称（第20行）**
-```go
-// 原来
-"query_document_payload",
-
-// 改为
-"grep_payload",
-```
-
-**改动位置4：参数描述优化**
-```go
-// 优化 keywords 描述（第29行附近）
-aitool.WithStringArrayParam(
-	"keywords",
-	aitool.WithParam_Description(`关键词/短语搜索（中英文）。
-示例：["端口扫描", "HTTP请求", "文件读取", "错误处理"]
-适用：搜索功能相关代码片段`)),
-
-// 优化 regexp 描述
-aitool.WithStringArrayParam(
-	"regexp",
-	aitool.WithParam_Description(`正则表达式匹配（区分大小写）。
-示例：["servicescan\\.Scan", "poc\\.HTTP.*", "str\\.\\w+"]
-适用：精确搜索函数调用模式
-注意：用 \\ 转义特殊字符`)),
-
-// 优化 lib_names 描述
-aitool.WithStringArrayParam(
-	"lib_names",
-	aitool.WithParam_Description(`库名查询 - 查看整个库的函数。
-示例：["servicescan", "str", "poc", "http", "file"]
-适用：了解某个库有哪些功能`)),
-
-// 优化 lib_function_globs 描述
-aitool.WithStringArrayParam(
-	"lib_function_globs",
-	aitool.WithParam_Description(`函数通配符搜索 - 模糊匹配函数名。
-示例：["*Scan*", "str.Split*", "*HTTP*"]
-适用：不确定完整函数名时`)),
-```
-
-**改动位置5：事件名称（第88行）**
-```go
-// 原来
-"query_yaklang_document",
-
-// 改为
-"grep_yaklang_samples",
-```
-
-**改动位置6：Timeline 消息（第97行、第100行）**
-```go
-// 原来
-invoker.AddToTimeline("start_query_yaklang_docs", "AI decided to query document...")
-invoker.AddToTimeline("query_yaklang_docs_result", "No document searcher available...")
-
-// 改为
-invoker.AddToTimeline("start_grep_yaklang_samples", "AI decided to grep yaklang samples: "+utils.InterfaceToString(payloads))
-invoker.AddToTimeline("grep_yaklang_samples_no_result", "No document searcher available, cannot grep: "+utils.InterfaceToString(payloads))
-```
-
----
-
-### 改进2：强化 Prompt - 添加强制搜索原则
-
-#### 文件：`prompts/persistent_instruction.txt`
-
-**在文件开头（第1行之前）添加：**
-
-```markdown
-## ⚠️⚠️⚠️ Yaklang 代码生成核心原则 - 搜索优先！⚠️⚠️⚠️
-
-### 八荣八耻 - Yaklang 开发者的行为准则
-
-以暗猜接口为耻，以认真查阅为荣
-以模糊执行为耻，以寻求确认为荣
-以盲想业务为耻，以人类确认为荣
-以创造接口为耻，以复用现有为荣
-以跳过验证为耻，以主动测试为荣
-以破坏架构为耻，以遵循规范为荣
-以假装理解为耻，以诚实无知为荣
-以盲目修改为耻，以谨慎重构为荣
-
-### 核心工作流程（强制执行）
-
-```
-【正确流程】
-需求理解 → grep_yaklang_samples 搜索 → 基于样例编写 → 测试 → (如有错误) → grep 搜索 → 精确修改
-
-【错误流程 - 禁止！】
-需求理解 → 直接写代码 → 报错 → 猜测修改 → 报错 → 再猜测 → ...
-```
-
-### 强制 grep 场景（必须执行）
-
-1. **编写任何代码前** - 先 grep 相关功能的样例
-2. **遇到 lint 错误后** - 立即 grep，禁止猜测
-3. **使用新库/函数时** - 先 grep 用法
-4. **不确定参数时** - grep 搜索示例
-
-### 禁止行为清单
-
-❌ 看到需求就直接写代码（没有先 grep）
-❌ 遇到 API 错误后继续猜测其他 API 名称
-❌ 连续 2 次以上 modify_code 而没有 grep
-❌ 假装知道某个函数的用法（实际没 grep 确认）
-❌ 使用 "我觉得"、"应该是"、"可能是" 这类猜测性语言
-
-### grep_yaklang_samples 工具是你的第一选择
-
-**重要性排序：**
-1. grep_yaklang_samples - 【最重要】搜索代码样例
-2. write_code - 基于 grep 结果编写代码
-3. modify_code - 基于 grep 结果修改代码
-4. bash - 测试代码
-
-**使用频率期望：**
-- 理想：每次 write_code 前至少 1 次 grep
-- 底线：每次遇到错误后必须 grep
-
----
-
-```
-
-**在原有的"代码生成与修改的铁律"之后（约第35行）添加：**
-
-```markdown
-## grep_yaklang_samples - 你最重要的工具
-
-### 为什么必须使用 grep？
-
-Yaklang 是一门 **DSL（领域特定语言）**，不是 Python、Go、JavaScript！
-- API 命名可能完全不同
-- 语法可能有特殊规则
-- 参数顺序可能不符合直觉
-
-**猜测 = 浪费时间 = 连续报错**
-**grep = 准确快速 = 一次成功**
-
-### 何时必须 grep（强制）
-
-1. **API 不存在错误**
-   ```
-   错误：ExternLib [servicescan] don't has [timeout]
-   行动：立即 grep lib_names=["servicescan"] 查看所有可用选项
-   ```
-
-2. **语法错误**
-   ```
-   错误：SyntaxError near 'if err != nil'
-   行动：立即 grep keywords=["错误处理", "error handling"]
-   ```
-
-3. **不确定的函数**
-   ```
-   想用：不确定 str 库有没有 Split 函数
-   行动：立即 grep lib_function_globs=["str.Split*"]
-   ```
-
-### grep 搜索示例
-
-**场景1：想实现端口扫描**
-```json
-{"@action": "grep_yaklang_samples", 
- "keywords": ["端口扫描", "服务扫描"],
- "lib_names": ["servicescan"],
- "human_readable_thought": "我需要先查看端口扫描的样例代码"}
-```
-
-**场景2：遇到 API 错误**
-```json
-{"@action": "grep_yaklang_samples",
- "lib_names": ["synscan"],
- "regexp": ["synscan\\.\\w+"],
- "human_readable_thought": "synscan.timeout 不存在，我需要搜索 synscan 的所有可用选项"}
-```
-
-**场景3：模糊搜索函数**
-```json
-{"@action": "grep_yaklang_samples",
- "lib_function_globs": ["*Split*", "*Join*"],
- "human_readable_thought": "我需要查找字符串分割和拼接的函数"}
-```
-
-```
-
----
-
-### 改进3：优化错误提示 - 强制 grep
-
-#### 文件：`prompts/reactive_data.txt`
-
-**找到 FeedbackMessages 部分（约第464行），在 `<|ERR/LINT_WARNING_END|>` 之后添加：**
-
-```markdown
-### ⚠️ 错误处理强制规则 ⚠️
-
-**如果上述错误包含以下任何一种，你必须立即使用 grep_yaklang_samples：**
-
-#### 错误类型1：API 不存在
-```
-ExternLib [xxx] don't has [yyy]
-```
-**含义**：你猜错了 API 名称，该库没有这个函数/选项
-**行动**：必须 grep_yaklang_samples，参数设置：
-- lib_names: ["xxx"]  （搜索该库）
-- regexp: ["xxx\\.\\w+"]  （搜索该库的所有函数）
-
-**禁止**：❌ 继续猜测其他 API 名称
-**正确**：✅ 立即 grep 搜索真实可用的 API
-
-#### 错误类型2：语法错误
-```
-SyntaxError: ...
-```
-**含义**：你的语法不符合 Yaklang DSL 规范
-**行动**：必须 grep_yaklang_samples，参数设置：
-- keywords: ["相关功能的中文描述"]
-- regexp: ["相关的代码模式"]
-
-**禁止**：❌ 继续尝试不同的语法写法
-**正确**：✅ grep 搜索正确的语法示例
-
-#### 错误类型3：未定义符号
-```
-undefined: xxx
-```
-**含义**：变量/函数不存在
-**行动**：必须 grep_yaklang_samples，参数设置：
-- lib_function_globs: ["*xxx*"]
-- keywords: ["功能描述"]
-
-### 反面教材 - 禁止的行为模式
-
-❌ **错误模式1：连续猜测**
-```
-尝试1: servicescan.timeout(5)     → 报错
-尝试2: servicescan.setTimeout(5)  → 报错
-尝试3: servicescan.withTimeout(5) → 报错
-... 继续猜测
-```
-
-✅ **正确模式：立即搜索**
-```
-尝试1: servicescan.timeout(5) → 报错
-行动: grep_yaklang_samples(lib_names=["servicescan"]) → 找到 probeTimeout
-成功: servicescan.probeTimeout(5) → 通过！
-```
-
-### 自查清单
-
-在执行 modify_code 之前，问自己：
-1. ✅ 我是否刚刚 grep 过相关 API？
-2. ✅ 我的修改是基于 grep 结果还是猜测？
-3. ✅ 如果是猜测，为什么不先 grep？
-
-如果答案是"我在猜测"，**立即停止**，先执行 grep_yaklang_samples！
-
-```
-
----
-
-### 改进4：添加正确示例
-
-#### 文件：`prompts/reflection_output_example.txt`
-
-**在文件末尾（第97行后）添加：**
-
-```markdown
-
----
-
-## ✅ grep_yaklang_samples 正确使用示例
-
-### 示例1：编写新功能前先 grep
-
-**场景**：用户要求实现一个端口扫描脚本
-
-**步骤1：理解需求后立即 grep**
-```json
-{"@action": "grep_yaklang_samples",
- "keywords": ["端口扫描", "服务扫描", "servicescan"],
- "lib_names": ["servicescan"],
- "human_readable_thought": "用户需要端口扫描功能，我先搜索 servicescan 库的使用示例，了解正确的 API 用法"}
-```
-
-**步骤2：查看 grep 结果**
-```
-找到 15 个相关样例：
-- servicescan.Scan(target, ports, ...opts)
-- servicescan.concurrent(n) - 设置并发数
-- servicescan.probeTimeout(n) - 设置超时
-- servicescan.onOpen(callback) - 开放端口回调
-```
-
-**步骤3：基于 grep 结果编写代码**
-```json
-{"@action": "write_code",
- "human_readable_thought": "根据 grep 结果，我知道了正确的用法：servicescan.Scan + probeTimeout + concurrent + onOpen"}
-```
-
-<|GEN_CODE_xxx|>
-yakit.AutoInitYakit()
-
-target := cli.String("target", cli.setRequired(true))
-ports := cli.String("ports", cli.setDefault("80,443,8080"))
-cli.check()
-
-results, err := servicescan.Scan(
-    target, 
-    ports,
-    servicescan.concurrent(50),
-    servicescan.probeTimeout(5),
-    servicescan.onOpen(result => {
-        yakit.Info("发现开放端口: %v", result.String())
-    }),
-)
-die(err)
-
-for result in results {
-    yakit.Info("扫描结果: %v", result.String())
+【强制使用场景】：
+1. 编写任何代码前，先 grep 相关函数用法
+2. 遇到 API 错误（ExternLib don't has）时 - 必须立即 grep
+3. 遇到语法错误（SyntaxError）时 - 必须立即 grep  
+4. 不确定函数参数或返回值时
+
+【参数说明】：
+- pattern (必需) - 搜索模式，支持：
+  * 关键词：如 "端口扫描", "HTTP请求"
+  * 正则：如 "servicescan\\.Scan", "poc\\..*"
+  * 函数名：如 "str.Split", "yakit.Info"
+  
+- case_sensitive (可选) - 是否区分大小写，默认 false
+
+- context_lines (可选) - 上下文行数，默认 15
+  * 需要更多上下文：设置 20-30
+  * 只看函数调用：设置 5-10
+  * 看完整实现：设置 30-50
+
+【使用示例】：
+grep_yaklang_samples(pattern="servicescan\\.Scan", context_lines=20)
+grep_yaklang_samples(pattern="die\\(err\\)", context_lines=10)
+grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
+
+记住：Yaklang 是 DSL！每个 API 都可能与 Python/Go 不同！
+先 grep 找样例，再写代码，节省 90% 调试时间！`,
+		[]aitool.ToolOption{
+			aitool.WithStructParam(
+				"grep_payload",
+				[]aitool.PropertyOption{
+					aitool.WithStringParam(
+						"pattern",
+						aitool.WithParam_Required(true),
+						aitool.WithParam_Description(`搜索模式（必需）- 支持多种格式：
+1. 关键词：如 "端口扫描", "HTTP请求", "错误处理"
+2. 精确函数名：如 "servicescan.Scan", "str.Split"
+3. 正则表达式：如 "servicescan\\.", "poc\\.HTTP.*", "die\\(err\\)"
+4. 组合搜索：如 "servicescan\\.Scan|端口扫描"
+
+注意：正则中的 . 需要转义为 \\.`),
+					),
+					aitool.WithBoolParam(
+						"case_sensitive",
+						aitool.WithParam_Description("是否区分大小写（默认 false - 不区分，推荐）"),
+					),
+					aitool.WithIntParam(
+						"context_lines",
+						aitool.WithParam_Description(`上下文行数（默认 15）- 控制返回结果的上下文范围：
+• 5-10: 快速查看函数调用
+• 15-20: 理解函数用法（默认，推荐）
+• 25-35: 学习完整实现
+• 40-50: 研究复杂功能`),
+					),
+				},
+			),
+		},
+		[]*reactloops.LoopStreamField{},
+		// Validator
+		func(r *reactloops.ReActLoop, action *aicommon.Action) error {
+			payloads := action.GetInvokeParams("grep_payload")
+			
+			pattern := payloads.GetString("pattern")
+			if pattern == "" {
+				return utils.Error("grep_yaklang_samples requires 'pattern' parameter")
+			}
+			
+			return nil
+		},
+		// Handler
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			payloads := action.GetInvokeParams("grep_payload")
+			
+			pattern := payloads.GetString("pattern")
+			caseSensitive := payloads.GetBool("case_sensitive")
+			contextLines := payloads.GetInt("context_lines")
+			
+			// 设置默认值
+			if contextLines == 0 {
+				contextLines = 15
+			}
+			
+			// 显示搜索参数
+			searchInfo := fmt.Sprintf("Grep pattern: %s, case_sensitive: %v, context: %d lines", 
+				pattern, caseSensitive, contextLines)
+			loop.GetEmitter().EmitTextPlainTextStreamEvent(
+				"grep_yaklang_samples",
+				bytes.NewReader([]byte(searchInfo)),
+				loop.GetCurrentTask().GetIndex(),
+				func() {
+					log.Infof("grep yaklang samples: %s", searchInfo)
+				},
+			)
+			
+			invoker := loop.GetInvoker()
+			invoker.AddToTimeline("start_grep_yaklang_samples", searchInfo)
+			
+			// 检查 docSearcher
+			if docSearcher == nil {
+				errorMsg := "Document searcher not available, cannot grep. Please ensure yaklang-aikb is properly installed."
+				log.Warn(errorMsg)
+				invoker.AddToTimeline("grep_failed", errorMsg)
+				op.Feedback("⚠️ " + errorMsg)
+				op.Continue()
+				return
+			}
+			
+			// 执行 grep 搜索
+			grepOpts := []ziputil.GrepOption{
+				ziputil.WithGrepCaseSensitive(caseSensitive),
+				ziputil.WithContext(int(contextLines)),
+			}
+			
+			var results []*ziputil.GrepResult
+			var err error
+			
+			// 尝试正则搜索
+			results, err = docSearcher.GrepRegexp(pattern, grepOpts...)
+			if err != nil {
+				// 如果正则失败，尝试子字符串搜索
+				log.Warnf("regexp search failed, trying substring search: %v", err)
+				results, err = docSearcher.GrepSubString(pattern, grepOpts...)
+			}
+			
+			if err != nil {
+				errorMsg := fmt.Sprintf("Grep search failed: %v", err)
+				log.Error(errorMsg)
+				invoker.AddToTimeline("grep_failed", errorMsg)
+				op.Feedback("❌ " + errorMsg)
+				op.Continue()
+				return
+			}
+			
+			if len(results) == 0 {
+				noResultMsg := fmt.Sprintf("No matches found for pattern: %s\n\n💡 建议：\n- 尝试更通用的搜索词\n- 使用正则表达式扩大搜索范围\n- 检查拼写是否正确", pattern)
+				log.Info(noResultMsg)
+				invoker.AddToTimeline("grep_no_results", noResultMsg)
+				op.Feedback("ℹ️ " + noResultMsg)
+				op.Continue()
+				return
+			}
+			
+			// 格式化结果
+			var resultBuffer bytes.Buffer
+			resultBuffer.WriteString(fmt.Sprintf("\n🔍 找到 %d 个匹配结果：\n\n", len(results)))
+			
+			maxResults := 20 // 最多显示20个结果
+			displayCount := len(results)
+			if displayCount > maxResults {
+				displayCount = maxResults
+			}
+			
+			for i := 0; i < displayCount; i++ {
+				result := results[i]
+				resultBuffer.WriteString(fmt.Sprintf("--- 结果 %d/%d ---\n", i+1, len(results)))
+				resultBuffer.WriteString(fmt.Sprintf("文件: %s\n", result.FileName))
+				resultBuffer.WriteString(fmt.Sprintf("行号: %d\n", result.LineNumber))
+				resultBuffer.WriteString(fmt.Sprintf("\n"))
+				
+				// 显示上下文
+				if len(result.ContextBefore) > 0 {
+					for _, line := range result.ContextBefore {
+						resultBuffer.WriteString(fmt.Sprintf("  %s\n", line))
+					}
+				}
+				
+				// 高亮匹配行
+				resultBuffer.WriteString(fmt.Sprintf("▶ %s\n", result.Line))
+				
+				if len(result.ContextAfter) > 0 {
+					for _, line := range result.ContextAfter {
+						resultBuffer.WriteString(fmt.Sprintf("  %s\n", line))
+					}
+				}
+				
+				resultBuffer.WriteString("\n")
+			}
+			
+			if len(results) > maxResults {
+				resultBuffer.WriteString(fmt.Sprintf("... 还有 %d 个结果未显示（总共 %d 个）\n", 
+					len(results)-maxResults, len(results)))
+			}
+			
+			resultStr := resultBuffer.String()
+			log.Infof("grep results:\n%s", resultStr)
+			invoker.AddToTimeline("grep_success", fmt.Sprintf("Found %d matches", len(results)))
+			
+			// 返回结果给 AI
+			op.Feedback(resultStr)
+			op.Continue()
+		},
+	)
 }
-<|GEN_CODE_END_xxx|>
-
-**结果**：✅ 代码一次通过，没有错误！
+```
 
 ---
 
-### 示例2：遇到 API 错误后立即 grep
+## 步骤2：在 code.go 中注册新工具
 
-**场景**：修改代码后遇到错误
+### 修改文件：`code.go`
 
-**Linter 报错**：
-```
-Line 10: ExternLib [synscan] don't has [callback], maybe you meant excludePorts?
-```
+找到工具注册部分（约第 150 行附近），添加新工具的注册：
 
-**❌ 错误做法：继续猜测**
-```json
-{"@action": "modify_code",
- "modify_start_line": 10,
- "modify_end_line": 10,
- "human_readable_thought": "callback 不行，我试试 onCallback"}
-```
-*这会导致继续报错，浪费时间！*
-
-**✅ 正确做法：立即 grep**
-```json
-{"@action": "grep_yaklang_samples",
- "lib_names": ["synscan"],
- "regexp": ["synscan\\.\\w+"],
- "keywords": ["回调", "结果处理"],
- "human_readable_thought": "synscan.callback 不存在，Linter 提示可能是 excludePorts，但我不确定如何处理扫描结果。我需要 grep 搜索 synscan 的正确用法"}
-```
-
-**查看 grep 结果**：
-```
-找到结果：
-- synscan.Scan() 返回 channel 和 error
-- 使用 for result := range channel 接收结果
-- 没有 callback 选项，应该直接遍历 channel
-```
-
-**基于 grep 结果修改**：
-```json
-{"@action": "modify_code",
- "modify_start_line": 8,
- "modify_end_line": 12,
- "human_readable_thought": "根据 grep 结果，synscan.Scan 返回 channel，应该用 for-range 接收，而不是 callback"}
-```
-
-<|GEN_CODE_xxx|>
-synChan, err := synscan.Scan(target, ports)
-die(err)
-
-for result := range synChan {
-    yakit.Info("发现开放端口: %v", result.String())
+```go
+preset := []reactloops.ReActLoopOption{
+	reactloops.WithAllowRAG(true),
+	reactloops.WithAllowToolCall(true),
+	reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+		// ... 现有代码 ...
+	}),
+	reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+	reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
+	reactloops.WithAITagFieldWithAINodeId("GEN_CODE", "yak_code", "re-act-loop-answer-payload"),
+	reactloops.WithPersistentInstruction(instruction),
+	reactloops.WithReflectionOutputExample(outputExample),
+	reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
+		// ... 现有代码 ...
+	}),
+	queryDocumentAction(r, docSearcher),       // 保留原有工具
+	grepYaklangSamplesAction(r, docSearcher),  // 新增 grep 工具 ← 添加这一行
+	writeCode(r),
+	modifyCode(r),
+	insertCode(r),
+	deleteCode(r),
 }
-<|GEN_CODE_END_xxx|>
-
-**结果**：✅ 修改成功，一次通过！
-
----
-
-### 示例3：不确定函数名时 grep
-
-**场景**：需要字符串分割功能，但不确定函数名
-
-**❌ 错误做法：猜测**
-```json
-{"@action": "write_code",
- "human_readable_thought": "应该是 str.split 吧"}
-```
-*可能函数名不对*
-
-**✅ 正确做法：先 grep**
-```json
-{"@action": "grep_yaklang_samples",
- "lib_function_globs": ["*Split*", "str.*"],
- "keywords": ["字符串分割", "split"],
- "human_readable_thought": "我不确定 Yaklang 中字符串分割函数的准确名称，先 grep 搜索"}
-```
-
-**查看 grep 结果**：
-```
-找到：
-- str.Split(s, sep) - 分割字符串
-- str.SplitN(s, sep, n) - 分割 N 次
-- str.ParseStringToLines(s) - 按行分割
-```
-
-**基于结果编写**：
-```json
-{"@action": "write_code",
- "human_readable_thought": "根据 grep 结果，应该使用 str.Split(s, sep)"}
 ```
 
 ---
 
-## ❌ grep 反面教材 - 禁止的错误模式
+## 步骤3：Prompt 文件更新（已完成 ✅）
 
-### 反面教材1：不 grep 直接写
+以下 prompt 文件已更新完成：
 
-```json
-{"@action": "write_code",
- "human_readable_thought": "用户要端口扫描，我直接写"}
-```
-**问题**：没有先 grep 确认 API，可能写错
-
-### 反面教材2：报错后继续猜测
-
-**报错**: `ExternLib [poc] don't has [Get]`
-
-```json
-{"@action": "modify_code",
- "human_readable_thought": "Get 不行，试试 HTTPGet"}
-```
-**问题**：继续猜测而不是 grep 搜索
-
-### 反面教材3：连续多次 modify 没有 grep
-
-```
-第1次: modify_code → 报错
-第2次: modify_code → 报错
-第3次: modify_code → 报错
-```
-**问题**：陷入猜测循环，应该在第一次报错后立即 grep
+- ✅ `prompts/persistent_instruction.txt` - 添加了八荣八耻和 grep 使用指南
+- ✅ `prompts/reactive_data.txt` - 添加了强制 grep 规则和错误处理指导
+- ✅ `prompts/reflection_output_example.txt` - 添加了 grep 正确使用示例
 
 ---
 
-**记住：grep 一次，胜过猜测十次！**
+## 步骤4：测试验证
+
+### 测试用例1：基础 grep 功能
+
+**测试目标**：验证基本的 grep 搜索功能
+
+**用户输入**：
 ```
+帮我写一个端口扫描脚本
+```
+
+**期望 AI 行为**：
+1. 首先执行 `grep_yaklang_samples(pattern="servicescan\\.Scan|端口扫描", context_lines=20)`
+2. 基于搜索结果编写代码
+3. 使用正确的 API：`servicescan.Scan`, `servicescan.probeTimeout`, `servicescan.concurrent`
+
+**验证点**：
+- ✅ AI 在编写代码前先 grep
+- ✅ 使用的 API 与搜索结果一致
+- ✅ 代码一次通过，无语法错误
+
+---
+
+### 测试用例2：API 错误后 grep
+
+**测试目标**：验证遇到 API 错误后立即 grep
+
+**模拟场景**：
+```
+AI 写了: synscan.timeout(5)
+报错: ExternLib [synscan] don't has [timeout]
+```
+
+**期望 AI 行为**：
+1. 看到错误后立即执行 `grep_yaklang_samples(pattern="synscan\\.", context_lines=20)`
+2. 从搜索结果中发现 synscan 没有 timeout 选项
+3. 基于搜索结果修改为正确的实现
+
+**禁止行为**：
+- ❌ 连续猜测：synscan.setTimeout, synscan.withTimeout, ...
+- ❌ 不搜索就修改
+
+**验证点**：
+- ✅ 第一次错误后立即 grep
+- ✅ 不连续猜测
+- ✅ 基于搜索结果精确修改
+
+---
+
+### 测试用例3：语法错误后 grep
+
+**测试目标**：验证遇到语法错误后 grep 正确语法
+
+**模拟场景**：
+```
+AI 写了错误的错误处理语法
+报错: SyntaxError
+```
+
+**期望 AI 行为**：
+1. 立即执行 `grep_yaklang_samples(pattern="die\\(err\\)|err != nil", context_lines=10)`
+2. 学习正确的错误处理模式
+3. 修改为正确语法
 
 ---
 
 ## 实施检查清单
 
-完成以上修改后，请检查：
+### 代码修改
+- [ ] 创建 `action_grep_yaklang_samples.go` 文件
+- [ ] 在 `code.go` 中注册 `grepYaklangSamplesAction`
+- [ ] Prompt 文件已更新（✅ 已完成）
 
-### ✅ 文件修改清单
+### 功能测试
+- [ ] 测试基础 grep 功能
+- [ ] 测试 pattern 参数（关键词、正则、函数名）
+- [ ] 测试 case_sensitive 参数
+- [ ] 测试 context_lines 参数（5, 15, 30）
+- [ ] 测试 API 错误后自动 grep
+- [ ] 测试语法错误后自动 grep
 
-- [ ] `action_query_document.go` - 工具名改为 `grep_yaklang_samples`
-- [ ] `action_query_document.go` - 工具描述强调"搜索优先"
-- [ ] `action_query_document.go` - 参数名改为 `grep_payload`
-- [ ] `action_query_document.go` - 所有参数描述优化
-- [ ] `prompts/persistent_instruction.txt` - 开头添加八荣八耻
-- [ ] `prompts/persistent_instruction.txt` - 添加 grep 使用指南
-- [ ] `prompts/reactive_data.txt` - 错误提示部分添加强制 grep 规则
-- [ ] `prompts/reflection_output_example.txt` - 添加 grep 正确示例
-
-### ✅ 代码修改清单
-
-- [ ] 所有 `query_document` 引用改为 `grep_yaklang_samples`
-- [ ] 所有 `query_document_payload` 改为 `grep_payload`
-- [ ] 所有相关的 timeline 事件名称更新
-
-### ✅ 测试验证
-
-测试用例：要求 AI 写一个端口扫描脚本
-
-**期望行为**：
-1. AI 首先执行 `grep_yaklang_samples`
-2. 搜索 `servicescan` 相关样例
-3. 基于搜索结果编写代码
-4. 一次通过，无错误
-
-**如果出现问题**：
-- AI 直接写代码没有 grep → Prompt 需要更强调
-- AI 遇到错误继续猜测 → 错误提示需要更明确
+### 集成测试
+- [ ] 完整编写端口扫描脚本（从需求到成功）
+- [ ] API 错误修复流程（错误 → grep → 修改 → 成功）
+- [ ] 对比改进前后的迭代次数
 
 ---
 
 ## 预期改进效果
 
-### 改进前
+### 改进前（当前问题）
 ```
-用户请求 → AI 猜测写代码 → 报错 → 猜测修改 → 报错 → 再猜测 → ...
-平均迭代: 5-10 次
-成功率: 60%
+用户：帮我写个端口扫描脚本
+
+AI：我来写
+→ write_code: servicescan.Scan(target, ports, servicescan.timeout(5))
+→ 报错：ExternLib don't has [timeout]
+→ modify_code: servicescan.setTimeout(5)
+→ 报错：ExternLib don't has [setTimeout]  
+→ modify_code: servicescan.withTimeout(5)
+→ 报错：ExternLib don't has [withTimeout]
+... 循环多次才找到 probeTimeout
+
+平均迭代：5-10 次
+成功率：60%
 ```
 
-### 改进后
+### 改进后（预期效果）
 ```
-用户请求 → AI grep 搜索 → 基于样例写代码 → 成功
-平均迭代: 1-2 次  
-成功率: 95%+
+用户：帮我写个端口扫描脚本
+
+AI：我先搜索端口扫描的样例
+→ grep_yaklang_samples(pattern="servicescan\\.Scan|端口扫描", context_lines=20)
+→ 找到正确API：servicescan.Scan, servicescan.probeTimeout, servicescan.concurrent
+→ write_code: 基于搜索结果编写
+→ ✅ 成功！一次通过
+
+平均迭代：1-2 次
+成功率：95%+
 ```
+
+---
+
+## 关键参数说明
+
+### pattern 参数设计考虑
+
+**为什么支持多种格式？**
+- 关键词：适合AI不知道精确函数名时
+- 正则：适合搜索某个库的所有函数
+- 函数名：适合验证特定函数用法
+
+**示例**：
+```
+pattern="servicescan\\.Scan"           // 精确搜索
+pattern="servicescan\\."               // 搜索所有 servicescan 函数
+pattern="端口扫描|port.*scan"          // 中英文组合
+pattern="die\\(err\\)|err != nil"     // 错误处理模式
+```
+
+### context_lines 默认值为什么是 15？
+
+经过分析真实代码库，15 行能覆盖：
+- 函数定义前的注释（1-3行）
+- 函数签名（1行）
+- 函数体主要逻辑（5-10行）
+- 函数调用示例（2-5行）
+
+**调整建议**：
+- 快速查看调用：5-10 行
+- 理解用法（默认）：15-20 行
+- 学习实现：25-35 行
+- 复杂研究：40-50 行
+
+### case_sensitive 默认为 false 的原因
+
+Yaklang 中：
+- 库名通常小写：`servicescan`, `str`, `poc`
+- 函数名可能大小写混合：`HTTPEx`, `AutoInitYakit`
+- 关键词可能中英文混合
+
+默认不区分大小写，能匹配更多结果，提高搜索成功率。
 
 ---
 
 ## 快速参考
 
-### 核心改动
-1. 工具名：`query_document` → `grep_yaklang_samples`
-2. 核心理念：查询文档 → grep 代码样例
-3. 行为准则：八荣八耻 + 搜索优先
+### 新增文件
+```
+action_grep_yaklang_samples.go  // 新增的 grep 工具
+```
 
-### 关键文件
-- `action_query_document.go` - 工具定义
-- `prompts/persistent_instruction.txt` - 持久指令
-- `prompts/reactive_data.txt` - 响应式数据（错误处理）
-- `prompts/reflection_output_example.txt` - 示例
+### 修改文件
+```
+code.go                         // 注册新工具
+prompts/persistent_instruction.txt   // ✅ 已完成
+prompts/reactive_data.txt           // ✅ 已完成  
+prompts/reflection_output_example.txt // ✅ 已完成
+```
+
+### 核心改动
+```
+新增工具：grep_yaklang_samples
+参数：pattern (必需), case_sensitive (可选), context_lines (可选)
+定位：快速 grep 代码样例，优先使用
+与 query_document 关系：并存，各司其职
+```
 
 ---
 
-**一句话总结**：把"查询文档"改成"grep 代码样例"，让 AI 像 Unix 程序员一样先 grep 再写代码！
-
+**一句话总结**：新增 `grep_yaklang_samples` 专门工具，让 AI 像 Unix 程序员一样先 grep 代码样例再编写！

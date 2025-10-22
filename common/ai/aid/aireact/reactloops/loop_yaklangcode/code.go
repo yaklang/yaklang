@@ -3,10 +3,11 @@ package loop_yaklangcode
 import (
 	"bytes"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -152,6 +153,7 @@ func init() {
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				queryDocumentAction(r, docSearcher),
+				grepYaklangSamplesAction(r, docSearcher), // 新增：快速 grep 代码样例
 				writeCode(r),
 				modifyCode(r),
 				insertCode(r),

@@ -52,23 +52,66 @@ if err != nil {
 defer reader.Close()
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-### **示例: `query_document` 动作（当 API 不存在时）**
+### ✅ **示例 3: `grep_yaklang_samples` 动作（当 API 不存在时）- 推荐！**
 
-**场景**: 上一步 `modify_code` 尝试使用 `synscan.timeout(3)`，但收到 `lint error: ExternLib [synscan] don't has [timeout], maybe you meant rateLimit?`。
-
-```json
-{"@action": "query_document", "human_readable_thought": "Linter报错说 synscan 没有 timeout 方法，并提示了 rateLimit。我需要查询 synscan 和 synscan.rateLimit 的正确用法，以了解如何设置超时或速率。", "keywords": ["synscan.Scan", "synscan.rateLimit", "端口扫描"], "case_sensitive": false}
-```
-**这是正确的做法！** AI 识别出 API 错误，并根据 Linter 的提示，**精确地查询**相关模块和函数文档，而不是盲目猜测下一个方法名。**注意：`query_document` 动作不需要 `<|GEN_CODE...|>` 代码块。**
-
-### **示例 4: `query_document` 动作（当遇到语法错误时）**
-
-**场景**: AI 尝试编写 `if err != nil { ... }`，但反复收到 `SyntaxError`。
+**场景**: 上一步 `modify_code` 尝试使用 `synscan.timeout(3)`，但收到 `lint error: ExternLib [synscan] don't has [timeout]`。
 
 ```json
-{"@action": "query_document", "human_readable_thought": "我反复遇到语法错误，不确定Yaklang中正确的错误处理方式。我将使用关键词和正则表达式来搜索 'die(err)' 和 '~' 操作符的用法示例。", "keywords": ["error handling", "错误处理", "die"], "regexp": ["die\\(err\\)", "~\s*$"]}
+{"@action": "grep_yaklang_samples", 
+ "pattern": "synscan\\.",
+ "context_lines": 20,
+ "human_readable_thought": "Linter 报错说 synscan 没有 timeout 方法。我需要立即 grep 搜索 synscan 库的所有可用函数，而不是猜测其他名称"}
 ```
-**这也是正确的做法！** AI 认识到自己对基础语法不熟，于是结合**关键词（概念）**和**正则表达式（具体模式）**来查找权威的示例代码，从而学习正确的语法范式。
+
+**这是最佳做法！** 使用 `grep_yaklang_samples` 直接搜索代码样例，快速找到真实可用的 API。搜索结果会显示：
+```
+找到结果：
+- synscan.Scan(target, ports, ...opts)
+- synscan.concurrent(n) - 并发数
+- synscan.excludeHosts(hosts) - 排除主机
+- 没有 timeout 选项，使用 servicescan.probeTimeout 来设置超时
+```
+
+**注意：`grep_yaklang_samples` 动作不需要 `<|GEN_CODE...|>` 代码块。**
+
+---
+
+### **备选示例: `query_document` 动作（更全面的文档查询）**
+
+**场景**: 同样是 synscan API 错误，但需要更详细的文档说明。
+
+```json
+{"@action": "query_document", 
+ "human_readable_thought": "我需要查询 synscan 库的完整文档，了解所有可用选项", 
+ "lib_names": ["synscan"],
+ "case_sensitive": false}
+```
+
+**区别说明：**
+- `grep_yaklang_samples` - 快速搜索代码样例，直接看用法（推荐优先使用）
+- `query_document` - 查询完整文档，了解详细说明（需要更全面了解时使用）
+
+---
+
+### ✅ **示例 4: `grep_yaklang_samples` 动作（当遇到语法错误时）**
+
+**场景**: AI 尝试编写错误处理，但反复收到 `SyntaxError`。
+
+```json
+{"@action": "grep_yaklang_samples",
+ "pattern": "die\\(err\\)|err != nil",
+ "context_lines": 10,
+ "human_readable_thought": "我遇到语法错误，需要立即 grep 搜索 Yaklang 中正确的错误处理模式，而不是继续猜测"}
+```
+
+**这是正确的做法！** 直接搜索真实代码中的错误处理模式，学习正确的语法。搜索结果会显示：
+```
+找到多个错误处理示例：
+1. die(err) - 致命错误直接退出
+2. if err != nil { yakit.Error(...); return }
+3. result := someFunc()~ - 忽略错误（谨慎使用）
+4. try { ... } catch e { ... }
+```
 ---
 
 ### **示例5: `rag_search_payload` 动作（当编写代码有疑问的时候）**
@@ -91,15 +134,115 @@ defer reader.Close()
 <|GEN_CODE_END_{{ .Nonce }}|>
 ️ 这种格式是错误的！包含行号会导致语法解析失败！
 
-### **错误示例 3: 收到 API 错误后仍盲目修改**
+### ✅ **示例 5: grep_yaklang_samples 完整工作流**
 
-**场景**: 与正确示例3相同，收到 `lint error: ExternLib [synscan] don't has [timeout]`。
+**场景**: 用户要求编写端口扫描脚本，AI 需要完整实现。
 
+**步骤1：需求分析后立即 grep**
 ```json
-{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7, "modify_code_reason": "timeout 不对，我试试 set_timeout"}
+{"@action": "grep_yaklang_samples",
+ "pattern": "servicescan\\.Scan|端口扫描",
+ "context_lines": 25,
+ "human_readable_thought": "用户需要端口扫描功能，我先 grep 搜索真实的端口扫描示例，了解正确的 API 用法"}
+```
+
+**步骤2：基于 grep 结果编写代码**
+```json
+{"@action": "write_code",
+ "human_readable_thought": "根据 grep 结果，我知道了 servicescan.Scan 的正确用法：target, ports, 加上选项如 concurrent, probeTimeout, onOpen"}
 ```
 
 <|GEN_CODE_{{ .Nonce }}|>
-err, results = synscan.Scan(target, ports, synscan.set_timeout(3))
+yakit.AutoInitYakit()
+
+target := cli.String("target", cli.setRequired(true))
+ports := cli.String("ports", cli.setDefault("80,443,8080"))
+cli.check()
+
+results, err := servicescan.Scan(
+    target,
+    ports,
+    servicescan.concurrent(50),
+    servicescan.probeTimeout(5),
+    servicescan.onOpen(result => {
+        yakit.Info("发现开放端口: %v", result.String())
+    }),
+)
+die(err)
+
+for result in results {
+    yakit.Info("扫描结果: %v", result.String())
+}
 <|GEN_CODE_END_{{ .Nonce }}|>
-**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `query_document` 来学习，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**
+
+**结果**: ✅ 代码一次成功，没有任何错误！
+
+---
+
+### ❌ **错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止！）**
+
+**场景**: 收到 `lint error: ExternLib [synscan] don't has [timeout]`。
+
+**错误做法 - 连续猜测（这会导致失败循环）：**
+```json
+// 第1次尝试
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7, 
+ "modify_code_reason": "timeout 不对，我试试 set_timeout"}
+```
+→ 报错：`ExternLib [synscan] don't has [set_timeout]`
+
+```json
+// 第2次尝试  
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7,
+ "modify_code_reason": "set_timeout 也不对，试试 withTimeout"}
+```
+→ 报错：`ExternLib [synscan] don't has [withTimeout]`
+
+```json
+// 第3次尝试
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7,
+ "modify_code_reason": "withTimeout 还不对，试试 setTimeout"}
+```
+→ 报错：`ExternLib [synscan] don't has [setTimeout]`
+
+**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `grep_yaklang_samples` 或 `query_document` 来搜索真实 API，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**
+
+---
+
+### ✅ **正确做法 - 第一次错误后立即 grep：**
+
+```json
+// 第1次尝试
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7}
+```
+→ 报错：`ExternLib [synscan] don't has [timeout]`
+
+```json
+// 立即 grep 搜索，不要猜测！
+{"@action": "grep_yaklang_samples",
+ "pattern": "synscan\\.",
+ "context_lines": 20,
+ "human_readable_thought": "synscan.timeout 不存在，我立即 grep 搜索 synscan 库的真实可用函数"}
+```
+→ 找到：synscan.Scan 没有 timeout 选项，返回 channel，使用 servicescan.probeTimeout 设置超时
+
+```json
+// 基于搜索结果精确修改
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 10,
+ "modify_code_reason": "根据 grep 结果，synscan 不支持 timeout，改用正确的实现"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+// synscan 返回 channel，没有 timeout 选项
+synChan, err := synscan.Scan(target, ports)
+die(err)
+for result := range synChan {
+    yakit.Info("发现: %v", result.String())
+}
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+**结果**: ✅ 修改成功，一次通过！
+
+**对比总结：**
+- ❌ 连续猜测：浪费 3+ 次尝试，仍然失败
+- ✅ 立即 grep：1 次搜索 + 1 次精确修改 = 成功

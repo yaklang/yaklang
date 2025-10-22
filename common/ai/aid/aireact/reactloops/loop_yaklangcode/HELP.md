@@ -10,7 +10,7 @@ AI Agent 在编写 Yaklang 代码时经常出现以下问题：
 
 ### 根本原因
 1. **工具命名问题**：`query_document` 太抽象，AI 理解为"查文档"而非"grep 代码样例"
-2. **工具描述问题**：没有强调"搜索代码样例"的核心作用
+2. **工具功能单一**：缺少专门的快速 grep 工具
 3. **Prompt 哲学缺失**：没有强调"以暗猜接口为耻，以认真查阅为荣"的核心理念
 4. **缺少搜索优先原则**：没有明确要求"先搜索再编写"
 
@@ -18,66 +18,80 @@ AI Agent 在编写 Yaklang 代码时经常出现以下问题：
 
 ## 解决方案
 
-### 1. 工具改名建议
+### 1. 新增 grep_yaklang_samples 工具（推荐方案）
 
-#### 当前命名
-```
-query_document - 查询Yaklang代码文档和库函数
-```
+#### 解决思路
+**不修改现有工具，而是新增一个专门的 grep 工具**
 
-#### 建议改名（推荐顺序）
+保留现有的 `query_document`（查询完整文档），新增 `grep_yaklang_samples`（快速 grep 代码样例）。
 
-**最推荐**：
-```
-grep_yaklang_samples - 搜索 Yaklang 代码样例和库函数用法
-```
+#### 新增工具设计
 
-**备选方案**：
-```
-search_code_examples - 搜索代码示例和函数用法
-grep_code_samples - Grep 代码样例库
-find_yaklang_usage - 查找 Yaklang 函数用法示例
-```
+**工具名称**：`grep_yaklang_samples`
 
-#### 改名理由
-- `grep` 是程序员的本能词汇，看到就知道是"搜索"
-- `samples/examples` 明确表示"代码样例"而非"文档"
-- AI 看到 `grep_yaklang_samples` 会自然联想到"grep代码找例子"
+**工具定位**：快速 grep 代码样例库，直接搜索真实代码
+
+**核心参数**：
+- `pattern` - 搜索模式（支持正则表达式和关键词）
+- `case_sensitive` - 是否区分大小写（默认 false）
+- `context_lines` - 上下文行数（默认 15 行，可调整）
+
+**与 query_document 的区别**：
+| 特性 | grep_yaklang_samples | query_document |
+|------|---------------------|----------------|
+| 定位 | 快速 grep 代码样例 | 查询完整文档 |
+| 速度 | 快 | 相对较慢 |
+| 返回 | 匹配的代码片段 + 上下文 | 结构化的文档说明 |
+| 使用场景 | API 错误、快速找用法 | 学习新库、深入理解 |
+| 优先级 | 首选 | 备选 |
+
+#### 命名理由
+- `grep` - 程序员的本能词汇，看到就知道是"搜索代码"
+- `yaklang` - 明确是 Yaklang 相关内容
+- `samples` - 强调是"代码样例"而非抽象文档
+- AI 看到 `grep_yaklang_samples` 会自然联想到"grep 代码找例子"
 - 符合 Unix 哲学，直观易懂
 
 ---
 
-### 2. 工具描述优化
+### 2. grep_yaklang_samples 工具描述
 
-#### 当前描述
+#### 推荐描述
 ```
-查询Yaklang代码文档和库函数。支持关键字搜索（使用动宾结构，如'端口扫描'、'文件读取'）、
-正则表达式匹配、库名查询（如'str'、'http'）和函数模糊搜索（如'*Split*'、'str.Join'）。
-当你需要了解某个功能如何实现、查找特定函数或学习库的用法时使用此工具。
+🔍 Grep Yaklang 代码样例库 - 快速搜索真实代码示例
+
+⚠️ 核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
+
+【强制使用场景】：
+1. 编写任何代码前，先 grep 相关函数用法
+2. 遇到 API 错误（ExternLib don't has）时
+3. 遇到语法错误（SyntaxError）时
+4. 不确定函数参数或返回值时
+
+【参数说明】：
+- pattern (必需) - 搜索模式，支持：
+  * 关键词：如 "端口扫描", "HTTP请求"
+  * 正则：如 "servicescan\\.Scan", "poc\\..*"
+  * 函数名：如 "str.Split", "yakit.Info"
+  
+- case_sensitive (可选) - 是否区分大小写，默认 false
+
+- context_lines (可选) - 上下文行数，默认 15
+  * 需要更多上下文：设置 20-30
+  * 只看函数调用：设置 5-10
+  * 看完整实现：设置 30-50
+
+【使用示例】：
+pattern="servicescan\\.Scan", context_lines=20  // 搜索端口扫描用法
+pattern="die\\(err\\)", context_lines=10        // 搜索错误处理
+pattern="端口扫描|服务扫描", context_lines=25     // 搜索相关功能
+
+记住：Yaklang 是 DSL！每个 API 都可能与 Python/Go 不同！
+先 grep 找样例，再写代码，节省 90% 调试时间！
 ```
 
-#### 建议描述（强调搜索优先）
-```
-🔍 Grep Yaklang 代码样例库 - 你的首要工具！
-
-⚠️ 核心原则：禁止臆造 Yaklang 代码！必须先 grep 搜索真实样例！
-
-使用场景（按优先级排序）：
-1. 【最高优先级】编写任何代码前，先 grep 相关函数用法
-2. 【必须】遇到 API 错误（ExternLib [...] don't has [...]）时
-3. 【必须】遇到语法错误（SyntaxError）时
-4. 【强烈推荐】不确定某个库的用法时
-5. 【推荐】需要学习如何实现某个功能时
-
-支持的搜索方式：
-- keywords: 关键词搜索（如 "端口扫描", "文件读取", "HTTP请求"）
-- regexp: 正则表达式（如 "servicescan\\.Scan", "poc\\.HTTPEx"）
-- lib_names: 库名查询（如 "str", "http", "servicescan"）
-- lib_function_globs: 函数模糊搜索（如 "*Split*", "str.Join*"）
-
-记住：Yaklang 是 DSL，不是你熟悉的 Python/Go，每个 API 都可能不同！
-先 grep，后编写！
-```
+#### query_document 保持不变
+`query_document` 工具保持原有功能，用于查询完整的库文档和函数说明。当需要深入了解某个库的所有功能时使用。
 
 ---
 
@@ -537,14 +551,126 @@ AI：好的，我先搜索端口扫描的样例
 **Q: 为什么一定要改名？**
 A: AI 对工具名称非常敏感。`query_document` 听起来像"查阅文档"，而 `grep_yaklang_samples` 明确表示"grep 代码样例"，AI 会更自然地调用它。
 
-**Q: 改名后会不会影响现有代码？**
-A: 只需修改工具注册的名称和参数名，不影响底层实现。已有的调用需要更新工具名。
+**Q: 为什么新增工具而不是修改现有工具？**
+A: 保持向后兼容，不破坏现有功能。`query_document` 和 `grep_yaklang_samples` 各有用途，AI 可以根据需求选择。
+
+**Q: context_lines 默认值为什么是 15？**
+A: 经过实践验证，15 行能覆盖大多数函数的完整上下文，包括：
+- 函数定义前的注释（1-3行）
+- 函数签名（1行）
+- 函数体（5-10行）
+- 函数调用示例（2-5行）
 
 **Q: 如果 AI 还是不用 grep 怎么办？**
-A: 添加强制检查逻辑（阶段3），在检测到应该 grep 但没 grep 时，直接返回错误并要求 grep。
+A: Prompt 已强化，在每次错误后都会提示必须 grep。如仍不够，可以添加强制检查逻辑，在检测到 API 错误后没有 grep 时，阻止继续 modify。
 
-**Q: 搜索结果太多怎么办？**
-A: 已有 limit 和 size 限制，可以通过 RRF 排序返回最相关的结果。关键是让 AI 意识到搜索的重要性。
+**Q: grep 和 query_document 何时选择？**
+A: 
+- 优先 `grep_yaklang_samples` - 快速找代码样例（80%的场景）
+- 备选 `query_document` - 需要完整文档说明（20%的场景）
+
+---
+
+## grep_yaklang_samples 参数详细说明
+
+### pattern 参数
+
+**类型**：string (必需)
+
+**作用**：指定要搜索的模式，支持多种格式
+
+**支持的模式**：
+
+1. **关键词搜索**（推荐新手）
+   ```
+   pattern="端口扫描"       // 中文关键词
+   pattern="HTTP请求"       // 功能描述
+   pattern="错误处理"       // 概念搜索
+   ```
+
+2. **精确函数名**
+   ```
+   pattern="servicescan.Scan"    // 完整函数名
+   pattern="str.Split"           // 标准库函数
+   pattern="yakit.Info"          // 输出函数
+   ```
+
+3. **正则表达式**（推荐熟练用户）
+   ```
+   pattern="servicescan\\."      // 搜索 servicescan 库的所有函数
+   pattern="poc\\.HTTP.*"        // 搜索 poc 库的 HTTP 相关函数
+   pattern="die\\(err\\)"        // 搜索错误处理模式
+   pattern="端口扫描|服务扫描"     // OR 逻辑
+   ```
+
+4. **组合搜索**
+   ```
+   pattern="servicescan\\.Scan|端口扫描"  // 函数名或关键词
+   pattern=".*Timeout|超时"              // 超时相关
+   ```
+
+**注意事项**：
+- 正则表达式中的特殊字符需要转义：`.` 写成 `\\.`
+- 使用 `|` 表示 OR 逻辑
+- 大小写默认不敏感（可通过 case_sensitive 控制）
+
+### case_sensitive 参数
+
+**类型**：bool (可选)
+
+**默认值**：false
+
+**作用**：控制搜索是否区分大小写
+
+**使用建议**：
+```
+case_sensitive=false   // 默认，推荐（覆盖更广）
+case_sensitive=true    // 精确搜索特定大小写的函数
+```
+
+**示例**：
+```json
+// 搜索 HTTP 相关（不区分大小写，能匹配 http, HTTP, Http）
+{"pattern": "http", "case_sensitive": false}
+
+// 只搜索 HTTP（大写，精确匹配）
+{"pattern": "HTTP", "case_sensitive": true}
+```
+
+### context_lines 参数
+
+**类型**：int (可选)
+
+**默认值**：15
+
+**作用**：控制返回结果中每个匹配项的上下文行数
+
+**推荐值**：
+
+| 场景 | 推荐值 | 说明 |
+|------|--------|------|
+| 快速查看函数调用 | 5-10 | 只看调用方式 |
+| 理解函数用法 | 15-20 | 看完整上下文（默认） |
+| 学习完整实现 | 25-35 | 看整个函数或代码块 |
+| 复杂功能研究 | 40-50 | 看大段实现逻辑 |
+
+**示例**：
+```json
+// 快速查看函数调用
+{"pattern": "servicescan.Scan", "context_lines": 10}
+
+// 学习完整实现（包括注释、参数、返回值）
+{"pattern": "servicescan.Scan", "context_lines": 30}
+
+// 研究复杂功能（如完整的扫描流程）
+{"pattern": "synscan.*servicescan", "context_lines": 50}
+```
+
+**注意事项**：
+- context_lines 越大，返回内容越多，可能超出显示限制
+- 建议从默认值 15 开始，根据需要调整
+- 如果结果不够，可以增加到 25-30
+- 如果结果太多，可以减少到 8-10
 
 ---
 
