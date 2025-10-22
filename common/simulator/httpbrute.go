@@ -36,8 +36,10 @@ type HttpBruteForceCore struct {
 	CaptchaImgSelector  string
 	LoginButtonSelector string
 
-	compiler *regexp.Regexp
-	observer bool
+	compiler         *regexp.Regexp
+	observer         bool
+	successMatchers  []string
+	lastObserverInfo string
 }
 
 func NewHttpBruteForceCore(targetUrl string, opts ...BruteConfigOpt) (*HttpBruteForceCore, error) {
@@ -57,6 +59,8 @@ func NewHttpBruteForceCore(targetUrl string, opts ...BruteConfigOpt) (*HttpBrute
 		CaptchaSelector:     config.captchaSelector,
 		CaptchaImgSelector:  config.captchaImgSelector,
 		LoginButtonSelector: config.loginButtonSelector,
+
+		successMatchers: config.successMatchers,
 
 		observer: true,
 	}
@@ -109,6 +113,7 @@ func (bruteForce *HttpBruteForceCore) init() (err error) {
 	loginDetectMap := map[loginDetectMode]func() (bool, error){
 		UrlChangeMode:     bruteForce.loginDetectByUrl,
 		HtmlChangeMode:    bruteForce.loginDetectByHTML,
+		StringMatchMode:   bruteForce.loginDetectByString,
 		DefaultChangeMode: bruteForce.loginDetect,
 	}
 	if fn, ok := loginDetectMap[bruteForce.config.loginDetect]; ok {
@@ -453,6 +458,7 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
 	}
 	var objStr string
+	bruteForce.lastObserverInfo = ""
 	if bruteForce.observer {
 		obj, err := bruteForce.page.Eval(getObverserResult)
 		if err != nil {
@@ -470,25 +476,49 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 		password:  password,
 		bruteInfo: objStr,
 	}
+	bruteForce.lastObserverInfo = objStr
 	status, err := bruteForce.loginDetectFunc()
 	if err != nil {
 		return false, utils.Error(err)
 	}
 	if status {
-		time.Sleep(time.Second)
-		b64, _ := ScreenShot(bruteForce.page)
-		result.b64 = b64
-		result.status = true
-		info, err := bruteForce.page.Info()
-		if err == nil {
-			result.loginSuccessUrl = info.URL
-		}
+		bruteForce.fillSuccessResult(&result)
 		bruteForce.resultChannel <- &result
 		return true, nil
 	}
 	result.status = false
 	bruteForce.resultChannel <- &result
 	return false, nil
+}
+
+func (bruteForce *HttpBruteForceCore) loginDetectByString() (bool, error) {
+	if len(bruteForce.successMatchers) == 0 {
+		return false, nil
+	}
+	texts := []string{bruteForce.lastObserverInfo}
+	if html, err := bruteForce.page.HTML(); err == nil {
+		texts = append(texts, html)
+	} else {
+		log.Errorf(`get page html error: %v`, err)
+	}
+	for _, matcher := range bruteForce.successMatchers {
+		for _, text := range texts {
+			if text != "" && strings.Contains(text, matcher) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func (bruteForce *HttpBruteForceCore) fillSuccessResult(result *BruteResult) {
+	time.Sleep(time.Second)
+	b64, _ := ScreenShot(bruteForce.page)
+	result.b64 = b64
+	result.status = true
+	if info, err := bruteForce.page.Info(); err == nil {
+		result.loginSuccessUrl = info.URL
+	}
 }
 
 func (bruteForce *HttpBruteForceCore) loginDetectByUrl() (bool, error) {
@@ -517,7 +547,14 @@ func (bruteForce *HttpBruteForceCore) loginDetectByHTML() (bool, error) {
 }
 
 func (bruteForce *HttpBruteForceCore) loginDetect() (bool, error) {
-	status, err := bruteForce.loginDetectByUrl()
+	status, err := bruteForce.loginDetectByString()
+	if err != nil {
+		return status, utils.Errorf(`login string detect error: %v`, err.Error())
+	}
+	if status {
+		return true, nil
+	}
+	status, err = bruteForce.loginDetectByUrl()
 	if err != nil {
 		return status, utils.Errorf(`login url detect error: %v`, err.Error())
 	}

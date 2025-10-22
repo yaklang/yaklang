@@ -4,9 +4,10 @@ package simulator
 
 import (
 	"encoding/json"
+	"net/url"
+
 	"github.com/yaklang/yaklang/common/crawlerx/preaction"
 	"github.com/yaklang/yaklang/common/log"
-	"net/url"
 )
 
 type LeaklessMode int
@@ -27,6 +28,8 @@ const (
 	UrlChangeMode loginDetectMode = 0
 	// simulator.htmlChangeMode 页面内容变化检测登录
 	HtmlChangeMode loginDetectMode = 1
+	// simulator.stringMatchMode 字符串匹配检测登录
+	StringMatchMode loginDetectMode = 2
 	// simulator.defaultChangeMode 综合变化检测登录
 	DefaultChangeMode loginDetectMode = -1
 )
@@ -135,6 +138,7 @@ type BruteConfig struct {
 	leakless          LeaklessMode
 	extraWaitLoadTime int
 	similarityDegree  float64
+	successMatchers   []string
 
 	saveToDB   bool
 	sourceType string
@@ -384,6 +388,7 @@ func WithResultChannel(ch chan Result) BruteConfigOpt {
 // 其中simulator.htmlChangeMode 表示检测html变化程度 超过一定数字则认为发生登录跳转
 // simulator.urlChangeMode 表示检测url变化 如果url发生变化则认为登录成功
 // simulator.defaultChangeMode 表示同时使用以上两种策略
+// simulator.stringMatchMode 表示使用页面内容或变动中的字符串匹配结果判断登录
 // 第二个参数表示检测html变化程度的比例，超过该比例则认为发生变化 默认为0.6
 //
 // Example:
@@ -430,6 +435,20 @@ func WithLeakless(leakless LeaklessMode) BruteConfigOpt {
 func WithExtraWaitLoadTime(time int) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.extraWaitLoadTime = time
+	}
+}
+
+// successMatchers 是一个请求选项 用于在页面变化中匹配指定字符串来判断登录成功
+//
+// Example:
+// ```
+//
+//	ch, err = simulator.HttpBruteForce("http://127.0.0.1:8080/", simulator.successMatchers("login success"))
+//
+// ```
+func WithSuccessMatchers(matchers ...string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.successMatchers = append(config.successMatchers, matchers...)
 	}
 }
 
