@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"io"
 	"strings"
 	"sync"
@@ -310,13 +311,15 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	}
 
 	// 生成压缩提示
-	prompt := m.renderBatchCompressPrompt(itemsToCompress)
+	nonceStr := utils.RandStringBytes(4)
+	prompt := m.renderBatchCompressPrompt(itemsToCompress, nonceStr)
 	if prompt == "" {
 		return
 	}
 
 	// 调用 AI 进行批量压缩
 	var action *Action
+	var cumulativeSummary string
 	err := CallAITransaction(m.config, prompt, m.ai.CallAI, func(response *AIResponse) error {
 		var err error
 		response, err = m.ai.CallAI(NewAIRequest(prompt))
@@ -331,6 +334,23 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 		} else {
 			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
 		}
+
+		wg := new(sync.WaitGroup)
+
+		wg.Add(1)
+		r = utils.CreateUTF8StreamMirror(r, func(content io.Reader) {
+			defer func() {
+				wg.Done()
+			}()
+			aitag.Parse(content, aitag.WithCallback("REDUCER_MEMORY", nonceStr, func(mem io.Reader) {
+				var buf bytes.Buffer
+				io.Copy(io.Discard, io.TeeReader(mem, &buf)) // drain to EOF
+				cumulativeSummary = buf.String()
+			}))
+			// reader aitag
+
+		})
+		wg.Wait()
 
 		action, err = ExtractActionFromStreamWithJSONExtractOptions(
 			r, "timeline-reducer", []string{},
@@ -350,7 +370,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			return utils.Errorf("extract timeline context-shrink action failed: %v", err)
 		}
 		result := action.GetString("reducer_memory")
-		if result == "" {
+		if result == "" && cumulativeSummary == "" {
 			log.Warnf("batch compress got empty reducer memory")
 			return utils.Error("context-shrink got empty reducer memory")
 		}
@@ -362,6 +382,11 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	}
 
 	compressedMemory := action.GetString("reducer_memory")
+	if compressedMemory == "" {
+		compressedMemory = cumulativeSummary
+	} else {
+		compressedMemory += "\n" + cumulativeSummary
+	}
 	if compressedMemory == "" {
 		log.Warnf("batch compress got empty compressed memory")
 		return
@@ -547,7 +572,7 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 //go:embed prompts/timeline/batch_compress.txt
 var timelineBatchCompress string
 
-func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem) string {
+func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem, nonceStr string) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -559,7 +584,10 @@ func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem) string {
 	}
 
 	var buf bytes.Buffer
-	var nonce = utils.RandStringBytes(6)
+	var nonce = nonceStr
+	if nonce == "" {
+		nonce = utils.RandStringBytes(6)
+	}
 
 	// 构建要压缩的 items 字符串
 	var itemsStr strings.Builder
