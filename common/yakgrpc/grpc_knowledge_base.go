@@ -115,6 +115,31 @@ func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowled
 	}, nil
 }
 
+func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowledgeBaseV2Request) (*ypb.CreateKnowledgeBaseV2Response, error) {
+	db := consts.GetGormProfileDatabase()
+	kb, err := knowledgebase.CreateKnowledgeBase(db, req.GetName(), req.GetDescription(), req.GetType())
+	if err != nil {
+		return nil, utils.Errorf("创建知识库失败: %v", err)
+	}
+
+	var kbInfo schema.KnowledgeBaseInfo
+	err = db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", kb.GetID()).First(&kbInfo).Error
+	if err != nil {
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
+	}
+	return &ypb.CreateKnowledgeBaseV2Response{
+		KnowledgeBase: &ypb.KnowledgeBaseInfo{
+			ID:                       int64(kbInfo.ID),
+			KnowledgeBaseName:        kbInfo.KnowledgeBaseName,
+			KnowledgeBaseDescription: kbInfo.KnowledgeBaseDescription,
+			KnowledgeBaseType:        kbInfo.KnowledgeBaseType,
+		},
+		IsSuccess:   true,
+		Message:     "创建知识库成功",
+		MessageType: "info",
+	}, nil
+}
+
 func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
 

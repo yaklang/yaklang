@@ -560,6 +560,7 @@ const (
 	Yak_GetKnowledgeBaseTypeList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseTypeList"
 	Yak_DeleteKnowledgeBase_FullMethodName                        = "/ypb.Yak/DeleteKnowledgeBase"
 	Yak_CreateKnowledgeBase_FullMethodName                        = "/ypb.Yak/CreateKnowledgeBase"
+	Yak_CreateKnowledgeBaseV2_FullMethodName                      = "/ypb.Yak/CreateKnowledgeBaseV2"
 	Yak_UpdateKnowledgeBase_FullMethodName                        = "/ypb.Yak/UpdateKnowledgeBase"
 	Yak_DeleteKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/DeleteKnowledgeBaseEntry"
 	Yak_CreateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/CreateKnowledgeBaseEntry"
@@ -1274,6 +1275,7 @@ type YakClient interface {
 	GetKnowledgeBaseTypeList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseTypeListResponse, error)
 	DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	CreateKnowledgeBaseV2(ctx context.Context, in *CreateKnowledgeBaseV2Request, opts ...grpc.CallOption) (*CreateKnowledgeBaseV2Response, error)
 	UpdateKnowledgeBase(ctx context.Context, in *UpdateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	DeleteKnowledgeBaseEntry(ctx context.Context, in *DeleteKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	CreateKnowledgeBaseEntry(ctx context.Context, in *CreateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
@@ -7531,6 +7533,16 @@ func (c *yakClient) CreateKnowledgeBase(ctx context.Context, in *CreateKnowledge
 	return out, nil
 }
 
+func (c *yakClient) CreateKnowledgeBaseV2(ctx context.Context, in *CreateKnowledgeBaseV2Request, opts ...grpc.CallOption) (*CreateKnowledgeBaseV2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateKnowledgeBaseV2Response)
+	err := c.cc.Invoke(ctx, Yak_CreateKnowledgeBaseV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) UpdateKnowledgeBase(ctx context.Context, in *UpdateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GeneralResponse)
@@ -8468,6 +8480,7 @@ type YakServer interface {
 	GetKnowledgeBaseTypeList(context.Context, *Empty) (*GetKnowledgeBaseTypeListResponse, error)
 	DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error)
 	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error)
+	CreateKnowledgeBaseV2(context.Context, *CreateKnowledgeBaseV2Request) (*CreateKnowledgeBaseV2Response, error)
 	UpdateKnowledgeBase(context.Context, *UpdateKnowledgeBaseRequest) (*GeneralResponse, error)
 	DeleteKnowledgeBaseEntry(context.Context, *DeleteKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	CreateKnowledgeBaseEntry(context.Context, *CreateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
@@ -10124,6 +10137,9 @@ func (UnimplementedYakServer) DeleteKnowledgeBase(context.Context, *DeleteKnowle
 }
 func (UnimplementedYakServer) CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) CreateKnowledgeBaseV2(context.Context, *CreateKnowledgeBaseV2Request) (*CreateKnowledgeBaseV2Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBaseV2 not implemented")
 }
 func (UnimplementedYakServer) UpdateKnowledgeBase(context.Context, *UpdateKnowledgeBaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateKnowledgeBase not implemented")
@@ -19176,6 +19192,24 @@ func _Yak_CreateKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateKnowledgeBaseV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateKnowledgeBaseV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateKnowledgeBaseV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateKnowledgeBaseV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateKnowledgeBaseV2(ctx, req.(*CreateKnowledgeBaseV2Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_UpdateKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateKnowledgeBaseRequest)
 	if err := dec(in); err != nil {
@@ -21292,6 +21326,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateKnowledgeBase",
 			Handler:    _Yak_CreateKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "CreateKnowledgeBaseV2",
+			Handler:    _Yak_CreateKnowledgeBaseV2_Handler,
 		},
 		{
 			MethodName: "UpdateKnowledgeBase",
