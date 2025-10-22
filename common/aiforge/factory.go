@@ -46,7 +46,7 @@ func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*sch
 	var (
 		db     *gorm.DB = consts.GetGormProfileDatabase()
 		filter          = &ypb.AIForgeFilter{}
-		paging          = &ypb.Paging{Page: 1, Limit: 20}
+		paging          = &ypb.Paging{Page: 1, Limit: 100}
 	)
 
 	for _, opt := range opts {
