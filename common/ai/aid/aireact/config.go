@@ -3,7 +3,6 @@ package aireact
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,8 +10,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -154,6 +156,9 @@ type ReActConfig struct {
 	// Memory triage for dynamic memory management
 	memoryTriage   aimem.MemoryTriage
 	memoryPoolSize int64
+
+	// hotpatch broadcaster for plan and execute
+	hotpatchBroadcaster *chanx.Broadcaster[aid.Option]
 }
 
 var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
@@ -579,6 +584,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	}
 
 	config := &ReActConfig{
+		hotpatchBroadcaster: chanx.NewBroadcastChannel[aid.Option](ctx, 10),
 		KeyValueConfig:      aicommon.NewKeyValueConfig(),
 		task:                task,
 		ctx:                 ctx,
