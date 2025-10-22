@@ -742,7 +742,7 @@ a as $a
 $a?{<fullTypeName>?{have: 'test'}} as $output;
 		`,
 		map[string][]string{
-			"output": {"ParameterMember-freeValue-test.a", "side-effect(ParameterMember-freeValue-test.a, a)"},
+			"output": {"side-effect(Undefined-a, a)", "Undefined-a"},
 		}, ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
