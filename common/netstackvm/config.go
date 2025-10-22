@@ -73,6 +73,9 @@ type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	selectedDeviceName string
+	openAllPcapDevice  bool
+
 	stack *stack.Stack
 
 	pcapPromisc        bool
@@ -403,6 +406,20 @@ func WithUDPDisabled(disabled bool) Option {
 
 func WithDisableForwarding(v bool) Option {
 	return func(s *Config) error {
+		return nil
+	}
+}
+
+func WithSelectedDeviceName(s string) Option {
+	return func(c *Config) error {
+		c.selectedDeviceName = s
+		return nil
+	}
+}
+
+func WithOpenAllDeviceName(open bool) Option {
+	return func(c *Config) error {
+		c.openAllPcapDevice = open
 		return nil
 	}
 }
