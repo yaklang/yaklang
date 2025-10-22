@@ -8,8 +8,8 @@ import (
 )
 
 type I18n struct {
-	Zh string
-	En string
+	Zh string `json:"zh"`
+	En string `json:"en"`
 }
 
 var nodeIdMapper = map[string]*I18n{
