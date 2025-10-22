@@ -22,6 +22,5 @@ func InitEmbedFS() {
 		yakScriptFS = gzip_embed.NewEmptyPreprocessingEmbed()
 	} else {
 		yakScriptFS = fs
-		log.Info("init gzip embed fs successfully")
 	}
 }
