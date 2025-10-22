@@ -83,7 +83,7 @@ jobs:
         run: go install github.com/yaklang/yaklang/common/utils/gzip_embed/gzip-embed@latest || go install ./common/utils/gzip_embed/gzip-embed
 
       - name: Generate yakscriptforai tar.gz
-        run: go generate ./common/ai/aid/aitool/buildinaitools/yakscripttools/...
+        run: gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
 
       - name: Initialize License Machine
         if: inputs.ee
