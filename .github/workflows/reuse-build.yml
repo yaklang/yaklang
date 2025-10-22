@@ -80,7 +80,7 @@ jobs:
         run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
 
       - name: Install gzip-embed tool
-        run: go install github.com/yaklang/yaklang/common/utils/gzip_embed/gzip-embed@latest || go install ./common/utils/gzip_embed/gzip-embed
+        run: go install ./common/utils/gzip_embed/gzip-embed
 
       - name: Generate yakscriptforai tar.gz
         run: gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
