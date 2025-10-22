@@ -22,6 +22,7 @@ var Exports = map[string]interface{}{
 	"captchaImgSelector":   WithCaptchaImgSelector,
 	"submitButtonSelector": WithLoginButtonSelector,
 	"loginDetectMode":      WithLoginDetectMode,
+	"successMatchers":      WithSuccessMatchers,
 	"exePath":              WithExePath,
 	"extraWaitLoadTime":    WithExtraWaitLoadTime,
 	"leaklessStatus":       WithLeakless,
@@ -29,6 +30,7 @@ var Exports = map[string]interface{}{
 
 	"urlChangeMode":     UrlChangeMode,
 	"htmlChangeMode":    HtmlChangeMode,
+	"stringMatchMode":   StringMatchMode,
 	"defaultChangeMode": DefaultChangeMode,
 
 	"leaklessDefault": LeaklessDefault,
