@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aicommon_mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"path/filepath"
 	"testing"
 
