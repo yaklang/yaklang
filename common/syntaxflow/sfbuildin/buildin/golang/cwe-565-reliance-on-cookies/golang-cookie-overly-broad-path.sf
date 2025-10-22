@@ -1,0 +1,404 @@
+desc(
+	title: "Detect Golang Cookie Overly Broad Path Vulnerability"
+	title_zh: "检测Golang Cookie路径过宽漏洞"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Cookie路径过宽是指在设置Cookie时，将Path属性设置为根目录（"/"），这意味着Cookie将被发送到该域名下的所有路径。攻击者可以利用这一点进行会话固定攻击或跨站点请求伪造（CSRF）。
+
+2. **触发场景**
+   ```go
+   http.SetCookie(writer, &http.Cookie{
+       Name:    "sessionID",
+       Value:   sessionID,
+       Path:    "/",
+       Expires: time.Now().Add(15 * time.Minute),
+   })
+   ```
+   在上述代码中，Cookie的Path属性被设置为"/"，这将导致Cookie被发送到所有路径，增加了安全风险。
+
+3. **潜在影响**
+   - 会话固定攻击：攻击者可以诱导用户使用预先设定的会话ID。
+   - CSRF攻击：攻击者可以利用Cookie的广泛路径发起跨站点请求伪造攻击。
+   - 信息泄露：Cookie可能在不需要的路径上被发送，增加了信息泄露的风险。
+DESC
+	rule_id: "938d8c18-e87e-4ff2-85a4-5e2370a88feb"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 限制Cookie的Path属性
+将Cookie的Path属性设置为最严格的路径，仅限必要的路径使用Cookie。
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:    "sessionID",
+    Value:   sessionID,
+    Path:    "/MyForum",
+    Expires: time.Now().Add(15 * time.Minute),
+})
+```
+
+#### 2. 使用HttpOnly和Secure属性
+启用HttpOnly和Secure属性以防止JavaScript访问Cookie并确保仅在HTTPS连接中传输Cookie。
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/MyForum",
+    HttpOnly: true,
+    Secure:   true,
+    Expires:  time.Now().Add(15 * time.Minute),
+})
+```
+
+#### 3. 使用SameSite属性
+设置SameSite属性为Strict或Lax以防止CSRF攻击。
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/MyForum",
+    HttpOnly: true,
+    Secure:   true,
+    SameSite: http.SameSiteStrictMode,
+    Expires:  time.Now().Add(15 * time.Minute),
+})
+```
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP Cookie Security](https://owasp.org/www-community/controls/SecureCookieAttribute)
+[CWE-565: Reliance on Cookies without Validation and Integrity Checking](https://cwe.mitre.org/data/definitions/565.html)
+REFERENCE
+)
+
+http?{<fullTypeName>?{have: "net/http"}} as $http;
+
+$http.SetCookie as $cookie
+$cookie(* as $param);
+
+$param #{
+    until: "*.Path"
+}-> as $sink
+
+$sink.Path as $path
+$path?{have: /^"\/"$/} as $high
+
+alert $high for {
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 限制Cookie的Path属性
+确保Cookie的Path属性设置为最小必要的路径范围，避免设置为`/`。
+
+```go
+// 修复代码示例
+http.SetCookie(writer, &http.Cookie{
+    Name:    "sessionID",
+    Value:   sessionID,
+    Path:    "/MyForum", // 限制为特定路径
+    Expires: time.Now().Add(15 * time.Minute),
+})
+```
+
+#### 2. 启用SameSite属性
+为Cookie设置SameSite属性以防止跨站请求伪造（CSRF）攻击。
+
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/MyForum",
+    SameSite: http.SameSiteLaxMode, // 或SameSiteStrictMode
+    Expires:  time.Now().Add(15 * time.Minute),
+})
+```
+
+#### 3. 使用Secure和HttpOnly属性
+启用Secure和HttpOnly属性以增强Cookie的安全性。
+
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/MyForum",
+    SameSite: http.SameSiteLaxMode,
+    Secure:   true, // 仅在HTTPS下传输
+    HttpOnly: true, // 防止JavaScript访问
+    Expires:  time.Now().Add(15 * time.Minute),
+})
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Cookie的Path属性设置为`/`时，该Cookie可以被同一域下的所有路径访问。攻击者可能利用此漏洞进行会话固定攻击，通过诱导用户访问恶意页面来获取用户的会话ID。
+
+2. **触发场景**
+   ```go
+   http.SetCookie(writer, &http.Cookie{
+       Name:    "sessionID",
+       Value:   sessionID,
+       Path:    "/", // 路径设置过宽
+       Expires: time.Now().Add(15 * time.Minute),
+   })
+   ```
+   攻击者可以创建一个恶意页面，诱导用户访问并设置会话ID，从而固定用户的会话。
+
+3. **潜在影响**
+   - 会话固定攻击，可能导致用户账户被劫持。
+   - 跨站请求伪造（CSRF）攻击风险增加。
+   - 敏感信息泄露风险。
+DESC
+	level: "high",
+	type: "vuln",
+	title: "Golang Cookie Overly Broad Path Vulnerability Was Detected",
+	title_zh: "检测到Golang Cookie路径设置过宽漏洞",
+	message: "检测到Golang Cookie路径设置过宽漏洞，可能导致会话固定攻击",
+	risk: "会话固定攻击",
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+)
+
+//go:embed html/mall/vul_mall_register.html
+var mallRegisterPage []byte
+
+//go:embed html/mall/vul_mall_login.html
+var mallLoginPage []byte
+
+//go:embed html/mall/vul_mall_userProfile.html
+var mallUserProfilePage []byte
+
+func (s *VulinServer) mallUserRoute() {
+	// var router = s.router
+	// malloginGroup := router.PathPrefix("/mall").Name("购物商城").Subrouter()
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
+		{
+			DefaultQuery: "",
+			Path:         "/user/login",
+			// Title:        "商城登陆",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodGet {
+					// 返回登录页面
+					writer.Header().Set("Content-Type", "text/html")
+					writer.Write(mallLoginPage)
+					return
+				}
+
+				// 解析请求体中的 JSON 数据
+				var loginRequest struct {
+					Username string 
+					Password string 
+				}
+
+				err := json.NewDecoder(request.Body).Decode(&loginRequest)
+				if err != nil {
+					writer.WriteHeader(http.StatusBadRequest)
+					writer.Write([]byte("Invalid request"))
+					return
+				}
+
+				username := loginRequest.Username
+				password := loginRequest.Password
+
+				// 在这里执行用户登录逻辑，验证用户名和密码是否正确
+				// 检查数据库中是否存在匹配的用户信息
+				if username == "" || password == "" {
+					writer.WriteHeader(400)
+					writer.Write([]byte("username or password cannot be empty"))
+					return
+				}
+				// sql 注入 , 万能密码
+				users, err := s.database.GetUserByUnsafe(username, password)
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error: " + err.Error()))
+					return
+				}
+				user := users[0]
+				userMap := utils.InterfaceToMap(user)
+				id, err := strconv.Atoi(userMap["id"][0])
+				if err != nil {
+					id = 0
+				}
+				// 假设验证通过，返回登录成功消息
+				response := struct {
+					Id      uint  
+					Success bool   
+					Message string
+				}{
+					Id:      uint(id),
+					Success: true,
+					Message: "Login successful",
+				}
+				var sessionID = "fixedSessionID"
+				// session, err := user.CreateSession(s.database)
+				if err != nil {
+					return
+				}
+				http.SetCookie(writer, &http.Cookie{
+					Name:    "sessionID",
+					Value:   sessionID,
+					Path:    "/",
+					Expires: time.Now().Add(15 * time.Minute),
+				})
+				writer.Header().Set("Content-Type", "application/json")
+				err = json.NewEncoder(writer).Encode(response)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				writer.WriteHeader(http.StatusOK)
+				return
+			},
+			RiskDetected: true,
+		},
+	}
+
+	for _, v := range mallloginRoutes {
+		addRouteWithVulInfo(MallGroup, v)
+	}
+
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+)
+
+//go:embed html/mall/vul_mall_register.html
+var mallRegisterPage []byte
+
+//go:embed html/mall/vul_mall_login.html
+var mallLoginPage []byte
+
+//go:embed html/mall/vul_mall_userProfile.html
+var mallUserProfilePage []byte
+
+func (s *VulinServer) mallUserRoute() {
+	// var router = s.router
+	// malloginGroup := router.PathPrefix("/mall").Name("购物商城").Subrouter()
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
+		{
+			DefaultQuery: "",
+			Path:         "/user/login",
+			// Title:        "商城登陆",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodGet {
+					// 返回登录页面
+					writer.Header().Set("Content-Type", "text/html")
+					writer.Write(mallLoginPage)
+					return
+				}
+
+				// 解析请求体中的 JSON 数据
+				var loginRequest struct {
+					Username string 
+					Password string 
+				}
+
+				err := json.NewDecoder(request.Body).Decode(&loginRequest)
+				if err != nil {
+					writer.WriteHeader(http.StatusBadRequest)
+					writer.Write([]byte("Invalid request"))
+					return
+				}
+
+				username := loginRequest.Username
+				password := loginRequest.Password
+
+				// 在这里执行用户登录逻辑，验证用户名和密码是否正确
+				// 检查数据库中是否存在匹配的用户信息
+				if username == "" || password == "" {
+					writer.WriteHeader(400)
+					writer.Write([]byte("username or password cannot be empty"))
+					return
+				}
+				// sql 注入 , 万能密码
+				users, err := s.database.GetUserByUnsafe(username, password)
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error: " + err.Error()))
+					return
+				}
+				user := users[0]
+				userMap := utils.InterfaceToMap(user)
+				id, err := strconv.Atoi(userMap["id"][0])
+				if err != nil {
+					id = 0
+				}
+				// 假设验证通过，返回登录成功消息
+				response := struct {
+					Id      uint  
+					Success bool   
+					Message string
+				}{
+					Id:      uint(id),
+					Success: true,
+					Message: "Login successful",
+				}
+				var sessionID = "fixedSessionID"
+				// session, err := user.CreateSession(s.database)
+				if err != nil {
+					return
+				}
+				http.SetCookie(writer, &http.Cookie{
+					Name:    "sessionID",
+					Value:   sessionID,
+					Path:    "/MyForum",
+					Expires: time.Now().Add(15 * time.Minute),
+				})
+				writer.Header().Set("Content-Type", "application/json")
+				err = json.NewEncoder(writer).Encode(response)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				writer.WriteHeader(http.StatusOK)
+				return
+			},
+			RiskDetected: true,
+		},
+	}
+
+	for _, v := range mallloginRoutes {
+		addRouteWithVulInfo(MallGroup, v)
+	}
+
+}
+SAFE
+)
+
