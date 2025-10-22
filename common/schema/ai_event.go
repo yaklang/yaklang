@@ -58,6 +58,7 @@ const (
 	EVENT_TOOL_CALL_DONE        = "tool_call_done"        // tool call end event, used to emit the tool call end information
 	EVENT_TOOL_CALL_ERROR       = "tool_call_error"       // tool call error event, used to emit the tool call error information
 	EVENT_TOOL_CALL_SUMMARY     = "tool_call_summary"     // tool call summary event, used to emit the tool call summary information
+	EVENT_TOOL_CALL_DECISION    = "tool_call_decision"    // tool call decision event, used to emit the tool call decision information
 
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
 	EVENT_TYPE_END_PLAN_AND_EXECUTION      EventType = "end_plan_and_execution"
