@@ -1,0 +1,383 @@
+desc(
+	title: "Detect Golang Path Manipulation Vulnerability"
+	title_zh: "检测Golang路径操作漏洞"
+	type: audit
+	level: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   路径操作漏洞（Path Manipulation）发生在应用程序使用用户提供的输入来构造文件路径时，未对输入进行充分的验证和清理。攻击者可以通过构造特殊的路径输入，访问或操作超出预期范围的文件系统资源，例如读取敏感文件或写入恶意文件。在Golang中，常见的相关函数包括`path.Join`、`strings.TrimPrefix`等。
+
+2. **触发场景**
+   ```go
+   filePath := request.URL.Path
+   if filePath == "website/" {
+       filePath = "website/index.html"
+   }
+   fp, err := zipGitFS.Open(filePath)
+   ```
+   如果`filePath`未经验证，攻击者可以通过输入类似`../../etc/passwd`的路径来访问系统敏感文件。
+
+3. **潜在影响**
+   - 敏感文件泄露（如配置文件、用户凭证等）。
+   - 可导致任意文件读取或写入，进一步引发服务器入侵。
+   - 破坏应用程序的正常运行或数据完整性。
+DESC
+	rule_id: "b3a1227f-5d9b-4840-91c4-43a0eef85c32"
+	title_zh: "检测Golang路径操作漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 验证用户输入
+   对用户提供的路径输入进行严格验证，确保其符合预期的格式和范围。
+   ```go
+   import "path/filepath"
+
+   func sanitizePath(inputPath string) (string, error) {
+       cleanedPath := filepath.Clean(inputPath)
+       if strings.Contains(cleanedPath, "..") || strings.HasPrefix(cleanedPath, "/") {
+           return "", fmt.Errorf("invalid path")
+       }
+       return cleanedPath, nil
+   }
+   ```
+
+#### 2. 使用安全路径拼接函数
+   避免直接拼接用户输入，使用Golang的`path/filepath`库提供的安全函数。
+   ```go
+   safePath := filepath.Join("website", sanitizedInput)
+   ```
+
+#### 3. 限制文件访问范围
+   在文件系统操作中，限制文件的访问范围为预定义的目录。
+   ```go
+   baseDir := "/var/www/website"
+   fullPath := filepath.Join(baseDir, sanitizedPath)
+   if !strings.HasPrefix(fullPath, baseDir) {
+       return fmt.Errorf("access denied")
+   }
+   ```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+<include("golang-user-input")> as $user_input
+strings?{<fullTypeName>?{have: "strings"}} as $strings
+
+$user_input.URL.Path as $path
+$strings.TrimPrefix(*?{<slice(index=0)> #{ until: "* $path"}->} as $key )
+$key?{opcode: const}?{have: /"*\/"/} as $low
+
+alert $low for {
+	type: "vuln",
+	title: "Golang Path Manipulation Vulnerability Was Detected",
+	title_zh: "检测到Golang路径操纵漏洞",
+	level: "low",
+	message: "检测到Golang路径操纵漏洞，但路径已包含过滤机制，通常无需处理",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的文件路径操作
+使用 `path/filepath` 包中的 `Clean` 和 `Join` 函数来处理文件路径，避免直接拼接用户输入。
+
+```go
+safePath := filepath.Join(baseDir, filepath.Clean(userInput))
+```
+
+#### 2. 验证用户输入
+确保用户提供的路径在预期的目录范围内，防止目录遍历攻击。
+
+```go
+baseDir := "/safe/directory"
+fullPath := filepath.Join(baseDir, filepath.Clean(userInput))
+if !strings.HasPrefix(fullPath, baseDir) {
+    return errors.New("路径超出安全范围")
+}
+```
+
+#### 3. 使用白名单验证
+对于特定的文件操作，只允许符合预期格式的文件名或路径。
+
+```go
+allowedExtensions := []string{".txt", ".pdf"}
+ext := filepath.Ext(userInput)
+allowed := false
+for _, e := range allowedExtensions {
+    if e == ext {
+        allowed = true
+        break
+    }
+}
+if !allowed {
+    return errors.New("不允许的文件类型")
+}
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+路径操纵漏洞是由于应用程序未对用户输入的文件路径进行严格的过滤或验证，攻击者可通过构造特殊路径访问非预期的文件或目录。这可能导致敏感信息泄露、文件覆盖或服务器文件系统被篡改。
+
+2. **触发场景**
+```go
+filePath := request.URL.Path // 未充分验证的用户输入
+fp, err := os.Open(filePath) // 直接使用用户提供的路径
+```
+攻击者可以输入 `../../../etc/passwd` 来访问系统敏感文件，或者输入恶意路径覆盖重要文件。
+
+3. **潜在影响**
+- 敏感系统文件被读取
+- 应用程序文件被覆盖或删除
+- 服务器配置被篡改
+DESC
+	name: "low",
+	risk: "路径操纵",
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package vulinbox
+
+import (
+	"archive/zip"
+	"bytes"
+	"embed"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
+
+	"github.com/yaklang/yaklang/common/log"
+
+	"io"
+	"net/http"
+	"path"
+	"strings"
+)
+
+//go:embed sensitivefs
+var _sensitiveFS embed.FS
+
+//go:embed fakegit/website.zip
+var _fakeGitWebsite []byte
+
+//go:embed fakegit/website-repository.git.zip
+var _fakeGitRepository []byte
+
+//go:embed fakegit/sca-testcase.git.zip
+var _fakeGitSCARespos []byte
+
+func GetSensitiveFile(name string) []byte {
+	f, err := _sensitiveFS.Open(path.Join("sensitivefs", name))
+	if err != nil {
+		log.Errorf("cannot found sensitive file: %s", err)
+		return nil
+	}
+	raw, _ := io.ReadAll(f)
+	f.Close()
+	return raw
+}
+
+func (s *VulinServer) registerSensitive() {
+	r := s.router
+
+	_sensitive := func(s string) string {
+		return path.Join("/sensitive", s)
+	}
+	_ = _sensitive
+
+	zipGitFS, err := zip.NewReader(bytes.NewReader(_fakeGitWebsite), int64(len(_fakeGitWebsite)))
+	if err != nil {
+		log.Errorf("cannot open zip file: %s", err)
+	}
+
+	var sensitiveGroup = r.PathPrefix("/sensitive").Name("敏感信息与敏感文件泄漏").Subrouter()
+	var swaggerGroup = r.PathPrefix("/swagger").Name("敏感信息与敏感文件泄漏（Swagger）").Subrouter()
+	var vuls = []*VulInfo{
+
+	}
+	for _, v := range vuls {
+		addRouteWithVulInfo(sensitiveGroup, v)
+		addRouteWithVulInfo(swaggerGroup, v)
+	}
+
+	addRouteWithVulInfo(swaggerGroup, &VulInfo{
+		Path: `/index.html`,
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", `text/html`)
+			writer.Write(GetSensitiveFile("swagger-ui.html"))
+		},
+		RiskDetected: true,
+	})
+	fakeGitSubrouter := s.router.PathPrefix("/git/")
+	fakeGitSubrouter.PathPrefix("/website/").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if zipGitFS == nil {
+			Failed(writer, request, "Create FAKE GIT Website FAILED")
+			return
+		}
+
+		request.RequestURI = strings.TrimPrefix(request.RequestURI, `/git/`)
+		request.URL.Path = strings.TrimPrefix(request.URL.Path, `/git/`)
+
+		filePath := request.URL.Path
+		if filePath == "website/" {
+			filePath = "website/index.html"
+		}
+		if strings.Contains(filePath, "flag.txt") {
+			Failed(writer, request, "Cannot found file(%v) in fake git website", request.URL.Path)
+		}
+
+		var fp, err = zipGitFS.Open(filePath)
+		if err != nil {
+			Failed(writer, request, "Cannot found file(%v) in fake git website", request.URL.Path)
+			return
+		}
+		defer fp.Close()
+		raw, _ := io.ReadAll(fp)
+
+		if strings.Contains(filePath, ".git/") {
+			writer.Header().Set("Content-Type", `application/octet-stream`)
+		} else {
+			writer.Header().Set("Content-Type", `text/html`)
+		}
+		writer.Write(raw)
+	})
+
+	{
+		// "/gitserver/sca-testcase.git"
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "sca-testcase.git", _fakeGitSCARespos)
+		s.router.PathPrefix(router).HandlerFunc(handler)
+	}
+
+	{
+		// "/gitserver/website-repository.git"
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "website-repository.git", _fakeGitRepository)
+		s.router.PathPrefix(router).HandlerFunc(handler)
+	}
+}
+
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package vulinbox
+
+import (
+	"archive/zip"
+	"bytes"
+	"embed"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
+
+	"github.com/yaklang/yaklang/common/log"
+
+	"io"
+	"net/http"
+	"path"
+	"strings"
+)
+
+//go:embed sensitivefs
+var _sensitiveFS embed.FS
+
+//go:embed fakegit/website.zip
+var _fakeGitWebsite []byte
+
+//go:embed fakegit/website-repository.git.zip
+var _fakeGitRepository []byte
+
+//go:embed fakegit/sca-testcase.git.zip
+var _fakeGitSCARespos []byte
+
+func GetSensitiveFile(name string) []byte {
+	f, err := _sensitiveFS.Open(path.Join("sensitivefs", name))
+	if err != nil {
+		log.Errorf("cannot found sensitive file: %s", err)
+		return nil
+	}
+	raw, _ := io.ReadAll(f)
+	f.Close()
+	return raw
+}
+
+func (s *VulinServer) registerSensitive() {
+	r := s.router
+
+	_sensitive := func(s string) string {
+		return path.Join("/sensitive", s)
+	}
+	_ = _sensitive
+
+	zipGitFS, err := zip.NewReader(bytes.NewReader(_fakeGitWebsite), int64(len(_fakeGitWebsite)))
+	if err != nil {
+		log.Errorf("cannot open zip file: %s", err)
+	}
+
+	var sensitiveGroup = r.PathPrefix("/sensitive").Name("敏感信息与敏感文件泄漏").Subrouter()
+	var swaggerGroup = r.PathPrefix("/swagger").Name("敏感信息与敏感文件泄漏（Swagger）").Subrouter()
+	var vuls = []*VulInfo{
+
+	}
+	for _, v := range vuls {
+		addRouteWithVulInfo(sensitiveGroup, v)
+		addRouteWithVulInfo(swaggerGroup, v)
+	}
+
+	addRouteWithVulInfo(swaggerGroup, &VulInfo{
+		Path: `/index.html`,
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", `text/html`)
+			writer.Write(GetSensitiveFile("swagger-ui.html"))
+		},
+		RiskDetected: true,
+	})
+	fakeGitSubrouter := s.router.PathPrefix("/git/")
+	fakeGitSubrouter.PathPrefix("/website/").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if zipGitFS == nil {
+			Failed(writer, request, "Create FAKE GIT Website FAILED")
+			return
+		}
+
+		request.RequestURI = strings.TrimPrefix(request.RequestURI, `/git`)
+		request.URL.Path = strings.TrimPrefix(request.URL.Path, `/git`)
+
+		filePath := request.URL.Path
+		if filePath == "website/" {
+			filePath = "website/index.html"
+		}
+		if strings.Contains(filePath, "flag.txt") {
+			Failed(writer, request, "Cannot found file(%v) in fake git website", request.URL.Path)
+		}
+
+		var fp, err = zipGitFS.Open(filePath)
+		if err != nil {
+			Failed(writer, request, "Cannot found file(%v) in fake git website", request.URL.Path)
+			return
+		}
+		defer fp.Close()
+		raw, _ := io.ReadAll(fp)
+
+		if strings.Contains(filePath, ".git/") {
+			writer.Header().Set("Content-Type", `application/octet-stream`)
+		} else {
+			writer.Header().Set("Content-Type", `text/html`)
+		}
+		writer.Write(raw)
+	})
+
+	{
+		// "/gitserver/sca-testcase.git"
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "sca-testcase.git", _fakeGitSCARespos)
+		s.router.PathPrefix(router).HandlerFunc(handler)
+	}
+
+	{
+		// "/gitserver/website-repository.git"
+		router, handler := yakgit.GeneratorGitHTTPHandler("gitserver", "website-repository.git", _fakeGitRepository)
+		s.router.PathPrefix(router).HandlerFunc(handler)
+	}
+}
+
+SAFE
+)

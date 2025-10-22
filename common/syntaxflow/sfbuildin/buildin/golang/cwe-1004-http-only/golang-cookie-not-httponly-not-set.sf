@@ -1,0 +1,402 @@
+desc(
+	title: "Detect Golang Cookie HTTPOnly Flag Missing"
+	title_zh: "检测Golang Cookie HTTPOnly标志缺失"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   HTTPOnly是Cookie的一个重要安全属性，当设置为true时，可以阻止客户端脚本（如JavaScript）访问该Cookie，从而缓解跨站脚本攻击（XSS）的风险。如果Cookie未设置HTTPOnly标志，攻击者可能通过XSS漏洞窃取用户的会话Cookie，导致会话劫持或其他安全风险。
+
+2. **触发场景**
+   ```go
+   http.SetCookie(writer, &http.Cookie{
+       Name:    "sessionID",
+       Value:   sessionID,
+       Path:    "/",
+       Expires: time.Now().Add(15 * time.Minute),
+       // HttpOnly: true,
+   })
+   ```
+   上述代码中，Cookie未设置HTTPOnly标志，因此客户端脚本可以访问该Cookie，存在安全风险。
+
+3. **潜在影响**
+   - 会话劫持：攻击者可以窃取用户的会话Cookie，冒充用户执行操作。
+   - 信息泄露：敏感信息可能通过Cookie被泄露。
+   - 权限提升：攻击者可能利用窃取的Cookie获取更高权限。
+DESC
+	rule_id: "5b485362-1df1-40df-afc4-a3252bee0150"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 设置HTTPOnly标志
+确保所有敏感Cookie都设置了HTTPOnly标志，防止客户端脚本访问。
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/",
+    Expires:  time.Now().Add(15 * time.Minute),
+    HttpOnly: true,
+})
+```
+
+#### 2. 结合Secure标志使用
+在HTTPS环境中，还应设置Secure标志，确保Cookie仅通过加密连接传输。
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/",
+    Expires:  time.Now().Add(15 * time.Minute),
+    HttpOnly: true,
+    Secure:   true,
+})
+```
+
+#### 3. 定期更新会话ID
+即使设置了HTTPOnly标志，也应定期更新会话ID，减少会话劫持的风险。
+```go
+func renewSessionID(writer http.ResponseWriter, request *http.Request) {
+    newSessionID := generateNewSessionID()
+    http.SetCookie(writer, &http.Cookie{
+        Name:     "sessionID",
+        Value:    newSessionID,
+        Path:     "/",
+        Expires:  time.Now().Add(15 * time.Minute),
+        HttpOnly: true,
+        Secure:   true,
+    })
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP HTTPOnly](https://owasp.org/www-community/HttpOnly)
+[CWE-1004](https://cwe.mitre.org/data/definitions/1004.html)
+REFERENCE
+)
+
+http?{<fullTypeName>?{have: "net/http"}} as $http;
+
+$http.SetCookie as $cookie
+$cookie(* as $param);
+
+$param #{
+    until: "*.HttpOnly"
+}-> as $sink
+
+$sink.HttpOnly?{have: false} as $false
+$sink.HttpOnly?{have: true} as $true
+
+$true -->?{have: SetCookie}<getCallee> as $safe
+
+$false as $high
+$cookie - $safe as $high
+
+alert $high for {
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 为敏感Cookie设置HttpOnly标志
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/",
+    Expires:  time.Now().Add(15 * time.Minute),
+    HttpOnly: true, // 添加此设置
+})
+```
+
+#### 2. 结合Secure标志（HTTPS环境）
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "sessionID",
+    Value:    sessionID,
+    Path:     "/",
+    Expires:  time.Now().Add(15 * time.Minute),
+    HttpOnly: true,
+    Secure:   true, // 仅HTTPS传输
+})
+```
+
+#### 3. 实施内容安全策略(CSP)
+通过设置HTTP头`Content-Security-Policy`缓解潜在的XSS攻击。
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   当Cookie未设置HttpOnly标志时，JavaScript可以通过document.cookie访问该Cookie，攻击者可利用XSS漏洞窃取用户会话Cookie，导致会话劫持。
+
+2. **触发场景**
+   ```go
+   http.SetCookie(writer, &http.Cookie{
+       Name:    "sessionID",
+       Value:   sessionID,
+       Path:    "/",
+       Expires: time.Now().Add(15 * time.Minute),
+       // HttpOnly: true, // 缺少HttpOnly设置
+   })
+   ```
+
+3. **潜在影响**
+   - 攻击者可窃取用户身份凭证
+   - 导致敏感操作被未授权执行
+   - 用户隐私数据泄露
+DESC
+	level: "high",
+	type: "vuln",
+	title: "Golang Cookie HTTPOnly Not Set Vulnerability Was Detected",
+	title_zh: "检测到Golang Cookie未设置HTTPOnly漏洞",
+	message: "检测到Golang Cookie未设置HTTPOnly标志，可能导致会话劫持漏洞",
+	risk: "会话劫持",
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+)
+
+//go:embed html/mall/vul_mall_register.html
+var mallRegisterPage []byte
+
+//go:embed html/mall/vul_mall_login.html
+var mallLoginPage []byte
+
+//go:embed html/mall/vul_mall_userProfile.html
+var mallUserProfilePage []byte
+
+func (s *VulinServer) mallUserRoute() {
+	// var router = s.router
+	// malloginGroup := router.PathPrefix("/mall").Name("购物商城").Subrouter()
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
+		{
+			DefaultQuery: "",
+			Path:         "/user/login",
+			// Title:        "商城登陆",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodGet {
+					// 返回登录页面
+					writer.Header().Set("Content-Type", "text/html")
+					writer.Write(mallLoginPage)
+					return
+				}
+
+				// 解析请求体中的 JSON 数据
+				var loginRequest struct {
+					Username string 
+					Password string 
+				}
+
+				err := json.NewDecoder(request.Body).Decode(&loginRequest)
+				if err != nil {
+					writer.WriteHeader(http.StatusBadRequest)
+					writer.Write([]byte("Invalid request"))
+					return
+				}
+
+				username := loginRequest.Username
+				password := loginRequest.Password
+
+				// 在这里执行用户登录逻辑，验证用户名和密码是否正确
+				// 检查数据库中是否存在匹配的用户信息
+				if username == "" || password == "" {
+					writer.WriteHeader(400)
+					writer.Write([]byte("username or password cannot be empty"))
+					return
+				}
+				// sql 注入 , 万能密码
+				users, err := s.database.GetUserByUnsafe(username, password)
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error: " + err.Error()))
+					return
+				}
+				user := users[0]
+				userMap := utils.InterfaceToMap(user)
+				id, err := strconv.Atoi(userMap["id"][0])
+				if err != nil {
+					id = 0
+				}
+				// 假设验证通过，返回登录成功消息
+				response := struct {
+					Id      uint  
+					Success bool   
+					Message string
+				}{
+					Id:      uint(id),
+					Success: true,
+					Message: "Login successful",
+				}
+				var sessionID = "fixedSessionID"
+				// session, err := user.CreateSession(s.database)
+				if err != nil {
+					return
+				}
+				http.SetCookie(writer, &http.Cookie{
+					Name:    "sessionID",
+					Value:   sessionID,
+					Path:    "/",
+					Expires: time.Now().Add(15 * time.Minute),
+
+					// HttpOnly: true,
+				})
+				writer.Header().Set("Content-Type", "application/json")
+				err = json.NewEncoder(writer).Encode(response)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				writer.WriteHeader(http.StatusOK)
+				return
+			},
+			RiskDetected: true,
+		},
+	}
+
+	for _, v := range mallloginRoutes {
+		addRouteWithVulInfo(MallGroup, v)
+	}
+
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+)
+
+//go:embed html/mall/vul_mall_register.html
+var mallRegisterPage []byte
+
+//go:embed html/mall/vul_mall_login.html
+var mallLoginPage []byte
+
+//go:embed html/mall/vul_mall_userProfile.html
+var mallUserProfilePage []byte
+
+func (s *VulinServer) mallUserRoute() {
+	// var router = s.router
+	// malloginGroup := router.PathPrefix("/mall").Name("购物商城").Subrouter()
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
+		{
+			DefaultQuery: "",
+			Path:         "/user/login",
+			// Title:        "商城登陆",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodGet {
+					// 返回登录页面
+					writer.Header().Set("Content-Type", "text/html")
+					writer.Write(mallLoginPage)
+					return
+				}
+
+				// 解析请求体中的 JSON 数据
+				var loginRequest struct {
+					Username string 
+					Password string 
+				}
+
+				err := json.NewDecoder(request.Body).Decode(&loginRequest)
+				if err != nil {
+					writer.WriteHeader(http.StatusBadRequest)
+					writer.Write([]byte("Invalid request"))
+					return
+				}
+
+				username := loginRequest.Username
+				password := loginRequest.Password
+
+				// 在这里执行用户登录逻辑，验证用户名和密码是否正确
+				// 检查数据库中是否存在匹配的用户信息
+				if username == "" || password == "" {
+					writer.WriteHeader(400)
+					writer.Write([]byte("username or password cannot be empty"))
+					return
+				}
+				// sql 注入 , 万能密码
+				users, err := s.database.GetUserByUnsafe(username, password)
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error: " + err.Error()))
+					return
+				}
+				user := users[0]
+				userMap := utils.InterfaceToMap(user)
+				id, err := strconv.Atoi(userMap["id"][0])
+				if err != nil {
+					id = 0
+				}
+				// 假设验证通过，返回登录成功消息
+				response := struct {
+					Id      uint  
+					Success bool   
+					Message string
+				}{
+					Id:      uint(id),
+					Success: true,
+					Message: "Login successful",
+				}
+				var sessionID = "fixedSessionID"
+				// session, err := user.CreateSession(s.database)
+				if err != nil {
+					return
+				}
+				http.SetCookie(writer, &http.Cookie{
+					Name:    "sessionID",
+					Value:   sessionID,
+					Path:    "/",
+					Expires: time.Now().Add(15 * time.Minute),
+
+					HttpOnly: true,
+				})
+				writer.Header().Set("Content-Type", "application/json")
+				err = json.NewEncoder(writer).Encode(response)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				writer.WriteHeader(http.StatusOK)
+				return
+			},
+			RiskDetected: true,
+		},
+	}
+
+	for _, v := range mallloginRoutes {
+		addRouteWithVulInfo(MallGroup, v)
+	}
+
+}
+SAFE
+)
+

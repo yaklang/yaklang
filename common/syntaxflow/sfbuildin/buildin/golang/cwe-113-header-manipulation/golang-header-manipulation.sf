@@ -1,0 +1,193 @@
+desc(
+	title: "Detect Golang Header Manipulation Vulnerability"
+	title_zh: "检测Golang头部操纵漏洞"
+	type: audit
+	level: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   Header Manipulation漏洞发生在应用程序未对HTTP响应头中的用户可控输入进行适当过滤或编码时。攻击者可以通过注入恶意数据（如换行符）篡改原始响应头，导致HTTP响应分裂攻击（HTTP Response Splitting）或其他安全问题。这可能导致缓存投毒、跨站脚本攻击(XSS)或会话固定等风险。
+
+2. **触发场景**
+   ```go
+   writer.Header().Set("Location", r.RequestURI) // 直接使用用户输入设置头部
+   writer.WriteHeader(302)
+   ```
+   如果`r.RequestURI`包含恶意输入（如`\r\nSet-Cookie: malicious=value`），攻击者可注入任意响应头或修改响应状态码。
+
+3. **潜在影响**
+   - 通过注入`Set-Cookie`头劫持用户会话
+   - 利用缓存投毒攻击其他用户
+   - 绕过安全限制（如CSP头）导致XSS攻击
+   - 泄露敏感信息通过自定义头
+DESC
+	rule_id: "34545e88-e64d-4534-9e96-261ff984b6ba"
+	title_zh: "检测Golang头部操纵漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 严格验证头部值内容
+对所有设置到响应头部的值进行严格检查，禁止包含换行符（`\r\n`）和特殊字符。
+```go
+func sanitizeHeaderValue(input string) string {
+    return strings.ReplaceAll(
+        strings.ReplaceAll(input, "\r", ""), 
+        "\n", ""
+    )
+}
+
+// 使用安全设置方法
+safeValue := sanitizeHeaderValue(r.RequestURI)
+writer.Header().Set("Location", safeValue)
+```
+
+#### 2. 使用白名单校验
+对特定头部值（如Location）使用白名单校验，确保只允许预期格式的值：
+```go
+func isValidRedirectURL(url string) bool {
+    parsed, err := url.Parse(url)
+    if err != nil || !parsed.IsAbs() {
+        return false
+    }
+    // 只允许同源重定向或可信域名
+    return parsed.Host == "trusted.example.com"
+}
+```
+
+#### 3. 使用标准库的安全函数
+对于Cookie设置，应使用`http.SetCookie()`而非手动构造头部：
+```go
+http.SetCookie(writer, &http.Cookie{
+    Name:     "session",
+    Value:    "safe-value",
+    HttpOnly: true,
+    Secure:   true,
+})
+```
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP HTTP Response Splitting](https://owasp.org/www-community/attacks/HTTP_Response_Splitting)
+[CWE-113](https://cwe.mitre.org/data/definitions/113.html)
+REFERENCE
+)
+
+<include('golang-user-input')> as $input;
+$input.Header().Set(* as $sink)
+
+$sink #{
+	until: "*.RequestURI"
+}-> as $high
+
+alert $high for {
+	type: "vuln",
+	title: "Golang Header Manipulation Vulnerability Was Detected",
+	title_zh: "检测到Golang头操作漏洞",
+	level: "high",
+	message: "检测到Golang HTTP头注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **对用户输入进行严格的过滤和转义**
+   移除用户输入中的所有控制字符（如回车、换行符）。
+   ```go
+   // 修复代码示例
+   location := strings.ReplaceAll(r.RequestURI, "\r", "")
+   location = strings.ReplaceAll(location, "\n", "")
+   writer.Header().Set("Location", location)
+   ```
+
+2. **使用安全的跳转方式**
+   避免直接使用用户输入设置Location头，改用固定值或安全生成的URL。
+   ```go
+   // 安全跳转示例
+   http.Redirect(writer, r, "/safe-path", http.StatusFound)
+   ```
+
+3. **验证输入的有效性**
+   检查用户输入的URL是否合法，是否为预期的路径格式。
+   ```go
+   // 输入验证示例
+   if !isValidPath(r.RequestURI) {
+       http.Error(writer, "Invalid request path", http.StatusBadRequest)
+       return
+   }
+   ```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   由于应用程序未对HTTP头部的用户输入进行严格的过滤或转义处理，攻击者可通过构造特殊输入篡改HTTP响应头。这可能导致HTTP响应拆分攻击、缓存投毒或跨站脚本攻击。
+
+2. **触发场景**
+   存在漏洞的代码示例中直接使用了用户可控的输入设置HTTP头部（如Location头），恶意输入可注入换行符控制响应内容。
+
+3. **潜在影响**
+   - 导致HTTP响应拆分攻击，可能用于发起跨站脚本攻击。
+   - 缓存投毒，污染缓存服务器中的内容。
+   - 可能被用于跳转到恶意网站。
+DESC
+	name: "high",
+	risk: "HTTP头注入",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"net/http"
+)
+
+func ForceEnsureCookie(writer http.ResponseWriter, r *http.Request, key, val string) bool {
+	if r == nil {
+		Failed(writer, r, "request is nil")
+		return false
+	}
+	cookie, err := r.Cookie(key)
+	if cookie != nil && cookie.Name != "" && err == nil {
+		return true
+	}
+	writer.Header().Add("Set-Cookie", CookiesToString([]*http.Cookie{{
+		Name:  key,
+		Value: val,
+	}}))
+	writer.Header().Set("Location", r.RequestURI)
+	writer.WriteHeader(302)
+	return false
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package vulinbox
+
+import (
+	_ "embed"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"net/http"
+)
+
+func ForceEnsureCookie(writer http.ResponseWriter, r *http.Request, key, val string) bool {
+	if r == nil {
+		Failed(writer, r, "request is nil")
+		return false
+	}
+	cookie, err := r.Cookie(key)
+	if cookie != nil && cookie.Name != "" && err == nil {
+		return true
+	}
+	writer.Header().Add("Set-Cookie", CookiesToString([]*http.Cookie{{
+		Name:  key,
+		Value: val,
+	}}))
+	// writer.Header().Set("Location", r.RequestURI)
+	// writer.WriteHeader(302)
+	return false
+}
+SAFE
+)
