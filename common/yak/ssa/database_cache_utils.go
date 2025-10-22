@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -66,7 +65,7 @@ func (c *Cache[T]) Set(item T) {
 	c.SafeMapWithKey.Set(id, item)
 }
 
-func (c *Cache[T]) Close(wg *sync.WaitGroup) {
+func (c *Cache[T]) Close() {
 	if c.persistence == nil {
 		return
 	}
@@ -75,7 +74,7 @@ func (c *Cache[T]) Close(wg *sync.WaitGroup) {
 		c.persistence.Save(value)
 		return true
 	})
-	c.persistence.Close(wg)
+	c.persistence.Close()
 }
 
 func createInstructionCache(
@@ -177,7 +176,7 @@ func saveIrType(db *gorm.DB) func(t []*ssadb.IrType) {
 
 type PersistenceStrategy[T any] interface {
 	Save(item T)
-	Close(wg ...*sync.WaitGroup)
+	Close()
 }
 
 var _ PersistenceStrategy[any] = (*asyncdb.Save[any])(nil)
@@ -217,10 +216,10 @@ func (s *SerializingPersistenceStrategy[T, D]) Save(item T) {
 	s.pipe.Feed(item)
 }
 
-func (s *SerializingPersistenceStrategy[T, D]) Close(wg ...*sync.WaitGroup) {
+func (s *SerializingPersistenceStrategy[T, D]) Close() {
 	if s == nil {
 		return
 	}
 	s.pipe.Close()
-	s.save.Close(wg...)
+	s.save.Close()
 }
