@@ -347,6 +347,7 @@ func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary
 	r.EmitJSON(schema.EVENT_TOOL_CALL_DECISION, callToolId, map[string]any{
 		"call_tool_id": callToolId,
 		"action":       action,
+		"i18n":         schema.GetActionI18n(action),
 		"summary":      summary,
 	})
 }
