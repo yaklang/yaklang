@@ -9,6 +9,7 @@
 {{ .ExtraMetaInfo }}
 {{ end }}
 </CONTEXT_{{ .NONCE }}>
+
 <ITEMS_TO_COMPRESS_{{ .NONCE }}>
 {{ .ItemsToCompress }}
 </ITEMS_TO_COMPRESS_{{ .NONCE }}>
@@ -29,7 +30,7 @@
 
 # **输出格式：JSON**
 
-你 **必须** 将你的处理结果输出为一个严格遵守以下 Schema 的 JSON 对象。**不要**在 JSON 结构之外添加任何解释性文字。
+你 **必须** 将你的处理结果输出一个严格遵守以下 Schema 的 JSON 对象。
 
 ```schema
 {
@@ -38,6 +39,7 @@
   "required": ["@action", "reducer_memory"],
   "properties": {
     "@action": {
+      "type": "string",
       "const": "timeline-reducer"
     },
     "reducer_memory": {

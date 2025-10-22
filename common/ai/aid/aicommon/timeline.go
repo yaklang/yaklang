@@ -34,6 +34,8 @@ type Timeline struct {
 	// this limit is used to limit the timeline dump string size.
 	perDumpContentLimit   int64
 	totalDumpContentLimit int64
+
+	compressing *utils.Once
 }
 
 func (m *Timeline) Valid() bool {
@@ -87,6 +89,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		reducers:              m.reducers.Copy(),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
+		compressing:           utils.NewOnce(),
 	}
 	return tl
 }
@@ -154,6 +157,7 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
 		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{}),
 		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
+		compressing:      utils.NewOnce(),
 	}
 }
 
@@ -472,7 +476,29 @@ func (m *Timeline) compressForSizeLimit() {
 	log.Infof("content size %d > limit %d, compressing to half size: %d items",
 		currentSize, m.totalDumpContentLimit, targetSize)
 
-	m.batchCompressByTargetSize(targetSize)
+	if m.compressing.Done() {
+		m.compressing.Reset()
+	}
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("batch compress panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		m.compressing.DoOr(func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("batch compress panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			m.batchCompressByTargetSize(targetSize)
+		}, func() {
+			log.Info("batch compress is already running, skip this compress request")
+		})
+	}()
 }
 
 func (m *Timeline) shrink(currentItem *TimelineItem) {
