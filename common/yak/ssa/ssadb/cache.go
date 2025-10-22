@@ -40,8 +40,12 @@ func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
 }
 
 func DeleteCache(progName string) {
-	irTypeCaches.Delete(progName)
-	irCodeCaches.Delete(progName)
+	if irCodeCaches != nil {
+		irCodeCaches.Delete(progName)
+	}
+	if irTypeCaches != nil {
+		irTypeCaches.Delete(progName)
+	}
 }
 
 func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {

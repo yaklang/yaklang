@@ -78,6 +78,9 @@ func (sm *SafeMapWithKey[K, V]) Values() []V {
 }
 
 func (sm *SafeMapWithKey[K, V]) Delete(key K) {
+	if sm == nil {
+		return
+	}
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	delete(sm.m, key)
