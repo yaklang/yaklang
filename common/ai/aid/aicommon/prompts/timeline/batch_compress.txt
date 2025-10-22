@@ -4,17 +4,17 @@
 背景：随着任务的进展，整体 Timeline 可能会变得过长。为了保持效率并减少上下文负担，你需要对指定的多个 Timeline 项目进行批量再总结，目标是显著减少其长度，同时**绝对保留所有关键数据、决策和核心成果**。
 
 你 **必须** 基于提供的 `<CONTEXT>`、`<ITEMS_TO_COMPRESS>` 来操作。
-<CONTEXT_{{ .NONCE }}>
+<|CONTEXT_{{ .NONCE }}|>
 {{ if .ExtraMetaInfo }}
 {{ .ExtraMetaInfo }}
 {{ end }}
-</CONTEXT_{{ .NONCE }}>
+<|CONTEXT_END_{{ .NONCE }}|>
 
-<ITEMS_TO_COMPRESS_{{ .NONCE }}>
+<|ITEMS_TO_COMPRESS_{{ .NONCE }}|>
 {{ .ItemsToCompress }}
-</ITEMS_TO_COMPRESS_{{ .NONCE }}>
+<|ITEMS_TO_COMPRESS_END_{{ .NONCE }}|>
 
-请仔细分析 `<ITEMS_TO_COMPRESS>` 中指定的 {{ .ItemCount }} 个 Timeline 项目。基于 `<CONTEXT>` 的理解，执行以下操作：
+请仔细分析 `<|ITEMS_TO_COMPRESS...|>` 中指定的 {{ .ItemCount }} 个 Timeline 项目。基于 `<CONTEXT>` 的理解，执行以下操作：
 
 1.  **识别核心价值**：从所有项目中提取出绝对关键的信息，例如：
     *   重要的决策及其理由。
@@ -26,7 +26,6 @@
     *   已被后续信息更新或替代的旧数据。
     *   不必要的细节、重复说明或过长的解释。
     *   已完成且结果已明确的工具调用的中间步骤（除非这些步骤本身包含关键参数）。
-3.  **生成浓缩记忆**：将提炼出的核心价值信息，用最简洁、最直接的语言重新组织成一段新的文本。这段文本将取代原始的所有项目内容。
 
 # **输出格式：JSON**
 
@@ -36,7 +35,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["@action", "reducer_memory"],
+  "required": ["@action"],
   "properties": {
     "@action": {
       "type": "string",
@@ -44,8 +43,22 @@
     },
     "reducer_memory": {
       "type": "string",
-      "description": "对<ITEMS_TO_COMPRESS>中指定的所有项目进行高度精炼和浓缩后的文本。此文本应显著缩短原始长度，只保留最核心的关键数据、决策、成果和逻辑，去除所有不必要的上下文和冗余信息，以减少后续处理的 Token 消耗。"
+      "note": "如果 memory 内有很多需要转义的内容，请你使用 <|REDUCER_MEMORY_{{ .NONCE }}|> 来输出文本块，可以避免转义问题。",
+      "description": "短回答，对<ITEMS_TO_COMPRESS>中指定的所有项目进行压缩后的文本。此文本应显著缩短原始长度，只保留最核心的关键数据、决策、成果和逻辑，去除所有不必要的上下文和冗余信息，以减少后续处理的 Token 消耗。"
     }
   }
 }
 ```
+
+输出案例：
+
+## Good Case 1
+
+{"@action": "timeline-reducer"}
+<|REDUCER_MEMORY_{{ .NONCE }}|>
+之前发生的事件为A，有关键指标B，这个动作需要注意C的行为和潜在风险。
+<|REDUCER_MEMORY_END_{{ .NONCE }}|>
+
+## Good Case 2
+
+{"@action": "timeline-reducer", "reducer_memory": "简短但是有力的回答。"}
