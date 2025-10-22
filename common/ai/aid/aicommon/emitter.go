@@ -343,6 +343,14 @@ func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) {
 	})
 }
 
+func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary string) {
+	r.EmitJSON(schema.EVENT_TOOL_CALL_DECISION, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"action":       action,
+		"summary":      summary,
+	})
+}
+
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
 	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex)
 	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex)
