@@ -8,12 +8,9 @@ on:
     branches: [main]
     types: [ opened, synchronize, reopened ]
     paths:
-      - "go.mod"
       - ".github/workflows/diff-code-check.yml"
-      - ".github/workflows/security-comment-simple.yml"
       - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
-      - "common/syntaxflow/sfbuildin/buildin/golang/**"
       - "scripts/ssa-risk-tools/**"
 
 concurrency:

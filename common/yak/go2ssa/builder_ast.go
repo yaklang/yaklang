@@ -1970,9 +1970,13 @@ func (b *astbuilder) buildAssignment(stmt *gol.AssignmentContext) []ssa.Value {
 			ssaop = ssa.OpShr
 		case "&^=":
 			ssaop = ssa.OpAndNot
+		default:
+			return rightvl
 		}
-		retv := b.EmitBinOp(ssaop, b.ReadValueByVariable(leftvl[0]), rightvl[0])
-		b.AssignList(leftvl, []ssa.Value{retv})
+		if len(leftvl) > 0 && len(rightvl) > 0 {
+			retv := b.EmitBinOp(ssaop, b.ReadValueByVariable(leftvl[0]), rightvl[0])
+			b.AssignList(leftvl, []ssa.Value{retv})
+		}
 	}
 
 	return rightvl
