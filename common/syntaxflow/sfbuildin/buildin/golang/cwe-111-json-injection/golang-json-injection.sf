@@ -121,7 +121,10 @@ none
 REFERENCE
 )
 
-json.Unmarshal(* as $unmarshal)
+<include("golang-user-input")> as $user_input
+json?{<fullTypeName>?{have: "encoding/json"}} as $json
+
+$json.Unmarshal(* as $unmarshal)
 
 *.ReadBytes -{
     until: "* & $unmarshal"
@@ -129,6 +132,11 @@ json.Unmarshal(* as $unmarshal)
 
 json.Marshal(* #-> as $marshal_param);
 $unmarshal & $sink as $high;
+
+$json.NewDecoder(* as $sink2);
+$sink2 #{
+    until: "* & $user_input"
+}-> as $high;
 
 
 alert $high for {

@@ -1,0 +1,205 @@
+desc(
+	title: "Detect Golang Command Injection Vulnerability in HTTP"
+	title_zh: "检测Golang HTTP命令注入漏洞"
+	type: audit
+	severity: high
+	risk: "rce"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   命令注入漏洞发生在应用程序通过不可信来源（如HTTP请求参数）构造操作系统命令时。攻击者可以通过精心构造的输入在服务器上执行任意命令，导致服务器被完全控制。在Golang中，当使用`os/exec`包构造命令并直接拼接用户输入时，尤其容易受到此类攻击。
+
+2. **触发场景**
+   ```go
+   ip := request.URL.Query().Get("ip")
+   raw := fmt.Sprintf("ping %v", ip)
+   outputs, err := exec.CommandContext(ctx, "bash", "-c", raw).CombinedOutput()
+   ```
+   如果攻击者输入`127.0.0.1 && rm -rf /`，服务器将执行删除根目录的危险操作。
+
+3. **潜在影响**
+   - 服务器被完全控制
+   - 敏感数据泄露
+   - 服务器可用性被破坏（如通过删除关键文件）
+   - 可能成为内部网络渗透的跳板
+DESC
+	rule_id: "1bec797b-053e-4774-a36e-b4241402895e"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化执行
+避免直接拼接用户输入到命令中，使用数组形式传递参数：
+```go
+args := []string{"-c", "ping", ip}
+cmd := exec.CommandContext(ctx, "bash", args...)
+```
+
+#### 2. 输入验证
+严格限制输入格式（如只允许IP地址格式）：
+```go
+validIP := net.ParseIP(ip)
+if validIP == nil {
+    http.Error(w, "Invalid IP address", http.StatusBadRequest)
+    return
+}
+```
+
+#### 3. 使用安全库
+考虑使用`shlex`等安全库来解析命令：
+```go
+list, err := shlex.Split(fmt.Sprintf("ping %v", ip))
+if err != nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+}
+cmd := exec.CommandContext(ctx.getElement(0), list[1:]...)
+```
+
+#### 4. 最小权限原则
+以最低权限运行命令执行进程，避免root权限执行。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+)
+
+<include("golang-user-input")> as $user_input
+
+exec?{<fullTypeName()>?{have: "os/exec"}} as $exec;
+
+$exec.CommandContext(*<slice(index=1)> -> as $sink);
+$exec.CommandContext(*<slice(index=2)> -> as $sink);
+
+$sink #{
+    until: '* & $user_input'
+}-> as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "Golang Command Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang命令注入漏洞",
+	risk: "命令注入",
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package vulinbox
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"os/exec"
+	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
+)
+
+func (s *VulinServer) registerPingCMDI() {
+	r := s.router
+
+	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例 (Unsafe Mode)").Subrouter()
+	cmdIRoutes := []*VulInfo{
+		{
+			DefaultQuery: "ip=127.0.0.1",
+			Path:         "/ping/shlex",
+			Title:        "Shlex  解析的命令注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				ip := request.URL.Query().Get("ip")
+				if ip == "" {
+					writer.Write([]byte(`no ip set`))
+					return
+				}
+				raw := fmt.Sprintf("ping %v", ip)
+				list, err := shlex.Split(raw)
+				if err != nil {
+					writer.Write([]byte(`shlex parse failed: ` + err.Error()))
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				outputs, err1 := exec.CommandContext(ctx, list[0], list[1:]...).CombinedOutput()
+				// 尝试将 GBK 转换为 UTF-8
+				utf8Outputs, err2 := utils.GbkToUtf8(outputs)
+				if err2 != nil {
+					writer.Write(outputs)
+				} else {
+					writer.Write(utf8Outputs)
+				}
+				if err1 != nil {
+					writer.Write([]byte("exec : " + err1.Error()))
+					return
+				}
+			},
+			RiskDetected: false,
+		},
+	}
+
+	for _, v := range cmdIRoutes {
+		addRouteWithVulInfo(cmdIGroup, v)
+	}
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package vulinbox
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"os/exec"
+	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
+)
+
+func (s *VulinServer) registerPingCMDI() {
+	r := s.router
+
+	cmdIGroup := r.PathPrefix("/exec").Name("命令注入测试案例 (Unsafe Mode)").Subrouter()
+	cmdIRoutes := []*VulInfo{
+		{
+			DefaultQuery: "ip=127.0.0.1",
+			Path:         "/ping/bash",
+			Title:        "Bash  解析的命令注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				ip := "aaaaaaaaaaa"
+				if ip == "" {
+					writer.Write([]byte(`no ip set`))
+					return
+				}
+				raw := fmt.Sprintf("ping %v", ip)
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				outputs, err1 := exec.CommandContext(ctx, `bash`, "-c", raw).CombinedOutput()
+				// 尝试将 GBK 转换为 UTF-8
+				utf8Outputs, err2 := utils.GbkToUtf8(outputs)
+				if err2 != nil {
+					writer.Write(outputs)
+				} else {
+					writer.Write(utf8Outputs)
+				}
+				if err1 != nil {
+					writer.Write([]byte("exec : " + err1.Error()))
+					return
+				}
+			},
+			RiskDetected: true,
+		},
+	}
+
+	for _, v := range cmdIRoutes {
+		addRouteWithVulInfo(cmdIGroup, v)
+	}
+}
+
+SAFE
+)
+

@@ -1,0 +1,187 @@
+desc(
+	title: "Detect Golang Insecure Transport Vulnerability"
+	title_zh: "检测Golang不安全传输漏洞"
+	type: audit
+	level: critical
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   不安全的传输漏洞是由于应用程序使用了未加密的HTTP协议进行通信，而不是更安全的HTTPS协议。攻击者可以通过中间人攻击（MITM）截获、篡改或窃取传输中的数据。在没有加密的情况下，敏感信息如用户凭证、会话令牌等可以被轻易窃取。
+
+2. **触发场景**
+   ```go
+   package main
+
+   import (
+       "io"
+       "log"
+       "net/http"
+   )
+
+   func main() {
+       helloHandler := func(w http.ResponseWriter, req *http.Request) {
+           io.WriteString(w, "Hello, world!\n")
+       }
+       http.HandleFunc("/hello", helloHandler)
+       log.Fatal(http.ListenAndServe(":8080", nil))
+   }
+   ```
+   上述代码使用了`http.ListenAndServe`，这会启动一个未加密的HTTP服务，使得所有传输的数据都是明文。
+
+3. **潜在影响**
+   - 敏感数据（如用户凭证、会话令牌）可能被窃取。
+   - 攻击者可以篡改传输中的数据。
+   - 可能导致用户信任度下降，影响业务声誉。
+DESC
+	rule_id: "d151f41e-648c-45dd-b5e7-eebe64f59225"
+	title_zh: "检测Golang不安全传输漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用HTTPS协议
+   通过使用`http.ListenAndServeTLS`替代`http.ListenAndServe`，可以启用加密传输。
+   ```go
+   package main
+
+   import (
+       "io"
+       "log"
+       "net/http"
+   )
+
+   func main() {
+       http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+           io.WriteString(w, "Hello, Secure World!\n")
+       })
+       // 使用HTTPS协议
+       log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
+   }
+   ```
+
+#### 2. 获取有效的TLS证书
+   确保使用由可信CA颁发的TLS证书。可以使用Let's Encrypt等服务免费获取证书。
+
+#### 3. 强制HTTPS
+   在服务器配置中强制使用HTTPS，并启用HSTS（HTTP Strict Transport Security）策略。
+   ```go
+   // 重定向HTTP到HTTPS
+   func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
+       http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
+   }
+
+   func main() {
+       go http.ListenAndServe(":80", http.HandlerFunc(redirectToHTTPS))
+       http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil)
+   }
+   ```
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP TLS指南](https://owasp.org/www-project-transport-layer-security-cheat-sheet/)
+[CWE-319](https://cwe.mitre.org/data/definitions/319.html)
+REFERENCE
+)
+
+http?{<fullTypeName>?{have: "net/http"}} as $http
+
+$http.ListenAndServe as $critical
+
+alert $critical for {
+	type: "vuln",
+	title: "Golang Insecure Transport Vulnerability Was Detected",
+	title_zh: "检测到Golang不安全传输漏洞",
+	level: "critical",
+	message: "检测到Golang中使用不安全的HTTP协议传输数据，建议使用HTTPS协议进行传输。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用HTTPS协议
+   通过使用HTTPS协议加密数据传输，防止数据在传输过程中被窃听或篡改。
+   ```go
+   package main
+   import (
+       "io"
+       "log"
+       "net/http"
+   )
+   func main() {
+       http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+           io.WriteString(w, "Hello, Secure World!\n")
+       })
+       // 使用HTTPS协议
+       log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
+   }
+   ```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   使用不安全的HTTP协议传输数据，可能导致数据在传输过程中被窃听或篡改。
+
+2. **触发场景**
+   ```go
+   package main
+   import (
+       "io"
+       "log"
+       "net/http"
+   )
+   func main() {
+       helloHandler := func(w http.ResponseWriter, req *http.Request) {
+           io.WriteString(w, "Hello, world!\n")
+       }
+       http.HandleFunc("/hello", helloHandler)
+       log.Fatal(http.ListenAndServe(":8080", nil))
+   }
+   ```
+
+3. **潜在影响**
+   - 数据在传输过程中可能被窃听或篡改。
+   - 攻击者可能利用中间人攻击获取敏感信息。
+DESC
+	name: "critical",
+	risk: "不安全传输",
+}
+
+desc(
+	lang: golang
+	alert_critical: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+    "io"
+    "log"
+    "net/http"
+)
+
+func main() {
+	helloHandler := func(w http.ResponseWriter, req *http.Request) {
+		io.WriteString(w, "Hello, world!\n")
+	}
+	
+	http.HandleFunc("/hello", helloHandler)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "io"
+    "log"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+        io.WriteString(w, "Hello, Secure World!\n")
+    })
+    
+    // 使用HTTPS协议
+    log.Fatal(http.ListenAndServeTLS(":443", "cert.pem", "key.pem", nil))
+}
+SAFE
+)
