@@ -3,6 +3,7 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils/linktable"
@@ -92,6 +93,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	timeline := &Timeline{
 		perDumpContentLimit:   serializable.PerDumpContentLimit,
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
+		compressing:           utils.NewOnce(),
 	}
 
 	// 恢复 idToTs
