@@ -199,6 +199,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				}
 			}
 			var actionErr error
+
 			action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
 				stream, "object", actionNames,
 				[]jsonextractor.CallbackOption{
