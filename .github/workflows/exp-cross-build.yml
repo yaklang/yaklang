@@ -146,12 +146,18 @@ jobs:
       - name: Sync Embed FS Hash to Code
         run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
 
+      - name: Install gzip-embed tool
+        run: go install github.com/yaklang/yaklang/common/utils/gzip_embed/gzip-embed@latest || go install ./common/utils/gzip_embed/gzip-embed
+
+      - name: Generate yakscriptforai tar.gz
+        run: go generate ./common/ai/aid/aitool/buildinaitools/yakscripttools/...
+
       - name: Initialize License Machine
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
 
       - name: Build
         run: |
-          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
+          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
       # release
       - name: Generate Checksums
         run: |
