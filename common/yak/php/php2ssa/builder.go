@@ -211,7 +211,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentCon
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.HtmlDocument()
-	log.Errorf("ast: %v", ast.ToStringTree(parser.RuleNames, parser))
+	// log.Errorf("ast: %v", ast.ToStringTree(parser.RuleNames, parser))
 	return ast, errListener.Error()
 }
 
