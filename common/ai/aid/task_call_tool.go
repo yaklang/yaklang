@@ -134,6 +134,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 		}
 
 		t.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action.Name())
+		t.EmitToolCallDecision(result.ToolCallID, action.Name(), t.GetSummary())
 		return nil
 	})
 	if err != nil {
