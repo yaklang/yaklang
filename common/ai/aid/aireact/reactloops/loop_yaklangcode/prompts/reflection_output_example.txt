@@ -69,7 +69,15 @@ defer reader.Close()
 {"@action": "query_document", "human_readable_thought": "我反复遇到语法错误，不确定Yaklang中正确的错误处理方式。我将使用关键词和正则表达式来搜索 'die(err)' 和 '~' 操作符的用法示例。", "keywords": ["error handling", "错误处理", "die"], "regexp": ["die\\(err\\)", "~\s*$"]}
 ```
 **这也是正确的做法！** AI 认识到自己对基础语法不熟，于是结合**关键词（概念）**和**正则表达式（具体模式）**来查找权威的示例代码，从而学习正确的语法范式。
+---
 
+### **示例5: `rag_search_payload` 动作（当编写代码有疑问的时候）**
+
+**场景**: AI 需要实现一个功能：通过 HTTP GET 请求获取一个网站的标题，但不确定具体应该使用哪个库、哪个函数，以及如何从返回结果中解析出标题。
+
+```json
+{"@action": "rag_search_payload", "human_readable_thought": "我需要编写代码来获取一个URL的网页标题。我对Yaklang中处理HTTP请求和HTML解析的库不熟悉。因此，我将使用关键词搜索与HTTP请求和HTML解析相关的函数，并直接提问如何组合它们来实现我的目标。", "keywords": ["http get", "fuzz.http", "html", "title", "获取标题"], "questions": ["如何用Yaklang发送一个HTTP GET请求并获取返回网页的标题？"]}
+```
 ---
 
 ### 错误示例 2：包含行号前缀（绝对禁止！）
