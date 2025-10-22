@@ -2,13 +2,20 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestExportTemp(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip github actions")
+		return
+	}
+
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
