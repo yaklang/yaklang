@@ -139,8 +139,18 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		}
 	}
 
-	var typeHandler func(ssa.Type, []keyValue) ssa.Value
+	getUndefinedObj := func() ssa.Value {
+		obj := b.InterfaceAddFieldBuild(0,
+			func(i int) ssa.Value {
+				return b.EmitConstInst(i)
+			},
+			func(i int) ssa.Value {
+				return b.EmitConstInst(i)
+			})
+		return obj
+	}
 
+	var typeHandler func(ssa.Type, []keyValue) ssa.Value
 	typeHandler = func(typ ssa.Type, kvs []keyValue) ssa.Value {
 		var obj ssa.Value
 
@@ -252,13 +262,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			}
 		case ssa.InterfaceTypeKind:
 			// TODO
-			obj = b.InterfaceAddFieldBuild(0,
-				func(i int) ssa.Value {
-					return b.EmitConstInst(i)
-				},
-				func(i int) ssa.Value {
-					return b.EmitConstInst(i)
-				})
+			obj = getUndefinedObj()
 		case ssa.AliasTypeKind:
 			alias := typ.(*ssa.AliasType)
 			obj = typeHandler(alias.GetType(), kvs)
@@ -266,7 +270,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			var objtyp ssa.Type
 
 			if len(kvs) == 0 {
-				return b.EmitUndefined(typ.String())
+				return getUndefinedObj()
 			}
 			if kvs[0].value != nil {
 				return kvs[0].value
@@ -284,18 +288,12 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					objtyp.(*ssa.ObjectType).AddField(kv.key, value.GetType())
 				}
 			} else {
-				return b.EmitUndefined(objtyp.String())
+				return getUndefinedObj()
 			}
 
 			return typeHandler(objtyp, kvs)
 		case ssa.UndefinedTypeKind:
-			obj = b.InterfaceAddFieldBuild(0,
-				func(i int) ssa.Value {
-					return b.EmitConstInst(i)
-				},
-				func(i int) ssa.Value {
-					return b.EmitConstInst(i)
-				})
+			obj = getUndefinedObj()
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
 			return kvs[0].value
 		default:

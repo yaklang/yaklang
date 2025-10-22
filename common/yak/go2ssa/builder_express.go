@@ -545,6 +545,12 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.EmitConstInstPlaceholder(c)
 		}
 
+		if v := b.PeekValueInRoot(text); !utils.IsNil(v) {
+			if ex, ok := ssa.ToExternLib(v); ok {
+				return ex
+			}
+		}
+
 		if v := b.PeekValue(text); !utils.IsNil(v) {
 			return v
 		}
@@ -555,12 +561,6 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 
 		if f, ok := b.GetFunc(text, ""); ok {
 			return f
-		}
-
-		if v := b.PeekValueInRoot(text); !utils.IsNil(v) {
-			if ex, ok := ssa.ToExternLib(v); ok {
-				return ex
-			}
 		}
 
 		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))

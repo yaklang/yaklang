@@ -210,6 +210,55 @@ func Cors1(c *gin.Context) {
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
+
+	t.Run("check object in closure and function", func(t *testing.T) {
+		code := `package vulinbox
+
+import (
+	_ "embed"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"strconv"
+	"strings"
+	"text/template"
+	"time"
+)
+
+func (s *VulinServer) mallUserRoute() {
+	http.SetCookie2(writer, &http.Cookie{
+		Name:    "sessionID2",
+	})
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
+		{
+			DefaultQuery: "",
+			Path:         "/user/login",
+			// Title:        "商城登陆",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				http.SetCookie(writer, &http.Cookie{
+					Name:    "sessionID1",
+				})
+			
+				return
+			},
+			RiskDetected: true,
+		},
+	}
+}
+			`
+		ssatest.CheckSyntaxFlow(t, code, `
+	http.SetCookie(*<slice(index=1)>.Name as $a) 
+	http.SetCookie2(*<slice(index=1)>.Name as $b)
+
+		`, map[string][]string{
+			"a": {`"sessionID1"`},
+			"b": {`"sessionID2"`},
+		},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }
 
 func TestMutiReturn_TopDef_Syntaxflow(t *testing.T) {
