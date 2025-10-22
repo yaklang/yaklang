@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +18,8 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 
@@ -658,7 +659,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 		clientPassword := ctx.String("client-password")
 
-		var version string
+		var version = consts.GetYakVersion()
 		var secret = utils.RandStringBytes(16)
 
 		defer func() {
@@ -750,7 +751,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			fmt.Printf("  Server: %s\n", addr)
 			fmt.Printf("  Password: ***\n")
 			fmt.Printf("  Version: %s\n\n", versionResp.Version)
-
+			version = versionResp.Version
 			finalError = nil
 			return
 		}
@@ -875,6 +876,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		fmt.Printf("  Port: %d\n", port)
 		fmt.Printf("  Secret: %s\n", secret)
 		fmt.Printf("  Version: %s\n\n", versionResp.Version)
+		version = versionResp.Version
 		finalError = nil
 		return
 	},
