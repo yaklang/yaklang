@@ -3,7 +3,7 @@ package loop_yaklangcode
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aicommon_mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
