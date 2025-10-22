@@ -2,7 +2,7 @@ package aimem
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/aimem_mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aicommon_mock"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,7 +14,7 @@ func TestHandleMemory_Basic(t *testing.T) {
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
+		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
@@ -53,7 +53,7 @@ func TestHandleMemory_Deduplication(t *testing.T) {
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
+		WithInvoker(mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
