@@ -19,7 +19,7 @@ func mockedToolCallingForRemove(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": "directly_answer", "directly_answer": "Task completed"}
+{"@action": "directly_answer", "answer_payload": "Task completed"}
 `))
 		rsp.Close()
 		return rsp, nil
