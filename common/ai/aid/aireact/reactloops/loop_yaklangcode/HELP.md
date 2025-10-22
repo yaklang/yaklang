@@ -58,9 +58,9 @@ AI Agent 在编写 Yaklang 代码时经常出现以下问题：
 
 #### 推荐描述
 ```
-🔍 Grep Yaklang 代码样例库 - 快速搜索真实代码示例
+Grep Yaklang 代码样例库 - 快速搜索真实代码示例
 
-⚠️ 核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
+核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
 
 【强制使用场景】：
 1. 编写任何代码前，先 grep 相关函数用法
@@ -118,16 +118,16 @@ pattern="端口扫描|服务扫描", context_lines=25     // 搜索相关功能
 ### 具体执行准则
 
 1. **禁止臆造代码**
-   ❌ 看到需求就直接写代码
-   ✅ 先 grep_yaklang_samples 搜索相关函数
+   [错误] 看到需求就直接写代码
+   [正确] 先 grep_yaklang_samples 搜索相关函数
 
 2. **禁止猜测 API**
-   ❌ "我觉得应该是 synscan.timeout(...)"
-   ✅ "让我先 grep 'synscan' 看看有哪些选项"
+   [错误] "我觉得应该是 synscan.timeout(...)"
+   [正确] "让我先 grep 'synscan' 看看有哪些选项"
 
 3. **禁止重复试错**
-   ❌ 连续 3 次 modify_code 尝试不同的 API 名称
-   ✅ 第一次失败立即 grep 搜索正确用法
+   [错误] 连续 3 次 modify_code 尝试不同的 API 名称
+   [正确] 第一次失败立即 grep 搜索正确用法
 
 4. **强制搜索场景**（必须先 grep）
    - 编写任何新功能前
@@ -151,8 +151,8 @@ pattern="端口扫描|服务扫描", context_lines=25     // 搜索相关功能
 【步骤5】modify_code 修正（基于搜索结果）
 ```
 
-❌ 错误流程：需求 → 写代码 → 报错 → 猜测修改 → 报错 → 再猜测...
-✅ 正确流程：需求 → grep 搜索 → 写代码 → 报错 → grep 搜索 → 精确修改
+[错误流程] 需求 → 写代码 → 报错 → 猜测修改 → 报错 → 再猜测...
+[正确流程] 需求 → grep 搜索 → 写代码 → 报错 → grep 搜索 → 精确修改
 ```
 
 #### 3.2 修改 `reactive_data.txt` 错误提示部分
@@ -194,12 +194,12 @@ pattern="端口扫描|服务扫描", context_lines=25     // 搜索相关功能
    → 示例：grep regexp=["servicescan\\.Scan.*opts"]
 
 **禁止的错误行为：**
-❌ 看到 `synscan.timeout` 不存在 → 尝试 `synscan.set_timeout`
-❌ 看到 `synscan.set_timeout` 不存在 → 尝试 `synscan.withTimeout`
-❌ 继续猜测 `synscan.setTimeout`, `synscan.timeoutOption`...
+[错误] 看到 `synscan.timeout` 不存在 → 尝试 `synscan.set_timeout`
+[错误] 看到 `synscan.set_timeout` 不存在 → 尝试 `synscan.withTimeout`
+[错误] 继续猜测 `synscan.setTimeout`, `synscan.timeoutOption`...
 
 **正确的行为：**
-✅ 看到 `synscan.timeout` 不存在 → 立即 grep_yaklang_samples
+[正确] 看到 `synscan.timeout` 不存在 → 立即 grep_yaklang_samples
    ```json
    {"@action": "grep_yaklang_samples", 
     "keywords": ["synscan"], 
@@ -315,9 +315,9 @@ ExternLib [synscan] don't has [callback], maybe you meant excludePorts?
 var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"grep_yaklang_samples",  // 改名！
-		`🔍 Grep Yaklang 代码样例 - 【必须优先使用】
+		`Grep Yaklang 代码样例 - 【必须优先使用】
 
-⚠️ 铁律：禁止臆造 Yaklang 代码！必须先 grep 真实样例！
+铁律：禁止臆造 Yaklang 代码！必须先 grep 真实样例！
 
 这是一个 grep 工具，用于搜索 Yaklang 代码样例库中的真实代码。
 
@@ -463,37 +463,37 @@ type CodeGenMetrics struct {
 
 ### 阶段1：立即改进（高优先级）
 
-1. ✅ **改名工具**
+1. [完成] **改名工具**
    - `query_document` → `grep_yaklang_samples`
    - 修改 `action_query_document.go` 中的注册名称
 
-2. ✅ **更新工具描述**
+2. [完成] **更新工具描述**
    - 强调"禁止臆造"
    - 明确"搜索优先"
    - 添加使用示例
 
-3. ✅ **强化 Prompt**
+3. [完成] **强化 Prompt**
    - 在 `persistent_instruction.txt` 开头添加八荣八耻
    - 强调强制搜索场景
 
 ### 阶段2：增强验证（中优先级）
 
-4. ✅ **修改错误提示**
+4. [完成] **修改错误提示**
    - 在 `reactive_data.txt` 中添加强制搜索提示
    - 明确何时必须 grep
 
-5. ✅ **添加示例**
+5. [完成] **添加示例**
    - 在 `reflection_output_example.txt` 添加正反示例
    - 展示正确的 grep 工作流
 
 ### 阶段3：智能检查（可选）
 
-6. ⭕ **添加强制检查逻辑**
+6. [可选] **添加强制检查逻辑**
    - 检测连续 modify 没有 grep
    - 检测 API 错误后没有 grep
    - 自动建议 grep 查询
 
-7. ⭕ **添加指标监控**
+7. [可选] **添加指标监控**
    - 统计 grep 使用率
    - 监控盲目修改次数
    - 生成质量报告
@@ -675,4 +675,252 @@ case_sensitive=true    // 精确搜索特定大小写的函数
 ---
 
 **记住：一次正确的 grep 胜过十次错误的猜测！**
+
+---
+
+## 阶段4：语义搜索增强（未来优化）
+
+### 新增工具：search_yaklang_solutions
+
+#### 设计理念
+
+基于现有的 `grep_yaklang_samples` 和 `query_document`，新增第三个搜索工具 `search_yaklang_solutions`，用于语义搜索。
+
+#### 工具对比
+
+| 特性 | grep_yaklang_samples | query_document | search_yaklang_solutions（新） |
+|------|---------------------|----------------|----------------------|
+| 搜索方式 | 精确模式匹配 | 结构化文档查询 | 语义理解搜索 |
+| 输入方式 | pattern（正则/关键词） | 库名/函数名/关键词 | 自然语言问题 |
+| 使用场景 | 知道关键词，找代码 | 知道库名，查文档 | 描述问题，找解决方案 |
+| 返回结果 | 代码片段 + 上下文 | 结构化文档 | 相关代码示例 + 说明 |
+| 技术实现 | 正则/子串匹配 | 索引查询 | RAG 语义检索 |
+| 速度 | 最快 | 快 | 中等 |
+| 精确度 | 高（需精确关键词） | 高（需知道库名） | 中（理解意图） |
+
+#### 命名理由
+
+**`search_yaklang_solutions`**
+
+1. **search vs grep**
+   - `grep` - Unix 风格，精确模式匹配
+   - `search` - 更高层次，语义理解搜索
+
+2. **solutions vs samples/code**
+   - `samples` - 代码样例（grep 的目标）
+   - `solutions` - 解决方案（RAG 的目标）
+   - 强调"解决问题"而不只是"找代码"
+
+3. **适用场景差异**
+   - grep_yaklang_samples: "我知道我要找什么，给我代码"
+   - search_yaklang_solutions: "我有个问题，给我解决方案"
+
+#### 工具描述
+
+```
+Search Yaklang 解决方案 - 通过自然语言问题搜索解决方案
+
+适用场景：
+1. 不确定用哪个库/函数时 - 描述你的需求
+2. 需要理解某个功能如何实现 - 提问具体问题
+3. grep 找不到合适结果时 - 换个角度描述问题
+
+【参数说明】：
+- question (必需) - 用自然语言描述你的问题或需求
+  * "如何实现端口扫描？"
+  * "怎样处理 HTTP 请求的超时？"
+  * "Yaklang 中如何读取文件内容？"
+  
+- max_results (可选) - 返回结果数量，默认 5
+  * 3-5: 快速查看主要方案（推荐）
+  * 5-8: 需要更多选择时
+  * 8-10: 全面了解所有可能方案
+
+【使用示例】：
+search_yaklang_solutions(question="如何实现端口扫描", max_results=5)
+search_yaklang_solutions(question="Yaklang中的错误处理最佳实践", max_results=3)
+search_yaklang_solutions(question="如何并发执行多个HTTP请求", max_results=5)
+
+【与 grep 的区别】：
+- grep: 你知道关键词（如 "servicescan"），找代码
+- search: 你描述问题（如 "端口扫描"），找方案
+
+建议：
+1. 优先使用 grep_yaklang_samples（速度快，结果精确）
+2. grep 找不到时使用 search_yaklang_solutions（理解意图）
+3. 需要深入学习时使用 query_document（完整文档）
+```
+
+#### 核心参数
+
+##### question 参数
+
+**类型**：string (必需)
+
+**作用**：用自然语言描述你的问题或需求，RAG 系统会理解问题意图并返回相关的代码示例
+
+**推荐问法**：
+
+1. **How类问题**（如何实现）
+   ```
+   "如何实现端口扫描？"
+   "How to send HTTP POST request in Yaklang?"
+   "怎样并发执行多个任务？"
+   ```
+
+2. **What类问题**（是什么）
+   ```
+   "Yaklang中的错误处理是什么样的？"
+   "What is the best way to parse JSON?"
+   "servicescan 库有哪些主要功能？"
+   ```
+
+3. **需求描述**
+   ```
+   "我需要扫描1000个端口并设置3秒超时"
+   "读取ZIP文件中的所有文本文件"
+   "发送HTTP请求并解析响应的JSON"
+   ```
+
+**注意事项**：
+- 问题要具体明确（避免过于宽泛）
+- 可以中英文混用
+- 描述功能需求而不是技术细节
+- 如果结果不理想，尝试换个角度重新提问
+
+##### max_results 参数
+
+**类型**：int (可选)
+
+**默认值**：5
+
+**作用**：控制返回的解决方案数量
+
+**推荐值**：
+
+| 场景 | 推荐值 | 说明 |
+|------|--------|------|
+| 快速查看主要方案 | 3-5 | 查看最相关的几个示例（推荐） |
+| 需要更多选择 | 5-8 | 对比不同实现方式 |
+| 全面了解所有方案 | 8-10 | 深入研究，看所有可能性 |
+
+#### 实现要点
+
+1. **基于现有 RAG 基础设施**
+   - 复用 `document_searcher_rag.go` 中的 RAG 实现
+   - 使用 `rag.NewEmbeddingManager()` 进行语义检索
+   - 返回格式与 grep 类似（代码片段 + 上下文）
+
+2. **与 grep 的技术对比**
+   - `grep_yaklang_samples`: 使用 `ziputil.ZipGrepSearcher` 进行正则/子串匹配
+   - `search_yaklang_solutions`: 使用 `rag.EmbeddingManager` 进行向量检索
+
+3. **实现简洁性**
+   - 不修改现有代码逻辑
+   - 新建 `action_search_yaklang_solutions.go`
+   - 参数简单：只需 `question` 和 `max_results`
+   - 复用现有的 summarizer（可选）
+
+#### 使用场景示例
+
+**场景1：不知道用什么库**
+```
+需求：我想扫描端口，但不知道用哪个库
+
+错误做法：猜测 portscan.Scan, scan.Port ...
+grep 做法：grep_yaklang_samples("端口扫描", context_lines=20)
+         → 需要你知道关键词"端口扫描"或"scan"
+search 做法：search_yaklang_solutions("我需要扫描目标的端口")
+          → 理解意图，返回 servicescan/synscan 相关方案
+```
+
+**场景2：grep 没找到合适结果**
+```
+尝试：grep_yaklang_samples("timeout|超时", context_lines=15)
+结果：找到很多不相关的 timeout
+
+优化：search_yaklang_solutions("servicescan 如何设置扫描超时")
+结果：返回 servicescan.probeTimeout 相关的代码示例
+```
+
+**场景3：学习新功能**
+```
+问题：我不知道 Yaklang 如何处理并发
+
+grep：grep_yaklang_samples("并发|concurrent", context_lines=20)
+     → 找到很多代码但不知道哪个是推荐做法
+
+search：search_yaklang_solutions("Yaklang中并发编程的最佳实践")
+       → 返回经过整理的并发示例和说明
+```
+
+#### 工具选择决策树
+
+```
+问题/需求
+  ↓
+1. 你知道精确的库名或函数名吗？
+   是 → 使用 grep_yaklang_samples("servicescan\\.Scan", ...)
+   否 → 往下
+
+2. 你能描述关键词吗？
+   是 → 使用 grep_yaklang_samples("端口扫描|portscan", ...)
+   否 → 往下
+
+3. 你只能用自然语言描述问题吗？
+   是 → 使用 search_yaklang_solutions("如何扫描端口并处理结果")
+   
+4. 需要完整的库文档说明吗？
+   是 → 使用 query_document(lib_names=["servicescan"])
+```
+
+#### 优先级建议
+
+1. **首选**: `grep_yaklang_samples` - 速度最快，结果最精确
+2. **备选**: `search_yaklang_solutions` - 理解意图，找解决方案
+3. **深入**: `query_document` - 完整文档，系统学习
+
+#### FAQ
+
+**Q: 为什么不直接用 RAG 替代 grep？**
+
+A: 
+- grep 速度更快（直接正则匹配 vs 向量检索）
+- grep 结果更精确（当你知道关键词时）
+- grep 适合快速查找（90%的场景）
+- RAG 适合意图理解（grep 找不到时的补充）
+
+**Q: search_yaklang_solutions 和 query_document 的区别？**
+
+A:
+- search: 通过问题找代码示例（问答式）
+- query: 通过库名查文档说明（学习式）
+
+**Q: 什么时候用 search 而不用 grep？**
+
+A:
+- 不知道准确关键词时
+- 用 grep 找到的结果太多或不相关时
+- 需要理解"如何实现某功能"而不只是"找某函数"时
+
+**Q: 实现复杂度如何？**
+
+A:
+- 实现简单，基于现有 RAG 基础设施
+- 新增约 200 行代码（参考 grep action 的结构）
+- 不修改现有代码，完全新增
+- 与 grep 并存，不冲突
+
+---
+
+**工具矩阵总结**：
+
+| 你的情况 | 使用工具 | 示例 |
+|---------|---------|------|
+| 知道函数名 | grep_yaklang_samples | `pattern="servicescan\\.Scan"` |
+| 知道关键词 | grep_yaklang_samples | `pattern="端口扫描\|portscan"` |
+| 描述问题 | search_yaklang_solutions | `question="如何实现端口扫描"` |
+| 学习库 | query_document | `lib_names=["servicescan"]` |
+
+**记住：grep 为主，search 为辅，document 深入学习！**
 
