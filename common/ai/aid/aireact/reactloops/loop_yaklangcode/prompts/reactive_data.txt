@@ -471,11 +471,11 @@ When you receive a request, first understand the user's goal. Then, structure yo
 {{ .FeedbackMessages }}
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
-### ⚠️ 错误处理强制规则 - 必须立即 grep！⚠️
+### [重要] 错误处理强制规则 - 必须立即 grep
 
 **如果上述错误包含以下任何一种，你必须立即使用 grep_yaklang_samples 或 query_document：**
 
-#### 错误类型1：API 不存在 ❌
+#### 错误类型1：API 不存在
 ```
 ExternLib [xxx] don't has [yyy]
 ```
@@ -489,10 +489,10 @@ ExternLib [xxx] don't has [yyy]
  "human_readable_thought": "API 错误，需要搜索 xxx 库的真实可用函数"}
 ```
 
-**禁止**：❌ 继续猜测其他 API 名称（如 timeout → setTimeout → withTimeout → ...）
-**正确**：✅ 立即 grep 搜索该库的真实 API
+**禁止**：[X] 继续猜测其他 API 名称（如 timeout → setTimeout → withTimeout → ...）
+**正确**：[O] 立即 grep 搜索该库的真实 API
 
-#### 错误类型2：语法错误 ❌
+#### 错误类型2：语法错误
 ```
 SyntaxError: ...
 ```
@@ -506,10 +506,10 @@ SyntaxError: ...
  "human_readable_thought": "语法错误，需要搜索正确的语法示例"}
 ```
 
-**禁止**：❌ 继续尝试不同的语法写法
-**正确**：✅ grep 搜索正确的语法示例并学习
+**禁止**：[X] 继续尝试不同的语法写法
+**正确**：[O] grep 搜索正确的语法示例并学习
 
-#### 错误类型3：未定义符号 ❌
+#### 错误类型3：未定义符号
 ```
 undefined: xxx
 ```
@@ -525,7 +525,7 @@ undefined: xxx
 
 ### 反面教材 - 禁止的行为模式
 
-❌ **错误模式：连续猜测（绝对禁止！）**
+[错误模式] 连续猜测（绝对禁止！）
 ```
 尝试1: servicescan.timeout(5)     → 报错 ExternLib don't has [timeout]
 尝试2: servicescan.setTimeout(5)  → 报错 ExternLib don't has [setTimeout]  
@@ -535,12 +535,12 @@ undefined: xxx
 ```
 **这是最糟糕的模式！浪费时间且永远无法成功！**
 
-✅ **正确模式：立即搜索**
+[正确模式] 立即搜索
 ```
 尝试1: servicescan.timeout(5) → 报错 ExternLib don't has [timeout]
 行动:  grep_yaklang_samples("servicescan\\.", context_lines=20)
 结果:  找到 servicescan.probeTimeout(n) - 设置探测超时
-成功:  servicescan.probeTimeout(5) → ✅ 通过！
+成功:  servicescan.probeTimeout(5) → [通过！]
 ```
 
 ### 核心原则：从思考转向行动
@@ -553,10 +553,10 @@ undefined: xxx
 
 在执行 `modify_code` 之前，必须完成以下检查：
 
-1. ✅ 我是否刚刚 grep 过相关 API？
-2. ✅ 我的修改是基于 grep 结果还是猜测？
-3. ✅ 如果是猜测，为什么不先 grep？
-4. ✅ 上次报错后我是否已经 grep 搜索？
+1. [检查] 我是否刚刚 grep 过相关 API？
+2. [检查] 我的修改是基于 grep 结果还是猜测？
+3. [检查] 如果是猜测，为什么不先 grep？
+4. [检查] 上次报错后我是否已经 grep 搜索？
 
 **如果答案是"我在猜测"，立即停止，先执行 grep_yaklang_samples！**
 
@@ -575,8 +575,8 @@ undefined: xxx
 - 连续使用 `write_code` 说明策略失败
 
 **一次思考，立即 grep：**
-- ❌ 错误：反复思考"需要查询 X 的正确用法"
-- ✅ 正确：思考一次后立即 grep 搜索
+- [错误] 反复思考"需要查询 X 的正确用法"
+- [正确] 思考一次后立即 grep 搜索
 
 **搜索策略：**
 - API 错误：`grep_yaklang_samples("library\\.function")`
@@ -599,8 +599,8 @@ undefined: xxx
 ```
 报错: ExternLib [poc] don't has [Get]
 
-❌ 错误: 尝试 poc.HTTPGet, poc.get, poc.GetHTTP ...
-✅ 正确: grep_yaklang_samples("poc\\.", context_lines=20)
+[错误] 尝试 poc.HTTPGet, poc.get, poc.GetHTTP ...
+[正确] grep_yaklang_samples("poc\\.", context_lines=20)
        找到: poc.HTTPEx(packet, opts...)
 ```
 
@@ -608,8 +608,8 @@ undefined: xxx
 ```
 报错: SyntaxError near 'if err != nil'
 
-❌ 错误: 尝试不同的 if 语法格式
-✅ 正确: grep_yaklang_samples("err.*nil|die\\(err\\)", context_lines=10)
+[错误] 尝试不同的 if 语法格式
+[正确] grep_yaklang_samples("err.*nil|die\\(err\\)", context_lines=10)
        学习: die(err) 或 if err != nil { return }
 ```
 
@@ -617,16 +617,16 @@ undefined: xxx
 ```
 需求: 字符串分割
 
-❌ 错误: 猜测 str.split, string.Split, Split ...
-✅ 正确: grep_yaklang_samples("split|Split|分割", context_lines=10)
+[错误] 猜测 str.split, string.Split, Split ...
+[正确] grep_yaklang_samples("split|Split|分割", context_lines=10)
        找到: str.Split(s, sep)
 ```
 
 ### 典型优化场景
 
 ```
-❌ 错误做法：看到 yakit.AppendRow 报错后，继续尝试 yakit.EnableTable 的各种写法
-✅ 正确做法：立即 grep_yaklang_samples("yakit.*table|EnableTable", context_lines=15)
+[错误做法] 看到 yakit.AppendRow 报错后，继续尝试 yakit.EnableTable 的各种写法
+[正确做法] 立即 grep_yaklang_samples("yakit.*table|EnableTable", context_lines=15)
 
 记住：
 * Yaklang 变量声明: x = 10 或 var x，而不是 var x int
@@ -638,10 +638,10 @@ undefined: xxx
 
 ### 下一步行动
 
-* ⚠️ **首选**：使用 `grep_yaklang_samples` 搜索代码样例（快速、直接）
-* 备选：使用 `query_document` 搜索相关文档（更全面但较慢）
-* 最后：使用 `modify_code` 基于搜索结果修改代码
-* 禁止：在没有 grep 的情况下猜测性修改代码
+* [首选] 使用 `grep_yaklang_samples` 搜索代码样例（快速、直接）
+* [备选] 使用 `query_document` 搜索相关文档（更全面但较慢）
+* [最后] 使用 `modify_code` 基于搜索结果修改代码
+* [禁止] 在没有 grep 的情况下猜测性修改代码
 
 ## 核心循环结束条件
 

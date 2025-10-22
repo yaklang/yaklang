@@ -52,7 +52,7 @@ if err != nil {
 defer reader.Close()
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-### ✅ **示例 3: `grep_yaklang_samples` 动作（当 API 不存在时）- 推荐！**
+### 示例 3: `grep_yaklang_samples` 动作（当 API 不存在时）- 推荐
 
 **场景**: 上一步 `modify_code` 尝试使用 `synscan.timeout(3)`，但收到 `lint error: ExternLib [synscan] don't has [timeout]`。
 
@@ -93,7 +93,7 @@ defer reader.Close()
 
 ---
 
-### ✅ **示例 4: `grep_yaklang_samples` 动作（当遇到语法错误时）**
+### 示例 4: `grep_yaklang_samples` 动作（当遇到语法错误时）
 
 **场景**: AI 尝试编写错误处理，但反复收到 `SyntaxError`。
 
@@ -134,7 +134,7 @@ defer reader.Close()
 <|GEN_CODE_END_{{ .Nonce }}|>
 ️ 这种格式是错误的！包含行号会导致语法解析失败！
 
-### ✅ **示例 5: grep_yaklang_samples 完整工作流**
+### 示例 5: grep_yaklang_samples 完整工作流
 
 **场景**: 用户要求编写端口扫描脚本，AI 需要完整实现。
 
@@ -175,11 +175,11 @@ for result in results {
 }
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-**结果**: ✅ 代码一次成功，没有任何错误！
+**结果**: [成功] 代码一次成功，没有任何错误！
 
 ---
 
-### ❌ **错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止！）**
+### [错误示例] 错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止）
 
 **场景**: 收到 `lint error: ExternLib [synscan] don't has [timeout]`。
 
@@ -209,7 +209,7 @@ for result in results {
 
 ---
 
-### ✅ **正确做法 - 第一次错误后立即 grep：**
+### [正确做法] 第一次错误后立即 grep
 
 ```json
 // 第1次尝试
@@ -241,8 +241,8 @@ for result := range synChan {
 }
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-**结果**: ✅ 修改成功，一次通过！
+**结果**: [成功] 修改成功，一次通过！
 
 **对比总结：**
-- ❌ 连续猜测：浪费 3+ 次尝试，仍然失败
-- ✅ 立即 grep：1 次搜索 + 1 次精确修改 = 成功
+- [错误] 连续猜测：浪费 3+ 次尝试，仍然失败
+- [正确] 立即 grep：1 次搜索 + 1 次精确修改 = 成功

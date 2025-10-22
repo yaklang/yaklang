@@ -15,9 +15,9 @@ import (
 var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"grep_yaklang_samples",
-		`🔍 Grep Yaklang 代码样例库 - 快速搜索真实代码示例
+		`Grep Yaklang 代码样例库 - 快速搜索真实代码示例
 
-⚠️ 核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
+核心原则：禁止臆造 Yaklang API！必须先 grep 搜索真实样例！
 
 【强制使用场景】：
 1. 编写任何代码前，先 grep 相关函数用法
@@ -121,7 +121,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				errorMsg := "Document searcher not available, cannot grep. Please ensure yaklang-aikb is properly installed."
 				log.Warn(errorMsg)
 				invoker.AddToTimeline("grep_failed", errorMsg)
-				op.Feedback("⚠️ " + errorMsg)
+				op.Feedback("[WARN] " + errorMsg)
 				op.Continue()
 				return
 			}
@@ -147,7 +147,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				errorMsg := fmt.Sprintf("Grep search failed: %v", err)
 				log.Error(errorMsg)
 				invoker.AddToTimeline("grep_failed", errorMsg)
-				op.Feedback("❌ " + errorMsg)
+				op.Feedback("[ERROR] " + errorMsg)
 				op.Continue()
 				return
 			}
@@ -155,21 +155,21 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			if len(results) == 0 {
 				noResultMsg := fmt.Sprintf(`No matches found for pattern: %s
 
-💡 建议：
+[建议]
 - 尝试更通用的搜索词（如 "scan" 而不是 "servicescan.ScanWithTimeout"）
 - 使用正则表达式扩大搜索范围（如 "servicescan\\." 搜索所有 servicescan 函数）
 - 检查拼写是否正确
 - 尝试中英文组合搜索（如 "端口扫描|port.*scan"）`, pattern)
 				log.Info(noResultMsg)
 				invoker.AddToTimeline("grep_no_results", noResultMsg)
-				op.Feedback("ℹ️ " + noResultMsg)
+				op.Feedback("[INFO] " + noResultMsg)
 				op.Continue()
 				return
 			}
 
 			// 格式化结果 - 直接返回 grep 结果，不经过 summarizer
 			var resultBuffer bytes.Buffer
-			resultBuffer.WriteString(fmt.Sprintf("\n🔍 Grep Results: 找到 %d 个匹配\n\n", len(results)))
+			resultBuffer.WriteString(fmt.Sprintf("\n[Grep Results] 找到 %d 个匹配\n\n", len(results)))
 
 			// 限制返回结果数量，避免内容过多
 			maxResults := 20
@@ -191,7 +191,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				}
 
 				// 高亮匹配行
-				resultBuffer.WriteString(fmt.Sprintf("▶ %s\n", result.Line))
+				resultBuffer.WriteString(fmt.Sprintf(">>> %s\n", result.Line))
 
 				// 显示上下文（后）
 				if len(result.ContextAfter) > 0 {
@@ -206,7 +206,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			if len(results) > maxResults {
 				resultBuffer.WriteString(fmt.Sprintf("... 还有 %d 个结果未显示（总共 %d 个）\n\n",
 					len(results)-maxResults, len(results)))
-				resultBuffer.WriteString("💡 提示：如果需要查看更多结果，可以：\n")
+				resultBuffer.WriteString("[提示] 如果需要查看更多结果，可以：\n")
 				resultBuffer.WriteString("  - 使用更精确的 pattern 缩小搜索范围\n")
 				resultBuffer.WriteString("  - 减少 context_lines 以查看更多匹配项\n")
 			}
