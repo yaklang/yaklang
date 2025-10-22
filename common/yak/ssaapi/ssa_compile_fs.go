@@ -273,7 +273,7 @@ func (c *Config) parseProjectWithFS(
 	}
 
 	f5 := func() error {
-		total := prog.Cache.CountInstruction() * 2
+		total := prog.Cache.CountInstruction()
 		process = 0.9
 		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 

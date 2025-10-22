@@ -186,13 +186,12 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
-	wg := sync.WaitGroup{}
 	f1 := func() {
-		c.InstructionCache.Close(&wg)
+		c.InstructionCache.Close()
 		log.Infof("Instruction cache closed")
 	}
 	f2 := func() {
-		c.TypeCache.Close(&wg)
+		c.TypeCache.Close()
 		log.Infof("Type Cache closed")
 	}
 	f3 := func() {
@@ -215,9 +214,6 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		c.indexCache.Close()
 	}
 	f9 := func() {
-		log.Info("wait for type and instruction save...")
-		wg.Wait()
-		log.Info("wait for type and instruction save done")
 		c.cacheCtxCancel()
 	}
 	ProfileAdd(true, "ssa.ProgramCache.SaveToDatabase",
