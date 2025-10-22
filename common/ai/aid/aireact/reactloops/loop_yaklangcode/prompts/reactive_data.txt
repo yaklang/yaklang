@@ -471,77 +471,177 @@ When you receive a request, first understand the user's goal. Then, structure yo
 {{ .FeedbackMessages }}
 <|ERR/LINT_WARNING_END_{{ .Nonce }}|>
 
-### 问题解决行动指令
+### ⚠️ 错误处理强制规则 - 必须立即 grep！⚠️
 
-**核心原则：从思考转向行动 - Think Once, Act Immediately**
+**如果上述错误包含以下任何一种，你必须立即使用 grep_yaklang_samples 或 query_document：**
 
-当遇到 API 调用错误、语法错误或不确定的函数用法时，**必须先进行搜索和验证，而不是盲目猜测或重复思考**。
-
-### 优先级处理顺序：
-
-1. **语法错误** - 最高优先级，必须立即修复
-2. **API 使用错误** - 通过搜索文档和示例解决
-3. **功能缺陷** - 使用调试工具辅助排查
-
-### 行动规则：
-
-核心原则：渐进式修复。
-永远不要轻易使用 `write_code` 来重置你的工作。你必须在现有代码的基础上进行修改和调试。
-
-如果你连续使用 `write_code`，说明你的策略已经失败，必须重新分析问题的根源。
-
-**一次思考，立即行动**
-- 错误做法：反复思考"需要查询 X 的正确用法"
-- 正确做法：思考一次后立即执行搜索命令
-
-**具体搜索策略**
-- 语法错误：使用 `query_document` 搜索相关语法和示例
-- API 用法：搜索函数名、参数类型、返回值
-- 类似功能：搜索相似的代码片段作为参考
-
-**避免思考循环**
-- 如果连续 2 次有相同的思考内容，立即停止思考
-- 转为执行具体的搜索或验证命令
-- 基于搜索结果做决策，而不是基于猜测
-
-**调试工具使用**
-- 使用 `desc(instance)` 查看变量类型和属性
-- 使用 `log.Info()` 或 `dump()` 打印调试信息
-- 通过日志输出验证代码执行流程
-
-### 处理步骤：
-
-1. **立即搜索** - 遇到错误时，直接使用工具查找：
-   - 正确的 API 用法示例
-   - 相关的文档或代码片段
-   - 类似功能的实现方式
-
-2. **验证语法** - 在修改代码前：
-   - 查找官方文档中的正确语法
-   - 搜索现有代码库中的使用示例
-   - 确认函数签名和参数类型
-
-3. **避免重复错误** - 如果某个方法报错：
-   - 不要反复尝试相似的错误写法
-   - 立即搜索该库/框架的正确用法
-   - 查看错误信息中的提示和建议
-
-### 典型优化场景：
-
+#### 错误类型1：API 不存在 ❌
 ```
-错误做法：看到 yakit.AppendRow 报错后，继续尝试 yakit.EnableTable 的各种写法
-正确做法：立即搜索 "yakit table usage" 或 "yakit.EnableTable" 找到正确语法
-* Yaklang中声明一个变量不需要类型，可以直接写 `x = 10` 或者 "var x"，而不是 `var x int`
-* 在 yaklang 中生成随机数，可以直接搜索 `randstr` 或 `randn` 的用法
-* yaklang 禁止使用 import 或者 require 类似，所有包都是内置的
+ExternLib [xxx] don't has [yyy]
+```
+**含义**：你猜错了 API 名称，该库没有这个函数/选项
+
+**强制行动**：立即使用 `grep_yaklang_samples`
+```json
+{"@action": "grep_yaklang_samples",
+ "pattern": "xxx\\.",
+ "context_lines": 20,
+ "human_readable_thought": "API 错误，需要搜索 xxx 库的真实可用函数"}
 ```
 
-**记住：搜索 5 分钟比盲目试错 50 分钟更高效！**
+**禁止**：❌ 继续猜测其他 API 名称（如 timeout → setTimeout → withTimeout → ...）
+**正确**：✅ 立即 grep 搜索该库的真实 API
 
-### 下一步行动：
-* 使用 `query_document` 搜索相关文档和示例代码
-* 使用 `modify_code` 修改或局部生成代码以修复问题
-* 如果不确定如何修复，先搜索相关的代码片段作为参考
+#### 错误类型2：语法错误 ❌
+```
+SyntaxError: ...
+```
+**含义**：你的语法不符合 Yaklang DSL 规范
+
+**强制行动**：立即使用 `grep_yaklang_samples`
+```json
+{"@action": "grep_yaklang_samples",
+ "pattern": "相关功能的代码模式",
+ "context_lines": 15,
+ "human_readable_thought": "语法错误，需要搜索正确的语法示例"}
+```
+
+**禁止**：❌ 继续尝试不同的语法写法
+**正确**：✅ grep 搜索正确的语法示例并学习
+
+#### 错误类型3：未定义符号 ❌
+```
+undefined: xxx
+```
+**含义**：变量/函数不存在
+
+**强制行动**：立即使用 `grep_yaklang_samples`
+```json
+{"@action": "grep_yaklang_samples",
+ "pattern": "xxx",
+ "context_lines": 15,
+ "human_readable_thought": "未定义符号，需要搜索正确的函数名"}
+```
+
+### 反面教材 - 禁止的行为模式
+
+❌ **错误模式：连续猜测（绝对禁止！）**
+```
+尝试1: servicescan.timeout(5)     → 报错 ExternLib don't has [timeout]
+尝试2: servicescan.setTimeout(5)  → 报错 ExternLib don't has [setTimeout]  
+尝试3: servicescan.withTimeout(5) → 报错 ExternLib don't has [withTimeout]
+尝试4: servicescan.Timeout(5)     → 报错 ...
+... 继续猜测更多名称
+```
+**这是最糟糕的模式！浪费时间且永远无法成功！**
+
+✅ **正确模式：立即搜索**
+```
+尝试1: servicescan.timeout(5) → 报错 ExternLib don't has [timeout]
+行动:  grep_yaklang_samples("servicescan\\.", context_lines=20)
+结果:  找到 servicescan.probeTimeout(n) - 设置探测超时
+成功:  servicescan.probeTimeout(5) → ✅ 通过！
+```
+
+### 核心原则：从思考转向行动
+
+**Think Once, Grep Immediately - 思考一次，立即搜索**
+
+当遇到 API 调用错误、语法错误或不确定的函数用法时，**必须先 grep 搜索真实样例，而不是盲目猜测或重复思考**。
+
+### 强制 grep 检查清单
+
+在执行 `modify_code` 之前，必须完成以下检查：
+
+1. ✅ 我是否刚刚 grep 过相关 API？
+2. ✅ 我的修改是基于 grep 结果还是猜测？
+3. ✅ 如果是猜测，为什么不先 grep？
+4. ✅ 上次报错后我是否已经 grep 搜索？
+
+**如果答案是"我在猜测"，立即停止，先执行 grep_yaklang_samples！**
+
+### 优先级处理顺序
+
+1. **API 错误** - 最高优先级，必须立即 grep
+2. **语法错误** - 必须立即 grep 正确语法
+3. **逻辑错误** - 可以先分析，必要时 grep
+4. **功能缺陷** - 使用调试工具辅助排查
+
+### 行动规则
+
+**渐进式修复原则：**
+- 永远不要轻易使用 `write_code` 重置工作
+- 必须在现有代码基础上修改和调试
+- 连续使用 `write_code` 说明策略失败
+
+**一次思考，立即 grep：**
+- ❌ 错误：反复思考"需要查询 X 的正确用法"
+- ✅ 正确：思考一次后立即 grep 搜索
+
+**搜索策略：**
+- API 错误：`grep_yaklang_samples("library\\.function")`
+- 语法错误：`grep_yaklang_samples("功能描述|code_pattern")`
+- 函数查找：`grep_yaklang_samples("functionName")`
+
+**避免思考循环：**
+- 连续 2 次相同思考 → 立即停止
+- 转为执行 grep 搜索
+- 基于搜索结果做决策，不基于猜测
+
+**调试工具：**
+- `desc(instance)` - 查看变量类型和属性
+- `log.Info()` 或 `dump()` - 打印调试信息
+- `grep_yaklang_samples` - 查找正确用法
+
+### 典型场景处理
+
+**场景1：API 不存在**
+```
+报错: ExternLib [poc] don't has [Get]
+
+❌ 错误: 尝试 poc.HTTPGet, poc.get, poc.GetHTTP ...
+✅ 正确: grep_yaklang_samples("poc\\.", context_lines=20)
+       找到: poc.HTTPEx(packet, opts...)
+```
+
+**场景2：语法错误**
+```
+报错: SyntaxError near 'if err != nil'
+
+❌ 错误: 尝试不同的 if 语法格式
+✅ 正确: grep_yaklang_samples("err.*nil|die\\(err\\)", context_lines=10)
+       学习: die(err) 或 if err != nil { return }
+```
+
+**场景3：不确定函数**
+```
+需求: 字符串分割
+
+❌ 错误: 猜测 str.split, string.Split, Split ...
+✅ 正确: grep_yaklang_samples("split|Split|分割", context_lines=10)
+       找到: str.Split(s, sep)
+```
+
+### 典型优化场景
+
+```
+❌ 错误做法：看到 yakit.AppendRow 报错后，继续尝试 yakit.EnableTable 的各种写法
+✅ 正确做法：立即 grep_yaklang_samples("yakit.*table|EnableTable", context_lines=15)
+
+记住：
+* Yaklang 变量声明: x = 10 或 var x，而不是 var x int
+* 随机数生成: 先 grep "randstr|randn"，不要猜测
+* 无需 import - 所有包都是内置的
+```
+
+**记住：grep 搜索 1 次 = 节省 10 次错误尝试！**
+
+### 下一步行动
+
+* ⚠️ **首选**：使用 `grep_yaklang_samples` 搜索代码样例（快速、直接）
+* 备选：使用 `query_document` 搜索相关文档（更全面但较慢）
+* 最后：使用 `modify_code` 基于搜索结果修改代码
+* 禁止：在没有 grep 的情况下猜测性修改代码
 
 ## 核心循环结束条件
 
