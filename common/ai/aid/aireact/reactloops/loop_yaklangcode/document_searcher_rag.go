@@ -85,23 +85,6 @@ func handleRAGQueryDocument(
 		ragSearch(q)
 	}
 
-	// Search by lib_names and lib_function_globs using yakdoc
-	yakdocResults := searchYakdocLibraries(payloads)
-	if len(yakdocResults) > 0 {
-		// Convert yakdoc results to ziputil.GrepResult format for consistency
-		for _, yakdocResult := range yakdocResults {
-			searchResult := &aicommon.LazyEnhanceKnowledge{
-				BasicEnhanceKnowledge: aicommon.BasicEnhanceKnowledge{
-					Content: yakdocResult.Content,
-					Source:  "yakdoc_library_search",
-					Score:   0.8, // yak doc results get a fixed score
-					UUID:    yakdocResult.Path,
-				},
-			}
-			allResult = append(allResult, searchResult)
-		}
-	}
-
 	if len(allResult) == 0 {
 		invoker.AddToTimeline("query_document", "no results found")
 		return "No matching documents found for the query; ", false
