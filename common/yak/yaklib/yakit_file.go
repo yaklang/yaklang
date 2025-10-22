@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type YakitFileAction struct {
@@ -68,11 +69,13 @@ func FileDeleteAction(isDir bool) *YakitFileAction {
 }
 
 func FileStatusAction(status any) *YakitFileAction {
+	statusMap := utils.UnSafeInterfaceToGeneralMap(status)
+
 	return &YakitFileAction{
 		Action: Status_Action,
 		Message: map[string]any{
-			"message": fmt.Sprintf("get file status: %v", status),
-			"status":  status,
+			"message": fmt.Sprintf("get file status: %+v", statusMap),
+			"status":  statusMap,
 		},
 	}
 }
