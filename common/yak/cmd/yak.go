@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"io"
 	"io/ioutil"
 	"net"
@@ -398,13 +399,21 @@ var startGRPCServerCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		// 检查 local-password 模式
 		localPassword := c.String("local-password")
+		localRandomPasswordPort := 9011
 		if localPassword != "" {
 			// 检查互斥选项
 			if c.IsSet("host") && c.String("host") != "127.0.0.1" {
 				return utils.Error("local-password is mutually exclusive with host option")
 			}
-			if c.IsSet("port") && c.Int("port") != 8087 {
-				return utils.Error("local-password is mutually exclusive with port option")
+			if c.IsSet("port") {
+				manualPort := c.Int("port")
+				if manualPort == 8087 {
+					return utils.Error("local-password is mutually exclusive with port option")
+				}
+				if manualPort <= 0 {
+					return utils.Error("local-password mode port must be positive")
+				}
+				localRandomPasswordPort = manualPort
 			}
 			if c.IsSet("secret") {
 				return utils.Error("local-password is mutually exclusive with secret option")
@@ -544,7 +553,7 @@ var startGRPCServerCommand = cli.Command{
 		if localPassword != "" {
 			// local-password 模式：强制使用 127.0.0.1:9011
 			host = "127.0.0.1"
-			port = 9011
+			port = localRandomPasswordPort
 		} else {
 			host = c.String("host")
 			port = c.Int("port")
@@ -636,12 +645,47 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			Name:  "client-password",
 			Usage: "客户端模式：使用指定密码连接到现有服务器进行测试，不启动服务器",
 		},
+		cli.IntFlag{
+			Name:  "p,port",
+			Usage: "Specific port to start local grpc server (default 9011)",
+			Value: 9011,
+		},
 	},
-	Action: func(ctx *cli.Context) error {
-		const port = 9011
+	Action: func(ctx *cli.Context) (finalError error) {
+		var port = ctx.Int("port")
+
 		addr := utils.HostPort("127.0.0.1", port)
 
 		clientPassword := ctx.String("client-password")
+
+		var version string
+		var secret = utils.RandStringBytes(16)
+
+		defer func() {
+			const extractorFlag = `50551aa97b5aa5ae8a3c3243ac60a8a7`
+
+			if err := recover(); err != nil {
+				finalError = utils.Errorf("panic: %v\n%s", err, spew.Sdump(string(debug.Stack())))
+			}
+
+			m := omap.NewGeneralOrderedMap()
+			ok := utils.IsNil(finalError)
+			var reason string
+			if ok {
+				reason = ""
+			} else {
+				reason = utils.InterfaceToString(finalError)
+			}
+			m.Set("ok", ok)
+			m.Set("reason", reason)
+			m.Set("host", "127.0.0.1")
+			m.Set("port", port)
+			m.Set("addr", utils.HostPort("127.0.0.1", port))
+			m.Set("secret", secret)
+			m.Set("version", version)
+			result := string(m.Jsonify())
+			fmt.Printf("\n<json-%v>\n%v\n</json-%v>\n\n", extractorFlag, result, extractorFlag)
+		}()
 
 		// 客户端模式：只连接服务器测试
 		if clientPassword != "" {
@@ -672,7 +716,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("  1. Server is running on port %d\n", port)
 				fmt.Printf("  2. Local firewall is not blocking the connection\n")
 				fmt.Printf("  3. Connection timeout (10s exceeded)\n\n")
-				return err
+				finalError = utils.Wrap(err, "dial grpc server failed")
+				return
 			}
 			defer conn.Close()
 
@@ -696,7 +741,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("Please check if:\n")
 				fmt.Printf("  1. The password is correct\n")
 				fmt.Printf("  2. The server is running in local-password mode\n\n")
-				return err
+				finalError = utils.Wrap(err, "call Version RPC failed")
+				return
 			}
 
 			log.Infof("Version RPC successful: %s", versionResp.Version)
@@ -705,7 +751,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			fmt.Printf("  Password: ***\n")
 			fmt.Printf("  Version: %s\n\n", versionResp.Version)
 
-			return nil
+			finalError = nil
+			return
 		}
 
 		// 服务器模式：启动测试服务器
@@ -720,11 +767,12 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			fmt.Printf("  1. Local firewall is blocking the port\n")
 			fmt.Printf("  2. Anti-virus software is preventing yak engine from starting\n")
 			fmt.Printf("  3. Another yak instance is already running\n\n")
-			return utils.Errorf("port %d is occupied, please check local firewall or anti-virus software", port)
+			err = utils.Wrapf(err, "port %d is occupied, please check local firewall or anti-virus software", port)
+			finalError = utils.Wrap(err, "net.Listen(tcp, addr) failed")
+			return
 		}
+		defer lis.Close()
 
-		// 生成随机密码
-		secret := utils.RandStringBytes(32)
 		log.Infof("generated random secret for testing: %s", secret)
 
 		// 创建 GRPC 服务器
@@ -762,7 +810,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
-			return err
+			finalError = utils.Wrap(err, "build yak grpc server failed")
+			return
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
 
@@ -797,7 +846,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		)
 		if err != nil {
 			log.Errorf("failed to dial grpc server: %s", err)
-			return err
+			finalError = utils.Wrap(err, "dial grpc server failed")
+			return
 		}
 		defer conn.Close()
 
@@ -816,7 +866,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		versionResp, err := client.Version(rpcCtx, &ypb.Empty{})
 		if err != nil {
 			log.Errorf("failed to call Version: %s", err)
-			return err
+			finalError = utils.Wrap(err, "call client.Version failed")
+			return
 		}
 
 		log.Infof("Version RPC successful: %s", versionResp.Version)
@@ -824,8 +875,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		fmt.Printf("  Port: %d\n", port)
 		fmt.Printf("  Secret: %s\n", secret)
 		fmt.Printf("  Version: %s\n\n", versionResp.Version)
-
-		return nil
+		finalError = nil
+		return
 	},
 }
 
@@ -1109,8 +1160,14 @@ func main() {
 						return utils.Errorf("fetch abs file path failed: %s", err)
 					}
 				}
-				raw, err := ioutil.ReadFile(file)
+				raw, err := os.ReadFile(file)
 				if err != nil {
+					log.Errorf("read yak file[%s] failed: %s", file, err)
+					if filepath.Ext(file) == "" {
+						log.Infof("no file ext, maybe you want to execute an unexisted command? [%v]", file)
+						fmt.Println("please check '--help' for more info.")
+						fmt.Println()
+					}
 					return err
 				}
 
