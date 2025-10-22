@@ -18,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
+var defaultYaklangRagCollection = "yak"
+
 // createDocumentSearcher creates a document searcher from aikb path
 func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
 	var zipPath string
@@ -149,7 +151,7 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-
+				queryDocumentAction(r, docSearcher),
 				writeCode(r),
 				modifyCode(r),
 				insertCode(r),
@@ -157,13 +159,11 @@ func init() {
 			}
 
 			preset = append(preset, opts...)
-			enhanceCollectionName := "yak"
+			enhanceCollectionName := defaultYaklangRagCollection
 			if config.GetConfigString("aikb_collection") != "" {
 				enhanceCollectionName = config.GetConfigString("aikb_collection")
 			}
-			if !rag.CollectionIsExists(consts.GetGormProfileDatabase(), enhanceCollectionName) {
-				preset = append(preset, queryDocumentAction(r, docSearcher))
-			} else {
+			if rag.CollectionIsExists(consts.GetGormProfileDatabase(), enhanceCollectionName) {
 				log.Infof("RAG collection '%s' loaded successfully for WriteYakLangCode loop", enhanceCollectionName)
 				preset = append(preset, ragQueryDocumentAction(r, consts.GetGormProfileDatabase(), enhanceCollectionName))
 			}
