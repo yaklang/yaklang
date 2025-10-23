@@ -273,6 +273,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
+	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
 	result["DynamicContext"] = pm.DynamicContext()
 	result["Language"] = pm.react.config.language
 
