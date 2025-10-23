@@ -1002,7 +1002,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 				if len(bp.ParentBlueprints) == 0 {
 					continue
 				}
-				if exlib := b.PeekValueInRoot(bp.ParentBlueprints[0].Name); exlib != nil {
+				if exlib := b.PeekExternInRoot(bp.ParentBlueprints[0].Name); exlib != nil {
 					method := bp.GetMagicMethod(ssa.Constructor, b.FunctionBuilder)
 					lv := b.CreateMemberCallVariable(exlib, method)
 					b.AssignVariable(lv, p)
@@ -2087,7 +2087,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		}
 		if ssatyp == nil {
 			b.NewError(ssa.Warn, TAG, StructNotFind(name))
-			ssatyp = ssa.NewStructType()
+			ssatyp = ssa.CreateAnyType()
 		}
 
 		return ssatyp

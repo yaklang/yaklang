@@ -40,7 +40,7 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
-	return b.readValueEx(name, true, true && b.SupportClosure)
+	return b.readValueEx(name, true, true && b.SupportClosure, true)
 }
 
 func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
@@ -52,7 +52,7 @@ func (b *FunctionBuilder) ReadOrCreateMemberCallVariable(caller, callee Value) V
 }
 
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
-	return b.readValueEx(name, true, false)
+	return b.readValueEx(name, true, false, true)
 }
 
 func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
@@ -64,20 +64,20 @@ func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
-	return b.readValueEx(name, false, true && b.SupportClosure)
+	return b.readValueEx(name, false, true && b.SupportClosure, true)
 }
 
 func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
-	return b.readValueEx(name, false, false)
+	return b.readValueEx(name, false, false, true)
 }
 
 // for ExternLib
-func (b *FunctionBuilder) PeekValueInRoot(name string) Value {
+func (b *FunctionBuilder) PeekExternInRoot(name string) Value {
 	root := b
 	for p := b.parentBuilder; p != nil; p = p.parentBuilder {
 		root = p
 	}
-	return root.readValueEx(name, false, false)
+	return root.readValueEx(name, false, false, false)
 }
 
 func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
@@ -108,6 +108,7 @@ func (b *FunctionBuilder) readValueEx(
 	name string,
 	create bool, // disable create undefine
 	enableClosureFreeValue bool, // disable free-value
+	tryExtern bool,
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
@@ -155,7 +156,7 @@ func (b *FunctionBuilder) readValueEx(
 		}
 	}
 
-	if ret := b.TryBuildExternValue(name); ret != nil {
+	if ret := b.TryBuildExternValue(name); ret != nil && tryExtern {
 
 		// create variable for extern lib value
 		variable := ret.GetVariable(name)
