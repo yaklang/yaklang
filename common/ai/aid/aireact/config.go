@@ -609,7 +609,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		userInteractiveLimitedTimes: 3, // Default to 3 times
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
-		workdir:                     consts.GetDefaultYakitBaseDir(),
+		workdir:                     "",
 		memoryPoolSize:              10 * 1024,
 
 		// aiforge manager
