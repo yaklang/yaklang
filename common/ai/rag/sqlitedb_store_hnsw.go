@@ -53,7 +53,7 @@ const (
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
-		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, err)
+		return nil, utils.Wrap(err, fmt.Sprintf("query rag collection [%#v]", collectionName))
 	}
 
 	if collection == nil {

@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -38,6 +39,8 @@ type CollectionConfig struct {
 	buildGraphPolicy string
 
 	otherOptions []any
+
+	DB *gorm.DB
 }
 
 func NewCollectionConfig(options ...any) *CollectionConfig {
@@ -58,6 +61,9 @@ func NewCollectionConfig(options ...any) *CollectionConfig {
 		} else {
 			defaultConfig.otherOptions = append(defaultConfig.otherOptions, option)
 		}
+	}
+	if defaultConfig.DB == nil {
+		defaultConfig.DB = consts.GetGormProfileDatabase()
 	}
 	return defaultConfig
 }
@@ -176,6 +182,13 @@ func WithCosineDistance() RAGOption {
 	}
 }
 
+// WithDB 设置数据库
+func WithDB(db *gorm.DB) RAGOption {
+	return func(config *CollectionConfig) {
+		config.DB = db
+	}
+}
+
 // WithHNSWParameters 批量设置HNSW参数
 func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGOption {
 	return func(config *CollectionConfig) {
@@ -227,7 +240,7 @@ func LoadCollection(db *gorm.DB, name string, opts ...any) (*RAGSystem, error) {
 	log.Infof("start to load sqlite vector store for collection %#v", name)
 	store, err := LoadSQLiteVectorStoreHNSW(db, name, opts...)
 	if err != nil {
-		return nil, utils.Errorf("load SQLite vector storage err: %v", err)
+		return nil, utils.Wrap(err, fmt.Sprintf("load SQLite vector storage for collection %#v", name))
 	}
 	log.Infof("start to create RAG system for collection %#v", name)
 
@@ -358,19 +371,18 @@ func Get(name string, i ...any) (*RAGSystem, error) {
 	config := NewCollectionConfig(i...)
 	if config.ForceNew {
 		log.Infof("force creating new RAG collection for name: %s", name)
-		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
+		return CreateCollection(config.DB, name, config.Description, i...)
 	}
 
 	// load existed first
 	log.Infof("attempting to load existing RAG collection '%s'", name)
-	ragSystem, err := LoadCollection(consts.GetGormProfileDatabase(), name)
-	if err != nil {
+	ragSystem, err := LoadCollection(config.DB, name)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("failed to load existing RAG collection '%s': %v, creating new one", name, err)
-		return CreateCollection(consts.GetGormProfileDatabase(), name, config.Description, i...)
+		return CreateCollection(config.DB, name, config.Description, i...)
+	} else {
+		return ragSystem, err
 	}
-
-	log.Infof("successfully loaded RAG collection '%s'", name)
-	return ragSystem, nil
 }
 
 type DocumentOption func(document *Document)
