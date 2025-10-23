@@ -98,11 +98,19 @@ func NewTreeViewFromFSWithLimits(filesystem filesys_interface.FileSystem, root s
 
 // NewTreeViewFromFSWithOptions 从 FileSystem 创建带完整选项的树形视图实例
 func NewTreeViewFromFSWithOptions(filesystem filesys_interface.FileSystem, root string, maxDepth, maxLines int, collapseSingle bool) *TreeView {
+	if maxDepth <= 0 {
+		maxDepth = 4
+	}
+
+	if maxLines <= 0 {
+		maxLines = 100
+	}
+
 	if filesystem == nil {
 		return NewTreeViewWithOptions(nil, maxDepth, maxLines, collapseSingle)
 	}
 
-	paths := collectPathsFromFS(filesystem, root)
+	paths := collectPathsFromFS(filesystem, root, maxDepth, maxLines)
 	// 为文件系统创建特殊的树结构，保存完整路径信息
 	data := []byte(strings.Join(paths, "\n"))
 	index := suffixarray.New(data)
@@ -125,12 +133,27 @@ func NewTreeViewFromFSWithOptions(filesystem filesys_interface.FileSystem, root 
 }
 
 // collectPathsFromFS 从 FileSystem 递归收集所有路径
-func collectPathsFromFS(filesystem filesys_interface.FileSystem, root string) []string {
+func collectPathsFromFS(filesystem filesys_interface.FileSystem, root string, maxDepth int, maxCount int) []string {
 	var paths []string
+	var fileCount int
 
-	var walkFS func(string) error
-	walkFS = func(path string) error {
-		// 添加当前路径到结果
+	// 应用5倍限制
+	actualMaxDepth := maxDepth * 5
+	actualMaxCount := maxCount * 5
+
+	var walkFS func(string, int) error
+	walkFS = func(path string, currentDepth int) error {
+		// 检查深度限制
+		if currentDepth > actualMaxDepth {
+			return nil
+		}
+
+		// 检查文件数量限制
+		if fileCount >= actualMaxCount {
+			return nil
+		}
+
+		// 添加当前路径到结果（如果是目录）
 		if path != "." && path != "" {
 			paths = append(paths, path)
 		}
@@ -143,6 +166,11 @@ func collectPathsFromFS(filesystem filesys_interface.FileSystem, root string) []
 
 		// 遍历目录项
 		for _, entry := range entries {
+			// 检查文件数量限制
+			if fileCount >= actualMaxCount {
+				break
+			}
+
 			entryPath := path
 			if path == "." || path == "" {
 				entryPath = entry.Name()
@@ -151,21 +179,22 @@ func collectPathsFromFS(filesystem filesys_interface.FileSystem, root string) []
 			}
 
 			if entry.IsDir() {
-				// 递归处理子目录
-				if err := walkFS(entryPath); err != nil {
+				// 递归处理子目录，深度+1
+				if err := walkFS(entryPath, currentDepth+1); err != nil {
 					continue // 跳过错误目录继续处理其他目录
 				}
 			} else {
-				// 添加文件路径
+				// 添加文件路径并增加文件计数
 				paths = append(paths, entryPath)
+				fileCount++
 			}
 		}
 
 		return nil
 	}
 
-	// 从根目录开始遍历
-	if err := walkFS(root); err != nil {
+	// 从根目录开始遍历，初始深度为0
+	if err := walkFS(root, 0); err != nil {
 		// 如果遍历失败，返回空路径
 		return []string{}
 	}

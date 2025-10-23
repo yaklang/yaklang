@@ -61,6 +61,7 @@ func glance(i filesys_interface.FileSystem) string {
 	var fileCount = 0
 	var dirCount = 0
 
+	overSize := false
 	ctx, cancel := context.WithCancel(context.Background())
 	err := Recursive(".",
 		WithContext(ctx),
@@ -70,9 +71,10 @@ func glance(i filesys_interface.FileSystem) string {
 			} else {
 				fileCount++
 			}
-			if dirCount+fileCount > 10000 {
+			if dirCount+fileCount > 5000 {
+				overSize = true
 				cancel()
-				return errors.New("too many files, stop counting")
+				return utils.Wrap(SkipAll, "too many files, stop counting")
 			}
 			return nil
 		}), WithFileSystem(i))
@@ -108,8 +110,14 @@ func glance(i filesys_interface.FileSystem) string {
 
 	// 写入当前目录和统计信息
 	buf.WriteString(fmt.Sprintf("current dir: %s\n", currentDir))
-	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\n", fileCount+dirCount, dirCount, fileCount))
+	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]", fileCount+dirCount, dirCount, fileCount))
+	if overSize {
+		buf.WriteString(" (too many files, over 5000 files, limited show)\n")
+	} else {
+		buf.WriteString("\n")
+	}
 
+	log.Infof("start to dump tree view with limits for fs glance: depth: %v, lines: %v", 4, 50)
 	// 使用 DumpTreeViewWithLimits 直接从 FileSystem 生成树形视图，限制为 4 层深度，50 行输出
 	treeOutput := DumpTreeViewWithLimits(i, 4, 50)
 	if treeOutput != "" {
@@ -195,8 +203,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			// file stat
 			if c.onDirStat != nil {
 				if err := c.onDirStat(path, info); err != nil {
-					if err == SkipDir || err == SkipAll {
-						return nil
+					if errors.Is(err, SkipAll) {
+						c.Stop()
+						return SkipAll
 					}
 					return err
 				}
@@ -253,6 +262,10 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			return err
 		}
 		for _, d := range dirs {
+			if c.isStop() {
+				return lastErr
+			}
+
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
 				lastErr = err
