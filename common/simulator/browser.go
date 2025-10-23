@@ -24,6 +24,7 @@ type BrowserStarter struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+	ready  bool
 }
 
 func CreateNewStarter(opts ...BrowserConfigOpt) *BrowserStarter {
@@ -73,16 +74,14 @@ func (starter *BrowserStarter) Start() error {
 		starter.browser = starter.browser.Client(client)
 	}
 	starter.browser = starter.browser.Context(starter.ctx)
-	err := starter.browser.Connect()
-	if err != nil {
+	if err := starter.browser.Connect(); err != nil {
 		return err
 	}
-	err = starter.browser.IgnoreCertErrors(true)
-	if err != nil {
+	starter.ready = true
+	if err := starter.browser.IgnoreCertErrors(true); err != nil {
 		return err
 	}
-	err = starter.createBrowserHijack()
-	if err != nil {
+	if err := starter.createBrowserHijack(); err != nil {
 		return err
 	}
 	return nil
@@ -162,5 +161,8 @@ func (starter *BrowserStarter) createBrowserHijack() error {
 }
 
 func (starter *BrowserStarter) Close() error {
+	if !starter.ready || starter.browser == nil {
+		return nil
+	}
 	return starter.browser.Close()
 }
