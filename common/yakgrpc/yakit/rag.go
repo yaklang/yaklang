@@ -140,10 +140,7 @@ func QueryRAGDocumentPaging(db *gorm.DB, filter *ypb.ListVectorStoreEntriesFilte
 	// 2. 应用过滤条件
 	db = FilterRAGDocument(db, filter)
 
-	// 3. 应用排序和分页相关的预处理
-	db = bizhelper.OrderByPaging(db, paging)
-
-	// 4. 执行分页查询
+	// 3. 执行分页查询
 	ret := make([]*schema.VectorStoreDocument, 0)
 	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
 	if db.Error != nil {
