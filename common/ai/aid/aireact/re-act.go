@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -205,6 +207,16 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.timeline)
 	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	// Initialize prompt manager
+	workdir := cfg.workdir
+	if workdir == "" {
+		workdir, _ = react.artifacts.Getwd()
+		if workdir == "" {
+			workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
+			if utils.GetFirstExistedFile(workdir) == "" {
+				os.MkdirAll(workdir, os.ModePerm)
+			}
+		}
+	}
 	react.promptManager = NewPromptManager(react, cfg.workdir)
 	cfg.promptManager = react.promptManager
 
