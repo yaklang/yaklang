@@ -524,7 +524,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 						if getMirrorHTTPFlowParams != nil {
 							for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
-								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: "string"})
+								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: marshalValue(v)})
 							}
 						}
 
@@ -659,7 +659,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	notInStatusCode := utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
 	var iInput any
-	retryPayloadsMap := make(map[string][]string, 0) // key 是原始请求报文，value 是重试的payload，我们需要将重试的payload绑定回去
+	retryPayloadsMap := make(map[string][]string) // key 是原始请求报文，value 是重试的payload，我们需要将重试的payload绑定回去
 	// 这里可能会出现原始请求报文一样的情况，但是这样也是因为payload没有而导致的，例如{{repeat(10)}}
 
 	if !isRetry {
@@ -867,7 +867,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			if result != nil && result.ExtraInfo != nil {
 				for k, v := range result.ExtraInfo {
-					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: "string"})
+					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: marshalValue(v)})
 				}
 			}
 
