@@ -212,9 +212,14 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 	var anValue *anValue
 
-	if typ := value.GetType(); !utils.IsNil(typ) && typ.GetId() <= 0 {
-		log.Errorf("BUG: value2IrCode called with nil type: %s %s", value.GetOpcode().String(), value.GetName())
-		// return
+	if typ := value.GetType(); utils.IsNil(typ) {
+		log.Warnf("BUG: value2IrCode called (%s)[%v] with nil type", value.String(), value.GetOpcode().String())
+	} else {
+		if typ.GetId() == 0 {
+			saveTypeWithValue(value, typ)
+		}
+		ir.TypeID = typ.GetId()
+		// log.Errorf("marshal instruction (%s)[%v] type id: %v", value.String(), value.GetOpcode().String(), ir.TypeID)
 	}
 	// ir.String = value.String()
 	ir.HasDefs = value.HasValues()
@@ -270,7 +275,6 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			ir.String = constInst.String()
 		}
 	}
-	ir.TypeID = saveType(anValue.GetType())
 }
 
 func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
