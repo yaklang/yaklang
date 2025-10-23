@@ -593,10 +593,12 @@ func TestMUSTPASS_GetKnowledgeBaseEntryByFilter(t *testing.T) {
 	assert.Len(t, entriesOverLimit, 0) // 超出范围，应该返回空数组
 
 	// 测试 AfterId - 获取ID大于指定值的记录
-	// 先获取第一个条目的ID
+	// 先获取ID最小的条目（按ID升序排序）
 	pagingFirst := &ypb.Paging{
-		Page:  1,
-		Limit: 1,
+		Page:    1,
+		Limit:   1,
+		OrderBy: "id",
+		Order:   "asc",
 	}
 	_, firstEntries, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingFirst)
 	assert.NoError(t, err)
@@ -619,15 +621,17 @@ func TestMUSTPASS_GetKnowledgeBaseEntryByFilter(t *testing.T) {
 	}
 
 	// 测试 BeforeId - 获取ID小于指定值的记录
-	// 先获取最后一个条目的ID
+	// 先获取ID最大的条目（按ID降序排序）
 	pagingLast := &ypb.Paging{
-		Page:  2,
-		Limit: 5,
+		Page:    1,
+		Limit:   1,
+		OrderBy: "id",
+		Order:   "desc",
 	}
 	_, lastPageEntries, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingLast)
 	assert.NoError(t, err)
-	assert.Len(t, lastPageEntries, 5)
-	lastEntryID := lastPageEntries[len(lastPageEntries)-1].ID
+	assert.Len(t, lastPageEntries, 1)
+	lastEntryID := lastPageEntries[0].ID
 
 	// 测试获取ID小于最后一个条目的所有记录
 	pagingBefore := &ypb.Paging{
