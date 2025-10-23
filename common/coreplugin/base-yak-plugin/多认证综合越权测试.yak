@@ -12,13 +12,12 @@ args = cli.Json(
       "items": {
         "properties": {
           "kind": {
-            "title": "Kind",
+            "title": "认证类型",
             "type": "string",
             "enum": [
                 "Header",
                 "Cookie"
             ],
-            "title": "认证类型",
             "default": "Header",
             "description": "设置认证信息，如果需要对整体 Cookie 进行测试，请使用 Header 模式，Key 填写 Cookie 即可"
             },
@@ -57,7 +56,7 @@ args = cli.Json(
             ]
           }
         },
-        "require": [
+        "required": [
           "key",
           "value",
           "kind",
@@ -266,8 +265,8 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
     }
     dump(replaceResults)
 
-    replaceReq = originReq
     for seq in Product(replaceResults) {
+        replaceReq = originReq
         tags = []
         for m in seq {
             kind, key, value = m.kind, m.key, m.value
@@ -281,9 +280,9 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
         tag = f"值 ${str.Join(tags, ", ")}"
         handleReq(https, replaceReq, rsp, tag)
     }
-        
-    emptyReq = originReq
+
     for seq in Product(emptyResults) {
+        emptyReq = originReq
         tags = []
         for m in seq {
             kind, key, value = m.kind, m.key, m.value
