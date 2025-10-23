@@ -8214,8 +8214,15 @@ message MITMV2Request{
   bool RecoverContext = 45; // recover mitm context plugin config...
   int64 PluginConcurrency = 47; // 设置插件并发数，默认30
 
-  // optional host/domain whitelist for downstream proxy
-  repeated string DownstreamProxyHosts = 48;
+  // optional per-host downstream proxy mapping
+  map<string, MITMV2ProxySetting> DownstreamProxyMap = 48;
+}
+
+message MITMV2ProxySetting{
+  string Proxy = 1;    // endpoint, host:port or full url
+  string Protocol = 2; // http/socks5...
+  string Username = 3;
+  string Password = 4;
 }
 
 message MITMV2Response {

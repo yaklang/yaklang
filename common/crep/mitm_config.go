@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -348,7 +349,7 @@ func MITM_SetDownstreamProxy(proxys ...string) MITMConfig {
 		server.proxyUrlStrings = nil
 		if len(proxys) == 0 || proxys == nil {
 			server.proxyUrls = nil
-			server.proxy.SetDownstreamProxyConfig(nil, server.proxyHostMatcher)
+			server.applyProxyConfig()
 			return nil
 		}
 		server.proxyUrlStrings = make([]string, 0, len(proxys))
@@ -361,21 +362,38 @@ func MITM_SetDownstreamProxy(proxys ...string) MITMConfig {
 			server.proxyUrls = append(server.proxyUrls, urlRaw)
 			server.proxyUrlStrings = append(server.proxyUrlStrings, urlRaw.String())
 		}
-		server.proxy.SetDownstreamProxyConfig(server.proxyUrlStrings, server.proxyHostMatcher)
+		server.applyProxyConfig()
 		return nil
 	}
 }
 
-func MITM_SetDownstreamProxyHostFilter(hosts ...string) MITMConfig {
+func MITM_SetDownstreamProxyRoutes(routes map[string][]string) MITMConfig {
 	return func(server *MITMServer) error {
-		clean := utils.StringArrayFilterEmpty(hosts)
-		if len(clean) == 0 {
-			server.proxyHostMatcher = nil
-		} else {
-			server.proxyHostMatcher = minimartian.NewProxyHostMatcher(clean)
-			log.Infof("set downstream proxy host filter: %v", clean)
+		if server.proxyRouteMap == nil {
+			server.proxyRouteMap = make(map[string][]string)
 		}
-		server.proxy.SetDownstreamProxyConfig(server.proxyUrlStrings, server.proxyHostMatcher)
+		for k := range server.proxyRouteMap {
+			delete(server.proxyRouteMap, k)
+		}
+		for pattern, proxies := range routes {
+			pattern = strings.TrimSpace(pattern)
+			if pattern == "" {
+				continue
+			}
+			candidates := utils.StringArrayFilterEmpty(proxies)
+			if len(candidates) == 0 {
+				continue
+			}
+			server.proxyRouteMap[pattern] = append([]string(nil), candidates...)
+		}
+		if len(server.proxyRouteMap) > 0 {
+			keys := make([]string, 0, len(server.proxyRouteMap))
+			for pattern := range server.proxyRouteMap {
+				keys = append(keys, pattern)
+			}
+			log.Infof("set downstream proxy routes: %v", keys)
+		}
+		server.applyProxyConfig()
 		return nil
 	}
 }
