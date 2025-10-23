@@ -10,20 +10,25 @@ import (
 func saveTypeWithValue(value Value, typ Type) {
 	// i know is ugle, just is, and i will fix this after remove init value in ssa/next.go
 	if utils.IsNil(value) {
+		log.Debugf("value is nil ")
 		return
 	}
 	prog := value.GetProgram()
 	if utils.IsNil(prog) {
+		log.Debug("no program")
 		return
 	}
 	application := prog.GetApplication()
 	if utils.IsNil(application) {
+		log.Debug("no application ")
 		return
 	}
 
 	if cache := application.Cache; cache != nil {
 		cache.TypeCache.Set(typ)
 		saveType(typ)
+	} else {
+		log.Debug("cache is nil ")
 	}
 }
 
