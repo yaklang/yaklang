@@ -327,7 +327,7 @@ type MITMServer struct {
 	proxyUrl                 *url.URL
 	proxyUrls                []*url.URL
 	proxyUrlStrings          []string
-	proxyHostMatcher         *minimartian.ProxyHostMatcher
+	proxyRouteMap            map[string][]string
 	hijackedMaxContentLength int
 
 	// transparent hijack mode
@@ -382,6 +382,24 @@ func (m *MITMServer) Configure(options ...MITMConfig) error {
 
 func (m *MITMServer) GetMartianProxy() *minimartian.Proxy {
 	return m.proxy
+}
+
+func (m *MITMServer) applyProxyConfig() {
+	if m == nil || m.proxy == nil {
+		return
+	}
+	defaultProxies := append([]string(nil), m.proxyUrlStrings...)
+	var routeCopy map[string][]string
+	if len(m.proxyRouteMap) > 0 {
+		routeCopy = make(map[string][]string, len(m.proxyRouteMap))
+		for pattern, proxies := range m.proxyRouteMap {
+			if len(proxies) == 0 {
+				continue
+			}
+			routeCopy[pattern] = append([]string(nil), proxies...)
+		}
+	}
+	m.proxy.SetDownstreamProxyConfig(defaultProxies, routeCopy)
 }
 
 func (m *MITMServer) GetCaCert() []byte {
@@ -525,6 +543,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		DNSServers:                 make([]string, 0),
 		dnsCache:                   new(sync.Map),
 		HostMapping:                make(map[string]string),
+		proxyRouteMap:              make(map[string][]string),
 		hijackedMaxContentLength:   10 * 1024 * 1024,
 		http2:                      false,
 		maxContentLength:           10 * 1024 * 1024,
