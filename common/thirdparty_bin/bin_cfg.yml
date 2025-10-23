@@ -58,7 +58,7 @@ binaries:
         bin_path: "llama-server/llama-server.exe"
       linux-amd64:
         url: "/llama.cpp/llama-b6209-bin-ubuntu-x64.zip"
-        pick: "*"
+        pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
   - name: "page2image"
