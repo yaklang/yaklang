@@ -2,6 +2,7 @@ package filesys
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -60,17 +61,21 @@ func glance(i filesys_interface.FileSystem) string {
 	var fileCount = 0
 	var dirCount = 0
 
-	err := Recursive(".", WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if isDir {
-			dirCount++
-		} else {
-			fileCount++
-		}
-		if dirCount+fileCount > 10000 {
-			return errors.New("too many files, stop counting")
-		}
-		return nil
-	}), WithFileSystem(i))
+	ctx, cancel := context.WithCancel(context.Background())
+	err := Recursive(".",
+		WithContext(ctx),
+		WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+			if isDir {
+				dirCount++
+			} else {
+				fileCount++
+			}
+			if dirCount+fileCount > 10000 {
+				cancel()
+				return errors.New("too many files, stop counting")
+			}
+			return nil
+		}), WithFileSystem(i))
 	_ = err // ignore error
 
 	// 获取当前工作目录的绝对路径

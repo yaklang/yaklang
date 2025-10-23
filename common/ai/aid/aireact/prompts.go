@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
-	"sync"
 	"text/template"
 	"time"
 
@@ -55,21 +54,19 @@ var basePrompt string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
-	cpm                  *aicommon.ContextProviderManager
-	workdir              string
-	glanceWorkdir        string
-	genWorkdirGlanceOnce sync.Once
-	react                *ReAct
+	cpm           *aicommon.ContextProviderManager
+	workdir       string
+	glanceWorkdir string
+	react         *ReAct
 }
 
 // NewPromptManager creates a new prompt manager
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 	return &PromptManager{
-		cpm:                  aicommon.NewContextProviderManager(),
-		workdir:              workdir,
-		glanceWorkdir:        "",
-		react:                react,
-		genWorkdirGlanceOnce: sync.Once{},
+		cpm:           aicommon.NewContextProviderManager(),
+		workdir:       workdir,
+		glanceWorkdir: "",
+		react:         react,
 	}
 }
 
@@ -253,9 +250,7 @@ type YaklangCodeActionLoopPromptData struct {
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
-	pm.genWorkdirGlanceOnce.Do(func() {
-		pm.glanceWorkdir = filesys.Glance(wd)
-	})
+	pm.glanceWorkdir = filesys.Glance(wd)
 	return pm.glanceWorkdir
 }
 
