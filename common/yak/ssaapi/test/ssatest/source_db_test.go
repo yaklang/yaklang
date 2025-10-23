@@ -83,6 +83,18 @@ func TestSourceWithInclude_PHP(t *testing.T) {
 	checkSource(vf, t)
 }
 
+func TestTypeSaveLoad(t *testing.T) {
+	code := `
+	a = int(1)
+	`
+	CheckSyntaxFlow(t, code,
+		`a as $t `, map[string][]string{
+			"t": {"castType(number, 1)"},
+		},
+		ssaapi.WithLanguage(ssaapi.Yak),
+	)
+}
+
 func TestMarshalInstruction(t *testing.T) {
 	t.Run("type cast", func(t *testing.T) {
 		code := `
