@@ -23,6 +23,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,9 +84,10 @@ type Proxy struct {
 	proxyPassword string
 
 	// lowhttp config
-	lowhttpConfig    []lowhttp.LowhttpOpt
-	proxyUrlStrings  []string
-	proxyHostMatcher *ProxyHostMatcher
+	lowhttpConfig       []lowhttp.LowhttpOpt
+	proxyUrlStrings     []string
+	proxyExactRoutes    map[string][]string
+	proxyWildcardRoutes []compiledProxyRoute
 
 	maxContentLength int
 	maxReadWaitTime  time.Duration
@@ -142,6 +145,12 @@ func (p *Proxy) MergeExtraIncomingConnectionChannelLegacy(ctx context.Context, c
 	}()
 }
 
+type compiledProxyRoute struct {
+	pattern string
+	matcher *ProxyHostMatcher
+	proxies []string
+}
+
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
 	if p == nil {
 		return
@@ -180,13 +189,14 @@ func (p *Proxy) deleteCache(req *http.Request) {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	proxy := &Proxy{
-		timeout:             5 * time.Minute,
-		closing:             make(chan bool),
-		reqmod:              noop,
-		resmod:              noop,
-		ctxCacheInitOnce:    new(sync.Once),
-		ctxCacheLock:        new(sync.Mutex),
-		ctxCache:            utils.NewTTLCache[*Context](5 * time.Minute),
+		timeout:          5 * time.Minute,
+		closing:          make(chan bool),
+		reqmod:           noop,
+		resmod:           noop,
+		ctxCacheInitOnce: new(sync.Once),
+		ctxCacheLock:     new(sync.Mutex),
+		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
+		proxyExactRoutes: make(map[string][]string),
 		extraIncomingConnCh: make(chan *WrapperedConn),
 	}
 	return proxy
@@ -272,13 +282,97 @@ func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 }
 
 // SetDownstreamProxyConfig updates the proxy routing configuration.
-func (p *Proxy) SetDownstreamProxyConfig(proxies []string, matcher *ProxyHostMatcher) {
-	if len(proxies) == 0 {
+func (p *Proxy) SetDownstreamProxyConfig(defaultProxies []string, routeMap map[string][]string) {
+	if len(defaultProxies) == 0 {
 		p.proxyUrlStrings = nil
 	} else {
-		p.proxyUrlStrings = append([]string(nil), proxies...)
+		p.proxyUrlStrings = append([]string(nil), defaultProxies...)
 	}
-	p.proxyHostMatcher = matcher
+
+	if p.proxyExactRoutes == nil {
+		p.proxyExactRoutes = make(map[string][]string)
+	}
+	for k := range p.proxyExactRoutes {
+		delete(p.proxyExactRoutes, k)
+	}
+	p.proxyWildcardRoutes = nil
+
+	if len(routeMap) == 0 {
+		return
+	}
+
+	type wildcardEntry struct {
+		pattern string
+		matcher *ProxyHostMatcher
+		proxies []string
+	}
+	var wildcardRoutes []wildcardEntry
+
+	for pattern, proxies := range routeMap {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		proxies = utils.StringArrayFilterEmpty(proxies)
+		if len(proxies) == 0 {
+			continue
+		}
+		proxyCopy := append([]string(nil), proxies...)
+		lowerPattern := strings.ToLower(pattern)
+
+		isWildcard := strings.Contains(pattern, "*") || strings.HasPrefix(pattern, ".")
+		if !isWildcard {
+			p.proxyExactRoutes[lowerPattern] = proxyCopy
+			continue
+		}
+
+		matcher := NewProxyHostMatcher([]string{pattern})
+		if matcher == nil {
+			continue
+		}
+		wildcardRoutes = append(wildcardRoutes, wildcardEntry{
+			pattern: pattern,
+			matcher: matcher,
+			proxies: proxyCopy,
+		})
+	}
+
+	if len(wildcardRoutes) > 0 {
+		sort.SliceStable(wildcardRoutes, func(i, j int) bool {
+			if wildcardRoutes[i].pattern == wildcardRoutes[j].pattern {
+				return i < j
+			}
+			return wildcardRoutes[i].pattern < wildcardRoutes[j].pattern
+		})
+		for _, route := range wildcardRoutes {
+			p.proxyWildcardRoutes = append(p.proxyWildcardRoutes, compiledProxyRoute{
+				pattern: route.pattern,
+				matcher: route.matcher,
+				proxies: route.proxies,
+			})
+		}
+	}
+}
+
+func (p *Proxy) selectProxiesForHost(host string) []string {
+	if p == nil {
+		return nil
+	}
+	normalized := strings.ToLower(strings.TrimSpace(host))
+	if normalized != "" {
+		if proxies, ok := p.proxyExactRoutes[normalized]; ok && len(proxies) > 0 {
+			return proxies
+		}
+		for _, route := range p.proxyWildcardRoutes {
+			if route.matcher != nil && route.matcher.Match(normalized) {
+				return route.proxies
+			}
+		}
+	}
+	if len(p.proxyUrlStrings) > 0 {
+		return p.proxyUrlStrings
+	}
+	return nil
 }
 
 func (p *Proxy) SetFindProcessName(b bool) {
