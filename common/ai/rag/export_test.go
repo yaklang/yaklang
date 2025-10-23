@@ -24,7 +24,7 @@ func createTempTestDatabase() (*gorm.DB, error) {
 
 }
 
-func TestExports(t *testing.T) {
+func TestMUSTPASS_Exports(t *testing.T) {
 	// 用于储存测试数据
 	testDB, err := createTempTestDatabase()
 	if err != nil {
@@ -123,7 +123,7 @@ func TestExports(t *testing.T) {
 	}
 }
 
-func TestExportRAGToBinary(t *testing.T) {
+func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 	// 创建测试数据库
 	testDB, err := createTempTestDatabase()
 	if err != nil {
