@@ -296,7 +296,7 @@ func PreprocessCMacros(src string) (string, error) {
 	// Build preprocessor arguments with include paths
 	preprocessorArgs := []string{
 		"-E",
-		"-P",
+		// "-P",
 		"-nostdinc",
 		"-Wno-everything",
 	}

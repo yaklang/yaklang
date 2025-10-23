@@ -9,6 +9,9 @@ import (
 func ReplaceMemberCall(t, v, to Value) map[string]Value {
 	ret := make(map[string]Value)
 	builder := t.GetFunc().builder
+	if utils.IsNil(builder) {
+		return ret
+	}
 	recoverScope := builder.SetCurrent(t)
 	defer recoverScope()
 	createPhi := generatePhi(builder, nil, nil)

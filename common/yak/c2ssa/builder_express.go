@@ -270,6 +270,7 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 		case "|=":
 			right = b.EmitBinOp(ssa.OpOr, right, newRight)
 		default:
+			right = newRight
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", op))
 		}
 		b.AssignVariable(left, right)
