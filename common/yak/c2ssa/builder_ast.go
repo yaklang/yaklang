@@ -197,6 +197,9 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 				base = b.EmitConstInst(i1 * i2)
 			}
 		}
+		if utils.IsNil(base) {
+			base = b.EmitConstInst(0)
+		}
 		return variable, base, nil
 	}
 
@@ -211,6 +214,9 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		case PARAM_KIND:
 			_, ssatypes = b.buildParameterTypeList(ast.ParameterTypeList().(*cparser.ParameterTypeListContext))
 		}
+		if utils.IsNil(base) {
+			base = b.EmitConstInst(0)
+		}
 		return nil, base, ssatypes
 	}
 
@@ -219,6 +225,9 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
 		if idl := ast.IdentifierList(); idl != nil {
 			b.buildIdentifierList(idl.(*cparser.IdentifierListContext))
+		}
+		if utils.IsNil(base) {
+			base = b.EmitConstInst(0)
 		}
 		return nil, base, nil
 	}

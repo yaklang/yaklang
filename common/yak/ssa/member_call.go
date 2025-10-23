@@ -188,6 +188,9 @@ func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, obj
 	}
 
 	currentScope := b.CurrentBlock.ScopeTable
+	if utils.IsNil(object.GetBlock()) {
+		return
+	}
 	objectScope := object.GetBlock().ScopeTable
 	if utils.IsNil(currentScope) || utils.IsNil(objectScope) {
 		return

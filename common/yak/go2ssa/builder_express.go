@@ -553,7 +553,7 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.EmitConstInstPlaceholder(c)
 		}
 
-		if v := b.PeekValueInRoot(text); !utils.IsNil(v) {
+		if v := b.PeekExternInRoot(text); !utils.IsNil(v) {
 			if ex, ok := ssa.ToExternLib(v); ok {
 				return ex
 			}
