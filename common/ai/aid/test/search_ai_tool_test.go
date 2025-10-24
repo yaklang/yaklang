@@ -1,9 +1,10 @@
 package test
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/yak/depinjector"
 
@@ -139,6 +140,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 	coordinator, err := aid.NewCoordinator("帮我解码一个base64编码的字符串: eWFrbGFuZw==",
 		aid.WithAiToolsSearchTool(),
 		aid.WithAgreeYOLO(),
+		aid.WithEnableToolsName("decode"),
 		aid.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			pair := stateKeyword[currentStateIndex]
