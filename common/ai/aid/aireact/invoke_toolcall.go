@@ -84,7 +84,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
 	)
 
-	toolCaller, err = aicommon.NewToolCaller(toolCallerOptions...)
+	toolCaller, err = aicommon.NewToolCaller(ctx, toolCallerOptions...)
 	if err != nil {
 		return nil, false, utils.Errorf("failed to create tool caller: %v", err)
 	}

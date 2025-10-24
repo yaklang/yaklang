@@ -1,6 +1,8 @@
 package aid
 
 import (
+	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -100,7 +102,14 @@ type HandleToolUseNext string
 //	}
 //}
 
-func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, bool, error) {
+func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, bool, error) {
+	// Check context at the beginning
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	default:
+	}
+
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
@@ -144,6 +153,12 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 	var selecteddTool *aitool.Tool
 	var directlyAnswer bool
 	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		// Check context before AI call
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
@@ -177,7 +192,13 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 	return selecteddTool, directlyAnswer, nil
 }
 
-func (t *AiTask) toolReviewPolicy_wrongParam(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error) {
+func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error) {
+	// Check context at the beginning
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	prompt, err := t.quickBuildPrompt(__prompt_ParamsReGenerate, map[string]any{
 		"Tool":      tool,
@@ -190,6 +211,12 @@ func (t *AiTask) toolReviewPolicy_wrongParam(tool *aitool.Tool, oldParam aitool.
 
 	var invokeParams = aitool.InvokeParams{}
 	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		// Check context before AI call
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {

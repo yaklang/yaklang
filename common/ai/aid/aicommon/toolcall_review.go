@@ -71,11 +71,20 @@ func (t *ToolCaller) review(
 	e := t.emitter
 	switch suggestion {
 	case "wrong_tool":
+		// Check context before processing
+		select {
+		case <-t.ctx.Done():
+			e.EmitError("context cancelled during tool review")
+			return targetTool, param, nil, HandleToolUseNext_Default, t.ctx.Err()
+		default:
+		}
+
 		if t.reviewWrongToolHandler == nil {
 			e.EmitError("no review wrong tool handler defined")
 			return targetTool, param, nil, HandleToolUseNext_Default, nil
 		}
 		newTool, directlyAnswer, err := t.reviewWrongToolHandler(
+			t.ctx,
 			targetTool,
 			userInput.GetString("suggestion_tool"),
 			userInput.GetString("suggestion_tool_keyword"),
@@ -103,11 +112,19 @@ func (t *ToolCaller) review(
 		}
 		return targetTool, param, result, HandleToolUseNext_Override, nil
 	case "wrong_params":
+		// Check context before processing
+		select {
+		case <-t.ctx.Done():
+			e.EmitError("context cancelled during tool review")
+			return targetTool, param, nil, HandleToolUseNext_Default, t.ctx.Err()
+		default:
+		}
+
 		if t.reviewWrongParamHandler == nil {
 			e.EmitError("wrong params suggestion received, but no handler defined")
 			return targetTool, param, nil, HandleToolUseNext_Override, nil
 		}
-		newParam, err := t.reviewWrongParamHandler(targetTool, param, userInput.GetString("extra_prompt"))
+		newParam, err := t.reviewWrongParamHandler(t.ctx, targetTool, param, userInput.GetString("extra_prompt"))
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
 			userCancelHandler("tool directly answer (err in review-wrong-params)")
