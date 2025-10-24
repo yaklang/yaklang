@@ -17,6 +17,7 @@ if !file.IsExisted(pathName) {
     yakit.Info("no such file or directory: %v" % pathName)
     return
 }
+
 if pattern == "" {
     yakit.Info("grep target not right")
     return

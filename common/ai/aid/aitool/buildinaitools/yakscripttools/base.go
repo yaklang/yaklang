@@ -33,15 +33,16 @@ type FileSystemWithHash interface {
 func init() {
 	InitEmbedFS()
 	yakit.RegisterPostInitDatabaseFunction(func() error {
+		const key = "2b709ef7252a06a0c1cfbb952f77f976"
+		var calculatedHash string
 		if !consts.IsDevMode() {
-			const key = "2b709ef7252a06a0c1cfbb952f77f976"
 			if yakit.Get(key) == consts.ExistedBuildInAIToolEmbedFSHash {
 				return nil
 			}
 			log.Debug("start to load build in ai tools")
 			defer func() {
-				hash, _ := BuildInAIToolHash()
-				yakit.Set(key, hash)
+				calculatedHash, _ = BuildInAIToolHash()
+				yakit.Set(key, calculatedHash)
 			}()
 		}
 
@@ -52,6 +53,13 @@ func init() {
 			}
 		}
 
+		if calculatedHash == "" {
+			calculatedHash, _ = BuildInAIToolHash()
+		}
+		if yakit.Get(key) == calculatedHash && calculatedHash != "" {
+			return nil
+		}
+		yakit.Set(key, calculatedHash)
 		OverrideYakScriptAiTools()
 		return nil
 	}, "sync-ai-tool")
