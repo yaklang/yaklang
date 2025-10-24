@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -9,7 +10,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, error) {
+func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, error) {
+	// Check context at the beginning
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	default:
+	}
+
 	manager := r.config.aiToolManager
 
 	var tools []*aitool.Tool
@@ -53,6 +61,13 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 	var answerDirectly bool
 	noUserInteract := r.config.enableUserInteract
 REDO:
+	// Check context before each iteration
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	default:
+	}
+
 	redo = false
 	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
 	if err != nil {

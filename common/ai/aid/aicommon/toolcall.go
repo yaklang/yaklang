@@ -1,11 +1,13 @@
 package aicommon
 
 import (
+	"context"
 	"fmt"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -21,20 +23,23 @@ type ToolCaller struct {
 	done       *sync.Once
 	callToolId string
 
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	generateToolParamsBuilder func(tool *aitool.Tool, toolName string) (string, error)
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)
 	onCallToolEnd   func(callToolId string)
 
-	reviewWrongToolHandler  func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
-	reviewWrongParamHandler func(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
+	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
+	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 }
 
 type ToolCallerOption func(tc *ToolCaller)
 
 func WithToolCaller_ReviewWrongTool(
-	handler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error),
+	handler func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongToolHandler = handler
@@ -42,7 +47,7 @@ func WithToolCaller_ReviewWrongTool(
 }
 
 func WithToolCaller_ReviewWrongParam(
-	handler func(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error),
+	handler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongParamHandler = handler
@@ -99,7 +104,7 @@ func WithToolCaller_GenerateToolParamsBuilder(
 	}
 }
 
-func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
+func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
 		callToolId: ksuid.New().String(),
 		start:      &sync.Once{},
@@ -119,6 +124,12 @@ func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
 
 	if caller.ai == nil || utils.IsNil(caller.ai) {
 		return nil, fmt.Errorf("ai caller is nil in ToolCaller")
+	}
+
+	if utils.IsNil(ctx) {
+		caller.ctx, caller.cancel = context.WithCancel(caller.config.GetContext())
+	} else {
+		caller.ctx, caller.cancel = context.WithCancel(ctx)
 	}
 
 	return caller, nil
@@ -283,7 +294,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 
 		// wait for agree
-		config.DoWaitAgree(nil, ep)
+		config.DoWaitAgree(t.ctx, ep)
 		params := ep.GetParams()
 		t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)

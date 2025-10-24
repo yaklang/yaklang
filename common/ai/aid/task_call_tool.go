@@ -64,6 +64,7 @@ func (t *AiTask) getToolResultAction(response string) string {
 func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	var caller *aicommon.ToolCaller
 	caller, err = aicommon.NewToolCaller(
+		t.Config.GetContext(),
 		aicommon.WithToolCaller_Task(t),
 		aicommon.WithToolCaller_AICallerConfig(t),
 		aicommon.WithToolCaller_Emitter(t.GetEmitter()),

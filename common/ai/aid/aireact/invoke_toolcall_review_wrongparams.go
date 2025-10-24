@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -8,7 +9,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.InvokeParams, extraPrompt string) (aitool.InvokeParams, error) {
+func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aitool.Tool, old aitool.InvokeParams, extraPrompt string) (aitool.InvokeParams, error) {
+	// Check context at the beginning
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	input := r.GetCurrentTask().GetUserInput()
 	if extraPrompt != "" {
 		input = input + "\n\n Extra:\n\n" + extraPrompt
