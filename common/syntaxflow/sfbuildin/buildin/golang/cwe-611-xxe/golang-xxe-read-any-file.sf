@@ -112,7 +112,7 @@ $sink.Entity?{!have: 'xml.HTMLEntity'} as $high;
 
 alert $high for {
 	type: "vuln",
-	risk: "xxe",
+	risk: "XXE",
 	title: "Check Golang XXE Read Any File",
 	title_zh: "检测Golang XXE任意文件读取漏洞",
 	solution: <<<SOLUTION
@@ -211,7 +211,6 @@ fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的�
 - **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
 DESC
 	level: "high",
-	risk: "XXE",
 	name: "high",
 	message: "发现Golang XXE任意文件读取漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }

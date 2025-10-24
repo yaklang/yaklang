@@ -116,7 +116,7 @@ $sink & $input as $high;
 
 alert $high for {
 	type: "vuln",
-	risk: "rce",
+	risk: "命令注入",
 	title: "Golang Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang命令注入漏洞",
 	solution: <<<SOLUTION
@@ -221,7 +221,6 @@ DESC
 	level: "high",
 	name: "high",
 	message: "检测到Golang应用程序中的命令注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
-	risk: "命令注入",
 }
 
 desc(

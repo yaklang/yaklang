@@ -100,7 +100,7 @@ $cmd_sink & $user_input as $high;
 
 alert $high for {
 	level: "high",
-	risk: "rce",
+	risk: "命令注入",
 	type: "vuln",
 	title: "C Command Injection Vulnerability Was Detected",
 	title_zh: "检测到C语言命令注入漏洞",
@@ -197,7 +197,6 @@ void safe_exec(const char *safe_path) {
 }
 ```
 SOLUTION
-	risk: "命令注入",
 	name: "high",
 }
 

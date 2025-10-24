@@ -127,7 +127,7 @@ alert $low for {
 ### 漏洞描述\n1. **漏洞原理**\n当应用程序未对用户提供的文件路径进行充分的验证和授权检查时，就会出现文件路径未授权漏洞。攻击者可以构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，从而突破应用程序设定的目录限制，访问、篡改或删除系统中的任意文件。这是一种典型的路径穿越（Path Traversal）攻击。\n2. **触发场景**\n此漏洞通常发生在需要处理用户上传文件、访问用户指定文件或删除文件的场景。例如，应用程序接受用户输入的文件名或文件ID，并将其直接或简单拼接后用于文件操作 API（如 `os.Open`, `os.Remove`, `os.Stat` 等），而没有对拼接后的最终路径进行规范化、路径穿越检测以及针对当前用户的权限检查。\n```go\npackage main\nimport (\n\"fmt\"\n\"net/http\"\n\"os\"\n)\nfunc deleteFile(w http.ResponseWriter, r *http.Request) {\n// 从请求中直接获取用户输入的文件路径，未进行任何验证或授权检查\nfilePath := r.URL.Query().Get(\"file_id\")\n// 潜在危险的文件操作，如果 filePath 包含 \"../\"，可能删除应用程序目录之外的文件\nerr := os.Remove(filePath)\nif err != nil {\nfmt.Fprintf(w, \"Failed to delete file: %v\", err)\nreturn\n}\nfmt.Fprintf(w, \"File deleted successfully\")\n}\nfunc main() {\nhttp.HandleFunc(\"/delete\", deleteFile)\nhttp.ListenAndServe(\":8080\", nil)\n}\n```\n3. **潜在影响**\n- **敏感信息泄露**: 攻击者可以访问配置文件、源代码、用户数据等敏感文件。\n- **数据篡改或丢失**: 攻击者可以修改、删除或上传恶意文件。\n- **远程代码执行**: 如果应用程序还存在其他漏洞（如文件包含），路径穿越可能导致远程代码执行。\n- **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
 DESC
 	level: "low",
-	risk: "path-traversal",
+	risk: "路径穿越",
 	type: "vuln",
 	title: "Detect Golang Path Traversal Vulnerability",
 	title_zh: "检测Golang路径穿越漏洞",
@@ -196,7 +196,6 @@ http.ListenAndServe(":8080", nil)
 除了路径验证，还应根据当前用户的身份和权限，判断其是否有权访问或操作指定的文件。文件操作应与用户授权体系相结合。
 SOLUTION
 	message: "检测到Golang路径穿越漏洞，但可能存在过滤函数，需进一步审计确认。",
-	risk: "路径穿越",
 	name: "low",
 }
 

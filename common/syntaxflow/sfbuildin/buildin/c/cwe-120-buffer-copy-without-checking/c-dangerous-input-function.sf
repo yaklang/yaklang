@@ -84,7 +84,7 @@ vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
 
 alert $high for {
 	level: "high",
-	risk: "buffer-overflow",
+	risk: "缓冲区溢出",
 	type: "vuln",
 	title: "C Dangerous Input Function Vulnerability Was Detected",
 	title_zh: "检测到C语言中的危险输入函数漏洞",
@@ -157,7 +157,6 @@ void safe_input() {
 #### 3. 使用现代C库
 考虑使用现代C库（如Safe C）或高级语言（如Rust）减少此类风险。
 SOLUTION
-	risk: "缓冲区溢出",
 }
 
 desc(

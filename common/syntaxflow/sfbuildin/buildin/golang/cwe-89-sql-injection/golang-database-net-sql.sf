@@ -87,7 +87,7 @@ $param & $input as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
-	risk: "sqli",
+	risk: "SQL注入",
 	title_zh: "检测Golang SQL注入漏洞",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -160,7 +160,6 @@ fmt.Fprintf(w, "User ID: %d", userID)
 DESC
 	level: "high",
 	type: "vuln",
-	risk: "SQL注入",
 	name: "high",
 	message: "检测到Golang代码中存在SQL注入漏洞，用户输入未经过滤直接拼接到SQL查询中。",
 }

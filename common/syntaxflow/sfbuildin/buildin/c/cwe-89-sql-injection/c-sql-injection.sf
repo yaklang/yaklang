@@ -123,7 +123,7 @@ $user_input & $sql_exec as $high;
 
 alert $high for {
 	level: "high",
-	risk: "sqli",
+	risk: "SQL注入",
 	type: "vuln",
 	title: "C SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到C语言SQL注入漏洞",
@@ -182,7 +182,6 @@ if (strlen(username) > 100 || strlen(password) > 100) {
 }
 ```
 SOLUTION
-	risk: "SQL注入",
 }
 
 desc(

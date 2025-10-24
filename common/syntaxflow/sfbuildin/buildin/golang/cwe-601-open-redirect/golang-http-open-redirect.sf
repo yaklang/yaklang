@@ -121,7 +121,7 @@ $target.Get() #->?{!opcode:const} as $high
 
 alert $high for {
 	title: "Check Golang Open Redirect Vulnerability",
-	risk: "url-redirect",
+	risk: "URL重定向",
 	title_zh: "检测Golang开放重定向漏洞 (http)",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -227,7 +227,6 @@ DESC
 	type: "vuln",
 	name: "high",
 	message: "检测到Go语言HTTP开放重定向漏洞，且从数据源（source）到污染汇聚点（sink）间未发现任何过滤函数信息。",
-	risk: "URL重定向",
 }
 
 desc(
