@@ -3,6 +3,7 @@ desc(
 	title_zh: "检测Golang头部操纵漏洞"
 	type: audit
 	level: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 

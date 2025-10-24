@@ -1,7 +1,8 @@
 desc(
 	title: "Check C Information Exposure Vulnerability"
 	type: audit
-	severity: medium
+	level: medium
+	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 

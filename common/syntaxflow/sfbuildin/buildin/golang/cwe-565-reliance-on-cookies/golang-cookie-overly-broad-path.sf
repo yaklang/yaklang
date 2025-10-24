@@ -2,7 +2,8 @@ desc(
 	title: "Detect Golang Cookie Overly Broad Path Vulnerability"
 	title_zh: "检测Golang Cookie路径过宽漏洞"
 	type: audit
-	severity: high
+	level: high
+	risk: "csrf"
 	desc: <<<DESC
 ### 漏洞描述
 

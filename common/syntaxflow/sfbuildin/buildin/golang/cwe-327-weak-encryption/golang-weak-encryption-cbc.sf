@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Weak Encryption Using AES-CBC Mode"
 	title_zh: "检测Golang使用AES-CBC弱加密模式"
 	type: vuln
-	severity: mid
+	level: mid
 	desc: <<<DESC
 ### 漏洞描述
 

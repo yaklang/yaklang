@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Reflected XSS Vulnerability in Beego"
 	title_zh: "检测Golang在Beego框架中的反射型跨站脚本攻击漏洞"
 	type: vuln
-	severity: mid
+	level: mid
 	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述

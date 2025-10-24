@@ -2,7 +2,8 @@ desc(
 	title: "Detect Golang Cookie HTTPOnly Flag Missing"
 	title_zh: "检测Golang Cookie HTTPOnly标志缺失"
 	type: audit
-	severity: high
+	level: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 

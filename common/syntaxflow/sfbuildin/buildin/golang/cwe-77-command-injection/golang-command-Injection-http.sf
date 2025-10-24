@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Command Injection Vulnerability in HTTP"
 	title_zh: "检测Golang HTTP命令注入漏洞"
 	type: audit
-	severity: high
+	level: high
 	risk: "rce"
 	desc: <<<DESC
 ### 漏洞描述

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang HTTP Server Using Plaintext Communication"
 	title_zh: "检测Golang HTTP服务器使用明文通信"
 	type: vuln
-	severity: mid
+	level: mid
 	desc: <<<DESC
 ### 漏洞描述
 

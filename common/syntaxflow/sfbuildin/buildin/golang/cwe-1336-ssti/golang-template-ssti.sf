@@ -1,7 +1,7 @@
 desc(
 	title: "Check Golang Server-Side Template Injection Vulnerability"
 	type: audit
-	severity: high
+	level: high
 	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
