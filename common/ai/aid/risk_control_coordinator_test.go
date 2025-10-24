@@ -310,8 +310,8 @@ func TestPIM_Basic(t *testing.T) {
 	UnregisterAIDBuildinForge("pimatrix-mock")
 	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		a := aicommon.NewSimpleAction("", nil)
-		a.GetParams().Set("probability", 0.5)
-		a.GetParams().Set("impact", 0.5)
+		a.Set("probability", 0.5)
+		a.Set("impact", 0.5)
 		return a, nil
 	})
 	if err != nil {

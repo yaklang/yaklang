@@ -134,6 +134,7 @@ func WithMaxIterations(maxIterations int) ReActLoopOption {
 	}
 }
 
+// WithAITagField 行为变化！！！：现在VariableName 不仅仅是在loop中get数据的key，也是tag set到action的field的key
 func WithAITagField(tagName, variableName string) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.aiTagFields == nil {
