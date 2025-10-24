@@ -162,7 +162,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			//stream = io.TeeReader(stream, os.Stdout)
 			//raw, err := io.ReadAll(stream)
 			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
-			action, err := aicommon.ExtractActionFormStream(pr.config.ctx, stream, "plan", aicommon.WithSupperActionAlias("require-user-interact"))
+			action, err := aicommon.ExtractActionFormStream(pr.config.ctx, stream, "plan", aicommon.WithActionAlias("require-user-interact"))
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}

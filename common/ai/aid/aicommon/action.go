@@ -16,6 +16,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 )
 
 var ActionMagicKey = "@action"
@@ -162,21 +163,21 @@ type FieldStreamItem struct {
 	Handler   func(key string, reader io.Reader)
 }
 
-type SupperActionMakerOption func(maker *ActionMaker)
+type ActionMakerOption func(maker *ActionMaker)
 
-func WithSupperActionAlias(alias ...string) SupperActionMakerOption {
+func WithActionAlias(alias ...string) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		maker.alias = alias
 	}
 }
 
-func WithSupperActionJSONCallback(opts ...jsonextractor.CallbackOption) SupperActionMakerOption {
+func WithActionJSONCallback(opts ...jsonextractor.CallbackOption) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		maker.jsonCallback = opts
 	}
 }
 
-func WithSupperActionOnReaderFinished(f ...func()) SupperActionMakerOption {
+func WithActionOnReaderFinished(f ...func()) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		if maker.onReaderFinished == nil {
 			maker.onReaderFinished = make([]func(), 0)
@@ -185,7 +186,7 @@ func WithSupperActionOnReaderFinished(f ...func()) SupperActionMakerOption {
 	}
 }
 
-func WithSupperActionTagToKey(tagName string, key string) SupperActionMakerOption {
+func WithActionTagToKey(tagName string, key string) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		if maker.tagToKey == nil {
 			maker.tagToKey = make(map[string]string)
@@ -194,13 +195,13 @@ func WithSupperActionTagToKey(tagName string, key string) SupperActionMakerOptio
 	}
 }
 
-func WithSupperActionOnce(once string) SupperActionMakerOption {
+func WithActionOnce(once string) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		maker.once = once
 	}
 }
 
-func WithSupperActionFieldStreamHandler(fieldNames []string, handler func(key string, r io.Reader)) SupperActionMakerOption {
+func WithActionFieldStreamHandler(fieldNames []string, handler func(key string, r io.Reader)) ActionMakerOption {
 	return func(maker *ActionMaker) {
 		maker.fieldStreamHandler = append(maker.fieldStreamHandler, &FieldStreamItem{
 			FieldName: fieldNames,
@@ -267,11 +268,29 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 	// make tag parsers
 	var tagsParseHandles []func(mReader io.Reader)
 	for tagName, fieldName := range m.tagToKey {
+		tagName := tagName
+		fieldName := fieldName
 		parserWG.Add(1)
 		handle := func(mReader io.Reader) {
-			defer parserWG.Done()
+			mirrorStart := time.Now()
+			log.Debugf("[ai-tag] mirror[%s] started, time since mirror start: %v", tagName, time.Since(mirrorStart))
+			pReader := utils.NewPeekableReader(mReader)
+			parseStart := time.Now()
+			pReader.Peek(1)
+			log.Debugf("[ai-tag] mirror peeked first byte for tag[%s] cost: %v", tagName, time.Since(parseStart))
+			log.Debugf("starting aitag.Parse for tag[%s]", tagName)
+			defer func() {
+				cost := time.Since(parseStart)
+				log.Debugf("finished aitag.Parse for tag[%s], total cost: %v", tagName, cost)
+				if cost.Milliseconds() <= 300 {
+					log.Debugf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", tagName, cost)
+				} else {
+					log.Debugf("AI Response Mirror[%s] stream cost %v, stream maybe valid", tagName, cost)
+				}
+				parserWG.Done()
+			}()
 			err := aitag.Parse(
-				utils.UTF8Reader(mReader),
+				utils.UTF8Reader(pReader),
 				aitag.WithCallback(tagName, m.once, func(rd io.Reader) {
 					var out bytes.Buffer
 					writer := mirrorPipe(fieldName) // if the fieldName which this tag maps to has field stream handler, create pipe writer
@@ -400,7 +419,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 	return action
 }
 
-func NewActionMaker(actionName string, opts ...SupperActionMakerOption) *ActionMaker {
+func NewActionMaker(actionName string, opts ...ActionMakerOption) *ActionMaker {
 	maker := &ActionMaker{
 		actionName: actionName,
 	}
@@ -410,14 +429,14 @@ func NewActionMaker(actionName string, opts ...SupperActionMakerOption) *ActionM
 	return maker
 }
 
-func ExtractActionFormStream(ctx context.Context, reader io.Reader, actionName string, opts ...SupperActionMakerOption) (*Action, error) {
+func ExtractActionFormStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
 	maker := NewActionMaker(actionName, opts...)
 	action := maker.ReadFromReader(ctx, reader)
 	return action, nil
 }
 
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
-	return ExtractActionFormStream(context.Background(), strings.NewReader(i), actionName, WithSupperActionAlias(alias...))
+	return ExtractActionFormStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
 }
 
 func ExtractAllAction(i string) []*Action {

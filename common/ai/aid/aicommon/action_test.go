@@ -238,8 +238,8 @@ func TestSupperAction_TagToKey(t *testing.T) {
 `, tagData)
 	ctx := context.Background()
 	maker := NewActionMaker("plan",
-		WithSupperActionTagToKey(tagName, keyName),
-		WithSupperActionOnce(once),
+		WithActionTagToKey(tagName, keyName),
+		WithActionOnce(once),
 	)
 	action := maker.ReadFromReader(ctx, strings.NewReader(input))
 	require.Equal(t, action.GetString(keyName), tagData)
@@ -258,7 +258,7 @@ func TestSupperAction_FieldStreamHandler(t *testing.T) {
 	ctx := context.Background()
 	wg.Add(1)
 	maker := NewActionMaker("plan",
-		WithSupperActionFieldStreamHandler([]string{fieldName}, func(key string, r io.Reader) {
+		WithActionFieldStreamHandler([]string{fieldName}, func(key string, r io.Reader) {
 			defer wg.Done()
 			data, err := io.ReadAll(r)
 			require.NoError(t, err)
@@ -289,9 +289,9 @@ func TestSupperAction_TagToKeyStream(t *testing.T) {
 `, tagData)
 	ctx := context.Background()
 	maker := NewActionMaker("plan",
-		WithSupperActionTagToKey(tagName, keyName),
-		WithSupperActionOnce(once),
-		WithSupperActionFieldStreamHandler([]string{keyName}, func(key string, r io.Reader) {
+		WithActionTagToKey(tagName, keyName),
+		WithActionOnce(once),
+		WithActionFieldStreamHandler([]string{keyName}, func(key string, r io.Reader) {
 			// no-op, just to test stream handling
 			data, err := io.ReadAll(r)
 			require.NoError(t, err)

@@ -336,8 +336,8 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 		action, err = ExtractActionFormStream(
 			m.config.GetContext(),
 			r, "timeline-reducer",
-			WithSupperActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
-			WithSupperActionFieldStreamHandler(
+			WithActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
+			WithActionFieldStreamHandler(
 				[]string{"reducer_memory"},
 				func(key string, reader io.Reader) {
 					reducerMem := utils.JSONStringReader(reader)

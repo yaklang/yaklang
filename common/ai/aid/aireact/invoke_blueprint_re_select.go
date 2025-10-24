@@ -47,7 +47,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 			action, err := aicommon.ExtractActionFormStream(
 				r.config.ctx, reader,
 				"change-ai-blueprint",
-				aicommon.WithSupperActionFieldStreamHandler(
+				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
 					func(key string, reasonReader io.Reader) {
 						var reasonBuf bytes.Buffer

@@ -217,7 +217,7 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 	var callResults []*searchtools.KeywordSearchResult
 
 	err = c.callAiTransaction(prompt, c.CallAI, func(response *aicommon.AIResponse) error {
-		action, err := aicommon.ExtractActionFormStream(c.ctx, response.GetUnboundStreamReader(false), "keyword_search", aicommon.WithSupperActionOnce(nonce))
+		action, err := aicommon.ExtractActionFormStream(c.ctx, response.GetUnboundStreamReader(false), "keyword_search", aicommon.WithActionOnce(nonce))
 		if err != nil {
 			log.Errorf("extract aitool-keyword-search action failed: %v", err)
 			return utils.Errorf("extract aitool-keyword-search failed: %v", err)

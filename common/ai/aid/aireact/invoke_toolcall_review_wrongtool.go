@@ -78,7 +78,7 @@ REDO:
 			action, err := aicommon.ExtractActionFormStream(
 				r.config.GetContext(),
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
-				"require-tool", aicommon.WithSupperActionAlias("abandon", "ask-for-clarification"))
+				"require-tool", aicommon.WithActionAlias("abandon", "ask-for-clarification"))
 			if err != nil {
 				return err
 			}
