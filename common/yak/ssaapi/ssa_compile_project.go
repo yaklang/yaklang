@@ -48,7 +48,6 @@ func (c *Config) parseProject() (Programs, error) {
 	if c.GetCompileReCompile() {
 		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
-		ssadb.DeleteCache(c.ProgramName)
 		c.Processf(0, "recompile project, delete old data finish")
 	}
 

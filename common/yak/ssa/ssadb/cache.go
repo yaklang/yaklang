@@ -16,30 +16,40 @@ import (
 const (
 	irCacheCapacity = 100000          // 10w
 	irCacheTTL      = 5 * time.Minute // 5 minute
+
+	// ProgramCacheCapacity = 20 // 20 programs
+	ProgramCacheTTL = 10 * time.Minute // 30 minute
+
 	irRelationCount = 5
 )
 
 var irTypeSingleFlight singleflight.Group
 var initIrTypeOnce = sync.Once{}
-var irTypeCaches *utils.SafeMap[*utils.CacheExWithKey[int64, *IrType]]
+var irTypeCaches *utils.CacheEx[*utils.CacheExWithKey[int64, *IrType]]
 
 var irCodeSingleFlight singleflight.Group
 var initIrCodeOnce = sync.Once{}
-var irCodeCaches *utils.SafeMap[*utils.CacheExWithKey[int64, *IrCode]]
+var irCodeCaches *utils.CacheEx[*utils.CacheExWithKey[int64, *IrCode]]
 
 func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
 	initIrTypeOnce.Do(func() {
-		irTypeCaches = utils.NewSafeMap[*utils.CacheExWithKey[int64, *IrType]]()
+		irTypeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrType]](
+			utils.WithCacheTTL(ProgramCacheTTL),
+		)
 	})
-	return irTypeCaches.GetOrLoad(progName, func() *utils.CacheExWithKey[int64, *IrType] {
+	if ret, err := irTypeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrType], error) {
 		return utils.NewCacheExWithKey[int64, *IrType](
 			utils.WithCacheCapacity(irCacheCapacity),
 			utils.WithCacheTTL(irCacheTTL),
-		)
-	})
+		), nil
+	}); err == nil {
+		return ret
+	} else {
+		return nil
+	}
 }
 
-func DeleteCache(progName string) {
+func deleteCache(progName string) {
 	if irCodeCaches != nil {
 		irCodeCaches.Delete(progName)
 	}
@@ -50,15 +60,18 @@ func DeleteCache(progName string) {
 
 func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {
 	initIrCodeOnce.Do(func() {
-		irCodeCaches = utils.NewSafeMap[*utils.CacheExWithKey[int64, *IrCode]]()
+		irCodeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrCode]](utils.WithCacheTTL(ProgramCacheTTL))
 	})
 
-	return irCodeCaches.GetOrLoad(progName, func() *utils.CacheExWithKey[int64, *IrCode] {
+	if ret, err := irCodeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrCode], error) {
 		return utils.NewCacheExWithKey[int64, *IrCode](
 			utils.WithCacheCapacity(irCacheCapacity),
 			utils.WithCacheTTL(irCacheTTL),
-		)
-	})
+		), nil
+	}); err == nil {
+		return ret
+	}
+	return nil
 }
 
 func dbKey(programName string, id int64) string {
