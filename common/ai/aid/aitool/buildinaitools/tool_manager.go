@@ -171,8 +171,8 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 		enabledTools = append(enabledTools, tool...)
 	}
 	if m.enableForgeSearchTool {
-		if m.aiToolsSearcher == nil {
-			log.Errorf("searcher is not set")
+		if m.aiForgeSearcher == nil {
+			log.Errorf("forge searcher is not set")
 			return enabledTools, nil
 		}
 		tool, err := m.getForgeSearchTools()
