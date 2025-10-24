@@ -3,6 +3,8 @@ package reactloopstests
 import (
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/utils"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -662,16 +664,41 @@ func TestExec_MaxIterationsExactly(t *testing.T) {
 
 // TestExec_WithAITagFieldProcessing 测试带AI标签字段的完整处理
 func TestExec_WithAITagFieldProcessing(t *testing.T) {
+	aiCallCount := 1
 	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
-			// 返回带标签的代码
-			rsp.EmitOutputStream(bytes.NewBufferString(`<test-code>
+			prompt := req.GetPrompt()
+			if aiCallCount == 1 {
+				// 第一次调用：从prompt中提取nonce并返回带正确nonce的AITag
+				re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
+				matches := re.FindStringSubmatch(prompt)
+				var nonceStr string
+				if len(matches) > 1 {
+					nonceStr = matches[1]
+				}
+
+				// 调试输出
+				t.Logf("Extracted nonce: '%s' from prompt", nonceStr)
+				if nonceStr == "" {
+					t.Logf("No nonce found in prompt, using default")
+					nonceStr = "test123"
+				}
+
+				// 使用提取的nonce返回AITag内容和write_code action
+				rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`<|test-code_{{ .nonce }}|>
 func main() {
     println("Hello, World!")
 }
-</test-code>
-{"@action": "finish", "answer": "Code generated"}`))
+<|test-code_END_{{ .nonce }}|>
+{"@action": "finish", "answer": "Code generated"}`, map[string]any{
+					"nonce": nonceStr,
+				})))
+			} else {
+				// 第二次调用：完成
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Code generated"}`))
+			}
+
 			rsp.Close()
 			return rsp, nil
 		}),

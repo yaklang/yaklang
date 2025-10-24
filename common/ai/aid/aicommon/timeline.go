@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"fmt"
 	"io"
@@ -521,12 +522,14 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 		return
 	}
 	var r io.Reader
+	ctx := context.Background()
 	if m.config == nil {
 		r = response.GetUnboundStreamReader(false)
 	} else {
 		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
+		ctx = m.config.GetContext()
 	}
-	action, err := ExtractValidActionFormStream(m.config.GetContext(), r, "timeline-shrink")
+	action, err := ExtractValidActionFormStream(ctx, r, "timeline-shrink")
 	if err != nil {
 		log.Errorf("extract timeline action failed: %v", err)
 		return

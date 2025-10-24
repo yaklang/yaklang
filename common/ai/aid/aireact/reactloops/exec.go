@@ -39,13 +39,17 @@ func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicom
 				callbackStart := time.Now()
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
+				wg := sync.WaitGroup{}
+				wg.Add(1)
 				emitter.EmitStreamEvent(
 					nodeId,
 					time.Now(),
 					fieldReader,
 					taskIndex,
 					func() {
+						defer wg.Done()
 						// Use parseStart instead of callbackStart to measure the whole streaming process
+						r.Set(v.VariableName, result.String())
 						totalCost := time.Since(callbackStart)
 						contentLength := len(result.String())
 						log.Debugf("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
@@ -60,6 +64,7 @@ func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicom
 						}
 					},
 				)
+				wg.Wait()
 			}),
 		)
 	}
@@ -211,7 +216,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if verifier.ActionVerifier == nil {
 				return nil
 			}
-			return verifier.ActionVerifier(r, nil)
+			return verifier.ActionVerifier(r, action)
 		},
 	)
 	if transactionErr != nil {
@@ -233,6 +238,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if utils.IsNil(handler) {
 		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
 	}
+	action.WaitStream(r.GetCurrentTask().GetContext()) // sync
 
 	return action, handler, nil
 }
