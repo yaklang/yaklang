@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,11 +23,11 @@ var mustpassFS embed.FS
 //go:embed sample
 var sourceCodeSample embed.FS
 
-const MUSTPASS_JAVA_CACHE_KEY = "54Ot5qCH562+77yM5Y+v5Lul5Lit6Ze05aSE55CGZGVzIGFlc+etieWKoOWvhu+8jOaXoOmcgOWGjeeisHB5IOKAlOKAlOaYr+aenOWunuiPjOWVig==a-"
+// const MUSTPASS_JAVA_CACHE_KEY = "54Ot5qCH562+77yM5Y+v5Lul5Lit6Ze05aSE55CGZGVzIGFlc+etieWKoOWvhu+8jOaXoOmcgOWGjeeisHB5IOKAlOKAlOaYr+aenOWunuiPjOWVig==a-"
 
 func TestMustPassMapping(t *testing.T) {
 	ssatest.CheckFSWithProgram(
-		t, MUSTPASS_JAVA_CACHE_KEY,
+		t, "",
 		filesys.NewEmbedFS(sourceCodeSample),
 		filesys.NewEmbedFS(mustpassFS),
 		ssaapi.WithLanguage(ssaapi.JAVA),
@@ -38,13 +39,14 @@ func TestMustPass_JAVA_Debug_Compile(t *testing.T) {
 		t.Skip()
 		return
 	}
+	progName := uuid.NewString()
 
-	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
-	defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
-	program, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
+	program, err := ssaapi.FromDatabase(progName)
 	if err != nil {
 		t.Fatalf("get program from database failed: %v", err)
 	}
@@ -56,13 +58,14 @@ func TestMustPass_Debug(t *testing.T) {
 		t.Skip()
 		return
 	}
+	progName := uuid.NewString()
 
-	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.JAVA))
 	require.NoError(t, err, "compile failed")
-	// defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 
 	keyword := "local-file-write.sf"
-	// prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
+	// prog, err = ssaapi.FromDatabase(progName)
 	// require.NoError(t, err, "load from database ")
 
 	code := filesys.NewEmbedFS(mustpassFS)
@@ -131,19 +134,20 @@ $entryFunc<getFormalParams>?{opcode: param && !have: this} as $source;
 	})
 
 	t.Run("db", func(t *testing.T) {
-		ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+		progName := uuid.NewString()
+		// ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
 		_, err := ssaapi.ParseProjectWithFS(
 			filesys.NewEmbedFS(sourceCodeSample),
-			ssaapi.WithProgramName(MUSTPASS_JAVA_CACHE_KEY),
+			ssaapi.WithProgramName(progName),
 			ssaapi.WithLanguage(ssaapi.JAVA),
 			// ssaapi.WithCacheTTL(500*time.Millisecond), //	trigger  cache save/refresh/load
 		)
 		if err != nil {
 			t.Fatalf("compile failed: %v", err)
 		}
-		defer ssadb.DeleteProgram(ssadb.GetDB(), MUSTPASS_JAVA_CACHE_KEY)
+		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 
-		prog, err := ssaapi.FromDatabase(MUSTPASS_JAVA_CACHE_KEY)
+		prog, err := ssaapi.FromDatabase(progName)
 		if err != nil {
 			t.Fatalf("compile failed: %v", err)
 		}
