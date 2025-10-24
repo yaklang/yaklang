@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"runtime"
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -133,7 +132,7 @@ func (d *PreHandlerBase) Clearup() {
 	// Clear DFA cache explicitly
 	d.Caches = nil
 	// Force garbage collection
-	runtime.GC()
+	// runtime.GC() // in multiple goroutines environment, this run long time
 }
 
 func (a *AntlrCache) Empty() bool {

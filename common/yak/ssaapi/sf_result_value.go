@@ -276,7 +276,7 @@ func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []string) Values {
 func (r *SyntaxFlowResult) getValueFromTmpAuditNode(nodeId string) *Value {
 	auditNode, err := ssadb.GetAuditNodeById(nodeId)
 	if err != nil {
-		log.Errorf("NewValueFromDB: audit node not found: %d", nodeId)
+		log.Errorf("NewValueFromDB: audit node not found: %v", nodeId)
 		return nil
 	}
 
