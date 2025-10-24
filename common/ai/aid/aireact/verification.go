@@ -53,7 +53,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				}
 			}
 
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractValidActionFormStream(
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionFieldStreamHandler(

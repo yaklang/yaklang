@@ -90,7 +90,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					stream := rsp.GetOutputStreamReader("review", true, r.Emitter)
 					// stream = io.TeeReader(stream, os.Stdout)
 					var err error
-					action, err = aicommon.ExtractActionFormStream(
+					action, err = aicommon.ExtractValidActionFormStream(
 						ctx,
 						stream, "risk_assessment",
 						aicommon.WithActionAlias("object"),

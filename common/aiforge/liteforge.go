@@ -188,14 +188,10 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
-			action, err = aicommon.ExtractActionFormStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, aicommon.WithActionJSONCallback(l.OutputJsonHook...))
+			action, err = aicommon.ExtractValidActionFormStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, aicommon.WithActionJSONCallback(l.OutputJsonHook...))
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}
-			action.WaitParse(ctx) // 理论上可以直接wait stream， 这里保险起见先wait parse
-			action.WaitStream(ctx)
-			// question: 这里压平action之后是否回有影响？
-
 			if action == nil {
 				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}
