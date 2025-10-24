@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,11 +18,12 @@ func TestExportImportEntityRepository(t *testing.T) {
 		t.Fatal("database is nil")
 	}
 
+	mockEmbedding := rag.NewDefaultMockEmbedding()
 	ctx := context.Background()
 
 	// 创建测试实体仓库
 	reposName := "test_export_import_" + utils.RandStringBytes(8)
-	repos, err := GetOrCreateEntityRepository(db, reposName, "测试导出导入功能", WithDisableBulkProcess())
+	repos, err := GetOrCreateEntityRepository(db, reposName, "测试导出导入功能", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("create entity repository failed: %v", err)
 	}
@@ -102,7 +104,7 @@ func TestExportImportEntityRepository(t *testing.T) {
 
 	// 验证导入结果
 	t.Log("验证导入结果...")
-	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess())
+	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("get imported entity repository failed: %v", err)
 	}
@@ -157,7 +159,8 @@ func TestExportEntityRepositoryWithSkipVectorStore(t *testing.T) {
 
 	// 创建测试实体仓库
 	reposName := "test_skip_vector_" + utils.RandStringBytes(8)
-	repos, err := GetOrCreateEntityRepository(db, reposName, "测试跳过向量库导出", WithDisableBulkProcess())
+	mockEmbedding := rag.NewDefaultMockEmbedding()
+	repos, err := GetOrCreateEntityRepository(db, reposName, "测试跳过向量库导出", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("create entity repository failed: %v", err)
 	}
@@ -239,7 +242,7 @@ func TestExportEntityRepositoryWithSkipVectorStore(t *testing.T) {
 	}
 
 	// 验证导入结果
-	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess())
+	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("get imported entity repository failed: %v", err)
 	}
@@ -276,9 +279,10 @@ func TestImportEntityRepositoryWithEmptyVectorStore(t *testing.T) {
 
 	ctx := context.Background()
 
+	mockEmbedding := rag.NewDefaultMockEmbedding()
 	// 创建测试实体仓库
 	reposName := "test_empty_vector_" + utils.RandStringBytes(8)
-	repos, err := GetOrCreateEntityRepository(db, reposName, "测试空向量库处理", WithDisableBulkProcess())
+	repos, err := GetOrCreateEntityRepository(db, reposName, "测试空向量库处理", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("create entity repository failed: %v", err)
 	}
@@ -333,7 +337,7 @@ func TestImportEntityRepositoryWithEmptyVectorStore(t *testing.T) {
 	}
 
 	// 验证导入结果
-	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess())
+	importedRepos, err := GetEntityRepositoryByName(db, reposName, WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("get imported entity repository failed: %v", err)
 	}
