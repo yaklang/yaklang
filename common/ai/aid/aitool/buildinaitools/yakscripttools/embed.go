@@ -5,7 +5,6 @@ package yakscripttools
 import (
 	"embed"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
@@ -30,5 +29,4 @@ func InitEmbedFS() {
 		FileSystem: filesys.NewEmbedFS(resourceFS),
 		fs:         resourceFS,
 	}
-	log.Info("init embed fs successfully")
 }
