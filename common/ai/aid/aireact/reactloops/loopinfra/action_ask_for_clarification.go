@@ -64,7 +64,12 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 		}
 		options := loop.GetStringSlice("options")
 		invoker := loop.GetInvoker()
-		suggestion := invoker.AskForClarification(question, options)
+		ctx := invoker.GetConfig().GetContext()
+		t := loop.GetCurrentTask()
+		if t != nil && !utils.IsNil(t.GetContext()) {
+			ctx = t.GetContext()
+		}
+		suggestion := invoker.AskForClarification(ctx, question, options)
 		if suggestion == "" {
 			suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 		}

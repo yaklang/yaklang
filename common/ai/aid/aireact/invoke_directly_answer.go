@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"sync"
 
@@ -13,7 +14,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, error) {
+func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+
+	// Check context cancellation early
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
 	prompt, nonceStr, err := r.promptManager.GenerateDirectlyAnswerPrompt(
 		query,
 		tools,

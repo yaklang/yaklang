@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -8,7 +9,19 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) AskForClarification(question string, payloads []string) string {
+func (r *ReAct) AskForClarification(ctx context.Context, question string, payloads []string) string {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+
+	// Check context cancellation early
+	select {
+	case <-ctx.Done():
+		log.Errorf("AskForClarification cancelled: %v", ctx.Err())
+		return ""
+	default:
+	}
+
 	r.currentUserInteractiveCount++
 	r.AddToTimeline("question-for-clarification", question)
 	ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
@@ -36,7 +49,6 @@ func (r *ReAct) AskForClarification(question string, payloads []string) string {
 		"require-user-interact",
 		result,
 	)
-	ctx := r.config.GetContext()
 	ctx = utils.SetContextKey(ctx, SKIP_AI_REVIEW, true)
 	r.config.DoWaitAgree(ctx, ep)
 	params := ep.GetParams()

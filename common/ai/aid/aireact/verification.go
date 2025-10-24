@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -11,7 +12,17 @@ import (
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
-func (r *ReAct) VerifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, error) {
+func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (bool, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+	// Check context cancellation early
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
+	}
+	
 	verificationPrompt := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
@@ -44,7 +55,7 @@ func (r *ReAct) VerifyUserSatisfaction(originalQuery string, isToolCall bool, pa
 			}
 
 			action, err := aicommon.ExtractWaitableActionFromStream(
-				r.config.GetContext(),
+				ctx,
 				stream, "verify-satisfaction", []string{}, []jsonextractor.CallbackOption{
 					jsonextractor.WithRegisterFieldStreamHandler("human_readable_result", createReasonCallback("Result")),
 					jsonextractor.WithRegisterFieldStreamHandler("reasoning", createReasonCallback("Reasoning")),

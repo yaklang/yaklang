@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -191,15 +192,15 @@ func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, pr
 	return nil, utils.Errorf("unexpected action: %s", actionName)
 }
 
-func (m *MockInvoker) ExecuteToolRequiredAndCall(name string) (*aitool.ToolResult, bool, error) {
+func (m *MockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 
-func (m *MockInvoker) AskForClarification(question string, payloads []string) string {
+func (m *MockInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {
 	return ""
 }
 
-func (m *MockInvoker) DirectlyAnswer(query string, tools []*aitool.Tool) (string, error) {
+func (m *MockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
 	return "", nil
 }
 
@@ -207,7 +208,7 @@ func (m *MockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (str
 	return "", nil
 }
 
-func (m *MockInvoker) VerifyUserSatisfaction(query string, isToolCall bool, payload string) (bool, error) {
+func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
 	return true, nil
 }
 

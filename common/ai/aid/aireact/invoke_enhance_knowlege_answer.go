@@ -10,6 +10,10 @@ import (
 )
 
 func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (string, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
 	config := r.config
@@ -18,7 +22,7 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
 	}
 
-	enhanceData, err := config.enhanceKnowledgeManager.FetchKnowledge(r.config.ctx, userQuery)
+	enhanceData, err := config.enhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
 	if err != nil {
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
@@ -49,7 +53,7 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 		}
 	}
 
-	finalResult, err := r.DirectlyAnswer(queryBuf.String(), nil)
+	finalResult, err := r.DirectlyAnswer(ctx, queryBuf.String(), nil)
 	if finalResult != "" {
 		r.EmitTextArtifact("enhance_directly_answer", finalResult)
 	}

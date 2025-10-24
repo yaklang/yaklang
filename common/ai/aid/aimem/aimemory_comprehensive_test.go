@@ -140,15 +140,15 @@ func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName st
 }
 
 // 实现其他必需的接口方法
-func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCall(name string) (*aitool.ToolResult, bool, error) {
+func (m *AdvancedMockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
 
-func (m *AdvancedMockInvoker) AskForClarification(question string, payloads []string) string {
+func (m *AdvancedMockInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {
 	return ""
 }
 
-func (m *AdvancedMockInvoker) DirectlyAnswer(query string, tools []*aitool.Tool) (string, error) {
+func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
 	return "", nil
 }
 
@@ -156,7 +156,7 @@ func (m *AdvancedMockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s stri
 	return "", nil
 }
 
-func (m *AdvancedMockInvoker) VerifyUserSatisfaction(query string, isToolCall bool, payload string) (bool, error) {
+func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
 	return true, nil
 }
 

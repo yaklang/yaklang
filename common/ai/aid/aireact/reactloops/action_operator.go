@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,6 +21,10 @@ type LoopActionHandlerOperator struct {
 	isSilence    bool
 
 	task aicommon.AIStatefulTask
+}
+
+func (r *LoopActionHandlerOperator) GetContext() context.Context {
+	return r.task.GetContext()
 }
 
 func newLoopActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandlerOperator {
