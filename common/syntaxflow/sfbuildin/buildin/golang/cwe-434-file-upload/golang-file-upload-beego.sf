@@ -86,7 +86,7 @@ $sink.GetString<fullTypeName>?{have: "github.com/beego/beego/v2/server/web/Contr
 alert $low for {
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	level: "low",
-	risk: "file-upload",
+	risk: "文件上传",
 	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
 	solution: <<<SOLUTION
@@ -126,7 +126,6 @@ return false
 ```
 此外，还可以使用专业的安全工具对上传的文件进行扫描，以检测是否存在恶意代码或病毒。
 SOLUTION
-	risk: "文件上传",
 	desc: <<<DESC
 ### 规则描述
 1. **规则原理**

@@ -346,7 +346,7 @@ $user_input & $weak_hash as $low;
 
 alert $mid for {
 	level: "mid",
-	risk: "auth-bypass",
+	risk: "身份验证不当",
 	type: "vuln",
 	title: "C Improper Authentication Vulnerability Was Detected",
 	title_zh: "检测到C语言身份验证不当漏洞",
@@ -455,13 +455,12 @@ int validate_password_strength(const char *password) {
 }
 ```
 SOLUTION
-	risk: "身份验证不当",
 	name: "mid",
 }
 
 alert $low for {
 	level: "low",
-	risk: "auth-bypass",
+	risk: "弱哈希算法",
 	type: "vuln",
 	title: "C Weak Hash Algorithm Usage Was Detected",
 	title_zh: "检测到C语言使用弱哈希算法",
@@ -485,7 +484,6 @@ char* password_hash(const char *password, const char *salt) {
 }
 ```
 SOLUTION
-	risk: "弱哈希算法",
 	name: "low",
 }
 

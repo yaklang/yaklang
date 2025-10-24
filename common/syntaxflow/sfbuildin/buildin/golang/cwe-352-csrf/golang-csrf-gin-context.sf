@@ -108,7 +108,7 @@ alert $high for {
 	title: "Golang CSRF Protection Disabled Vulnerability Was Detected",
 	title_zh: "检测到Golang CSRF保护被禁用",
 	level: "high",
-	risk: "csrf",
+	risk: "CSRF",
 	message: "检测到Golang CSRF保护被禁用，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	solution: <<<SOLUTION
 为了防止CSRF攻击，可以采取以下措施：
@@ -158,7 +158,6 @@ c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ance
 }
 ```
 SOLUTION
-	risk: "CSRF",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -115,7 +115,7 @@ $data & $input as $low;
 
 alert $low for {
 	title: "Golang Unfiltered File Path Vulnerability Was Detected",
-	risk: "path-traversal",
+	risk: "路径遍历",
 	title_zh: "检测到Golang未过滤文件路径漏洞",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -208,7 +208,6 @@ http.ListenAndServe(":8080", nil)
 DESC
 	level: "low",
 	type: "vuln",
-	risk: "路径遍历",
 	name: "low",
 	message: "检测到Golang未过滤文件路径漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 }
