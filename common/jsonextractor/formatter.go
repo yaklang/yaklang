@@ -165,7 +165,7 @@ func rawValueFormatter(data any) (RAW_VALUE_TYPE, any, map[string]any, []any) {
 	return RAW_VALUE_TYPE_RAW, data, nil, nil
 }
 
-func (c *callbackManager) kv(key, data any) {
+func (c *callbackManager) kv(key, data any, parents []string) {
 	// raw key value callback
 	originKey := key
 	originValue := data
@@ -192,7 +192,7 @@ func (c *callbackManager) kv(key, data any) {
 	}
 
 	if c.formatKVCallback != nil {
-		c.formatKVCallback(rawKeyFormatted(key), autoData)
+		c.formatKVCallback(rawKeyFormatted(key), autoData, parents)
 	}
 
 	switch key.(type) {

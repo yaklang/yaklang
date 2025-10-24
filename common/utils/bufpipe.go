@@ -2,10 +2,40 @@ package utils
 
 import (
 	"github.com/yaklang/yaklang/common/utils/bufpipe"
+	"io"
 )
 
 var NewPipe = bufpipe.NewPipe
 var NewBufPipe = bufpipe.NewBufPipe
+
+func NewMirrorPipe(count int) ([]*bufpipe.PipeReader, *bufpipe.PipeWriter) {
+	if count <= 0 {
+		return nil, nil
+	}
+
+	pr, pw := NewPipe()
+
+	numPipes := count
+	writers := make([]*bufpipe.PipeWriter, numPipes)
+	readers := make([]*bufpipe.PipeReader, numPipes)
+	for i := 0; i < count; i++ {
+		readers[i], writers[i] = NewPipe()
+	}
+	go func() {
+		defer func() {
+			for _, w := range writers {
+				w.Close()
+			}
+		}()
+		var pipes = make([]io.Writer, numPipes)
+		for i, w := range writers {
+			pipes[i] = w
+		}
+
+		io.Copy(io.MultiWriter(pipes...), pr)
+	}()
+	return readers, pw
+}
 
 //type pipe struct {
 //	cond       *sync.Cond

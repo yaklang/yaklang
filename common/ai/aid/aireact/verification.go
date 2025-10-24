@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -22,7 +21,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		return false, ctx.Err()
 	default:
 	}
-	
+
 	verificationPrompt := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
@@ -37,8 +36,8 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
 
-			createReasonCallback := func(prompt string) func(key string, reader io.Reader, parents []string) {
-				return func(key string, reader io.Reader, parents []string) {
+			createReasonCallback := func(prompt string) func(key string, reader io.Reader) {
+				return func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
 					r.Emitter.EmitTextPlainTextStreamEvent(
@@ -54,17 +53,22 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				}
 			}
 
-			action, err := aicommon.ExtractWaitableActionFromStream(
-				ctx,
-				stream, "verify-satisfaction", []string{}, []jsonextractor.CallbackOption{
-					jsonextractor.WithRegisterFieldStreamHandler("human_readable_result", createReasonCallback("Result")),
-					jsonextractor.WithRegisterFieldStreamHandler("reasoning", createReasonCallback("Reasoning")),
-				})
+			action, err := aicommon.ExtractActionFormStream(
+				r.config.GetContext(),
+				stream, "verify-satisfaction",
+				aicommon.WithSupperActionFieldStreamHandler(
+					[]string{"human_readable_result"},
+					createReasonCallback("Result"),
+				),
+				aicommon.WithSupperActionFieldStreamHandler(
+					[]string{"reasoning"},
+					createReasonCallback("Reasoning"),
+				))
 			if err != nil {
 				return utils.Errorf("failed to extract verification action: %v, need ...\"@action\":\"verify-satisfaction\" ", err)
 			}
 			// If we found a proper @action structure, extract data from it
-			satisfied = action.WaitBool("user_satisfied")
+			satisfied = action.GetBool("user_satisfied")
 			return nil
 		},
 	)

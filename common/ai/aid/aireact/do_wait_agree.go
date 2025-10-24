@@ -3,7 +3,6 @@ package aireact
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"io"
 	"time"
 
@@ -86,29 +85,28 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					return
 				}
 				var score float64
-				var action *aicommon.WaitableAction
+				var action *aicommon.Action
 				err = aicommon.CallAITransaction(r, prompt, r.CallAI, func(rsp *aicommon.AIResponse) error {
 					stream := rsp.GetOutputStreamReader("review", true, r.Emitter)
 					// stream = io.TeeReader(stream, os.Stdout)
 					var err error
-					action, err = aicommon.ExtractWaitableActionFromStream(
+					action, err = aicommon.ExtractActionFormStream(
 						ctx,
-						stream, "risk_assessment", []string{
-							"object",
-						}, []jsonextractor.CallbackOption{
-							jsonextractor.WithRegisterFieldStreamHandler("reason", func(key string, reader io.Reader, parents []string) {
-								reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-								r.Emitter.EmitTextMarkdownStreamEvent(
-									"review",
-									reader,
-									rsp.GetTaskIndex(),
-								)
-							}),
-						})
+						stream, "risk_assessment",
+						aicommon.WithSupperActionAlias("object"),
+						aicommon.WithSupperActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
+							reader = utils.JSONStringReader(utils.UTF8Reader(reader))
+							r.Emitter.EmitTextMarkdownStreamEvent(
+								"review",
+								reader,
+								rsp.GetTaskIndex(),
+							)
+						}),
+					)
 					if err != nil {
 						return utils.Errorf("error extracting action from stream: %v", err)
 					}
-					score = action.WaitFloat("risk_score")
+					score = action.GetFloat("risk_score")
 					if score < 0 {
 						score = 0.0
 					}
@@ -152,7 +150,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					endpoint.Release()
 				} else {
 					r.Emitter.EmitInfo("Auto-review score is high, suggesting to handled by user")
-					reason := action.WaitString("reason")
+					reason := action.GetString("reason")
 					endNormally(score, "high", reason)
 				}
 			}()

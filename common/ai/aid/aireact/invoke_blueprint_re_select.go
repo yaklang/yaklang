@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -45,31 +44,28 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 				false,
 				r.Emitter,
 			)
-			action, err := aicommon.ExtractWaitableActionFromStream(
+			action, err := aicommon.ExtractActionFormStream(
 				r.config.ctx, reader,
 				"change-ai-blueprint",
-				[]string{}, []jsonextractor.CallbackOption{
-					jsonextractor.WithRegisterFieldStreamHandler(
-						"reasoning",
-						func(key string, reasonReader io.Reader, parents []string) {
-							var reasonBuf bytes.Buffer
-							var reason = io.TeeReader(reasonReader, &reasonBuf)
-							r.Emitter.EmitTextMarkdownStreamEvent(
-								"change-blueprint-reasoning",
-								reason,
-								r.GetCurrentTask().GetId(),
-								func() {
-									r.AddToTimeline("blueprint-selection", "Reasoning: "+reasonBuf.String())
-								},
-							)
-						},
-					),
-				},
+				aicommon.WithSupperActionFieldStreamHandler(
+					[]string{"reasoning"},
+					func(key string, reasonReader io.Reader) {
+						var reasonBuf bytes.Buffer
+						var reason = io.TeeReader(reasonReader, &reasonBuf)
+						r.Emitter.EmitTextMarkdownStreamEvent(
+							"change-blueprint-reasoning",
+							reason,
+							r.GetCurrentTask().GetId(),
+							func() {
+								r.AddToTimeline("blueprint-selection", "Reasoning: "+reasonBuf.String())
+							},
+						)
+					}),
 			)
 			if err != nil {
 				return utils.Errorf("extract action from change-ai-blueprint failed: %v", err)
 			}
-			selectedBlueprintName := action.WaitString("new_blueprint")
+			selectedBlueprintName := action.GetString("new_blueprint")
 			if selectedBlueprintName == "" {
 				return utils.Error("selected blueprint name is empty, require non-empty")
 			}
@@ -110,7 +106,8 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("call-new-forge", false, r.Emitter)
-			action, err := aicommon.ExtractActionFromStream(
+			action, err := aicommon.ExtractActionFormStream(
+				r.config.ctx,
 				stream, "call-ai-blueprint",
 			)
 			if err != nil {

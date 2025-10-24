@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -133,18 +132,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var action *aicommon.Action
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
-	actionNameFallback := ""
 
-	getHandlerActionName := func() string {
-		if action.ActionType() == "object" {
-			if actionNameFallback != "" {
-				return actionNameFallback
-			}
-			if action.GetString("next_action") != "" {
-				return action.GetString("next_action")
-			}
+	getNextActionType := func(a *aicommon.Action) string { //legacy support
+		actionType := action.ActionType()
+		if actionType == "object" {
+			actionType = action.GetString("next_action.type")
 		}
-		return action.ActionType()
+		return actionType
 	}
 
 	ctxCanceled := utils.NewBool(false)
@@ -189,8 +183,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				stream = rawStream
 			}
 
-			actionNameFallback = ""
-
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
@@ -200,84 +192,70 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			}
 			var actionErr error
 
-			action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-				stream, "object", actionNames,
-				[]jsonextractor.CallbackOption{
-					jsonextractor.WithRegisterFieldStreamHandler(
-						"type",
-						func(key string, reader io.Reader, parents []string) {
-							if len(parents) <= 0 {
-								return
-							}
-							if parents[len(parents)-1] != "next_action" {
-								return
-							}
-							raw, err := io.ReadAll(utils.JSONStringReader(reader))
-							if err != nil {
-								return
-							}
-							actionNameFallback = string(raw)
-						},
-					),
-					jsonextractor.WithRegisterMultiFieldStreamHandler(
-						streamFields.Keys(),
-						func(key string, reader io.Reader, parents []string) {
-							streamWg.Add(1)
-							doneOnce := utils.NewOnce()
-							done := func() {
-								doneOnce.Do(func() {
-									streamWg.Done()
-								})
-							}
+			action, actionErr = aicommon.ExtractActionFormStream(
+				r.currentTask.GetContext(),
+				stream,
+				"object",
+				aicommon.WithSupperActionAlias(actionNames...),
+				aicommon.WithSupperActionFieldStreamHandler(
+					streamFields.Keys(),
+					func(key string, reader io.Reader) {
+						streamWg.Add(1)
+						doneOnce := utils.NewOnce()
+						done := func() {
+							doneOnce.Do(func() {
+								streamWg.Done()
+							})
+						}
 
-							reader = utils.JSONStringReader(reader)
-							fieldIns, ok := streamFields.Get(key)
-							if !ok {
-								done()
-								return
+						reader = utils.JSONStringReader(reader)
+						fieldIns, ok := streamFields.Get(key)
+						if !ok {
+							done()
+							return
+						}
+
+						pr, pw := utils.NewPipe()
+						go func(field *LoopStreamField) {
+							defer pw.Close()
+							if field.Prefix != "" {
+								pw.WriteString(field.Prefix + ": ")
 							}
+							io.Copy(pw, reader)
+						}(fieldIns)
 
-							pr, pw := utils.NewPipe()
-							go func(field *LoopStreamField) {
-								defer pw.Close()
-								if field.Prefix != "" {
-									pw.WriteString(field.Prefix + ": ")
-								}
-								io.Copy(pw, reader)
-							}(fieldIns)
+						defaultNodeId := "re-act-loop-thought"
+						if fieldIns.AINodeId != "" {
+							defaultNodeId = fieldIns.AINodeId
+						}
 
-							defaultNodeId := "re-act-loop-thought"
-							if fieldIns.AINodeId != "" {
-								defaultNodeId = fieldIns.AINodeId
-							}
-
-							emitter.EmitStreamEvent(
-								defaultNodeId,
-								time.Now(),
-								pr,
-								resp.GetTaskIndex(),
-								func() { done() },
-							)
-						},
-					),
-				},
+						emitter.EmitStreamEvent(
+							defaultNodeId,
+							time.Now(),
+							pr,
+							resp.GetTaskIndex(),
+							func() { done() },
+						)
+					},
+				),
 			)
+
 			if actionErr != nil {
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
-			actionName := getHandlerActionName()
-			verifier, err := r.GetActionHandler(actionName)
+			actionType := getNextActionType(action)
+			verifier, err := r.GetActionHandler(actionType)
 			if err != nil {
-				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionName, err))
-				return utils.Wrapf(err, "action[%s] GetActionHandler failed", actionName)
+				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionType, err))
+				return utils.Wrapf(err, "action[%s] GetActionHandler failed", actionType)
 			}
 			if utils.IsNil(verifier) {
-				return utils.Errorf("action[%s] verifier is nil", actionName)
+				return utils.Errorf("action[%s] verifier is nil", actionType)
 			}
 			if verifier.ActionVerifier == nil {
 				return nil
 			}
-			return verifier.ActionVerifier(r, action)
+			return verifier.ActionVerifier(r, nil)
 		},
 	)
 	if transactionErr != nil {
@@ -292,7 +270,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	handler, err := r.GetActionHandler(getHandlerActionName())
+	handler, err := r.GetActionHandler(getNextActionType(action))
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
 	}

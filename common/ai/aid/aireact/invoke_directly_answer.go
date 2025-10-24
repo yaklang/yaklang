@@ -7,11 +7,9 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 )
 
 func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
@@ -34,59 +32,34 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 	}
 
 	var finalResult string
-	var aiTagResult string
-	var wg = new(sync.WaitGroup)
 	err = aicommon.CallAITransaction(
 		r.config,
 		prompt,
 		r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
-			wg.Add(1)
-			stream = utils.CreateUTF8StreamMirror(stream, func(reader io.Reader) {
-				defer func() {
-					wg.Done()
-				}()
-				err := aitag.Parse(
-					utils.UTF8Reader(reader),
-					aitag.WithCallback("FINAL_ANSWER", nonceStr, func(rd io.Reader) {
+			action, err := aicommon.ExtractActionFormStream(
+				r.GetCurrentTask().GetContext(),
+				stream, "object",
+				aicommon.WithSupperActionOnce(nonceStr),
+				aicommon.WithSupperActionTagToKey("FINAL_ANSWER", "answer_payload"),
+				aicommon.WithSupperActionAlias("directly_answer"),
+				aicommon.WithSupperActionFieldStreamHandler(
+					[]string{"answer_payload"},
+					func(key string, reader io.Reader) {
 						var out bytes.Buffer
+						reader = utils.JSONStringReader(reader)
+						reader = io.TeeReader(reader, &out)
 						r.Emitter.EmitTextMarkdownStreamEvent(
 							"re-act-loop-answer-payload",
-							io.TeeReader(rd, &out),
+							reader,
 							rsp.GetTaskIndex(),
 							func() {
-								aiTagResult = out.String()
 								r.EmitResultAfterStream(out.String())
 							},
 						)
-					}))
-				if err != nil && err != io.EOF {
-					log.Warnf("DirectlyAnswer failed: %v", err)
-				}
-			})
-
-			action, err := aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-				stream, "object", []string{
-					"directly_answer",
-				}, []jsonextractor.CallbackOption{
-					jsonextractor.WithRegisterFieldStreamHandler(
-						"answer_payload",
-						func(key string, reader io.Reader, parents []string) {
-							var out bytes.Buffer
-							reader = utils.JSONStringReader(reader)
-							reader = io.TeeReader(reader, &out)
-							r.Emitter.EmitTextMarkdownStreamEvent(
-								"re-act-loop-answer-payload",
-								reader,
-								rsp.GetTaskIndex(),
-								func() {
-									r.EmitResultAfterStream(out.String())
-								},
-							)
-						},
-					),
-				})
+					}),
+			)
 			if err != nil {
 				return err
 			}
@@ -95,16 +68,12 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				payload = r
 			}
 			if payload == "" {
-				payload = action.GetInvokeParams("next_action").GetString("answer_payload")
+				payload = action.GetString("next_action.answer_payload")
 			}
 			finalResult = payload
 			return nil
 		},
 	)
-	wg.Wait()
-	if aiTagResult != "" {
-		return aiTagResult, nil
-	}
 	if finalResult != "" {
 		return finalResult, nil
 	}

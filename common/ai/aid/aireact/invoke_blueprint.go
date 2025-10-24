@@ -121,7 +121,8 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("call-forge", false, r.config.GetEmitter())
-			action, err := aicommon.ExtractActionFromStream(
+			action, err := aicommon.ExtractActionFormStream(
+				r.config.GetContext(),
 				stream, "call-ai-blueprint",
 			)
 			if err != nil {

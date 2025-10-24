@@ -41,7 +41,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 		rawParams["impact"] = 0.5
 		rawParams["reason"] = "test reason"
 		p["params"] = rawParams
-		return aicommon.NewAction("", p), nil
+		return aicommon.NewSimpleAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +214,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return aicommon.NewAction("", p), nil
+		return aicommon.NewSimpleAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -374,7 +374,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return aicommon.NewAction("", p), nil
+		return aicommon.NewSimpleAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)

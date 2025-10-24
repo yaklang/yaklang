@@ -4,14 +4,12 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"io"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
 
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -335,27 +333,13 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
 		}
 
-		wg := new(sync.WaitGroup)
-
-		wg.Add(1)
-		r = utils.CreateUTF8StreamMirror(r, func(content io.Reader) {
-			defer func() {
-				wg.Done()
-			}()
-			aitag.Parse(content, aitag.WithCallback("REDUCER_MEMORY", nonceStr, func(mem io.Reader) {
-				var buf bytes.Buffer
-				io.Copy(io.Discard, io.TeeReader(mem, &buf)) // drain to EOF
-				cumulativeSummary = buf.String()
-			}))
-			// reader aitag
-
-		})
-		wg.Wait()
-
-		action, err = ExtractActionFromStreamWithJSONExtractOptions(
-			r, "timeline-reducer", []string{},
-			[]jsonextractor.CallbackOption{
-				jsonextractor.WithRegisterFieldStreamHandler("reducer_memory", func(key string, reader io.Reader, parents []string) {
+		action, err = ExtractActionFormStream(
+			m.config.GetContext(),
+			r, "timeline-reducer",
+			WithSupperActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
+			WithSupperActionFieldStreamHandler(
+				[]string{"reducer_memory"},
+				func(key string, reader io.Reader) {
 					reducerMem := utils.JSONStringReader(reader)
 					m.config.GetEmitter().EmitTextPlainTextStreamEvent(
 						"memory-timeline",
@@ -363,7 +347,6 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 						response.GetTaskIndex(),
 					)
 				}),
-			},
 		)
 		if err != nil {
 			log.Errorf("extract timeline batch compress action failed: %v", err)
@@ -543,7 +526,7 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 	} else {
 		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
 	}
-	action, err := ExtractActionFromStream(r, "timeline-shrink")
+	action, err := ExtractActionFormStream(m.config.GetContext(), r, "timeline-shrink")
 	if err != nil {
 		log.Errorf("extract timeline action failed: %v", err)
 		return
