@@ -14,7 +14,6 @@ type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
 
-	// PreHandlerParseAST(fi.FileSystem)
 	FilterParseAST(string) bool
 	ParseAST(string, *AntlrCache) (FrontAST, error)
 	GetAntlrCache() *AntlrCache

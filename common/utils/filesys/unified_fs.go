@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
@@ -16,6 +20,11 @@ type UnifiedFSConfig struct {
 	inputExtMap map[string]string // VirtualExt -> RealExt
 	// 文件系统输出文件名称的时候，需要将文件名后缀转换为虚拟后缀
 	outputExtMap map[string]string // RealExt -> VirtualExt
+
+	// C preprocessor support
+	enableCPreprocessor bool
+	cTempDir            string
+	cIncludeDirs        []string
 }
 
 type UnifiedFS struct {
@@ -37,6 +46,11 @@ func NewUnifiedFS(fs fi.FileSystem, opts ...UnifiedFsOption) *UnifiedFS {
 	for _, opt := range opts {
 		opt(u.config)
 	}
+
+	if u.config.enableCPreprocessor {
+		u.setupCPreprocessor()
+	}
+
 	return u
 }
 
@@ -56,6 +70,12 @@ func WithUnifiedFsExtMap(extReal, extVirtual string) func(config *UnifiedFSConfi
 		}
 		config.inputExtMap[extVirtual] = extReal
 		config.outputExtMap[extReal] = extVirtual
+	}
+}
+
+func WithUnifiedFsCPreprocessor(enabled bool) func(config *UnifiedFSConfig) {
+	return func(config *UnifiedFSConfig) {
+		config.enableCPreprocessor = enabled
 	}
 }
 
@@ -135,7 +155,21 @@ func (u *UnifiedFS) Open(name string) (fs.File, error) {
 
 func (u *UnifiedFS) ReadFile(name string) ([]byte, error) {
 	realPath, _ := u.convertToRealPath(name)
-	return u.fs.ReadFile(realPath)
+	data, err := u.fs.ReadFile(realPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.config.enableCPreprocessor && strings.HasSuffix(strings.ToLower(name), ".c") {
+		preprocessed, err := u.preprocessCSource(string(data))
+		if err != nil {
+			log.Warnf("C preprocessing failed for %s: %v", name, err)
+			return data, nil
+		}
+		return []byte(preprocessed), nil
+	}
+
+	return data, nil
 }
 
 func (u *UnifiedFS) ExtraInfo(s string) map[string]any {
@@ -219,7 +253,7 @@ func (u *UnifiedFS) convertToVirtualPath(name string) string {
 }
 
 func (f *UnifiedFS) String() string {
-	return fmt.Sprintf("%s",f.fs)
+	return fmt.Sprintf("%s", f.fs)
 }
 
 type UnifiedDirEntry struct {
@@ -269,4 +303,110 @@ func (f *UnifiedFile) Stat() (fs.FileInfo, error) {
 		FileInfo: info,
 		name:     f.Name(),
 	}, nil
+}
+
+// setupCPreprocessor initializes C preprocessor support
+func (u *UnifiedFS) setupCPreprocessor() error {
+	tmpDir, err := os.MkdirTemp("", "c_headers_*")
+	if err != nil {
+		return err
+	}
+	u.config.cTempDir = tmpDir
+
+	headerDirs := make(map[string]bool)
+
+	var walkDir func(string) error
+	walkDir = func(dir string) error {
+		entries, err := u.fs.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range entries {
+			filePath := u.fs.Join(dir, entry.Name())
+
+			if entry.IsDir() {
+				walkDir(filePath)
+			} else if u.fs.Ext(entry.Name()) == ".h" {
+				if content, err := u.fs.ReadFile(filePath); err == nil {
+					relPath := strings.TrimPrefix(filePath, ".")
+					relPath = strings.TrimPrefix(relPath, string(u.fs.GetSeparators()))
+					targetPath := filepath.Join(u.config.cTempDir, relPath)
+					targetDir := filepath.Dir(targetPath)
+
+					os.MkdirAll(targetDir, 0755)
+					os.WriteFile(targetPath, content, 0644)
+					headerDirs[targetDir] = true
+				}
+			}
+		}
+		return nil
+	}
+
+	walkDir(".")
+
+	u.config.cIncludeDirs = make([]string, 0, len(headerDirs)+1)
+	u.config.cIncludeDirs = append(u.config.cIncludeDirs, u.config.cTempDir)
+	for dir := range headerDirs {
+		if dir != u.config.cTempDir {
+			u.config.cIncludeDirs = append(u.config.cIncludeDirs, dir)
+		}
+	}
+
+	return nil
+}
+
+// preprocessCSource performs C macro preprocessing
+func (u *UnifiedFS) preprocessCSource(src string) (string, error) {
+	var preprocessorCmd string
+	candidates := []string{"gcc", "clang", "cc"}
+	for _, cmd := range candidates {
+		if _, err := exec.LookPath(cmd); err == nil {
+			preprocessorCmd = cmd
+			break
+		}
+	}
+
+	if preprocessorCmd == "" {
+		return "", fmt.Errorf("c preprocessor not found (platform: %s/%s)", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmpFile, err := os.CreateTemp(u.config.cTempDir, "c_preprocess_*.c")
+	if err != nil {
+		return "", err
+	}
+	tmpFileName := tmpFile.Name()
+	defer os.Remove(tmpFileName)
+
+	if _, err := tmpFile.WriteString(src); err != nil {
+		tmpFile.Close()
+		return "", err
+	}
+	tmpFile.Close()
+
+	args := []string{"-E", "-P", "-nostdinc", "-Wno-everything"}
+	for _, includeDir := range u.config.cIncludeDirs {
+		args = append(args, "-I", includeDir)
+	}
+	args = append(args, tmpFileName)
+
+	cmd := exec.Command(preprocessorCmd, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		outputStr := string(output)
+		if len(outputStr) > 500 {
+			outputStr = outputStr[:500] + "..."
+		}
+		return src, fmt.Errorf("preprocessor failed: %w\n%s", err, outputStr)
+	}
+
+	return string(output), nil
+}
+
+// Cleanup removes temporary directories
+func (u *UnifiedFS) Cleanup() {
+	if u.config.cTempDir != "" {
+		os.RemoveAll(u.config.cTempDir)
+		u.config.cTempDir = ""
+	}
 }
