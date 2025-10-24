@@ -199,6 +199,9 @@ func initYaklangLib() {
 	// 执行系统命令的库
 	yaklang.Import("exec", yaklib.ExecExports)
 
+	// SSH 客户端
+	yaklang.Import("ssh", yaklib.SSHExports)
+
 	// 爆破
 	yaklang.Import("brute", tools.BruterExports)
 
