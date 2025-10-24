@@ -54,13 +54,13 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			}
 
 			action, err := aicommon.ExtractActionFormStream(
-				r.config.GetContext(),
+				ctx,
 				stream, "verify-satisfaction",
-				aicommon.WithSupperActionFieldStreamHandler(
+				aicommon.WithActionFieldStreamHandler(
 					[]string{"human_readable_result"},
 					createReasonCallback("Result"),
 				),
-				aicommon.WithSupperActionFieldStreamHandler(
+				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
 					createReasonCallback("Reasoning"),
 				))

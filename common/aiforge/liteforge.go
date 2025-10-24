@@ -188,7 +188,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
-			action, err = aicommon.ExtractActionFormStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, aicommon.WithSupperActionJSONCallback(l.OutputJsonHook...))
+			action, err = aicommon.ExtractActionFormStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, aicommon.WithActionJSONCallback(l.OutputJsonHook...))
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

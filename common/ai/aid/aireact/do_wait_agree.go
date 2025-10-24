@@ -93,8 +93,8 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					action, err = aicommon.ExtractActionFormStream(
 						ctx,
 						stream, "risk_assessment",
-						aicommon.WithSupperActionAlias("object"),
-						aicommon.WithSupperActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
+						aicommon.WithActionAlias("object"),
+						aicommon.WithActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
 							reader = utils.JSONStringReader(utils.UTF8Reader(reader))
 							r.Emitter.EmitTextMarkdownStreamEvent(
 								"review",

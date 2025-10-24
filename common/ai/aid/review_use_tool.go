@@ -165,7 +165,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		action, err := aicommon.ExtractActionFormStream(
 			t.ctx,
 			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
-			"require-tool", aicommon.WithSupperActionAlias("abandon"))
+			"require-tool", aicommon.WithActionAlias("abandon"))
 		if err != nil {
 			return err
 		}
