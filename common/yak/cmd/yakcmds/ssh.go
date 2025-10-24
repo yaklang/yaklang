@@ -57,6 +57,10 @@ var SSHCommands = []*cli.Command{
 				Usage: "Shell to use (default: bash, fallback: sh)",
 				Value: "bash",
 			},
+			cli.StringFlag{
+				Name:  "upload-file",
+				Usage: "Upload a file to remote server's home directory",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			host := c.String("host")
@@ -72,6 +76,7 @@ var SSHCommands = []*cli.Command{
 			bashScript := c.String("bash-script")
 			port := c.Int("port")
 			shellType := c.String("shell")
+			uploadFile := c.String("upload-file")
 
 			// Parse host and port
 			parsedHost, parsedPort, err := utils.ParseStringToHostPort(host)
@@ -148,6 +153,55 @@ var SSHCommands = []*cli.Command{
 			defer client.Close()
 
 			log.Info("✓ SSH connection established successfully")
+
+			// Upload file if specified
+			if uploadFile != "" {
+				log.Infof("Uploading file: %s", uploadFile)
+
+				// Check if local file exists
+				if _, err := os.Stat(uploadFile); os.IsNotExist(err) {
+					log.Errorf("local file not found: %s", uploadFile)
+					os.Exit(-1)
+				}
+
+				// Get the filename
+				fileName := filepath.Base(uploadFile)
+
+				// Get remote home directory
+				homeCmd := client.Cmd("echo $HOME")
+				homeOutput, err := homeCmd.Output()
+				if err != nil {
+					log.Errorf("failed to get remote home directory: %s", err)
+					os.Exit(-1)
+				}
+				remoteHome := strings.TrimSpace(string(homeOutput))
+				remotePath := filepath.Join(remoteHome, fileName)
+
+				log.Infof("target remote path: %s", remotePath)
+
+				// Check if remote file exists
+				checkCmd := client.Cmd(fmt.Sprintf("test -f %s && echo exists || echo notexists", remotePath))
+				checkOutput, err := checkCmd.Output()
+				if err != nil {
+					log.Errorf("failed to check remote file existence: %s", err)
+					os.Exit(-1)
+				}
+
+				if strings.TrimSpace(string(checkOutput)) == "exists" {
+					log.Errorf("remote file already exists: %s", remotePath)
+					os.Exit(-1)
+				}
+
+				// Upload the file
+				err = client.CopyLocalFileToRemote(uploadFile, remotePath)
+				if err != nil {
+					log.Errorf("failed to upload file: %s", err)
+					os.Exit(-1)
+				}
+
+				log.Infof("✓ file uploaded successfully to %s", remotePath)
+				os.Exit(0)
+			}
 
 			// Execute command if specified
 			if command != "" {
@@ -338,4 +392,3 @@ func WithPassphrase(passphrase string) SSHOption {
 		c.Passphrase = passphrase
 	}
 }
-
