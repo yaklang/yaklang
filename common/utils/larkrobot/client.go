@@ -79,8 +79,7 @@ func (c *Client) send(url string, body interface{}) (*Response, error) {
 		return nil, utils.Errorf("larkrobot send error: json.Marshal error: %v", err)
 	}
 
-	// 调试日志（临时）
-	log.Infof("larkrobot sending body: %s", string(bodyBytes))
+	// 调试日志已移除
 
 	req := lowhttp.BasicRequest()
 	req = lowhttp.SetHTTPPacketUrl(req, url)
@@ -122,11 +121,19 @@ func (c *Client) GenSign(secret string, timestamp int64) (string, error) {
 
 // Response response struct
 type Response struct {
-	Code int64  `json:"code"`
-	Msg  string `json:"msg"`
+	Code          int64       `json:"code"`
+	Msg           string      `json:"msg"`
+	Data          interface{} `json:"data,omitempty"`
+	StatusCode    int64       `json:"StatusCode,omitempty"`
+	StatusMessage string      `json:"StatusMessage,omitempty"`
 }
 
 // IsSuccess is success
 func (r *Response) IsSuccess() bool {
+	// 检查新格式的 StatusCode (0 表示成功)
+	if r.StatusCode == 0 {
+		return true
+	}
+	// 检查旧格式的 Code (0 表示成功)
 	return r.Code == 0
 }
