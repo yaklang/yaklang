@@ -19,11 +19,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// createMockSearcher creates a simple mock searcher for testing that returns all matching tools
-func createMockSearcher() searchtools.AISearcher[searchtools.AISearchable] {
-	return func(query string, searchList []searchtools.AISearchable) ([]searchtools.AISearchable, error) {
+// createMockToolSearcher creates a simple mock searcher for testing that returns all matching tools
+func createMockToolSearcher() searchtools.AISearcher[*aitool.Tool] {
+	return func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
 		// Simple keyword matching - return tools that contain the query in name or description
-		var results []searchtools.AISearchable
+		var results []*aitool.Tool
 		queryLower := strings.ToLower(query)
 
 		for _, item := range searchList {
@@ -36,6 +36,37 @@ func createMockSearcher() searchtools.AISearcher[searchtools.AISearchable] {
 		}
 
 		// If no matches found, return first 3 tools (or all if less than 3)
+		if len(results) == 0 {
+			maxResults := 3
+			if len(searchList) < maxResults {
+				maxResults = len(searchList)
+			}
+			for i := 0; i < maxResults && i < len(searchList); i++ {
+				results = append(results, searchList[i])
+			}
+		}
+
+		return results, nil
+	}
+}
+
+// createMockForgeSearcher creates a simple mock searcher for testing forge search
+func createMockForgeSearcher() searchtools.AISearcher[*schema.AIForge] {
+	return func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
+		// Simple keyword matching - return forges that contain the query in name or description
+		var results []*schema.AIForge
+		queryLower := strings.ToLower(query)
+
+		for _, item := range searchList {
+			nameLower := strings.ToLower(item.GetName())
+			descLower := strings.ToLower(item.GetDescription())
+
+			if strings.Contains(nameLower, queryLower) || strings.Contains(descLower, queryLower) {
+				results = append(results, item)
+			}
+		}
+
+		// If no matches found, return first 3 forges (or all if less than 3)
 		if len(results) == 0 {
 			maxResults := 3
 			if len(searchList) < maxResults {
@@ -84,10 +115,11 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 		buildinaitools.WithExtendTools([]*aitool.Tool{sleepTool}, true),
 		buildinaitools.WithSearchToolEnabled(true),
 		buildinaitools.WithForgeSearchToolEnabled(true),
-		buildinaitools.WithAIToolsSearcher(createMockSearcher()),
+		buildinaitools.WithAIToolsSearcher(createMockToolSearcher()),
+		buildinaitools.WithAiForgeSearcher(createMockForgeSearcher()),
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
@@ -205,10 +237,10 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 	toolManagerOpts := []buildinaitools.ToolManagerOption{
 		buildinaitools.WithExtendTools([]*aitool.Tool{sleepTool, echoTool}, true),
 		buildinaitools.WithSearchToolEnabled(true),
-		buildinaitools.WithAIToolsSearcher(createMockSearcher()),
+		buildinaitools.WithAIToolsSearcher(createMockToolSearcher()),
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
@@ -328,10 +360,10 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 	// Create tool manager options with searcher
 	toolManagerOpts := []buildinaitools.ToolManagerOption{
 		buildinaitools.WithForgeSearchToolEnabled(true),
-		buildinaitools.WithAIToolsSearcher(createMockSearcher()),
+		buildinaitools.WithAiForgeSearcher(createMockForgeSearcher()),
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
@@ -444,10 +476,11 @@ func TestReAct_BothSearchTools_InPrompt(t *testing.T) {
 	toolManagerOpts := []buildinaitools.ToolManagerOption{
 		buildinaitools.WithSearchToolEnabled(true),
 		buildinaitools.WithForgeSearchToolEnabled(true),
-		buildinaitools.WithAIToolsSearcher(createMockSearcher()),
+		buildinaitools.WithAIToolsSearcher(createMockToolSearcher()),
+		buildinaitools.WithAiForgeSearcher(createMockForgeSearcher()),
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
