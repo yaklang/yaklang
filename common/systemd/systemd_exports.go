@@ -1,11 +1,11 @@
 package systemd
 
-func create(name string, opt ...ConfigOption) (string, string) {
+func Create(name string, opt ...ConfigOption) (string, string) {
 	return NewSystemServiceConfig(name, opt...).ToServiceFile()
 }
 
 var Exports = map[string]interface{}{
-	"Create": create,
+	"Create": Create,
 
 	// params
 	"unit_description":          WithUnitDescription,
