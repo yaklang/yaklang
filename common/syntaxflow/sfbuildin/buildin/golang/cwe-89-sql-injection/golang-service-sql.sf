@@ -104,6 +104,7 @@ $param & $input as $high;
 
 alert $high for {
 	level: "high",
+	risk: "sqli",
 	type: "vuln",
 	title: "Golang SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang SQL注入漏洞",

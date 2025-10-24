@@ -106,6 +106,7 @@ $alloc - $safe as $low
 
 alert $low for {
 	level: "low",
+	risk: "memory-leak",
 	type: "vuln",
 	title: "C Memory Leak Vulnerability Was Detected",
 	title_zh: "检测到C语言内存泄漏漏洞",

@@ -144,6 +144,7 @@ alert $high for {
 	title: "Golang JSON Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang JSON注入漏洞",
 	level: "high",
+	risk: "json_injection",
 	name: "high",
 	message: "检测到Golang JSON注入漏洞：不可信数据未经清洗直接序列化为JSON，可能导致解析器差异性攻击、数据污染或权限绕过。",
 	solution: <<<SOLUTION

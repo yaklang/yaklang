@@ -142,7 +142,7 @@ SOLUTION
    - 攻击者可能利用中间人攻击获取敏感信息。
 DESC
 	name: "critical",
-	risk: "不安全传输",
+	risk: "info-exposure",
 }
 
 desc(

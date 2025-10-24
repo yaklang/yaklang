@@ -136,6 +136,7 @@ alert $high for {
 	title: "Golang XXE Vulnerability Was Detected",
 	title_zh: "检测到Golang XXE漏洞",
 	level: "high",
+	risk: "xxe",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -112,6 +112,7 @@ $sink.Entity?{!have: 'xml.HTMLEntity'} as $high;
 
 alert $high for {
 	type: "vuln",
+	risk: "xxe",
 	title: "Check Golang XXE Read Any File",
 	title_zh: "检测Golang XXE任意文件读取漏洞",
 	solution: <<<SOLUTION

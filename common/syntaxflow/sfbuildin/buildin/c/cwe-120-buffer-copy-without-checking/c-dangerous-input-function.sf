@@ -84,6 +84,7 @@ vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
 
 alert $high for {
 	level: "high",
+	risk: "buffer-overflow",
 	type: "vuln",
 	title: "C Dangerous Input Function Vulnerability Was Detected",
 	title_zh: "检测到C语言中的危险输入函数漏洞",

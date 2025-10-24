@@ -115,6 +115,7 @@ $data & $input as $low;
 
 alert $low for {
 	title: "Golang Unfiltered File Path Vulnerability Was Detected",
+	risk: "path-traversal",
 	title_zh: "检测到Golang未过滤文件路径漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

@@ -86,6 +86,7 @@ $sink.GetString<fullTypeName>?{have: "github.com/beego/beego/v2/server/web/Contr
 alert $low for {
 	title_zh: "检测到Golang文件路径未授权漏洞",
 	level: "low",
+	risk: "file-upload",
 	type: "vuln",
 	title: "Check Golang File Upload Vulnerability",
 	solution: <<<SOLUTION

@@ -105,6 +105,7 @@ alert $mid for {
 	title: "Golang Reflected XSS Vulnerability in Beego Was Detected",
 	title_zh: "检测到Golang在Beego框架中的反射型跨站脚本攻击漏洞",
 	level: "mid",
+	risk: "xss",
 	type: "vuln",
 	message: "检测到Golang在Beego框架中存在反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 	solution: <<<SOLUTION

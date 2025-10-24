@@ -112,6 +112,7 @@ alert $mid for {
 	title: "Golang HTTP SSRF Vulnerability Detected",
 	title_zh: "检测到Golang HTTP SSRF漏洞",
 	level: "mid",
+	risk: "ssrf",
 	type: "vuln",
 	name: "mid",
 	message: "检测到Golang HTTP请求中存在SSRF漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",

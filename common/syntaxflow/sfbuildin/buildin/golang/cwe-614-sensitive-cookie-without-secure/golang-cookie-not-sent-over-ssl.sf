@@ -94,6 +94,7 @@ $cookie - $safe as $low
 
 alert $low for {
 	solution: <<<SOLUTION
+	risk: "info-exposure",
 ### 修复建议
 
 #### 1. 设置Secure标志

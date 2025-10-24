@@ -101,7 +101,7 @@ alert $high for {
 	title: "Golang CORS Misconfiguration Vulnerability Was Detected",
 	title_zh: "检测到Golang CORS配置错误漏洞",
 	level: "high",
-	risk: "CORS配置错误",
+	risk: "ssti",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
