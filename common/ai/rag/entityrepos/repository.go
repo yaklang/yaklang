@@ -921,7 +921,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		ragSystem, err = rag.LoadCollection(db, name)
+		ragSystem, err = rag.LoadCollection(db, name, opts...)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
