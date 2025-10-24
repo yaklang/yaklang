@@ -376,7 +376,7 @@ func Get(name string, i ...any) (*RAGSystem, error) {
 
 	// load existed first
 	log.Infof("attempting to load existing RAG collection '%s'", name)
-	ragSystem, err := LoadCollection(config.DB, name)
+	ragSystem, err := LoadCollection(config.DB, name, i...)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("failed to load existing RAG collection '%s': %v, creating new one", name, err)
 		return CreateCollection(config.DB, name, config.Description, i...)
