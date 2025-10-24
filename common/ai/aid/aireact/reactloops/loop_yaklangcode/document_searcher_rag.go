@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -22,7 +23,7 @@ func handleRAGQueryDocument(
 	ragSys, err := rag.LoadCollection(db, collectionName)
 	if err != nil {
 		log.Warn("rag db not available, rag query action will be skipped")
-		return fmt.Sprintf("please check yaklang enhance collection"), false
+		return fmt.Sprintf("please check yaklang enhance collection[%v]", collectionName), false
 	}
 
 	limit := int(payloads.GetInt("limit"))

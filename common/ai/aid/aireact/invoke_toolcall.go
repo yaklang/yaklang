@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -11,7 +12,18 @@ import (
 )
 
 // ExecuteToolRequiredAndCall handles tool requirement action using aicommon.ToolCaller
-func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult, bool, error) {
+func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string) (*aitool.ToolResult, bool, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+
+	// Check context cancellation early
+	select {
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	default:
+	}
+
 	var taskId string
 	if !utils.IsNil(r.currentTask) {
 		taskId = r.currentTask.GetId()

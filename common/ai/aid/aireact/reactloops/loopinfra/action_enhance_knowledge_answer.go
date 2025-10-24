@@ -45,13 +45,19 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		}
 
 		invoker := loop.GetInvoker()
-		enhancedAnswer, err := invoker.EnhanceKnowledgeAnswer(loop.GetConfig().GetContext(), rewriteQuery)
+		ctx := loop.GetConfig().GetContext()
+		task := loop.GetCurrentTask()
+		if task != nil && !utils.IsNil(task.GetContext()) {
+			ctx = task.GetContext()
+		}
+		enhancedAnswer, err := invoker.EnhanceKnowledgeAnswer(ctx, rewriteQuery)
 		if err != nil {
 			op.Fail(err.Error())
 			return
 		}
 
 		satisfied, err := invoker.VerifyUserSatisfaction(
+			ctx,
 			rewriteQuery,
 			false,
 			enhancedAnswer,
