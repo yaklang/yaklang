@@ -44,7 +44,7 @@ func (p *PalmScriptEngineHelper) HelpInfo() string {
 	buffer.WriteString(fmt.Sprintf("\n%v\n", strings.Repeat("-", 48)))
 
 	t := tablewriter.NewWriter(buffer)
-	t.SetHeader([]string{"内置值", "值的类型", "值"})
+	t.Header([]string{"内置值", "值的类型", "值"})
 	for name, item := range p.Instances {
 		if item.Value == nil {
 			t.Append([]string{name, item.Type, "-"})
@@ -57,7 +57,7 @@ func (p *PalmScriptEngineHelper) HelpInfo() string {
 	buffer.WriteString(fmt.Sprintf("\n%v\n", strings.Repeat("-", 48)))
 
 	t = tablewriter.NewWriter(buffer)
-	t.SetHeader([]string{"可用依赖库", "依赖库可用元素(值/函数)"})
+	t.Header([]string{"可用依赖库", "依赖库可用元素(值/函数)"})
 	for libName, libs := range p.Libs {
 		t.Append([]string{libName, fmt.Sprint(len(libs.ElementDocs))})
 	}
