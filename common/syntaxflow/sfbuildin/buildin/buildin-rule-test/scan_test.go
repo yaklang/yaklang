@@ -27,6 +27,7 @@ func TestVerifiedRule(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("is_build_in_rule = ? ", true)
 	failedRules := make([]string, 0)
+	swg := utils.NewSizedWaitGroup(10)
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
@@ -37,6 +38,8 @@ func TestVerifiedRule(t *testing.T) {
 		}
 		success := t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 			t.Parallel()
+			swg.Add(1)
+			defer swg.Done()
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
