@@ -9,7 +9,7 @@ import (
 
 func TestBufStack(t *testing.T) {
 	count := 0
-	buf := newBufStackManager(func(key any, val any) {
+	buf := newBufStackManager(func(key any, val any, parent []string) {
 		count++
 		log.Infof("emit: %#v, %#v", key, val)
 	})
@@ -29,7 +29,7 @@ func TestBufStack(t *testing.T) {
 func TestBufStackContainerSimple(t *testing.T) {
 	count := 0
 	containerBasicPass := false
-	buf := newBufStackManager(func(key any, val any) {
+	buf := newBufStackManager(func(key any, val any, parent []string) {
 		count++
 		if key == "container" {
 			if val, ok := val.(map[string]any); ok {
@@ -51,7 +51,7 @@ func TestBufStackContainerSimple(t *testing.T) {
 
 func TestBufStackContainer(t *testing.T) {
 	count := 0
-	buf := newBufStackManager(func(key any, val any) {
+	buf := newBufStackManager(func(key any, val any, parent []string) {
 		count++
 		log.Infof("emit: %#v, %#v", key, val)
 	})
@@ -71,7 +71,7 @@ func TestBufStackContainer(t *testing.T) {
 
 func TestBufStackContainer2(t *testing.T) {
 	count := 0
-	buf := newBufStackManager(func(key any, val any) {
+	buf := newBufStackManager(func(key any, val any, parent []string) {
 		count++
 		log.Infof("emit: %#v, %#v", key, val)
 	})
@@ -93,7 +93,7 @@ func TestBufStackContainer2(t *testing.T) {
 
 func TestBufStackComplexKey(t *testing.T) {
 	count := 0
-	buf := newBufStackManager(func(key any, val any) {
+	buf := newBufStackManager(func(key any, val any, parent []string) {
 		count++
 		log.Infof("emit: %#v, %#v", key, val)
 	})

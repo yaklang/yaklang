@@ -162,9 +162,10 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		action, err := aicommon.ExtractActionFromStream(
+		action, err := aicommon.ExtractActionFormStream(
+			t.ctx,
 			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
-			"require-tool", "abandon")
+			"require-tool", aicommon.WithSupperActionAlias("abandon"))
 		if err != nil {
 			return err
 		}
@@ -220,7 +221,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		action, err := aicommon.ExtractActionFromStream(
+		action, err := aicommon.ExtractActionFormStream(t.ctx,
 			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
 			"call-tool")
 		if err != nil {
