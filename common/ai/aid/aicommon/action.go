@@ -92,7 +92,7 @@ func (a *Action) SetName(i string) {
 func (a *Action) waitKey(key ...string) {
 	err := a.barrier.Wait(key...)
 	if err != nil {
-		log.Errorf("SupperAction waitKey %v error: %v", key, err)
+		log.Debugf("action wait key %v error: %v", key, err)
 	}
 }
 
@@ -113,6 +113,9 @@ func (a *Action) GetFloat(key string, defaults ...float64) float64 {
 }
 
 func (a *Action) GetString(key string, defaults ...string) string {
+	if a == nil {
+		return ""
+	}
 	a.waitKey(key)
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -270,7 +273,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}
 			streamWg.Add(1)
 			go func(reader io.Reader, callback func(key string, r io.Reader)) {
-				defer streamWg.Done()
+				defer func() {
+					streamWg.Done()
+				}()
 				callback(filedName, reader)
 			}(prs[i], h)
 		}
@@ -345,6 +350,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 
 		//  stream set field handler
 		opts = append(opts, jsonextractor.WithFormatKeyValueCallback(func(key, data any, parents []string) {
+			if key == "" {
+				return
+			}
 			if actionStart.IsSet() {
 				keyString := utils.InterfaceToString(key)
 
@@ -371,6 +379,13 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}
 		}))
 
+		fixParams := func(generalParams map[string]any) {
+			action.Set(generalParamsKey, generalParams)
+			for k, v := range generalParams {
+				action.Set(k, v)
+			}
+		}
+
 		opts = append(opts, jsonextractor.WithObjectCallback(func(data map[string]any) { // set the general object if @action matched
 			dataParams := aitool.InvokeParams(data)
 			if !dataParams.Has("@action") {
@@ -379,14 +394,14 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			targetString := dataParams.GetString("@action")
 			if targetString != "" {
 				if utils.StringArrayContains(actionNames, targetString) {
-					action.Set(generalParamsKey, data)
+					fixParams(data)
 					return
 				}
 			} else {
 				target := dataParams.GetObject("@action")
 				for _, v := range target {
 					if utils.StringArrayContains(actionNames, utils.InterfaceToString(v)) {
-						action.Set(generalParamsKey, data)
+						fixParams(data)
 						return
 					}
 				}
@@ -506,6 +521,9 @@ func ExtractAllAction(i string) []*Action {
 }
 
 func NewSimpleAction(name string, params aitool.InvokeParams) *Action {
+	if params == nil {
+		params = make(aitool.InvokeParams)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	return &Action{
