@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/orderedmap"
 
 	"github.com/samber/lo"
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
@@ -485,7 +486,6 @@ func (flow *CodecExecFlow) AESGCMEncrypt(key string, keyType string, nonce strin
 func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, input outputType) error {
 	decodeKey := decodeData([]byte(key), keyType)
 	decodeNonce := decodeData([]byte(nonce), nonceType)
-	inputText := decodeData(flow.Text, input)
 
 	var nonceSizeInt int
 	switch nonceSize {
@@ -497,13 +497,24 @@ func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce strin
 		nonceSizeInt = 12
 	}
 
-	dec, err := codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
-	if err != nil {
-		return err
+	cands := candidatesFrom(flow.Text)
+	if len(cands) == 0 {
+		return utils.Error("AES-GCM decrypt error: 空的密文输入")
 	}
 
-	flow.Text = dec
-	return nil
+	var (
+		dec []byte
+		err error
+	)
+
+	for _, inputText := range cands {
+		dec, err = codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
+		if err == nil {
+			flow.Text = dec
+			return nil
+		}
+	}
+	return utils.Errorf("AES-GCM 解密失败（已尝试原文/Base64/Hex）：%v", err)
 }
 
 // Tag = "加密"
@@ -701,23 +712,33 @@ func (flow *CodecExecFlow) SM2Encrypt(pubKey string, encryptSchema string) error
 // { Name = "decryptSchema", Type = "select",DefaultValue = "C1C2C3", Options = ["ASN1", "C1C2C3", "C1C3C2"], Required = true, Label = "编码格式"},
 // ]
 func (flow *CodecExecFlow) SM2Decrypt(priKey string, decryptSchema string) error {
-	var data []byte
-	var err error
-
-	switch decryptSchema { // choose alg
-	case "ASN1":
-		data, err = codec.SM2DecryptASN1([]byte(priKey), []byte(flow.Text))
-	case "C1C2C3":
-		data, err = codec.SM2DecryptC1C2C3([]byte(priKey), []byte(flow.Text))
-	case "C1C3C2":
-		data, err = codec.SM2DecryptC1C3C2([]byte(priKey), []byte(flow.Text))
-	default:
-	}
-	if err == nil {
-		flow.Text = data
+	cands := candidatesFrom(flow.Text)
+	if len(cands) == 0 {
+		return utils.Error("SM2 decrypt error: 空的密文输入")
 	}
 
-	return err
+	var (
+		data []byte
+		err  error
+	)
+
+	for _, inputText := range cands {
+		switch decryptSchema { // choose alg
+		case "ASN1":
+			data, err = codec.SM2DecryptASN1([]byte(priKey), inputText)
+		case "C1C2C3":
+			data, err = codec.SM2DecryptC1C2C3([]byte(priKey), inputText)
+		case "C1C3C2":
+			data, err = codec.SM2DecryptC1C3C2([]byte(priKey), inputText)
+		default:
+			return utils.Error("SM2 decrypt error: 未知的编码格式")
+		}
+		if err == nil {
+			flow.Text = data
+			return nil
+		}
+	}
+	return utils.Errorf("SM2 解密失败（已尝试原文/Base64/Hex）：%v", err)
 }
 
 // Tag = "加密"
@@ -771,37 +792,45 @@ func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algor
 // { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
 // ]
 func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algorithm string) error {
-	var data []byte
-	var err error
-	var hashFunc hash.Hash
-
-	switch algorithm { // choose alg
-	case "SHA-256":
-		hashFunc = sha256.New()
-	case "SHA-384":
-		hashFunc = sha512.New384()
-	case "SHA-512":
-		hashFunc = sha512.New()
-	case "MD5":
-		hashFunc = md5.New()
-	case "SHA-1":
-		fallthrough
-	default:
-		hashFunc = sha1.New()
+	priKeyBytes := []byte(priKey)
+	hashFunc := getHash("SHA-1")
+	if f := getHash(algorithm); f != nil {
+		hashFunc = f
 	}
+
+	cands := candidatesFrom(flow.Text)
+	if len(cands) == 0 {
+		return utils.Error("RSA decrypt error: 空的密文输入")
+	}
+
+	var (
+		data []byte
+		err  error
+	)
 
 	switch decryptSchema {
 	case "RSA-OAEP":
-		data, err = tlsutils.PkcsOAEPDecryptWithHash([]byte(priKey), flow.Text, hashFunc)
+		for _, c := range cands {
+			hashFunc.Reset()
+			if data, err = tlsutils.PkcsOAEPDecryptWithHash(priKeyBytes, c, hashFunc); err == nil {
+				flow.Text = data
+				return nil
+			}
+		}
+		return utils.Errorf("RSA-OAEP 解密失败（已尝试原文/Base64/Hex）：%v", err)
+
 	case "PKCS1v15":
-		data, err = tlsutils.Pkcs1v15Decrypt([]byte(priKey), flow.Text)
+		for _, c := range cands {
+			if data, err = tlsutils.Pkcs1v15Decrypt(priKeyBytes, c); err == nil {
+				flow.Text = data
+				return nil
+			}
+		}
+		return utils.Errorf("PKCS1v15 解密失败（已尝试原文/Base64/Hex）：%v", err)
+
 	default:
 		return utils.Error("RSA decrypt error: 未知的填充方式")
 	}
-	if err == nil {
-		flow.Text = data
-	}
-	return err
 }
 
 // Tag = "Java"
@@ -1290,23 +1319,24 @@ func (flow *CodecExecFlow) JwtReverseSign() error {
 	}
 	res := gjson.ParseBytes(flow.Text)
 	alg := res.Get("alg").String()
-	claims := make(map[string]any)
+	claims := authhack.NewOMapClaims()
 	res.Get("claims").ForEach(func(key, value gjson.Result) bool {
-		claims[key.String()] = value.Value()
+		claims.Set(key.String(), value.Value())
 		return true
 	})
-	headers := make(map[string]any)
-	headerMap := res.Get("header").Map()
-	for k, v := range headerMap {
-		headers[k] = v.Value()
-	}
+	headerMap := orderedmap.NewOrderMap(nil, nil, false)
+	res.Get("header").ForEach(func(key, value gjson.Result) bool {
+		headerMap.Set(key.String(), value.Value())
+		return true
+	})
+
 	typ := "None"
-	if iTyp, ok := headerMap["typ"]; ok {
-		typ = iTyp.String()
+	if iTyp, ok := headerMap.Get("typ"); ok {
+		typ = utils.InterfaceToString(iTyp)
 	}
 	key := res.Get("secret_key").String()
 
-	jwtSign, err := authhack.JwtGenerateEx(alg, headers, claims, typ, []byte(key))
+	jwtSign, err := authhack.JwtGenerateEx(alg, headerMap, claims, typ, []byte(key))
 	if err != nil {
 		return utils.Wrapf(err, "codec JWT签名失败")
 	}
@@ -1661,4 +1691,30 @@ func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
 
 	flow.Text = result
 	return nil
+}
+
+// 自动尝试原文 / Base64 / Hex 三种密文，成功即返回
+func candidatesFrom(flowText []byte) [][]byte {
+	raw := strings.TrimSpace(utils.InterfaceToString(flowText))
+	type void struct{}
+	var out [][]byte
+
+	push := func(b []byte) {
+		if len(b) == 0 {
+			return
+		}
+		out = append(out, b)
+	}
+
+	// 原文按字节
+	push(flowText)
+	// Base64
+	if b, err := codec.DecodeBase64(raw); err == nil {
+		push(b)
+	}
+	// Hex
+	if b, err := codec.DecodeHex(raw); err == nil {
+		push(b)
+	}
+	return out
 }
