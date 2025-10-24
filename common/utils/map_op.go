@@ -549,13 +549,13 @@ func UnSafeInterfaceToGeneralMap(params interface{}) (finalResult map[string]int
 					log.Debugf("handle ptr/struct to map failed: %s", err)
 				}
 			}
-			key := r.Field(i)
-			value := v.Field(i)
-			finalValue := reflectAny2Interface(value)
-			if finalValue != nil {
-				p[key.Name] = finalValue
-			}
 		}()
+		key := r.Field(i)
+		value := v.Field(i)
+		finalValue := reflectAny2Interface(value)
+		if finalValue != nil {
+			p[key.Name] = finalValue
+		}
 	}
 	pType := reflect.TypeOf(params)
 	switch pType.Kind() {
