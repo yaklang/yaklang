@@ -67,6 +67,7 @@ func DeleteProgramIrCode(db *gorm.DB, program string) {
 func deleteProgramCodeOnly(db *gorm.DB, program string) {
 	// delete the program
 	// code
+	deleteCache(program)
 	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
 	db.Model(&IrIndex{}).Where("program_name = ?", program).Unscoped().Delete(&IrIndex{})
 	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
