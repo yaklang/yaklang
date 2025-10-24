@@ -262,7 +262,7 @@ func (p *Program) NewValueFromAuditNode(nodeID string) *Value {
 
 	auditNode, err := ssadb.GetAuditNodeById(nodeID)
 	if err != nil {
-		log.Errorf("NewValueFromDB: audit node not found: %d", nodeID)
+		log.Errorf("NewValueFromDB: audit node not found: %v", nodeID)
 		return nil
 	}
 	// if auditNode is -1,check it.

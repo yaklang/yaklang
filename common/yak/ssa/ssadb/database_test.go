@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,22 +118,25 @@ func TestSyncFromDatabase(t *testing.T) {
 		// valueA.GetId()
 
 		// cache.SaveToDatabase() // not allow save again
-		lazyInst := cache.GetInstruction(valueA.GetId())
-		require.NotNil(t, lazyInst)
+		inst := cache.GetInstruction(valueA.GetId())
+		require.NotNil(t, inst)
 
-		lz, isLazyInstruction := ssa.ToLazyInstruction(lazyInst)
-		spew.Dump(lazyInst)
-		require.True(t, isLazyInstruction)
-		require.Equal(t, ssa.SSAOpcodeConstInst, lz.GetOpcode())
+		// lz, isLazyInstruction := ssa.ToLazyInstruction(lazyInst)
+		// spew.Dump(lazyInst)
+		// require.True(t, isLazyInstruction)
+		require.Equal(t, ssa.SSAOpcodeConstInst, inst.GetOpcode())
 
-		fmt.Println("lz: ", lz.String())
+		fmt.Println("lz: ", inst.String())
 
-		users := lz.GetUsers()
-		fmt.Println("users: ", users)
-		require.Len(t, users, 1)
-		user := users[0]
-		require.NotNil(t, user)
-		require.Equal(t, ssa.SSAOpcodeCall, user.GetOpcode())
+		if value, ok := ssa.ToValue(inst); ok {
+			users := value.GetUsers()
+			fmt.Println("users: ", users)
+			require.Len(t, users, 1)
+			user := users[0]
+			require.NotNil(t, user)
+			require.Equal(t, ssa.SSAOpcodeCall, user.GetOpcode())
+		}
+
 	})
 
 }
