@@ -346,6 +346,7 @@ $user_input & $weak_hash as $low;
 
 alert $mid for {
 	level: "mid",
+	risk: "auth-bypass",
 	type: "vuln",
 	title: "C Improper Authentication Vulnerability Was Detected",
 	title_zh: "检测到C语言身份验证不当漏洞",
@@ -460,6 +461,7 @@ SOLUTION
 
 alert $low for {
 	level: "low",
+	risk: "auth-bypass",
 	type: "vuln",
 	title: "C Weak Hash Algorithm Usage Was Detected",
 	title_zh: "检测到C语言使用弱哈希算法",

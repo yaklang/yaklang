@@ -102,6 +102,7 @@ $sink & $input as $high
 
 alert $high for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
+	risk: "xss",
 	title_zh: "检测到Golang反射型XSS漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

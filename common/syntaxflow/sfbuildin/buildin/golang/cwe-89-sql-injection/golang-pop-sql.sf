@@ -109,6 +109,7 @@ $param & $input as $high;
 
 alert $high for {
 	type: "vuln",
+	risk: "sqli",
 	title: "Golang Pop SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang Pop SQL注入漏洞",
 	solution: <<<SOLUTION

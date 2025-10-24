@@ -99,6 +99,7 @@ $cookie - $safe as $low
 
 alert $low for {
 	solution: <<<SOLUTION
+	risk: "csrf",
 ### 修复建议
 
 #### 1. 配置SameSite属性

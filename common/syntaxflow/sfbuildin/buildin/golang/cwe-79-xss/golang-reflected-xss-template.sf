@@ -98,6 +98,7 @@ $target3.Execute as $high;
 
 alert $high for {
 	solution: <<<SOLUTION
+	risk: "xss",
 ### 修复建议
 #### 1. 避免使用 `template.HTML` 包装不可信的用户输入
 除非能够确定输入内容是完全安全的 HTML，否则不要使用 `template.HTML` 来包装用户输入。Go 语言的 `html/template` 包默认会对非 `template.HTML` 类型的内容进行自动转义，这是防御 XSS 的最有效方式。

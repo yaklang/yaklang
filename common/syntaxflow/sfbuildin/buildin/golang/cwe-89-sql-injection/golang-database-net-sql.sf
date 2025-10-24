@@ -87,6 +87,7 @@ $param & $input as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
+	risk: "sqli",
 	title_zh: "检测Golang SQL注入漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

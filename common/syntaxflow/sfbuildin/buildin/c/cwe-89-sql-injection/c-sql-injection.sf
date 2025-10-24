@@ -123,6 +123,7 @@ $user_input & $sql_exec as $high;
 
 alert $high for {
 	level: "high",
+	risk: "sqli",
 	type: "vuln",
 	title: "C SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到C语言SQL注入漏洞",
