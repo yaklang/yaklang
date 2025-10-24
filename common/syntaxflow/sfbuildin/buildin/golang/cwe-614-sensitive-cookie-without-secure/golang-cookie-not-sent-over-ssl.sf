@@ -2,7 +2,8 @@ desc(
 	title: "Detect Golang Cookie Not Sent Over SSL Vulnerability"
 	title_zh: "检测Golang Cookie未通过SSL发送漏洞"
 	type: audit
-	severity: low
+	level: low
+	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 

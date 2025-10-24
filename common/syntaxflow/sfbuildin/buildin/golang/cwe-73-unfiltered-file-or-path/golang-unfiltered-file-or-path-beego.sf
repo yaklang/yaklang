@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Unfiltered File-or-Path Vulnerability"
 	title_zh: "检测Golang未过滤的文件或路径漏洞"
 	type: audit
-	severity: low
+	level: low
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述

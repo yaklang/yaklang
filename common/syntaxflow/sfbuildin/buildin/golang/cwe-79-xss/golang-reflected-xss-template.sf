@@ -1,7 +1,7 @@
 desc(
 	title: "Detect Golang Reflected XSS using template.HTML"
 	type: audit
-	severity: high
+	level: high
 	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述

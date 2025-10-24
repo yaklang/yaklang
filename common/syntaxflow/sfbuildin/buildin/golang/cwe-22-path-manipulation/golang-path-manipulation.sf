@@ -3,6 +3,7 @@ desc(
 	title_zh: "检测Golang路径操作漏洞"
 	type: audit
 	level: low
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
 

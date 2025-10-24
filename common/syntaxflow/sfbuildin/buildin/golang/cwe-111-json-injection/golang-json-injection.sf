@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang JSON Injection Vulnerability"
 	title_zh: "检测Golang JSON注入漏洞"
 	type: vuln
-	severity: high
+	level: high
 	risk: "json_injection"
 	desc: <<<DESC
 ### 漏洞描述

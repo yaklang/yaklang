@@ -2,7 +2,8 @@ desc(
 	title: "Detect Golang Missing SameSite Attribute Vulnerability"
 	title_zh: "检测Golang缺少SameSite属性漏洞"
 	type: audit
-	severity: low
+	level: low
+	risk: "csrf"
 	desc: <<<DESC
 ### 漏洞描述
 

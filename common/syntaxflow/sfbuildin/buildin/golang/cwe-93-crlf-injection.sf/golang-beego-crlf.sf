@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang CRLF Injection Vulnerability in Beego"
 	title_zh: "检测Golang Beego框架中的CRLF注入漏洞"
 	type: vuln
-	severity: high
+	level: high
 	risk: crlf
 	desc: <<<DESC
 ### 漏洞描述

@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang SSRF HTTP Vulnerability"
 	title_zh: "检测Golang HTTP SSRF漏洞"
 	type: audit
-	severity: mid
+	level: mid
 	risk: "ssrf"
 	desc: <<<DESC
 ### 漏洞描述
