@@ -296,11 +296,6 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		if err != nil {
 			return "", nil, err
 		}
-		searchTools, err := pm.react.config.aiToolManager.GetSearchTools()
-		if err != nil {
-			return "", nil, err
-		}
-		tools = append(tools, searchTools...)
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
 		result["TopToolsCount"] = pm.react.config.topToolsCount

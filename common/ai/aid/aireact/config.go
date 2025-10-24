@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
+	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -392,10 +392,40 @@ func WithAiToolsSearchTool() Option {
 		if cfg.aiToolManagerOption == nil {
 			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
-		// Enable tool search functionality
+		aiChatFunc := func(prompt string) (io.Reader, error) {
+			response, err := ai.Chat(prompt)
+			if err != nil {
+				return nil, err
+			}
+			return strings.NewReader(response), nil
+		}
+
+		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
 		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
-			buildinaitools.WithSearchEnabled(true),
+			buildinaitools.WithSearchToolEnabled(true),
+			buildinaitools.WithAIToolsSearcher(aiToolSearcher),
 		)
+	}
+}
+
+func WithAiForgeSearchTool() Option {
+	return func(cfg *ReActConfig) {
+		if cfg.aiToolManagerOption == nil {
+			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		aiChatFunc := func(prompt string) (io.Reader, error) {
+			response, err := ai.Chat(prompt)
+			if err != nil {
+				return nil, err
+			}
+			return strings.NewReader(response), nil
+		}
+
+		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
+		cfg.aiToolManagerOption = append(
+			cfg.aiToolManagerOption,
+			buildinaitools.WithForgeSearchToolEnabled(true),
+			buildinaitools.WithAiForgeSearcher(forgeSearcher))
 	}
 }
 
@@ -447,13 +477,15 @@ func WithBuiltinTools() Option {
 		}
 
 		// Create keyword searcher
-		keywordSearcher := searchtools.NewKeyWordSearcher[*aitool.Tool](aiChatFunc)
-
+		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
+		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
 		// Enable tool search functionality
 		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
 			buildinaitools.WithExtendTools(allTools, true),
-			buildinaitools.WithSearchEnabled(true),
-			buildinaitools.WithSearcher(keywordSearcher),
+			buildinaitools.WithSearchToolEnabled(true),
+			buildinaitools.WithForgeSearchToolEnabled(true),
+			buildinaitools.WithAIToolsSearcher(aiToolSearcher),
+			buildinaitools.WithAiForgeSearcher(forgeSearcher),
 		)
 
 		log.Infof("Added %d builtin AI tools with search capability", len(allTools))

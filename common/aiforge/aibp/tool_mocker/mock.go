@@ -109,7 +109,9 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 			}))
 		allTools = append(allTools, factory.Tools()...)
 		return allTools
-	}, buildinaitools.WithSearcher(NewMockerSearcher(mocker.SearchTool)), buildinaitools.WithToolEnabled("tools_search", true))
+	}, buildinaitools.WithAIToolsSearcher(NewMockerSearcher(func(ctx context.Context, query string) (searchtools.AISearchable, error) {
+		return mocker.SearchTool(ctx, query)
+	})), buildinaitools.WithToolEnabled("tools_search", true))
 	return mocker
 }
 

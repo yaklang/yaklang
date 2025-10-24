@@ -44,7 +44,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 		result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 		if err != nil {
-			operator.Fail(utils.Error("ExecuteToolRequiredAndCall fail"))
+			operator.Fail(utils.Errorf("ExecuteToolRequiredAndCall error: %v", err))
 			return
 		}
 		if directly {

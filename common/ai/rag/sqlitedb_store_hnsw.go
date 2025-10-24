@@ -401,6 +401,16 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorSto
 	}
 }
 
+func (s *SQLiteVectorStoreHNSW) Has(docId string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.hnsw.Layers) == 0 {
+		return false
+	}
+	_, ok := s.hnsw.Layers[0].Nodes[docId]
+	return ok
+}
+
 // DeleteEmbeddingData 删除嵌入数据
 func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 	if !s.collection.EnablePQMode {
