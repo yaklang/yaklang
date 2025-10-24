@@ -60,7 +60,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".c" || extension == ".h"
+	return extension == ".c" // || extension == ".h"
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
@@ -115,7 +115,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
-	return filepath.Ext(path) == ".c" || filepath.Ext(path) == ".h"
+	return filepath.Ext(path) == ".c" // || filepath.Ext(path) == ".h"
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
@@ -126,76 +126,9 @@ func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
 }
 
-func (s *SSABuilder) PreHandlerParseAST(globalFileSystem fi.FileSystem) {
-	if globalTempDir == "" {
-		tmpDir, err := os.MkdirTemp("", "c_headers_*")
-		if err == nil {
-			globalTempDir = tmpDir
-
-		}
-	}
-
-	var walkDir func(string) error
-	walkDir = func(dir string) error {
-		entries, err := globalFileSystem.ReadDir(dir)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			filePath := globalFileSystem.Join(dir, entry.Name())
-
-			if entry.IsDir() {
-				walkDir(filePath)
-			} else if globalFileSystem.Ext(entry.Name()) == ".h" {
-				if content, err := globalFileSystem.ReadFile(filePath); err == nil {
-					relPath := strings.TrimPrefix(filePath, ".")
-					relPath = strings.TrimPrefix(relPath, string(globalFileSystem.GetSeparators()))
-					targetPath := filepath.Join(globalTempDir, relPath)
-					targetDir := filepath.Dir(targetPath)
-
-					os.MkdirAll(targetDir, 0755)
-					os.WriteFile(targetPath, content, 0644)
-				}
-			}
-		}
-		return nil
-	}
-	walkDir(".")
-
-	var copyIncludeDir func(string, string) error
-	copyIncludeDir = func(srcDir, dstDir string) error {
-		entries, err := globalFileSystem.ReadDir(srcDir)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			srcPath := globalFileSystem.Join(srcDir, entry.Name())
-			dstPath := filepath.Join(dstDir, entry.Name())
-
-			if entry.IsDir() {
-				os.MkdirAll(dstPath, 0755)
-				copyIncludeDir(srcPath, dstPath)
-			} else {
-				if content, err := globalFileSystem.ReadFile(srcPath); err == nil {
-					os.WriteFile(dstPath, content, 0644)
-				}
-			}
-		}
-		return nil
-	}
-
-	if exists, _ := globalFileSystem.Exists("include"); exists {
-		includeDir := filepath.Join(globalTempDir, "include")
-		os.MkdirAll(includeDir, 0755)
-		copyIncludeDir("include", includeDir)
-	}
-}
-
 func (s *SSABuilder) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".c" || extension == ".h"
+	return extension == ".c" //|| extension == ".h"
 }
 
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
