@@ -79,7 +79,7 @@ func FileStatusAction(status any) *YakitFileAction {
 		statusMap["modTime"] = fileInfo.ModTime().String()
 		statusMap["isDir"] = fileInfo.IsDir()
 	} else {
-		statusMap = utils.UnSafeInterfaceToGeneralMap(status)
+		statusMap = utils.InterfaceToGeneralMap(status)
 	}
 	return &YakitFileAction{
 		Action: Status_Action,

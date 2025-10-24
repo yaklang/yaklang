@@ -3,13 +3,11 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-	"unsafe"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -467,95 +465,6 @@ func InterfaceToGeneralMap(params interface{}) (finalResult map[string]interface
 				p[key.Name] = v.FieldByName(key.Name).Interface()
 			}
 		}()
-	}
-	pType := reflect.TypeOf(params)
-	switch pType.Kind() {
-	case reflect.Ptr:
-		mapValue := reflect.ValueOf(params)
-		res := mapValue.Elem()
-		pType = reflect.TypeOf(res.Interface())
-		for i := 0; i < res.NumField(); i++ {
-			setField(pType, res, i)
-		}
-	case reflect.Struct:
-		res := reflect.ValueOf(params)
-		for i := 0; i < res.NumField(); i++ {
-			setField(pType, res, i)
-		}
-	case reflect.Map:
-		mapValue := reflect.ValueOf(params)
-		for _, k := range mapValue.MapKeys() {
-			valueRaw := mapValue.MapIndex(k)
-			value := valueRaw.Interface()
-			switch ret := value.(type) {
-			case []byte:
-				mapValue.SetMapIndex(k, reflect.ValueOf(string(ret)))
-				p[k.String()] = string(ret)
-			default:
-				p[k.String()] = value
-			}
-		}
-		return p
-	default:
-		p["__DEFAULT__"] = params
-		return p
-	}
-	return p
-}
-
-func UnSafeInterfaceToGeneralMap(params interface{}) (finalResult map[string]interface{}) {
-	if IsNil(params) {
-		return map[string]any{}
-	}
-
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("handle ptr/struct to map failed: %s", err)
-			finalResult = map[string]interface{}{
-				"__FALLBACK__": params,
-			}
-		}
-	}()
-
-	reflectAny2Interface := func(v reflect.Value) interface{} {
-		var finalValue interface{}
-		if v.CanInterface() {
-			finalValue = v.Interface()
-		} else {
-			if v.CanAddr() { // use unsafe to get unexported field
-				switch v.Kind() {
-				case reflect.String:
-					finalValue = *(*string)(unsafe.Pointer(v.UnsafeAddr()))
-				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					finalValue = *(*int64)(unsafe.Pointer(v.UnsafeAddr()))
-				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-					finalValue = *(*uint64)(unsafe.Pointer(v.UnsafeAddr()))
-				case reflect.Float32, reflect.Float64:
-					finalValue = *(*float64)(unsafe.Pointer(v.UnsafeAddr()))
-				case reflect.Bool:
-					finalValue = *(*bool)(unsafe.Pointer(v.UnsafeAddr()))
-				default:
-				}
-			}
-		}
-		return finalValue
-	}
-
-	p := map[string]interface{}{}
-	setField := func(r reflect.Type, v reflect.Value, i int) {
-		defer func() {
-			if err := recover(); err != nil {
-				if err != nil {
-					log.Debugf("handle ptr/struct to map failed: %s", err)
-				}
-			}
-		}()
-		key := r.Field(i)
-		value := v.Field(i)
-		finalValue := reflectAny2Interface(value)
-		if finalValue != nil {
-			p[key.Name] = finalValue
-		}
 	}
 	pType := reflect.TypeOf(params)
 	switch pType.Kind() {
