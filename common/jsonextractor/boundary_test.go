@@ -1442,19 +1442,6 @@ func TestFieldStreamHandler_NestedLevel2AndLevel3(t *testing.T) {
 				parents: parentsCopy,
 			})
 			mu.Unlock()
-		}),
-		WithRegisterFieldStreamHandler("sibling", func(key string, reader io.Reader, parents []string) {
-			defer wg.Done()
-			data, _ := io.ReadAll(reader)
-			mu.Lock()
-			parentsCopy := make([]string, len(parents))
-			copy(parentsCopy, parents)
-			results = append(results, result{
-				key:     key,
-				data:    string(data),
-				parents: parentsCopy,
-			})
-			mu.Unlock()
 		}))
 
 	require.NoError(t, err)
