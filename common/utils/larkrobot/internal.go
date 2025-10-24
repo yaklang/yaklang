@@ -442,7 +442,7 @@ func (card *CardMarkdown) SetHref(url *UrlElement) *CardMarkdown {
 func (card *CardMarkdown) GetContentTag() string {
 	return "markdown"
 }
-func (card *CardMarkdown) ToMessageMap() map[string]interface{} {
+func (card *CardMarkdown) ToMessage() map[string]interface{} {
 	msg := map[string]interface{}{}
 	msg["tag"] = card.GetContentTag()
 	msg["content"] = card.Content
@@ -453,6 +453,9 @@ func (card *CardMarkdown) ToMessageMap() map[string]interface{} {
 		msg["href"] = href
 	}
 	return msg
+}
+func (card *CardMarkdown) ToMessageMap() map[string]interface{} {
+	return card.ToMessage()
 }
 
 // CardHr 分割线模块
