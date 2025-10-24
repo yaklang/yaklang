@@ -197,6 +197,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
 			actionType := getNextActionType(action)
+			if actionType == "" {
+				return utils.Error("action type is empty")
+			}
 			verifier, err := r.GetActionHandler(actionType)
 			if err != nil {
 				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionType, err))

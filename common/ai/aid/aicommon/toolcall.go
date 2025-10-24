@@ -169,7 +169,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
-		callToolAction, err := ExtractActionFormStream(t.config.GetContext(), stream, "call-tool")
+		callToolAction, err := ExtractValidActionFormStream(t.config.GetContext(), stream, "call-tool")
 		if err != nil {
 			emitter.EmitError("error extract tool params: %v", err)
 			return utils.Errorf("error extracting action params: %v", err)

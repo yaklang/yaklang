@@ -34,6 +34,20 @@ type Action struct {
 	barrier      *utils.CondBarrier
 }
 
+// ValidCheck 检查 检查当前 Action是否有效，主要检查是否有合法的 @action 字段 即 action type
+func (a *Action) ValidCheck(expectName ...string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.params == nil {
+		return false
+	}
+	if expectName != nil && len(expectName) > 0 {
+		return utils.StringArrayContains(expectName, a.params.GetString(ActionMagicKey))
+	} else {
+		return a.params.GetString(ActionMagicKey) != ""
+	}
+}
+
 func (a *Action) WaitParse(ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -435,8 +449,29 @@ func ExtractActionFormStream(ctx context.Context, reader io.Reader, actionName s
 	return action, nil
 }
 
+func ExtractValidActionFormStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
+	maker := NewActionMaker(actionName, opts...)
+	action := maker.ReadFromReader(ctx, reader)
+	action.WaitParse(ctx)
+	action.WaitStream(ctx)
+	if !action.ValidCheck(append(maker.alias, actionName)...) {
+		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(maker.alias, actionName))
+	}
+	return action, nil
+}
+
+// ExtractAction 从字符串中提取指定的 Action 对象，支持别名，这里隐含一个强校验行为，即会等待处理完毕之后检查是否有可用的Action
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
-	return ExtractActionFormStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
+	action, err := ExtractActionFormStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
+	if err != nil {
+		return nil, err
+	}
+	action.WaitParse(context.Background())
+	action.WaitStream(context.Background())
+	if !action.ValidCheck(append(alias, actionName)...) {
+		return nil, utils.Errorf("action @action not found or invalid, expect one of: %v", append(alias, actionName))
+	}
+	return action, nil
 }
 
 func ExtractAllAction(i string) []*Action {
