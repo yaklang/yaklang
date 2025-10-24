@@ -52,6 +52,8 @@ type ReactTaskItem struct {
 	Metadata  map[string]interface{} // 额外元数据
 }
 
+var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
+
 type ReAct struct {
 	*aicommon.Emitter
 

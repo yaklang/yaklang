@@ -37,13 +37,18 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			return
 		}
 		invoker := loop.GetInvoker()
-		result, directly, err := invoker.ExecuteToolRequiredAndCall(toolPayload)
+		ctx := invoker.GetConfig().GetContext()
+		t := loop.GetCurrentTask()
+		if t != nil {
+			ctx = t.GetContext()
+		}
+		result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 		if err != nil {
 			operator.Fail(utils.Error("ExecuteToolRequiredAndCall fail"))
 			return
 		}
 		if directly {
-			answer, err := invoker.DirectlyAnswer("在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
+			answer, err := invoker.DirectlyAnswer(ctx, "在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
 			if err != nil {
 				operator.Fail(utils.Error("DirectlyAnswer fail, reason: " + err.Error()))
 				return
@@ -65,7 +70,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 
 		task := loop.GetCurrentTask()
-		satisfied, err := invoker.VerifyUserSatisfaction(task.GetUserInput(), true, toolPayload)
+		satisfied, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
 		if err != nil {
 			operator.Fail(err)
 			return
