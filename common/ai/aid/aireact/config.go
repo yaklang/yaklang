@@ -554,17 +554,6 @@ func (cfg *ReActConfig) callAI(prompt string, opts ...aicommon.AIRequestOption) 
 	return cfg.CallAI(req)
 }
 
-// CreateToolCaller creates a ToolCaller for this ReAct config
-func (cfg *ReActConfig) CreateToolCaller() (*aicommon.ToolCaller, error) {
-	return aicommon.NewToolCaller(
-		aicommon.WithToolCaller_AICallerConfig(cfg),
-		aicommon.WithToolCaller_AICaller(cfg),
-		aicommon.WithToolCaller_Task(cfg.task),
-		aicommon.WithToolCaller_RuntimeId(cfg.id),
-		aicommon.WithToolCaller_Emitter(cfg.Emitter),
-	)
-}
-
 // newReActConfig creates a new ReActConfig with default values
 func newReActConfig(ctx context.Context) *ReActConfig {
 	if ctx == nil {
