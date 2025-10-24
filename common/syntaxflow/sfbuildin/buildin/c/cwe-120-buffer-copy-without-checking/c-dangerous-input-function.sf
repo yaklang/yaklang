@@ -2,7 +2,8 @@ desc(
 	title: "Audit C Dangerous Input Functions"
 	title_zh: "审计C语言中的危险输入函数"
 	type: audit
-	severity: high
+	level: high
+	risk: "buffer-overflow"
 	desc: <<<DESC
 ### 漏洞描述
 

@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang CORS Misconfiguration Vulnerability in Beego"
 	title_zh: "检测Golang CORS配置错误漏洞(beego)"
 	type: vuln
-	severity: high
+	level: high
 	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述

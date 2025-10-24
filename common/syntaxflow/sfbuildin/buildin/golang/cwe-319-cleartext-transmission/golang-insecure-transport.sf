@@ -3,6 +3,7 @@ desc(
 	title_zh: "检测Golang不安全传输漏洞"
 	type: audit
 	level: critical
+	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述
 

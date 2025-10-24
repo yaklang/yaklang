@@ -1,7 +1,7 @@
 desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
-	severity: high
+	level: high
 	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述

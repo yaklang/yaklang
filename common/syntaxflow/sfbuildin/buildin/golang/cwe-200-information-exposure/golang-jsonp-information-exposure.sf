@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang JSON Information Exposure Vulnerability"
 	title_zh: "检测Golang JSON信息泄露漏洞"
 	type: audit
-	severity: low
+	level: low
 	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述

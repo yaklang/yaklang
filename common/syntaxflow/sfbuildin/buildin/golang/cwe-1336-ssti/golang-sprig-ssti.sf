@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang SSTI Vulnerability with Sprig"
 	title_zh: "检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln
-	severity: low
+	level: low
 	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
