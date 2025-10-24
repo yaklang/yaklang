@@ -2,9 +2,10 @@ package authhack
 
 import (
 	"encoding/json"
-	"github.com/samber/lo"
 	"slices"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
