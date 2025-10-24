@@ -1,7 +1,6 @@
 package yaklib
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -220,8 +219,4 @@ func SSHConnectWithPasswd(host, username, password string) (*SSHClient, error) {
 	}
 
 	return &SSHClient{client: client}, nil
-}
-
-func init() {
-	log.Info("SSH library initialized")
 }
