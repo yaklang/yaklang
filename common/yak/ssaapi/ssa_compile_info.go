@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -30,26 +31,50 @@ func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	defer func() {
 		c.Processf(0, "parse info finish")
 	}()
+
+	var baseFS fi.FileSystem
 	switch codeSource.GetCodeSourceKind() {
 	case ssaconfig.CodeSourceLocal:
-		return filesys.NewRelLocalFs(codeSource.GetCodeSourceLocalFile()), nil
+		baseFS = filesys.NewRelLocalFs(codeSource.GetCodeSourceLocalFile())
 	case ssaconfig.CodeSourceCompression:
-		return getZipFile(codeSource)
+		baseFS, err = getZipFile(codeSource)
+		if err != nil {
+			return nil, err
+		}
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(codeSource)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		fs := filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
+		baseFS = filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
-		return fs, nil
 	case ssaconfig.CodeSourceGit:
-		return gitFs(codeSource, c.Processf)
+		baseFS, err = gitFs(codeSource, c.Processf)
+		if err != nil {
+			return nil, err
+		}
 	case ssaconfig.CodeSourceSvn:
 		return svnFs(codeSource)
+	default:
+		return nil, utils.Errorf("unsupported kind: %s", codeSource.GetCodeSourceKind())
 	}
-	return nil, utils.Errorf("unsupported kind: %s", codeSource.GetCodeSourceKind())
+
+	return baseFS, nil
+}
+
+func (c *Config) wrapWithPreprocessedCFS(fs fi.FileSystem) (fi.FileSystem, error) {
+	if c.language != consts.C {
+		return fs, nil
+	}
+
+	c.Processf(0, "wrapping filesystem with C preprocessor support")
+	preprocessedFS, err := filesys.NewPreprocessedCFs(fs)
+	if err != nil {
+		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
+		return fs, nil
+	}
+	return preprocessedFS, nil
 }
 
 func getZipFile(codeSource *ssaconfig.Config) (*filesys.ZipFS, error) {
