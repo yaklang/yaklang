@@ -152,15 +152,14 @@ func nodeId(i int) string {
 }
 
 func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
-	an := &ssadb.AuditNode{
-		AuditNodeStatus: ssadb.AuditNodeStatus{
-			RiskHash: riskHash,
-		},
-		IsEntryNode:      n.IsEntryNode,
-		IRCodeID:         -1,
-		TmpValue:         n.IRCode,
-		TmpValueFileHash: n.IRSourceHash,
+	an := ssadb.NewAuditNode()
+	an.AuditNodeStatus = ssadb.AuditNodeStatus{
+		RiskHash: riskHash,
 	}
+	an.IsEntryNode = n.IsEntryNode
+	an.IRCodeID = -1
+	an.TmpValue = n.IRCode
+	an.TmpValueFileHash = n.IRSourceHash
 	if n.CodeRange != nil {
 		an.TmpStartOffset = n.StartOffset
 		an.TmpEndOffset = n.EndOffset
@@ -168,7 +167,7 @@ func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 	return an
 }
 
-func (e *EdgeInfo) ToAuditEdge(m map[string]uint) *ssadb.AuditEdge {
+func (e *EdgeInfo) ToAuditEdge(m map[string]string) *ssadb.AuditEdge {
 	return &ssadb.AuditEdge{
 		FromNode:      m[e.FromNodeID],
 		ToNode:        m[e.ToNodeID],
@@ -179,14 +178,14 @@ func (e *EdgeInfo) ToAuditEdge(m map[string]uint) *ssadb.AuditEdge {
 
 type saveDataFlowCtx struct {
 	db       *gorm.DB
-	nodeMap  map[string]uint // nodeId -> id
+	nodeMap  map[string]string // nodeId -> nodeid
 	riskHash string
 }
 
 func newSaveDataFlowCtx(db *gorm.DB, riskHash string) *saveDataFlowCtx {
 	return &saveDataFlowCtx{
 		db:       db,
-		nodeMap:  make(map[string]uint),
+		nodeMap:  make(map[string]string),
 		riskHash: riskHash,
 	}
 }
@@ -205,14 +204,14 @@ func (sc *saveDataFlowCtx) saveAuditNodes(nodes []*NodeInfo) {
 	}
 	for _, n := range nodes {
 		// 存储过的不重复存储
-		if sc.nodeMap[n.NodeID] > 0 {
+		if sc.nodeMap[n.NodeID] != "" {
 			continue
 		}
 		auditNode := n.ToAuditNode(sc.riskHash)
 		if err := sc.db.Create(auditNode).Error; err != nil {
 			log.Errorf("save audit node failed: %v", err)
 		}
-		sc.nodeMap[n.NodeID] = auditNode.ID
+		sc.nodeMap[n.NodeID] = auditNode.NodeID
 	}
 }
 

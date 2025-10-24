@@ -358,7 +358,7 @@ func (a *SyntaxFlowAction) GetResultByRiskHash(
 }
 
 func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Value, error) {
-	var auditNodeID uint
+	var auditNodeID string
 
 	auditNodeIDs, err := ssadb.GetResultNodeByRiskHash(ssadb.GetDB(), risk.Hash)
 	if err != nil {
@@ -375,6 +375,9 @@ func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Va
 
 	prog := ssaapi.NewTmpProgram(programName)
 	value := prog.NewValueFromAuditNode(auditNodeID)
+	if utils.IsNil(value) {
+		return nil, utils.Errorf("value not found from audit node id: %s", auditNodeID)
+	}
 	return value, nil
 }
 

@@ -28,7 +28,7 @@ func (c *Config) GetFileHandler(
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
-			log.Infof("pre-handler cost:%v parse ast: %s", time.Since(start), path)
+			log.Infof("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
 		}()
 
 		defer func() {
@@ -86,4 +86,20 @@ func getGID() uint64 {
 	idStr := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
 	id, _ := strconv.ParseUint(idStr, 10, 64)
 	return id
+}
+
+func Size(size int) string {
+	if size < 1024 {
+		return strconv.Itoa(size) + "B"
+	}
+	sizeKB := float64(size) / 1024.0
+	if sizeKB < 1024 {
+		return strconv.FormatFloat(sizeKB, 'f', 2, 64) + "KB"
+	}
+	sizeMB := sizeKB / 1024.0
+	if sizeMB < 1024 {
+		return strconv.FormatFloat(sizeMB, 'f', 2, 64) + "MB"
+	}
+	sizeGB := sizeMB / 1024.0
+	return strconv.FormatFloat(sizeGB, 'f', 2, 64) + "GB"
 }

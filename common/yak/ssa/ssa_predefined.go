@@ -165,7 +165,7 @@ func (a *anInstruction) GetProgramName() string {
 	if a.prog == nil {
 		return ""
 	}
-	return a.prog.Name
+	return a.prog.GetApplication().GetProgramName()
 }
 
 func (a *anInstruction) SetProgram(prog *Program) {

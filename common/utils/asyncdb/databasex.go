@@ -69,9 +69,6 @@ func NewCache[T MemoryItem, D DBItem](
 			}, nil
 		},
 	)
-	if !config.enableSave {
-		cache.DisableSave()
-	}
 
 	c := &Cache[T, D]{
 		cache:   cache,
@@ -104,7 +101,9 @@ func (c *Cache[T, U]) Set(item T) {
 }
 
 func (c *Cache[T, U]) Get(id int64) (T, bool) {
-	item, ok := c.cache.Get(id)
+	var item *CacheItem[T, U]
+	var ok bool
+	item, ok = c.cache.Get(id)
 	if !ok {
 		return *new(T), false
 	}

@@ -76,7 +76,7 @@ func NewInstructionWithCover[T Instruction](prog *Program, id int64, Cover func(
 
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(prog *Program, id int64) (Instruction, error) {
-	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
+	ir := ssadb.GetIrCodeById(ssadb.GetDB(), prog.GetProgramName(), id)
 	if ir == nil {
 		return nil, utils.Error("IrCode is nil")
 	}
@@ -95,13 +95,8 @@ func NewLazyInstructionFromIrCode(ir *ssadb.IrCode, prog *Program, ignoreCache .
 	if prog == nil {
 		return nil, utils.Errorf("BUG: program is nil: %s", ir.ProgramName)
 	}
-	if len(ignoreCache) == 0 || !ignoreCache[0] {
-		if inst := prog.Cache.GetInstruction(ir.GetIdInt64()); !utils.IsNil(inst) {
-			return inst, nil
-		}
-	}
-	if ir.ID == 0 {
-		log.Infof("ircode id is 0")
+	if ir == nil || ir.CodeID == 0 {
+		log.Infof("ircode is nil or id is 0")
 	}
 	lz := &LazyInstruction{
 		id:          ir.GetIdInt64(),

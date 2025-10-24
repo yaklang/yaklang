@@ -20,18 +20,20 @@ import (
 
 type ProgramCache struct {
 	program          *Program // mark which program handled
+	ProgramCacheKind ProgramCacheKind
 	DB               *gorm.DB
-	InstructionCache Cache[Instruction]
-	TypeCache        Cache[Type]
 
-	VariableIndex SimpleCache[Instruction]
-	MemberIndex   SimpleCache[Instruction]
-	ClassIndex    SimpleCache[Instruction]
-	ConstCache    SimpleCache[Instruction]
+	InstructionCache *Cache[Instruction]
+	TypeCache        *Cache[Type]
 
-	indexCache  SimpleCache[*ssadb.IrIndex]
-	offsetCache SimpleCache[*ssadb.IrOffset]
-	editorCache SimpleCache[*ssadb.IrSource]
+	VariableIndex *SimpleCache[Instruction]
+	MemberIndex   *SimpleCache[Instruction]
+	ClassIndex    *SimpleCache[Instruction]
+	ConstCache    *SimpleCache[Instruction]
+
+	indexCache  *SimpleCache[*ssadb.IrIndex]
+	offsetCache *SimpleCache[*ssadb.IrOffset]
+	editorCache *SimpleCache[*ssadb.IrSource]
 
 	afterSaveNotify func(int)
 
@@ -46,7 +48,8 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
-		program: prog,
+		program:          prog,
+		ProgramCacheKind: databaseKind,
 		// set ttl
 		cacheCtxCancel: cancel,
 		waitGroup:      &sync.WaitGroup{},
@@ -65,17 +68,13 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		cacheCtx, databaseKind,
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
-		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.afterSaveNotify(1)
-		},
-		func(count int) {
-			cache.afterSaveNotify(count)
+		func(size int) {
+			cache.afterSaveNotify(size)
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseKind,
-		cache.DB, prog,
-		programName, fetchSize, saveSize,
+		cacheCtx, cache.DB,
+		programName, saveSize,
 	)
 	return cache
 }
@@ -110,7 +109,17 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 	if ret, ok := c.InstructionCache.Get(id); ok {
 		return ret
 	}
+
+	if c.ProgramCacheKind == ProgramCacheDBRead {
+		if inst, err := NewLazyInstruction(c.program, id); err == nil {
+			c.InstructionCache.Set(inst)
+			return inst
+		} else {
+			log.Debugf("LazyInstruction Create faild: %v", err)
+		}
+	}
 	return nil
+
 }
 
 // =============================================== Variable =======================================================
@@ -177,13 +186,12 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
-	wg := sync.WaitGroup{}
 	f1 := func() {
-		c.InstructionCache.Close(&wg)
+		c.InstructionCache.Close()
 		log.Infof("Instruction cache closed")
 	}
 	f2 := func() {
-		c.TypeCache.Close(&wg)
+		c.TypeCache.Close()
 		log.Infof("Type Cache closed")
 	}
 	f3 := func() {
@@ -206,9 +214,6 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		c.indexCache.Close()
 	}
 	f9 := func() {
-		log.Info("wait for type and instruction save...")
-		wg.Wait()
-		log.Info("wait for type and instruction save done")
 		c.cacheCtxCancel()
 	}
 	ProfileAdd(true, "ssa.ProgramCache.SaveToDatabase",

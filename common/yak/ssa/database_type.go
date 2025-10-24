@@ -10,23 +10,29 @@ import (
 func saveTypeWithValue(value Value, typ Type) {
 	// i know is ugle, just is, and i will fix this after remove init value in ssa/next.go
 	if utils.IsNil(value) {
+		log.Debugf("value is nil ")
 		return
 	}
 	prog := value.GetProgram()
 	if utils.IsNil(prog) {
+		log.Debug("no program")
 		return
 	}
 	application := prog.GetApplication()
 	if utils.IsNil(application) {
+		log.Debug("no application ")
 		return
 	}
 
-	if cache := application.Cache; cache != nil && cache.HaveDatabaseBackend() {
-		saveType(cache, typ)
+	if cache := application.Cache; cache != nil {
+		cache.TypeCache.Set(typ)
+		saveType(typ)
+	} else {
+		log.Debug("cache is nil ")
 	}
 }
 
-func saveType(cache *ProgramCache, typ Type) int64 {
+func saveType(typ Type) int64 {
 	if utils.IsNil(typ) {
 		return -1
 	}
@@ -34,7 +40,7 @@ func saveType(cache *ProgramCache, typ Type) int64 {
 		// log.Errorf("saveType: type %v already has id %d", typ, id)
 		return id
 	}
-	cache.TypeCache.Set(typ)
+	// cache.TypeCache.Set(typ)
 	return typ.GetId()
 }
 
@@ -98,6 +104,7 @@ func type2IrType(typ Type, ir *ssadb.IrType) {
 	if err != nil {
 		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
 	}
+	ir.TypeId = uint64(typ.GetId())
 	ir.Kind = int(kind)
 	ir.ExtraInformation = utils.UnsafeBytesToString(extra)
 	ir.String = str
@@ -108,7 +115,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		return nil
 	}
 
-	irType := ssadb.GetIrTypeById(cache.DB, id)
+	irType := ssadb.GetIrTypeById(cache.DB, cache.program.GetProgramName(), id)
 	if utils.IsNil(irType) {
 		log.Errorf("GetTypeFromDB: failed type is nil: id: %v", id)
 		return nil

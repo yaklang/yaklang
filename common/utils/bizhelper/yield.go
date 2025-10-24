@@ -15,6 +15,7 @@ type YieldModelConfig struct {
 	IndexField    string
 	CountCallback func(int)
 	Limit         int
+	Fast          bool
 }
 
 func NewYieldModelConfig() *YieldModelConfig {
@@ -29,6 +30,16 @@ type YieldModelOpts func(*YieldModelConfig)
 func WithYieldModel_IndexField(selectField string) YieldModelOpts {
 	return func(c *YieldModelConfig) {
 		c.IndexField = selectField
+	}
+}
+
+func WithYieldModel_Fast(fast ...bool) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		if len(fast) > 0 {
+			c.Fast = fast[0]
+		} else {
+			c.Fast = true
+		}
 	}
 }
 
@@ -51,7 +62,6 @@ func WithYieldModel_Limit(l int) YieldModelOpts {
 }
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
-
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
@@ -60,6 +70,14 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 		opt(cfg)
 	}
 
+	if cfg.Fast {
+		return FastPagination[T](ctx, db, cfg)
+	} else {
+		return normalPagination[T](cfg, ctx, db)
+	}
+}
+
+func normalPagination[T any](cfg *YieldModelConfig, ctx context.Context, db *gorm.DB) chan T {
 	outC := make(chan T)
 	total := 0
 	go func() {
