@@ -526,7 +526,7 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 	} else {
 		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
 	}
-	action, err := ExtractActionFormStream(m.config.GetContext(), r, "timeline-shrink")
+	action, err := ExtractValidActionFormStream(m.config.GetContext(), r, "timeline-shrink")
 	if err != nil {
 		log.Errorf("extract timeline action failed: %v", err)
 		return
