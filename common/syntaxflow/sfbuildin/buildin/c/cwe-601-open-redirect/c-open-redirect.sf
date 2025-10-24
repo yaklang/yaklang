@@ -292,6 +292,7 @@ $sink #{
 
 alert $low for {
 	level: "low",
+	risk: "url-redirect",
 	type: "vuln",
 	title: "C Open Redirect Vulnerability Was Detected",
 	title_zh: "检测到C语言开放重定向漏洞",

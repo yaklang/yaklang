@@ -125,6 +125,7 @@ CODE
 
 alert $high for {
 	solution: <<<SOLUTION
+	risk: "sqli",
 ### 修复建议
 #### 1. 使用 Reform 提供的参数化查询方法
 Reform 框架提供了安全的参数化查询方法，如 `FindBy` 或 `FindOne`. 避免手动拼接 SQL 语句。

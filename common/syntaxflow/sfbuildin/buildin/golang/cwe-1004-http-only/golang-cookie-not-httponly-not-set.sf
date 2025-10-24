@@ -97,6 +97,7 @@ $cookie - $safe as $high
 
 alert $high for {
 	solution: <<<SOLUTION
+	risk: "xss",
 ### 修复建议
 
 #### 1. 为敏感Cookie设置HttpOnly标志

@@ -167,6 +167,7 @@ $error_info?{* #{ until: `* & $output_sink`}-> } as $medium
 $db_error?{* #{ until: `* & $output_sink`}-> } as $medium
 alert $medium for {
 	level: "medium",
+	risk: "info-exposure",
 	type: "vuln",
 	title: "C Information Exposure Vulnerability Was Detected",
 	title_zh: "检测到C语言信息泄露漏洞",

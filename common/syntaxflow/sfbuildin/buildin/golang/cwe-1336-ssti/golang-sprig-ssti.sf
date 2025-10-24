@@ -109,6 +109,7 @@ $param?{<fullTypeName>?{have: 'sprig'}} as $low;
 
 alert $low for {
 	solution: <<<SOLUTION
+	risk: "ssti",
 ### 修复建议
 #### 1. 避免直接使用用户输入作为模板内容
 通过避免直接将未经验证的用户输入传递给模板引擎，可以有效防止SSTI漏洞。

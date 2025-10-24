@@ -116,6 +116,7 @@ $sink & $input as $high;
 
 alert $high for {
 	type: "vuln",
+	risk: "rce",
 	title: "Golang Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang命令注入漏洞",
 	solution: <<<SOLUTION

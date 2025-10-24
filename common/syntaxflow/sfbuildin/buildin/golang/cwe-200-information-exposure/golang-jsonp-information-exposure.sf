@@ -93,6 +93,7 @@ $obj #{
 
 alert $low for {
 	level: "low",
+	risk: "info-exposure",
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",

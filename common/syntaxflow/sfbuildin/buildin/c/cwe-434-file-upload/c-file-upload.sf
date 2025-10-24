@@ -423,6 +423,7 @@ $file_ops?{* #{ until: `* & $user_input`}-> } as $mid
 
 alert $mid for {
 	level: "mid",
+	risk: "file-upload",
 	type: "vuln",
 	title: "C File Upload Vulnerability Was Detected",
 	title_zh: "检测到C语言文件上传漏洞",
@@ -560,7 +561,7 @@ DESC
 3. 对文件名进行安全过滤
 4. 实施适当的访问控制
 SOLUTION
-	risk: "文件操作",
+	risk: "file-upload",
 	name: "medium",
 }
 

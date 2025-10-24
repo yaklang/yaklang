@@ -130,7 +130,7 @@ SOLUTION
    - 可能被用于跳转到恶意网站。
 DESC
 	name: "high",
-	risk: "HTTP头注入",
+	risk: "xss",
 }
 
 desc(

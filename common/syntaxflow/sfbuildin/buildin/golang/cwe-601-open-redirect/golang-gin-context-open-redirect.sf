@@ -88,6 +88,7 @@ alert $high for {
 	title: "Golang Open Redirect Vulnerability Was Detected",
 	title_zh: "检测到Golang开放重定向漏洞",
 	level: "high",
+	risk: "url-redirect",
 	type: "vuln",
 	desc: <<<DESC
 ### 漏洞描述

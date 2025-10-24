@@ -103,7 +103,7 @@ DESC
 3. **使用现代语言特性**
    考虑使用更安全的编程语言如Rust，内置内存安全机制。
 SOLUTION
-	risk: "缓冲区溢出",
+	risk: "buffer-overflow",
 	name: "mid",
 }
 
@@ -142,7 +142,7 @@ DESC
 3. **增加边界检查**
    在拷贝前后添加边界检查逻辑以确保安全。
 SOLUTION
-	risk: "缓冲区溢出",
+	risk: "buffer-overflow",
 	name: "low",
 }
 

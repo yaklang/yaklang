@@ -72,6 +72,7 @@ $user_input & $unsafe_str as $high;
 
 alert $high for {
 	level: "high",
+	risk: "buffer-overflow",
 	type: "vuln",
 	title: "C Buffer Overflow Vulnerability Was Detected",
 	title_zh: "检测到C语言缓冲区溢出漏洞",

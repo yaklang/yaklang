@@ -94,6 +94,7 @@ $param.FormValue as $high;
 
 alert $high for {
 	title: "Golang SQL Injection Vulnerability Was Detected",
+	risk: "sqli",
 	title_zh: "检测到Golang SQL注入漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

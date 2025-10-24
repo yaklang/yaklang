@@ -120,6 +120,7 @@ $data & $input as $low;
 
 alert $low for {
 	solution: <<<SOLUTION
+	risk: "file-upload",
 ### 修复建议
 #### 1. 严格验证文件名和路径
 使用 `filepath.Base()` 获取文件名，丢弃路径信息，然后将其安全地拼接到目标上传目录中。同时，验证生成的最终路径是否仍然在预期的上传目录下，防止路径穿越。

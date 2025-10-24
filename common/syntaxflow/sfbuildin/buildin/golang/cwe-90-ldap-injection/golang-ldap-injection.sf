@@ -177,7 +177,7 @@ alert $high for {
    escapedUsername := escapeLDAPFilterForBuilder(username)
    ```
 SOLUTION
-	risk: "LDAP注入",
+	risk: "ldap",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
