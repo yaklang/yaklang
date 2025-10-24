@@ -30,12 +30,12 @@ func TestMUSTPASS_Exports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	embedding := NewDefaultMockEmbedding()
 	collectionName := utils.RandStringBytes(10)
-	store, err := NewSQLiteVectorStoreHNSW(collectionName, "test", "text-embedding-3-small", 1024, nil, testDB)
+	store, err := NewSQLiteVectorStoreHNSW(collectionName, "test", "text-embedding-3-small", 1024, embedding, testDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	embedding := NewDefaultMockEmbedding()
 	ragSystem := NewRAGSystem(embedding, store)
 	for i := 0; i < 100; i++ {
 		// 使用包含词典词汇的文本，确保生成非零向量
@@ -132,13 +132,13 @@ func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 
 	// 创建测试集合
 	collectionName := utils.RandStringBytes(10)
-	store, err := NewSQLiteVectorStoreHNSW(collectionName, "test description", "text-embedding-3-small", 1024, nil, testDB)
+	embedding := NewDefaultMockEmbedding()
+	store, err := NewSQLiteVectorStoreHNSW(collectionName, "test description", "text-embedding-3-small", 1024, embedding, testDB)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// 创建RAG系统并添加测试数据
-	embedding := NewDefaultMockEmbedding()
 	ragSystem := NewRAGSystem(embedding, store)
 
 	testDocuments := []struct {
