@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -80,14 +79,15 @@ func (c *Client) send(url string, body interface{}) (*Response, error) {
 		return nil, utils.Errorf("larkrobot send error: json.Marshal error: %v", err)
 	}
 
-	// 添加调试日志
-	log.Debugf("larkrobot sending body: %s", string(bodyBytes))
+	// 调试日志（临时）
+	log.Infof("larkrobot sending body: %s", string(bodyBytes))
 
 	req := lowhttp.BasicRequest()
 	req = lowhttp.SetHTTPPacketUrl(req, url)
 	req = lowhttp.ReplaceHTTPPacketMethod(req, "POST")
 	req = lowhttp.ReplaceHTTPPacketHeader(req, "Accept", "application/json")
-	req = lowhttp.ReplaceHTTPPacketHeader(req, "Content-Type", "application/json")
+	req = lowhttp.ReplaceHTTPPacketHeader(req, "Content-Type", "application/json; charset=utf-8")
+	req = lowhttp.ReplaceHTTPPacketHeader(req, "User-Agent", "yaklang-larkrobot/1.0")
 	req = lowhttp.ReplaceHTTPPacketBody(req, bodyBytes, false)
 	resp, err := lowhttp.HTTP(lowhttp.WithRequest(req))
 	if err != nil {
@@ -99,6 +99,7 @@ func (c *Client) send(url string, body interface{}) (*Response, error) {
 	}
 
 	respBodyBytes := lowhttp.GetHTTPPacketBody(resp.RawPacket)
+	log.Infof("larkrobot response: %s", string(respBodyBytes))
 	var result Response
 	err = json.Unmarshal(respBodyBytes, &result)
 	if err != nil {
