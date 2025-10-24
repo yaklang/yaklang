@@ -3,8 +3,6 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"io"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -39,12 +37,12 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
 			action, err := aicommon.ExtractActionFormStream(
-				r.GetCurrentTask().GetContext(),
+				ctx,
 				stream, "object",
-				aicommon.WithSupperActionOnce(nonceStr),
-				aicommon.WithSupperActionTagToKey("FINAL_ANSWER", "answer_payload"),
-				aicommon.WithSupperActionAlias("directly_answer"),
-				aicommon.WithSupperActionFieldStreamHandler(
+				aicommon.WithActionOnce(nonceStr),
+				aicommon.WithActionTagToKey("FINAL_ANSWER", "answer_payload"),
+				aicommon.WithActionAlias("directly_answer"),
+				aicommon.WithActionFieldStreamHandler(
 					[]string{"answer_payload"},
 					func(key string, reader io.Reader) {
 						var out bytes.Buffer

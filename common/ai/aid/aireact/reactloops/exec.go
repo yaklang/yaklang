@@ -10,16 +10,12 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
-	var aiTagStreamMirror []func(io.Reader)
+func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicommon.ActionMakerOption {
 	var emitter = r.GetEmitter()
-	var mirrorStart = time.Now()
-
 	tagFields := r.aiTagFields.Copy()
 	for _, i := range r.GetAllActions() {
 		for _, field := range i.AITagStreamFields {
@@ -27,36 +23,20 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 		}
 	}
 
+	var actionOptions []aicommon.ActionMakerOption
+	actionOptions = append(actionOptions, aicommon.WithActionOnce(nonce))
+
 	for _, _tagInstance := range tagFields.Values() {
 		v := _tagInstance
-		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
-			log.Debugf("[ai-tag] mirror[%s] started, time since mirror start: %v", v.TagName, time.Since(mirrorStart))
 
-			pReader := utils.NewPeekableReader(reader)
-			parseStart := time.Now()
-			pReader.Peek(1)
-			log.Debugf("[ai-tag] mirror peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
-			log.Debugf("starting aitag.Parse for tag[%s]", v.TagName)
-			defer func() {
-				cost := time.Since(parseStart)
-				log.Debugf("finished aitag.Parse for tag[%s], total cost: %v", v.TagName, cost)
-				if cost.Milliseconds() <= 300 {
-					log.Debugf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
-				} else {
-					log.Debugf("AI Response Mirror[%s] stream cost %v, stream maybe valid", v.TagName, cost)
-				}
-				streamWg.Done()
-			}()
-			tagErr := aitag.Parse(utils.UTF8Reader(pReader), aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
-				streamWg.Add(1)
-
+		actionOptions = append(actionOptions,
+			aicommon.WithActionTagToKey(v.TagName, v.VariableName),
+			aicommon.WithActionFieldStreamHandler([]string{v.VariableName}, func(key string, fieldReader io.Reader) {
 				nodeId := v.AINodeId
 				if nodeId == "" {
 					nodeId = "re-act-loop-answer-payload"
 				}
-
 				callbackStart := time.Now()
-				log.Debugf("tag[%s] callback started, parse started %v ago", v.TagName, callbackStart.Sub(parseStart))
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
 				emitter.EmitStreamEvent(
@@ -66,7 +46,7 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 					taskIndex,
 					func() {
 						// Use parseStart instead of callbackStart to measure the whole streaming process
-						totalCost := time.Since(parseStart)
+						totalCost := time.Since(callbackStart)
 						contentLength := len(result.String())
 						log.Debugf("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
 							v.TagName, contentLength, totalCost)
@@ -78,22 +58,12 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 							log.Infof("AITag[%s] stream processing completed normally, cost %v for %d chars",
 								v.TagName, totalCost, contentLength)
 						}
-
-						defer streamWg.Done()
-						code := result.String()
-						if code == "" {
-							return
-						}
-						r.Set(v.VariableName, code)
 					},
 				)
-			}))
-			if tagErr != nil {
-				log.Errorf("Failed to emit tag event for[%v]: %v", v.TagName, tagErr)
-			}
-		})
+			}),
+		)
 	}
-	return aiTagStreamMirror
+	return actionOptions
 }
 
 func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {
@@ -159,30 +129,12 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if ctxCanceled.IsSet() {
 				return nil
 			}
-			rawStream := resp.GetOutputStreamReader(
+			stream := resp.GetOutputStreamReader(
 				r.loopName,
 				true,
 				r.config.GetEmitter(),
 			)
-
-			var stream io.Reader
-			aiTagStreamMirror := r.createAITagStreamMirrors(resp.GetTaskIndex(), nonce, streamWg)
-			if len(aiTagStreamMirror) > 0 {
-				streamWg.Add(len(aiTagStreamMirror))
-				log.Debugf("creating %d aitag stream mirrors, will mirror the stream", len(aiTagStreamMirror))
-				pr, pw := utils.NewPipe()
-				go func() {
-					defer func() {
-						pw.Close()
-					}()
-					rawReader := utils.CreateUTF8StreamMirror(rawStream, aiTagStreamMirror...)
-					io.Copy(pw, rawReader)
-				}()
-				stream = pr
-			} else {
-				stream = rawStream
-			}
-
+			tagOptions := r.buildActionTagOption(resp.GetTaskIndex(), nonce)
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
@@ -191,13 +143,8 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				}
 			}
 			var actionErr error
-
-			action, actionErr = aicommon.ExtractActionFormStream(
-				r.currentTask.GetContext(),
-				stream,
-				"object",
-				aicommon.WithSupperActionAlias(actionNames...),
-				aicommon.WithSupperActionFieldStreamHandler(
+			options := append(tagOptions, aicommon.WithActionAlias(actionNames...),
+				aicommon.WithActionFieldStreamHandler(
 					streamFields.Keys(),
 					func(key string, reader io.Reader) {
 						streamWg.Add(1)
@@ -236,8 +183,14 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							resp.GetTaskIndex(),
 							func() { done() },
 						)
-					},
-				),
+					}),
+			)
+
+			action, actionErr = aicommon.ExtractActionFormStream(
+				r.currentTask.GetContext(),
+				stream,
+				"object",
+				options...,
 			)
 
 			if actionErr != nil {
