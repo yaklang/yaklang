@@ -69,12 +69,7 @@ func (c *Config) wrapWithPreprocessedCFS(fs fi.FileSystem) (fi.FileSystem, error
 	}
 
 	c.Processf(0, "wrapping filesystem with C preprocessor support")
-	preprocessedFS, err := filesys.NewPreprocessedCFs(fs)
-	if err != nil {
-		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
-		return fs, nil
-	}
-	return preprocessedFS, nil
+	return filesys.NewUnifiedFS(fs, filesys.WithUnifiedFsCPreprocessor(true)), nil
 }
 
 func getZipFile(codeSource *ssaconfig.Config) (*filesys.ZipFS, error) {

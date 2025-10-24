@@ -41,8 +41,8 @@ int main() {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
 
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
+		cf := filesys.NewUnifiedFS(vf, filesys.WithUnifiedFsCPreprocessor(true))
+		defer cf.Cleanup()
 
 		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaapi.C))
 		require.Nil(t, err)
@@ -89,8 +89,8 @@ int main() {
 		vf.AddFile("src/config.h", headerCode)
 		vf.AddFile("src/main.c", mainCode)
 
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
+		cf := filesys.NewUnifiedFS(vf, filesys.WithUnifiedFsCPreprocessor(true))
+		defer cf.Cleanup()
 
 		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaapi.C))
 		require.Nil(t, err)

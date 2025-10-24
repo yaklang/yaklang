@@ -31,8 +31,8 @@ func (c *Config) parseProjectWithFS(
 	}
 	filesystem = wrappedFS
 
-	if preprocessedFS, ok := filesystem.(*filesys.PreprocessedCFS); ok {
-		defer preprocessedFS.Cleanup()
+	if unifiedFS, ok := filesystem.(*filesys.UnifiedFS); ok {
+		defer unifiedFS.Cleanup()
 	}
 
 	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
