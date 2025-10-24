@@ -43,7 +43,7 @@ func (text *TextMessage) ToMessageMap() map[string]interface{} {
 	textMsg := map[string]interface{}{}
 	textMsg["text"] = text.Text + isAtAll
 	msg := map[string]interface{}{}
-	msg["msg_type"] = TextMsg
+	msg["msg_type"] = string(TextMsg) // 确保转换为字符串
 	msg["content"] = textMsg
 	return msg
 }
@@ -77,7 +77,7 @@ func (post *PostMessage) ToMessageMap() map[string]interface{} {
 		"post": langMsg,
 	}
 	msg := map[string]interface{}{}
-	msg["msg_type"] = PostMsg
+	msg["msg_type"] = string(PostMsg) // 确保转换为字符串
 	msg["content"] = postMsg
 	return msg
 }
@@ -100,7 +100,7 @@ func (image *ImageMessage) ToMessageMap() map[string]interface{} {
 		"image_key": image.ImageKey,
 	}
 	msg := map[string]interface{}{}
-	msg["msg_type"] = ImageMsg
+	msg["msg_type"] = string(ImageMsg) // 确保转换为字符串
 	msg["content"] = imgMsg
 	return msg
 }
@@ -184,7 +184,7 @@ func (message *InteractiveMessage) ToMessageMap() map[string]interface{} {
 		interactiveMsg["i18n_elements"] = message.i18nElements.ToMap()
 	}
 	return map[string]interface{}{
-		"msg_type": InteractiveMsg,
+		"msg_type": string(InteractiveMsg), // 确保转换为字符串
 		"card":     interactiveMsg,
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -78,6 +79,9 @@ func (c *Client) send(url string, body interface{}) (*Response, error) {
 	if err != nil {
 		return nil, utils.Errorf("larkrobot send error: json.Marshal error: %v", err)
 	}
+
+	// 添加调试日志
+	log.Debugf("larkrobot sending body: %s", string(bodyBytes))
 
 	req := lowhttp.BasicRequest()
 	req = lowhttp.SetHTTPPacketUrl(req, url)

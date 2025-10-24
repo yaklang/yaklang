@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/dingrobot"
 	"github.com/yaklang/yaklang/common/utils/larkrobot"
@@ -31,7 +32,9 @@ func (c *Config) SendText(text string, items ...interface{}) {
 			log.Error("lark failed")
 			return
 		}
-		rsp, err := c._larkCache.SendMessageStr(finalText)
+		// 使用 TextMessage 而不是 SendMessageStr
+		textMsg := larkrobot.NewTextMessage(finalText, false)
+		rsp, err := c._larkCache.SendMessage(textMsg)
 		if err != nil {
 			log.Errorf("lark send message failed: %s", err)
 			return
@@ -100,14 +103,18 @@ func (c *Config) SendMarkdown(text string) {
 			log.Error("lark failed")
 			return
 		}
-		m := larkrobot.NewCardMarkdown(finalText)
-		rsp, err := c._larkCache.SendMessage(m)
+		// 使用 PostMessage 发送富文本
+		postTags := larkrobot.NewPostTags(&larkrobot.TextTag{Text: finalText, UnEscape: false})
+		postItems := larkrobot.NewPostItems("通知", postTags)
+		langItem := larkrobot.NewLangPostItem("zh_cn", postItems)
+		postMsg := larkrobot.NewPostMessage(langItem)
+		rsp, err := c._larkCache.SendMessage(postMsg)
 		if err != nil {
-			log.Error("lark send message failed: %s", err)
+			log.Errorf("lark send message failed: %s", err)
 			return
 		}
 		if !rsp.IsSuccess() {
-			log.Error("lark bot[%v]: %v", rsp.Code, rsp.Msg)
+			log.Errorf("lark bot[%v]: %v", rsp.Code, rsp.Msg)
 		}
 	case BotType_WorkWechat:
 		if c._wxCache == nil {
