@@ -104,7 +104,7 @@ $param & $input as $high;
 
 alert $high for {
 	level: "high",
-	risk: "sqli",
+	risk: "SQL注入",
 	type: "vuln",
 	title: "Golang SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang SQL注入漏洞",
@@ -141,7 +141,6 @@ if err != nil {
 db, err := sql.Open("mysql", "limited_user:password@tcp(127.0.0.1:3306)/database")
 ```
 SOLUTION
-	risk: "SQL注入",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

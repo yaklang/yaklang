@@ -106,7 +106,7 @@ $alloc - $safe as $low
 
 alert $low for {
 	level: "low",
-	risk: "memory-leak",
+	risk: "内存泄漏",
 	type: "vuln",
 	title: "C Memory Leak Vulnerability Was Detected",
 	title_zh: "检测到C语言内存泄漏漏洞",
@@ -184,7 +184,6 @@ std::unique_ptr<char[]> safe_function(const char *input) {
 #### 3. 使用静态分析工具定期检查内存泄漏
 建议使用Valgrind、AddressSanitizer等工具定期检查应用程序中的内存泄漏问题。
 SOLUTION
-	risk: "内存泄漏",
 	name: "low",
 }
 

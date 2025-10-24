@@ -72,7 +72,7 @@ $user_input & $unsafe_str as $high;
 
 alert $high for {
 	level: "high",
-	risk: "buffer-overflow",
+	risk: "缓冲区溢出",
 	type: "vuln",
 	title: "C Buffer Overflow Vulnerability Was Detected",
 	title_zh: "检测到C语言缓冲区溢出漏洞",
@@ -127,7 +127,6 @@ if (strlen(input) >= sizeof(buffer)) {
 gcc -fstack-protector-all -pie -fPIE -D_FORTIFY_SOURCE=2 -O2 program.c
 ```
 SOLUTION
-	risk: "缓冲区溢出",
 	name: "high",
 }
 

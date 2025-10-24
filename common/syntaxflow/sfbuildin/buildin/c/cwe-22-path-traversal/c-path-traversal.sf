@@ -81,7 +81,7 @@ $file_path & $user_input as $low
 
 alert $low for {
 	level: "low",
-	risk: "path-traversal",
+	risk: "路径遍历",
 	type: "vuln",
 	title: "C Path Traversal Vulnerability Was Detected",
 	title_zh: "检测到C语言路径遍历漏洞",
@@ -134,7 +134,6 @@ if (!strspn(filename, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234
 }
 ```
 SOLUTION
-	risk: "路径遍历",
 	name: "low",
 }
 

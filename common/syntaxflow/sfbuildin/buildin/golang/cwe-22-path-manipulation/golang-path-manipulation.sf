@@ -77,7 +77,7 @@ alert $low for {
 	title: "Golang Path Manipulation Vulnerability Was Detected",
 	title_zh: "检测到Golang路径操纵漏洞",
 	level: "low",
-	risk: "path-traversal",
+	risk: "路径操纵",
 	message: "检测到Golang路径操纵漏洞，但路径已包含过滤机制，通常无需处理",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -137,7 +137,6 @@ fp, err := os.Open(filePath) // 直接使用用户提供的路径
 - 服务器配置被篡改
 DESC
 	name: "low",
-	risk: "路径操纵",
 }
 
 desc(

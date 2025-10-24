@@ -423,7 +423,7 @@ $file_ops?{* #{ until: `* & $user_input`}-> } as $mid
 
 alert $mid for {
 	level: "mid",
-	risk: "file-upload",
+	risk: "文件上传",
 	type: "vuln",
 	title: "C File Upload Vulnerability Was Detected",
 	title_zh: "检测到C语言文件上传漏洞",
@@ -540,7 +540,6 @@ int is_safe_filepath(const char *filepath) {
 }
 ```
 SOLUTION
-	risk: "文件上传",
 	name: "mid",
 }
 
