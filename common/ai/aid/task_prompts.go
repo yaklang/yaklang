@@ -191,7 +191,9 @@ func (t *AiTask) DeepThink(suggestion string) error {
 	err = t.callAiTransaction(
 		prompt, t.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			action, err := aicommon.ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, t.GetEmitter()), "plan", "require-user-interact")
+			action, err := aicommon.ExtractActionFormStream(
+				t.ctx,
+				rsp.GetOutputStreamReader("plan", false, t.GetEmitter()), "plan", aicommon.WithSupperActionAlias("require-user-interact"))
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}

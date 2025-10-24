@@ -52,6 +52,7 @@ type FieldStreamHandler struct {
 	pattern    string         // 匹配模式：可以是字段名、正则表达式或glob模式
 	fieldNames []string       // 多字段匹配时使用
 
+	startCallback func(key string, parents []string)
 	// 统一的回调函数
 	handler func(key string, reader io.Reader, parents []string) // 回调函数，包含字段名和父路径
 }
@@ -63,10 +64,11 @@ type callbackManager struct {
 	onArrayCallback             func(data []any)
 	onObjectCallback            func(data map[string]any)
 	onConditionalObjectCallback []*ConditionalCallback
-	fieldStreamHandlers         []*FieldStreamHandler
+
+	fieldStreamHandlers []*FieldStreamHandler
 
 	rawKVCallback    func(key, data any)
-	formatKVCallback func(key, value any)
+	formatKVCallback func(key, value any, parents []string)
 
 	// 字段流处理相关
 	activeFieldStreams map[string]io.WriteCloser // 当前活跃的字段流 写入器
@@ -87,7 +89,7 @@ func WithRawKeyValueCallback(callback func(key, data any)) CallbackOption {
 	}
 }
 
-func WithFormatKeyValueCallback(callback func(key, data any)) CallbackOption {
+func WithFormatKeyValueCallback(callback func(key, data any, parents []string)) CallbackOption {
 	return func(c *callbackManager) {
 		c.formatKVCallback = callback
 	}
@@ -179,15 +181,29 @@ func WithRegisterGlobFieldStreamHandler(pattern string, handler func(key string,
 	}
 }
 
+func WithRegisterFieldStreamHandlerAndStartCallback(fieldName string, handler func(key string, reader io.Reader, parents []string), callback func(key string, parents []string)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.fieldStreamHandlers == nil {
+			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
+		}
+		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
+			matchType:     FieldMatchExact,
+			pattern:       fieldName,
+			handler:       handler,
+			startCallback: callback,
+		})
+	}
+}
+
 // handleFieldStreamStart 开始字段流处理
 func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) []io.WriteCloser {
 	// 清理字段名中的引号和空格
 	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
 
 	// 从stack获取父路径
-	var parents []string
+	var prefix []string
 	if bufManager != nil {
-		parents = bufManager.getParentPath()
+		prefix = bufManager.getPrefixKey()
 	}
 
 	// 初始化活跃字段流 map
@@ -203,7 +219,7 @@ func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *b
 			if c.isFieldMatch(cleanFieldName, handler) {
 				// 如果已经有这个字段的流在运行，就不再创建新的
 				if _, exists := c.activeFieldStreams[cleanFieldName]; !exists {
-					writer := c.createFieldStream(cleanFieldName, handler, parents)
+					writer := c.createFieldStream(cleanFieldName, handler, prefix)
 					if writer != nil {
 						writers = append(writers, writer)
 					}
@@ -272,6 +288,11 @@ func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStre
 
 	// 保存写入器，用于后续写入数据
 	c.activeFieldStreams[fieldName] = writer
+
+	if handler.startCallback != nil {
+		// 调用开始回调函数 用于强同步
+		handler.startCallback(fieldName, parents)
+	}
 
 	// 在新的 goroutine 中调用处理函数
 	go func(h *FieldStreamHandler, r io.Reader, key string, parentPath []string) {
@@ -399,8 +420,8 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		})
 	}
 
-	bufManager := newBufStackManager(func(key any, val any) {
-		callbackManager.kv(key, val)
+	bufManager := newBufStackManager(func(key any, val any, parents []string) {
+		callbackManager.kv(key, val, parents)
 	})
 	bufManager.setCallbackManager(callbackManager)
 

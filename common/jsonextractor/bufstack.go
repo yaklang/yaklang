@@ -30,15 +30,17 @@ type bufStackManager struct {
 	callbackManager *callbackManager
 }
 
-func newBufStackManager(kv func(key any, val any)) *bufStackManager {
+func newBufStackManager(kv func(key any, val any, parents []string)) *bufStackManager {
 	manager := &bufStackManager{
-		base: &bufStack{
-			isRoot:       true,
-			kv:           kv,
-			currentStack: vmstack.New(),
-			recorders:    []*bufStackKv{},
-		},
 		stack: vmstack.New(),
+	}
+	manager.base = &bufStack{
+		isRoot: true,
+		kv: func(key any, val any) {
+			kv(key, val, manager.getParentPath())
+		},
+		currentStack: vmstack.New(),
+		recorders:    []*bufStackKv{},
 	}
 	manager.stack.Push(manager.base)
 	return manager
@@ -105,7 +107,13 @@ func (m *bufStackManager) getParentPath() []string {
 		current = current.parent
 	}
 
-	// 还需要检查当前正在处理的键
+	return parents
+}
+
+func (m *bufStackManager) getPrefixKey() []string { // get parent path and current path prefix key
+	prefix := m.getParentPath()
+
+	// 需要检查当前正在处理的键
 	if m.base != nil && m.base.currentStack != nil {
 		// 获取stack中的所有键，除了最后一个（当前正在处理的值）
 		size := m.base.currentStack.Len()
@@ -114,13 +122,13 @@ func (m *bufStackManager) getParentPath() []string {
 				if keyStr, ok := key.(string); ok {
 					// 清理键名中的引号和空格
 					cleanKey := strings.Trim(strings.TrimSpace(keyStr), `"`)
-					parents = append(parents, cleanKey)
+					prefix = append(prefix, cleanKey)
 				}
 			}
 		}
 	}
 
-	return parents
+	return prefix
 }
 
 func (m *bufStackManager) PushValue(v string) {

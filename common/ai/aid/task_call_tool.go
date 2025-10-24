@@ -3,10 +3,9 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
+	"io"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
