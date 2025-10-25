@@ -2,6 +2,7 @@ package cvequeryops
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
@@ -24,15 +25,34 @@ func DownloadCWE() (string, error) {
 		return "", err
 	}
 	defer fp.Close()
+
+	// 使用流式处理下载 CWE zip 文件，避免大文件占用内存
+	var downloadErr error
 	// https://cwe.mitre.org/data/xml/cwec_latest.xml.zip
-	rsp, _, err := poc.DoGET(`https://cwe.mitre.org/data/xml/cwec_latest.xml.zip`)
+	_, _, err = poc.DoGET(`https://cwe.mitre.org/data/xml/cwec_latest.xml.zip`,
+		poc.WithSave(false),        // 禁用 HTTP 流保存到数据库
+		poc.WithNoBodyBuffer(true), // 禁用响应体缓冲
+		poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
+			defer bodyReader.Close()
+
+			// 流式复制到临时文件
+			_, copyErr := io.Copy(fp, bodyReader)
+			if copyErr != nil {
+				downloadErr = copyErr
+				log.Errorf("copy cwe data failed: %v", copyErr)
+			}
+		}))
+
 	if err != nil {
 		log.Errorf("download mitre cwe failed: %s", err)
 		return "", err
 	}
-	if _, err := fp.Write(rsp.GetBody()); err != nil {
-		return "", err
+
+	if downloadErr != nil {
+		log.Errorf("save mitre cwe failed: %s", downloadErr)
+		return "", downloadErr
 	}
+
 	return fp.Name(), nil
 }
 
