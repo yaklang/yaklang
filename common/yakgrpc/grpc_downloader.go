@@ -64,6 +64,7 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 		lowhttp.WithPacketBytes([]byte(headRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
+		lowhttp.WithSaveHTTPFlow(false), // 禁用 HTTP 流保存
 	}
 
 	// 如果提供了代理，添加代理配置
@@ -149,6 +150,8 @@ func (s *Server) DownloadWithStream(proxy string, fileGetter func() (urlStr stri
 		lowhttp.WithPacketBytes([]byte(getRequest)),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithContext(ctx),
+		lowhttp.WithSaveHTTPFlow(false), // 禁用 HTTP 流保存到数据库，避免大文件占用内存
+		lowhttp.WithNoBodyBuffer(true),  // 禁用响应体缓冲，避免大文件占用内存
 	}
 	if proxy != "" {
 		opts = append(opts, lowhttp.WithProxy(proxy))

@@ -1,7 +1,6 @@
 package cvequeryops
 
 import (
-	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -129,29 +128,55 @@ func DownLoad(dir string, cached bool) error {
 			}
 		}
 		log.Infof("start to download from: %v", url)
-		resp, _, err := poc.DoGET(url, poc.WithRetryTimes(3))
+
+		// 使用流式处理，避免将大文件读入内存
+		var downloadErr error
+		_, _, err := poc.DoGET(url,
+			poc.WithRetryTimes(3),
+			poc.WithSave(false),        // 禁用 HTTP 流保存到数据库
+			poc.WithNoBodyBuffer(true), // 禁用响应体缓冲
+			poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
+				defer bodyReader.Close()
+
+				log.Infof("start to un-gzip from: %v", url)
+				rawData, err := gzip.NewReader(bodyReader)
+				if err != nil {
+					downloadErr = utils.Errorf("gzip decompress failed: %v", err)
+					log.Error(downloadErr)
+					return
+				}
+				defer rawData.Close()
+
+				log.Infof("start to save to local file: %v", fileName)
+				dstFile, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o666)
+				if err != nil {
+					downloadErr = utils.Errorf("open %v failed: %v", fileName, err)
+					log.Error(downloadErr)
+					return
+				}
+				defer dstFile.Close()
+
+				_, err = io.Copy(dstFile, rawData)
+				if err != nil {
+					downloadErr = utils.Errorf("copy data failed: %v", err)
+					log.Error(downloadErr)
+					return
+				}
+
+				log.Infof("handle %v finished", dstFile.Name())
+			}))
+
 		if err != nil {
-			log.Error(err)
+			log.Errorf("download %v failed: %v", url, err)
 			continue
 		}
 
-		log.Infof("start to un-gzip from: %v", url)
-		rawData, err := gzip.NewReader(bytes.NewReader(resp.GetBody()))
-		if err != nil {
-			log.Error(err)
+		if downloadErr != nil {
+			log.Errorf("process %v failed: %v", url, downloadErr)
+			// 清理可能产生的不完整文件
+			os.Remove(fileName)
 			continue
 		}
-		log.Infof("start to save to local file: %v", fileName)
-		dstFile, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0o666)
-		if err != nil {
-			return utils.Errorf("open %v failed; %v", fileName, err)
-		}
-		_, err = io.Copy(dstFile, rawData)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-		log.Infof("handle %v finished", dstFile.Name())
 	}
 	return nil
 }
