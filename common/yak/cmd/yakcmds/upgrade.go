@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"time"
 
@@ -49,11 +50,76 @@ var UpgradeCommand = cli.Command{
 			Usage: "Set retry times for yak binary download and sha256 check, default 3.",
 			Value: 3,
 		},
+		cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "Enable memory profiling during upgrade",
+		},
+		cli.IntFlag{
+			Name:  "pprof-interval",
+			Usage: "Memory profile interval in seconds (default 1)",
+			Value: 1,
+		},
 	},
 	Action: func(c *cli.Context) error {
+		// 启动内存监控
+		if c.Bool("pprof") {
+			interval := c.Int("pprof-interval")
+			if interval <= 0 {
+				interval = 1
+			}
+
+			pprofDir := filepath.Join(os.TempDir(), "yak-upgrade-pprof", time.Now().Format("20060102-150405"))
+			err := os.MkdirAll(pprofDir, 0o755)
+			if err != nil {
+				log.Warnf("create pprof dir failed: %v", err)
+			} else {
+				log.Infof("memory profiling enabled, saving to: %s", pprofDir)
+
+				// 启动内存监控
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				go func() {
+					counter := 0
+					ticker := time.NewTicker(time.Duration(interval) * time.Second)
+					defer ticker.Stop()
+
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+							counter++
+
+							// 获取内存统计
+							var m runtime.MemStats
+							runtime.ReadMemStats(&m)
+
+							// 保存 heap profile
+							heapFile := filepath.Join(pprofDir, fmt.Sprintf("heap_%03d.pprof", counter))
+							f, err := os.Create(heapFile)
+							if err == nil {
+								pprof.WriteHeapProfile(f)
+								f.Close()
+
+								// 打印内存使用情况
+								log.Infof("[PPROF %03d] Alloc=%dMB TotalAlloc=%dMB Sys=%dMB NumGC=%d Goroutines=%d",
+									counter,
+									m.Alloc/1024/1024,
+									m.TotalAlloc/1024/1024,
+									m.Sys/1024/1024,
+									m.NumGC,
+									runtime.NumGoroutine())
+							}
+						}
+					}
+				}()
+			}
+		}
+
 		const activeVersions = `https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt`
 		if c.Bool("list") {
-			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10))
+			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10), poc.WithSave(false))
 			if err != nil {
 				log.Errorf("fetch active versions failed: %v", err)
 				return err
@@ -82,7 +148,7 @@ var UpgradeCommand = cli.Command{
 
 		version := c.String("version")
 		if version == "" {
-			rsp, _, err := poc.DoGET(`https://aliyun-oss.yaklang.com/yak/latest/version.txt`, poc.WithTimeout(10))
+			rsp, _, err := poc.DoGET(`https://aliyun-oss.yaklang.com/yak/latest/version.txt`, poc.WithTimeout(10), poc.WithSave(false))
 			if err != nil {
 				log.Warnf("fetch latest yak version failed: %v", err)
 				return err
@@ -101,7 +167,7 @@ var UpgradeCommand = cli.Command{
 		}
 
 		downloadUrl := fetchUrl(version)
-		rsp, _, err := poc.DoHEAD(downloadUrl, poc.WithTimeout(10))
+		rsp, _, err := poc.DoHEAD(downloadUrl, poc.WithTimeout(10), poc.WithSave(false))
 		if err != nil {
 			log.Errorf("fetch yak binary failed: %v", err)
 			return err
@@ -109,7 +175,7 @@ var UpgradeCommand = cli.Command{
 		_ = rsp
 		if rsp.GetStatusCode() >= 400 {
 			log.Infof("fetch yak binary failed: %v", rsp.GetStatusCode())
-			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10))
+			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10), poc.WithSave(false))
 			if err != nil {
 				log.Errorf("fetch active versions failed: %v", err)
 				return err
@@ -137,7 +203,7 @@ var UpgradeCommand = cli.Command{
 			}
 			// 1. 下载sha256校验值
 			var expectedSha256 string
-			shaRsp, _, shaErr := poc.DoGET(sha256Url, poc.WithTimeout(10))
+			shaRsp, _, shaErr := poc.DoGET(sha256Url, poc.WithTimeout(10), poc.WithSave(false))
 			if shaErr != nil {
 				lastErr = utils.Errorf("fetch yak sha256 failed: %v", shaErr)
 				continue
@@ -157,10 +223,25 @@ var UpgradeCommand = cli.Command{
 				lastErr = utils.Errorf("create temp file failed: %v", err)
 				continue
 			}
+
+			// 创建 context 用于控制进度显示
 			ctx, cancel := context.WithCancel(context.Background())
-			_, _, err = poc.DoGET(downloadUrl, poc.WithTimeout((time.Duration(c.Int("timeout")) * time.Minute).Seconds()),
+
+			// 捕获下载过程中的错误
+			var downloadErr error
+
+			_, _, err = poc.DoGET(downloadUrl,
+				poc.WithTimeout((time.Duration(c.Int("timeout")) * time.Minute).Seconds()),
+				poc.WithSave(false),        // 禁用 HTTP 流保存到数据库
+				poc.WithNoBodyBuffer(true), // 禁用响应体缓冲，避免大文件占用内存
 				poc.WithBodyStreamReaderHandler(func(header []byte, bodyReader io.ReadCloser) {
-					defer cancel()
+					// 确保关闭 bodyReader
+					defer func() {
+						if bodyReader != nil {
+							bodyReader.Close()
+						}
+					}()
+
 					log.Infof("downloading yak binary...")
 					contentLength := lowhttp.GetHTTPPacketHeader(header, "content-length")
 					writer := progresswriter.New(uint64(codec.Atoi(contentLength)))
@@ -169,6 +250,7 @@ var UpgradeCommand = cli.Command{
 					// 使用带错误检查的io.Copy
 					written, copyErr := io.Copy(io.MultiWriter(fd, writer), bodyReader)
 					if copyErr != nil && copyErr != io.EOF {
+						downloadErr = copyErr
 						log.Errorf("download yak failed: %v", copyErr)
 						return
 					}
@@ -177,13 +259,25 @@ var UpgradeCommand = cli.Command{
 					if contentLength != "" {
 						expectedSize := codec.Atoi(contentLength)
 						if written != int64(expectedSize) {
+							downloadErr = utils.Errorf("download incomplete: expected %d bytes, got %d bytes", expectedSize, written)
 							log.Errorf("download incomplete: expected %d bytes, got %d bytes", expectedSize, written)
 							return
 						}
 					}
 				}))
+
+			// 确保取消 context，停止进度显示的 goroutine
+			cancel()
 			fd.Sync()
 			fd.Close()
+
+			// 检查下载错误
+			if downloadErr != nil {
+				os.Remove(newFilePath)
+				lastErr = utils.Errorf("download yak failed: %v", downloadErr)
+				continue
+			}
+
 			if err != nil {
 				os.Remove(newFilePath)
 				lastErr = utils.Errorf("download yak failed: %v", err)
@@ -205,6 +299,8 @@ var UpgradeCommand = cli.Command{
 			break
 		}
 		if lastErr != nil {
+			// 清理失败的临时文件
+			os.Remove(newFilePath)
 			return lastErr
 		}
 
