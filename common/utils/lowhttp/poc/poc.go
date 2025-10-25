@@ -91,6 +91,7 @@ type PocConfig struct {
 	DNSNoCache bool
 
 	BodyStreamHandler func([]byte, io.ReadCloser)
+	NoBodyBuffer      *bool // 禁用响应体缓冲，用于下载大文件避免内存占用
 
 	ClientHelloSpec *utls.ClientHelloSpec
 	RandomJA3       bool
@@ -209,6 +210,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.BodyStreamHandler != nil {
 		opts = append(opts, lowhttp.WithBodyStreamReaderHandler(c.BodyStreamHandler))
 	}
+	if c.NoBodyBuffer != nil {
+		opts = append(opts, lowhttp.WithNoBodyBuffer(*c.NoBodyBuffer))
+	}
 
 	if c.Username != nil {
 		opts = append(opts, lowhttp.WithUsername(*c.Username))
@@ -320,6 +324,25 @@ func WithRedirect(i func(current *http.Request, vias []*http.Request) bool) PocC
 func WithBodyStreamReaderHandler(i func(r []byte, closer io.ReadCloser)) PocConfigOption {
 	return func(c *PocConfig) {
 		c.BodyStreamHandler = i
+	}
+}
+
+// noBodyBuffer 是一个请求选项参数，用于指定是否禁用响应体缓冲，设置为 true 时可以避免大文件下载时的内存占用
+// 通常与 WithBodyStreamReaderHandler 配合使用，用于流式处理大文件
+// Example:
+// ```
+// poc.Get("https://example.com/large-file.zip",
+//
+//	poc.noBodyBuffer(true),
+//	poc.bodyStreamHandler(func(header, body) {
+//	    // 流式处理响应体，不会将整个文件读入内存
+//	    io.Copy(file, body)
+//	}))
+//
+// ```
+func WithNoBodyBuffer(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.NoBodyBuffer = &b
 	}
 }
 
@@ -2041,6 +2064,8 @@ var PoCExports = map[string]interface{}{
 	"dnsServer":            WithDNSServers,
 	"dnsNoCache":           WithDNSNoCache,
 	"noFixContentLength":   WithNoFixContentLength,
+	"noBodyBuffer":         WithNoBodyBuffer,
+	"bodyStreamHandler":    WithBodyStreamReaderHandler,
 	"session":              WithSession,
 	"save":                 WithSave,
 	"saveSync":             WithSaveSync,
