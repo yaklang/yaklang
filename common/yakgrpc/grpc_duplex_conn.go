@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
@@ -62,7 +63,9 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 					return
 				case <-rpsTicker.C:
 					if currentRPS := lowhttp.GetLowhttpRPS(); currentRPS != lastRPS {
-						log.Infof("current lowhttp rps:%d", currentRPS)
+						if currentRPS > 10 {
+							log.Infof("current lowhttp rps:%d", currentRPS)
+						}
 						yakit.BroadcastData(yakit.ServerPushType_RPS, currentRPS)
 						lastRPS = currentRPS
 					}
@@ -79,7 +82,9 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 					return
 				case <-cpsTicker.C:
 					if currentCPS := netx.GetDialxCPS(); currentCPS != lastCPS {
-						log.Infof("current dialx cps:%d", currentCPS)
+						if currentCPS > 10 {
+							log.Infof("current dialx cps:%d", currentCPS)
+						}
 						yakit.BroadcastData(yakit.ServerPushType_CPS, currentCPS)
 						lastCPS = currentCPS
 					}
