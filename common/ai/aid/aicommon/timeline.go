@@ -338,6 +338,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			m.config.GetContext(),
 			r, "timeline-reducer",
 			WithActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
+			WithActionNonce(nonceStr),
 			WithActionFieldStreamHandler(
 				[]string{"reducer_memory"},
 				func(key string, reader io.Reader) {
@@ -351,12 +352,11 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 		)
 		if err != nil {
 			log.Errorf("extract timeline batch compress action failed: %v", err)
-			return utils.Errorf("extract timeline context-shrink action failed: %v", err)
+			return utils.Errorf("extract timeline reducer_memory action failed: %v", err)
 		}
 		result := action.GetString("reducer_memory")
 		if result == "" && cumulativeSummary == "" {
-			log.Warnf("batch compress got empty reducer memory")
-			return utils.Error("context-shrink got empty reducer memory")
+			log.Warn("batch compress got empty reducer memory in json field")
 		}
 		return nil
 	})
@@ -372,7 +372,12 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 		compressedMemory += "\n" + cumulativeSummary
 	}
 	if compressedMemory == "" {
-		log.Warnf("batch compress got empty compressed memory")
+		log.Warn("================================================================")
+		log.Warn("================================================================")
+		log.Warn("batch compress got empty compressed memory, action dumpped: ")
+		fmt.Println(action.GetParams())
+		log.Warn("================================================================")
+		log.Warn("================================================================")
 		return
 	}
 

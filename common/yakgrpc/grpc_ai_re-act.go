@@ -70,6 +70,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 		aireact.WithPersistentSessionId(persistentSession),
+		aireact.WithEnableSelfReflection(true),
 	}
 	reActOptions = append(reActOptions, optsFromStartParams...)
 
