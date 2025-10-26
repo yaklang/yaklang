@@ -52,7 +52,7 @@ func TestSupperActionMaker_ReadFromReader(t *testing.T) {
 	maker := &ActionMaker{
 		actionName: "my_action",
 		tagToKey:   map[string]string{"FINAL_ANSWER": "answer"},
-		once:       "abc",
+		nonce:      "abc",
 	}
 	// JSON input with @action and some fields
 	input := `{
@@ -110,7 +110,7 @@ func TestSupperAction_Extractor(t *testing.T) {
 }
 `
 	ctx := context.Background()
-	action, err := ExtractActionFormStream(ctx, strings.NewReader(raw), "plan")
+	action, err := ExtractActionFromStream(ctx, strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	require.Equal(t, "plan", action.ActionType())
 	params := action.GetParams()
@@ -147,7 +147,7 @@ func TestSupperAction_WaitString(t *testing.T) {
 }
 `
 	ctx := context.Background()
-	action, err := ExtractActionFormStream(ctx, strings.NewReader(raw), "plan")
+	action, err := ExtractActionFromStream(ctx, strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	require.Equal(t, action.GetString("mytest"), token)
 }
@@ -156,7 +156,7 @@ func TestSupperAction_WaitString_MissingParam(t *testing.T) {
 	token := uuid.NewString()
 	raw := `{ "type": "object", "required": [ "@action", "main_task" ], "properties": { "@action": {"const": "plan"}, "main_task": {"type": "string"}, "mytest": "` + token + `" } }`
 	ctx := context.Background()
-	action, err := ExtractActionFormStream(ctx, strings.NewReader(raw), "plan")
+	action, err := ExtractActionFromStream(ctx, strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	require.Equal(t, action.GetString("mytest"), token)
 	require.Equal(t, action.GetString("not_exist"), "")
@@ -166,7 +166,7 @@ func TestSupperAction_WaitObject(t *testing.T) {
 	token := uuid.NewString()
 	raw := `{ "type": "object", "required": [ "@action", "main_task", "info" ], "properties": { "@action": {"const": "plan"}, "main_task": {"type": "string"}, "info": { "type": "object", "mytest": "` + token + `", "age": 18 } } }`
 	ctx := context.Background()
-	action, err := ExtractActionFormStream(ctx, strings.NewReader(raw), "plan")
+	action, err := ExtractActionFromStream(ctx, strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	info := action.GetInvokeParams("info")
 	require.NotNil(t, info)
@@ -177,7 +177,7 @@ func TestSupperAction_WaitObject(t *testing.T) {
 func TestSupperAction_WaitStringSlice(t *testing.T) {
 	raw := `{ "type": "object", "required": [ "@action", "items" ], "properties": { "@action": {"const": "plan"}, "items": ["a", "b", "c"] } }`
 	ctx := context.Background()
-	action, err := ExtractActionFormStream(ctx, strings.NewReader(raw), "plan")
+	action, err := ExtractActionFromStream(ctx, strings.NewReader(raw), "plan")
 	require.NoError(t, err)
 	items := action.GetStringSlice("items")
 	require.Len(t, items, 3)
@@ -204,7 +204,7 @@ func TestSupperAction_Get_WaitForParam(t *testing.T) {
 	}()
 
 	go func() {
-		action, err := ExtractActionFormStream(ctx, pr, "plan")
+		action, err := ExtractActionFromStream(ctx, pr, "plan")
 		require.NoError(t, err)
 		val := action.GetString("A.B")
 		require.Equal(t, val, uuidString)
@@ -239,7 +239,7 @@ func TestSupperAction_TagToKey(t *testing.T) {
 	ctx := context.Background()
 	maker := NewActionMaker("plan",
 		WithActionTagToKey(tagName, keyName),
-		WithActionOnce(once),
+		WithActionNonce(once),
 	)
 	action := maker.ReadFromReader(ctx, strings.NewReader(input))
 	require.Equal(t, action.GetString(keyName), tagData)
@@ -290,7 +290,7 @@ func TestSupperAction_TagToKeyStream(t *testing.T) {
 	ctx := context.Background()
 	maker := NewActionMaker("plan",
 		WithActionTagToKey(tagName, keyName),
-		WithActionOnce(once),
+		WithActionNonce(once),
 		WithActionFieldStreamHandler([]string{keyName}, func(key string, r io.Reader) {
 			// no-op, just to test stream handling
 			data, err := io.ReadAll(r)

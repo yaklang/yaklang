@@ -75,7 +75,7 @@ REDO:
 	}
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractActionFromStream(
 				r.config.GetContext(),
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
 				"require-tool", aicommon.WithActionAlias("abandon", "ask-for-clarification"))

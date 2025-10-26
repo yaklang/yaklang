@@ -36,10 +36,10 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractActionFromStream(
 				ctx,
 				stream, "object",
-				aicommon.WithActionOnce(nonceStr),
+				aicommon.WithActionNonce(nonceStr),
 				aicommon.WithActionTagToKey("FINAL_ANSWER", "answer_payload"),
 				aicommon.WithActionAlias("directly_answer"),
 				aicommon.WithActionFieldStreamHandler(

@@ -266,3 +266,16 @@ func WithMemorySizeLimit(sizeLimit int) ReActLoopOption {
 		}
 	}
 }
+
+// WithEnableSelfReflection 启用自我反思功能
+// 启用后，每次 action 执行后会根据策略进行自我反思分析
+// action 可以通过 operator.SetReflectionLevel() 自定义反思级别
+func WithEnableSelfReflection(enable ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(enable) > 0 {
+			r.enableSelfReflection = enable[0]
+		} else {
+			r.enableSelfReflection = true
+		}
+	}
+}

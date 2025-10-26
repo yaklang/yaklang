@@ -38,7 +38,7 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 				false,
 				r.Emitter,
 			)
-			action, err := aicommon.ExtractValidActionFormStream(
+			action, err := aicommon.ExtractValidActionFromStream(
 				r.config.GetContext(),
 				reader, "call-ai-blueprint",
 			)
