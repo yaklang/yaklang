@@ -228,6 +228,10 @@ func (c *ReActConfig) GetAllowUserInteraction() bool {
 	return c.enableUserInteract
 }
 
+func (c *ReActConfig) GetEnableSelfReflection() bool {
+	return c.enableSelfReflection
+}
+
 type Option func(*ReActConfig)
 
 func WithEnhanceKnowledgeManager(manager *aicommon.EnhanceKnowledgeManager) Option {
@@ -596,9 +600,8 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		reviewPolicy:  aicommon.AgreePolicyManual,
-		maxIterations: 100,
-		// memory:                      aid.GetDefaultMemory(), // Initialize with default memory
+		reviewPolicy:                aicommon.AgreePolicyManual,
+		maxIterations:               100,
 		language:                    "zh", // Default to Chinese
 		topToolsCount:               100,  //
 		inputConsumption:            new(int64),

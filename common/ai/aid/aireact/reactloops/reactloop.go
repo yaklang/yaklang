@@ -156,6 +156,10 @@ func (r *ReActLoop) GetMemoryTriage() aimem.MemoryTriage {
 	return r.memoryTriage
 }
 
+func (r *ReActLoop) GetEnableSelfReflection() bool {
+	return r.enableSelfReflection
+}
+
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
 	if utils.IsNil(invoker) {
 		return nil, utils.Error("invoker is nil in ReActLoop")

@@ -83,6 +83,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithMemoryPool(r.memoryPool),
 		reactloops.WithMemorySizeLimit(int(r.config.memoryPoolSize)),
+		reactloops.WithEnableSelfReflection(r.config.GetEnableSelfReflection()),
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(task)
 		}),
