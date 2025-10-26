@@ -2,6 +2,7 @@ package loop_default
 
 import (
 	_ "embed"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -28,6 +29,13 @@ func init() {
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG),
+			}
+
+			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
+			if config := r.GetConfig(); config != nil {
+				if reactConfig, ok := config.(interface{ GetEnableSelfReflection() bool }); ok {
+					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
+				}
 			}
 			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
