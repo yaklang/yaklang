@@ -159,6 +159,9 @@ type ReActConfig struct {
 
 	// hotpatch broadcaster for plan and execute
 	hotpatchBroadcaster *chanx.Broadcaster[aid.Option]
+
+	// Self-reflection for ReActLoop
+	enableSelfReflection bool
 }
 
 var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
@@ -319,6 +322,14 @@ func WithMaxIterations(max int) Option {
 		if max > 0 {
 			cfg.maxIterations = max
 		}
+	}
+}
+
+// WithEnableSelfReflection enables or disables self-reflection for ReActLoop
+func WithEnableSelfReflection(enable ...bool) Option {
+	return func(cfg *ReActConfig) {
+		enabled := len(enable) == 0 || enable[0]
+		cfg.enableSelfReflection = enabled
 	}
 }
 
