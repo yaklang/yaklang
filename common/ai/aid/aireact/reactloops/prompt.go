@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed loop_template.tpl
+//go:embed prompts/loop_template.tpl
 var coreTemplate string
 
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
