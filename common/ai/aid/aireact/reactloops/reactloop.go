@@ -73,6 +73,9 @@ type ReActLoop struct {
 
 	// 启动这个 loop 的时候马上要执行的事情
 	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error
+
+	// 自我反思功能开关
+	enableSelfReflection bool
 }
 
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {

@@ -191,7 +191,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 	err = t.callAiTransaction(
 		prompt, t.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			action, err := aicommon.ExtractValidActionFormStream(
+			action, err := aicommon.ExtractValidActionFromStream(
 				t.ctx,
 				rsp.GetOutputStreamReader("plan", false, t.GetEmitter()), "plan", aicommon.WithActionAlias("require-user-interact"))
 			if err != nil {

@@ -24,7 +24,7 @@ func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicom
 	}
 
 	var actionOptions []aicommon.ActionMakerOption
-	actionOptions = append(actionOptions, aicommon.WithActionOnce(nonce))
+	actionOptions = append(actionOptions, aicommon.WithActionNonce(nonce))
 
 	for _, _tagInstance := range tagFields.Values() {
 		v := _tagInstance
@@ -191,7 +191,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 					}),
 			)
 
-			action, actionErr = aicommon.ExtractActionFormStream(
+			action, actionErr = aicommon.ExtractActionFromStream(
 				r.currentTask.GetContext(),
 				stream,
 				"object",
@@ -464,15 +464,30 @@ LOOP:
 			return utils.Errorf("task context done in executing ReActLoop(before ActionHandler): %v", task.GetContext().Err())
 		default:
 		}
+
+		// 记录 action 执行开始时间
+		actionStartTime := time.Now()
+
 		handler.ActionHandler(
 			r,
 			actionParams,
 			operator,
 		)
+
+		// 计算 action 执行时间
+		actionExecutionDuration := time.Since(actionStartTime)
+
 		select {
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())
 		default:
+		}
+
+		// 执行自我反思（如果启用）
+		reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
+		if reflectionLevel != ReflectionLevel_None {
+			log.Infof("trigger self-reflection for action[%s] with level[%s]", actionName, reflectionLevel.String())
+			r.executeReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
 		}
 
 		// 检查 operator 状态

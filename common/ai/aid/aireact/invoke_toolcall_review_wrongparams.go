@@ -35,7 +35,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 		prompt,
 		r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractActionFromStream(
 				r.config.GetContext(),
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
 				"call-tool",
