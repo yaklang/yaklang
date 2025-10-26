@@ -63,7 +63,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 					return
 				case <-rpsTicker.C:
 					if currentRPS := lowhttp.GetLowhttpRPS(); currentRPS != lastRPS {
-						if currentRPS > 10 {
+						if currentRPS > 30 {
 							log.Infof("current lowhttp rps:%d", currentRPS)
 						}
 						yakit.BroadcastData(yakit.ServerPushType_RPS, currentRPS)
@@ -82,7 +82,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 					return
 				case <-cpsTicker.C:
 					if currentCPS := netx.GetDialxCPS(); currentCPS != lastCPS {
-						if currentCPS > 10 {
+						if currentCPS > 20 {
 							log.Infof("current dialx cps:%d", currentCPS)
 						}
 						yakit.BroadcastData(yakit.ServerPushType_CPS, currentCPS)
