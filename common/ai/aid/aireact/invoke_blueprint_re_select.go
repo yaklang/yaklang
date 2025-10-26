@@ -44,7 +44,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 				false,
 				r.Emitter,
 			)
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractActionFromStream(
 				r.config.ctx, reader,
 				"change-ai-blueprint",
 				aicommon.WithActionFieldStreamHandler(
@@ -106,7 +106,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("call-new-forge", false, r.Emitter)
-			action, err := aicommon.ExtractActionFormStream(
+			action, err := aicommon.ExtractActionFromStream(
 				r.config.ctx,
 				stream, "call-ai-blueprint",
 			)

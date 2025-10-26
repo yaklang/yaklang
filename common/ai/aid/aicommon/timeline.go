@@ -334,7 +334,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
 		}
 
-		action, err = ExtractActionFormStream(
+		action, err = ExtractActionFromStream(
 			m.config.GetContext(),
 			r, "timeline-reducer",
 			WithActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
@@ -529,7 +529,7 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
 		ctx = m.config.GetContext()
 	}
-	action, err := ExtractValidActionFormStream(ctx, r, "timeline-shrink")
+	action, err := ExtractValidActionFromStream(ctx, r, "timeline-shrink")
 	if err != nil {
 		log.Errorf("extract timeline action failed: %v", err)
 		return

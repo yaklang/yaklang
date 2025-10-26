@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bufpipe"
-	"io"
-	"strings"
-	"sync"
-	"time"
 )
 
 var ActionMagicKey = "@action"
@@ -171,7 +172,7 @@ type ActionMaker struct {
 	jsonCallback     []jsonextractor.CallbackOption
 	onReaderFinished []func()
 	tagToKey         map[string]string // tag to param name mapping
-	once             string
+	nonce            string
 
 	fieldStreamHandler []*FieldStreamItem
 }
@@ -212,9 +213,9 @@ func WithActionTagToKey(tagName string, key string) ActionMakerOption {
 	}
 }
 
-func WithActionOnce(once string) ActionMakerOption {
+func WithActionNonce(nonce string) ActionMakerOption {
 	return func(maker *ActionMaker) {
-		maker.once = once
+		maker.nonce = nonce
 	}
 }
 
@@ -310,7 +311,7 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}()
 			err := aitag.Parse(
 				utils.UTF8Reader(pReader),
-				aitag.WithCallback(tagName, m.once, func(rd io.Reader) {
+				aitag.WithCallback(tagName, m.nonce, func(rd io.Reader) {
 					var out bytes.Buffer
 					writer := mirrorPipe(fieldName) // if the fieldName which this tag maps to has field stream handler, create pipe writer
 					if writer != nil {
@@ -458,13 +459,13 @@ func NewActionMaker(actionName string, opts ...ActionMakerOption) *ActionMaker {
 	return maker
 }
 
-func ExtractActionFormStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
+func ExtractActionFromStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
 	maker := NewActionMaker(actionName, opts...)
 	action := maker.ReadFromReader(ctx, reader)
 	return action, nil
 }
 
-func ExtractValidActionFormStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
+func ExtractValidActionFromStream(ctx context.Context, reader io.Reader, actionName string, opts ...ActionMakerOption) (*Action, error) {
 	maker := NewActionMaker(actionName, opts...)
 	action := maker.ReadFromReader(ctx, reader)
 	action.WaitParse(ctx)
@@ -477,7 +478,7 @@ func ExtractValidActionFormStream(ctx context.Context, reader io.Reader, actionN
 
 // ExtractAction 从字符串中提取指定的 Action 对象，支持别名，这里隐含一个强校验行为，即会等待处理完毕之后检查是否有可用的Action
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
-	action, err := ExtractActionFormStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
+	action, err := ExtractActionFromStream(context.Background(), strings.NewReader(i), actionName, WithActionAlias(alias...))
 	if err != nil {
 		return nil, err
 	}
