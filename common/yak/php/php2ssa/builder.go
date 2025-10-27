@@ -19,19 +19,19 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type SSABuild struct {
+type SSABuilder struct {
 	*ssa.PreHandlerBase
 }
 
-var Builder ssa.Builder = &SSABuild{}
+var Builder ssa.Builder = &SSABuilder{}
 
-func (*SSABuild) FilterPreHandlerFile(path string) bool {
+func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"
 }
 
 func CreateBuilder() ssa.Builder {
-	builder := &SSABuild{
+	builder := &SSABuilder{
 		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
 	builder.WithLanguageConfigOpts(
@@ -69,7 +69,7 @@ func initHandler(fb *ssa.FunctionBuilder) {
 	}
 }
 
-func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -100,26 +100,26 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST,
 	return nil
 }
 
-func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuild) GetAntlrCache() *ssa.AntlrCache {
+func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	return s.CreateAntlrCache(phpparser.GetPHPLexerSerializedATN(), phpparser.GetPHPParserSerializedATN())
 }
 
-func (s *SSABuild) FilterParseAST(path string) bool {
+func (s *SSABuilder) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php"
 }
 
-func (s *SSABuild) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
+func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
 	return Frontend(src, cache)
 }
 
 // func (s *ssa.BasicBlock) BuildFromAst()
 
-func (s *SSABuild) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	ast, ok := raw.(phpparser.IHtmlDocumentContext)
 	if !ok {
 		return utils.Errorf("invalid AST type: %T, expected phpparser.IHtmlDocumentContext", raw)
@@ -172,13 +172,17 @@ func (s *SSABuild) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+	return fs
+}
+
 // FilterFile 这里可能还会有问题 比如配置文件
-func (*SSABuild) FilterFile(path string) bool {
+func (*SSABuilder) FilterFile(path string) bool {
 	ext := filepath.Ext(path)
 	return ext == ".php"
 }
 
-func (*SSABuild) GetLanguage() consts.Language {
+func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.PHP
 }
 

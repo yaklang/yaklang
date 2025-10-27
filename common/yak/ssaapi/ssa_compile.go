@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
+
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 const (
@@ -165,4 +167,11 @@ func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	}
 	c.LanguageBuilder = languageBuilder
 	return nil
+}
+
+func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
+	if c.LanguageBuilder != nil {
+		return c.LanguageBuilder.WrapWithPreprocessedFS(fs)
+	}
+	return c.fs
 }
