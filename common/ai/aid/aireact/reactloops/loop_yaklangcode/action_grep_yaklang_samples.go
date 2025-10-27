@@ -3,14 +3,218 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
+
+// compressGrepResults 压缩和优化grep搜索结果
+func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
+	if len(resultStr) == 0 {
+		return resultStr
+	}
+
+	resultEditor := memedit.NewMemEditor(resultStr)
+	dNonce := utils.RandStringBytes(4)
+
+	materials, err := utils.RenderTemplate(`
+<|QUERY_{{ .nonce }}|>
+搜索模式: {{ .query }}
+<|QUERY_END_{{ .nonce }}|>
+
+<|GREP_RESULT_{{ .nonce }}|>
+{{ .samples }}
+<|GREP_RESULT_END_{{ .nonce }}|>
+
+<|INSTRUCT_{{ .nonce }}|>
+【智能代码片段提取与排序】
+
+请从上述搜索结果中提取最有价值的代码片段，按重要性排序：
+
+【提取要求】
+1. 最多提取 8-10 个代码片段
+2. 每个片段 3-15 行，确保上下文完整
+3. 按重要性从高到低排序（rank: 1最重要，数字越大越不重要）
+
+【重要性评判标准】（按优先级排序）
+🔥 最高优先级 (rank 1-3)：
+- 完整的函数调用示例 + 错误处理
+- 包含关键参数配置的典型用法
+- 展示核心API调用模式的代码
+
+⭐ 高优先级 (rank 4-6)：
+- 包含重要配置或选项的示例
+- 展示常见使用场景的代码
+- 有详细注释说明的关键代码
+
+📝 中等优先级 (rank 7-10)：
+- 辅助功能或工具函数调用
+- 简单的变量赋值或初始化
+- 补充性的代码片段
+
+【输出格式】
+返回JSON数组，每个元素包含：
+{
+  "range": "start-end", 
+  "rank": 数字(1-10),
+  "reason": "选择理由"
+}
+
+【严格要求】
+- 总行数控制在80行以内
+- 避免重复或相似的代码片段
+- 优先选择能独立理解的完整代码块
+- 确保每个片段都有实际参考价值
+
+请按重要性排序输出ranges数组。
+<|INSTRUCT_END_{{ .nonce }}|>`, map[string]any{
+		"nonce":   dNonce,
+		"samples": utils.PrefixLinesWithLineNumbers(resultStr),
+		"query":   pattern,
+	})
+
+	if err != nil {
+		log.Errorf("compressGrepResults: template render failed: %v", err)
+		return resultStr
+	}
+
+	log.Infof("compressGrepResults: invoking lite forge for pattern: %s", pattern)
+	forgeResult, err := invoker.InvokeLiteForge(
+		op.GetTask().GetContext(),
+		"extract-ranked-lines",
+		materials, []aitool.ToolOption{
+			aitool.WithStructArrayParam(
+				"ranges",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Description("按重要性排序的代码片段范围数组"),
+				},
+				nil,
+				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end")),
+				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
+				aitool.WithStringParam("reason", aitool.WithParam_Description("选择此片段的理由")),
+			),
+		})
+
+	if err != nil {
+		log.Errorf("compressGrepResults: forge failed: %v", err)
+		return resultStr
+	}
+
+	if forgeResult == nil {
+		log.Warnf("compressGrepResults: forge result is nil")
+		return resultStr
+	}
+
+	log.Infof("compressGrepResults: forge result received")
+	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+
+	if len(rangeItems) == 0 {
+		log.Warnf("compressGrepResults: no ranges extracted")
+		return resultStr
+	}
+
+	// 提取并排序代码片段
+	type RankedRange struct {
+		Range  string
+		Rank   int
+		Reason string
+		Text   string
+	}
+
+	var rankedRanges []RankedRange
+	totalLines := 0
+
+	for _, item := range rangeItems {
+		rangeStr := item.GetString("range")
+		rank := item.GetInt("rank")
+		reason := item.GetString("reason")
+
+		if rangeStr == "" {
+			continue
+		}
+
+		// 解析行范围
+		parts := strings.Split(rangeStr, "-")
+		if len(parts) != 2 {
+			log.Warnf("compressGrepResults: invalid range format: %s", rangeStr)
+			continue
+		}
+
+		startLine, err1 := strconv.Atoi(parts[0])
+		endLine, err2 := strconv.Atoi(parts[1])
+
+		if err1 != nil || err2 != nil {
+			log.Errorf("compressGrepResults: parse range failed: %s, errors: %v, %v", rangeStr, err1, err2)
+			continue
+		}
+
+		if startLine <= 0 || endLine < startLine {
+			log.Warnf("compressGrepResults: invalid range values: %s (start=%d, end=%d)", rangeStr, startLine, endLine)
+			continue
+		}
+
+		// 提取文本
+		text := resultEditor.GetTextFromPositionInt(startLine, 1, endLine, 1)
+		if text == "" {
+			log.Warnf("compressGrepResults: empty text for range: %s", rangeStr)
+			continue
+		}
+
+		lineCount := strings.Count(text, "\n") + 1
+		if totalLines+lineCount > 100 {
+			log.Warnf("compressGrepResults: would exceed 100 lines limit, stopping at range: %s", rangeStr)
+			break
+		}
+
+		rankedRanges = append(rankedRanges, RankedRange{
+			Range:  rangeStr,
+			Rank:   int(rank),
+			Reason: reason,
+			Text:   text,
+		})
+
+		totalLines += lineCount
+	}
+
+	if len(rankedRanges) == 0 {
+		log.Warnf("compressGrepResults: no valid ranges extracted")
+		return resultStr
+	}
+
+	// 构建优化后的结果
+	var result strings.Builder
+	result.WriteString("【AI智能提取】按重要性排序的代码片段：\n\n")
+
+	for i, item := range rankedRanges {
+		result.WriteString(fmt.Sprintf("=== [%d] 重要性排序: %d | 范围: %s ===\n", i+1, item.Rank, item.Range))
+		if item.Reason != "" {
+			result.WriteString(fmt.Sprintf("选择理由: %s\n", item.Reason))
+		}
+		result.WriteString(item.Text)
+		result.WriteString("\n\n")
+	}
+
+	finalResult := result.String()
+
+	// 手动截断超过100行的内容
+	lines := strings.Split(finalResult, "\n")
+	if len(lines) > 100 {
+		log.Warnf("compressGrepResults: result has %d lines, truncating to 100", len(lines))
+		finalResult = strings.Join(lines[:100], "\n") + "\n\n[... 内容已截断，共提取了前100行最重要的代码片段 ...]"
+	}
+
+	log.Infof("compressGrepResults: compressed from %d chars to %d chars, %d ranges",
+		len(resultStr), len(finalResult), len(rankedRanges))
+
+	return finalResult
+}
 
 var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
@@ -46,42 +250,34 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 记住：Yaklang 是 DSL！每个 API 都可能与 Python/Go 不同！
 先 grep 找样例，再写代码，节省 90% 调试时间！`,
 		[]aitool.ToolOption{
-			aitool.WithStructParam(
-				"grep_payload",
-				[]aitool.PropertyOption{
-					aitool.WithParam_Description("USE THIS FIELD for grep_yaklang_samples action. Provide search parameters to grep Yaklang code samples."),
-				},
-				aitool.WithStringParam(
-					"pattern",
-					aitool.WithParam_Required(true),
-					aitool.WithParam_Description(`搜索模式（必需）- 支持多种格式：
+			aitool.WithStringParam(
+				"pattern",
+				aitool.WithParam_Required(true),
+				aitool.WithParam_Description(`搜索模式（必需）- 支持多种格式：
 1. 关键词：如 "端口扫描", "HTTP请求", "错误处理"
 2. 精确函数名：如 "servicescan.Scan", "str.Split"
 3. 正则表达式：如 "servicescan\\.", "poc\\.HTTP.*", "die\\(err\\)"
 4. 组合搜索：如 "servicescan\\.Scan|端口扫描"
 
 注意：正则中的 . 需要转义为 \\.`),
-				),
-				aitool.WithBoolParam(
-					"case_sensitive",
-					aitool.WithParam_Description("是否区分大小写（默认 false - 不区分，推荐）"),
-				),
-				aitool.WithIntegerParam(
-					"context_lines",
-					aitool.WithParam_Description(`上下文行数（默认 15）- 控制返回结果的上下文范围：
+			),
+			aitool.WithBoolParam(
+				"case_sensitive",
+				aitool.WithParam_Description("是否区分大小写（默认 false - 不区分，推荐）"),
+			),
+			aitool.WithIntegerParam(
+				"context_lines",
+				aitool.WithParam_Description(`上下文行数（默认 15）- 控制返回结果的上下文范围：
 • 5-10: 快速查看函数调用
 • 15-20: 理解函数用法（默认，推荐）
 • 25-35: 学习完整实现
 • 40-50: 研究复杂功能`),
-				),
 			),
 		},
 		[]*reactloops.LoopStreamField{},
 		// Validator
 		func(r *reactloops.ReActLoop, action *aicommon.Action) error {
-			payloads := action.GetInvokeParams("grep_payload")
-
-			pattern := payloads.GetString("pattern")
+			pattern := action.GetString("pattern")
 			if pattern == "" {
 				return utils.Error("grep_yaklang_samples requires 'pattern' parameter in 'grep_payload'")
 			}
@@ -90,11 +286,9 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			payloads := action.GetInvokeParams("grep_payload")
-
-			pattern := payloads.GetString("pattern")
-			caseSensitive := payloads.GetBool("case_sensitive")
-			contextLines := payloads.GetInt("context_lines")
+			pattern := action.GetString("pattern")
+			caseSensitive := action.GetBool("case_sensitive")
+			contextLines := action.GetInt("context_lines")
 
 			// 设置默认值
 			if contextLines == 0 {
@@ -137,9 +331,12 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			// 记录当前查询
 			loop.Set("last_grep_query", currentQuery)
 
+			emitter := loop.GetEmitter()
+
 			// 显示搜索参数
 			searchInfo := fmt.Sprintf("Grep pattern: %s, case_sensitive: %v, context: %d lines",
 				pattern, caseSensitive, contextLines)
+			emitter.EmitThought(op.GetTask().GetId(), searchInfo)
 			loop.GetEmitter().EmitTextPlainTextStreamEvent(
 				"grep_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
@@ -287,6 +484,18 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 
 			// 将搜索结果添加到Timeline
 			resultStr := resultBuffer.String()
+
+			// 尝试压缩和优化搜索结果
+			if len(results) > 5 {
+				log.Infof("grep_yaklang_samples: attempting to compress %d results", len(results))
+				compressedResult := compressGrepResults(resultStr, pattern, invoker, op)
+				if len(compressedResult) < len(resultStr) {
+					resultStr = compressedResult
+					log.Infof("grep_yaklang_samples: successfully compressed results")
+				}
+			}
+
+			emitter.EmitThought("grep_samples_result", "Search Result:\n"+resultStr)
 			invoker.AddToTimeline("grep_search_results", fmt.Sprintf("Found %d matches for pattern: %s\n%s", len(results), pattern, resultStr))
 
 			// 根据结果数量生成不同的建议，添加到Timeline
