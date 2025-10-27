@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -55,6 +56,10 @@ func (*SSABuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	}
 	astBuilder.build(ast)
 	return nil
+}
+
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+	return fs
 }
 
 func (*SSABuilder) FilterFile(path string) bool {

@@ -7,7 +7,6 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -63,19 +62,20 @@ func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	return baseFS, nil
 }
 
-func (c *Config) wrapWithPreprocessedCFS(fs fi.FileSystem) (fi.FileSystem, error) {
-	if c.language != consts.C {
-		return fs, nil
-	}
+// 已弃用
+// func (c *Config) wrapWithPreprocessedCFS(fs fi.FileSystem) (fi.FileSystem, error) {
+// 	if c.language != consts.C {
+// 		return fs, nil
+// 	}
 
-	c.Processf(0, "wrapping filesystem with C preprocessor support")
-	preprocessedFS, err := filesys.NewPreprocessedCFs(fs)
-	if err != nil {
-		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
-		return fs, nil
-	}
-	return preprocessedFS, nil
-}
+// 	c.Processf(0, "wrapping filesystem with C preprocessor support")
+// 	preprocessedFS, err := filesys.NewPreprocessedCFs(fs)
+// 	if err != nil {
+// 		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
+// 		return fs, nil
+// 	}
+// 	return preprocessedFS, nil
+// }
 
 func getZipFile(codeSource *ssaconfig.Config) (*filesys.ZipFS, error) {
 	// use local
