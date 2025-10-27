@@ -16,12 +16,18 @@ import (
 )
 
 func SyncEmbedRule(force ...bool) {
-	sync := false
+	isForce := false
 	if len(force) > 0 {
-		sync = force[0]
+		isForce = force[0]
 	}
 	log.Infof("================= check builtin rule sync ================")
-	if sync {
+	if isForce {
+		// 强制同步：用于命令行 sync-rule，忽略哈希检查
+		sfbuildin.ForceSyncEmbedRule(func(process float64, ruleName string) {
+			log.Infof("force sync embed rule: %s, process: %f", ruleName, process)
+		})
+	} else {
+		// 自动同步：用于应用启动，检查哈希
 		sfbuildin.SyncEmbedRule(func(process float64, ruleName string) {
 			log.Infof("sync embed rule: %s, process: %f", ruleName, process)
 		})

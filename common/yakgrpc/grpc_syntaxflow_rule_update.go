@@ -32,7 +32,8 @@ func (s *Server) ApplySyntaxFlowRuleUpdate(req *ypb.ApplySyntaxFlowRuleUpdateReq
 		})
 	}
 	sfdb.DeleteBuildInRule()
-	err := sfbuildin.SyncEmbedRule(notify)
+	// 前端手动更新按钮 → 使用强制同步
+	err := sfbuildin.ForceSyncEmbedRule(notify)
 	if err != nil {
 		return err
 	}
