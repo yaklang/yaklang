@@ -89,6 +89,7 @@ type EntityRepository struct {
 	info      *schema.EntityRepository
 	ragSystem *rag.RAGSystem
 
+	wg            sync.WaitGroup
 	bulkProcessor *bulkProcessor
 	runtimeConfig *EntityRepositoryRuntimeConfig
 }
@@ -727,7 +728,9 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	if err != nil {
 		return err
 	}
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		goroutineStartTime := time.Now()
 		defer func() {
 			goroutineDuration := time.Since(goroutineStartTime)
@@ -759,6 +762,10 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 		}
 	}()
 	return nil
+}
+
+func (r *EntityRepository) Wait() {
+	r.wg.Wait()
 }
 
 //--- Relationship Operations ---
@@ -855,7 +862,9 @@ func (r *EntityRepository) AddRelationship(sourceIndex, targetIndex string, rela
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
 	}
+	r.wg.Add(1)
 	go func() {
+		defer r.wg.Done()
 		err = r.addRelationshipToVectorIndex(data)
 		if err != nil {
 			log.Warnf("failed to add relation [%s] to vector index: %v", relationType, err)
