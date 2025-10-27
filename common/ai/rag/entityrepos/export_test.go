@@ -5,17 +5,86 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func createTempTestDatabase() (*gorm.DB, error) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	if err != nil {
+		return nil, err
+	}
+	db.AutoMigrate(
+		&schema.VectorStoreCollection{},
+		&schema.VectorStoreDocument{},
+		&schema.ERModelEntity{},
+		&schema.ERModelRelationship{},
+		&schema.EntityRepository{},
+	)
+	return db, nil
+}
+
+func TestGetOrCreateEntityRepository(t *testing.T) {
+	db, err := createTempTestDatabase()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockEmbedding := rag.NewDefaultMockEmbedding()
+
+	// 创建测试实体仓库
+	reposName := "test_export_import_" + utils.RandStringBytes(8)
+	repos, err := GetOrCreateEntityRepository(db, reposName, "测试导出导入功能", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
+	if err != nil {
+		t.Fatalf("create entity repository failed: %v", err)
+	}
+	defer DeleteEntityRepository(db, reposName)
+
+	// 添加测试实体
+	entity1 := &schema.ERModelEntity{
+		EntityName:        "测试实体1",
+		Description:       "这是第一个测试实体",
+		EntityType:        "Person",
+		EntityTypeVerbose: "人物",
+		Attributes: map[string]any{
+			"age":  30,
+			"city": "北京",
+		},
+	}
+	if err := repos.CreateEntity(entity1); err != nil {
+		t.Fatalf("create entity1 failed: %v", err)
+	}
+	repos.Wait()
+	entity2 := &schema.ERModelEntity{
+		EntityName:        "测试实体2",
+		Description:       "这是第二个测试实体",
+		EntityType:        "Company",
+		EntityTypeVerbose: "公司",
+		Attributes: map[string]any{
+			"industry": "科技",
+			"founded":  2020,
+		},
+	}
+	if err := repos.CreateEntity(entity2); err != nil {
+		t.Fatalf("create entity2 failed: %v", err)
+	}
+	repos.Wait()
+	// 添加测试关系
+	if err := repos.AddRelationship(entity1.Uuid, entity2.Uuid, "WORKS_AT", "在...工作", map[string]any{
+		"since": "2021",
+	}); err != nil {
+		t.Fatalf("add relationship failed: %v", err)
+	}
+	repos.Wait()
+}
+
 func TestExportImportEntityRepository(t *testing.T) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		t.Fatal("database is nil")
+	db, err := createTempTestDatabase()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	mockEmbedding := rag.NewDefaultMockEmbedding()
@@ -43,6 +112,7 @@ func TestExportImportEntityRepository(t *testing.T) {
 	if err := repos.CreateEntity(entity1); err != nil {
 		t.Fatalf("create entity1 failed: %v", err)
 	}
+	repos.Wait()
 
 	entity2 := &schema.ERModelEntity{
 		EntityName:        "测试实体2",
@@ -57,14 +127,14 @@ func TestExportImportEntityRepository(t *testing.T) {
 	if err := repos.CreateEntity(entity2); err != nil {
 		t.Fatalf("create entity2 failed: %v", err)
 	}
-
+	repos.Wait()
 	// 添加测试关系
 	if err := repos.AddRelationship(entity1.Uuid, entity2.Uuid, "WORKS_AT", "在...工作", map[string]any{
 		"since": "2021",
 	}); err != nil {
 		t.Fatalf("add relationship failed: %v", err)
 	}
-
+	repos.Wait()
 	// 导出实体仓库
 	t.Log("开始导出实体仓库...")
 	exportReader, err := repos.Export(ctx, &ExportEntityRepositoryOptions{
@@ -150,9 +220,9 @@ func TestExportImportEntityRepository(t *testing.T) {
 }
 
 func TestExportEntityRepositoryWithSkipVectorStore(t *testing.T) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		t.Fatal("database is nil")
+	db, err := createTempTestDatabase()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	ctx := context.Background()
@@ -179,7 +249,7 @@ func TestExportEntityRepositoryWithSkipVectorStore(t *testing.T) {
 	if err := repos.CreateEntity(entity1); err != nil {
 		t.Fatalf("create entity failed: %v", err)
 	}
-
+	repos.Wait()
 	// 测试1: 跳过向量库导出
 	t.Log("测试跳过向量库导出...")
 	exportReader, err := repos.Export(ctx, &ExportEntityRepositoryOptions{
@@ -272,9 +342,9 @@ func TestExportEntityRepositoryWithSkipVectorStore(t *testing.T) {
 }
 
 func TestImportEntityRepositoryWithEmptyVectorStore(t *testing.T) {
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		t.Fatal("database is nil")
+	db, err := createTempTestDatabase()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	ctx := context.Background()
@@ -298,7 +368,7 @@ func TestImportEntityRepositoryWithEmptyVectorStore(t *testing.T) {
 	if err := repos.CreateEntity(entity); err != nil {
 		t.Fatalf("create entity failed: %v", err)
 	}
-
+	repos.Wait()
 	// 导出时跳过向量库
 	t.Log("导出实体仓库（跳过向量库）...")
 	exportReader, err := repos.Export(ctx, &ExportEntityRepositoryOptions{
