@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -93,38 +94,34 @@ type GenerateMetadataResult struct {
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		if !consts.IsDevMode() {
-			const key = "6ef3c850244a2b26ed0b163d1fda9600"
-			if yakit.Get(key) == consts.ExistedBuildInForgeEmbedFSHash {
-				return nil
-			}
-			log.Debug("start to load core plugin")
-			defer func() {
-				hash, _ := BuildInForgeHash()
-				yakit.Set(key, hash)
-			}()
-		}
-		registerBuildInForge("fragment_summarizer")
-		registerBuildInForge("long_text_summarizer")
-		registerBuildInForge("xss")
-		registerBuildInForge("sqlinject")
-		registerBuildInForge("travelmaster")
-		registerBuildInForge("pimatrix")
-		registerBuildInForge("netscan")
-		registerBuildInForge("recon")
-		registerBuildInForge("biography")
-		registerBuildInForge("intent_recognition")
-		registerBuildInForge("entity_identify")
-		registerBuildInForge("log_event_formatter")
-		registerBuildInForge("event_analyzer")
-		registerBuildInForge("web_log_monitor")
-		registerBuildInForge("vulscan")
-		registerBuildInForge("hostscan")
-		registerBuildInForge("ssapoc")
-		registerBuildInForge("flow_report")
-		registerBuildInForge("ssa_vulnerability_analyzer")
-		registerBuildInForge("mock_forge")
-		return nil
+		const key = "6ef3c850244a2b26ed0b163d1fda9600"
+
+		return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedBuildInForgeEmbedFSHash).MonitorModifiedWithAction(func() string {
+			buildinHash, _ := BuildInForgeHash()
+			return buildinHash
+		}, func() error {
+			registerBuildInForge("fragment_summarizer")
+			registerBuildInForge("long_text_summarizer")
+			registerBuildInForge("xss")
+			registerBuildInForge("sqlinject")
+			registerBuildInForge("travelmaster")
+			registerBuildInForge("pimatrix")
+			registerBuildInForge("netscan")
+			registerBuildInForge("recon")
+			registerBuildInForge("biography")
+			registerBuildInForge("intent_recognition")
+			registerBuildInForge("entity_identify")
+			registerBuildInForge("log_event_formatter")
+			registerBuildInForge("event_analyzer")
+			registerBuildInForge("web_log_monitor")
+			registerBuildInForge("vulscan")
+			registerBuildInForge("hostscan")
+			registerBuildInForge("ssapoc")
+			registerBuildInForge("flow_report")
+			registerBuildInForge("ssa_vulnerability_analyzer")
+			registerBuildInForge("mock_forge")
+			return nil
+		})
 	}, "sync-buildin-ai-forge")
 }
 
