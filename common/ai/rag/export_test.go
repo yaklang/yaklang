@@ -1,7 +1,6 @@
 package rag
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -44,7 +43,7 @@ func TestMUSTPASS_Exports(t *testing.T) {
 	}
 
 	// 导出测试数据
-	reader, err := ExportRAGToBinary(context.Background(), testDB, collectionName)
+	reader, err := ExportRAGToBinary(collectionName, WithImportExportDB(testDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +60,7 @@ func TestMUSTPASS_Exports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = ImportRAGFromFile(context.Background(), newTestDB, tempFile.Name(), nil)
+	err = ImportRAGFromFile(tempFile.Name(), WithImportExportDB(newTestDB))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +155,7 @@ func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 	}
 
 	// 导出RAG数据为二进制格式
-	reader, err := ExportRAGToBinary(context.Background(), testDB, collectionName)
+	reader, err := ExportRAGToBinary(collectionName, WithImportExportDB(testDB))
 	if err != nil {
 		t.Fatal(err)
 	}

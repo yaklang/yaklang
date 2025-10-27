@@ -155,6 +155,26 @@ func GetRAGDocumentByFilter(db *gorm.DB, filter *ypb.Paging) (*bizhelper.Paginat
 	return QueryRAGDocumentPaging(db, nil, filter)
 }
 
+// DeleteRAGCollection 删除 RAG 集合
+func DeleteRAGCollection(db *gorm.DB, name string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var collection schema.VectorStoreCollection
+		err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).First(&collection).Error
+		if err != nil {
+			return utils.Errorf("get VectorStoreCollection failed: %s", err)
+		}
+		err = tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error
+		if err != nil {
+			return utils.Errorf("delete VectorStoreCollection failed: %s", err)
+		}
+		err = tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error
+		if err != nil {
+			return utils.Errorf("delete VectorStoreDocument failed: %s", err)
+		}
+		return nil
+	})
+}
+
 func UpdateRAGDocument(db *gorm.DB, doc *schema.VectorStoreDocument) error {
 	return db.Save(doc).Error
 }

@@ -1,0 +1,59 @@
+// Test RAG export and import functionality
+// This test verifies that RAG knowledge base data can be completely exported and imported
+
+// Enable mock mode for testing environment
+rag.EnableMockMode()
+
+// Create two randomly named test collection names
+// collectionName is used for original data storage
+// collectionName2 is used for imported data verification
+collectionName = "test_collection_"+str.RandStr(10)
+collectionName2 = "test_collection2_"+str.RandStr(10)
+
+// Get the first test collection instance
+collection = rag.GetCollection(collectionName)~
+
+collection.Add(
+    "doc-product-ai", 
+    "Our flagship product, 'Visionary AI Suite', offers advanced image recognition and natural language processing. The official API endpoint is api.company.com/v1/visionary.",
+)~
+collection.Add(
+    "doc-product-nlp", 
+    "We provide a range of natural language processing tools, including sentiment analysis and text summarization, designed for enterprise customers.",
+)~
+collection.Add(
+    "doc-tech-infra", 
+    "The company's core cloud infrastructure is built on Microsoft Azure, ensuring high scalability and security for all our customer-facing products.",
+)~
+collection.Add(
+    "doc-policy-pto", 
+    "All full-time employees are entitled to 20 days of paid time off (PTO) annually. Please submit leave requests through the 'HR-Connect' portal at least one week in advance.",
+)~
+collection.Add(
+    "doc-policy-remote", 
+    "Our flexible remote work policy allows employees to work from home up to three days per week, subject to manager approval and team requirements.",
+)~
+collection.Add(
+    "doc-news-q3", 
+    "In our successful third quarter, we celebrated the launch of the 'Visionary AI Suite', which drove a 15% increase in quarterly revenue.",
+)~
+
+// Create temporary export file path with .rag extension
+exportPath = file.TempFileName("%s-*.rag"%collectionName)~
+
+// Export collection data to temporary file
+rag.Export(collectionName,exportPath)~
+
+// Import data from export file to a new collection
+rag.Import(exportPath,rag.name(collectionName2))
+
+// Get the imported collection instance
+collection = rag.GetCollection(collectionName2)~
+
+// List all documents in the imported collection
+docs = collection.ListDocuments()~
+
+// Assert that 6 documents were imported correctly
+assert len(docs) == 6
+rag.DeleteCollection(collectionName)~
+rag.DeleteCollection(collectionName2)~

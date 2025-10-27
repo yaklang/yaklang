@@ -1,9 +1,10 @@
 package yak
 
 import (
+	"path/filepath"
+
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/schema"
-	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -24,6 +25,10 @@ var RagExports = map[string]interface{}{
 	},
 	"GetCollectionInfo": func(name string) (*rag.CollectionInfo, error) {
 		return rag.GetCollectionInfo(consts.GetGormProfileDatabase(), name)
+	},
+
+	"HasCollection": func(name string) bool {
+		return rag.CollectionIsExists(consts.GetGormProfileDatabase(), name)
 	},
 
 	"Query":           rag.QueryYakitProfile,
@@ -89,4 +94,17 @@ var RagExports = map[string]interface{}{
 	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeFromEntityReposByName,
 
 	"BuildIndexKnowledgeFromFile": aiforge.BuildIndexKnowledgeFromFile,
+
+	"Import":          rag.ImportRAGFromFile,
+	"db":              rag.WithImportExportDB,
+	"importOverwrite": rag.WithOverwriteExisting,
+	"importName":      rag.WithCollectionName,
+	"documentHandler": rag.WithDocumentHandler,
+	"progressHandler": rag.WithProgressHandler,
+
+	"Export":        rag.ExportRAGToFile,
+	"noHNSWGraph":   rag.WithNoHNSWGraph,
+	"noMetadata":    rag.WithNoMetadata,
+	"noOriginInput": rag.WithNoOriginInput,
+	"onlyPQCode":    rag.WithOnlyPQCode,
 }
