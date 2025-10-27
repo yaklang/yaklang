@@ -354,9 +354,8 @@ func exportIndex(c *cli.Context) error {
 
 	// 导出索引
 	reader, err := rag.ExportRAGToBinary(
-		context.Background(),
-		db,
 		collectionName,
+		rag.WithImportExportDB(db),
 		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
 			fmt.Printf("[%.1f%%] %s\n", percent, message)
 		}),
