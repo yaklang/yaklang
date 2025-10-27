@@ -604,7 +604,7 @@ func TestMregePackagesVersionRangeFirst(t *testing.T) {
 
 func TestSemverRange(t *testing.T) {
 	check := func(semver, want string) {
-		got := hanlderSemverVersionRange(semver)
+		got := handlerSemverVersionRange(semver)
 		if got != want {
 			t.Fatalf("error: %s(org): %s(got) vs %s(want)", semver, got, want)
 		}
