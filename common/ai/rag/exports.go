@@ -260,8 +260,7 @@ func CreateOrLoadCollection(db *gorm.DB, name string, description string, opts .
 
 // DeleteCollection 删除知识库
 func DeleteCollection(db *gorm.DB, name string) error {
-	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Unscoped().Delete(&schema.VectorStoreCollection{})
-	return nil
+	return yakit.DeleteRAGCollection(db, name)
 }
 
 // ListCollections 获取所有知识库列表
@@ -367,6 +366,20 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 
 func Get(name string, i ...any) (*RAGSystem, error) {
 	log.Infof("getting RAG collection '%s' with local embedding service", name)
+
+	var newOptions []any
+	for _, option := range i {
+		if ragOption, ok := option.(RAGExportOptionFunc); ok {
+			cfg := &RAGExportConfig{}
+			ragOption(cfg)
+			if cfg.DB != nil {
+				newOptions = append(newOptions, WithDB(cfg.DB))
+			}
+		} else {
+			newOptions = append(newOptions, option)
+		}
+	}
+	i = newOptions
 
 	config := NewCollectionConfig(i...)
 	if config.ForceNew {

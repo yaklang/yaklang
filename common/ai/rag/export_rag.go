@@ -2,7 +2,6 @@ package rag
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +9,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,68 +24,27 @@ type RAGBinaryData struct {
 	Documents  []*ExportVectorStoreDocument
 }
 
-// RAGExportConfig 导出选项
-type RAGExportConfig struct {
-	IncludeHNSWIndex  bool // 是否包含HNSW索引
-	OnlyPQCode        bool // 是否只导出PQ编码
-	NoMetadata        bool // 是否不导出元数据
-	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
-	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
-}
-
-// RAGImportConfig 导入选项
-type RAGImportConfig struct {
-	OverwriteExisting bool   // 是否覆盖现有数据
-	CollectionName    string // 指定集合名称（可选）
-	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
-	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
-}
-
-type ExportOptionFunc func(*RAGExportConfig)
-
-func WithExportNoMetadata(b bool) ExportOptionFunc {
-	return func(opts *RAGExportConfig) {
-		opts.NoMetadata = b
+func ExportRAGToFile(collectionName string, fileName string, opts ...RAGExportOptionFunc) error {
+	reader, err := ExportRAGToBinary(collectionName, opts...)
+	if err != nil {
+		return err
 	}
-}
-
-func WithExportOnlyPQCode(b bool) ExportOptionFunc {
-	return func(opts *RAGExportConfig) {
-		opts.OnlyPQCode = b
+	file, err := os.Create(fileName)
+	if err != nil {
+		return err
 	}
-}
-
-func WithExportIncludeHNSWIndex(b bool) ExportOptionFunc {
-	return func(opts *RAGExportConfig) {
-		opts.IncludeHNSWIndex = b
+	defer file.Close()
+	_, err = io.Copy(file, reader)
+	if err != nil {
+		return err
 	}
-}
-
-func WithExportDocumentHandler(handler func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)) ExportOptionFunc {
-	return func(opts *RAGExportConfig) {
-		opts.DocumentHandler = handler
-	}
-}
-
-func WithExportProgressHandler(handler func(percent float64, message string, messageType string)) ExportOptionFunc {
-	return func(opts *RAGExportConfig) {
-		opts.OnProgressHandler = handler
-	}
-}
-
-func NewExportOptions(opts ...ExportOptionFunc) *RAGExportConfig {
-	config := &RAGExportConfig{
-		IncludeHNSWIndex: true,
-	}
-	for _, opt := range opts {
-		opt(config)
-	}
-	return config
+	return nil
 }
 
 // ExportRAGToBinary 导出RAG数据为二进制格式
-func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, opts ...ExportOptionFunc) (io.Reader, error) {
-	cfg := NewExportOptions(opts...)
+func ExportRAGToBinary(collectionName string, opts ...RAGExportOptionFunc) (io.Reader, error) {
+	db := consts.GetGormProfileDatabase()
+	cfg := NewRAGConfig(opts...)
 	buf := new(bytes.Buffer)
 
 	// 进度回调辅助函数
@@ -198,7 +156,7 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 	reportProgress(80, "向量文档导出完成，开始导出HNSW索引", "info")
 
 	// 导出并写入HNSW索引
-	if cfg.IncludeHNSWIndex {
+	if !cfg.NoHNSWIndex {
 		hnswGraphBinary := collection.GraphBinary
 		// 写入HNSW索引长度
 		if err := pbWriteVarint(buf, uint64(len(hnswGraphBinary))); err != nil {
@@ -612,13 +570,7 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 }
 
 // ImportRAGFromFile 从二进制文件导入RAG数据，支持从文件路径导入
-func ImportRAGFromFile(ctx context.Context, db *gorm.DB, inputPath string, opts *RAGImportConfig) error {
-	if opts == nil {
-		opts = &RAGImportConfig{
-			OverwriteExisting: false,
-		}
-	}
-
+func ImportRAGFromFile(inputPath string, optFuncs ...RAGExportOptionFunc) error {
 	// 读取二进制文件
 	file, err := os.Open(inputPath)
 	if err != nil {
@@ -633,16 +585,12 @@ func ImportRAGFromFile(ctx context.Context, db *gorm.DB, inputPath string, opts 
 	}
 
 	// 执行导入
-	return importRAGDataToDB(ctx, db, ragData, opts)
+	return importRAGDataToDB(ragData, optFuncs...)
 }
 
 // ImportRAGFromReader 从二进制流导入RAG数据
-func ImportRAGFromReader(ctx context.Context, db *gorm.DB, reader io.Reader, opts *RAGImportConfig) error {
-	if opts == nil {
-		opts = &RAGImportConfig{
-			OverwriteExisting: false,
-		}
-	}
+func ImportRAGFromReader(reader io.Reader, optFuncs ...RAGExportOptionFunc) error {
+	opts := NewRAGConfig(optFuncs...)
 
 	// 加载RAG数据
 	ragData, err := LoadRAGFromBinary(reader)
@@ -656,11 +604,13 @@ func ImportRAGFromReader(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 	}
 
 	// 执行导入
-	return importRAGDataToDB(ctx, db, ragData, opts)
+	return importRAGDataToDB(ragData, optFuncs...)
 }
 
 // importRAGDataToDB 将RAG数据导入到数据库
-func importRAGDataToDB(ctx context.Context, db *gorm.DB, ragData *RAGBinaryData, opts *RAGImportConfig) error {
+func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) error {
+	opts := NewRAGConfig(optFuncs...)
+	db := opts.DB
 	if ragData.Collection == nil {
 		return utils.Error("collection data is missing")
 	}

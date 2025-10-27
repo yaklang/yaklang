@@ -119,9 +119,11 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 	reportProgress(70, "知识库条目导出完成，开始导出向量库数据", "info")
 
 	// 写入向量库
-	ragBinaryReader, err := rag.ExportRAGToBinary(ctx, db, kbInfo.KnowledgeBaseName,
-		rag.WithExportDocumentHandler(opts.ExportRAGDocumentHandler),
-		rag.WithExportProgressHandler(func(percent float64, message string, messageType string) {
+	ragBinaryReader, err := rag.ExportRAGToBinary(kbInfo.KnowledgeBaseName,
+		rag.WithContext(ctx),
+		rag.WithImportExportDB(db),
+		rag.WithDocumentHandler(opts.ExportRAGDocumentHandler),
+		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
 			// 将RAG导出进度映射到70-90%范围
 			ragProgress := 70 + (percent/100)*20
 			reportProgress(ragProgress, message, messageType)
@@ -351,18 +353,18 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 		reportProgress(75, "正在导入向量库数据", "info")
 		ragReader := bytes.NewReader(ragBinaryBytes)
 
-		// 使用现有的ImportRAGFromReader函数，并传递集合名称
-		importConfig := &rag.RAGImportConfig{
-			OverwriteExisting: opts.OverwriteExisting,
-			CollectionName:    finalKbName, // 使用最终的知识库名称作为集合名称
-			DocumentHandler:   opts.ImportRAGDocumentHandler,
-			OnProgressHandler: func(percent float64, message string, messageType string) {
-				// 将RAG导入进度映射到75-90%范围
+		opts := []rag.RAGExportOptionFunc{
+			rag.WithContext(ctx),
+			rag.WithImportExportDB(db),
+			rag.WithOverwriteExisting(opts.OverwriteExisting),
+			rag.WithCollectionName(finalKbName),
+			rag.WithDocumentHandler(opts.ImportRAGDocumentHandler),
+			rag.WithProgressHandler(func(percent float64, message string, messageType string) {
 				ragProgress := 75 + (percent/100)*15
 				reportProgress(ragProgress, message, messageType)
-			},
+			}),
 		}
-		if err := rag.ImportRAGFromReader(ctx, db, ragReader, importConfig); err != nil {
+		if err := rag.ImportRAGFromReader(ragReader, opts...); err != nil {
 			return utils.Wrap(err, "import rag data")
 		}
 		reportProgress(90, "向量库数据导入完成", "info")
