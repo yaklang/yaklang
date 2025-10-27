@@ -103,6 +103,16 @@ func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err erro
 	if !NeedSyncEmbedRule() {
 		return nil
 	}
+	return syncEmbedRuleInternal(notifies...)
+}
+
+// ForceSyncEmbedRule 强制同步嵌入规则，忽略哈希检查
+func ForceSyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
+	return syncEmbedRuleInternal(notifies...)
+}
+
+// syncEmbedRuleInternal 内部同步实现
+func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (err error) {
 	defer DoneEmbedRule()
 	log.Infof("start sync embed rule")
 	// sfdb.DeleteBuildInRule()
