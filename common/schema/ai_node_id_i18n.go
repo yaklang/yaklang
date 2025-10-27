@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"grep_samples_result": {
+		Zh: "样本搜索结果",
+		En: "Sample Search Result",
+	},
 	"query_yaklang_document": {
 		Zh: "查询 Yaklang 文档",
 		En: "Query Yaklang Document",
