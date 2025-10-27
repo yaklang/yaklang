@@ -25,16 +25,6 @@ func (c *Config) parseProjectWithFS(
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
 
-	wrappedFS, err := c.wrapWithPreprocessedCFS(filesystem)
-	if err != nil {
-		return nil, err
-	}
-	filesystem = wrappedFS
-
-	if preprocessedFS, ok := filesystem.(*filesys.PreprocessedCFS); ok {
-		defer preprocessedFS.Cleanup()
-	}
-
 	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
 	defer func() {
 		log.Debugf("calculate time: %v", calculateTime)
@@ -60,6 +50,7 @@ func (c *Config) parseProjectWithFS(
 	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
 
+	var err error
 	start := time.Now()
 
 	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
@@ -69,6 +60,8 @@ func (c *Config) parseProjectWithFS(
 	if c.ProgramName != "" {
 		folder2Save = append(folder2Save, []string{"/", c.ProgramName})
 	}
+
+	filesystem = c.swapLanguageFs(filesystem)
 	// get total size
 	err = filesys.Recursive(programPath,
 		filesys.WithFileSystem(filesystem),

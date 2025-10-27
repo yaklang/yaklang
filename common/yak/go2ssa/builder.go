@@ -134,6 +134,10 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 	return nil
 }
 
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+	return fs
+}
+
 func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".go"
 }

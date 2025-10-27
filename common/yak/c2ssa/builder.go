@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -112,6 +113,11 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 	astBuilder.build(ast)
 	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
 	return nil
+}
+
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+	cfs, _ := filesys.NewPreprocessedCFs(fs)
+	return cfs
 }
 
 func (*SSABuilder) FilterFile(path string) bool {

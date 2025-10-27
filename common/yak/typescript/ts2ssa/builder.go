@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
@@ -64,6 +65,10 @@ func Frontend(src string) (*ast.SourceFile, error) {
 
 type SSABuilder struct {
 	*ssa.PreHandlerBase
+}
+
+func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
+	return fs
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
