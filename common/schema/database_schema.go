@@ -72,6 +72,10 @@ var ProfileTables = []interface{}{
 	&Snippets{}, // Snippets
 	// SSA Projects Config Info
 	&SSAProject{},
+	&ProxyEndpoint{},
+	&ProxyRoute{},
+	&ProxyRoutePattern{},
+	&ProxyRouteEndpoint{},
 }
 
 var databaseSchemas = map[uint8][]any{
