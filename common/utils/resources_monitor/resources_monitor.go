@@ -26,15 +26,14 @@ func (m *EmbedResourcesMonitor) getCurrentHash(currentHashGetter func() string) 
 }
 
 func (m *EmbedResourcesMonitor) MonitorModifiedWithAction(currentHashGetter func() string, callBack func() error) error {
-	var err error
 	resourceHash := m.getCurrentHash(currentHashGetter)
 	if resourceHash != yakit.Get(m.resourceID) {
-		err = callBack()
-	}
-	if err != nil {
-		return err
-	} else {
-		yakit.Set(m.resourceID, resourceHash)
+		err := callBack()
+		if err != nil {
+			return err
+		} else {
+			yakit.Set(m.resourceID, resourceHash)
+		}
 	}
 	return nil
 }
