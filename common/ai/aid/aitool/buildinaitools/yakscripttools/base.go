@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	utils "github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
@@ -33,35 +34,20 @@ type FileSystemWithHash interface {
 func init() {
 	InitEmbedFS()
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		const key = "2b709ef7252a06a0c1cfbb952f77f976"
-		var calculatedHash string
-		if !consts.IsDevMode() {
-			if yakit.Get(key) == consts.ExistedBuildInAIToolEmbedFSHash {
-				return nil
-			}
-			log.Debug("start to load build in ai tools")
-			defer func() {
-				calculatedHash, _ = BuildInAIToolHash()
-				yakit.Set(key, calculatedHash)
-			}()
-		}
-
 		if result, ok := os.LookupEnv("SKIP_SYNC_BUILD_IN_AI_TOOL"); ok {
 			r, _ := strconv.ParseBool(result)
 			if r {
 				return nil
 			}
 		}
-
-		if calculatedHash == "" {
-			calculatedHash, _ = BuildInAIToolHash()
-		}
-		if yakit.Get(key) == calculatedHash && calculatedHash != "" {
+		const key = "2b709ef7252a06a0c1cfbb952f77f976"
+		return utils.NewEmbedResourcesMonitor(key, consts.ExistedBuildInAIToolEmbedFSHash).MonitorModifiedWithAction(func() string {
+			buildinHash, _ := BuildInAIToolHash()
+			return buildinHash
+		}, func() error {
+			OverrideYakScriptAiTools()
 			return nil
-		}
-		yakit.Set(key, calculatedHash)
-		OverrideYakScriptAiTools()
-		return nil
+		})
 	}, "sync-ai-tool")
 }
 
