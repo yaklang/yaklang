@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
 	licenses "github.com/yaklang/yaklang/common/sca/license"
@@ -160,6 +161,12 @@ func (ag *AnalyzerGroup) Consume(wg *sync.WaitGroup) {
 
 	for i := 0; i < ag.numWorkers; i++ {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("analyzer worker panic: %v", r)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
 			defer wg.Done()
 			for fileInfo := range ag.ch {
 				pkgs, err := fileInfo.Self.Analyzer.Analyze(fileInfo)

@@ -39,7 +39,10 @@ func parseVersion(version string) ([]int, error) {
 	return v, nil
 }
 
-func hanlderSemverVersionRange(semverRange string) string {
+func handlerSemverVersionRange(semverRange string) string {
+	if len(semverRange) == 0 {
+		return ""
+	}
 	if semverRange[0] == '~' {
 		v, err := parseVersion(semverRange[1:])
 		if err != nil {

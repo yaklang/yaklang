@@ -50,7 +50,7 @@ func (a npmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 		return nil, err
 	}
 	lo.ForEach(pkgs, func(pkg *dxtypes.Package, _ int) {
-		pkg.Version = hanlderSemverVersionRange(strings.TrimSpace(pkg.Version))
+		pkg.Version = handlerSemverVersionRange(strings.TrimSpace(pkg.Version))
 	})
 	return pkgs, nil
 }
