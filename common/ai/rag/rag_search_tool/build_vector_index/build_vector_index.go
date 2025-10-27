@@ -357,7 +357,7 @@ func exportIndex(c *cli.Context) error {
 		context.Background(),
 		db,
 		collectionName,
-		rag.WithExportProgressHandler(func(percent float64, message string, messageType string) {
+		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
 			fmt.Printf("[%.1f%%] %s\n", percent, message)
 		}),
 	)
