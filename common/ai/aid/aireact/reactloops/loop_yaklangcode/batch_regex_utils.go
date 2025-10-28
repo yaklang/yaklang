@@ -87,17 +87,38 @@ func BatchRegexReplace(code string, opts *BatchRegexReplaceOptions) (*BatchRegex
 
 	// 按行分割代码
 	lines := strings.Split(code, "\n")
-	modifiedLines := make([]string, len(lines))
+	var finalLines []string
 	var modifiedLineInfos []ModifiedLineInfo
 	replacementCount := 0
+	deletedCount := 0
 
 	// 逐行进行正则替换
 	for i, line := range lines {
+		// 首先检查是否是删除整行的情况（替换为空字符串且原行完全匹配）
+		if opts.Replacement == "" && re.MatchString(line) && re.FindString(line) == line {
+			// 删除整行 - 不添加到结果中
+			replacementCount++
+			modifiedLineInfos = append(modifiedLineInfos, ModifiedLineInfo{
+				LineNumber:   i + 1,
+				OriginalLine: line,
+				ModifiedLine: "[DELETED]", // 标记为已删除
+			})
+
+			if opts.VerboseLog {
+				log.Infof("line %d deleted: %s", i+1, utils.ShrinkTextBlock(line, 50))
+			}
+			deletedCount++
+			// 不添加到 finalLines，实现真正的删除
+			continue
+		}
+
+		// 普通替换逻辑
 		newLine, modified := replaceLineWithRegex(line, re, opts)
-		modifiedLines[i] = newLine
 
 		if modified {
 			replacementCount++
+			// 普通替换或部分替换
+			finalLines = append(finalLines, newLine)
 			modifiedLineInfos = append(modifiedLineInfos, ModifiedLineInfo{
 				LineNumber:   i + 1,
 				OriginalLine: line,
@@ -109,11 +130,14 @@ func BatchRegexReplace(code string, opts *BatchRegexReplaceOptions) (*BatchRegex
 					utils.ShrinkTextBlock(line, 50),
 					utils.ShrinkTextBlock(newLine, 50))
 			}
+		} else {
+			// 未修改的行
+			finalLines = append(finalLines, line)
 		}
 	}
 
 	// 重新组合代码
-	newCode := strings.Join(modifiedLines, "\n")
+	newCode := strings.Join(finalLines, "\n")
 
 	return &BatchRegexReplaceResult{
 		ModifiedCode:     newCode,

@@ -14,24 +14,24 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+var insertLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
-		"insert_code",
-		"Insert new code at the specified line number. The line number is 1-based, meaning the first line of the file is line 1. The code will be inserted at the beginning of the specified line, pushing existing content down.",
+		"insert_lines",
+		"Insert new lines at the specified line number. Use this action to add new code, comments, or blank lines. The line number is 1-based, meaning the first line of the file is line 1. The lines will be inserted at the beginning of the specified line, pushing existing content down. This is ideal for adding new functionality or fixing missing code.",
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("insert_line"),
-			aitool.WithStringParam("insert_code_reason", aitool.WithParam_Description(`Explain why inserting code at this position, and summarize the insertion approach and lessons learned, keeping the original code content for future reference value`)),
+			aitool.WithStringParam("insert_lines_reason", aitool.WithParam_Description(`Explain why inserting lines at this position, and summarize the insertion approach and lessons learned, keeping the original code content for future reference value`)),
 		},
 		[]*reactloops.LoopStreamField{
 			{
-				FieldName: "insert_code_reason",
+				FieldName: "insert_lines_reason",
 				AINodeId:  "re-act-loop-thought",
 			},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			line := action.GetInt("insert_line")
 			if line <= 0 {
-				return utils.Error("insert_code action must have valid 'insert_line' parameter")
+				return utils.Error("insert_lines action must have valid 'insert_line' parameter")
 			}
 			l.GetEmitter().EmitTextPlainTextStreamEvent(
 				"thought",
@@ -41,7 +41,7 @@ var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			filename := loop.Get("filename")
 			if filename == "" {
-				op.Fail("no filename found in loop context for insert_code action")
+				op.Fail("no filename found in loop context for insert_lines action")
 				return
 			}
 
@@ -51,17 +51,17 @@ var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			editor := memedit.NewMemEditor(fullCode)
 			insertLine := action.GetInt("insert_line")
 
-			msg := fmt.Sprintf("decided to insert code at line[%v]", insertLine)
-			invoker.AddToTimeline("insert_code", msg)
+			msg := fmt.Sprintf("decided to insert lines at line[%v]", insertLine)
+			invoker.AddToTimeline("insert_lines", msg)
 
-			reason := action.GetString("insert_code_reason")
+			reason := action.GetString("insert_lines_reason")
 			if reason != "" {
 				r.AddToTimeline("insert_reason", reason)
 			}
 
 			start, end, codeSegment, fixedCode := prettifyAITagCode(partialCode)
 			if fixedCode {
-				log.Infof("use prettified code segment for 'insert_code' action, original range %d to %d", start, end)
+				log.Infof("use prettified code segment for 'insert_lines' action, original range %d to %d", start, end)
 				partialCode = codeSegment
 			}
 
@@ -93,9 +93,9 @@ var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			} else {
 				msg += "\n\n--[linter]--\nNo issues found in the inserted code segment."
 			}
-			r.AddToTimeline("code_inserted", msg)
-			log.Infof("insert_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_code", partialCode)
+			r.AddToTimeline("lines_inserted", msg)
+			log.Infof("insert_lines done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
+			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_lines", partialCode)
 
 			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use 'grep_yaklang_samples' to find more syntax sample or docs")
