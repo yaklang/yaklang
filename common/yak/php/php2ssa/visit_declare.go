@@ -1,3 +1,6 @@
+//go:build !no_language
+// +build !no_language
+
 package php2ssa
 
 import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"

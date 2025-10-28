@@ -1,3 +1,6 @@
+//go:build !no_language
+// +build !no_language
+
 package java2ssa
 
 import "github.com/yaklang/yaklang/common/yak/ssa"

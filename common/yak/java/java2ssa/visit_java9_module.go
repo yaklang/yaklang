@@ -1,3 +1,6 @@
+//go:build !no_language
+// +build !no_language
+
 package java2ssa
 
 import javaparser "github.com/yaklang/yaklang/common/yak/java/parser"

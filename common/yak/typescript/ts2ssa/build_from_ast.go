@@ -1,3 +1,6 @@
+//go:build !no_language
+// +build !no_language
+
 package ts2ssa
 
 import (

@@ -1,3 +1,6 @@
+//go:build !no_language
+// +build !no_language
+
 package java2ssa
 
 import (
