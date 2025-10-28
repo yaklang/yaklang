@@ -15,8 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
-// compressGrepResults 压缩和优化grep搜索结果
-func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
+// Universal compress function for search results
+func compressSearchResults(resultStr string, searchInfo string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator, maxRanges int, minLines int, maxLines int, title string, usePatterns bool) string {
 	if len(resultStr) == 0 {
 		return resultStr
 	}
@@ -24,11 +24,7 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 	resultEditor := memedit.NewMemEditor(resultStr)
 	dNonce := utils.RandStringBytes(4)
 
-	materials, err := utils.RenderTemplate(`
-<|QUERY_{{ .nonce }}|>
-搜索模式: {{ .query }}
-<|QUERY_END_{{ .nonce }}|>
-
+	promptTemplate := `
 <|GREP_RESULT_{{ .nonce }}|>
 {{ .samples }}
 <|GREP_RESULT_END_{{ .nonce }}|>
@@ -39,8 +35,8 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 请从上述搜索结果中提取最有价值的代码片段，按重要性排序：
 
 【提取要求】
-1. 最多提取 8-10 个代码片段
-2. 每个片段 3-15 行，确保上下文完整
+1. 最多提取 %d 个代码片段
+2. 每个片段 %d-%d 行，确保上下文完整
 3. 按重要性从高到低排序（rank: 1最重要，数字越大越不重要）
 
 【重要性评判标准】（按优先级排序）
@@ -74,22 +70,36 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 - 确保每个片段都有实际参考价值
 
 请按重要性排序输出ranges数组。
-<|INSTRUCT_END_{{ .nonce }}|>`, map[string]any{
-		"nonce":   dNonce,
-		"samples": utils.PrefixLinesWithLineNumbers(resultStr),
-		"query":   pattern,
+<|INSTRUCT_END_{{ .nonce }}|>
+`
+
+	if usePatterns {
+		promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|SEARCH_PATTERNS_{{ .nonce }}|>\n{{ .searchInfo }}\n<|SEARCH_PATTERNS_END_{{ .nonce }}|>\n\n<|SEARCH_RESULTS_{{ .nonce }}|>", 1)
+	} else {
+		promptTemplate = strings.Replace(promptTemplate, "<|GREP_RESULT_{{ .nonce }}|>", "<|QUERY_{{ .nonce }}|>\n搜索模式: {{ .searchInfo }}\n<|QUERY_END_{{ .nonce }}|>\n\n<|GREP_RESULT_{{ .nonce }}|>", 1)
+	}
+
+	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
+		"nonce":      dNonce,
+		"samples":    utils.PrefixLinesWithLineNumbers(resultStr),
+		"searchInfo": searchInfo,
 	})
 
 	if err != nil {
-		log.Errorf("compressGrepResults: template render failed: %v", err)
+		log.Errorf("compressSearchResults: template render failed: %v", err)
 		return resultStr
 	}
 
-	log.Infof("compressGrepResults: invoking lite forge for pattern: %s", pattern)
+	var context = invoker.GetConfig().GetContext()
+	if op != nil {
+		context = op.GetTask().GetContext()
+	}
+
 	forgeResult, err := invoker.InvokeLiteForge(
-		op.GetTask().GetContext(),
+		context,
 		"extract-ranked-lines",
-		materials, []aitool.ToolOption{
+		materials,
+		[]aitool.ToolOption{
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -100,24 +110,24 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
 				aitool.WithStringParam("reason", aitool.WithParam_Description("选择此片段的理由")),
 			),
-		}, aicommon.WithGeneralConfigStreamableField("reason"),
+		},
+		aicommon.WithGeneralConfigStreamableField("reason"),
 	)
 
 	if err != nil {
-		log.Errorf("compressGrepResults: forge failed: %v", err)
+		log.Errorf("compressSearchResults: forge failed: %v", err)
 		return resultStr
 	}
 
 	if forgeResult == nil {
-		log.Warnf("compressGrepResults: forge result is nil")
+		log.Warnf("compressSearchResults: forge result is nil")
 		return resultStr
 	}
 
-	log.Infof("compressGrepResults: forge result received")
 	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
 
 	if len(rangeItems) == 0 {
-		log.Warnf("compressGrepResults: no ranges extracted")
+		log.Warnf("compressSearchResults: no ranges extracted")
 		return resultStr
 	}
 
@@ -144,7 +154,7 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 		// 解析行范围
 		parts := strings.Split(rangeStr, "-")
 		if len(parts) != 2 {
-			log.Warnf("compressGrepResults: invalid range format: %s", rangeStr)
+			log.Warnf("compressSearchResults: invalid range format: %s", rangeStr)
 			continue
 		}
 
@@ -152,25 +162,25 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 		endLine, err2 := strconv.Atoi(parts[1])
 
 		if err1 != nil || err2 != nil {
-			log.Errorf("compressGrepResults: parse range failed: %s, errors: %v, %v", rangeStr, err1, err2)
+			log.Errorf("compressSearchResults: parse range failed: %s, errors: %v, %v", rangeStr, err1, err2)
 			continue
 		}
 
 		if startLine <= 0 || endLine < startLine {
-			log.Warnf("compressGrepResults: invalid range values: %s (start=%d, end=%d)", rangeStr, startLine, endLine)
+			log.Warnf("compressSearchResults: invalid range values: %s (start=%d, end=%d)", rangeStr, startLine, endLine)
 			continue
 		}
 
 		// 提取文本
 		text := resultEditor.GetTextFromPositionInt(startLine, 1, endLine, 1)
 		if text == "" {
-			log.Warnf("compressGrepResults: empty text for range: %s", rangeStr)
+			log.Warnf("compressSearchResults: empty text for range: %s", rangeStr)
 			continue
 		}
 
 		lineCount := strings.Count(text, "\n") + 1
 		if totalLines+lineCount > 100 {
-			log.Warnf("compressGrepResults: would exceed 100 lines limit, stopping at range: %s", rangeStr)
+			log.Warnf("compressSearchResults: would exceed 100 lines limit, stopping at range: %s", rangeStr)
 			break
 		}
 
@@ -185,13 +195,13 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 	}
 
 	if len(rankedRanges) == 0 {
-		log.Warnf("compressGrepResults: no valid ranges extracted")
+		log.Warnf("compressSearchResults: no valid ranges extracted")
 		return resultStr
 	}
 
 	// 构建优化后的结果
 	var result strings.Builder
-	result.WriteString("【AI智能提取】按重要性排序的代码片段：\n\n")
+	result.WriteString(title + "\n\n")
 
 	for i, item := range rankedRanges {
 		result.WriteString(fmt.Sprintf("=== [%d] 重要性排序: %d | 范围: %s ===\n", i+1, item.Rank, item.Range))
@@ -207,14 +217,19 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 	// 手动截断超过100行的内容
 	lines := strings.Split(finalResult, "\n")
 	if len(lines) > 100 {
-		log.Warnf("compressGrepResults: result has %d lines, truncating to 100", len(lines))
+		log.Warnf("compressSearchResults: result has %d lines, truncating to 100", len(lines))
 		finalResult = strings.Join(lines[:100], "\n") + "\n\n[... 内容已截断，共提取了前100行最重要的代码片段 ...]"
 	}
 
-	log.Infof("compressGrepResults: compressed from %d chars to %d chars, %d ranges",
+	log.Infof("compressSearchResults: compressed from %d chars to %d chars, %d ranges",
 		len(resultStr), len(finalResult), len(rankedRanges))
 
 	return finalResult
+}
+
+// compressGrepResults is now a wrapper for compressSearchResults with specific parameters for grep
+func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
+	return compressSearchResults(resultStr, pattern, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
 }
 
 var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
