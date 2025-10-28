@@ -14,18 +14,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+var deleteLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
-		"delete_code",
-		"Delete code lines between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. If only 'delete_start_line' is provided, only that single line will be deleted. If both 'delete_start_line' and 'delete_end_line' are provided, all lines in the range will be deleted.",
+		"delete_lines",
+		"Delete lines between the specified line numbers (inclusive). Use this action to remove unwanted lines, comments, or code blocks. The line numbers are 1-based, meaning the first line of the file is line 1. If only 'delete_start_line' is provided, only that single line will be deleted. If both 'delete_start_line' and 'delete_end_line' are provided, all lines in the range will be deleted. This is more precise than batch_regex_replace for line deletion.",
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("delete_start_line"),
 			aitool.WithIntegerParam("delete_end_line", aitool.WithParam_Required(false)),
-			aitool.WithStringParam("delete_code_reason", aitool.WithParam_Description(`Explain why deleting these lines, and summarize the deletion approach and lessons learned, keeping the original code content for future reference value`)),
+			aitool.WithStringParam("delete_lines_reason", aitool.WithParam_Description(`Explain why deleting these lines, and summarize the deletion approach and lessons learned, keeping the original code content for future reference value`)),
 		},
 		[]*reactloops.LoopStreamField{
 			{
-				FieldName: "delete_code_reason",
+				FieldName: "delete_lines_reason",
 				AINodeId:  "re-act-loop-thought",
 			},
 		},
@@ -33,10 +33,10 @@ var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			startLine := action.GetInt("delete_start_line")
 			endLine := action.GetInt("delete_end_line")
 			if startLine <= 0 {
-				return utils.Error("delete_code action must have valid 'delete_start_line' parameter")
+				return utils.Error("delete_lines action must have valid 'delete_start_line' parameter")
 			}
 			if endLine > 0 && endLine < startLine {
-				return utils.Error("delete_code action: 'delete_end_line' must be greater than or equal to 'delete_start_line'")
+				return utils.Error("delete_lines action: 'delete_end_line' must be greater than or equal to 'delete_start_line'")
 			}
 
 			var msg string
@@ -53,7 +53,7 @@ var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			filename := loop.Get("filename")
 			if filename == "" {
-				op.Fail("no filename found in loop context for delete_code action")
+				op.Fail("no filename found in loop context for delete_lines action")
 				return
 			}
 
@@ -79,9 +79,9 @@ var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				err = editor.DeleteLine(deleteStartLine)
 			}
 
-			invoker.AddToTimeline("delete_code", msg)
+			invoker.AddToTimeline("delete_lines", msg)
 
-			reason := action.GetString("delete_code_reason")
+			reason := action.GetString("delete_lines_reason")
 			if reason != "" {
 				r.AddToTimeline("delete_reason", reason)
 			}
@@ -114,8 +114,8 @@ var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			} else {
 				msg += "\n\n--[linter]--\nNo issues found after code deletion."
 			}
-			r.AddToTimeline("code_deleted", msg)
-			log.Infof("delete_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
+			r.AddToTimeline("lines_deleted", msg)
+			log.Infof("delete_lines done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 
 			// Emit event with deletion info
 			deletionInfo := map[string]interface{}{
@@ -124,7 +124,7 @@ var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			if deleteEndLine > 0 {
 				deletionInfo["end_line"] = deleteEndLine
 			}
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "delete_code", deletionInfo)
+			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "delete_lines", deletionInfo)
 
 			if errMsg != "" {
 				invoker.AddToTimeline("advice", "use 'grep_yaklang_samples' to find more syntax sample or docs")
