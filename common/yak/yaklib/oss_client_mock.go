@@ -1,4 +1,4 @@
-package sfdb
+package yaklib
 
 import (
 	"bytes"

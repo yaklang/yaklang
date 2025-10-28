@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -369,41 +370,22 @@ func (m *scanManager) setupProjectMode(projectId uint64) error {
 
 // setupScanMode 设置扫描模式（批量规则）
 func (m *scanManager) setupScanMode(filter *ypb.SyntaxFlowRuleFilter) error {
-	// 步骤1: 创建规则加载器
-	loader, err := m.createRuleLoader()
-	if err != nil {
-		return err
-	}
-
-	// 步骤2: 根据加载器类型执行不同的加载策略
-	if loader.GetLoaderType() == sfdb.LoaderTypeDatabase {
-		return m.loadRulesFromDatabase(loader, filter)
-	}
-
-	// OSS或其他类型加载器
-	return m.loadRulesFromOSS(loader, filter)
-}
-
-// createRuleLoader 创建规则加载器
-func (m *scanManager) createRuleLoader() (sfdb.RuleLoader, error) {
-	db := consts.GetGormProfileDatabase()
-
 	// 检查是否配置了OSS客户端
-	var ossClient sfdb.OSSClient
+	var ossClient yaklib.OSSClient
 	if clientInterface := m.Config.GetOSSRuleClient(); clientInterface != nil {
-		if client, ok := clientInterface.(sfdb.OSSClient); ok {
+		if client, ok := clientInterface.(yaklib.OSSClient); ok {
 			ossClient = client
 		}
 	}
 
-	// 根据配置创建相应的加载器
+	// 如果配置了 OSS，使用 OSS + 数据库合并模式
 	if ossClient != nil {
-		log.Info("creating OSS rule loader")
-		return sfdb.CreateRuleLoader(sfdb.RuleSourceTypeOSS, ossClient, db), nil
+		return m.loadRulesFromOSS(ossClient, filter)
 	}
 
-	log.Info("creating database rule loader")
-	return sfdb.CreateDefaultRuleLoader(db), nil
+	// 否则使用纯数据库模式
+	loader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
+	return m.loadRulesFromDatabase(loader, filter)
 }
 
 // loadRulesFromDatabase 从数据库加载规则（轻量计数 + 流式加载）
@@ -428,26 +410,56 @@ func (m *scanManager) loadRulesFromDatabase(loader sfdb.RuleLoader, filter *ypb.
 	return nil
 }
 
-// loadRulesFromOSS 从OSS加载规则（一次性加载 + 缓存）
-// 同时也会从数据库加载自定义规则，实现 OSS + Database 规则合并
-func (m *scanManager) loadRulesFromOSS(loader sfdb.RuleLoader, filter *ypb.SyntaxFlowRuleFilter) error {
-	// 一次性加载所有 OSS 规则
-	ossRules, err := loader.LoadRules(m.ctx, filter)
-	if err != nil {
-		log.Warnf("load rules from %s failed: %v, fallback to database", loader.GetLoaderType(), err)
-		// 失败则回退到数据库
-		dbLoader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
-		return m.loadRulesFromDatabase(dbLoader, filter)
+// loadRulesFromOSS 从OSS下载规则并与数据库规则合并
+// 参数 ossClient: OSS 客户端
+// 参数 filter: 规则筛选条件
+func (m *scanManager) loadRulesFromOSS(ossClient yaklib.OSSClient, filter *ypb.SyntaxFlowRuleFilter) error {
+	// OSS 默认配置
+	bucket := "yaklang-rules"
+	prefix := "syntaxflow/"
+
+	// 从 OSS 下载规则文件（只下载内容，不解析）
+	log.Infof("Downloading rule files from OSS (bucket: %s, prefix: %s)", bucket, prefix)
+	ossStream := yaklib.DownloadOSSSyntaxFlowRuleFiles(m.ctx, ossClient, bucket, prefix)
+
+	// 解析并收集 OSS 规则
+	ossRules := make([]*schema.SyntaxFlowRule, 0)
+	for item := range ossStream.Chan {
+		if item.Error != nil {
+			log.Warnf("download OSS rule file error: %v", item.Error)
+			continue
+		}
+
+		// 解析规则内容
+		rule, err := sfdb.CheckSyntaxFlowRuleContent(item.Content)
+		if err != nil {
+			log.Warnf("compile rule %s failed: %v, skipping", item.RuleName, err)
+			continue
+		}
+
+		// 设置规则名称（从文件名提取的）
+		rule.RuleName = item.RuleName
+
+		ossRules = append(ossRules, rule)
+	}
+
+	// 如果 OSS 下载失败，回退到纯数据库模式
+	if len(ossRules) == 0 {
+		log.Warn("no rules loaded from OSS, fallback to database")
+		loader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
+		return m.loadRulesFromDatabase(loader, filter)
 	}
 
 	log.Infof("OSS: loaded %d rules", len(ossRules))
 
 	// 同时从数据库加载自定义规则
+	db := consts.GetGormProfileDatabase()
+	db = yakit.FilterSyntaxFlowRule(db, filter)
+
 	dbLoader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
 	dbRules, err := dbLoader.LoadRules(m.ctx, filter)
 	if err != nil {
 		log.Warnf("load rules from database failed: %v, using OSS rules only", err)
-		// 数据库失败不影响 OSS 规则使用
 		dbRules = nil
 	} else {
 		log.Infof("Database: loaded %d custom rules", len(dbRules))
@@ -461,14 +473,9 @@ func (m *scanManager) loadRulesFromOSS(loader sfdb.RuleLoader, filter *ypb.Synta
 	m.rulesCount = int64(len(allRules))
 	log.Infof("Total: %d rules (OSS: %d, Database: %d)", len(allRules), len(ossRules), len(dbRules))
 
-	// 使用合并后的规则创建channel（避免重复加载）
+	// 使用合并后的规则创建channel
 	m.ruleChan = convertRulesToChannel(allRules, m.ctx)
 	m.kind = schema.SFResultKindScan
-
-	// 关闭加载器
-	if err := loader.Close(); err != nil {
-		log.Errorf("close rule loader failed: %v", err)
-	}
 
 	return nil
 }

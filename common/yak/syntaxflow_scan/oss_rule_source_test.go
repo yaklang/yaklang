@@ -13,11 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -236,7 +236,7 @@ func TestScanWithOSSRuleSource_Performance(t *testing.T) {
 // FailingOSSClient 总是失败的 OSS 客户端，用于测试回退机制
 type FailingOSSClient struct{}
 
-func (c *FailingOSSClient) ListObjects(bucket, prefix string) ([]sfdb.OSSObject, error) {
+func (c *FailingOSSClient) ListObjects(bucket, prefix string) ([]yaklib.OSSObject, error) {
 	return nil, assert.AnError
 }
 
@@ -252,8 +252,8 @@ func (c *FailingOSSClient) Close() error {
 	return nil
 }
 
-func (c *FailingOSSClient) GetType() sfdb.OSSType {
-	return sfdb.OSSTypeMinIO
+func (c *FailingOSSClient) GetType() yaklib.OSSType {
+	return yaklib.OSSTypeMinIO
 }
 
 // TestScanWithOSSRuleSource_Fallback 测试 OSS 失败时回退到数据库
@@ -340,11 +340,15 @@ func TestScanWithOSSRuleSource_ConcurrentScan(t *testing.T) {
 	mockOSSClient := createMockOSSClientWithRules()
 
 	var successCount int32
+	doneChan := make(chan bool, 3)
 
 	// 启动多个并发扫描（测试 OSS 客户端的并发安全性）
 	const concurrentScans = 3
 	for i := 0; i < concurrentScans; i++ {
 		go func(idx int) {
+			defer func() { doneChan <- true }()
+
+			var scanCompleted bool
 			err := StartScan(
 				context.Background(),
 				ssaconfig.WithProgramNames(progID),
@@ -353,7 +357,8 @@ func TestScanWithOSSRuleSource_ConcurrentScan(t *testing.T) {
 					Language: []string{"java"},
 				}),
 				WithScanResultCallback(func(result *ScanResult) {
-					if result.Status == "done" {
+					if result.Status == "done" && !scanCompleted {
+						scanCompleted = true
 						atomic.AddInt32(&successCount, 1)
 						log.Infof("并发扫描 #%d 完成", idx)
 					}
@@ -365,14 +370,25 @@ func TestScanWithOSSRuleSource_ConcurrentScan(t *testing.T) {
 		}(i)
 	}
 
-	// 等待所有扫描完成
-	time.Sleep(5 * time.Second)
+	// 等待所有扫描完成（或超时）
+	completed := 0
+	timeout := time.After(10 * time.Second)
+	for completed < concurrentScans {
+		select {
+		case <-doneChan:
+			completed++
+		case <-timeout:
+			t.Logf("超时：只有 %d/%d 个扫描完成", completed, concurrentScans)
+			goto CHECK
+		}
+	}
 
+CHECK:
 	// 验证：至少有一个扫描成功
-	assert.Greater(t, atomic.LoadInt32(&successCount), int32(0),
-		"至少应该有一个并发扫描成功")
+	actualSuccess := atomic.LoadInt32(&successCount)
+	assert.Greater(t, actualSuccess, int32(0), "至少应该有一个并发扫描成功")
 
-	log.Infof("✅ 并发测试完成：%d/%d 个扫描成功", successCount, concurrentScans)
+	log.Infof("✅ 并发测试完成：%d/%d 个扫描成功（%d 个完成）", actualSuccess, concurrentScans, completed)
 }
 
 // TestScanWithOSSRuleSource_vs_Database 对比 OSS 和数据库规则源的行为
@@ -490,8 +506,8 @@ public class UserController extends HttpServlet {
 }
 
 // createMockOSSClientWithRules 创建包含测试规则的 Mock OSS 客户端
-func createMockOSSClientWithRules() *sfdb.MockOSSClient {
-	mockClient := sfdb.NewMockOSSClient(sfdb.OSSTypeMinIO)
+func createMockOSSClientWithRules() *yaklib.MockOSSClient {
+	mockClient := yaklib.NewMockOSSClient(yaklib.OSSTypeMinIO)
 
 	// 添加 SQL 注入检测规则
 	mockClient.AddRuleObject("sql_injection_detector", `desc(
@@ -557,7 +573,7 @@ alert $ci_vuln
 
 // CountingOSSClient 带计数功能的 OSS 客户端，用于性能测试
 type CountingOSSClient struct {
-	*sfdb.MockOSSClient
+	*yaklib.MockOSSClient
 	getObjectCalls *int32
 }
 
@@ -566,7 +582,7 @@ func (c *CountingOSSClient) GetObject(bucket, key string) ([]byte, error) {
 	return c.MockOSSClient.GetObject(bucket, key)
 }
 
-func (c *CountingOSSClient) ListObjects(bucket, prefix string) ([]sfdb.OSSObject, error) {
+func (c *CountingOSSClient) ListObjects(bucket, prefix string) ([]yaklib.OSSObject, error) {
 	return c.MockOSSClient.ListObjects(bucket, prefix)
 }
 
@@ -574,7 +590,7 @@ func (c *CountingOSSClient) Close() error {
 	return c.MockOSSClient.Close()
 }
 
-func (c *CountingOSSClient) GetType() sfdb.OSSType {
+func (c *CountingOSSClient) GetType() yaklib.OSSType {
 	return c.MockOSSClient.GetType()
 }
 
