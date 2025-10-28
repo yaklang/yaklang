@@ -10,11 +10,18 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
+	"os"
 	"strings"
 	"text/template"
 )
+
+type streamableField struct {
+	AINodeId string
+	FieldKey string
+}
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
@@ -25,7 +32,31 @@ type LiteForge struct {
 	OutputActionName string
 	ExtendAIDOptions []aid.Option
 
+	streamFields *omap.OrderedMap[string, *streamableField]
+	emitter      *aicommon.Emitter
+
 	OutputJsonHook []jsonextractor.CallbackOption
+}
+
+func WithLiteForge_Emitter(emitter *aicommon.Emitter) LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.emitter = emitter
+		return nil
+	}
+}
+
+func WithLiteForge_StreamableFieldWithAINodeId(aiNodeId string, fieldKey string) LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.streamFields.Set(fieldKey, &streamableField{
+			AINodeId: aiNodeId,
+			FieldKey: fieldKey,
+		})
+		return nil
+	}
+}
+
+func WithLiteForge_StreamableField(fieldKey string) LiteForgeOption {
+	return WithLiteForge_StreamableFieldWithAINodeId("thought", fieldKey)
 }
 
 type LiteForgeOption func(*LiteForge) error
@@ -96,7 +127,8 @@ func WithLiteForge_Prompt(i string) LiteForgeOption {
 
 func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 	lf := &LiteForge{
-		ForgeName: i,
+		ForgeName:    i,
+		streamFields: omap.NewOrderedMap[string, *streamableField](make(map[string]*streamableField)),
 	}
 	for _, o := range opts {
 		err := o(lf)
@@ -123,15 +155,16 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 
 	nonce := strings.ToLower(utils.RandStringBytes(6))
 	var callBuffer bytes.Buffer
-	for _, i := range params {
-		if strings.Contains(i.Value, "\n") {
-			callBuffer.WriteString(i.Key + ": \\\n")
-			for _, line := range utils.ParseStringToLines(i.Value) {
-				callBuffer.WriteString("  ")
-				callBuffer.WriteString(line + " \\\n")
+	if len(params) == 1 {
+		callBuffer.WriteString(params[0].Value)
+	} else {
+		for _, i := range params {
+			if strings.Contains(i.Value, "\n") {
+				callBuffer.WriteString(i.Key + ": \n")
+				callBuffer.WriteString(utils.PrefixLines(i.Value, "  "))
+			} else {
+				callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
 			}
-		} else {
-			callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
 		}
 	}
 	call := callBuffer.String()
@@ -144,17 +177,17 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 {{ if .PROMPT }}<background_{{ .NONCE }}>
 {{ .PROMPT }}
 </background_{{ .NONCE }}>{{end}}
-{{ if .PARAMS }}<params_{{ .NONCE }}>
-{{ .PARAMS }}
-</params_{{ .NONCE }}>{{end}}
+
+{{ if .MEMORY.Timeline }}<timeline_{{ .NONCE }}>
+{{ .MEMORY.Timeline }}
+</timeline_{{ .NONCE }}>{{ end }}
 
 {{ if .MEMORY.PersistentMemory }}# 牢记
 {{ .MEMORY.PersistentMemory}}{{end}}
 
-# timeline
-<timeline_{{ .NONCE }}>
-{{ .MEMORY.Timeline }}
-</timeline_{{ .NONCE }}>
+{{ if .PARAMS }}<params_{{ .NONCE }}>
+{{ .PARAMS }}
+</params_{{ .NONCE }}>{{end}}
 
 # Output Formatter
 
@@ -188,7 +221,29 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
-			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, aicommon.WithActionJSONCallback(l.OutputJsonHook...))
+			var actionOpts = []aicommon.ActionMakerOption{
+				aicommon.WithActionJSONCallback(l.OutputJsonHook...),
+			}
+
+			// add streamable fields handlers
+			for _, i := range l.streamFields.Values() {
+				i := i
+				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler([]string{i.FieldKey}, func(key string, r io.Reader) {
+					r = utils.JSONStringReader(r)
+					if utils.IsNil(l.emitter) {
+						r = io.TeeReader(r, os.Stdout)
+						io.Copy(io.Discard, r)
+						return
+					}
+
+					utils.Debug(func() {
+						r = io.TeeReader(r, os.Stdout)
+					})
+					l.emitter.EmitTextPlainTextStreamEvent(i.AINodeId, r, response.GetTaskIndex())
+				}))
+			}
+
+			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, actionOpts...)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

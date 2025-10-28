@@ -10,20 +10,28 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption) (*aicommon.Action, error) {
+func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	var rawOutputs []any
 	for _, output := range outputs {
 		var rawOpt any = output
 		rawOutputs = append(rawOutputs, rawOpt)
 	}
-	f, err := aiforge.NewLiteForge(
-		actionName,
+
+	gconfig := aicommon.NewGeneralKVConfig(opts...)
+
+	fopts := []aiforge.LiteForgeOption{
 		aiforge.WithLiteForge_Prompt(prompt),
 		aiforge.WithLiteForge_OutputSchemaRaw(
 			actionName,
 			aitool.NewObjectSchemaWithActionName(actionName, rawOutputs...),
 		),
-	)
+	}
+	for _, i := range gconfig.GetStreamableFields() {
+		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
+	}
+	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
+
+	f, err := aiforge.NewLiteForge(actionName, fopts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "create liteforge failed")
 	}

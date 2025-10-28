@@ -92,8 +92,9 @@ func init() {
 						[]aitool.ToolOption{
 							aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new file or modify an existing file? If modifying an existing file, return the file path to modify in 'existed_filepath' and set 'create_new_file' to false. If creating a new file, set 'create_new_file' to true and the system will create it automatically."), aitool.WithParam_Required(true)),
 							aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Effective only when create_new_file is false. Set this field to the file path of the existing file to be modified.")),
-							aitool.WithBoolParam("reason", aitool.WithParam_Description("给出这么做的理由，例如：'用户让我在/tmp/test.yak 创建文件，所以直接使用用户路径，无需创建新文件'"), aitool.WithParam_Required(true)),
+							aitool.WithStringParam("reason", aitool.WithParam_Description("给出这么做的理由，例如：'用户让我在/tmp/test.yak 创建文件，所以直接使用用户路径，无需创建新文件'"), aitool.WithParam_Required(true)),
 						},
+						aicommon.WithGeneralConfigStreamableField("reason"),
 					)
 					if err != nil {
 						log.Errorf("failed to invoke liteforge: %v", err)
@@ -105,7 +106,7 @@ func init() {
 					reason := result.GetString("reason")
 					existed := result.GetString("existed_filepath")
 
-					r.GetConfig().GetEmitter().EmitThoughtStream(task.GetIndex(), reason)
+					r.GetConfig().GetEmitter().EmitThought(task.GetIndex(), reason)
 
 					log.Infof("identified create_new_file: %v", createNewFile)
 					if !createNewFile || existed != "" {

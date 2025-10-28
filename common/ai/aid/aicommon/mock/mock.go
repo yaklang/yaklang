@@ -138,7 +138,7 @@ func (m *MockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[stri
 	}, nil
 }
 
-func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption) (*aicommon.Action, error) {
+func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	log.Infof("mock InvokeLiteForge called with action: %s", actionName)
 
 	if actionName == "memory-triage" {

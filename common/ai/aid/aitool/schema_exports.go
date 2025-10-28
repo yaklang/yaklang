@@ -38,7 +38,7 @@ func NewObjectSchemaWithActionName(name string, opts ...any) string {
 	return NewObjectSchema(params...)
 }
 
-func NewObjectSchema(opts ...any) string {
+func NewObjectSchemaFrameOmap(opts ...any) *omap.OrderedMap[string, any] {
 	var params []ToolOption
 	var props []PropertyOption
 	for _, i := range opts {
@@ -81,6 +81,11 @@ func NewObjectSchema(opts ...any) string {
 	}
 	baseFrame.Set("properties", paramActually)
 	baseFrame.Set("additionalProperties", true)
+	return baseFrame
+}
+
+func NewObjectSchema(opts ...any) string {
+	baseFrame := NewObjectSchemaFrameOmap(opts...)
 	results, _ := json.MarshalIndent(baseFrame, "", "  ")
 	return string(results)
 }
