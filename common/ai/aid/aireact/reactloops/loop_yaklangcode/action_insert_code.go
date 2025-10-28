@@ -98,7 +98,7 @@ var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "insert_code", partialCode)
 
 			if errMsg != "" {
-				invoker.AddToTimeline("advice", "use 'query_document' to find more syntax sample or docs")
+				invoker.AddToTimeline("advice", "use 'grep_yaklang_samples' to find more syntax sample or docs")
 			}
 		},
 	)
