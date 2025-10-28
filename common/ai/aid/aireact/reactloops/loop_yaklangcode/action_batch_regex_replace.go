@@ -29,7 +29,7 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 4. 批量修改特定模式的代码内容
 
 【参数说明】：
-- regexp_pattern (必需) - 正则表达式模式，用于匹配要替换的内容
+- pattern (必需) - 正则表达式模式，用于匹配要替换的内容
 - group (可选) - 指定要替换的捕获组编号（从1开始），如果不指定则替换整个匹配
 - replaced_string (必需) - 替换后的字符串，支持 $1, $2 等捕获组引用
 
@@ -45,7 +45,7 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 - 使用前请确保正则表达式正确，避免误替换`,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(
-				"regexp_pattern",
+				"pattern",
 				aitool.WithParam_Required(true),
 				aitool.WithParam_Description(`正则表达式模式（必需）- 用于匹配要替换的内容
 支持标准的 Go 正则表达式语法，包括：
@@ -94,9 +94,9 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 		},
 		// Validator
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
-			pattern := action.GetString("regexp_pattern")
+			pattern := action.GetString("pattern")
 			if pattern == "" {
-				return utils.Error("batch_regex_replace requires 'regexp_pattern' parameter")
+				return utils.Error("batch_regex_replace requires 'pattern' parameter")
 			}
 
 			replacedString := action.GetString("replaced_string")
@@ -144,7 +144,7 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 			invoker := loop.GetInvoker()
 
 			// 提取参数
-			regexpPattern := action.GetString("regexp_pattern")
+			regexpPattern := action.GetString("pattern")
 			group := action.GetInt("group")
 			replacedString := action.GetString("replaced_string")
 			reason := action.GetString("replace_reason")

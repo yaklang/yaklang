@@ -2,9 +2,9 @@ package aicommon
 
 import (
 	"context"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
+
 
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
@@ -16,7 +16,7 @@ type AIInvokeRuntime interface {
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error)
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
-	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption) (*Action, error)
+	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 
 	// timeline operator
 	AddToTimeline(entry, content string)

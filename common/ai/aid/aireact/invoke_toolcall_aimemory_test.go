@@ -45,7 +45,7 @@ type MockAIMemoryInvoker struct {
 	memoryTriageCallCount int
 }
 
-func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption) (*aicommon.Action, error) {
+func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	if actionName == "memory-triage" {
 		m.memoryTriageCallCount++
 		// 构造mock的返回数据
