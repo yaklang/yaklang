@@ -100,7 +100,8 @@ func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIIn
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
 				aitool.WithStringParam("reason", aitool.WithParam_Description("选择此片段的理由")),
 			),
-		})
+		}, aicommon.WithGeneralConfigStreamableField("reason"),
+	)
 
 	if err != nil {
 		log.Errorf("compressGrepResults: forge failed: %v", err)

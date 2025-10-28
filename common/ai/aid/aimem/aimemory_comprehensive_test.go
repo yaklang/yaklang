@@ -66,7 +66,7 @@ func (m *AdvancedMockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, 
 	}, nil
 }
 
-func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption) (*aicommon.Action, error) {
+func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	// 记录调用
 	m.capturedActions = append(m.capturedActions, actionName)
 	m.capturedPrompts = append(m.capturedPrompts, prompt)
