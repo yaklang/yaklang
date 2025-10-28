@@ -26,7 +26,7 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 1. 批量重命名变量或函数名
 2. 修改配置参数或常量值
 3. 统一代码风格或格式
-4. 批量添加或删除特定模式的代码
+4. 批量修改特定模式的代码内容
 
 【参数说明】：
 - regexp_pattern (必需) - 正则表达式模式，用于匹配要替换的内容
@@ -38,9 +38,10 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 2. 修改变量值：pattern="var\\s+port\\s*=\\s*(\\d+)", replaced_string="var port = 8080"
 3. 添加前缀：pattern="(\\w+)\\(\\)", group=1, replaced_string="prefix_$1"
 
-【注意事项】：
+【重要提醒】：
 - 只能匹配单行内容，不支持跨行正则
 - 替换会应用到所有匹配的行
+- 如需删除整行，请使用 delete_lines action 而不是设置 replaced_string 为空
 - 使用前请确保正则表达式正确，避免误替换`,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(

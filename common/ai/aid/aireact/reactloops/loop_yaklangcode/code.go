@@ -156,8 +156,8 @@ func init() {
 				grepYaklangSamplesAction(r, docSearcher), // 新增：快速 grep 代码样例
 				writeCode(r),
 				modifyCode(r),
-				insertCode(r),
-				deleteCode(r),
+				insertLines(r),
+				deleteLines(r),
 				batchRegexReplace(r),
 			}
 

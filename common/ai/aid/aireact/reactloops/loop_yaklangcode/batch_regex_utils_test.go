@@ -431,6 +431,85 @@ func TestBatchRegexReplace_ErrorCases(t *testing.T) {
 	}
 }
 
+func TestBatchRegexReplace_DeleteLines(t *testing.T) {
+	tests := []struct {
+		name                 string
+		code                 string
+		opts                 *BatchRegexReplaceOptions
+		expected             string
+		expectedDeletedCount int
+	}{
+		{
+			name: "delete single comment line",
+			code: "line1\n// 保存ZIP文件\nline3",
+			opts: &BatchRegexReplaceOptions{
+				Pattern:     "^// 保存ZIP文件$",
+				Replacement: "",
+				Group:       0,
+			},
+			expected:             "line1\nline3",
+			expectedDeletedCount: 1,
+		},
+		{
+			name: "delete multiple comment lines",
+			code: "line1\n// 保存ZIP文件\nline3\n// 保存ZIP文件\nline5",
+			opts: &BatchRegexReplaceOptions{
+				Pattern:     "^// 保存ZIP文件$",
+				Replacement: "",
+				Group:       0,
+			},
+			expected:             "line1\nline3\nline5",
+			expectedDeletedCount: 2,
+		},
+		{
+			name: "delete empty lines",
+			code: "line1\n\nline3\n\nline5",
+			opts: &BatchRegexReplaceOptions{
+				Pattern:     "^$",
+				Replacement: "",
+				Group:       0,
+			},
+			expected:             "line1\nline3\nline5",
+			expectedDeletedCount: 2,
+		},
+		{
+			name: "partial line replacement (not deletion)",
+			code: "// TODO: 保存ZIP文件\n// FIXME: 保存ZIP文件",
+			opts: &BatchRegexReplaceOptions{
+				Pattern:     "保存ZIP文件",
+				Replacement: "",
+				Group:       0,
+			},
+			expected:             "// TODO: \n// FIXME: ",
+			expectedDeletedCount: 0, // 不是删除整行，而是部分替换
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := BatchRegexReplace(tt.code, tt.opts)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expected, result.ModifiedCode)
+
+			// 检查删除的行数
+			deletedCount := 0
+			for _, modLine := range result.ModifiedLines {
+				if modLine.ModifiedLine == "[DELETED]" {
+					deletedCount++
+				}
+			}
+			assert.Equal(t, tt.expectedDeletedCount, deletedCount)
+
+			// 验证行数变化
+			originalLines := len(strings.Split(tt.code, "\n"))
+			resultLines := len(strings.Split(result.ModifiedCode, "\n"))
+			expectedLines := originalLines - tt.expectedDeletedCount
+			assert.Equal(t, expectedLines, resultLines)
+		})
+	}
+}
+
 // 性能测试
 func BenchmarkBatchRegexReplace(b *testing.B) {
 	// 创建一个较大的代码示例
