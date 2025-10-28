@@ -18,6 +18,25 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// convertRulesToChannel 将规则列表转换为channel（避免重复加载）
+func convertRulesToChannel(rules []*schema.SyntaxFlowRule, ctx context.Context) chan *schema.SyntaxFlowRule {
+	ruleChan := make(chan *schema.SyntaxFlowRule, 10)
+
+	go func() {
+		defer close(ruleChan)
+		for _, rule := range rules {
+			select {
+			case ruleChan <- rule:
+			case <-ctx.Done():
+				log.Info("context cancelled, stop sending rules")
+				return
+			}
+		}
+	}()
+
+	return ruleChan
+}
+
 type scanManager struct {
 	// *Config
 	Config *Config
@@ -206,7 +225,6 @@ func (m *scanManager) RestoreTask() error {
 	}
 	m.taskRecorder = task
 	m.status = task.Status
-	m.status = task.Status
 	// m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 
 	// load config
@@ -247,89 +265,211 @@ func (m *scanManager) initByConfig() error {
 		return utils.Errorf("config is nil")
 	}
 
+	// 步骤1: 加载项目配置（如果有项目ID）
+	if err := m.loadProjectConfig(); err != nil {
+		return err
+	}
+
+	log.Infof("initializing scan task with config: %+v", config.Config.GetRuleInput())
+
+	// 步骤2: 根据不同模式设置规则channel
+	if err := m.setupRuleChannel(); err != nil {
+		return err
+	}
+
+	// 步骤3: 计算总任务数
+	programCount := len(config.GetProgramNames())
+	totalQuery := m.rulesCount * int64(programCount)
+	log.Infof("ruleCount: %d, programCount: %d, totalQuery: %d", m.rulesCount, programCount, totalQuery)
+	m.setTotalQuery(totalQuery)
+
+	return nil
+}
+
+// loadProjectConfig 加载项目配置
+func (m *scanManager) loadProjectConfig() error {
+	config := m.Config
 	projectId := config.GetProjectID()
+
+	// 如果有项目ID且未指定程序名，从项目加载配置
 	if projectId != 0 && len(config.GetProgramNames()) == 0 {
-		// init by project info in db
-		project, err := yakit.QuerySSAProjectById((projectId))
+		project, err := yakit.QuerySSAProjectById(projectId)
 		if err != nil || project == nil {
 			return utils.Errorf("query ssa project by id failed: %s", err)
 		}
-		config, err := project.GetConfig()
-		if config == nil || err != nil {
+
+		projectConfig, err := project.GetConfig()
+		if projectConfig == nil || err != nil {
 			return utils.Errorf("scan config error: %v", err)
 		}
 
-		// m.programs = []string{project.ProjectName}
-		m.Config.Config = config
-		// m.ignoreLanguage = scanConfig.IgnoreLanguage
-		// m.memory = scanConfig.Memory
-		// m.concurrency = scanConfig.Concurrency
-	} else {
-		// init by stream config
-		// if len(config.GetProgramName()) == 0 {
-		// 	return utils.Errorf("program name is empty")
-		// }
-		// m.programs = config.GetProgramName()
-		// m.ignoreLanguage = config.GetIgnoreLanguage()
-		// m.memory = config.GetMemory()
-		// m.concurrency = config.GetConcurrency()
+		m.Config.Config = projectConfig
+		log.Infof("loaded config from project %d", projectId)
 	}
 
-	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
-		db := consts.GetGormProfileDatabase()
-		db = yakit.FilterSyntaxFlowRule(db, filter)
-		// get all rule name
-		var ruleNames []string
-		err := db.Pluck("rule_name", &ruleNames).Error
-		if err != nil {
-			return utils.Errorf("count rules failed: %s", err)
-		}
-		m.ruleChan = sfdb.YieldSyntaxFlowRules(db, m.ctx)
-		m.rulesCount = int64(len(ruleNames))
-		m.kind = schema.SFResultKindScan
-		return nil
-	}
+	return nil
+}
 
-	log.Errorf("config: %v", config.Config.GetRuleInput())
+// setupRuleChannel 根据配置设置规则channel
+func (m *scanManager) setupRuleChannel() error {
+	config := m.Config
+
+	// 模式1: Debug模式（单规则调试）
 	if input := config.GetRuleInput(); input != nil {
-		// start debug mode scan task
-		ruleCh := make(chan *schema.SyntaxFlowRule)
-		go func() {
-			defer close(ruleCh)
-			if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
-				m.errorCallback("compile rule failed: %s", err)
-			} else {
-				ruleCh <- rule
-			}
-		}()
-		m.ruleChan = ruleCh
-		m.rulesCount = 1
-		m.kind = schema.SFResultKindDebug
-	} else if config.GetRuleFilter() != nil {
-		if err := setRuleChan(config.GetRuleFilter()); err != nil {
-			return err
+		return m.setupDebugMode(input)
+	}
+
+	// 模式2: Filter模式（批量扫描）
+	if filter := config.GetRuleFilter(); filter != nil {
+		return m.setupScanMode(filter)
+	}
+
+	// 模式3: Project模式（项目规则）
+	if projectId := config.GetProjectID(); projectId != 0 {
+		return m.setupProjectMode(uint64(projectId))
+	}
+
+	// 模式4: 默认模式（全部规则）
+	return m.setupScanMode(nil)
+}
+
+// setupDebugMode 设置Debug模式（单规则调试）
+func (m *scanManager) setupDebugMode(input *ypb.SyntaxFlowRuleInput) error {
+	ruleCh := make(chan *schema.SyntaxFlowRule)
+	go func() {
+		defer close(ruleCh)
+		if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
+			m.errorCallback("compile rule failed: %s", err)
+		} else {
+			ruleCh <- rule
 		}
-	} else if projectId != 0 {
-		project, err := yakit.QuerySSAProjectById(projectId)
-		if err != nil {
-			return utils.Errorf("load ssa project by id failed: %s", err)
-		}
-		config, err := project.GetConfig()
-		if err != nil {
-			return utils.Errorf("get rule filter from project config failed: %s", err)
-		}
-		if err := setRuleChan(config.GetRuleFilter()); err != nil {
-			return err
-		}
-	} else {
-		if err := setRuleChan(nil); err != nil {
-			return err
+	}()
+
+	m.ruleChan = ruleCh
+	m.rulesCount = 1
+	m.kind = schema.SFResultKindDebug
+	log.Info("setup debug mode: single rule")
+	return nil
+}
+
+// setupProjectMode 设置Project模式（项目规则）
+func (m *scanManager) setupProjectMode(projectId uint64) error {
+	project, err := yakit.QuerySSAProjectById(projectId)
+	if err != nil {
+		return utils.Errorf("load ssa project by id failed: %s", err)
+	}
+
+	config, err := project.GetConfig()
+	if err != nil {
+		return utils.Errorf("get rule filter from project config failed: %s", err)
+	}
+
+	return m.setupScanMode(config.GetRuleFilter())
+}
+
+// setupScanMode 设置扫描模式（批量规则）
+func (m *scanManager) setupScanMode(filter *ypb.SyntaxFlowRuleFilter) error {
+	// 步骤1: 创建规则加载器
+	loader, err := m.createRuleLoader()
+	if err != nil {
+		return err
+	}
+
+	// 步骤2: 根据加载器类型执行不同的加载策略
+	if loader.GetLoaderType() == sfdb.LoaderTypeDatabase {
+		return m.loadRulesFromDatabase(loader, filter)
+	}
+
+	// OSS或其他类型加载器
+	return m.loadRulesFromOSS(loader, filter)
+}
+
+// createRuleLoader 创建规则加载器
+func (m *scanManager) createRuleLoader() (sfdb.RuleLoader, error) {
+	db := consts.GetGormProfileDatabase()
+
+	// 检查是否配置了OSS客户端
+	var ossClient sfdb.OSSClient
+	if clientInterface := m.Config.GetOSSRuleClient(); clientInterface != nil {
+		if client, ok := clientInterface.(sfdb.OSSClient); ok {
+			ossClient = client
 		}
 	}
 
-	programCount := len(config.GetProgramNames())
-	log.Errorf("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
-	m.setTotalQuery(m.rulesCount * int64(programCount))
+	// 根据配置创建相应的加载器
+	if ossClient != nil {
+		log.Info("creating OSS rule loader")
+		return sfdb.CreateRuleLoader(sfdb.RuleSourceTypeOSS, ossClient, db), nil
+	}
+
+	log.Info("creating database rule loader")
+	return sfdb.CreateDefaultRuleLoader(db), nil
+}
+
+// loadRulesFromDatabase 从数据库加载规则（轻量计数 + 流式加载）
+func (m *scanManager) loadRulesFromDatabase(loader sfdb.RuleLoader, filter *ypb.SyntaxFlowRuleFilter) error {
+	db := consts.GetGormProfileDatabase()
+	db = yakit.FilterSyntaxFlowRule(db, filter)
+
+	// 轻量计数：只查询规则名称
+	var ruleNames []string
+	if err := db.Pluck("rule_name", &ruleNames).Error; err != nil {
+		return utils.Errorf("count rules failed: %s", err)
+	}
+
+	m.rulesCount = int64(len(ruleNames))
+	log.Infof("database: counted %d rules", m.rulesCount)
+
+	// 流式加载：使用稳定的 YieldSyntaxFlowRules（避免嵌套 goroutine 和资源竞争）
+	// 注意：不使用 convertRuleLoaderToChannel，因为它会引入额外的 goroutine 层
+	// 导致 context 取消时出现竞争条件（特别是在循环测试时）
+	m.ruleChan = sfdb.YieldSyntaxFlowRules(db, m.ctx)
+	m.kind = schema.SFResultKindScan
+	return nil
+}
+
+// loadRulesFromOSS 从OSS加载规则（一次性加载 + 缓存）
+// 同时也会从数据库加载自定义规则，实现 OSS + Database 规则合并
+func (m *scanManager) loadRulesFromOSS(loader sfdb.RuleLoader, filter *ypb.SyntaxFlowRuleFilter) error {
+	// 一次性加载所有 OSS 规则
+	ossRules, err := loader.LoadRules(m.ctx, filter)
+	if err != nil {
+		log.Warnf("load rules from %s failed: %v, fallback to database", loader.GetLoaderType(), err)
+		// 失败则回退到数据库
+		dbLoader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
+		return m.loadRulesFromDatabase(dbLoader, filter)
+	}
+
+	log.Infof("OSS: loaded %d rules", len(ossRules))
+
+	// 同时从数据库加载自定义规则
+	dbLoader := sfdb.CreateDefaultRuleLoader(consts.GetGormProfileDatabase())
+	dbRules, err := dbLoader.LoadRules(m.ctx, filter)
+	if err != nil {
+		log.Warnf("load rules from database failed: %v, using OSS rules only", err)
+		// 数据库失败不影响 OSS 规则使用
+		dbRules = nil
+	} else {
+		log.Infof("Database: loaded %d custom rules", len(dbRules))
+	}
+
+	// 合并 OSS 规则和数据库规则
+	allRules := make([]*schema.SyntaxFlowRule, 0, len(ossRules)+len(dbRules))
+	allRules = append(allRules, ossRules...)
+	allRules = append(allRules, dbRules...)
+
+	m.rulesCount = int64(len(allRules))
+	log.Infof("Total: %d rules (OSS: %d, Database: %d)", len(allRules), len(ossRules), len(dbRules))
+
+	// 使用合并后的规则创建channel（避免重复加载）
+	m.ruleChan = convertRulesToChannel(allRules, m.ctx)
+	m.kind = schema.SFResultKindScan
+
+	// 关闭加载器
+	if err := loader.Close(); err != nil {
+		log.Errorf("close rule loader failed: %v", err)
+	}
+
 	return nil
 }
 

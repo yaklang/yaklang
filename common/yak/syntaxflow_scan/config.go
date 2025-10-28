@@ -49,6 +49,7 @@ const (
 	processCallbackKey = "processCallback"
 	reporterKey        = "reporter"
 	reporterWriterKey  = "reporterWriter"
+	ossRuleClientKey   = "ossRuleClient"
 )
 
 func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
@@ -83,6 +84,14 @@ func WithErrorCallback(callback errorCallback) ssaconfig.Option {
 func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
 	return func(sc *ssaconfig.Config) error {
 		sc.SetExtraInfo(processCallbackKey, callback)
+		return nil
+	}
+}
+
+// WithOSSRuleSource 设置OSS规则来源
+func WithOSSRuleSource(ossClient interface{}) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(ossRuleClientKey, ossClient)
 		return nil
 	}
 }
@@ -128,4 +137,15 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// GetOSSRuleClient 获取OSS规则客户端
+func (c *Config) GetOSSRuleClient() interface{} {
+	if c.ExtraInfo == nil {
+		return nil
+	}
+	if client, ok := c.ExtraInfo[ossRuleClientKey]; ok {
+		return client
+	}
+	return nil
 }
