@@ -216,6 +216,8 @@ var DESEncryptCBCWithPKCSPadding = DESEncFactory(PKCS5Padding, CBC)
 // 它接受一个密钥（key）、需要加密的数据（data to encrypt）和一个初始化向量（iv）。
 // 密钥的长度必须是 8 个字节，并且 iv 可以是 nil 或者 8 个字节长。
 // 如果 iv 为 nil，它将被固定为密钥，或者用零填充到 8 个字节。
+// 加密数据长度需要是8的倍数。默认使用零填充方式进行填充。
+// 如果希望使用其他填充方式，请使用 codec.PKCS7PaddingForDES 进行填充后，再调用此函数进行加密。
 // DESCBCEncrypt DESEncrypt 是同一个函数。
 // example:
 // ```
