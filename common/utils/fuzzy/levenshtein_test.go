@@ -24,7 +24,7 @@ func TestLevenshtein(t *testing.T) {
 	for _, test := range levenshteinDistanceTests {
 		distance := LevenshteinDistance(test.s, test.t)
 		if int(distance) != test.wanted {
-			t.Errorf("got distance %d, expected %d for %s in %s",
+			t.Errorf("got distance %f, expected %d for %s in %s",
 				distance, test.wanted, test.s, test.t)
 		}
 	}

@@ -4,11 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
 )
 
 //go:embed fragment_summarizer_prompts/persistent.txt
