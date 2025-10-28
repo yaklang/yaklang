@@ -158,6 +158,7 @@ func init() {
 				modifyCode(r),
 				insertCode(r),
 				deleteCode(r),
+				batchRegexReplace(r),
 			}
 
 			preset = append(preset, opts...)
