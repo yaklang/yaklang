@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -43,9 +42,9 @@ func ExportRAGToFile(collectionName string, fileName string, opts ...RAGExportOp
 
 // ExportRAGToBinary 导出RAG数据为二进制格式
 func ExportRAGToBinary(collectionName string, opts ...RAGExportOptionFunc) (io.Reader, error) {
-	db := consts.GetGormProfileDatabase()
 	cfg := NewRAGConfig(opts...)
 	buf := new(bytes.Buffer)
+	db := cfg.DB
 
 	// 进度回调辅助函数
 	reportProgress := func(percent float64, message string, messageType string) {
