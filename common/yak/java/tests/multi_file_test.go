@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -11,6 +12,9 @@ import (
 )
 
 func Test_Multi_File(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip in CI due to the dependency on relative file path")
+	}
 	progs, err := ssaapi.ParseProjectFromPath(
 		"./code/mutiFileDemo",
 		ssaapi.WithLanguage(ssaconfig.JAVA),

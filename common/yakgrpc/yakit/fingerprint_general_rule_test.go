@@ -1,12 +1,13 @@
 package yakit
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestCURD_GeneralRule_base(t *testing.T) {
@@ -16,6 +17,9 @@ func TestCURD_GeneralRule_base(t *testing.T) {
 	ruleExpr2 := utils.RandStringBytes(10)
 
 	db := consts.GetGormProfileDatabase()
+	// 清理测试数据，确保测试环境干净
+	ClearGeneralRule(db)
+
 	generalRule := &schema.GeneralRule{
 		MatchExpression: ruleExpr1,
 		RuleName:        ruleName1,
