@@ -364,6 +364,15 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
+// Get 获取或创建 RAG 集合
+// 如果集合不存在，会自动创建一个新的集合
+// Example:
+// ```
+//
+//	ragSystem = rag.GetCollection("my_collection")~
+//	ragSystem = rag.GetCollection("my_collection", rag.ragForceNew(true))~
+//
+// ```
 func Get(name string, i ...any) (*RAGSystem, error) {
 	log.Infof("getting RAG collection '%s' with local embedding service", name)
 
