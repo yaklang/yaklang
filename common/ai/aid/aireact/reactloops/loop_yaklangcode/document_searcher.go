@@ -21,6 +21,8 @@ type YakdocSearchResult struct {
 	Content string
 }
 
+// DEPRECATED: handleQueryDocument 已被 grep_yaklang_samples action 替代
+// 保留此函数仅用于向后兼容，不应在新代码中使用
 // handleQueryDocument handles document query action
 // Returns: documentResults string, shouldContinue bool
 func handleQueryDocument(
