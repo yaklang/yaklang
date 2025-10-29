@@ -3,7 +3,9 @@ package ssaconfig
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -138,18 +140,18 @@ func TestExtraInfo(t *testing.T) {
 	cfg.SetExtraInfo("int", 123)
 	cfg.SetExtraInfo("bool", true)
 
-	v, ok := cfg.GetExtraInfo("string")
+	stringGot, ok := cfg.GetExtraInfo("string")
 	require.True(t, ok)
-	require.Equal(t, "value", v)
-	require.Equal(t, "value", cfg.GetExtraInfoString("string"))
-	require.Equal(t, 123, cfg.GetExtraInfoInt("int"))
-	require.True(t, cfg.GetExtraInfoBool("bool"))
+	require.Equal(t, 1, len(stringGot))
+	require.Equal(t, "value", stringGot[0])
+
+	intGot, ok := cfg.GetExtraInfo("int")
+	require.True(t, ok)
+	require.Equal(t, 1, len(intGot))
+	require.Equal(t, 123, intGot[0])
 
 	_, ok = cfg.GetExtraInfo("missing")
 	require.False(t, ok)
-	require.Equal(t, "", cfg.GetExtraInfoString("missing"))
-	require.Equal(t, 0, cfg.GetExtraInfoInt("missing"))
-	require.False(t, cfg.GetExtraInfoBool("missing"))
 }
 
 func TestOptionRequiresMode(t *testing.T) {
@@ -453,4 +455,160 @@ func TestMultipleOptionsOnSameField(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cfg.BaseInfo)
 	require.Equal(t, []string{"prog1", "prog2", "prog3"}, cfg.BaseInfo.ProgramNames)
+}
+
+type OtherScanConfig struct {
+	*Config
+	OtherField string
+}
+
+const otherKey = "other_scan/otherField"
+
+var WithOtherField = SetOption(otherKey, func(c *OtherScanConfig, val string) {
+	c.OtherField = val
+})
+
+func NewOtherScanConfig(opts ...Option) (*OtherScanConfig, error) {
+	cfg := &OtherScanConfig{
+		Config: &Config{},
+	}
+	var err error
+	cfg.Config, err = New(ModeSyntaxFlowScan, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	ApplyExtraOptions(cfg, cfg.Config)
+	return cfg, nil
+}
+
+// --- 测试 ---
+
+func TestApplyExtraOptions(t *testing.T) {
+
+	t.Run("Correctly applies extra option to derived config", func(t *testing.T) {
+		key := uuid.NewString()
+		prefix := "other_scan/"
+		run := false
+		withCheckCallback := SetOption(key, func(c *OtherScanConfig, value string) {
+			run = true
+			c.OtherField = prefix + value
+		})
+
+		value := uuid.NewString()
+		want := prefix + value
+
+		cfg, err := NewOtherScanConfig(
+			withCheckCallback(value),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.True(t, run, "Callback should have been executed")
+		require.Equal(t, want, cfg.OtherField, "OtherField should be set correctly by ApplyExtraOptions")
+
+	})
+
+	t.Run("handler has string with option", func(t *testing.T) {
+		key := uuid.NewString()
+		cfg, err := NewOtherScanConfig(
+			WithOtherField(key),
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.Equal(t, key, cfg.OtherField, "OtherField should be set correctly by ApplyExtraOptions")
+	})
+
+	t.Run("Handles nil options without error", func(t *testing.T) {
+		// 1. 不传入任何选项
+		cfg, err := NewOtherScanConfig()
+
+		// 2. 断言
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// 3. 验证特定字段为 nil
+		require.Empty(t, cfg.OtherField, "OtherField should be empty when no option is provided")
+	})
+
+	t.Run("Safely ignores extra option for a different type", func(t *testing.T) {
+		// 1. 传入一个为 *OtherScanConfig 准备的选项
+		cfg, err := NewSyntaxFlowScanConfig(
+			WithOtherField("this-should-be-ignored"),
+		)
+		ApplyExtraOptions(cfg, cfg)
+
+		// 2. 断言
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		// 4. 验证 ExtraInfo 仍然包含了这个"不相关"的选项 (它只是没被应用)
+		require.Contains(t, cfg.ExtraInfo, otherKey, "ExtraInfo should still contain the other key")
+		require.IsType(t, ExtraOption[*OtherScanConfig]{}, cfg.ExtraInfo[otherKey], "The stored type should be for OtherScanConfig")
+	})
+}
+
+type MapConfig struct {
+	*Config
+	FieldMap map[string]string
+}
+
+var withFeildMap = SetOption("map_config/field_map", func(c *MapConfig, val struct {
+	name  string
+	value string
+}) {
+	if c.FieldMap == nil {
+		c.FieldMap = make(map[string]string)
+	}
+	c.FieldMap[val.name] = val.value
+})
+
+func WithFieldMap(name, value string) Option {
+	return withFeildMap(struct {
+		name  string
+		value string
+	}{
+		name:  name,
+		value: value,
+	})
+}
+
+func NewMapConfig(opts ...Option) (*MapConfig, error) {
+	cfg := &MapConfig{
+		Config: &Config{},
+	}
+	var err error
+	cfg.Config, err = New(ModeProjectBase, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	ApplyExtraOptions(cfg, cfg.Config)
+	return cfg, nil
+}
+
+func TestWrapOption(t *testing.T) {
+	t.Run("Correctly applies map option to derived config", func(t *testing.T) {
+		cfg, err := NewMapConfig(
+			WithFieldMap("key1", "value1"),
+			WithFieldMap("key2", "value2"),
+		)
+
+		log.Errorf("%+v", cfg)
+
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+		require.NotNil(t, cfg.FieldMap)
+		require.Equal(t, 2, len(cfg.FieldMap))
+
+		// check key value
+		value1, ok1 := cfg.FieldMap["key1"]
+		require.True(t, ok1)
+		require.Equal(t, "value1", value1)
+
+		value2, ok2 := cfg.FieldMap["key2"]
+		require.True(t, ok2)
+		require.Equal(t, "value2", value2)
+	})
 }

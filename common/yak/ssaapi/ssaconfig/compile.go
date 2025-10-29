@@ -6,7 +6,8 @@ import (
 
 // 基础信息配置
 type BaseInfo struct {
-	ProgramNames       []string `json:"program_names"`
+	ProgramNames []string `json:"program_names"`
+	// TODO: set project ID should update config with this project??
 	ProjectID          uint64   `json:"project_id"`
 	ProjectName        string   `json:"project_name"`
 	ProjectDescription string   `json:"project_description"`
@@ -73,6 +74,16 @@ func WithProjectID(projectId uint64) Option {
 			return err
 		}
 		c.BaseInfo.ProjectID = projectId
+		return nil
+	}
+}
+
+func WithProjectName(name string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Name"); err != nil {
+			return err
+		}
+		c.BaseInfo.ProjectName = name
 		return nil
 	}
 }
