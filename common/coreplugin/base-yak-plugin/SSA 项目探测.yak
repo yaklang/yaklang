@@ -14,6 +14,13 @@ languages = cli.StringSlice(
 )
 
 
+noCompile := cli.Bool("no-compile",
+    cli.setDefault(false),
+    cli.setVerboseName("跳过编译"),
+    cli.setHelp("跳过编译步骤，只产生分析结果。"),
+)
+
+
 
 concurrency := cli.Int("concurrency",
     cli.setVerboseName("并发数"),
@@ -63,6 +70,7 @@ var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "
 
 params = {
     "program_name": "",
+    "project_name":"",
     "language": "",
     "info": {
         "kind": "",
@@ -143,6 +151,7 @@ func generateFileName(kind, filename) {
     filename2 = str.Split(filename2, "\\")[-1]
     name := sprintf("%s(%s)",  filename2, time.Now().Format("2006-0102-15:04"))
     params.program_name = name
+    params.project_name = filename2 
 }
 func AutoParseLanguage() {
     maxinfo = {"key": "", "value": 0}
@@ -357,6 +366,11 @@ if params.error.kind != "" {
 }
 
 generateDesc()
+
+if noCompile {
+    yakit.Info("跳过编译步骤，仅产生分析结果。")
+    return
+}
 
 programName = sprint(params.program_name)
 language = sprint(params.language)
