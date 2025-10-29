@@ -48,49 +48,32 @@ type ScanTaskCallback struct {
 }
 
 const (
-	pauseFuncKey       = "pauseFunc"
-	resultCallbackKey  = "resultCallback"
-	errorCallbackKey   = "errorCallback"
-	processCallbackKey = "processCallback"
-	reporterKey        = "reporter"
-	reporterWriterKey  = "reporterWriter"
+	pauseFuncKey       = "syntaxflow-scan/pauseFunc"
+	resultCallbackKey  = "syntaxflow-scan/resultCallback"
+	errorCallbackKey   = "syntaxflow-scan/errorCallback"
+	processCallbackKey = "syntaxflow-scan/processCallback"
+	reporterKey        = "syntaxflow-scan/reporter"
 )
 
-func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(reporterKey, reporter)
-		return nil
-	}
-}
+var WithReporter = ssaconfig.SetOption(reporterKey, func(c *Config, reporter sfreport.IReport) {
+	c.Reporter = reporter
+})
 
-func WithPauseFunc(pause func() bool) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(pauseFuncKey, pause)
-		return nil
-	}
-}
+var WithPauseFunc = ssaconfig.SetOption(pauseFuncKey, func(c *Config, pause func() bool) {
+	c.pauseCheck = pause
+})
 
-func WithScanResultCallback(callback ScanResultCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(resultCallbackKey, callback)
-		return nil
-	}
-}
+var WithScanResultCallback = ssaconfig.SetOption(resultCallbackKey, func(c *Config, callback ScanResultCallback) {
+	c.resultCallback = callback
+})
 
-func WithErrorCallback(callback errorCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(errorCallbackKey, callback)
-		return nil
-	}
-}
+var WithErrorCallback = ssaconfig.SetOption(errorCallbackKey, func(c *Config, callback errorCallback) {
+	c.errorCallback = callback
+})
 
-// WithProcessCallback 设置扫描进度回调函数
-func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(processCallbackKey, callback)
-		return nil
-	}
-}
+var WithProcessCallback = ssaconfig.SetOption(processCallbackKey, func(c *Config, callback ProcessCallback) {
+	c.ProcessCallback = callback
+})
 
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	cfg := &Config{
@@ -102,35 +85,6 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 		return nil, err
 	}
 
-	if f, ok := cfg.ExtraInfo[pauseFuncKey]; ok {
-		if pauseFunc, ok := f.(func() bool); ok {
-			cfg.pauseCheck = pauseFunc
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[resultCallbackKey]; ok {
-		if resultCallback, ok := f.(ScanResultCallback); ok {
-			cfg.resultCallback = resultCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[errorCallbackKey]; ok {
-		if errorCallback, ok := f.(errorCallback); ok {
-			cfg.errorCallback = errorCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[processCallbackKey]; ok {
-		if processCallback, ok := f.(ProcessCallback); ok {
-			cfg.ProcessCallback = processCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[reporterKey]; ok {
-		if reporter, ok := f.(sfreport.IReport); ok {
-			cfg.Reporter = reporter
-		}
-	}
-
+	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	return cfg, nil
 }

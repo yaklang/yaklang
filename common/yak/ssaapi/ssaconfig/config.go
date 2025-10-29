@@ -1,6 +1,8 @@
 package ssaconfig
 
-import "context"
+import (
+	"context"
+)
 
 type Config struct {
 	ctx            context.Context
@@ -13,7 +15,7 @@ type Config struct {
 	SyntaxFlowRule *SyntaxFlowRuleConfig
 
 	// 其他配置项可以在这里添加
-	ExtraInfo map[string]any `json:"-"` // 用于存储外部传入的其他信息
+	ExtraInfo map[string][]any `json:"-"` // 用于存储外部传入的其他信息
 }
 
 type Option func(*Config) error
@@ -35,7 +37,7 @@ const (
 
 func New(mode Mode, opts ...Option) (*Config, error) {
 	cfg := &Config{
-		ExtraInfo: map[string]any{},
+		ExtraInfo: map[string][]any{},
 	}
 	cfg.Mode = mode
 	// New intentionally does not eagerly initialize nested config structs.
@@ -95,7 +97,7 @@ func defaultSyntaxFlowRuleConfig() *SyntaxFlowRuleConfig {
 
 // --- ExtraInfo 扩展信息 Get/Set 方法 ---
 
-func (c *Config) GetExtraInfo(key string) (any, bool) {
+func (c *Config) GetExtraInfo(key string) ([]any, bool) {
 	if c == nil || c.ExtraInfo == nil {
 		return nil, false
 	}
@@ -108,61 +110,11 @@ func (c *Config) SetExtraInfo(key string, value any) {
 		return
 	}
 	if c.ExtraInfo == nil {
-		c.ExtraInfo = map[string]any{}
+		c.ExtraInfo = map[string][]any{}
 	}
-	c.ExtraInfo[key] = value
+	c.ExtraInfo[key] = append(c.ExtraInfo[key], value)
 }
 
-func (c *Config) GetExtraInfoString(key string) string {
-	if c == nil || c.ExtraInfo == nil {
-		return ""
-	}
-	val, ok := c.ExtraInfo[key]
-	if !ok {
-		return ""
-	}
-	if str, ok := val.(string); ok {
-		return str
-	}
-	return ""
-}
-
-func (c *Config) GetExtraInfoInt(key string) int {
-	if c == nil || c.ExtraInfo == nil {
-		return 0
-	}
-	val, ok := c.ExtraInfo[key]
-	if !ok {
-		return 0
-	}
-	if i, ok := val.(int); ok {
-		return i
-	}
-	return 0
-}
-
-func (c *Config) GetExtraInfoBool(key string) bool {
-	if c == nil || c.ExtraInfo == nil {
-		return false
-	}
-	val, ok := c.ExtraInfo[key]
-	if !ok {
-		return false
-	}
-	if b, ok := val.(bool); ok {
-		return b
-	}
-	return false
-}
-
-// --- ExtraInfo 扩展信息 Options ---
-
-func WithExtraInfo(key string, value any) Option {
-	return func(c *Config) error {
-		c.SetExtraInfo(key, value)
-		return nil
-	}
-}
 func WithContext(ctx context.Context) Option {
 	return func(c *Config) error {
 		c.ctx = ctx
@@ -187,4 +139,42 @@ func (c *Config) IsContextCancel() bool {
 	default:
 		return false
 	}
+}
+
+type ExtraOption[C any] struct {
+	fn    func(C, any)
+	value any
+}
+
+func ApplyExtraOptions[C any](config C, c *Config) {
+	for name, option := range c.ExtraInfo {
+		_ = name
+		for _, option := range option {
+			if extraOpt, ok := option.(ExtraOption[C]); ok {
+				extraOpt.fn(config, extraOpt.value)
+			}
+		}
+	}
+}
+
+// type WithFunction[T any] func(T) Option
+
+func SetOption[TValue, TCache any](
+	name string,
+	fn func(TCache, TValue),
+) func(TValue) Option {
+	with := func(value TValue) Option {
+		return func(c *Config) error {
+			c.SetExtraInfo(name, ExtraOption[TCache]{
+				fn: func(u TCache, a any) {
+					if v, ok := a.(TValue); ok {
+						fn(u, v)
+					}
+				},
+				value: value,
+			})
+			return nil
+		}
+	}
+	return with
 }
