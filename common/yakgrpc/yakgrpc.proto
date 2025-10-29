@@ -791,6 +791,7 @@ service Yak {
 
   rpc SyntaxFlowRuleToOnline(SyntaxFlowRuleToOnlineRequest) returns (stream SyntaxFlowRuleOnlineProgress);
   rpc DownloadSyntaxFlowRule(DownloadSyntaxFlowRuleRequest) returns (stream SyntaxFlowRuleOnlineProgress);
+  rpc DownloadSyntaxFlowRuleFromOSS(DownloadSyntaxFlowRuleFromOSSRequest) returns (stream SyntaxFlowRuleOnlineProgress);
 
   // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
@@ -7329,6 +7330,23 @@ message SyntaxFlowRuleOnlineProgress {
 message DownloadSyntaxFlowRuleRequest {
   string Token = 1;
   SyntaxFlowRuleFilter Filter = 2;
+}
+
+// OSS配置
+message OSSConfig {
+  string Type = 1;              // OSS类型: "aliyun", "s3", "minio"
+  string Endpoint = 2;          // OSS endpoint
+  string AccessKeyId = 3;       // Access Key ID
+  string AccessKeySecret = 4;   // Access Key Secret
+  string Bucket = 5;            // Bucket名称
+  string Prefix = 6;            // 规则文件前缀
+  string Region = 7;            // 区域（AWS S3需要）
+  bool EnableSSL = 8;           // 是否启用SSL
+}
+
+// 从OSS下载规则请求
+message DownloadSyntaxFlowRuleFromOSSRequest {
+  OSSConfig OssConfig = 1;      // OSS配置
 }
 
 message SyntaxFlowScanRequest{
