@@ -1,3 +1,6 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package sfcompletion
 
 import (

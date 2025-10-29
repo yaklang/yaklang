@@ -1,7 +1,11 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package yakgrpc
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"

@@ -1,9 +1,13 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package yakgrpc
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"

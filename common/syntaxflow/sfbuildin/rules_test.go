@@ -1,12 +1,16 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package sfbuildin
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
 func Test_BuildIn_Rule_Ast(t *testing.T) {

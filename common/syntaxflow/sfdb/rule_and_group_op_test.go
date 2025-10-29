@@ -1,14 +1,18 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package sfdb
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {

@@ -1,7 +1,11 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package sfdb
 
 import (
 	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"

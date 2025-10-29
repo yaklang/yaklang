@@ -1,3 +1,6 @@
+//go:build !no_syntaxflow
+// +build !no_syntaxflow
+
 package sfanalyzer
 
 import "github.com/yaklang/yaklang/common/yak/static_analyzer/result"
