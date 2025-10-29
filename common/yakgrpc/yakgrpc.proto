@@ -8383,10 +8383,11 @@ message SSAProjectFilter {
 
 message CreateSSAProjectRequest {
   SSAProject Project = 1;
+  string ProjectRawData = 2;  // json from ssa.yak 
 }
 
 message CreateSSAProjectResponse {
-  SSAProject Project = 1;
+  SSAProject Project = 1; // why ? 
   DbOperateMessage Message = 2;
 }
 
