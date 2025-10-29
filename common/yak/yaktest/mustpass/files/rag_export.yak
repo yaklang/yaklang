@@ -45,13 +45,18 @@ exportPath = file.TempFileName("%s-*.rag"%collectionName)~
 rag.Export(collectionName,exportPath)~
 
 // Import data from export file to a new collection
-rag.Import(exportPath,rag.name(collectionName2))
+rag.Import(exportPath,rag.importName(collectionName2))
 
 // Get the imported collection instance
 collection = rag.GetCollection(collectionName2)~
 
 // List all documents in the imported collection
 docs = collection.ListDocuments()~
+
+for doc in docs {
+    log.Info("Add doc %v successful" % doc.ID)
+}
+log.Info("Total docs: %v" % len(docs))
 
 // Assert that 6 documents were imported correctly
 assert len(docs) == 6
