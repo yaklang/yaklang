@@ -5768,9 +5768,19 @@ message FuzzerRequests {
   int64 Concurrent = 2;
 }
 
+message GroupHTTPFuzzerOverrides {
+  int64 RepeatTimes = 1;
+  int64 Concurrent = 2;
+  double DelayMinSeconds = 3;
+  double DelayMaxSeconds = 4;
+  bool DisableUseConnPool = 5;
+}
+
 message GroupHTTPFuzzerRequest {
   repeated FuzzerRequest Requests = 1;
   int64 Concurrent = 2;
+  bool EnableOverrides = 3;
+  GroupHTTPFuzzerOverrides Overrides = 4;
 }
 
 message GroupHTTPFuzzerResponse {
