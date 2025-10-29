@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestJar(t *testing.T) {
@@ -54,7 +55,7 @@ func TestJar(t *testing.T) {
 		progName := uuid.NewString()
 		prog, err := ssaapi.ParseProject(
 			ssaapi.WithFileSystem(jarFs),
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(progName),
 		)
 		require.NoError(t, err)

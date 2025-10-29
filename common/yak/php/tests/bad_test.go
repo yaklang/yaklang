@@ -2,12 +2,14 @@ package tests
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/stretchr/testify/require"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed bad_doc.php
@@ -25,7 +27,7 @@ var qrcode string
 //	ssatest.Check(t, qrcode, func(prog *ssaapi.Program) error {
 //		prog.Show()
 //		return nil
-//	}, ssaapi.WithLanguage(ssaapi.PHP))
+//	}, ssaapi.WithLanguage(ssaconfig.PHP))
 //}
 
 //go:embed bad/badFile_panic1.php
@@ -35,7 +37,7 @@ func TestBadPanic(t *testing.T) {
 	ssatest.Check(t, bad_panic, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 //go:embed bad/badFile_panic2.php
@@ -45,7 +47,7 @@ func TestBadPanic2(t *testing.T) {
 	ssatest.Check(t, bad_panic2, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 //go:embed bad/bad_panic3.php

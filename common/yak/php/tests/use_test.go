@@ -1,9 +1,11 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestUse(t *testing.T) {
@@ -28,7 +30,7 @@ namespace{
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("only use pkgName,use blueprint static", func(t *testing.T) {
 		code := `<?php
@@ -54,7 +56,7 @@ namespace{
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("only use pkgName,use blueprint keyword", func(t *testing.T) {
 		code := `<?php

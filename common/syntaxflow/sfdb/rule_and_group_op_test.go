@@ -2,13 +2,14 @@ package sfdb
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func AddGroupForRule(db *gorm.DB, ruleName, groupName string) error {
@@ -78,7 +79,7 @@ func TestRule_OP(t *testing.T) {
 
 		got, err := QueryRuleByName(db, ruleName)
 		require.NoError(t, err)
-		require.Equal(t, "java", got.Language)
+		require.Equal(t, "java", string(got.Language))
 	})
 }
 

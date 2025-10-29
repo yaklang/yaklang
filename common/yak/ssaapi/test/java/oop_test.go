@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -25,7 +26,7 @@ public class Kls1 {
 `
 	ssatest.CheckSyntaxFlow(t, code, `.create.defaultHandler(* #-> * as $param)`, map[string][]string{
 		"param": {`"/api/fast.json"`, "nil", "Undefined-BeanFactory"},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestOopInterface(t *testing.T) {
 	code := `package com.example.demo1;
@@ -52,7 +53,7 @@ public class Main {
 }`
 	ssatest.CheckSyntaxFlow(t, code, `func0(* #-> * as $param)`, map[string][]string{
 		"param": {"Function-IFunc.DoGet", "2"},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestTypename(t *testing.T) {
@@ -72,12 +73,12 @@ class test{
 	t.Run("test typename field", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `.alias<getObject><typeName> as $output`,
 			map[string][]string{"output": {`"com.thoughtworks.xstream.XStream"`, `"XStream"`}},
-			ssaapi.WithLanguage(ssaapi.JAVA))
+			ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test typename member method", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `.alias<typeName> as $output`,
 			map[string][]string{"output": {`"com.thoughtworks.xstream.XStream"`, `"XStream"`}},
-			ssaapi.WithLanguage(ssaapi.JAVA))
+			ssaapi.WithLanguage(ssaconfig.JAVA))
 	},
 	)
 }
@@ -94,7 +95,7 @@ class test{
 `
 		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
 			"output": {"Function-test.test(Undefined-test)"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("no constructor", func(t *testing.T) {
 		code := `package main;
@@ -106,6 +107,6 @@ class test{
 `
 		ssatest.CheckSyntaxFlow(t, code, `test() as $output`, map[string][]string{
 			"output": {"Undefined-test(Undefined-test)"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

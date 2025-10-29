@@ -2,10 +2,12 @@ package java
 
 import (
 	_ "embed"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 //go:embed sample/mybatis_mapper_interface.java
@@ -22,7 +24,7 @@ func TestJavaInterfaceMapper(t *testing.T) {
 		assert.Greater(t, prog.SyntaxFlowChain(`UserMapper.*User as $sink`).Show().Len(), 2)
 		assert.Greater(t, prog.SyntaxFlowChain(`UserMapper.*User* as $sink`).Show().Len(), 3)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestJavaInterfaceMapper_WithAnnotation(t *testing.T) {
@@ -41,5 +43,5 @@ func TestJavaInterfaceMapper_WithAnnotation(t *testing.T) {
 		assert.Greater(t, prog.SyntaxFlowChain(`Delete.__ref__?{have: deleteUser} as $sink`).Show().Len(), 0)
 		assert.Greater(t, prog.SyntaxFlowChain(`deleteUser.annotation?{.Delete} as $sink`).Show().Len(), 0)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

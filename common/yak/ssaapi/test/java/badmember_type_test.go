@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -40,6 +41,6 @@ public class FastJSONDemoController {
 		results := prog.SyntaxFlowChain(`.getParameter()?{<getCallee><getObject><fullTypeName>?{have: servlet} && <getFunc><getObject>.annotation.*Mapping} as $dynamicParams`, ssaapi.QueryWithEnableDebug(true))
 		assert.Equal(t, 1, len(results))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }

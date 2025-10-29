@@ -14,13 +14,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -357,7 +357,7 @@ func TestSFURL(t *testing.T) {
 		}
 		`)
 	s := NewSSAURLTest(t, vf,
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramPath("example"),
 	)
 	defer s.RunDefer()
@@ -580,7 +580,7 @@ func main() {
 	`)
 
 	s := NewSSAURLTest(t, vf,
-		ssaapi.WithLanguage(consts.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 	)
 	defer s.RunDefer()
 
@@ -697,7 +697,7 @@ func TestSSAURLPagination(t *testing.T) {
 
 	progID := uuid.NewString()
 	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
 	)
@@ -845,7 +845,7 @@ func TestHaveRange(t *testing.T) {
 		`)
 	progID := uuid.NewString()
 	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
 	)
@@ -942,7 +942,7 @@ func TestRiskHashQuery(t *testing.T) {
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
-	suite, clean := ssatest.NewSFScanRiskTestSuite(t, local, progID, consts.JAVA)
+	suite, clean := ssatest.NewSFScanRiskTestSuite(t, local, progID, ssaconfig.JAVA)
 	defer clean()
 
 	vf := filesys.NewVirtualFs()

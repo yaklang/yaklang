@@ -1,11 +1,12 @@
 package java
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func Test_Phi_Type(t *testing.T) {
@@ -49,6 +50,6 @@ class Main{
 			vals := res.GetValues("sinkCall")
 			require.Equal(t, 1, vals.Len())
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

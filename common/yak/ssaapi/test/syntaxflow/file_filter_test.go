@@ -1,12 +1,13 @@
 package syntaxflow
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -50,7 +51,7 @@ ${*.properties}.regexp(/(?i).*access[_-]?[token|key].*\s*=\s*((?!\{\{)(?!(?i)^(t
 				`"jsc.accessKey.id=aaaaaaaaaaaa"`,
 				`"jsc.accessKey.secret=bbbbbbbbbbbbbbbbb"`,
 			},
-		}, true, ssaapi.WithLanguage(consts.JAVA),
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -186,7 +187,7 @@ ${*.json}.xpath("//book/*/author") as $result4;
 			require.Contains(t, result4.String(), "Herman Melville")
 			require.Contains(t, result4.String(), "J. R. R. Tolkien")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -214,7 +215,7 @@ address:
 			require.Contains(t, result.String(), "10001")
 			require.Contains(t, result.StringEx(1), "12:8 - 12:13")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test match docker file by xpath", func(t *testing.T) {
@@ -268,6 +269,6 @@ XPATH) as $result
 			require.Contains(t, result.String(), "Redis@Auth789!")
 			require.Contains(t, result.String(), "App@DB!Secure")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

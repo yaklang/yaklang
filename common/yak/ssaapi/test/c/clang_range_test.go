@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func check[T ssa.Instruction](t *testing.T, gots ssaapi.Values, want []string, Cover func(ssa.Instruction) (T, bool)) {
@@ -44,7 +45,7 @@ int main() {
 		cf, err := filesys.NewPreprocessedCFs(vf)
 		require.Nil(t, err)
 
-		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaapi.C))
+		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaconfig.C))
 		require.Nil(t, err)
 
 		results, err := p.SyntaxFlowWithError(`
@@ -92,7 +93,7 @@ int main() {
 		cf, err := filesys.NewPreprocessedCFs(vf)
 		require.Nil(t, err)
 
-		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaapi.C))
+		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaconfig.C))
 		require.Nil(t, err)
 
 		results, err := p.SyntaxFlowWithError(`

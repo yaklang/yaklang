@@ -28,11 +28,11 @@ const (
 )
 
 type SyntaxFlowScanConfig struct {
-	IgnoreLanguage bool     `json:"ignore_language"`
-	Language       []string `json:"language"`
-	Concurrency    uint32   `json:"concurrency"`
-	ControlMode    string   `json:"control_mode"`   // 控制模式 "start" "pause" "resume" "status"
-	ResumeTaskId   string   `json:"resume_task_id"` // 恢复任务ID
+	IgnoreLanguage bool       `json:"ignore_language"`
+	Language       []Language `json:"language"`
+	Concurrency    uint32     `json:"concurrency"`
+	ControlMode    string     `json:"control_mode"`   // 控制模式 "start" "pause" "resume" "status"
+	ResumeTaskId   string     `json:"resume_task_id"` // 恢复任务ID
 }
 
 // --- SyntaxFlow 配置 Get/Set 方法 ---
@@ -142,7 +142,7 @@ func (c *Config) GetScanResumeTaskId() string {
 	return c.SyntaxFlowScan.ResumeTaskId
 }
 
-func (c *Config) GetScanLanguage() []string {
+func (c *Config) GetScanLanguage() []Language {
 	if c == nil || c.SyntaxFlowScan == nil {
 		return nil
 	}
@@ -256,7 +256,7 @@ func WithScanResumeTaskId(taskId string) Option {
 }
 
 // WithScanLanguage 设置扫描语言
-func WithScanLanguage(language ...string) Option {
+func WithScanLanguage(language ...Language) Option {
 	return func(c *Config) error {
 		if err := c.ensureSyntaxFlowScan("Scan Language"); err != nil {
 			return err

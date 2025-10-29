@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -317,7 +318,7 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 					}
 				}
 				return nil
-			}, ssaapi.WithLanguage(ssaapi.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 		}
 	})
 }

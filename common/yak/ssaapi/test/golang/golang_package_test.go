@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -39,7 +40,7 @@ func TestPackage_normol(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1", "2", "3"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -72,7 +73,7 @@ func TestPackage_lazybuild(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"3", "1", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -110,7 +111,7 @@ func TestPackage_muti_file_init(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"\"hello world\""},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -152,7 +153,7 @@ func TestPackage_muti_file_init(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"\"hello world\""},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -184,7 +185,7 @@ func TestPackage_global_value(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"\"hello world\""},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -240,7 +241,7 @@ func TestFileName_muti_package(t *testing.T) {
 		}
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
 
 func TestFileName_muti_file(t *testing.T) {
@@ -294,5 +295,5 @@ func TestFileName_muti_file(t *testing.T) {
 		}
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -42,7 +43,7 @@ func TestChain_Basic(t *testing.T) {
 			{"b+c", "b", ""},
 			{"b+c", "c", ""},
 		},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestChain_Basic2(t *testing.T) {
@@ -54,7 +55,7 @@ func TestChain_Basic2(t *testing.T) {
 			{"b+c", "b", ""},
 			{"b+c", "c", ""},
 		},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestChain_Phi_If(t *testing.T) {
@@ -79,7 +80,7 @@ g=d+a;`
 			graph.Check(t, "b+c", "b")
 			graph.Check(t, "b+c", "c")
 		},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestChain_Phi_ForSelfSpin(t *testing.T) {
@@ -128,7 +129,7 @@ f = b(2,3,4)`
 			require.Contains(t, dot, `label="3"`)
 			require.NotContains(t, dot, `label="4"`)
 		},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestPathTrace(t *testing.T) {

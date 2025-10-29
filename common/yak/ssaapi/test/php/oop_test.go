@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -21,7 +22,7 @@ println(A::$a);
 `
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"1"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestConstructorDataFlow(t *testing.T) {
 	t.Run("constructor", func(t *testing.T) {
@@ -31,7 +32,7 @@ println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"Undefined-AA", "1", "Undefined-AA.AA-destructor", "AA"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("have constructor", func(t *testing.T) {
 		code := `<?php
@@ -47,7 +48,7 @@ $output -> as $sink
 `, map[string][]string{
 			"output": {"Function-A.A(Undefined-A)"},
 			"sink":   {"Undefined-$a.bb(Function-A.A(Undefined-A))", "Undefined-A.A-destructor(Function-A.A(Undefined-A))"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("no constructor", func(t *testing.T) {
 		code := `<?php
@@ -60,7 +61,7 @@ $output -> as $sink
 `, map[string][]string{
 			"output": {"Undefined-A(Undefined-A)"},
 			"sink":   {"Undefined-$a.bb(Undefined-A(Undefined-A))", "Undefined-A.A-destructor(Undefined-A(Undefined-A))"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -72,7 +73,7 @@ $a = new A();
 `
 		ssatest.CheckSyntaxFlow(t, code, `A() as $start;  $start<fullTypeName><show> as $end`, map[string][]string{
 			"end": {`"main.A"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test package blueprint packageName", func(t *testing.T) {
 		code := `<?php
@@ -89,7 +90,7 @@ A() as $start;
 $start<fullTypeName><show> as $end;
 `, map[string][]string{
 			"end": {`"B.A.C.A"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test package blueprint member", func(t *testing.T) {
 		code := `<?php
@@ -105,7 +106,7 @@ println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $start);$start<fullTypeName><show>  as $end`, map[string][]string{
 			"end": {`"main.B"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test package bluePrint member not import", func(t *testing.T) {
 		code := `<?php
@@ -124,7 +125,7 @@ namespace {
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
 			"end": {`"B.C.D.B"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test package blueprint", func(t *testing.T) {
 		code := `<?php
@@ -139,7 +140,7 @@ println($a->a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
 			"end": {`"B.C.D"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("test no import", func(t *testing.T) {
@@ -155,7 +156,7 @@ namespace {
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* as $param);$param<fullTypeName><show> as $end`, map[string][]string{
 			"end": {`"main.A"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("parent class", func(t *testing.T) {
 		code := `<?php
@@ -177,7 +178,7 @@ namespace{
 			map[string][]string{
 				"end": {`"A.B.C.BB"`, `"B.C.D.A"`},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("anymous-class with parent2", func(t *testing.T) {
 		code := `<?php
@@ -201,7 +202,7 @@ class B{
 }`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": []string{"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestBlueprintNativeCall(t *testing.T) {
@@ -218,7 +219,7 @@ class A extends B{
 			map[string][]string{
 				"sink": {`"main.A"`, `"main.B"`, `"main.Think"`},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test getCurrent blueprint with fs", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -238,7 +239,7 @@ class C extends A{
 				"output": {`"main.A"`, `"main.C"`},
 			},
 			true,
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("getFunc getCurrentBlueprint", func(t *testing.T) {
 		code := `<?php
@@ -254,7 +255,7 @@ $source<getFunc><getCurrentBlueprint> as $output
 $output<fullTypeName> as $sink
 `, map[string][]string{
 			"sink": {`"main.Think"`, `"main.A"`, `"main.B"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test currentBlueprint with fs", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -274,7 +275,7 @@ class Backend extends \app\common\controller\Base{
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `aa<getCurrentBlueprint><fullTypeName> as $output`, map[string][]string{
 			"output": {"app.BaseController"},
-		}, true, ssaapi.WithLanguage(ssaapi.PHP))
+		}, true, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestStaticBlueprint(t *testing.T) {
@@ -296,7 +297,7 @@ $savename = \think\facade\Filesystem::disk('public')->putFile($path, $file);
 		require.NotEqual(t, result.GetValues("method").Len(), 0)
 		require.NotEqual(t, result.GetValues("param").Len(), 0)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func Test_MethodName_in_Syntaxflow(t *testing.T) {
@@ -313,7 +314,7 @@ class A{
 		
 		`, map[string][]string{
 			"a": {"Function-A.F"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -353,7 +354,7 @@ eval("echo $input;");
 `
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"high": {},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("check high", func(t *testing.T) {
 		code := `<?php
@@ -362,7 +363,7 @@ eval("echo $input");
 `
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"high": {`Undefined-_GET`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -375,7 +376,7 @@ echo $template->render(['filter_func' => 'ccc']);`
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestOopStaticBlueprint(t *testing.T) {
 	code := `<?php
@@ -386,5 +387,5 @@ $obj.* as $sink
 `, map[string][]string{
 		"obj":  {"Undefined-Yii.app"},
 		"sink": {"Undefined-Yii.app.request(valid)"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

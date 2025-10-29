@@ -3,10 +3,9 @@ package syntaxflow
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -21,7 +20,7 @@ func b(){}
 			"Function-@main",
 			"Function-a",
 			"Function-b",
-		}}, ssaapi.WithLanguage(ssaapi.Yak))
+		}}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("Test opcode", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, `
@@ -204,7 +203,7 @@ a* as $target
 $target?{have: /^[0-9]+$/} as $output
 `, map[string][]string{
 			"output": {`12`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test global condition", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
@@ -212,7 +211,7 @@ b* as $target
 $target?{have: anc1*} as $output
 `, map[string][]string{
 			"output": {`"anc123"`, `"anc1anc"`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test exact condition", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
@@ -220,7 +219,7 @@ a* as $target
 $target?{have: abc} as $output
 `, map[string][]string{
 			"output": {`"abc"`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test global and exact", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
@@ -236,7 +235,7 @@ b* as $target
 $target?{have: anc,/[0-9]+anc$/} as $output
 `, map[string][]string{
 			"output": {`"anc1anc"`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test global and regex", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
@@ -349,7 +348,7 @@ a2 = 22
 `
 			ssatest.CheckSyntaxFlow(t, code, `a*?{opcode: const && have: '11'} as $target1`, map[string][]string{
 				"target1": {"11"},
-			}, ssaapi.WithLanguage(ssaapi.Yak))
+			}, ssaapi.WithLanguage(ssaconfig.Yak))
 		}
 	})
 	t.Run("test CompareOpcode 1-2", func(t *testing.T) {
@@ -364,7 +363,7 @@ a2 = 22
 			`,
 			map[string][]string{
 				"target1": {"11"},
-			}, ssaapi.WithLanguage(ssaapi.Yak))
+			}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("test CompareOpcode 2", func(t *testing.T) {
@@ -378,7 +377,7 @@ a2 = 22
     }`, `*?{opcode:call && have:"contain"} as $output;
 alert $output;`, map[string][]string{
 			"output": {"contain"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test muti filter", func(t *testing.T) {
@@ -416,7 +415,7 @@ e* as $target
 $target?{<typeName>?{have:Exception}} as $output
 	`, map[string][]string{
 			"output": {"11", "22", "33"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("check normal have regexp", func(t *testing.T) {
@@ -425,11 +424,11 @@ e* as $target
 $target?{<typeName>?{have:/^Exception$/}} as $output
 `, map[string][]string{
 			"output": {"11"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
 func TestSearch(t *testing.T) {
 	code := `function a(){}`
-	ssatest.CheckSyntaxFlow(t, code, `*?{opcode: const}`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
+	ssatest.CheckSyntaxFlow(t, code, `*?{opcode: const}`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.Yak))
 }

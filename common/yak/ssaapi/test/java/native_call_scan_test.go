@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -116,13 +116,13 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious(exclude=`*?{opcode: const}`)> as $result;",
 			map[string][]string{
 				"result": {"Undefined-bb1", "Undefined-c", "if (Undefined-c)"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test include", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb2<scanPrevious{include:`* ?{opcode:const}`}> as $result;",
 			map[string][]string{
 				"result": {"1", "2", "3"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test until", func(t *testing.T) {
@@ -133,7 +133,7 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 			values.ShowWithSource()
 			require.True(t, len(values) == 0)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test hook", func(t *testing.T) {
@@ -141,12 +141,12 @@ func TestScanPreviousIfStmtWithConfig(t *testing.T) {
 			map[string][]string{
 				"result": {"1", "2", "3", "Undefined-bb1", "Undefined-c", "if (Undefined-c)"},
 				"num":    {"1", "2", "3"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test current", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, code, `bb1<scanInstruction> as $result`, map[string][]string{
 			"result": {"Undefined-bb1", "1"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -173,13 +173,13 @@ func TestScanNextLoopWithConfig(t *testing.T) {
 					"lt(phi(i)[0,add(i, 1)], 10)",
 					"loop(lt(phi(i)[0,add(i, 1)], 10))",
 				},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test include", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, "bb1<scanNext{include:`* ?{opcode:const}`}> as $result;",
 			map[string][]string{
 				"result": {"0", "0", "1", "10"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test until", func(t *testing.T) {
@@ -193,7 +193,7 @@ UNTIL)> as $result;`)
 			values := result.GetValues("result")
 			require.True(t, len(values) == 0)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test hook", func(t *testing.T) {
@@ -206,7 +206,7 @@ UNTIL)> as $result;`)
 					"loop(lt(phi(i)[0,add(i, 1)], 10))",
 				},
 				"num": {"0", "0", "1", "10"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test foreach function blocks", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `main<foreach_function_inst(hook=<<<CODE
@@ -215,7 +215,7 @@ CODE)>`,
 			map[string][]string{
 				"output": {"10", "0", "0", "1"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }

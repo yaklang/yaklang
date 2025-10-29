@@ -3,10 +3,10 @@ package ts2ssa
 import (
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/parser"
@@ -81,8 +81,8 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 	return ext == ".ts" || ext == ".tsx" || ext == ".js"
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
-	return consts.TS
+func (*SSABuilder) GetLanguage() ssaconfig.Language {
+	return ssaconfig.TS
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {

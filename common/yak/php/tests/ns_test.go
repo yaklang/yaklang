@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -107,7 +108,7 @@ namespace {
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"1"}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("new class ", func(t *testing.T) {
 		code := `<?php
@@ -128,11 +129,11 @@ namespace {
 			prog.Show()
 			return nil
 		},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 		//ssatest.CheckSyntaxFlow(t, code,
 		//	`println(* #-> * as $param)`,
 		//	map[string][]string{"param": {"1"}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
+		//	ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	//todo:
 	t.Run("use namespace", func(t *testing.T) {
@@ -162,7 +163,7 @@ namespace {
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"1"}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("more namespace", func(t *testing.T) {
@@ -204,7 +205,7 @@ namespace {
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"1"}},
 			false,
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("namespace references each other", func(t *testing.T) {
 		code := `<?php
@@ -295,7 +296,7 @@ namespace {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test no namespace", func(t *testing.T) {
 		code := `<?php
@@ -345,7 +346,7 @@ namespace B\C\D\E{
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(*<fullTypeName> as $param)`, map[string][]string{
 			"param": {"\"A.B.C.test\""},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestMember(t *testing.T) {
@@ -362,7 +363,7 @@ println($a->a);
 	ssatest.CheckSyntaxFlow(t, code,
 		`println(* #-> as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestCheckObjectExist(t *testing.T) {
 	code := `<?php
@@ -390,5 +391,5 @@ $a->generate();
 `
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"1111"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

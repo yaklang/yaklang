@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 
@@ -16,63 +15,7 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-type Language string
-
 const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
-const (
-	Yak     Language = "yak"
-	JS      Language = "js"
-	PHP     Language = "php"
-	JAVA    Language = "java"
-	GO      Language = "golang"
-	C       Language = "c"
-	TS      Language = "ts"
-	General Language = "general"
-)
-
-func (l Language) GetFileExt() string {
-	switch l {
-	case Yak:
-		return ".yak"
-	case JAVA:
-		return ".java"
-	case GO:
-		return ".go"
-	case TS:
-		return ".ts"
-	case JS:
-		return ".js"
-	case C:
-		return ".c"
-	case PHP:
-		return ".php"
-	default:
-		return ""
-	}
-}
-func GetAllSupportedLanguages() []Language {
-	return []Language{Yak, JS, PHP, JAVA, GO, C, TS}
-}
-
-func ValidateLanguage(language string) (Language, error) {
-	switch strings.TrimSpace(strings.ToLower(language)) {
-	case "yak", "yaklang":
-		return Yak, nil
-	case "java":
-		return JAVA, nil
-	case "php":
-		return PHP, nil
-	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
-		return JS, nil
-	case "go", "golang":
-		return GO, nil
-	case "c", "clang":
-		return C, nil
-	case "ts", "typescript":
-		return TS, nil
-	}
-	return "", errors.Errorf("unsupported language: %s", language)
-}
 
 const (
 	CONST_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"

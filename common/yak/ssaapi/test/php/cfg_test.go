@@ -1,10 +1,12 @@
 package php
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestCFG(t *testing.T) {
@@ -22,7 +24,7 @@ func TestCFG(t *testing.T) {
 			values := result.GetValues("param")
 			require.Contains(t, values.String(), "aa")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("check no variables declare", func(t *testing.T) {
 		code := `<?php
@@ -37,7 +39,7 @@ println($a);`
 			values := result.GetValues("param")
 			require.Contains(t, values.String(), "12312")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestCfgAssignment(t *testing.T) {
@@ -80,7 +82,7 @@ CODE
 		map[string][]string{
 			"sink": {"Undefined-_FILES"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestTypeCast(t *testing.T) {
@@ -98,5 +100,5 @@ exclude: <<<EXCLUDE
 *?{opcode: typecast}
 EXCLUDE
 }->) as $sink
-`, map[string][]string{"sink": {}}, ssaapi.WithLanguage(ssaapi.PHP))
+`, map[string][]string{"sink": {}}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

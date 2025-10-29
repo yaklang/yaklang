@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -44,5 +45,5 @@ alert $b
 		fmt.Println(result)
 		require.Contains(t, result, "strict digraph")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }

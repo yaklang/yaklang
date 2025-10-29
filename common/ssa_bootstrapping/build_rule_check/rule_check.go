@@ -177,9 +177,9 @@ func (s *RuleChecker) run() error {
 		defaultExclude = strings.Split(s.ExcludeFile, ",")
 	} else if s.RequiredExclude {
 		switch strings.ToLower(s.Language) {
-		case string(consts.PHP):
+		case string(ssaconfig.PHP):
 			defaultExclude = strings.Split("**vendor**,vendor**,lib**,**lib**", ",")
-		case string(consts.JAVA):
+		case string(ssaconfig.JAVA):
 			defaultExclude = strings.Split("**/classes/**,**/target/**", ",")
 		}
 	}

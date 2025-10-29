@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -52,7 +52,7 @@ func TestImport_struct(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"\"hello world\"", "1", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -84,7 +84,7 @@ func TestImport_function(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1", "2", "3"},
-	}, false, ssaapi.WithLanguage(ssaapi.GO),
+	}, false, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -131,7 +131,7 @@ func TestImport_method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -165,7 +165,7 @@ func TestImport_aliastyp(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -210,7 +210,7 @@ func TestImport_globals(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1", "\"hello world\"", "3"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -249,7 +249,7 @@ func TestImport_globals(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"3.1415926"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -287,7 +287,7 @@ func TestImport_globals(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"3.1415926"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -315,7 +315,7 @@ func TestImport_Syntaxflow(t *testing.T) {
 				"function": {"Undefined-test.Println"},
 				"value":    {"Undefined-a"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -347,7 +347,7 @@ func TestImport_Syntaxflow(t *testing.T) {
 		alias.function(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -377,7 +377,7 @@ func TestFakeImport_Syntaxflow(t *testing.T) {
 			map[string][]string{
 				"target": {"Parameter-r"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -424,7 +424,7 @@ func TestImport_unorder(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"\"hello world\"", "1", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -460,7 +460,7 @@ func TestImport_fulltypename(t *testing.T) {
 			assert.GreaterOrEqual(t, have.Len(), 1)
 			assert.GreaterOrEqual(t, nothave.Len(), 0)
 			return nil
-		}, ssaapi.WithLanguage(consts.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("fulltypename lib", func(t *testing.T) {
@@ -487,6 +487,6 @@ func TestImport_fulltypename(t *testing.T) {
 			assert.GreaterOrEqual(t, have.Len(), 1)
 			assert.GreaterOrEqual(t, nothave.Len(), 0)
 			return nil
-		}, ssaapi.WithLanguage(consts.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }

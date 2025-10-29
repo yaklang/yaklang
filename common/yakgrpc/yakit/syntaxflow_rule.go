@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -198,7 +199,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	if err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
-	updateRule.Language = rule.GetLanguage()
+	updateRule.Language = ssaconfig.Language(rule.GetLanguage())
 	updateRule.Content = rule.GetContent()
 	updateRule.Tag = strings.Join(rule.GetTags(), ",")
 	updateRule.Description = rule.GetDescription()
@@ -235,12 +236,12 @@ func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema
 }
 
 func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
-	language, err := sfdb.CheckSyntaxFlowLanguage(ruleInput.Language)
+	language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
 	if err != nil {
 		return nil, err
 	}
 	rule, _ := sfdb.CheckSyntaxFlowRuleContent(ruleInput.Content)
-	rule.Language = string(language)
+	rule.Language = language
 	rule.RuleName = ruleInput.RuleName
 	rule.Tag = strings.Join(ruleInput.Tags, "|")
 	rule.Title = ruleInput.RuleName

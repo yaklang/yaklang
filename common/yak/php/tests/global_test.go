@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -17,7 +18,7 @@ func TestGlobal(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"Function-base64_decode", "Undefined-_GET"}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test globals", func(t *testing.T) {
 		code := `<?php
@@ -54,6 +55,6 @@ function test(){
 	//	ssatest.CheckSyntaxFlow(t, code,
 	//		`println(* #-> * as $param)`,
 	//		map[string][]string{"param": {"1", "Undefined-.GLOBALS.a(valid)", "make(any)"}},
-	//		ssaapi.WithLanguage(ssaapi.PHP))
+	//		ssaapi.WithLanguage(ssaconfig.PHP))
 	//})
 }

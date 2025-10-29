@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -162,7 +163,7 @@ b()
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func Test_SideEffect_Double_lower(t *testing.T) {
@@ -184,7 +185,7 @@ b()
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func Test_SideEffect_Double_more(t *testing.T) {
@@ -205,7 +206,7 @@ b=()=>{
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 /* TODO: 继承外部side-effect的情况下，外部的scope可能没有执行完毕 */
@@ -228,7 +229,7 @@ b=()=>{
 		b := prog.SyntaxFlow("b as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func Test_SideEffect_Double_lower_exclude(t *testing.T) {
@@ -251,7 +252,7 @@ f1=()=>{
 		b := prog.SyntaxFlow("f2 as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(b, 2))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func Test_SideEffect_panic(t *testing.T) {
@@ -274,5 +275,5 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
 	ssatest.CheckWithName("link-side-effect cannot participate in generating phi", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }

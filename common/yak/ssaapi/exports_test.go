@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestA(t *testing.T) {
@@ -50,7 +51,7 @@ var b = (()=>{return window.location.hostname + "/app/"})()
 window.location.href = b + "/login.html?ts=";
 window.location.href = "www"
 	`,
-		WithLanguage(JS),
+		WithLanguage(ssaconfig.JS),
 	)
 	if err != nil {
 		t.Fatal("prog parse error", err)
@@ -195,7 +196,7 @@ func TestB(t *testing.T) {
 		  });
 		});
 	  });
-	`, WithLanguage(JS))
+	`, WithLanguage(ssaconfig.JS))
 	if err != nil {
 		t.Fatal("prog parse error", err)
 	}
@@ -235,7 +236,7 @@ func TestFeedCode(t *testing.T) {
 	defer println("defer 3")
 	`
 
-	prog, err := Parse(code1, WithFeedCode())
+	prog, err := Parse(code1)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"golang.org/x/exp/slices"
 )
 
@@ -53,7 +54,7 @@ public class A {
 	ssadb.DeleteProgram(ssadb.GetDB(), pkgName)
 
 	// compile only source
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.JAVA))
 	assert.NoError(t, err)
 	prog.Show()
 	assert.Equal(t, 1, prog.Program.UpStream.Len())
@@ -78,7 +79,7 @@ public class A {
 	ssadb.DeleteProgram(ssadb.GetDB(), programId)
 
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(programId),
 	)
 	assert.NoError(t, err)
@@ -142,7 +143,7 @@ func TestCompileProgram_OnlyDatabase(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programId)
 
 		_, err := ssaapi.Parse(code,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programId),
 		)
 		assert.NoError(t, err)
@@ -182,7 +183,7 @@ func TestCompileProgram_Delete(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programId)
 
 		_, err := ssaapi.Parse(code,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programId),
 		)
 		assert.NoError(t, err)
@@ -225,7 +226,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	{
 		ssadb.DeleteProgram(ssadb.GetDB(), programID1)
 		_, err := ssaapi.Parse(code,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID1),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programID1)
@@ -243,7 +244,7 @@ func TestCompileProgram_ReUseLibrary(t *testing.T) {
 	{
 		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
 		_, err := ssaapi.Parse(code,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID2),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programID2)
@@ -344,7 +345,7 @@ func TestCompileProgram_MultipleFileInLibrary(t *testing.T) {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
 		prog, err := ssaapi.ParseProjectWithFS(
 			vf,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID),
 		)
 		assert.NoError(t, err)

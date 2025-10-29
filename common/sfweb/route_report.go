@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -153,7 +154,7 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			writeErrorJson(w, NewReportMissingParameterError("risk_hash"))
 			return
 		}
-		lang, err := consts.ValidateLanguage(req.Lang)
+		lang, err := ssaconfig.ValidateLanguage(req.Lang)
 		if err != nil {
 			writeErrorJson(w, NewInvalidLangError(req.Lang))
 			return
@@ -215,7 +216,7 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			return
 		}
 
-		lang, err := consts.ValidateLanguage(req.Lang)
+		lang, err := ssaconfig.ValidateLanguage(req.Lang)
 		if err != nil {
 			writeErrorJson(w, NewInvalidLangError(req.Lang))
 			return

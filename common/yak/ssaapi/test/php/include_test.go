@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -35,7 +36,7 @@ include('files/'.$action.'.php'); //载入相应文件
 			} else {
 				return utils.Error("not match")
 			}
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test-exec", func(t *testing.T) {
 		ssatest.Check(t, ExecCode, func(prog *ssaapi.Program) error {
@@ -55,7 +56,7 @@ include('files/'.$action.'.php'); //载入相应文件
 			})
 			require.True(t, flag)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -84,5 +85,5 @@ shell_exec("ls -la");
 shell_exec(* as $target )
 `, map[string][]string{
 		"target": {`"ls -la"`},
-	}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 }

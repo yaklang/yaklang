@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -24,6 +25,6 @@ func TestPlugin(t *testing.T) {
 		"param1": {"Parameter-url"},
 		"param2": {"Parameter-req"},
 		"param3": {"Parameter-forward"},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 	// }
 }

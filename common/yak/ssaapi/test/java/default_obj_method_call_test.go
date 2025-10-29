@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -45,7 +45,7 @@ func TestDefaultOBJMethodCall(t *testing.T) {
 			t.Fatal("replaceAll bind object not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestDefaultOBJMethodCall2(t *testing.T) {
@@ -56,7 +56,7 @@ func TestDefaultOBJMethodCall2(t *testing.T) {
 			t.Fatal("toString bind object not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestDefaultOBJMethodCall3(t *testing.T) {
@@ -153,7 +153,7 @@ class B {
 		//}
 
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestDefaultOBJFieldCall4(t *testing.T) {
 	ssatest.CheckSyntaxFlow(t, `
@@ -173,7 +173,7 @@ class A {
 
 `, `staticValue as $entry;`, map[string][]string{
 		"entry": []string{"\"abc\"", "\"ddd\"", "\"eee\"", "phi(staticValue)[\"eee\",\"abc\"]"},
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestDefaultOBJParamAsCaller(t *testing.T) {
@@ -201,7 +201,7 @@ class A {
 		callC := prog.SyntaxFlow(`p.CallC(* as $param,)`).GetValues("param")
 		assert.Contains(t, callC.String(), "Parameter-p")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestDefaultOBJ_Type_Transform(t *testing.T) {
@@ -233,7 +233,7 @@ class A {
 		callC.Show()
 		assert.Contains(t, callC.String(), "Parameter-p")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -264,7 +264,7 @@ class A {
 		assert.Contains(t, callB.String(), "Undefined-b.getBody(valid)(Undefined-B(Undefined-B),Parameter-p)")
 		callB.Show()
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -285,7 +285,7 @@ public class B{
 		require.NoError(t, err)
 		require.True(t, result.GetValues("call").Len() == 2)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestDefaultObjForPeekValue(t *testing.T) {
 	ssatest.Check(t, `
@@ -313,7 +313,7 @@ public class B{
 		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[0].String())
 		assert.Equal(t, "Undefined-a.b(Undefined-A(Undefined-A))", result2[1].String())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -342,7 +342,7 @@ public class B{
 		assert.Equal(t, "Undefined-A.b(A)", result2[0].String())
 		assert.Equal(t, "Undefined-A.b(A)", result2[1].String())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -372,7 +372,7 @@ public class B{
 		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[0].String())
 		assert.Equal(t, "Undefined-object.b(Undefined-A(Undefined-A))", result2[1].String())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestDefaultObj_XX(t *testing.T) {
@@ -412,5 +412,5 @@ public class FileDownloadController {
 		target = prog.SyntaxFlowChain(`headers.add(* as $param)`).Show()
 		assert.Equal(t, 3, target.Len())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

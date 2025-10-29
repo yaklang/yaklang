@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func GetLibrary(program, version string) (*Program, error) {
@@ -26,7 +27,7 @@ func GetProgram(program string, kind ssadb.ProgramKind) (*Program, error) {
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	prog := NewProgram(p.ProgramName, ProgramCacheDBRead, p.ProgramKind, nil, "", 0)
 	prog.irProgram = p
-	prog.Language = p.Language
+	prog.Language = ssaconfig.Language(p.Language)
 	prog.FileList = p.FileList
 	prog.LineCount = p.LineCount
 	prog.ExtraFile = p.ExtraFile

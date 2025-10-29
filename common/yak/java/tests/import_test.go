@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -36,7 +36,7 @@ func TestImport(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 		"a": {"1"},
-	}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+	}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -71,7 +71,7 @@ public class MDCAccessServletFilter implements Filter {
 		log.Info(result.String())
 		require.Contains(t, result.String(), "src/main/java/io/github/talelin/latticy/module/log/MDCAccessServletFilter.java")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestImportWithInterface(t *testing.T) {
 	vf := filesys.NewVirtualFs()
@@ -95,7 +95,7 @@ class A{
 		`off #-> * as $param`,
 		map[string][]string{
 			"param": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestImportClass(t *testing.T) {
 	t.Run("import class", func(t *testing.T) {
@@ -118,7 +118,7 @@ class test {
     }
 }
 `)
-		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaapi.JAVA))
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{"param": {"1"}}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("import class2", func(t *testing.T) {
 		//todo: the case need default ???
@@ -145,7 +145,7 @@ class B{
 				"sink": {"ParameterMember-parameterMember"},
 			},
 			true,
-			ssaapi.WithLanguage(ssaapi.JAVA))
+			ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -178,7 +178,7 @@ class A {
 			"param": {"1", "1"},
 		},
 		true,
-		ssaapi.WithLanguage(ssaapi.JAVA))
+		ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestImportStaticMember(t *testing.T) {
@@ -209,7 +209,7 @@ public class A {
 			"param": {"1", "Parameter-a"},
 		},
 		true,
-		ssaapi.WithLanguage(ssaapi.JAVA))
+		ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestImportSourceCodeRange(t *testing.T) {
@@ -239,7 +239,7 @@ public class FreeMakerDemo {
 PrintWriter as $writer
 	`, map[string][]string{
 		"writer": {"import java.io.PrintWriter;", "getWriter()"},
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestImportClassTypeName(t *testing.T) {
@@ -281,7 +281,7 @@ b<typeName> as $jsonType2
 	`, map[string][]string{
 			"typeName":  {"com.alibaba.fastjson.JSON"},
 			"jsonType2": {"com.alibaba.fastjson.JSON"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("check import type with import start", func(t *testing.T) {
@@ -321,7 +321,7 @@ b<typeName> as $jsonType2
 	`, map[string][]string{
 			"typeName":  {"com.alibaba.fastjson.JSON"},
 			"jsonType2": {"com.alibaba.fastjson.JSON"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("check import type with creator", func(t *testing.T) {
 		code := `
@@ -349,7 +349,7 @@ b<typeName> as $jsonType2
 			"request_type_name":             {"okhttp3.Request"},
 			"builder_type_name":             {"okhttp3.Request.Builder"},
 			"builder_constructor_type_name": {"okhttp3.Request.Builder"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("check import type with full name", func(t *testing.T) {
@@ -369,7 +369,7 @@ b<typeName> as $jsonType2
 			"builder":           {"Undefined-Builder(valid)"},
 			"request_type_name": {"com.squareup.okhttp.Request"},
 			"builder_type_name": {"com.squareup.okhttp.Request.Builder"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("check import type same name with current package ", func(t *testing.T) {
@@ -410,6 +410,6 @@ b<typeName> as $jsonType2
 	$function() as $function_call_site
 	`, map[string][]string{
 			"function_call_site": {"writeBytes(filePath, response.getOutputStream())"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

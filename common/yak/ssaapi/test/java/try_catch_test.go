@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -29,7 +30,7 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 	check := func(t *testing.T, functionCode string, want map[string][]string) {
 		code := fmt.Sprintf(format, functionCode)
 		log.Infof("code: %s", code)
-		ssatest.CheckSyntaxFlow(t, code, rule, want, ssaapi.WithLanguage(ssaapi.JAVA))
+		ssatest.CheckSyntaxFlow(t, code, rule, want, ssaapi.WithLanguage(ssaconfig.JAVA))
 	}
 
 	t.Run("test normal", func(t *testing.T) {
@@ -110,7 +111,7 @@ $catch.exception as $exception
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"exception": {`Undefined-eeeeee`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test exception with type", func(t *testing.T) {
@@ -122,7 +123,7 @@ $exception<typeName> as $type_name
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"type_name": {`"Exception"`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test exception with type and users", func(t *testing.T) {
@@ -134,7 +135,7 @@ $exception<getUsers>?{!opcode:catch} as $users
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"users": {`Undefined-eeeeee.printStackTrace(Undefined-eeeeee)`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 }
@@ -166,7 +167,7 @@ public class WebSocketsProxyEndpoint extends Endpoint {
 		}`,
 		},
 		"exception": {`eeeeee`},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -186,7 +187,7 @@ public class AA{
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"throws": {`"Exception"`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test method exception source code", func(t *testing.T) {
@@ -199,7 +200,7 @@ public class AA{
 		`
 		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
 			"throws": {`Exception`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test constructor exception", func(t *testing.T) {
@@ -212,7 +213,7 @@ public class AA{
 		`
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"throws": {`"Exception"`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test interface function exception", func(t *testing.T) {
@@ -225,7 +226,7 @@ public interface AA{
 
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"throws": {`"Exception"`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -244,7 +245,7 @@ public class AA{
 `
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"throw": {"panic(Exception(Undefined-Exception,\"test\"))"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test throw with source code", func(t *testing.T) {
@@ -261,7 +262,7 @@ public class AA{
 `
 		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
 			"throw": {`throw new Exception("test");`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test throw Block", func(t *testing.T) {
@@ -287,6 +288,6 @@ $finally<scanInstruction>?{opcode:throw} as $throw
 `
 		ssatest.CheckSyntaxFlowSource(t, code, rule, map[string][]string{
 			"throw": {`throw new Exception("finally");`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

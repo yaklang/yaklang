@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -49,7 +50,7 @@ $a(1);
 A() as $functionA`, map[string][]string{
 			"functionA": {`phi($a)["B","A"](1)`},
 			"functionB": {`phi($a)["B","A"](1)`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("side effect call", func(t *testing.T) {
 		code := `
@@ -118,7 +119,7 @@ $a(1);
 A() as $functionA`, map[string][]string{
 			"functionA": {`side-effect(phi($a)["A","B"], $a)(1)`},
 			"functionB": {`side-effect(phi($a)["A","B"], $a)(1)`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("phi side-effect", func(t *testing.T) {
 		code := `<?php
@@ -155,6 +156,6 @@ c() as $functionC
 			"functionA": {`phi($a)[side-effect(phi($a)["A","B"], $a),"c"](1)`},
 			"functionB": {`phi($a)[side-effect(phi($a)["A","B"], $a),"c"](1)`},
 			"functionC": {`phi($a)[side-effect(phi($a)["A","B"], $a),"c"](1)`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }

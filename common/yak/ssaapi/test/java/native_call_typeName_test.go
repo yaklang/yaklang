@@ -11,9 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -24,7 +24,7 @@ func TestNativeCallTypeName(t *testing.T) {
 		typeName = prog.SyntaxFlowChain(`documentBuilder<fullTypeName> as $id;`, ssaapi.QueryWithEnableDebug())[0]
 		assert.Contains(t, typeName.Show().String(), "javax.xml.parsers.DocumentBuilder")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCallTypeNameWithSCAVersion(t *testing.T) {
@@ -98,7 +98,7 @@ public class FastJSONDemoController {
 		// assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON:1.2.24")
 		assert.Contains(t, typeName.String(), "com.alibaba.fastjson.JSON")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestLocalVariableDeclareTypeName(t *testing.T) {
@@ -157,7 +157,7 @@ func TestLocalVariableDeclareTypeName(t *testing.T) {
 		obj = prog.SyntaxFlowChain(`test2<fullTypeName>?{have:'com.org.LocalVariableDeclareTypeName.A.A'} as $obj`)
 		assert.Equal(t, 1, obj.Len())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 
@@ -233,7 +233,7 @@ func TestMemberCallTypeName(t *testing.T) {
 			assert.Equal(t, 1, obj.Len())
 
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -276,7 +276,7 @@ func TestParamTypeName(t *testing.T) {
 		assert.Contains(t, obj.String(), "com.example.ParamTypeName.B.Dog")
 
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestTypeMergeWithUndefinedAndByteArray(t *testing.T) {
@@ -310,7 +310,7 @@ func TestTypeMergeWithUndefinedAndByteArray(t *testing.T) {
 $string_constructor?{<getActualParams()>* <fullTypeName()><var("aaa")>?{have:"byte"}} as $target `)
 		assert.Contains(t, obj.String(), "byte")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestTypeNamePriority(t *testing.T) {
@@ -344,7 +344,7 @@ func TestTypeNamePriority(t *testing.T) {
 		assert.Equal(t, 1, obj.Len())
 
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestTypeNameForImportStar(t *testing.T) {
@@ -381,7 +381,7 @@ func TestTypeNameForImportStar(t *testing.T) {
 		assert.Contains(t, typeName.String(), "com.yak.ImportStar.Cat", "com.example.ImportStar.B.Cat")
 
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestFullTypeNameWithParentClass1(t *testing.T) {
@@ -440,7 +440,7 @@ func TestFullTypeNameWithParentClass1(t *testing.T) {
 		obj = prog.SyntaxFlowChain("a<typeName>?{have:'com.org.ParentClass1.A.A'} as $obj")
 		assert.Equal(t, 1, obj.Len())
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestFullTypeNameWithParentClass2(t *testing.T) {
@@ -469,7 +469,7 @@ func TestFullTypeNameWithParentClass2(t *testing.T) {
 		assert.Contains(t, obj.String(), "com.example.ParentClass2.B.A")
 		assert.Contains(t, obj.String(), "com.example.ParentClass2.B.C")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestFullTypeNameForAnnotation(t *testing.T) {
@@ -500,7 +500,7 @@ public class FastJSONDemoController {
 			assert.Equal(t, 1, obj.Len())
 
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test no spring framework anntation type name ", func(t *testing.T) {
@@ -526,7 +526,7 @@ public class FastJSONDemoController {
 			require.Contains(t, obj.String(), "java.lang.Hello")
 			require.Contains(t, obj.String(), "org.springframework.web.bind.annotation.Hello")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test servlet annotation1", func(t *testing.T) {
@@ -551,7 +551,7 @@ public class Simple extends HttpServlet {
 			obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 			assert.Equal(t, 1, obj.Len())
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test servlet annotation2", func(t *testing.T) {
@@ -576,7 +576,7 @@ public class Simple extends HttpServlet {
 			obj := prog.SyntaxFlowChain("Simple.annotation.WebServlet<fullTypeName>?{have:'javax.servlet.annotation.WebServlet'} as $obj")
 			assert.Equal(t, 1, obj.Len())
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -604,7 +604,7 @@ func TestTypeNameForCreator(t *testing.T) {
 			assert.Equal(t, 1, res.Len())
 
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test chain creator simple", func(t *testing.T) {
@@ -618,7 +618,7 @@ func TestTypeNameForCreator(t *testing.T) {
 `
 		ssatest.CheckSyntaxFlowContain(t, code, `Request?{<typeName>?{have:'okhttp3.'}}.Builder as $result`, map[string][]string{
 			"result": {"Undefined-Builder(valid)"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test chain creator complex", func(t *testing.T) {
@@ -632,7 +632,7 @@ func TestTypeNameForCreator(t *testing.T) {
 `
 		ssatest.CheckSyntaxFlowContain(t, code, `Request.Builder.AAA<typeName> as $result`, map[string][]string{
 			"result": {"okhttp3.Request"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -686,7 +686,7 @@ class Main{
 			"f": {"\"String\""},
 			"b": {"\"Integer\""},
 			"t": {"\"Long\""},
-		}, ssaapi.WithLanguage(consts.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 func TestReturnType(t *testing.T) {
@@ -703,7 +703,7 @@ class Main{
 		assert.Contains(t, b.String(), "Long")
 		assert.Contains(t, b.String(), "java.lang.Long")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func Test_Class_Declare_Type_Name(t *testing.T) {
@@ -737,7 +737,7 @@ public interface UserMapper {
 		require.Contains(t, res.String(), "UserMapper")
 		require.Contains(t, res.String(), "com.mycompany.myapp.UserMapper")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestJava_Creator_MethodCallTypeName(t *testing.T) {
@@ -764,7 +764,7 @@ public class OkHttpClientExample {
 Request.Builder().url()<typeName> as $result2`, map[string][]string{
 			"result1": {"okhttp3.Request"},
 			"result2": {"okhttp3.Request"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -784,7 +784,7 @@ public class ClassDataLoader {
 defineClassMethod<fullTypeName()> as $name
 	`, map[string][]string{
 			"name": {"\"java.lang.reflect.Method\""},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("full typename only declare", func(t *testing.T) {
@@ -803,6 +803,6 @@ public class ClassDataLoader {
 defineClassMethod<fullTypeName()> as $name
 	`, map[string][]string{
 			"name": {"\"java.lang.Method\"", "\"org.joychou.controller.Method\""},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

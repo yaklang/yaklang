@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -28,7 +29,7 @@ func Test_Struct(t *testing.T) {
 			a2 #-> * as $param
 		`, true, map[string][]string{
 			"param": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 	t.Run("struct function inheritance", func(t *testing.T) {
 		code := `package main
@@ -64,7 +65,7 @@ func Test_Struct(t *testing.T) {
 		`, true, map[string][]string{
 			"a1": {"1"},
 			"a2": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 	t.Run("struct function inheritance extend", func(t *testing.T) {
 		code := `package main
@@ -108,7 +109,7 @@ func Test_Struct(t *testing.T) {
 			"a1": {"1"},
 			"a2": {"3"},
 			"a3": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -155,7 +156,7 @@ $param?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $input
 $sink & $input as $high;
 		`, true, map[string][]string{
 			"high": {"Parameter-c"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("fulltype name from inheritance", func(t *testing.T) {
@@ -193,7 +194,7 @@ func (c *SSRFVuln1Controller) Get() {
 $sink<fullTypeName> as $type
 		`, true, map[string][]string{
 			"type": {"github.com/beego/beego/v2/server/web"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -222,7 +223,7 @@ func Test_Template(t *testing.T) {
 		println(* #-> as $a)
 		`, true, map[string][]string{
 			"a": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("function", func(t *testing.T) {
@@ -248,7 +249,7 @@ func Test_Template(t *testing.T) {
 		println(* #-> as $a)
 		`, true, map[string][]string{
 			"a": {"1", "\"1\"", "true"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -292,6 +293,6 @@ func main() {
 		`, true, map[string][]string{
 			"a": {"Parameter-w"},
 			"b": {"Parameter-w"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }

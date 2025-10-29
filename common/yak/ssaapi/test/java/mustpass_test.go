@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -30,7 +31,7 @@ func TestMustPassMapping(t *testing.T) {
 		t, "",
 		filesys.NewEmbedFS(sourceCodeSample),
 		filesys.NewEmbedFS(mustpassFS),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -41,7 +42,7 @@ func TestMustPass_JAVA_Debug_Compile(t *testing.T) {
 	}
 	progName := uuid.NewString()
 
-	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.JAVA))
+	_, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.JAVA))
 	if err != nil {
 		t.Fatalf("compile failed: %v", err)
 	}
@@ -60,7 +61,7 @@ func TestMustPass_Debug(t *testing.T) {
 	}
 	progName := uuid.NewString()
 
-	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.ParseProjectWithFS(filesys.NewEmbedFS(sourceCodeSample), ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.JAVA))
 	require.NoError(t, err, "compile failed")
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 
@@ -125,7 +126,7 @@ $entryFunc<getFormalParams>?{opcode: param && !have: this} as $source;
 	t.Run("memory ", func(t *testing.T) {
 		prog, err := ssaapi.ParseProjectWithFS(
 			filesys.NewEmbedFS(sourceCodeSample),
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 		if err != nil {
 			t.Fatalf("compile failed: %v", err)
@@ -139,7 +140,7 @@ $entryFunc<getFormalParams>?{opcode: param && !have: this} as $source;
 		_, err := ssaapi.ParseProjectWithFS(
 			filesys.NewEmbedFS(sourceCodeSample),
 			ssaapi.WithProgramName(progName),
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			// ssaapi.WithCacheTTL(500*time.Millisecond), //	trigger  cache save/refresh/load
 		)
 		if err != nil {
@@ -202,6 +203,6 @@ $Mapping?{opcode: function} as $entryFunc;
 	`, map[string][]string{
 		"entryFunc": {"Function-DemoABCEntryClass.methodEntry", "Function-GroovyExecIF.groovyExec"},
 	}, false,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }

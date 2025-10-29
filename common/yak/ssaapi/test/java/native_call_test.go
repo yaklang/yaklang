@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -85,7 +86,7 @@ func TestNativeCall_GetObject(t *testing.T) {
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 }
 
@@ -104,7 +105,7 @@ HHHHH <getReturns> as $sink;
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -124,7 +125,7 @@ HHHHH <getFormalParams> as $sink;
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -140,7 +141,7 @@ flexible <getCall> <searchFunc> as $sink;
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -156,7 +157,7 @@ aArgs <getCall> as $sink;
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -178,7 +179,7 @@ yourMethod()<getCallee> as $sink;
 			}
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -200,7 +201,7 @@ aArgs <getCall> <getCallee> as $sink;
 
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -228,7 +229,7 @@ aArgs <getFunc> as $sink;
 
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 }
 
@@ -243,7 +244,7 @@ func TestNativeCall_SearchFormalParams(t *testing.T) {
 			})
 			return nil
 		},
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -276,7 +277,7 @@ func TestNativeCall_Java_FuncName(t *testing.T) {
 		}
 		assert.True(t, haveFuncName)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_Java_Eval(t *testing.T) {
@@ -292,7 +293,7 @@ func TestNativeCall_Java_Eval(t *testing.T) {
 		}
 		assert.True(t, haveFuncName)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_Java_Eval_Show(t *testing.T) {
@@ -308,7 +309,7 @@ func TestNativeCall_Java_Eval_Show(t *testing.T) {
 		}
 		assert.True(t, haveFuncName)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_Java_FuzztagNEval(t *testing.T) {
@@ -327,7 +328,7 @@ check $sink;
 		}
 		assert.True(t, haveFuncName)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_Java_FuzztagThenEval_Basic(t *testing.T) {
@@ -346,7 +347,7 @@ check $sink;
 		}
 		assert.True(t, haveFuncName)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_Java_FuzztagThenEval(t *testing.T) {
@@ -471,7 +472,7 @@ A as $output
 $output<FilenameByContent> as $sink
 `, map[string][]string{
 			"sink": {"a.java"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("check syntaxflow with alert", func(t *testing.T) {
@@ -497,7 +498,7 @@ alert $output
 				return nil
 			})
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -508,7 +509,7 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 		fs.AddFile("/src/main/java/bcd.java", `package main2;`)
 		programID := uuid.NewString()
 		programID = strings.ReplaceAll(programID, "a", "b")
-		prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+		prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
 		require.NoError(t, err)
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -574,7 +575,7 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 //		`DriverManager.getConnection<getActualParams> as $params`,
 //		map[string][]string{
 //			"params": {"root", "mydb", "DriverManager", "nil"},
-//		}, ssaapi.WithLanguage(consts.JAVA))
+//		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 //}
 
 //todo: fix this
@@ -613,5 +614,5 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 //		`DriverManager.getConnection<getActualParamLen> as $len`,
 //		map[string][]string{
 //			"len": {"4"},
-//		}, ssaapi.WithLanguage(consts.JAVA))
+//		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 //}

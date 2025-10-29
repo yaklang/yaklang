@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -28,7 +29,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Result(t *testing.T) {
 
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(`println("araa")`,
-		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	require.NoError(t, err)
@@ -222,7 +223,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Notify(t *testing.T) {
 		progName := uuid.NewString()
 		prog, err := ssaapi.Parse(`println("araa")`,
 			ssaapi.WithProgramName(progName),
-			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithLanguage(ssaconfig.Yak),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 		require.NoError(t, err)
@@ -255,7 +256,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_ResultDelete(t *testing.T) {
 
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(`println("araa")`,
-		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	require.NoError(t, err)

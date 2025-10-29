@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestParseInclude(t *testing.T) {
 	fs.AddFile("b/b.yak", `b = 3`)
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `dump(* as $sink)`, map[string][]string{
 		"sink": {"3"},
-	}, false, ssaapi.WithLanguage(ssaapi.Yak))
+	}, false, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestParseInclude2(t *testing.T) {
@@ -24,7 +25,7 @@ func TestParseInclude2(t *testing.T) {
 	fs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
 	fs.AddFile("b/b.yak", `b = 3`)
 	fs.AddFile("a/c.yak", `include "b/b.yak"; dump(b)`)
-	programs, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.Yak))
+	programs, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.Yak))
 	require.NoError(t, err)
 	valB := programs[0].Ref("b")
 	valB.Show()
@@ -42,7 +43,7 @@ func TestParseProject(t *testing.T) {
 		progs, err := ssaapi.ParseProjectWithFS(
 			vfs,
 			ssaapi.WithFileSystemEntry("a/a.yak"),
-			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithLanguage(ssaconfig.Yak),
 			// ssaapi.WithDatabaseProgramName("test"),
 		)
 		progs.Show()

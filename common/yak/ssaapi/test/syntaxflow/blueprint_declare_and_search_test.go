@@ -1,10 +1,12 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_PHP_Blueprint_name2declare(t *testing.T) {
@@ -28,7 +30,7 @@ func Test_PHP_Blueprint_name2declare(t *testing.T) {
 			`, map[string][]string{
 				"classA": {"A"},
 				"classC": {"C"},
-			}, ssaapi.WithLanguage(ssaapi.PHP))
+			}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("search declare class", func(t *testing.T) {
@@ -36,7 +38,7 @@ func Test_PHP_Blueprint_name2declare(t *testing.T) {
 		A_declare as $classA;
 		`, map[string][]string{
 			"classA": {"A"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("search parent and children relationship", func(t *testing.T) {
@@ -56,7 +58,7 @@ func Test_PHP_Blueprint_name2declare(t *testing.T) {
 			"retE": {"C"},
 			"retF": {"C"},
 			"retG": {"A"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -85,7 +87,7 @@ $c = new class implements C {};
 			require.Equal(t, res.GetValues("retA1").Len(), 1)
 			require.Equal(t, res.GetValues("retC1").Len(), 1)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -128,7 +130,7 @@ class D extends AA implements BB {}
 			require.Equal(t, classAs.Len(), 1)
 			require.Equal(t, "A", classAs[0].GetRange().GetText())
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -165,7 +167,7 @@ class StripeObject implements ArrayAccess, JsonSerializable{}
 		JsonSerializable.__implement__ as $retA
 		`, map[string][]string{
 			"retA": {"StripeObject"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -189,7 +191,7 @@ func Test_JAVA_Blueprint_name2declare(t *testing.T) {
 			`, map[string][]string{
 				"classA": {"A"},
 				"classC": {"C"},
-			}, ssaapi.WithLanguage(ssaapi.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("search declare class", func(t *testing.T) {
@@ -197,7 +199,7 @@ func Test_JAVA_Blueprint_name2declare(t *testing.T) {
 		A_declare as $classA;
 		`, map[string][]string{
 			"classA": {"A"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("search parent and children relationship", func(t *testing.T) {
@@ -217,7 +219,7 @@ func Test_JAVA_Blueprint_name2declare(t *testing.T) {
 			"retE": {"C"},
 			"retF": {"C"},
 			"retG": {"A"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -247,7 +249,7 @@ func Test_JAVA_Blueprint_Anonymous_Name2declare(t *testing.T) {
 			require.Equal(t, res.GetValues("retA1").Len(), 1)
 			require.Equal(t, res.GetValues("retC1").Len(), 1)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -291,6 +293,6 @@ func Test_JAVA_Blueprint_Range(t *testing.T) {
 			require.Equal(t, classAs.Len(), 1)
 			require.Equal(t, classAs[0].GetRange().GetText(), "A")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

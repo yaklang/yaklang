@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -31,5 +32,5 @@ B() as $functionB
 `, map[string][]string{
 		"functionA": {`phi(B)[Function-B,Function-A](1)`},
 		"functionB": {`phi(B)[Function-B,Function-A](1)`},
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }

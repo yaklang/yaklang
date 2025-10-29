@@ -1,10 +1,12 @@
 package javascript
 
 import (
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -25,7 +27,7 @@ func Test_JS_XMLHttpRequest(t *testing.T) {
 				"url":    {"\"http://example.com\""},
 				"method": {"\"GET\""},
 			}, false,
-			ssaapi.WithLanguage(ssaapi.JS),
+			ssaapi.WithLanguage(ssaconfig.JS),
 		)
 	})
 
@@ -71,7 +73,7 @@ const data2 = {
 				"method": {"\"POST\"", "\"POST\""},
 				// "data": {"\"name=job&age=12\"", "\"name=job&age=12\""},
 			},
-			ssaapi.WithLanguage(ssaapi.JS),
+			ssaapi.WithLanguage(ssaconfig.JS),
 		)
 	})
 
@@ -107,7 +109,7 @@ func TestJs_JQuery(t *testing.T) {
 				"dataType": {"\"json\""},
 				// "data":     {"\"{url:window.location.href}\""},
 			},
-			ssaapi.WithLanguage(ssaapi.JS),
+			ssaapi.WithLanguage(ssaconfig.JS),
 		)
 	})
 
@@ -146,7 +148,7 @@ func TestJs_JQuery(t *testing.T) {
 				"contentType": {"\"application/json\"", "\"application/json\""},
 				"data":        {"Undefined-JSON.stringify(valid)(Undefined-formData)", "\"aaa\""},
 			},
-			ssaapi.WithLanguage(ssaapi.JS))
+			ssaapi.WithLanguage(ssaconfig.JS))
 	})
 }
 
@@ -198,7 +200,7 @@ func Test_JS_Fetch(t *testing.T) {
 			// "body":    {"Undefined-JSON.stringify(valid)(make(object{}))"},
 			// "headers": {"make(object{})"},
 		},
-		ssaapi.WithLanguage(ssaapi.JS))
+		ssaapi.WithLanguage(ssaconfig.JS))
 }
 
 func Test_JS_Axios(t *testing.T) {
@@ -227,7 +229,7 @@ func Test_JS_Axios(t *testing.T) {
 			map[string][]string{
 				"getUrl":  {"\"http://example.com\""},
 				"postUrl": {"\"/user\""},
-			}, ssaapi.WithLanguage(ssaapi.JS))
+			}, ssaapi.WithLanguage(ssaconfig.JS))
 	})
 
 	t.Run("test axios post", func(t *testing.T) {
@@ -246,7 +248,7 @@ func Test_JS_Axios(t *testing.T) {
 			`axios.post(* as $url, * as $data)`,
 			map[string][]string{
 				"url": {"\"/user\""},
-			}, ssaapi.WithLanguage(ssaapi.JS))
+			}, ssaapi.WithLanguage(ssaconfig.JS))
 	})
 	t.Run("test http request by config ", func(t *testing.T) {
 		code := `
@@ -268,7 +270,7 @@ func Test_JS_Axios(t *testing.T) {
 				"method": {"\"post\""},
 				"url":    {"\"/user/12345\""},
 				// "data":   {"\"key\":\"value\""},
-			}, ssaapi.WithLanguage(ssaapi.JS))
+			}, ssaapi.WithLanguage(ssaconfig.JS))
 	})
 
 }

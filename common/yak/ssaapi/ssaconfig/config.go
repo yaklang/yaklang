@@ -1,6 +1,9 @@
 package ssaconfig
 
+import "context"
+
 type Config struct {
+	ctx            context.Context
 	Mode           Mode
 	BaseInfo       *BaseInfo
 	CodeSource     *CodeSourceInfo
@@ -78,7 +81,6 @@ func defaultSyntaxFlowConfig() *SyntaxFlowConfig {
 func defaultSyntaxFlowScanConfig() *SyntaxFlowScanConfig {
 	return &SyntaxFlowScanConfig{
 		IgnoreLanguage: false,
-		Language:       []string{},
 		Concurrency:    5,
 	}
 }
@@ -159,5 +161,30 @@ func WithExtraInfo(key string, value any) Option {
 	return func(c *Config) error {
 		c.SetExtraInfo(key, value)
 		return nil
+	}
+}
+func WithContext(ctx context.Context) Option {
+	return func(c *Config) error {
+		c.ctx = ctx
+		return nil
+	}
+}
+
+func (c *Config) GetContext() context.Context {
+	if c == nil {
+		return context.Background()
+	}
+	return c.ctx
+}
+
+func (c *Config) IsContextCancel() bool {
+	if c == nil || c.ctx == nil {
+		return false
+	}
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
 	}
 }

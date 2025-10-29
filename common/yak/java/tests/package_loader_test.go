@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -45,7 +46,7 @@ func TestPackageLoader(t *testing.T) {
 			`, map[string][]string{
 			"a": {"1"},
 		}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 		)
 	})
@@ -56,7 +57,7 @@ func TestPackageLoader(t *testing.T) {
 			`, map[string][]string{
 			"a": {"1"},
 		}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 		)
 	})

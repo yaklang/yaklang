@@ -13,8 +13,8 @@ import (
 func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
 	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
-	application.Language = string(c.language)
-	application.ProjectName = c.ProjectName
+	application.Language = c.GetLanguage()
+	application.ProjectName = c.GetProjectName()
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
@@ -36,10 +36,10 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		LanguageBuilder := c.LanguageBuilder
 		// check builder
 		if LanguageBuilder == nil {
-			return utils.Errorf("not support language %s", c.language)
+			return utils.Errorf("not support language %s", c.GetLanguage())
 		}
 		if application.Language == "" {
-			application.Language = string(LanguageBuilder.GetLanguage())
+			application.Language = LanguageBuilder.GetLanguage()
 		}
 
 		// get source code

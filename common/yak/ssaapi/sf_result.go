@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"sort"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"go.uber.org/atomic"
 
@@ -229,7 +230,7 @@ func (r *SyntaxFlowResult) GetProgramName() string {
 	return ""
 }
 
-func (r *SyntaxFlowResult) GetProgramLang() string {
+func (r *SyntaxFlowResult) GetProgramLang() ssaconfig.Language {
 	if r == nil {
 		return ""
 	}

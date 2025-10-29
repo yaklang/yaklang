@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -54,7 +55,7 @@ func HandleJSGetNewRequest(isHttps bool, req []byte, code string, cb ...func(boo
 }
 
 func handleJS(code string, callback func(*requestNewTarget)) {
-	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.JS))
 	if err != nil {
 		log.Error("parse js failed")
 		return

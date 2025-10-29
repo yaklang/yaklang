@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
@@ -14,29 +13,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-const (
-	Yak  = consts.Yak
-	JS   = consts.JS
-	PHP  = consts.PHP
-	JAVA = consts.JAVA
-	GO   = consts.GO
-	C    = consts.C
-	TS   = consts.TS
-)
-
-var LanguageBuilderCreater = map[consts.Language]ssa.CreateBuilder{
-	Yak:  yak2ssa.CreateBuilder,
-	JS:   ts2ssa.CreateBuilder,
-	PHP:  php2ssa.CreateBuilder,
-	JAVA: java2ssa.CreateBuilder,
-	GO:   go2ssa.CreateBuilder,
-	C:    c2ssa.CreateBuilder,
-	TS:   ts2ssa.CreateBuilder,
+var LanguageBuilderCreater = map[ssaconfig.Language]ssa.CreateBuilder{
+	ssaconfig.Yak:  yak2ssa.CreateBuilder,
+	ssaconfig.JS:   ts2ssa.CreateBuilder,
+	ssaconfig.PHP:  php2ssa.CreateBuilder,
+	ssaconfig.JAVA: java2ssa.CreateBuilder,
+	ssaconfig.GO:   go2ssa.CreateBuilder,
+	ssaconfig.C:    c2ssa.CreateBuilder,
+	ssaconfig.TS:   ts2ssa.CreateBuilder,
 }
 
 func (c *Config) isStop() bool {
@@ -95,8 +85,8 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}()
 	// path is empty, use language or YakLang as default
 	if c.LanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilderCreater[Yak]()
-		log.Debugf("use default language [%s] for empty path", Yak)
+		c.LanguageBuilder = LanguageBuilderCreater[ssaconfig.Yak]()
+		log.Debugf("use default language [%s] for empty path", ssaconfig.Yak)
 	}
 
 	prog, builder, err := c.init(c.fs, 1)

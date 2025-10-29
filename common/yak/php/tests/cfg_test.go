@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -527,6 +528,6 @@ if (in_array($filename, $INCLUDE_ALLOW_LIST)) {
 		ssatest.CheckSyntaxFlow(t, code, "include(* #-> * as $param)",
 			map[string][]string{
 				"param": {"Undefined-_GET"},
-			}, ssaapi.WithLanguage(ssaapi.PHP))
+			}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }

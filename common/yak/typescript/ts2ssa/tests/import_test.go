@@ -3,9 +3,9 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -35,7 +35,7 @@ go0p()
 		console.log(* #-> as $result)
 	`, map[string][]string{
 		"result": {"Undefined-PI", "FreeValue-getValue", "42", "\"Hello World\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -56,7 +56,7 @@ export default function calculate(): number {
 		console.log(* #-> as $output)
 	`, map[string][]string{
 		"output": {"100"},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -80,7 +80,7 @@ console.log(Constants.getVersion());
 		console.log(* #-> as $values)
 	`, map[string][]string{
 		"values": {"3.14", "\"1.0.0\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -111,7 +111,7 @@ console.log(helper());
 		console.log(* #-> as $outputs)
 	`, map[string][]string{
 		"outputs": {"20", "10", "\"2.0\"", "\"helper\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -147,7 +147,7 @@ console.log(button.getText());
 		console.log(* #-> as $text)
 	`, map[string][]string{
 		"text": {"\"Click me\"", "\"clicked\""},
-	}, true, ssaapi.WithLanguage(ssaapi.TS),
+	}, true, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -175,7 +175,7 @@ console.log(status2);
 		console.log(* #-> as $statuses)
 	`, map[string][]string{
 		"statuses": {"\"connected\"", "\"disconnected\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -201,7 +201,7 @@ processFile('test.txt');
 	`, map[string][]string{
 		"readFileFunc": {"readFile"},
 		"pathModule":   {"path"},
-	}, ssaapi.WithLanguage(consts.TS))
+	}, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestImportTypeOnly(t *testing.T) {
@@ -232,7 +232,7 @@ console.log(user.name);
 		console.log(* #-> as $userName)
 	`, map[string][]string{
 		"userName": {"\"Alice\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+	}, false, ssaapi.WithLanguage(ssaconfig.TS),
 	)
 }
 
@@ -271,7 +271,7 @@ service.getData().then(data => {
 		console.log(* #-> as $processed)
 	`, map[string][]string{
 		"processed": {"sample data"},
-	}, true, ssaapi.WithLanguage(ssaapi.TS))
+	}, true, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestImportClass(t *testing.T) {
@@ -298,7 +298,7 @@ console.log(MathUtils.PI);
 			console.log(* #-> as $values)
 		`, map[string][]string{
 			"values": {"5", "10", "3.14159"},
-		}, false, ssaapi.WithLanguage(ssaapi.TS))
+		}, false, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 
 	t.Run("import class with instance method", func(t *testing.T) {
@@ -323,7 +323,7 @@ console.log(user.getInfo());
 			console.log(* #-> as $info)
 		`, map[string][]string{
 			"info": {"\" is \"", "\" years old\"", "\"John\"", "25"},
-		}, true, ssaapi.WithLanguage(ssaapi.TS))
+		}, true, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 }
 
@@ -353,7 +353,7 @@ export enum Status {
 		console.log(* #-> as $enumValues)
 	`, map[string][]string{
 		"enumValues": {"\"red\"", "2"},
-	}, false, ssaapi.WithLanguage(ssaapi.TS))
+	}, false, ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 // TODO: Fix environment lost in lazy build lazy build not contain full variable table context
@@ -390,5 +390,5 @@ export const enum Palette {
 		console.log(* #-> as $enumValues)
 	`, map[string][]string{
 		"enumValues": {"\"red\"", "2"},
-	}, true, ssaapi.WithLanguage(ssaapi.TS))
+	}, true, ssaapi.WithLanguage(ssaconfig.TS))
 }

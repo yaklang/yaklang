@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"io"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestUnhealthyLargeFile(t *testing.T) {
@@ -28,7 +30,7 @@ func TestUnhealthyLargeFile(t *testing.T) {
 		buf.WriteString(fmt.Sprintf("cost: %v\n", time.Now().Sub(start)))
 		start = time.Now()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	log.SetOutput(os.Stdout)
 	fmt.Println(buf.String())
 	ssa.ShowDatabaseCacheCost()

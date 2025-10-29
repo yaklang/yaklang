@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -41,7 +42,7 @@ func TestNativeCallOpCode(t *testing.T) {
 	// 获取a所在函数所有的opcode
 	ssatest.CheckSyntaxFlowContain(t, code, `a<opcodes> as $result;`, map[string][]string{
 		"result": {"Parameter", "ParameterMember", "Return", "Loop", "Function", "Call", "Phi", "Undefined", "ConstInst", "Jump", "If", "UnOp", "Switch", "ErrorHandler", "Make", "BinOp"},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestGetSourceCode(t *testing.T) {
@@ -63,11 +64,11 @@ func TestGetSourceCode(t *testing.T) {
 	ssatest.CheckSyntaxFlow(t, code, `bb1<sourceCode> as $result;`,
 		map[string][]string{
 			"result": {"\"\\t\\t\\t\\t\\tbb1;\\n\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 	ssatest.CheckSyntaxFlow(t, code, `bb2<sourceCode(context=3)> as $result;`,
 		map[string][]string{
 			"result": {"\"\\t\\t\\t\\tif (c){\\n\\t\\t\\t\\t\\tbb1;\\n\\t\\t\\t\\t}else {\\n\\t\\t\\t\\t\\tbb2;\\n\\t\\t\\t\\t}\\n\\t\\t\\t\\tprinln(a);\\n\\t\\t}\\n\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }

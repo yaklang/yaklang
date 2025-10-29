@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -92,7 +93,7 @@ func Test_Panic(t *testing.T) {
 			`Tensor as $a`,
 			map[string][]string{
 				"a": {""},
-			}, true, ssaapi.WithLanguage(ssaapi.GO))
+			}, true, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("getTopDefs of if value", func(t *testing.T) {
@@ -143,7 +144,7 @@ $source #-> as $test;
 // $if #-> as $test;
 
 `,
-			map[string][]string{}, ssaapi.WithLanguage(ssaapi.GO),
+			map[string][]string{}, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 

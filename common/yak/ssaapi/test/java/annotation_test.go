@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -19,7 +20,7 @@ func TestAnnotation_Negative(t *testing.T) {
 			t.Fatal("xmlStr --> $ret not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestAnnotation_Positive_Basic1(t *testing.T) {
@@ -28,7 +29,7 @@ func TestAnnotation_Positive_Basic1(t *testing.T) {
 			t.Fatal("Request*.__ref__ --> $ret not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 //go:embed sample/formal_param_annotation.java
@@ -40,7 +41,7 @@ func TestAnnotation_Postive_FormalParam(t *testing.T) {
 			t.Fatal("*Param.__ref__ --> $ret not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestAnnotation_Postive_FormalParam_2(t *testing.T) {
@@ -49,7 +50,7 @@ func TestAnnotation_Postive_FormalParam_2(t *testing.T) {
 			t.Fatal("*Param.__ref__ --> $ret not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestAnnotation_Positive_Basic2(t *testing.T) {
@@ -93,7 +94,7 @@ public class DemoABCEntryClass {
 *Mapping.__ref__<getFormalParams>?{have: this} as $ref
 `, ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestAnnotation_GetTopDef(t *testing.T) {
@@ -116,7 +117,7 @@ public class Demo3 {
 	println(* #-> as $target)
 	`, map[string][]string{
 		"target": {`"aaaaaaa"`},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestInterfaceAnnotation(t *testing.T) {
@@ -190,5 +191,5 @@ public class DemoABCEntryClass {
 		assert.Equal(t, prog.SyntaxFlowChain(".annotation.*Mapping.value?{have:'/'} as $ref", ssaapi.QueryWithEnableDebug(false)).Show(false).Len(), 1)
 		assert.Equal(t, prog.SyntaxFlowChain(".annotation.ResponseStatus.value?{have:'200'} as $ref ", ssaapi.QueryWithEnableDebug(false)).Show().Len(), 1)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

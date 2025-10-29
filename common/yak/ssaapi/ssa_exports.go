@@ -17,8 +17,6 @@ import (
 
 	"github.com/gobwas/glob"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -39,7 +37,7 @@ type Config struct {
 	ProgramDescription string
 
 	// language
-	language        consts.Language
+	language        ssaconfig.Language
 	LanguageBuilder ssa.Builder
 
 	// other compile options
@@ -258,7 +256,7 @@ func WithRawLanguage(input_language string) Option {
 	if input_language == "" {
 		return func(*Config) error { return nil }
 	}
-	if language, err := consts.ValidateLanguage(input_language); err == nil {
+	if language, err := ssaconfig.ValidateLanguage(input_language); err == nil {
 		return WithLanguage(language)
 	} else {
 		return func(c *Config) error {
@@ -267,7 +265,7 @@ func WithRawLanguage(input_language string) Option {
 	}
 }
 
-func WithLanguage(language consts.Language) Option {
+func WithLanguage(language ssaconfig.Language) Option {
 	return func(c *Config) error {
 		if language == "" {
 			return nil
@@ -625,10 +623,10 @@ var Exports = map[string]any{
 	"runtimeId": schema.RuntimeId,
 
 	// language:
-	"Javascript": JS,
-	"Yak":        Yak,
-	"PHP":        PHP,
-	"Java":       JAVA,
+	"Javascript": ssaconfig.JS,
+	"Yak":        ssaconfig.Yak,
+	"PHP":        ssaconfig.PHP,
+	"Java":       ssaconfig.JAVA,
 
 	/// static analyze
 	"YaklangScriptChecking": YaklangScriptChecking,
