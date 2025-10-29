@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -29,7 +30,7 @@ func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProject
 		return nil, utils.Errorf("create SSA project failed: request or project is nil")
 	}
 
-	project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), req.Project)
+	project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), req)
 	if err != nil {
 		return &ypb.CreateSSAProjectResponse{
 			Message: &ypb.DbOperateMessage{
