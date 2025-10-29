@@ -73,6 +73,17 @@ func cloneFuzzerRequest(req *ypb.FuzzerRequest) *ypb.FuzzerRequest {
 	return cloned
 }
 
+func applyGroupOverrides(overrides *ypb.GroupHTTPFuzzerOverrides, req *ypb.FuzzerRequest) {
+	if overrides == nil || req == nil {
+		return
+	}
+	req.RepeatTimes = overrides.GetRepeatTimes()
+	req.Concurrent = overrides.GetConcurrent()
+	req.DelayMinSeconds = overrides.GetDelayMinSeconds()
+	req.DelayMaxSeconds = overrides.GetDelayMaxSeconds()
+	req.DisableUseConnPool = overrides.GetDisableUseConnPool()
+}
+
 func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak_HTTPFuzzerGroupServer) error {
 	requests := req.GetRequests()
 	if len(requests) == 0 {
@@ -112,6 +123,9 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 		if request == nil {
 			log.Errorf("clone fuzzer request failed")
 			continue
+		}
+		if req.GetEnableOverrides() {
+			applyGroupOverrides(req.GetOverrides(), request)
 		}
 		request.FuzzerSequenceIndex = uuid.NewString()
 
