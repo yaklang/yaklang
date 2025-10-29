@@ -87,8 +87,8 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				queryDocumentAction(r, docSearcher),
-				grepYaklangSamplesAction(r, docSearcher), // 新增：快速 grep 代码样例
+				// queryDocumentAction(r, docSearcher), // DEPRECATED: 已被 grepYaklangSamplesAction 替代
+				grepYaklangSamplesAction(r, docSearcher), // 快速 grep 代码样例
 				writeCode(r),
 				modifyCode(r),
 				insertLines(r),

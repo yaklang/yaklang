@@ -19,6 +19,20 @@ import (
 
 func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Handle init task: analyze-requirement-and-search
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["println"],
+  "reason": "Simple test code"
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -36,7 +50,7 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, `"query_document"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
 		// extract nonce from <|GEN_CODE_{{.Nonce}}|>
 		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
 		matches := re.FindStringSubmatch(prompt)
