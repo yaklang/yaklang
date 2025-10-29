@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -52,7 +53,7 @@ func TestReadFileWith_SSADB(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/b/c.yak", code)
 	_, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(programName),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)

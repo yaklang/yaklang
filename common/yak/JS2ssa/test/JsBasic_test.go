@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type TestCase struct {
@@ -17,7 +18,7 @@ type TestCase struct {
 }
 
 func check(t *testing.T, tc TestCase) {
-	prog, err := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaapi.JS))
+	prog, err := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaconfig.JS))
 	if err != nil {
 		t.Fatal("prog parse error", err)
 	}

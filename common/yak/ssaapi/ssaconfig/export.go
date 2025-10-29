@@ -6,4 +6,6 @@ var SyntaxFlowScanConfigExports = map[string]interface{}{
 	"withIgnoreLanguage":     WithScanIgnoreLanguage,
 	"withRuleFilter":         WithRuleFilter,
 	"withRuleFilterLanguage": WithRuleFilterLanguage,
+
+	"withLanguage": WithProjectLanguage,
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestExclude(t *testing.T) {
@@ -17,7 +18,7 @@ phpinfo();
 	fs.AddFile("/var/www/exclude/2.php", `<?php
 println(2);
 `)
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.PHP))
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP))
 	require.NoError(t, err)
 	prog.Show()
 	result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -29,7 +30,7 @@ println(2);
 			return true
 		}
 		return false
-	}), ssaapi.WithLanguage(ssaapi.PHP))
+	}), ssaapi.WithLanguage(ssaconfig.PHP))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -48,7 +49,7 @@ println(2);
 	fs.AddFile("/vendor/src/main/3.php", `<?php
 println(2);
 `)
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.PHP))
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP))
 	require.NoError(t, err)
 	result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
 	require.NoError(t, err)
@@ -57,7 +58,7 @@ println(2);
 
 	filterFunc, err := ssaapi.DefaultExcludeFunc([]string{"**/vendor/**", "vendor/**"})
 	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.PHP), filterFunc)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), filterFunc)
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -106,7 +107,7 @@ func CMD1(c *gin.Context) {
 	})
 }
 `)
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO))
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO))
 	require.NoError(t, err)
 	result, err := prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())
 	require.NoError(t, err)
@@ -115,7 +116,7 @@ func CMD1(c *gin.Context) {
 
 	filterFunc, err := ssaapi.DefaultExcludeFunc([]string{"**temp**"})
 	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO), filterFunc)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())
@@ -125,7 +126,7 @@ func CMD1(c *gin.Context) {
 
 	filterFunc, err = ssaapi.DefaultExcludeFunc([]string{"**temp/**"})
 	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO), filterFunc)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`exec.Command(*?{opcode:const} #-> as $param)`, ssaapi.QueryWithEnableDebug())

@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -50,7 +51,7 @@ func prepareProgram(t *testing.T, progID string) func() {
 	}
 	`)
 	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
 	)
@@ -370,7 +371,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode: "start",
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				GroupNames: []string{string(consts.JAVA), string(consts.PHP), string(consts.GO)},
+				GroupNames: []string{string(ssaconfig.JAVA), string(ssaconfig.PHP), string(ssaconfig.GO)},
 			},
 			ProgramName: []string{
 				progID,
@@ -510,7 +511,7 @@ func CMD1(c *gin.Context) {
 }
 	`)
 	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
 	)
@@ -1075,7 +1076,7 @@ alert $low for {
 			vf := filesys.NewVirtualFs()
 			vf.AddFile("example/src/main/a.go", code1)
 			prog, err := ssaapi.ParseProjectWithFS(vf,
-				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithLanguage(ssaconfig.GO),
 				ssaapi.WithProgramName(progID),
 			)
 			require.NoError(t, err)
@@ -1114,7 +1115,7 @@ alert $low for {
 			vf := filesys.NewVirtualFs()
 			vf.AddFile("example/src/main/b.go", code2)
 			prog, err := ssaapi.ParseProjectWithFS(vf,
-				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithLanguage(ssaconfig.GO),
 				ssaapi.WithProgramName(progID),
 				ssaapi.WithReCompile(true),
 			)
@@ -1154,7 +1155,7 @@ alert $low for {
 			vf := filesys.NewVirtualFs()
 			vf.AddFile("example/src/main/c.go", code3)
 			prog, err := ssaapi.ParseProjectWithFS(vf,
-				ssaapi.WithLanguage(consts.GO),
+				ssaapi.WithLanguage(ssaconfig.GO),
 				ssaapi.WithProgramName(progID),
 				ssaapi.WithReCompile(true),
 			)

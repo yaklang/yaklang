@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestSqliteID(t *testing.T) {
@@ -39,7 +40,7 @@ func TestBuild(t *testing.T) {
 
 	prog, err := ssaapi.Parse(
 		code,
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(programName),
 	)
 	defer ssadb.DeleteProgram(db, programName)
@@ -69,7 +70,7 @@ func TestBuild_Multiple_Program(t *testing.T) {
 
 		prog, err := ssaapi.Parse(
 			code,
-			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithLanguage(ssaconfig.Yak),
 			ssaapi.WithProgramName(programName),
 		)
 		defer ssadb.DeleteProgram(db, programName)
@@ -102,7 +103,7 @@ func TestSyncFromDatabase(t *testing.T) {
 		a = 1 
 		print(a)
 		`,
-			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithLanguage(ssaconfig.Yak),
 			ssaapi.WithProgramName(programName),
 		)
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -205,7 +206,7 @@ func TestLoadEditor(t *testing.T) {
 	// get prog
 	_, err := ssaapi.ParseProject(
 		ssaapi.WithProgramName(programName),
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaapi.WithFileSystem(vf),
 	)
 	require.NoError(t, err)
@@ -243,7 +244,7 @@ func TestAuditResult(t *testing.T) {
 	// get prog
 	_, err := ssaapi.ParseProject(
 		ssaapi.WithProgramName(programName),
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaapi.WithFileSystem(vf),
 	)
 	require.NoError(t, err)

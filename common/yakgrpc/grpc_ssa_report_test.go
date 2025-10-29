@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -20,7 +21,7 @@ func createMockProgram(programName, language, description string, fileCount, lin
 	program := &ssadb.IrProgram{
 		ProgramName: programName,
 		Description: description,
-		Language:    language,
+		Language:    ssaconfig.Language(language),
 		ProgramKind: ssadb.Application,
 		FileList:    make(ssadb.StringMap),
 		LineCount:   lineCount,

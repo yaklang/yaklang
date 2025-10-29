@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/samber/lo"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -163,10 +163,8 @@ func (b *FunctionBuilder) GetEditor() *memedit.MemEditor {
 	return b._editor
 }
 
-func (b *FunctionBuilder) GetLanguage() consts.Language {
-	lang, err := consts.ValidateLanguage(b.GetProgram().Language)
-	_ = err
-	return lang
+func (b *FunctionBuilder) GetLanguage() ssaconfig.Language {
+	return b.GetProgram().Language
 }
 
 // current block is finish?

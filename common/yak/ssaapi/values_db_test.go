@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -16,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func CreateValue(prog *ssaapi.Program, nodeId int) *ssaapi.Value {
@@ -34,7 +34,7 @@ func TestValuesDB_Save_Audit_Node(t *testing.T) {
 		a.c=1
 		`
 		programName := uuid.NewString()
-		prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+		prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.Yak))
 		t.Cleanup(func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)
 		})
@@ -177,7 +177,7 @@ public class Cookies {
 	progId := uuid.NewString()
 	prog, err := ssaapi.ParseProject(
 		ssaapi.WithProgramName(progId),
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithFileSystem(vf),
 	)
 	log.Infof("prog: %v", progId)

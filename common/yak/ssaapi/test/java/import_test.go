@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -30,5 +31,5 @@ class B{
 `)
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"1"},
-	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, true, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

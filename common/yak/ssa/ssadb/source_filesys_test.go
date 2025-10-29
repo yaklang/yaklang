@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -73,7 +74,7 @@ func TestSourceFilesysLocal(t *testing.T) {
 		`))
 	programID := uuid.NewString()
 	_, err = ssaapi.ParseProjectFromPath(dir,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(programID),
 	)
 	defer func() {
@@ -205,7 +206,7 @@ func TestSourceFilesys(t *testing.T) {
 
 	programID := uuid.NewString()
 	_, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(programID),
 	)
 	defer func() {
@@ -307,7 +308,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 
 	var err error
 	programID1 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID1))
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID1))
 	defer func() {
 
 		// ssadb.CheckAndSwitchDB(programID1)
@@ -317,7 +318,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 	assert.NoErrorf(t, err, "parse project error: %v", err)
 
 	programID2 := uuid.NewString()
-	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID2))
+	_, err = ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID2))
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID2)
 	}()
@@ -372,7 +373,7 @@ func TestProgram_ListAndDelete(t *testing.T) {
 				matchExtra := false
 				for _, info := range res.Extra {
 					if info.Key == "Language" {
-						if info.Value == string(ssaapi.JAVA) {
+						if info.Value == string(ssaconfig.JAVA) {
 							matchExtra = true
 						}
 					}
@@ -475,7 +476,7 @@ func TestSourceFilesystem_YakURL(t *testing.T) {
 	vf.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", codeb)
 
 	programID := uuid.NewString()
-	_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+	_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), programID)
 	}()
@@ -610,7 +611,7 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 			path := "path_" + uuid.NewString()
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName), content)
 
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				ssadb.DeleteProgram(ssadb.GetDB(), programID)
@@ -642,7 +643,7 @@ func TestIrSourceFS_File_URL(t *testing.T) {
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName1), content)
 			vf.AddFile(fmt.Sprintf("/%s/%s", path, fileName2), content)
 
-			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+			_, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(programID))
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				ssadb.DeleteProgram(ssadb.GetDB(), programID)

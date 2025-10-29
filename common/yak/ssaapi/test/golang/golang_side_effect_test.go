@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -53,7 +54,7 @@ func Test_SideEffect_Inherit(t *testing.T) {
 		require.NoError(t, checkSideeffect(t, prog.SyntaxFlow("f1 as $func").GetValues("func"), 1))
 		require.NoError(t, checkSideeffect(t, prog.SyntaxFlow("f2 as $b").GetValues("b"), 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	code = `package main
 
@@ -75,7 +76,7 @@ func Test_SideEffect_Inherit(t *testing.T) {
 		b := prog.SyntaxFlow("f2 as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(t, b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	code = `package main
 
@@ -98,7 +99,7 @@ func Test_SideEffect_Inherit(t *testing.T) {
 		b := prog.SyntaxFlow("f2 as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(t, b, 0))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	code = `package main
 
@@ -123,7 +124,7 @@ func Test_SideEffect_Inherit(t *testing.T) {
 		b := prog.SyntaxFlow("f2 as $b").GetValues("b")
 		require.NoError(t, checkSideeffect(t, b, 1))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
 
 func Test_SideEffect_Bind(t *testing.T) {
@@ -153,7 +154,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"20"},
 			"c": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -185,7 +186,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"2"},
 			"c": {"10"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -217,7 +218,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"2"},
 			"c": {"10"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -248,7 +249,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"4"},
 			"c": {"4"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -276,7 +277,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"2", "1", "true"},
 			"c": {"2", "1"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -304,7 +305,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 	`, map[string][]string{
 			"b": {"2", "0", "true"},
 			"c": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -337,7 +338,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			"b": {"1", "2", "3", "true"},
 			"c": {"2", "1"},
 			"d": {"2", "3"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -372,7 +373,7 @@ func Test_SideEffect_Bind(t *testing.T) {
 			"b": {"3", "4", "true"},
 			"c": {"3", "4"},
 			"d": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -396,7 +397,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 			c #-> as $c
 		`, map[string][]string{
 			"c": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("normal nesting", func(t *testing.T) {
@@ -423,7 +424,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"2"},
 			"c": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("object member", func(t *testing.T) {
@@ -448,7 +449,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 			c #-> as $c
 		`, map[string][]string{
 			"c": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("object member nesting", func(t *testing.T) {
@@ -480,7 +481,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"2"},
 			"c": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("object", func(t *testing.T) {
@@ -509,7 +510,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"o1": {"1"},
 			"o2": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("method", func(t *testing.T) {
@@ -536,7 +537,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 			c #-> as $c
 		`, map[string][]string{
 			"c": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("method nesting", func(t *testing.T) {
@@ -573,7 +574,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"2"},
 			"c": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("closu", func(t *testing.T) {
@@ -605,7 +606,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"3"},
 			"c": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("closu not find", func(t *testing.T) {
@@ -636,7 +637,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 		`, map[string][]string{
 			"b": {"2"},
 			"c": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 	t.Run("closu find but not modify", func(t *testing.T) {
 		code := `package main
@@ -672,7 +673,7 @@ func Test_SideEffect_Capture(t *testing.T) {
 			"b": {"3"},
 			"c": {"3"},
 			"d": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -713,7 +714,7 @@ func main() {
 			$output(, * as $sink);
 	`, map[string][]string{
 			"sink": {`"11111111111"`},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -743,6 +744,6 @@ $a?{<fullTypeName>?{have: 'test'}} as $output;
 		`,
 		map[string][]string{
 			"output": {"side-effect(Undefined-a, a)", "Undefined-a"},
-		}, ssaapi.WithLanguage(ssaapi.GO),
+		}, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }

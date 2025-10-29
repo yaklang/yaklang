@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -60,7 +60,7 @@ public interface UserMapper {
 			require.Contains(t, params.String(), "Parameter-user")
 			require.Equal(t, 1, params.Len())
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test mybatis weak param2", func(t *testing.T) {
@@ -115,7 +115,7 @@ public interface DictDao {
 			param := prog.SyntaxFlowChain(`<mybatisSink> as $params`).Show()
 			require.Contains(t, param.String(), "Parameter-myDict")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test mybatis weak param range", func(t *testing.T) {
@@ -186,7 +186,7 @@ public interface UserMapper {
 			require.True(t, check)
 			require.True(t, checkRng, "mybatis 位置信息错误")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test mybatis weak param range with chinese", func(t *testing.T) {
@@ -249,7 +249,7 @@ public interface UserMapper {
 			})
 			require.True(t, checkRng, "mybatis 位置信息错误")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -324,5 +324,5 @@ public interface ReportMapper extends BaseMapper<User>{
 		})
 		require.True(t, checkRng, "mybatis 位置信息错误")
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

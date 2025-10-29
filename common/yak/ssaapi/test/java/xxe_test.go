@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -23,7 +24,7 @@ func TestXXE(t *testing.T) {
 			t.Fatal("parse().getDocumentElement() not found (not right)")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestXXE_WithConditionExpr_Basic(t *testing.T) {
@@ -32,7 +33,7 @@ func TestXXE_WithConditionExpr_Basic(t *testing.T) {
 			t.Fatal("setFeature(*) not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestXXE_WithConditionExpr(t *testing.T) {
@@ -51,7 +52,7 @@ check $result then "dangerous xml doc builder" else "safe xml doc builder";
 			ret.Get(0).ShowWithSourceCode()
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestXXE_WithConditionExprAndSarif(t *testing.T) {
@@ -81,5 +82,5 @@ alert $output;
 		}
 		fmt.Println(string(buf.String()))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

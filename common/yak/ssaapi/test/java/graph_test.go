@@ -6,13 +6,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -59,17 +59,17 @@ check $source then "XXE Attack" else "XXE Safe";
 
 	t.Run("draw dot graph in memory", func(t *testing.T) {
 		ssatest.Check(t, XXE_Code, func(prog *ssaapi.Program) error {
-			assert.Equal(t, prog.GetLanguage(), "java")
+			assert.Equal(t, string(prog.GetLanguage()), "java")
 			results, err := prog.SyntaxFlowWithError(sfRule)
 			require.NoError(t, err)
 			check(t, results)
 
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("draw dot which its value from database", func(t *testing.T) {
 		programName := uuid.NewString()
-		prog, err := ssaapi.Parse(XXE_Code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.JAVA))
+		prog, err := ssaapi.Parse(XXE_Code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.JAVA))
 		require.NoError(t, err)
 		require.NotNil(t, prog)
 

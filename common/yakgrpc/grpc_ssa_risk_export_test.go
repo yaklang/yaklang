@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -28,7 +28,7 @@ func TestGRPCMUSTPASS_SSARisk_Export_And_Import(t *testing.T) {
 	require.NoError(t, err)
 
 	program := uuid.NewString()
-	suite, clean := ssatest.NewSFScanRiskTestSuite(t, client, program, consts.JAVA)
+	suite, clean := ssatest.NewSFScanRiskTestSuite(t, client, program, ssaconfig.JAVA)
 	defer clean()
 
 	// 创建虚拟文件系统并添加测试文件
@@ -159,7 +159,7 @@ public interface UserMapper {
 		})
 		require.Greater(t, len(risks), 0)
 		risk := risks[0]
-		require.Equal(t, string(consts.JAVA), risk.GetLanguage())
+		require.Equal(t, string(ssaconfig.JAVA), risk.GetLanguage())
 		require.Equal(t, "MyBatis SQL 注入漏洞", risk.GetTitleVerbose())
 		require.Greater(t, len(risk.DataFlowPaths), 0, "Expected data flow paths")
 

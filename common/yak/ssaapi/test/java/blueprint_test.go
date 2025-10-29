@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -29,7 +30,7 @@ public class Main {
     }
 }
 `
-	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1", "Undefined-System"}}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1", "Undefined-System"}}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestBlueprintFullTypeName(t *testing.T) {
@@ -48,7 +49,7 @@ public class DemoServlet extends HttpServlet {
 `
 		ssatest.CheckSyntaxFlow(t, code, `request<fullTypeName> as $output`, map[string][]string{
 			"output": {`"javax.servlet.http.HttpServletRequest"`},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test blueprint virtual import,fullTypeName is more", func(t *testing.T) {
 		code := `package com.example.servlet;
@@ -67,7 +68,7 @@ public class DemoServlet extends HttpServlet {
 				`"com.example.servlet.HttpServletRequest"`,
 				`"java.lang.HttpServletRequest"`,
 			},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("blueprint keyword", func(t *testing.T) {
 		code := `package com.example.servlet;
@@ -81,7 +82,7 @@ class A {
 	}
 }
 `
-		ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $output`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
+		ssatest.CheckSyntaxFlow(t, code, `in<fullTypeName> as $output`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 func TestNativeCallBlueprint(t *testing.T) {
@@ -93,7 +94,7 @@ public class OuterClass {
 `
 	ssatest.CheckSyntaxFlow(t, code, `main<getCurrentBlueprint><fullTypeName> as $sink`, map[string][]string{
 		"sink": {`"main.OuterClass"`},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestBlueprintBottomUse(t *testing.T) {
 	t.Run("test new creator", func(t *testing.T) {
@@ -109,6 +110,6 @@ class A{
 		ssatest.CheckSyntaxFlowContain(t, code,
 			`request.getParameter() --> as $res`, map[string][]string{
 				"res": {"rt.exec"},
-			}, ssaapi.WithLanguage(ssaapi.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

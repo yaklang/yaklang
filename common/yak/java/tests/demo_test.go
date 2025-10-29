@@ -2,9 +2,11 @@ package tests
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestCaseForSimple(t *testing.T) {
@@ -27,5 +29,5 @@ public class XXEController {
 		a := prog.SyntaxFlowChain("MetricDataSource.getConnection().prepareState*(* #-> * as $source)").Show().DotGraph()
 		fmt.Println(string(a))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

@@ -1,12 +1,13 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestCompile_Jar(t *testing.T) {
@@ -19,7 +20,7 @@ func TestCompile_Jar(t *testing.T) {
 			"local_file": jarPath,
 		}
 
-		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(consts.JAVA), ssaapi.WithConfigInfo(info))
+		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithConfigInfo(info))
 		require.NoError(t, err)
 		require.NotNil(t, prog)
 
@@ -42,6 +43,6 @@ func TestCompile_Jar(t *testing.T) {
 			res := vals.GetValues("a")
 			require.Equal(t, 0, res.Len())
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

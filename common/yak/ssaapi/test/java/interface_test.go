@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -49,7 +50,7 @@ public class test {
 					"Undefined-this.b.getA(valid)(ParameterMember-parameter[0].b)",
 				},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA))
+			ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("test big interface demo", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
@@ -102,7 +103,7 @@ public class PmsPortalBrandServiceImpl implements PmsPortalBrandService {
 			"ParameterDef": {"1", "Parameter-pageNum", "Parameter-pageSize"},
 		},
 			false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }

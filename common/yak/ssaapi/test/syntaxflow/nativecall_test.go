@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -20,7 +21,7 @@ $b<getPredecessors> as $ret
 	`, map[string][]string{
 			"b":   {"222"},
 			"ret": {"111"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 
 	})
 
@@ -36,7 +37,7 @@ $a<getPredecessors> as $ret
 	`, map[string][]string{
 			"a":   {"11"},
 			"ret": {},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("test dataflow predecessors", func(t *testing.T) {
@@ -55,7 +56,7 @@ $top_b<getPredecessors> as $b
 	`, map[string][]string{
 			"top_b": {"1", "2"},
 			"b":     {"Function-foo(2)"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }
 func TestGetRoot(t *testing.T) {

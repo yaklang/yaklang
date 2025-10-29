@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -37,7 +38,7 @@ func TestAlertStatement(t *testing.T) {
 			}
 			fmt.Println(string(buf.String()))
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("alert statement with extra message", func(t *testing.T) {
@@ -61,7 +62,7 @@ func TestAlertStatement(t *testing.T) {
 			}
 			fmt.Println(string(buf.String()))
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test alert get exInfo", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `f( * as $i )
@@ -69,6 +70,6 @@ alert $i for{
 info: "info",
 level: 'level'
 }
-`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
+`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }

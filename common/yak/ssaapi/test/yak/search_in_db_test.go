@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -23,7 +24,7 @@ register("/route1", handler)
 `
 	ssatest.CheckSyntaxFlowContain(t, code, `req*.GetParams() --> * as $target`, map[string][]string{
 		"target": {"ParameterMember-parameter[1].Write(ParameterMember-freeValue-os"},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
 func TestSearchAndFind(t *testing.T) {

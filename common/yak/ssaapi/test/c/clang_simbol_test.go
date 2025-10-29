@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -20,7 +21,7 @@ int main() {
 		a #-> as $target
 		`, map[string][]string{
 			"target": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
 	t.Run("pointer", func(t *testing.T) {
@@ -38,7 +39,7 @@ int main() {
 		p #-> as $target
 		`, true, map[string][]string{
 			"target": {"Undefined-b", "make(Pointer)"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
 	t.Run("struct", func(t *testing.T) {
@@ -56,7 +57,7 @@ int main() {
 		s.x #-> as $target
 		`, true, map[string][]string{
 			"target": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -81,7 +82,7 @@ int main() {
 		`,
 		map[string][]string{
 			"a": {"phi(a)[Function-add(1,2),Function-add(a,phi(i)[0,add(i, 1)])]", "phi(i)[0,add(i, 1)]"},
-		}, ssaapi.WithLanguage(ssaapi.C),
+		}, ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -99,7 +100,7 @@ int main() {
 		add(* #-> as $target)
 		`, map[string][]string{
 			"target": {"3", "4"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
 	t.Run("recursive", func(t *testing.T) {
@@ -118,7 +119,7 @@ int main() {
 		fact(* #-> as $target)
 		`, map[string][]string{
 			"target": {"5", "2", "1"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -142,7 +143,7 @@ int main() {
 		c #-> as $target
 		`, true, map[string][]string{
 			"target": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
 	t.Run("while loop", func(t *testing.T) {
@@ -162,7 +163,7 @@ int main() {
 		sum #-> as $target
 		`, true, map[string][]string{
 			"target": {"0", "phi(i)[0,add(i, 1)]"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -186,7 +187,7 @@ int main() {
 			"x": {"1"},
 			"y": {"2"},
 			"z": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -206,7 +207,7 @@ int main() {
 		p #-> as $target
 		`, map[string][]string{
 			"target": {"p", "1"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -227,7 +228,7 @@ int main() {
 		sum #-> as $target
 		`, true, map[string][]string{
 			"target": {"10", "20"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -245,7 +246,7 @@ int main() {
 		d #-> as $target
 		`, map[string][]string{
 			"target": {"3.14"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -264,7 +265,7 @@ int main() {
 		a #-> as $target
 		`, map[string][]string{
 			"target": {"6", "3"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
 
@@ -283,6 +284,6 @@ int main() {
 		a #-> as $target
 		`, map[string][]string{
 			"target": {"1", "2", "3"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }

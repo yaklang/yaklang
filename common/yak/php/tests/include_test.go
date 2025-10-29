@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -20,7 +21,7 @@ echo $a;
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.PHP))
+		}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test 2 include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -38,7 +39,7 @@ echo $a;
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{
 			"param": {"1", "2"},
-		}, false, ssaapi.WithLanguage(ssaapi.PHP))
+		}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test include lazyBuild", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -53,7 +54,7 @@ a(1);
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> as $param)`, map[string][]string{
 			"param": {"1"},
-		}, true, ssaapi.WithLanguage(ssaapi.PHP))
+		}, true, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -69,7 +70,7 @@ include("1.txt");
 $a = new A();
 $a->TT(1);
 `)
-		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{}, false, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `echo(* #-> * as $param)`, map[string][]string{}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("custom include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -85,7 +86,7 @@ println($a);
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"1"}},
 			false,
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("include return", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -108,7 +109,7 @@ println($a);
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"1", "123"}},
 			false,
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("include file and include", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -133,7 +134,7 @@ println($a);
 			`println(* #-> * as $param)`,
 			map[string][]string{"param": {"2", "123"}},
 			false,
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -168,7 +169,7 @@ _COOKIE.* as $params
 			"Undefined-$password(valid)", "Undefined-$user2(valid)",
 			"Undefined-$username(valid)",
 		},
-	}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestNamespace2(t *testing.T) {
@@ -211,7 +212,7 @@ scan(* as $param)
 input() as $source
 $param#{include: <<<CODE
 * & $source
-CODE}-> as $sink`, map[string][]string{"sink": {"input"}}, true, ssaapi.WithLanguage(ssaapi.PHP))
+CODE}-> as $sink`, map[string][]string{"sink": {"input"}}, true, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("same namespace name", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -248,6 +249,6 @@ class AA{
 `)
 		ssatest.CheckSyntaxFlowWithFS(t, fs, `scandir(* #->* as $param)`, map[string][]string{
 			"param": {"input"},
-		}, true, ssaapi.WithLanguage(ssaapi.PHP))
+		}, true, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }

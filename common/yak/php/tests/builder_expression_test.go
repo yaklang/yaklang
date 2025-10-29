@@ -1,10 +1,12 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -38,7 +40,7 @@ $a->a();
 		result := prog.SyntaxFlow(".a() as $call", ssaapi.QueryWithEnableDebug())
 		assert.True(t, len(result.GetValues("call")) == 2)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestMemberAddSideEffect(t *testing.T) {
@@ -510,7 +512,7 @@ $a = "test"::${$c->c};
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func Test_Array(t *testing.T) {
@@ -525,7 +527,7 @@ eval($validate);
 			map[string][]string{
 				"param": {"Function-explode", `"."`, `"1.2"`},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("array assign2", func(t *testing.T) {
 		code := `<?php
@@ -538,7 +540,7 @@ eval($validate);
 			map[string][]string{
 				"param": {"Function-array", `"2"`, `"1"`},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("instanceof expression", func(t *testing.T) {
 		code := `<?php

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func checkSource(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) {
@@ -68,7 +69,7 @@ func TestSourceWithInclude_JaaAVA(t *testing.T) {
 	class C {
 	}
 	`)
-	checkSource(vf, t, ssaapi.WithLanguage(ssaapi.JAVA))
+	checkSource(vf, t, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestSourceWithInclude_PHP(t *testing.T) {
@@ -91,7 +92,7 @@ func TestTypeSaveLoad(t *testing.T) {
 		`a as $t `, map[string][]string{
 			"t": {"castType(number, 1)"},
 		},
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 }
 
@@ -105,6 +106,6 @@ func TestMarshalInstruction(t *testing.T) {
 		CheckSyntaxFlow(t, code, `println(* as $para); $para #-> as $top`, map[string][]string{
 			"para": {"castType(number, 1)"},
 			"top":  {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }

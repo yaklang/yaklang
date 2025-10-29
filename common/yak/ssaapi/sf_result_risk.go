@@ -104,7 +104,7 @@ func buildSSARisk(
 		Index:    int64(index),
 
 		Line:     riskCodeRange.StartLine,
-		Language: result.program.GetLanguage(),
+		Language: string(result.program.GetLanguage()),
 	}
 	if fun := value.GetFunction(); fun != nil {
 		newSSARisk.FunctionName = utils.EscapeInvalidUTF8Byte([]byte(fun.GetName()))

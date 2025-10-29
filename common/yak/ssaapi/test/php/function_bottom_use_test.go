@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -20,7 +21,7 @@ a($b);
 			map[string][]string{
 				"sink": {"Undefined-a(Undefined-$b(valid))"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestCallBottomUse(t *testing.T) {
@@ -36,7 +37,7 @@ a($_GET[1]);
 		map[string][]string{
 			"sink": {"Function-println(Parameter-$a)"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 func TestFunction(t *testing.T) {
@@ -52,7 +53,7 @@ println($c);
 			map[string][]string{
 				"sink": {"Function-println(Function-a())"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("parameter function call", func(t *testing.T) {
 		code := `<?php
@@ -68,7 +69,7 @@ println($c);
 			map[string][]string{
 				"sink": {"Parameter-$a(1)"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 
@@ -92,7 +93,7 @@ println($c);
 			map[string][]string{
 				"sink": {"Function-echo(Parameter-$a)"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 }
@@ -113,7 +114,7 @@ printValue($classA);
 `
 	ssatest.CheckSyntaxFlowContain(t, code, `A() --> as $sink`, map[string][]string{
 		"sink": {"Function-println(ParameterMember-parameter[0].a)"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestParameterMemberIsCall(t *testing.T) {
 	t.Run("parameterMember is called", func(t *testing.T) {
@@ -131,7 +132,7 @@ func TestParameterMemberIsCall(t *testing.T) {
 	`
 		ssatest.CheckSyntaxFlowContain(t, code, `A() --> as $sink`, map[string][]string{
 			"sink": {"Function-echo(ParameterMember-parameter[0].b(Parameter-$a,1))"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -151,5 +152,5 @@ echo($cd);
 		values := result.GetValues("sink")
 		require.Contains(t, values.String(), "Function-echo(Function-functionCC(Undefined-$get(valid)))")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

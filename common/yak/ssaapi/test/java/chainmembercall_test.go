@@ -3,8 +3,8 @@ package java
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -36,5 +36,5 @@ $concatA + $concatB as $concat;
 
 	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 		"info": {`"a"`, `"b"`, `"c"`},
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

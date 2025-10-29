@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -284,6 +285,6 @@ c,d,e = a(f,2,3);
 	ssatest.CheckBottomUser(t, code, "f",
 		[]string{
 			"Undefined-c(valid)", "Undefined-d(valid)",
-		}, false, ssaapi.WithLanguage(ssaapi.Yak),
+		}, false, ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 }

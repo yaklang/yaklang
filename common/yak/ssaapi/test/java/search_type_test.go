@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -146,7 +147,7 @@ func Test_SearchType_undefine_Class(t *testing.T) {
 			`B as $target`,
 			map[string][]string{
 				"target": {"Undefined-B"},
-			}, ssaapi.WithLanguage(ssaapi.JAVA),
+			}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -157,7 +158,7 @@ func Test_SearchType_undefine_Class(t *testing.T) {
 	// 		`B.methodB as $target`,
 	// 		map[string][]string{
 	// 			"target": {"Undefined-b1.methodB(valid)"},
-	// 		}, ssaapi.WithLanguage(ssaapi.JAVA),
+	// 		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 	// 	)
 	// })
 

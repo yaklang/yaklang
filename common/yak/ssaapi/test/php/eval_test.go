@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -20,7 +21,7 @@ $c($fun);
 	ssatest.CheckSyntaxFlow(t, code,
 		"_GET.* -{until: `* ?{opcode:call} as $sink`}-> *",
 		map[string][]string{"sink": {"Function-base64_decode(Undefined-_GET.func(valid))", "add(add(Undefined-$a, Undefined-$s), Undefined-_GET.func2(valid))(Function-base64_decode(Undefined-_GET.func(valid)))"}},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 
@@ -36,5 +37,5 @@ println("1");
 println(* as $param)
 $param<FilenameByContent> as $output`, map[string][]string{
 		"output": {`"b.php"`},
-	}, false, ssaapi.WithLanguage(ssaapi.PHP))
+	}, false, ssaapi.WithLanguage(ssaconfig.PHP))
 }

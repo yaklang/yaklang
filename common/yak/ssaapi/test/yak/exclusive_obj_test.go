@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -571,6 +572,6 @@ func TestObject_Make(t *testing.T) {
 			$j --> as $target
 			`, map[string][]string{
 				"target": {`Undefined-print("j")`},
-			}, ssaapi.WithLanguage(ssaapi.Yak))
+			}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }

@@ -8,8 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
@@ -17,6 +15,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
@@ -32,10 +31,10 @@ type TestCase struct {
 
 var (
 	languageOption ssaapi.Option = nil
-	language       consts.Language
+	language       ssaconfig.Language
 )
 
-func SetLanguage(lang consts.Language, build ...ssa.CreateBuilder) {
+func SetLanguage(lang ssaconfig.Language, build ...ssa.CreateBuilder) {
 	if len(build) > 0 {
 		ssaapi.LanguageBuilderCreater[lang] = build[0]
 	}

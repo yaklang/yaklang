@@ -5,10 +5,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestDeleteResult(t *testing.T) {
@@ -21,7 +21,7 @@ c = b + 3
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
 		ssaapi.WithProgramName(progName),
-		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 	require.NoError(t, err)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), prog.GetProgramName())

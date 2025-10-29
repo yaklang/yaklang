@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -16,7 +17,7 @@ var springbootLoader embed.FS
 func TestExtraFileAnalyzer(t *testing.T) {
 	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(springbootLoader),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestSimpleExtraFile(t *testing.T) {
 					`"jdbc:mysql://localhost:3306/your_database"`,
 				},
 			}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -80,7 +81,7 @@ func TestSimpleExtraFile(t *testing.T) {
 				"url":  {`"selectUserByUsername"`},
 				"url2": {`"selectUserByUsername"`},
 			}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }
@@ -174,7 +175,7 @@ public interface HomeDao {
 			map[string][]string{
 				"url": {`"getFlashProductList"`},
 			}, false,
-			// ssaapi.WithLanguage(ssaapi.JAVA),
+			// ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -184,7 +185,7 @@ public interface HomeDao {
 			map[string][]string{
 				"func": {"Function-HomeDao.getFlashProductList"},
 			}, false,
-			// ssaapi.WithLanguage(ssaapi.JAVA),
+			// ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -196,7 +197,7 @@ public interface HomeDao {
 			map[string][]string{
 				"func": {"Function-HomeDao.getFlashProductList"},
 			}, false,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }
@@ -214,6 +215,6 @@ func TestMultipleResultExtraFile(t *testing.T) {
 		map[string][]string{
 			"url": {`"http://a.com"`, `"http://b.com"`},
 		}, true,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }

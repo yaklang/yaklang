@@ -1,9 +1,11 @@
 package php
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestBlueprintParameterMember(t *testing.T) {
@@ -92,7 +94,7 @@ $c->a::bb(1);`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`,
 			map[string][]string{
 				"param": {"1"},
-			}, ssaapi.WithLanguage(ssaapi.PHP))
+			}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	//todo:
 	//	t.Run("Loop func", func(t *testing.T) {
@@ -118,6 +120,6 @@ $c->a::bb(1);`
 	//`
 	//		ssatest.CheckSyntaxFlow(t, code, `a1 #-> as $param`, map[string][]string{
 	//			"param": {"2"},
-	//		}, ssaapi.WithLanguage(ssaapi.Yak))
+	//		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	//	})
 }

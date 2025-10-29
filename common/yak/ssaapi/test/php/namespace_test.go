@@ -1,11 +1,13 @@
 package php
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestNamespace(t *testing.T) {
@@ -45,7 +47,7 @@ class c{
 			require.True(t, len(values) == 2)
 			values.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -77,5 +79,5 @@ class c{
 //	ssatest.CheckSyntaxFlow(t, code, `
 //exit(* #-> * as $param)
 //println(* #-> * as $sink)
-//`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+//`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.PHP))
 //}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -84,7 +85,7 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 			$obj  = new A(333333);
 			$a = $obj->i;
 			`, "a", []string{"333333"}, false,
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 

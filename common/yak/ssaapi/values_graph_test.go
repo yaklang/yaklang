@@ -7,13 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -64,7 +64,7 @@ func TestGraph(t *testing.T) {
 		`)
 	progID := uuid.NewString()
 	prog, err := ssaapi.ParseProjectWithFS(vf,
-		ssaapi.WithLanguage(consts.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramPath("example"),
 		ssaapi.WithProgramName(progID),
 	)
@@ -167,7 +167,7 @@ public interface RemoteLogService
 
 	ProgName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(ProgName),
 	)
 	require.NoError(t, err)

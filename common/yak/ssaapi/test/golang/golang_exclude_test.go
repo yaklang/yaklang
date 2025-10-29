@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestExclude(t *testing.T) {
@@ -36,13 +37,13 @@ func main(){
 	println(3);
 }
 `)
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO))
+	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO))
 	require.NoError(t, err)
 	prog.Show()
 	check(prog, 3)
 	gb, err := glob.Compile(`*.pb.go`)
 	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.GO), ssaapi.WithExcludeFile(func(path, filename string) bool {
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), ssaapi.WithExcludeFile(func(path, filename string) bool {
 		a := filename
 		_ = a
 		return gb.Match(filename)

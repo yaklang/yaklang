@@ -100,7 +100,7 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 		UpdateAt:      prog.UpdatedAt.Unix(),
 		Name:          prog.ProgramName,
 		Description:   prog.Description,
-		Language:      prog.Language,
+		Language:      string(prog.Language),
 		EngineVersion: prog.EngineVersion,
 		Dbpath:        consts.SSA_PROJECT_DB_RAW,
 	}

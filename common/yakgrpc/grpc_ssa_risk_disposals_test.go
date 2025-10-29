@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -621,7 +620,7 @@ alert $result for {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
@@ -842,7 +841,7 @@ sink2()
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
@@ -914,7 +913,7 @@ sink3()
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
@@ -1043,7 +1042,7 @@ sink3()
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 

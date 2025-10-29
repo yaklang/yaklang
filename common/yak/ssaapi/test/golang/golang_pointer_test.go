@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -24,7 +25,7 @@ func TestPointer_normal(t *testing.T) {
 			b as $b
 		`, map[string][]string{
 			"b": {"1", "2"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -48,7 +49,7 @@ func TestPointer_SideEffect(t *testing.T) {
 			a as $a
 		`, map[string][]string{
 			"a": {"1", "2"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 

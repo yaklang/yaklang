@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 )
@@ -193,8 +193,8 @@ func (b *astbuilder) OutCmapLevel() {
 	b.cmap = b.cmap[:len(b.cmap)-1]
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
-	return consts.GO
+func (*SSABuilder) GetLanguage() ssaconfig.Language {
+	return ssaconfig.GO
 }
 
 func (b *astbuilder) AddResultDefault(name string) {

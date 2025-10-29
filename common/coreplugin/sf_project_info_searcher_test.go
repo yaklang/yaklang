@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
@@ -12,11 +15,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"testing"
 )
 
 type sfProjectInfoSearcher struct {
@@ -294,6 +296,6 @@ public class ContentFilterProcessor {
 `
 	fs.AddFile("demo2.java", code2)
 
-	s := NewSfProjectInfoSearcher(fs, t, ssaapi.WithLanguage(ssaapi.JAVA))
+	s := NewSfProjectInfoSearcher(fs, t, ssaapi.WithLanguage(ssaconfig.JAVA))
 	s.RunSearchAndCheck("filterFunc")
 }

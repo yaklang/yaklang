@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -49,7 +50,7 @@ level: high
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("test.php", code)
 	program, err2 := ssaapi.ParseProjectWithFS(fs,
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 		ssaapi.WithProgramName(baseProg),
 	)
 	require.NoError(t, err2)
@@ -74,7 +75,7 @@ level: high
 		virtualFs := filesys.NewVirtualFs()
 		virtualFs.AddFile("tt.php", code)
 		program, err2 := ssaapi.ParseProjectWithFS(fs,
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 			ssaapi.WithProgramName(newProg),
 		)
 		require.NoError(t, err2)
@@ -113,7 +114,7 @@ level: high
 		virtualfs.AddFile("aa.php", `<?php
 include($_GET[1]);
 `)
-		program, err := ssaapi.ParseProjectWithFS(virtualfs, ssaapi.WithLanguage(ssaapi.PHP),
+		program, err := ssaapi.ParseProjectWithFS(virtualfs, ssaapi.WithLanguage(ssaconfig.PHP),
 			ssaapi.WithProgramName(newProg))
 		require.NoError(t, err)
 		require.NoError(t, err2)
@@ -204,7 +205,7 @@ func main() {
 }
 `)
 	program, err := ssaapi.ParseProjectWithFS(fs,
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaapi.WithProgramName(baseProg),
 	)
 	require.NoError(t, err)

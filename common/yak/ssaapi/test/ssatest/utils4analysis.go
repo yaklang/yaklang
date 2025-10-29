@@ -13,6 +13,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -183,12 +184,12 @@ func CheckJava(
 	handler func(prog *ssaapi.Program) error,
 	opt ...ssaapi.Option,
 ) {
-	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
+	opt = append(opt, ssaapi.WithLanguage(ssaconfig.JAVA))
 	CheckWithName("", t, code, handler, opt...)
 }
 
 func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
-	opt = append(opt, ssaapi.WithLanguage(ssaapi.JAVA))
+	opt = append(opt, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 	{
 		start := time.Now()

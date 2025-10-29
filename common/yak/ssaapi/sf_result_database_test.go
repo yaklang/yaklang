@@ -1,19 +1,20 @@
 package ssaapi_test
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/exp/slices"
@@ -28,7 +29,7 @@ func queryAndSave(t *testing.T) (func(), *ssaapi.SyntaxFlowResult) {
 		`
 	// parse code
 	programName := uuid.NewString()
-	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.Yak))
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
@@ -126,7 +127,7 @@ func TestGetResultVariableByID(t *testing.T) {
 		`
 	// parse code
 	programName := uuid.NewString()
-	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+	prog, err := ssaapi.Parse(code, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.Yak))
 	require.NoError(t, err)
 	require.NotNil(t, prog)
 
@@ -170,7 +171,7 @@ func TestRuleAlertMsg(t *testing.T) {
 	`
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(progName),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
@@ -262,7 +263,7 @@ func TestRuleRisk(t *testing.T) {
 	`
 	progName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(progName),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)

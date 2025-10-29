@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -17,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type SSABuilder struct {
@@ -182,8 +182,8 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return ext == ".php"
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
-	return consts.PHP
+func (*SSABuilder) GetLanguage() ssaconfig.Language {
+	return ssaconfig.PHP
 }
 
 type builder struct {

@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestVariadicParameterMemberAccess(t *testing.T) {
@@ -29,7 +30,7 @@ println(getPacketPipeline("123", func(){
 
 	programName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(programName),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -62,7 +63,7 @@ func TestVariadicParameterInClosure(t *testing.T) {
 
 	programName := uuid.NewString()
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 	)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 

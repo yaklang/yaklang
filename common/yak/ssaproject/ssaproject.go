@@ -17,7 +17,7 @@ type SSAProjectBuilder struct {
 	ProjectName string
 	Description string
 	Tags        []string
-	Language    string
+	Language    ssaconfig.Language
 	Config      *ssaconfig.Config
 }
 
@@ -30,7 +30,12 @@ func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, err
 		ProjectName: proto.ProjectName,
 		Description: proto.Description,
 		Tags:        proto.Tags,
-		Language:    proto.Language,
+		// Language:     proto.Language,
+	}
+	if language, err := ssaconfig.ValidateLanguage(proto.Language); err != nil {
+		return nil, utils.Errorf("failed to new SSA project builder: invalid language %s", proto.Language)
+	} else {
+		builder.Language = language
 	}
 	var err error
 	builder.Config, err = ssaconfig.New(ssaconfig.ModeProjectBase)

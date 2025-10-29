@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -19,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // skip  current statement or filter-expression when error
@@ -60,7 +60,7 @@ type SFFrame struct {
 type VerifyFileSystem struct {
 	vfs       filesys_interface.FileSystem
 	checkInfo map[string]string
-	language  consts.Language
+	language  ssaconfig.Language
 }
 
 func (s *SFFrame) GetResult() *SFFrameResult {
@@ -71,7 +71,7 @@ func (v *VerifyFileSystem) GetVirtualFs() filesys_interface.FileSystem {
 	return v.vfs
 }
 
-func (v *VerifyFileSystem) GetLanguage() consts.Language {
+func (v *VerifyFileSystem) GetLanguage() ssaconfig.Language {
 	return v.language
 }
 
@@ -134,10 +134,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 }
 
 func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() ([]*VerifyFileSystem, error) {
-	ruleLanguage, err := consts.ValidateLanguage(s.rule.Language)
-	if err != nil {
-		log.Warnf("validate language failed: %s", err)
-	}
+	ruleLanguage := s.rule.Language
 
 	var result []*VerifyFileSystem
 	hasVerifyFs := false
@@ -148,7 +145,7 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() ([]*VerifyFileSystem, err
 		hasVerifyFs = true
 		language := ruleLanguage
 		if l := verifyFSInfo.language; l != "" {
-			language, _ = consts.ValidateLanguage(l)
+			language, _ = ssaconfig.ValidateLanguage(l)
 		}
 		verify := &VerifyFileSystem{}
 		vfs := filesys.NewVirtualFs()
@@ -156,7 +153,7 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() ([]*VerifyFileSystem, err
 			if language == "" {
 				lidx := strings.LastIndex(name, ".")
 				if lidx > 0 {
-					language, _ = consts.ValidateLanguage(name[lidx+1:])
+					language, _ = ssaconfig.ValidateLanguage(name[lidx+1:])
 				}
 			}
 			vfs.AddFile(name, content)
@@ -174,10 +171,7 @@ func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() ([]*VerifyFileSystem, err
 }
 
 func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, error) {
-	ruleLanguage, err := consts.ValidateLanguage(s.rule.Language)
-	if err != nil {
-		log.Warnf("validate language failed: %s", err)
-	}
+	ruleLanguage := s.rule.Language
 	var result []*VerifyFileSystem
 	for _, verifyFSInfo := range s.VerifyFsInfo {
 		if len(verifyFSInfo.negativeFilesystem) == 0 {
@@ -185,7 +179,7 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 		}
 		language := ruleLanguage
 		if l := verifyFSInfo.language; l != "" {
-			language, _ = consts.ValidateLanguage(l)
+			language, _ = ssaconfig.ValidateLanguage(l)
 		}
 		verify := &VerifyFileSystem{}
 		vfs := filesys.NewVirtualFs()
@@ -193,7 +187,7 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 			if language == "" {
 				lidx := strings.LastIndex(name, ".")
 				if lidx > 0 {
-					language, _ = consts.ValidateLanguage(name[lidx+1:])
+					language, _ = ssaconfig.ValidateLanguage(name[lidx+1:])
 				}
 			}
 			vfs.AddFile(name, content)

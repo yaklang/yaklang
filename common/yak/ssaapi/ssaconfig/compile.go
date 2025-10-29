@@ -1,12 +1,16 @@
 package ssaconfig
 
+import (
+	"time"
+)
+
 // 基础信息配置
 type BaseInfo struct {
 	ProgramNames       []string `json:"program_names"`
 	ProjectID          uint64   `json:"project_id"`
 	ProjectName        string   `json:"project_name"`
 	ProjectDescription string   `json:"project_description"`
-	Language           string   `json:"language"`
+	Language           Language `json:"language"`
 	Tags               []string `json:"tags"`
 }
 
@@ -17,6 +21,13 @@ func (c *Config) GetProjectID() uint64 {
 		return 0
 	}
 	return c.BaseInfo.ProjectID
+}
+
+func (c *Config) GetProgramName() string {
+	if c == nil || c.BaseInfo == nil || len(c.BaseInfo.ProgramNames) == 0 {
+		return ""
+	}
+	return c.BaseInfo.ProgramNames[0]
 }
 
 func (c *Config) GetProgramNames() []string {
@@ -40,7 +51,7 @@ func (c *Config) GetProjectDescription() string {
 	return c.BaseInfo.ProjectDescription
 }
 
-func (c *Config) GetLanguage() string {
+func (c *Config) GetLanguage() Language {
 	if c == nil || c.BaseInfo == nil {
 		return ""
 	}
@@ -86,7 +97,20 @@ func WithProgramDescription(description string) Option {
 	}
 }
 
-func WithProgramLanguage(language string) Option {
+func WithProjectRawLanguage(language string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Raw Language"); err != nil {
+			return err
+		}
+		var err error
+		if c.BaseInfo.Language, err = ValidateLanguage(language); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func WithProjectLanguage(language Language) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Language"); err != nil {
 			return err
@@ -98,12 +122,13 @@ func WithProgramLanguage(language string) Option {
 
 // SSACompileConfig 编译配置
 type SSACompileConfig struct {
-	StrictMode    bool     `json:"strict_mode"`
-	PeepholeSize  int      `json:"peephole_size"`
-	ExcludeFiles  []string `json:"exclude_files"`
-	ReCompile     bool     `json:"re_compile"`
-	MemoryCompile bool     `json:"memory_compile"`
-	Concurrency   uint32   `json:"compile_concurrency"`
+	StrictMode        bool          `json:"strict_mode"`
+	PeepholeSize      int           `json:"peephole_size"`
+	ExcludeFiles      []string      `json:"exclude_files"`
+	ReCompile         bool          `json:"re_compile"`
+	MemoryCompile     bool          `json:"memory_compile"`
+	Concurrency       uint32        `json:"compile_concurrency"`
+	CompileIrCacheTTL time.Duration `json:"compile_ir_cache_ttl"`
 }
 
 // --- 编译配置 Get/Set 方法 ---

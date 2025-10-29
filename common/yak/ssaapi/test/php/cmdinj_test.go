@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -18,7 +19,7 @@ system($command); //system函数特性 执行结果会自动打印
 		map[string][]string{
 			"command": {"add(\"ping -c 1 \", Undefined-_GET.ip(valid))"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 
@@ -41,7 +42,7 @@ system($c);`
 		map[string][]string{
 			"param": {"Function-base64_decode", "Undefined-_GET"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 
@@ -64,7 +65,7 @@ eval($ob->a);
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
 			map[string][]string{"param": {"Undefined-_GET"}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -78,7 +79,7 @@ eval($a);
 		map[string][]string{
 			"param": {"Undefined-_GET"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 func TestPHP_EVALGetTop(t *testing.T) {
@@ -92,7 +93,7 @@ test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code, `eval(* #-> * as $command)`, map[string][]string{
 		"command": {"Undefined-_GET"},
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestPhpEval(t *testing.T) {
@@ -104,7 +105,7 @@ test($_GET[1]);`
 	ssatest.CheckSyntaxFlow(t, code,
 		`system(* #->  as $param)`,
 		map[string][]string{"param": {"Undefined-_GET"}},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestDataflow(t *testing.T) {
 	code := `<?php
@@ -135,7 +136,7 @@ CODE,
 exclude: <<<CODE
 <self> & $filter
 CODE
-}-> as $output`, map[string][]string{"output": {"Undefined-$a(valid)", "Undefined-_GET"}}, ssaapi.WithLanguage(ssaapi.PHP))
+}-> as $output`, map[string][]string{"output": {"Undefined-$a(valid)", "Undefined-_GET"}}, ssaapi.WithLanguage(ssaconfig.PHP))
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

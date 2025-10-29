@@ -1,10 +1,12 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_Static_Member_And_Method(t *testing.T) {
@@ -23,7 +25,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test call self static method", func(t *testing.T) {
@@ -40,7 +42,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"22"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -58,7 +60,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"22"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -83,7 +85,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -106,7 +108,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -127,7 +129,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -147,7 +149,7 @@ func Test_Static_Member_And_Method(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -179,7 +181,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test static method without instantiation", func(t *testing.T) {
@@ -206,7 +208,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"1"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test static member ", func(t *testing.T) {
@@ -232,7 +234,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test static member with instantiation ", func(t *testing.T) {
@@ -258,7 +260,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test the static member and method of the same name without instantiation ", func(t *testing.T) {
@@ -289,7 +291,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 	t.Run("test the static member and method of the same name ", func(t *testing.T) {
@@ -319,7 +321,7 @@ func Test_Static_Member_And_Method_Cross_File(t *testing.T) {
 		println(* #-> as $a)
 		`, map[string][]string{
 			"a": {"11", "22"},
-		}, false, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }

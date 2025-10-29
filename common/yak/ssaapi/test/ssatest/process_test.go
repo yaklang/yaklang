@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) {
@@ -90,7 +91,7 @@ func TestParseProject_JAVA(t *testing.T) {
 	}
 	`)
 
-	checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.JAVA))
+	checkProcess(vf, t, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestParseProject_PHP(t *testing.T) {
@@ -123,7 +124,7 @@ func TestParseProject_PHP(t *testing.T) {
 			}
 		}`)
 
-	checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+	checkProcess(vf, t, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseProject_PHP_withEmptyFile(t *testing.T) {
@@ -138,7 +139,7 @@ func TestParseProject_PHP_withEmptyFile(t *testing.T) {
 		`)
 		vf.AddFile("example/src/main/php/c.php", ``)
 
-		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("empty file with include", func(t *testing.T) {
@@ -153,7 +154,7 @@ func TestParseProject_PHP_withEmptyFile(t *testing.T) {
 		`)
 		vf.AddFile("example/src/main/php/c.php", ``)
 
-		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("normal file ", func(t *testing.T) {
@@ -175,6 +176,6 @@ func TestParseProject_PHP_withEmptyFile(t *testing.T) {
 		echo 1;
 		`)
 
-		checkProcess(vf, t, ssaapi.WithLanguage(ssaapi.PHP))
+		checkProcess(vf, t, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }

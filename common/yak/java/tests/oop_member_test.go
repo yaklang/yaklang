@@ -1,12 +1,13 @@
 package tests
 
 import (
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -141,7 +142,7 @@ class A {
 			map[string][]string{
 				"target": {"Undefined-this.key.String(ParameterMember-parameter[0].key)"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -169,7 +170,7 @@ class A {
 			map[string][]string{
 				"result": {"12"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -197,7 +198,7 @@ class A {
 			map[string][]string{
 				"result": {"12"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -225,7 +226,7 @@ class A {
 			map[string][]string{
 				"result": {"12"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -253,7 +254,7 @@ class A {
 			map[string][]string{
 				"result": {"12"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -282,7 +283,7 @@ class A {
 			map[string][]string{
 				"result": {"12"},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -366,7 +367,7 @@ public class OuterClass {
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* as $result)`, map[string][]string{
 				"result": {"ParameterMember-parameter[0].value", "11"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test outerclass.super", func(t *testing.T) {
@@ -389,7 +390,7 @@ public class OuterClass extends A {
 		ssatest.CheckSyntaxFlow(t, code,
 			`println(* as $result)`, map[string][]string{
 				"result": {"ParameterMember-parameter[0].value", "11"},
-			}, ssaapi.WithLanguage(consts.JAVA))
+			}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -404,5 +405,5 @@ public interface SqliService extends IService<Sqli> {
 `
 	ssatest.CheckSyntaxFlow(t, code, `nativeInsert?{opcode:function}<getCurrentBlueprint> as $result`, map[string][]string{
 		"result": {"SqliService"},
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

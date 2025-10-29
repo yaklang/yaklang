@@ -1,9 +1,11 @@
 package java
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestClassMethod(t *testing.T) {
@@ -13,5 +15,5 @@ class A{
 	public void XX(int b){}
 }
 `
-	ssatest.CheckSyntaxFlow(t, code, `*Method(* as $params)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.JAVA))
+	ssatest.CheckSyntaxFlow(t, code, `*Method(* as $params)`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

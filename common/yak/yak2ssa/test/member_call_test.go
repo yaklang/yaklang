@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -321,7 +322,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 			fmt.Println(values.String())
 			require.Contains(t, values.String(), "1")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("test loop", func(t *testing.T) {
@@ -343,7 +344,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 			fmt.Println(values.String())
 			require.Contains(t, values.String(), "1")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }
 
@@ -385,7 +386,7 @@ for(x=1;;){
 			map[string][]string{
 				"param": {"1"},
 			},
-			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithLanguage(ssaconfig.Yak),
 		)
 	})
 	t.Run("check extern value", func(t *testing.T) {
@@ -398,7 +399,7 @@ println(b)
 		println(* #-> * as $param)
 		`, map[string][]string{
 			"param": {"Undefined-a"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("check free value1", func(t *testing.T) {
@@ -412,7 +413,7 @@ for(x=1;;){
 }`
 		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"Undefined-a"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test freeValue in loop", func(t *testing.T) {
 		code := `var a = ssa
@@ -425,7 +426,7 @@ for(){
 }`
 		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"Undefined-a", "1", "Undefined-c"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 	t.Run("test paramMember in loop", func(t *testing.T) {
 		code := `func(a){
@@ -437,6 +438,6 @@ for{
     }
 }
 }`
-		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1", "FreeValue-c", "Parameter-a"}}, ssaapi.WithLanguage(ssaapi.Yak))
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"1", "FreeValue-c", "Parameter-a"}}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }

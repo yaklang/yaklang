@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -676,7 +677,7 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 }
 
 func TestTemplateString(t *testing.T) {
-	prog, err := ssaapi.Parse("a = 12; print(f`aaa${a}bbb`)", ssaapi.WithLanguage(ssaapi.Yak))
+	prog, err := ssaapi.Parse("a = 12; print(f`aaa${a}bbb`)", ssaapi.WithLanguage(ssaconfig.Yak))
 	if err != nil {
 		t.Fatal("prog parse error", err)
 	}

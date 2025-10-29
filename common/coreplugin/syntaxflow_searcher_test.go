@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -242,7 +243,7 @@ funcA(222);
 `
 	fs.AddFile("/var/www/html/funcA.php", code3)
 
-	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaconfig.PHP))
 
 	t.Run("check all funcA", func(t *testing.T) {
 		s.SearchAndCheck(t, "all", "funcA", false, map[string][]string{
@@ -329,7 +330,7 @@ funcA(222);
 `
 	fs.AddFile("/var/www/html/funcA.php", code3)
 
-	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaconfig.PHP))
 
 	// search
 	_ = s
@@ -396,7 +397,7 @@ funcA(222);
 `
 	fs.AddFile("/var/www/html/funcA.php", code3)
 
-	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.PHP))
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaconfig.PHP))
 
 	// search
 	result := s.RunSearch("all", "funcA", true)
@@ -687,7 +688,7 @@ public class FormDataAction extends BaseAction {
 `
 	memEditor := memedit.NewMemEditor(code1)
 	fs.AddFile("/var/java/test.java", code1)
-	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.JAVA))
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaconfig.JAVA))
 	// search
 	s.SearchAndCheck(t, "function", "@RequestMapping", false, map[string][]string{
 		"Function-FormDataAction.queryData": {memEditor.GetTextFromPositionInt(86, 12, 100, 6)}, // annotated func
@@ -1446,7 +1447,7 @@ public class FormDataAction extends BaseAction {
 	fs.AddFile("/var/java/test1.xml", code1)
 	fs.AddFile("/var/java/test1.java", code2)
 
-	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaapi.JAVA))
+	s := NewSfSearch(fs, t, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 	// search
 	s.SearchAndCheck(t, "all", "$", true, map[string][]string{

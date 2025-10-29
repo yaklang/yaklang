@@ -4,11 +4,12 @@ import (
 	"slices"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type Rule struct {
-	RuleName string `json:"rule_name"`
-	Language string `json:"language"`
+	RuleName string             `json:"rule_name"`
+	Language ssaconfig.Language `json:"language"`
 
 	Title       string `json:"title"`
 	TitleZh     string `json:"title_zh"`

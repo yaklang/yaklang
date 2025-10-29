@@ -1,13 +1,14 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -39,7 +40,7 @@ PrintWriter as $writer
 $writer.write(, * as $text) as $write_site
 	`, map[string][]string{
 		"text": {`"aaaa"`},
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
 

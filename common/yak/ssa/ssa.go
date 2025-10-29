@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
@@ -222,7 +223,7 @@ type Program struct {
 	Name            string
 	Version         string
 	ProgramKind     ssadb.ProgramKind // is library or application
-	Language        string
+	Language        ssaconfig.Language
 	magicMethodName []string
 	// from pom.xml file
 	SCAPackages []*dxtypes.Package

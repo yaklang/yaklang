@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -76,14 +77,14 @@ type SSAProjectReport struct {
 	ReportTime  time.Time `json:"report_time"`
 
 	// 项目信息
-	Language      string    `json:"language"`
-	Description   string    `json:"description"`
-	RepositoryURL string    `json:"repository_url"`
-	FileCount     int       `json:"file_count"`
-	CodeLineCount int       `json:"code_line_count"`
-	ScanStartTime time.Time `json:"scan_start_time"`
-	ScanEndTime   time.Time `json:"scan_end_time"`
-	TotalRules    int       `json:"total_rules"`
+	Language      ssaconfig.Language `json:"language"`
+	Description   string             `json:"description"`
+	RepositoryURL string             `json:"repository_url"`
+	FileCount     int                `json:"file_count"`
+	CodeLineCount int                `json:"code_line_count"`
+	ScanStartTime time.Time          `json:"scan_start_time"`
+	ScanEndTime   time.Time          `json:"scan_end_time"`
+	TotalRules    int                `json:"total_rules"`
 
 	// 漏洞信息
 	TotalRisksCount    int `json:"total_risks_count"`
@@ -173,14 +174,14 @@ type SSAReportRisk struct {
 
 // SSAReportFile SSA报告中的文件信息
 type SSAReportFile struct {
-	FilePath      string `json:"file_path"`
-	Language      string `json:"language"`
-	LineCount     int    `json:"line_count"`
-	RiskCount     int    `json:"risk_count"`
-	CriticalCount int    `json:"critical_count"`
-	HighCount     int    `json:"high_count"`
-	MiddleCount   int    `json:"middle_count"`
-	LowCount      int    `json:"low_count"`
+	FilePath      string             `json:"file_path"`
+	Language      ssaconfig.Language `json:"language"`
+	LineCount     int                `json:"line_count"`
+	RiskCount     int                `json:"risk_count"`
+	CriticalCount int                `json:"critical_count"`
+	HighCount     int                `json:"high_count"`
+	MiddleCount   int                `json:"middle_count"`
+	LowCount      int                `json:"low_count"`
 }
 
 // SSAReportRule SSA报告中的规则信息
@@ -218,7 +219,7 @@ type RiskInstance struct {
 // ProjectInfo 项目基本信息
 type ProjectInfo struct {
 	ProgramName   string
-	Language      string
+	Language      ssaconfig.Language
 	Description   string
 	RepositoryURL string
 	FileCount     int
@@ -993,7 +994,7 @@ func groupRisksByTypeAndSeverity(risks []*SSAReportRisk) []*RiskGroup {
 }
 
 // generateRiskDetailsByTypeGroups 按风险类型分组生成详情
-func generateRiskDetailsByTypeGroups(reportInstance *schema.Report, riskGroups []*RiskGroup, language string) {
+func generateRiskDetailsByTypeGroups(reportInstance *schema.Report, riskGroups []*RiskGroup, language ssaconfig.Language) {
 	displayedCount := 0
 
 	for groupIndex, group := range riskGroups {
@@ -1008,7 +1009,7 @@ func generateRiskDetailsByTypeGroups(reportInstance *schema.Report, riskGroups [
 }
 
 // generateSingleRiskGroupDetail 生成单个风险分组的详情
-func generateSingleRiskGroupDetail(reportInstance *schema.Report, group *RiskGroup, groupIndex int, language string) {
+func generateSingleRiskGroupDetail(reportInstance *schema.Report, group *RiskGroup, groupIndex int, language ssaconfig.Language) {
 	// 使用漏洞名称和数量作为主标题
 	reportInstance.Markdown(fmt.Sprintf("## 漏洞类型%d %s (%d个实例)", groupIndex, group.TitleVerbose, group.Count))
 
@@ -1051,7 +1052,7 @@ func generateRiskGroupInfoTable(reportInstance *schema.Report, group *RiskGroup)
 }
 
 // generateRiskInstancesTable 生成风险实例代码片段
-func generateRiskInstancesTable(reportInstance *schema.Report, instances []*RiskInstance, codeFragmentLanguage string) {
+func generateRiskInstancesTable(reportInstance *schema.Report, instances []*RiskInstance, codeFragmentLanguage ssaconfig.Language) {
 	if len(instances) == 0 {
 		return
 	}

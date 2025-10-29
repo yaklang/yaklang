@@ -1331,7 +1331,7 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("================= get or parse rule ================")
 		// scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
-			Language:          []string{prog.GetLanguage()},
+			Language:          []string{string(prog.GetLanguage())},
 			Keyword:           c.String("rule-keyword"),
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
@@ -1782,12 +1782,7 @@ var ssaQuery = &cli.Command{
 			// use database
 			db := consts.GetGormProfileDatabase()
 			expected := []string{""}
-			for _, l := range utils.PrettifyListFromStringSplitEx(prog.GetLanguage(), ",") {
-				if l == "" {
-					continue
-				}
-				expected = append(expected, l)
-			}
+			expected = append(expected, string(prog.GetLanguage()))
 			db = bizhelper.ExactQueryStringArrayOr(db, "language", expected)
 			for result := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 				err := handleBySyntaxFlowContent(result.Content)

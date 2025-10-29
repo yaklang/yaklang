@@ -27,7 +27,7 @@ func TestConfigWithOptions(t *testing.T) {
 		ModeAll,
 		WithProgramNames("yak", "yaklang"),
 		WithProgramDescription("yaklang project"),
-		WithProgramLanguage("Go"),
+		WithProjectLanguage(GO),
 		WithCompileStrictMode(true),
 		WithCompilePeepholeSize(42),
 		WithCompileExcludeFiles([]string{"*.tmp"}),
@@ -306,7 +306,7 @@ func TestModeBitmaskValidation(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Base mode")
 
-		err = WithProgramLanguage("Go")(cfg)
+		err = WithProjectLanguage("Go")(cfg)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Base mode")
 	})
@@ -346,7 +346,7 @@ func TestModeBitmaskValidation(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Scan mode")
 
-		err = WithScanLanguage("go")(cfg)
+		err = WithScanLanguage(GO)(cfg)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Scan mode")
 	})

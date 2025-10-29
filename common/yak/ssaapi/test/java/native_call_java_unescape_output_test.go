@@ -1,12 +1,13 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_Java_Unescape_Output(t *testing.T) {
@@ -36,7 +37,7 @@ func Test_Java_Unescape_Output(t *testing.T) {
 			res := vals.GetValues("res").Show()
 			require.Contains(t, res.String(), "sessionScope.userInput")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("simple xss demo", func(t *testing.T) {
@@ -88,7 +89,7 @@ $request.setAttribute(,,* as $res)
 			res := vals.GetValues("res")
 			require.Contains(t, res.String(), "ParameterMember-parameter[1].getParameter(Parameter-request,\"input\")")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test unescape out", func(t *testing.T) {
@@ -153,6 +154,6 @@ $request.setAttribute(,,* as $res)
 			require.Contains(t, res.String(), "getMessage")
 			require.Contains(t, res.String(), "toString")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

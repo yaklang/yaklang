@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -51,7 +52,7 @@ func TestRange_normol(t *testing.T) {
 		}
 		check(t, targets, want, ssa.ToConstInst)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 }
 
@@ -81,7 +82,7 @@ func main(){
 				"3:1 - 5:2: func test() bool{\n\treturn true\n}",
 			}, ssa.ToFunction)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("check target2 ", func(t *testing.T) {
@@ -91,7 +92,7 @@ func main(){
 				"7:1 - 9:2: func test2() bool{\n\treturn false\n}",
 			}, ssa.ToFunction)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 func TestRange_import(t *testing.T) {
@@ -140,13 +141,13 @@ func login(w http.ResponseWriter, r *http.Request) {
 			ent := prog.SyntaxFlow("ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $target;").GetValues("target")
 			check(t, ent, []string{"9:2 - 9:16: \"entgo.io/ent\""}, ssa.ToExternLib)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 	t.Run("test ent2", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
 			check(t, fmt, []string{"5:2 - 5:7: \"fmt\""}, ssa.ToExternLib)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }

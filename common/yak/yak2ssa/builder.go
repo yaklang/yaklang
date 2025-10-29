@@ -3,13 +3,12 @@ package yak2ssa
 import (
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type SSABuilder struct {
@@ -71,8 +70,8 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return filepath.Ext(path) == ".yak" || filepath.Ext(path) == ".yaklang"
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
-	return consts.Yak
+func (*SSABuilder) GetLanguage() ssaconfig.Language {
+	return ssaconfig.Yak
 }
 
 type astbuilder struct {
