@@ -62815,10 +62815,11 @@ func (x *SSAProjectFilter) GetLanguages() []string {
 }
 
 type CreateSSAProjectRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Project        *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
+	ProjectRawData string                 `protobuf:"bytes,2,opt,name=ProjectRawData,proto3" json:"ProjectRawData,omitempty"` // json from ssa.yak
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateSSAProjectRequest) Reset() {
@@ -62858,9 +62859,16 @@ func (x *CreateSSAProjectRequest) GetProject() *SSAProject {
 	return nil
 }
 
+func (x *CreateSSAProjectRequest) GetProjectRawData() string {
+	if x != nil {
+		return x.ProjectRawData
+	}
+	return ""
+}
+
 type CreateSSAProjectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
+	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"` // why ?
 	Message       *DbOperateMessage      `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -68652,9 +68660,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03IDs\x18\x01 \x03(\x03R\x03IDs\x12\"\n" +
 	"\fProjectNames\x18\x02 \x03(\tR\fProjectNames\x12$\n" +
 	"\rSearchKeyword\x18\x03 \x01(\tR\rSearchKeyword\x12\x1c\n" +
-	"\tLanguages\x18\x04 \x03(\tR\tLanguages\"D\n" +
+	"\tLanguages\x18\x04 \x03(\tR\tLanguages\"l\n" +
 	"\x17CreateSSAProjectRequest\x12)\n" +
-	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\"v\n" +
+	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12&\n" +
+	"\x0eProjectRawData\x18\x02 \x01(\tR\x0eProjectRawData\"v\n" +
 	"\x18CreateSSAProjectResponse\x12)\n" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12/\n" +
 	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"D\n" +

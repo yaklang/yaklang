@@ -13,12 +13,21 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func CreateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject, error) {
-	if project == nil {
+func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SSAProject, error) {
+	if req == nil {
 		return nil, utils.Errorf("create SSA project failed: project is nil")
 	}
 
-	projectBuilder, err := ssaproject.NewSSAProjectBuilderByProto(project)
+	var projectBuilder *ssaproject.SSAProjectBuilder
+	var err error
+	if req.Project != nil {
+		projectBuilder, err = ssaproject.NewSSAProjectBuilderByProto(req.Project)
+	} else if req.ProjectRawData != "" {
+		projectBuilder, err = ssaproject.NewSSAProjectBuilderByRawData(req.ProjectRawData)
+	} else {
+		return nil, utils.Errorf("create SSA project failed: project data is missing")
+	}
+
 	if err != nil {
 		return nil, utils.Errorf("create SSA project failed: %s", err)
 	}

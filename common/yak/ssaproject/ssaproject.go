@@ -14,11 +14,24 @@ import (
 
 type SSAProjectBuilder struct {
 	ID          uint
-	ProjectName string
-	Description string
+	ProjectName string `json:"project_name"`
+	Description string `json:"description"`
 	Tags        []string
-	Language    ssaconfig.Language
+	Language    ssaconfig.Language `json:"language"`
 	Config      *ssaconfig.Config
+	Info        *ssaconfig.CodeSourceInfo `json:"info"`
+}
+
+func NewSSAProjectBuilderByRawData(rawData string) (*SSAProjectBuilder, error) {
+	builder := &SSAProjectBuilder{}
+	if rawData == "" {
+		return nil, utils.Errorf("failed to new SSA project builder: raw data is empty")
+	}
+	err := json.Unmarshal([]byte(rawData), builder)
+	if err != nil {
+		return nil, utils.Errorf("failed to unmarshal SSA project raw data: %s", err)
+	}
+	return builder, nil
 }
 
 func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, error) {
