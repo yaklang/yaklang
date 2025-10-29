@@ -196,6 +196,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 		// 创建新文件
 		filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
+		emitter.EmitPinFilename(filename)
 		loop.Set("filename", filename)
 		return nil
 	}

@@ -2,6 +2,7 @@ package loop_yaklangcode
 
 import (
 	"bytes"
+
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -12,6 +13,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
+// DEPRECATED: queryDocumentAction 已被 grepYaklangSamplesAction 替代
+// 保留此代码仅用于向后兼容，不应在新代码中使用
+// 推荐使用 grepYaklangSamplesAction 进行代码样例搜索
 var queryDocumentAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"query_document",
