@@ -27,15 +27,16 @@ const (
 
 type SyntaxFlowScanTask struct {
 	gorm.Model
-	TaskId   string `gorm:"unique_index"`
-	Programs string
+	TaskId      string `gorm:"unique_index"`
+	Programs    string `gorm:"index"`
+	ProjectName string `gorm:"index"`
 	// rules
 	RulesCount int64
 
 	Status string // executing / done / paused / error
 	Reason string // user cancel / finished / recover failed so on
 
-	Kind SyntaxflowResultKind `json:"kind"` // debug / scan / query
+	Kind SyntaxflowResultKind `json:"kind",gorm:"index"` // debug / scan / query
 
 	// 扫描批次
 	ScanBatch uint64 `gorm:"index"`
