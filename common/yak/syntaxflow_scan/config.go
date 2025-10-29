@@ -49,67 +49,40 @@ type ScanTaskCallback struct {
 }
 
 const (
-	pauseFuncKey          = "pauseFunc"
-	resultCallbackKey     = "resultCallback"
-	errorCallbackKey      = "errorCallback"
-	processCallbackKey    = "processCallback"
-	reporterKey           = "reporter"
-	reporterWriterKey     = "reporterWriter"
-	processRuleKey        = "processRuleDetail"
-	rulePerformanceLogKey = "rulePerformanceLog"
+	pauseFuncKey       = "syntaxflow-scan/pauseFunc"
+	resultCallbackKey  = "syntaxflow-scan/resultCallback"
+	errorCallbackKey   = "syntaxflow-scan/errorCallback"
+	processCallbackKey = "syntaxflow-scan/processCallback"
+	reporterKey        = "syntaxflow-scan/reporter"
 )
 
-func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(reporterKey, reporter)
-		return nil
-	}
-}
+var WithReporter = ssaconfig.SetOption(reporterKey, func(c *Config, reporter sfreport.IReport) {
+	c.Reporter = reporter
+})
 
-func WithPauseFunc(pause func() bool) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(pauseFuncKey, pause)
-		return nil
-	}
-}
+var WithPauseFunc = ssaconfig.SetOption(pauseFuncKey, func(c *Config, pause func() bool) {
+	c.pauseCheck = pause
+})
 
-func WithScanResultCallback(callback ScanResultCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(resultCallbackKey, callback)
-		return nil
-	}
-}
+var WithScanResultCallback = ssaconfig.SetOption(resultCallbackKey, func(c *Config, callback ScanResultCallback) {
+	c.resultCallback = callback
+})
 
-func WithErrorCallback(callback errorCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(errorCallbackKey, callback)
-		return nil
-	}
-}
+var WithErrorCallback = ssaconfig.SetOption(errorCallbackKey, func(c *Config, callback errorCallback) {
+	c.errorCallback = callback
+})
 
-// WithProcessCallback 设置扫描进度回调函数
-func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(processCallbackKey, callback)
-		return nil
-	}
-}
+var WithProcessCallback = ssaconfig.SetOption(processCallbackKey, func(c *Config, callback ProcessCallback) {
+	c.ProcessCallback = callback
+})
 
-// WithProcessRuleDetail 控制进度回调是否包含规则级别详情
-func WithProcessRuleDetail(withRule bool) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(processRuleKey, withRule)
-		return nil
-	}
-}
+var WithProcessRuleDetail = ssaconfig.SetOption("syntaxflow-scan/processRuleDetail", func(c *Config, withDetail bool) {
+	c.ProcessWithRule = withDetail
+})
 
-// WithRulePerformanceLog 控制是否开启规则级性能日志
-func WithRulePerformanceLog(enable bool) ssaconfig.Option {
-	return func(sc *ssaconfig.Config) error {
-		sc.SetExtraInfo(rulePerformanceLogKey, enable)
-		return nil
-	}
-}
+var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerformanceLog", func(c *Config, enable bool) {
+	c.EnableRulePerformanceLog = enable
+})
 
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	cfg := &Config{
@@ -121,50 +94,6 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 		return nil, err
 	}
 
-	if f, ok := cfg.ExtraInfo[pauseFuncKey]; ok {
-		if pauseFunc, ok := f.(func() bool); ok {
-			cfg.pauseCheck = pauseFunc
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[resultCallbackKey]; ok {
-		if resultCallback, ok := f.(ScanResultCallback); ok {
-			cfg.resultCallback = resultCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[errorCallbackKey]; ok {
-		if errorCallback, ok := f.(errorCallback); ok {
-			cfg.errorCallback = errorCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[processCallbackKey]; ok {
-		if processCallback, ok := f.(ProcessCallback); ok {
-			cfg.ProcessCallback = processCallback
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[processRuleKey]; ok {
-		if withRule, ok := f.(bool); ok {
-			cfg.ProcessWithRule = withRule
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[reporterKey]; ok {
-		if reporter, ok := f.(sfreport.IReport); ok {
-			cfg.Reporter = reporter
-		}
-	}
-
-	if f, ok := cfg.ExtraInfo[rulePerformanceLogKey]; ok {
-		if enable, ok := f.(bool); ok {
-			cfg.EnableRulePerformanceLog = enable
-			if cfg.ScanTaskCallback != nil {
-				cfg.ScanTaskCallback.EnableRulePerformanceLog = enable
-			}
-		}
-	}
-
+	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	return cfg, nil
 }
