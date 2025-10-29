@@ -255,104 +255,104 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 }
 
 // DownloadSyntaxFlowRuleFromOSS 从OSS下载规则并保存到本地数据库
-func (s *Server) DownloadSyntaxFlowRuleFromOSS(req *ypb.DownloadSyntaxFlowRuleFromOSSRequest, stream ypb.Yak_DownloadSyntaxFlowRuleFromOSSServer) error {
-	// 参数校验
-	if req.OssConfig == nil {
-		return utils.Error("OSS config is empty")
-	}
-	config := req.OssConfig
+// func (s *Server) DownloadSyntaxFlowRuleFromOSS(req *ypb.DownloadSyntaxFlowRuleFromOSSRequest, stream ypb.Yak_DownloadSyntaxFlowRuleFromOSSServer) error {
+// 	// 参数校验
+// 	if req.OssConfig == nil {
+// 		return utils.Error("OSS config is empty")
+// 	}
+// 	config := req.OssConfig
 
-	// 创建 OSS 客户端
-	var ossClient yaklib.OSSClient
-	var err error
+// 	// 创建 OSS 客户端
+// 	var ossClient yaklib.OSSClient
+// 	var err error
 
-	switch config.Type {
-	case "aliyun":
-		ossClient, err = yaklib.NewAliyunOSSClient(config.Endpoint, config.AccessKeyId, config.AccessKeySecret)
-		if err != nil {
-			return utils.Wrapf(err, "create aliyun OSS client failed")
-		}
-	default:
-		return utils.Errorf("unsupported OSS type: %s", config.Type)
-	}
-	defer ossClient.Close()
+// 	switch config.Type {
+// 	case "aliyun":
+// 		ossClient, err = yaklib.NewAliyunOSSClient(config.Endpoint, config.AccessKeyId, config.AccessKeySecret)
+// 		if err != nil {
+// 			return utils.Wrapf(err, "create aliyun OSS client failed")
+// 		}
+// 	default:
+// 		return utils.Errorf("unsupported OSS type: %s", config.Type)
+// 	}
+// 	defer ossClient.Close()
 
-	// OSS 配置
-	bucket := config.Bucket
-	if bucket == "" {
-		bucket = "yaklang-rules"
-	}
-	prefix := config.Prefix
-	if prefix == "" {
-		prefix = "syntaxflow/"
-	}
+// 	// OSS 配置
+// 	bucket := config.Bucket
+// 	if bucket == "" {
+// 		bucket = "yaklang-rules"
+// 	}
+// 	prefix := config.Prefix
+// 	if prefix == "" {
+// 		prefix = "syntaxflow/"
+// 	}
 
-	// 发送初始化进度
-	sendProgress(stream, 0, fmt.Sprintf("准备从OSS下载规则 (bucket: %s, prefix: %s)", bucket, prefix), "info")
+// 	// 发送初始化进度
+// 	sendProgress(stream, 0, fmt.Sprintf("准备从OSS下载规则 (bucket: %s, prefix: %s)", bucket, prefix), "info")
 
-	// 从 OSS 下载规则文件
-	ctx := stream.Context()
-	ossStream := yaklib.DownloadOSSSyntaxFlowRuleFiles(ctx, ossClient, bucket, prefix)
+// 	// 从 OSS 下载规则文件
+// 	ctx := stream.Context()
+// 	ossStream := yaklib.DownloadOSSSyntaxFlowRuleFiles(ctx, ossClient, bucket, prefix)
 
-	// 解析并保存规则
-	var (
-		total           int64
-		successCount    int
-		errorCount      int
-		count, progress float64
-	)
+// 	// 解析并保存规则
+// 	var (
+// 		total           int64
+// 		successCount    int
+// 		errorCount      int
+// 		count, progress float64
+// 	)
 
-	for item := range ossStream.Chan {
-		if item.Error != nil {
-			errorCount++
-			sendProgress(stream, progress, fmt.Sprintf("下载规则文件失败: %v", item.Error), "error")
-			continue
-		}
+// 	for item := range ossStream.Chan {
+// 		if item.Error != nil {
+// 			errorCount++
+// 			sendProgress(stream, progress, fmt.Sprintf("下载规则文件失败: %v", item.Error), "error")
+// 			continue
+// 		}
 
-		if total == 0 {
-			total = ossStream.Total
-		}
-		if total > 0 {
-			progress = count / float64(total)
-		}
-		count++
+// 		if total == 0 {
+// 			total = ossStream.Total
+// 		}
+// 		if total > 0 {
+// 			progress = count / float64(total)
+// 		}
+// 		count++
 
-		// 解析规则内容
-		rule, err := sfdb.CheckSyntaxFlowRuleContent(item.Content)
-		if err != nil {
-			errorCount++
-			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 解析失败: %v", item.RuleName, err), "error")
-			continue
-		}
+// 		// 解析规则内容
+// 		rule, err := sfdb.CheckSyntaxFlowRuleContent(item.Content)
+// 		if err != nil {
+// 			errorCount++
+// 			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 解析失败: %v", item.RuleName, err), "error")
+// 			continue
+// 		}
 
-		// 设置规则名称
-		rule.RuleName = item.RuleName
+// 		// 设置规则名称
+// 		rule.RuleName = item.RuleName
 
-		// 保存到数据库
-		_, err = sfdb.CreateOrUpdateRuleWithGroup(rule)
-		if err != nil {
-			errorCount++
-			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 保存失败: %v", item.RuleName, err), "error")
-			continue
-		}
+// 		// 保存到数据库
+// 		_, err = sfdb.CreateOrUpdateRuleWithGroup(rule)
+// 		if err != nil {
+// 			errorCount++
+// 			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 保存失败: %v", item.RuleName, err), "error")
+// 			continue
+// 		}
 
-		successCount++
-		sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 保存成功", item.RuleName), "success")
-	}
+// 		successCount++
+// 		sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 保存成功", item.RuleName), "success")
+// 	}
 
-	// 发送最终结果
-	msg := fmt.Sprintf("完成: 成功 %d, 失败 %d", successCount, errorCount)
-	msgType := "success"
-	if errorCount > 0 {
-		msgType = "warning"
-	}
-	if successCount == 0 && errorCount > 0 {
-		msgType = "error"
-	}
+// 	// 发送最终结果
+// 	msg := fmt.Sprintf("完成: 成功 %d, 失败 %d", successCount, errorCount)
+// 	msgType := "success"
+// 	if errorCount > 0 {
+// 		msgType = "warning"
+// 	}
+// 	if successCount == 0 && errorCount > 0 {
+// 		msgType = "error"
+// 	}
 
-	return stream.Send(&ypb.SyntaxFlowRuleOnlineProgress{
-		Progress:    1,
-		Message:     msg,
-		MessageType: msgType,
-	})
-}
+// 	return stream.Send(&ypb.SyntaxFlowRuleOnlineProgress{
+// 		Progress:    1,
+// 		Message:     msg,
+// 		MessageType: msgType,
+// 	})
+// }

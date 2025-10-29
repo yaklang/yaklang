@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // TestMockOSSClient 测试 Mock OSS 客户端
@@ -322,66 +321,5 @@ func BenchmarkGetObject(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = client.GetObject("test-bucket", "test.txt")
-	}
-}
-
-// TestSaveOSSRule 测试保存OSS规则
-func TestSaveOSSRule(t *testing.T) {
-	content := `desc(
-	title_zh: "测试规则"
-	title: "Test Rule"
-	type: vuln
-	level: high
-	language: java
-)
-alert $var for {
-	level: "high",
-	title: "Test Alert"
-}`
-
-	// 使用简化版本的保存功能
-	err := SaveOSSRule(nil, "test-rule", content)
-	// 由于需要实际的数据库连接，这里只测试函数调用不会panic
-	// 在实际环境中应该有数据库连接
-	if err != nil {
-		// 预期可能会有数据库连接错误，这是正常的
-		t.Logf("SaveOSSRule returned error (expected without DB): %v", err)
-	}
-}
-
-// TestSaveOSSRuleWithFullInfo 测试完整信息保存OSS规则
-func TestSaveOSSRuleWithFullInfo(t *testing.T) {
-	content := `desc(
-	title_zh: "完整测试规则"
-	title: "Full Test Rule"
-	type: vuln
-	level: high
-	language: java
-)
-alert $var for {
-	level: "high",
-	title: "Test Alert"
-}`
-
-	// 测试完整信息保存
-	err := SaveOSSRuleWithFullInfo(
-		nil,
-		"full-test-rule",
-		"java",
-		content,
-		schema.SFR_RULE_TYPE_SF,
-		schema.SFR_SEVERITY_HIGH,
-		schema.SFR_PURPOSE_VULN,
-		"Test Rule",
-		"测试规则",
-		"Description",
-		"test",
-		"",
-		[]string{},
-	)
-
-	// 由于需要实际的数据库连接，这里只测试函数调用不会panic
-	if err != nil {
-		t.Logf("SaveOSSRuleWithFullInfo returned error (expected without DB): %v", err)
 	}
 }
