@@ -1,10 +1,12 @@
 package php
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestSearchMember(t *testing.T) {
@@ -19,5 +21,5 @@ $xx->$a->cc();
 		result := prog.SyntaxFlow(`BB.cc() as $sink`)
 		assert.True(t, result.GetValues("sink").Len() != 0)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"gotest.tools/v3/assert"
@@ -44,7 +45,7 @@ func Test_Phi_WithGoto(t *testing.T) {
 		}
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 }
 
@@ -83,7 +84,7 @@ func Test_Phi_WithGoto_inLoop(t *testing.T) {
 			}
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
 
 func Test_Phi_WithReturn(t *testing.T) {
@@ -113,7 +114,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	ssatest.CheckWithName("phi-with-return-undefined", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
@@ -128,7 +129,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	ssatest.CheckWithName("phi-with-return-with-param", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
@@ -138,7 +139,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 			t.Fatal("It shouldn be phi here")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	ssatest.CheckWithName("phi-with-return-syntaxflow", t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
@@ -153,7 +154,7 @@ func Test_Phi_WithReturn(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
 
 func Test_Phi_WithReturn_Extend(t *testing.T) {
@@ -207,7 +208,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		assert.Equal(t, 2, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	code = `package main
 
@@ -259,7 +260,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 
 	code = `package main
 
@@ -311,7 +312,7 @@ func Test_Phi_WithReturn_Extend(t *testing.T) {
 		assert.Equal(t, 1, len(conds))
 
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.GO))
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
 
 func Test_MemberCall_WithPhi(t *testing.T) {
@@ -333,7 +334,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 `, map[string][]string{
 			"entry":  {"Undefined-function1()"},
 			"output": {"Undefined-a.test"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -358,7 +359,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 `, map[string][]string{
 			"entry":  {"Undefined-function1()"},
 			"output": {"Undefined-a.test"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -382,7 +383,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 `, map[string][]string{
 			"output1": {"1"},
 			"output2": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package main
@@ -420,7 +421,7 @@ func Test_MemberCall_WithPhi(t *testing.T) {
 			"output1": {"1", "5"},
 			"output2": {"2", "4", "5"},
 			"output4": {"3", "4", "5"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -445,7 +446,7 @@ func Test_ImportPackage_WithPhi(t *testing.T) {
 		$tmp.Execute(, * #-> as $sink);
 		`, map[string][]string{
 			"sink": {"Undefined-w", "Undefined-messages"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -470,7 +471,7 @@ func Test_PhiType(t *testing.T) {
 			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
 		}
 	}
-	opts = append(opts, ssaapi.WithLanguage(ssaapi.GO))
+	opts = append(opts, ssaapi.WithLanguage(ssaconfig.GO))
 
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()

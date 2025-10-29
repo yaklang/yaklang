@@ -4,7 +4,9 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -113,8 +115,13 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		case SFDescKeyType_Level:
 			y.rule.Severity = schema.ValidSeverityType(value)
 		case SFDescKeyType_Lang:
+			rule, err := ssaconfig.ValidateLanguage(value)
+			if err != nil {
+				log.Warnf("validate language failed: %s", err)
+				continue
+			}
 			if y.rule.Language == "" {
-				y.rule.Language = value
+				y.rule.Language = rule
 			}
 			extraDesc.language = value
 		case SFDescKeyType_CVE:

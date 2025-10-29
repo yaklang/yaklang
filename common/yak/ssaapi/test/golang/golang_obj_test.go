@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -28,7 +29,7 @@ func TestBasic_BasicObject(t *testing.T) {
 			map[string][]string{
 				"target": {"3", "1"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -55,7 +56,7 @@ func TestBasic_BasicObject(t *testing.T) {
 			map[string][]string{
 				"target": {"3", "1"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -83,7 +84,7 @@ func TestBasic_BasicObjectEx(t *testing.T) {
 	`, map[string][]string{
 		"target": {"1"},
 	},
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -109,7 +110,7 @@ func TestBasic_Phi(t *testing.T) {
 			"p":      {"phi(a)[1,2,4]"},
 			"target": {"1", "2", "4"},
 		},
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -134,7 +135,7 @@ func main (){
 	`, map[string][]string{
 			"a": {"1"},
 		},
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -163,7 +164,7 @@ ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.ReadFile(* #-> as $output)
 		`, map[string][]string{
 			"output": {"\"file\"", "Parameter-r"},
-		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -185,7 +186,7 @@ func (c* Context)Cors1() {
 		`, map[string][]string{
 			"output": {"\"*\""},
 		},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -207,7 +208,7 @@ func Cors1(c *gin.Context) {
 		`, map[string][]string{
 			"output": {"\"*\""},
 		},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -256,7 +257,7 @@ func (s *VulinServer) mallUserRoute() {
 			"a": {`"sessionID1"`},
 			"b": {`"sessionID2"`},
 		},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -288,7 +289,7 @@ $entry.Create(* #-> as $sink)
 			map[string][]string{
 				"sink": {"Parameter-r"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }

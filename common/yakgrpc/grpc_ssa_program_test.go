@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -33,7 +34,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 
 	prog, err := ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	_ = prog
@@ -54,7 +55,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 		prog := queryByFilter(t, nil)
 		require.NotNil(t, prog)
 		require.Equal(t, prog.Name, name)
-		require.Equal(t, prog.Language, string(ssaapi.Yak))
+		require.Equal(t, prog.Language, string(ssaconfig.Yak))
 		require.Equal(t, prog.Description, desc)
 	})
 	t.Run("query with filter name", func(t *testing.T) {
@@ -69,12 +70,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAPrograms_Query(t *testing.T) {
 	})
 	t.Run("query with Language", func(t *testing.T) {
 		require.NotNil(t, queryByFilter(t, &ypb.SSAProgramFilter{
-			Languages: []string{string(ssaapi.Yak)},
+			Languages: []string{string(ssaconfig.Yak)},
 		}))
 	})
 	t.Run("query risk by filter", func(t *testing.T) {
 		require.Nil(t, queryByFilter(t, &ypb.SSAProgramFilter{
-			Languages: []string{string(ssaapi.JAVA)},
+			Languages: []string{string(ssaconfig.JAVA)},
 		}))
 	})
 
@@ -106,7 +107,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Program_Delete_WithKeyword(t *testing.T) {
 
 	_, err = ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	defer func() {
@@ -145,7 +146,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Program_Update(t *testing.T) {
 
 	_, err = ssaapi.Parse(`print("a")`,
 		ssaapi.WithProgramName(name),
-		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramDescription(desc),
 	)
 	defer func() {

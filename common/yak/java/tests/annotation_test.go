@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -76,7 +77,7 @@ class A{
 
 		return nil
 
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestSearchAnnotation(t *testing.T) {
@@ -133,5 +134,5 @@ $path_handler?{.annotation.*?{have:"GET"}} as $ get_path_handler
 		require.Equal(t, res.GetValueCount("path_handler"), 2)
 		require.Equal(t, res.GetValueCount("get_path_handler"), 2)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

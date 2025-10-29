@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -262,7 +263,7 @@ println($d[0]);
 			values := result.GetValues("param")
 			require.Contains(t, values.String(), "side-effect")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestParseSSA_DefinedFunc(t *testing.T) {
@@ -371,7 +372,7 @@ func TestClosure(t *testing.T) {
 			map[string][]string{
 				"param": {"1"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("lamda-has-free_value", func(t *testing.T) {
 		code := `<?php
@@ -386,7 +387,7 @@ $a(1);`
 			map[string][]string{
 				"param": {"1"},
 			},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("lamda-free-value 2 ", func(t *testing.T) {
 		code := `<?php
@@ -409,7 +410,7 @@ function a(){
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{"param": {`"whoami"`}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestFunction(t *testing.T) {
@@ -425,7 +426,7 @@ function b($cmd)
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{"param": {`"whoami"`}},
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 	t.Run("test function in function", func(t *testing.T) {
@@ -442,7 +443,7 @@ function b($cmd)
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{"param": {`"whoami"`}},
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 
@@ -466,7 +467,7 @@ namespace {
 		test.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{"param": {`"whoami"`}},
-			ssaapi.WithLanguage(ssaapi.PHP),
+			ssaapi.WithLanguage(ssaconfig.PHP),
 		)
 	})
 	//	t.Run("test function spin", func(t *testing.T) {
@@ -489,7 +490,7 @@ namespace {
 	//		test.CheckSyntaxFlow(t, code,
 	//			`exec(* #-> * as $param)`,
 	//			map[string][]string{"param": {`"whoam"`}},
-	//			ssaapi.WithLanguage(ssaapi.PHP),
+	//			ssaapi.WithLanguage(ssaconfig.PHP),
 	//		)
 	//	})
 	t.Run("test undefined function", func(t *testing.T) {
@@ -498,7 +499,7 @@ a($a);`
 		test.CheckSyntaxFlowContain(t, code,
 			`a as $target`,
 			map[string][]string{"target": {"Undefined-a"}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test function not use", func(t *testing.T) {
 		code := `<?php
@@ -511,7 +512,7 @@ function b($a){
 }`
 		test.CheckSyntaxFlow(t, code, `exec(* #-> * as $param)`, map[string][]string{
 			"param": {`"whoami"`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test A use self", func(t *testing.T) {
 		code := `<?php
@@ -570,7 +571,7 @@ CODE
 
 `, map[string][]string{
 		"sink": {"Undefined-request"},
-	}, true, ssaapi.WithLanguage(ssaapi.PHP))
+	}, true, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestA(t *testing.T) {

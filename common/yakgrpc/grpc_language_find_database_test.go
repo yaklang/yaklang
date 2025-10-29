@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -72,7 +73,7 @@ class A {
 	num2 := newRangeFromText("8:17 8:18")
 	println2 := newRangeFromText("10:18 10:19")
 	// only test reference
-	programID, fun := initProgram(t, vf, ssaapi.WithLanguage(ssaapi.JAVA))
+	programID, fun := initProgram(t, vf, ssaapi.WithLanguage(ssaconfig.JAVA))
 	_ = fun
 	defer fun()
 	t.Run("find from assign by variable: a1", func(t *testing.T) {

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -61,7 +61,7 @@ EXCLUDE,
 			//res.ShowDot()
 			require.Nil(t, res)
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test exclude filter from sink to source", func(t *testing.T) {
@@ -81,7 +81,7 @@ EXCLUDE,
 			res := vals.GetValues("result")
 			require.Nil(t, res)
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -118,6 +118,6 @@ public class Main {
 			require.Contains(t, path, "DoGet")
 			require.Contains(t, path, "DoGet")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

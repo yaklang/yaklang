@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -97,7 +98,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task_Info(t *testing.T) {
 		`)
 		progID := uuid.NewString()
 		prog, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID),
 		)
@@ -253,7 +254,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 
 		progID1 := uuid.NewString()
 		prog1, err := ssaapi.ParseProjectWithFS(vf1,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID1),
 		)
@@ -266,7 +267,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 
 		progID2 := uuid.NewString()
 		prog2, err := ssaapi.ParseProjectWithFS(vf2,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID2),
 		)
@@ -465,7 +466,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		`)
 		progID := uuid.NewString()
 		prog, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramPath("example"),
 			ssaapi.WithProgramName(progID),
 		)
@@ -559,7 +560,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("/a.java", `package com.example.apackage;`)
 
-		languages := []string{string(consts.JAVA), string(consts.General), string(consts.PHP), string(consts.GO)}
+		languages := []ssaconfig.Language{ssaconfig.JAVA, ssaconfig.General, ssaconfig.PHP, ssaconfig.GO}
 		db := consts.GetGormProfileDatabase()
 		groupName := uuid.NewString()
 		_, err := sfdb.CreateGroup(db, groupName)
@@ -589,7 +590,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 
 		progIDA := uuid.NewString()
 		progA, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(progIDA),
 		)
 		defer func() {
@@ -613,7 +614,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		// start without ignore language and have general language rule
 		progIdB := uuid.NewString()
 		progB, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(progIdB),
 		)
 		require.NoError(t, err)

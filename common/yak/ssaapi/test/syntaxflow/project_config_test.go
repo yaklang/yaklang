@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestParsePropertiesFile(t *testing.T) {
@@ -70,7 +70,7 @@ func TestParsePropertiesFile(t *testing.T) {
 	`)
 
 	t.Run("test parse config", func(t *testing.T) {
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.JAVA))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA))
 		require.NoError(t, err)
 		app := programs[0].Program.GetApplication()
 		require.Equal(t, "myApplication", app.GetProjectConfigValue("spring.application.name"))
@@ -132,7 +132,7 @@ myapp:
 `)
 
 	t.Run("test parse config", func(t *testing.T) {
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.JAVA))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.JAVA))
 		require.NoError(t, err)
 		app := programs[0].Program.GetApplication()
 		for k, v := range app.ProjectConfig {

@@ -12,8 +12,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 var (
@@ -88,7 +88,7 @@ func NewReadFileError() error {
 
 type TemplateLangResponse struct {
 	// 支持的语言
-	Language []consts.Language `json:"language"`
+	Language []ssaconfig.Language `json:"language"`
 }
 
 type TemplateListResponse struct {
@@ -101,7 +101,7 @@ type TemplateContentResponse struct {
 }
 
 func toValidLang(lang string) (string, bool) {
-	valid, err := consts.ValidateLanguage(lang)
+	valid, err := ssaconfig.ValidateLanguage(lang)
 	if err != nil {
 		return "", false
 	}
@@ -112,9 +112,10 @@ func toValidLang(lang string) (string, bool) {
 	return lang, true
 }
 
-func GetAllSupportedLanguages() []consts.Language {
-	return lo.FilterMap(consts.GetAllSupportedLanguages(), func(item consts.Language, index int) (consts.Language, bool) {
-		return item, item != consts.JS
+func GetAllSupportedLanguages() []ssaconfig.Language {
+	return lo.FilterMap(ssaconfig.GetAllSupportedLanguages(), func(v string, index int) (ssaconfig.Language, bool) {
+		item := ssaconfig.Language(v)
+		return item, item != ssaconfig.JS
 	})
 }
 

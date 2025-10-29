@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 //go:embed sample
@@ -25,7 +26,7 @@ func Test_Debug(t *testing.T) {
 	programID := uuid.NewString()
 	progs, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		// ssaapi.WithDatabaseProgramName(programID),
 	)
 	defer func() {
@@ -41,7 +42,7 @@ func TestCheckRuleInSource(t *testing.T) {
 	// source
 	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 	if err != nil {
 		t.Fatalf("parse project error: %v", err)
@@ -53,7 +54,7 @@ func TestCheckRuleWithDatabase(t *testing.T) {
 	programID := uuid.NewString()
 	prog, err := ssaapi.ParseProjectWithFS(
 		filesys.NewEmbedFS(sample_code),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(programID),
 	)
 	defer func() {
@@ -71,7 +72,7 @@ func TestCheckRuleOnlyDatabase(t *testing.T) {
 	{
 		_, err := ssaapi.ParseProjectWithFS(
 			filesys.NewEmbedFS(sample_code),
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID),
 		)
 		defer func() {

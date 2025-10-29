@@ -17,7 +17,7 @@ func SaveConfig(c *Config, prog *Program) {
 			return
 		}
 		irProg.Description = c.ProgramDescription
-		irProg.Language = string(c.language)
+		irProg.Language = c.language
 		irProg.EngineVersion = consts.GetYakVersion()
 		irProg.ConfigInput = c.info
 		irProg.PeepholeSize = c.GetCompilePeepholeSize()
@@ -52,7 +52,7 @@ func (prog *Program) Recompile(opts ...Option) error {
 
 	// append other options
 	opts = append(opts, WithProgramName(prog.Program.Name))
-	opts = append(opts, WithRawLanguage(prog.GetLanguage()))
+	opts = append(opts, WithLanguage(prog.GetLanguage()))
 	opts = append(opts, WithReCompile(true))
 
 	// parse

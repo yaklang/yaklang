@@ -15,10 +15,10 @@ import (
 type SSAProject struct {
 	gorm.Model
 	// 项目基础信息
-	ProjectName string `json:"project_name" gorm:"unique_index;not null;comment:项目名称"`
-	Description string `json:"description,omitempty" gorm:"comment:项目描述"`
-	Tags        string `json:"tags,omitempty" gorm:"comment:项目标签"`
-	Language    string `json:"language" gorm:"comment:项目语言"`
+	ProjectName string             `json:"project_name" gorm:"unique_index;not null;comment:项目名称"`
+	Description string             `json:"description,omitempty" gorm:"comment:项目描述"`
+	Tags        string             `json:"tags,omitempty" gorm:"comment:项目标签"`
+	Language    ssaconfig.Language `json:"language" gorm:"comment:项目语言"`
 	// 配置选项
 	Config []byte `json:"config"`
 }
@@ -60,7 +60,7 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		CreatedAt:        p.CreatedAt.Unix(),
 		UpdatedAt:        p.UpdatedAt.Unix(),
 		ProjectName:      p.ProjectName,
-		Language:         p.Language,
+		Language:         string(p.Language),
 		CodeSourceConfig: config.CodeSource.JsonString(),
 		Description:      p.Description,
 		Tags:             p.GetTagsList(),

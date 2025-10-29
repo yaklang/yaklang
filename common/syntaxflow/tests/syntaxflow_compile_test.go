@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
@@ -81,7 +82,7 @@ a*?{.b} as $a
 	require.NoError(t, err)
 	require.NotEqual(t, rule.OpCodes, "")
 
-	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.Yak))
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.Yak))
 	prog.Show()
 	require.NoError(t, err)
 

@@ -62,7 +62,7 @@ func TestRealJsFrontEnd(t *testing.T) {
 }
 
 // func TestRealJs(t *testing.T) {
-// 	prog, err := ssaapi.Parse(largeJS, ssaapi.WithLanguage(ssaapi.JS))
+// 	prog, err := ssaapi.Parse(largeJS, ssaapi.WithLanguage(ssaconfig.JS))
 // 	if err != nil {
 // 		t.Fatal("prog parse error", err)
 // 	}

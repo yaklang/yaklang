@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -15,7 +16,7 @@ var uploadCase1 string
 
 func TestUploadParsing(t *testing.T) {
 	name := uuid.New().String()
-	prog, err := ssaapi.Parse(uploadCase1, ssaapi.WithLanguage(ssaapi.PHP), ssaapi.WithProgramName(name))
+	prog, err := ssaapi.Parse(uploadCase1, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithProgramName(name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +36,7 @@ move_uploaded_file($file['tmp_name'], auto_charset($filename,'utf-8','gbk'));`
 		map[string][]string{
 			"target": {"Undefined-move_uploaded_file"},
 		},
-		ssaapi.WithLanguage(ssaapi.PHP),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 	)
 }
 
@@ -51,5 +52,5 @@ if(!move_uploaded_file($file['tmp_name'], auto_charset($filename,'utf-8','gbk'))
 			t.Fatal("compiling failed")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

@@ -3,10 +3,12 @@ package java
 import (
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestTraceConstructor(t *testing.T) {
@@ -55,7 +57,7 @@ func TestTraceConstructor(t *testing.T) {
 			t.Fatal("GBK not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestCrossMethod(t *testing.T) {
@@ -87,7 +89,7 @@ func TestCrossMethod(t *testing.T) {
 			t.Fatal("Cross Method failed not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestCrossMethod_UseMethodBeforeDecl(t *testing.T) {
@@ -119,7 +121,7 @@ func TestCrossMethod_UseMethodBeforeDecl(t *testing.T) {
 			t.Fatal("Cross Method failed not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestCrossMethod_UseMethodBeforeDecl_NoThis(t *testing.T) {
@@ -151,5 +153,5 @@ func TestCrossMethod_UseMethodBeforeDecl_NoThis(t *testing.T) {
 			t.Fatal("Cross Method failed not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

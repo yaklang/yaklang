@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -114,5 +114,5 @@ out.write(,*?{have:'老年人'} as $switchStmt) ;
 		switchStmt.ShowWithSource()
 		require.Contains(t, switchStmt.StringEx(1), `老年人</p>`)
 		return nil
-	}, ssaapi.WithLanguage(consts.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

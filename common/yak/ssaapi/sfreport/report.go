@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type Report struct {
@@ -16,14 +17,14 @@ type Report struct {
 	EngineVersion string     `json:"engine_version"`
 	ReportTime    time.Time  `json:"report_time"`
 
-	ProgramName   string    `json:"program_name"`
-	ProgramLang   string    `json:"program_lang"`
-	Description   string    `json:"description"`
-	RepositoryURL string    `json:"repository_url"`
-	FileCount     int       `json:"file_count"`
-	CodeLineCount int       `json:"code_line_count"`
-	ScanStartTime time.Time `json:"scan_start_time"`
-	ScanEndTime   time.Time `json:"scan_end_time"`
+	ProgramName   string             `json:"program_name"`
+	ProgramLang   ssaconfig.Language `json:"program_lang"`
+	Description   string             `json:"description"`
+	RepositoryURL string             `json:"repository_url"`
+	FileCount     int                `json:"file_count"`
+	CodeLineCount int                `json:"code_line_count"`
+	ScanStartTime time.Time          `json:"scan_start_time"`
+	ScanEndTime   time.Time          `json:"scan_end_time"`
 	// ProgramVersion string `json:"program_version"`
 	RiskNums int
 	// Program Program
@@ -61,7 +62,7 @@ func (r *Report) SetProgramName(programName string) {
 	r.ProgramName = programName
 }
 
-func (r *Report) SetProgramLang(lang string) {
+func (r *Report) SetProgramLang(lang ssaconfig.Language) {
 	r.ProgramLang = lang
 }
 

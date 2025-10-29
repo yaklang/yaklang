@@ -261,7 +261,7 @@ func (s *SFFrameResult) GetDescription() string {
 			"desc":     s.rule.Description,
 			"type":     string(s.rule.Purpose),
 			"level":    string(s.rule.Severity),
-			"lang":     s.rule.Language,
+			"lang":     string(s.rule.Language),
 			"solution": s.rule.Solution,
 		}
 		return codec.AnyToString(info)
@@ -284,7 +284,7 @@ func (s *SFFrameResult) ToGRPCModel() *ypb.SyntaxFlowResult {
 		Description: s.GetDescription(),
 		Severity:    string(s.rule.Severity),
 		Purpose:     string(s.rule.Purpose),
-		Language:    s.rule.Language,
+		Language:    string(s.rule.Language),
 		RuleContent: s.rule.Content,
 	}
 }

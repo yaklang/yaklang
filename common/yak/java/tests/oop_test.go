@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -65,7 +65,7 @@ public class main{
 `
 		ssatest.CheckSyntaxFlow(t, code, `A.a() as $call`, map[string][]string{
 			"call": {"Undefined-A.a(A)"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("just use method", func(t *testing.T) {
@@ -137,7 +137,7 @@ public class C {
 			"o2": {"2"},
 			"o3": {"3"},
 			"o4": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	// todo: 跨过程会导致指针失效
@@ -195,7 +195,7 @@ public class C {
 			"o2": {"2"},
 			"o3": {"3"},
 			"o4": {"3"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	// todo
@@ -244,7 +244,7 @@ public class C {
 			o4 #-> as $o4
 		`, map[string][]string{
 			"": {""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -583,7 +583,7 @@ class Test{
 	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, this.a)"}, t)
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"2"},
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestJava_Instantiation(t *testing.T) {
 	t.Run("Instantiate a non-existent object", func(t *testing.T) {
@@ -638,7 +638,7 @@ public class ImageUtils{
 `
 		ssatest.CheckSyntaxFlow(t, code, `*readFile as $fun`, map[string][]string{
 			"fun": {"Function-ImageUtils.readFile"},
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 	t.Run("new java blueprint by fullName", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()
@@ -661,7 +661,7 @@ class B{
 }`)
 		ssatest.CheckProfileWithFS(fs, t, func(p ssatest.ParseStage, prog ssaapi.Programs, start time.Time) error {
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 func TestImport1(t *testing.T) {
@@ -808,7 +808,7 @@ public class Encryption {
 			program.Show()
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestJava_Super_Class(t *testing.T) {
@@ -863,7 +863,7 @@ class ChildClass extends ParentClass {
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"\"Parent\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test super class static method", func(t *testing.T) {
@@ -882,7 +882,7 @@ class ChildClass extends ParentClass {
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"\"Parent\""},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -914,5 +914,5 @@ public class XMLReaderFactorySafe {
 XMLReaderFactory?{<typeName>?{have:'org.xml.sax.helpers.XMLReaderFactory'}} as $factory;
 $factory.createXMLReader() as $reader;
 $reader.setFeature?(,*?{=="http://xml.org/sax/features/external-general-entities"},*?{==false}) as $excludeCall;
-`, map[string][]string{}, ssaapi.WithLanguage(consts.JAVA))
+`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

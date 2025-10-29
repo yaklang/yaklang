@@ -103,7 +103,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, projectName, project.ProjectName)
 		require.Equal(t, configJSON, project.CodeSourceConfig)
 		require.Equal(t, "测试本地项目", project.Description)
-		require.Equal(t, "go", project.Language)
+		require.Equal(t, string(ssaconfig.GO), project.Language)
 		require.True(t, project.CompileConfig.StrictMode)
 		require.Equal(t, int64(200), project.CompileConfig.PeepholeSize)
 		require.Equal(t, []string{"*.test.go", "*.mock.go"}, project.CompileConfig.ExcludeFiles)

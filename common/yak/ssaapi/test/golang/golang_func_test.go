@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -31,7 +32,7 @@ func Test_CrossFunction(t *testing.T) {
 			"c_def": {"1"},
 			"d_def": {"2"},
 		},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -47,7 +48,7 @@ func Test_CrossFunction(t *testing.T) {
 		}
 		`
 		ssatest.CheckTopDef(t, code, "c", []string{"1"}, false,
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -63,7 +64,7 @@ func Test_CrossFunction(t *testing.T) {
 			}
 		`,
 			"d", []string{"2"}, false,
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -83,7 +84,7 @@ func Test_CrossFunction(t *testing.T) {
 		`, map[string][]string{
 			"target": {"6"},
 		},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -101,7 +102,7 @@ func Test_CrossFunction(t *testing.T) {
 			}
 		`,
 			"c", []string{"1"}, false,
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -119,7 +120,7 @@ func Test_CrossFunction(t *testing.T) {
 			}
 		`,
 			"d", []string{"2"}, false,
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -133,7 +134,7 @@ func Test_Function_Global(t *testing.T) {
 			b := a
 		}
 		`, "b", []string{"1"}, false,
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -154,7 +155,7 @@ func Test_Closure(t *testing.T) {
 			map[string][]string{
 				"target": {"1"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 
@@ -180,7 +181,7 @@ func Test_Closure(t *testing.T) {
 			map[string][]string{
 				"target": {"1", "2"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -205,7 +206,7 @@ func (t *T) List() int {
 			map[string][]string{
 				"a": {"Function-T.T"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -234,7 +235,7 @@ func Test_Method_lazybuild(t *testing.T) {
 			map[string][]string{
 				"target": {"1", "2", "3"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 }
@@ -258,7 +259,7 @@ func Test_Function_lazybuild(t *testing.T) {
 			map[string][]string{
 				"target": {"1", "2", "3"},
 			},
-			ssaapi.WithLanguage(ssaapi.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
 

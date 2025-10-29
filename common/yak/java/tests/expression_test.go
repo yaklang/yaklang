@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -300,7 +300,7 @@ class A {
 				"in":  {"\"java.io.FileInputStream\"", "\"java.io.InputStream\""},
 				"out": {"\"java.io.FileOutputStream\"", "\"java.io.OutputStream\""},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -317,7 +317,7 @@ class A {
 					"\"java.io.OutputStream\"",
 				},
 			},
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }
@@ -383,7 +383,7 @@ public class Main {
 			ret.Show()
 			require.Contains(t, ret.String(), "select * from user where username=")
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -444,7 +444,7 @@ public class Test extends Parent {
 			require.Equal(t, objSuperRange, "super",
 				"obj.super should have method name")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test call range", func(t *testing.T) {
@@ -481,6 +481,6 @@ public class Test extends Parent {
 			require.Equal(t, methodCallRange, "super()",
 				"obj.super should have method name")
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

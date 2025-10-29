@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -17,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 )
@@ -124,8 +124,8 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return filepath.Ext(path) == ".c" // || filepath.Ext(path) == ".h"
 }
 
-func (*SSABuilder) GetLanguage() consts.Language {
-	return consts.C
+func (*SSABuilder) GetLanguage() ssaconfig.Language {
+	return ssaconfig.C
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {

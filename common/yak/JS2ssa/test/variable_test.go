@@ -8,6 +8,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func Test_JS_Variable(t *testing.T) {
@@ -15,7 +16,7 @@ func Test_JS_Variable(t *testing.T) {
 	check := func(code string, want []string, t *testing.T) {
 		test := assert.New(t)
 
-		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+		prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.JS))
 		test.Nil(err)
 		prog.Show()
 

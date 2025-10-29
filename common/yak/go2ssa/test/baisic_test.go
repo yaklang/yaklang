@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -800,7 +801,7 @@ func TestFuntion_normol(t *testing.T) {
 			}
 			`, `println( * #-> as $a)`, map[string][]string{
 			"a": {"4", "5", "6", "7"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -877,7 +878,7 @@ func TestMethod_normol(t *testing.T) {
 	`, map[string][]string{
 			"a": {"1"},
 			"b": {"Undefined-T_F"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -904,7 +905,7 @@ func TestMethod_repeat(t *testing.T) {
 
 			`, `println(* #-> as $a)`, map[string][]string{
 			"a": {"1", "Undefined-add"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("method same name with global function ", func(t *testing.T) {
@@ -930,7 +931,7 @@ func TestMethod_repeat(t *testing.T) {
 
 			`, `println(* #-> as $a)`, map[string][]string{
 			"a": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	t.Run("method repeat", func(t *testing.T) {

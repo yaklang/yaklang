@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -29,7 +30,7 @@ int main() {
 			map[string][]string{
 				"target": {"3", "1"},
 			},
-			ssaapi.WithLanguage(ssaapi.C),
+			ssaapi.WithLanguage(ssaconfig.C),
 		)
 	})
 
@@ -46,7 +47,7 @@ int main() {
 	}
 	`, `result.b as $target `, map[string][]string{
 			"target": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.C))
+		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
 	t.Run("simple cross function extend", func(t *testing.T) {
@@ -71,7 +72,7 @@ int main() {
 			map[string][]string{
 				"target": {"3", "2"},
 			},
-			ssaapi.WithLanguage(ssaapi.C),
+			ssaapi.WithLanguage(ssaconfig.C),
 		)
 	})
 }
@@ -102,7 +103,7 @@ int main() {
 	`, map[string][]string{
 		"target": {"1"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -129,7 +130,7 @@ int main() {
 			"p":      {"phi(a)[1,phi(a)[2,4]]", "phi(a)[2,4]"},
 			"target": {"0", "1", "2", "4"},
 		},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -158,7 +159,7 @@ int main() {
 	`, map[string][]string{
 			"a": {"1"},
 		},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -191,7 +192,7 @@ void handler(struct Response* w, struct Request* r) {
 			$entry<getFormalParams> as $output
 		`, map[string][]string{
 			"output": {"Parameter-r", "Parameter-w"},
-		}, true, ssaapi.WithLanguage(ssaapi.C),
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
 		)
 	})
 
@@ -215,7 +216,7 @@ void cors1(struct Context* c) {
 		`, map[string][]string{
 			"output": {"\"*\""},
 		},
-			ssaapi.WithLanguage(ssaapi.C),
+			ssaapi.WithLanguage(ssaconfig.C),
 		)
 	})
 }
@@ -238,7 +239,7 @@ int main() {
 	`, map[string][]string{
 		"target": {"1", "4"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -264,7 +265,7 @@ int main() {
 	`, map[string][]string{
 		"target": {"10"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -288,7 +289,7 @@ int main() {
 	`, map[string][]string{
 		"target": {"10"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -311,7 +312,7 @@ int main() {
 	`, map[string][]string{
 		"target": {"1"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }
 
@@ -333,6 +334,6 @@ int main() {
 	`, map[string][]string{
 		"target": {"1", "2"},
 	},
-		ssaapi.WithLanguage(ssaapi.C),
+		ssaapi.WithLanguage(ssaconfig.C),
 	)
 }

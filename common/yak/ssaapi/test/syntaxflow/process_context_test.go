@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -89,7 +90,7 @@ func Test_Process(t *testing.T) {
 			DocumentBuilderFactory.newInstance().*Builder().parse(* as $param)
 			`)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	t.Run("test loop filter", func(t *testing.T) {
@@ -99,7 +100,7 @@ func Test_Process(t *testing.T) {
 	$entry.*Builder().parse(* #-> as $param);
 			`)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -128,6 +129,6 @@ func Test_Context(t *testing.T) {
 			require.Contains(t, err.Error(), "context done")
 			require.True(t, process < 1.0)
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

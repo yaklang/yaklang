@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -67,7 +68,7 @@ array(1, "2", "key" => "value");
 		prog.Show()
 		return nil
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_Basic2(t *testing.T) {
@@ -165,7 +166,7 @@ a($b[0]); `
 		prog.Show()
 		return nil
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 
 }
 
@@ -179,7 +180,7 @@ func TestParseSSA_DoWhileTag(t *testing.T) {
 	`, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_WhileTag(t *testing.T) {
@@ -219,7 +220,7 @@ echo "abc";
 	test.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_TryCatch(t *testing.T) {
@@ -314,7 +315,7 @@ a?b:c;
 		prog.Show()
 		return nil
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_SMOKING_if(t *testing.T) {
@@ -326,7 +327,7 @@ false xor true;
 	test.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_SMOKING(t *testing.T) {
@@ -375,7 +376,7 @@ $k >>= 1;`
 		prog.Show()
 		return nil
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestParseSSA_Valid1(t *testing.T) {
@@ -462,5 +463,5 @@ endif;
 		prog.Show()
 		return nil
 	},
-		ssaapi.WithLanguage(ssaapi.PHP))
+		ssaapi.WithLanguage(ssaconfig.PHP))
 }

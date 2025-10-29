@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestParseClass(t *testing.T) {
@@ -38,7 +39,7 @@ func TestParseClass(t *testing.T) {
 			return nil
 		}
 		_ = source
-		_, err = ssaapi.Parse(source, ssaapi.WithLanguage(ssaapi.JAVA))
+		_, err = ssaapi.Parse(source, ssaapi.WithLanguage(ssaconfig.JAVA))
 		if err != nil {
 			os.WriteFile("/Users/z3/Downloads/error.java", []byte(source), 0644)
 			println(path)

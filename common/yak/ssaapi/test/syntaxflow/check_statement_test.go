@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -25,7 +26,7 @@ b3 = 3
 	b* as $b 
 	`, map[string][]string{
 			"b": {},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
 	t.Run("simple, positive", func(t *testing.T) {

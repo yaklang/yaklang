@@ -1,9 +1,11 @@
 package php
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestParamCall(t *testing.T) {
@@ -19,7 +21,7 @@ func TestParamCall(t *testing.T) {
 	`
 		ssatest.CheckSyntaxFlow(t, code, `echo(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("parameterMember is called", func(t *testing.T) {
 		code := `<?php
@@ -36,7 +38,7 @@ func TestParamCall(t *testing.T) {
 	`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test parameterMember call and parameter", func(t *testing.T) {
 		code := `<?php
@@ -63,7 +65,7 @@ $b->run($a);
 `
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"1"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test freeValue call", func(t *testing.T) {
 		code := `<?php
@@ -211,7 +213,7 @@ topDef:
  // parameterMemberCall/MoreParameterMemberCall`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 			"param": {"2"},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -219,5 +221,5 @@ func TestCode(t *testing.T) {
 	code := `<?php
 a(1,2,3,4,5);
 `
-	ssatest.CheckSyntaxFlow(t, code, `a(,* as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	ssatest.CheckSyntaxFlow(t, code, `a(,* as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

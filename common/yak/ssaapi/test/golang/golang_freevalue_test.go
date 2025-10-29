@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -40,7 +41,7 @@ func main() {
 			$output.Query as $query;
 	`, map[string][]string{
 			"query": {"ParameterMember-freeValue-db.Query"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 
 	code = `package example
@@ -76,6 +77,6 @@ func main() {
 			$output.Query as $query;
 	`, map[string][]string{
 			"query": {"ParameterMember-freeValue-db.Query"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }

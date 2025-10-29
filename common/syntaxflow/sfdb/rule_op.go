@@ -13,6 +13,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -139,7 +140,7 @@ func DeleteRuleByTitle(name string) error {
 
 func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleFileName, "-")
-	language, err := CheckSyntaxFlowLanguage(languageRaw)
+	language, err := ssaconfig.ValidateLanguage(languageRaw)
 	if err != nil {
 		log.Error(err)
 	}
@@ -175,7 +176,7 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
-	rule.Language = string(language)
+	rule.Language = language
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersion(rule.RuleId)
@@ -208,7 +209,7 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
 	languageRaw, _, _ := strings.Cut(ruleName, "-")
-	language, err := CheckSyntaxFlowLanguage(languageRaw)
+	language, err := ssaconfig.ValidateLanguage(languageRaw)
 	if err != nil {
 		log.Error(err)
 	}
@@ -221,7 +222,7 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 	if err != nil {
 		return err
 	}
-	rule.Language = string(language)
+	rule.Language = language
 	rule.Type = ruleType
 
 	err = LoadFileSystem(rule, system)
@@ -241,26 +242,6 @@ func ImportValidRule(system fi.FileSystem, ruleName string, content string) erro
 		return utils.Wrap(err, "create or update syntax flow rule error")
 	}
 	return nil
-}
-
-func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
-	switch strings.TrimSpace(strings.ToLower(languageRaw)) {
-	case "yak", "yaklang":
-		return consts.Yak, nil
-	case "java":
-		return consts.JAVA, nil
-	case "php":
-		return consts.PHP, nil
-	case "js", "es", "javascript", "ecmascript", "nodejs", "node", "node.js":
-		return consts.JS, nil
-	case "golang", "go":
-		return consts.GO, nil
-	case "clang", "c":
-		return consts.C, nil
-	case "general":
-		return consts.General, nil
-	}
-	return "", utils.Errorf("invalid language: %v is not supported yet", languageRaw)
 }
 
 func CheckSyntaxFlowRuleType(ruleName string) (schema.SyntaxFlowRuleType, error) {
@@ -380,7 +361,7 @@ func QueryRulesById(db *gorm.DB, ruleIds []string) ([]*schema.SyntaxFlowRule, er
 	return rules, nil
 }
 
-func QueryRuleByLanguage(db *gorm.DB, language consts.Language) ([]*schema.SyntaxFlowRule, error) {
+func QueryRuleByLanguage(db *gorm.DB, language ssaconfig.Language) ([]*schema.SyntaxFlowRule, error) {
 	var rules []*schema.SyntaxFlowRule
 	if err := db.Where("language = ?", language).Find(&rules).Error; err != nil {
 		return nil, err

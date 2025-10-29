@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -19,7 +20,7 @@ func Test_Express(t *testing.T) {
 		a #-> as $target
 		`, map[string][]string{
 			"target": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }
 
@@ -48,7 +49,7 @@ func Test_Stmt(t *testing.T) {
 		map[string][]string{
 			"b": {"2"},
 			"a": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO),
+		}, ssaapi.WithLanguage(ssaconfig.GO),
 	)
 }
 
@@ -81,6 +82,6 @@ func Test_Statement(t *testing.T) {
 		println(* #-> as $target)
 		`, map[string][]string{
 			"target": {"1", "2"},
-		}, ssaapi.WithLanguage(ssaapi.GO))
+		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }*/

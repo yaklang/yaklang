@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -221,7 +222,7 @@ func (s *OnlineClient) SaveSyntaxFlowRule(db *gorm.DB, rule ...*OnlineSyntaxFlow
 	for _, i := range rule {
 		y := &schema.SyntaxFlowRule{
 			IsBuildInRule: i.IsBuildInRule,
-			Language:      i.Language,
+			Language:      ssaconfig.Language(i.Language),
 			RuleName:      i.RuleName,
 			Title:         i.Title,
 			TitleZh:       i.TitleZh,

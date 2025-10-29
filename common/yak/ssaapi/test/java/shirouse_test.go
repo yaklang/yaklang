@@ -2,9 +2,11 @@ package java
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 //go:embed sample/shirouse.java
@@ -16,5 +18,5 @@ func TestShiroUseJava(t *testing.T) {
 			t.Fatal("getCred*() not found")
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -1311,7 +1311,7 @@ alert $sink5 for {
 		programName := uuid.NewString()
 		progNames = append(progNames, programName)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.GO), ssaapi.WithProgramName(programName))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.GO), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
@@ -1368,7 +1368,7 @@ alert $sink5 for {
 
 		programs, err := ssaapi.ParseProjectWithFS(
 			vf,
-			ssaapi.WithLanguage(consts.GO),
+			ssaapi.WithLanguage(ssaconfig.GO),
 			ssaapi.WithProgramName(programName),
 			ssaapi.WithReCompile(true),
 		)
@@ -1613,7 +1613,7 @@ func test1() {
 
 	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
-	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, client, programName, consts.GO)
+	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, client, programName, ssaconfig.GO)
 	defer cleanup()
 
 	// 执行所有扫描操作（在主测试函数中，确保所有子测试都能访问到结果）

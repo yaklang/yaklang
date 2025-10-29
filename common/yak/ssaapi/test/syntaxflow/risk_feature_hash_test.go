@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -218,7 +218,7 @@ alert $result for {
 			vf1.AddFile(tc.fileName1, tc.code1)
 
 			// 第一次扫描
-			programs1, err := ssaapi.ParseProjectWithFS(vf1, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName1))
+			programs1, err := ssaapi.ParseProjectWithFS(vf1, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName1))
 			require.NoError(t, err)
 			require.NotEmpty(t, programs1)
 			prog1 := programs1[0]
@@ -240,7 +240,7 @@ alert $result for {
 			vf2.AddFile(tc.fileName2, tc.code2)
 
 			// 第二次扫描
-			programs2, err := ssaapi.ParseProjectWithFS(vf2, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName2))
+			programs2, err := ssaapi.ParseProjectWithFS(vf2, ssaapi.WithLanguage(ssaconfig.Yak), ssaapi.WithProgramName(programName2))
 			require.NoError(t, err)
 			require.NotEmpty(t, programs2)
 			prog2 := programs2[0]

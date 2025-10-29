@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type Program struct {
@@ -49,7 +50,7 @@ func (p *Program) GetProgramKind() ssadb.ProgramKind {
 	return p.Program.ProgramKind
 }
 
-func (p *Program) GetLanguage() string {
+func (p *Program) GetLanguage() ssaconfig.Language {
 	return p.Program.Language
 }
 

@@ -9,13 +9,13 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -27,7 +27,7 @@ type SFScanRiskTestSuite struct {
 	ProgramName string
 	TestRisks   []SFScanTestRisk
 	TaskIDs     []string
-	Language    consts.Language
+	Language    ssaconfig.Language
 }
 
 // SFScanTestRisk 定义测试风险的结构
@@ -44,7 +44,7 @@ type SFScanRiskData struct {
 	Count int
 }
 
-func NewSFScanRiskTestSuite(t *testing.T, client ypb.YakClient, programName string, language consts.Language) (*SFScanRiskTestSuite, func()) {
+func NewSFScanRiskTestSuite(t *testing.T, client ypb.YakClient, programName string, language ssaconfig.Language) (*SFScanRiskTestSuite, func()) {
 	suite := &SFScanRiskTestSuite{
 		t:           t,
 		Client:      client,

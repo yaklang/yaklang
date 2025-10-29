@@ -14,12 +14,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -112,7 +112,7 @@ public class SQLI {
 	`)
 
 	progName := uuid.NewString()
-	prog, err := ssaapi.ParseProject(ssaapi.WithFileSystem(vf), ssaapi.WithLanguage(consts.JAVA), ssaapi.WithProgramName(progName))
+	prog, err := ssaapi.ParseProject(ssaapi.WithFileSystem(vf), ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithProgramName(progName))
 	require.NoError(t, err)
 
 	rule := `
@@ -260,7 +260,7 @@ func TestRiskImportAndExportWithDataFlow(t *testing.T) {
 	program := uuid.NewString()
 	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
-	suite, clean := ssatest.NewSFScanRiskTestSuite(t, client, program, consts.JAVA)
+	suite, clean := ssatest.NewSFScanRiskTestSuite(t, client, program, ssaconfig.JAVA)
 	defer clean()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("sqli.java", `package com.mycompany.myapp;
@@ -354,7 +354,7 @@ public interface UserMapper {
 			return value
 		})
 		risk := risks[0]
-		require.Equal(t, string(consts.JAVA), risk.GetLanguage())
+		require.Equal(t, string(ssaconfig.JAVA), risk.GetLanguage())
 		require.Greater(t, len(risk.DataFlowPaths), 0)
 		require.Equal(t, "MyBatis SQL 注入漏洞", risk.GetTitleVerbose())
 

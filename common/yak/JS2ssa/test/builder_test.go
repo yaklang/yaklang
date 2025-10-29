@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func ParseSSA(code string) (*ssaapi.Program, error) {
-	return ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+	return ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.JS))
 }
 
 func TestDemo1(t *testing.T) {

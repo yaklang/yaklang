@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -127,7 +128,7 @@ func TestCompileWithDatabase_Big(t *testing.T) {
 include `+strconv.Quote(filename)+`
 
 c("d")
-`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak))
+`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.Yak))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)
@@ -169,7 +170,7 @@ func TestCompileWithDatabase_MultiFile(t *testing.T) {
 include `+strconv.Quote(filepath)+`
 
 c("d")
-`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak))
+`, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaconfig.Yak))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	if err != nil {
 		panic(err)

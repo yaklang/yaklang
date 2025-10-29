@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -189,7 +190,7 @@ println(result)
 		require.Contains(t, param.String(), "b")
 		require.Contains(t, param.String(), "1")
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 func TestMethodCall(t *testing.T) {
 	//	t.Run("test phi method call", func(t *testing.T) {
@@ -210,7 +211,7 @@ func TestMethodCall(t *testing.T) {
 	//		ssatest.CheckPrintlnValue(code, []string{}, t)
 	//		//		ssatest.CheckSyntaxFlow(t, code, `FuncA() as $functionA
 	//		//FuncC() as $functionC
-	//		//`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.Yak))
+	//		//`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.Yak))
 	//	})
 	t.Run("sideEffect get callBy", func(t *testing.T) {
 		code := `
@@ -229,6 +230,6 @@ d()
 a(1)`
 		ssatest.CheckSyntaxFlow(t, code, `FuncC() as $functionC`, map[string][]string{
 			"functionC": {"side-effect(FreeValue-FuncC, a)(1)"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }

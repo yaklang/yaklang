@@ -2,6 +2,7 @@ package sfdb
 
 import (
 	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -154,7 +155,7 @@ func addGroupsForRule(db *gorm.DB, rule *schema.SyntaxFlowRule, needDefaultGroup
 		return utils.Errorf("add default group for rule failed:rule is empty")
 	}
 	if needDefaultGroup {
-		groups = append(groups, rule.Language)
+		groups = append(groups, string(rule.Language))
 		groups = append(groups, string(rule.Severity))
 		groups = append(groups, string(rule.Purpose))
 	}

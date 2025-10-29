@@ -25,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -37,7 +38,7 @@ func TestRealJava_PanicInMemberCall(t *testing.T) {
 	vf.AddFile("DynamicSecurityMetadataSource.java", DynamicSecurityMetadataSource)
 	ssatest.CheckWithFS(vf, t, func(prog ssaapi.Programs) error {
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestCodeCompile(t *testing.T) {
@@ -90,7 +91,7 @@ func TestCodeCompile(t *testing.T) {
 	start := time.Now()
 	prog, err := ssaapi.ParseProject(
 		ssaapi.WithFileSystem(filesys.NewRelLocalFs(path)),
-		ssaapi.WithLanguage(ssaapi.JAVA),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(progName),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			log.Errorf("DB--Process: %s, %.2f%%", msg, process*100)
@@ -111,7 +112,7 @@ func TestCodeCompile(t *testing.T) {
 		ssaprofile.Refresh()
 		_, err := ssaapi.ParseProject(
 			ssaapi.WithFileSystem(filesys.NewRelLocalFs(path)),
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProcess(func(msg string, process float64) {
 				log.Errorf("Mem-Process: %s, %.2f%%", msg, process*100)
 			}),
@@ -289,7 +290,7 @@ func TestA(t *testing.T) {
 	for _, opt := range []ssaapi.Option{
 		ssaapi.WithContext(ctx),
 		ssaapi.WithFileSystem(fs),
-		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithLanguage(ssaconfig.GO),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			log.Infof("Process: %s, %.2f%%", msg, process*100)
 		}),

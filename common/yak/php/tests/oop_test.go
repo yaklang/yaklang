@@ -3,11 +3,11 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -209,7 +209,7 @@ class MyClass {
 `
 		ssatest.CheckSyntaxFlow(t, code, `*myStaticMethod as $fun`, map[string][]string{
 			"fun": {"Function-MyClass.myStaticMethod"},
-		}, ssaapi.WithLanguage(consts.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -292,7 +292,7 @@ func TestOOP_var_member(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code,
 			`eval(* #-> * as $param)`,
 			map[string][]string{},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 		//ssatest.CheckPrintlnValue(code, []string{
 		//	"Undefined-$b.getA(valid)(make(A)) member[0]",
 		//	"Undefined-$b.getA(valid)(make(A)) member[side-effect(Parameter-$par, $this.a)]",
@@ -527,14 +527,14 @@ $c = new test;
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 
 		//todo: 这个测试有问题
 		//ssatest.CheckSyntaxFlowEx(t, code,
 		//	`print(* #-> * as $param)`,
 		//	false,
 		//	map[string][]string{"param": {"1"}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
+		//	ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("extends __destruct", func(t *testing.T) {
 		code := `<?php
@@ -552,11 +552,11 @@ $c->a = 1;
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 		//ssatest.CheckSyntaxFlow(t, code,
 		//	`eval(* #-> * as $param)`,
 		//	map[string][]string{"param": {`1`}},
-		//	ssaapi.WithLanguage(ssaapi.PHP))
+		//	ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -610,7 +610,7 @@ $engine = new $class();
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("class typehint", func(t *testing.T) {
 		code := `<?php
@@ -647,7 +647,7 @@ class test
 		ssatest.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test-function", func(t *testing.T) {
 		code := `<?php
@@ -677,7 +677,7 @@ new test();`
 		ssatest.CheckSyntaxFlow(t, code,
 			`exec(* #-> * as $param)`,
 			map[string][]string{},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("cls use other cls function", func(t *testing.T) {
 		code := `<?php
@@ -818,7 +818,7 @@ class a
 `
 		ssatest.CheckSyntaxFlow(t, code, `eval(* #-> as $param)`, map[string][]string{
 			"param": {`"file"`, `Undefined-input`},
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	t.Run("test oop construct", func(t *testing.T) {
@@ -832,7 +832,7 @@ class a{
 }
 $a = new a(2);
 println($a->a);`
-		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"2"}}, ssaapi.WithLanguage(ssaapi.PHP))
+		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"2"}}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test oop constructor", func(t *testing.T) {
 		code := `<?php
@@ -884,7 +884,7 @@ println($b->a);
 	//			"$param #{until: `<self> & $params`,include: `<self> & $params`}-> as $root;"+
 	//			`$root?{<dataflow(<<<CODE
 	//<self>?{opcode: call && !<self & $filter} as $__next__;
-	//CODE)>} as $low;`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	//CODE)>} as $low;`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.PHP))
 	//	})
 }
 
@@ -1013,7 +1013,7 @@ $c->a::bb(1);
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test blueprint loop", func(t *testing.T) {
 		code := `<?php
@@ -1032,7 +1032,7 @@ $a = new C();
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 
@@ -1052,5 +1052,5 @@ class StmComment extends StmBaseModel{
 }`
 	ssatest.CheckSyntaxFlow(t, code, `echo(* #-> as $sink)`, map[string][]string{
 		"sink": {"Undefined-_GET"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

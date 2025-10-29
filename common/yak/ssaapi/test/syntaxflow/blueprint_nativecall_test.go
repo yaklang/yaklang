@@ -1,9 +1,11 @@
 package syntaxflow
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestSF_NativeCall_Blueprint(t *testing.T) {
@@ -35,6 +37,6 @@ func TestSF_NativeCall_Blueprint(t *testing.T) {
 			"retD":  {"C"},
 			"retE":  {"A"},
 			"root1": {"A"},
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }

@@ -2,9 +2,11 @@ package tests
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 //go:embed smtp-demo.php
@@ -13,7 +15,7 @@ var phpCase string
 func TestSyntaxForClass(t *testing.T) {
 	ssatest.Check(t, phpCase, func(prog *ssaapi.Program) error {
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 
 func TestSyntaxForClass_SelfDoubleColon(t *testing.T) {
@@ -36,5 +38,5 @@ class SMTP
 }
 `, func(prog *ssaapi.Program) error {
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

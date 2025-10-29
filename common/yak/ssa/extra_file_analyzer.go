@@ -4,9 +4,9 @@ import (
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/consts"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type PreHandlerAnalyzer interface {
@@ -46,7 +46,7 @@ type Builder interface {
 	// create a new builder
 	BuildFromAST(FrontAST, *FunctionBuilder) error
 	FilterFile(string) bool
-	GetLanguage() consts.Language
+	GetLanguage() ssaconfig.Language
 	PreHandlerAnalyzer
 }
 

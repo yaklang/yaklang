@@ -1,9 +1,11 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestStatic(t *testing.T) {
@@ -29,7 +31,7 @@ class A{
     }
 }
 `
-	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaapi.PHP))
+	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
 func TestStatic2(t *testing.T) {
 	code := `<?php
@@ -41,5 +43,5 @@ class A{
 `
 	ssatest.CheckSyntaxFlow(t, code, `.post() as $sink`, map[string][]string{
 		"sink": {"Undefined-Request.post()"},
-	}, ssaapi.WithLanguage(ssaapi.PHP))
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"gotest.tools/v3/assert"
 )
@@ -60,7 +61,7 @@ spring.freemarker.suffix=.ftl
 			require.NoError(t, err)
 			assert.Equal(t, 1, sink.GetValues("a").Len())
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -103,7 +104,7 @@ public class FreeMarkerDemo {
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 func TestNativeCall_FreeMarkerXSS_WithDirfferentSuffix(t *testing.T) {
@@ -150,5 +151,5 @@ spring.freemarker.suffix=.html
 		sink := prog.SyntaxFlowChain("*Mapping.__ref__<getFunc><getReturns>?{<typeName>?{have:'String'}}<freeMarkerSink>  as  $a")
 		assert.Equal(t, 1, sink.Len())
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

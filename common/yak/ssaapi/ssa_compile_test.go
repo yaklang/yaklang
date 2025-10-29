@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func Test_CompileError(t *testing.T) {
@@ -130,7 +131,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 		programID := uuid.NewString()
 		ctx, cancel := context.WithCancel(context.Background())
 		_, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(ssaapi.JAVA),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
 			ssaapi.WithProgramName(programID),
 			ssaapi.WithProcess(func(msg string, process float64) {
 				if process >= 0.5 {

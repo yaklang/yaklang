@@ -2,13 +2,16 @@ package java
 
 import (
 	_ "embed"
+
 	"github.com/yaklang/yaklang/common/log"
+
+	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
-	"time"
 )
 
 //go:embed sample/fastjson/ParserConfig.java
@@ -238,7 +241,7 @@ public class UmsAdminController {
 //			dbCost = time.Since(start)
 //		}
 //		return nil
-//	}, ssaapi.WithLanguage(ssaapi.JAVA))
+//	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 //	ssa.ShowDatabaseCacheCost()
 //	log.Info("ast cost: ", astCost)
 //	log.Info("mem cost: ", memCost)
@@ -260,7 +263,7 @@ func TestBigJavaFile2(t *testing.T) {
 			dbCost = time.Since(start)
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	ssa.ShowDatabaseCacheCost()
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)
@@ -285,7 +288,7 @@ func TestBigJavaFile3(t *testing.T) {
 			dbCost = time.Since(start)
 		}
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	ssa.ShowDatabaseCacheCost()
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)

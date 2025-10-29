@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -148,7 +148,7 @@ CODE
 			source := vals.GetValues("vul")
 			require.Contains(t, source.String(), `Parameter-socket`)
 			return nil
-		}, ssaapi.WithLanguage(consts.JAVA))
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
@@ -194,7 +194,7 @@ b(cc)
 
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"target": {"12344"},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 
 	})
 
@@ -206,6 +206,6 @@ b(cc)
 `
 		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 			"target": {},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }

@@ -1,9 +1,11 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -17,7 +19,7 @@ function dump($a){}
 		`, func(prog *ssaapi.Program) error {
 			prog.Show()
 			return nil
-		}, ssaapi.WithLanguage(ssaapi.PHP))
+		}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("array assign", func(t *testing.T) {
 		code := `<?php
@@ -27,7 +29,7 @@ $files[] = array(
 );
 println($files);
 `
-		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"make(any)", "Undefined-substr", "Undefined-$path2", "Undefined-a", "Undefined-filemtime"}}, ssaapi.WithLanguage(ssaapi.PHP))
+		test.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{"param": {"make(any)", "Undefined-substr", "Undefined-$path2", "Undefined-a", "Undefined-filemtime"}}, ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 
 	//todo:

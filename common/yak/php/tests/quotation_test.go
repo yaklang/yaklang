@@ -1,9 +1,11 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestDouble_quotation(t *testing.T) {
@@ -21,7 +23,7 @@ $a = "1";
 println("$a"."a"."b");`
 		ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`,
 			map[string][]string{"param": {`"1"`, `"a"`, `"b"`}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 	t.Run("test exec quotation $", func(t *testing.T) {
 		code := `<?php
@@ -35,7 +37,7 @@ println("$a"."a"."b");`
 exec(* #-> * as $param)
 `,
 			map[string][]string{"param": {`"whoami"`}},
-			ssaapi.WithLanguage(ssaapi.PHP))
+			ssaapi.WithLanguage(ssaconfig.PHP))
 	})
 }
 func TestStringPart(t *testing.T) {

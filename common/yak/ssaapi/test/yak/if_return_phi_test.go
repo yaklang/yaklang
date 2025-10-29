@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -21,5 +22,5 @@ check $result;
 
 	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
 		"result": {"phi(a)[Undefined-a,1]"},
-	}, ssaapi.WithLanguage(ssaapi.Yak))
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }

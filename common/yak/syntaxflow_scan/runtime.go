@@ -6,10 +6,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
@@ -76,7 +76,7 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	if !m.Config.GetScanIgnoreLanguage() {
-		if rule.Language != string(consts.General) && string(rule.Language) != prog.GetLanguage() {
+		if rule.Language != ssaconfig.General && rule.Language != prog.GetLanguage() {
 			m.markRuleSkipped()
 			return
 		}

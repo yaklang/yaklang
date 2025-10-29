@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -17,7 +16,7 @@ func TestBuildInRule(t *testing.T) {
 			URL:    "https://github.com/digininja/DVWA",
 			Branch: "master",
 		},
-		Language:        string(consts.PHP),
+		Language:        string(ssaconfig.PHP),
 		RequiredExclude: true,
 		RiskInfo: []*RiskInfo{
 			{

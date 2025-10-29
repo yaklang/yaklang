@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 
 	"github.com/google/uuid"
@@ -15,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -165,7 +165,7 @@ $directParam + $indirectParam + $getInputStream +$getSession as $params;
 		results.Show()
 		require.Greater(t, len(results.GetValues("params")), 7)
 		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 
 //go:embed syntaxflow_include_test.lib.sf
@@ -243,7 +243,7 @@ func TestFS_RuleUpdate(t *testing.T) {
 func Test_Include_HitCache(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
-	prog, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.JAVA))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog)
@@ -298,7 +298,7 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 		$check<include('%s')> as $target`, libName)
 
 		programName := uuid.NewString()
-		prog, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(consts.Yak))
+		prog, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.Yak))
 		defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
 		require.NoError(t, err)
@@ -341,7 +341,7 @@ func TestSF_NativeCall_Include_Input_Value(t *testing.T) {
 func TestSF_Include_Cache_For_Recompile(t *testing.T) {
 	programName := uuid.NewString()
 	vfs := createTestVFS()
-	prog1, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaapi.JAVA))
+	prog1, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithProgramName(programName), ssaapi.WithLanguage(ssaconfig.JAVA))
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	require.NoError(t, err)
 	require.NotNil(t, prog1)

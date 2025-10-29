@@ -3,6 +3,7 @@ package ssadb
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type ProgramKind string
@@ -27,7 +28,7 @@ type IrProgram struct {
 	// if the program contains many language,
 	// use comma to separate them.
 	// e.g. "yak,java,php"
-	Language string `json:"language" gorm:"index"`
+	Language ssaconfig.Language `json:"language" gorm:"index"`
 
 	// application / library
 	ProgramKind ProgramKind `json:"program_kind" gorm:"index"`

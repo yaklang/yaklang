@@ -13,6 +13,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -37,15 +38,7 @@ func GetAllSFPurposeTypes() []string {
 }
 
 func GetAllSFSupportLanguage() []string {
-	return []string{
-		"yak",
-		"java",
-		"javaScript",
-		"php",
-		"golang",
-		"c",
-		"general", // 通用规则
-	}
+	return ssaconfig.GetAllSupportedLanguages()
 }
 
 const (
@@ -202,7 +195,7 @@ type SyntaxFlowRule struct {
 
 	// Language is the language of the rule.
 	// if the rule is not set, all languages will be used.
-	Language string
+	Language ssaconfig.Language
 
 	RuleName    string `gorm:"unique_index"`
 	Title       string
@@ -320,7 +313,7 @@ func (s *SyntaxFlowRule) ToGRPCModel() *ypb.SyntaxFlowRule {
 	sfRule := &ypb.SyntaxFlowRule{
 		Id:            int64(s.ID),
 		IsBuildInRule: s.IsBuildInRule,
-		Language:      s.Language,
+		Language:      string(s.Language),
 		RuleName:      s.RuleName,
 		Title:         s.Title,
 		TitleZh:       s.TitleZh,

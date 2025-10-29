@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func CheckResultWithFS(t *testing.T, fs filesys_interface.FileSystem, rule string, handler func(*ssaapi.SyntaxFlowResult), opt ...ssaapi.Option) {
@@ -173,7 +174,7 @@ func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]st
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
 func CheckSyntaxFlowPrintWithPhp(t *testing.T, code string, wants []string) {
-	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaapi.Option{ssaapi.WithLanguage(ssaapi.PHP)}, nil)
+	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaapi.Option{ssaapi.WithLanguage(ssaconfig.PHP)}, nil)
 }
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)

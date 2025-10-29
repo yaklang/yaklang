@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -164,7 +165,7 @@ public class SysDeptController extends BaseController
 $Param #-> as $ParamTopDef
 	`, map[string][]string{
 		"ParamTopDef": {"Parameter-source"},
-	}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+	}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 	)
 }
 
@@ -233,7 +234,7 @@ class User {
 	$func() as $call
 	`, map[string][]string{
 			"call": {"ia.get", "iai.get"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -243,7 +244,7 @@ class User {
 		target --> as $target
 	`, map[string][]string{
 			"target": {"func0", "func1"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -257,7 +258,7 @@ class User {
 			"interfaceTarget": {"11", "22"},
 			"impl1Target":     {"11"},
 			"impl2Target":     {"22"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 	// form bottom to top
@@ -267,7 +268,7 @@ class User {
 		$func(* #-> ?{opcode: const} as $para) as $call
 		`, map[string][]string{
 			"para": {"0", "1", "2"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 
@@ -281,7 +282,7 @@ class User {
 		`, map[string][]string{
 			"para1": {"1", "0"},
 			"para2": {"2", "0"},
-		}, true, ssaapi.WithLanguage(ssaapi.JAVA),
+		}, true, ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
 }
@@ -302,5 +303,5 @@ class B{
 	ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`,
 		map[string][]string{},
 		false,
-		ssaapi.WithLanguage(ssaapi.JAVA))
+		ssaapi.WithLanguage(ssaconfig.JAVA))
 }

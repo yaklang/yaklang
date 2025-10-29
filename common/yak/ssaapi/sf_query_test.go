@@ -5,10 +5,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestSFSave(t *testing.T) {
@@ -17,7 +17,7 @@ func TestSFSave(t *testing.T) {
 println(123)
 	`
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(progName),
 	)
 	defer func() {
@@ -45,7 +45,7 @@ func TestSFQueryWithCache(t *testing.T) {
 println(123)
 	`
 	prog, err := ssaapi.Parse(code,
-		ssaapi.WithLanguage(consts.Yak),
+		ssaapi.WithLanguage(ssaconfig.Yak),
 		ssaapi.WithProgramName(progName),
 	)
 	defer func() {
