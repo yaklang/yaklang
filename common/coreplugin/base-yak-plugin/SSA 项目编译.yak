@@ -16,7 +16,17 @@ languages = cli.StringSlice("language",
     cli.setSelectOption("C", "c"),
     cli.setRequired(true)
 )
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**"))
+excludeFile := cli.String(
+    "excludeFile", 
+    cli.setVerboseName("排除文件/文件夹"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**"), 
+)
+
+projectName := cli.String("projectName",
+    cli.setVerboseName("项目名称"),
+    cli.setHelp("从一个项目中编译多个程序时使用。"),
+)
 
 info = cli.Json("info",
     cli.setVerboseName("项目信息"),
@@ -369,6 +379,7 @@ opts = [
     ssa.withPeepholeSize(peepholeSize),
     ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
     ssa.withConcurrency(concurrency),
+    ssa.withProjectName(projectName),
 ]
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))
