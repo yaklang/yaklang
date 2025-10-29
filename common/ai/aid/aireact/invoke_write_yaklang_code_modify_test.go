@@ -37,6 +37,19 @@ func mockedYaklangWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon.AI
 		return rsp, nil
 	}
 
+	// Handle compress search results: extract-ranked-lines
+	if utils.MatchAllOfSubString(prompt, "extract-ranked-lines", "ranges", "rank", "reason") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "extract-ranked-lines",
+  "ranges": [
+    {"range": "1-3", "rank": 1, "reason": "Test code"}
+  ]
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
