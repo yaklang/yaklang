@@ -43,52 +43,16 @@ func GetGlobalProxyRulesConfig() (*ypb.GlobalProxyRulesConfig, error) {
 	if err := db.Find(&endpoints).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
-	idByInternal := make(map[uint]string, len(endpoints))
 	for _, endpoint := range endpoints {
 		cfg.Endpoints = append(cfg.Endpoints, endpoint.ToProto())
-		idByInternal[endpoint.ID] = endpoint.ExternalID
 	}
 
 	var routes []schema.ProxyRoute
 	if err := db.Find(&routes).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
-	if len(routes) == 0 {
-		return cfg, nil
-	}
-	routeIDs := lo.Map(routes, func(item schema.ProxyRoute, _ int) uint {
-		return item.ID
-	})
-
-	var patterns []schema.ProxyRoutePattern
-	if err := db.Where("route_id IN (?)", routeIDs).Find(&patterns).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
-		return nil, err
-	}
-	patternsByRoute := make(map[uint][]string, len(routeIDs))
-	for _, pattern := range patterns {
-		normalized := pattern.NormalizedPattern()
-		if normalized == "" {
-			continue
-		}
-		patternsByRoute[pattern.RouteID] = append(patternsByRoute[pattern.RouteID], normalized)
-	}
-
-	var bindings []schema.ProxyRouteEndpoint
-	if err := db.Where("route_id IN (?)", routeIDs).Find(&bindings).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
-		return nil, err
-	}
-	endpointsByRoute := make(map[uint][]string, len(routeIDs))
-	for _, bind := range bindings {
-		if externalID, ok := idByInternal[bind.EndpointID]; ok {
-			endpointsByRoute[bind.RouteID] = append(endpointsByRoute[bind.RouteID], externalID)
-		}
-	}
-
 	for _, route := range routes {
-		cfg.Routes = append(cfg.Routes, route.ToProto(
-			lo.Uniq(patternsByRoute[route.ID]),
-			lo.Uniq(endpointsByRoute[route.ID]),
-		))
+		cfg.Routes = append(cfg.Routes, route.ToProto())
 	}
 
 	return cfg, nil
@@ -162,13 +126,11 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 		})
 	}
 
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Where("1 = 1").Delete(&schema.ProxyRouteEndpoint{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Unscoped().Where("1 = 1").Delete(&schema.ProxyRoutePattern{}).Error; err != nil {
-			return err
-		}
+	tx := db.Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	err := func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("1 = 1").Delete(&schema.ProxyRoute{}).Error; err != nil {
 			return err
 		}
@@ -176,17 +138,15 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 			return err
 		}
 
-		endpointInternalIDs := make(map[string]uint, len(normalized.Endpoints))
 		for _, endpoint := range normalized.Endpoints {
 			model := &schema.ProxyEndpoint{
 				ExternalID: endpoint.GetId(),
 				Name:       endpoint.GetName(),
-				Url:        endpoint.GetUrl(),
+				URL:        endpoint.GetUrl(),
 			}
 			if err := tx.Create(model).Error; err != nil {
 				return err
 			}
-			endpointInternalIDs[endpoint.GetId()] = model.ID
 		}
 
 		for _, route := range normalized.Routes {
@@ -194,43 +154,21 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 				ExternalID: route.GetId(),
 				Name:       route.GetName(),
 			}
+			model.UpdatePatterns(route.GetPatterns())
+			model.UpdateEndpointIDs(route.GetEndpointIds())
 			if err := tx.Create(model).Error; err != nil {
 				return err
 			}
-
-			for _, pattern := range route.GetPatterns() {
-				pattern = strings.TrimSpace(pattern)
-				if pattern == "" {
-					continue
-				}
-				patternModel := &schema.ProxyRoutePattern{
-					RouteID: model.ID,
-					Pattern: pattern,
-				}
-				if err := tx.Create(patternModel).Error; err != nil {
-					return err
-				}
-			}
-
-			for _, endpointID := range route.GetEndpointIds() {
-				internalID, ok := endpointInternalIDs[endpointID]
-				if !ok {
-					continue
-				}
-				bind := &schema.ProxyRouteEndpoint{
-					RouteID:    model.ID,
-					EndpointID: internalID,
-				}
-				if err := tx.Create(bind).Error; err != nil {
-					return err
-				}
-			}
 		}
 		return nil
-	})
+	}(tx)
 
 	if err != nil {
+		tx.Rollback()
 		return nil, err
+	}
+	if commitErr := tx.Commit().Error; commitErr != nil {
+		return nil, commitErr
 	}
 
 	return normalized, nil

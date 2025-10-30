@@ -59510,15 +59510,16 @@ type MITMV2Request struct {
 	SetPluginMode   bool     `protobuf:"varint,38,opt,name=SetPluginMode,proto3" json:"SetPluginMode,omitempty"`
 	InitPluginNames []string `protobuf:"bytes,39,rep,name=InitPluginNames,proto3" json:"InitPluginNames,omitempty"`
 	// mitm manual hijack message
-	SetAutoForward      bool                              `protobuf:"varint,40,opt,name=SetAutoForward,proto3" json:"SetAutoForward,omitempty"`
-	AutoForwardValue    bool                              `protobuf:"varint,41,opt,name=AutoForwardValue,proto3" json:"AutoForwardValue,omitempty"`
-	RecoverManualHijack bool                              `protobuf:"varint,42,opt,name=RecoverManualHijack,proto3" json:"RecoverManualHijack,omitempty"`
-	ManualHijackControl bool                              `protobuf:"varint,43,opt,name=ManualHijackControl,proto3" json:"ManualHijackControl,omitempty"`
-	ManualHijackMessage *SingleManualHijackControlMessage `protobuf:"bytes,44,opt,name=ManualHijackMessage,proto3" json:"ManualHijackMessage,omitempty"`
-	RecoverContext      bool                              `protobuf:"varint,45,opt,name=RecoverContext,proto3" json:"RecoverContext,omitempty"`       // recover mitm context plugin config...
-	PluginConcurrency   int64                             `protobuf:"varint,47,opt,name=PluginConcurrency,proto3" json:"PluginConcurrency,omitempty"` // 设置插件并发数，默认30
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	SetAutoForward        bool                              `protobuf:"varint,40,opt,name=SetAutoForward,proto3" json:"SetAutoForward,omitempty"`
+	AutoForwardValue      bool                              `protobuf:"varint,41,opt,name=AutoForwardValue,proto3" json:"AutoForwardValue,omitempty"`
+	RecoverManualHijack   bool                              `protobuf:"varint,42,opt,name=RecoverManualHijack,proto3" json:"RecoverManualHijack,omitempty"`
+	ManualHijackControl   bool                              `protobuf:"varint,43,opt,name=ManualHijackControl,proto3" json:"ManualHijackControl,omitempty"`
+	ManualHijackMessage   *SingleManualHijackControlMessage `protobuf:"bytes,44,opt,name=ManualHijackMessage,proto3" json:"ManualHijackMessage,omitempty"`
+	RecoverContext        bool                              `protobuf:"varint,45,opt,name=RecoverContext,proto3" json:"RecoverContext,omitempty"`       // recover mitm context plugin config...
+	PluginConcurrency     int64                             `protobuf:"varint,47,opt,name=PluginConcurrency,proto3" json:"PluginConcurrency,omitempty"` // 设置插件并发数，默认30
+	DownstreamProxyRuleId string                            `protobuf:"bytes,48,opt,name=DownstreamProxyRuleId,proto3" json:"DownstreamProxyRuleId,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *MITMV2Request) Reset() {
@@ -59878,6 +59879,13 @@ func (x *MITMV2Request) GetPluginConcurrency() int64 {
 		return x.PluginConcurrency
 	}
 	return 0
+}
+
+func (x *MITMV2Request) GetDownstreamProxyRuleId() string {
+	if x != nil {
+		return x.DownstreamProxyRuleId
+	}
+	return ""
 }
 
 type MITMV2Response struct {
@@ -66733,7 +66741,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\n" +
 	" \x01(\v2\x15.ypb.LocalModelStatusR\x06Status\"P\n" +
 	"\x1fGetSupportedLocalModelsResponse\x12-\n" +
-	"\x06Models\x18\x01 \x03(\v2\x15.ypb.LocalModelConfigR\x06Models\"\xc1\x10\n" +
+	"\x06Models\x18\x01 \x03(\v2\x15.ypb.LocalModelConfigR\x06Models\"\xf7\x10\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -66788,7 +66796,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13ManualHijackControl\x18+ \x01(\bR\x13ManualHijackControl\x12W\n" +
 	"\x13ManualHijackMessage\x18, \x01(\v2%.ypb.SingleManualHijackControlMessageR\x13ManualHijackMessage\x12&\n" +
 	"\x0eRecoverContext\x18- \x01(\bR\x0eRecoverContext\x12,\n" +
-	"\x11PluginConcurrency\x18/ \x01(\x03R\x11PluginConcurrency\"\xa5\x05\n" +
+	"\x11PluginConcurrency\x18/ \x01(\x03R\x11PluginConcurrency\x124\n" +
+	"\x15DownstreamProxyRuleId\x180 \x01(\tR\x15DownstreamProxyRuleId\"\xa5\x05\n" +
 	"\x0eMITMV2Response\x12\x1e\n" +
 	"\n" +
 	"JustFilter\x18\x01 \x01(\bR\n" +
