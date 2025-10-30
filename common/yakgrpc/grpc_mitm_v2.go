@@ -127,7 +127,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
-	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, error) {
+	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
 		downstreamProxy = strings.Trim(downstreamProxy, `":`)
@@ -169,7 +169,57 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 			proxys = append(proxys, proxyUrl.String())
 		}
-		return proxys, nil
+		ruleID := strings.TrimSpace(request.GetDownstreamProxyRuleId())
+		var routeMap map[string][]string
+		if ruleID != "" {
+			cfg, err := yakit.GetGlobalProxyRulesConfig()
+			if err != nil {
+				return nil, nil, err
+			}
+			endpointURLByID := make(map[string]string, len(cfg.GetEndpoints()))
+			for _, endpoint := range cfg.GetEndpoints() {
+				if endpoint == nil {
+					continue
+				}
+				url := strings.TrimSpace(endpoint.GetUrl())
+				if url == "" {
+					continue
+				}
+				endpointURLByID[endpoint.GetId()] = url
+			}
+			var rule *ypb.ProxyRoute
+			for _, r := range cfg.GetRoutes() {
+				if r != nil && strings.EqualFold(r.GetId(), ruleID) {
+					rule = r
+					break
+				}
+			}
+			if rule == nil {
+				feedbackToUser(fmt.Sprintf("未找到代理规则 / proxy rule not found: %s", ruleID))
+			} else {
+				ruleProxies := make([]string, 0, len(rule.GetEndpointIds()))
+				for _, endpointID := range rule.GetEndpointIds() {
+					if url := strings.TrimSpace(endpointURLByID[endpointID]); url != "" {
+						ruleProxies = append(ruleProxies, url)
+					}
+				}
+				ruleProxies = lo.Uniq(ruleProxies)
+				if len(ruleProxies) > 0 {
+					for _, pattern := range rule.GetPatterns() {
+						pattern = strings.TrimSpace(pattern)
+						if pattern == "" {
+							continue
+						}
+						if routeMap == nil {
+							routeMap = make(map[string][]string)
+						}
+						routeMap[pattern] = append(routeMap[pattern], ruleProxies...)
+					}
+				}
+			}
+		}
+		proxys = lo.Uniq(proxys)
+		return proxys, routeMap, nil
 	}
 	var (
 		host                        = "127.0.0.1"
@@ -193,7 +243,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		pluginConcurrency = 20
 	}
 
-	downstreamProxy, err := getDownstreamProxy(firstReq)
+	downstreamProxy, downstreamProxyRoutes, err := getDownstreamProxy(firstReq)
 	if err != nil {
 		return err
 	}
@@ -290,8 +340,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		mitmPluginCallerGlobal = nil
 	}()
 
-	if downstreamProxy != nil {
-		mitmPluginCaller.SetProxy(downstreamProxy...)
+	allProxies := append([]string{}, downstreamProxy...)
+	for _, proxies := range downstreamProxyRoutes {
+		allProxies = append(allProxies, proxies...)
+	}
+	allProxies = lo.Uniq(allProxies)
+	if len(allProxies) > 0 {
+		mitmPluginCaller.SetProxy(allProxies...)
 	}
 
 	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
@@ -503,17 +558,29 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			// 运行时更新代理
 			if reqInstance.GetSetDownstreamProxy() {
-				downstreamProxy, err := getDownstreamProxy(reqInstance)
+				downstreamProxy, downstreamProxyRoutes, err := getDownstreamProxy(reqInstance)
 				if err == nil && mServer != nil {
 					err = mServer.Configure(
 						crep.MITM_SetDownstreamProxy(downstreamProxy...),
+						crep.MITM_SetDownstreamProxyRoutes(downstreamProxyRoutes),
 					)
 					if err != nil {
 						feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
 						log.Errorf("set downstream proxy failed: %s", err)
 					}
-					mitmPluginCaller.SetProxy(downstreamProxy...)
-					feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
+					allProxies := append([]string{}, downstreamProxy...)
+					for _, proxies := range downstreamProxyRoutes {
+						allProxies = append(allProxies, proxies...)
+					}
+					allProxies = lo.Uniq(allProxies)
+					if len(allProxies) > 0 {
+						mitmPluginCaller.SetProxy(allProxies...)
+					}
+					if len(downstreamProxyRoutes) > 0 {
+						feedbackToUser(fmt.Sprintf("设置代理规则成功 / set downstream proxy routes successful: %v", reqInstance.GetDownstreamProxyRuleId()))
+					} else {
+						feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
+					}
 				}
 				continue
 			}
@@ -1395,6 +1462,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
+		crep.MITM_SetDownstreamProxyRoutes(downstreamProxyRoutes),
 		crep.MITM_SetHTTPResponseHijackRaw(handleHijackResponse),
 		crep.MITM_SetHTTPRequestHijackRaw(handleHijackRequest),
 		crep.MITM_SetWebsocketRequestHijackRaw(handleHijackWsRequest),
