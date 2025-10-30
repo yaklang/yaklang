@@ -11,6 +11,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+type ContextProviderEntry struct{
+	Name     string
+	Provider ContextProvider
+	Traced   bool
+}
+
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
 
 type ContextProviderManager struct {
