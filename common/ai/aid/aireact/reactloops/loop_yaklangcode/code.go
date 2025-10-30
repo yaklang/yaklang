@@ -3,10 +3,13 @@ package loop_yaklangcode
 import (
 	"bytes"
 	_ "embed"
+	"os"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -46,6 +49,54 @@ func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
 
 	log.Infof("document searcher created successfully from: %s", zipPath)
 	return searcher
+}
+
+func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath string) (*rag.RAGSystem, error) {
+	path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb-rag")
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
+	}
+	// 集合不存在则导入
+	if !rag.CollectionIsExists(db, collectionName) {
+		err = rag.ImportRAGFromFile(path, rag.WithCollectionName(collectionName))
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to import rag collection")
+		}
+	}
+	// 集合存在则检查版本
+	if !utils.FileExists(aikbPath) {
+		return rag.Get(collectionName, rag.WithDB(db))
+	}
+	file, err := os.OpenFile(aikbPath, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to open aikb file")
+	}
+	defer file.Close()
+	ragData, err := rag.LoadRAGFileHeader(file)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to load rag file header")
+	}
+
+	ragData
+
+	collectionInfo, err := yakit.GetRAGCollectionInfoByName(db, collectionName)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to get rag collection info")
+	}
+	collectionInfo.
+		err = rag.ImportRAGFromFile(path, rag.WithCollectionName(collectionName))
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to import rag collection")
+	}
+	if !rag.CollectionIsExists(db, collectionName) {
+		return nil, utils.Errorf("rag collection %s not found", collectionName)
+	}
+	ragSystem, err := rag.LoadCollection(db, collectionName)
+	if err != nil {
+		log.Warnf("failed to load rag collection: %v", err)
+		return nil, utils.Wrap(err, "failed to load rag collection")
+	}
+	return ragSystem
 }
 
 //go:embed prompts/persistent_instruction.txt

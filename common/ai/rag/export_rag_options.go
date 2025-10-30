@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -23,9 +24,16 @@ type RAGExportConfig struct {
 	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
 	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
 
+	SerialVersionUID string // 序列化版本号（导入时使用）
 }
 
 type RAGExportOptionFunc func(*RAGExportConfig)
+
+func WithSerialVersionUID(version string) RAGExportOptionFunc {
+	return func(opts *RAGExportConfig) {
+		opts.SerialVersionUID = version
+	}
+}
 
 // 通用选项
 func WithContext(ctx context.Context) RAGExportOptionFunc {
@@ -105,6 +113,7 @@ func NewRAGConfig(opts ...RAGExportOptionFunc) *RAGExportConfig {
 		NoHNSWIndex:       false,
 		RebuildHNSWIndex:  false,
 		OverwriteExisting: false,
+		SerialVersionUID:  uuid.NewString(),
 		DB:                consts.GetGormProfileDatabase(),
 	}
 	for _, opt := range opts {

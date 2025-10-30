@@ -3,6 +3,14 @@ description: "Third-party binary tools configuration"
 baseurl: "https://oss-qn.yaklang.com"
 
 binaries:
+  - name: "yaklang-aikb-rag"
+    description: "Yaklang AIKB RAG - A comprehensive knowledge base for AI"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/ai-knowledge-base/rag/yaklang-aikb.rag"
+        bin_path: "yaklang-aikb.rag"
   - name: "yaklang-aikb"
     description: "Yaklang AIKB - A comprehensive knowledge base for AI"
     version: "latest"
