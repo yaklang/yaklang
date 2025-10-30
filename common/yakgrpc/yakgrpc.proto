@@ -8238,6 +8238,7 @@ message MITMV2Request{
 
   bool RecoverContext = 45; // recover mitm context plugin config...
   int64 PluginConcurrency = 47; // 设置插件并发数，默认30
+  string DownstreamProxyRuleId = 48;
 
 }
 
