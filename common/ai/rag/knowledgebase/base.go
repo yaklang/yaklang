@@ -2,6 +2,8 @@ package knowledgebase
 
 import (
 	"fmt"
+	"slices"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
@@ -31,6 +33,10 @@ func AutoMigrate(db *gorm.DB) error {
 
 // NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
 func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
+	defaultOpts := []any{rag.WithLazyLoadEmbeddingClient()}
+	newOpts := slices.Clone(opts)
+	newOpts = append(defaultOpts, opts...)
+	opts = newOpts
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}
@@ -66,7 +72,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		}
 
 		// 创建 RAG Collection
-		ragSystem, err := rag.CreateCollection(db, name, description, append(opts, rag.WithLazyLoadEmbeddingClient())...)
+		ragSystem, err := rag.CreateCollection(db, name, description, opts...)
 		if err != nil {
 			// 如果 RAG 创建失败，删除已创建的 KnowledgeBaseInfo
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -85,7 +91,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 
 	// 如果知识库信息存在但 RAG Collection 不存在，创建 RAG Collection
 	if !needCreateInfo && !collectionExists {
-		ragSystem, err := rag.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, append(opts, rag.WithLazyLoadEmbeddingClient())...)
+		ragSystem, err := rag.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, opts...)
 		if err != nil {
 			return nil, utils.Errorf("创建RAG集合失败: %v", err)
 		}
@@ -114,7 +120,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 	}
 
 	// 如果都存在，直接加载
-	ragSystem, err := rag.LoadCollection(db, name)
+	ragSystem, err := rag.LoadCollection(db, name, opts...)
 	if err != nil {
 		return nil, utils.Errorf("加载RAG集合失败: %v", err)
 	}
@@ -191,7 +197,7 @@ func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, e
 	}
 
 	// 加载 RAG 系统
-	ragSystem, err := rag.CreateOrLoadCollection(db, name, "")
+	ragSystem, err := rag.CreateOrLoadCollection(db, name, "", opts...)
 	if err != nil {
 		return nil, utils.Errorf("加载知识库失败: %v", err)
 	}

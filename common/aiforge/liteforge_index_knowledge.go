@@ -2,6 +2,9 @@ package aiforge
 
 import (
 	_ "embed"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"strings"
-	"sync"
 )
 
 //go:embed liteforge_prompt/knowledge_index_build.txt
@@ -59,10 +60,10 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) (<-c
 	return _buildIndex(analyzeResult, option...)
 }
 
-func _buildIndex(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	refineConfig := NewRefineConfig(option...)
+func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType, options...)
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
@@ -80,7 +81,7 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *s
 			buildWg.Add(1)
 			go func() {
 				defer buildWg.Done()
-				entries, err := BuildIndexFormAnalyzeResult(res, option...)
+				entries, err := BuildIndexFormAnalyzeResult(res, options...)
 				if err != nil {
 					log.Errorf("failed to build index from analyze result: %v", err)
 					return
