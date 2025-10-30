@@ -2,10 +2,11 @@ package aibp
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/ai/aid"
+
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -30,8 +31,8 @@ func TestSmart(t *testing.T) {
 }
 `},
 		},
-		aid.WithDebugPrompt(true),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
+		aicommon.WithDebugPrompt(true),
+		aicommon.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)

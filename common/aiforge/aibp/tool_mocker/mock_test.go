@@ -20,7 +20,7 @@ func init() {
 func TestGetSuggestions(t *testing.T) {
 	mockServer := NewAiToolMockServer(aispec.WithDebugStream(true))
 	ctx := context.Background()
-	suggestions, err := mockServer.QueryToolSuggestion(ctx, "查询dns信息", aid.WithDebugPrompt(true))
+	suggestions, err := mockServer.QueryToolSuggestion(ctx, "查询dns信息", aicommon.WithDebugPrompt(true))
 	if err != nil {
 		t.Fatal(err)
 		return

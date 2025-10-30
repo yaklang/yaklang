@@ -3,7 +3,7 @@ package aibp
 import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -21,7 +21,7 @@ func TestFreeStyle(t *testing.T) {
 		{
 			Key: "before_cursor", Value: "你好，我认为在具体性上",
 		},
-	}, aid.WithAgreeYOLO(true), aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
+	}, aicommon.WithAgreeYOLO(true), aicommon.WithAICallback(aiforge.GetOpenRouterAICallback()))
 	if err != nil {
 		t.Fatal(err)
 		return

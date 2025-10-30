@@ -180,15 +180,13 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
-		opts = append(opts, aicommon.WithResultHandler(func(config *aicommon.Config) {
-			memory := aid.GetDefaultMemory()
-			memory.SetTimelineInstance(config.Timeline)
-			prompt, err := f.renderResultPrompt(memory)
+		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
+			prompt, err := f.renderResultPrompt(cod.Memory)
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
 			}
-
+			config := cod.Config
 			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt))
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result failed: %v", err))

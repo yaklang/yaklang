@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 
@@ -91,7 +92,7 @@ func TestForgeFactory_Query(t *testing.T) {
 
 	t.Run("Query with keyword filter", func(t *testing.T) {
 		// 使用我们创建的测试数据的关键词进行搜索
-		forges, err := factory.Query(ctx, WithForgeFilter_Keyword(testForgeName))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Keyword(testForgeName))
 		assert.NoError(t, err, "Query with keyword should not return error")
 		assert.NotEmpty(t, forges, "should return forges matching keyword")
 
@@ -107,15 +108,15 @@ func TestForgeFactory_Query(t *testing.T) {
 	})
 
 	t.Run("Query with limit", func(t *testing.T) {
-		forges, err := factory.Query(ctx, WithForgeFilter_Limit(5))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Limit(5))
 		assert.NoError(t, err, "Query with limit should not return error")
 		assert.LessOrEqual(t, len(forges), 5, "should respect the limit")
 	})
 
 	t.Run("Query with keyword and limit", func(t *testing.T) {
 		forges, err := factory.Query(ctx,
-			WithForgeFilter_Keyword(testForgeName),
-			WithForgeFilter_Limit(10))
+			aicommon.WithForgeFilter_Keyword(testForgeName),
+			aicommon.WithForgeFilter_Limit(10))
 		assert.NoError(t, err, "Query with multiple filters should not return error")
 
 		// 应该能找到我们的测试数据
@@ -264,7 +265,7 @@ func TestForgeFactory_Integration(t *testing.T) {
 
 	t.Run("Complete workflow: Query -> Generate Prompt", func(t *testing.T) {
 		// 步骤1: 查询数据库
-		forges, err := factory.Query(ctx, WithForgeFilter_Keyword("integration"))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Keyword("integration"))
 		require.NoError(t, err, "Query should succeed")
 		require.NotEmpty(t, forges, "should find our test forge")
 
@@ -333,18 +334,18 @@ func TestForgeFactory_EdgeCases(t *testing.T) {
 
 	t.Run("Query with invalid limit", func(t *testing.T) {
 		// 测试负数限制
-		forges, err := factory.Query(ctx, WithForgeFilter_Limit(-1))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Limit(-1))
 		assert.NoError(t, err, "should handle negative limit gracefully")
 		assert.NotNil(t, forges, "should return valid result")
 
 		// 测试零限制
-		forges, err = factory.Query(ctx, WithForgeFilter_Limit(0))
+		forges, err = factory.Query(ctx, aicommon.WithForgeFilter_Limit(0))
 		assert.NoError(t, err, "should handle zero limit gracefully")
 		assert.NotNil(t, forges, "should return valid result")
 	})
 
 	t.Run("Query with empty keyword", func(t *testing.T) {
-		forges, err := factory.Query(ctx, WithForgeFilter_Keyword(""))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Keyword(""))
 		assert.NoError(t, err, "should handle empty keyword")
 		assert.NotNil(t, forges, "should return valid result")
 	})
@@ -359,7 +360,7 @@ func TestForgeFactory_EdgeCases(t *testing.T) {
 		}
 
 		for _, keyword := range specialKeywords {
-			forges, err := factory.Query(ctx, WithForgeFilter_Keyword(keyword))
+			forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Keyword(keyword))
 			assert.NoError(t, err, "should handle special keyword safely: %s", keyword)
 			assert.NotNil(t, forges, "should return valid result for keyword: %s", keyword)
 		}
@@ -408,7 +409,7 @@ func TestForgeFactory_Performance(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Query with large limit", func(t *testing.T) {
-		forges, err := factory.Query(ctx, WithForgeFilter_Limit(1000))
+		forges, err := factory.Query(ctx, aicommon.WithForgeFilter_Limit(1000))
 		assert.NoError(t, err, "should handle large limit")
 		assert.LessOrEqual(t, len(forges), 1000, "should respect large limit")
 	})
@@ -524,7 +525,7 @@ func TestForgeFactory_ConcurrentAccess(t *testing.T) {
 					}
 				}()
 
-				_, err := factory.Query(ctx, WithForgeFilter_Limit(5))
+				_, err := factory.Query(ctx, aicommon.WithForgeFilter_Limit(5))
 				if err != nil {
 					results <- fmt.Errorf("goroutine %d query failed: %v", id, err)
 					return

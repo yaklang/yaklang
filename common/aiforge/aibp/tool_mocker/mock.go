@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"html/template"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
@@ -109,7 +109,7 @@ func NewAiToolMockServer(aiOptions ...aispec.AIConfigOption) *AiToolMockServer {
 			}))
 		allTools = append(allTools, factory.Tools()...)
 		return allTools
-	}, buildinaitools.WithAIToolsSearcher(NewMockerSearcher(func(ctx context.Context, query string) (searchtools.AISearchable, error) {
+	}, buildinaitools.WithAIToolsSearcher(NewMockerSearcher[*aitool.Tool](func(ctx context.Context, query string) (*aitool.Tool, error) {
 		return mocker.SearchTool(ctx, query)
 	})), buildinaitools.WithToolEnabled("tools_search", true))
 	return mocker
@@ -136,7 +136,7 @@ func (s *AiToolMockServer) AllTools() []*aitool.Tool {
 func (s *AiToolMockServer) GetToolManager() *buildinaitools.AiToolManager {
 	return s.ToolManager
 }
-func (s *AiToolMockServer) QueryToolSuggestion(ctx context.Context, query string, opts ...aid.Option) ([]*ToolSuggestion, error) {
+func (s *AiToolMockServer) QueryToolSuggestion(ctx context.Context, query string, opts ...aicommon.ConfigOption) ([]*ToolSuggestion, error) {
 	var promptBuffer bytes.Buffer
 	promptTemplate := template.Must(template.New("query").Parse(toolSuggestionPrompt))
 	err := promptTemplate.Execute(&promptBuffer, map[string]any{

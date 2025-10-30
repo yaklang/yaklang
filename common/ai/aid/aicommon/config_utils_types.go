@@ -33,7 +33,6 @@ type MemoryTriage interface {
 	Close() error
 }
 
-
 type ForgeQueryConfig struct {
 	Filter *ypb.AIForgeFilter
 	Paging *ypb.Paging
@@ -50,6 +49,22 @@ func WithForgeQueryFilter(filter *ypb.AIForgeFilter) ForgeQueryOption {
 func WithForgeQueryPaging(paging *ypb.Paging) ForgeQueryOption {
 	return func(config *ForgeQueryConfig) {
 		config.Paging = paging
+	}
+}
+
+// WithForgeFilter_Keyword 设置关键词搜索
+func WithForgeFilter_Keyword(keyword string) ForgeQueryOption {
+	return func(config *ForgeQueryConfig) {
+		config.Filter.Keyword = keyword
+	}
+}
+
+// WithForgeFilter_Limit 设置返回条数限制
+func WithForgeFilter_Limit(limit int) ForgeQueryOption {
+	return func(config *ForgeQueryConfig) {
+		if limit > 0 {
+			config.Paging.Limit = int64(limit)
+		}
 	}
 }
 
@@ -73,5 +88,3 @@ type AIForgeFactory interface {
 	GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error)
 	GenerateAIJSONSchemaFromSchemaAIForge(forge *schema.AIForge) (string, error)
 }
-
-

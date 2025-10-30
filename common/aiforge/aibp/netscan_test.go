@@ -1,6 +1,7 @@
 package aibp
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -11,8 +12,8 @@ func TestNetScan(t *testing.T) {
 	result, err := ExecuteForge(
 		"netscan",
 		"www.example.com",
-		aid.WithAgreeYOLO(),
-		aid.WithDebugPrompt(true),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithDebugPrompt(true),
 		aid.WithAiToolsSearchTool(),
 	)
 	if err != nil {

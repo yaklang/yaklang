@@ -70,6 +70,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		aicommon.WithEventHandler(sendEvent),
 		aicommon.WithEventInputChanx(inputEvent),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
+		aicommon.WithEnablePETaskAnalyze(true),
 	}
 
 	configOption = append(configOption, buildAIDOption(startParams)...)
