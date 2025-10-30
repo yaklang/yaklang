@@ -19,7 +19,7 @@ import (
 // generate task prompt just can direct answer.
 func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
 	templateData := map[string]interface{}{
-		"Memory": t.memory,
+		"Memory": t.Memory,
 	}
 
 	// 解析prompt模板
@@ -41,13 +41,13 @@ func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
 // generateTaskPrompt 生成执行任务的prompt
 func (t *AiTask) generateTaskPrompt() (string, error) {
 	// 创建模板数据
-	alltools, err := t.aiToolManager.GetEnableTools()
+	alltools, err := t.AiToolManager.GetEnableTools()
 	if err != nil {
 		return "", fmt.Errorf("error getting all tools: %w", err)
 	}
 	templateData := map[string]interface{}{
 		"Tools":  alltools,
-		"Memory": t.memory,
+		"Memory": t.Memory,
 	}
 
 	// 解析prompt模板
@@ -76,7 +76,7 @@ func (t *AiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, tool
 	toolJSONSchema := targetTool.ToJSONSchemaString()
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Memory":         t.memory,
+		"Memory":         t.Memory,
 		"Tool":           targetTool,
 		"ToolJSONSchema": toolJSONSchema,
 	}
@@ -100,7 +100,7 @@ func (t *AiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, tool
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
 func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
-		"Memory": t.memory,
+		"Memory": t.Memory,
 		"Tool":   targetTool,
 		"Result": result,
 	}
@@ -135,7 +135,7 @@ func (t *AiTask) generateToolCallResultsPrompt() (string, error) {
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Memory":    t.memory,
+		"Memory":    t.Memory,
 		"UserInput": userInput,
 	}
 
@@ -157,7 +157,7 @@ func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 
 func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
 	return t.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"Memory":    t.memory,
+		"Memory":    t.Memory,
 		"UserInput": suggestion,
 	})
 }
@@ -175,7 +175,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 			if task == nil {
 				return
 			}
-			task.Config = t.Config
+			task.Coordinator = t.Coordinator
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -188,11 +188,11 @@ func (t *AiTask) DeepThink(suggestion string) error {
 		t.GenerateIndex()
 	}()
 
-	err = t.callAiTransaction(
+	err = t.CallAiTransaction(
 		prompt, t.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			action, err := aicommon.ExtractValidActionFromStream(
-				t.ctx,
+				t.Ctx,
 				rsp.GetOutputStreamReader("plan", false, t.GetEmitter()), "plan", aicommon.WithActionAlias("require-user-interact"))
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
@@ -204,9 +204,9 @@ func (t *AiTask) DeepThink(suggestion string) error {
 						continue
 					}
 					t.Subtasks = append(t.Subtasks, &AiTask{
-						Config: t.Config,
-						Name:   subtask.GetAnyToString("subtask_name"),
-						Goal:   subtask.GetAnyToString("subtask_goal"),
+						Coordinator: t.Coordinator,
+						Name:        subtask.GetAnyToString("subtask_name"),
+						Goal:        subtask.GetAnyToString("subtask_goal"),
 					})
 				}
 				if t.Name == "" {
@@ -238,7 +238,7 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 			if task == nil {
 				return
 			}
-			task.Config = t.Config
+			task.Coordinator = t.Coordinator
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -251,7 +251,7 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 		t.GenerateIndex()
 	}()
 
-	err = t.callAiTransaction(
+	err = t.CallAiTransaction(
 		planPrompt,
 		t.CallAI,
 		func(response *aicommon.AIResponse) error {
@@ -262,7 +262,7 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 				t.EmitError("error reading AI response: %v", err)
 				return utils.Errorf("error reading AI response: %v", err)
 			}
-			nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.Config, string(taskResponse))
+			nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.Coordinator, string(taskResponse))
 			if err != nil {
 				t.EmitError("error extracting task from raw response: %v", err)
 				return utils.Errorf("error extracting task from raw response: %v", err)
@@ -292,10 +292,10 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 
 			// 添加新的任务
 			for _, subTask := range nextPlanTask {
-				subTask.Config = t.Config
+				subTask.Coordinator = t.Coordinator
 				subTask.ParentTask = parentTask
 				parentTask.Subtasks = append(parentTask.Subtasks, subTask)
-				subTask.Config.EmitInfo("new dynamic plan: %s", subTask.Name)
+				subTask.Coordinator.EmitInfo("new dynamic plan: %s", subTask.Name)
 			}
 			return nil
 		},

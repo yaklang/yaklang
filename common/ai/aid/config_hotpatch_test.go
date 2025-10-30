@@ -1,13 +1,14 @@
 package aid
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -17,18 +18,18 @@ func TestCoordinator_ConfigHotpatch(t *testing.T) {
 	ctx := utils.TimeoutContextSeconds(20)
 	keywordsToken := uuid.New().String()
 	newKeywordsToken := uuid.New().String()
-	hotpatchOptionChan := chanx.NewUnlimitedChan[Option](ctx, 10)
-	inputChan := make(chan *InputEvent)
+	hotpatchOptionChan := chanx.NewUnlimitedChan[aicommon.ConfigOption](ctx, 10)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithToolKeywords(keywordsToken),
-		WithHotpatchOptionChan(hotpatchOptionChan),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithKeywords(keywordsToken),
+		aicommon.WithHotPatchOptionChan(hotpatchOptionChan),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -75,7 +76,7 @@ LOOP:
 			if result.Type == schema.EVENT_TYPE_AID_CONFIG {
 				if strings.Contains(string(result.Content), keywordsToken) {
 					originConfigCheck = true
-					hotpatchOptionChan.SafeFeed(WithToolKeywords(newKeywordsToken))
+					hotpatchOptionChan.SafeFeed(aicommon.WithKeywords(newKeywordsToken))
 					optionHotpatchOk = true
 				}
 				if optionHotpatchOk && strings.Contains(string(result.Content), newKeywordsToken) {
@@ -87,12 +88,7 @@ LOOP:
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				time.Sleep(100 * time.Millisecond)
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 

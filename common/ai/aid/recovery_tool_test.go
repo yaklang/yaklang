@@ -1,8 +1,11 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
 	"testing"
@@ -21,13 +24,13 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 	fmt.Println("------------------------------------------------------------")
 	fmt.Println("------------------------------------------------------------")
 	fmt.Println("------------------------------------------------------------")
-	inputChan := make(chan *InputEvent, 100)            // 增加缓冲区大小
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区大小
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小
+	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区大小
 	coordinator, err := NewFastRecoverCoordinator(
 		uid,
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			select {
 			case outputChan <- event:
 			case <-time.After(1 * time.Second):
@@ -35,7 +38,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 				fmt.Printf("Warning: output channel full, dropping event: %s\n", event.String())
 			}
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -80,17 +83,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 
 				fmt.Println("result:" + result.String())
 				if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-					select {
-					case inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}:
-					case <-time.After(1 * time.Second):
-						fmt.Println("Warning: input channel full, dropping plan review response")
-					}
-					continue
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				}
 
 				if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
@@ -103,22 +96,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 						mu.Unlock()
 
 						// 增加重试机制发送输入事件
-						for retry := 0; retry < 3; retry++ {
-							select {
-							case inputChan <- &InputEvent{
-								Id: result.GetInteractiveId(),
-								Params: aitool.InvokeParams{
-									"suggestion": "continue",
-								},
-							}:
-								goto inputSent
-							case <-time.After(2 * time.Second):
-								if retry == 2 {
-									fmt.Printf("Warning: failed to send tool review response after %d retries\n", retry+1)
-								}
-							}
-						}
-					inputSent:
+						inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 						continue
 					}
 				}
@@ -172,13 +150,13 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 	t.Skip(true)
 
-	inputChan := make(chan *InputEvent, 200)            // 增加缓冲区大小以适应CI环境
-	outputChan := make(chan *schema.AiOutputEvent, 200) // 增加缓冲区大小以适应CI环境
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小以适应CI环境
+	outputChan := make(chan *schema.AiOutputEvent, 200)                              // 增加缓冲区大小以适应CI环境
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			select {
 			case outputChan <- event:
 			case <-time.After(1 * time.Second):
@@ -186,7 +164,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				fmt.Printf("Warning: output channel full, dropping event: %s\n", event.String())
 			}
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -275,16 +253,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 
 				fmt.Println("result:" + result.String())
 				if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-					select {
-					case inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}:
-					case <-time.After(1 * time.Second):
-						fmt.Println("Warning: input channel full, dropping plan review response")
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 
@@ -297,24 +266,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 						useToolReview = true
 						mu.Unlock()
 
-						// 增加重试机制发送输入事件
-						for retry := 0; retry < 3; retry++ {
-							select {
-							case inputChan <- &InputEvent{
-								Id: result.GetInteractiveId(),
-								Params: aitool.InvokeParams{
-									"suggestion": "continue",
-								},
-							}:
-								goto inputSent
-							case <-time.After(2 * time.Second):
-								if retry == 2 {
-									fmt.Printf("Warning: failed to send tool review response after %d retries\n", retry+1)
-								}
-							}
-						}
-					inputSent:
-						continue
+						inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					}
 				}
 
@@ -362,5 +314,5 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 	if !useToolReviewPass {
 		t.Fatal("tool review not finished")
 	}
-	testRecoveryToolUseReview(t, coordinator.config.id)
+	testRecoveryToolUseReview(t, coordinator.Config.Id)
 }

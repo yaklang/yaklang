@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func TestSimpleUsage(t *testing.T) {
 
 	t.Run("BasicOperations", func(t *testing.T) {
 		// 创建测试记忆
-		memories := []*MemoryEntity{
+		memories := []*memory_type.MemoryEntity{
 			{
 				Id:                 uuid.New().String(),
 				CreatedAt:          time.Now(),
@@ -245,10 +246,10 @@ func TestPerformanceBaseline(t *testing.T) {
 
 	// 添加一些测试数据
 	numMemories := 50
-	memories := make([]*MemoryEntity, numMemories)
+	memories := make([]*memory_type.MemoryEntity, numMemories)
 
 	for i := 0; i < numMemories; i++ {
-		memory := &MemoryEntity{
+		memory := &memory_type.MemoryEntity{
 			Id:        uuid.New().String(),
 			CreatedAt: time.Now(),
 			Content:   fmt.Sprintf("测试记忆 %d", i),

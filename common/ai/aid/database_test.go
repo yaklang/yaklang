@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -17,15 +19,15 @@ import (
 )
 
 func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -74,12 +76,7 @@ LOOP:
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(100 * time.Millisecond)
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
@@ -98,20 +95,14 @@ LOOP:
 				}
 				if inputConsumption > 0 && outputConsumption > 0 {
 					consumptionCheck = true
-					inputChan <- &InputEvent{
-						IsSyncInfo: true,
-						SyncType:   SYNC_TYPE_PING,
-					}
+					inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PING))
 					continue
 				}
 			}
 
 			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
-				inputChan <- &InputEvent{
-					IsSyncInfo: true,
-					SyncType:   SYNC_TYPE_PLAN,
-				}
+				inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PLAN))
 				continue
 			}
 
@@ -149,16 +140,16 @@ LOOP:
 		t.Fatal("sync check failed")
 	}
 
-	rt, err := yakit.GetAgentRuntime(ins.config.GetDB(), ins.config.id)
+	rt, err := yakit.GetAgentRuntime(ins.Config.GetDB(), ins.Config.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, rt.Uuid, ins.config.id)
+	assert.Equal(t, rt.Uuid, ins.Config.Id)
 	t.Logf("rt: %+v", rt)
 	count := 0
 	aiInteractivity := 0
 	reviewCount := 0
-	for i := range yakit.YieldCheckpoint(context.Background(), ins.config.GetDB(), ins.config.id) {
+	for i := range yakit.YieldCheckpoint(context.Background(), ins.Config.GetDB(), ins.Config.Id) {
 		t.Logf("i: %+v", i)
 		count++
 		if i.Type == schema.AiCheckpointType_AIInteractive {

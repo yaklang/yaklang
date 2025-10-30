@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -52,15 +52,15 @@ func TestCoordinator_Consumption(t *testing.T) {
 }
 
 func basicTestCoordinator_Consumption(t *testing.T) {
-	inputChan := make(chan *InputEvent, 10) // 增加缓冲区大小，避免阻塞
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小，避免阻塞
 	outChan := chanx.NewUnlimitedChan[*schema.AiOutputEvent](context.Background(), 100)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -116,22 +116,7 @@ LOOP:
 				parsedTask = true
 
 				// 使用 goroutine 异步发送输入事件，避免阻塞主循环
-				go func() {
-					inputTimeout := time.NewTimer(5 * time.Second)
-					defer inputTimeout.Stop()
-
-					select {
-					case inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}:
-						log.Info("successfully sent continue suggestion")
-					case <-inputTimeout.C:
-						log.Warn("timeout sending continue suggestion to inputChan")
-					}
-				}()
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_CONSUMPTION && parsedTask {

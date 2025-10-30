@@ -1,9 +1,12 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,8 +18,49 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func Map2Json(m map[string]any) string {
+	b, _ := json.Marshal(m)
+	return string(b)
+}
+
+func ContinueSuggestionInputEvent(id string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(map[string]any{
+			"suggestion": "continue",
+		}),
+	}
+}
+
+func SuggestionInputEvent(id string, suggestion string, extra string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(map[string]any{
+			"suggestion":   suggestion,
+			"extra_prompt": extra,
+		}),
+	}
+}
+
+func SuggestionInputEventEx(id string, params map[string]any) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(params),
+	}
+}
+
+func SyncInputEvent(syncType string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      syncType,
+	}
+}
+
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	m := new(sync.Mutex)
@@ -25,11 +69,11 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			m.Lock()
 			defer m.Unlock()
 
@@ -96,12 +140,7 @@ LOOP:
 					plansJson, _ := json.Marshal(plansRaw)
 					if strings.Contains(string(plansJson), `将最大文件的路径和大小以可读格式输出`) {
 						parsedTask = true
-						inputChan <- &InputEvent{
-							Id: result.GetInteractiveId(),
-							Params: aitool.InvokeParams{
-								"suggestion": "continue",
-							},
-						}
+						inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 						continue
 					}
 				}
@@ -122,20 +161,14 @@ LOOP:
 				}
 				if inputConsumption > 0 && outputConsumption > 0 {
 					consumptionCheck = true
-					inputChan <- &InputEvent{
-						IsSyncInfo: true,
-						SyncType:   SYNC_TYPE_PING,
-					}
+					inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PING))
 					continue
 				}
 			}
 
 			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
-				inputChan <- &InputEvent{
-					IsSyncInfo: true,
-					SyncType:   SYNC_TYPE_PLAN,
-				}
+				inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PLAN))
 				continue
 			}
 
