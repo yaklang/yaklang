@@ -48,15 +48,15 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		log.Debugf("RAG mock mode detected, embedding considered available for session: %s", sessionId)
 		embeddingAvailable = true
 	} else {
-		// 非 mock 模式下检查实际的 embedding 服务
-		_, err = rag.GetLocalEmbeddingService()
-		if err != nil {
-			log.Warnf("embedding service not available, RAG-based semantic search will be disabled: %v", err)
-			log.Warnf("all semantic searches and RAG queries will return empty results for session: %s", sessionId)
-			embeddingAvailable = false
-		} else {
-			embeddingAvailable = true
-		}
+		//// 非 mock 模式下检查实际的 embedding 服务
+		//_, err = rag.GetLocalEmbeddingService()
+		//if err != nil {
+		//	log.Warnf("embedding service not available, RAG-based semantic search will be disabled: %v", err)
+		//	log.Warnf("all semantic searches and RAG queries will return empty results for session: %s", sessionId)
+		//	embeddingAvailable = false
+		//} else {
+		//	embeddingAvailable = true
+		//}
 	}
 
 	// 尝试加载现有collection，如果不存在则创建新的
