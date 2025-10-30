@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -367,4 +369,95 @@ func shouldSkipUpdate(localVersion, onlineVersion string) bool {
 		return false
 	}
 	return localVersion >= onlineVersion
+}
+
+func (s *Server) CompleteSyntaxFlowRule(req *ypb.CompleteSyntaxFlowRuleRequest, stream ypb.Yak_CompleteSyntaxFlowRuleServer) error {
+	if req == nil {
+		return utils.Error("request is nil")
+	}
+
+	ruleContent := req.GetRuleContent()
+	if ruleContent == "" {
+		return utils.Error("rule content is empty")
+	}
+
+	fileName := req.GetFileName()
+	if fileName == "" {
+		fileName = "rule.sf"
+	}
+
+	// 发送开始消息
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "开始优化规则...",
+		Progress: 0.1,
+	})
+
+	// 构建 AI 配置选项
+	aiOpts := buildAIOptions(req)
+
+	// 调用规则补全逻辑
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "正在调用 AI 补全规则描述...",
+		Progress: 0.3,
+	})
+
+	completedRule, err := sfcompletion.CompleteRuleDesc(fileName, ruleContent, aiOpts...)
+	if err != nil {
+		return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+			Status:   "error",
+			Message:  fmt.Sprintf("规则补全失败: %v", err),
+			Progress: 1.0,
+		})
+	}
+
+	// 验证优化后的规则
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "正在验证优化后的规则...",
+		Progress: 0.8,
+	})
+
+	if _, err := sfdb.CheckSyntaxFlowRuleContent(completedRule); err != nil {
+		return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+			Status:   "error",
+			Message:  fmt.Sprintf("优化后的规则验证失败: %v", err),
+			Progress: 1.0,
+		})
+	}
+
+	// 发送成功结果
+	return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:        "completed",
+		Message:       "规则优化完成",
+		CompletedRule: completedRule,
+		Progress:      1.0,
+	})
+}
+
+// buildAIOptions 根据请求构建 AI 配置选项
+func buildAIOptions(req *ypb.CompleteSyntaxFlowRuleRequest) []aispec.AIConfigOption {
+	var opts []aispec.AIConfigOption
+
+	if aiType := req.GetAIType(); aiType != "" {
+		opts = append(opts, aispec.WithType(aiType))
+	}
+	if apiKey := req.GetAPIKey(); apiKey != "" {
+		opts = append(opts, aispec.WithAPIKey(apiKey))
+	}
+	if model := req.GetModel(); model != "" {
+		opts = append(opts, aispec.WithModel(model))
+	}
+	if proxy := req.GetProxy(); proxy != "" {
+		opts = append(opts, aispec.WithProxy(proxy))
+	}
+	if domain := req.GetDomain(); domain != "" {
+		opts = append(opts, aispec.WithDomain(domain))
+	}
+	if baseURL := req.GetBaseURL(); baseURL != "" {
+		opts = append(opts, aispec.WithBaseURL(baseURL))
+	}
+
+	return opts
 }

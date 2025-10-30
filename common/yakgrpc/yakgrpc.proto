@@ -792,6 +792,7 @@ service Yak {
 
   rpc SyntaxFlowRuleToOnline(SyntaxFlowRuleToOnlineRequest) returns (stream SyntaxFlowRuleOnlineProgress);
   rpc DownloadSyntaxFlowRule(DownloadSyntaxFlowRuleRequest) returns (stream SyntaxFlowRuleOnlineProgress);
+  rpc CompleteSyntaxFlowRule(CompleteSyntaxFlowRuleRequest) returns (stream CompleteSyntaxFlowRuleResponse);
 
   // syntaxflow scan
   rpc SyntaxFlowScan(stream SyntaxFlowScanRequest) returns (stream SyntaxFlowScanResponse);
@@ -7351,6 +7352,25 @@ message SyntaxFlowRuleOnlineProgress {
 message DownloadSyntaxFlowRuleRequest {
   string Token = 1;
   SyntaxFlowRuleFilter Filter = 2;
+}
+
+message CompleteSyntaxFlowRuleRequest {
+  string RuleContent = 1;
+  string FileName = 2;
+  // AI 配置
+  string AIType = 3;
+  string APIKey = 4;
+  string Model = 5;
+  string Proxy = 6;
+  string Domain = 7;
+  string BaseURL = 8;
+}
+
+message CompleteSyntaxFlowRuleResponse {
+  string Status = 1; // "processing" | "completed" | "error"
+  string Message = 2;
+  string CompletedRule = 3; // 优化后的规则内容
+  double Progress = 4;
 }
 
 message SyntaxFlowScanRequest{
