@@ -1310,6 +1310,17 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	}
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
 
+	// 添加调试日志
+	log.Infof("[LSP Debug] Code: %q, Word: %q, ContainPoint: %v, PointSuffix: %v, Range: Line %d Col %d",
+		req.GetYakScriptCode(), word, containPoint, result.PointSuffix,
+		req.GetRange().StartLine, req.GetRange().StartColumn)
+	if v != nil {
+		log.Infof("[LSP Debug] Value Type: %s, IsExternLib: %v, IsUndefined: %v",
+			v.GetType(), v.IsExternLib(), v.IsUndefined())
+	} else {
+		log.Infof("[LSP Debug] Value is nil")
+	}
+
 	if v == nil {
 		return ret, nil
 	}
