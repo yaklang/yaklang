@@ -118,10 +118,9 @@ jobs:
       - name: Download CrossBuild GCC(Linux x64)
         if: matrix.os == 'linux-amd64'
         run: |
-          brew update
-          brew upgrade
-          brew uninstall --ignore-dependencies --force pkg-config@0.29.2
-          brew install coreutils pkgconf
+          brew uninstall --ignore-dependencies --force pkg-config@0.29.2 || true
+          brew list coreutils >/dev/null 2>&1 || brew install coreutils
+          brew list pkgconf  >/dev/null 2>&1 || brew install pkgconf
           brew tap messense/macos-cross-toolchains
           brew install x86_64-unknown-linux-gnu
           x86_64-linux-gnu-gcc -v
@@ -129,10 +128,9 @@ jobs:
       - name: Download CrossBuild GCC(Linux arm64)
         if: matrix.os == 'linux-arm64'
         run: |
-          brew update
-          brew upgrade
-          brew uninstall --ignore-dependencies --force pkg-config@0.29.2
-          brew install coreutils pkgconf
+          brew uninstall --ignore-dependencies --force pkg-config@0.29.2 || true
+          brew list coreutils >/dev/null 2>&1 || brew install coreutils
+          brew list pkgconf  >/dev/null 2>&1 || brew install pkgconf
           brew tap messense/macos-cross-toolchains
           brew install aarch64-unknown-linux-gnu
           aarch64-linux-gnu-gcc -v
