@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/segmentio/ksuid"
@@ -274,14 +276,26 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 				t.Fatal(err)
 			}
 			cancel()
-			_, data, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-				Keyword: token,
-			})
+
+			// 等待数据库写入完成（异步操作）
+			var data []*schema.HTTPFlow
+			maxRetries := 10
+			for i := 0; i < maxRetries; i++ {
+				_, data, err = yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+					Keyword: token,
+				})
+				if err == nil && len(data) == 1 {
+					break
+				}
+				if i < maxRetries-1 {
+					time.Sleep(500 * time.Millisecond)
+				}
+			}
 			if err != nil {
 				t.Fatal("query taged flow failed", err)
 			}
 			if len(data) != 1 {
-				t.Fatal("query taged flow failed(count is not right)")
+				t.Fatalf("query taged flow failed(count is not right), expected 1 but got %d after %d retries", len(data), maxRetries)
 			}
 			if data[0].BodyLength > 4000000 {
 				t.Fatal("query taged flow failed")
