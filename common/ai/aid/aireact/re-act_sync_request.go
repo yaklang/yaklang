@@ -3,9 +3,10 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/log"
@@ -28,7 +29,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 	case SYNC_TYPE_KNOWLEDGE:
 		// 同步某个任务已经获取到的知识
 		taskID := r.GetCurrentTask().GetId()         // 默认使用当前任务ID
-		if r.config.enhanceKnowledgeManager == nil { // 检查知识管理器是否配置, 如果没有则报错记录但不会返回错误
+		if r.config.EnhanceKnowledgeManager == nil { // 检查知识管理器是否配置, 如果没有则报错记录但不会返回错误
 			r.EmitError("knowledge manager is not configured")
 			return nil
 		}
@@ -40,7 +41,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 				}
 			}
 		}
-		knowledgeList := r.config.enhanceKnowledgeManager.GetKnowledgeByTaskID(taskID)
+		knowledgeList := r.config.EnhanceKnowledgeManager.GetKnowledgeByTaskID(taskID)
 		if len(knowledgeList) <= 0 {
 			log.Error("no knowledge found")
 		}
@@ -78,11 +79,15 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 			err := r.config.loadAIServiceByName(event.Params.GetAIService())
 			if err != nil {
 				r.EmitError("load ai service failed: %v", err)
+			} else {
+				r.config.SetAICallback(aicommon.AIChatToAICallbackType(chat))
+				r.config.HotPatchBroadcaster.Submit(aicommon.WithAICallback(r.config.OriginalAICallback))
+				updateConfig["ai_service"] = event.Params.GetAIService()
 			}
 		}
 		if event.Params.GetReviewPolicy() != "" {
-			r.config.reviewPolicy = aicommon.AgreePolicyType(event.Params.GetReviewPolicy())
-			r.config.hotpatchBroadcaster.Submit(aid.WithAgreePolicy(r.config.reviewPolicy))
+			r.config.AgreePolicy = aicommon.AgreePolicyType(event.Params.GetReviewPolicy())
+			r.config.HotPatchBroadcaster.Submit(aicommon.WithAgreePolicy(r.config.AgreePolicy))
 			updateConfig["review_policy"] = event.Params.GetReviewPolicy()
 		}
 		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig)
@@ -97,7 +102,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		}
 
 		// 收集 memoryPool 中的所有 MemoryEntity
-		var memoryInfos []*aimem.MemoryEntity
+		var memoryInfos []*memory_type.MemoryEntity
 		var totalSize int
 		if r.memoryPool != nil {
 			for _, memoryEntity := range r.memoryPool.Values() {
@@ -113,7 +118,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 			"memory_session_id": memorySessionID,
 			"total_memories":    len(memoryInfos),
 			"total_size":        totalSize,
-			"memory_pool_limit": r.config.memoryPoolSize,
+			"memory_pool_limit": r.config.MemoryPoolSize,
 			"memories":          memoryInfos,
 		}
 

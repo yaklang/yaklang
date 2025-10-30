@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
+	"github.com/yaklang/yaklang/common/aiforge"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,8 +71,10 @@ type ReAct struct {
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
 
-	config        *ReActConfig
+	config        *aicommon.Config
 	promptManager *PromptManager
+
+	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
 	currentTask          aicommon.AIStatefulTask // 当前正在处理的任务
@@ -80,31 +89,28 @@ type ReAct struct {
 
 	wg             *sync.WaitGroup
 	timelineDiffer *aicommon.TimelineDiffer
-	memoryTriage   aimem.MemoryTriage
-	memoryPool     *omap.OrderedMap[string, *aimem.MemoryEntity]
+	memoryTriage   aicommon.MemoryTriage
+	memoryPool     *omap.OrderedMap[string, *memory_type.MemoryEntity]
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return r.config.GetBasicPromptInfo(tools)
+	return r.promptManager.GetBasicPromptInfo(tools)
 }
 
 var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
-var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
+
+const SKIP_AI_REVIEW = "skip_ai_review"
 
 func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
 }
 
-func (r *ReActConfig) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return r.promptManager.GetBasicPromptInfo(tools)
-}
-
 func (r *ReAct) SaveTimeline() {
-	if r.config.persistentSessionId == "" {
+	if r.config.PersistentSessionId == "" {
 		return
 	}
 	r.saveTimelineThrottle(func() {
-		ins := r.config.timeline
+		ins := r.config.Timeline
 		if ins == nil {
 			return
 		}
@@ -114,7 +120,7 @@ func (r *ReAct) SaveTimeline() {
 			return
 		}
 		result := strconv.Quote(tl)
-		if err := yakit.UpdateAIAgentRuntimeTimeline(r.config.GetDB(), r.config.id, result); err != nil {
+		if err := yakit.UpdateAIAgentRuntimeTimeline(r.config.GetDB(), r.config.Id, result); err != nil {
 			log.Errorf("ReAct: save timeline to db failed: %v", err)
 			return
 		}
@@ -136,10 +142,10 @@ func (r *ReAct) PushCumulativeSummaryHandle(f func() string) {
 }
 
 func (r *ReAct) DumpTimeline() string {
-	if r == nil || r.config == nil || r.config.timeline == nil {
+	if r == nil || r.config == nil || r.config.Timeline == nil {
 		return ""
 	}
-	return r.config.timeline.Dump()
+	return r.config.Timeline.Dump()
 }
 
 func (r *ReAct) SetCurrentPlanExecutionTask(t aicommon.AIStatefulTask) {
@@ -179,9 +185,10 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 	delete(r.mirrorOfAIInputEvent, id)
 }
 
-func NewReAct(opts ...Option) (*ReAct, error) {
-	cfg := NewReActConfig(context.Background(), opts...)
-	dirname := consts.TempAIDir(cfg.id)
+func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
+	opts = append(opts,aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
+	cfg := aicommon.NewConfig(context.Background(), opts...)
+	dirname := consts.TempAIDir(cfg.GetRuntimeId())
 	if existed, _ := utils.PathExists(dirname); !existed {
 		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
 	}
@@ -193,11 +200,11 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
-		memoryPool:           omap.NewOrderedMap(make(map[string]*aimem.MemoryEntity)),
+		memoryPool:           omap.NewOrderedMap(make(map[string]*memory_type.MemoryEntity)),
 	}
 
-	if cfg.memoryTriage != nil {
-		react.memoryTriage = cfg.memoryTriage
+	if cfg.MemoryTriage != nil {
+		react.memoryTriage = cfg.MemoryTriage
 	} else {
 		var err error
 		react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
@@ -206,10 +213,10 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		}
 	}
 
-	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.timeline)
-	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
+	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
+	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	// Initialize prompt manager
-	workdir := cfg.workdir
+	workdir := cfg.Workdir
 	if workdir == "" {
 		workdir, _ = react.artifacts.Getwd()
 		if workdir == "" {
@@ -219,37 +226,36 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 			}
 		}
 	}
-	react.promptManager = NewPromptManager(react, cfg.workdir)
-	cfg.promptManager = react.promptManager
+	react.promptManager = NewPromptManager(react, workdir)
 
 	// Register pending context providers
-	for _, entry := range cfg.pendingContextProviders {
-		if entry.traced {
-			cfg.promptManager.cpm.RegisterTracedContent(entry.name, entry.provider)
+	for _, entry := range cfg.PendingContextProviders {
+		if entry.Traced {
+			react.promptManager.cpm.RegisterTracedContent(entry.Name, entry.Provider)
 		} else {
-			cfg.promptManager.cpm.Register(entry.name, entry.provider)
+			react.promptManager.cpm.Register(entry.Name, entry.Provider)
 		}
 	}
 	// Clear pending list after registration
-	cfg.pendingContextProviders = nil
+	cfg.PendingContextProviders = nil
 
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
-	react.startEventLoop(cfg.ctx, mainloopDone)
+	react.startEventLoop(cfg.Ctx, mainloopDone)
 	<-mainloopDone // Ensure the event loop has started
 
 	// Start queue processor in background
 	done := make(chan struct{})
-	react.startQueueProcessor(cfg.ctx, done)
+	react.startQueueProcessor(cfg.Ctx, done)
 	<-done // Ensure the queue processor has started
 
 	err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
 			Name:              "[re-act-runtime]",
-			Seq:               cfg.idSequence,
+			Seq:               cfg.IdSequence,
 			TypeName:          schema.AIAgentRuntimeType_ReAct,
-			PersistentSession: cfg.persistentSessionId,
+			PersistentSession: cfg.PersistentSessionId,
 		},
 	)
 	if err != nil {
@@ -267,8 +273,8 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 // UpdateDebugMode dynamically updates the debug mode settings
 func (r *ReAct) UpdateDebugMode(debug bool) {
-	r.config.debugEvent = debug
-	r.config.debugPrompt = debug
+	r.config.DebugPrompt = debug
+	r.config.DebugEvent = debug
 }
 
 // SendInputEvent sends an input event to the task queue (non-blocking)
@@ -283,7 +289,7 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 		return fmt.Errorf("input event is nil")
 	}
 
-	r.config.eventInputChan.SafeFeed(event)
+	r.config.EventInputChan.SafeFeed(event)
 	return nil
 }
 
@@ -303,17 +309,17 @@ func (r *ReAct) AddToTimeline(entryType, content string) {
 		msg.WriteString(":\n")
 	}
 	msg.WriteString(utils.PrefixLines(content, "  "))
-	r.config.timeline.PushText(r.config.AcquireId(), msg.String())
+	r.config.Timeline.PushText(r.config.AcquireId(), msg.String())
 	r.SaveTimeline()
 }
 
 // getTimeline 获取时间线信息（可选择限制数量）
 func (r *ReAct) getTimeline(lastN int) []*aicommon.TimelineItemOutput {
-	return r.config.timeline.ToTimelineItemOutputLastN(lastN)
+	return r.config.Timeline.ToTimelineItemOutputLastN(lastN)
 }
 
 func (r *ReAct) getTimelineTotal() int {
-	return r.config.timeline.GetIdToTimelineItem().Len()
+	return r.config.Timeline.GetIdToTimelineItem().Len()
 }
 
 // startQueueProcessor 启动任务队列处理器
@@ -346,8 +352,8 @@ func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 					close(done)
 				})
 			}()
-			if r.config.debugEvent {
-				log.Infof("Task queue processor started for ReAct instance: %s", r.config.id)
+			if r.config.DebugEvent {
+				log.Infof("Task queue processor started for ReAct instance: %s", r.config.Id)
 			}
 
 			// register hook for queue
@@ -369,8 +375,8 @@ func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 				case <-ticker.C:
 					r.processReActFromQueue()
 				case <-ctx.Done():
-					if r.config.debugEvent {
-						log.Infof("Task queue processor stopped for ReAct instance: %s", r.config.id)
+					if r.config.DebugEvent {
+						log.Infof("Task queue processor stopped for ReAct instance: %s", r.config.Id)
 					}
 					return
 				}
@@ -406,7 +412,7 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 
 // processInputEvent processes a single input event and triggers ReAct loop
 func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Processing input event: IsFreeInput=%v, IsInteractive=%v", event.IsFreeInput, event.IsInteractiveMessage)
 	}
 
@@ -428,7 +434,7 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 	doneOnce := new(sync.Once)
 
-	r.config.startInputEventOnce.Do(func() {
+	r.config.StartInputEventOnce.Do(func() {
 		go func() {
 			defer func() {
 				doneOnce.Do(func() {
@@ -437,8 +443,8 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 					}
 				})
 			}()
-			if r.config.debugEvent {
-				log.Infof("ReAct event loop started for instance: %s", r.config.id)
+			if r.config.DebugEvent {
+				log.Infof("ReAct event loop started for instance: %s", r.config.Id)
 			}
 
 			doneOnce.Do(func() {
@@ -448,16 +454,16 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 			})
 			for {
 				select {
-				case event, ok := <-r.config.eventInputChan.OutputChannel():
+				case event, ok := <-r.config.EventInputChan.OutputChannel():
 					if !ok {
-						log.Errorf("ReAct event input channel closed for instance: %s", r.config.id)
+						log.Errorf("ReAct event input channel closed for instance: %s", r.config.Id)
 						return
 					}
 					if event == nil {
 						continue
 					}
 
-					if r.config.debugEvent {
+					if r.config.DebugEvent {
 						log.Infof("ReAct event loop processing event: IsFreeInput=%v, IsInteractive=%v",
 							event.IsFreeInput, event.IsInteractiveMessage)
 					}
@@ -469,8 +475,8 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 						}
 					}(event)
 				case <-ctx.Done():
-					if r.config.debugEvent {
-						log.Infof("ReAct event loop stopped for instance: %s", r.config.id)
+					if r.config.DebugEvent {
+						log.Infof("ReAct event loop stopped for instance: %s", r.config.Id)
 					}
 					return
 				}
@@ -491,4 +497,35 @@ func (r *ReAct) Wait() {
 		return
 	}
 	r.wg.Wait()
+}
+
+// cycle import issue
+
+func WithBuiltinTools() aicommon.ConfigOption {
+	return func(cfg *aicommon.Config) error {
+
+		// Get all builtin tools
+		allTools := buildinaitools.GetAllTools()
+
+		// Create a simple AI chat function for the searcher
+		aiChatFunc := func(prompt string) (io.Reader, error) {
+			response, err := ai.Chat(prompt)
+			if err != nil {
+				return nil, err
+			}
+			return strings.NewReader(response), nil
+		}
+
+		// Create keyword searcher
+		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
+		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
+		// Enable tool search functionality
+		log.Infof("Added %d builtin AI tools with search capability", len(allTools))
+		return aicommon.WithAiToolManagerOptions(
+			buildinaitools.WithExtendTools(allTools, true),
+			buildinaitools.WithSearchToolEnabled(true),
+			buildinaitools.WithForgeSearchToolEnabled(true),
+			buildinaitools.WithAIToolsSearcher(aiToolSearcher),
+			buildinaitools.WithAiForgeSearcher(forgeSearcher))(cfg)
+	}
 }

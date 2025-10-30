@@ -22,7 +22,7 @@ func TestExec_CreateMirrors_SingleAITag(t *testing.T) {
 	codeExtracted := false
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			aiCallCount++
 			prompt := req.GetPrompt()
 			rsp := i.NewAIResponse()
@@ -114,7 +114,7 @@ func testFunc() {
 // TestExec_CreateMirrors_MultipleAITags 测试多个AITag
 func TestExec_CreateMirrors_MultipleAITags(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 返回多个标签
 			rsp.EmitOutputStream(bytes.NewBufferString(`<yaklang-code>
@@ -182,7 +182,7 @@ const jsCode = "test js code";
 // TestExec_CreateMirrors_EmptyTag 测试空标签内容
 func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 返回空标签
 			rsp.EmitOutputStream(bytes.NewBufferString(`<GEN_CODE></GEN_CODE>
@@ -221,7 +221,7 @@ func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 // TestExec_CreateMirrors_NoAITags 测试没有AITag的情况
 func TestExec_CreateMirrors_NoAITags(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "No tags"}`))
 			rsp.Close()
@@ -249,7 +249,7 @@ func TestExec_CreateMirrors_NoAITags(t *testing.T) {
 // TestExec_CreateMirrors_TagWithNewlines 测试带换行符的标签
 func TestExec_CreateMirrors_TagWithNewlines(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 标签内容前后有换行符
 			rsp.EmitOutputStream(bytes.NewBufferString(`<GEN_CODE>
@@ -320,7 +320,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 	done := make(chan struct{})
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 添加小延迟确保processing状态能被捕获
 			time.Sleep(50 * time.Millisecond)
@@ -464,7 +464,7 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 	var capturedTask aicommon.AIStatefulTask
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
 			rsp.Close()
@@ -516,7 +516,7 @@ func TestExec_AITransaction_RetryMechanism(t *testing.T) {
 	attemptCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			attemptCount++
 			rsp := i.NewAIResponse()
 
@@ -559,7 +559,7 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 	codeExtracted := false
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			rsp := i.NewAIResponse()
 
@@ -650,7 +650,7 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 	iterCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
 
@@ -692,7 +692,7 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 	iterCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
 
@@ -745,7 +745,7 @@ func TestExec_BoundaryCondition_MaxIterationsOne(t *testing.T) {
 	iterCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "One iteration"}`))
@@ -776,7 +776,7 @@ func TestExec_BoundaryCondition_MaxIterationsOne(t *testing.T) {
 // TestExec_StreamProcessing_ComplexJSON 测试复杂JSON流处理
 func TestExec_StreamProcessing_ComplexJSON(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 
 			// 复杂的嵌套JSON
@@ -821,7 +821,7 @@ func TestExec_Feedback_MultipleRounds(t *testing.T) {
 	roundCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			roundCount++
 			rsp := i.NewAIResponse()
 
@@ -880,7 +880,7 @@ func TestExec_DisallowNextLoopExit_Enforcement(t *testing.T) {
 	attemptCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			attemptCount++
 			rsp := i.NewAIResponse()

@@ -83,15 +83,15 @@ func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
 	abort, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequireBlueprint_ModifyParams(i, r, flag)
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithReActHijackPlanRequest(func(ctx context.Context, planPayload string) error {
+		aicommon.WithHijackPERequest(func(ctx context.Context, planPayload string) error {
 			forgeExecute = true
 			if strings.Contains(planPayload, codec.Sha256(flag)) {
 				forgeHaveFlag = true

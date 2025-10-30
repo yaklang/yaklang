@@ -24,7 +24,7 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 
 	r.currentUserInteractiveCount++
 	r.AddToTimeline("question-for-clarification", question)
-	ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+	ep := r.config.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 	var opts []map[string]any
 	for i, payload := range payloads {

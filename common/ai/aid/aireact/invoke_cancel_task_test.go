@@ -57,7 +57,7 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 
 	toolCalled := false
 	toolCompleted := false
-	
+
 	// 创建一个长时间运行的工具
 	longTool, err := aitool.New(
 		"long_task",
@@ -68,9 +68,9 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 			if sleepDuration <= 0 {
 				sleepDuration = 5.0
 			}
-			
+
 			fmt.Printf("Long task started, will run for %.1f seconds\n", sleepDuration)
-			
+
 			// 使用小的时间片来检测取消
 			for i := 0; i < int(sleepDuration*10); i++ {
 				select {
@@ -81,7 +81,7 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 					// 继续执行
 				}
 			}
-			
+
 			toolCompleted = true
 			fmt.Println("Long task completed normally")
 			return "task completed", nil
@@ -92,16 +92,16 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCallingForCancel(i, r, "long_task")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(longTool),
-		WithDebug(false),
-		WithReviewPolicy(aicommon.AgreePolicyYOLO), // 跳过用户审核，直接执行工具
+		aicommon.WithTools(longTool),
+		aicommon.WithDebug(false),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO), // 跳过用户审核，直接执行工具
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ LOOP:
 		select {
 		case e := <-out:
 			fmt.Println(e.String())
-			
+
 			if e.NodeId == "react_task_created" {
 				taskCreated = true
 				taskId = utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_id"))
@@ -140,7 +140,7 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				status := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_now_status"))
 				fmt.Printf("Task status changed to: %s\n", status)
-				
+
 				if status == "processing" {
 					taskProcessing = true
 				} else if status == "aborted" {
@@ -151,7 +151,7 @@ LOOP:
 			if e.Type == "tool_call_start" {
 				toolStarted = true
 				fmt.Println("Tool call started")
-				
+
 				// 立即发送取消请求
 				go func() {
 					time.Sleep(100 * time.Millisecond) // 稍微等待确保工具开始

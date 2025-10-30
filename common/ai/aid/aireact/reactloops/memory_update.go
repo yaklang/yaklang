@@ -2,9 +2,9 @@ package reactloops
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -16,7 +16,7 @@ func (r *ReActLoop) currentMemorySize() int {
 	return size
 }
 
-func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
+func (r *ReActLoop) PushMemory(result *memory_type.SearchMemoryResult) {
 	if utils.IsNil(result) {
 		return
 	}
@@ -37,7 +37,7 @@ func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
 
 		for r.currentMemorySize() > r.memorySizeLimit {
 			// 删除最早的记忆
-			var removed *aimem.MemoryEntity
+			var removed *memory_type.MemoryEntity
 			removed = r.currentMemories.Shift()
 			if utils.IsNil(removed) {
 				continue
