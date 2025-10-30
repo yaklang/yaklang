@@ -477,6 +477,57 @@ func (ve *MemEditor) GetWordTextFromRange(i *Range) string {
 	return ve.GetTextFromRange(i)
 }
 
+// GetWordWithPointAtPosition 获取光标所在的单词，如果光标前面是 . 的话，还会尝试往前找一个单词
+// 例如: a.b.c.d 光标在 d 的位置，会返回 (c.d, startPos, endPos)
+// 这个方法复刻了 yakit Monaco Editor 中的 getWordWithPointAtPosition 逻辑
+func (ve *MemEditor) GetWordWithPointAtPosition(position *Position) (word string, start *Position, end *Position) {
+	if position == nil {
+		return "", nil, nil
+	}
+
+	// 获取当前位置的单词范围
+	wordRange := ve.GetRangeByPosition(position, position)
+	wordRange = ve.ExpandWordTextRange(wordRange)
+
+	word = wordRange.GetText()
+	start = wordRange.GetStart()
+	end = wordRange.GetEnd()
+
+	// 如果起始列 > 0，检查前一个字符是否是 '.'
+	if start.GetColumn() > 0 {
+		prevCharOffset, err := ve.GetOffsetByPositionWithError(start.GetLine(), start.GetColumn()-1)
+		if err == nil && prevCharOffset >= 0 && prevCharOffset < ve.safeSourceCode.Len() {
+			prevChar := ve.safeSourceCode.Slice1(prevCharOffset)
+
+			if prevChar == '.' {
+				// 前一个字符是 '.'，尝试往前找一个单词
+				if start.GetColumn() >= 2 {
+					prevWordPos := ve.GetPositionByLine(start.GetLine(), start.GetColumn()-2)
+					prevWordRange := ve.GetRangeByPosition(prevWordPos, prevWordPos)
+					prevWordRange = ve.ExpandWordTextRange(prevWordRange)
+					prevWord := prevWordRange.GetText()
+
+					if prevWord != "" {
+						// 连接前一个单词 + "." + 当前单词
+						word = prevWord + "." + word
+						start = prevWordRange.GetStart()
+					} else {
+						// 只有 "." + 当前单词
+						word = "." + word
+						start = ve.GetPositionByLine(start.GetLine(), start.GetColumn()-1)
+					}
+				} else {
+					// 只有 "." + 当前单词
+					word = "." + word
+					start = ve.GetPositionByLine(start.GetLine(), start.GetColumn()-1)
+				}
+			}
+		}
+	}
+
+	return word, start, end
+}
+
 func (ve *MemEditor) IsOffsetValid(offset int) bool {
 	return offset >= 0 && offset <= ve.safeSourceCode.Len()
 }
