@@ -120,7 +120,7 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
 			// Check if the prompt contains tools_search
@@ -145,12 +145,12 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 
 			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
-		WithDebug(false),
+		aicommon.WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
+		aicommon.WithDebug(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
 			// When AI decides to use tools_search
@@ -272,12 +272,12 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 
 			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
-		WithDebug(false),
+		aicommon.WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
+		aicommon.WithDebug(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -364,7 +364,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
 			// When AI decides to use forge_search
@@ -395,12 +395,12 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 
 			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
-		WithDebug(false),
+		aicommon.WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
+		aicommon.WithDebug(false),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -481,7 +481,7 @@ func TestReAct_BothSearchTools_InPrompt(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
 			// Check if both tools appear in the same prompt
@@ -502,12 +502,12 @@ func TestReAct_BothSearchTools_InPrompt(t *testing.T) {
 
 			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
-		WithDebug(false),
+		aicommon.WithToolManager(buildinaitools.NewToolManager(toolManagerOpts...)),
+		aicommon.WithDebug(false),
 	)
 	if err != nil {
 		t.Fatal(err)

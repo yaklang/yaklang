@@ -2,12 +2,12 @@ package reactloops
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -62,8 +62,8 @@ type ReActLoop struct {
 
 	// memory management
 	memorySizeLimit int
-	currentMemories *omap.OrderedMap[string, *aimem.MemoryEntity]
-	memoryTriage    aimem.MemoryTriage
+	currentMemories *omap.OrderedMap[string, *memory_type.MemoryEntity]
+	memoryTriage    aicommon.MemoryTriage
 
 	// task status control
 	onTaskCreated       func(task aicommon.AIStatefulTask)
@@ -152,7 +152,7 @@ func (r *ReActLoop) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
 }
 
-func (r *ReActLoop) GetMemoryTriage() aimem.MemoryTriage {
+func (r *ReActLoop) GetMemoryTriage() aicommon.MemoryTriage {
 	return r.memoryTriage
 }
 
@@ -179,7 +179,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		aiTagFields:     omap.NewEmptyOrderedMap[string, *LoopAITagField](),
 		vars:            omap.NewEmptyOrderedMap[string, any](),
 		taskMutex:       new(sync.Mutex),
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 		memorySizeLimit: 10 * 1024,
 	}
 

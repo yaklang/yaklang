@@ -43,15 +43,15 @@ func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 
 	pid := uuid.New()
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool),
-		WithPersistentSessionId(pid.String()),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithPersistentSessionId(pid.String()),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -144,29 +144,29 @@ LOOP:
 	fmt.Println("--------------------------------------")
 
 	persistentTimeline, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool),
-		WithPersistentSessionId(pid.String()),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithPersistentSessionId(pid.String()),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	withoutPersistent, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool),
+		aicommon.WithTools(sleepTool),
 	)
 	if err != nil {
 		t.Fatal(err)

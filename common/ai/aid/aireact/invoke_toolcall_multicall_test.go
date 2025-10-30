@@ -84,15 +84,15 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling3(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool),
-		WithMaxIterations(4),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithMaxIterationCount(4),
 	)
 	if err != nil {
 		t.Fatal(err)

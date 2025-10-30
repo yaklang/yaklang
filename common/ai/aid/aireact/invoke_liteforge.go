@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -37,7 +36,7 @@ func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt s
 	}
 	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
 		{Key: "query", Value: prompt},
-	}, aid.WithAgreeYOLO(true), aid.WithAICallback(r.config.aiCallback))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(r.config.QualityPriorityAICallback))
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}

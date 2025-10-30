@@ -46,10 +46,10 @@ func TestReAct_RemoveTask_StatusChanges(t *testing.T) {
 	out := make(chan *schema.AiOutputEvent, 100)
 
 	ins, err := NewTestReAct(
-		WithAICallback(mockedToolCallingForRemove),
-		WithReviewPolicy(aicommon.AgreePolicyYOLO),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithAICallback(mockedToolCallingForRemove),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			select {
 			case out <- e:
 			case <-time.After(1 * time.Second):

@@ -12,8 +12,7 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 	release func(),
 ) (*schema.AIForge, aitool.InvokeParams, bool, error) {
 	defer release()
-
-	manager := r.config.aiBlueprintManager
+	manager := r.config.AiForgeManager
 	extraPrompt := reviewParams.GetString("extra_prompt")
 	schemaString, err := manager.GenerateAIJSONSchemaFromSchemaAIForge(ins)
 	if err != nil {

@@ -67,15 +67,15 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 	planDo := false
 	planMatchFlag := false
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequestPlanAndExecuting_Normal(i, r, flag)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool),
-		WithReActHijackPlanRequest(func(ctx context.Context, payload string) error {
+		aicommon.WithTools(sleepTool),
+		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			planDo = true
 			if payload == flag {
 				planMatchFlag = true

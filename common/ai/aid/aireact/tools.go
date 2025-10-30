@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -61,9 +62,9 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 	return result
 }
 
-func NewTestReAct(opts ...Option) (*ReAct, error) {
-	basicOption := []Option{
-		WithMemoryTriage(aimem.NewMockMemoryTriage()),
+func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
+	basicOption := []aicommon.ConfigOption{
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(

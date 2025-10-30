@@ -72,11 +72,11 @@ func TestReAct_WriteYaklangCode(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedYaklangWriting(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)

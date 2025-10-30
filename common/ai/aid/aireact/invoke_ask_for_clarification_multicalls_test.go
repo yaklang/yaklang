@@ -59,17 +59,17 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 
 	_ = flag
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedClarification2(i, r, flag)
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithUserInteractive(true),
-		WithUserInteractiveLimitedTimes(4),
-		WithMaxIterations(7),
+		aicommon.WithAllowRequireForUserInteract(true),
+		aicommon.WithPerTaskUserInteractiveLimitedTimes(4),
+		aicommon.WithMaxIterationCount(7),
 	)
 	if err != nil {
 		t.Fatal(err)

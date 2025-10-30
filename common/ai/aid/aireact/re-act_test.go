@@ -18,13 +18,13 @@ func TestReAct_QueueEnqueue(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			time.Sleep(20 * time.Second)
 			return nil, nil
 		}),
-		WithDebug(true),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(true),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)
@@ -67,13 +67,13 @@ func TestReAct_CounterForQueueEnqueueFlushed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	atomicCount := new(int32)
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			time.Sleep(20 * time.Second)
 			return nil, nil
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			fmt.Println("===============================")
 			fmt.Println("Event: ", e.String())
 			fmt.Println("===============================")
@@ -120,7 +120,7 @@ func TestReAct_QueueEnqueueDequeue(t *testing.T) {
 	haveTaskEnqueue := false
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if strings.Contains(req.GetPrompt(), `如果你觉得问题比较简单，直接回答 Example`) {
 				for {
 					time.Sleep(30 * time.Millisecond)
@@ -138,9 +138,9 @@ func TestReAct_QueueEnqueueDequeue(t *testing.T) {
 			time.Sleep(100 * time.Second)
 			return nil, nil
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)

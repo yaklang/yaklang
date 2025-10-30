@@ -18,7 +18,7 @@ import (
 // TestExec_PanicRecovery 测试panic恢复
 func TestExec_PanicRecovery(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
 			rsp.Close()
@@ -81,7 +81,7 @@ func TestExec_NilTask(t *testing.T) {
 // TestExec_NoActions 测试没有注册action的情况
 func TestExec_NoActions(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
@@ -110,7 +110,7 @@ func TestExec_NoActions(t *testing.T) {
 // TestExec_ActionNotFound 测试action不存在的情况
 func TestExec_ActionNotFound(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 返回一个不存在的action
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "nonexistent_action_xyz"}`))
@@ -135,7 +135,7 @@ func TestExec_ActionNotFound(t *testing.T) {
 // TestExec_NoActionHandler 测试action没有handler的情况
 func TestExec_NoActionHandler(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "no_handler_action"}`))
 			rsp.Close()
@@ -170,7 +170,7 @@ func TestExec_NoActionHandler(t *testing.T) {
 // TestExec_OperatorFail 测试operator Fail
 func TestExec_OperatorFail(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "fail_action"}`))
 			rsp.Close()
@@ -207,7 +207,7 @@ func TestExec_OperatorFail(t *testing.T) {
 // TestExec_CompleteWithReason 测试complete with reason
 func TestExec_CompleteWithReason(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Task done"}`))
 			rsp.Close()
@@ -232,7 +232,7 @@ func TestExec_CompleteWithReason(t *testing.T) {
 // TestExec_StreamFieldsProcessing 测试stream fields处理
 func TestExec_StreamFieldsProcessing(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 包含human_readable_thought字段
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -265,7 +265,7 @@ func TestExec_OnTaskCreatedCallback(t *testing.T) {
 	var capturedTask aicommon.AIStatefulTask
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
@@ -310,7 +310,7 @@ func TestExec_AsyncModeWithCallback(t *testing.T) {
 	var capturedTask aicommon.AIStatefulTask
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "async_test_action", "data": "test"}`))
 			rsp.Close()
@@ -361,7 +361,7 @@ func TestExec_ActionVerifierOnly(t *testing.T) {
 	verifierCalled := false
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verifier_only"}`))
 			rsp.Close()
@@ -405,7 +405,7 @@ func TestExec_ComplexIterations(t *testing.T) {
 	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -440,7 +440,7 @@ func TestExec_ComplexIterations(t *testing.T) {
 // TestExec_ActionNameFallback 测试action name fallback逻辑
 func TestExec_ActionNameFallback(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 使用next_action.type格式（fallback场景）
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -473,7 +473,7 @@ func TestExec_ContextCancellationDuringExecution(t *testing.T) {
 	iterCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			// 模拟一些延迟
 			time.Sleep(50 * time.Millisecond)
@@ -509,7 +509,7 @@ func TestExec_ContextCancellationDuringExecution(t *testing.T) {
 // TestExec_GettersUsage 测试loop的getter方法
 func TestExec_GettersUsage(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
@@ -568,7 +568,7 @@ func TestExec_OperatorNoContinueOrExit(t *testing.T) {
 	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -618,7 +618,7 @@ func TestExec_MaxIterationsExactly(t *testing.T) {
 	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -666,7 +666,7 @@ func TestExec_MaxIterationsExactly(t *testing.T) {
 func TestExec_WithAITagFieldProcessing(t *testing.T) {
 	aiCallCount := 1
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			prompt := req.GetPrompt()
 			if aiCallCount == 1 {

@@ -255,12 +255,18 @@ func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
 }
 
 func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
-	forges, err := pm.react.config.aiBlueprintManager.Query(pm.react.config.GetContext())
+	// use getter and nil-check for safety
+	mgr := pm.react.config.GetAIForgeManager()
+	if mgr == nil {
+		log.Warnf("cannot query any ai-forge manager: nil manager")
+		return ""
+	}
+	forges, err := mgr.Query(pm.react.config.GetContext())
 	if err != nil {
 		log.Warnf("cannot query any ai-forge manager: %v", err)
 		return ""
 	}
-	result, err := pm.react.config.aiBlueprintManager.GenerateAIForgeListForPrompt(forges)
+	result, err := mgr.GenerateAIForgeListForPrompt(forges)
 	if err != nil {
 		log.Warnf("cannot generate ai-forge list for prompt: %v", err)
 		return ""
@@ -275,13 +281,14 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["WorkingDir"] = pm.workdir
 	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
 	result["DynamicContext"] = pm.DynamicContext()
-	result["Language"] = pm.react.config.language
+	result["Language"] = pm.react.config.GetLanguage()
 
-	result["AllowPlan"] = pm.react.config.enablePlanAndExec && pm.react.GetCurrentPlanExecutionTask() == nil
-	result["AllowAskForClarification"] = pm.react.config.enableUserInteract
-	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.enhanceKnowledgeManager == nil || !pm.react.config.disableEnhanceDirectlyAnswer
+	// Use getters instead of direct field access
+	result["AllowPlan"] = pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
+	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
+	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
-	result["AskForClarificationMaxTimes"] = pm.react.config.userInteractiveLimitedTimes
+	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
 
 	result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	if len(tools) > 0 {
@@ -292,16 +299,21 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		result["HasMoreTools"] = false
 	} else {
 		var err error
-		tools, err = pm.react.config.aiToolManager.GetEnableTools()
+		// use getter for ai tool manager and handle nil
+		toolMgr := pm.react.config.GetAiToolManager()
+		if toolMgr == nil {
+			return "", nil, fmt.Errorf("ai tool manager is nil")
+		}
+		tools, err = toolMgr.GetEnableTools()
 		if err != nil {
 			return "", nil, err
 		}
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = pm.react.config.topToolsCount
+		result["TopToolsCount"] = pm.react.config.GetTopToolsCount()
 		// Get prioritized tools
 		if len(tools) > 0 {
-			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
 			result["TopTools"] = topTools
 			result["HasMoreTools"] = len(tools) > len(topTools)
 		} else {
@@ -311,7 +323,12 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	}
 
 	result["ConversationMemory"] = pm.react.cumulativeSummary
-	result["Timeline"] = pm.react.config.timeline.Dump()
+	// use timeline getter
+	if t := pm.react.config.GetTimeline(); t != nil {
+		result["Timeline"] = t.Dump()
+	} else {
+		result["Timeline"] = ""
+	}
 	return basePrompt, result, nil
 }
 
@@ -329,15 +346,15 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if pm.react.config.timeline != nil {
+	if t := pm.react.config.GetTimeline(); t != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = pm.react.config.timeline.Dump()
+		data.Timeline = t.Dump()
 	}
 	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
-	data.MaxIterations = pm.react.config.maxIterations
+	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
 	return pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
 }
@@ -349,16 +366,16 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		OriginalQuery:  originalQuery,
 		IsToolCall:     isToolResult,
 		Payload:        payload,
-		Timeline:       pm.react.config.timeline.Dump(),
-		Language:       pm.react.config.language,
+		Timeline:       "",
+		Language:       pm.react.config.GetLanguage(),
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContext(),
 		EnhanceData:    enhanceData,
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 	}
 
 	return pm.executeTemplate("verification", verificationPromptTemplate, data)
@@ -373,7 +390,7 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 		Title:       toolOrTitle,
 		Details:     params,
 		Nonce:       utils.RandStringBytes(4),
-		Language:    pm.react.config.language,
+		Language:    pm.react.config.GetLanguage(),
 	}
 
 	// Set working directory
@@ -388,8 +405,8 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	}
 
 	// Set timeline memory
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 	}
 
 	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
@@ -407,11 +424,11 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:      userQuery,
 		Nonce:          nonceString,
-		Language:       pm.react.config.language,
+		Language:       pm.react.config.GetLanguage(),
 		Schema:         directlyAnswerSchema,
 		Tools:          tools,
 		ToolsCount:     len(tools),
-		TopToolsCount:  pm.react.config.topToolsCount,
+		TopToolsCount:  pm.react.config.GetTopToolsCount(),
 		DynamicContext: pm.DynamicContext(),
 	}
 
@@ -423,7 +440,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 
 	// Get prioritized tools
 	if len(tools) > 0 {
-		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
 		data.HasMoreTools = len(tools) > len(data.TopTools)
 	}
 
@@ -433,8 +450,8 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	// Set timeline memory
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 	}
 
 	result, err := pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
@@ -470,8 +487,8 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	}
 
 	// Set timeline memory
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 	}
 
 	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
@@ -501,8 +518,8 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 	}
 
 	// Set timeline memory
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 	}
 
 	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
@@ -521,7 +538,7 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 		ForgeList:        forgeList,
 		ExtraPrompt:      extraPrompt,
 		Nonce:            utils.RandStringBytes(4),
-		Language:         pm.react.config.language,
+		Language:         pm.react.config.GetLanguage(),
 		DynamicContext:   pm.DynamicContext(),
 	}
 
@@ -543,8 +560,8 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	}
 
 	// Set timeline memory
-	if pm.react.config.timeline != nil {
-		data.Timeline = pm.react.config.timeline.Dump()
+	if t := pm.react.config.GetTimeline(); t != nil {
+		data.Timeline = t.Dump()
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.UserQuery = task.GetUserInput()
 		}
@@ -575,15 +592,15 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if pm.react.config.timeline != nil {
+	if t := pm.react.config.GetTimeline(); t != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = pm.react.config.timeline.Dump()
+		data.Timeline = t.Dump()
 	}
 	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
-	data.MaxIterations = pm.react.config.maxIterations
+	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
 }
 

@@ -14,12 +14,12 @@ type InteractOption struct {
 }
 
 func (r *ReAct) _requireUserInteract(question string, options []map[string]any) (string, string, error) {
-	if !r.config.enableUserInteract {
+	if !r.config.AllowRequireForUserInteract {
 		r.AddToTimeline("note", "Require user interact but not enabled, skip it.")
 		return "", "", utils.Errorf("require user interact but not enabled")
 	}
 
-	ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+	ep := r.config.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
 	result := map[string]any{

@@ -10,7 +10,7 @@ import (
 
 func (r *ReAct) handleInteractiveEvent(event *ypb.AIInputEvent) error {
 	// Handle interactive messages (tool review responses)
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Processing interactive message: ID=%s", event.InteractiveId)
 	}
 
@@ -23,7 +23,7 @@ func (r *ReAct) handleInteractiveEvent(event *ypb.AIInputEvent) error {
 			}
 
 			params := aitool.InvokeParams(data)
-			r.config.epm.Feed(event.InteractiveId, params)
+			r.config.Epm.Feed(event.InteractiveId, params)
 		}),
 	)
 	if err != nil {

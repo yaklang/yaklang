@@ -25,7 +25,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	verificationPrompt := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
-	if r.config.debugPrompt {
+	if r.config.DebugPrompt {
 		log.Infof("Verification prompt: %s", verificationPrompt)
 	}
 

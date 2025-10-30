@@ -81,16 +81,16 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 	planDo := false
 	planMatchFlag := false
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequestPlanAndExecuting_MultiPlans(i, r, flag)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithReActAllowPlanAndExec(true),
-		WithTools(sleepTool),
-		WithReActHijackPlanRequest(func(ctx context.Context, payload string) error {
+		aicommon.WithEnablePlanAndExec(true),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			planDo = true
 			if payload == flag {
 				planMatchFlag = true

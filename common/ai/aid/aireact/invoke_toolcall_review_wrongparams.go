@@ -25,7 +25,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 		"re-generate-tool-params",
 		fmt.Sprintf("Regenerating parameters for tool: %s", tool.Name),
 	)
-	prompt, err := r.config.promptManager.GenerateReGenerateToolParamsPrompt(input, old, tool)
+	prompt, err := r.promptManager.GenerateReGenerateToolParamsPrompt(input, old, tool)
 	if err != nil {
 		return nil, err
 	}

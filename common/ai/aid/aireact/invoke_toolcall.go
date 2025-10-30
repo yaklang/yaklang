@@ -38,7 +38,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		r.config.Emitter = r.config.Emitter.PopEventProcesser()
 	}()
 	// Find the required tool
-	tool, err := r.config.aiToolManager.GetToolByName(toolName)
+	tool, err := r.config.AiToolManager.GetToolByName(toolName)
 	if err != nil {
 		return nil, false, utils.Errorf("tool '%s' not found: %v", toolName, err)
 	}
@@ -54,7 +54,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
-		aicommon.WithToolCaller_RuntimeId(r.config.id),
+		aicommon.WithToolCaller_RuntimeId(r.config.Id),
 		aicommon.WithToolCaller_Emitter(r.config.Emitter),
 	)
 
@@ -63,7 +63,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(currentTask))
 	} else {
 		// Fall back to config.task if available
-		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.task))
+		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
 	// Add the remaining options
@@ -104,7 +104,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 			result.ID = r.config.AcquireId()
 		}
 		// Store the result in memory
-		r.config.timeline.PushToolResult(result)
+		r.config.Timeline.PushToolResult(result)
 		// Emit the result
 		r.EmitInfo("Tool execution completed: %s", result.Name)
 	}
@@ -118,12 +118,12 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (st
 	}
 
 	// Use PromptManager to generate the prompt
-	prompt, err := r.config.promptManager.GenerateToolParamsPrompt(tool)
+	prompt, err := r.promptManager.GenerateToolParamsPrompt(tool)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate tool params prompt: %w", err)
 	}
 
-	if r.config.debugPrompt {
+	if r.config.DebugPrompt {
 		log.Infof("Tool params prompt: %s", prompt)
 	}
 

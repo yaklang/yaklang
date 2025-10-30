@@ -46,7 +46,7 @@ func (r *ReAct) reviewAIForge(
 	invokeParams aitool.InvokeParams,
 ) (*schema.AIForge, aitool.InvokeParams, bool, error) {
 	// reivew
-	epm := r.config.epm
+	epm := r.config.Epm
 	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	reqs := map[string]any{
@@ -101,7 +101,7 @@ func (r *ReAct) reviewAIForge(
 }
 
 func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.InvokeParams, error) {
-	manager := r.config.aiBlueprintManager
+	manager := r.config.AiForgeManager
 	ins, err := manager.GetAIForge(forgeName)
 	if err != nil {
 		return nil, nil, utils.Errorf("get ai forge [%v] failed", err)

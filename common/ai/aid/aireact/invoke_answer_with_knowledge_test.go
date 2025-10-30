@@ -72,12 +72,12 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 	}
 
 	_, err := NewTestReAct(
-		WithAICallback(callback),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithAICallback(callback),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithEnhanceKnowledgeManager(manager),
+		aicommon.WithEnhanceKnowledgeManager(manager),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -214,13 +214,13 @@ func TestReAct_AnswerWithKnowledge_SatisfactionLoop(t *testing.T) {
 	okToken := uuid.NewString()
 
 	_, err := NewTestReAct(
-		WithAICallback(newMockedAnswerWithKnowledgeUnsatisfied(firstToken, okToken)),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithAICallback(newMockedAnswerWithKnowledgeUnsatisfied(firstToken, okToken)),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithMaxIterations(2),
-		WithEnhanceKnowledgeManager(aicommon.NewDifferentResultEKManager(firstToken, okToken)),
+		aicommon.WithMaxIterationCount(2),
+		aicommon.WithEnhanceKnowledgeManager(aicommon.NewDifferentResultEKManager(firstToken, okToken)),
 	)
 	if err != nil {
 		t.Fatal(err)

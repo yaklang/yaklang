@@ -214,14 +214,14 @@ println(parts)
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangGrepSamples(i, r, stat)
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedYaklangQueryDocument(i, r, stat)
 		}),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithAIKBPath(zipPath), // Use test zip file as aikb
+		aicommon.WithAIKBPath(zipPath), // Use test zip file as aikb
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -518,14 +518,14 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)
@@ -543,17 +543,17 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 
 	// Test with custom value
 	ins2, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithAIKBResultMaxSize(10*1024), // 10KB
+		aicommon.WithAIKBResultMaxSize(10*1024), // 10KB
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -567,17 +567,17 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 
 	// Test with value exceeding hard limit
 	ins3, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			rsp.Close()
 			return rsp, nil
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithAIKBResultMaxSize(50*1024), // Try to set 50KB (exceeds hard limit)
+		aicommon.WithAIKBResultMaxSize(50*1024), // Try to set 50KB (exceeds hard limit)
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -122,7 +122,7 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 		writeDone: false,
 	}
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			sample := `[Error]: 基础语法错误（Syntax Error）`
 			if strings.Contains(r.GetPrompt(), sample) {
 				if !haveError {
@@ -131,8 +131,8 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 			}
 			return mockedYaklangWritingAndModifyCauseError(i, r, "demo", stat)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)

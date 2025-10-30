@@ -32,12 +32,12 @@ func TestReAct_FreeInput(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutput(i, flag)
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)
@@ -95,12 +95,12 @@ func TestReAct_FreeInput_MultiCalls(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutput(i, flag)
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 	)

@@ -262,16 +262,16 @@ func createDebugAICallback(aiCallback aicommon.AICallbackType, config *CLIConfig
 	}
 }
 
-func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, outputChan chan<- *schema.AiOutputEvent, config *CLIConfig) []aireact.Option {
-	options := []aireact.Option{
-		aireact.WithContext(ctx),
-		aireact.WithAICallback(aiCallback),
-		aireact.WithDebug(config.DebugMode),
-		aireact.WithMaxIterations(50),
-		aireact.WithLanguage(config.Language),
-		aireact.WithTopToolsCount(100),
-		aireact.WithReviewPolicy(aicommon.AgreePolicyAI),
-		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
+func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, outputChan chan<- *schema.AiOutputEvent, config *CLIConfig) []aicommon.ConfigOption {
+	options := []aicommon.ConfigOption{
+		aicommon.WithContext(ctx),
+		aicommon.WithAICallback(aiCallback),
+		aicommon.WithDebug(config.DebugMode),
+		aicommon.WithMaxIterationCount(50),
+		aicommon.WithLanguage(config.Language),
+		aicommon.WithTopToolsCount(100),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyAI),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
 		aireact.WithBuiltinTools(),
@@ -279,7 +279,7 @@ func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, 
 
 	// 如果指定了文件路径，添加 traced file context provider
 	if config.FilePath != "" {
-		options = append(options, aireact.WithTracedFileContext("monitored_file", config.FilePath))
+		options = append(options, aicommon.WithTracedFileContext("monitored_file", config.FilePath))
 	}
 
 	return options

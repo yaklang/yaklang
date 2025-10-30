@@ -45,7 +45,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 				r.Emitter,
 			)
 			action, err := aicommon.ExtractActionFromStream(
-				r.config.ctx, reader,
+				r.config.Ctx, reader,
 				"change-ai-blueprint",
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
@@ -70,7 +70,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 				return utils.Error("selected blueprint name is empty, require non-empty")
 			}
 
-			selected, err := r.config.aiBlueprintManager.GetAIForge(selectedBlueprintName)
+			selected, err := r.config.AiForgeManager.GetAIForge(selectedBlueprintName)
 			if err != nil {
 				return utils.Errorf("get selected blueprint '%s' info failed: %v", selectedBlueprintName, err)
 			}
@@ -90,7 +90,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 	release()
 
 	// Generate new parameters for the selected blueprint
-	manager := r.config.aiBlueprintManager
+	manager := r.config.AiForgeManager
 	forgeSchema, err := manager.GenerateAIJSONSchemaFromSchemaAIForge(selectedForge)
 	if err != nil {
 		return nil, nil, false, utils.Errorf("generate ai json schema for selected forge failed: %v", err)
@@ -107,7 +107,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("call-new-forge", false, r.Emitter)
 			action, err := aicommon.ExtractActionFromStream(
-				r.config.ctx,
+				r.config.Ctx,
 				stream, "call-ai-blueprint",
 			)
 			if err != nil {

@@ -34,15 +34,15 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutputWithMemory(i, flag)
 		}),
-		WithDebug(false),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithDebug(false),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithMemoryPoolSize(300),
+		aicommon.WithMemoryPoolSize(300),
 	)
 
 	if o, ok := ins.memoryTriage.(*aimem.MockMemoryTriage); ok {

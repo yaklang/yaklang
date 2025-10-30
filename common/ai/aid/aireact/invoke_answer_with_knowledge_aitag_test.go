@@ -80,12 +80,12 @@ Go is a statically typed, compiled programming language designed at Google. It s
 	}
 
 	_, err := NewTestReAct(
-		WithAICallback(callback),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithAICallback(callback),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithEnhanceKnowledgeManager(manager),
+		aicommon.WithEnhanceKnowledgeManager(manager),
 	)
 	if err != nil {
 		t.Fatal(err)
