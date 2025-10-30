@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type ForgeExecutor func(context.Context, []*ypb.ExecParamItem, ...aid.Option) (*ForgeResult, error)
+type ForgeExecutor func(context.Context, []*ypb.ExecParamItem, ...aicommon.ConfigOption) (*ForgeResult, error)
 
 var forgeMutex = new(sync.RWMutex)
 var forges = make(map[string]ForgeExecutor)
@@ -26,7 +26,7 @@ func RegisterYakAiForge(cfg *YakForgeBlueprintConfig) error {
 	if err != nil {
 		return err
 	}
-	return RegisterForgeExecutor(cfg.Name, func(ctx context.Context, items []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+	return RegisterForgeExecutor(cfg.Name, func(ctx context.Context, items []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
 		ins, err := blueprint.CreateCoordinator(ctx, items, opts...)
 		if err != nil {
 			return nil, err
@@ -51,7 +51,7 @@ func RegisterAIDBuildInForge(i string, params ...LiteForgeOption) error {
 	if err != nil {
 		return utils.Errorf("build lite forge failed: %v", err)
 	}
-	return aid.RegisterAIDBuildinForge(i, func(c context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*aicommon.Action, error) {
+	return aid.RegisterAIDBuildinForge(i, func(c context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*aicommon.Action, error) {
 		result, err := lf.Execute(c, params, opts...)
 		if err != nil {
 			return nil, err
@@ -75,7 +75,7 @@ func ExecuteForge(
 	forgeName string,
 	ctx context.Context,
 	params []*ypb.ExecParamItem,
-	opts ...aid.Option,
+	opts ...aicommon.ConfigOption,
 ) (*ForgeResult, error) {
 	forgeMutex.RLock()
 	defer forgeMutex.RUnlock()

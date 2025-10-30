@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
 
@@ -15,6 +17,63 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOption {
+	opts := make([]aicommon.ConfigOption, 0)
+	if i == nil {
+		return opts
+	}
+	if i.DisallowRequireForUserPrompt {
+		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
+	} else {
+		opts = append(opts, aicommon.WithAllowRequireForUserInteract(true))
+	}
+
+	if i.ReviewPolicy != "" {
+		opts = append(opts, aicommon.WithAgreePolicy(aicommon.AgreePolicyType(i.ReviewPolicy)))
+	}
+
+	if i.ReActMaxIteration > 0 {
+		opts = append(opts, aicommon.WithMaxIterationCount(int64(int(i.ReActMaxIteration))))
+	}
+
+	if i.GetTimelineContentSizeLimit() > 0 {
+		opts = append(opts, aicommon.WithTimeLineLimit(int(i.GetTimelineContentSizeLimit())))
+	}
+
+	if i.UserInteractLimit > 0 {
+		opts = append(opts, aicommon.WithPlanUserInteractMaxCount(i.UserInteractLimit))
+	}
+
+	if i.GetDisableToolUse() {
+		opts = append(opts, aicommon.WithDisableToolUse(true))
+	}
+	if i.GetEnableAISearchTool() {
+		opts = append(opts, aid.WithAiToolsSearchTool())
+	}
+	if len(i.GetExcludeToolNames()) > 0 {
+		opts = append(opts, aicommon.WithDisableToolsName(i.GetExcludeToolNames()...))
+	}
+	if len(i.GetIncludeSuggestedToolNames()) > 0 {
+		opts = append(opts, aicommon.WithEnableToolsName(i.GetIncludeSuggestedToolNames()...))
+	}
+	if len(i.GetIncludeSuggestedToolKeywords()) > 0 {
+		opts = append(opts, aicommon.WithKeywords(i.GetIncludeSuggestedToolKeywords()...))
+	}
+	if i.GetAIService() != "" {
+		chat, err := ai.LoadChater(i.GetAIService())
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		} else {
+			opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
+		}
+	}
+
+	// 默认开启 forge 搜索
+	opts = append(opts, aid.WithAiForgeSearchTool())
+
+	return opts
+}
 
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	firstMsg, err := stream.Recv()
@@ -33,9 +92,9 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	baseCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	inputEvent := make(chan *ypb.AIInputEvent, 1000)
+	inputEvent := chanx.NewUnlimitedChan[*ypb.AIInputEvent](baseCtx, 10)
 
-	optsFromStartParams := aireact.ConvertYPBAIStartParamsToReActConfig(startParams)
+	optsFromStartParams := ConvertYPBAIStartParamsToReActConfig(startParams)
 
 	var currentCoordinatorId = startParams.CoordinatorId
 	_ = currentCoordinatorId
@@ -59,22 +118,23 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	if persistentSession == "" {
 		persistentSession = "default"
 	}
-
-	var reActOptions = []aireact.Option{
-		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
+	var hotpatchChan = chanx.NewUnlimitedChan[aicommon.ConfigOption](baseCtx, 10)
+	var configOptions = []aicommon.ConfigOption{
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			feedback(e)
 		}),
-		aireact.WithEventInputChan(inputEvent),
-		aireact.WithContext(baseCtx),
+		aicommon.WithEventInputChanx(inputEvent),
+		aicommon.WithContext(baseCtx),
 		aireact.WithBuiltinTools(),
-		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
-		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
-		aireact.WithPersistentSessionId(persistentSession),
-		aireact.WithEnableSelfReflection(true),
+		aicommon.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
+		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
+		aicommon.WithPersistentSessionId(persistentSession),
+		aicommon.WithEnableSelfReflection(true),
+		aicommon.WithHotPatchOptionChan(hotpatchChan),
 	}
-	reActOptions = append(reActOptions, optsFromStartParams...)
+	configOptions = append(configOptions, optsFromStartParams...)
 
-	reAct, err := aireact.NewReAct(reActOptions...)
+	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {
 		log.Errorf("create re-act failed: %v", err)
 		return utils.Errorf("create re-act instance failed: %v", err)
@@ -89,16 +149,33 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 			// continue processing
 		}
 
-		msg, err := stream.Recv()
+		event, err := stream.Recv()
 		if err != nil {
 			log.Errorf("recv re-act msg failed: %v", err)
 			continue
 		}
-		select {
-		case <-baseCtx.Done():
-			log.Info("AIReAct stream context done, stopping re-act")
-			return nil
-		case inputEvent <- msg:
+
+		if event.IsConfigHotpatch {
+			params := event.GetParams()
+			var updateOption aicommon.ConfigOption
+			switch event.HotpatchType {
+			case "ReviewPolicy":
+				switch params.GetReviewPolicy() {
+				case "yolo":
+					updateOption = aicommon.WithAgreeYOLO()
+				case "ai":
+					updateOption = aicommon.WithAIAgree()
+				case "manual":
+					updateOption = aicommon.WithAgreeManual()
+				}
+			default:
+				log.Errorf("unknown hotpatch type: %s", event.HotpatchType)
+				continue
+			}
+			hotpatchChan.SafeFeed(updateOption)
+			continue
 		}
+
+		inputEvent.SafeFeed(event)
 	}
 }

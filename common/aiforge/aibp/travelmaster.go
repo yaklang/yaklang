@@ -3,8 +3,8 @@ package aibp
 import (
 	"context"
 	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
@@ -18,12 +18,12 @@ var travelMasterInitPrompt string
 var travelMasterExecutePrompt string
 
 func _init_travelmaster() {
-	err := aiforge.RegisterForgeExecutor("travelmaster", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
+	err := aiforge.RegisterForgeExecutor("travelmaster", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aicommon.ConfigOption) (*aiforge.ForgeResult, error) {
 		forge := aiforge.NewForgeBlueprint(
 			"travelmaster",
 			aiforge.WithInitializePrompt(travelMasterInitPrompt),
 			aiforge.WithPersistentPrompt(travelMasterExecutePrompt),
-			aiforge.WithAIDOptions(option...),
+			aiforge.WithAIOptions(option...),
 			aiforge.WithTools(yakscripttools.GetYakScriptAiTools("amap")...),
 		)
 

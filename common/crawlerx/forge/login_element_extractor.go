@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -92,7 +91,7 @@ func NewLoginElementExtractor() (*LoginElementExtractor, error) {
 }
 
 // ExtractLoginElements 提取登录元素
-func (lee *LoginElementExtractor) ExtractLoginElements(ctx context.Context, htmlContent string, opts ...aid.Option) (*LoginElements, error) {
+func (lee *LoginElementExtractor) ExtractLoginElements(ctx context.Context, htmlContent string, opts ...aicommon.ConfigOption) (*LoginElements, error) {
 	// 准备输入参数
 	params := []*ypb.ExecParamItem{
 		{
@@ -101,7 +100,7 @@ func (lee *LoginElementExtractor) ExtractLoginElements(ctx context.Context, html
 		},
 	}
 
-	opts = append(opts, aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	opts = append(opts, aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		return aiforge.GetQwenAICallback("qwen-plus")(config, req)
 	}))
 

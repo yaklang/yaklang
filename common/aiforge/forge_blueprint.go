@@ -28,7 +28,7 @@ type ForgeBlueprint struct {
 	Name string
 
 	// Plan
-	PlanMocker func(config *aid.Config) *aid.PlanResponse
+	PlanMocker func(config *aid.Coordinator) *aid.PlanResponse
 
 	// InitializePrompt 是AI助手初始化时使用的提示词，用于设置AI的基本行为和知识
 	InitializePrompt string
@@ -43,8 +43,8 @@ type ForgeBlueprint struct {
 	// Tools 是AI助手可以使用的工具列表，这些工具可以扩展AI的能力
 	Tools []*aitool.Tool
 
-	// AIDOptions 是AI助手的其他配置选项
-	AIDOptions []aid.Option
+	// AIOptions 是AI助手的其他配置选项
+	AIOptions []aicommon.ConfigOption
 
 	// ParameterRuleYaklangCode 是原始的Yaklang CLI代码，用于AI理解和操作Yaklang环境
 	// 不执行这段代码，只通过代码生成表单
@@ -66,15 +66,15 @@ func NewForgeBlueprint(name string, opts ...Option) *ForgeBlueprint {
 // Option 是一个函数类型，用于实现选项模式来配置ForgeBlueprint
 type Option func(*ForgeBlueprint)
 
-// WithAIDOptions 设置AI助手的配置选项
-func WithAIDOptions(options ...aid.Option) Option {
+// WithAIOptions 设置AI助手的配置选项
+func WithAIOptions(options ...aicommon.ConfigOption) Option {
 	return func(f *ForgeBlueprint) {
-		f.AIDOptions = append(f.AIDOptions, options...)
+		f.AIOptions = append(f.AIOptions, options...)
 	}
 }
 
 // WithPlanMocker 设置AI助手的计划生成器
-func WithPlanMocker(plan func(config *aid.Config) *aid.PlanResponse) Option {
+func WithPlanMocker(plan func(config *aid.Coordinator) *aid.PlanResponse) Option {
 	return func(f *ForgeBlueprint) {
 		f.PlanMocker = plan
 	}
@@ -156,7 +156,7 @@ func (f *ForgeBlueprint) GenerateParameter() *ypb.YaklangInspectInformationRespo
 // GenerateFirstPromptWithMemoryOption 用户根据 Origin
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	params []*ypb.ExecParamItem,
-) (string, []aid.Option, error) {
+) (string, []aicommon.ConfigOption, error) {
 	initPrompt, err := f.renderInitPrompt("", params...)
 	if err != nil {
 		return "", nil, utils.Errorf("render init prompt failed: %v", err)
@@ -168,24 +168,22 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
 	}
 
-	var opts []aid.Option
+	var opts []aicommon.ConfigOption
 	_ = persistentPrompt
 	if persistentPrompt != "" {
-		opts = append(opts, aid.WithAppendPersistentMemory(persistentPrompt))
-	}
-
-	if f.PlanMocker != nil {
-		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+		opts = append(opts, aicommon.WithAppendPersistentMemory(persistentPrompt))
 	}
 
 	if len(f.Tools) > 0 {
-		opts = append(opts, aid.WithTools(f.Tools...))
+		opts = append(opts, aicommon.WithTools(f.Tools...))
 	}
 
-	opts = append(opts, f.AIDOptions...)
+	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
-		opts = append(opts, aid.WithResultHandler(func(config *aid.Config) {
-			prompt, err := f.renderResultPrompt(config.GetMemory())
+		opts = append(opts, aicommon.WithResultHandler(func(config *aicommon.Config) {
+			memory := aid.GetDefaultMemory()
+			memory.SetTimelineInstance(config.Timeline)
+			prompt, err := f.renderResultPrompt(memory)
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
@@ -211,7 +209,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 
 func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOptionWithQuery(
 	query string,
-) (string, []aid.Option, error) {
+) (string, []aicommon.ConfigOption, error) {
 	params := []*ypb.ExecParamItem{
 		{
 			Key:   "query",
