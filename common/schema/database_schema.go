@@ -74,8 +74,6 @@ var ProfileTables = []interface{}{
 	&SSAProject{},
 	&ProxyEndpoint{},
 	&ProxyRoute{},
-	&ProxyRoutePattern{},
-	&ProxyRouteEndpoint{},
 }
 
 var databaseSchemas = map[uint8][]any{
