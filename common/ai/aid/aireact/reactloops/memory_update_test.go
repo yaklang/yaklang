@@ -1,11 +1,11 @@
 package reactloops
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"strings"
 	"sync"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -13,7 +13,7 @@ import (
 // TestCurrentMemorySize_Empty 测试空内存大小
 func TestCurrentMemorySize_Empty(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	size := loop.currentMemorySize()
@@ -26,11 +26,11 @@ func TestCurrentMemorySize_Empty(t *testing.T) {
 // TestCurrentMemorySize_SingleMemory 测试单个记忆的大小
 func TestCurrentMemorySize_SingleMemory(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	content := "This is a test memory content"
-	entity := &aimem.MemoryEntity{
+	entity := &memory_type.MemoryEntity{
 		Id:      "mem-1",
 		Content: content,
 	}
@@ -48,7 +48,7 @@ func TestCurrentMemorySize_SingleMemory(t *testing.T) {
 // TestCurrentMemorySize_MultipleMemories 测试多个记忆的大小
 func TestCurrentMemorySize_MultipleMemories(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	contents := []struct {
@@ -62,7 +62,7 @@ func TestCurrentMemorySize_MultipleMemories(t *testing.T) {
 
 	expectedSize := 0
 	for _, c := range contents {
-		entity := &aimem.MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:      c.id,
 			Content: c.content,
 		}
@@ -80,7 +80,7 @@ func TestCurrentMemorySize_MultipleMemories(t *testing.T) {
 // TestGetCurrentMemoriesContent_Empty 测试获取空记忆内容
 func TestGetCurrentMemoriesContent_Empty(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	content := loop.GetCurrentMemoriesContent()
@@ -93,10 +93,10 @@ func TestGetCurrentMemoriesContent_Empty(t *testing.T) {
 // TestGetCurrentMemoriesContent_SingleMemory 测试获取单个记忆的内容
 func TestGetCurrentMemoriesContent_SingleMemory(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
-	entity := &aimem.MemoryEntity{
+	entity := &memory_type.MemoryEntity{
 		Id:      "mem-1",
 		Content: "Test content",
 	}
@@ -112,12 +112,12 @@ func TestGetCurrentMemoriesContent_SingleMemory(t *testing.T) {
 // TestGetCurrentMemoriesContent_MultipleMemories 测试获取多个记忆的内容
 func TestGetCurrentMemoriesContent_MultipleMemories(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	contents := []string{"First memory", "Second memory", "Third memory"}
 	for i, c := range contents {
-		entity := &aimem.MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:      "mem-" + string(rune(i+1)),
 			Content: c,
 		}
@@ -138,14 +138,14 @@ func TestGetCurrentMemoriesContent_MultipleMemories(t *testing.T) {
 // TestGetCurrentMemoriesContent_WithNewlines 测试获取内容中的换行符
 func TestGetCurrentMemoriesContent_WithNewlines(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
-	entity1 := &aimem.MemoryEntity{
+	entity1 := &memory_type.MemoryEntity{
 		Id:      "mem-1",
 		Content: "First",
 	}
-	entity2 := &aimem.MemoryEntity{
+	entity2 := &memory_type.MemoryEntity{
 		Id:      "mem-2",
 		Content: "Second",
 	}
@@ -166,11 +166,11 @@ func TestGetCurrentMemoriesContent_WithNewlines(t *testing.T) {
 // TestMemorySize_DirectAccess 测试通过直接设置记忆来计算大小
 func TestMemorySize_DirectAccess(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	// 直接设置记忆条目而不通过 PushMemory
-	entities := []*aimem.MemoryEntity{
+	entities := []*memory_type.MemoryEntity{
 		{Id: "m1", Content: "Short"},
 		{Id: "m2", Content: "Medium length content here"},
 		{Id: "m3", Content: "This is a very long memory content"},
@@ -193,7 +193,7 @@ func TestMemorySize_DirectAccess(t *testing.T) {
 // TestMemoryContent_Retrieval 测试记忆内容检索的完整性
 func TestMemoryContent_Retrieval(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 	}
 
 	// 设置多个内存条目
@@ -204,7 +204,7 @@ func TestMemoryContent_Retrieval(t *testing.T) {
 	}
 
 	for id, content := range memories {
-		loop.currentMemories.Set(id, &aimem.MemoryEntity{
+		loop.currentMemories.Set(id, &memory_type.MemoryEntity{
 			Id:      id,
 			Content: content,
 		})
@@ -244,9 +244,9 @@ func TestMemorySize_Accuracy(t *testing.T) {
 
 	for _, tc := range testCases {
 		loop := &ReActLoop{
-			currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+			currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 		}
-		loop.currentMemories.Set(tc.id, &aimem.MemoryEntity{
+		loop.currentMemories.Set(tc.id, &memory_type.MemoryEntity{
 			Id:      tc.id,
 			Content: tc.content,
 		})
@@ -265,7 +265,7 @@ func TestMemorySize_Accuracy(t *testing.T) {
 // TestMemoryOperations_Concurrent 测试并发访问记忆操作
 func TestMemoryOperations_Concurrent(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
 		taskMutex:       &sync.Mutex{},
 	}
 
@@ -275,7 +275,7 @@ func TestMemoryOperations_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(index int) {
 			defer wg.Done()
-			entity := &aimem.MemoryEntity{
+			entity := &memory_type.MemoryEntity{
 				Id:      "mem-" + string(rune(index)),
 				Content: "Concurrent memory " + string(rune(index)),
 			}

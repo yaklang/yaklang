@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestPromptManager_WithDynamicContextProvider(t *testing.T) {
+func TestPromptManagerWithDynamicContextProvider(t *testing.T) {
 	// Track if the provider was called
 	providerCalled := false
 	providerCallCount := 0
@@ -32,8 +32,8 @@ func TestPromptManager_WithDynamicContextProvider(t *testing.T) {
 
 	// Create ReAct instance with the dynamic context provider
 	react, err := NewTestReAct(
-		WithDynamicContextProvider("test_provider", mockProvider),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithDynamicContextProvider("test_provider", mockProvider),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			// Mock AI response for testing
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
@@ -74,7 +74,7 @@ func TestPromptManager_WithDynamicContextProvider(t *testing.T) {
 	t.Logf("Dynamic context: %s", ctx)
 }
 
-func TestPromptManager_WithDynamicContextProvider_MultipleProviders(t *testing.T) {
+func TestPromptManager__MultipleProviders(t *testing.T) {
 	callCounts := make(map[string]int)
 	var countsMutex sync.Mutex
 
@@ -94,9 +94,9 @@ func TestPromptManager_WithDynamicContextProvider_MultipleProviders(t *testing.T
 
 	// Create ReAct instance with multiple providers
 	react, err := NewTestReAct(
-		WithDynamicContextProvider("provider1", provider1),
-		WithDynamicContextProvider("provider2", provider2),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithDynamicContextProvider("provider1", provider1),
+		aicommon.WithDynamicContextProvider("provider2", provider2),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -128,7 +128,7 @@ func TestPromptManager_WithDynamicContextProvider_MultipleProviders(t *testing.T
 	t.Logf("Dynamic context with multiple providers: %s", ctx)
 }
 
-func TestPromptManager_WithDynamicContextProvider_ErrorHandling(t *testing.T) {
+func TestPromptManager__ErrorHandling(t *testing.T) {
 	// Provider that returns an error
 	errorProvider := func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
 		return "", fmt.Errorf("mock provider error")
@@ -140,9 +140,9 @@ func TestPromptManager_WithDynamicContextProvider_ErrorHandling(t *testing.T) {
 	}
 
 	react, err := NewTestReAct(
-		WithDynamicContextProvider("error_provider", errorProvider),
-		WithDynamicContextProvider("normal_provider", normalProvider),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithDynamicContextProvider("error_provider", errorProvider),
+		aicommon.WithDynamicContextProvider("normal_provider", normalProvider),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -169,7 +169,7 @@ func TestPromptManager_WithDynamicContextProvider_ErrorHandling(t *testing.T) {
 	t.Logf("Dynamic context with error handling: %s", ctx)
 }
 
-func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.T) {
+func TestPromptManager__InPromptGeneration(t *testing.T) {
 	providerCalled := false
 	var callMutex sync.Mutex
 
@@ -181,8 +181,8 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 	}
 
 	react, err := NewTestReAct(
-		WithDynamicContextProvider("prompt_test", mockProvider),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithDynamicContextProvider("prompt_test", mockProvider),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -193,7 +193,7 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
 
-	_, _, err = react.config.GetBasicPromptInfo(nil)
+	_, _, err = react.GetBasicPromptInfo(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,8 +235,8 @@ func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 	}
 
 	react, err := NewTestReAct(
-		WithTracedDynamicContextProvider("traced_provider", mockProvider),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTracedDynamicContextProvider("traced_provider", mockProvider),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -292,8 +292,8 @@ func TestPromptManager_WithTracedFileContext(t *testing.T) {
 	tempFile.Close()
 
 	react, err := NewTestReAct(
-		WithTracedFileContext("test_file", tempFile.Name()),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTracedFileContext("test_file", tempFile.Name()),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -343,8 +343,8 @@ func TestPromptManager_WithTracedFileContext_FileNotExist(t *testing.T) {
 	nonExistentFile := "/tmp/non_existent_file_12345.txt"
 
 	react, err := NewTestReAct(
-		WithTracedFileContext("non_existent", nonExistentFile),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTracedFileContext("non_existent", nonExistentFile),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -388,9 +388,9 @@ func TestPromptManager_WithMixedContextProviders(t *testing.T) {
 	}
 
 	react, err := NewTestReAct(
-		WithDynamicContextProvider("regular", regularProvider),
-		WithTracedDynamicContextProvider("traced", tracedProvider),
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithDynamicContextProvider("regular", regularProvider),
+		aicommon.WithTracedDynamicContextProvider("traced", tracedProvider),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -442,19 +442,19 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 	// Create a ReAct instance with traced providers
 	react, err := NewTestReAct(
 		// Regular dynamic context provider (no tracing)
-		WithDynamicContextProvider("system_info", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		aicommon.WithDynamicContextProvider("system_info", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
 			return "System: Linux x86_64", nil
 		}),
 
 		// Traced dynamic context provider (tracks changes)
-		WithTracedDynamicContextProvider("user_session", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		aicommon.WithTracedDynamicContextProvider("user_session", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
 			return fmt.Sprintf("Session active since %s", time.Now().Format("15:04:05")), nil
 		}),
 
 		// Traced file context provider (monitors file changes)
-		WithTracedFileContext("config_file", "/etc/config.yaml"),
+		aicommon.WithTracedFileContext("config_file", "/etc/config.yaml"),
 
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Example completed"}, "cumulative_summary": "Example summary", "human_readable_thought": "Example thought"}`))
 			rsp.Close()
@@ -490,7 +490,7 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 func TestPromptManager_AIForgeList(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 AIForgeList 功能
 	react, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -531,7 +531,7 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 GenerateAIBlueprintForgeParamsPrompt 方法
 	react, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
 			rsp.Close()
@@ -634,7 +634,7 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 		// 设置一些上下文信息
 		react.cumulativeSummary = "Previous task summary"
 		react.currentIteration = 2
-		react.config.maxIterations = 10
+		react.config.MaxIterationCount = 10
 
 		schema := `{"type": "object", "properties": {"test": {"type": "string"}}}`
 		prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(testAIForge, schema)

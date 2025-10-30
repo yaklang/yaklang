@@ -22,7 +22,7 @@ func (r *ReAct) processReActFromQueue() {
 	}
 
 	// 从队列获取下一个任务
-	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.id)
+	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.Id)
 	nextTask := r.taskQueue.GetFirst()
 	if nextTask == nil {
 		return
@@ -30,7 +30,7 @@ func (r *ReAct) processReActFromQueue() {
 
 	r.setCurrentTask(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Processing task from queue: %s", nextTask.GetId())
 	}
 	// 异步处理任务
@@ -49,7 +49,7 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 			task.SetStatus(aicommon.AITaskState_Aborted)
 			r.AddToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
 		} else {
-			if r.config.debugEvent {
+			if r.config.DebugEvent {
 				log.Infof("Finished processing task: %s", task.GetId())
 			}
 			if !skipStatusFallback.IsSet() {
@@ -82,8 +82,8 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		schema.AI_REACT_LOOP_NAME_DEFAULT, r,
 		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithMemoryPool(r.memoryPool),
-		reactloops.WithMemorySizeLimit(int(r.config.memoryPoolSize)),
-		reactloops.WithEnableSelfReflection(r.config.GetEnableSelfReflection()),
+		reactloops.WithMemorySizeLimit(int(r.config.MemoryPoolSize)),
+		reactloops.WithEnableSelfReflection(r.config.EnableSelfReflection),
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(task)
 		}),
@@ -101,7 +101,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 
 			// 如果没有新的时间线差异，跳过记忆处理
 			if diffStr == "" {
-				if r.config.debugEvent {
+				if r.config.DebugEvent {
 					log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
 				}
 				r.wg.Done()
@@ -118,7 +118,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 				}()
 
 				// 使用智能记忆处理系统
-				if r.config.debugEvent {
+				if r.config.DebugEvent {
 					log.Infof("processing memory for iteration %d with timeline diff: %s", iteration, utils.ShrinkString(diffStr, 200))
 				}
 
@@ -138,7 +138,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 					return
 				}
 
-				if r.config.debugEvent {
+				if r.config.DebugEvent {
 					log.Infof("intelligent memory processing completed for iteration %d", iteration)
 				}
 
@@ -162,7 +162,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 						if len(searchResult.Memories) > 0 {
 							log.Infof("found %d relevant memories for completed task %s (total: %d bytes)",
 								len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
-							if r.config.debugEvent {
+							if r.config.DebugEvent {
 								log.Infof("memory search summary: %s", searchResult.SearchSummary)
 								for i, mem := range searchResult.Memories {
 									log.Infof("relevant memory %d: %s (tags: %v, relevance: C=%.2f, R=%.2f)",
@@ -170,7 +170,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 								}
 							}
 						} else {
-							if r.config.debugEvent {
+							if r.config.DebugEvent {
 								log.Infof("no relevant memories found for completed task %s", task.GetId())
 							}
 						}

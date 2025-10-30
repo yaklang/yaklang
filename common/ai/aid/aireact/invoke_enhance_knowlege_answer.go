@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	"context"
-
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,18 +17,18 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 	enhanceID := uuid.NewString()
 	config := r.config
 
-	if config.enhanceKnowledgeManager == nil {
+	if config.EnhanceKnowledgeManager == nil {
 		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
 	}
 
-	enhanceData, err := config.enhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
+	enhanceData, err := config.EnhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
 	if err != nil {
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		config.enhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
+		config.EnhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
 	}
 
 	var queryBuf bytes.Buffer

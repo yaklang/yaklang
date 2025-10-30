@@ -114,14 +114,14 @@ func TestReAct_ToolUse_WrongTool_AskForClarification(t *testing.T) {
 	}
 
 	ins, err := NewTestReAct(
-		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCallingWrongTool_AskForClarification(i, r, "sleep")
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithTools(sleepTool, echoTool),
+		aicommon.WithTools(sleepTool, echoTool),
 	)
 	if err != nil {
 		t.Fatal(err)

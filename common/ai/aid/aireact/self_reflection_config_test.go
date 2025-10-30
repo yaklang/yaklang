@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,8 +15,8 @@ func TestSelfReflectionConfig(t *testing.T) {
 	// 测试启用自我反思
 	t.Run("EnableSelfReflection", func(t *testing.T) {
 		reactIns, err := NewReAct(
-			WithContext(context.Background()),
-			WithEnableSelfReflection(true),
+			aicommon.WithContext(context.Background()),
+			aicommon.WithEnableSelfReflection(true),
 		)
 		assert.NoError(t, err)
 		assert.True(t, reactIns.config.GetEnableSelfReflection())
@@ -36,8 +37,8 @@ func TestSelfReflectionConfig(t *testing.T) {
 	// 测试禁用自我反思
 	t.Run("DisableSelfReflection", func(t *testing.T) {
 		reactIns, err := NewReAct(
-			WithContext(context.Background()),
-			WithEnableSelfReflection(false),
+			aicommon.WithContext(context.Background()),
+			aicommon.WithEnableSelfReflection(false),
 		)
 		assert.NoError(t, err)
 		assert.False(t, reactIns.config.GetEnableSelfReflection())
@@ -57,7 +58,7 @@ func TestSelfReflectionConfig(t *testing.T) {
 
 	// 测试默认配置（应该是禁用的）
 	t.Run("DefaultSelfReflection", func(t *testing.T) {
-		reactIns, err := NewReAct(WithContext(context.Background()))
+		reactIns, err := NewReAct(aicommon.WithContext(context.Background()))
 		assert.NoError(t, err)
 		assert.False(t, reactIns.config.GetEnableSelfReflection()) // 默认应该是 false
 

@@ -18,7 +18,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *ai
 	default:
 	}
 
-	manager := r.config.aiToolManager
+	manager := r.config.AiToolManager
 
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
@@ -59,7 +59,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(ctx context.Context, oldTool *ai
 	var redo bool
 	var selectedTool *aitool.Tool
 	var answerDirectly bool
-	noUserInteract := r.config.enableUserInteract
+	noUserInteract := r.config.AllowRequireForUserInteract
 REDO:
 	// Check context before each iteration
 	select {
@@ -69,7 +69,7 @@ REDO:
 	}
 
 	redo = false
-	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
+	prompt, err := r.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
 	if err != nil {
 		return oldTool, true, err
 	}
