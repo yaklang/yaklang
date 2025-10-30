@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -278,4 +279,52 @@ func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 	}
 
 	t.Logf("Successfully exported and loaded %d documents with correct data", len(ragData.Documents))
+}
+
+func TestMUSTPASS_ImportAndRebuildHNSWIndex(t *testing.T) {
+	// 创建测试数据库
+	testDB, err := createTempTestDatabase()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 创建测试集合
+	collectionName := utils.RandStringBytes(10)
+	embedding := NewDefaultMockEmbedding()
+	store, err := NewSQLiteVectorStoreHNSW(collectionName, "test description", "text-embedding-3-small", 1024, embedding, testDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ragSystem := NewRAGSystem(embedding, store)
+	for i := 0; i < 100; i++ {
+		ragSystem.Add(fmt.Sprintf("computer algorithm data %d", i), fmt.Sprintf("computer algorithm data %d", i), WithDocumentRawMetadata(map[string]any{"test": "test"}))
+	}
+	reader, err := ExportRAGToBinary(collectionName, WithImportExportDB(testDB), WithNoHNSWGraph(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var binBuffer bytes.Buffer
+	ragData, err := LoadRAGFromBinary(io.TeeReader(reader, &binBuffer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, len(ragData.Documents), 100)
+	assert.Equal(t, len(ragData.Collection.GraphBinary), 0)
+
+	newCollectionName := utils.RandStringBytes(10)
+	err = ImportRAGFromReader(&binBuffer, WithImportExportDB(testDB), WithRebuildHNSWIndex(true), WithCollectionName(newCollectionName))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var collection schema.VectorStoreCollection
+	if err := testDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", newCollectionName).First(&collection).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(collection.GraphBinary) == 0 {
+		t.Fatal("GraphBinary is empty")
+	}
+	assert.NotNil(t, collection.GraphBinary)
+	assert.NotEqual(t, len(collection.GraphBinary), 0)
 }
