@@ -61,7 +61,7 @@ func TestDebugCompletion_RagDot(t *testing.T) {
 	for i, item := range resp.SuggestionMessage {
 		if item.Label == "BuildIndexKnowledgeFromFile" {
 			found = true
-			t.Logf("✅ 找到! 位置: [%d]", i+1)
+			t.Logf("找到! 位置: [%d]", i+1)
 			t.Logf("   Label: %s", item.Label)
 			t.Logf("   InsertText: %s", item.InsertText)
 			t.Logf("   Kind: %s", item.Kind)
@@ -70,7 +70,7 @@ func TestDebugCompletion_RagDot(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("❌ 未找到 BuildIndexKnowledgeFromFile")
+		t.Errorf("未找到 BuildIndexKnowledgeFromFile")
 	}
 
 	// 搜索所有包含 "rag" 的补全项
@@ -136,7 +136,7 @@ func TestDebugCompletion_RagNoDot(t *testing.T) {
 	for i, item := range resp.SuggestionMessage {
 		if item.Label == "rag" {
 			found = true
-			t.Logf("✅ 找到! 位置: [%d]", i+1)
+			t.Logf("找到! 位置: [%d]", i+1)
 			t.Logf("   Label: %s", item.Label)
 			t.Logf("   InsertText: %s", item.InsertText)
 			t.Logf("   Kind: %s", item.Kind)
@@ -144,7 +144,7 @@ func TestDebugCompletion_RagNoDot(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("❌ 未找到 rag 库")
+		t.Errorf("未找到 rag 库")
 	}
 }
 
@@ -203,7 +203,7 @@ x.`
 	for i, item := range resp.SuggestionMessage {
 		if item.Label == "BuildIndexKnowledgeFromFile" {
 			found = true
-			t.Logf("✅ 找到! 位置: [%d]", i+1)
+			t.Logf("找到! 位置: [%d]", i+1)
 			t.Logf("   Label: %s", item.Label)
 			t.Logf("   InsertText: %s", item.InsertText)
 			t.Logf("   Kind: %s", item.Kind)
@@ -211,8 +211,8 @@ x.`
 		}
 	}
 	if found {
-		t.Logf("✅ 测试通过：x = rag; x. 能正确补全")
+		t.Logf("测试通过：x = rag; x. 能正确补全")
 	} else {
-		t.Errorf("❌ x = rag; x. 无法补全 rag 的方法")
+		t.Errorf("x = rag; x. 无法补全 rag 的方法")
 	}
 }
