@@ -104,6 +104,8 @@ type ReActConfig struct {
 	// AI callback for handling LLM calls
 	aiCallback AICallbackType
 
+	aiServiceName string
+
 	toolKeywords []string // Keywords for tool suggestions
 
 	// Tool management
@@ -269,6 +271,13 @@ func WithContext(ctx context.Context) Option {
 func WithAICallback(callback aicommon.AICallbackType) Option {
 	return func(cfg *ReActConfig) {
 		cfg.aiCallback = callback
+	}
+}
+
+// WithAICallback sets the AI callback for LLM interactions
+func WithAIServiceName(name string) Option {
+	return func(cfg *ReActConfig) {
+		cfg.aiServiceName = name
 	}
 }
 
@@ -658,6 +667,13 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		return nil
 	})
 
+	config.Emitter = config.Emitter.PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if e.AIService == "" {
+			e.AIService = config.aiServiceName
+		}
+		return e
+	})
+
 	// Initialize checkpoint storage
 	config.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(id, consts.GetGormProjectDatabase())
 
@@ -759,6 +775,21 @@ func (c *ReActConfig) restorePersistentSession() {
 		c.persistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
 }
 
+func (c *ReActConfig) loadAIServiceByName(name string) error {
+	chat, err := ai.LoadChater(name)
+	if err != nil {
+		return err
+	}
+	// update react config
+	c.aiCallback = aicommon.AIChatToAICallbackType(chat)
+	c.aiServiceName = name
+
+	// submit hotpatch options
+	c.hotpatchBroadcaster.Submit(aid.WithAIServiceName(c.aiServiceName))
+	c.hotpatchBroadcaster.Submit(aid.WithAICallback(c.aiCallback))
+	return nil
+}
+
 // NewReActConfig creates a new ReActConfig with options
 func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 	config := newReActConfig(ctx)
@@ -768,6 +799,12 @@ func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 		opt(config)
 	}
 
+	if config.aiServiceName != "" {
+		err := config.loadAIServiceByName(config.aiServiceName)
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		}
+	}
 	// Initialize tool manager if not set
 	if config.aiToolManager == nil {
 		config.aiToolManager = buildinaitools.NewToolManager(config.aiToolManagerOption...)

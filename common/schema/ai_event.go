@@ -137,6 +137,7 @@ type AiOutputEvent struct {
 	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
 
 	ContentType string
+	AIService   string
 }
 
 func (e *AiOutputEvent) ShouldSave() bool {
@@ -300,5 +301,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		CallToolID:      e.CallToolID,
 		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
 		ContentType:     e.ContentType,
+		AIService:       e.AIService,
 	}
 }
