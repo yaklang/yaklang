@@ -199,7 +199,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 	}
 
-	err = CheckUpdateFileMonitors(absPath)
+	CheckUpdateFileMonitors(absPath)
 
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
@@ -301,7 +301,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 			return nil, utils.Wrapf(err, "cannot write file[%s]", u.GetPath())
 		}
 	}
-	err = CheckUpdateFileMonitors(absPath)
+	CheckUpdateFileMonitors(absPath)
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath()) // check file / dir
@@ -344,7 +344,7 @@ func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestY
 	if err != nil {
 		return nil, err
 	}
-	err = CheckUpdateFileMonitors(absPath)
+	CheckUpdateFileMonitors(absPath)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
