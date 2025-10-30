@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -129,14 +128,13 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 
-	// 预取远端同名规则版本，避免逐条请求/连接
-	var ruleNames []string
+	var ruleIds []string
 	for _, r := range ret {
-		ruleNames = append(ruleNames, r.RuleName)
+		ruleIds = append(ruleIds, r.RuleId)
 	}
-	remoteVersionMap, prefetchErr := fetchRemoteRuleVersionMap(stream.Context(), client, req.Token, ruleNames)
+	remoteVersionMap, prefetchErr := fetchRemoteRuleVersionMap(stream.Context(), client, req.Token, ruleIds)
 	if prefetchErr != nil {
-		sendProgress(stream, 0, fmt.Sprintf("获取远端版本失败 [%s]: %v，将继续尝试上传", strings.Join(ruleNames, ","), err), "warning")
+		sendProgress(stream, 0, fmt.Sprintf("获取远端版本失败: %v，将继续尝试上传", err), "warning")
 	}
 
 	for i, k := range ret {
@@ -215,7 +213,7 @@ func fetchRemoteRuleVersionMap(ctx context.Context, client *yaklib.OnlineClient,
 	}
 	for item := range ch.Chan {
 		if item != nil && item.Rule != nil {
-			versionMap[item.Rule.RuleName] = item.Rule.Version
+			versionMap[item.Rule.RuleId] = item.Rule.Version
 		}
 	}
 	return versionMap, nil
@@ -299,7 +297,7 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 		}
 		count++
 
-		localRule, err := sfdb.QueryRuleByName(s.GetProfileDatabase(), result.RuleName)
+		localRule, err := sfdb.QueryRuleByRuleId(s.GetProfileDatabase(), result.RuleId)
 		if err == nil && localRule != nil {
 			if shouldSkipUpdate(localRule.Version, result.Version) {
 				skippedCount++

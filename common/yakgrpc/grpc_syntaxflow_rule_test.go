@@ -591,9 +591,12 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 	t.Run("normal - new rules upload", func(t *testing.T) {
 		ruleName1 := uuid.NewString()
 		ruleName2 := uuid.NewString()
+		ruleHash1 := uuid.NewString()
+		ruleHash2 := uuid.NewString()
 		onlineRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName1,
+				RuleId:   ruleHash1,
 				Content:  "aaa",
 			},
 		}
@@ -601,6 +604,7 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		testRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName2,
+				RuleId:   ruleHash2,
 				Content:  "bbb",
 			},
 		}
@@ -614,7 +618,6 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		uploadCount := 0
 		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
 			uploadCount++
-
 			for i, r := range onlineRules {
 				if r.RuleName == rule.RuleName {
 					onlineRules[i] = rule
@@ -664,9 +667,11 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 
 	t.Run("skip upload - online version is newer", func(t *testing.T) {
 		ruleName := uuid.NewString()
+		ruleHash := uuid.NewString()
 		onlineRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName,
+				RuleId:   ruleHash,
 				Content:  "aaa",
 				Version:  "20251015.0002",
 			},
@@ -675,6 +680,7 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		testRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName,
+				RuleId:   ruleHash,
 				Content:  "bbb",
 				Version:  "20251015.0001",
 			},
@@ -738,9 +744,11 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 
 	t.Run("upload - local version is newer", func(t *testing.T) {
 		ruleName := uuid.NewString()
+		ruleHash := uuid.NewString()
 		onlineRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName,
+				RiskType: ruleHash,
 				Content:  "aaa",
 				Version:  "20251015.0002",
 			},
@@ -749,6 +757,7 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		testRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName,
+				RiskType: ruleHash,
 				Content:  "bbb",
 				Version:  "20251015.0003",
 			},
@@ -812,9 +821,10 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 }
 
 func TestDownloadSyntaxFlowRule(t *testing.T) {
-	buildRule := func(ruleName, version string) {
+	buildRule := func(ruleName, ruleId, version string) {
 		rule, err := sfdb.CheckSyntaxFlowRuleContent("aaa")
 		rule.RuleName = ruleName
+		rule.RuleId = ruleId
 		rule.Version = version
 		require.NoError(t, err)
 		err = sfdb.MigrateSyntaxFlow(rule.CalcHash(), rule)
@@ -824,6 +834,8 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 	t.Run("normal - new rules download", func(t *testing.T) {
 		ruleName1 := uuid.NewString()
 		ruleName2 := uuid.NewString()
+		ruleHash1 := uuid.NewString()
+		ruleHash2 := uuid.NewString()
 
 		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
 			assert.True(t, progress >= 0 && progress <= 1)
@@ -837,9 +849,11 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 2)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName1,
+				RuleId:   ruleHash1,
 			}, Total: 2}
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName2,
+				RuleId:   ruleHash2,
 			}, Total: 2}
 			close(ch)
 			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 2}
@@ -859,7 +873,8 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 
 	t.Run("skip download - local version is newer", func(t *testing.T) {
 		ruleName := uuid.NewString()
-		buildRule(ruleName, "20251015.0002")
+		ruleHash := uuid.NewString()
+		buildRule(ruleName, ruleHash, "20251015.0002")
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 
 		guard4 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
@@ -874,6 +889,7 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName,
+				RuleId:   ruleHash,
 				Version:  "20251015.0001",
 				Content:  "bbb",
 			}, Total: 1}
@@ -894,7 +910,8 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 
 	t.Run("download - online version is newer", func(t *testing.T) {
 		ruleName := uuid.NewString()
-		buildRule(ruleName, "20251015.0002")
+		ruleHash := uuid.NewString()
+		buildRule(ruleName, ruleHash, "20251015.0002")
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 
 		guard7 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
@@ -909,6 +926,7 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName,
+				RuleId:   ruleHash,
 				Version:  "20251015.0003",
 				Content:  "ccc",
 			}, Total: 1}
