@@ -24,9 +24,15 @@ import (
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
 
-func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) CoordinatorOption {
-	return func(config *Coordinator) {
-		config.PlanMocker = i
+func WithCoordinatorPlanMocker(i func(coordinator *Coordinator) *PlanResponse) CoordinatorOption {
+	return func(cod *Coordinator) {
+		cod.PlanMocker = i
+	}
+}
+
+func WithCoordinatorResultHandler(h func(c *Coordinator)) CoordinatorOption {
+	return func(cod *Coordinator) {
+		cod.ResultHandler = h
 	}
 }
 
@@ -36,7 +42,7 @@ func WithMemoryProvider(provider *PromptContextProvider) aicommon.ConfigOption {
 			return err
 		}
 
-		if err := aicommon.WithPersistentMemory(provider.PersistentMemory())(config); err != nil {
+		if err := aicommon.WithAppendPersistentMemory(provider.PersistentMemory())(config); err != nil {
 			return err
 		}
 		return nil
@@ -44,6 +50,17 @@ func WithMemoryProvider(provider *PromptContextProvider) aicommon.ConfigOption {
 }
 
 // cycle import issue
+func WithResultHandler(h func(c *Coordinator)) aicommon.ConfigOption {
+	return func(config *aicommon.Config) error {
+		return aicommon.WithAppendOtherOption(WithCoordinatorResultHandler(h))(config)
+	}
+}
+
+func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) aicommon.ConfigOption {
+	return func(config *aicommon.Config) error {
+		return aicommon.WithAppendOtherOption(WithCoordinatorPlanMocker(i))(config)
+	}
+}
 
 // !!!!
 func WithAiToolsSearchTool() aicommon.ConfigOption {
@@ -79,7 +96,7 @@ func WithAiForgeSearchTool() aicommon.ConfigOption {
 	}
 }
 
-func (c *Coordinator) appendUtilsOption() {
+func (c *Coordinator) enableTaskAnalyze() {
 	err := aicommon.WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		var plansUUID string
 		var planTree string
@@ -151,6 +168,8 @@ type Coordinator struct {
 	runtime    *runtime
 	PlanMocker func(config *Coordinator) *PlanResponse
 	Memory     *PromptContextProvider
+
+	ResultHandler func(cod *Coordinator)
 
 	rootTask *AiTask
 }
@@ -239,7 +258,7 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
-	c.appendUtilsOption()
+
 	return c, nil
 }
 
@@ -273,6 +292,17 @@ func (c *Coordinator) loadToolsViaOptions() error {
 		if err != nil {
 			log.Errorf("enable tool manager AI search: %v", err)
 			return err
+		}
+	}
+
+	if c.Config.EnableTaskAnalyze {
+		c.enableTaskAnalyze()
+	}
+
+	for _, o := range c.OtherOption {
+		switch co := o.(type) {
+		case CoordinatorOption:
+			co(c)
 		}
 	}
 
@@ -359,7 +389,7 @@ func (c *Coordinator) Run() error {
 		用户可以在这个回调函数中处理 AI 的输出结果，或者将结果存储到数据库中。
 	*/
 	if c.ResultHandler != nil {
-		c.ResultHandler(c.Config)
+		c.ResultHandler(c)
 	} else if c.GenerateReport {
 		c.EmitInfo("start to generate report or result")
 		prompt, err := c.generateReport()
@@ -385,6 +415,10 @@ func (c *Coordinator) Run() error {
 	c.EmitInfo("coordinator run finished")
 	c.Wait()
 	return nil
+}
+
+func (c *Coordinator) GetMemory() *PromptContextProvider {
+	return c.Memory
 }
 
 func (c *Coordinator) registerPEModeInputEventCallback() {

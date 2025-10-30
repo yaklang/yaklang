@@ -163,8 +163,8 @@ type Config struct {
 	MaxTaskContinue int64
 
 	// other
-	ResultHandler          func(*Config)
 	ExtendedActionCallback map[string]func(config *Config, action *Action)
+	EnableTaskAnalyze      bool
 
 	/*
 		Re-Act Mode special config
@@ -197,6 +197,9 @@ type Config struct {
 	*/
 	DebugPrompt bool
 	DebugEvent  bool
+
+	// other Options
+	OtherOption []any
 }
 
 // NewConfig creates a new Config with options
@@ -814,18 +817,6 @@ func WithMemoryLimits(contentSizeLimit, totalContentLimit int) ConfigOption {
 	}
 }
 
-func WithPersistentMemory(keys ...string) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.PersistentMemory = append([]string{}, keys...)
-		c.m.Unlock()
-		return nil
-	}
-}
-
 func WithAllowPlanUserInteract(v bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1099,7 +1090,12 @@ func WithDebugEvent(v bool) ConfigOption {
 	}
 }
 
-func WithAgreeYOLO() ConfigOption {
+func WithAgreeYOLO(b ...bool) ConfigOption {
+	if len(b) > 0 && !b[0] {
+		return func(c *Config) error {
+			return nil
+		}
+	}
 	return WithAgreePolicy(AgreePolicyYOLO)
 }
 
@@ -1219,6 +1215,18 @@ func WithGenerateReport(v bool) ConfigOption {
 	}
 }
 
+func WithEnablePETaskAnalyze(v bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.EnableTaskAnalyze = v
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithMaxTaskContinue(n int64) ConfigOption {
 	return func(c *Config) error {
 		if n < 0 {
@@ -1234,17 +1242,16 @@ func WithMaxTaskContinue(n int64) ConfigOption {
 	}
 }
 
-// WithResultHandler sets the result handler callback.
-func WithResultHandler(fn func(*Config)) ConfigOption {
+func WithAppendOtherOption(opts any) ConfigOption {
 	return func(c *Config) error {
-		if fn == nil {
+		if opts == nil {
 			return nil
 		}
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		c.ResultHandler = fn
+		c.OtherOption = append(c.OtherOption, opts)
 		c.m.Unlock()
 		return nil
 	}
@@ -1329,7 +1336,7 @@ func WithForgeParams(i any) ConfigOption {
 		buf.WriteString("<user_input_" + nonce + ">\n")
 		buf.WriteString(aispec.ShrinkAndSafeToFile(i))
 		buf.WriteString("\n</user_input_" + nonce + ">\n")
-		return WithPersistentMemory(buf.String())(c)
+		return WithAppendPersistentMemory(buf.String())(c)
 	}
 }
 

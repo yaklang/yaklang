@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aiforge/aibp/tool_mocker"
@@ -19,7 +18,7 @@ func TestSQLInject(t *testing.T) {
 	mockServer := tool_mocker.NewAiToolMockServer(aispec.WithDebugStream(true))
 	aiforge.ExecuteForge("sqlinject", context.Background(), []*ypb.ExecParamItem{
 		{Key: "target", Value: "http://www.example.com?a=1"},
-	}, aid.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)), aid.WithDebugPrompt(true),
-		aid.WithAgreeYOLO(),
-		aid.WithToolManager(mockServer.GetToolManager()))
+	}, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)), aicommon.WithDebugPrompt(true),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithToolManager(mockServer.GetToolManager()))
 }

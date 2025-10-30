@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -30,8 +30,8 @@ func TestSFDescCompletion(t *testing.T) {
 				Key: "file_content", Value: string(content),
 			},
 		},
-		aid.WithAgreeYOLO(true),
-		aid.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
+		aicommon.WithAgreeYOLO(true),
+		aicommon.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 	)
 	if err != nil {
 		t.Fatal(err)

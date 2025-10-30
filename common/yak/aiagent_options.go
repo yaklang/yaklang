@@ -132,7 +132,7 @@ var (
 	WithEventInputChan               = aicommon.WithEventInputChanx
 	WithDebug                        = aicommon.WithDebug
 	WithGenerateReport               = aicommon.WithGenerateReport
-	WithResultHandler                = aicommon.WithResultHandler
+	WithResultHandler                = aid.WithResultHandler
 	WithAppendPersistentMemory       = aicommon.WithAppendPersistentMemory
 
 	// Deprecated: use WithTimelineContentLimit instead
