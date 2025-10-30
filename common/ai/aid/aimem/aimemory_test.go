@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"path/filepath"
 	"testing"
 
@@ -306,7 +307,7 @@ func TestSearchByScoreVector(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 构建目标分数向量（寻找相似评分的记忆）
-	targetScores := &MemoryEntity{
+	targetScores := &memory_type.MemoryEntity{
 		C_Score: 0.7,
 		O_Score: 0.85,
 		R_Score: 0.75,
@@ -358,7 +359,7 @@ func TestSearchByScores(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 搜索高相关性的记忆
-	filter := &ScoreFilter{
+	filter := &memory_type.ScoreFilter{
 		R_Min: 0.7,
 		R_Max: 1.0,
 	}
@@ -502,7 +503,7 @@ func TestErrorHandling(t *testing.T) {
 	assert.Empty(t, results)
 
 	// 测试无效的分数范围
-	filter := &ScoreFilter{R_Min: 2.0, R_Max: 3.0} // 超出0-1范围
+	filter := &memory_type.ScoreFilter{R_Min: 2.0, R_Max: 3.0} // 超出0-1范围
 	results2, err := mem.SearchByScores(filter, 5)
 	assert.NoError(t, err)
 	assert.Empty(t, results2)
@@ -573,7 +574,7 @@ func TestSearchEdgeCases(t *testing.T) {
 	// 测试SearchByScores的不同分数维度
 	dimensions := []string{"C_Score", "O_Score", "R_Score", "E_Score", "P_Score", "A_Score", "T_Score"}
 	for _, dim := range dimensions {
-		filter := &ScoreFilter{
+		filter := &memory_type.ScoreFilter{
 			C_Min: 0.0, C_Max: 1.0,
 			O_Min: 0.0, O_Max: 1.0,
 			R_Min: 0.0, R_Max: 1.0,
@@ -593,7 +594,7 @@ func TestSearchEdgeCases(t *testing.T) {
 	log.Infof("tag search (matchAll) returned %d results", len(results))
 
 	// 测试SearchByScoreVector的边界情况
-	targetEntity := &MemoryEntity{
+	targetEntity := &memory_type.MemoryEntity{
 		CorePactVector: []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5},
 	}
 	results2, err := mem.SearchByScoreVector(targetEntity, 10)

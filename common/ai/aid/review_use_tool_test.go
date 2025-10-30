@@ -1,10 +1,13 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -14,16 +17,16 @@ import (
 )
 
 func TestCoordinator_ToolUseReview(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -79,12 +82,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -94,12 +92,7 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}

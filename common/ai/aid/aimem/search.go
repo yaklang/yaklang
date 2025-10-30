@@ -1,6 +1,7 @@
 package aimem
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -10,33 +11,33 @@ import (
 )
 
 // SearchBySemantics 通过语义搜索记忆
-func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchResult, error) {
+func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*memory_type.SearchResult, error) {
 	// 检查 embedding 服务是否可用
 	if !r.embeddingAvailable {
 		log.Debugf("embedding service not available for session %s, returning empty semantic search results", r.sessionID)
-		return []*SearchResult{}, nil
+		return []*memory_type.SearchResult{}, nil
 	}
 
 	// 检查 RAG 系统是否已初始化
 	if r.rag == nil {
 		log.Debugf("RAG system not initialized for session %s, returning empty semantic search results", r.sessionID)
-		return []*SearchResult{}, nil
+		return []*memory_type.SearchResult{}, nil
 	}
 
 	// 使用 RAG 搜索相关问题
 	ragResults, err := r.rag.QueryWithPage(query, 1, limit)
 	if err != nil {
 		log.Warnf("RAG search failed for session %s: %v, returning empty results", r.sessionID, err)
-		return []*SearchResult{}, nil
+		return []*memory_type.SearchResult{}, nil
 	}
 
 	db := r.GetDB()
 	if db == nil {
 		log.Debugf("database connection is nil for session %s, returning empty semantic search results", r.sessionID)
-		return []*SearchResult{}, nil
+		return []*memory_type.SearchResult{}, nil
 	}
 
-	var results []*SearchResult
+	var results []*memory_type.SearchResult
 	processedMemoryIDs := make(map[string]bool)
 
 	for _, ragResult := range ragResults {
@@ -62,7 +63,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchRe
 			continue
 		}
 
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 dbEntity.MemoryID,
 			CreatedAt:          dbEntity.CreatedAt,
 			Content:            dbEntity.Content,
@@ -78,7 +79,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchRe
 			CorePactVector:     []float32(dbEntity.CorePactVector),
 		}
 
-		results = append(results, &SearchResult{
+		results = append(results, &memory_type.SearchResult{
 			Entity: entity,
 			Score:  ragResult.Score,
 		})
@@ -88,7 +89,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchRe
 }
 
 // SearchByScores 按照C.O.R.E. P.A.C.T.评分搜索
-func (r *AIMemoryTriage) SearchByScores(filter *ScoreFilter, limit int) ([]*MemoryEntity, error) {
+func (r *AIMemoryTriage) SearchByScores(filter *memory_type.ScoreFilter, limit int) ([]*memory_type.MemoryEntity, error) {
 	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -150,9 +151,9 @@ func (r *AIMemoryTriage) SearchByScores(filter *ScoreFilter, limit int) ([]*Memo
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
-	var results []*MemoryEntity
+	var results []*memory_type.MemoryEntity
 	for _, dbEntity := range dbEntities {
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 dbEntity.MemoryID,
 			CreatedAt:          dbEntity.CreatedAt,
 			Content:            dbEntity.Content,
@@ -174,7 +175,7 @@ func (r *AIMemoryTriage) SearchByScores(filter *ScoreFilter, limit int) ([]*Memo
 }
 
 // SearchByScoreVector 通过分数向量搜索相似的记忆（基于HNSW）
-func (r *AIMemoryTriage) SearchByScoreVector(targetScores *MemoryEntity, limit int) ([]*SearchResult, error) {
+func (r *AIMemoryTriage) SearchByScoreVector(targetScores *memory_type.MemoryEntity, limit int) ([]*memory_type.SearchResult, error) {
 	// 构建目标向量
 	queryVector := []float32{
 		float32(targetScores.C_Score),
@@ -197,9 +198,9 @@ func (r *AIMemoryTriage) SearchByScoreVector(targetScores *MemoryEntity, limit i
 	}
 
 	// 转换结果格式
-	var results []*SearchResult
+	var results []*memory_type.SearchResult
 	for _, sr := range searchResults {
-		results = append(results, &SearchResult{
+		results = append(results, &memory_type.SearchResult{
 			Entity: sr.Entity,
 			Score:  sr.Score,
 		})
@@ -209,7 +210,7 @@ func (r *AIMemoryTriage) SearchByScoreVector(targetScores *MemoryEntity, limit i
 }
 
 // SearchByTags 按照标签搜索
-func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error) {
+func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*memory_type.MemoryEntity, error) {
 	if len(tags) == 0 {
 		return nil, utils.Errorf("at least one tag is required")
 	}
@@ -224,7 +225,7 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
-	var results []*MemoryEntity
+	var results []*memory_type.MemoryEntity
 	for _, dbEntity := range dbEntities {
 		entityTags := []string(dbEntity.Tags)
 
@@ -266,7 +267,7 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 			}
 		}
 
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 dbEntity.MemoryID,
 			CreatedAt:          dbEntity.CreatedAt,
 			Content:            dbEntity.Content,

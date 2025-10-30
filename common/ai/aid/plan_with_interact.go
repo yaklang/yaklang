@@ -20,13 +20,13 @@ func (pr *planRequest) handlePlanWithUserInteract(interactAction *aicommon.Actio
 	}
 	haveOpt := len(opt) > 0
 	_ = haveOpt
-	params, ep, err := pr.config.RequireUserPromptWithEndpointResult(q, opts...)
+	params, ep, err := pr.cod.RequireUserPromptWithEndpointResult(q, opts...)
 	if err != nil {
 		return nil, utils.Errorf("plan: require user interact failed: %v", err)
 	}
 	_ = params
 
-	pr.config.memory.timeline.PushUserInteraction(
+	pr.cod.Memory.timeline.PushUserInteraction(
 		aicommon.UserInteractionStage_BeforePlan,
 		ep.GetSeq(),
 		q,
@@ -34,7 +34,7 @@ func (pr *planRequest) handlePlanWithUserInteract(interactAction *aicommon.Actio
 	)
 
 	pr.deltaInteractCount(1)
-	if pr.GetInteractCount() >= pr.config.planUserInteractMaxCount {
+	if pr.GetInteractCount() >= pr.cod.PlanUserInteractMaxCount {
 		pr.disableInteract = true
 	}
 	return pr.Invoke()

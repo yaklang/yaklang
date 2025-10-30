@@ -15,7 +15,7 @@ import (
 // CreateRequireUserInteract 创建一个需要用户输入的提示工具
 // 这个工具非常有意思，AI 如果调用这个工具，意味着，他觉得他受阻了，需要人的提示来帮助他继续完成任务
 // 调用这个工具会强制让 AI 进入等待状态，直到用户输入提示
-func (c *Config) CreateRequireUserInteract() (*aitool.Tool, error) {
+func (c *Coordinator) CreateRequireUserInteract() (*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(
 		"require-user-interact",
@@ -82,12 +82,12 @@ type RequireInteractiveRequest struct {
 	Options []*RequireInteractiveRequestOption `json:"options"`
 }
 
-func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
-	return c.RequireUserPromptWithEndpointResultEx(c.ctx, prompt, opts...)
+func (c *Coordinator) RequireUserPromptWithEndpointResult(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
+	return c.RequireUserPromptWithEndpointResultEx(c.Ctx, prompt, opts...)
 }
 
-func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
-	ep := c.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+func (c *Coordinator) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
 	req := &RequireInteractiveRequest{
@@ -96,19 +96,19 @@ func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prom
 		Options: opts,
 	}
 	c.EmitRequireUserInteractive(req, ep.GetId())
-	c.doWaitAgreeWithPolicy(ctx, aicommon.AgreePolicyManual, ep)
+	c.DoWaitAgreeWithPolicy(ctx, aicommon.AgreePolicyManual, ep)
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	return params, ep, nil
 }
 
-func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, error) {
+func (c *Coordinator) RequireUserPrompt(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, error) {
 	params, _, err := c.RequireUserPromptWithEndpointResult(prompt, opts...)
 	return params, err
 }
 
-func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id string) {
-	if ep, ok := c.epm.LoadEndpoint(id); ok {
+func (c *Coordinator) EmitRequireUserInteractive(i *RequireInteractiveRequest, id string) {
+	if ep, ok := c.Epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(map[string]any{
 			"id":      i.Id,
 			"prompt":  i.Prompt,

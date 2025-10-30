@@ -2,8 +2,11 @@ package aid
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -15,16 +18,16 @@ import (
 
 func TestPlanRetry(t *testing.T) {
 	count := 0
-	inputChan := make(chan *InputEvent, 10)             // 增加缓冲区
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区
+	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
-		WithAIAutoRetry(2),
-		WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAIAutoRetry(2),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
 			if count > 2 {
 				rsp := config.NewAIResponse()
@@ -111,21 +114,21 @@ LOOP:
 	fmt.Println("==========================================================================================")
 	fmt.Println("==========================================================================================")
 	fmt.Println("==========================================================================================")
-	testRecoverPlanRetry(t, ins.config.id)
+	testRecoverPlanRetry(t, ins.Config.Id)
 }
 
 func testRecoverPlanRetry(t *testing.T, uid string) {
 	count := 0
-	inputChan := make(chan *InputEvent, 10)             // 增加缓冲区
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区
+	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区
 	ins, err := NewFastRecoverCoordinator(
 		uid,
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
-		WithAIAutoRetry(2),
-		WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAIAutoRetry(2),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
 			// 修复：让恢复测试能够成功，而不是总是失败
 			rsp := config.NewAIResponse()

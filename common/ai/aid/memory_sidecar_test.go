@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +26,7 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 	m := memoryTestBasic(t)
 	m.ClearRuntimeConfig()
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	requireMoreToolCount := 0
@@ -48,14 +50,14 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 	requireMoreToolCountForShrink := 0
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithMemory(m),
-		WithTimelineContentLimit(200),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTimeline(m.timeline),
+		aicommon.WithTimelineContentLimit(200),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -152,12 +154,7 @@ LOOP:
 				break LOOP
 			}
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -166,12 +163,7 @@ LOOP:
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/"+noexistedfileToken &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
@@ -196,7 +188,7 @@ LOOP:
 }
 
 func memoryTestBasic(t *testing.T) *PromptContextProvider {
-	inputChan := make(chan *InputEvent, 1000)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent, 1000)
 
 	requireMoreToolCount := 0
@@ -218,14 +210,14 @@ func memoryTestBasic(t *testing.T) *PromptContextProvider {
 
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithMemory(m),
-		WithTimelineContentLimit(100),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTimeline(m.timeline),
+		aicommon.WithTimelineContentLimit(100),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -325,12 +317,7 @@ LOOP:
 
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -340,12 +327,7 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/"+noexistedfileToken &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}

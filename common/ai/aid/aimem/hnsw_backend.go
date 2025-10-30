@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -244,7 +245,7 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 }
 
 // Add 添加记忆实体到HNSW索引
-func (b *AIMemoryHNSWBackend) Add(entity *MemoryEntity) error {
+func (b *AIMemoryHNSWBackend) Add(entity *memory_type.MemoryEntity) error {
 	// 获取写锁来修改图
 	b.graphMutex.Lock()
 	defer b.graphMutex.Unlock()
@@ -286,7 +287,7 @@ func (b *AIMemoryHNSWBackend) Delete(memoryID string) error {
 }
 
 // Update 更新HNSW索引中的记忆实体
-func (b *AIMemoryHNSWBackend) Update(entity *MemoryEntity) error {
+func (b *AIMemoryHNSWBackend) Update(entity *memory_type.MemoryEntity) error {
 	// 获取写锁来修改图
 	b.graphMutex.Lock()
 	defer b.graphMutex.Unlock()
@@ -360,7 +361,7 @@ func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]Search
 			continue
 		}
 
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 dbEntity.MemoryID,
 			CreatedAt:          dbEntity.CreatedAt,
 			Content:            dbEntity.Content,
@@ -472,7 +473,7 @@ func (b *AIMemoryHNSWBackend) Close() error {
 
 // SearchResultWithDistance 搜索结果（包含距离）
 type SearchResultWithDistance struct {
-	Entity   *MemoryEntity
+	Entity   *memory_type.MemoryEntity
 	Distance float64
 	Score    float64
 }

@@ -2,19 +2,20 @@ package aid
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	token := utils.RandStringBytes(100)
@@ -25,12 +26,12 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 
 	ins, err := NewCoordinator(
 		"test",
-		WithAllowPlanUserInteract(true),
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithAllowPlanUserInteract(true),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 
 			prompts := request.GetPrompt()
@@ -91,12 +92,7 @@ LOOP:
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
 				if result.GetInteractiveId() != "" && strings.Contains(result.String(), token) {
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"extra_prompt": token,
-						},
-					}
+					inputChan.SafeFeed(SuggestionInputEvent(result.GetInteractiveId(), "", token))
 					userInteractTrigger = true
 					continue
 				} else {
@@ -119,7 +115,7 @@ LOOP:
 }
 
 func TestCoordinator_PlanInteraction(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	token := utils.RandStringBytes(100)
@@ -128,12 +124,12 @@ func TestCoordinator_PlanInteraction(t *testing.T) {
 
 	ins, err := NewCoordinator(
 		"test",
-		WithAllowPlanUserInteract(true),
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithAllowPlanUserInteract(true),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 
 			prompts := request.GetPrompt()
@@ -186,12 +182,7 @@ LOOP:
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
 				if result.GetInteractiveId() != "" && strings.Contains(result.String(), token) {
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"extra_prompt": token,
-						},
-					}
+					inputChan.SafeFeed(SuggestionInputEvent(result.GetInteractiveId(), "", token))
 					userInteractTrigger = true
 					break LOOP
 				} else {

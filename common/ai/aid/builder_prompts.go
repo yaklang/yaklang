@@ -68,7 +68,7 @@ var __prompt_DirectAnswer string
 //go:embed prompts/search/aitool-keyword-search.txt
 var __prompt_KeywordSearchPrompt string
 
-func (c *Config) quickBuildPrompt(tmp string, i map[string]any) (string, error) {
+func (c *Coordinator) quickBuildPrompt(tmp string, i map[string]any) (string, error) {
 	tmpl, err := template.New("prompt").Parse(tmp)
 	if err != nil {
 		return "", err
@@ -76,11 +76,11 @@ func (c *Config) quickBuildPrompt(tmp string, i map[string]any) (string, error) 
 
 	if utils.IsNil(i) {
 		i = make(map[string]any)
-		i["Memory"] = c.memory
+		i["Memory"] = c.Memory
 	}
 
 	if _, ok := i["Memory"]; !ok {
-		i["Memory"] = c.memory
+		i["Memory"] = c.Memory
 	}
 
 	var buf bytes.Buffer

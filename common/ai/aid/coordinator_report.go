@@ -6,9 +6,9 @@ import (
 	"text/template"
 )
 
-func (r *Coordinator) generateReport() (string, error) {
+func (c *Coordinator) generateReport() (string, error) {
 	params := map[string]any{
-		"Memory": r.config.memory,
+		"Memory": c.Memory,
 	}
 
 	tmp, err := template.New(`report-finished`).Parse(__prompt_ReportFinished)

@@ -113,7 +113,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
-			toolins, err := t.aiToolManager.GetToolByName(item)
+			toolins, err := t.AiToolManager.GetToolByName(item)
 			if err != nil || utils.IsNil(toolins) {
 				if err != nil {
 					t.EmitError("error searching tool: %v", err)
@@ -127,7 +127,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 
 	var err error
 	if suggestionKeyword != "" {
-		searched, err := t.aiToolManager.SearchTools("", suggestionKeyword)
+		searched, err := t.AiToolManager.SearchTools("", suggestionKeyword)
 		if err != nil {
 			t.EmitError("error searching tool: %v", err)
 		}
@@ -135,7 +135,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 	}
 
 	if len(tools) <= 0 {
-		tools, _ = t.aiToolManager.GetEnableTools()
+		tools, _ = t.AiToolManager.GetEnableTools()
 	}
 
 	if len(tools) <= 0 {
@@ -152,7 +152,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 
 	var selecteddTool *aitool.Tool
 	var directlyAnswer bool
-	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	transErr := t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		// Check context before AI call
 		select {
 		case <-ctx.Done():
@@ -163,7 +163,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
 		action, err := aicommon.ExtractValidActionFromStream(
-			t.ctx,
+			t.Ctx,
 			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
 			"require-tool", aicommon.WithActionAlias("abandon"))
 		if err != nil {
@@ -172,7 +172,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 		switch action.ActionType() {
 		case "require-tool":
 			toolName := action.GetString("tool")
-			selecteddTool, err = t.aiToolManager.GetToolByName(toolName)
+			selecteddTool, err = t.AiToolManager.GetToolByName(toolName)
 			if err != nil {
 				return utils.Errorf("error searching tool: %v", err)
 			}
@@ -211,7 +211,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 	}
 
 	var invokeParams = aitool.InvokeParams{}
-	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	transErr := t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		// Check context before AI call
 		select {
 		case <-ctx.Done():
@@ -221,7 +221,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
-		action, err := aicommon.ExtractValidActionFromStream(t.ctx,
+		action, err := aicommon.ExtractValidActionFromStream(t.Ctx,
 			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
 			"call-tool")
 		if err != nil {

@@ -13,7 +13,7 @@ import (
 )
 
 type planRequest struct {
-	config   *Config
+	cod      *Coordinator
 	rawInput string
 
 	// interactCount
@@ -37,14 +37,14 @@ func (pr *planRequest) GetInteractCount() int64 {
 
 func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{
-		pr.config.planAICallback,
-		pr.config.coordinatorAICallback,
-		pr.config.taskAICallback,
+		pr.cod.QualityPriorityAICallback,
+		pr.cod.SpeedPriorityAICallback,
+		pr.cod.OriginalAICallback,
 	} {
 		if cb == nil {
 			continue
 		}
-		return cb(pr.config, request)
+		return cb(pr.cod, request)
 	}
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
@@ -83,10 +83,10 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 		}
 
 		i.Subtasks = append(i.Subtasks, &AiTask{
-			Config:     p.RootTask.Config,
-			Name:       name,
-			Goal:       goal,
-			ParentTask: i,
+			Coordinator: p.RootTask.Coordinator,
+			Name:        name,
+			Goal:        goal,
+			ParentTask:  i,
 		})
 		return utils.Error("normal exit")
 	}, utils.NewBool(false))
@@ -94,30 +94,21 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 
 // GenerateFirstPlanPrompt 根据PlanRequest生成prompt
 func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
-	if pr.config.allowPlanUserInteract && !pr.disableInteract {
-		return pr.config.quickBuildPrompt(__prompt_GenerateTaskListPromptWithUserInteract, map[string]any{
-			"Memory": pr.config.memory,
+	if pr.cod.AllowPlanUserInteract && !pr.disableInteract {
+		return pr.cod.quickBuildPrompt(__prompt_GenerateTaskListPromptWithUserInteract, map[string]any{
+			"Memory": pr.cod.Memory,
 		})
 	} else {
-		return pr.config.quickBuildPrompt(__prompt_GenerateTaskListPrompt, map[string]any{
-			"Memory": pr.config.memory,
+		return pr.cod.quickBuildPrompt(__prompt_GenerateTaskListPrompt, map[string]any{
+			"Memory": pr.cod.Memory,
 		})
-	}
-}
-
-func (c *Config) newPlanResponse(rootTask *AiTask) *PlanResponse {
-	c.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
-		return rootTask
-	})
-	return &PlanResponse{
-		RootTask: rootTask,
 	}
 }
 
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
 func (pr *planRequest) Invoke() (*PlanResponse, error) {
-	if pr.config.planMocker != nil {
-		planRes := pr.config.planMocker(pr.config)
+	if pr.cod.PlanMocker != nil {
+		planRes := pr.cod.PlanMocker(pr.cod)
 		if utils.IsNil(planRes) {
 			return nil, utils.Error("planMocker returns nil, unknown error")
 		}
@@ -137,7 +128,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			if task == nil {
 				return
 			}
-			task.Config = pr.config
+			task.Coordinator = pr.cod
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -156,14 +147,14 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return interactAction != nil && interactAction.ActionType() == "require-user-interact"
 	}
 
-	err = pr.config.callAiTransaction(
+	err = pr.cod.CallAiTransaction(
 		prompt, pr.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			stream := rsp.GetOutputStreamReader("plan", false, pr.config.GetEmitter())
+			stream := rsp.GetOutputStreamReader("plan", false, pr.cod.GetEmitter())
 			//stream = io.TeeReader(stream, os.Stdout)
 			//raw, err := io.ReadAll(stream)
 			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
-			action, err := aicommon.ExtractActionFromStream(pr.config.ctx, stream, "plan", aicommon.WithActionAlias("require-user-interact"))
+			action, err := aicommon.ExtractActionFromStream(pr.cod.Ctx, stream, "plan", aicommon.WithActionAlias("require-user-interact"))
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
@@ -176,9 +167,9 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 						continue
 					}
 					rootTask.Subtasks = append(rootTask.Subtasks, &AiTask{
-						Config: pr.config,
-						Name:   subtask.GetAnyToString("subtask_name"),
-						Goal:   subtask.GetAnyToString("subtask_goal"),
+						Coordinator: pr.cod,
+						Name:        subtask.GetAnyToString("subtask_name"),
+						Goal:        subtask.GetAnyToString("subtask_goal"),
 					})
 				}
 				if rootTask.Name == "" {
@@ -193,7 +184,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		},
 	)
 	if err != nil {
-		pr.config.EmitError(err.Error())
+		pr.cod.EmitError(err.Error())
 		return nil, err
 	}
 
@@ -205,7 +196,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return nil, utils.Error("cannot found any task in AI response, please check your AI model or prompt")
 	}
 
-	return pr.config.newPlanResponse(rootTask), nil
+	return pr.cod.newPlanResponse(rootTask), nil
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {
@@ -213,7 +204,7 @@ func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, erro
 	if err != nil {
 		return nil, err
 	}
-	req.config = c.config
+	req.cod = c
 	req.rawInput = rawUserInput
 	return req, nil
 }

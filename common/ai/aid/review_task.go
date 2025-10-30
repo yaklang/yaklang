@@ -18,7 +18,6 @@ type ReviewSuggestion struct {
 	PromptEnglish    string `json:"prompt_english"`
 	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 
-	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
 	ParamSchema      string                          `json:"param_schema"`
 }
@@ -79,7 +78,7 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 			"root_task": t.getCurrentTaskPlan(),
 		})
 
-		return t.aiTaskRuntime.executeSubTask(1, t)
+		return t.runtime.executeSubTask(1, t)
 	case "inaccurate":
 		t.EmitInfo("inaccurate")
 		return t.executeTask()

@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"strings"
 	"testing"
 	"time"
@@ -411,7 +412,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 		defer memory.Close()
 
 		// 创建测试实体
-		entities := []*MemoryEntity{
+		entities := []*memory_type.MemoryEntity{
 			{
 				Id:                 "test-1",
 				Content:            "Go语言并发编程",
@@ -448,7 +449,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 		}
 		defer memory.Close()
 
-		worthSaving := memory.ShouldSaveMemoryEntities([]*MemoryEntity{})
+		worthSaving := memory.ShouldSaveMemoryEntities([]*memory_type.MemoryEntity{})
 		if len(worthSaving) != 0 {
 			t.Errorf("expected 0 entities for empty input, got %d", len(worthSaving))
 		}
@@ -606,7 +607,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("SaveAndRetrieve", func(t *testing.T) {
 		// 创建测试实体
-		testEntity := &MemoryEntity{
+		testEntity := &memory_type.MemoryEntity{
 			Id:                 "storage-save-retrieve-" + uuid.New().String(),
 			Content:            "测试存储操作的记忆实体",
 			Tags:               []string{"测试", "存储"},
@@ -639,7 +640,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("UpdateEntity", func(t *testing.T) {
 		// 创建并保存实体
-		testEntity := &MemoryEntity{
+		testEntity := &memory_type.MemoryEntity{
 			Id:                 "storage-update-" + uuid.New().String(),
 			Content:            "原始记忆内容",
 			Tags:               []string{"测试", "存储"},
@@ -655,7 +656,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 		}
 
 		// 更新实体
-		updatedEntity := &MemoryEntity{
+		updatedEntity := &memory_type.MemoryEntity{
 			Id:                 testEntity.Id,
 			Content:            "更新后的记忆内容",
 			Tags:               []string{"测试", "存储", "更新"},
@@ -686,7 +687,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("DeleteEntity", func(t *testing.T) {
 		// 创建并保存实体
-		testEntity := &MemoryEntity{
+		testEntity := &memory_type.MemoryEntity{
 			Id:                 "storage-delete-" + uuid.New().String(),
 			Content:            "待删除的记忆实体",
 			Tags:               []string{"测试", "删除"},
@@ -716,7 +717,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("ListAllMemories", func(t *testing.T) {
 		// 添加多个实体
-		entities := []*MemoryEntity{
+		entities := []*memory_type.MemoryEntity{
 			{
 				Id: "list-test-1-" + uuid.New().String(), Content: "第一个测试记忆",
 				Tags: []string{"测试"}, PotentialQuestions: []string{"测试1？"},
@@ -813,7 +814,7 @@ func TestAIMemoryTriage_HNSWOperations(t *testing.T) {
 		}
 
 		// 创建查询向量
-		queryEntity := &MemoryEntity{
+		queryEntity := &memory_type.MemoryEntity{
 			C_Score: 0.7, O_Score: 0.8, R_Score: 0.6, E_Score: 0.5,
 			P_Score: 0.7, A_Score: 0.6, T_Score: 0.8,
 		}
@@ -943,7 +944,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 		}
 
 		// 测试保存无效向量的实体
-		invalidEntity := &MemoryEntity{
+		invalidEntity := &memory_type.MemoryEntity{
 			Id:             "invalid-entity",
 			Content:        "测试无效实体",
 			CorePactVector: []float32{0.1, 0.2}, // 错误的维度
@@ -973,7 +974,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 		}
 
 		// 尝试更新不存在的实体
-		nonExistentEntity := &MemoryEntity{
+		nonExistentEntity := &memory_type.MemoryEntity{
 			Id:             "non-existent-update",
 			Content:        "不存在的实体",
 			CorePactVector: []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7},

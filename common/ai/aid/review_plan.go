@@ -32,7 +32,7 @@ type PlanReviewSuggestion struct {
 	ParamSchema      string                               `json:"param_schema"`
 }
 
-func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
+func (c *Coordinator) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 	opt := []*PlanReviewSuggestion{
 		{
 			Value:            "freedom-review",
@@ -66,12 +66,12 @@ func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 		},
 	}
 	for idx, o := range opt {
-		o.Id = fmt.Sprintf("plan-review-suggestion-%v-%d", c.id, idx)
+		o.Id = fmt.Sprintf("plan-review-suggestion-%v-%d", c.Id, idx)
 	}
 	return opt
 }
 
-func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.InvokeParams) (*PlanResponse, error) {
+func (pr *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.InvokeParams) (*PlanResponse, error) {
 	reviewQuestion := "请审查当前的任务计划"
 
 	if utils.IsNil(rsp) {
@@ -81,12 +81,12 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
-		p.config.EmitError("suggestion is empty, use default: continue")
+		pr.cod.EmitError("suggestion is empty, use default: continue")
 		return rsp, nil
 	}
 
 	if suggestion == "continue" {
-		p.config.EmitInfo("plan is reasonable, continue")
+		pr.cod.EmitInfo("plan is reasonable, continue")
 		// 继续执行现有计划
 		return rsp, nil
 	}
@@ -94,7 +94,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "unclear":
-		p.config.EmitInfo("user suggestion: the plan is unclear, regenerate plan")
+		pr.cod.EmitInfo("user suggestion: the plan is unclear, regenerate plan")
 		extraPrompt := param.GetString("extra_prompt")
 		if extraPrompt == "" {
 			extraPrompt = param.GetString("prompt")
@@ -102,53 +102,53 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		if extraPrompt == "" {
 			extraPrompt = "用户认为当前计划不够明确，需要细化每个子任务具体的目标和清晰的定义，包含其中可能会用到的工具"
 		}
-		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
+		newPlan, err := pr.generateNewPlan(suggestion, extraPrompt, rsp)
 		if err != nil {
-			p.config.EmitError("generate new plan failed: %v", err)
+			pr.cod.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := pr.cod.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		p.config.DoWaitAgree(nil, ep)
+		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
+		pr.cod.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
+		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
-			p.config.EmitError("user review params is nil, plan failed")
+			pr.cod.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
-		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
-		return p.handleReviewPlanResponse(newPlan, params)
+		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		return pr.handleReviewPlanResponse(newPlan, params)
 	case "incomplete":
-		p.config.EmitInfo("plan is incomplete")
+		pr.cod.EmitInfo("plan is incomplete")
 		// 重新生成计划，但保留现有任务
 		extraPrompt := param.GetString("extra_prompt")
 		if extraPrompt == "" {
 			extraPrompt = param.GetString("prompt")
 		}
-		newPlan, err := p.generateNewPlan(suggestion, extraPrompt, rsp)
+		newPlan, err := pr.generateNewPlan(suggestion, extraPrompt, rsp)
 		if err != nil {
-			p.config.EmitError("generate new plan failed: %v", err)
+			pr.cod.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := pr.cod.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		p.config.DoWaitAgree(nil, ep)
+		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
+		pr.cod.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
+		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
-			p.config.EmitError("user review params is nil, plan failed")
+			pr.cod.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
-		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
-		return p.handleReviewPlanResponse(newPlan, params)
+		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		return pr.handleReviewPlanResponse(newPlan, params)
 	case "create-subtask":
-		p.config.EmitError("create-subtask required via user suggestion")
+		pr.cod.EmitError("create-subtask required via user suggestion")
 		extraPrompt := param.GetString("extra_prompt")
 		if extraPrompt == "" {
 			extraPrompt = "用户认为某些任务太宽泛了，需要被分割成更小的子任务以确保执行顺利，切分制定任务需要注意一下原则\n"
@@ -165,27 +165,27 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 		} else {
 			extraPrompt += "\n用户没有规定你需要具体拆分哪些子任务，你需要自己决定在当前任务树的叶节点拆分"
 		}
-		newPlan, err := p.generateCreateSubtaskPlan(extraPrompt, rsp)
+		newPlan, err := pr.generateCreateSubtaskPlan(extraPrompt, rsp)
 		if err != nil {
-			p.config.EmitError("generate new plan failed: %v", err)
+			pr.cod.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := pr.cod.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		p.config.DoWaitAgree(nil, ep)
+		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
+		pr.cod.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
+		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
-			p.config.EmitError("user review params is nil, plan failed")
+			pr.cod.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
-		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
-		return p.handleReviewPlanResponse(newPlan, params)
+		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		return pr.handleReviewPlanResponse(newPlan, params)
 	case "freedom-review":
-		p.config.EmitInfo("user uses freedom review mode to review the plan")
+		pr.cod.EmitInfo("user uses freedom review mode to review the plan")
 		// 重新生成计划，但保留现有任务
 		var userReviewTaskTree strings.Builder
 		err := generateReviewedTaskTree(param.GetObject("reviewed-task-tree"), &userReviewTaskTree, "")
@@ -193,27 +193,27 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			return nil, err
 		}
 
-		newPlan, err := p.freedomReviewGenerateNewPlan(userReviewTaskTree.String(), rsp)
+		newPlan, err := pr.freedomReviewGenerateNewPlan(userReviewTaskTree.String(), rsp)
 		if err != nil {
-			p.config.EmitError("generate new plan failed: %v", err)
+			pr.cod.EmitError("generate new plan failed: %v", err)
 			return nil, utils.Errorf("generate new plan failed: %v", err)
 		}
 
-		ep := p.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep := pr.cod.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
-		p.config.EmitRequireReviewForPlan(newPlan, ep.GetId())
-		p.config.DoWaitAgree(nil, ep)
+		pr.cod.EmitRequireReviewForPlan(newPlan, ep.GetId())
+		pr.cod.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		p.config.ReleaseInteractiveEvent(ep.GetId(), params)
+		pr.cod.ReleaseInteractiveEvent(ep.GetId(), params)
 		if params == nil {
-			p.config.EmitError("user review params is nil, plan failed")
+			pr.cod.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
-		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
-		return p.handleReviewPlanResponse(newPlan, params)
+		pr.cod.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
+		return pr.handleReviewPlanResponse(newPlan, params)
 	default:
-		p.config.EmitError("unknown review suggestion: %s", suggestion)
+		pr.cod.EmitError("unknown review suggestion: %s", suggestion)
 		return rsp, nil
 	}
 }
@@ -243,14 +243,14 @@ func generateReviewedTaskTree(task aitool.InvokeParams, buf *strings.Builder, pr
 	return nil
 }
 
-func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
+func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
 	tmpl, err := template.New("partial-replan").Parse(planReviewCreateSubtaskPrompts)
 	if err != nil {
 		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
 	}
 	nonce := utils.RandStringBytes(6)
 	params := map[string]any{
-		"Memory":      p.config.memory,
+		"Memory":      pr.cod.Memory,
 		"CurrentPlan": rsp.RootTask,
 		"ExtraPrompt": extraPrompt,
 		"NONCE":       nonce,
@@ -260,8 +260,8 @@ func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRes
 	if err != nil {
 		return nil, err
 	}
-	err = p.config.callAiTransaction(buf.String(), p.CallAI, func(response *aicommon.AIResponse) error {
-		reader := response.GetOutputStreamReader("create-subtasks", false, p.config.GetEmitter())
+	err = pr.cod.CallAiTransaction(buf.String(), pr.CallAI, func(response *aicommon.AIResponse) error {
+		reader := response.GetOutputStreamReader("create-subtasks", false, pr.cod.GetEmitter())
 		if reader == nil {
 			return utils.Error("get output stream failed")
 		}
@@ -293,7 +293,7 @@ func (p *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRes
 	return rsp, nil
 }
 
-func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
+func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
 	// 生成新的计划，使用自由审查模式
 	tmpl, err := template.New("freedom-plan-review").Parse(planFreedomReviewPrompts)
 	if err != nil {
@@ -302,7 +302,7 @@ func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Plan
 
 	nonce := utils.RandStringBytes(6)
 	data := map[string]any{
-		"Memory":           p.config.memory,
+		"Memory":           pr.cod.Memory,
 		"CurrentPlan":      rsp.RootTask,
 		"USER_REVIEW_PLAN": extraPrompt,
 		"NONCE":            nonce,
@@ -314,18 +314,18 @@ func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Plan
 		return nil, utils.Errorf("error executing freedom plan review prompt: %v", err)
 	}
 
-	p.config.EmitInfo("freedom plan review prompt: %s", planPrompt.String())
+	pr.cod.EmitInfo("freedom plan review prompt: %s", planPrompt.String())
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = p.config.callAiTransaction(prompt, p.CallAI, func(response *aicommon.AIResponse) error {
-		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, p.config.Emitter)
+	err = pr.cod.CallAiTransaction(prompt, pr.CallAI, func(response *aicommon.AIResponse) error {
+		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, pr.cod.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)
 		if err != nil {
 			return utils.Errorf("error reading AI response: %v", err)
 		}
 
-		task, err = ExtractTaskFromRawResponse(p.config, string(taskResponse))
+		task, err = ExtractTaskFromRawResponse(pr.cod, string(taskResponse))
 		if err != nil {
 			return utils.Errorf("error extracting task from raw response: %v", err)
 		}
@@ -334,11 +334,11 @@ func (p *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Plan
 	if err != nil {
 		return nil, utils.Error(err.Error())
 	}
-	return p.config.newPlanResponse(task), nil
+	return pr.cod.newPlanResponse(task), nil
 }
 
 // generateNewPlan 生成新的计划
-func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
+func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp *PlanResponse) (*PlanResponse, error) {
 	tmpl, err := template.New("plan-review").Parse(planReviewPrompts)
 	if err != nil {
 		return nil, utils.Errorf("error parsing plan review prompt: %v", err)
@@ -346,7 +346,7 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 
 	nonce := utils.RandStringBytes(6)
 	data := map[string]any{
-		"Memory":         p.config.memory,
+		"Memory":         pr.cod.Memory,
 		"CurrentPlan":    rsp.RootTask,
 		"UserSuggestion": suggestion,
 		"ExtraPrompt":    extraPrompt,
@@ -359,20 +359,20 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 		return nil, utils.Errorf("error executing plan review prompt: %v", err)
 	}
 
-	p.config.EmitInfo("re-plan review prompt: %s", planPrompt.String())
+	pr.cod.EmitInfo("re-plan review prompt: %s", planPrompt.String())
 	// 调用 AI 生成新的任务计划
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = p.config.callAiTransaction(prompt, p.CallAI, func(response *aicommon.AIResponse) error {
+	err = pr.cod.CallAiTransaction(prompt, pr.CallAI, func(response *aicommon.AIResponse) error {
 		// 读取 AI 的响应
-		responseReader := response.GetOutputStreamReader("dynamic-plan", false, p.config.Emitter)
+		responseReader := response.GetOutputStreamReader("dynamic-plan", false, pr.cod.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)
 		if err != nil {
 			return utils.Errorf("error reading AI response: %v", err)
 		}
 
-		task, err = ExtractTaskFromRawResponse(p.config, string(taskResponse))
+		task, err = ExtractTaskFromRawResponse(pr.cod, string(taskResponse))
 		if err != nil {
 			return utils.Errorf("error extracting task from raw response: %v", err)
 		}
@@ -386,26 +386,26 @@ func (p *planRequest) generateNewPlan(suggestion string, extraPrompt string, rsp
 	//if err != nil {
 	//	return nil, utils.Errorf("error calling AI: %v", err)
 	//}
-	return p.config.newPlanResponse(task), nil
+	return pr.cod.newPlanResponse(task), nil
 }
 
 // mergePlans 合并新旧计划
-func (p *planRequest) mergePlans(newPlan *planRequest) {
+func (pr *planRequest) mergePlans(newPlan *planRequest) {
 	// 合并新的计划内容
-	p.rawInput = newPlan.rawInput
+	pr.rawInput = newPlan.rawInput
 }
 
 // adjustTaskDifficulty 调整任务难度
-func (p *planRequest) adjustTaskDifficulty(rsp *PlanResponse) error {
+func (pr *planRequest) adjustTaskDifficulty(rsp *PlanResponse) error {
 	// 从当前计划中提取任务
-	task, err := ExtractTaskFromRawResponse(p.config, p.rawInput)
+	task, err := ExtractTaskFromRawResponse(pr.cod, pr.rawInput)
 	if err != nil {
 		return utils.Errorf("error extracting task: %v", err)
 	}
 
 	// 调整未完成任务的难度
 	for _, subtask := range task.Subtasks {
-		subtask.Goal = p.simplifyTaskGoal(subtask.Goal)
+		subtask.Goal = pr.simplifyTaskGoal(subtask.Goal)
 	}
 
 	// 更新计划内容
@@ -413,12 +413,12 @@ func (p *planRequest) adjustTaskDifficulty(rsp *PlanResponse) error {
 	if err != nil {
 		return utils.Errorf("error marshaling task: %v", err)
 	}
-	p.rawInput = string(taskBytes)
+	pr.rawInput = string(taskBytes)
 	return nil
 }
 
 // simplifyTaskGoal 简化任务目标
-func (p *planRequest) simplifyTaskGoal(goal string) string {
+func (pr *planRequest) simplifyTaskGoal(goal string) string {
 	// 这里可以实现具体的任务简化逻辑
 	// 例如：移除复杂条件、减少依赖等
 	return goal

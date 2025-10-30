@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,47 +18,42 @@ import (
 )
 
 func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
-	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+
+	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
 
-		for _, i := range params {
-			if i.Key == "id" && len(i.Value) > 3 {
-				id = append(id, i.Value)
-			}
+		materials := ep.GetReviewMaterials()
+
+		data := materials.GetString("id")
+		if len(data) > 3 {
+			id = append(id, data)
 		}
 
-		spew.Dump(params)
+		fmt.Printf("%v", materials)
 		p := make(aitool.InvokeParams)
-		rawParams := make(aitool.InvokeParams)
-		rawParams["probability"] = 0.5
-		rawParams["impact"] = 0.5
-		rawParams["reason"] = "test reason"
-		p["params"] = rawParams
-		return aicommon.NewSimpleAction("", p), nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		p["risk_score"] = 0.2 // low risk score, quickly pass
+		p["reason"] = "test reason"
+		return aicommon.NewSimpleAction("object", p), nil
 	}
 
 	token2 := "status-..." + utils.RandStringBytes(20)
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAiAgreeRiskControl(mockRiskControl),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -94,8 +88,8 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			`))
 			return rsp, nil
 		}),
-		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
+		aicommon.WithAIAgree(),
+		aicommon.WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -126,12 +120,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -141,17 +130,12 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
 
-			if result.Type == schema.EVENT_TYPE_RISK_CONTROL_PROMPT {
+			if result.Type == schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN {
 				riskControlMsg++
 				continue
 			}
@@ -194,43 +178,39 @@ LOOP:
 }
 
 func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
-	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
 
-		for _, i := range params {
-			if i.Key == "id" && len(i.Value) > 3 {
-				id = append(id, i.Value)
-			}
+		materials := ep.GetReviewMaterials()
+
+		data := materials.GetString("id")
+		if len(data) > 3 {
+			id = append(id, data)
 		}
 
-		spew.Dump(params)
+		fmt.Printf("%v", materials)
 		p := make(aitool.InvokeParams)
-		p["probability"] = 0.5
-		p["impact"] = 0.5
+		p["risk_score"] = 0.2 // low risk score, quickly pass
 		p["reason"] = "test reason"
-		return aicommon.NewSimpleAction("", p), nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		return aicommon.NewSimpleAction("object", p), nil
 	}
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAiAgreeRiskControl(mockRiskControl),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -265,8 +245,8 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			`))
 			return rsp, nil
 		}),
-		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
+		aicommon.WithAIAgree(),
+		aicommon.WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -295,12 +275,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -310,17 +285,12 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
 
-			if result.Type == schema.EVENT_TYPE_RISK_CONTROL_PROMPT {
+			if result.Type == schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN {
 				riskControlMsg++
 				continue
 			}
@@ -354,43 +324,39 @@ LOOP:
 }
 
 func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
-	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
 
-		for _, i := range params {
-			if i.Key == "id" && len(i.Value) > 3 {
-				id = append(id, i.Value)
-			}
+		materials := ep.GetReviewMaterials()
+
+		data := materials.GetString("id")
+		if len(data) > 3 {
+			id = append(id, data)
 		}
 
-		spew.Dump(params)
+		fmt.Printf("%v", materials)
 		p := make(aitool.InvokeParams)
-		p["probability"] = 0.5
-		p["impact"] = 0.5
+		p["risk_score"] = 0.2 // low risk score, quickly pass
 		p["reason"] = "test reason"
-		return aicommon.NewSimpleAction("", p), nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		return aicommon.NewSimpleAction("object", p), nil
 	}
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAiAgreeRiskControl(mockRiskControl),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -424,8 +390,8 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 			`))
 			return rsp, nil
 		}),
-		WithAIAgree(),
-		WithGuardianMirrorStreamMirror("test", func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
+		aicommon.WithAIAgree(),
+		aicommon.WithGuardianMirrorStreamMirror("test", func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 			for event := range unlimitedChan.OutputChannel() {
 				if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 					guardianSmokingTestPassed = true
@@ -454,12 +420,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -469,17 +430,12 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
 
-			if result.Type == schema.EVENT_TYPE_RISK_CONTROL_PROMPT {
+			if result.Type == schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN {
 				riskControlMsg++
 				continue
 			}

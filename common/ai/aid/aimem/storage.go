@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -12,7 +13,7 @@ import (
 )
 
 // SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW
-func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
+func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*memory_type.MemoryEntity) error {
 	db := r.SafeGetDB()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
@@ -174,7 +175,7 @@ func (r *AIMemoryTriage) DeleteMemoryEntity(memoryID string) error {
 }
 
 // UpdateMemoryEntity 更新记忆条目
-func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
+func (r *AIMemoryTriage) UpdateMemoryEntity(entity *memory_type.MemoryEntity) error {
 	db := r.GetDB()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
@@ -219,7 +220,7 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
 }
 
 // GetMemoryEntity 获取单个记忆条目
-func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error) {
+func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*memory_type.MemoryEntity, error) {
 	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -234,7 +235,7 @@ func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error)
 		return nil, utils.Errorf("query memory entity failed: %v", err)
 	}
 
-	entity := &MemoryEntity{
+	entity := &memory_type.MemoryEntity{
 		Id:                 dbEntity.MemoryID,
 		CreatedAt:          dbEntity.CreatedAt,
 		Content:            dbEntity.Content,
@@ -254,7 +255,7 @@ func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error)
 }
 
 // ListAllMemories 列出所有记忆条目
-func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*MemoryEntity, error) {
+func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*memory_type.MemoryEntity, error) {
 	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -270,9 +271,9 @@ func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*MemoryEntity, error) {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
-	var results []*MemoryEntity
+	var results []*memory_type.MemoryEntity
 	for _, dbEntity := range dbEntities {
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 dbEntity.MemoryID,
 			CreatedAt:          dbEntity.CreatedAt,
 			Content:            dbEntity.Content,

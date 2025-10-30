@@ -1,6 +1,7 @@
 package aimem
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,7 +10,7 @@ import (
 )
 
 // AddRawText 从原始文本生成记忆条目
-func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
+func (r *AIMemoryTriage) AddRawText(i string) ([]*memory_type.MemoryEntity, error) {
 	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
 	if err != nil {
 		return nil, utils.Errorf("GetBasicPromptInfo failed: %v", err)
@@ -76,10 +77,10 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 		return nil, utils.Errorf("no memory entities found")
 	}
 
-	var entities []*MemoryEntity
+	var entities []*memory_type.MemoryEntity
 	for _, item := range result {
 		id := uuid.New().String()
-		entity := &MemoryEntity{
+		entity := &memory_type.MemoryEntity{
 			Id:                 id,
 			CreatedAt:          time.Now(),
 			Content:            item.GetString("content"),

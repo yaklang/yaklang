@@ -133,7 +133,9 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 
 // NewToolManager 创建一个新的默认工具管理器实例
 func NewToolManager(options ...ToolManagerOption) *AiToolManager {
-	manager := NewToolManagerByToolGetter(GetAllTools, options...)
+	basicToolsOptions := []ToolManagerOption{WithExtendTools(GetBasicBuildInTools(),true)} // 默认开启基础工具
+	options = append(basicToolsOptions, options...)
+	manager := NewToolManagerByToolGetter(GetAllTools, options...) //候选工具由GetAllTools提供
 	return manager
 }
 
@@ -249,4 +251,43 @@ func (m *AiToolManager) EnableTool(name string) {
 // DisableTool 关闭单个工具
 func (m *AiToolManager) DisableTool(name string) {
 	m.toolEnabled[name] = false
+}
+
+func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
+	var allTools []*aitool.Tool
+	if m.toolsGetter != nil {
+		allTools = m.toolsGetter()
+	}
+
+	toolsMap := map[string]*aitool.Tool{}
+	for _, tool := range allTools {
+		toolsMap[tool.Name] = tool
+	}
+
+	var extTools []*aitool.Tool
+	lo.ForEach(tools, func(tool *aitool.Tool, _ int) {
+		m.EnableTool(tool.Name)
+		if _, ok := toolsMap[tool.Name]; !ok {
+			extTools = append(extTools, tool)
+		}
+	})
+
+	originGetter := m.toolsGetter
+	m.toolsGetter = func() []*aitool.Tool {
+		return append(originGetter(), extTools...)
+	}
+	return nil
+}
+
+
+func (m *AiToolManager) EnableAIToolSearch(searcher searchtools.AISearcher[*aitool.Tool]) error {
+	m.enableForgeSearchTool = true
+	m.aiToolsSearcher = searcher
+	return nil
+}
+
+func (m *AiToolManager) EnableAIForgeSearch(searcher searchtools.AISearcher[*schema.AIForge]) error {
+	m.enableForgeSearchTool = true
+	m.aiForgeSearcher = searcher
+	return nil
 }
