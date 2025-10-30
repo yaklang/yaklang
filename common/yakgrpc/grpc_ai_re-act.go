@@ -131,6 +131,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithPersistentSessionId(persistentSession),
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
+		aicommon.WithEnablePETaskAnalyze(true),
 	}
 	configOptions = append(configOptions, optsFromStartParams...)
 

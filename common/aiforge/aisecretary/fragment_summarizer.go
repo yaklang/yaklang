@@ -48,7 +48,7 @@ cli.Int("limit",cli.help("字数限制"))
 				aicommon.WithExtendedActionCallback("summarize", func(config *aicommon.Config, action *aicommon.Action) {
 					summary = action.GetString("summary")
 				}),
-				aicommon.WithResultHandler(func(config *aicommon.Config) {}),
+				aid.WithResultHandler(func(config *aid.Coordinator) {}),
 			),
 		)
 		ord, err := bp.CreateCoordinator(ctx, items, option...)
