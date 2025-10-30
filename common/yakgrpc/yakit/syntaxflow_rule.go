@@ -235,6 +235,26 @@ func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema
 	return sfdb.GetIntersectionGroup(consts.GetGormProfileDatabase(), groups), nil
 }
 
+func ParseSyntaxFlowAutoInput(ruleInput *ypb.SyntaxFlowRuleAutoInput) (*schema.SyntaxFlowRule, error) {
+	language, err := sfdb.CheckSyntaxFlowLanguage(ruleInput.Language)
+	if err != nil {
+		return nil, err
+	}
+
+	content := createRuleByTemplate(ruleInput)
+	rule, _ := sfdb.CheckSyntaxFlowRuleContent(content)
+	rule.Language = string(language)
+	rule.RuleName = ruleInput.RuleName
+	rule.Tag = strings.Join(ruleInput.Tags, "|")
+	rule.Title = ruleInput.RuleName
+	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
+	rule.Description = ruleInput.Description
+	for s, message := range ruleInput.AlertMsg {
+		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
+	}
+	return rule, nil
+}
+
 func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
 	language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
 	if err != nil {

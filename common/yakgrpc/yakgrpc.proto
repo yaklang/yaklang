@@ -775,6 +775,7 @@ service Yak {
   rpc QuerySyntaxFlowRule(QuerySyntaxFlowRuleRequest) returns (QuerySyntaxFlowRuleResponse);
   rpc CreateSyntaxFlowRule(CreateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc CreateSyntaxFlowRuleEx(CreateSyntaxFlowRuleRequest) returns (CreateSyntaxFlowRuleResponse);
+  rpc CreateSyntaxFlowRuleAuto(CreateSyntaxFlowRuleAutoRequest) returns (CreateSyntaxFlowRuleResponse);
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (UpdateSyntaxFlowRuleResponse);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
@@ -7117,6 +7118,19 @@ message  SyntaxFlowRuleInput{
   map<string, AlertMessage> AlertMsg = 7;
 }
 
+message SyntaxFlowRuleAutoInput {
+  string RuleName = 1; // RuleName作为索引，因此不能update RuleName
+  string Language = 2;
+  string Description = 3;
+  repeated string Tags = 4;
+  repeated string GroupNames = 5;
+  repeated string RuleSubjects = 6;
+  repeated string RuleSafeTests = 7;
+  repeated string RuleUnSafeTests = 8;
+  repeated string RuleLevels = 9;
+  map<string, AlertMessage> AlertMsg = 10;
+}
+
 message SyntaxFlowRuleFilter {
   repeated string RuleNames = 1;
   repeated string Language = 2;
@@ -7221,6 +7235,10 @@ message QuerySSAProgramResponse{
   repeated SSAProgram Programs = 2; // abort
   repeated SSAProgram Data = 4;
   int64 Total = 3;
+}
+
+message CreateSyntaxFlowRuleAutoRequest{
+  SyntaxFlowRuleAutoInput SyntaxFlowInput = 1;
 }
 
 message CreateSyntaxFlowRuleRequest{

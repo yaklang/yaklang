@@ -33,6 +33,31 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 	return rsp, nil
 }
 
+// 只需要配置关键信息，其他由AI生成
+func (s *Server) CreateSyntaxFlowRuleAuto(ctx context.Context, req *ypb.CreateSyntaxFlowRuleAutoRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
+	if req == nil || req.GetSyntaxFlowInput() == nil {
+		return nil, utils.Error("create syntax flow rule failed: request is nil")
+	}
+
+	input := req.GetSyntaxFlowInput()
+	rule, err := yakit.ParseSyntaxFlowAutoInput(input)
+	if err != nil {
+		return nil, err
+	}
+	_, err = sfdb.CreateRuleWithDefaultGroup(rule, input.GetGroupNames()...)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.CreateSyntaxFlowRuleResponse{
+		Rule: rule.ToGRPCModel(),
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreate,
+			EffectRows: 1,
+		},
+	}, nil
+}
+
 func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
 	if req == nil || req.GetSyntaxFlowInput() == nil {
 		return nil, utils.Error("create syntax flow rule failed: request is nil")
