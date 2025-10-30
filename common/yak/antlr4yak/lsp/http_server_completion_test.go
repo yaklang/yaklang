@@ -366,3 +366,155 @@ func TestHTTPServerCompletion_JSONOutput(t *testing.T) {
 		}
 	}
 }
+
+// TestHTTPServerCompletion_RealWorldScenario 测试真实场景：模拟客户端发送的请求
+func TestHTTPServerCompletion_RealWorldScenario(t *testing.T) {
+	// 创建 gRPC 服务器
+	grpcServer, err := yakgrpc.NewServer(
+		yakgrpc.WithInitFacadeServer(false),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create grpc server: %v", err)
+	}
+
+	// 创建 HTTP LSP 服务器
+	httpServer := NewYakLSPHTTPServer(grpcServer, ":0") // 使用随机端口
+	defer httpServer.Stop()
+
+	// 测试场景 1: rag. 补全
+	t.Run("rag.BuildIndex", func(t *testing.T) {
+		// 构造与客户端完全一致的请求参数
+		params := map[string]interface{}{
+			"textDocument": map[string]interface{}{
+				"uri":  "file:///test.yak",
+				"text": "rag.", // 直接传递文档内容
+			},
+			"position": map[string]interface{}{
+				"line":      0,
+				"character": 4, // rag. 后面
+			},
+		}
+
+		paramsBytes, _ := json.Marshal(params)
+		result, err := httpServer.handleCompletion(paramsBytes)
+		if err != nil {
+			t.Fatalf("handleCompletion failed: %v", err)
+		}
+
+		items, ok := result.([]map[string]interface{})
+		if !ok {
+			t.Fatalf("Expected []map[string]interface{}, got %T", result)
+		}
+
+		t.Logf("✅ 返回 %d 个补全项", len(items))
+
+		// 验证必须包含 BuildIndexKnowledgeFromFile
+		found := false
+		for _, itemMap := range items {
+			if label, ok := itemMap["label"].(string); ok {
+				if strings.Contains(label, "BuildIndexKnowledgeFromFile") {
+					found = true
+					t.Logf("✅ 找到 BuildIndexKnowledgeFromFile")
+					t.Logf("   Label: %s", label)
+					if insertText, ok := itemMap["insertText"].(string); ok {
+						t.Logf("   InsertText: %s", insertText)
+					}
+					break
+				}
+			}
+		}
+
+		if !found {
+			t.Errorf("❌ 未找到 BuildIndexKnowledgeFromFile")
+			t.Logf("前 10 个补全项:")
+			for i, itemMap := range items {
+				if i >= 10 {
+					break
+				}
+				t.Logf("  [%d] %v", i+1, itemMap["label"])
+			}
+			t.FailNow()
+		}
+	})
+
+	// 测试场景 2: str. 补全
+	t.Run("str.Split", func(t *testing.T) {
+		params := map[string]interface{}{
+			"textDocument": map[string]interface{}{
+				"uri":  "file:///test.yak",
+				"text": "str.",
+			},
+			"position": map[string]interface{}{
+				"line":      0,
+				"character": 4,
+			},
+		}
+
+		paramsBytes, _ := json.Marshal(params)
+		result, err := httpServer.handleCompletion(paramsBytes)
+		if err != nil {
+			t.Fatalf("handleCompletion failed: %v", err)
+		}
+
+		items := result.([]map[string]interface{})
+		t.Logf("✅ 返回 %d 个补全项", len(items))
+
+		// 验证包含常见字符串方法
+		expectedMethods := []string{"Split", "ToUpper", "ToLower", "Contains"}
+		for _, method := range expectedMethods {
+			found := false
+			for _, itemMap := range items {
+				if label, ok := itemMap["label"].(string); ok {
+					if strings.Contains(label, method) {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				t.Logf("✅ 找到方法: %s", method)
+			} else {
+				t.Errorf("❌ 未找到方法: %s", method)
+			}
+		}
+	})
+
+	// 测试场景 3: http. 补全
+	t.Run("http.Get", func(t *testing.T) {
+		params := map[string]interface{}{
+			"textDocument": map[string]interface{}{
+				"uri":  "file:///test.yak",
+				"text": "http.",
+			},
+			"position": map[string]interface{}{
+				"line":      0,
+				"character": 5,
+			},
+		}
+
+		paramsBytes, _ := json.Marshal(params)
+		result, err := httpServer.handleCompletion(paramsBytes)
+		if err != nil {
+			t.Fatalf("handleCompletion failed: %v", err)
+		}
+
+		items := result.([]map[string]interface{})
+		t.Logf("✅ 返回 %d 个补全项", len(items))
+
+		// 验证包含 Get 方法
+		found := false
+		for _, itemMap := range items {
+			if label, ok := itemMap["label"].(string); ok {
+				if strings.Contains(label, "Get") {
+					found = true
+					t.Logf("✅ 找到 Get 方法: %s", label)
+					break
+				}
+			}
+		}
+
+		if !found {
+			t.Errorf("❌ 未找到 Get 方法")
+		}
+	})
+}
