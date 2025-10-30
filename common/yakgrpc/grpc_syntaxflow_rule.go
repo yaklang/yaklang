@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -127,10 +129,31 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
 
+	// 预取远端同名规则版本，避免逐条请求/连接
+	var ruleNames []string
+	for _, r := range ret {
+		ruleNames = append(ruleNames, r.RuleName)
+	}
+	remoteVersionMap, prefetchErr := fetchRemoteRuleVersionMap(stream.Context(), client, req.Token, ruleNames)
+	if prefetchErr != nil {
+		sendProgress(stream, 0, fmt.Sprintf("获取远端版本失败 [%s]: %v，将继续尝试上传", strings.Join(ruleNames, ","), err), "warning")
+	}
+
 	for i, k := range ret {
 		progress := float64(i) / float64(len(ret))
 
-		err := uploadRule(ctx, client, req.Token, k)
+		if remoteVersion, ok := remoteVersionMap[k.RuleName]; ok {
+			if shouldSkipUpload(k.Version, remoteVersion) {
+				sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 远端版本为最新 (远端: %s，本地: %s)，跳过上传", k.RuleName, remoteVersion, k.Version), "info")
+				continue
+			}
+
+			if remoteVersion != "" {
+				sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 发现远端旧版本 (远端: %s → 本地: %s)，开始覆盖上传", k.RuleName, remoteVersion, k.Version), "info")
+			}
+		}
+
+		err = uploadRule(ctx, client, req.Token, k)
 		if err != nil {
 			errorCount++
 			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 上传失败: %v", k.RuleName, err), "error")
@@ -159,6 +182,53 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 		Message:     msg,
 		MessageType: msgType,
 	})
+}
+
+// fetchRemoteRuleVersion 拉取远端同名规则的版本（若不存在则返回空字符串）
+func fetchRemoteRuleVersion(ctx context.Context, client *yaklib.OnlineClient, token, ruleName string) (string, error) {
+	if ruleName == "" {
+		return "", nil
+	}
+	req := &ypb.DownloadSyntaxFlowRuleRequest{Filter: &ypb.SyntaxFlowRuleFilter{RuleNames: []string{ruleName}}}
+	ch := client.DownloadOnlineSyntaxFlowRule(ctx, token, req)
+	if ch == nil {
+		return "", utils.Error("download stream is nil")
+	}
+	for item := range ch.Chan {
+		if item != nil && item.Rule != nil {
+			return item.Rule.Version, nil
+		}
+	}
+	return "", nil
+}
+
+// fetchRemoteRuleVersionMap 一次性拉取多个规则的远端版本
+func fetchRemoteRuleVersionMap(ctx context.Context, client *yaklib.OnlineClient, token string, ruleNames []string) (map[string]string, error) {
+	versionMap := make(map[string]string)
+	if len(ruleNames) == 0 {
+		return versionMap, nil
+	}
+	req := &ypb.DownloadSyntaxFlowRuleRequest{Filter: &ypb.SyntaxFlowRuleFilter{RuleNames: ruleNames}}
+	ch := client.DownloadOnlineSyntaxFlowRule(ctx, token, req)
+	if ch == nil {
+		return nil, utils.Error("download stream is nil")
+	}
+	for item := range ch.Chan {
+		if item != nil && item.Rule != nil {
+			versionMap[item.Rule.RuleName] = item.Rule.Version
+		}
+	}
+	return versionMap, nil
+}
+
+func shouldSkipUpload(localVersion, remoteVersion string) bool {
+	if remoteVersion == "" {
+		return false
+	}
+	if localVersion == "" {
+		return true
+	}
+	return localVersion <= remoteVersion
 }
 
 func uploadRule(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
@@ -213,6 +283,7 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 		total           int64
 		successCount    int
 		errorCount      int
+		skippedCount    int
 		count, progress float64
 	)
 
@@ -227,17 +298,28 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 			progress = count / float64(total)
 		}
 		count++
-		err := client.SaveSyntaxFlowRule(s.GetProfileDatabase(), result)
+
+		localRule, err := sfdb.QueryRuleByName(s.GetProfileDatabase(), result.RuleName)
+		if err == nil && localRule != nil {
+			if shouldSkipUpdate(localRule.Version, result.Version) {
+				skippedCount++
+				sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 已是最新版本 (本地: %s, 在线: %s)，跳过更新", result.RuleName, localRule.Version, result.Version), "info")
+				continue
+			}
+			sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 有新版本 (本地: %s → 在线: %s)，开始更新", result.RuleName, localRule.Version, result.Version), "info")
+		}
+
+		err = client.SaveSyntaxFlowRule(s.GetProfileDatabase(), result)
 		if err != nil {
 			errorCount++
 			sendProgress(stream, progress, fmt.Sprintf("save [%s] to local db failed: %s", result.RuleName, err), "error")
 			continue
 		}
 		successCount++
-		sendProgress(stream, progress, fmt.Sprintf("save [%s] to local db success: %s", result.RuleName, err), "success")
+		sendProgress(stream, progress, fmt.Sprintf("save [%s] to local db success", result.RuleName), "success")
 	}
 	// 发送最终结果
-	msg := fmt.Sprintf("完成: 成功 %d, 失败 %d", successCount, errorCount)
+	msg := fmt.Sprintf("完成: 成功 %d, 跳过 %d, 失败 %d", successCount, skippedCount, errorCount)
 	msgType := "success"
 	if errorCount > 0 {
 		msgType = "warning"
@@ -251,4 +333,15 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 		Message:     msg,
 		MessageType: msgType,
 	})
+}
+
+func shouldSkipUpdate(localVersion, onlineVersion string) bool {
+	if onlineVersion == "" {
+		return true
+	}
+
+	if localVersion == "" {
+		return false
+	}
+	return localVersion >= onlineVersion
 }
