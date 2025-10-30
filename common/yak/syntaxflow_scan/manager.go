@@ -18,6 +18,25 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// convertRulesToChannel 将规则列表转换为channel（避免重复加载）
+func convertRulesToChannel(rules []*schema.SyntaxFlowRule, ctx context.Context) chan *schema.SyntaxFlowRule {
+	ruleChan := make(chan *schema.SyntaxFlowRule, 10)
+
+	go func() {
+		defer close(ruleChan)
+		for _, rule := range rules {
+			select {
+			case ruleChan <- rule:
+			case <-ctx.Done():
+				log.Info("context cancelled, stop sending rules")
+				return
+			}
+		}
+	}()
+
+	return ruleChan
+}
+
 type scanManager struct {
 	// *Config
 	Config *Config
@@ -205,7 +224,6 @@ func (m *scanManager) RestoreTask() error {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by [%s] is failed", m.TaskId())
 	}
 	m.taskRecorder = task
-	m.status = task.Status
 	m.status = task.Status
 	// m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 
