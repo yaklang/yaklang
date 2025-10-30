@@ -21,6 +21,7 @@ import (
 type RAGBinaryData struct {
 	Collection *schema.VectorStoreCollection
 	Documents  []*ExportVectorStoreDocument
+	Version    uint32
 }
 
 func ExportRAGToFile(collectionName string, fileName string, opts ...RAGExportOptionFunc) error {
@@ -75,8 +76,12 @@ func ExportRAGToBinary(collectionName string, opts ...RAGExportOptionFunc) (io.R
 	if _, err := buf.WriteString("YAKRAG"); err != nil {
 		return nil, utils.Wrap(err, "failed to write magic header")
 	}
-	if err := pbWriteUint32(buf, 1); err != nil {
+	if err := pbWriteUint32(buf, 2); err != nil {
 		return nil, utils.Wrap(err, "failed to write version")
+	}
+
+	if _, err := buf.WriteString(cfg.SerialVersionUID); err != nil {
+		return nil, utils.Wrap(err, "failed to write serialVersionUID")
 	}
 
 	// 写入集合信息
@@ -305,8 +310,7 @@ func writeDocumentToBinary(writer io.Writer, doc *schema.VectorStoreDocument) er
 	return nil
 }
 
-// LoadRAGFromBinary 从二进制数据流式加载RAG格式
-func LoadRAGFromBinary(reader io.Reader) (*RAGBinaryData, error) {
+func LoadRAGFileHeader(reader io.Reader) (*RAGBinaryData, error) {
 	// 读取魔数头
 	magic := make([]byte, 6)
 	if _, err := io.ReadFull(reader, magic); err != nil {
@@ -321,8 +325,13 @@ func LoadRAGFromBinary(reader io.Reader) (*RAGBinaryData, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "read version")
 	}
-	if version != 1 {
-		return nil, utils.Errorf("unsupported version: %d", version)
+	var serialVersionUID string
+	if version == 2 {
+		serialVersionUIDBytes, err := consumeBytes(reader)
+		if err != nil {
+			return nil, utils.Wrap(err, "read serialVersionUID")
+		}
+		serialVersionUID = string(serialVersionUIDBytes)
 	}
 
 	// 读取集合信息
@@ -331,6 +340,19 @@ func LoadRAGFromBinary(reader io.Reader) (*RAGBinaryData, error) {
 		return nil, utils.Wrap(err, "read collection")
 	}
 
+	collection.SerialVersionUID = serialVersionUID
+	return &RAGBinaryData{
+		Version:    version,
+		Collection: collection,
+	}, nil
+}
+
+// LoadRAGFromBinary 从二进制数据流式加载RAG格式
+func LoadRAGFromBinary(reader io.Reader) (*RAGBinaryData, error) {
+	ragData, err := LoadRAGFileHeader(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "load rag file header")
+	}
 	// 读取文档数据
 	documents, err := readDocumentsFromStream(reader)
 	if err != nil {
@@ -342,11 +364,9 @@ func LoadRAGFromBinary(reader io.Reader) (*RAGBinaryData, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "read hnsw index")
 	}
-	collection.GraphBinary = hnswIndex
-	return &RAGBinaryData{
-		Collection: collection,
-		Documents:  documents,
-	}, nil
+	ragData.Collection.GraphBinary = hnswIndex
+	ragData.Documents = documents
+	return ragData, nil
 }
 
 // readCollectionFromStream 从流中读取集合信息
@@ -658,6 +678,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 			"description":        collection.Description,
 			"model_name":         collection.ModelName,
 			"dimension":          collection.Dimension,
+			"serial_version_uid": collection.SerialVersionUID,
 			"m":                  collection.M,
 			"ml":                 collection.Ml,
 			"ef_search":          collection.EfSearch,

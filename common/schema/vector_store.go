@@ -171,6 +171,8 @@ type VectorStoreCollection struct {
 
 	GraphBinary    []byte `gorm:"type:blob" json:"graph_binary"`
 	CodeBookBinary []byte `gorm:"type:blob" json:"code_book_binary"`
+
+	SerialVersionUID string `gorm:"index" json:"serial_version_uid"`
 }
 
 func (v *VectorStoreCollection) BeforeSave() error {
