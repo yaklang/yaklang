@@ -71,6 +71,9 @@ type Config struct {
 	planAICallback        aicommon.AICallbackType
 	taskAICallback        aicommon.AICallbackType // no need to think, low level
 
+	// ai service name
+	aiServiceName string
+
 	// asyncGuardian can auto collect event handler data
 	guardian     *aicommon.AsyncGuardian
 	eventHandler func(e *schema.AiOutputEvent)
@@ -645,6 +648,15 @@ func WithAllowRequireForUserInteract(opts ...bool) Option {
 			return nil
 		}
 		config.allowRequireForUserInteract = true
+		return nil
+	}
+}
+
+func WithAIServiceName(name string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.aiServiceName = name
 		return nil
 	}
 }
