@@ -231,6 +231,23 @@ func (v *VectorStoreDocument) TableName() string {
 	return "rag_vector_document_test_v1"
 }
 
+const VectorStoreDocumentBroadcastType = "vector_store_document"
+
+func (a *VectorStoreDocument) AfterCreate(tx *gorm.DB) (err error) {
+	broadcastData.Call(VectorStoreDocumentBroadcastType, "create")
+	return nil
+}
+
+func (a *VectorStoreDocument) AfterUpdate(tx *gorm.DB) (err error) {
+	broadcastData.Call(VectorStoreDocumentBroadcastType, "update")
+	return nil
+}
+
+func (a *VectorStoreDocument) AfterDelete(tx *gorm.DB) (err error) {
+	broadcastData.Call(VectorStoreDocumentBroadcastType, "delete")
+	return nil
+}
+
 // StringArray 用于存储字符串数组的自定义类型
 // 实现了 driver.Valuer 和 sql.Scanner 接口，支持数据库存储和读取
 type StringArray []string
@@ -328,6 +345,23 @@ type KnowledgeBaseEntry struct {
 
 	// 唯一标识符，用于在向量索引中唯一标识该知识条目
 	HiddenIndex string `gorm:"unique_index"`
+}
+
+const KnowledgeBaseEntryBroadcastType = "knowledge_base_entry"
+
+func (e *KnowledgeBaseEntry) AfterCreate(tx *gorm.DB) (err error) {
+	broadcastData.Call(KnowledgeBaseEntryBroadcastType, "create")
+	return nil
+}
+
+func (e *KnowledgeBaseEntry) AfterUpdate(tx *gorm.DB) (err error) {
+	broadcastData.Call(KnowledgeBaseEntryBroadcastType, "update")
+	return nil
+}
+
+func (e *KnowledgeBaseEntry) AfterDelete(tx *gorm.DB) (err error) {
+	broadcastData.Call(KnowledgeBaseEntryBroadcastType, "delete")
+	return nil
 }
 
 func (e *KnowledgeBaseEntry) TableName() string {

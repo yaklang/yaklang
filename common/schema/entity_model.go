@@ -57,6 +57,23 @@ type ERModelEntity struct {
 	RuntimeID string
 }
 
+const ERModelEntityBroadcastType = "er_model_entity"
+
+func (a *ERModelEntity) AfterCreate(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelEntityBroadcastType, "create")
+	return nil
+}
+
+func (a *ERModelEntity) AfterUpdate(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelEntityBroadcastType, "update")
+	return nil
+}
+
+func (a *ERModelEntity) AfterDelete(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelEntityBroadcastType, "delete")
+	return nil
+}
+
 func (e *ERModelEntity) TableName() string {
 	return "rag_entity_test"
 }
@@ -157,6 +174,23 @@ type ERModelRelationship struct {
 	Attributes              MetadataMap `gorm:"type:text" json:"attributes"`
 
 	RuntimeID string
+}
+
+const ERModelRelationshipBroadcastType = "er_model_relationship"
+
+func (r *ERModelRelationship) AfterCreate(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelRelationshipBroadcastType, "create")
+	return nil
+}
+
+func (r *ERModelRelationship) AfterUpdate(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelRelationshipBroadcastType, "update")
+	return nil
+}
+
+func (r *ERModelRelationship) AfterDelete(tx *gorm.DB) (err error) {
+	broadcastData.Call(ERModelRelationshipBroadcastType, "delete")
+	return nil
 }
 
 func (r *ERModelRelationship) TableName() string {

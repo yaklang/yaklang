@@ -163,11 +163,12 @@ func (s *Server) ListVectorStoreEntries(ctx context.Context, req *ypb.ListVector
 
 		// 转换嵌入向量
 		pbEntry := &ypb.VectorStoreEntry{
-			ID:        int64(doc.ID),
-			UID:       doc.DocumentID,
-			Content:   doc.Content,
-			Metadata:  metadataStr,
-			Embedding: doc.Embedding,
+			ID:           int64(doc.ID),
+			UID:          doc.DocumentID,
+			Content:      doc.Content,
+			Metadata:     metadataStr,
+			Embedding:    doc.Embedding,
+			DocumentType: string(doc.DocumentType),
 		}
 		pbEntries = append(pbEntries, pbEntry)
 	}
