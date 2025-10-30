@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
@@ -76,13 +75,9 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 	case SYNC_TYPE_UPDATE_CONFIG:
 		updateConfig := map[string]interface{}{}
 		if event.Params.GetAIService() != "" {
-			chat, err := ai.LoadChater(event.Params.GetAIService())
+			err := r.config.loadAIServiceByName(event.Params.GetAIService())
 			if err != nil {
 				r.EmitError("load ai service failed: %v", err)
-			} else {
-				r.config.aiCallback = aicommon.AIChatToAICallbackType(chat)
-				r.config.hotpatchBroadcaster.Submit(aid.WithAICallback(r.config.aiCallback))
-				updateConfig["ai_service"] = event.Params.GetAIService()
 			}
 		}
 		if event.Params.GetReviewPolicy() != "" {
