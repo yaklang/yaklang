@@ -946,6 +946,7 @@ func main() {
 	}
 
 	mainCommands := []*cli.Command{
+		yakcmds.LSPCommand,
 		{
 			Name: "version",
 			Flags: []cli.Flag{
