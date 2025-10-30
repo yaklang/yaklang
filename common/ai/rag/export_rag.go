@@ -623,7 +623,11 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 
 	reportProgress(0, "开始导入向量库数据", "info")
 
-	collection := ragData.Collection
+	collectionIns := *ragData.Collection
+	collection := &collectionIns
+	if opts.RebuildHNSWIndex {
+		collection.GraphBinary = nil
+	}
 	collectionName := collection.Name
 
 	// 如果指定了集合名称，使用指定的名称
@@ -738,7 +742,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 	reportProgress(90, "向量文档导入完成，开始导入HNSW索引", "info")
 
 	// 导入HNSW索引（如果存在）
-	if len(ragData.Collection.GraphBinary) > 0 {
+	if len(ragData.Collection.GraphBinary) > 0 && !opts.RebuildHNSWIndex {
 		err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Update("graph_binary", ragData.Collection.GraphBinary).Error
 		if err != nil {
 			// HNSW索引导入失败不应该影响整个导入过程
@@ -746,7 +750,12 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 		}
 		reportProgress(95, "HNSW索引导入完成", "info")
 	} else {
-		reportProgress(95, "跳过HNSW索引导入", "info")
+		reportProgress(92, "HNSW索引重建开始", "info")
+		err := MigrateHNSWGraph(db, collection)
+		if err != nil {
+			return utils.Wrap(err, "failed to migrate HNSW graph")
+		}
+		reportProgress(95, "HNSW索引重建完成", "info")
 	}
 
 	reportProgress(100, "向量库数据导入完成", "success")

@@ -17,6 +17,7 @@ type RAGExportConfig struct {
 	NoMetadata        bool     // 是否不导出元数据（导出时使用）
 	OverwriteExisting bool     // 是否覆盖现有数据（导入时使用）
 	NoOriginInput     bool     // 是否不导出原始输入数据（导出时使用）
+	RebuildHNSWIndex  bool     // 是否重新构建HNSW索引（导入时使用）
 
 	CollectionName    string // 指定集合名称（导入时使用，可选）
 	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
@@ -92,10 +93,17 @@ func WithCollectionName(name string) RAGExportOptionFunc {
 	}
 }
 
+func WithRebuildHNSWIndex(b bool) RAGExportOptionFunc {
+	return func(opts *RAGExportConfig) {
+		opts.RebuildHNSWIndex = b
+	}
+}
+
 func NewRAGConfig(opts ...RAGExportOptionFunc) *RAGExportConfig {
 	config := &RAGExportConfig{
 		Ctx:               context.Background(),
 		NoHNSWIndex:       false,
+		RebuildHNSWIndex:  false,
 		OverwriteExisting: false,
 		DB:                consts.GetGormProfileDatabase(),
 	}

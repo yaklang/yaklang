@@ -79,12 +79,13 @@ var RagExports = map[string]interface{}{
 
 	"BuildIndexKnowledgeFromFile": aiforge.BuildIndexKnowledgeFromFile,
 
-	"Import":          rag.ImportRAGFromFile,
-	"db":              rag.WithImportExportDB,
-	"importOverwrite": rag.WithOverwriteExisting,
-	"importName":      rag.WithCollectionName,
-	"documentHandler": rag.WithDocumentHandler,
-	"progressHandler": rag.WithProgressHandler,
+	"Import":             rag.ImportRAGFromFile,
+	"db":                 rag.WithImportExportDB,
+	"importOverwrite":    rag.WithOverwriteExisting,
+	"importName":         rag.WithCollectionName,
+	"importRebuildGraph": rag.WithRebuildHNSWIndex,
+	"documentHandler":    rag.WithDocumentHandler,
+	"progressHandler":    rag.WithProgressHandler,
 
 	"Export":        rag.ExportRAGToFile,
 	"noHNSWGraph":   rag.WithNoHNSWGraph,
