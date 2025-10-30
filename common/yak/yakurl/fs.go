@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -200,12 +199,7 @@ func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYak
 		}
 	}
 
-	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
-		err = YakRunnerMonitor.UpdateFileTree()
-		if err != nil {
-			log.Errorf("failed to update file tree: %s", err)
-		}
-	}
+	err = CheckUpdateFileMonitors(absPath)
 
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
@@ -307,14 +301,7 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 			return nil, utils.Wrapf(err, "cannot write file[%s]", u.GetPath())
 		}
 	}
-
-	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
-		err = YakRunnerMonitor.UpdateFileTree()
-		if err != nil {
-			log.Errorf("failed to update file tree: %s", err)
-		}
-	}
-
+	err = CheckUpdateFileMonitors(absPath)
 	currentInfo, err := fs.Stat(absPath)
 	if err != nil {
 		return nil, utils.Wrapf(err, "cannot stat path[%s]", u.GetPath()) // check file / dir
@@ -357,12 +344,7 @@ func (f fileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestY
 	if err != nil {
 		return nil, err
 	}
-	if YakRunnerMonitor != nil && utils.IsSubPath(absPath, YakRunnerMonitor.WatchPatch) {
-		err = YakRunnerMonitor.UpdateFileTree()
-		if err != nil {
-			log.Errorf("failed to update file tree: %s", err)
-		}
-	}
+	err = CheckUpdateFileMonitors(absPath)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,

@@ -4,12 +4,13 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/log"
 )
