@@ -358,16 +358,41 @@ func NewHNSWGraph(collectionName string, opts ...hnsw.GraphOption[string]) *hnsw
 var graphNodesIsEmpty = errors.New("hnsw graph nodes is empty")
 
 func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) error {
+	cacheMinSize := 100000
+	cacheMaxSize := cacheMinSize + 2000
+	cache := map[hnswspec.LazyNodeID][]float32{}
+	clearCache := func() {
+		if len(cache) > cacheMaxSize {
+			clearNum := len(cache) - cacheMinSize
+			clearKeys := []hnswspec.LazyNodeID{}
+			for key := range cache {
+				clearKeys = append(clearKeys, key)
+				clearNum--
+				if clearNum <= 0 {
+					break
+				}
+			}
+			for _, key := range clearKeys {
+				delete(cache, key)
+			}
+		}
+	}
 	hnswGraph := NewHNSWGraph(collection.Name)
 
 	// 分页查询向量节点
 	pageSize := 1000
 
 	getVectorByID := func(id hnswspec.LazyNodeID) ([]float32, error) {
+		idStr := fmt.Sprint(id)
+		if node, ok := cache[idStr]; ok {
+			return node, nil
+		}
 		doc, err := getVectorDocumentByLazyNodeID(db, id)
 		if err != nil {
 			return nil, err
 		}
+		clearCache()
+		cache[idStr] = doc.Embedding
 		return doc.Embedding, nil
 	}
 
