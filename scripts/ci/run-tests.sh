@@ -157,7 +157,8 @@ run_test() {
     # 创建一个临时函数来同时输出到屏幕和日志
     exec 3>&1  # 保存原始 stdout
     
-    {
+    # 使用子shell而不是代码块，这样可以正确捕获exit code
+    (
       # 第一行：最重要的信息 - 运行命令
       echo "Command: (cd $pkg_dir && $bin ${args[*]})"
       echo "Test: $name | Package: $pkg_path"
@@ -165,13 +166,9 @@ run_test() {
       [[ $max_retries -gt 0 ]] && echo "Retry: enabled (max=$max_retries, delay=${delay}s, attempt=$((attempt + 1)))"
       echo "----"
       
-      set +e
-      (cd "$pkg_dir" && "$bin" "${args[@]}") 2>&1
-      local code=$?
-      set -e
-      
-      return $code
-    } 2>&1 | tee "$log" >&3
+      # 在子shell中，exit会退出子shell而不是整个脚本
+      cd "$pkg_dir" && "$bin" "${args[@]}"
+    ) 2>&1 | tee "$log" >&3
     
     local code=${PIPESTATUS[0]}
     exec 3>&-  # 关闭文件描述符
