@@ -30,7 +30,7 @@ type LiteForge struct {
 	RequireSchema    string
 	OutputSchema     string
 	OutputActionName string
-	ExtendAIDOptions []aid.Option
+	ExtendAIDOptions []aicommon.ConfigOption
 
 	streamFields *omap.OrderedMap[string, *streamableField]
 	emitter      *aicommon.Emitter
@@ -108,10 +108,10 @@ func WithLiteForge_OutputMemoryOP() LiteForgeOption {
 	}
 }
 
-func WithExtendLiteForge_AIDOption(opts ...aid.Option) LiteForgeOption {
+func WithExtendLiteForge_AIOption(opts ...aicommon.ConfigOption) LiteForgeOption {
 	return func(l *LiteForge) error {
 		if l.ExtendAIDOptions == nil {
-			l.ExtendAIDOptions = make([]aid.Option, 0)
+			l.ExtendAIDOptions = make([]aicommon.ConfigOption, 0)
 		}
 		l.ExtendAIDOptions = append(l.ExtendAIDOptions, opts...)
 		return nil
@@ -139,11 +139,11 @@ func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 	return lf, nil
 }
 
-func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
 	return l.ExecuteEx(ctx, params, nil, opts...)
 }
 
-func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aid.Option) (*ForgeResult, error) {
+func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
 	if l.OutputSchema == "" {
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
@@ -202,7 +202,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		"PROMPT": string(l.Prompt),
 		"PARAMS": string(call),
 		"SCHEMA": string(l.OutputSchema),
-		"MEMORY": cod.GetConfig().GetMemory(),
+		"MEMORY": cod.Memory,
 	}
 	tmp, err := template.New("liteforge").Parse(temp)
 	if err != nil {
@@ -219,7 +219,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			if l.ForgeName == "" {
 				l.ForgeName = "LiteForge"
 			}
-			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
+			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetEmitter())
 			var mirrored bytes.Buffer
 			var actionOpts = []aicommon.ActionMakerOption{
 				aicommon.WithActionJSONCallback(l.OutputJsonHook...),

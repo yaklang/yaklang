@@ -2,10 +2,9 @@ package aiforge
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/consts"
@@ -42,7 +41,7 @@ func WithForgeFilter_Limit(limit int) ForgeQueryOption {
 	}
 }
 
-func (f ForgeFactory) NLQuery(ctx context.Context, query string, aiChatFunc func(string) (io.Reader, error), opts ...ForgeQueryOption) ([]*schema.AIForge, error) {
+func (f ForgeFactory) NLQuery(ctx context.Context, query string, aiChatFunc func(string) (io.Reader, error), opts ...aicommon.ForgeQueryOption) ([]*schema.AIForge, error) {
 	data, err := f.Query(ctx, opts...)
 	if err != nil {
 		return nil, err
@@ -52,20 +51,11 @@ func (f ForgeFactory) NLQuery(ctx context.Context, query string, aiChatFunc func
 }
 
 // Query 从 Profile 数据库中查询 schema.AIForge 列表
-func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*schema.AIForge, error) {
-	_ = ctx
-	var (
-		db     *gorm.DB = consts.GetGormProfileDatabase()
-		filter          = &ypb.AIForgeFilter{}
-		paging          = &ypb.Paging{Page: 1, Limit: 100}
-	)
-
-	for _, opt := range opts {
-		opt(filter, paging)
-	}
-
-	log.Debugf("ForgeFactory.Query: keyword=%q limit=%d", filter.GetKeyword(), paging.GetLimit())
-	_, data, err := yakit.QueryAIForge(db, filter, paging)
+func (ForgeFactory) Query(ctx context.Context, opts ...aicommon.ForgeQueryOption) ([]*schema.AIForge, error) {
+	queryConfig := aicommon.NewForgeQueryConfig(opts...)
+	db := consts.GetGormProfileDatabase()
+	log.Debugf("ForgeFactory.Query: keyword=%q limit=%d", queryConfig.Filter.GetKeyword(), queryConfig.Paging.GetLimit())
+	_, data, err := yakit.QueryAIForge(db, queryConfig.Filter, queryConfig.Paging)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +88,7 @@ func (f *ForgeFactory) GetAIForge(name string) (*schema.AIForge, error) {
 	return yakit.GetAIForgeByName(db, name)
 }
 
-// GenerateAIJSONSchemaOptionsFromSchemaAIForge 从 AIForge 生成对应的 aitool.ToolOption 选项
+// GenerateAIJSONSchemaFromSchemaAIForge  从 AIForge 生成对应的 aitool.ToolOption 选项
 // 这个函数解析 AIForge.Params 中的 Yak 语言 CLI 参数定义代码，并生成相应的 aitool.ToolOption 配置
 func (f *ForgeFactory) GenerateAIJSONSchemaFromSchemaAIForge(forge *schema.AIForge) (string, error) {
 	if forge == nil {
@@ -135,6 +125,6 @@ func (f *ForgeFactory) GenerateAIJSONSchemaFromSchemaAIForge(forge *schema.AIFor
 }
 
 // Execute 透明转发到内置 ExecuteForge
-func (ForgeFactory) Execute(ctx context.Context, forgeName string, params []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+func (ForgeFactory) Execute(ctx context.Context, forgeName string, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
 	return ExecuteForge(forgeName, ctx, params, opts...)
 }

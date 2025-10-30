@@ -37,13 +37,13 @@ func (c *YakForgeBlueprintAIDOptionsConfig) WithYOLO(yolo bool) *YakForgeBluepri
 	return c
 }
 
-func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aid.Option {
-	res := []aid.Option{}
+func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aicommon.ConfigOption {
+	var res []aicommon.ConfigOption
 	if c.DisableToolUse != nil {
-		res = append(res, aid.WithDisableToolUse(*c.DisableToolUse))
+		res = append(res, aicommon.WithDisableToolUse(*c.DisableToolUse))
 	}
-	if c.YOLO != nil {
-		res = append(res, aid.WithAgreeYOLO(*c.YOLO))
+	if c.YOLO != nil && *c.YOLO {
+		res = append(res, aicommon.WithAgreeYOLO())
 	}
 	return res
 }
@@ -175,14 +175,14 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 	}
 	config := c
 
-	var aidOpts []aid.Option
+	var aidOpts []aicommon.ConfigOption
 	if c.YakForgeBlueprintAIDOptionsConfig != nil {
 		aidOpts = c.YakForgeBlueprintAIDOptionsConfig.ToOptions()
 	}
 
-	var planMocker func(cfg *aid.Config) *aid.PlanResponse
+	var planMocker func(cfg *aid.Coordinator) *aid.PlanResponse
 	if c.PlanPrompt != "" {
-		planMocker = func(cfg *aid.Config) *aid.PlanResponse {
+		planMocker = func(cfg *aid.Coordinator) *aid.PlanResponse {
 			plan, err := aid.ExtractPlan(cfg, config.PlanPrompt)
 			if err != nil {
 				cfg.EmitError("mock SMART Plan failed: %v", err)
@@ -208,7 +208,7 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 		WithPersistentPrompt(config.PersistentPrompt),
 		WithPlanMocker(planMocker),
 		WithResultPrompt(config.ResultPrompt),
-		WithAIDOptions(aidOpts...),
+		WithAIOptions(aidOpts...),
 		WithResultHandler(func(s string, err error) {
 			if err != nil {
 				log.Errorf("Failed to get result: %v", err)

@@ -2,20 +2,20 @@ package tests
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func init() {
-	aiforge.RegisterForgeExecutor("sheep-test-1", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
+	aiforge.RegisterForgeExecutor("sheep-test-1", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aicommon.ConfigOption) (*aiforge.ForgeResult, error) {
 		forge := aiforge.NewForgeBlueprint(
 			"sheep-test-1",
 			aiforge.WithInitializePrompt("你需要在一个大片的文本中找到 blacksheep 这个词，并且说出他的大概位置 {{ .Forge.UserParams }} "),
@@ -27,7 +27,7 @@ func init() {
 		}
 		return nil, cd.Run()
 	})
-	aiforge.RegisterForgeExecutor("sheep-test-2", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
+	aiforge.RegisterForgeExecutor("sheep-test-2", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aicommon.ConfigOption) (*aiforge.ForgeResult, error) {
 		forge := aiforge.NewForgeBlueprint(
 			"sheep-test-1",
 			aiforge.WithInitializePrompt("你需要在一个大片的文本中找到 blacksheep 这个词，并且说出他的大概位置 {{ .Forge.UserParams }} 并且给出 blacksheep 附近的字节，展示一些上下文"),
@@ -66,12 +66,11 @@ func TestSheepTest(t *testing.T) {
 				Value: tempFile.Name(),
 			},
 		},
-		aid.WithPlanAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
-		aid.WithAgreeYOLO(),
-		aid.WithDebugPrompt(),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithDebugPrompt(),
 	)
 }
 
@@ -96,11 +95,10 @@ func TestSheepTest2(t *testing.T) {
 				Value: tempFile.Name(),
 			},
 		},
-		aid.WithPlanAICallback(aiforge.GetOpenRouterAICallback()),
-		aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return aiforge.GetOpenRouterAICallback()(config, req)
 		}),
-		aid.WithAgreeYOLO(),
-		aid.WithDebugPrompt(),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithDebugPrompt(),
 	)
 }
