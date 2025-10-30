@@ -31,7 +31,7 @@ func (t *AiTask) getToolRequired(response string) []*aitool.Tool {
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
 			count := 0
-			toolIns, err := t.aiToolManager.GetToolByName(toolName)
+			toolIns, err := t.AiToolManager.GetToolByName(toolName)
 			if err != nil {
 				t.EmitError("error searching tool: %v", err)
 				continue
@@ -63,7 +63,7 @@ func (t *AiTask) getToolResultAction(response string) string {
 func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	var caller *aicommon.ToolCaller
 	caller, err = aicommon.NewToolCaller(
-		t.Config.GetContext(),
+		t.Coordinator.GetContext(),
 		aicommon.WithToolCaller_Task(t),
 		aicommon.WithToolCaller_AICallerConfig(t),
 		aicommon.WithToolCaller_Emitter(t.GetEmitter()),
@@ -95,7 +95,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	}
 
 	var action *aicommon.Action
-	err = t.callAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	err = t.CallAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(continueResult *aicommon.AIResponse) error {

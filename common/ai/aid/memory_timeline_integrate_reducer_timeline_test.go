@@ -2,7 +2,7 @@ package aid
 
 //func TestCoordinator_Timeline_ToolUse_BatchCompression_Reducer(t *testing.T) {
 //	t.Skip(true)
-//	inputChan := make(chan *InputEvent)
+//	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(),10)
 //	outputChan := make(chan *schema.AiOutputEvent)
 //
 //	requireMoreToolCount := 0
@@ -14,13 +14,13 @@ package aid
 //
 //	coordinator, err := NewCoordinator(
 //		"test",
-//		WithEventInputChan(inputChan),
-//		WithSystemFileOperator(),
-//		WithEventHandler(func(event *schema.AiOutputEvent) {
+//		aicommon.WithEventInputChan(inputChan),
+//		aicommon.WithSystemFileOperator(),
+//		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 //			outputChan <- event
 //		}),
-//		WithTimelineContentLimit(500), // 设置更小的内容大小限制以更快触发compression
-//		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+//		aicommon.WithTimelineContentLimit(500), // 设置更小的内容大小限制以更快触发compression
+//		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 //			rsp := config.NewAIResponse()
 //			defer func() {
 //				rsp.Close()

@@ -13,7 +13,7 @@ import (
 
 type runtime struct {
 	RootTask *AiTask
-	config   *Config
+	config   *Coordinator
 	Stack    *utils.Stack[*AiTask]
 
 	statusMutex sync.Mutex
@@ -21,11 +21,9 @@ type runtime struct {
 
 func (c *Coordinator) createRuntime() *runtime {
 	r := &runtime{
-		config: c.config,
+		config: c,
 		Stack:  utils.NewStack[*AiTask](),
 	}
-	c.config.aiTaskRuntime = r
-
 	return r
 }
 

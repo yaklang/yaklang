@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,12 +23,12 @@ func recoverPlan(t *testing.T, uuid string) {
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("----------------------------------------------------------------")
 	fmt.Println("----------------------------------------------------------------")
-	inputChan := make(chan *InputEvent, 10)             // 增加缓冲区大小
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区大小
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小
+	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区大小
 
 	// 确保通道在函数结束时被正确关闭
 	defer func() {
-		close(inputChan)
+		inputChan.Close()
 		// 清空outputChan避免goroutine阻塞
 		go func() {
 			for range outputChan {
@@ -42,11 +43,11 @@ func recoverPlan(t *testing.T, uuid string) {
 	ord, err := NewFastRecoverCoordinatorContext(
 		recoverCtx,
 		uuid,
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			prompt := request.GetPrompt()
 
@@ -132,12 +133,12 @@ LOOP:
 }
 
 func TestCoordinator_RecoverCase(t *testing.T) {
-	inputChan := make(chan *InputEvent, 10)             // 增加缓冲区大小
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区大小
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小
+	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区大小
 
 	// 确保通道在测试结束时被正确关闭
 	defer func() {
-		close(inputChan)
+		inputChan.Close()
 		// 清空outputChan避免goroutine阻塞
 		go func() {
 			for range outputChan {
@@ -150,11 +151,11 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -209,23 +210,7 @@ LOOP:
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 
-				// 使用带超时的goroutine发送输入事件
-				go func() {
-					inputTimeout := time.NewTimer(5 * time.Second)
-					defer inputTimeout.Stop()
-
-					select {
-					case inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}:
-						log.Info("successfully sent continue suggestion")
-					case <-inputTimeout.C:
-						log.Warn("timeout sending continue suggestion to inputChan")
-					}
-				}()
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
@@ -260,5 +245,5 @@ LOOP:
 		t.Fatal("consumption check failed")
 	}
 
-	recoverPlan(t, ins.config.id)
+	recoverPlan(t, ins.Config.Id)
 }

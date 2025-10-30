@@ -1,19 +1,22 @@
 package aid
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
-	inputChan := make(chan *InputEvent, 10)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent, 10)
 
 	lsReviewed := false
@@ -21,12 +24,12 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -89,12 +92,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -106,23 +104,16 @@ LOOP:
 					lsReviewed = true
 				} else if toolname == "now" {
 					nowReviewed = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				}
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion":      "wrong_tool",
-							"suggestion_tool": "tree,now",
-						},
-					}
+
+					inputChan.SafeFeed(SuggestionInputEventEx(result.GetInteractiveId(), map[string]any{
+						"suggestion":      "wrong_tool",
+						"suggestion_tool": "tree,now",
+					}))
 					continue
 				}
 			}
