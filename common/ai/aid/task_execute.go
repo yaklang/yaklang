@@ -25,7 +25,7 @@ func (t *AiTask) execute() error {
 	if t.IsCtxDone() {
 		return utils.Errorf("context is done")
 	}
-	t.memory.StoreCurrentTask(t)
+	t.Memory.StoreCurrentTask(t)
 	// 生成初始执行任务的prompt
 	prompt, err := t.generateTaskPrompt()
 	if err != nil {
@@ -39,7 +39,7 @@ func (t *AiTask) execute() error {
 	var action *aicommon.Action
 	var directlyAnswer string
 	var directlyAnswerLong string
-	err = t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	err = t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(rsp *aicommon.AIResponse) error {
@@ -102,7 +102,7 @@ TOOLREQUIRED:
 			if err != nil {
 				return fmt.Errorf("error generating aiTask prompt: %w", err)
 			}
-			err = t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			err = t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
 				return t.CallAI(request)
 			}, func(rsp *aicommon.AIResponse) error {
@@ -159,7 +159,7 @@ TOOLREQUIRED:
 				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-			err = t.callAiTransaction(moreToolPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			err = t.CallAiTransaction(moreToolPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
 				return t.CallAI(request)
 			}, func(responseReader *aicommon.AIResponse) error {
@@ -211,7 +211,7 @@ TOOLREQUIRED:
 			return fmt.Errorf("error generating summary prompt: %w", err)
 		}
 
-		err = t.callAiTransaction(summaryPromptWellFormed, t.CallAI, func(summaryReader *aicommon.AIResponse) error {
+		err = t.CallAiTransaction(summaryPromptWellFormed, t.CallAI, func(summaryReader *aicommon.AIResponse) error {
 			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.GetEmitter()))
 			if err != nil {
 				t.EmitError("error reading summary: %v", err)
@@ -270,12 +270,12 @@ func (t *AiTask) executeTask() error {
 		return err
 	}
 	// start to wait for user review
-	ep := t.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	t.EmitInfo("start to wait for user review current task")
 
 	t.EmitRequireReviewForTask(t, ep.GetId())
-	t.DoWaitAgree(nil, ep)
+	t.DoWaitAgree(t.Ctx, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
 	t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
@@ -293,7 +293,7 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 	var buf bytes.Buffer
 	err := summaryTemplate.Execute(&buf, map[string]any{
-		"Memory": t.memory,
+		"Memory": t.Memory,
 	})
 	if err != nil {
 		return "", err

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
@@ -17,42 +18,39 @@ import (
 )
 
 func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
-	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+
+	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
 
-		for _, i := range params {
-			if i.Key == "id" && len(i.Value) > 3 {
-				id = append(id, i.Value)
-			}
+		materials := ep.GetReviewMaterials()
+
+		data := materials.GetString("id")
+		if len(data) > 3 {
+			id = append(id, data)
 		}
 
-		spew.Dump(params)
+		fmt.Printf("%v", materials)
 		p := make(aitool.InvokeParams)
-		p["probability"] = 0.5
-		p["impact"] = 0.5
+		p["risk_score"] = 0.2 // low risk score, quickly pass
 		p["reason"] = "test reason"
-		return aicommon.NewSimpleAction("", p), nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		return aicommon.NewSimpleAction("object", p), nil
 	}
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(utils.RandStringBytes(100), nil), // bad not right risk control
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAiAgreeRiskControl(mockRiskControl), // bad not right risk control
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -87,7 +85,6 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 			`))
 			return rsp, nil
 		}),
-		WithAIAgree(),
 	)
 	if err != nil {
 		t.Fatalf("NewCoordinator failed: %v", err)
@@ -109,12 +106,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -124,12 +116,7 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
@@ -159,42 +146,39 @@ LOOP:
 }
 
 func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
-	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+
+	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
 
-		for _, i := range params {
-			if i.Key == "id" && len(i.Value) > 3 {
-				id = append(id, i.Value)
-			}
+		materials := ep.GetReviewMaterials()
+
+		data := materials.GetString("id")
+		if len(data) > 3 {
+			id = append(id, data)
 		}
 
-		spew.Dump(params)
+		fmt.Printf("%v", materials)
 		p := make(aitool.InvokeParams)
-		p["probability"] = 0.5
-		p["impact"] = 0.5
+		p["risk_score"] = 0.2
 		p["reason"] = "test reason"
-		return aicommon.NewSimpleAction("", p), nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		return aicommon.NewSimpleAction("object", p), nil
 	}
 
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAiAgreeRiskControl(mockRiskControl),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -229,7 +213,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 			`))
 			return rsp, nil
 		}),
-		WithAIAgree(),
+		aicommon.WithAIAgree(),
 	)
 	if err != nil {
 		t.Fatalf("NewCoordinator failed: %v", err)
@@ -252,12 +236,7 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -267,17 +246,12 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan <- &InputEvent{
-						Id: result.GetInteractiveId(),
-						Params: aitool.InvokeParams{
-							"suggestion": "continue",
-						},
-					}
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}
 
-			if result.Type == schema.EVENT_TYPE_RISK_CONTROL_PROMPT {
+			if result.Type == schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN {
 				riskControlMsg++
 				continue
 			}
@@ -308,7 +282,7 @@ LOOP:
 
 func TestPIM_Basic(t *testing.T) {
 	UnregisterAIDBuildinForge("pimatrix-mock")
-	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*aicommon.Action, error) {
 		a := aicommon.NewSimpleAction("", nil)
 		a.Set("probability", 0.5)
 		a.Set("impact", 0.5)

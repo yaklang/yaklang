@@ -10,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
@@ -89,7 +91,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 	var timeLineDeleteCheck, timeLineSaveCheck bool
 
 	var testCallKey int64
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	timeoutDurationSecond := time.Duration(60) * time.Second
@@ -100,14 +102,14 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutDurationSecond)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(rawConfig aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			config := rawConfig.(*Config)
-			timeline := config.memory.timeline
+		aicommon.WithAICallback(func(rawConfig aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			config := rawConfig.(*Coordinator)
+			timeline := config.Memory.timeline
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -137,7 +139,7 @@ func TestCoodinator_Delete_Memory(t *testing.T) {
 								timeLineSaveCheck = true
 							}
 						}
-						config.memory.SoftDeleteTimeline(id)
+						config.Memory.SoftDeleteTimeline(id)
 						return true
 					})
 					rsp.EmitReasonStream(strings.NewReader(`{"@action": "continue-current-task"}`))
@@ -218,12 +220,7 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
@@ -240,7 +237,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 	var memoryPersistentCheck bool
 
 	var persistentMemory = utils.RandStringBytes(20)
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	timeoutDurationSecond := time.Duration(60) * time.Second
@@ -251,14 +248,14 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutDurationSecond)
 	coordinator, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithSystemFileOperator(),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithSystemFileOperator(),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(raw aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			config := raw.(*Config)
-			timeline := config.memory.timeline
+		aicommon.WithAICallback(func(raw aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			config := raw.(*Coordinator)
+			timeline := config.Memory.timeline
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -269,7 +266,7 @@ func TestCoodinator_Add_Persistent_Memory(t *testing.T) {
 					`{"@action": "call-tool", "tool": "now", "params": {"content": "` + persistentMemory + `"}}}`))
 				return rsp, nil
 			} else if utils.MatchAllOfSubString(request.GetPrompt(), `"continue-current-task"`, `"proceed-next-task"`, `"status_summary"`) {
-				config.memory.PushPersistentData(persistentMemory)
+				config.Memory.PushPersistentData(persistentMemory)
 				if timeline.GetIdToTimelineItem().Len() != 1 {
 					panic("skip add persistent memory to timeline fail")
 				}
@@ -329,12 +326,7 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 

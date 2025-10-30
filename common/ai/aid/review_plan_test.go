@@ -1,30 +1,31 @@
 package aid
 
 import (
+	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-
 	"github.com/davecgh/go-spew/spew"
 )
 
 func TestCoordinator_ReviewPlan(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -69,12 +70,7 @@ LOOP:
 			spew.Dump(result)
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
-				}
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				break LOOP
 			}
 
@@ -90,15 +86,15 @@ LOOP:
 }
 
 func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -168,12 +164,7 @@ LOOP:
 			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "incomplete",
-					},
-				}
+				inputChan.SafeFeed(SuggestionInputEvent(result.GetInteractiveId(), "incomplete", ""))
 				continue
 			}
 
@@ -198,16 +189,16 @@ LOOP:
 }
 
 func TestCoordinator_ReviewPlan_Incomplete_2(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			fmt.Println(request.GetPrompt())
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -278,13 +269,7 @@ LOOP:
 			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion":   "incomplete",
-						"extra_prompt": extraPromptToken,
-					},
-				}
+				inputChan.SafeFeed(SuggestionInputEvent(result.GetInteractiveId(), "incomplete", extraPromptToken))
 				continue
 			}
 
@@ -309,16 +294,16 @@ LOOP:
 }
 
 func TestCoordinator_ReviewPlan_CreateSubtask(t *testing.T) {
-	inputChan := make(chan *InputEvent)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
 	ins, err := NewCoordinator(
 		"test",
-		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *schema.AiOutputEvent) {
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			fmt.Println(request.GetPrompt())
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -393,14 +378,11 @@ LOOP:
 			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && !strings.Contains(result.String(), `1-2-2details`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion":   "create-subtask",
-						"target_plans": []string{"1-1", "1-2"},
-						"extra_prompt": extraPromptToken,
-					},
-				}
+				inputChan.SafeFeed(SuggestionInputEventEx(result.GetInteractiveId(), map[string]any{
+					"suggestion":   "create-subtask",
+					"target_plans": []string{"1-1", "1-2"},
+					"extra_prompt": extraPromptToken,
+				}))
 				continue
 			}
 

@@ -99,10 +99,10 @@ func GetDefaultMemory() *PromptContextProvider {
 }
 
 func (m *PromptContextProvider) BindCoordinator(c *Coordinator) {
-	config := c.config
+	config := c.Config
 	m.StoreQuery(c.userInput)
 	m.StoreTools(func() []*aitool.Tool {
-		alltools, err := config.aiToolManager.GetEnableTools()
+		alltools, err := config.AiToolManager.GetEnableTools()
 		if err != nil {
 			log.Errorf("coordinator: get all tools failed: %v", err)
 			return nil
@@ -110,9 +110,9 @@ func (m *PromptContextProvider) BindCoordinator(c *Coordinator) {
 		return alltools
 	})
 	m.StoreToolsKeywords(func() []string {
-		return config.keywords
+		return config.Keywords
 	})
-	m.PushPersistentData(config.persistentMemory...)
+	m.PushPersistentData(config.PersistentMemory...)
 	m.timeline.BindConfig(config, config)
 }
 
@@ -340,7 +340,7 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 }
 
 func (m *PromptContextProvider) TaskMaxContinue() int64 {
-	return m.CurrentTask.Config.maxTaskContinue
+	return m.CurrentTask.Coordinator.MaxTaskContinue
 }
 
 // timeline limit set
