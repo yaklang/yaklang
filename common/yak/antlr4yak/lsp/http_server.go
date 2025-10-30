@@ -222,18 +222,33 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 	// 使用 GetWordWithPointAtPosition 获取包含 "." 的完整单词
 	wordText, wordStart, wordEnd := editor.GetWordWithPointAtPosition(position)
 
-	// 关键修复：如果光标后面紧跟着 "."，需要把它包含进来
-	// 这样 Range.Code 才会包含点号，trimSourceCode 才能正确检测 PointSuffix
-	rangeCode := wordText
+	// 关键修复：确保 endPosition 包含点号
+	// 问题：GrpcRangeToSSARange 会根据 StartLine/StartColumn/EndLine/EndColumn 重新从源码中提取文本
+	// 所以我们必须确保 endPosition 指向正确的位置，使得提取的文本包含点号
 	endPosition := wordEnd
-	endOffset := editor.GetOffsetByPosition(wordEnd)
-	if endOffset < editor.CodeLength() {
-		nextChar := editor.GetTextFromOffset(endOffset, endOffset+1)
-		if nextChar == "." {
-			rangeCode = wordText + "."
-			endPosition = editor.GetPositionByLine(wordEnd.GetLine(), wordEnd.GetColumn()+1)
+	cursorOffset := editor.GetOffsetByPosition(position)
+
+	// 情况1：光标在点号之后（例如 "ai.|"，光标在第3列，点号在第2列）
+	// 此时 cursorOffset 指向点号后面，我们需要检查点号是否存在
+	if cursorOffset > 0 {
+		charBeforeCursor := editor.GetTextFromOffset(cursorOffset-1, cursorOffset)
+		if charBeforeCursor == "." {
+			// 光标在点号后面，endPosition 应该指向光标位置（点号后面）
+			endPosition = position
 		}
 	}
+
+	// 情况2：光标在点号之前（例如 "ai|."，光标在第2列）
+	// 此时我们需要检查光标后面是否有点号
+	if cursorOffset < editor.CodeLength() {
+		charAtCursor := editor.GetTextFromOffset(cursorOffset, cursorOffset+1)
+		if charAtCursor == "." {
+			// 光标在点号前面，endPosition 应该指向点号后面
+			endPosition = editor.GetPositionByOffset(cursorOffset + 1)
+		}
+	}
+
+	rangeCode := editor.GetTextFromRange(editor.GetRangeByPosition(wordStart, endPosition))
 
 	log.Infof("--------------------------------------------------------------------------------")
 	log.Infof("[LSP HTTP Completion] 处理补全请求")
