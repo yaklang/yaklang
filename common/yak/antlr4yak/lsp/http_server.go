@@ -75,9 +75,20 @@ func (s *YakLSPHTTPServer) handleLSP(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	// 打印原始请求体
+	log.Infof("================================================================================")
+	log.Infof("[LSP HTTP Server] 收到 HTTP 请求")
+	log.Infof("[LSP HTTP Server] Method: %s", r.Method)
+	log.Infof("[LSP HTTP Server] URL: %s", r.URL.String())
+	log.Infof("[LSP HTTP Server] Headers: %+v", r.Header)
+	log.Infof("[LSP HTTP Server] Raw Body (原始JSON):")
+	log.Infof("%s", string(body))
+	log.Infof("================================================================================")
+
 	// 解析 JSON-RPC 请求
 	var req jsonRPCRequest
 	if err := json.Unmarshal(body, &req); err != nil {
+		log.Errorf("Invalid JSON-RPC request: %v", err)
 		http.Error(w, "Invalid JSON-RPC request", http.StatusBadRequest)
 		return
 	}
@@ -131,6 +142,14 @@ func (s *YakLSPHTTPServer) handleLSP(w http.ResponseWriter, r *http.Request) {
 		Result:  result,
 		Error:   rpcErr,
 	}
+
+	// 打印原始响应
+	respBytes, _ := json.MarshalIndent(resp, "", "  ")
+	log.Infof("================================================================================")
+	log.Infof("[LSP HTTP Server] 发送 HTTP 响应")
+	log.Infof("[LSP HTTP Server] Response Body (原始JSON):")
+	log.Infof("%s", string(respBytes))
+	log.Infof("================================================================================")
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
@@ -203,7 +222,7 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 	// 使用 GetWordWithPointAtPosition 获取包含 "." 的完整单词
 	wordText, wordStart, wordEnd := editor.GetWordWithPointAtPosition(position)
 
-	// 🔥 关键修复：如果光标后面紧跟着 "."，需要把它包含进来
+	// 关键修复：如果光标后面紧跟着 "."，需要把它包含进来
 	// 这样 Range.Code 才会包含点号，trimSourceCode 才能正确检测 PointSuffix
 	rangeCode := wordText
 	endPosition := wordEnd
@@ -216,8 +235,18 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 		}
 	}
 
-	log.Infof("[LSP HTTP Completion] Position: Line %d Col %d, WordText: %q, RangeCode: %q",
-		p.Position.Line+1, p.Position.Character, wordText, rangeCode)
+	log.Infof("--------------------------------------------------------------------------------")
+	log.Infof("[LSP HTTP Completion] 处理补全请求")
+	log.Infof("[LSP HTTP Completion] Position (LSP): Line %d Col %d", p.Position.Line, p.Position.Character)
+	log.Infof("[LSP HTTP Completion] Position (memedit +1): Line %d Col %d", p.Position.Line+1, p.Position.Character+1)
+	log.Infof("[LSP HTTP Completion] WordText: %q", wordText)
+	log.Infof("[LSP HTTP Completion] RangeCode: %q", rangeCode)
+	log.Infof("[LSP HTTP Completion] WordStart: Line %d Col %d", wordStart.GetLine(), wordStart.GetColumn())
+	log.Infof("[LSP HTTP Completion] WordEnd: Line %d Col %d", wordEnd.GetLine(), wordEnd.GetColumn())
+	log.Infof("[LSP HTTP Completion] EndPosition (after fix): Line %d Col %d", endPosition.GetLine(), endPosition.GetColumn())
+	log.Infof("[LSP HTTP Completion] Code length: %d bytes", len(code))
+	log.Infof("[LSP HTTP Completion] Code (first 200 chars): %q", truncateString(code, 200))
+	log.Infof("--------------------------------------------------------------------------------")
 
 	// 调用 gRPC 服务获取补全（完全复刻 yakit 客户端参数）
 	req := &ypb.YaklangLanguageSuggestionRequest{
@@ -225,7 +254,7 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 		YakScriptType: "yak",
 		YakScriptCode: code, // 完整代码
 		Range: &ypb.Range{
-			Code:        rangeCode, // ⚠️ 关键：这里是光标处的单词（如 "rag."）
+			Code:        rangeCode, // 关键：这里是光标处的单词（如 "rag."）
 			StartLine:   int64(wordStart.GetLine()),
 			StartColumn: int64(wordStart.GetColumn()),
 			EndLine:     int64(endPosition.GetLine()),
@@ -233,13 +262,35 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 		},
 	}
 
+	log.Infof("--------------------------------------------------------------------------------")
+	log.Infof("[LSP HTTP Completion] 调用 gRPC YaklangLanguageSuggestion")
+	log.Infof("[LSP HTTP Completion] gRPC Request:")
+	log.Infof("  InspectType: %s", yakgrpc.COMPLETION)
+	log.Infof("  YakScriptType: yak")
+	log.Infof("  YakScriptCode: %q (length: %d)", truncateString(code, 200), len(code))
+	log.Infof("  Range.Code: %q", rangeCode)
+	log.Infof("  Range.StartLine: %d", req.Range.StartLine)
+	log.Infof("  Range.StartColumn: %d", req.Range.StartColumn)
+	log.Infof("  Range.EndLine: %d", req.Range.EndLine)
+	log.Infof("  Range.EndColumn: %d", req.Range.EndColumn)
+	log.Infof("--------------------------------------------------------------------------------")
+
 	resp, err := s.grpcServer.YaklangLanguageSuggestion(context.Background(), req)
 	if err != nil {
 		log.Errorf("get completion failed: %v", err)
 		return []interface{}{}, nil
 	}
 
+	log.Infof("--------------------------------------------------------------------------------")
+	log.Infof("[LSP HTTP Completion] gRPC 响应")
 	log.Infof("[LSP HTTP Completion] Got %d suggestions for word %q", len(resp.SuggestionMessage), wordText)
+	if len(resp.SuggestionMessage) > 0 {
+		log.Infof("[LSP HTTP Completion] First 5 suggestions:")
+		for i := 0; i < min(5, len(resp.SuggestionMessage)); i++ {
+			log.Infof("  %d. %s (kind: %s)", i+1, resp.SuggestionMessage[i].Label, resp.SuggestionMessage[i].Kind)
+		}
+	}
+	log.Infof("--------------------------------------------------------------------------------")
 
 	// 转换为 LSP CompletionItem
 	items := make([]map[string]interface{}, 0, len(resp.SuggestionMessage))
@@ -580,4 +631,20 @@ func (s *YakLSPHTTPServer) handleDiagnostics(params json.RawMessage) (interface{
 func StartLSPHTTPServer(grpcServer *yakgrpc.Server, addr string) error {
 	server := NewYakLSPHTTPServer(grpcServer, addr)
 	return server.Start()
+}
+
+// 辅助函数：截断字符串
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
+// 辅助函数：返回两个整数中的最小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
