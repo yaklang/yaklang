@@ -1,12 +1,13 @@
 package pcapfix
 
 import (
-	"github.com/yaklang/pcap"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/utils/permutil"
 	"runtime"
 	"time"
+
+	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/permutil"
 )
 
 func IsPrivilegedForNetRaw() bool {
@@ -23,7 +24,7 @@ func IsPrivilegedForNetRaw() bool {
 			log.Errorf("cannot found net.Interface by ip: %s", err)
 			return false
 		}
-		handler, err := pcap.OpenLive(i.Name, 65536, true, 5*time.Second)
+		handler, err := pcap.OpenLive(i.Name, 128, true, 5*time.Second)
 		if err != nil {
 			return false
 		}
