@@ -265,6 +265,9 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 			if c.isStop() {
 				return lastErr
 			}
+			if d.Name() == "" {
+				continue // skip empty name
+			}
 
 			targetFile := c.fileSystem.Join(path, d.Name())
 			if err := walkSingleFile(targetFile); err != nil {
