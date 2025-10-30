@@ -186,7 +186,7 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 }
 
 func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
-	opts = append(opts,aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
+	opts = append(opts, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
 	cfg := aicommon.NewConfig(context.Background(), opts...)
 	dirname := consts.TempAIDir(cfg.GetRuntimeId())
 	if existed, _ := utils.PathExists(dirname); !existed {
