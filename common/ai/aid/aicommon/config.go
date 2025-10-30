@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -84,6 +85,9 @@ type Config struct {
 	OriginalAICallback        AICallbackType // 原始 ai 回调, 用于 异步任务，不占用id
 	QualityPriorityAICallback AICallbackType // 质量优先 ai 回调
 	SpeedPriorityAICallback   AICallbackType // 速度优先 ai 回调
+
+	//aiServiceName
+	AiServerName string
 
 	// ai call config
 	AiCallTokenLimit       int64
@@ -280,6 +284,15 @@ func newConfig(ctx context.Context) *Config {
 	config.Timeline = NewTimeline(nil, nil)
 	config.Timeline.BindConfig(config, config)
 
+	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
+		if config.AiServerName != "" {
+			err := config.LoadAIServiceByName(config.AiServerName)
+			if err != nil {
+				log.Errorf("load ai service failed: %v", err)
+			}
+		}
+	}
+
 	return config
 }
 
@@ -310,7 +323,7 @@ func WithContext(ctx context.Context) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		ctx ,cancel := context.WithCancel(ctx)
+		ctx, cancel := context.WithCancel(ctx)
 		defer c.m.Unlock()
 		c.Ctx = ctx
 		c.cancel = cancel
@@ -574,9 +587,9 @@ func WithAIBlueprintManager(factory AIForgeFactory) ConfigOption {
 
 func WithDynamicContextProvider(name string, provider ContextProvider) ConfigOption {
 	return func(c *Config) error {
-		if name != ""  {
+		if name != "" {
 			c.PendingContextProviders = append(c.PendingContextProviders, ContextProviderEntry{
-				Traced: false,
+				Traced:   false,
 				Name:     name,
 				Provider: provider,
 			})
@@ -588,7 +601,7 @@ func WithDynamicContextProvider(name string, provider ContextProvider) ConfigOpt
 // WithTracedDynamicContextProvider registers a dynamic context provider with tracing capabilities
 // It tracks changes between calls and provides diff information
 func WithTracedDynamicContextProvider(name string, provider ContextProvider) ConfigOption {
-	return func(c *Config)error {
+	return func(c *Config) error {
 		if name != "" {
 			c.PendingContextProviders = append(c.PendingContextProviders, ContextProviderEntry{
 				Traced:   true,
@@ -999,6 +1012,19 @@ func WithEnhanceKnowledgeManager(m *EnhanceKnowledgeManager) ConfigOption {
 	}
 }
 
+// WithAICallback sets the AI callback for LLM interactions
+func WithAIServiceName(name string) ConfigOption {
+	return func(cfg *Config) error {
+		if cfg.m == nil {
+			cfg.m = &sync.Mutex{}
+		}
+		cfg.m.Lock()
+		defer cfg.m.Unlock()
+		cfg.AiServerName = name
+		return nil
+	}
+}
+
 func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1126,7 +1152,7 @@ func WithSequence(seq int64) ConfigOption {
 }
 
 func WithAIKBPath(path string) ConfigOption {
-	return func(c *Config) error{
+	return func(c *Config) error {
 		c.SetConfig("aikb_path", path)
 		return nil
 	}
@@ -1146,8 +1172,6 @@ func WithAIKBResultMaxSize(maxSize int64) ConfigOption {
 		return nil
 	}
 }
-
-
 
 // WithTool is a convenience wrapper to add a single tool (delegates to WithTools).
 func WithTool(tool *aitool.Tool) ConfigOption {
@@ -1340,7 +1364,7 @@ func WithForgeParams(i any) ConfigOption {
 }
 
 func WithEventInputChan(ch chan *ypb.AIInputEvent) ConfigOption {
-	return func(c *Config) error{
+	return func(c *Config) error {
 		if ch != nil {
 			go func() {
 				for event := range ch {
@@ -1599,8 +1623,6 @@ func (c *Config) CallAiTransaction(
 	return CallAITransaction(c, prompt, callAi, postHandler, requestOpts...)
 }
 
-
-
 func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Return nil for nil input
 	if i == nil {
@@ -1608,6 +1630,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	opts := make([]ConfigOption, 0)
+
+	// aiCallback
+	if i.AiServerName != "" {
+		opts = append(opts, WithAIServiceName(i.AiServerName))
+	}
 
 	// Keywords
 	if len(i.Keywords) > 0 {
@@ -1690,4 +1717,19 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	return opts
+}
+
+func (c *Config) LoadAIServiceByName(name string) error {
+	chat, err := ai.LoadChater(name)
+	if err != nil {
+		return err
+	}
+	// update react config
+	c.SetAICallback(AIChatToAICallbackType(chat))
+	c.AiServerName = name
+
+	// submit hotpatch options
+	c.HotPatchBroadcaster.Submit(WithAIServiceName(c.AiServerName))
+	c.HotPatchBroadcaster.Submit(WithAICallback(c.OriginalAICallback))
+	return nil
 }
