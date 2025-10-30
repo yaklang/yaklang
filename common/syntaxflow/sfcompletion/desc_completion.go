@@ -9,7 +9,6 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiforge"
 	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
@@ -50,8 +49,8 @@ func CompleteRuleDesc(
 				Key: "file_content", Value: ruleContent,
 			},
 		},
-		aid.WithAgreeYOLO(true),
-		aid.WithAICallback(aiCallback),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithAICallback(aiCallback),
 	)
 	if err != nil {
 		return "", utils.Errorf("complete rule failed: %v", err)
@@ -64,8 +63,8 @@ func CompleteRuleDesc(
 			Key: "file_content", Value: ruleContent,
 		},
 	},
-		aid.WithAgreeYOLO(true),
-		aid.WithAICallback(aiCallback))
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithAICallback(aiCallback))
 	if err != nil {
 		return "", err
 	}

@@ -2,12 +2,13 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -22,8 +23,8 @@ type Agent struct {
 
 	CoordinatorId string
 
-	ExtendAIDOptions []aid.Option
-	AiForgeOptions   []aiforge.Option
+	ExtendAICommonOptions []aicommon.ConfigOption
+	AiForgeOptions        []aiforge.Option
 
 	AgentEventHandler func(e *schema.AiOutputEvent)
 }
@@ -37,8 +38,8 @@ func NewAgent(iopts ...any) *Agent {
 				log.Errorf("failed to apply agent option: %v", err)
 				return nil
 			}
-		case aid.Option:
-			ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, o)
+		case aicommon.ConfigOption:
+			ag.ExtendAICommonOptions = append(ag.ExtendAICommonOptions, o)
 		case aiforge.Option:
 			ag.AiForgeOptions = append(ag.AiForgeOptions, o)
 		}
@@ -63,9 +64,9 @@ func WithContext(ctx context.Context) AIAgentOption {
 	}
 }
 
-func WithExtendAIDOptions(opts ...aid.Option) AIAgentOption {
+func WithExtendAICommonOptions(opts ...aicommon.ConfigOption) AIAgentOption {
 	return func(ag *Agent) error {
-		ag.ExtendAIDOptions = append(ag.ExtendAIDOptions, opts...)
+		ag.ExtendAICommonOptions = append(ag.ExtendAICommonOptions, opts...)
 		return nil
 	}
 }
@@ -78,15 +79,15 @@ func (ag *Agent) SubOption() []AIAgentOption {
 	if ag.CoordinatorId != "" {
 		opts = append(opts, WithCoordinatorId(ag.CoordinatorId))
 	}
-	if ag.ExtendAIDOptions != nil {
-		opts = append(opts, WithExtendAIDOptions(ag.ExtendAIDOptions...))
+	if ag.ExtendAICommonOptions != nil {
+		opts = append(opts, WithExtendAICommonOptions(ag.ExtendAICommonOptions...))
 	}
 	return opts
 }
 
 var (
-	// aid options
-	WithAgreeYOLO = aid.WithAgreeYOLO
+	// aicommon options
+	WithAgreeYOLO = aicommon.WithAgreeYOLO
 
 	// Additional With options
 	WithCoordinatorId = func(id string) AIAgentOption {
@@ -102,45 +103,47 @@ var (
 			return nil
 		}
 	}
-	WithOffsetSeq                    = aid.WithSequence
-	WithTool                         = aid.WithTool
-	WithExtendedActionCallback       = aid.WithExtendedActionCallback
-	WithDisallowRequireForUserPrompt = aid.WithDisallowRequireForUserPrompt
-	WithManualAssistantCallback      = aid.WithManualAssistantCallback
-	WithAgreePolicy                  = aid.WithAgreePolicy
-	WithAIAgree                      = aid.WithAIAgree
-	WithAgreeManual                  = aid.WithAgreeManual
-	WithAgreeAuto                    = aid.WithAgreeAuto
-	WithAllowRequireForUserInteract  = aid.WithAllowRequireForUserInteract
-	WithTools                        = aid.WithTools
-	WithAICallback                   = aid.WithAICallback
-	WithToolManager                  = aid.WithToolManager
-	WithMemory                       = aid.WithMemory
-	WithTaskAICallback               = aid.WithTaskAICallback
-	WithCoordinatorAICallback        = aid.WithCoordinatorAICallback
-	WithPlanAICallback               = aid.WithPlanAICallback
-	WithSystemFileOperator           = aid.WithSystemFileOperator
-	WithJarOperator                  = aid.WithJarOperator
-	WithOmniSearchTool               = aid.WithOmniSearchTool
+	WithOffsetSeq                    = aicommon.WithSequence
+	WithTool                         = aicommon.WithTool
+	WithExtendedActionCallback       = aicommon.WithExtendedActionCallback
+	WithDisallowRequireForUserPrompt = aicommon.WithDisallowRequireForUserPrompt
+	WithManualAssistantCallback      = aicommon.WithManualAssistantCallback
+	WithAgreePolicy                  = aicommon.WithAgreePolicy
+	WithAIAgree                      = aicommon.WithAIAgree
+	WithAgreeManual                  = aicommon.WithAgreeManual
+	WithAgreeAuto                    = aicommon.WithAgreeAuto
+	WithAllowRequireForUserInteract  = aicommon.WithAllowRequireForUserInteract
+	WithTools                        = aicommon.WithTools
+	WithAICallback                   = aicommon.WithAICallback
+	WithToolManager                  = aicommon.WithToolManager
+	WithTimeline                     = aicommon.WithTimeline
+	WithMemoryTriage                 = aicommon.WithMemoryTriage
+	WithMemory                       = aid.WithMemoryProvider
+	WithTaskAICallback               = aicommon.WithSpeedPriorityAICallback
+	WithCoordinatorAICallback        = aicommon.WithQualityPriorityAICallback
+	WithPlanAICallback               = aicommon.WithQualityPriorityAICallback
+	WithSystemFileOperator           = aicommon.WithSystemFileOperator
+	WithJarOperator                  = aicommon.WithJarOperator
+	WithOmniSearchTool               = aicommon.WithOmniSearchTool
 	WithAiToolsSearchTool            = aid.WithAiToolsSearchTool
 	WithAiForgeSearchTool            = aid.WithAiForgeSearchTool
-	WithDebugPrompt                  = aid.WithDebugPrompt
-	WithEventHandler                 = aid.WithEventHandler
-	WithEventInputChan               = aid.WithEventInputChan
-	WithDebug                        = aid.WithDebug
-	WithGenerateReport               = aid.WithGenerateReport
-	WithResultHandler                = aid.WithResultHandler
-	WithAppendPersistentMemory       = aid.WithAppendPersistentMemory
+	WithDebugPrompt                  = aicommon.WithDebugPrompt
+	WithEventHandler                 = aicommon.WithEventHandler
+	WithEventInputChan               = aicommon.WithEventInputChanx
+	WithDebug                        = aicommon.WithDebug
+	WithGenerateReport               = aicommon.WithGenerateReport
+	WithResultHandler                = aicommon.WithResultHandler
+	WithAppendPersistentMemory       = aicommon.WithAppendPersistentMemory
 
 	// Deprecated: use WithTimelineContentLimit instead
-	WithTimeLineLimit        = aid.WithTimeLineLimit
-	WithTimelineContentLimit = aid.WithTimelineContentLimit
+	WithTimeLineLimit        = aicommon.WithTimeLineLimit
+	WithTimelineContentLimit = aicommon.WithTimelineContentLimit
 	WithPlanMocker           = aid.WithPlanMocker
-	WithForgeParams          = aid.WithForgeParams
-	WithDisableToolUse       = aid.WithDisableToolUse
-	WithAIAutoRetry          = aid.WithAIAutoRetry
-	WithAITransactionRetry   = aid.WithAITransactionRetry
-	WithDisableOutputType    = aid.WithDisableOutputEvent
+	WithForgeParams          = aicommon.WithForgeParams
+	WithDisableToolUse       = aicommon.WithDisableToolUse
+	WithAIAutoRetry          = aicommon.WithAIAutoRetry
+	WithAITransactionRetry   = aicommon.WithAITransactionRetry
+	WithDisableOutputType    = aicommon.WithDisableOutputEvent
 
 	// aiforge options
 	WithForgePlanMocker      = aiforge.WithPlanMocker
@@ -171,14 +174,14 @@ func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	ag := NewAgent(opts...)
 	ag.ForgeName = name
 	aiforgeOpts := slices.Clone(ag.AiForgeOptions)
-	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.AIDOptions()...))
+	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIOptions(ag.AICommonOptions()...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
 func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
 	params := aiforge.Any2ExecParams(i)
-	return forge.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
+	return forge.CreateCoordinator(context.Background(), params, ag.AICommonOptions()...)
 }
 func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
@@ -192,7 +195,7 @@ func NewForgeExecutor(name string, i any, opts ...any) (*aid.Coordinator, error)
 	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
 	bp := NewForgeBlueprint(name, opts...)
-	ins, err := bp.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
+	ins, err := bp.CreateCoordinator(context.Background(), params, ag.AICommonOptions()...)
 	if err != nil {
 		return nil, err
 	}
