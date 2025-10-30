@@ -152,7 +152,7 @@ func createAntlrCache(lexer, parser []int32) *AntlrCache {
 	}
 
 	cache := &AntlrCache{}
-	log.Errorf("Creating new ANTLR cache")
+	log.Debugf("Creating new ANTLR cache")
 	if parser != nil {
 		atn, decisionToDFA, predictionContextCache := CreateCacheFromATN(parser)
 		cache.ParserATN = atn

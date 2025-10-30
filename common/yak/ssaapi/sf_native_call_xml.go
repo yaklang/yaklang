@@ -142,7 +142,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	prog.ForEachExtraFile(func(s string, me *memedit.MemEditor) bool {
 		name := me.GetFilename()
 		content := me.GetSourceCode()
-		log.Warnf("start to handling: %v len: %v", name, len(content))
+		// log.Debugf("start to handling: %v len: %v", name, len(content))
 		if !strings.HasSuffix(name, ".xml") {
 			return true
 		}
