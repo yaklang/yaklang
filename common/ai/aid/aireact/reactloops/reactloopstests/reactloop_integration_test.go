@@ -24,7 +24,7 @@ func TestReActLoop_BasicExecution(t *testing.T) {
 
 	// 创建 ReAct 实例作为 invoker
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -80,9 +80,9 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 	}
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithReviewPolicy(aicommon.AgreePolicyYOLO),
-		aireact.WithTools(sleepTool),
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
@@ -166,9 +166,9 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 	}
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithTools(sleepTool),
-		aireact.WithReviewPolicy(aicommon.AgreePolicyYOLO),
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithTools(sleepTool),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 				rsp := i.NewAIResponse()
@@ -224,7 +224,7 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 // TestReActLoop_WithAITagField 测试 AI 标签字段提取
 func TestReActLoop_WithAITagField(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 
 			// 返回带 yaklang-code 标签的响应
@@ -279,7 +279,7 @@ func TestReActLoop_CustomAction(t *testing.T) {
 
 	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -341,7 +341,7 @@ func TestReActLoop_CustomAction(t *testing.T) {
 // TestReActLoop_ActionVerifierError 测试动作验证失败
 func TestReActLoop_ActionVerifierError(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "error_action"}`))
 			rsp.Close()
@@ -383,7 +383,7 @@ func TestReActLoop_OperatorFeedback(t *testing.T) {
 
 	callCount := 0
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 
 			promptMu.Lock()
@@ -431,7 +431,7 @@ func TestReActLoop_DisallowLoopExit(t *testing.T) {
 	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 
@@ -483,7 +483,7 @@ func TestReActLoop_PromptGeneration(t *testing.T) {
 	var promptMu sync.Mutex
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			promptMu.Lock()
 			capturedPrompt = req.GetPrompt()
 			promptMu.Unlock()
@@ -530,7 +530,7 @@ func TestReActLoop_PromptGeneration(t *testing.T) {
 // TestReActLoop_StatusTransitions 测试状态转换
 func TestReActLoop_StatusTransitions(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Status test done"}`))
 			rsp.Close()
@@ -559,7 +559,7 @@ func TestReActLoop_StatusTransitions(t *testing.T) {
 // TestReActLoop_ErrorHandling 测试错误处理
 func TestReActLoop_ErrorHandling(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return nil, fmt.Errorf("simulated AI error")
 		}),
 	)
@@ -585,7 +585,7 @@ func TestReActLoop_AsyncMode(t *testing.T) {
 	callCount := 0
 
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
 			// 第一次返回async_action，之后返回finish避免无限循环
@@ -637,7 +637,7 @@ func TestReActLoop_AsyncMode(t *testing.T) {
 // TestReActLoop_ContextCancellation 测试上下文取消
 func TestReActLoop_ContextCancellation(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
-		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			// 模拟长时间运行
 			time.Sleep(100 * time.Millisecond)
 			rsp := i.NewAIResponse()

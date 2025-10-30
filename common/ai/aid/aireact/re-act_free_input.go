@@ -16,16 +16,16 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if userInput == "" || strings.TrimSpace(userInput) == "" {
 		return utils.Errorf("user input cannot be empty")
 	}
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)
 	}
 	// Reset session state if needed
 	r.currentIteration = 0
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Reset ReAct session for new input")
 	}
 	// Execute the main ReAct loop using the new schema-based approach
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Executing main loop with user input: %s", userInput)
 	}
 	return r.enqueueReTask(event)
@@ -33,7 +33,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 
 func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
 	r.currentTask = task
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		if task != nil {
 			log.Infof("Current task set to: %s", task.GetId())
 		}
@@ -48,18 +48,18 @@ func (r *ReAct) GetCurrentTask() aicommon.AIStatefulTask {
 	if r.currentTask == nil {
 		return nil
 	}
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Current task retrieved: %s", r.currentTask.GetId())
 	}
 	return r.currentTask
 }
 
 func (r *ReAct) DumpCurrentEnhanceData() string {
-	if r.config.enhanceKnowledgeManager == nil {
+	if r.config.EnhanceKnowledgeManager == nil {
 		return ""
 	}
-	data := r.config.enhanceKnowledgeManager.DumpTaskAboutKnowledge(r.GetCurrentTask().GetId())
-	if r.config.debugEvent {
+	data := r.config.EnhanceKnowledgeManager.DumpTaskAboutKnowledge(r.GetCurrentTask().GetId())
+	if r.config.DebugEvent {
 		log.Infof("Dumped enhance data: %s", data)
 	}
 	return data
@@ -73,7 +73,7 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 		event.FreeInput,
 		r.config.GetContext(),
 		r.Emitter)
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Task created: %s with input: %s", task.GetId(), event.FreeInput)
 	}
 
@@ -85,7 +85,7 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 		log.Errorf("Failed to add task to queue: %v", err)
 		return fmt.Errorf("failed to enqueue task: %v", err)
 	}
-	if r.config.debugEvent {
+	if r.config.DebugEvent {
 		log.Infof("Task enqueued: %s with input: %s", task.GetId(), event.FreeInput)
 	}
 	return nil

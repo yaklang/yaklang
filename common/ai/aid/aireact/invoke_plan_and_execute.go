@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 
 	"github.com/google/uuid"
@@ -113,25 +115,25 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	// generate config
 	uid := uuid.New().String()
 	params := map[string]any{
-		"re-act_id":      r.config.id,
+		"re-act_id":      r.config.Id,
 		"re-act_task":    r.GetCurrentTask().GetId(),
 		"coordinator_id": uid,
 	}
-	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.id, params)
+	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, params)
 	defer func() {
-		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.id, params)
+		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, params)
 	}()
 	r.EmitAction(fmt.Sprintf("Plan request: %s", planPayload))
 
 	if ctx == nil {
-		ctx = r.config.ctx
+		ctx = r.config.Ctx
 	}
 	planCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// if hijackPlanRequest is set, use it to handle the plan request
 	// this is useful for testing/mocking and advanced usage
-	if r.config.hijackPlanRequest != nil {
+	if r.config.HijackPERequest != nil {
 		r.EmitAction("hijack plan and execute in re-act mode")
 		var payload string
 		if planPayload == "" {
@@ -141,36 +143,32 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 		log.Infof("hijack plan and execute in re-act mode with payload: %v", utils.ShrinkString(planPayload, 200))
 		done()
-		return r.config.hijackPlanRequest(planCtx, payload)
+		return r.config.HijackPERequest(planCtx, payload)
 	}
 
-	inputChannel := make(chan *aid.InputEvent, 100)
+	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](r.config.Ctx, 10)
 	r.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
 			log.Infof("Received AI input event: %v", event)
-			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
-			if err != nil {
-				log.Errorf("Failed to convert AI input event to AID input event: %v, data: %v", err, event)
-				return
-			}
-			inputChannel <- result
+			inputChannel.SafeFeed(event)
 		}()
 	})
 	defer func() {
 		r.UnregisterMirrorOfAIInputEvent(uid)
 	}()
 
-	hotpatchChan := r.config.hotpatchBroadcaster.Subscribe()
-	baseOpts := ConvertReActConfigToAIDConfigOptions(r.config)
-	baseOpts = append(baseOpts, aid.WithCoordinatorId(uid),
-		aid.WithTimelineInstance(r.config.timeline),
-		aid.WithAICallback(r.config.aiCallback),
-		aid.WithAllowPlanUserInteract(true),
-		aid.WithAgreeManual(),
-		aid.WithEventInputChan(inputChannel),
-		aid.WithAgreePolicy(r.config.reviewPolicy),
-		aid.WithHotpatchOptionChan(hotpatchChan),
-		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
+	hotpatchChan := r.config.HotPatchBroadcaster.Subscribe()
+	baseOpts := aicommon.ConvertConfigToOptions(r.config)
+	baseOpts = append(baseOpts,
+		aicommon.WithID(uid),
+		aicommon.WithTimeline(r.config.Timeline),
+		aicommon.WithAICallback(r.config.OriginalAICallback),
+		aicommon.WithAllowPlanUserInteract(true),
+		aicommon.WithAgreeManual(),
+		aicommon.WithEventInputChanx(inputChannel),
+		aicommon.WithAgreePolicy(r.config.AgreePolicy),
+		aicommon.WithHotPatchOptionChan(hotpatchChan),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = uid
 			emitErr := r.config.Emit(e)
 			if emitErr != nil {
@@ -218,7 +216,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 		_ = result
 		r.AddToTimeline("forge output log", stdOut.String())
-		r.config.hotpatchBroadcaster.Unsubscribe(hotpatchChan)
+		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	} else {
 		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
@@ -231,7 +229,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			log.Errorf("Plan execution failed: %v", err)
 			return utils.Errorf("plan execution failed: %v", err)
 		}
-		r.config.hotpatchBroadcaster.Unsubscribe(hotpatchChan)
+		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	}
 }
