@@ -25,22 +25,6 @@ func NewForgeFactory() *ForgeFactory {
 // ForgeQueryOption 定义 Query 的可选项
 type ForgeQueryOption func(*ypb.AIForgeFilter, *ypb.Paging)
 
-// WithForgeFilter_Keyword 设置关键词搜索
-func WithForgeFilter_Keyword(keyword string) ForgeQueryOption {
-	return func(filter *ypb.AIForgeFilter, _ *ypb.Paging) {
-		filter.Keyword = keyword
-	}
-}
-
-// WithForgeFilter_Limit 设置返回条数限制
-func WithForgeFilter_Limit(limit int) ForgeQueryOption {
-	return func(_ *ypb.AIForgeFilter, paging *ypb.Paging) {
-		if limit > 0 {
-			paging.Limit = int64(limit)
-		}
-	}
-}
-
 func (f ForgeFactory) NLQuery(ctx context.Context, query string, aiChatFunc func(string) (io.Reader, error), opts ...aicommon.ForgeQueryOption) ([]*schema.AIForge, error) {
 	data, err := f.Query(ctx, opts...)
 	if err != nil {
