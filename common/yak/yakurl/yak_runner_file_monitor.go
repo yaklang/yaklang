@@ -35,9 +35,7 @@ func handlerFileMonitor(ctx context.Context, request *ypb.DuplexConnectionReques
 		if err != nil {
 			return err
 		}
-		if _, ok := YakRunnerMonitor.Get(id); ok {
-			// stop the old monitor. keep just watch one
-			oldMonitor, _ := YakRunnerMonitor.Get(id)
+		if oldMonitor, ok := YakRunnerMonitor.Get(id); ok {
 			oldMonitor.CancelFunc()
 		}
 		YakRunnerMonitor.Set(id, m)
@@ -54,15 +52,16 @@ func handlerFileMonitor(ctx context.Context, request *ypb.DuplexConnectionReques
 }
 
 func CheckUpdateFileMonitors(absPath string) error {
-	var err error
+	var e error
 	YakRunnerMonitor.ForEach(func(key string, value *filesys.YakFileMonitor) bool {
 		if utils.IsSubPath(absPath, value.WatchPatch) {
-			err = value.UpdateFileTree()
+			err := value.UpdateFileTree()
 			if err != nil {
+				e = utils.JoinErrors(e, err)
 				log.Errorf("failed to update file tree: %s", err)
 			}
 		}
 		return true
 	})
-	return err
+	return e
 }
