@@ -194,7 +194,6 @@ func (m *scanManager) SaveTask() error {
 		}
 	}
 	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
-	log.Errorf("save task : %v", utils.InterfaceToString(m.taskRecorder))
 	return err
 }
 

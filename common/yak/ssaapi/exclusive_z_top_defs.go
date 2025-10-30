@@ -39,7 +39,7 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 		ret = actx.untilMatch
 	}
 	if ret.Count() > dataflowValueLimit {
-		log.Warnf("Value TopDef %v too many: %d", i.StringWithRange(), ret.Count())
+		log.Warnf("Value TopDef too many: %d:\n\t%s", ret.Count(), i.StringWithRange())
 		return nil
 	}
 	ret = MergeValues(ret)

@@ -68,7 +68,7 @@ func (c *Config) GetFileHandler(
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()
 		ret.Set(key, c.LanguageBuilder.GetAntlrCache())
-		log.Errorf("create antrl cache, goroutine id: %d", getGID())
+		log.Debugf("create antrl cache, goroutine id: %d", getGID())
 		return ret
 	}
 	return ssareducer.FilesHandler(

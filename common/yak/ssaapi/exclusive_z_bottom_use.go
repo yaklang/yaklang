@@ -33,7 +33,7 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 		ret = actx.untilMatch
 	}
 	if ret.Count() > dataflowValueLimit {
-		log.Warnf("Value BottomUse %v too many: %d", v.StringWithRange(), ret.Count())
+		log.Warnf("Value BottomUse too many: %d:\n\t%s", ret.Count(), v.StringWithRange())
 		return nil
 	}
 	ret = MergeValues(ret)
