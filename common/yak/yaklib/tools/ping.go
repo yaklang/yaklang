@@ -37,6 +37,7 @@ func NewDefaultPingConfig() *_pingConfig {
 		timeout:    5 * time.Second,
 		scanCClass: false,
 		concurrent: 50,
+		tcpPingPort: "22,80,443",
 	}
 }
 
@@ -200,11 +201,7 @@ func _pingScan(target string, opts ...PingConfigOpt) chan *pingutil.PingResult {
 }
 
 func _ping(target string, opts ...PingConfigOpt) *pingutil.PingResult {
-	config := &_pingConfig{
-		dnsTimeout: time.Second * 5,
-		timeout:    5 * time.Second,
-		proxies:    []string{},
-	}
+	config := NewDefaultPingConfig()
 	for _, r := range opts {
 		r(config)
 	}

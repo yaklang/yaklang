@@ -3,6 +3,9 @@ package scannode
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/yaklang/yaklang/common/fp"
@@ -11,8 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
-	"net"
-	"strings"
 )
 
 type ScannerAgentReporter struct {
@@ -21,6 +22,30 @@ type ScannerAgentReporter struct {
 	RuntimeId string
 
 	agent *ScanNode
+}
+
+// convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
+func convertRawToString(raw interface{}) string {
+	if raw == nil {
+		return ""
+	}
+	switch data := raw.(type) {
+	case []byte:
+		return string(data)
+	case []interface{}:
+		// JSON 反序列化后的数组，每个元素是 float64
+		bytes := make([]byte, len(data))
+		for i, v := range data {
+			if f, ok := v.(float64); ok {
+				bytes[i] = byte(f)
+			}
+		}
+		return string(bytes)
+	case string:
+		return data
+	default:
+		return utils.InterfaceToString(raw)
+	}
 }
 
 func NewScannerAgentReporter(taskId string, subTaskId string, runtimeId string, agent *ScanNode) *ScannerAgentReporter {
@@ -147,6 +172,15 @@ func (r *ScannerAgentReporter) ReportRisk(
 		vul.Title = utils.MapGetString(v, "Title")
 		vul.ReverseToken = utils.MapGetString(v, "ReverseToken")
 		vul.Url = utils.MapGetString(v, "Url")
+		vul.Description = utils.MapGetString(v, "Description")
+		vul.Solution = utils.MapGetString(v, "Solution")
+		vul.Request = convertRawToString(utils.MapGetRaw(v, "Request"))
+		vul.Response = convertRawToString(utils.MapGetRaw(v, "Response"))
+		vul.Parameter = utils.MapGetString(v, "Parameter")
+		vul.IsPotential = utils.MapGetBool(v, "IsPotential")
+		vul.CVE = utils.MapGetString(v, "CVE")
+		vul.CveAccessVector = utils.MapGetString(v, "CveAccessVector")
+		vul.CveAccessComplexity = utils.MapGetString(v, "CveAccessComplexity")
 	}
 	res, err := NewVulnResult(vul)
 	if err != nil {

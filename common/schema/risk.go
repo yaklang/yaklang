@@ -151,6 +151,7 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		ResultID:           uint64(p.ResultID),
 		ProgramName:        p.ProgramName,
 		SyntaxFlowVariable: p.Variable,
+		IsPotential:        p.IsPotential,
 	}
 }
 
