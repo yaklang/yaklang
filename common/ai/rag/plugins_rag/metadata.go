@@ -24,7 +24,7 @@ func GenerateYakScriptMetadata(forgeContent string) (*GenerateResult, error) {
 		aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
 	))
 
-	lfopts = append(lfopts, aiforge.WithExtendLiteForge_AIDOption(
+	lfopts = append(lfopts, aiforge.WithExtendLiteForge_AIOption(
 	// aid.WithDebugPrompt(true),
 	))
 

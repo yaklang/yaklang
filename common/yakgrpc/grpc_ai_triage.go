@@ -55,14 +55,14 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		}
 	}
 
-	inputEvent := make(chan *aid.InputEvent, 1000)
-	var aidOption = []aid.Option{
-		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
+	inputEvent := chanx.NewUnlimitedChan[*ypb.AIInputEvent](baseCtx, 1000)
+	var aicommonOptions = []aicommon.ConfigOption{
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			sendEvent(e)
 		}),
-		aid.WithEventInputChan(inputEvent),
+		aicommon.WithEventInputChanx(inputEvent),
 	}
-	aidOption = append(aidOption, buildAIDOption(startParams)...)
+	aicommonOptions = append(aicommonOptions, buildAIDOption(startParams)...)
 
 	freeInputChan := chanx.NewUnlimitedChan[chunkmaker.Chunk](baseCtx, 1000)
 	seqClear := regexp.MustCompile("\n\n+")
@@ -93,27 +93,22 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 					log.Errorf("unmarshal interactive json input failed: %v", err)
 					continue
 				}
-				inEvent := &aid.InputEvent{
-					IsInteractive: true,
-					Id:            event.InteractiveId,
-					Params:        params,
-				}
-				select {
-				case inputEvent <- inEvent:
-					continue
-				case <-baseCtx.Done():
-					return
-				}
+
+				inputEvent.SafeFeed(&ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        event.InteractiveId,
+					InteractiveJSONInput: event.InteractiveJSONInput,
+				})
 			}
 		}
 	}()
 
-	cod, err := aid.NewCoordinatorContext(baseCtx, "", aidOption...)
+	cod, err := aid.NewCoordinatorContext(baseCtx, "", aicommonOptions...)
 	if err != nil {
 		return err
 	}
 
-	memory := cod.GetConfig().GetMemory()
+	memory := cod.Memory
 	searchHandler := func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
 		keywords := omap.NewOrderedMap[string, []string](nil)
 		forgeMap := map[string]*schema.AIForge{}
@@ -121,7 +116,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 			keywords.Set(forge.GetName(), forge.GetKeywords())
 			forgeMap[forge.GetName()] = forge
 		}
-		searchResults, err := cod.GetConfig().HandleSearch(query, keywords)
+		searchResults, err := cod.HandleSearch(query, keywords)
 		if err != nil {
 			return nil, err
 		}
@@ -153,13 +148,13 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		freeInputChan,
 		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			query := strings.TrimSpace(string(chunk.Data()))
-			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.AcquireId(), "", query) // push user input timeline
 			defer emitEvent(Triage_Event_Finish, []byte("意图识别完成"))
 			emitEvent(Triage_Event_Log, []byte(fmt.Sprintf("正在识别意图：%s", query)))
 			res, err := yak.ExecuteForge("intent_recognition",
 				query,
 				append(
-					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aidOption...),
+					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aicommonOptions...),
 					yak.WithMemory(memory),
 					yak.WithDisallowRequireForUserPrompt(),
 					yak.WithContext(baseCtx))...)

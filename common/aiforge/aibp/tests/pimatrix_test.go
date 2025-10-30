@@ -3,9 +3,9 @@ package tests
 import (
 	"embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -24,9 +24,9 @@ func DebugExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 		return nil, err
 	}
 	aiCallback = aiforge.MockAICallbackByRecord(data)
-	iopts = append(iopts, aid.WithAICallback(aiCallback))
-	iopts = append(iopts, aid.WithDebug(true))
-	iopts = append(iopts, aid.WithAgreeYOLO(true))
+	iopts = append(iopts, aicommon.WithAICallback(aiCallback))
+	iopts = append(iopts, aicommon.WithDebug(true))
+	iopts = append(iopts, aicommon.WithAgreeYOLO())
 	return yak.ExecuteForge(forgeName, i, iopts...)
 }
 

@@ -3,7 +3,7 @@ package tests
 import (
 	"context"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	aiforge.RegisterForgeExecutor("read-chunk-test-2", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aid.Option) (*aiforge.ForgeResult, error) {
+	aiforge.RegisterForgeExecutor("read-chunk-test-2", func(ctx context.Context, items []*ypb.ExecParamItem, option ...aicommon.ConfigOption) (*aiforge.ForgeResult, error) {
 		od, err := aiforge.NewForgeBlueprint(
 			"read-chunk-test-2",
 			aiforge.WithInitializePrompt(`分析文件中的敏感信息和外部链接是一个重要工作，你需要分析用户的文件，但是文件大小会非常大，你一次可以处理的上下文不多，所以你需要多次读取文件的内容，直到你找到你需要的信息。`),
@@ -37,5 +37,5 @@ func TestReadChunk(t *testing.T) {
 	log.Infof("prepare file: %v", filename)
 	aiforge.ExecuteForge("read-chunk-test-2", context.Background(), []*ypb.ExecParamItem{
 		{Key: "query", Value: filename},
-	}, aid.WithAgreeYOLO(), aid.WithDebugPrompt(), aid.WithAICallback(aiforge.GetOpenRouterAICallback()))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithDebugPrompt(), aicommon.WithAICallback(aiforge.GetOpenRouterAICallback()))
 }

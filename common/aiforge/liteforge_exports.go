@@ -3,7 +3,6 @@ package aiforge
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -58,7 +57,7 @@ type liteforgeConfig struct {
 	images     []*aicommon.ImageData
 	forceImage bool
 
-	aidOptions []aid.Option
+	aidOptions []aicommon.ConfigOption
 
 	jsonExtractHook []jsonextractor.CallbackOption
 }
@@ -216,7 +215,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		switch opt := optRaw.(type) {
 		case LiteForgeExecOption:
 			opt(cfg)
-		case aid.Option:
+		case aicommon.ConfigOption:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
 		}
 	}
@@ -289,7 +288,7 @@ func LiteForgeExecWithContext(ctx context.Context) LiteForgeExecOption {
 // SOME_CONTENT
 // PROMPT, liteforge.verboseName("my-forge-instance"))
 // ```
-func _withVerboseName(opts ...aid.Option) LiteForgeExecOption {
+func _withVerboseName(opts ...aicommon.ConfigOption) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.aidOptions = append(cfg.aidOptions, opts...)
 	}

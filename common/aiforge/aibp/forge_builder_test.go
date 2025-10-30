@@ -84,7 +84,7 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 		"query": "1+1",
 	},
 		yak.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
-		yak.WithAgreeYOLO(true),
+		yak.WithAgreeYOLO(),
 		yak.WithDebugPrompt(true),
 		yak.WithDebug(true),
 	)

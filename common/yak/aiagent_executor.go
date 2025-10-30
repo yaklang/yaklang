@@ -2,11 +2,11 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -115,12 +115,12 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	}
 }
 
-func (ag *Agent) AIDOptions() []aid.Option {
-	opts := make([]aid.Option, 0)
+func (ag *Agent) AICommonOptions() []aicommon.ConfigOption {
+	opts := make([]aicommon.ConfigOption, 0)
 	if ag.CoordinatorId != "" {
-		opts = append(opts, aid.WithCoordinatorId(ag.CoordinatorId))
+		opts = append(opts, aicommon.WithID(ag.CoordinatorId))
 	}
-	opts = append(ag.ExtendAIDOptions, opts...)
+	opts = append(ag.ExtendAICommonOptions, opts...)
 	return opts
 }
 
@@ -138,7 +138,7 @@ func buildDefaultForgeHandle(ctx context.Context, forgeIns *schema.AIForge, engi
 	}
 	return func(items []*ypb.ExecParamItem, anyOpts ...any) (any, error) {
 		ag := NewAgent(anyOpts...)
-		aidOpts := ag.AIDOptions()
+		aiCommonOpts := ag.AICommonOptions()
 
 		initPrompt, ok := getStringVar(DEFAULT_INIT_PROMPT_NAME)
 		if !ok {
@@ -165,7 +165,7 @@ func buildDefaultForgeHandle(ctx context.Context, forgeIns *schema.AIForge, engi
 		if err != nil {
 			return nil, utils.Errorf("failed to build forge handle: %v", err)
 		}
-		ins, err := blueprint.CreateCoordinator(ctx, items, aidOpts...)
+		ins, err := blueprint.CreateCoordinator(ctx, items, aiCommonOpts...)
 		if err != nil {
 			return nil, err
 		}

@@ -45,8 +45,8 @@ func TestBuildInForge(t *testing.T) {
 			{Key: "filePath", Value: "我的叔叔于勒.txt"},
 		},
 		WithAICallback(aiforge.GetHoldAICallback()),
-		WithExtendAIDOptions(
-			aid.WithDebugPrompt(true),
+		WithExtendAICommonOptions(
+			aicommon.WithDebugPrompt(true),
 		),
 	)
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestBuildInForge(t *testing.T) {
 
 	//res, err := ExecuteForge("yaklang_writer",
 	//	"写一个目录扫描脚本",
-	//	aid.WithDebugPrompt(true),
+	//	aicommon.WithDebugPrompt(true),
 	//	aid.WithAICallback(aiforge.GetHoldAICallback()),
 	//	aid.WithAgreeYOLO(true),
 	//)
@@ -86,8 +86,8 @@ func TestReducerAI(t *testing.T) {
 					},
 				},
 				WithAICallback(aiforge.GetHoldAICallback()),
-				WithExtendAIDOptions(
-					aid.WithDebugPrompt(true),
+				WithExtendAICommonOptions(
+					aicommon.WithDebugPrompt(true),
 				),
 				WithDisallowRequireForUserPrompt(),
 			)
@@ -125,8 +125,8 @@ func TestReducerAI2(t *testing.T) {
 					},
 				},
 				WithAICallback(aiforge.GetHoldAICallback()),
-				WithExtendAIDOptions(
-					aid.WithDebugPrompt(true),
+				WithExtendAICommonOptions(
+					aicommon.WithDebugPrompt(true),
 				),
 				WithDisallowRequireForUserPrompt(),
 				WithMemory(memory.CopyReducibleMemory()),
@@ -151,9 +151,9 @@ func TestReducerIntentRecognition(t *testing.T) {
 	raw := "我想做渗透测试\n\n可能需要用到xss攻击。\n\nsql注入\n\n还是不测xss了"
 
 	ctx := context.Background()
-	cod, err := aid.NewCoordinatorContext(ctx, "", aid.WithAICallback(aiforge.GetHoldAICallback()))
+	cod, err := aid.NewCoordinatorContext(ctx, "", aicommon.WithAICallback(aiforge.GetHoldAICallback()))
 	require.NoError(t, err)
-	memory := cod.GetConfig().GetMemory()
+	memory := cod.Memory
 
 	searchHandler := func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
 		keywords := omap.NewOrderedMap[string, []string](nil)
@@ -162,7 +162,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 			keywords.Set(forge.GetName(), forge.GetKeywords())
 			forgeMap[forge.GetName()] = forge
 		}
-		searchResults, err := cod.GetConfig().HandleSearch(query, keywords)
+		searchResults, err := cod.HandleSearch(query, keywords)
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +224,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 					//spew.Dump(param)
 				}
 			}()
-			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.AcquireId(), "", query) // push user input timeline
 			return nil
 		}),
 		aireducer.WithSeparatorTrigger("\n\n"),
@@ -484,9 +484,9 @@ func TestWebLogMonitor(t *testing.T) {
 	fp := bytes.NewReader(content)
 
 	ctx := context.Background()
-	cod, err := aid.NewCoordinatorContext(ctx, "", aid.WithAICallback(aiCB))
+	cod, err := aid.NewCoordinatorContext(ctx, "", aicommon.WithAICallback(aiCB))
 	require.NoError(t, err)
-	memory := cod.GetConfig().GetMemory()
+	memory := cod.Memory
 
 	var cacheBuffer []string
 

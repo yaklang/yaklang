@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/aiforge"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
@@ -36,7 +35,7 @@ func NewCaptchaDetector() (*CatpchaDetector, error) {
 	}, nil
 }
 
-func (lee *CatpchaDetector) DetectCaptcha(ctx context.Context, imgBase64 string, opts ...aid.Option) (*CaptchaResult, error) {
+func (lee *CatpchaDetector) DetectCaptcha(ctx context.Context, imgBase64 string, opts ...aicommon.ConfigOption) (*CaptchaResult, error) {
 	imageData := []*aicommon.ImageData{
 		{
 			Data:     []byte(imgBase64),
@@ -44,7 +43,7 @@ func (lee *CatpchaDetector) DetectCaptcha(ctx context.Context, imgBase64 string,
 		},
 	}
 
-	opts = append(opts, aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	opts = append(opts, aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		return aiforge.GetQwenAICallback("qwen-vl-max")(config, req)
 	}))
 

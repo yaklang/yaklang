@@ -45,7 +45,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	baseCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	inputEvent := make(chan *aid.InputEvent, 1000)
+	inputEvent := chanx.NewUnlimitedChan[*ypb.AIInputEvent](baseCtx, 10)
 	var currentCoordinatorId = startParams.CoordinatorId
 	var coordinatorIdOnce sync.Once
 	var sendEvent = func(e *schema.AiOutputEvent) {
@@ -64,17 +64,16 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		}
 	}
 
-	var aidOption = []aid.Option{
-		aid.WithSaveEvent(true),
-		aid.WithTaskAnalysis(true),
-		aid.WithEventHandler(sendEvent),
-		aid.WithEventInputChan(inputEvent),
+	var hotpatchChan = chanx.NewUnlimitedChan[aicommon.ConfigOption](baseCtx, 10)
+	var configOption = []aicommon.ConfigOption{
+		aicommon.WithSaveEvent(true),
+		aicommon.WithEventHandler(sendEvent),
+		aicommon.WithEventInputChanx(inputEvent),
+		aicommon.WithHotPatchOptionChan(hotpatchChan),
 	}
 
-	aidOption = append(aidOption, buildAIDOption(startParams)...)
+	configOption = append(configOption, buildAIDOption(startParams)...)
 
-	var hotpatchBroadcaster = chanx.NewBroadcastChannel[aid.Option](baseCtx, 10)
-	aidOption = append(aidOption, aid.WithHotpatchOptionChanFactory(hotpatchBroadcaster.Subscribe))
 	go func() {
 		defer cancel()
 		for {
@@ -86,38 +85,26 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 			if event.IsConfigHotpatch {
 				params := event.GetParams()
-				var updateOption aid.Option
+				var updateOption aicommon.ConfigOption
 				switch event.HotpatchType {
 				case "ReviewPolicy":
 					switch params.GetReviewPolicy() {
 					case "yolo":
-						updateOption = aid.WithAgreeYOLO(true)
+						updateOption = aicommon.WithAgreeYOLO()
 					case "ai":
-						updateOption = aid.WithAIAgree()
+						updateOption = aicommon.WithAIAgree()
 					case "manual":
-						updateOption = aid.WithAgreeManual()
+						updateOption = aicommon.WithAgreeManual()
 					}
 				default:
 					log.Errorf("unknown hotpatch type: %s", event.HotpatchType)
 					continue
 				}
-				if updateOption == nil {
-					hotpatchBroadcaster.Submit(updateOption)
-				}
-			}
-
-			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
-			if err != nil {
-				log.Errorf("Failed to convert AI input event to AID input event: %v", err)
+				hotpatchChan.SafeFeed(updateOption)
 				continue
 			}
 
-			select {
-			case inputEvent <- result:
-				continue
-			case <-baseCtx.Done():
-				return
-			}
+			inputEvent.SafeFeed(event)
 		}
 	}()
 
@@ -133,7 +120,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	var res any
 	if forgeName != "" {
 		log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
-		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aidOption...)...)
+		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, configOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
@@ -142,7 +129,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	} else {
 		log.Info("call without forgeName, use 'forge_triage' as default")
 
-		cod, err := aid.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(aidOption, aid.WithCoordinatorId(currentCoordinatorId))...)
+		cod, err := aid.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(configOption, aicommon.WithID(currentCoordinatorId))...)
 		if err != nil {
 			log.Errorf("create ai coordinator failed: %v", err)
 			return err
@@ -163,7 +150,7 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	return nil
 }
 
-func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHandler func(e *schema.AiOutputEvent), extendOption ...aid.Option) []any {
+func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHandler func(e *schema.AiOutputEvent), extendOption ...aicommon.ConfigOption) []any {
 	agentOption := []any{
 		yak.WithContext(ctx),
 	}
@@ -172,7 +159,7 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHan
 	}
 
 	if len(extendOption) > 0 {
-		agentOption = append(agentOption, yak.WithExtendAIDOptions(extendOption...))
+		agentOption = append(agentOption, yak.WithExtendAICommonOptions(extendOption...))
 	}
 
 	if agentEventHandler != nil {
@@ -182,42 +169,42 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHan
 	return agentOption
 }
 
-func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
-	aidOption := make([]aid.Option, 0)
+func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
+	aidOption := make([]aicommon.ConfigOption, 0)
 
 	if startParams.GetEnableSystemFileSystemOperator() {
-		aidOption = append(aidOption, aid.WithSystemFileOperator())
-		aidOption = append(aidOption, aid.WithJarOperator())
+		aidOption = append(aidOption, aicommon.WithSystemFileOperator())
+		aidOption = append(aidOption, aicommon.WithJarOperator())
 	}
 
 	switch startParams.GetReviewPolicy() {
 	case "yolo":
-		aidOption = append(aidOption, aid.WithAgreeYOLO(true))
+		aidOption = append(aidOption, aicommon.WithAgreeYOLO())
 	case "ai":
-		aidOption = append(aidOption, aid.WithAIAgree())
+		aidOption = append(aidOption, aicommon.WithAIAgree())
 	case "manual":
-		aidOption = append(aidOption, aid.WithAgreeManual())
+		aidOption = append(aidOption, aicommon.WithAgreeManual())
 	}
 
 	if startParams.GetEnableQwenNoThinkMode() {
-		aidOption = append(aidOption, aid.WithQwenNoThink())
+		aidOption = append(aidOption, aicommon.WithQwenNoThink())
 	}
 
 	if startParams.GetAllowPlanUserInteract() {
-		aidOption = append(aidOption, aid.WithAllowPlanUserInteract())
+		aidOption = append(aidOption, aicommon.WithAllowPlanUserInteract(true))
 	}
 
 	if startParams.GetPlanUserInteractMaxCount() > 0 {
-		aidOption = append(aidOption, aid.WithPlanUserInteractMaxCount(startParams.GetPlanUserInteractMaxCount()))
+		aidOption = append(aidOption, aicommon.WithPlanUserInteractMaxCount(startParams.GetPlanUserInteractMaxCount()))
 	}
 
 	if startParams.GetAllowGenerateReport() {
-		aidOption = append(aidOption, aid.WithGenerateReport(startParams.GetAllowGenerateReport()))
+		aidOption = append(aidOption, aicommon.WithGenerateReport(startParams.GetAllowGenerateReport()))
 	}
 
 	if startParams.GetUseDefaultAIConfig() {
 		wrapperChat := aicommon.AIChatToAICallbackType(ai.Chat)
-		aidOption = append(aidOption, aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aidOption = append(aidOption, aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			//fmt.Println(req.GetPrompt())
 			//time.Sleep(100 * time.Millisecond)
 			return wrapperChat(config, req)
@@ -229,28 +216,28 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
 		} else {
-			aidOption = append(aidOption, aid.WithAICallback(callback))
+			aidOption = append(aidOption, aicommon.WithAICallback(callback))
 		}
 	}
 
 	if mockedAIChat != nil {
-		aidOption = append(aidOption, aid.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))
+		aidOption = append(aidOption, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))
 	}
 
 	if startParams.GetDisallowRequireForUserPrompt() {
-		aidOption = append(aidOption, aid.WithDisallowRequireForUserPrompt())
+		aidOption = append(aidOption, aicommon.WithDisallowRequireForUserPrompt())
 	}
 
 	if startParams.GetDisableToolUse() {
-		aidOption = append(aidOption, aid.WithDisableToolUse())
+		aidOption = append(aidOption, aicommon.WithDisableToolUse(true))
 	}
 
 	if startParams.GetAICallAutoRetry() > 0 {
-		aidOption = append(aidOption, aid.WithAIAutoRetry(int(startParams.GetAICallAutoRetry())))
+		aidOption = append(aidOption, aicommon.WithAIAutoRetry(startParams.GetAICallAutoRetry()))
 	}
 
 	if startParams.GetAITransactionRetry() > 0 {
-		aidOption = append(aidOption, aid.WithAITransactionRetry(int(startParams.GetAITransactionRetry())))
+		aidOption = append(aidOption, aicommon.WithAITransactionRetry(startParams.GetAITransactionRetry()))
 	}
 
 	if startParams.GetEnableAISearchTool() {
@@ -258,27 +245,27 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	if startParams.GetEnableAISearchInternet() {
-		aidOption = append(aidOption, aid.WithOmniSearchTool())
+		aidOption = append(aidOption, aicommon.WithOmniSearchTool())
 	}
 
 	if len(startParams.GetIncludeSuggestedToolKeywords()) > 0 {
-		aidOption = append(aidOption, aid.WithToolKeywords(startParams.GetIncludeSuggestedToolKeywords()...))
+		aidOption = append(aidOption, aicommon.WithKeywords(startParams.GetIncludeSuggestedToolKeywords()...))
 	}
 
 	if len(startParams.GetIncludeSuggestedToolNames()) > 0 {
-		aidOption = append(aidOption, aid.WithEnableToolsName(startParams.GetIncludeSuggestedToolNames()...))
+		aidOption = append(aidOption, aicommon.WithEnableToolsName(startParams.GetIncludeSuggestedToolNames()...))
 	}
 
 	if len(startParams.GetExcludeToolNames()) > 0 {
-		aidOption = append(aidOption, aid.WithDisableToolsName(startParams.GetExcludeToolNames()...))
+		aidOption = append(aidOption, aicommon.WithDisableToolsName(startParams.GetExcludeToolNames()...))
 	}
 
 	if startParams.GetCoordinatorId() != "" {
-		aidOption = append(aidOption, aid.WithCoordinatorId(startParams.GetCoordinatorId()))
+		aidOption = append(aidOption, aicommon.WithID(startParams.GetCoordinatorId()))
 	}
 
 	if startParams.GetTaskMaxContinueCount() > 0 {
-		aidOption = append(aidOption, aid.WithMaxTaskContinue(startParams.GetTaskMaxContinueCount()))
+		aidOption = append(aidOption, aicommon.WithMaxTaskContinue(startParams.GetTaskMaxContinueCount()))
 	}
 
 	return aidOption

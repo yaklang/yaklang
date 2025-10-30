@@ -158,7 +158,7 @@ var AIAgentExport = map[string]any{
 	"resultHandler":                WithResultHandler,
 	"forgeName":                    WithForgeName,
 	"context":                      WithContext,
-	"extendAIDOptions":             WithExtendAIDOptions,
+	"extendAIDOptions":             WithExtendAICommonOptions,
 	"offsetSeq":                    WithOffsetSeq,
 	"tool":                         WithTool,
 	"disallowRequireForUserPrompt": WithDisallowRequireForUserPrompt,

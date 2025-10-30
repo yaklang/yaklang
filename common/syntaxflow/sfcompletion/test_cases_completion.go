@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -80,8 +79,8 @@ func CompleteTestCases(
 				Key: "file_content", Value: ruleContent,
 			},
 		},
-		aid.WithAgreeYOLO(true),
-		aid.WithAICallback(aiCallback),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithAICallback(aiCallback),
 	)
 	if err != nil {
 		return "", utils.Errorf("complete test cases failed: %v", err)
