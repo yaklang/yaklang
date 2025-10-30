@@ -116,6 +116,7 @@ type Config struct {
 	// tool config
 	DisableToolUse      bool
 	AiToolManagerOption []buildinaitools.ToolManagerOption
+	EnableAISearch      bool
 
 	// Interactive(review/require_user/sync) features
 	// endpoint manager
@@ -366,9 +367,10 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+		oCb := cb
 		cb = c.wrapper(cb)
 		c.m.Lock()
-		c.OriginalAICallback = cb
+		c.OriginalAICallback = oCb
 		c.QualityPriorityAICallback = cb
 		c.SpeedPriorityAICallback = cb
 		c.m.Unlock()
@@ -383,19 +385,6 @@ func WithToolManager(tm *buildinaitools.AiToolManager) ConfigOption {
 		}
 		c.m.Lock()
 		c.AiToolManager = tm
-		c.m.Unlock()
-		return nil
-	}
-}
-
-func WithOriginalAICallback(cb AICallbackType) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		cb = c.wrapper(cb)
-		c.m.Lock()
-		c.OriginalAICallback = cb
 		c.m.Unlock()
 		return nil
 	}
@@ -642,8 +631,11 @@ func WithAiToolManagerOptions(opts ...buildinaitools.ToolManagerOption) ConfigOp
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		c.AiToolManagerOption = append([]buildinaitools.ToolManagerOption{}, opts...)
-		c.m.Unlock()
+		defer c.m.Unlock()
+		if c.AiToolManagerOption == nil {
+			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		c.AiToolManagerOption = append(c.AiToolManagerOption, opts...)
 		return nil
 	}
 }
@@ -656,6 +648,18 @@ func WithDisableToolUse(disable bool) ConfigOption {
 		c.m.Lock()
 		c.DisableToolUse = disable
 		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithEnableToolManagerAISearch(enable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.EnableAISearch = enable
 		return nil
 	}
 }
@@ -836,37 +840,13 @@ func WithAllowPlanUserInteract(v bool) ConfigOption {
 
 func WithDisableToolsName(toolsName ...string) ConfigOption {
 	return func(c *Config) error {
-		c.m.Lock()
-		defer c.m.Unlock()
-		if c.AiToolManagerOption == nil {
-			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
-		}
-		c.AiToolManagerOption = append(c.AiToolManagerOption, buildinaitools.WithDisableTools(toolsName))
-		return nil
-	}
-}
-
-func WithAiToolsManagerOption(opt ...buildinaitools.ToolManagerOption) ConfigOption {
-	return func(c *Config) error {
-		c.m.Lock()
-		defer c.m.Unlock()
-		if c.AiToolManagerOption == nil {
-			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
-		}
-		c.AiToolManagerOption = append(c.AiToolManagerOption, opt...)
-		return nil
+		return WithAiToolManagerOptions(buildinaitools.WithDisableTools(toolsName))(c)
 	}
 }
 
 func WithEnableToolsName(toolsName ...string) ConfigOption {
 	return func(c *Config) error {
-		c.m.Lock()
-		defer c.m.Unlock()
-		if c.AiToolManagerOption == nil {
-			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
-		}
-		c.AiToolManagerOption = append(c.AiToolManagerOption, buildinaitools.WithEnabledTools(toolsName))
-		return nil
+		return WithAiToolManagerOptions(buildinaitools.WithEnabledTools(toolsName))(c)
 	}
 }
 
@@ -895,17 +875,7 @@ func WithSystemFileOperator() ConfigOption {
 
 func WithTools(tool ...*aitool.Tool) ConfigOption {
 	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		defer c.m.Unlock()
-		if c.AiToolManagerOption == nil {
-			c.AiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
-		}
-		c.AiToolManagerOption = append(c.AiToolManagerOption,
-			buildinaitools.WithExtendTools(tool, true))
-		return nil
+		return WithAiToolManagerOptions(buildinaitools.WithExtendTools(tool, true))(c)
 	}
 }
 

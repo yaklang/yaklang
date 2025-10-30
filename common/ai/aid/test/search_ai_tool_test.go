@@ -138,10 +138,10 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 
 	currentStateIndex := 0
 	coordinator, err := aid.NewCoordinator("帮我解码一个base64编码的字符串: eWFrbGFuZw==",
-		aid.WithAiToolsSearchTool(),
-		aid.WithAgreeYOLO(),
-		aid.WithEnableToolsName("decode"),
-		aid.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		aicommon.WithEnableToolManagerAISearch(true),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithEnableToolsName("decode"),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			pair := stateKeyword[currentStateIndex]
 			matcher := pair.matcher

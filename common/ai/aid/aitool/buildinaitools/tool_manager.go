@@ -133,7 +133,7 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 
 // NewToolManager 创建一个新的默认工具管理器实例
 func NewToolManager(options ...ToolManagerOption) *AiToolManager {
-	basicToolsOptions := []ToolManagerOption{WithExtendTools(GetBasicBuildInTools(),true)} // 默认开启基础工具
+	basicToolsOptions := []ToolManagerOption{WithExtendTools(GetBasicBuildInTools(), true)} // 默认开启基础工具
 	options = append(basicToolsOptions, options...)
 	manager := NewToolManagerByToolGetter(GetAllTools, options...) //候选工具由GetAllTools提供
 	return manager
@@ -279,9 +279,8 @@ func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
 	return nil
 }
 
-
 func (m *AiToolManager) EnableAIToolSearch(searcher searchtools.AISearcher[*aitool.Tool]) error {
-	m.enableForgeSearchTool = true
+	m.enableSearchTool = true
 	m.aiToolsSearcher = searcher
 	return nil
 }
