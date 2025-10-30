@@ -5876,15 +5876,16 @@ func (x *CreateVectorStoreEntryRequest) GetMetadata() string {
 }
 
 type VectorStoreEntry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	UID           string                 `protobuf:"bytes,2,opt,name=UID,proto3" json:"UID,omitempty"`
-	Content       string                 `protobuf:"bytes,3,opt,name=Content,proto3" json:"Content,omitempty"`
-	Metadata      string                 `protobuf:"bytes,4,opt,name=Metadata,proto3" json:"Metadata,omitempty"`
-	Embedding     []float32              `protobuf:"fixed32,5,rep,packed,name=Embedding,proto3" json:"Embedding,omitempty"`
-	DocumentType  string                 `protobuf:"bytes,6,opt,name=DocumentType,proto3" json:"DocumentType,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ID              int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	UID             string                 `protobuf:"bytes,2,opt,name=UID,proto3" json:"UID,omitempty"`
+	Content         string                 `protobuf:"bytes,3,opt,name=Content,proto3" json:"Content,omitempty"`
+	Metadata        string                 `protobuf:"bytes,4,opt,name=Metadata,proto3" json:"Metadata,omitempty"`
+	Embedding       []float32              `protobuf:"fixed32,5,rep,packed,name=Embedding,proto3" json:"Embedding,omitempty"`
+	DocumentType    string                 `protobuf:"bytes,6,opt,name=DocumentType,proto3" json:"DocumentType,omitempty"`
+	RelatedEntities []string               `protobuf:"bytes,7,rep,name=RelatedEntities,proto3" json:"RelatedEntities,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *VectorStoreEntry) Reset() {
@@ -5957,6 +5958,13 @@ func (x *VectorStoreEntry) GetDocumentType() string {
 		return x.DocumentType
 	}
 	return ""
+}
+
+func (x *VectorStoreEntry) GetRelatedEntities() []string {
+	if x != nil {
+		return x.RelatedEntities
+	}
+	return nil
 }
 
 type ListVectorStoreEntriesResponse struct {
@@ -63328,14 +63336,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1dCreateVectorStoreEntryRequest\x12\x10\n" +
 	"\x03UID\x18\x01 \x01(\tR\x03UID\x12\x18\n" +
 	"\aContent\x18\x02 \x01(\tR\aContent\x12\x1a\n" +
-	"\bMetadata\x18\x03 \x01(\tR\bMetadata\"\xac\x01\n" +
+	"\bMetadata\x18\x03 \x01(\tR\bMetadata\"\xd6\x01\n" +
 	"\x10VectorStoreEntry\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x10\n" +
 	"\x03UID\x18\x02 \x01(\tR\x03UID\x12\x18\n" +
 	"\aContent\x18\x03 \x01(\tR\aContent\x12\x1a\n" +
 	"\bMetadata\x18\x04 \x01(\tR\bMetadata\x12\x1c\n" +
 	"\tEmbedding\x18\x05 \x03(\x02R\tEmbedding\x12\"\n" +
-	"\fDocumentType\x18\x06 \x01(\tR\fDocumentType\"\x94\x01\n" +
+	"\fDocumentType\x18\x06 \x01(\tR\fDocumentType\x12(\n" +
+	"\x0fRelatedEntities\x18\a \x03(\tR\x0fRelatedEntities\"\x94\x01\n" +
 	"\x1eListVectorStoreEntriesResponse\x12/\n" +
 	"\aEntries\x18\x01 \x03(\v2\x15.ypb.VectorStoreEntryR\aEntries\x12+\n" +
 	"\n" +
