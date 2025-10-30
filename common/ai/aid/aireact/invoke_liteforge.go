@@ -36,7 +36,7 @@ func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt s
 	}
 	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
 		{Key: "query", Value: prompt},
-	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(r.config.QualityPriorityAICallback))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(r.config.OriginalAICallback))
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}

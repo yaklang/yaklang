@@ -215,10 +215,10 @@ println(parts)
 
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedYaklangQueryDocument(i, r, stat)
+			return mockedYaklangGrepSamples(i, r, stat)
 		}),
-		WithEventInputChan(in),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithAIKBPath(zipPath), // Use test zip file as aikb

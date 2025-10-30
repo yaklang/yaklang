@@ -45,6 +45,7 @@ func WithMemoryProvider(provider *PromptContextProvider) aicommon.ConfigOption {
 
 // cycle import issue
 
+// !!!!
 func WithAiToolsSearchTool() aicommon.ConfigOption {
 	return func(c *aicommon.Config) error {
 		aiChatFunc := func(prompt string) (io.Reader, error) {
@@ -56,15 +57,13 @@ func WithAiToolsSearchTool() aicommon.ConfigOption {
 		}
 
 		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
-		aicommon.WithAiToolManagerOptions(buildinaitools.WithSearchToolEnabled(true),
-			buildinaitools.WithAIToolsSearcher(aiToolSearcher))
-		return nil
+		return aicommon.WithAiToolManagerOptions(buildinaitools.WithSearchToolEnabled(true),
+			buildinaitools.WithAIToolsSearcher(aiToolSearcher))(c)
 	}
 }
 
 func WithAiForgeSearchTool() aicommon.ConfigOption {
 	return func(c *aicommon.Config) error {
-
 		aiChatFunc := func(prompt string) (io.Reader, error) {
 			response, err := ai.Chat(prompt)
 			if err != nil {
@@ -74,9 +73,9 @@ func WithAiForgeSearchTool() aicommon.ConfigOption {
 		}
 
 		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
-		aicommon.WithAiToolManagerOptions(buildinaitools.WithForgeSearchToolEnabled(true),
-			buildinaitools.WithAiForgeSearcher(forgeSearcher))
-		return nil
+		return aicommon.WithAiToolManagerOptions(
+			buildinaitools.WithForgeSearchToolEnabled(true),
+			buildinaitools.WithAiForgeSearcher(forgeSearcher))(c)
 	}
 }
 
@@ -240,10 +239,6 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
-	err := c.EnableToolManagerAISearch()
-	if err != nil {
-		return nil, err
-	}
 	c.appendUtilsOption()
 	return c, nil
 }
@@ -272,6 +267,15 @@ func (c *Coordinator) loadToolsViaOptions() error {
 			return err
 		}
 	}
+
+	if c.EnableAISearch {
+		err := c.EnableToolManagerAISearch()
+		if err != nil {
+			log.Errorf("enable tool manager AI search: %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
