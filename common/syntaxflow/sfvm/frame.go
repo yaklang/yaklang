@@ -1375,6 +1375,9 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 }
 
 func (s *SFFrame) debugSubLog(i string, item ...any) {
+	if !s.config.debug {
+		return
+	}
 	prefix := "  |-- "
 	results := fmt.Sprintf(i, item...)
 	var result bytes.Buffer
