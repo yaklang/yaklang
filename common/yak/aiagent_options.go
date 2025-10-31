@@ -2,9 +2,10 @@ package yak
 
 import (
 	"context"
+	"slices"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
@@ -86,9 +87,6 @@ func (ag *Agent) SubOption() []AIAgentOption {
 }
 
 var (
-	// aicommon options
-	WithAgreeYOLO = aicommon.WithAgreeYOLO
-
 	// Additional With options
 	WithCoordinatorId = func(id string) AIAgentOption {
 		return func(ag *Agent) error {
@@ -103,64 +101,10 @@ var (
 			return nil
 		}
 	}
-	WithOffsetSeq                    = aicommon.WithSequence
-	WithTool                         = aicommon.WithTool
-	WithExtendedActionCallback       = aicommon.WithExtendedActionCallback
 	WithDisallowRequireForUserPrompt = aicommon.WithDisallowRequireForUserPrompt
-	WithManualAssistantCallback      = aicommon.WithManualAssistantCallback
-	WithAgreePolicy                  = aicommon.WithAgreePolicy
-	WithAIAgree                      = aicommon.WithAIAgree
-	WithAgreeManual                  = aicommon.WithAgreeManual
-	WithAgreeAuto                    = aicommon.WithAgreeAuto
-	WithAllowRequireForUserInteract  = aicommon.WithAllowRequireForUserInteract
-	WithTools                        = aicommon.WithTools
 	WithAICallback                   = aicommon.WithAICallback
-	WithToolManager                  = aicommon.WithToolManager
-	WithTimeline                     = aicommon.WithTimeline
-	WithMemoryTriage                 = aicommon.WithMemoryTriage
-	WithMemory                       = aid.WithMemoryProvider
-	WithTaskAICallback               = aicommon.WithSpeedPriorityAICallback
-	WithCoordinatorAICallback        = aicommon.WithQualityPriorityAICallback
-	WithPlanAICallback               = aicommon.WithQualityPriorityAICallback
-	WithSystemFileOperator           = aicommon.WithSystemFileOperator
-	WithJarOperator                  = aicommon.WithJarOperator
-	WithOmniSearchTool               = aicommon.WithOmniSearchTool
-	WithAiToolsSearchTool            = aid.WithAiToolsSearchTool
-	WithAiForgeSearchTool            = aid.WithAiForgeSearchTool
-	WithDebugPrompt                  = aicommon.WithDebugPrompt
-	WithEventHandler                 = aicommon.WithEventHandler
-	WithEventInputChan               = aicommon.WithEventInputChanx
-	WithDebug                        = aicommon.WithDebug
-	WithGenerateReport               = aicommon.WithGenerateReport
+	WithPromptContextProvider        = aid.WithPromptContextProvider
 	WithResultHandler                = aid.WithResultHandler
-	WithAppendPersistentMemory       = aicommon.WithAppendPersistentMemory
-
-	// Deprecated: use WithTimelineContentLimit instead
-	WithTimeLineLimit        = aicommon.WithTimeLineLimit
-	WithTimelineContentLimit = aicommon.WithTimelineContentLimit
-	WithPlanMocker           = aid.WithPlanMocker
-	WithForgeParams          = aicommon.WithForgeParams
-	WithDisableToolUse       = aicommon.WithDisableToolUse
-	WithAIAutoRetry          = aicommon.WithAIAutoRetry
-	WithAITransactionRetry   = aicommon.WithAITransactionRetry
-	WithDisableOutputType    = aicommon.WithDisableOutputEvent
-
-	// aiforge options
-	WithForgePlanMocker      = aiforge.WithPlanMocker
-	WithInitializePrompt     = aiforge.WithInitializePrompt
-	WithResultPrompt         = aiforge.WithResultPrompt
-	WithResultHandlerForge   = aiforge.WithResultHandler
-	WithPersistentPrompt     = aiforge.WithPersistentPrompt
-	WithToolKeywords         = aiforge.WithToolKeywords
-	WithForgeTools           = aiforge.WithTools
-	WithOriginYaklangCliCode = aiforge.WithOriginYaklangCliCode
-
-	// lite aiforge options
-	WithLiteForgePrompt          = aiforge.WithLiteForge_Prompt
-	WithLiteForgeOutputSchema    = aiforge.WithLiteForge_OutputSchema
-	WithLiteForgeRequireParams   = aiforge.WithLiteForge_RequireParams
-	WithLiteForgeOutputMemoryOP  = aiforge.WithLiteForge_OutputMemoryOP
-	WithLiteForgeOutputSchemaRaw = aiforge.WithLiteForge_OutputSchemaRaw
 
 	// aitools
 	AllYakScriptTools = yakscripttools.GetAllYakScriptAiTools
