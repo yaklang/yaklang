@@ -2,12 +2,14 @@ package rag
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
-	"testing"
-	"time"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,12 +36,12 @@ func TestRAGQuery(t *testing.T) {
 	collections := []struct {
 		name        string
 		description string
-		documents   []Document
+		documents   []vectorstore.Document
 	}{
 		{
 			name:        "cybersecurity_knowledge_" + utils.RandStringBytes(6),
 			description: "网络安全知识库：专门收录网络安全攻防技术、漏洞分析、安全工具使用等专业知识，为安全研究人员和渗透测试工程师提供全面的安全技术指导，涵盖Web安全、系统安全、网络防护等多个安全领域的理论和实践内容。",
-			documents: []Document{
+			documents: []vectorstore.Document{
 				{
 					ID:      "sec_001",
 					Content: "SQL注入攻击是一种常见的Web安全漏洞，攻击者通过在输入字段中插入恶意SQL代码来获取数据库敏感信息。防护措施包括使用参数化查询、输入验证和最小权限原则。",
@@ -63,7 +65,7 @@ func TestRAGQuery(t *testing.T) {
 		{
 			name:        "ai_technology_" + utils.RandStringBytes(6),
 			description: "人工智能技术知识库：汇集机器学习、深度学习、自然语言处理等AI前沿技术知识，为AI研究人员和算法工程师提供从基础理论到工程实践的完整技术栈，包括神经网络架构、模型训练、数据处理等核心技术内容。",
-			documents: []Document{
+			documents: []vectorstore.Document{
 				{
 					ID:      "ai_001",
 					Content: "深度学习是机器学习的一个子领域，使用多层神经网络来学习数据的复杂模式。常见的网络架构包括卷积神经网络(CNN)用于图像处理，循环神经网络(RNN)用于序列数据处理。",
@@ -87,7 +89,7 @@ func TestRAGQuery(t *testing.T) {
 		{
 			name:        "programming_guide_" + utils.RandStringBytes(6),
 			description: "编程开发指南知识库：涵盖主流编程语言、开发框架、软件工程实践等开发技术知识，为软件开发工程师提供从语言基础到架构设计的全方位技术指导，包括代码规范、性能优化、项目管理等开发实践经验。",
-			documents: []Document{
+			documents: []vectorstore.Document{
 				{
 					ID:      "prog_001",
 					Content: "Go语言是Google开发的开源编程语言，以其简洁的语法、高效的并发处理和快速的编译速度著称。Go的goroutine和channel机制为并发编程提供了优雅的解决方案。",
@@ -263,13 +265,13 @@ func TestRAGQuery(t *testing.T) {
 			t.Logf("Status: %s", result.Message)
 		case "mid_result":
 			midResults = append(midResults, result)
-			if doc, ok := result.Data.(*Document); ok {
+			if doc, ok := result.Data.(*vectorstore.Document); ok {
 				discoveredCollections[result.Source] = true
 				t.Logf("Mid result from %s: ID=%s, Score=%.3f", result.Source, doc.ID, result.Score)
 			}
 		case "result":
 			finalResults = append(finalResults, result)
-			if doc, ok := result.Data.(*Document); ok {
+			if doc, ok := result.Data.(*vectorstore.Document); ok {
 				t.Logf("Final result from %s: ID=%s, Score=%.3f", result.Source, doc.ID, result.Score)
 			}
 		}
@@ -293,7 +295,7 @@ func TestRAGQuery(t *testing.T) {
 	// 验证结果的相关性
 	foundNLPDoc := false
 	for _, result := range finalResults {
-		if doc, ok := result.Data.(*Document); ok {
+		if doc, ok := result.Data.(*vectorstore.Document); ok {
 			if doc.ID == "ai_002" { // NLP相关文档
 				foundNLPDoc = true
 				t.Logf("✓ Found expected NLP document with score %.3f", result.Score)
@@ -314,7 +316,7 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 		return
 	}
 
-	mockEmbed := NewMockEmbedder(testEmbedder)
+	mockEmbed := vectorstore.NewMockEmbedder(testEmbedder)
 
 	ragSystem, err := CreateCollection(db, "test", "test", WithEmbeddingClient(mockEmbed))
 	if err != nil {
@@ -406,12 +408,12 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	collections := []struct {
 		name        string
 		description string
-		document    Document
+		document    vectorstore.Document
 	}{
 		{
 			name:        "A" + utils.RandStringBytes(6),
 			description: "测试知识库A",
-			document: Document{
+			document: vectorstore.Document{
 				ID:      uuidHypotheticalAnswer,
 				Content: contentHypotheticalAnswer,
 			},
@@ -419,7 +421,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		{
 			name:        "B" + utils.RandStringBytes(6),
 			description: "测试知识库B",
-			document: Document{
+			document: vectorstore.Document{
 				ID:      uuidGeneralizeQuery,
 				Content: contentGeneralizeQuery,
 			},
@@ -427,7 +429,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		{
 			name:        "C" + utils.RandStringBytes(6),
 			description: "测试知识库C",
-			document: Document{
+			document: vectorstore.Document{
 				ID:      uuidSplitQuery,
 				Content: contentSplitQuery,
 			},
@@ -473,7 +475,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 			WithRAGSimilarityThreshold(LowSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 3)
-		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+		require.Contains(t, lo.Map(results, func(item *vectorstore.SearchResult, index int) string {
 			return item.Document.ID
 		}), uuidHypotheticalAnswer, uuidGeneralizeQuery, uuidSplitQuery)
 	})
@@ -485,7 +487,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 			WithRAGSimilarityThreshold(MidSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 2)
-		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+		require.Contains(t, lo.Map(results, func(item *vectorstore.SearchResult, index int) string {
 			return item.Document.ID
 		}), uuidHypotheticalAnswer, uuidGeneralizeQuery)
 	})
@@ -497,7 +499,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 			WithRAGSimilarityThreshold(HighSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 1)
-		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+		require.Contains(t, lo.Map(results, func(item *vectorstore.SearchResult, index int) string {
 			return item.Document.ID
 		}), uuidHypotheticalAnswer)
 	})
