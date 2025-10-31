@@ -1,4 +1,4 @@
-package memory_type
+package aicommon
 
 import (
 	"bytes"

@@ -2,7 +2,8 @@ package aimem
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"strings"
 	"testing"
 	"time"
@@ -233,6 +234,40 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 			t.Errorf("error should mention sessionId requirement, got: %v", err)
 		}
 	})
+
+	embeddingCheckCreate := func(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
+		db, err := getTestDatabase()
+		if err != nil {
+			return nil, err
+		}
+		defaultOpts := []Option{
+			WithDatabase(db),
+			WithInvoker(NewAdvancedMockInvoker(context.Background())),
+		}
+		allOpts := append(defaultOpts, opts...)
+		return NewAIMemory(sessionID, allOpts...)
+	}
+
+	t.Run("embedding-check", func(t *testing.T) {
+		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithEmbeddingClient(rag.EmptyEmbedding{})))
+		require.NoError(t, err)
+		require.NotNil(t, m)
+		require.Equal(t, true, m.embeddingAvailable)
+		switch m.rag.Embedder.(type) {
+		case rag.EmptyEmbedding:
+		default:
+			t.Errorf("expected EmptyEmbedding type for embedder")
+		}
+	})
+
+	t.Run("embedding-check-ng", func(t *testing.T) {
+		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithModelName(utils.RandStringBytes(10)))) // use
+		require.NoError(t, err)
+		require.NotNil(t, m)
+		require.Equal(t, false, m.embeddingAvailable)
+		require.Nil(t, m.rag)
+	})
+
 }
 
 // TestAIMemoryTriage_AddRawText 测试原始文本处理
@@ -412,7 +447,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 		defer memory.Close()
 
 		// 创建测试实体
-		entities := []*memory_type.MemoryEntity{
+		entities := []*aicommon.MemoryEntity{
 			{
 				Id:                 "test-1",
 				Content:            "Go语言并发编程",
@@ -449,7 +484,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 		}
 		defer memory.Close()
 
-		worthSaving := memory.ShouldSaveMemoryEntities([]*memory_type.MemoryEntity{})
+		worthSaving := memory.ShouldSaveMemoryEntities([]*aicommon.MemoryEntity{})
 		if len(worthSaving) != 0 {
 			t.Errorf("expected 0 entities for empty input, got %d", len(worthSaving))
 		}
@@ -607,7 +642,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("SaveAndRetrieve", func(t *testing.T) {
 		// 创建测试实体
-		testEntity := &memory_type.MemoryEntity{
+		testEntity := &aicommon.MemoryEntity{
 			Id:                 "storage-save-retrieve-" + uuid.New().String(),
 			Content:            "测试存储操作的记忆实体",
 			Tags:               []string{"测试", "存储"},
@@ -640,7 +675,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("UpdateEntity", func(t *testing.T) {
 		// 创建并保存实体
-		testEntity := &memory_type.MemoryEntity{
+		testEntity := &aicommon.MemoryEntity{
 			Id:                 "storage-update-" + uuid.New().String(),
 			Content:            "原始记忆内容",
 			Tags:               []string{"测试", "存储"},
@@ -656,7 +691,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 		}
 
 		// 更新实体
-		updatedEntity := &memory_type.MemoryEntity{
+		updatedEntity := &aicommon.MemoryEntity{
 			Id:                 testEntity.Id,
 			Content:            "更新后的记忆内容",
 			Tags:               []string{"测试", "存储", "更新"},
@@ -687,7 +722,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("DeleteEntity", func(t *testing.T) {
 		// 创建并保存实体
-		testEntity := &memory_type.MemoryEntity{
+		testEntity := &aicommon.MemoryEntity{
 			Id:                 "storage-delete-" + uuid.New().String(),
 			Content:            "待删除的记忆实体",
 			Tags:               []string{"测试", "删除"},
@@ -717,7 +752,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 	t.Run("ListAllMemories", func(t *testing.T) {
 		// 添加多个实体
-		entities := []*memory_type.MemoryEntity{
+		entities := []*aicommon.MemoryEntity{
 			{
 				Id: "list-test-1-" + uuid.New().String(), Content: "第一个测试记忆",
 				Tags: []string{"测试"}, PotentialQuestions: []string{"测试1？"},
@@ -814,7 +849,7 @@ func TestAIMemoryTriage_HNSWOperations(t *testing.T) {
 		}
 
 		// 创建查询向量
-		queryEntity := &memory_type.MemoryEntity{
+		queryEntity := &aicommon.MemoryEntity{
 			C_Score: 0.7, O_Score: 0.8, R_Score: 0.6, E_Score: 0.5,
 			P_Score: 0.7, A_Score: 0.6, T_Score: 0.8,
 		}
@@ -944,7 +979,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 		}
 
 		// 测试保存无效向量的实体
-		invalidEntity := &memory_type.MemoryEntity{
+		invalidEntity := &aicommon.MemoryEntity{
 			Id:             "invalid-entity",
 			Content:        "测试无效实体",
 			CorePactVector: []float32{0.1, 0.2}, // 错误的维度
@@ -974,7 +1009,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 		}
 
 		// 尝试更新不存在的实体
-		nonExistentEntity := &memory_type.MemoryEntity{
+		nonExistentEntity := &aicommon.MemoryEntity{
 			Id:             "non-existent-update",
 			Content:        "不存在的实体",
 			CorePactVector: []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7},

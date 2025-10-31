@@ -3,7 +3,7 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sort"
 	"strings"
 
@@ -11,21 +11,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (t *AIMemoryTriage) SearchMemory(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (t *AIMemoryTriage) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	return t.searchMemoryWithAIOption(origin, bytesLimit, false)
 }
 
-func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	return t.searchMemoryWithAIOption(origin, bytesLimit, true)
 }
 
 // SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
-func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*memory_type.SearchMemoryResult, error) {
+func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
 	// 转换输入为字符串
 	queryText := utils.InterfaceToString(origin)
 	if strings.TrimSpace(queryText) == "" {
-		return &memory_type.SearchMemoryResult{
-			Memories:      []*memory_type.MemoryEntity{},
+		return &aicommon.SearchMemoryResult{
+			Memories:      []*aicommon.MemoryEntity{},
 			TotalContent:  "",
 			ContentBytes:  0,
 			SearchSummary: "empty query provided",
@@ -35,7 +35,7 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 	log.Infof("searching memories for query: %s (bytes limit: %d)",
 		utils.ShrinkString(queryText, 100), bytesLimit)
 
-	var allMemories []*memory_type.MemoryEntity
+	var allMemories []*aicommon.MemoryEntity
 	var searchSteps []string
 
 	// 1. 使用 SelectTags 获取相关标签
@@ -91,7 +91,7 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 
 	log.Infof("memory search completed: %d memories, %d bytes content", len(selectedMemories), contentBytes)
 
-	return &memory_type.SearchMemoryResult{
+	return &aicommon.SearchMemoryResult{
 		Memories:      selectedMemories,
 		TotalContent:  totalContent,
 		ContentBytes:  contentBytes,
@@ -100,9 +100,9 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 }
 
 // deduplicateMemories 去重记忆列表
-func (t *AIMemoryTriage) deduplicateMemories(memories []*memory_type.MemoryEntity) []*memory_type.MemoryEntity {
+func (t *AIMemoryTriage) deduplicateMemories(memories []*aicommon.MemoryEntity) []*aicommon.MemoryEntity {
 	seen := make(map[string]bool)
-	var unique []*memory_type.MemoryEntity
+	var unique []*aicommon.MemoryEntity
 
 	for _, memory := range memories {
 		if memory != nil && !seen[memory.Id] {
@@ -116,12 +116,12 @@ func (t *AIMemoryTriage) deduplicateMemories(memories []*memory_type.MemoryEntit
 
 // rankMemoriesByRelevance 基于 C.O.R.E. P.A.C.T. 原则对记忆进行重排序
 // 现已集成改进的关键词系统
-func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*memory_type.MemoryEntity, query string) []*memory_type.MemoryEntity {
+func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*aicommon.MemoryEntity, query string) []*aicommon.MemoryEntity {
 	// 关键词匹配器在创建时已初始化
 
 	// 为每个记忆计算综合相关性分数
 	type ScoredMemory struct {
-		Memory         *memory_type.MemoryEntity
+		Memory         *aicommon.MemoryEntity
 		RelevanceScore float64
 	}
 
@@ -142,7 +142,7 @@ func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*memory_type.MemoryE
 	})
 
 	// 过滤低分记忆（相关性分数低于0.3的记忆）
-	var rankedMemories []*memory_type.MemoryEntity
+	var rankedMemories []*aicommon.MemoryEntity
 	for _, scored := range scoredMemories {
 		if scored.RelevanceScore >= 0.3 {
 			rankedMemories = append(rankedMemories, scored.Memory)
@@ -155,7 +155,7 @@ func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*memory_type.MemoryE
 
 // calculateRelevanceScore 基于 C.O.R.E. P.A.C.T. 原则计算记忆的相关性分数
 // 现已集成改进的关键词匹配系统
-func (t *AIMemoryTriage) calculateRelevanceScore(memory *memory_type.MemoryEntity, query string) float64 {
+func (t *AIMemoryTriage) calculateRelevanceScore(memory *aicommon.MemoryEntity, query string) float64 {
 	// 关键词匹配器在创建时已初始化，这里直接使用
 
 	// 权重设计基于搜索场景的重要性
@@ -195,7 +195,7 @@ func (t *AIMemoryTriage) calculateRelevanceScore(memory *memory_type.MemoryEntit
 }
 
 // calculateKeywordBonus 使用关键词系统计算匹配加成
-func (t *AIMemoryTriage) calculateKeywordBonus(memory *memory_type.MemoryEntity, query string) float64 {
+func (t *AIMemoryTriage) calculateKeywordBonus(memory *aicommon.MemoryEntity, query string) float64 {
 	if t.keywordMatcher == nil {
 		// 防御性编程：即使没有初始化，也返回0
 		return 0.0
@@ -244,12 +244,12 @@ func (t *AIMemoryTriage) calculateKeywordBonus(memory *memory_type.MemoryEntity,
 }
 
 // selectMemoriesByBytesLimit 根据字节限制选择记忆
-func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*memory_type.MemoryEntity, bytesLimit int) ([]*memory_type.MemoryEntity, string, int) {
+func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryEntity, bytesLimit int) ([]*aicommon.MemoryEntity, string, int) {
 	if bytesLimit <= 0 {
-		return []*memory_type.MemoryEntity{}, "", 0
+		return []*aicommon.MemoryEntity{}, "", 0
 	}
 
-	var selectedMemories []*memory_type.MemoryEntity
+	var selectedMemories []*aicommon.MemoryEntity
 	var contentParts []string
 	totalBytes := 0
 

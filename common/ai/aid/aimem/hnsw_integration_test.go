@@ -1,7 +1,7 @@
 package aimem
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 	"time"
 
@@ -21,7 +21,7 @@ func TestAIMemoryHNSWBackend_BasicOperations(t *testing.T) {
 	backend.autoSave = true
 
 	// 测试数据
-	entities := []*memory_type.MemoryEntity{
+	entities := []*aicommon.MemoryEntity{
 		{
 			Id:        uuid.New().String(),
 			CreatedAt: time.Now(),
@@ -268,7 +268,7 @@ func TestAIMemoryHNSWBackend_Persistence(t *testing.T) {
 		backend.autoSave = true
 
 		// 添加测试数据
-		entity := &memory_type.MemoryEntity{
+		entity := &aicommon.MemoryEntity{
 			Id:             uuid.New().String(),
 			CreatedAt:      time.Now(),
 			Content:        "持久化测试记忆",

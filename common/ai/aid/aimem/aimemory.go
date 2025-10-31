@@ -42,25 +42,8 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	var system *rag.RAGSystem
 	var embeddingAvailable bool
 	var err error
-
-	// 在 mock 模式下，总是认为 embedding 可用
-	if rag.IsMockMode {
-		log.Debugf("RAG mock mode detected, embedding considered available for session: %s", sessionId)
-		embeddingAvailable = true
-	} else {
-		//// 非 mock 模式下检查实际的 embedding 服务
-		//_, err = rag.GetLocalEmbeddingService()
-		//if err != nil {
-		//	log.Warnf("embedding service not available, RAG-based semantic search will be disabled: %v", err)
-		//	log.Warnf("all semantic searches and RAG queries will return empty results for session: %s", sessionId)
-		//	embeddingAvailable = false
-		//} else {
-		//	embeddingAvailable = true
-		//}
-	}
-
-	// 尝试加载现有collection，如果不存在则创建新的
-	// 只有在 embedding 可用时才真正初始化 RAG
+	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragOpts...)
+	//  检查是否有默认的嵌入模型可用
 	if embeddingAvailable {
 		system, err = rag.LoadCollection(db, name, ragOpts...)
 		if err != nil {

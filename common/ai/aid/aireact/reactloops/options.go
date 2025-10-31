@@ -2,7 +2,6 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -249,7 +248,7 @@ func WithMemoryTriage(triage aicommon.MemoryTriage) ReActLoopOption {
 	}
 }
 
-func WithMemoryPool(pool *omap.OrderedMap[string, *memory_type.MemoryEntity]) ReActLoopOption {
+func WithMemoryPool(pool *omap.OrderedMap[string, *aicommon.MemoryEntity]) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if utils.IsNil(pool) {
 			return
