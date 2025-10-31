@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -105,4 +106,12 @@ func (p ProxyAICaller) CallAI(request *AIRequest) (*AIResponse, error) {
 		return p.callFunc(request)
 	}
 	return nil, utils.Error("proxy function returned nil request")
+}
+
+func LoadAIService(typeName string, opts ...aispec.AIConfigOption) (AICallbackType, error) {
+	chatter, err := ai.LoadChater(typeName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return AIChatToAICallbackType(chatter), nil
 }
