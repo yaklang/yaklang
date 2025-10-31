@@ -168,7 +168,11 @@ run_test() {
       
       # 在子shell中，exit会退出子shell而不是整个脚本
       cd "$pkg_dir" && "$bin" "${args[@]}"
-    ) 2>&1 | tee "$log" >&3
+    ) 2>&1 | tee "$log" | {
+      # 过滤输出：优先显示失败/panic信息，如果没有则显示关键的运行信息
+      grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || \
+      grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" "$log"
+    } >&3
     
     local code=${PIPESTATUS[0]}
     exec 3>&-  # 关闭文件描述符
