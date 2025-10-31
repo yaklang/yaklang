@@ -1,12 +1,8 @@
-package rag
+package vectorstore
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -101,7 +97,7 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 			return utils.Errorf("failed to get mock rag data for test: %v", err)
 		}
 		log.Infof("successfully initialized RAG system with mock embedding service")
-		c.EmbeddingClient = vectorstore.NewMockEmbedder(mockRagDataForTest)
+		c.EmbeddingClient = NewMockEmbedder(mockRagDataForTest)
 	} else if c.EmbeddingClient == nil {
 		localEmbedder, err := GetLocalEmbeddingService()
 		if err != nil {
@@ -206,58 +202,7 @@ func CollectionIsExists(db *gorm.DB, name string) bool {
 	return col != nil && err == nil
 }
 
-// CreateCollection 创建RAG集合
-func CreateCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
-	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	// 创建RAG配置
-	// 检查集合是否存在
-	if CollectionIsExists(db, name) {
-		return nil, utils.Errorf("集合 %s 已存在", name)
-	}
-
-	store, err := vectorstore.NewSQLiteVectorStoreHNSWEx(db, name, description, opts...)
-	if err != nil {
-		return nil, utils.Errorf("创建SQLite向量存储失败: %v", err)
-	}
-	ragSystem := NewRAGSystemWithName(name, store.GetEmbedder(), store)
-	if err != nil {
-		return nil, utils.Errorf("创建集合失败: %v", err)
-	}
-	ragSystem.addDocuments(vectorstore.Document{
-		ID:      vectorstore.DocumentTypeCollectionInfo,
-		Content: fmt.Sprintf("collection_name: %s\ncollection_description: %s", name, description),
-		Metadata: map[string]any{
-			"collection_name": name,
-			"collection_id":   store.GetCollectionInfo().ID,
-		},
-		Embedding: nil,
-	})
-	return ragSystem, nil
-}
-
 var IsMockMode = false
-
-func LoadCollection(db *gorm.DB, name string, opts ...any) (*RAGSystem, error) {
-	log.Infof("start to load sqlite vector store for collection %#v", name)
-	store, err := vectorstore.LoadSQLiteVectorStoreHNSW(db, name, opts...)
-	if err != nil {
-		return nil, utils.Wrap(err, fmt.Sprintf("load SQLite vector storage for collection %#v", name))
-	}
-	log.Infof("start to create RAG system for collection %#v", name)
-
-	return NewRAGSystemWithName(name, store.GetEmbedder(), store), nil
-}
-
-// CreateOrLoadCollection 创建或加载知识库
-func CreateOrLoadCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
-	if CollectionIsExists(db, name) {
-		log.Infof("using default local embedding service for collection '%s'", name)
-		return LoadCollection(db, name, opts...)
-	} else {
-		log.Infof("collection '%s' does not exist, creating it", name)
-		return CreateCollection(db, name, description, opts...)
-	}
-}
 
 // DeleteCollection 删除知识库
 func DeleteCollection(db *gorm.DB, name string) error {
@@ -317,101 +262,10 @@ func GetCollectionInfo(db *gorm.DB, name string) (*CollectionInfo, error) {
 	}, nil
 }
 
-// AddDocument 添加文档
-func AddDocument(db *gorm.DB, knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
-	ragSystem, err := LoadCollection(db, knowledgeBaseName, opts...)
-	if err != nil {
-		return utils.Errorf("加载知识库失败: %v", err)
-	}
-	return ragSystem.addDocuments(vectorstore.Document{
-		ID:        documentName,
-		Content:   document,
-		Metadata:  metadata,
-		Embedding: nil,
-	})
-}
-
-// DeleteDocument 删除文档
-func DeleteDocument(db *gorm.DB, knowledgeBaseName, documentName string, opts ...any) error {
-	ragSystem, err := LoadCollection(db, knowledgeBaseName, opts...)
-	if err != nil {
-		return utils.Errorf("加载知识库失败: %v", err)
-	}
-	return ragSystem.DeleteDocuments(documentName)
-}
-
-// QueryDocuments 查询文档
-func QueryDocuments(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...any) ([]vectorstore.SearchResult, error) {
-	ragSystem, err := LoadCollection(db, knowledgeBaseName, opts...)
-	if err != nil {
-		return nil, utils.Errorf("加载知识库失败: %v", err)
-	}
-	return ragSystem.QueryWithPage(query, 1, limit)
-}
-
-// QueryDocumentsWithAISummary 查询文档并生成摘要
-func QueryDocumentsWithAISummary(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
-	// TODO: 实现查询文档并生成摘要
-	return "", nil
-}
-
-func NewRagDatabase(path string) (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", path)
-	if err != nil {
-		return db, err
-	}
-	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-
-	return db, nil
-}
-
-// Get 获取或创建 RAG 集合
-// 如果集合不存在，会自动创建一个新的集合
-// Example:
-// ```
-//
-//	ragSystem = rag.GetCollection("my_collection")~
-//	ragSystem = rag.GetCollection("my_collection", rag.ragForceNew(true))~
-//
-// ```
-func Get(name string, i ...any) (*RAGSystem, error) {
-	log.Infof("getting RAG collection '%s' with local embedding service", name)
-
-	var newOptions []any
-	for _, option := range i {
-		if ragOption, ok := option.(RAGExportOptionFunc); ok {
-			cfg := &RAGExportConfig{}
-			ragOption(cfg)
-			if cfg.DB != nil {
-				newOptions = append(newOptions, WithDB(cfg.DB))
-			}
-		} else {
-			newOptions = append(newOptions, option)
-		}
-	}
-	i = newOptions
-
-	config := NewCollectionConfig(i...)
-	if config.ForceNew {
-		log.Infof("force creating new RAG collection for name: %s", name)
-		return CreateCollection(config.DB, name, config.Description, i...)
-	}
-
-	// load existed first
-	log.Infof("attempting to load existing RAG collection '%s'", name)
-	ragSystem, err := LoadCollection(config.DB, name, i...)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Errorf("failed to load existing RAG collection '%s': %v, creating new one", name, err)
-		return CreateCollection(config.DB, name, config.Description, i...)
-	} else {
-		return ragSystem, err
-	}
-}
-
-type DocumentOption func(document *vectorstore.Document)
+type DocumentOption func(document *Document)
 
 func WithDocumentMetadataKeyValue(key string, value any) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		if utils.IsNil(document.Metadata) {
 			document.Metadata = make(map[string]any)
 		}
@@ -420,7 +274,7 @@ func WithDocumentMetadataKeyValue(key string, value any) DocumentOption {
 }
 
 func WithDocumentRawMetadata(i map[string]any) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		document.Metadata = i
 		if utils.IsNil(document.Metadata) {
 			document.Metadata = make(map[string]any)
@@ -429,25 +283,25 @@ func WithDocumentRawMetadata(i map[string]any) DocumentOption {
 }
 
 func WithDocumentType(i schema.RAGDocumentType) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		document.Type = i
 	}
 }
 
 func WithDocumentEntityID(entityUUID string) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		document.EntityUUID = entityUUID
 	}
 }
 
 func WithDocumentRelatedEntities(uuids ...string) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		document.RelatedEntities = uuids
 	}
 }
 
 func WithDocumentRuntimeID(runtimeID string) DocumentOption {
-	return func(document *vectorstore.Document) {
+	return func(document *Document) {
 		document.RuntimeID = runtimeID
 	}
 }

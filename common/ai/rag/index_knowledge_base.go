@@ -2,6 +2,7 @@ package rag
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -48,7 +49,7 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, i
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 添加文档到RAG系统
-	doc := Document{
+	doc := vectorstore.Document{
 		ID:       documentID,
 		Content:  content,
 		Metadata: metadata,
@@ -136,7 +137,7 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGS
 			documentID := utils.InterfaceToString(entry.ID)
 
 			// 添加文档到RAG系统
-			doc := Document{
+			doc := vectorstore.Document{
 				ID:       documentID,
 				Content:  content,
 				Metadata: metadata,
