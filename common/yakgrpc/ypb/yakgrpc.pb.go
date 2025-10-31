@@ -29850,6 +29850,7 @@ type QueryRisksRequest struct {
 	Title           string                 `protobuf:"bytes,13,opt,name=Title,proto3" json:"Title,omitempty"`
 	Ids             []int64                `protobuf:"varint,14,rep,packed,name=Ids,proto3" json:"Ids,omitempty"`
 	RuntimeId       string                 `protobuf:"bytes,15,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
+	RuntimeIds      []string               `protobuf:"bytes,19,rep,name=RuntimeIds,proto3" json:"RuntimeIds,omitempty"`
 	// ssa program
 	SSAProgramNames []string `protobuf:"bytes,16,rep,name=SSAProgramNames,proto3" json:"SSAProgramNames,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -30003,6 +30004,13 @@ func (x *QueryRisksRequest) GetRuntimeId() string {
 		return x.RuntimeId
 	}
 	return ""
+}
+
+func (x *QueryRisksRequest) GetRuntimeIds() []string {
+	if x != nil {
+		return x.RuntimeIds
+	}
+	return nil
 }
 
 func (x *QueryRisksRequest) GetSSAProgramNames() []string {
@@ -31273,13 +31281,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -40828,8 +40836,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -65388,7 +65396,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bResultID\x18\x1e \x01(\x04R\bResultID\x12.\n" +
 	"\x12SyntaxFlowVariable\x18\x1f \x01(\tR\x12SyntaxFlowVariable\x12 \n" +
 	"\vProgramName\x18  \x01(\tR\vProgramName\x12 \n" +
-	"\vIsPotential\x18! \x01(\bR\vIsPotential\"\xa0\x04\n" +
+	"\vIsPotential\x18! \x01(\bR\vIsPotential\"\xc0\x04\n" +
 	"\x11QueryRisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -65409,7 +65417,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsRead\x18\f \x01(\tR\x06IsRead\x12\x14\n" +
 	"\x05Title\x18\r \x01(\tR\x05Title\x12\x10\n" +
 	"\x03Ids\x18\x0e \x03(\x03R\x03Ids\x12\x1c\n" +
-	"\tRuntimeId\x18\x0f \x01(\tR\tRuntimeId\x12(\n" +
+	"\tRuntimeId\x18\x0f \x01(\tR\tRuntimeId\x12\x1e\n" +
+	"\n" +
+	"RuntimeIds\x18\x13 \x03(\tR\n" +
+	"RuntimeIds\x12(\n" +
 	"\x0fSSAProgramNames\x18\x10 \x03(\tR\x0fSSAProgramNames\"v\n" +
 	"\x12QueryRisksResponse\x12+\n" +
 	"\n" +

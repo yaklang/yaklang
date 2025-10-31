@@ -221,3 +221,37 @@ func TestQueryRisks(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(randInt), res.Total)
 }
+
+func TestQueryRisksWithRuntimeIds(t *testing.T) {
+	testRuntimeId := uuid.New().String()
+	testRuntimeId2 := uuid.New().String()
+	randInt := rand.Intn(10) + 1
+	for i := 0; i < randInt; i++ {
+		err := yakit.SaveRisk(&schema.Risk{
+			RuntimeId: testRuntimeId,
+		})
+		require.NoError(t, err)
+	}
+
+	for i := 0; i < randInt; i++ {
+		err := yakit.SaveRisk(&schema.Risk{
+			RuntimeId: testRuntimeId2,
+		})
+		require.NoError(t, err)
+	}
+	defer func() {
+		yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+			RuntimeId: testRuntimeId,
+		})
+		yakit.DeleteRisk(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{
+			RuntimeId: testRuntimeId2,
+		})
+	}()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	res, err := client.QueryRisks(context.Background(), &ypb.QueryRisksRequest{
+		RuntimeIds: []string{testRuntimeId, testRuntimeId2},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(randInt)*2, res.Total)
+}
