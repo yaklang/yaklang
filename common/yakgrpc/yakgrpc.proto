@@ -1171,8 +1171,6 @@ message RelationshipFilter {
   repeated string UUIDS = 11;
 
   repeated string RuntimeID = 12;
-
-  repeated string RuntimeIDs = 13;
 }
 
 message QueryRelationshipRequest {
