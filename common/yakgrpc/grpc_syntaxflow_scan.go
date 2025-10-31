@@ -82,7 +82,24 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		}),
 		syntaxflow_scan.WithProcessCallback(func(tid, s string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 			// update rule info
-			sendExecResult(tid, s, yaklib.NewYakitLogExecResult("code", info)) // 发送 rules info
+			activeTasks := make([]*ypb.SyntaxFlowScanActiveTask, 0, len(info.Rules))
+			for _, rule := range info.Rules {
+				item := &ypb.SyntaxFlowScanActiveTask{
+					RuleName:    rule.RuleName,
+					ProgramName: rule.ProgramName,
+					Progress:    rule.Progress,
+					UpdateTime:  rule.UpdateTime,
+					Info:        rule.Info,
+				}
+				activeTasks = append(activeTasks, item)
+			}
+			safeStream.Send(&ypb.SyntaxFlowScanResponse{
+				TaskID:     tid,
+				Status:     s,
+				ActiveTask: activeTasks,
+			})
+
+			// sendExecResult(tid, s, yaklib.NewYakitLogExecResult("code", info)) // 发送 rules info
 
 			// update progress
 			sendExecResult(tid, s, yaklib.NewYakitProgressExecResult("main", progress))
