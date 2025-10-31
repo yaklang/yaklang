@@ -532,15 +532,14 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 
 	var field1Chars []byte
 	var field2Chars []byte
-	var field1Times []time.Time
-	var field2Times []time.Time
+	startOrder := make(chan string, 2)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	wg.Add(2)
 
 	err := ExtractStructuredJSON(jsonData,
-		WithRegisterFieldStreamHandler("field1", func(key string, reader io.Reader, parents []string) {
+		WithRegisterFieldStreamHandlerAndStartCallback("field1", func(key string, reader io.Reader, parents []string) {
 			defer wg.Done()
 			buffer := make([]byte, 1)
 			for {
@@ -548,7 +547,6 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				if n > 0 {
 					mu.Lock()
 					field1Chars = append(field1Chars, buffer[0])
-					field1Times = append(field1Times, time.Now())
 					mu.Unlock()
 				}
 				if readErr == io.EOF {
@@ -556,8 +554,13 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				}
 				require.NoError(t, readErr)
 			}
-		}),
-		WithRegisterFieldStreamHandler("field2", func(key string, reader io.Reader, parents []string) {
+		},
+			func(key string, parents []string) {
+				// startCallback：在 goroutine 启动前同步调用，保证顺序
+				startOrder <- key
+			},
+		),
+		WithRegisterFieldStreamHandlerAndStartCallback("field2", func(key string, reader io.Reader, parents []string) {
 			defer wg.Done()
 			buffer := make([]byte, 1)
 			for {
@@ -565,7 +568,6 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				if n > 0 {
 					mu.Lock()
 					field2Chars = append(field2Chars, buffer[0])
-					field2Times = append(field2Times, time.Now())
 					mu.Unlock()
 				}
 				if readErr == io.EOF {
@@ -573,8 +575,12 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				}
 				require.NoError(t, readErr)
 			}
+		}, func(key string, parents []string) {
+			// startCallback：在 goroutine 启动前同步调用，保证顺序
+			startOrder <- key
 		}),
 	)
+	close(startOrder)
 
 	require.NoError(t, err)
 
@@ -599,11 +605,17 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 	assert.Equal(t, `"ABCDEFGHIJKLMNOP"`, string(field1Chars))
 	assert.Equal(t, `"1234567890"`, string(field2Chars))
 
-	// 验证field1在field2之前开始（因为在JSON中field1出现在前面）
-	if len(field1Times) > 0 && len(field2Times) > 0 {
-		assert.True(t, field1Times[0].Before(field2Times[0]) || field1Times[0].Equal(field2Times[0]),
-			"Field1 should start before or at the same time as field2")
+	// 验证启动顺序（通过 startCallback 记录，保证可靠）
+	var order []string
+	for field := range startOrder {
+		order = append(order, field)
 	}
+
+	require.Len(t, order, 2, "Should have recorded 2 field stream starts")
+	assert.Equal(t, "field1", order[0],
+		"field1 should start first (appears first in JSON)")
+	assert.Equal(t, "field2", order[1],
+		"field2 should start second (appears second in JSON)")
 }
 
 // === 边界情况和错误处理测试 ===
