@@ -537,11 +537,13 @@ func IsMac() bool {
 }
 
 func IsHttpOrHttpsUrl(raw string) bool {
-	return strings.HasPrefix(strings.TrimSpace(raw), "http://") || strings.HasPrefix(strings.TrimSpace(raw), "https://")
+	trimmed := strings.TrimSpace(raw)
+	return strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://")
 }
 
 func IsWebsocketUrl(raw string) bool {
-	return strings.HasPrefix(strings.TrimSpace(raw), "ws://") || strings.HasPrefix(strings.TrimSpace(raw), "wss://")
+	trimmed := strings.TrimSpace(raw)
+	return strings.HasPrefix(trimmed, "ws://") || strings.HasPrefix(trimmed, "wss://")
 }
 
 func IsJSON(raw string) (string, bool) {

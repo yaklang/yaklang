@@ -1,7 +1,5 @@
 package utils
 
-import "strings"
-
 // lower returns the ASCII lowercase version of b.
 func lower(b byte) byte {
 	if 'A' <= b && b <= 'Z' {
