@@ -47,6 +47,10 @@ var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return
 			}
 
+			if loop.GetInt("modify_attempts") >= 3 {
+				op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+			}
+
 			invoker := loop.GetInvoker()
 
 			fullCode := loop.Get("full_code")
