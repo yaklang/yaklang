@@ -659,21 +659,7 @@ func ReadHTTPPacketBodySize(raw []byte) (cl int, chunked bool) {
 	return 0, chunked
 }
 
-func IsPrint(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] < ' ' || s[i] > '~' {
-			return false
-		}
-	}
-	return true
-}
 
-func ToLower(s string) (lower string, ok bool) {
-	if !IsPrint(s) {
-		return "", false
-	}
-	return strings.ToLower(s), true
-}
 
 func FixRequestHostAndPort(r *http.Request) {
 	var host string
