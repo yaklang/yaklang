@@ -2,7 +2,6 @@ package reactloops
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -62,7 +61,7 @@ type ReActLoop struct {
 
 	// memory management
 	memorySizeLimit int
-	currentMemories *omap.OrderedMap[string, *memory_type.MemoryEntity]
+	currentMemories *omap.OrderedMap[string, *aicommon.MemoryEntity]
 	memoryTriage    aicommon.MemoryTriage
 
 	// task status control
@@ -179,7 +178,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		aiTagFields:     omap.NewEmptyOrderedMap[string, *LoopAITagField](),
 		vars:            omap.NewEmptyOrderedMap[string, any](),
 		taskMutex:       new(sync.Mutex),
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 10 * 1024,
 	}
 

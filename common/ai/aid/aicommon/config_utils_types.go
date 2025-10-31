@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -12,23 +11,23 @@ type MemoryTriage interface {
 	SetInvoker(invoker AIInvokeRuntime)
 
 	// AddRawText 添加原始文本，返回提取的记忆实体
-	AddRawText(text string) ([]*memory_type.MemoryEntity, error)
+	AddRawText(text string) ([]*MemoryEntity, error)
 
 	// SaveMemoryEntities 保存记忆条目到数据库
-	SaveMemoryEntities(entities ...*memory_type.MemoryEntity) error
+	SaveMemoryEntities(entities ...*MemoryEntity) error
 
-	SearchBySemantics(query string, limit int) ([]*memory_type.SearchResult, error)
+	SearchBySemantics(query string, limit int) ([]*SearchResult, error)
 
-	SearchByTags(tags []string, matchAll bool, limit int) ([]*memory_type.MemoryEntity, error)
+	SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error)
 
 	// HandleMemory 智能处理输入内容，自动构造记忆、去重并保存
 	HandleMemory(i any) error
 
 	// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
-	SearchMemory(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error)
+	SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error)
 
 	// SearchMemoryWithoutAI 不使用AI的关键词搜索，直接基于关键词匹配
-	SearchMemoryWithoutAI(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error)
+	SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error)
 
 	Close() error
 }

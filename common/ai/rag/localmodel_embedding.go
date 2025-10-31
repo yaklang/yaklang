@@ -95,6 +95,26 @@ func GetLocalEmbeddingService() (*LocalModelEmbedding, error) {
 	return embeddingServiceInstance, nil
 }
 
+func CheckConfigEmbeddingAvailable(opts ...any) bool {
+	config := &CollectionConfig{}
+
+	for _, opt := range opts {
+		switch opt := opt.(type) {
+		case RAGOption:
+			opt(config)
+		}
+	}
+	if config.EmbeddingClient != nil {
+		return true
+	}
+	modelName := "Qwen3-Embedding-0.6B-Q4_K_M"
+	if config.ModelName != "" {
+		modelName = config.ModelName
+	}
+	_, err := localmodel.GetModelPath(modelName)
+	return err == nil
+}
+
 // startEmbeddingServiceInternal 内部启动嵌入服务的函数
 func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 	address := "127.0.0.1:11435"

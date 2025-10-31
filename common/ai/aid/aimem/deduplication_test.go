@@ -2,8 +2,8 @@ package aimem
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"testing"
 	"time"
 
@@ -26,7 +26,7 @@ func TestShouldSaveMemoryEntities_BatchDeduplication(t *testing.T) {
 	defer memory.Close()
 
 	// 创建测试记忆实体（不再使用分数过滤，测试批量去重）
-	entities := []*memory_type.MemoryEntity{
+	entities := []*aicommon.MemoryEntity{
 		{
 			Id:                 "memory-1",
 			CreatedAt:          time.Now(),
@@ -114,7 +114,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 	defer memory.Close()
 
 	// 先保存一个记忆实体到数据库
-	existingEntity := &memory_type.MemoryEntity{
+	existingEntity := &aicommon.MemoryEntity{
 		Id:                 "existing-memory-" + uuid.New().String(),
 		Content:            "现有的Go语言记忆",
 		Tags:               []string{"编程", "Go语言", "后端"},
@@ -137,7 +137,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 
 	// 测试批量标签重叠检查
 	config := DefaultDeduplicationConfig()
-	testEntities := []*memory_type.MemoryEntity{
+	testEntities := []*aicommon.MemoryEntity{
 		{
 			Id:                 "high-overlap-memory-" + uuid.New().String(),
 			Content:            "另一个Go语言记忆",

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -90,7 +89,7 @@ type ReAct struct {
 	wg             *sync.WaitGroup
 	timelineDiffer *aicommon.TimelineDiffer
 	memoryTriage   aicommon.MemoryTriage
-	memoryPool     *omap.OrderedMap[string, *memory_type.MemoryEntity]
+	memoryPool     *omap.OrderedMap[string, *aicommon.MemoryEntity]
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -200,7 +199,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
-		memoryPool:           omap.NewOrderedMap(make(map[string]*memory_type.MemoryEntity)),
+		memoryPool:           omap.NewOrderedMap(make(map[string]*aicommon.MemoryEntity)),
 	}
 
 	if cfg.MemoryTriage != nil {
@@ -211,6 +210,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if err != nil {
 			return nil, utils.Errorf("create memory triage failed: %v", err)
 		}
+		react.config.MemoryTriage = react.memoryTriage
 	}
 
 	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)

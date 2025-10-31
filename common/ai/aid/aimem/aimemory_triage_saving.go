@@ -3,7 +3,7 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -30,7 +30,7 @@ func DefaultDeduplicationConfig() *DeduplicationConfig {
 }
 
 // ShouldSaveMemoryEntities 判断哪些记忆实体值得保存（去重后）
-func (t *AIMemoryTriage) ShouldSaveMemoryEntities(entities []*memory_type.MemoryEntity) []*memory_type.MemoryEntity {
+func (t *AIMemoryTriage) ShouldSaveMemoryEntities(entities []*aicommon.MemoryEntity) []*aicommon.MemoryEntity {
 	if len(entities) <= 0 {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (t *AIMemoryTriage) ShouldSaveMemoryEntities(entities []*memory_type.Memory
 	if err != nil {
 		log.Errorf("AI batch repetition check failed: %v", err)
 		// AI检查失败时，使用无AI版本的结果
-		var result []*memory_type.MemoryEntity
+		var result []*aicommon.MemoryEntity
 		for _, idx := range nonRepeatedIndices {
 			if idx >= 0 && idx < len(entities) {
 				result = append(result, entities[idx])
@@ -67,7 +67,7 @@ func (t *AIMemoryTriage) ShouldSaveMemoryEntities(entities []*memory_type.Memory
 	}
 
 	// 根据AI返回的索引构建最终结果
-	var worthSaving []*memory_type.MemoryEntity
+	var worthSaving []*aicommon.MemoryEntity
 	for _, idx := range finalIndices {
 		if idx >= 0 && idx < len(entities) {
 			worthSaving = append(worthSaving, entities[idx])
@@ -80,7 +80,7 @@ func (t *AIMemoryTriage) ShouldSaveMemoryEntities(entities []*memory_type.Memory
 }
 
 // BatchIsRepeatedMemoryEntities 批量无AI版本的重复检查
-func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntities(entities []*memory_type.MemoryEntity, config *DeduplicationConfig) ([]int, error) {
+func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntities(entities []*aicommon.MemoryEntity, config *DeduplicationConfig) ([]int, error) {
 	if len(entities) == 0 {
 		return []int{}, nil
 	}
@@ -136,7 +136,7 @@ func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntities(entities []*memory_type.M
 }
 
 // BatchIsRepeatedMemoryEntitiesByAI AI版本的批量重复检查
-func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, entities []*memory_type.MemoryEntity, candidateIndices []int, config *DeduplicationConfig) ([]int, error) {
+func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, entities []*aicommon.MemoryEntity, candidateIndices []int, config *DeduplicationConfig) ([]int, error) {
 	if len(candidateIndices) == 0 {
 		return []int{}, nil
 	}
@@ -181,7 +181,7 @@ func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, 
 }
 
 // checkTagRepetition 检查标签重复
-func (t *AIMemoryTriage) checkTagRepetition(entity *memory_type.MemoryEntity, threshold float64) (bool, error) {
+func (t *AIMemoryTriage) checkTagRepetition(entity *aicommon.MemoryEntity, threshold float64) (bool, error) {
 	if len(entity.Tags) == 0 {
 		return false, nil
 	}
@@ -241,7 +241,7 @@ func (t *AIMemoryTriage) checkTagRepetition(entity *memory_type.MemoryEntity, th
 }
 
 // checkQuestionRepetition 检查问题重复
-func (t *AIMemoryTriage) checkQuestionRepetition(entity *memory_type.MemoryEntity, threshold float64) (bool, error) {
+func (t *AIMemoryTriage) checkQuestionRepetition(entity *aicommon.MemoryEntity, threshold float64) (bool, error) {
 	if len(entity.PotentialQuestions) == 0 {
 		return false, nil
 	}
@@ -279,7 +279,7 @@ func (t *AIMemoryTriage) checkQuestionRepetition(entity *memory_type.MemoryEntit
 }
 
 // checkContentRepetition 检查内容重复
-func (t *AIMemoryTriage) checkContentRepetition(entity *memory_type.MemoryEntity, threshold float64) (bool, error) {
+func (t *AIMemoryTriage) checkContentRepetition(entity *aicommon.MemoryEntity, threshold float64) (bool, error) {
 	if strings.TrimSpace(entity.Content) == "" {
 		return false, nil
 	}
@@ -309,8 +309,8 @@ func (t *AIMemoryTriage) checkContentRepetition(entity *memory_type.MemoryEntity
 }
 
 // findSimilarMemories 查找相似的记忆实体
-func (t *AIMemoryTriage) findSimilarMemories(entity *memory_type.MemoryEntity, limit int) ([]*memory_type.MemoryEntity, error) {
-	var similarMemories []*memory_type.MemoryEntity
+func (t *AIMemoryTriage) findSimilarMemories(entity *aicommon.MemoryEntity, limit int) ([]*aicommon.MemoryEntity, error) {
+	var similarMemories []*aicommon.MemoryEntity
 
 	// 1. 基于标签查找相似记忆
 	if len(entity.Tags) > 0 {
@@ -330,7 +330,7 @@ func (t *AIMemoryTriage) findSimilarMemories(entity *memory_type.MemoryEntity, l
 
 	// 去重并限制数量
 	seen := make(map[string]bool)
-	var uniqueSimilar []*memory_type.MemoryEntity
+	var uniqueSimilar []*aicommon.MemoryEntity
 	for _, mem := range similarMemories {
 		if !seen[mem.Id] && mem.Id != entity.Id {
 			seen[mem.Id] = true
@@ -345,7 +345,7 @@ func (t *AIMemoryTriage) findSimilarMemories(entity *memory_type.MemoryEntity, l
 }
 
 // findSimilarByTags 基于标签查找相似记忆
-func (t *AIMemoryTriage) findSimilarByTags(entity *memory_type.MemoryEntity, limit int) ([]*memory_type.MemoryEntity, error) {
+func (t *AIMemoryTriage) findSimilarByTags(entity *aicommon.MemoryEntity, limit int) ([]*aicommon.MemoryEntity, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -358,7 +358,7 @@ func (t *AIMemoryTriage) findSimilarByTags(entity *memory_type.MemoryEntity, lim
 		return nil, utils.Errorf("failed to query existing entities: %v", err)
 	}
 
-	var similar []*memory_type.MemoryEntity
+	var similar []*aicommon.MemoryEntity
 	entityTagSet := make(map[string]bool)
 	for _, tag := range entity.Tags {
 		entityTagSet[strings.ToLower(tag)] = true
@@ -379,7 +379,7 @@ func (t *AIMemoryTriage) findSimilarByTags(entity *memory_type.MemoryEntity, lim
 		}
 
 		if intersection > 0 {
-			memEntity := &memory_type.MemoryEntity{
+			memEntity := &aicommon.MemoryEntity{
 				Id:                 existing.MemoryID,
 				Content:            existing.Content,
 				Tags:               existingTags,
@@ -403,14 +403,14 @@ func (t *AIMemoryTriage) findSimilarByTags(entity *memory_type.MemoryEntity, lim
 }
 
 // findSimilarByContent 基于内容查找相似记忆
-func (t *AIMemoryTriage) findSimilarByContent(entity *memory_type.MemoryEntity, limit int) ([]*memory_type.MemoryEntity, error) {
+func (t *AIMemoryTriage) findSimilarByContent(entity *aicommon.MemoryEntity, limit int) ([]*aicommon.MemoryEntity, error) {
 	// 使用RAG搜索相似内容
 	results, err := t.rag.QueryTopN(entity.Content, limit)
 	if err != nil {
 		return nil, utils.Errorf("RAG search failed: %v", err)
 	}
 
-	var similar []*memory_type.MemoryEntity
+	var similar []*aicommon.MemoryEntity
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
@@ -434,7 +434,7 @@ func (t *AIMemoryTriage) findSimilarByContent(entity *memory_type.MemoryEntity, 
 			continue // 记忆不存在，跳过
 		}
 
-		memEntity := &memory_type.MemoryEntity{
+		memEntity := &aicommon.MemoryEntity{
 			Id:                 existing.MemoryID,
 			Content:            existing.Content,
 			Tags:               []string(existing.Tags),
@@ -454,8 +454,8 @@ func (t *AIMemoryTriage) findSimilarByContent(entity *memory_type.MemoryEntity, 
 }
 
 // findSimilarMemoriesForBatch 为批量记忆查找相似记忆
-func (t *AIMemoryTriage) findSimilarMemoriesForBatch(entities []*memory_type.MemoryEntity, candidateIndices []int, limit int) ([]*memory_type.MemoryEntity, error) {
-	var allSimilarMemories []*memory_type.MemoryEntity
+func (t *AIMemoryTriage) findSimilarMemoriesForBatch(entities []*aicommon.MemoryEntity, candidateIndices []int, limit int) ([]*aicommon.MemoryEntity, error) {
+	var allSimilarMemories []*aicommon.MemoryEntity
 	seen := make(map[string]bool)
 
 	// 为每个候选记忆查找相似记忆
@@ -489,7 +489,7 @@ func (t *AIMemoryTriage) findSimilarMemoriesForBatch(entities []*memory_type.Mem
 }
 
 // buildBatchDeduplicationPrompt 构建批量去重判别的prompt
-func (t *AIMemoryTriage) buildBatchDeduplicationPrompt(entities []*memory_type.MemoryEntity, candidateIndices []int, similarMemories []*memory_type.MemoryEntity) (string, error) {
+func (t *AIMemoryTriage) buildBatchDeduplicationPrompt(entities []*aicommon.MemoryEntity, candidateIndices []int, similarMemories []*aicommon.MemoryEntity) (string, error) {
 	nonce := utils.RandStringBytes(4)
 
 	// 构建候选记忆列表

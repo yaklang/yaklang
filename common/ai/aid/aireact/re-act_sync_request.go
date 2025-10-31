@@ -3,7 +3,6 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -97,7 +96,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		}
 
 		// 收集 memoryPool 中的所有 MemoryEntity
-		var memoryInfos []*memory_type.MemoryEntity
+		var memoryInfos []*aicommon.MemoryEntity
 		var totalSize int
 		if r.memoryPool != nil {
 			for _, memoryEntity := range r.memoryPool.Values() {
