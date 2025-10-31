@@ -11,6 +11,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -281,7 +282,7 @@ type RAGQueryConfig struct {
 	CollectionNames      []string
 	CollectionScoreLimit float64
 	EnhancePlan          []string // 默认开启 HyDE 、 泛化查询 、拆分查询
-	Filter               func(key string, getDoc func() *Document) bool
+	Filter               func(key string, getDoc func() *vectorstore.Document) bool
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
 	OnSubQueryStart      func(method string, query string)
@@ -404,7 +405,7 @@ func WithRAGEnhance(enhancePlan ...string) RAGQueryOption {
 }
 
 // WithRAGFilter 设置文档过滤器
-func WithRAGFilter(filter func(key string, getDoc func() *Document) bool) RAGQueryOption {
+func WithRAGFilter(filter func(key string, getDoc func() *vectorstore.Document) bool) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.Filter = filter
 	}
@@ -508,7 +509,7 @@ type ScoredResult struct {
 	Index       int64
 	QueryMethod string
 	QueryOrigin string
-	Document    *Document
+	Document    *vectorstore.Document
 	Score       float64
 	Source      string
 }
@@ -582,7 +583,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendMidResult := func(idx int64, queryMethod string, query string, doc *Document, score float64, source string) {
+	sendMidResult := func(idx int64, queryMethod string, query string, doc *vectorstore.Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
 			Message:     fmt.Sprintf("[%s] 找到文档: %s", queryId, doc.ID),
 			Data:        doc,
@@ -628,7 +629,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendResult := func(idx int64, queryMethod string, query string, doc *Document, score float64, source string) {
+	sendResult := func(idx int64, queryMethod string, query string, doc *vectorstore.Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
 			Message:     fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
 			Data:        doc,
@@ -819,7 +820,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 		var nodesRecorder = make(map[string]struct{})
 
-		storeResults := func(source string, result SearchResult, query *subQuery) (int64, bool) {
+		storeResults := func(source string, result vectorstore.SearchResult, query *subQuery) (int64, bool) {
 			res := &ScoredResult{
 				QueryMethod: query.Method,
 				QueryOrigin: query.Query,
@@ -922,8 +923,8 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 							sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
 						}
 					} else {
-						searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit, func(key string, getDoc func() *Document) bool {
-							if key == DocumentTypeCollectionInfo {
+						searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit, func(key string, getDoc func() *vectorstore.Document) bool {
+							if key == vectorstore.DocumentTypeCollectionInfo {
 								return false
 							}
 
@@ -1031,7 +1032,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 }
 
 // SimpleQuery 简化的RAG查询接口，直接返回结果
-func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) ([]*SearchResult, error) {
+func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) ([]*vectorstore.SearchResult, error) {
 	// 添加限制选项
 	options := append(opts, WithRAGLimit(limit))
 
@@ -1040,11 +1041,11 @@ func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) (
 		return nil, err
 	}
 
-	var results []*SearchResult
+	var results []*vectorstore.SearchResult
 	for result := range resultCh {
 		if result.Type == RAGResultTypeResult && result.Data != nil {
-			if doc, ok := result.Data.(*Document); ok {
-				results = append(results, &SearchResult{
+			if doc, ok := result.Data.(*vectorstore.Document); ok {
+				results = append(results, &vectorstore.SearchResult{
 					Document: *doc,
 					Score:    result.Score,
 				})

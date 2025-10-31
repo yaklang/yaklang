@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -92,13 +93,13 @@ func TestMUSTPASS_ChunkText(t *testing.T) {
 // 测试内存向量存储
 func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := NewMockEmbedder(testEmbedder)
+	mockEmbed := vectorstore.NewMockEmbedder(testEmbedder)
 
 	// 创建内存向量存储
 	store := NewMemoryVectorStore(mockEmbed)
 
 	// 准备测试文档
-	docs := []Document{
+	docs := []vectorstore.Document{
 		{
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",
@@ -147,7 +148,7 @@ func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 // 测试RAG系统
 func TestMUSTPASS_RAGSystem(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := NewMockEmbedder(testEmbedder)
+	mockEmbed := vectorstore.NewMockEmbedder(testEmbedder)
 
 	// 创建内存向量存储
 	store := NewMemoryVectorStore(mockEmbed)
@@ -156,7 +157,7 @@ func TestMUSTPASS_RAGSystem(t *testing.T) {
 	ragSystem := NewRAGSystem(mockEmbed, store)
 
 	// 准备测试文档
-	docs := []Document{
+	docs := []vectorstore.Document{
 		{
 			ID:       "doc1",
 			Content:  "Yaklang是一种安全研究编程语言",
@@ -180,7 +181,7 @@ func TestMUSTPASS_RAGSystem(t *testing.T) {
 	assert.Equal(t, "doc2", results[0].Document.ID) // 第一个结果应该是RAG文档
 
 	// 测试生成提示
-	prompt := FormatRagPrompt("什么是RAG?", results, "")
+	prompt := vectorstore.FormatRagPrompt("什么是RAG?", results, "")
 	assert.Contains(t, prompt, "RAG是一种结合检索和生成的AI技术")
 	assert.Contains(t, prompt, "问题: 什么是RAG?")
 }
@@ -205,14 +206,14 @@ func TestMUSTPASS_TextToDocuments(t *testing.T) {
 
 // 测试FilterResults
 func TestMUSTPASS_FilterResults(t *testing.T) {
-	results := []SearchResult{
+	results := []vectorstore.SearchResult{
 		{Score: 0.9},
 		{Score: 0.7},
 		{Score: 0.5},
 		{Score: 0.3},
 	}
 
-	filtered := FilterResults(results, 0.6)
+	filtered := vectorstore.FilterResults(results, 0.6)
 	assert.Equal(t, 2, len(filtered))
 	assert.Equal(t, 0.9, filtered[0].Score)
 	assert.Equal(t, 0.7, filtered[1].Score)
@@ -308,7 +309,7 @@ func TestRequestLocalEmbedding(t *testing.T) {
 // 测试BigTextPlan功能
 func TestMUSTPASS_BigTextPlan(t *testing.T) {
 	// 创建模拟嵌入器，模拟文本过长时的错误
-	mockEmbed := &MockEmbedder{
+	mockEmbed := &vectorstore.MockEmbedder{
 		MockEmbedderFunc: func(text string) ([]float32, error) {
 			// 模拟长文本会失败，短文本成功
 			if len([]rune(text)) > 50 {
@@ -333,7 +334,7 @@ func TestMUSTPASS_BigTextPlan(t *testing.T) {
 
 	// 测试chunkText策略
 	t.Run("ChunkText Strategy", func(t *testing.T) {
-		ragSystem.SetBigTextPlan(BigTextPlanChunkText)
+		ragSystem.SetBigTextPlan(vectorstore.BigTextPlanChunkText)
 		ragSystem.MaxChunkSize = 20
 		ragSystem.ChunkOverlap = 10
 		err := ragSystem.Add("long_doc_1", longText)
