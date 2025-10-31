@@ -7,26 +7,27 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // MemoryVectorStore 是一个基于内存的向量存储实现适合储存临时数据，不适合储存大量数据
 type MemoryVectorStore struct {
-	documents map[string]Document // 文档存储，以 ID 为键
-	embedder  EmbeddingClient     // 用于生成查询的嵌入向量
-	mu        sync.RWMutex        // 用于并发安全的互斥锁
+	documents map[string]vectorstore.Document // 文档存储，以 ID 为键
+	embedder  vectorstore.EmbeddingClient     // 用于生成查询的嵌入向量
+	mu        sync.RWMutex                    // 用于并发安全的互斥锁
 }
 
 // NewMemoryVectorStore 创建一个新的内存向量存储
-func NewMemoryVectorStore(embedder EmbeddingClient) *MemoryVectorStore {
+func NewMemoryVectorStore(embedder vectorstore.EmbeddingClient) *MemoryVectorStore {
 	return &MemoryVectorStore{
-		documents: make(map[string]Document),
+		documents: make(map[string]vectorstore.Document),
 		embedder:  embedder,
 	}
 }
 
 // Add 添加文档到向量存储
-func (m *MemoryVectorStore) Add(docs ...Document) error {
+func (m *MemoryVectorStore) Add(docs ...vectorstore.Document) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -48,22 +49,22 @@ func (m *MemoryVectorStore) Add(docs ...Document) error {
 	return nil
 }
 
-func (m *MemoryVectorStore) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
+func (m *MemoryVectorStore) FuzzSearch(ctx context.Context, query string, limit int) (<-chan vectorstore.SearchResult, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (m *MemoryVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+func (m *MemoryVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *vectorstore.Document) bool) ([]vectorstore.SearchResult, error) {
 	return nil, errors.New("not implemented")
 }
 
 // Search 根据查询文本检索相关文档
-func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResult, error) {
+func (m *MemoryVectorStore) Search(query string, page, limit int) ([]vectorstore.SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	// 检查是否有文档
 	if len(m.documents) == 0 {
-		return []SearchResult{}, nil
+		return []vectorstore.SearchResult{}, nil
 	}
 
 	// 生成查询的嵌入向量
@@ -73,7 +74,7 @@ func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResul
 	}
 
 	// 计算所有文档与查询的相似度
-	var results []SearchResult
+	var results []vectorstore.SearchResult
 	for _, doc := range m.documents {
 		// 计算余弦相似度
 		similarity, err := hnsw.CosineSimilarity(queryEmbedding, doc.Embedding)
@@ -82,7 +83,7 @@ func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResul
 		}
 
 		// 添加到结果集
-		results = append(results, SearchResult{
+		results = append(results, vectorstore.SearchResult{
 			Document: doc,
 			Score:    similarity,
 		})
@@ -96,7 +97,7 @@ func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResul
 	// 计算分页
 	offset := (page - 1) * limit
 	if offset >= len(results) {
-		return []SearchResult{}, nil
+		return []vectorstore.SearchResult{}, nil
 	}
 	if offset+limit > len(results) {
 		limit = len(results) - offset
@@ -119,7 +120,7 @@ func (m *MemoryVectorStore) Delete(ids ...string) error {
 }
 
 // Get 根据 ID 获取文档
-func (m *MemoryVectorStore) Get(id string) (Document, bool, error) {
+func (m *MemoryVectorStore) Get(id string) (vectorstore.Document, bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -128,11 +129,11 @@ func (m *MemoryVectorStore) Get(id string) (Document, bool, error) {
 }
 
 // List 列出所有文档
-func (m *MemoryVectorStore) List() ([]Document, error) {
+func (m *MemoryVectorStore) List() ([]vectorstore.Document, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	docs := make([]Document, 0, len(m.documents))
+	docs := make([]vectorstore.Document, 0, len(m.documents))
 	for _, doc := range m.documents {
 		docs = append(docs, doc)
 	}
