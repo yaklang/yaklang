@@ -1,0 +1,262 @@
+name: Auto Fix gRPC Conflicts
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-fix-grpc-conflicts:
+    name: 检查并修复 gRPC 冲突 (Auto-fix gRPC Conflicts)
+    # Only run on PRs from the same repository (not forks)
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Fetch main branch
+        run: |
+          git fetch origin main:main
+          echo "Fetched main branch"
+      
+      - name: Check for conflicts with main
+        id: check-conflicts
+        run: |
+          echo "Checking for conflicts with main branch..."
+          
+          # Try to merge main into current branch (dry-run)
+          git merge --no-commit --no-ff main 2>&1 | tee /tmp/merge_output.txt || true
+          
+          # Check if there are conflicts
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Conflicts detected!"
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+            echo "Conflicting files:"
+            echo "$CONFLICT_FILES"
+            
+            # Check if the ONLY conflict is yakgrpc.pb.go
+            CONFLICT_COUNT=$(echo "$CONFLICT_FILES" | wc -l)
+            
+            if [ "$CONFLICT_COUNT" -eq 1 ] && echo "$CONFLICT_FILES" | grep -q "common/yakgrpc/ypb/yakgrpc.pb.go"; then
+              echo "Only yakgrpc.pb.go has conflicts - will auto-fix"
+              echo "should_fix=true" >> $GITHUB_OUTPUT
+              echo "has_conflicts=true" >> $GITHUB_OUTPUT
+            else
+              echo "Multiple files have conflicts or non-grpc conflicts - manual intervention required"
+              echo "should_fix=false" >> $GITHUB_OUTPUT
+              echo "has_conflicts=true" >> $GITHUB_OUTPUT
+              echo "conflict_files<<EOF" >> $GITHUB_OUTPUT
+              echo "$CONFLICT_FILES" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
+            
+            # Abort the merge attempt
+            git merge --abort
+          else
+            echo "No conflicts detected"
+            echo "should_fix=false" >> $GITHUB_OUTPUT
+            echo "has_conflicts=false" >> $GITHUB_OUTPUT
+            
+            # Abort the merge attempt if it was started
+            git merge --abort 2>/dev/null || true
+          fi
+      
+      - name: Comment on PR - Manual intervention needed
+        if: steps.check-conflicts.outputs.has_conflicts == 'true' && steps.check-conflicts.outputs.should_fix != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          CONFLICT_FILES="${{ steps.check-conflicts.outputs.conflict_files }}"
+          
+          gh pr comment ${{ github.event.pull_request.number }} --body "⚠️ **检测到合并冲突 / Merge Conflicts Detected** ⚠️
+          
+          此 PR 包含除 gRPC 生成文件之外的冲突，需要开发者人工介入解决。
+          
+          This PR has conflicts with the main branch in multiple files or non-gRPC files. Manual intervention is required.
+          
+          **冲突文件 / Conflicting files:**
+          \`\`\`
+          ${CONFLICT_FILES}
+          \`\`\`
+          
+          **解决方法 / To resolve:**
+          1. 拉取 main 分支最新代码: \`git fetch origin main\`
+          2. Rebase 你的分支: \`git rebase origin/main\`
+          3. 手动解决冲突
+          4. 强制推送: \`git push --force-with-lease\`
+          
+          **说明**: 如果只有 \`common/yakgrpc/ypb/yakgrpc.pb.go\` 文件冲突，此工作流会自动修复。
+          
+          **Note**: If only \`common/yakgrpc/ypb/yakgrpc.pb.go\` had conflicts, this workflow would have auto-fixed it." || true
+      
+      - name: ❌ 包含除 gRPC 生成文件之外的冲突，需开发者人工介入
+        if: steps.check-conflicts.outputs.has_conflicts == 'true' && steps.check-conflicts.outputs.should_fix != 'true'
+        run: |
+          echo "::error::包含除 gRPC 生成文件之外的冲突，需开发者人工介入"
+          echo "::error::This PR contains conflicts beyond gRPC generated files and requires manual intervention"
+          
+          CONFLICT_FILES="${{ steps.check-conflicts.outputs.conflict_files }}"
+          echo "::error::冲突文件 (Conflicting files):"
+          echo "$CONFLICT_FILES" | while IFS= read -r file; do
+            echo "::error::  - $file"
+          done
+          
+          echo ""
+          echo "::notice::如果只有 yakgrpc.pb.go 冲突，此工作流会自动修复"
+          echo "::notice::If only yakgrpc.pb.go had conflicts, this workflow would auto-fix it"
+          
+          exit 1
+      
+      - name: Set up Go
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+      
+      - name: Install protoc and dependencies
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        run: |
+          echo "Installing protoc 29.4..."
+          
+          PROTOC_VERSION="29.4"
+          PROTOC_ZIP="protoc-${PROTOC_VERSION}-linux-x86_64.zip"
+          
+          # Install dependencies
+          sudo apt-get update && sudo apt-get install -y unzip wget
+          
+          # Download protoc
+          wget -q -P /tmp "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${PROTOC_ZIP}"
+          
+          # Extract and install
+          mkdir -p /tmp/protoc_temp
+          unzip -q "/tmp/${PROTOC_ZIP}" -d /tmp/protoc_temp
+          sudo cp -R /tmp/protoc_temp/bin/* /usr/local/bin/
+          sudo cp -R /tmp/protoc_temp/include/* /usr/local/include/
+          
+          # Cleanup
+          rm -rf /tmp/protoc_temp /tmp/${PROTOC_ZIP}
+          
+          # Verify installation
+          protoc --version
+          
+          echo "Installing protoc-gen-go and protoc-gen-go-grpc..."
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+          
+          # Verify installations
+          protoc-gen-go --version
+          protoc-gen-go-grpc --version
+          
+          echo "All dependencies installed successfully"
+      
+      - name: Rebase on main and regenerate gRPC
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        run: |
+          echo "Starting rebase process..."
+          
+          # Rebase on main
+          git rebase main || {
+            echo "Rebase encountered conflicts, checking if it's only yakgrpc.pb.go..."
+            
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+            echo "Conflicting files during rebase:"
+            echo "$CONFLICT_FILES"
+            
+            if [ $(echo "$CONFLICT_FILES" | wc -l) -eq 1 ] && echo "$CONFLICT_FILES" | grep -q "common/yakgrpc/ypb/yakgrpc.pb.go"; then
+              echo "Confirmed: only yakgrpc.pb.go has conflicts"
+              
+              # Take the main branch version of yakgrpc.proto (the source file)
+              if git diff --name-only --diff-filter=U | grep -q "common/yakgrpc/yakgrpc.proto"; then
+                echo "yakgrpc.proto also has conflicts, taking main version..."
+                git checkout --theirs common/yakgrpc/yakgrpc.proto
+                git add common/yakgrpc/yakgrpc.proto
+              fi
+              
+              # Regenerate yakgrpc.pb.go from scratch
+              echo "Regenerating yakgrpc.pb.go..."
+              
+              # Remove the conflicted generated file
+              rm -f common/yakgrpc/ypb/yakgrpc.pb.go
+              rm -f common/yakgrpc/ypb/yakgrpc_grpc.pb.go
+              
+              # Generate new files
+              protoc \
+                --go-grpc_out=common/yakgrpc/ypb \
+                --go_out=common/yakgrpc/ypb \
+                --proto_path=common/yakgrpc/ yakgrpc.proto
+              
+              echo "Regeneration completed"
+              
+              # Stage the regenerated files
+              git add common/yakgrpc/ypb/yakgrpc.pb.go
+              git add common/yakgrpc/ypb/yakgrpc_grpc.pb.go 2>/dev/null || true
+              
+              # Continue rebase
+              git rebase --continue
+              
+              echo "Rebase completed successfully"
+            else
+              echo "Error: Unexpected conflicts during rebase"
+              git rebase --abort
+              exit 1
+            fi
+          }
+          
+          echo "Rebase process completed"
+      
+      - name: Push changes
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        run: |
+          echo "Pushing rebased branch..."
+          
+          # Get the branch name
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          
+          # Force push with lease (safer than --force)
+          git push --force-with-lease origin "$BRANCH_NAME"
+          
+          echo "Push completed successfully"
+      
+      - name: Comment on PR - Auto-fix applied
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "✅ **gRPC Conflict Auto-Fixed** ✅
+          
+          This PR had a conflict with the main branch in \`common/yakgrpc/ypb/yakgrpc.pb.go\`.
+          
+          **Actions taken:**
+          1. ✅ Rebased on the latest main branch
+          2. ✅ Regenerated \`yakgrpc.pb.go\` using protoc 29.4
+          3. ✅ Force-pushed the updated branch
+          
+          The PR is now up-to-date and ready for review. Please verify that the changes look correct." || true
+      
+      - name: Add success check
+        if: steps.check-conflicts.outputs.should_fix == 'true'
+        run: |
+          echo "gRPC conflict auto-fix completed successfully"
+          exit 0
+      
+      - name: Skip if no action needed
+        if: steps.check-conflicts.outputs.has_conflicts != 'true'
+        run: |
+          echo "No conflicts detected - no action needed"
+          exit 0
+
