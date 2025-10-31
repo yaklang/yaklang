@@ -1,26 +1,94 @@
 name: Auto Fix gRPC Conflicts
 
 on:
-  pull_request:
+  # 自动触发：每次 PR 更新时检查
+  # 使用 pull_request_target 确保即使 PR 有冲突也能运行
+  # 因为它使用的是 main 分支的 workflow 文件，而不是 PR 分支的
+  pull_request_target:
     branches: [main]
     types: [opened, synchronize, reopened]
+  
+  # 手动触发：通过 PR 评论 "/fix-grpc-conflicts" 触发
+  issue_comment:
+    types: [created]
+  
+  # 手动触发：通过 Actions 页面手动运行
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to fix conflicts for'
+        required: true
+        type: number
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   check-and-fix-grpc-conflicts:
     name: 检查并修复 gRPC 冲突 (Auto-fix gRPC Conflicts)
-    # Only run on PRs from the same repository (not forks)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # 只在以下情况运行：
+    # 1. PR 事件且来自同一仓库（安全检查：防止外部 fork 的恶意 PR）
+    # 2. 评论触发且评论内容包含 /fix-grpc-conflicts
+    # 3. 手动触发
+    if: |
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '/fix-grpc-conflicts')) ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     
     steps:
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let pr_number;
+            let pr_data;
+            
+            // pull_request_target 和 pull_request 的 payload 结构相同
+            if (context.eventName === 'pull_request_target' || context.eventName === 'pull_request') {
+              pr_number = context.payload.pull_request.number;
+              pr_data = context.payload.pull_request;
+            } else if (context.eventName === 'issue_comment') {
+              pr_number = context.payload.issue.number;
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number
+              });
+              pr_data = data;
+            } else if (context.eventName === 'workflow_dispatch') {
+              pr_number = context.payload.inputs.pr_number;
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr_number
+              });
+              pr_data = data;
+            }
+            
+            core.setOutput('number', pr_number);
+            core.setOutput('head_ref', pr_data.head.ref);
+            core.setOutput('head_sha', pr_data.head.sha);
+            core.setOutput('base_ref', pr_data.base.ref);
+      
+      - name: React to comment
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            });
+      
       - name: Check out PR branch
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ steps.pr.outputs.head_ref }}
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
       
@@ -83,7 +151,7 @@ jobs:
         run: |
           CONFLICT_FILES="${{ steps.check-conflicts.outputs.conflict_files }}"
           
-          gh pr comment ${{ github.event.pull_request.number }} --body "⚠️ **检测到合并冲突 / Merge Conflicts Detected** ⚠️
+          gh pr comment ${{ steps.pr.outputs.number }} --body "⚠️ **检测到合并冲突 / Merge Conflicts Detected** ⚠️
           
           此 PR 包含除 gRPC 生成文件之外的冲突，需要开发者人工介入解决。
           
@@ -95,14 +163,34 @@ jobs:
           \`\`\`
           
           **解决方法 / To resolve:**
+          
+          **方法 1: 手动触发自动修复 (仅适用于 gRPC 冲突)**
+          如果你确认冲突仅在 \`yakgrpc.pb.go\` 文件中，可以评论：
+          \`\`\`
+          /fix-grpc-conflicts
+          \`\`\`
+          工作流会自动尝试修复。
+          
+          **方法 2: 手动解决**
           1. 拉取 main 分支最新代码: \`git fetch origin main\`
           2. Rebase 你的分支: \`git rebase origin/main\`
           3. 手动解决冲突
           4. 强制推送: \`git push --force-with-lease\`
           
-          **说明**: 如果只有 \`common/yakgrpc/ypb/yakgrpc.pb.go\` 文件冲突，此工作流会自动修复。
+          ---
           
-          **Note**: If only \`common/yakgrpc/ypb/yakgrpc.pb.go\` had conflicts, this workflow would have auto-fixed it." || true
+          **Method 1: Trigger Auto-fix (for gRPC conflicts only)**
+          If you confirm the conflict is only in \`yakgrpc.pb.go\`, comment:
+          \`\`\`
+          /fix-grpc-conflicts
+          \`\`\`
+          The workflow will automatically attempt to fix it.
+          
+          **Method 2: Manual Resolution**
+          1. Fetch main: \`git fetch origin main\`
+          2. Rebase: \`git rebase origin/main\`
+          3. Resolve conflicts manually
+          4. Force push: \`git push --force-with-lease\`" || true
       
       - name: ❌ 包含除 gRPC 生成文件之外的冲突，需开发者人工介入
         if: steps.check-conflicts.outputs.has_conflicts == 'true' && steps.check-conflicts.outputs.should_fix != 'true'
@@ -225,7 +313,7 @@ jobs:
           echo "Pushing rebased branch..."
           
           # Get the branch name
-          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          BRANCH_NAME="${{ steps.pr.outputs.head_ref }}"
           
           # Force push with lease (safer than --force)
           git push --force-with-lease origin "$BRANCH_NAME"
@@ -237,7 +325,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh pr comment ${{ github.event.pull_request.number }} --body "✅ **gRPC Conflict Auto-Fixed** ✅
+          gh pr comment ${{ steps.pr.outputs.number }} --body "✅ **gRPC Conflict Auto-Fixed** ✅
           
           This PR had a conflict with the main branch in \`common/yakgrpc/ypb/yakgrpc.pb.go\`.
           
