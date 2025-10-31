@@ -389,7 +389,6 @@ LOOP:
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
 		case <-waitMem:
-			emitter.EmitThought("thought", "Sync memory search completed.")
 		case <-time.After(200 * time.Millisecond):
 		}
 
