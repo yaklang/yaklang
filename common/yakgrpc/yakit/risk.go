@@ -138,9 +138,17 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) *gorm.DB {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", 0, params.GetBeforeCreatedAt())
 	}
 
-	if runtimeId := params.GetRuntimeId(); runtimeId != "" {
-		db = db.Where("runtime_id = ?", runtimeId)
+	var runtimeIDs []string
+	if len(params.GetRuntimeIds()) != 0 {
+		runtimeIDs = append(runtimeIDs, params.GetRuntimeIds()...)
 	}
+
+	if params.GetRuntimeId() != "" {
+		runtimeIDs = append(runtimeIDs, params.GetRuntimeId())
+	}
+
+	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", runtimeIDs)
+
 	db = db.Where("waiting_verified = ?", params.GetWaitingVerified())
 	db = bizhelper.QueryBySpecificPorts(db, "port", params.GetPorts())
 	db = bizhelper.QueryBySpecificAddress(db, "ip_integer", params.GetNetwork())
