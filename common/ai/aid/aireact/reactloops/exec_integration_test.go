@@ -3,7 +3,6 @@ package reactloops
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"strings"
 	"testing"
 	"time"
@@ -527,7 +526,7 @@ func TestUtilityFunctions(t *testing.T) {
 type MockMemoryTriageForTesting struct {
 	searchMemoryCalled          bool
 	searchMemoryWithoutAICalled bool
-	searchMemoryResult          *memory_type.SearchMemoryResult
+	searchMemoryResult          *aicommon.SearchMemoryResult
 	searchMemoryError           error
 	callCount                   int
 }
@@ -536,34 +535,34 @@ func (m *MockMemoryTriageForTesting) SetInvoker(i aicommon.AIInvokeRuntime) {
 
 }
 
-func (m *MockMemoryTriageForTesting) AddRawText(text string) ([]*memory_type.MemoryEntity, error) {
-	return []*memory_type.MemoryEntity{}, nil
+func (m *MockMemoryTriageForTesting) AddRawText(text string) ([]*aicommon.MemoryEntity, error) {
+	return []*aicommon.MemoryEntity{}, nil
 }
 
-func (m *MockMemoryTriageForTesting) SaveMemoryEntities(entities ...*memory_type.MemoryEntity) error {
+func (m *MockMemoryTriageForTesting) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
 	return nil
 }
 
-func (m *MockMemoryTriageForTesting) SearchBySemantics(query string, limit int) ([]*memory_type.SearchResult, error) {
-	return []*memory_type.SearchResult{}, nil
+func (m *MockMemoryTriageForTesting) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
+	return []*aicommon.SearchResult{}, nil
 }
 
-func (m *MockMemoryTriageForTesting) SearchByTags(tags []string, matchAll bool, limit int) ([]*memory_type.MemoryEntity, error) {
-	return []*memory_type.MemoryEntity{}, nil
+func (m *MockMemoryTriageForTesting) SearchByTags(tags []string, matchAll bool, limit int) ([]*aicommon.MemoryEntity, error) {
+	return []*aicommon.MemoryEntity{}, nil
 }
 
 func (m *MockMemoryTriageForTesting) HandleMemory(i any) error {
 	return nil
 }
 
-func (m *MockMemoryTriageForTesting) SearchMemory(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (m *MockMemoryTriageForTesting) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	m.searchMemoryCalled = true
 	m.callCount++
 	log.Infof("SearchMemory called with query: %v, bytes limit: %d", utils.ShrinkString(utils.InterfaceToString(origin), 50), bytesLimit)
 	return m.searchMemoryResult, m.searchMemoryError
 }
 
-func (m *MockMemoryTriageForTesting) SearchMemoryWithoutAI(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (m *MockMemoryTriageForTesting) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	m.searchMemoryWithoutAICalled = true
 	m.callCount++
 	log.Infof("SearchMemoryWithoutAI called with query: %v, bytes limit: %d", utils.ShrinkString(utils.InterfaceToString(origin), 50), bytesLimit)
@@ -577,8 +576,8 @@ func (m *MockMemoryTriageForTesting) Close() error {
 // TestMemorySearch_NoMemories 测试没有记忆时的搜索
 func TestMemorySearch_NoMemories(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories:      []*memory_type.MemoryEntity{},
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories:      []*aicommon.MemoryEntity{},
 			TotalContent:  "",
 			ContentBytes:  0,
 			SearchSummary: "no memories found",
@@ -604,8 +603,8 @@ func TestMemorySearch_NoMemories(t *testing.T) {
 // TestMemorySearch_WithMemories 测试有记忆的搜索
 func TestMemorySearch_WithMemories(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{
 					Id:      "mem-1",
 					Content: "First memory content",
@@ -640,8 +639,8 @@ func TestMemorySearch_WithMemories(t *testing.T) {
 // TestMemorySearch_WithoutAI 测试不使用AI的记忆搜索
 func TestMemorySearch_WithoutAI(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{
 					Id:      "mem-1",
 					Content: "Keyword-based memory",
@@ -672,8 +671,8 @@ func TestMemorySearch_WithoutAI(t *testing.T) {
 // TestMemorySearch_BytesLimit 测试字节限制
 func TestMemorySearch_BytesLimit(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{
 					Id:      "mem-1",
 					Content: "First part",
@@ -718,7 +717,7 @@ func TestMemorySearch_Error(t *testing.T) {
 // TestReActLoop_MemoryIntegration_NoMemory 测试没有内存搜索时的执行
 func TestReActLoop_MemoryIntegration_NoMemory(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 5 * 1024,
 		memoryTriage:    nil, // 没有内存 triage
 	}
@@ -734,8 +733,8 @@ func TestReActLoop_MemoryIntegration_NoMemory(t *testing.T) {
 // TestReActLoop_MemoryIntegration_WithMemory 测试有内存搜索时的执行
 func TestReActLoop_MemoryIntegration_WithMemory(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{
 					Id:      "mem-1",
 					Content: "Important context for user query",
@@ -748,7 +747,7 @@ func TestReActLoop_MemoryIntegration_WithMemory(t *testing.T) {
 	}
 
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 5 * 1024,
 		memoryTriage:    mockMemory,
 	}
@@ -769,8 +768,8 @@ func TestReActLoop_MemoryIntegration_WithMemory(t *testing.T) {
 // TestReActLoop_MemorySearch_Integration 集成测试：循环中的内存搜索
 func TestReActLoop_MemorySearch_Integration(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{
 					Id:      "mem-1",
 					Content: "Context 1",
@@ -787,7 +786,7 @@ func TestReActLoop_MemorySearch_Integration(t *testing.T) {
 	}
 
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 5 * 1024,
 		memoryTriage:    mockMemory,
 	}
@@ -842,11 +841,11 @@ func TestReActLoop_MemorySearch_Integration(t *testing.T) {
 // TestMemorySize_CalculationCorrectness 测试内存大小计算的正确性
 func TestMemorySize_CalculationCorrectness(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 5 * 1024,
 	}
 
-	entities := []*memory_type.MemoryEntity{
+	entities := []*aicommon.MemoryEntity{
 		{Id: "mem-1", Content: "Short"},
 		{Id: "mem-2", Content: "Medium length content"},
 		{Id: "mem-3", Content: "This is a much longer memory content with more details and information"},
@@ -869,13 +868,13 @@ func TestMemorySize_CalculationCorrectness(t *testing.T) {
 // TestMemoryEviction_Correctness 测试内存淘汰的正确性
 func TestMemoryEviction_Correctness(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit: 40, // 限制为 40 字节
 	}
 
 	// 添加第一个内存（15 字节）
-	result1 := &memory_type.SearchMemoryResult{
-		Memories: []*memory_type.MemoryEntity{
+	result1 := &aicommon.SearchMemoryResult{
+		Memories: []*aicommon.MemoryEntity{
 			{Id: "mem-1", Content: "First memory "}, // 13 bytes
 		},
 	}
@@ -885,8 +884,8 @@ func TestMemoryEviction_Correctness(t *testing.T) {
 	log.Infof("After first push: size=%d", size1)
 
 	// 添加第二个内存（20 字节）
-	result2 := &memory_type.SearchMemoryResult{
-		Memories: []*memory_type.MemoryEntity{
+	result2 := &aicommon.SearchMemoryResult{
+		Memories: []*aicommon.MemoryEntity{
 			{Id: "mem-2", Content: "Second memory content"}, // 21 bytes
 		},
 	}
@@ -909,10 +908,10 @@ func TestMemoryEviction_Correctness(t *testing.T) {
 // TestMemoryContent_Formatting 测试内存内容格式化
 func TestMemoryContent_Formatting(t *testing.T) {
 	loop := &ReActLoop{
-		currentMemories: omap.NewEmptyOrderedMap[string, *memory_type.MemoryEntity](),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 	}
 
-	entities := []*memory_type.MemoryEntity{
+	entities := []*aicommon.MemoryEntity{
 		{Id: "mem-1", Content: "First"},
 		{Id: "mem-2", Content: "Second"},
 		{Id: "mem-3", Content: "Third"},
@@ -943,8 +942,8 @@ func TestMemoryContent_Formatting(t *testing.T) {
 // TestMemorySearch_MultipleCallsConsistency 测试多次调用的一致性
 func TestMemorySearch_MultipleCallsConsistency(t *testing.T) {
 	mockMemory := &MockMemoryTriageForTesting{
-		searchMemoryResult: &memory_type.SearchMemoryResult{
-			Memories: []*memory_type.MemoryEntity{
+		searchMemoryResult: &aicommon.SearchMemoryResult{
+			Memories: []*aicommon.MemoryEntity{
 				{Id: "mem-1", Content: "Consistent memory"},
 			},
 			TotalContent:  "Consistent memory",

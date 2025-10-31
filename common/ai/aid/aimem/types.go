@@ -2,7 +2,6 @@ package aimem
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -104,8 +103,8 @@ func (m *MockMemoryTriage) SetInvoker(invoker aicommon.AIInvokeRuntime) {
 	m.invoker = invoker
 }
 
-func (m *MockMemoryTriage) AddRawText(text string) ([]*memory_type.MemoryEntity, error) {
-	entity := &memory_type.MemoryEntity{
+func (m *MockMemoryTriage) AddRawText(text string) ([]*aicommon.MemoryEntity, error) {
+	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-id",
 		CreatedAt:          time.Now(),
 		Content:            text,
@@ -120,10 +119,10 @@ func (m *MockMemoryTriage) AddRawText(text string) ([]*memory_type.MemoryEntity,
 		CorePactVector:     []float32{0.1, 0.2, 0.3},
 		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
 	}
-	return []*memory_type.MemoryEntity{entity}, nil
+	return []*aicommon.MemoryEntity{entity}, nil
 }
 
-func (m *MockMemoryTriage) SaveMemoryEntities(entities ...*memory_type.MemoryEntity) error {
+func (m *MockMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) error {
 	return nil
 }
 
@@ -131,8 +130,8 @@ func (m *MockMemoryTriage) Close() error {
 	return nil
 }
 
-func (m *MockMemoryTriage) SearchBySemantics(query string, limit int) ([]*memory_type.SearchResult, error) {
-	entity := &memory_type.MemoryEntity{
+func (m *MockMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
+	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-id",
 		CreatedAt:          time.Now(),
 		Content:            "This is a mock memory entity related to " + query,
@@ -147,15 +146,15 @@ func (m *MockMemoryTriage) SearchBySemantics(query string, limit int) ([]*memory
 		CorePactVector:     []float32{0.1, 0.2, 0.3},
 		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
 	}
-	result := &memory_type.SearchResult{
+	result := &aicommon.SearchResult{
 		Entity: entity,
 		Score:  0.9,
 	}
-	return []*memory_type.SearchResult{result}, nil
+	return []*aicommon.SearchResult{result}, nil
 }
 
-func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*memory_type.MemoryEntity, error) {
-	entity := &memory_type.MemoryEntity{
+func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*aicommon.MemoryEntity, error) {
+	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-id",
 		CreatedAt:          time.Now(),
 		Content:            "This is a mock memory entity with tags",
@@ -170,7 +169,7 @@ func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int)
 		CorePactVector:     []float32{0.1, 0.2, 0.3},
 		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
 	}
-	return []*memory_type.MemoryEntity{entity}, nil
+	return []*aicommon.MemoryEntity{entity}, nil
 }
 
 func (m *MockMemoryTriage) HandleMemory(i any) error {
@@ -178,9 +177,9 @@ func (m *MockMemoryTriage) HandleMemory(i any) error {
 	return nil
 }
 
-func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	// Mock实现：返回一个简单的搜索结果
-	entity := &memory_type.MemoryEntity{
+	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-search-id",
 		CreatedAt:          time.Now(),
 		Content:            "Mock search result for: " + utils.InterfaceToString(origin),
@@ -197,17 +196,17 @@ func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*memory_typ
 	}
 
 	content := entity.Content
-	return &memory_type.SearchMemoryResult{
-		Memories:      []*memory_type.MemoryEntity{entity},
+	return &aicommon.SearchMemoryResult{
+		Memories:      []*aicommon.MemoryEntity{entity},
 		TotalContent:  content,
 		ContentBytes:  len([]byte(content)),
 		SearchSummary: "Mock search completed",
 	}, nil
 }
 
-func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*memory_type.SearchMemoryResult, error) {
+func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
 	// Mock实现：无AI版本，直接基于关键词匹配
-	entity := &memory_type.MemoryEntity{
+	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-search-no-ai-id",
 		CreatedAt:          time.Now(),
 		Content:            "Mock keyword search result for: " + utils.InterfaceToString(origin),
@@ -223,12 +222,12 @@ func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*m
 		PotentialQuestions: []string{"What keywords matched in this search?"},
 	}
 
-	var results []*memory_type.MemoryEntity
+	var results []*aicommon.MemoryEntity
 	results = append(results, entity)
 
 	if m.overSearch {
 		for i := 0; i < 300; i++ {
-			results = append(results, &memory_type.MemoryEntity{
+			results = append(results, &aicommon.MemoryEntity{
 				Id:                 "mock-search-no-ai-id-" + utils.InterfaceToString(i),
 				CreatedAt:          time.Now(),
 				Content:            "Mock keyword search result for: " + utils.InterfaceToString(origin) + " #" + utils.InterfaceToString(i),
@@ -247,7 +246,7 @@ func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*m
 	}
 
 	content := entity.Content
-	return &memory_type.SearchMemoryResult{
+	return &aicommon.SearchMemoryResult{
 		Memories:      results,
 		TotalContent:  content,
 		ContentBytes:  len([]byte(content)),
