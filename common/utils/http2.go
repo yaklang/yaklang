@@ -1,7 +1,5 @@
 package utils
 
-import "strings"
-
 // lower returns the ASCII lowercase version of b.
 func lower(b byte) byte {
 	if 'A' <= b && b <= 'Z' {
@@ -28,22 +26,4 @@ func AsciiEqualFold(s, t string) bool {
 	return true
 }
 
-// isASCIIPrint returns whether s is ASCII and printable according to
-// https://tools.ietf.org/html/rfc20#section-4.2.
-func IsASCIIPrint(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] < ' ' || s[i] > '~' {
-			return false
-		}
-	}
-	return true
-}
 
-// asciiToLower returns the lowercase version of s if s is ASCII and printable,
-// and whether or not it was.
-func AsciiToLower(s string) (lower string, ok bool) {
-	if !IsASCIIPrint(s) {
-		return "", false
-	}
-	return strings.ToLower(s), true
-}

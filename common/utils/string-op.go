@@ -108,7 +108,7 @@ func PrettifyListFromStringSplitEx(Raw string, sep ...string) (targets []string)
 }
 
 func ToLowerAndStrip(s string) string {
-	return strings.TrimSpace(strings.ToLower(s))
+	return StringLowerAndTrimSpace(s)
 }
 
 // StringSliceContains 判断字符串切片s中是否包含raw，对于非字符串的切片，会尝试将其元素转换为字符串再判断是否包含
