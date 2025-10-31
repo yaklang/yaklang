@@ -7,17 +7,17 @@ TEST_BIN_DIR="${TEST_BIN_DIR:-/tmp/test_binaries}"
 TEST_CONFIG="${TEST_CONFIG:-}"  # 测试配置文件（JSON格式），必须提供
 
 if [[ -z "$TEST_CONFIG" ]]; then
-  echo "❌ ERROR: TEST_CONFIG environment variable must be set"
+  echo "ERROR: TEST_CONFIG environment variable must be set"
   exit 1
 fi
 
 if [[ ! -f "$TEST_CONFIG" ]]; then
-  echo "❌ ERROR: TEST_CONFIG file not found: $TEST_CONFIG"
+  echo "ERROR: TEST_CONFIG file not found: $TEST_CONFIG"
   exit 1
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "❌ ERROR: jq is required but not found"
+  echo "ERROR: jq is required but not found"
   exit 1
 fi
 
@@ -54,7 +54,7 @@ mapfile -t PKGS < <(
 )
 
 if [[ ${#PKGS[@]} -eq 0 ]]; then
-  echo "⚠️  No test packages found"
+  echo "No test packages found"
   touch "$TEST_BIN_DIR/compiled_tests.txt"
   exit 0
 fi
@@ -167,11 +167,11 @@ echo "Compilation took ${compile_duration}s"
 
 if [[ $failed_count -gt 0 ]]; then
   echo ""
-  echo "⚠️  Failed packages:"
+  echo "  Failed packages:"
   cat "$TEST_BIN_DIR/failed_packages.txt" | sed 's/^/  - /'
   exit 1
 fi
 
 echo ""
-echo "✅ All tests compiled successfully"
+echo "All tests compiled successfully"
 
