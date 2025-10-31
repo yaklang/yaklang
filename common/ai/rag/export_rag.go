@@ -80,7 +80,7 @@ func ExportRAGToBinary(collectionName string, opts ...RAGExportOptionFunc) (io.R
 		return nil, utils.Wrap(err, "failed to write version")
 	}
 
-	if _, err := buf.WriteString(cfg.SerialVersionUID); err != nil {
+	if err := pbWriteBytes(buf, []byte(collection.SerialVersionUID)); err != nil {
 		return nil, utils.Wrap(err, "failed to write serialVersionUID")
 	}
 
