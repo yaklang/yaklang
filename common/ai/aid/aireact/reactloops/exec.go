@@ -354,7 +354,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	r.GetInvoker().AddToTimeline("current task user input", fmt.Sprintf("%v", task.GetUserInput()))
 
 	if r.GetCurrentMemoriesContent() == "" {
-		r.loadingSearchMemory(task.GetUserInput())
+		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
 	}
 
 	go func() {
@@ -377,10 +377,20 @@ LOOP:
 			break LOOP
 		}
 
+		waitMem := make(chan struct{})
+		go func() {
+			defer func() {
+				close(waitMem)
+			}()
+			r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
+		}()
+
 		select {
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
-		default:
+		case <-waitMem:
+			emitter.EmitThought("thought", "Sync memory search completed.")
+		case <-time.After(200 * time.Millisecond):
 		}
 
 		var prompt string
