@@ -92,6 +92,24 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 	}
 }
 
+func (s *Server) UpdateSyntaxFlowRuleAuto(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleAutoRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
+	if req == nil || req.SyntaxFlowInput == nil {
+		return nil, utils.Error("update syntax flow rule failed: request is nil")
+	}
+	updatedRule, err := yakit.UpdateSyntaxFlowAutoRule(s.GetProfileDatabase(), req.SyntaxFlowInput)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.UpdateSyntaxFlowRuleResponse{
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreateOrUpdate,
+			EffectRows: 1,
+		},
+		Rule: updatedRule.ToGRPCModel(),
+	}, nil
+}
+
 func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
 	if req == nil || req.SyntaxFlowInput == nil {
 		return nil, utils.Error("update syntax flow rule failed: request is nil")

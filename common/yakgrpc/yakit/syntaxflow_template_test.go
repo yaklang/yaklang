@@ -147,12 +147,4 @@ func main() {
 		re := regexp.MustCompile(`rule_id: \"[0-9a-fA-F-]{36}\"`)
 		require.True(t, re.MatchString(out), "rule_id not found or invalid")
 	})
-
-	t.Run("version in template create rule", func(t *testing.T) {
-
-	})
-
-	t.Run("version in template update rule", func(t *testing.T) {
-
-	})
 }

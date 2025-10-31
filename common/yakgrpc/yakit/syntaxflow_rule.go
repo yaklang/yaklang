@@ -181,6 +181,43 @@ func QuerySyntaxFlowRuleCount(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) (in
 	return count, db.Error
 }
 
+func UpdateSyntaxFlowAutoRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleAutoInput) (*schema.SyntaxFlowRule, error) {
+	if rule == nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
+	}
+
+	dbRule, err2 := ParseSyntaxFlowAutoInput(rule)
+	if err2 != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err2)
+	}
+	updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), rule.GetRuleName())
+	if err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	updateRule.Language = ssaconfig.Language(rule.GetLanguage())
+	updateRule.Content = dbRule.GetContent()
+	updateRule.Tag = strings.Join(rule.GetTags(), ",")
+	updateRule.Description = rule.GetDescription()
+	updateRule.AlertDesc = dbRule.AlertDesc
+	updateRule.TitleZh = dbRule.TitleZh
+	updateRule.OpCodes = dbRule.OpCodes
+	updateRule.Hash = dbRule.CalcHash()
+	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
+
+	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
+	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+
+	return updateRule, nil
+}
+
 func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule is nil")

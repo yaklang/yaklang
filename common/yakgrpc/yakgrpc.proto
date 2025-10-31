@@ -778,6 +778,7 @@ service Yak {
   rpc CreateSyntaxFlowRuleAuto(CreateSyntaxFlowRuleAutoRequest) returns (CreateSyntaxFlowRuleResponse);
   rpc UpdateSyntaxFlowRule(UpdateSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc UpdateSyntaxFlowRuleEx(UpdateSyntaxFlowRuleRequest) returns (UpdateSyntaxFlowRuleResponse);
+  rpc UpdateSyntaxFlowRuleAuto(UpdateSyntaxFlowRuleAutoRequest) returns (UpdateSyntaxFlowRuleResponse);
   rpc DeleteSyntaxFlowRule(DeleteSyntaxFlowRuleRequest) returns (DbOperateMessage);
   rpc CheckSyntaxFlowRuleUpdate(CheckSyntaxFlowRuleUpdateRequest) returns (CheckSyntaxFlowRuleUpdateResponse);
   rpc ApplySyntaxFlowRuleUpdate(ApplySyntaxFlowRuleUpdateRequest) returns (stream ApplySyntaxFlowRuleUpdateResponse);
@@ -7250,6 +7251,10 @@ message CreateSyntaxFlowRuleRequest{
 message CreateSyntaxFlowRuleResponse {
   DbOperateMessage Message = 1;
   SyntaxFlowRule Rule = 2;
+}
+
+message UpdateSyntaxFlowRuleAutoRequest{
+  SyntaxFlowRuleAutoInput SyntaxFlowInput = 1;
 }
 
 message UpdateSyntaxFlowRuleRequest{

@@ -441,6 +441,7 @@ const (
 	Yak_CreateSyntaxFlowRuleAuto_FullMethodName                   = "/ypb.Yak/CreateSyntaxFlowRuleAuto"
 	Yak_UpdateSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/UpdateSyntaxFlowRule"
 	Yak_UpdateSyntaxFlowRuleEx_FullMethodName                     = "/ypb.Yak/UpdateSyntaxFlowRuleEx"
+	Yak_UpdateSyntaxFlowRuleAuto_FullMethodName                   = "/ypb.Yak/UpdateSyntaxFlowRuleAuto"
 	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
 	Yak_CheckSyntaxFlowRuleUpdate_FullMethodName                  = "/ypb.Yak/CheckSyntaxFlowRuleUpdate"
 	Yak_ApplySyntaxFlowRuleUpdate_FullMethodName                  = "/ypb.Yak/ApplySyntaxFlowRuleUpdate"
@@ -1135,6 +1136,7 @@ type YakClient interface {
 	CreateSyntaxFlowRuleAuto(ctx context.Context, in *CreateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*CreateSyntaxFlowRuleResponse, error)
 	UpdateSyntaxFlowRule(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleEx(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error)
+	UpdateSyntaxFlowRuleAuto(ctx context.Context, in *UpdateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error)
 	DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	CheckSyntaxFlowRuleUpdate(ctx context.Context, in *CheckSyntaxFlowRuleUpdateRequest, opts ...grpc.CallOption) (*CheckSyntaxFlowRuleUpdateResponse, error)
 	ApplySyntaxFlowRuleUpdate(ctx context.Context, in *ApplySyntaxFlowRuleUpdateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ApplySyntaxFlowRuleUpdateResponse], error)
@@ -6161,6 +6163,16 @@ func (c *yakClient) UpdateSyntaxFlowRuleEx(ctx context.Context, in *UpdateSyntax
 	return out, nil
 }
 
+func (c *yakClient) UpdateSyntaxFlowRuleAuto(ctx context.Context, in *UpdateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSyntaxFlowRuleResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSyntaxFlowRuleAuto_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -8371,6 +8383,7 @@ type YakServer interface {
 	CreateSyntaxFlowRuleAuto(context.Context, *CreateSyntaxFlowRuleAutoRequest) (*CreateSyntaxFlowRuleResponse, error)
 	UpdateSyntaxFlowRule(context.Context, *UpdateSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleEx(context.Context, *UpdateSyntaxFlowRuleRequest) (*UpdateSyntaxFlowRuleResponse, error)
+	UpdateSyntaxFlowRuleAuto(context.Context, *UpdateSyntaxFlowRuleAutoRequest) (*UpdateSyntaxFlowRuleResponse, error)
 	DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	CheckSyntaxFlowRuleUpdate(context.Context, *CheckSyntaxFlowRuleUpdateRequest) (*CheckSyntaxFlowRuleUpdateResponse, error)
 	ApplySyntaxFlowRuleUpdate(*ApplySyntaxFlowRuleUpdateRequest, grpc.ServerStreamingServer[ApplySyntaxFlowRuleUpdateResponse]) error
@@ -9815,6 +9828,9 @@ func (UnimplementedYakServer) UpdateSyntaxFlowRule(context.Context, *UpdateSynta
 }
 func (UnimplementedYakServer) UpdateSyntaxFlowRuleEx(context.Context, *UpdateSyntaxFlowRuleRequest) (*UpdateSyntaxFlowRuleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleEx not implemented")
+}
+func (UnimplementedYakServer) UpdateSyntaxFlowRuleAuto(context.Context, *UpdateSyntaxFlowRuleAutoRequest) (*UpdateSyntaxFlowRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleAuto not implemented")
 }
 func (UnimplementedYakServer) DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSyntaxFlowRule not implemented")
@@ -17279,6 +17295,24 @@ func _Yak_UpdateSyntaxFlowRuleEx_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UpdateSyntaxFlowRuleAuto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSyntaxFlowRuleAutoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSyntaxFlowRuleAuto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSyntaxFlowRuleAuto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSyntaxFlowRuleAuto(ctx, req.(*UpdateSyntaxFlowRuleAutoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_DeleteSyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteSyntaxFlowRuleRequest)
 	if err := dec(in); err != nil {
@@ -21016,6 +21050,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSyntaxFlowRuleEx",
 			Handler:    _Yak_UpdateSyntaxFlowRuleEx_Handler,
+		},
+		{
+			MethodName: "UpdateSyntaxFlowRuleAuto",
+			Handler:    _Yak_UpdateSyntaxFlowRuleAuto_Handler,
 		},
 		{
 			MethodName: "DeleteSyntaxFlowRule",

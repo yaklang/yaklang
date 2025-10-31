@@ -654,6 +654,120 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_ByTemplate(t *testing.T) {
 
 		require.Equal(t, originalRuleID, updatedRsp[0].Id)
 	})
+
+	t.Run("update rule by template - basic", func(t *testing.T) {
+		ruleName := fmt.Sprintf("test_template_%s", uuid.NewString())
+
+		client.CreateSyntaxFlowRuleEx(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName: ruleName,
+				Content:  "aaa",
+				Language: "golang",
+			},
+		})
+
+		req := &ypb.UpdateSyntaxFlowRuleAutoRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleAutoInput{
+				RuleName:        ruleName,
+				Language:        "golang",
+				RuleSubjects:    []string{"any() as $entry"},
+				RuleSafeTests:   []string{"package main\n\nfunc safe() {}"},
+				RuleUnSafeTests: []string{"package main\n\nfunc unsafe() {}"},
+				RuleLevels:      []string{"high"},
+				GroupNames:      []string{"test-group"},
+				Description:     "Auto generated test rule",
+			},
+		}
+
+		rsp, err := client.UpdateSyntaxFlowRuleAuto(context.Background(), req)
+		require.NoError(t, err)
+		require.NotNil(t, rsp)
+		require.NotNil(t, rsp.Rule)
+		require.Equal(t, ruleName, rsp.Rule.RuleName)
+		require.Equal(t, "golang", rsp.Rule.Language)
+		require.Contains(t, rsp.Rule.Content, "any() as $entry")
+		require.Contains(t, rsp.Rule.Content, "type: audit")
+		require.Contains(t, rsp.Rule.Content, "level: high")
+		require.Contains(t, rsp.Rule.Content, "func safe()")
+		require.Contains(t, rsp.Rule.Content, "func unsafe()")
+
+		t.Cleanup(func() {
+			deleteRuleByNames(client, []string{ruleName})
+			deleteRuleGroup(client, []string{"test-group"})
+		})
+
+		queryRsp, err := queryRulesByName(client, []string{ruleName})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(queryRsp))
+		require.Equal(t, ruleName, queryRsp[0].RuleName)
+		require.Equal(t, "golang", queryRsp[0].Language)
+		require.NotEqual(t, "", queryRsp[0].Id)
+		require.Equal(t, "Auto generated test rule", queryRsp[0].Description)
+	})
+
+	t.Run("version in template create rule", func(t *testing.T) {
+		ruleName := fmt.Sprintf("test_template_%s", uuid.NewString())
+
+		req := &ypb.CreateSyntaxFlowRuleAutoRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleAutoInput{
+				RuleName:        ruleName,
+				Language:        "golang",
+				RuleSubjects:    []string{"any() as $entry"},
+				RuleSafeTests:   []string{"package main\n\nfunc safe() {}"},
+				RuleUnSafeTests: []string{"package main\n\nfunc unsafe() {}"},
+				RuleLevels:      []string{"high"},
+				GroupNames:      []string{"test-group"},
+				Description:     "Auto generated test rule",
+			},
+		}
+
+		_, err := client.CreateSyntaxFlowRuleAuto(context.Background(), req)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			deleteRuleByNames(client, []string{ruleName})
+			deleteRuleGroup(client, []string{"test-group"})
+		})
+
+		rules, err := sfdb.QueryRulesByName(consts.GetGormProfileDatabase(), []string{ruleName})
+		require.NoError(t, err)
+		require.NotEqual(t, "", rules[0].Version)
+	})
+
+	t.Run("version in template update rule", func(t *testing.T) {
+		ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err := createSfRuleEx(client, ruleName)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		rules, err := sfdb.QueryRulesByName(consts.GetGormProfileDatabase(), []string{ruleName})
+		require.NoError(t, err)
+
+		version := rules[0].Version
+		require.NotEqual(t, version, "")
+
+		req := &ypb.UpdateSyntaxFlowRuleAutoRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleAutoInput{
+				RuleName:        ruleName,
+				Language:        "golang",
+				RuleSubjects:    []string{"any() as $entry"},
+				RuleSafeTests:   []string{"package main\n\nfunc safe() {}"},
+				RuleUnSafeTests: []string{"package main\n\nfunc unsafe() {}"},
+				RuleLevels:      []string{"high"},
+				GroupNames:      []string{"test-group"},
+				Description:     "Auto generated test rule",
+			},
+		}
+
+		_, err = client.UpdateSyntaxFlowRuleAuto(context.Background(), req)
+		require.NoError(t, err)
+
+		rules, err = sfdb.QueryRulesByName(consts.GetGormProfileDatabase(), []string{ruleName})
+		require.NoError(t, err)
+		require.NotEqual(t, version, rules[0].Version)
+	})
 }
 
 func TestGRPCMUSTPASS_DeleteSyntaxFlow_With_Group(t *testing.T) {
