@@ -181,6 +181,43 @@ func QuerySyntaxFlowRuleCount(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter) (in
 	return count, db.Error
 }
 
+func UpdateSyntaxFlowAutoRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleAutoInput) (*schema.SyntaxFlowRule, error) {
+	if rule == nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule is nil")
+	}
+	if rule.RuleName == "" {
+		return nil, utils.Errorf("update syntaxFlow rule failed: rule name is empty")
+	}
+
+	dbRule, err2 := ParseSyntaxFlowAutoInput(rule)
+	if err2 != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err2)
+	}
+	updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), rule.GetRuleName())
+	if err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	updateRule.Language = ssaconfig.Language(rule.GetLanguage())
+	updateRule.Content = dbRule.GetContent()
+	updateRule.Tag = strings.Join(rule.GetTags(), ",")
+	updateRule.Description = rule.GetDescription()
+	updateRule.AlertDesc = dbRule.AlertDesc
+	updateRule.TitleZh = dbRule.TitleZh
+	updateRule.OpCodes = dbRule.OpCodes
+	updateRule.Hash = dbRule.CalcHash()
+	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
+
+	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
+	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
+	}
+
+	return updateRule, nil
+}
+
 func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
 	if rule == nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule is nil")
@@ -207,6 +244,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.TitleZh = dbRule.TitleZh
 	updateRule.OpCodes = dbRule.OpCodes
 	updateRule.Hash = dbRule.CalcHash()
+	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
@@ -215,6 +253,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	if err := db.Model(&updateRule).Association("Groups").Replace(groups).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
+
 	return updateRule, nil
 }
 
@@ -235,6 +274,27 @@ func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema
 	return sfdb.GetIntersectionGroup(consts.GetGormProfileDatabase(), groups), nil
 }
 
+func ParseSyntaxFlowAutoInput(ruleInput *ypb.SyntaxFlowRuleAutoInput) (*schema.SyntaxFlowRule, error) {
+	language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
+	if err != nil {
+		return nil, err
+	}
+	content := createRuleByTemplate(ruleInput)
+	rule, _ := sfdb.CheckSyntaxFlowRuleContent(content)
+	rule.Language = language
+	rule.RuleName = ruleInput.RuleName
+	rule.Tag = strings.Join(ruleInput.Tags, "|")
+	rule.Title = ruleInput.RuleName
+	rule.RiskType = ruleInput.RiskType
+	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
+	rule.Description = ruleInput.Description
+	rule.Version = sfdb.UpdateVersion(rule.Version)
+	for s, message := range ruleInput.AlertMsg {
+		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
+	}
+	return rule, nil
+}
+
 func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
 	language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
 	if err != nil {
@@ -247,6 +307,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Title = ruleInput.RuleName
 	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
+	rule.Version = sfdb.UpdateVersion(rule.Version)
 	for s, message := range ruleInput.AlertMsg {
 		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
 	}

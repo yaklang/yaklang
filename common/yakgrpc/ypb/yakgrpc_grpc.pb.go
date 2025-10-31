@@ -438,8 +438,10 @@ const (
 	Yak_QuerySyntaxFlowRule_FullMethodName                        = "/ypb.Yak/QuerySyntaxFlowRule"
 	Yak_CreateSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/CreateSyntaxFlowRule"
 	Yak_CreateSyntaxFlowRuleEx_FullMethodName                     = "/ypb.Yak/CreateSyntaxFlowRuleEx"
+	Yak_CreateSyntaxFlowRuleAuto_FullMethodName                   = "/ypb.Yak/CreateSyntaxFlowRuleAuto"
 	Yak_UpdateSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/UpdateSyntaxFlowRule"
 	Yak_UpdateSyntaxFlowRuleEx_FullMethodName                     = "/ypb.Yak/UpdateSyntaxFlowRuleEx"
+	Yak_UpdateSyntaxFlowRuleAuto_FullMethodName                   = "/ypb.Yak/UpdateSyntaxFlowRuleAuto"
 	Yak_DeleteSyntaxFlowRule_FullMethodName                       = "/ypb.Yak/DeleteSyntaxFlowRule"
 	Yak_CheckSyntaxFlowRuleUpdate_FullMethodName                  = "/ypb.Yak/CheckSyntaxFlowRuleUpdate"
 	Yak_ApplySyntaxFlowRuleUpdate_FullMethodName                  = "/ypb.Yak/ApplySyntaxFlowRuleUpdate"
@@ -451,6 +453,7 @@ const (
 	Yak_QuerySyntaxFlowSameGroup_FullMethodName                   = "/ypb.Yak/QuerySyntaxFlowSameGroup"
 	Yak_SyntaxFlowRuleToOnline_FullMethodName                     = "/ypb.Yak/SyntaxFlowRuleToOnline"
 	Yak_DownloadSyntaxFlowRule_FullMethodName                     = "/ypb.Yak/DownloadSyntaxFlowRule"
+	Yak_CompleteSyntaxFlowRule_FullMethodName                     = "/ypb.Yak/CompleteSyntaxFlowRule"
 	Yak_SyntaxFlowScan_FullMethodName                             = "/ypb.Yak/SyntaxFlowScan"
 	Yak_QuerySyntaxFlowScanTask_FullMethodName                    = "/ypb.Yak/QuerySyntaxFlowScanTask"
 	Yak_DeleteSyntaxFlowScanTask_FullMethodName                   = "/ypb.Yak/DeleteSyntaxFlowScanTask"
@@ -1130,8 +1133,10 @@ type YakClient interface {
 	QuerySyntaxFlowRule(ctx context.Context, in *QuerySyntaxFlowRuleRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowRuleResponse, error)
 	CreateSyntaxFlowRule(ctx context.Context, in *CreateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	CreateSyntaxFlowRuleEx(ctx context.Context, in *CreateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*CreateSyntaxFlowRuleResponse, error)
+	CreateSyntaxFlowRuleAuto(ctx context.Context, in *CreateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*CreateSyntaxFlowRuleResponse, error)
 	UpdateSyntaxFlowRule(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleEx(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error)
+	UpdateSyntaxFlowRuleAuto(ctx context.Context, in *UpdateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error)
 	DeleteSyntaxFlowRule(ctx context.Context, in *DeleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	CheckSyntaxFlowRuleUpdate(ctx context.Context, in *CheckSyntaxFlowRuleUpdateRequest, opts ...grpc.CallOption) (*CheckSyntaxFlowRuleUpdateResponse, error)
 	ApplySyntaxFlowRuleUpdate(ctx context.Context, in *ApplySyntaxFlowRuleUpdateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ApplySyntaxFlowRuleUpdateResponse], error)
@@ -1145,6 +1150,7 @@ type YakClient interface {
 	QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySyntaxFlowSameGroupRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowSameGroupResponse, error)
 	SyntaxFlowRuleToOnline(ctx context.Context, in *SyntaxFlowRuleToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxFlowRuleOnlineProgress], error)
 	DownloadSyntaxFlowRule(ctx context.Context, in *DownloadSyntaxFlowRuleRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxFlowRuleOnlineProgress], error)
+	CompleteSyntaxFlowRule(ctx context.Context, in *CompleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CompleteSyntaxFlowRuleResponse], error)
 	// syntaxflow scan
 	SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SyntaxFlowScanRequest, SyntaxFlowScanResponse], error)
 	QuerySyntaxFlowScanTask(ctx context.Context, in *QuerySyntaxFlowScanTaskRequest, opts ...grpc.CallOption) (*QuerySyntaxFlowScanTaskResponse, error)
@@ -6127,6 +6133,16 @@ func (c *yakClient) CreateSyntaxFlowRuleEx(ctx context.Context, in *CreateSyntax
 	return out, nil
 }
 
+func (c *yakClient) CreateSyntaxFlowRuleAuto(ctx context.Context, in *CreateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*CreateSyntaxFlowRuleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSyntaxFlowRuleResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateSyntaxFlowRuleAuto_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) UpdateSyntaxFlowRule(ctx context.Context, in *UpdateSyntaxFlowRuleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DbOperateMessage)
@@ -6141,6 +6157,16 @@ func (c *yakClient) UpdateSyntaxFlowRuleEx(ctx context.Context, in *UpdateSyntax
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateSyntaxFlowRuleResponse)
 	err := c.cc.Invoke(ctx, Yak_UpdateSyntaxFlowRuleEx_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSyntaxFlowRuleAuto(ctx context.Context, in *UpdateSyntaxFlowRuleAutoRequest, opts ...grpc.CallOption) (*UpdateSyntaxFlowRuleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSyntaxFlowRuleResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSyntaxFlowRuleAuto_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6284,9 +6310,28 @@ func (c *yakClient) DownloadSyntaxFlowRule(ctx context.Context, in *DownloadSynt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadSyntaxFlowRuleClient = grpc.ServerStreamingClient[SyntaxFlowRuleOnlineProgress]
 
+func (c *yakClient) CompleteSyntaxFlowRule(ctx context.Context, in *CompleteSyntaxFlowRuleRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CompleteSyntaxFlowRuleResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[80], Yak_CompleteSyntaxFlowRule_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[CompleteSyntaxFlowRuleRequest, CompleteSyntaxFlowRuleResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_CompleteSyntaxFlowRuleClient = grpc.ServerStreamingClient[CompleteSyntaxFlowRuleResponse]
+
 func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SyntaxFlowScanRequest, SyntaxFlowScanResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[80], Yak_SyntaxFlowScan_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[81], Yak_SyntaxFlowScan_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6429,7 +6474,7 @@ func (c *yakClient) NewSSARiskRead(ctx context.Context, in *NewSSARiskReadReques
 
 func (c *yakClient) ExportSSARisk(ctx context.Context, in *ExportSSARiskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportSSARiskResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[81], Yak_ExportSSARisk_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[82], Yak_ExportSSARisk_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6448,7 +6493,7 @@ type Yak_ExportSSARiskClient = grpc.ServerStreamingClient[ExportSSARiskResponse]
 
 func (c *yakClient) ImportSSARisk(ctx context.Context, in *ImportSSARiskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportSSARiskResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[82], Yak_ImportSSARisk_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[83], Yak_ImportSSARisk_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6467,7 +6512,7 @@ type Yak_ImportSSARiskClient = grpc.ServerStreamingClient[ImportSSARiskResponse]
 
 func (c *yakClient) SSARiskDiff(ctx context.Context, in *SSARiskDiffRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SSARiskDiffResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[83], Yak_SSARiskDiff_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_SSARiskDiff_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6666,7 +6711,7 @@ func (c *yakClient) GenerateFuzztag(ctx context.Context, in *GenerateFuzztagRequ
 
 func (c *yakClient) ExportSyntaxFlows(ctx context.Context, in *ExportSyntaxFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxflowsProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_ExportSyntaxFlows_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_ExportSyntaxFlows_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6685,7 +6730,7 @@ type Yak_ExportSyntaxFlowsClient = grpc.ServerStreamingClient[SyntaxflowsProgres
 
 func (c *yakClient) ImportSyntaxFlows(ctx context.Context, in *ImportSyntaxFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxflowsProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_ImportSyntaxFlows_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_ImportSyntaxFlows_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6814,7 +6859,7 @@ func (c *yakClient) ResetMITMHijackFilter(ctx context.Context, in *Empty, opts .
 
 func (c *yakClient) ExportHTTPFlowStream(ctx context.Context, in *ExportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6833,7 +6878,7 @@ type Yak_ExportHTTPFlowStreamClient = grpc.ServerStreamingClient[ExportHTTPFlowS
 
 func (c *yakClient) ImportHTTPFlowStream(ctx context.Context, in *ImportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6902,7 +6947,7 @@ func (c *yakClient) SearchNoteContent(ctx context.Context, in *SearchNoteContent
 
 func (c *yakClient) ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_ImportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_ImportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6921,7 +6966,7 @@ type Yak_ImportNoteClient = grpc.ServerStreamingClient[ImportNoteResponse]
 
 func (c *yakClient) ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_ExportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_ExportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6940,7 +6985,7 @@ type Yak_ExportNoteClient = grpc.ServerStreamingClient[ExportNoteResponse]
 
 func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_StartAIReAct_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_StartAIReAct_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6953,7 +6998,7 @@ type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEve
 
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_StartAITask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_StartAITask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6996,7 +7041,7 @@ func (c *yakClient) QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, o
 
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_StartAITriage_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_StartAITriage_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7059,7 +7104,7 @@ func (c *yakClient) GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts 
 
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_StartMcpServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_StartMcpServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7178,7 +7223,7 @@ func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReady
 
 func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_InstallLlamaServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7197,7 +7242,7 @@ type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_StartLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_StartLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7226,7 +7271,7 @@ func (c *yakClient) StopLocalModel(ctx context.Context, in *StopLocalModelReques
 
 func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_DownloadLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7315,7 +7360,7 @@ func (c *yakClient) IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearc
 
 func (c *yakClient) InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7414,7 +7459,7 @@ func (c *yakClient) ListThirdPartyBinary(ctx context.Context, in *Empty, opts ..
 
 func (c *yakClient) InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7453,7 +7498,7 @@ func (c *yakClient) IsThirdPartyBinaryReady(ctx context.Context, in *IsThirdPart
 
 func (c *yakClient) StartThirdPartyBinary(ctx context.Context, in *StartThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7472,7 +7517,7 @@ type Yak_StartThirdPartyBinaryClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_PluginTrace_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[101], Yak_PluginTrace_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7595,7 +7640,7 @@ func (c *yakClient) SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnow
 
 func (c *yakClient) QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[101], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[102], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7694,7 +7739,7 @@ func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotReques
 
 func (c *yakClient) ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[102], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[103], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7713,7 +7758,7 @@ type Yak_ExportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
 
 func (c *yakClient) ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[103], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[104], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7772,7 +7817,7 @@ func (c *yakClient) GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRe
 
 func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[104], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[105], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8335,8 +8380,10 @@ type YakServer interface {
 	QuerySyntaxFlowRule(context.Context, *QuerySyntaxFlowRuleRequest) (*QuerySyntaxFlowRuleResponse, error)
 	CreateSyntaxFlowRule(context.Context, *CreateSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	CreateSyntaxFlowRuleEx(context.Context, *CreateSyntaxFlowRuleRequest) (*CreateSyntaxFlowRuleResponse, error)
+	CreateSyntaxFlowRuleAuto(context.Context, *CreateSyntaxFlowRuleAutoRequest) (*CreateSyntaxFlowRuleResponse, error)
 	UpdateSyntaxFlowRule(context.Context, *UpdateSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	UpdateSyntaxFlowRuleEx(context.Context, *UpdateSyntaxFlowRuleRequest) (*UpdateSyntaxFlowRuleResponse, error)
+	UpdateSyntaxFlowRuleAuto(context.Context, *UpdateSyntaxFlowRuleAutoRequest) (*UpdateSyntaxFlowRuleResponse, error)
 	DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error)
 	CheckSyntaxFlowRuleUpdate(context.Context, *CheckSyntaxFlowRuleUpdateRequest) (*CheckSyntaxFlowRuleUpdateResponse, error)
 	ApplySyntaxFlowRuleUpdate(*ApplySyntaxFlowRuleUpdateRequest, grpc.ServerStreamingServer[ApplySyntaxFlowRuleUpdateResponse]) error
@@ -8350,6 +8397,7 @@ type YakServer interface {
 	QuerySyntaxFlowSameGroup(context.Context, *QuerySyntaxFlowSameGroupRequest) (*QuerySyntaxFlowSameGroupResponse, error)
 	SyntaxFlowRuleToOnline(*SyntaxFlowRuleToOnlineRequest, grpc.ServerStreamingServer[SyntaxFlowRuleOnlineProgress]) error
 	DownloadSyntaxFlowRule(*DownloadSyntaxFlowRuleRequest, grpc.ServerStreamingServer[SyntaxFlowRuleOnlineProgress]) error
+	CompleteSyntaxFlowRule(*CompleteSyntaxFlowRuleRequest, grpc.ServerStreamingServer[CompleteSyntaxFlowRuleResponse]) error
 	// syntaxflow scan
 	SyntaxFlowScan(grpc.BidiStreamingServer[SyntaxFlowScanRequest, SyntaxFlowScanResponse]) error
 	QuerySyntaxFlowScanTask(context.Context, *QuerySyntaxFlowScanTaskRequest) (*QuerySyntaxFlowScanTaskResponse, error)
@@ -9772,11 +9820,17 @@ func (UnimplementedYakServer) CreateSyntaxFlowRule(context.Context, *CreateSynta
 func (UnimplementedYakServer) CreateSyntaxFlowRuleEx(context.Context, *CreateSyntaxFlowRuleRequest) (*CreateSyntaxFlowRuleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSyntaxFlowRuleEx not implemented")
 }
+func (UnimplementedYakServer) CreateSyntaxFlowRuleAuto(context.Context, *CreateSyntaxFlowRuleAutoRequest) (*CreateSyntaxFlowRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSyntaxFlowRuleAuto not implemented")
+}
 func (UnimplementedYakServer) UpdateSyntaxFlowRule(context.Context, *UpdateSyntaxFlowRuleRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRule not implemented")
 }
 func (UnimplementedYakServer) UpdateSyntaxFlowRuleEx(context.Context, *UpdateSyntaxFlowRuleRequest) (*UpdateSyntaxFlowRuleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleEx not implemented")
+}
+func (UnimplementedYakServer) UpdateSyntaxFlowRuleAuto(context.Context, *UpdateSyntaxFlowRuleAutoRequest) (*UpdateSyntaxFlowRuleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSyntaxFlowRuleAuto not implemented")
 }
 func (UnimplementedYakServer) DeleteSyntaxFlowRule(context.Context, *DeleteSyntaxFlowRuleRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSyntaxFlowRule not implemented")
@@ -9810,6 +9864,9 @@ func (UnimplementedYakServer) SyntaxFlowRuleToOnline(*SyntaxFlowRuleToOnlineRequ
 }
 func (UnimplementedYakServer) DownloadSyntaxFlowRule(*DownloadSyntaxFlowRuleRequest, grpc.ServerStreamingServer[SyntaxFlowRuleOnlineProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadSyntaxFlowRule not implemented")
+}
+func (UnimplementedYakServer) CompleteSyntaxFlowRule(*CompleteSyntaxFlowRuleRequest, grpc.ServerStreamingServer[CompleteSyntaxFlowRuleResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method CompleteSyntaxFlowRule not implemented")
 }
 func (UnimplementedYakServer) SyntaxFlowScan(grpc.BidiStreamingServer[SyntaxFlowScanRequest, SyntaxFlowScanResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method SyntaxFlowScan not implemented")
@@ -17184,6 +17241,24 @@ func _Yak_CreateSyntaxFlowRuleEx_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateSyntaxFlowRuleAuto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSyntaxFlowRuleAutoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSyntaxFlowRuleAuto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSyntaxFlowRuleAuto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSyntaxFlowRuleAuto(ctx, req.(*CreateSyntaxFlowRuleAutoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_UpdateSyntaxFlowRule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateSyntaxFlowRuleRequest)
 	if err := dec(in); err != nil {
@@ -17216,6 +17291,24 @@ func _Yak_UpdateSyntaxFlowRuleEx_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).UpdateSyntaxFlowRuleEx(ctx, req.(*UpdateSyntaxFlowRuleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSyntaxFlowRuleAuto_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSyntaxFlowRuleAutoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSyntaxFlowRuleAuto(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSyntaxFlowRuleAuto_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSyntaxFlowRuleAuto(ctx, req.(*UpdateSyntaxFlowRuleAutoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -17396,6 +17489,17 @@ func _Yak_DownloadSyntaxFlowRule_Handler(srv interface{}, stream grpc.ServerStre
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadSyntaxFlowRuleServer = grpc.ServerStreamingServer[SyntaxFlowRuleOnlineProgress]
+
+func _Yak_CompleteSyntaxFlowRule_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(CompleteSyntaxFlowRuleRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).CompleteSyntaxFlowRule(m, &grpc.GenericServerStream[CompleteSyntaxFlowRuleRequest, CompleteSyntaxFlowRuleResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_CompleteSyntaxFlowRuleServer = grpc.ServerStreamingServer[CompleteSyntaxFlowRuleResponse]
 
 func _Yak_SyntaxFlowScan_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).SyntaxFlowScan(&grpc.GenericServerStream[SyntaxFlowScanRequest, SyntaxFlowScanResponse]{ServerStream: stream})
@@ -20936,12 +21040,20 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_CreateSyntaxFlowRuleEx_Handler,
 		},
 		{
+			MethodName: "CreateSyntaxFlowRuleAuto",
+			Handler:    _Yak_CreateSyntaxFlowRuleAuto_Handler,
+		},
+		{
 			MethodName: "UpdateSyntaxFlowRule",
 			Handler:    _Yak_UpdateSyntaxFlowRule_Handler,
 		},
 		{
 			MethodName: "UpdateSyntaxFlowRuleEx",
 			Handler:    _Yak_UpdateSyntaxFlowRuleEx_Handler,
+		},
+		{
+			MethodName: "UpdateSyntaxFlowRuleAuto",
+			Handler:    _Yak_UpdateSyntaxFlowRuleAuto_Handler,
 		},
 		{
 			MethodName: "DeleteSyntaxFlowRule",
@@ -21810,6 +21922,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "DownloadSyntaxFlowRule",
 			Handler:       _Yak_DownloadSyntaxFlowRule_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "CompleteSyntaxFlowRule",
+			Handler:       _Yak_CompleteSyntaxFlowRule_Handler,
 			ServerStreams: true,
 		},
 		{

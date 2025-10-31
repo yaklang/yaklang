@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -31,6 +33,31 @@ func (s *Server) QuerySyntaxFlowRule(ctx context.Context, req *ypb.QuerySyntaxFl
 		rsp.Rule = append(rsp.Rule, d.ToGRPCModel())
 	}
 	return rsp, nil
+}
+
+// 只需要配置关键信息，其他由AI生成
+func (s *Server) CreateSyntaxFlowRuleAuto(ctx context.Context, req *ypb.CreateSyntaxFlowRuleAutoRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
+	if req == nil || req.GetSyntaxFlowInput() == nil {
+		return nil, utils.Error("create syntax flow rule failed: request is nil")
+	}
+
+	input := req.GetSyntaxFlowInput()
+	rule, err := yakit.ParseSyntaxFlowAutoInput(input)
+	if err != nil {
+		return nil, err
+	}
+	_, err = sfdb.CreateRuleWithDefaultGroup(rule, input.GetGroupNames()...)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.CreateSyntaxFlowRuleResponse{
+		Rule: rule.ToGRPCModel(),
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreate,
+			EffectRows: 1,
+		},
+	}, nil
 }
 
 func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSyntaxFlowRuleRequest) (*ypb.CreateSyntaxFlowRuleResponse, error) {
@@ -63,6 +90,24 @@ func (s *Server) CreateSyntaxFlowRule(ctx context.Context, req *ypb.CreateSyntax
 	} else {
 		return ret.Message, nil
 	}
+}
+
+func (s *Server) UpdateSyntaxFlowRuleAuto(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleAutoRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
+	if req == nil || req.SyntaxFlowInput == nil {
+		return nil, utils.Error("update syntax flow rule failed: request is nil")
+	}
+	updatedRule, err := yakit.UpdateSyntaxFlowAutoRule(s.GetProfileDatabase(), req.SyntaxFlowInput)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.UpdateSyntaxFlowRuleResponse{
+		Message: &ypb.DbOperateMessage{
+			TableName:  "syntax_flow_rule",
+			Operation:  DbOperationCreateOrUpdate,
+			EffectRows: 1,
+		},
+		Rule: updatedRule.ToGRPCModel(),
+	}, nil
 }
 
 func (s *Server) UpdateSyntaxFlowRuleEx(ctx context.Context, req *ypb.UpdateSyntaxFlowRuleRequest) (*ypb.UpdateSyntaxFlowRuleResponse, error) {
@@ -141,7 +186,7 @@ func (s *Server) SyntaxFlowRuleToOnline(req *ypb.SyntaxFlowRuleToOnlineRequest, 
 		progress := float64(i) / float64(len(ret))
 
 		if remoteVersion, ok := remoteVersionMap[k.RuleName]; ok {
-			if shouldSkipUpload(k.Version, remoteVersion) {
+			if sfdb.CheckNewerVersion(remoteVersion, k.Version) {
 				sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 远端版本为最新 (远端: %s，本地: %s)，跳过上传", k.RuleName, remoteVersion, k.Version), "info")
 				continue
 			}
@@ -219,16 +264,6 @@ func fetchRemoteRuleVersionMap(ctx context.Context, client *yaklib.OnlineClient,
 	return versionMap, nil
 }
 
-func shouldSkipUpload(localVersion, remoteVersion string) bool {
-	if remoteVersion == "" {
-		return false
-	}
-	if localVersion == "" {
-		return true
-	}
-	return localVersion <= remoteVersion
-}
-
 func uploadRule(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
 	content, err := json.Marshal(rule)
 	if err != nil {
@@ -299,7 +334,7 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 
 		localRule, err := sfdb.QueryRuleByRuleId(s.GetProfileDatabase(), result.RuleId)
 		if err == nil && localRule != nil {
-			if shouldSkipUpdate(localRule.Version, result.Version) {
+			if sfdb.CheckNewerVersion(localRule.Version, result.Version) {
 				skippedCount++
 				sendProgress(stream, progress, fmt.Sprintf("规则 [%s] 已是最新版本 (本地: %s, 在线: %s)，跳过更新", result.RuleName, localRule.Version, result.Version), "info")
 				continue
@@ -333,13 +368,93 @@ func (s *Server) DownloadSyntaxFlowRule(req *ypb.DownloadSyntaxFlowRuleRequest, 
 	})
 }
 
-func shouldSkipUpdate(localVersion, onlineVersion string) bool {
-	if onlineVersion == "" {
-		return true
+func (s *Server) CompleteSyntaxFlowRule(req *ypb.CompleteSyntaxFlowRuleRequest, stream ypb.Yak_CompleteSyntaxFlowRuleServer) error {
+	if req == nil {
+		return utils.Error("request is nil")
 	}
 
-	if localVersion == "" {
-		return false
+	ruleContent := req.GetRuleContent()
+	if ruleContent == "" {
+		return utils.Error("rule content is empty")
 	}
-	return localVersion >= onlineVersion
+
+	fileName := req.GetFileName()
+	if fileName == "" {
+		fileName = "rule.sf"
+	}
+
+	// 发送开始消息
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "开始优化规则...",
+		Progress: 0.1,
+	})
+
+	// 构建 AI 配置选项
+	aiOpts := buildAIOptions(req)
+
+	// 调用规则补全逻辑
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "正在调用 AI 补全规则描述...",
+		Progress: 0.3,
+	})
+
+	completedRule, err := sfcompletion.CompleteRuleDesc(fileName, ruleContent, aiOpts...)
+	if err != nil {
+		return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+			Status:   "error",
+			Message:  fmt.Sprintf("规则补全失败: %v", err),
+			Progress: 1.0,
+		})
+	}
+
+	// 验证优化后的规则
+	stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:   "processing",
+		Message:  "正在验证优化后的规则...",
+		Progress: 0.8,
+	})
+
+	if _, err := sfdb.CheckSyntaxFlowRuleContent(completedRule); err != nil {
+		return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+			Status:   "error",
+			Message:  fmt.Sprintf("优化后的规则验证失败: %v", err),
+			Progress: 1.0,
+		})
+	}
+
+	// 发送成功结果
+	return stream.Send(&ypb.CompleteSyntaxFlowRuleResponse{
+		Status:        "completed",
+		Message:       "规则优化完成",
+		CompletedRule: completedRule,
+		Progress:      1.0,
+	})
+}
+
+// buildAIOptions 根据请求构建 AI 配置选项
+func buildAIOptions(req *ypb.CompleteSyntaxFlowRuleRequest) []aispec.AIConfigOption {
+	var opts []aispec.AIConfigOption
+
+	if aiType := req.GetAIType(); aiType != "" {
+		opts = append(opts, aispec.WithType(aiType))
+	}
+	if apiKey := req.GetAPIKey(); apiKey != "" {
+		opts = append(opts, aispec.WithAPIKey(apiKey))
+	}
+	if model := req.GetModel(); model != "" {
+		opts = append(opts, aispec.WithModel(model))
+	}
+	if proxy := req.GetProxy(); proxy != "" {
+		opts = append(opts, aispec.WithProxy(proxy))
+	}
+	if domain := req.GetDomain(); domain != "" {
+		opts = append(opts, aispec.WithDomain(domain))
+	}
+	if baseURL := req.GetBaseURL(); baseURL != "" {
+		opts = append(opts, aispec.WithBaseURL(baseURL))
+	}
+
+	return opts
 }

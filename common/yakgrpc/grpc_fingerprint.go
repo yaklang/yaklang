@@ -2,8 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/samber/lo"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
