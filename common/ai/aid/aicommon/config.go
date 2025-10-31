@@ -1307,6 +1307,22 @@ func WithDisableOutputEvent(types ...string) ConfigOption {
 	return WithDisableOutputEventType(types...)
 }
 
+// WithTimeLineLimit sets the timeline content size limit (deprecated name, kept for compatibility).
+func WithTimeLineLimit(limit int) ConfigOption {
+	return func(c *Config) error {
+		if limit < 0 {
+			return utils.Error("timeline limit cannot be negative")
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.TimelineContentSizeLimit = limit
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithTimeline(t *Timeline) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
