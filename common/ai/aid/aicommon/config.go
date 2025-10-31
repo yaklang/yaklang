@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand/v2"
+	"os"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -18,11 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand/v2"
-	"os"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 type ConfigOption func(*Config) error
@@ -1120,6 +1121,13 @@ func WithSequence(seq int64) ConfigOption {
 func WithAIKBPath(path string) ConfigOption {
 	return func(c *Config) error {
 		c.SetConfig("aikb_path", path)
+		return nil
+	}
+}
+
+func WithAIKBRagPath(path string) ConfigOption {
+	return func(c *Config) error {
+		c.SetConfig("aikb_rag_path", path)
 		return nil
 	}
 }
