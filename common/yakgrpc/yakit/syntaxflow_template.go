@@ -52,7 +52,10 @@ func createRuleByTemplate(ruleInput *ypb.SyntaxFlowRuleAutoInput) string {
 
 	// derive basic fields
 	level := deriveLevel(ruleLevels)
-	risk := deriveRisk(ruleSubjects)
+	risk := ruleInput.GetRiskType()
+	if risk == "" {
+		risk = ""
+	}
 	rule_id := uuid.NewString()
 	ext := languageToExt(language)
 
@@ -61,15 +64,28 @@ func createRuleByTemplate(ruleInput *ypb.SyntaxFlowRuleAutoInput) string {
 		titleVal = fmt.Sprintf("Auto Generated %s Rule", strings.Title(language))
 	}
 
-	for i, _ := range ruleSubjects {
+	// 如果没有提供 subjects，使用默认值
+	if len(ruleSubjects) == 0 {
+		ruleSubjects = []string{"any() as $entry"}
+	}
+
+	// 安全访问数组，避免越界
+	getSafeTest := func(arr []string, idx int) string {
+		if idx < len(arr) {
+			return arr[idx]
+		}
+		return ""
+	}
+
+	for i := range ruleSubjects {
 		keys += fmt.Sprintf(part,
-			ruleSubjects[i],    // %s subject(s)
-			language,           // %s lang
-			level,              // %s level
-			ext,                // %s main file ext
-			ruleUnSafeTests[i], // %s unsafe code
-			ext,                // %s safe http client ext
-			ruleSafeTests[i],   // %s safe1 code
+			ruleSubjects[i],                 // %s subject(s)
+			language,                        // %s lang
+			level,                           // %s level
+			ext,                             // %s main file ext
+			getSafeTest(ruleUnSafeTests, i), // %s unsafe code
+			ext,                             // %s safe http client ext
+			getSafeTest(ruleSafeTests, i),   // %s safe code
 		)
 	}
 
@@ -97,11 +113,6 @@ func deriveLevel(levels []string) string {
 		}
 	}
 	return best
-}
-
-func deriveRisk(subjects []string) string {
-	// use a generic risk; subjects are code expressions and may not convey human-readable risk
-	return "generic-risk"
 }
 
 func languageToExt(lang string) string {

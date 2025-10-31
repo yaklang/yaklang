@@ -7123,13 +7123,14 @@ message SyntaxFlowRuleAutoInput {
   string RuleName = 1; // RuleName作为索引，因此不能update RuleName
   string Language = 2;
   string Description = 3;
-  repeated string Tags = 4;
+  string RiskType = 4;
   repeated string GroupNames = 5;
   repeated string RuleSubjects = 6;
   repeated string RuleSafeTests = 7;
   repeated string RuleUnSafeTests = 8;
   repeated string RuleLevels = 9;
-  map<string, AlertMessage> AlertMsg = 10;
+  repeated string Tags = 10;
+  map<string, AlertMessage> AlertMsg = 11;
 }
 
 message SyntaxFlowRuleFilter {

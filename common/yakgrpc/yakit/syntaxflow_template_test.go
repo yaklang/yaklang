@@ -28,7 +28,7 @@ func TestCreateRuleByTemplate(t *testing.T) {
 		require.Contains(t, out, "level: high")
 		require.Contains(t, out, "lang: golang")
 		require.Contains(t, out, "title: \"Golang OS Exec\"")
-		require.Contains(t, out, "risk: \"generic-risk\"")
+		require.Contains(t, out, "risk: \"\"")
 		require.Contains(t, out, "any() as $entry")
 		require.Contains(t, out, "\"file://unsafe.go\": <<<UNSAFE")
 		require.Contains(t, out, "package main\nfunc main(){}")
@@ -123,7 +123,7 @@ func main() {
 		require.Contains(t, out, "title: \"Golang OS Exec\"")
 		require.Contains(t, out, "type: audit")
 		require.Contains(t, out, "level: high")
-		require.Contains(t, out, "risk: \"generic-risk\"")
+		require.Contains(t, out, "risk: \"\"")
 
 		// Verify both subjects are present
 		require.Contains(t, out, "exec?{<fullTypeName>?{have: 'os/exec'}} as $entry")

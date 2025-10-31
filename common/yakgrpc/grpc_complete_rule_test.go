@@ -82,7 +82,7 @@ desc(
 	title: "Golang OS Exec"
 	type: audit
 	level: high
-	risk: "generic-risk"
+	risk: ""
 	desc: <<<DESC
 
 DESC
