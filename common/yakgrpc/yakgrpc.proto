@@ -7448,6 +7448,20 @@ message SyntaxFlowScanResponse{
   SyntaxFlowResult Result = 4;
   repeated Risk risks = 5;
   repeated SSARisk SSARisks = 6;
+
+  repeated SyntaxFlowScanActiveTask ActiveTask = 7;
+}
+
+message SyntaxFlowScanActiveTask {
+  // index 
+  string RuleName = 3;
+  string ProgramName = 4; 
+  // progress 
+  double Progress = 5; 
+
+  // update 
+  int64 UpdateTime = 6;
+  string Info = 7;
 }
 
 
