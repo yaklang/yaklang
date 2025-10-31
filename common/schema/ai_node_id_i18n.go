@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"fast-memory-fetch": {
+		Zh: "快速记忆检索",
+		En: "Fast Memory Fetch",
+	},
 	"grep_yaklang_samples": {
 		Zh: "搜索Yaklang样本",
 		En: "Search Yaklang Samples",
