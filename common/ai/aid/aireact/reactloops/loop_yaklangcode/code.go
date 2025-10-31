@@ -164,17 +164,7 @@ func init() {
 				deleteLines(r),
 				batchRegexReplace(r),
 			}
-
 			preset = append(preset, opts...)
-			enhanceCollectionName := defaultYaklangRagCollection
-			if config.GetConfigString("aikb_collection") != "" {
-				enhanceCollectionName = config.GetConfigString("aikb_collection")
-			}
-			if rag.CollectionIsExists(consts.GetGormProfileDatabase(), enhanceCollectionName) {
-				log.Infof("RAG collection '%s' loaded successfully for WriteYakLangCode loop", enhanceCollectionName)
-				preset = append(preset, ragQueryDocumentAction(r, consts.GetGormProfileDatabase(), enhanceCollectionName))
-			}
-
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},
 	)
