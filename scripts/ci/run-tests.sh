@@ -89,7 +89,7 @@ find_matching_tests() {
 }
 
 if [[ ! -f "$MANIFEST" ]]; then
-  echo "❌ Manifest not found: $MANIFEST"
+  echo " Manifest not found: $MANIFEST"
   exit 1
 fi
 
@@ -150,7 +150,7 @@ run_test() {
   while [[ $attempt -le $max_retries ]]; do
     if [[ $attempt -gt 0 ]]; then
       echo ""
-      echo "⚠️  重试测试 (尝试 $((attempt + 1))/$((max_retries + 1))): $name"
+      echo " 重试测试 (尝试 $((attempt + 1))/$((max_retries + 1))): $name"
       sleep "$delay"
     fi
     
@@ -175,7 +175,7 @@ run_test() {
     
     if [[ $code -eq 0 ]]; then
       echo "PASS: $name"
-      [[ $attempt -gt 0 ]] && echo "✅ 重试成功！(在第 $((attempt + 1)) 次尝试)"
+      [[ $attempt -gt 0 ]] && echo " 重试成功！(在第 $((attempt + 1)) 次尝试)"
       success=1
       break
     else
@@ -193,7 +193,7 @@ run_test() {
   
   if [[ $success -eq 0 ]]; then
     echo ""
-    echo "❌ 测试失败，已尝试 $((max_retries + 1)) 次: $name"
+    echo "测试失败，已尝试 $((max_retries + 1)) 次: $name"
     echo "完整日志: $log"
     return 1
   fi
@@ -211,8 +211,8 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
   echo ""
   
   if ! command -v jq >/dev/null 2>&1; then
-    echo "❌ ERROR: jq is required for config-driven mode but not found"
-    echo "   Please install jq or remove TEST_CONFIG to use default mode"
+    echo " ERROR: jq is required for config-driven mode but not found"
+    echo " Please install jq or remove TEST_CONFIG to use default mode"
     exit 1
   fi
   
@@ -246,7 +246,7 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
     matched=$(find_matching_tests "$pattern")
     
     if [[ -z "$matched" ]]; then
-      echo "  ⚠️  No matching tests found"
+      echo "  No matching tests found"
       echo ""
       continue
     fi
@@ -289,9 +289,9 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
   done
   
   if [[ $uncovered_count -eq 0 ]]; then
-    echo "✅ All tests are covered by config rules"
+    echo " All tests are covered by config rules"
   else
-    echo "⚠️  WARNING: Found $uncovered_count test(s) not covered by config:"
+    echo " WARNING: Found $uncovered_count test(s) not covered by config:"
     for pkg in "${uncovered_tests[@]}"; do
       echo "  - $pkg"
     done
@@ -319,9 +319,9 @@ echo "=== Test Summary ==="
 echo "Total tests: ${#ALL_TEST_BINS[@]}"
 
 if [[ $rc -eq 0 ]]; then
-  echo "Result: ✅ ALL PASSED"
+  echo "Result: ALL PASSED"
 else
-  echo "Result: ❌ SOME FAILED"
+  echo "Result: SOME FAILED"
   echo ""
   echo "Failed tests:"
   # 列出所有包含失败标记的日志
