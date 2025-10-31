@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aibalance"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
@@ -385,20 +384,10 @@ func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.Gener
 	}, nil
 }
 
-// _loadAIService is a helper function to load an AI service by type name
-func _loadAIService(typeName string, opts ...aispec.AIConfigOption) (aicommon.AICallbackType, error) {
-	chatter, err := LoadChater(typeName, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return aicommon.AIChatToAICallbackType(chatter), nil
-}
-
 var Exports = map[string]any{
-	"OpenAI":        OpenAI,
-	"ChatGLM":       ChatGLM,
-	"Moonshot":      Moonshot,
-	"LoadAIService": _loadAIService,
+	"OpenAI":   OpenAI,
+	"ChatGLM":  ChatGLM,
+	"Moonshot": Moonshot,
 
 	"Chat":                    Chat,
 	"FunctionCall":            FunctionCall,
