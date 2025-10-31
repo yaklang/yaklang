@@ -83,10 +83,9 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 	result, err := yak.ExecuteForge(forge.ForgeName, map[string]any{
 		"query": "1+1",
 	},
-		yak.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
-		yak.WithAgreeYOLO(),
-		yak.WithDebugPrompt(true),
-		yak.WithDebug(true),
+		aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithDebugPrompt(true),
 	)
 	if err != nil {
 		return nil, err

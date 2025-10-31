@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
+	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -115,76 +117,69 @@ var AIAgentExport = map[string]any{
 		ai forge api
 	*/
 	// exec ai forge
-	"ExecuteForge":   ExecuteForge,
-	"planAICallback": WithPlanAICallback,
-	"taskAICallback": WithTaskAICallback,
-	"aiCallback":     WithAICallback,
-
-	"CreateLiteForge":          NewLiteForge,
-	"liteForgePrompt":          WithLiteForgePrompt,
-	"liteForgeOutputSchema":    WithLiteForgeOutputSchema,
-	"liteForgeOutputMemoryOP":  WithLiteForgeOutputMemoryOP,
-	"liteForgedRequireParams":  WithLiteForgeRequireParams,
-	"liteForgeOutputSchemaRaw": WithLiteForgeOutputSchemaRaw,
-
-	// todo: need to split?
-
+	"ExecuteForge": ExecuteForge,
 	//  create ai forge blue print
-	"CreateForge":           NewForgeBlueprint,
-	"NewExecutor":           NewForgeExecutor,
-	"NewExecutorFromJson":   NewExecutorFromJson,
-	"tools":                 WithTools,
-	"initPrompt":            WithInitializePrompt,
-	"persistentPrompt":      WithPersistentPrompt,
-	"resultPrompt":          WithResultPrompt,
-	"plan":                  WithPlanMocker,
-	"forgePlanMocker":       WithForgePlanMocker,
-	"initializePrompt":      WithInitializePrompt, // similar to initPrompt above
-	"resultPromptForge":     WithResultPrompt,     // similar to resultPrompt above
-	"resultHandlerForge":    WithResultHandlerForge,
-	"persistentPromptForge": WithPersistentPrompt, // similar to persistentPrompt above
-	"toolKeywords":          WithToolKeywords,
-	"forgeTools":            WithForgeTools,
-	"originYaklangCliCode":  WithOriginYaklangCliCode,
+	"CreateForge":         NewForgeBlueprint,
+	"NewExecutor":         NewForgeExecutor,
+	"NewExecutorFromJson": NewExecutorFromJson,
+	"CreateLiteForge":     NewLiteForge,
+
+	"planAICallback": aicommon.WithQualityPriorityAICallback,
+	"taskAICallback": aicommon.WithSpeedPriorityAICallback,
+	"aiCallback":     aicommon.WithAICallback,
+
+	// liteforge options
+	"liteForgePrompt":          aiforge.WithLiteForge_Prompt,
+	"liteForgeOutputSchema":    aiforge.WithLiteForge_OutputSchema,
+	"liteForgedRequireParams":  aiforge.WithLiteForge_RequireParams,
+	"liteForgeOutputSchemaRaw": aiforge.WithLiteForge_OutputSchemaRaw,
+	// "liteForgeOutputMemoryOP":  aiforge.WithLiteForge_OutputMemoryOP, // !已废弃
+
+	// forge
+	"tools":                 aicommon.WithTools,
+	"forgeTools":            aiforge.WithTools,
+	"initPrompt":            aiforge.WithInitializePrompt,
+	"initializePrompt":      aiforge.WithInitializePrompt, // alias for initPrompt
+	"persistentPrompt":      aiforge.WithPersistentPrompt,
+	"persistentPromptForge": aiforge.WithPersistentPrompt, // similar to persistentPrompt above
+	"resultPrompt":          aiforge.WithResultPrompt,
+	"resultPromptForge":     aiforge.WithResultPrompt, // similar to resultPrompt above
+	"plan":                  aid.WithPlanMocker,       // plan mocker
+	"forgePlanMocker":       aiforge.WithPlanMocker,
+
+	"resultHandlerForge":   aiforge.WithResultHandler,
+	"toolKeywords":         aiforge.WithToolKeywords,
+	"originYaklangCliCode": aiforge.WithOriginYaklangCliCode,
 
 	/*
 		aid api
 	*/
-	"agreeAuto":                    WithAgreeAuto,
-	"agreeYOLO":                    WithAgreeYOLO,
-	"agreePolicyAI":                WithAIAgree,
-	"agreeManual":                  WithAgreeManual,
-	"extendedActionCallback":       WithExtendedActionCallback,
-	"resultHandler":                WithResultHandler,
+	"offsetSeq":                    aicommon.WithSequence,
+	"tool":                         aicommon.WithTool,
+	"agreeAuto":                    aicommon.WithAgreeAuto,
+	"agreeYOLO":                    aicommon.WithAgreeYOLO,
+	"agreePolicyAI":                aicommon.WithAIAgree,
+	"agreeManual":                  aicommon.WithAgreeManual,
+	"agreePolicy":                  aicommon.WithAgreePolicy,
+	"extendedActionCallback":       aicommon.WithExtendedActionCallback,
+	"resultHandler":                aid.WithResultHandler,
 	"forgeName":                    WithForgeName,
 	"context":                      WithContext,
 	"extendAIDOptions":             WithExtendAICommonOptions,
-	"offsetSeq":                    WithOffsetSeq,
-	"tool":                         WithTool,
-	"disallowRequireForUserPrompt": WithDisallowRequireForUserPrompt,
-	"manualAssistantCallback":      WithManualAssistantCallback,
-	"agreePolicy":                  WithAgreePolicy,
-	"aiAgree":                      WithAIAgree,
-	"allowRequireForUserInteract":  WithAllowRequireForUserInteract,
-	"toolManager":                  WithToolManager,
-	"memory":                       WithMemory,
-	"coordinatorAICallback":        WithCoordinatorAICallback,
-	"systemFileOperator":           WithSystemFileOperator,
-	"jarOperator":                  WithJarOperator,
-	"omniSearchTool":               WithOmniSearchTool,
-	"aiToolsSearchTool":            WithAiToolsSearchTool,
-	"aiForgeSearchTool":            WithAiForgeSearchTool,
-	"debugPrompt":                  WithDebugPrompt,
-	"eventHandler":                 WithEventHandler,
-	"eventInputChan":               WithEventInputChan,
-	"debug":                        WithDebug,
-	"appendPersistentMemory":       WithAppendPersistentMemory,
-	"timeLineLimit":                WithTimeLineLimit,
-	"timelineContentLimit":         WithTimelineContentLimit,
-	"disableToolUse":               WithDisableToolUse,
-	"aiAutoRetry":                  WithAIAutoRetry,
-	"aiTransactionRetry":           WithAITransactionRetry,
-	"disableOutputType":            WithDisableOutputType,
+	"disallowRequireForUserPrompt": aicommon.WithDisallowRequireForUserPrompt,
+	"manualAssistantCallback":      aicommon.WithManualAssistantCallback,
+	"allowRequireForUserInteract":  aicommon.WithAllowRequireForUserInteract,
+	"coordinatorAICallback":        aicommon.WithQualityPriorityAICallback,
+	"systemFileOperator":           aicommon.WithSystemFileOperator,
+	"omniSearchTool":               aicommon.WithOmniSearchTool,
+	"debugPrompt":                  aicommon.WithDebugPrompt,
+	"debug":                        aicommon.WithDebug,
+	"appendPersistentMemory":       aicommon.WithAppendPersistentMemory,
+	"timelineContentLimit":         aicommon.WithTimelineContentLimit,
+	"disableToolUse":               aicommon.WithDisableToolUse,
+	"aiAutoRetry":                  aicommon.WithAIAutoRetry,
+	"aiTransactionRetry":           aicommon.WithAITransactionRetry,
+	"disableOutputType":            aicommon.WithDisableOutputEvent,
 
 	/*
 		ai utils api

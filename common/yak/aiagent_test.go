@@ -89,7 +89,7 @@ func TestReducerAI(t *testing.T) {
 				WithExtendAICommonOptions(
 					aicommon.WithDebugPrompt(true),
 				),
-				WithDisallowRequireForUserPrompt(),
+				aicommon.WithDisallowRequireForUserPrompt(),
 			)
 			if err != nil {
 				return err
@@ -129,8 +129,7 @@ func TestReducerAI2(t *testing.T) {
 					aicommon.WithDebugPrompt(true),
 				),
 				WithDisallowRequireForUserPrompt(),
-				WithMemory(memory.CopyReducibleMemory()),
-				WithDebug(true),
+				WithPromptContextProvider(memory.CopyReducibleMemory()),
 			)
 			if err != nil {
 				return err
@@ -193,7 +192,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 					query,
 					WithAICallback(aiforge.GetHoldAICallback()),
 					WithDisallowRequireForUserPrompt(),
-					WithMemory(memory),
+					WithPromptContextProvider(memory),
 				)
 				if err != nil {
 					log.Errorf("ExecuteForge: %v", err)
@@ -532,7 +531,7 @@ func TestWebLogMonitor(t *testing.T) {
 					logBuffer,
 					WithAICallback(aiCB),
 					WithDisallowRequireForUserPrompt(),
-					WithMemory(memory),
+					WithPromptContextProvider(memory),
 				)
 				if err != nil {
 					return
@@ -553,7 +552,7 @@ func TestWebLogMonitor(t *testing.T) {
 					logBuffer,
 					WithAICallback(aiCB),
 					WithDisallowRequireForUserPrompt(),
-					WithMemory(memory),
+					WithPromptContextProvider(memory),
 				)
 				if err != nil {
 					return

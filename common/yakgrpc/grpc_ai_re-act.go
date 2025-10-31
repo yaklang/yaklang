@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/yaklang/yaklang/common/ai/rag"
 
@@ -38,7 +39,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 
 	if i.GetTimelineContentSizeLimit() > 0 {
-		opts = append(opts, aicommon.WithTimeLineLimit(int(i.GetTimelineContentSizeLimit())))
+		opts = append(opts, aicommon.WithTimelineContentLimit(int(i.GetTimelineContentSizeLimit())))
 	}
 
 	if i.UserInteractLimit > 0 {
