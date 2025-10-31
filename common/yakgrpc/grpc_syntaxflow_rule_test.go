@@ -280,6 +280,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, len(ids), 100)
 		rules, err := queryRulesById(client, ids[20], ids[60])
+		require.NoError(t, err)
 		require.Equal(t, len(rules), 39)
 		err = deleteRuleByNames(client, ruleNames)
 		require.NoError(t, err)
@@ -415,6 +416,69 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		queryRule, err := queryRulesByName(client, []string{ruleName})
 		require.NoError(t, err)
 		require.Equal(t, des, queryRule[0].Description)
+	})
+
+	t.Run("test rule version in create rule", func(t *testing.T) {
+		ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err := createSfRuleEx(client, ruleName)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		db := consts.GetGormProfileDatabase()
+		_, rules, err := yakit.QuerySyntaxFlowRule(db, &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{
+					ruleName,
+				},
+			},
+		})
+		require.NotEqual(t, rules[0].Version, "")
+	})
+
+	t.Run("test rule version in update rule", func(t *testing.T) {
+		ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
+		_, err := createSfRuleEx(client, ruleName)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			err = deleteRuleByNames(client, []string{ruleName})
+			require.NoError(t, err)
+		})
+
+		db := consts.GetGormProfileDatabase()
+		_, rules, err := yakit.QuerySyntaxFlowRule(db, &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{
+					ruleName,
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		version := rules[0].Version
+		require.NotEqual(t, version, "")
+
+		_, err = client.UpdateSyntaxFlowRuleEx(context.Background(), &ypb.UpdateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				RuleName: ruleName,
+				Language: "java",
+				Content:  "aaa",
+			},
+		})
+		require.NoError(t, err)
+
+		_, rules, err = yakit.QuerySyntaxFlowRule(db, &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleNames: []string{
+					ruleName,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotEqual(t, version, rules[0].Version)
 	})
 }
 

@@ -20,15 +20,15 @@ type RuleInfo struct {
 }
 
 //go:embed rule_versions.json
-var ruleVersions []byte
+var embedRuleVersions []byte
 
-var ruleVersionMap map[string]*RuleInfo
+var embedRuleVersionMap map[string]*RuleInfo
 
-func GetVersion(ruleId string) (string, error) {
+func GetVersionFromEmbed(ruleId string) (string, error) {
 	if ruleId == "" {
 		return "", fmt.Errorf("ruleId is empty")
 	}
-	versionMap := getVersionMap()
+	versionMap := getEmbedVersionMap()
 	if ruleInfo, ok := versionMap[ruleId]; ok {
 		return ruleInfo.Version, nil
 	} else {
@@ -40,7 +40,7 @@ func GetRuleInfo(ruleId string) (*RuleInfo, error) {
 	if ruleId == "" {
 		return nil, fmt.Errorf("ruleId is empty")
 	}
-	versionMap := getVersionMap()
+	versionMap := getEmbedVersionMap()
 	if ruleInfo, ok := versionMap[ruleId]; ok {
 		return ruleInfo, nil
 	} else {
@@ -48,18 +48,18 @@ func GetRuleInfo(ruleId string) (*RuleInfo, error) {
 	}
 }
 
-func getVersionMap() map[string]*RuleInfo {
-	if ruleVersionMap != nil {
-		return ruleVersionMap
+func getEmbedVersionMap() map[string]*RuleInfo {
+	if embedRuleVersionMap != nil {
+		return embedRuleVersionMap
 	}
-	ruleVersionMap = make(map[string]*RuleInfo)
+	embedRuleVersionMap = make(map[string]*RuleInfo)
 	var rules []RuleInfo
-	if err := json.Unmarshal(ruleVersions, &rules); err == nil {
+	if err := json.Unmarshal(embedRuleVersions, &rules); err == nil {
 		for _, rule := range rules {
-			ruleVersionMap[rule.RuleID] = &rule
+			embedRuleVersionMap[rule.RuleID] = &rule
 		}
 	}
-	return ruleVersionMap
+	return embedRuleVersionMap
 }
 
 func EmbedRuleVersion() []RuleInfo {
@@ -124,4 +124,21 @@ func generateVersion(now time.Time, existingVersion string) string {
 	}
 
 	return currentDate + ".0001"
+}
+
+func UpdateVersion(existingVersion string) string {
+	now := time.Now()
+	version := generateVersion(now, existingVersion)
+	return version
+}
+
+func CheckNewerVersion(base, check string) bool {
+	if check == "" { // base is newer
+		return true
+	}
+
+	if base == "" { // check is newer
+		return false
+	}
+	return base >= check
 }
