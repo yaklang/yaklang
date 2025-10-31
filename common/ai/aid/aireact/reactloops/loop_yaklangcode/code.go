@@ -21,6 +21,7 @@ import (
 )
 
 var defaultYaklangRagCollection = "yak"
+var defaultYaklangAIKBRagCollectionName = "yaklang_aikb_rag"
 
 // createDocumentSearcher creates a document searcher from aikb path
 func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
@@ -52,21 +53,28 @@ func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
 }
 
 func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath string) (*rag.RAGSystem, error) {
-	path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb-rag")
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
+	// 如果 aikbPath 为空，则使用默认的 yaklang-aikb-rag 二进制文件路径
+	if aikbPath == "" {
+		path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb-rag")
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
+		}
+		aikbPath = path
 	}
+
 	// 集合不存在则导入
 	if !rag.CollectionIsExists(db, collectionName) {
-		err = rag.ImportRAGFromFile(path, rag.WithCollectionName(collectionName))
+		err := rag.ImportRAGFromFile(aikbPath, rag.WithCollectionName(collectionName))
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to import rag collection")
 		}
 	}
-	// 集合存在则检查版本
+	// 文件不存在则直接获取集合
 	if !utils.FileExists(aikbPath) {
 		return rag.Get(collectionName, rag.WithDB(db))
 	}
+
+	// 文件存在则加载文件
 	file, err := os.OpenFile(aikbPath, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to open aikb file")
@@ -77,26 +85,29 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 		return nil, utils.Wrap(err, "failed to load rag file header")
 	}
 
-	ragData
+	// v1 版本直接更新，v2版本需要检查版本是否一致
+	var updateCollection bool
+	if ragData.Version == 2 {
+		collectionInfo, err := yakit.GetRAGCollectionInfoByName(db, collectionName)
+		if err != nil || collectionInfo == nil {
+			return nil, utils.Wrap(err, "failed to get rag collection info")
+		}
+		if collectionInfo.SerialVersionUID != ragData.Collection.SerialVersionUID {
+			updateCollection = true
+		}
 
-	collectionInfo, err := yakit.GetRAGCollectionInfoByName(db, collectionName)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to get rag collection info")
+	} else {
+		updateCollection = true
 	}
-	collectionInfo.
-		err = rag.ImportRAGFromFile(path, rag.WithCollectionName(collectionName))
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to import rag collection")
+
+	if updateCollection {
+		err = rag.ImportRAGFromReader(file, rag.WithCollectionName(collectionName))
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to import rag collection")
+		}
 	}
-	if !rag.CollectionIsExists(db, collectionName) {
-		return nil, utils.Errorf("rag collection %s not found", collectionName)
-	}
-	ragSystem, err := rag.LoadCollection(db, collectionName)
-	if err != nil {
-		log.Warnf("failed to load rag collection: %v", err)
-		return nil, utils.Wrap(err, "failed to load rag collection")
-	}
-	return ragSystem
+
+	return rag.Get(collectionName, rag.WithDB(db))
 }
 
 //go:embed prompts/persistent_instruction.txt
@@ -114,7 +125,13 @@ func init() {
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			config := r.GetConfig()
 			aikbPath := config.GetConfigString("aikb_path")
+			aikbRagPath := config.GetConfigString("aikb_rag_path")
 			docSearcher := createDocumentSearcher(aikbPath)
+			docSearcherByRag, err := createDocumentSearcherByRag(consts.GetGormProfileDatabase(), defaultYaklangAIKBRagCollectionName, aikbRagPath)
+			if err != nil {
+				log.Errorf("failed to create document searcher by rag: %v", err)
+			}
+			_ = docSearcherByRag
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -139,7 +156,8 @@ func init() {
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				// queryDocumentAction(r, docSearcher), // DEPRECATED: 已被 grepYaklangSamplesAction 替代
-				grepYaklangSamplesAction(r, docSearcher), // 快速 grep 代码样例
+				grepYaklangSamplesAction(r, docSearcher),        // 快速 grep 代码样例
+				searchYaklangSamplesAction(r, docSearcherByRag), // 快速搜索 Yaklang 代码样例
 				writeCode(r),
 				modifyCode(r),
 				insertLines(r),

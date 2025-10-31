@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aibalance"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
@@ -369,13 +370,13 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	return responseRsp, nil
 }
 
-func LoadChater(name string) (aispec.GeneralChatter, error) {
+func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
 	gateway, ok := aispec.Lookup(name)
 	if !ok {
-		return nil, errors.New("not found valid ai agent")
+		return nil, errors.New("not found valid ai chatter type: " + name)
 	}
 	return func(msg string, opts ...aispec.AIConfigOption) (string, error) {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)
+		gateway.LoadOption(append(defaultOpts, append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", name, err)
 			return "", err
@@ -384,10 +385,20 @@ func LoadChater(name string) (aispec.GeneralChatter, error) {
 	}, nil
 }
 
+// _loadAIService is a helper function to load an AI service by type name
+func _loadAIService(typeName string, opts ...aispec.AIConfigOption) (aicommon.AICallbackType, error) {
+	chatter, err := LoadChater(typeName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return aicommon.AIChatToAICallbackType(chatter), nil
+}
+
 var Exports = map[string]any{
-	"OpenAI":   OpenAI,
-	"ChatGLM":  ChatGLM,
-	"Moonshot": Moonshot,
+	"OpenAI":        OpenAI,
+	"ChatGLM":       ChatGLM,
+	"Moonshot":      Moonshot,
+	"LoadAIService": _loadAIService,
 
 	"Chat":                    Chat,
 	"FunctionCall":            FunctionCall,
