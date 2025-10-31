@@ -123,7 +123,7 @@ func (a *ToolCaller) invoke(
 		aitool.WithResultCallback(toolCallSuccess),
 		aitool.WithCancelCallback(toolCallCancel),
 		aitool.WithRuntimeConfig(&aitool.ToolRuntimeConfig{
-			RuntimeID: c.GetRuntimeId(),
+			RuntimeID: a.callToolId,
 			FeedBacker: func(result *ypb.ExecResult) error {
 				e.EmitYakitExecResult(result)
 				return nil
