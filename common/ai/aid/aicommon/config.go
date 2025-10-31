@@ -1307,8 +1307,8 @@ func WithDisableOutputEvent(types ...string) ConfigOption {
 	return WithDisableOutputEventType(types...)
 }
 
-// WithTimeLineLimit sets the timeline content size limit (deprecated name, kept for compatibility).
-func WithTimeLineLimit(limit int) ConfigOption {
+// WithTimelineLimit sets the timeline content size limit (deprecated name, kept for compatibility).
+func WithTimelineLimit(limit int) ConfigOption {
 	return func(c *Config) error {
 		if limit < 0 {
 			return utils.Error("timeline limit cannot be negative")
@@ -1334,10 +1334,7 @@ func WithTimeline(t *Timeline) ConfigOption {
 
 // WithTimelineContentLimit sets timeline content size limit (keeps naming parity).
 func WithTimelineContentLimit(limit int) ConfigOption {
-	return func(c *Config) error {
-		c.TimelineTotalContentLimit = limit
-		return nil
-	}
+	return WithTimelineLimit(limit)
 }
 
 func WithForgeParams(i any) ConfigOption {
