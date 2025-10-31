@@ -155,7 +155,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 				query,
 				append(
 					buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aicommonOptions...),
-					yak.WithMemory(memory),
+					yak.WithPromptContextProvider(memory),
 					yak.WithDisallowRequireForUserPrompt(),
 					yak.WithContext(baseCtx))...)
 			if err != nil {

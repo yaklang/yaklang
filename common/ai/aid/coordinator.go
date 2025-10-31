@@ -2,6 +2,9 @@ package aid
 
 import (
 	"context"
+	"io"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -12,8 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -36,7 +37,7 @@ func WithCoordinatorResultHandler(h func(c *Coordinator)) CoordinatorOption {
 	}
 }
 
-func WithMemoryProvider(provider *PromptContextProvider) aicommon.ConfigOption {
+func WithPromptContextProvider(provider *PromptContextProvider) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		if err := aicommon.WithTimeline(provider.timeline)(config); err != nil {
 			return err
