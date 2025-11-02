@@ -12,9 +12,9 @@ import (
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -353,10 +353,10 @@ func exportIndex(c *cli.Context) error {
 	db := consts.GetGormProfileDatabase()
 
 	// 导出索引
-	reader, err := rag.ExportRAGToBinary(
+	reader, err := vectorstore.ExportRAGToBinary(
 		collectionName,
-		rag.WithImportExportDB(db),
-		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
+		vectorstore.WithImportExportDB(db),
+		vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 			fmt.Printf("[%.1f%%] %s\n", percent, message)
 		}),
 	)

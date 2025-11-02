@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,10 +17,10 @@ var Simpleliteforge contracts.LiteForge
 
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
 type KnowledgeBase struct {
-	db        *gorm.DB
-	name      string
-	ragSystem *rag.RAGSystem
-	id        int64
+	db          *gorm.DB
+	name        string
+	vectorStore *vectorstore.SQLiteVectorStoreHNSW
+	id          int64
 }
 
 func (kb *KnowledgeBase) GetID() int64 {
@@ -33,7 +33,7 @@ func AutoMigrate(db *gorm.DB) error {
 
 // NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
 func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
-	defaultOpts := []any{rag.WithLazyLoadEmbeddingClient()}
+	defaultOpts := []any{vectorstore.WithLazyLoadEmbeddingClient()}
 	newOpts := slices.Clone(opts)
 	newOpts = append(defaultOpts, opts...)
 	opts = newOpts
@@ -54,7 +54,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 	}
 
 	// 检查 RAG Collection 是否存在
-	collectionExists := rag.CollectionIsExists(db, name)
+	collectionExists := vectorstore.HasCollection(db, name)
 
 	// 如果都不存在，创建新的知识库
 	if needCreateInfo && !collectionExists {
@@ -72,7 +72,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		}
 
 		// 创建 RAG Collection
-		ragSystem, err := rag.CreateCollection(db, name, description, opts...)
+		collectionMg, err := vectorstore.CreateCollection(db, name, description, opts...)
 		if err != nil {
 			// 如果 RAG 创建失败，删除已创建的 KnowledgeBaseInfo
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -82,25 +82,25 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		}
 
 		return &KnowledgeBase{
-			db:        db,
-			name:      name,
-			ragSystem: ragSystem,
-			id:        int64(knowledgeBaseInfo.ID),
+			db:          db,
+			name:        name,
+			vectorStore: collectionMg,
+			id:          int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
 
 	// 如果知识库信息存在但 RAG Collection 不存在，创建 RAG Collection
 	if !needCreateInfo && !collectionExists {
-		ragSystem, err := rag.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, opts...)
+		collectionMg, err := vectorstore.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, opts...)
 		if err != nil {
 			return nil, utils.Errorf("创建RAG集合失败: %v", err)
 		}
 
 		return &KnowledgeBase{
-			db:        db,
-			name:      name,
-			ragSystem: ragSystem,
-			id:        int64(knowledgeBaseInfo.ID),
+			db:          db,
+			name:        name,
+			vectorStore: collectionMg,
+			id:          int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
 
@@ -120,16 +120,16 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 	}
 
 	// 如果都存在，直接加载
-	ragSystem, err := rag.LoadCollection(db, name, opts...)
+	collectionMg, err := vectorstore.LoadCollection(db, name, opts...)
 	if err != nil {
 		return nil, utils.Errorf("加载RAG集合失败: %v", err)
 	}
 
 	return &KnowledgeBase{
-		db:        db,
-		name:      name,
-		ragSystem: ragSystem,
-		id:        int64(knowledgeBaseInfo.ID),
+		db:          db,
+		name:        name,
+		vectorStore: collectionMg,
+		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
@@ -149,7 +149,7 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 	}
 
 	// 检查 RAG Collection 是否存在
-	if rag.CollectionIsExists(db, name) {
+	if vectorstore.HasCollection(db, name) {
 		return nil, utils.Errorf("RAG集合 %s 已存在", name)
 	}
 
@@ -168,7 +168,7 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 	}
 
 	// 创建 RAG Collection
-	ragSystem, err := rag.CreateCollection(db, name, description, opts...)
+	collectionMg, err := vectorstore.CreateCollection(db, name, description, opts...)
 	if err != nil {
 		// 如果 RAG 创建失败，删除已创建的 KnowledgeBaseInfo
 		_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -178,10 +178,10 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 	}
 
 	return &KnowledgeBase{
-		db:        db,
-		name:      name,
-		ragSystem: ragSystem,
-		id:        int64(knowledgeBaseInfo.ID),
+		db:          db,
+		name:        name,
+		vectorStore: collectionMg,
+		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
@@ -196,17 +196,16 @@ func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, e
 		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
 
-	// 加载 RAG 系统
-	ragSystem, err := rag.CreateOrLoadCollection(db, name, "", opts...)
+	collectionMg, err := vectorstore.GetCollection(db, name, opts...)
 	if err != nil {
 		return nil, utils.Errorf("加载知识库失败: %v", err)
 	}
 
 	return &KnowledgeBase{
-		db:        db,
-		name:      name,
-		ragSystem: ragSystem,
-		id:        int64(knowledgeBaseInfo.ID),
+		db:          db,
+		name:        name,
+		vectorStore: collectionMg,
+		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...any) (*KnowledgeBase, error) {
@@ -223,7 +222,7 @@ func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...any) (*KnowledgeBase, 
 }
 
 // AddKnowledgeEntry 添加知识条目到知识库（使用事务）
-func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
 	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("创建知识库条目失败: %v", err)
@@ -236,7 +235,7 @@ func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, opt
 	return nil
 }
 
-func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
 	entry.KnowledgeBaseID = kb.id
 	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
@@ -272,7 +271,7 @@ func (kb *KnowledgeBase) Drop() error {
 	if err != nil {
 		return utils.Errorf("删除知识库信息失败: %v", err)
 	}
-	rag.DeleteCollection(kb.db, kb.name)
+	vectorstore.DeleteCollection(kb.db, kb.name)
 	return nil
 }
 
@@ -288,7 +287,7 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(id string, entry *schema.Knowledge
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 删除旧的向量索引
-	if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
+	if err := kb.vectorStore.Delete(documentID); err != nil {
 		return utils.Errorf("删除旧向量索引失败: %v", err)
 	}
 
@@ -301,7 +300,7 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(id string, entry *schema.Knowledge
 
 // DeleteKnowledgeEntry 删除知识条目（使用事务）
 func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID string) error {
-	if err := kb.ragSystem.DeleteDocuments(entryID); err != nil {
+	if err := kb.vectorStore.Delete(entryID); err != nil {
 		return utils.Errorf("删除向量索引失败: %v", err)
 	}
 
@@ -352,7 +351,7 @@ func (kb *KnowledgeBase) BuildVectorIndex() error {
 		return err
 	}
 
-	_, err = rag.BuildVectorIndexForKnowledgeBase(kb.db, int64(knowledgeBaseInfo.ID))
+	_, err = vectorstore.BuildVectorIndexForKnowledgeBase(kb.db, int64(knowledgeBaseInfo.ID))
 	return err
 }
 
@@ -368,12 +367,12 @@ func (kb *KnowledgeBase) GetInfo() (*schema.KnowledgeBaseInfo, error) {
 
 // CountDocuments 获取文档总数
 func (kb *KnowledgeBase) CountDocuments() (int, error) {
-	return kb.ragSystem.CountDocuments()
+	return kb.vectorStore.Count()
 }
 
 // ClearDocuments 清空所有文档
 func (kb *KnowledgeBase) ClearDocuments() error {
-	kb.ragSystem.ClearDocuments()
+	kb.vectorStore.Clear()
 	kb.db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", kb.id).Unscoped().Delete(&schema.KnowledgeBaseEntry{})
 	return nil
 }
@@ -383,13 +382,13 @@ func (kb *KnowledgeBase) GetName() string {
 	return kb.name
 }
 
-// GetRAGSystem 获取底层的 RAG 系统
-func (kb *KnowledgeBase) GetRAGSystem() *rag.RAGSystem {
-	return kb.ragSystem
+// GetVectorStore 获取底层的向量存储
+func (kb *KnowledgeBase) GetVectorStore() *vectorstore.SQLiteVectorStoreHNSW {
+	return kb.vectorStore
 }
 
 // addEntryToVectorIndex 将知识条目添加到向量索引
-func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
 	// 构建文档内容
 	content := entry.KnowledgeTitle
 	if entry.Summary != "" {
@@ -414,13 +413,13 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry,
 
 	// 使用条目ID作为文档ID
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
-	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_Knowledge))
+	options = append(options, vectorstore.WithDocumentRawMetadata(metadata), vectorstore.WithDocumentType(schema.RAGDocumentType_Knowledge))
 
 	// 添加文档到RAG系统
-	return kb.ragSystem.Add(documentID, content, options...)
+	return kb.vectorStore.AddWithOptions(documentID, content, options...)
 }
 
-func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
 	// 构建元数据
 	metadata := map[string]any{
 		"knowledge_base_id":    entry.KnowledgeBaseID,
@@ -436,11 +435,11 @@ func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEnt
 
 	// 使用条目ID作为文档ID
 	baseDocumentID := utils.InterfaceToString(entry.HiddenIndex)
-	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_QuestionIndex))
+	options = append(options, vectorstore.WithDocumentRawMetadata(metadata), vectorstore.WithDocumentType(schema.RAGDocumentType_QuestionIndex))
 
 	for _, question := range entry.PotentialQuestions {
 		documentID := fmt.Sprintf("%s_question_%s", baseDocumentID, utils.CalcSha1(question))
-		err := kb.ragSystem.Add(documentID, question, options...)
+		err := kb.vectorStore.AddWithOptions(documentID, question, options...)
 		if err != nil {
 			return err
 		}
@@ -480,7 +479,7 @@ func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 	}
 
 	// 获取RAG中的所有文档
-	ragDocuments, err := kb.ragSystem.ListDocuments()
+	ragDocuments, err := kb.vectorStore.List()
 	if err != nil {
 		return result, utils.Errorf("获取RAG文档列表失败: %v", err)
 	}
@@ -506,7 +505,7 @@ func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 	// 查找RAG中有但知识库中没有的文档，从RAG中删除
 	for _, doc := range ragDocuments {
 		if !dbEntryIDs[doc.ID] {
-			if err := kb.ragSystem.DeleteDocuments(doc.ID); err != nil {
+			if err := kb.vectorStore.Delete(doc.ID); err != nil {
 				result.SyncErrors = append(result.SyncErrors,
 					fmt.Sprintf("从RAG删除文档 %s 失败: %v", doc.ID, err))
 			} else {
@@ -550,7 +549,7 @@ func (kb *KnowledgeBase) GetSyncStatus() (*SyncStatus, error) {
 	}
 
 	// 获取RAG中的文档总数
-	ragCount, err := kb.ragSystem.CountDocuments()
+	ragCount, err := kb.vectorStore.Count()
 	if err != nil {
 		return status, utils.Errorf("获取RAG文档数量失败: %v", err)
 	}
@@ -588,7 +587,7 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []string) (*SyncResult, error
 
 		// 检查RAG中是否已存在
 		documentID := entryID
-		_, exists, err := kb.ragSystem.GetDocument(documentID)
+		_, exists, err := kb.vectorStore.Get(documentID)
 		if err != nil {
 			result.SyncErrors = append(result.SyncErrors,
 				fmt.Sprintf("检查RAG文档 %s 失败: %v", entryID, err))
@@ -597,7 +596,7 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []string) (*SyncResult, error
 
 		if exists {
 			// 如果存在，先删除再添加（更新）
-			if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
+			if err := kb.vectorStore.Delete(documentID); err != nil {
 				result.SyncErrors = append(result.SyncErrors,
 					fmt.Sprintf("删除RAG文档 %s 失败: %v", entryID, err))
 				continue
@@ -625,6 +624,6 @@ func (kb *KnowledgeBase) EmbedKnowledgeBaseEntry(id string) error {
 }
 
 func (kb *KnowledgeBase) EmbedKnowledgeBase() error {
-	_, err := rag.BuildVectorIndexForKnowledgeBase(kb.db, kb.id)
+	_, err := vectorstore.BuildVectorIndexForKnowledgeBase(kb.db, kb.id)
 	return err
 }

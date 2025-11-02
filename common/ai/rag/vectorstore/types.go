@@ -10,6 +10,17 @@ type EmbeddingClient interface {
 	Embedding(text string) ([]float32, error)
 }
 
+// RAG 搜索结果类型常量
+const (
+	RAGResultTypeMessage   = "message"
+	RAGResultEntity        = "entity"
+	RAGResultTypeMidResult = "mid_result"
+	RAGResultTypeResult    = "result"
+	RAGResultTypeError     = "error"
+	RAGResultTypeERM       = "erm_analysis"
+	RAGResultTypeDotGraph  = "dot_graph"
+)
+
 // BigTextPlan 常量定义
 const (
 	// BigTextPlanChunkText 将大文本分割成多个文档分别存储
@@ -36,8 +47,8 @@ type Document struct {
 
 // SearchResult 表示检索结果
 type SearchResult struct {
-	Document Document `json:"document"` // 检索到的文档
-	Score    float64  `json:"score"`    // 相似度得分 (-1 到 1 之间)
+	Document *Document `json:"document"` // 检索到的文档
+	Score    float64   `json:"score"`    // 相似度得分 (-1 到 1 之间)
 }
 
 type EmptyEmbedding struct{}
@@ -53,7 +64,7 @@ func (e EmptyEmbedding) Embedding(text string) ([]float32, error) {
 // VectorStore 接口定义了向量存储的基本操作
 type VectorStore interface {
 	// Add 添加文档到向量存储
-	Add(docs ...Document) error
+	Add(docs ...*Document) error
 
 	// Search 根据查询文本检索相关文档
 	Search(query string, page, limit int) ([]SearchResult, error)
@@ -67,10 +78,10 @@ type VectorStore interface {
 	Delete(ids ...string) error
 
 	// Get 根据 ID 获取文档
-	Get(id string) (Document, bool, error)
+	Get(id string) (*Document, bool, error)
 
 	// List 列出所有文档
-	List() ([]Document, error)
+	List() ([]*Document, error)
 
 	// Count 返回文档总数
 	Count() (int, error)

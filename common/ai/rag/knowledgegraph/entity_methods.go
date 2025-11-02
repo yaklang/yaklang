@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 )
 
 // NewEntity 创建新实体
@@ -42,7 +42,7 @@ func (e *Entity) SetProperty(key string, value interface{}) {
 }
 
 // ToRAGDocument 转换为RAG文档
-func (e *Entity) ToRAGDocument() *rag.Document {
+func (e *Entity) ToRAGDocument() *vectorstore.Document {
 	// 构建实体的文本描述
 	var content strings.Builder
 	content.WriteString(fmt.Sprintf("实体名称: %s\n", e.Name))
@@ -77,7 +77,7 @@ func (e *Entity) ToRAGDocument() *rag.Document {
 		"updated_at":  e.UpdatedAt.Unix(),
 	}
 
-	return &rag.Document{
+	return &vectorstore.Document{
 		ID:       e.ID,
 		Content:  content.String(),
 		Metadata: metadata,

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
@@ -489,7 +490,7 @@ func (s *Server) DeleteSearchVectorDatabase(ctx context.Context, req *ypb.Delete
 	collectionNames := req.GetCollectionNames()
 	errs := []error{}
 	for _, collectionName := range collectionNames {
-		err := rag.RemoveCollectionHNSW(consts.GetGormProfileDatabase(), collectionName)
+		err := vectorstore.RemoveCollectionHNSW(consts.GetGormProfileDatabase(), collectionName)
 		if err != nil {
 			errs = append(errs, err)
 		}
