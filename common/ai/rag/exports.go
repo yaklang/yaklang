@@ -200,11 +200,8 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGOption 
 	}
 }
 
-// CollectionIsExists 检查知识库是否存在
-func CollectionIsExists(db *gorm.DB, name string) bool {
-	col, err := yakit.QueryRAGCollectionByName(db, name)
-	return col != nil && err == nil
-}
+// CollectionIsExists 检查知识库是否存在，别名
+var CollectionIsExists = vectorstore.HasCollection
 
 // CreateCollection 创建RAG集合
 func CreateCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
@@ -223,7 +220,7 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 	if err != nil {
 		return nil, utils.Errorf("创建集合失败: %v", err)
 	}
-	ragSystem.addDocuments(vectorstore.Document{
+	ragSystem.addDocuments(&vectorstore.Document{
 		ID:      vectorstore.DocumentTypeCollectionInfo,
 		Content: fmt.Sprintf("collection_name: %s\ncollection_description: %s", name, description),
 		Metadata: map[string]any{
@@ -323,7 +320,7 @@ func AddDocument(db *gorm.DB, knowledgeBaseName, documentName string, document s
 	if err != nil {
 		return utils.Errorf("加载知识库失败: %v", err)
 	}
-	return ragSystem.addDocuments(vectorstore.Document{
+	return ragSystem.addDocuments(&vectorstore.Document{
 		ID:        documentName,
 		Content:   document,
 		Metadata:  metadata,
@@ -377,20 +374,6 @@ func NewRagDatabase(path string) (*gorm.DB, error) {
 func Get(name string, i ...any) (*RAGSystem, error) {
 	log.Infof("getting RAG collection '%s' with local embedding service", name)
 
-	var newOptions []any
-	for _, option := range i {
-		if ragOption, ok := option.(RAGExportOptionFunc); ok {
-			cfg := &RAGExportConfig{}
-			ragOption(cfg)
-			if cfg.DB != nil {
-				newOptions = append(newOptions, WithDB(cfg.DB))
-			}
-		} else {
-			newOptions = append(newOptions, option)
-		}
-	}
-	i = newOptions
-
 	config := NewCollectionConfig(i...)
 	if config.ForceNew {
 		log.Infof("force creating new RAG collection for name: %s", name)
@@ -405,49 +388,5 @@ func Get(name string, i ...any) (*RAGSystem, error) {
 		return CreateCollection(config.DB, name, config.Description, i...)
 	} else {
 		return ragSystem, err
-	}
-}
-
-type DocumentOption func(document *vectorstore.Document)
-
-func WithDocumentMetadataKeyValue(key string, value any) DocumentOption {
-	return func(document *vectorstore.Document) {
-		if utils.IsNil(document.Metadata) {
-			document.Metadata = make(map[string]any)
-		}
-		document.Metadata[key] = value
-	}
-}
-
-func WithDocumentRawMetadata(i map[string]any) DocumentOption {
-	return func(document *vectorstore.Document) {
-		document.Metadata = i
-		if utils.IsNil(document.Metadata) {
-			document.Metadata = make(map[string]any)
-		}
-	}
-}
-
-func WithDocumentType(i schema.RAGDocumentType) DocumentOption {
-	return func(document *vectorstore.Document) {
-		document.Type = i
-	}
-}
-
-func WithDocumentEntityID(entityUUID string) DocumentOption {
-	return func(document *vectorstore.Document) {
-		document.EntityUUID = entityUUID
-	}
-}
-
-func WithDocumentRelatedEntities(uuids ...string) DocumentOption {
-	return func(document *vectorstore.Document) {
-		document.RelatedEntities = uuids
-	}
-}
-
-func WithDocumentRuntimeID(runtimeID string) DocumentOption {
-	return func(document *vectorstore.Document) {
-		document.RuntimeID = runtimeID
 	}
 }

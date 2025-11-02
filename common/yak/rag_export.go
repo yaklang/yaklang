@@ -12,6 +12,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 )
@@ -115,7 +116,7 @@ func _deleteCollection(name string) error {
 //
 // ```
 func _embeddingHandle(handle func(text string) any) rag.RAGOption {
-	embedder := rag.NewMockEmbedder(func(text string) ([]float32, error) {
+	embedder := vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
 		ires := handle(text)
 		resSlice, err := utils.InterfaceToSliceInterfaceE(ires)
 		if err != nil {
@@ -191,7 +192,7 @@ func _deleteDocument(knowledgeBaseName, documentName string, opts ...any) error 
 //	results, err = rag.QueryDocuments("my_collection", "query", 10)
 //
 // ```
-func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...any) ([]rag.SearchResult, error) {
+func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...any) ([]vectorstore.SearchResult, error) {
 	return rag.QueryDocuments(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
 }
 

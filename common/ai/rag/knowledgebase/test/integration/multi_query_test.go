@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/depinjector"
@@ -44,7 +44,7 @@ func TestMultiKnowledgeBaseQuery(t *testing.T) {
 			// 清理知识库信息
 			db.Where("knowledge_base_name = ?", kbName).Delete(&schema.KnowledgeBaseInfo{})
 			// 清理RAG集合
-			rag.DeleteCollection(db, kbName)
+			vectorstore.DeleteCollection(db, kbName)
 		}
 	}()
 
@@ -270,7 +270,7 @@ func TestMultiKnowledgeBaseQuery(t *testing.T) {
 	filterOpts := []knowledgebase.QueryOption{
 		knowledgebase.WithCtx(ctx),
 		knowledgebase.WithLimit(5),
-		knowledgebase.WithFilter(func(key string, docGetter func() *rag.Document, entryGetter func() (*schema.KnowledgeBaseEntry, error)) bool {
+		knowledgebase.WithFilter(func(key string, docGetter func() *vectorstore.Document, entryGetter func() (*schema.KnowledgeBaseEntry, error)) bool {
 			entry, err := entryGetter()
 			if err != nil {
 				return false
@@ -357,7 +357,7 @@ func TestMultiKnowledgeBaseQueryPerformance(t *testing.T) {
 		for _, kbName := range testKBNames {
 			db.Where("knowledge_base_id IN (SELECT id FROM knowledge_base_infos WHERE knowledge_base_name = ?)", kbName).Delete(&schema.KnowledgeBaseEntry{})
 			db.Where("knowledge_base_name = ?", kbName).Delete(&schema.KnowledgeBaseInfo{})
-			rag.DeleteCollection(db, kbName)
+			vectorstore.DeleteCollection(db, kbName)
 		}
 	}()
 

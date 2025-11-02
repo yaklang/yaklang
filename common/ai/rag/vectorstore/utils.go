@@ -419,3 +419,13 @@ func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) err
 	collection.GraphBinary = binaryBytes
 	return nil
 }
+
+func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", path)
+	if err != nil {
+		return db, err
+	}
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+
+	return db, nil
+}

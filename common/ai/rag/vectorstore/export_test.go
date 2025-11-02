@@ -1,4 +1,4 @@
-package rag
+package vectorstore
 
 import (
 	"bytes"
@@ -36,11 +36,10 @@ func TestMUSTPASS_Exports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ragSystem := NewRAGSystem(embedding, store)
 	for i := 0; i < 100; i++ {
 		// 使用包含词典词汇的文本，确保生成非零向量
 		data := fmt.Sprintf("computer algorithm data %d", i)
-		ragSystem.Add(data, data, WithDocumentRawMetadata(map[string]any{"test": "test"}))
+		store.AddWithOptions(data, data, WithDocumentRawMetadata(map[string]any{"test": "test"}))
 	}
 
 	// 导出测试数据
@@ -138,9 +137,6 @@ func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 创建RAG系统并添加测试数据
-	ragSystem := NewRAGSystem(embedding, store)
-
 	testDocuments := []struct {
 		id       string
 		content  string
@@ -152,7 +148,7 @@ func TestMUSTPASS_ExportRAGToBinary(t *testing.T) {
 	}
 
 	for _, doc := range testDocuments {
-		ragSystem.Add(doc.id, doc.content, WithDocumentRawMetadata(doc.metadata))
+		store.AddWithOptions(doc.id, doc.content, WithDocumentRawMetadata(doc.metadata))
 	}
 
 	// 导出RAG数据为二进制格式
@@ -297,9 +293,8 @@ func TestMUSTPASS_ImportAndRebuildHNSWIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ragSystem := NewRAGSystem(embedding, store)
 	for i := 0; i < 100; i++ {
-		ragSystem.Add(fmt.Sprintf("computer algorithm data %d", i), fmt.Sprintf("computer algorithm data %d", i), WithDocumentRawMetadata(map[string]any{"test": "test"}))
+		store.AddWithOptions(fmt.Sprintf("computer algorithm data %d", i), fmt.Sprintf("computer algorithm data %d", i), WithDocumentRawMetadata(map[string]any{"test": "test"}))
 	}
 	reader, err := ExportRAGToBinary(collectionName, WithImportExportDB(testDB), WithNoHNSWGraph(true))
 	if err != nil {
