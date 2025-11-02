@@ -3,6 +3,7 @@ package rag
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -57,7 +58,7 @@ func TestAddAndQuery(t *testing.T) {
 
 	// 添加文档到RAG系统
 	for _, doc := range testDocs {
-		err := ragSystem.Add(doc.id, doc.content, WithDocumentRawMetadata(doc.metadata))
+		err := ragSystem.Add(doc.id, doc.content, vectorstore.WithDocumentRawMetadata(doc.metadata))
 		if err != nil {
 			t.Fatalf("添加文档失败 %s: %v", doc.id, err)
 		}
@@ -277,7 +278,7 @@ func TestAddAndQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("获取集合失败: %v", err)
 	}
-	err = testCollection.ConvertToPQMode()
+	err = testCollection.VectorStore.ConvertToPQMode()
 	if err != nil {
 		t.Fatalf("转换为PQ模式失败: %v", err)
 	}

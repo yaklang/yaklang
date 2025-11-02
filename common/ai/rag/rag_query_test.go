@@ -130,7 +130,7 @@ func TestRAGQuery(t *testing.T) {
 
 		// 添加该集合的文档
 		for _, doc := range col.documents {
-			err = ragSystem.Add(doc.ID, doc.Content, WithDocumentRawMetadata(doc.Metadata))
+			err = ragSystem.Add(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
 			if err != nil {
 				t.Fatalf("Failed to add document %s to collection %s: %v", doc.ID, col.name, err)
 			}
@@ -324,7 +324,7 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 		return
 	}
 
-	ragSystem.Add("test", "test", WithDocumentRawMetadata(map[string]any{
+	ragSystem.Add("test", "test", vectorstore.WithDocumentRawMetadata(map[string]any{
 		"type": "test",
 	}))
 
@@ -453,7 +453,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		collectionNames = append(collectionNames, col.name)
 
 		doc := col.document
-		err = ragSystem.Add(doc.ID, doc.Content, WithDocumentRawMetadata(doc.Metadata))
+		err = ragSystem.Add(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
 		if err != nil {
 			t.Fatalf("Failed to add document %s to collection %s: %v", doc.ID, col.name, err)
 		}

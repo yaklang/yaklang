@@ -8,7 +8,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -21,7 +21,7 @@ type QueryConfig struct {
 	CollectionNumLimit   int
 	CollectionScoreLimit int
 	EnableAISummary      bool
-	Filter               func(key string, docGetter func() *rag.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool
+	Filter               func(key string, docGetter func() *vectorstore.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool
 	EnhancePlan          string
 	MsgCallBack          func(*SearchKnowledgebaseResult)
 }
@@ -64,7 +64,7 @@ func WithCollectionLimit(collectionLimit int) QueryOption {
 	}
 }
 
-func WithFilter(filter func(key string, docGetter func() *rag.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool) QueryOption {
+func WithFilter(filter func(key string, docGetter func() *vectorstore.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool) QueryOption {
 	return func(config *QueryConfig) {
 		config.Filter = filter
 	}
@@ -98,10 +98,10 @@ func NewQueryConfig(opts ...QueryOption) *QueryConfig {
 
 // SearchKnowledgebaseResult 消息类型常量
 const (
-	SearchResultTypeMessage   = rag.RAGResultTypeMessage
-	SearchResultTypeMidResult = rag.RAGResultTypeMidResult
-	SearchResultTypeResult    = rag.RAGResultTypeResult
-	SearchResultTypeError     = rag.RAGResultTypeError
+	SearchResultTypeMessage   = vectorstore.RAGResultTypeMessage
+	SearchResultTypeMidResult = vectorstore.RAGResultTypeMidResult
+	SearchResultTypeResult    = vectorstore.RAGResultTypeResult
+	SearchResultTypeError     = vectorstore.RAGResultTypeError
 	SearchResultTypeAISummary = "ai_summary"
 )
 
@@ -118,7 +118,7 @@ func (kb *KnowledgeBase) SearchKnowledgeEntriesWithEnhance(query string, opts ..
 // SearchKnowledgeEntries 搜索知识条目，返回知识库条目对象
 func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*schema.KnowledgeBaseEntry, error) {
 	// 先通过RAG系统进行向量搜索
-	searchResults, err := kb.ragSystem.QueryWithFilter(query, 1, limit+5, func(key string, getDoc func() *rag.Document) bool {
+	searchResults, err := kb.vectorStore.QueryWithFilter(query, 1, limit+5, func(key string, getDoc func() *vectorstore.Document) bool {
 		return getDoc().Type == schema.RAGDocumentType_Knowledge
 	})
 	if err != nil {
@@ -173,15 +173,15 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 	resultCh := make(chan *SearchKnowledgebaseResult)
 
 	// 构造RAG查询选项
-	ragOpts := []rag.RAGQueryOption{
-		rag.WithRAGLimit(config.Limit),
-		rag.WithRAGEnhance(config.EnhancePlan),
-		rag.WithRAGCtx(config.Ctx),
+	ragOpts := []vectorstore.CollectionConfigFunc{
+		vectorstore.WithLimit(config.Limit),
+		vectorstore.WithRAGEnhance(config.EnhancePlan),
+		vectorstore.WithRAGCtx(config.Ctx),
 	}
 
 	// 如果有Filter配置，转换为RAG Filter
 	if config.Filter != nil {
-		ragFilter := func(key string, getDoc func() *rag.Document) bool {
+		ragFilter := func(key string, getDoc func() *vectorstore.Document) bool {
 			if getDoc().Type != schema.RAGDocumentType_Knowledge {
 				return false
 			}
@@ -194,9 +194,9 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				return &entry, nil
 			})
 		}
-		ragOpts = append(ragOpts, rag.WithRAGFilter(ragFilter))
+		ragOpts = append(ragOpts, vectorstore.WithRAGFilter(ragFilter))
 	} else {
-		ragOpts = append(ragOpts, rag.WithRAGFilter(func(key string, getDoc func() *rag.Document) bool {
+		ragOpts = append(ragOpts, vectorstore.WithRAGFilter(func(key string, getDoc func() *vectorstore.Document) bool {
 			return getDoc().Type == schema.RAGDocumentType_Knowledge
 		}))
 	}
@@ -216,7 +216,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		}
 	}
 	// 设置RAG消息回调，转换为知识库结果格式
-	ragMsgCallback := func(ragResult *rag.RAGSearchResult) {
+	ragMsgCallback := func(ragResult *vectorstore.RAGSearchResult) {
 		kbResult := &SearchKnowledgebaseResult{
 			Message: ragResult.Message,
 			Type:    ragResult.Type,
@@ -224,7 +224,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 
 		// 对于result类型的消息，需要将Document转换为KnowledgeBaseEntry
 		if ragResult.Type == SearchResultTypeResult && ragResult.Data != nil {
-			if doc, ok := ragResult.Data.(*rag.Document); ok {
+			if doc, ok := ragResult.Data.(*vectorstore.Document); ok {
 				// 从文档ID获取知识库条目
 				var docID string
 				if doc.Metadata["original_doc_id"] != nil {
@@ -250,12 +250,12 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		return nil, utils.Errorf("get knowledge base name list failed: %v", err)
 	}
 
-	ragOpts = append(ragOpts, rag.WithRAGCollectionNames(kbNames...))
+	ragOpts = append(ragOpts, vectorstore.WithCollectionName(kbNames...))
 
-	ragOpts = append(ragOpts, rag.WithRAGMsgCallBack(ragMsgCallback))
+	ragOpts = append(ragOpts, vectorstore.WithRAGMsgCallBack(ragMsgCallback))
 
 	// 调用rag.Query进行搜索
-	ragResultCh, err := rag.Query(db, query, ragOpts...)
+	ragResultCh, err := vectorstore.Query(db, query, ragOpts...)
 	if err != nil {
 		return nil, err
 	}

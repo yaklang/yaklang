@@ -2,12 +2,14 @@ package entityrepos
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"sync"
-	"time"
 )
 
 // AddRequest 封装了单个添加操作的所有信息
@@ -103,7 +105,7 @@ func (p *bulkProcessor) addRequest(docId string, content string, opts ...rag.Doc
 
 func (p *bulkProcessor) processBatch(ctx context.Context, batch []*addRequest) {
 	log.Infof("[Processor] Processing a batch of %d items.\n", len(batch))
-	documents := make([]rag.Document, 0)
+	documents := make([]vectorstore.Document, 0)
 	for _, req := range batch {
 		documents = append(documents, rag.BuildDocument(req.DocID, req.Content, req.Options...))
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,7 +28,7 @@ func testEmbedder(text string) ([]float32, error) {
 func TestNewKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -38,9 +38,9 @@ func TestNewKnowledgeBase(t *testing.T) {
 		"test-kb-with-info",
 		"测试知识库",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb)
@@ -55,7 +55,7 @@ func TestNewKnowledgeBase(t *testing.T) {
 	assert.Equal(t, "test", info.KnowledgeBaseType)
 
 	// 验证 RAG Collection 被创建
-	assert.True(t, rag.CollectionIsExists(db, "test-kb-with-info"))
+	assert.True(t, vectorstore.HasCollection(db, "test-kb-with-info"))
 
 	// 再次调用 NewKnowledgeBase，应该直接加载而不创建新的
 	kb2, err := NewKnowledgeBase(
@@ -63,7 +63,7 @@ func TestNewKnowledgeBase(t *testing.T) {
 		"test-kb-with-info",
 		"不应该被使用的描述",
 		"不应该被使用的类型",
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb2)
@@ -80,7 +80,7 @@ func TestNewKnowledgeBase(t *testing.T) {
 func TestCreateKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -90,9 +90,9 @@ func TestCreateKnowledgeBase(t *testing.T) {
 		"new-kb",
 		"全新知识库",
 		"fresh",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb)
@@ -108,7 +108,7 @@ func TestCreateKnowledgeBase(t *testing.T) {
 		"new-kb",
 		"重复知识库",
 		"duplicate",
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.Error(t, err)
 	assert.Nil(t, kb2)
@@ -119,7 +119,7 @@ func TestCreateKnowledgeBase(t *testing.T) {
 func TestLoadKnowledgeBase(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -129,9 +129,9 @@ func TestLoadKnowledgeBase(t *testing.T) {
 		"load-test-kb",
 		"加载测试知识库",
 		"load-test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb1)
@@ -140,7 +140,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 	kb2, err := LoadKnowledgeBase(
 		db,
 		"load-test-kb",
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb2)
@@ -157,7 +157,7 @@ func TestLoadKnowledgeBase(t *testing.T) {
 func TestKnowledgeBaseOperations(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -167,9 +167,9 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 		"ops-test-kb",
 		"操作测试知识库",
 		"ops-test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 
@@ -222,8 +222,8 @@ func TestAddLargeDocument(t *testing.T) {
 		"large-doc-kb",
 		"超大文档知识库",
 		"large-doc",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb)

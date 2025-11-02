@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"gotest.tools/v3/assert"
@@ -41,7 +41,7 @@ func TestKnowledgeBaseDBOperation(t *testing.T) {
 		db.Where("knowledge_base_name = ?", testKBName).Delete(&schema.KnowledgeBaseInfo{})
 
 		// 清理向量集合
-		rag.DeleteCollection(db, testKBName)
+		vectorstore.DeleteCollection(db, testKBName)
 	}()
 
 	t.Run("TestKnowledgeBaseCreationAndVectorSync", func(t *testing.T) {
@@ -88,7 +88,7 @@ func testKnowledgeBaseCreationAndVectorSync(t *testing.T, db *gorm.DB, kbName st
 	t.Logf("Knowledge base created: %s (ID: %d)", kbInfo.KnowledgeBaseName, kbInfo.ID)
 
 	// 3. 验证向量集合已创建
-	exists := rag.CollectionIsExists(db, kbName)
+	exists := vectorstore.HasCollection(db, kbName)
 	if !exists {
 		t.Errorf("Vector collection %s should exist after creating knowledge base", kbName)
 	} else {
@@ -96,11 +96,11 @@ func testKnowledgeBaseCreationAndVectorSync(t *testing.T, db *gorm.DB, kbName st
 	}
 
 	// 4. 验证向量集合初始状态
-	ragSystem := kb.GetRAGSystem()
-	if ragSystem == nil {
-		t.Error("RAG system should be available")
+	collectionMg := kb.GetVectorStore()
+	if collectionMg == nil {
+		t.Error("vector store should be available")
 	} else {
-		count, err := ragSystem.CountDocuments()
+		count, err := collectionMg.Count()
 		if err != nil {
 			t.Errorf("Failed to count documents: %v", err)
 		} else {
@@ -175,8 +175,8 @@ func testKnowledgeEntryAdditionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	}
 
 	// 6. 验证向量内容
-	ragSystem := kb.GetRAGSystem()
-	doc, exists, err := ragSystem.GetDocument(entry.HiddenIndex)
+	collectionMg := kb.GetVectorStore()
+	doc, exists, err := collectionMg.Get(entry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to get document from vector store: %v", err)
 	} else if !exists {
@@ -240,8 +240,8 @@ func testKnowledgeEntryUpdateAndVectorSync(t *testing.T, db *gorm.DB, kbName str
 	t.Logf("Entry updated: %s -> %s", originalTitle, updatedEntry.KnowledgeTitle)
 
 	// 5. 验证向量已同步更新
-	ragSystem := kb.GetRAGSystem()
-	doc, exists, err := ragSystem.GetDocument(entry.HiddenIndex)
+	collectionMg := kb.GetVectorStore()
+	doc, exists, err := collectionMg.Get(entry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to get updated document from vector store: %v", err)
 	} else if !exists {
@@ -292,8 +292,8 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	}
 
 	// 4. 验证向量存在
-	ragSystem := kb.GetRAGSystem()
-	_, exists, err := ragSystem.GetDocument(tempEntry.HiddenIndex)
+	collectionMg := kb.GetVectorStore()
+	_, exists, err := collectionMg.Get(tempEntry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to check document existence: %v", err)
 	} else if !exists {
@@ -328,7 +328,7 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	}
 
 	// 8. 验证具体向量已删除
-	_, exists, err = ragSystem.GetDocument(tempEntry.HiddenIndex)
+	_, exists, err = collectionMg.Get(tempEntry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to check document after deletion: %v", err)
 	} else if exists {
@@ -402,7 +402,7 @@ func testKnowledgeBaseCascadeDelete(t *testing.T, db *gorm.DB, kbName string) {
 	t.Logf("Before cascade delete - Entries: %d, Documents: %d", len(beforeEntries), beforeDocCount)
 
 	// 4. 验证向量集合存在
-	exists := rag.CollectionIsExists(db, kbName)
+	exists := vectorstore.HasCollection(db, kbName)
 	if !exists {
 		t.Error("Vector collection should exist before deletion")
 	}
@@ -431,7 +431,7 @@ func testKnowledgeBaseCascadeDelete(t *testing.T, db *gorm.DB, kbName string) {
 	}
 
 	// 8. 验证向量集合已删除
-	exists = rag.CollectionIsExists(db, kbName)
+	exists = vectorstore.HasCollection(db, kbName)
 	if exists {
 		t.Error("Vector collection should have been deleted")
 	} else {

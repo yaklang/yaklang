@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -15,7 +15,7 @@ import (
 func TestSyncFunctionality(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -25,9 +25,9 @@ func TestSyncFunctionality(t *testing.T) {
 		"sync-test-kb",
 		"同步测试知识库",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 
@@ -90,7 +90,7 @@ func TestSyncFunctionality(t *testing.T) {
 
 	// 模拟RAG中有但数据库中没有的情况
 	// 添加一个额外的文档到RAG
-	err = kb.ragSystem.Add("extra-doc", "额外的文档内容")
+	err = kb.vectorStore.AddWithOptions("extra-doc", "额外的文档内容", vectorstore.WithDocumentRawMetadata(map[string]any{"source": "test"}))
 	assert.NoError(t, err)
 
 	// 检查不同步状态
@@ -121,7 +121,7 @@ func TestSyncFunctionality(t *testing.T) {
 func TestBatchSyncEntries(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -131,9 +131,9 @@ func TestBatchSyncEntries(t *testing.T) {
 		"batch-sync-test-kb",
 		"批量同步测试知识库",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 
@@ -174,7 +174,7 @@ func TestBatchSyncEntries(t *testing.T) {
 func TestTransactionOperations(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 
@@ -184,9 +184,9 @@ func TestTransactionOperations(t *testing.T) {
 		"transaction-test-kb",
 		"事务测试知识库",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	assert.NoError(t, err)
 

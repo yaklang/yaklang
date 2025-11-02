@@ -1,4 +1,4 @@
-package rag
+package vectorstore
 
 import (
 	"context"
@@ -8,6 +8,17 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+type ExportVectorStoreDocument struct {
+	DocumentID      string                 `json:"document_id"`
+	Metadata        map[string]interface{} `json:"metadata"`
+	Embedding       []float32              `json:"embedding"`
+	PQCode          []byte                 `json:"pq_code"`
+	Content         string                 `json:"content"`
+	DocumentType    string                 `json:"document_type"`
+	EntityID        string                 `json:"entity_id"`
+	RelatedEntities string                 `json:"related_entities"`
+}
 
 // RAGExportConfig 导入导出统一配置
 type RAGExportConfig struct {

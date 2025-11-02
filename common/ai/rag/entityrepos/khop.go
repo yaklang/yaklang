@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -309,7 +310,7 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 					if !ok {
 						return
 					}
-					if doc, ok := res.Data.(*rag.Document); ok {
+					if doc, ok := res.Data.(*vectorstore.Document); ok {
 						if doc.Type == schema.RAGDocumentType_Entity {
 							log.Debugf("Yield entity from RAG query: %s", doc.EntityUUID)
 							input.SafeFeed(doc.EntityUUID)

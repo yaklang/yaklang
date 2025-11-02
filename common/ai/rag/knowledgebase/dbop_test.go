@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -19,7 +19,7 @@ import (
 func TestDeleteKnowledgeBase_Success(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -30,9 +30,9 @@ func TestDeleteKnowledgeBase_Success(t *testing.T) {
 		kbName,
 		"测试删除知识库",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -90,7 +90,7 @@ func TestDeleteKnowledgeBase_Success(t *testing.T) {
 func TestDeleteKnowledgeBase_NotFound(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -105,7 +105,7 @@ func TestDeleteKnowledgeBase_NotFound(t *testing.T) {
 func TestDeleteKnowledgeBase_WithMultipleEntries(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -116,9 +116,9 @@ func TestDeleteKnowledgeBase_WithMultipleEntries(t *testing.T) {
 		kbName,
 		"测试多条目删除",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -155,7 +155,7 @@ func TestDeleteKnowledgeBase_WithMultipleEntries(t *testing.T) {
 func TestDeleteKnowledgeBase_WithDocuments(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -166,9 +166,9 @@ func TestDeleteKnowledgeBase_WithDocuments(t *testing.T) {
 		kbName,
 		"测试文档删除",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -210,7 +210,7 @@ func TestDeleteKnowledgeBase_WithDocuments(t *testing.T) {
 func TestDeleteKnowledgeBase_Transaction(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -221,9 +221,9 @@ func TestDeleteKnowledgeBase_Transaction(t *testing.T) {
 		kbName,
 		"测试事务性",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -246,7 +246,7 @@ func TestDeleteKnowledgeBase_Transaction(t *testing.T) {
 func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -257,9 +257,9 @@ func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 		kbName,
 		"测试额外数据",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -293,7 +293,7 @@ func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 
 	// 创建新数据库用于导入
 	path2 := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db2, err := rag.NewRagDatabase(path2)
+	db2, err := vectorstore.NewVectorStoreDatabase(path2)
 	require.NoError(t, err)
 	defer db2.Close()
 
@@ -339,7 +339,7 @@ func TestExportImportKnowledgeBase_WithExtraData(t *testing.T) {
 func TestExportImportKnowledgeBase_WithoutExtraData(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -350,9 +350,9 @@ func TestExportImportKnowledgeBase_WithoutExtraData(t *testing.T) {
 		kbName,
 		"测试无额外数据",
 		"test",
-		rag.WithEmbeddingModel("mock-model"),
-		rag.WithModelDimension(3),
-		rag.WithEmbeddingClient(rag.NewMockEmbedder(testEmbedder)),
+		vectorstore.WithEmbeddingModel("mock-model"),
+		vectorstore.WithModelDimension(3),
+		vectorstore.WithEmbeddingClient(vectorstore.NewMockEmbedder(testEmbedder)),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, kb)
@@ -373,7 +373,7 @@ func TestExportImportKnowledgeBase_WithoutExtraData(t *testing.T) {
 
 	// 创建新数据库用于导入
 	path2 := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	db2, err := rag.NewRagDatabase(path2)
+	db2, err := vectorstore.NewVectorStoreDatabase(path2)
 	require.NoError(t, err)
 	defer db2.Close()
 

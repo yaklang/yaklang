@@ -4,24 +4,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 )
 
 // 测试 SQLiteVectorStore
 func TestSQLiteVectorStore(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := NewMockEmbedder(func(text string) ([]float32, error) {
+	mockEmbed := vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
 		return []float32{1.0, 0.0, 0.0}, nil
 	})
 
 	db := consts.GetGormProfileDatabase()
 	// 创建 SQLite 向量存储
-	store, err := NewSQLiteVectorStoreHNSW("test_collection", "test", "Qwen3-Embedding-0.6B-Q4_K_M", 1024, mockEmbed, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW("test_collection", "test", "Qwen3-Embedding-0.6B-Q4_K_M", 1024, mockEmbed, db)
 	assert.NoError(t, err)
 	defer store.Remove()
 
 	// 准备测试文档
-	docs := []Document{
+	docs := []*vectorstore.Document{
 		{
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",

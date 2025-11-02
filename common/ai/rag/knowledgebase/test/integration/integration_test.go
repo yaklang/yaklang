@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -18,7 +18,7 @@ import (
 func TestIntegrationWithRealEmbedding(t *testing.T) {
 	// 创建临时数据库
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String()+".db")
-	db, err := rag.NewRagDatabase(path)
+	db, err := vectorstore.NewVectorStoreDatabase(path)
 	assert.NoError(t, err)
 	defer db.Close()
 

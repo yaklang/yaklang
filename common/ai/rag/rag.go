@@ -2,14 +2,11 @@ package rag
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,22 +17,22 @@ import (
 
 // RAGSystem 表示完整的 RAG 系统
 type RAGSystem struct {
-	Embedder     vectorstore.EmbeddingClient // 嵌入向量生成器
-	VectorStore  vectorstore.VectorStore     // 向量存储
-	BigTextPlan  string                      // 大文本方案
-	Concurrent   int                         // 并发数
-	MaxChunkSize int                         // 最大块大小
-	ChunkOverlap int                         // 块重叠
+	Embedder     vectorstore.EmbeddingClient        // 嵌入向量生成器
+	VectorStore  *vectorstore.SQLiteVectorStoreHNSW // 向量存储
+	BigTextPlan  string                             // 大文本方案
+	Concurrent   int                                // 并发数
+	MaxChunkSize int                                // 最大块大小
+	ChunkOverlap int                                // 块重叠
 	Name         string
 	UUID         string
 }
 
 // NewRAGSystem 创建一个新的 RAG 系统
-func NewRAGSystem(embedder vectorstore.EmbeddingClient, store vectorstore.VectorStore) *RAGSystem {
+func NewRAGSystem(embedder vectorstore.EmbeddingClient, store *vectorstore.SQLiteVectorStoreHNSW) *RAGSystem {
 	return NewRAGSystemWithName("", embedder, store)
 }
 
-func NewRAGSystemWithName(name string, embedder vectorstore.EmbeddingClient, store vectorstore.VectorStore) *RAGSystem {
+func NewRAGSystemWithName(name string, embedder vectorstore.EmbeddingClient, store *vectorstore.SQLiteVectorStoreHNSW) *RAGSystem {
 	return &RAGSystem{
 		Name:         name,
 		Embedder:     embedder,
@@ -49,7 +46,7 @@ func NewRAGSystemWithName(name string, embedder vectorstore.EmbeddingClient, sto
 
 // NewRAGSystemWithLocalEmbedding 创建使用本地模型嵌入的 RAG 系统
 // 自动启动本地嵌入服务，如果无法启动则报错
-func NewRAGSystemWithLocalEmbedding(store vectorstore.VectorStore) (*RAGSystem, error) {
+func NewRAGSystemWithLocalEmbedding(store *vectorstore.SQLiteVectorStoreHNSW) (*RAGSystem, error) {
 	log.Infof("creating RAG system with local embedding service")
 
 	// 获取本地嵌入服务单例
@@ -69,13 +66,13 @@ func NewRAGSystemWithLocalEmbedding(store vectorstore.VectorStore) (*RAGSystem, 
 
 // NewDefaultRAGSystem 创建默认的 RAG 系统（使用本地嵌入服务）
 // 这是推荐的创建方式，会自动使用本地模型嵌入服务
-func NewDefaultRAGSystem(store vectorstore.VectorStore) (*RAGSystem, error) {
+func NewDefaultRAGSystem(store *vectorstore.SQLiteVectorStoreHNSW) (*RAGSystem, error) {
 	return NewRAGSystemWithLocalEmbedding(store)
 }
 
 // NewRAGSystemWithOptionalEmbedding 创建 RAG 系统，支持可选的嵌入服务
 // 如果 embedder 为 nil，则使用默认的本地嵌入服务
-func NewRAGSystemWithOptionalEmbedding(store vectorstore.VectorStore, embedder vectorstore.EmbeddingClient) (*RAGSystem, error) {
+func NewRAGSystemWithOptionalEmbedding(store *vectorstore.SQLiteVectorStoreHNSW, embedder vectorstore.EmbeddingClient) (*RAGSystem, error) {
 	if embedder == nil {
 		log.Infof("no embedder provided, using default local embedding service")
 		return NewRAGSystemWithLocalEmbedding(store)
@@ -153,17 +150,10 @@ func averagePooling(embeddings [][]float32) []float32 {
 }
 
 func (r *RAGSystem) Has(docId string) bool {
-	v, ok := r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW)
-	if !ok {
-		return false
-	}
-	return v.Has(docId)
+	return r.VectorStore.Has(docId)
 }
 
-func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
-	if err := r.requireWriteCollection(); err != nil {
-		return utils.Wrap(err, "require write vector store")
-	}
+func (r *RAGSystem) Add(docId string, content string, opts ...vectorstore.DocumentOption) error {
 	//log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &vectorstore.Document{
 		ID:        docId,
@@ -178,345 +168,50 @@ func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) er
 		opt(doc)
 	}
 	//log.Infof("document metadata after options: %+v", doc.Metadata)
-	return r.addDocuments(*doc)
+	return r.addDocuments(doc)
 }
 
-func BuildDocument(docId, content string, opts ...DocumentOption) vectorstore.Document {
-	doc := vectorstore.Document{
+func BuildDocument(docId, content string, opts ...vectorstore.DocumentOption) *vectorstore.Document {
+	doc := &vectorstore.Document{
 		ID:        docId,
 		Content:   content,
 		Metadata:  make(map[string]any),
 		Embedding: nil,
 	}
 	for _, opt := range opts {
-		opt(&doc)
+		opt(doc)
 	}
 	return doc
 }
 
-func (r *RAGSystem) AddDocuments(docs ...vectorstore.Document) error {
-	if err := r.requireWriteCollection(); err != nil {
-		return utils.Wrap(err, "require write vector store")
-	}
-	return r.addDocuments(docs...)
+func (r *RAGSystem) AddDocuments(docs ...*vectorstore.Document) error {
+	return r.VectorStore.Add(docs...)
 }
 
 // AddDocuments 添加文档到 RAG 系统
-func (r *RAGSystem) addDocuments(docs ...vectorstore.Document) error {
-	//log.Infof("adding %d documents to RAG system", len(docs))
-
-	var finalDocs []vectorstore.Document
-
-	// 为每个文档生成嵌入向量
-	for i := range docs {
-		//log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
-		// 首先尝试直接生成嵌入
-		embeddingData, err := r.Embedder.Embedding(docs[i].Content)
-		if err != nil {
-			if errors.Is(err, embedding.ErrInputTooLarge) {
-				// 如果失败且是由于文本过大，使用BigTextPlan处理
-				processedDocs, processErr := r.processBigText(docs[i])
-				if processErr != nil {
-					log.Errorf("failed to process big text for document %s: %v", docs[i].ID, processErr)
-					return utils.Errorf("failed to process document %s: %v", docs[i].ID, processErr)
-				}
-
-				// 将处理后的文档添加到最终文档列表
-				finalDocs = append(finalDocs, processedDocs...)
-				continue
-			}
-			log.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
-			return utils.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
-		}
-
-		if len(embeddingData) <= 0 {
-			log.Errorf("empty embedding generated for document %s", docs[i].ID)
-			return utils.Errorf("failed to generate embedding for document (empty embedding) %s", docs[i].ID)
-		}
-
-		//log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embeddingData))
-		docs[i].Embedding = embeddingData
-		finalDocs = append(finalDocs, docs[i])
-	}
-
-	//log.Infof("adding %d processed documents with embeddings to vector store", len(finalDocs))
-	// 添加到向量存储
-	err := r.VectorStore.Add(finalDocs...)
-	if err != nil {
-		log.Errorf("failed to add documents to vector store: %v", err)
-		return err
-	}
-	//log.Infof("successfully added %d documents to vector store", len(finalDocs))
-	return nil
+func (r *RAGSystem) addDocuments(docs ...*vectorstore.Document) error {
+	return r.VectorStore.Add(docs...)
 }
 
 func (r *RAGSystem) SetArchived(archived bool) error {
-	if v, ok := r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW); ok {
-		return v.SetArchived(archived)
-	}
-	return utils.Errorf("current vector store is not support set archived")
+	return r.VectorStore.SetArchived(archived)
 }
 
 func (r *RAGSystem) GetArchived() bool {
-	if v, ok := r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW); ok {
-		return v.GetArchived()
-	}
-	return false
-}
-
-// processBigText 处理大文本，根据BigTextPlan策略进行不同的处理
-func (r *RAGSystem) processBigText(doc vectorstore.Document) ([]vectorstore.Document, error) {
-	log.Infof("processing big text for document %s using plan: %s", doc.ID, r.BigTextPlan)
-
-	// 设置合理的分块参数
-	maxChunkSize := r.MaxChunkSize // 默认块大小（rune计算）
-	overlap := r.ChunkOverlap      // 默认重叠
-
-	// 根据元数据调整分块参数
-	if chunkSize, ok := doc.Metadata["chunk_size"].(int); ok && chunkSize > 0 {
-		maxChunkSize = chunkSize
-	}
-	if chunkOverlap, ok := doc.Metadata["chunk_overlap"].(int); ok && chunkOverlap >= 0 {
-		overlap = chunkOverlap
-	}
-
-	// 分割文本
-	chunks := ChunkText(doc.Content, maxChunkSize, overlap)
-	if len(chunks) == 0 {
-		return nil, utils.Errorf("failed to chunk text for document %s", doc.ID)
-	}
-
-	log.Infof("split document %s into %d chunks", doc.ID, len(chunks))
-
-	switch r.BigTextPlan {
-	case vectorstore.BigTextPlanChunkText:
-		return r.processChunkText(doc, chunks)
-	case vectorstore.BigTextPlanChunkTextAndAvgPooling:
-		return r.processChunkTextAndAvgPooling(doc, chunks)
-	default:
-		log.Warnf("unknown big text plan: %s, using default chunkText", r.BigTextPlan)
-		return r.processChunkText(doc, chunks)
-	}
-}
-
-func (r *RAGSystem) ConvertToPQMode() error {
-	if v, ok := r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW); ok {
-		return v.ConvertToPQMode()
-	}
-	return utils.Errorf("vector store is not a vectorstore.SQLiteVectorStoreHNSW")
+	return r.VectorStore.GetArchived()
 }
 
 func (r *RAGSystem) ConvertToStandardMode() error {
-	if v, ok := r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW); ok {
-		return v.ConvertToStandardMode()
-	}
-	return utils.Errorf("vector store is not a vectorstore.SQLiteVectorStoreHNSW")
-}
-
-// processChunkText 将文本分割成多个文档分别存储
-func (r *RAGSystem) processChunkText(originalDoc vectorstore.Document, chunks []string) ([]vectorstore.Document, error) {
-	log.Infof("processing document %s with chunkText strategy, creating %d documents", originalDoc.ID, len(chunks))
-
-	if len(chunks) == 0 {
-		return []vectorstore.Document{}, nil
-	}
-
-	// 并行处理结果结构
-	type chunkResult struct {
-		index int
-		doc   vectorstore.Document
-		err   error
-	}
-
-	// 创建结果channel和sync.WaitGroup
-	resultChan := make(chan chunkResult, len(chunks))
-	var wg sync.WaitGroup
-
-	// 并行处理每个chunk
-	for i, chunk := range chunks {
-		wg.Add(1)
-		go func(index int, chunkText string) {
-			defer wg.Done()
-
-			// 为每个分块生成嵌入
-			embedding, err := r.Embedder.Embedding(chunkText)
-			if err != nil {
-				log.Errorf("failed to generate embedding for chunk %d of document %s: %v", index, originalDoc.ID, err)
-				resultChan <- chunkResult{
-					index: index,
-					err:   utils.Errorf("failed to generate embedding for chunk %d: %v", index, err),
-				}
-				return
-			}
-
-			if len(embedding) == 0 {
-				log.Warnf("empty embedding for chunk %d of document %s, skipping", index, originalDoc.ID)
-				resultChan <- chunkResult{
-					index: index,
-					err:   nil, // 空embedding不是错误，只是跳过
-				}
-				return
-			}
-
-			// 创建新文档
-			chunkDoc := vectorstore.Document{
-				ID:        fmt.Sprintf("%s_chunk_%d", originalDoc.ID, index),
-				Content:   chunkText,
-				Metadata:  make(map[string]any),
-				Embedding: embedding,
-			}
-
-			// 复制原始文档的元数据
-			for k, v := range originalDoc.Metadata {
-				chunkDoc.Metadata[k] = v
-			}
-
-			// 添加分块特有的元数据
-			chunkDoc.Metadata["original_doc_id"] = originalDoc.ID
-			chunkDoc.Metadata["chunk_index"] = index
-			chunkDoc.Metadata["total_chunks"] = len(chunks)
-			chunkDoc.Metadata["is_chunk"] = true
-
-			resultChan <- chunkResult{
-				index: index,
-				doc:   chunkDoc,
-				err:   nil,
-			}
-		}(i, chunk)
-	}
-
-	// 等待所有goroutine完成
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// 收集结果
-	results := make([]chunkResult, 0, len(chunks))
-	for result := range resultChan {
-		results = append(results, result)
-	}
-
-	// 检查错误
-	var firstError error
-	validDocs := make([]vectorstore.Document, 0, len(chunks))
-
-	// 按原始索引顺序排序结果
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].index < results[j].index
-	})
-
-	for _, result := range results {
-		if result.err != nil {
-			if firstError == nil {
-				firstError = result.err
-			}
-			continue
-		}
-
-		// 只有非空embedding的文档才添加到结果中
-		if len(result.doc.Embedding) > 0 {
-			validDocs = append(validDocs, result.doc)
-		}
-	}
-
-	// 如果有错误，返回第一个错误
-	if firstError != nil {
-		return nil, firstError
-	}
-
-	log.Infof("successfully created %d chunk documents for %s", len(validDocs), originalDoc.ID)
-	return validDocs, nil
-}
-
-// processChunkTextAndAvgPooling 将文本分割后生成多个嵌入向量，然后平均池化成一个文档存储
-func (r *RAGSystem) processChunkTextAndAvgPooling(originalDoc vectorstore.Document, chunks []string) ([]vectorstore.Document, error) {
-	log.Infof("processing document %s with chunkTextAndAvgPooling strategy", originalDoc.ID)
-
-	var embeddings [][]float32
-	var combinedContent string
-
-	// 为每个分块生成嵌入
-	for i, chunk := range chunks {
-		embedding, err := r.Embedder.Embedding(chunk)
-		if err != nil {
-			log.Errorf("failed to generate embedding for chunk %d of document %s: %v", i, originalDoc.ID, err)
-			return nil, utils.Errorf("failed to generate embedding for chunk %d: %v", i, err)
-		}
-
-		if len(embedding) == 0 {
-			log.Warnf("empty embedding for chunk %d of document %s, skipping", i, originalDoc.ID)
-			continue
-		}
-
-		embeddings = append(embeddings, embedding)
-		if i == 0 {
-			combinedContent = chunk
-		} else {
-			combinedContent += " " + chunk
-		}
-	}
-
-	if len(embeddings) == 0 {
-		return nil, utils.Errorf("no valid embeddings generated for document %s", originalDoc.ID)
-	}
-
-	// 对所有嵌入向量进行平均池化
-	avgEmbedding := averagePooling(embeddings)
-	if avgEmbedding == nil {
-		return nil, utils.Errorf("failed to compute average pooling for document %s", originalDoc.ID)
-	}
-
-	// 创建合并后的文档
-	pooledDoc := vectorstore.Document{
-		ID:        originalDoc.ID,
-		Content:   combinedContent,
-		Metadata:  make(map[string]any),
-		Embedding: avgEmbedding,
-	}
-
-	// 复制原始文档的元数据
-	for k, v := range originalDoc.Metadata {
-		pooledDoc.Metadata[k] = v
-	}
-
-	// 添加池化特有的元数据
-	pooledDoc.Metadata["is_pooled"] = true
-	pooledDoc.Metadata["pooled_chunks"] = len(embeddings)
-	pooledDoc.Metadata["pooling_method"] = "average"
-
-	log.Infof("successfully created pooled document for %s from %d chunks", originalDoc.ID, len(embeddings))
-	return []vectorstore.Document{pooledDoc}, nil
+	return r.VectorStore.ConvertToStandardMode()
 }
 
 // QueryWithPage 根据查询文本检索相关文档并返回结果
 func (r *RAGSystem) QueryWithPage(query string, page, limit int) ([]vectorstore.SearchResult, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("failed to query with page query: %s: %v", query, err)
-			fmt.Println(utils.ErrorStack(err))
-		}
-	}()
-	return r.VectorStore.Search(query, page, limit)
+	return r.VectorStore.QueryWithPage(query, page, limit)
 }
 
 func (r *RAGSystem) QueryWithFilter(query string, page, limit int, filter func(key string, getDoc func() *vectorstore.Document) bool) ([]vectorstore.SearchResult, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("failed to query with page query: %s: %v", query, err)
-			fmt.Println(utils.ErrorStack(err))
-		}
-	}()
-	results, err := r.VectorStore.SearchWithFilter(query, page, limit, func(key string, getDoc func() *vectorstore.Document) bool {
-		if filter != nil {
-			return filter(key, getDoc)
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
+	return r.VectorStore.QueryWithFilter(query, page, limit, filter)
 }
 
 // FuzzRawSearch Sql 文本模糊搜索（非语义）
@@ -537,86 +232,26 @@ func (r *RAGSystem) Query(query string, topN int, limits ...float64) ([]vectorst
 
 // QueryTopN 根据查询文本检索相关文档并返回结果
 func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]vectorstore.SearchResult, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("failed to query top_n %s: %v", query, err)
-			fmt.Println(utils.ErrorStack(err))
-		}
-	}()
-	if topN <= 0 {
-		topN = 20
-	}
-
-	var page = 1
-	var limit float64 = -1
-	if len(limits) > 0 {
-		limit = limits[0]
-	}
-
-	if limit >= 1 {
-		topN = utils.Max(topN, int(limit))
-		log.Warnf("limit should be less than 1, got %f, using -1 instead, use topN: %v (Max(topN, int(limit:%v)))", limit, topN, limit)
-		limit = -1
-	}
-
-	log.Infof("start to search in vector storage with query: %#v", query)
-	results, err := r.VectorStore.Search(query, page, topN)
-	if err != nil {
-		return nil, err
-	}
-
-	var filteredResults []vectorstore.SearchResult
-	for _, result := range results {
-		if limit < 0 || result.Score >= limit {
-			filteredResults = append(filteredResults, result)
-		}
-	}
-
-	return filteredResults, nil
+	return r.VectorStore.QueryTopN(query, topN, limits...)
 }
 
 // DeleteDocuments 删除文档
 func (r *RAGSystem) DeleteDocuments(ids ...string) error {
-	if err := r.requireWriteCollection(); err != nil {
-		return err
-	}
 	return r.VectorStore.Delete(ids...)
-}
-
-func (r *RAGSystem) requireWriteCollection() error {
-	if r.GetArchived() {
-		return utils.Errorf("current vector store is archived, please unarchive first")
-	}
-	return nil
 }
 
 // ClearDocuments 清空所有文档
 func (r *RAGSystem) ClearDocuments() error {
-	if err := r.requireWriteCollection(); err != nil {
-		return utils.Wrap(err, "require write vector store")
-	}
-	docs, err := r.ListDocuments()
-	if err != nil {
-		return err
-	}
-	ids := []string{}
-	for _, doc := range docs {
-		ids = append(ids, doc.ID)
-	}
-	err = r.VectorStore.Delete(ids...)
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.VectorStore.Clear()
 }
 
 // GetDocument 获取指定 ID 的文档
-func (r *RAGSystem) GetDocument(id string) (vectorstore.Document, bool, error) {
+func (r *RAGSystem) GetDocument(id string) (*vectorstore.Document, bool, error) {
 	return r.VectorStore.Get(id)
 }
 
 // ListDocuments 列出所有文档
-func (r *RAGSystem) ListDocuments() ([]vectorstore.Document, error) {
+func (r *RAGSystem) ListDocuments() ([]*vectorstore.Document, error) {
 	return r.VectorStore.List()
 }
 
@@ -626,7 +261,7 @@ func (r *RAGSystem) CountDocuments() (int, error) {
 }
 
 func (r *RAGSystem) DeleteEmbeddingData() error {
-	return r.VectorStore.(*vectorstore.SQLiteVectorStoreHNSW).DeleteEmbeddingData()
+	return r.VectorStore.DeleteEmbeddingData()
 }
 
 func QueryCollection(db *gorm.DB, query string, opts ...aispec.AIConfigOption) ([]*vectorstore.SearchResult, error) {
@@ -674,7 +309,7 @@ func QueryCollection(db *gorm.DB, query string, opts ...aispec.AIConfigOption) (
 		}
 
 		// 转换为Document结构
-		document := vectorstore.Document{
+		document := &vectorstore.Document{
 			ID:        doc.DocumentID,
 			Content:   "", // 从metadata中获取集合信息
 			Metadata:  map[string]any(doc.Metadata),

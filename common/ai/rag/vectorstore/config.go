@@ -53,7 +53,7 @@ func NewCollectionConfig(options ...any) *CollectionConfig {
 	}
 
 	for _, option := range options {
-		if ragOption, ok := option.(RAGOption); ok {
+		if ragOption, ok := option.(CollectionConfigFunc); ok {
 			ragOption(defaultConfig)
 		} else {
 			defaultConfig.otherOptions = append(defaultConfig.otherOptions, option)
@@ -79,7 +79,7 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		EnableAutoUpdateGraphInfos: true,
 	}
 	for _, option := range options {
-		if ragOption, ok := option.(RAGOption); ok {
+		if ragOption, ok := option.(CollectionConfigFunc); ok {
 			ragOption(loadBasicConfig)
 		} else {
 			loadBasicConfig.otherOptions = append(loadBasicConfig.otherOptions, option)
@@ -110,28 +110,28 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 	return nil
 }
 
-type RAGOption func(config *CollectionConfig)
+type CollectionConfigFunc func(config *CollectionConfig)
 
 // WithEmbeddingClient 设置embedding客户端
-func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGOption {
+func WithEmbeddingClient(client aispec.EmbeddingCaller) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.EmbeddingClient = client
 	}
 }
 
-func WithLazyLoadEmbeddingClient() RAGOption {
+func WithLazyLoadEmbeddingClient() CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.LazyLoadEmbeddingClient = true
 	}
 }
 
-func WithDescription(description string) RAGOption {
+func WithDescription(description string) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.Description = description
 	}
 }
 
-func WithForceNew(i ...bool) RAGOption {
+func WithForceNew(i ...bool) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		if len(i) > 0 {
 			config.ForceNew = i[0]
@@ -142,64 +142,58 @@ func WithForceNew(i ...bool) RAGOption {
 }
 
 // WithEmbeddingModel 设置embedding模型
-func WithEmbeddingModel(model string) RAGOption {
+func WithEmbeddingModel(model string) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.ModelName = model
 	}
 }
 
 // WithModelDimension 设置模型维度
-func WithModelDimension(dimension int) RAGOption {
+func WithModelDimension(dimension int) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.Dimension = dimension
 	}
 }
 
-func WithModelName(name string) RAGOption {
+func WithModelName(name string) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.ModelName = name
 	}
 }
 
-func WithBuildGraphFilter(filter *yakit.VectorDocumentFilter) RAGOption {
+func WithBuildGraphFilter(filter *yakit.VectorDocumentFilter) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.buildGraphFilter = filter
 	}
 }
 
-func WithBuildGraphPolicy(policy string) RAGOption {
+func WithBuildGraphPolicy(policy string) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.buildGraphPolicy = policy
 	}
 }
 
-func WithCosineDistance() RAGOption {
+func WithCosineDistance() CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.DistanceFuncType = "cosine"
 	}
 }
 
 // WithDB 设置数据库
-func WithDB(db *gorm.DB) RAGOption {
+func WithDB(db *gorm.DB) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.DB = db
 	}
 }
 
 // WithHNSWParameters 批量设置HNSW参数
-func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGOption {
+func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.MaxNeighbors = m
 		config.LayerGenerationFactor = ml
 		config.EfSearch = efSearch
 		config.EfConstruct = efConstruct
 	}
-}
-
-// CollectionIsExists 检查知识库是否存在
-func CollectionIsExists(db *gorm.DB, name string) bool {
-	col, err := yakit.QueryRAGCollectionByName(db, name)
-	return col != nil && err == nil
 }
 
 var IsMockMode = false
