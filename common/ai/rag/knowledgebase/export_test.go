@@ -11,7 +11,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -94,15 +94,13 @@ func createTestKnowledgeBaseEntries(db *gorm.DB, kbID int64) ([]*schema.Knowledg
 }
 
 func createTestRAGData(db *gorm.DB, collectionName string) error {
+	// 创建模拟嵌入器
+	embedding := vectorstore.NewDefaultMockEmbedding()
 	// 创建RAG向量存储
-	store, err := rag.NewSQLiteVectorStoreHNSW(collectionName, "测试向量集合", "text-embedding-3-small", 1024, nil, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW(collectionName, "测试向量集合", "text-embedding-3-small", 1024, embedding, db)
 	if err != nil {
 		return err
 	}
-
-	// 创建模拟嵌入器
-	embedding := rag.NewDefaultMockEmbedding()
-	ragSystem := rag.NewRAGSystem(embedding, store)
 
 	// 添加测试文档
 	testDocs := []struct {
@@ -115,7 +113,7 @@ func createTestRAGData(db *gorm.DB, collectionName string) error {
 	}
 
 	for _, doc := range testDocs {
-		ragSystem.Add(doc.id, doc.content, rag.WithDocumentRawMetadata(map[string]any{"source": "test"}))
+		store.AddWithOptions(doc.id, doc.content, vectorstore.WithDocumentRawMetadata(map[string]any{"source": "test"}))
 	}
 
 	return nil

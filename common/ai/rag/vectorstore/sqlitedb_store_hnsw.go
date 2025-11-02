@@ -19,6 +19,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
@@ -290,10 +291,13 @@ func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
 	cfg := NewCollectionConfig(opts...)
 
+	if cfg.Description != "" {
+		description = cfg.Description
+	}
 	// 创建集合配置
 	collection := schema.VectorStoreCollection{
 		Name:             name,
-		Description:      description,
+		Description:      cfg.Description,
 		ModelName:        cfg.ModelName,
 		Dimension:        cfg.Dimension,
 		M:                cfg.MaxNeighbors,
@@ -337,25 +341,6 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 	return NewSQLiteVectorStoreHNSWEx(db, name, description, options...)
 }
 
-func RemoveCollectionHNSW(db *gorm.DB, collectionName string) error {
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
-		if err != nil {
-			return err
-		}
-		if collection == nil {
-			return utils.Errorf("集合 %s 不存在", collectionName)
-		}
-
-		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-}
 func (s *SQLiteVectorStoreHNSW) Remove() error {
 	collectionName := s.collection.Name
 	return utils.GormTransaction(s.db, func(tx *gorm.DB) error {
@@ -379,8 +364,8 @@ func (s *SQLiteVectorStoreHNSW) Remove() error {
 }
 
 // 将 schema.VectorStoreDocument 转换为 Document
-func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Document {
-	return Document{
+func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) *Document {
+	return &Document{
 		ID:              doc.DocumentID,
 		Type:            doc.DocumentType,
 		Metadata:        map[string]any(doc.Metadata),
@@ -393,7 +378,7 @@ func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Docu
 }
 
 // 将 Document 转换为 schema.VectorStoreDocument
-func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorStoreDocument {
+func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc *Document) *schema.VectorStoreDocument {
 	return &schema.VectorStoreDocument{
 		DocumentID:      doc.ID,
 		UID:             GetLazyNodeUIDByMd5(s.collection.Name, doc.ID),
@@ -419,6 +404,13 @@ func (s *SQLiteVectorStoreHNSW) Has(docId string) bool {
 	return ok
 }
 
+func (s *SQLiteVectorStoreHNSW) requireWriteCollection() error {
+	if s.GetArchived() {
+		return utils.Errorf("current vector store is archived, please unarchive first")
+	}
+	return nil
+}
+
 // DeleteEmbeddingData 删除嵌入数据
 func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 	if !s.collection.EnablePQMode {
@@ -431,8 +423,63 @@ func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 	return nil
 }
 
+func (s *SQLiteVectorStoreHNSW) AddWithOptions(docId, content string, opts ...DocumentOption) error {
+	doc := &Document{
+		ID:        docId,
+		Content:   content,
+		Metadata:  make(map[string]any),
+		Embedding: nil,
+	}
+	for _, opt := range opts {
+		opt(doc)
+	}
+	return s.Add(doc)
+}
+
+func (s *SQLiteVectorStoreHNSW) embedDocuments(docs ...*Document) ([]*Document, error) {
+	var finalDocs []*Document
+
+	// 为每个文档生成嵌入向量
+	for i := range docs {
+		//log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
+		// 首先尝试直接生成嵌入
+		embeddingData, err := s.embedder.Embedding(docs[i].Content)
+		if err != nil {
+			if errors.Is(err, embedding.ErrInputTooLarge) {
+				// 如果失败且是由于文本过大，使用BigTextPlan处理
+				processedDocs, processErr := processBigText(s.embedder, docs[i], defaultMaxChunkSize, defaultChunkOverlap, defaultBigTextPlan)
+				if processErr != nil {
+					log.Errorf("failed to process big text for document %s: %v", docs[i].ID, processErr)
+					return nil, utils.Errorf("failed to process document %s: %v", docs[i].ID, processErr)
+				}
+
+				// 将处理后的文档添加到最终文档列表
+				finalDocs = append(finalDocs, processedDocs...)
+				continue
+			}
+			log.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
+			return nil, utils.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
+		}
+
+		if len(embeddingData) <= 0 {
+			log.Errorf("empty embedding generated for document %s", docs[i].ID)
+			return nil, utils.Errorf("failed to generate embedding for document (empty embedding) %s", docs[i].ID)
+		}
+
+		//log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embeddingData))
+		docs[i].Embedding = embeddingData
+		finalDocs = append(finalDocs, docs[i])
+	}
+	return finalDocs, nil
+}
+
 // Add 添加文档到向量存储
-func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
+func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
+	docs, err := s.embedDocuments(docs...)
+	if err != nil {
+		return utils.Wrap(err, "embed documents")
+	}
+
 	// 记录锁获取时间
 	helper := asynchelper.NewAsyncPerformanceHelper("Vector ADD")
 	defer helper.Close()
@@ -541,7 +588,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	// 事务提交时间 - 提交可能成为瓶颈，特别是当事务很大时
 	helper.SetStatus(fmt.Sprint("db transaction commit"))
 	helper.MarkNow()
-	err := tx.Commit().Error
+	err = tx.Commit().Error
 	commitTime := helper.CheckLastMark1Second("db transaction commit")
 	if err != nil {
 		log.Errorf("transaction commit failed: %v", err)
@@ -670,7 +717,7 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 					return nil
 				}
 				res := s.toDocument(doc)
-				return &res
+				return res
 			})
 		}
 		return true
@@ -750,6 +797,9 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 
 // Delete 根据 ID 删除文档
 func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
+	if err := s.requireWriteCollection(); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -769,23 +819,23 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 }
 
 // Get 根据 ID 获取文档
-func (s *SQLiteVectorStoreHNSW) Get(id string) (Document, bool, error) {
+func (s *SQLiteVectorStoreHNSW) Get(id string) (*Document, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	doc, err := yakit.GetRAGDocumentByID(s.db, s.collection.Name, id)
 	if err != nil {
-		return Document{}, false, utils.Errorf("查询文档失败: %v", err)
+		return nil, false, utils.Errorf("查询文档失败: %v", err)
 	}
 	if doc == nil {
-		return Document{}, false, nil
+		return nil, false, nil
 	}
 
 	return s.toDocument(doc), true, nil
 }
 
 // List 列出所有文档
-func (s *SQLiteVectorStoreHNSW) List() ([]Document, error) {
+func (s *SQLiteVectorStoreHNSW) List() ([]*Document, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -794,7 +844,7 @@ func (s *SQLiteVectorStoreHNSW) List() ([]Document, error) {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
 
-	results := make([]Document, len(docs))
+	results := make([]*Document, len(docs))
 	for i, doc := range docs {
 		results[i] = s.toDocument(&doc)
 	}
@@ -912,6 +962,25 @@ func (s *SQLiteVectorStoreHNSW) _logPerformanceDiagnosticsNeedLock() {
 	if docCount > 50000 {
 		log.Errorf("CRITICAL PERFORMANCE: Collection has %d documents - HNSW performance will degrade significantly", docCount)
 	}
+}
+
+func (s *SQLiteVectorStoreHNSW) Clear() error {
+	if err := s.requireWriteCollection(); err != nil {
+		return utils.Wrap(err, "require write vector store")
+	}
+	docs, err := s.List()
+	if err != nil {
+		return err
+	}
+	ids := []string{}
+	for _, doc := range docs {
+		ids = append(ids, doc.ID)
+	}
+	err = s.Delete(ids...)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // 确保 SQLiteVectorStoreHNSW 实现了 VectorStore 接口

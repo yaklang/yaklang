@@ -39,7 +39,7 @@ func TestMUSTPASS_SQLiteVectorStoreHNSW_AddPerformance(t *testing.T) {
 
 	startTime := time.Now()
 	for i := 0; i < 100; i++ {
-		store.Add(Document{
+		store.Add(&Document{
 			ID:        fmt.Sprintf("doc%d", i),
 			Content:   fmt.Sprintf("Yaklang是一种安全研究编程语言%d", i),
 			Metadata:  map[string]any{"source": "Yaklang介绍"},

@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-var testEmbedding = &rag.EmptyEmbedding{}
+var testEmbedding = &vectorstore.EmptyEmbedding{}
 
 // TestExportVectorData 测试向量数据的导出和导入功能的基础流程
 // 测试场景：在空白数据库环境下的完整导出导入周期
@@ -27,13 +28,13 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 2. 创建向量存储并添加测试数据
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// 添加第一个测试文档
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:      "Yakit 权威使用指南 v1",
 		Content: "Yakit 权威使用指南",
 		Embedding: []float32{
@@ -43,7 +44,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 添加第二个测试文档
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:      "Yakit 权威使用指南 v2",
 		Content: "Yakit 权威使用指南",
 		Embedding: []float32{
@@ -110,12 +111,12 @@ func TestMUSTPASS_ImportVectorData_ExistingCollection(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:      "original_doc",
 		Content: "Original document content",
 		Embedding: []float32{
@@ -172,13 +173,13 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	originalEmbedding := []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:        "shared_doc_id",
 		Content:   "Original content",
 		Embedding: originalEmbedding,
@@ -208,7 +209,7 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 添加另一个不同ID的文档
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:        "different_doc_id",
 		Content:   "Different document content",
 		Embedding: []float32{1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0},
@@ -256,12 +257,12 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
+	store, err := vectorstore.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:      "Yakit 权威使用指南 v1",
 		Content: "Yakit 权威使用指南",
 		Embedding: []float32{
@@ -279,7 +280,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 	err = db.Model(&schema.VectorStoreCollection{}).Where("name = ?", PLUGIN_RAG_COLLECTION_NAME).Update("description", "Original description").Error
 	assert.NoError(t, err)
 
-	err = store.Add(rag.Document{
+	err = store.Add(&vectorstore.Document{
 		ID:      "Yakit 权威使用指南 v2",
 		Content: "Yakit 权威使用指南",
 		Embedding: []float32{

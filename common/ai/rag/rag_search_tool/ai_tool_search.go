@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -45,7 +46,7 @@ func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISear
 			searchListMap[tool.GetName()] = tool
 		}
 
-		results, err := ragSystem.QueryWithFilter(query, 1, 20, func(key string, getDoc func() *rag.Document) bool {
+		results, err := ragSystem.QueryWithFilter(query, 1, 20, func(key string, getDoc func() *vectorstore.Document) bool {
 			if _, ok := searchListMap[key]; ok {
 				return true
 			}
@@ -54,7 +55,7 @@ func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISear
 		if err != nil {
 			return nil, err
 		}
-		results = lo.Filter(results, func(item rag.SearchResult, _ int) bool {
+		results = lo.Filter(results, func(item vectorstore.SearchResult, _ int) bool {
 			return item.Score > 0.5
 		})
 		resTools := []T{}

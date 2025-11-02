@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/depinjector"
@@ -51,7 +51,7 @@ func TestKnowledgeBaseQuery(t *testing.T) {
 		db.Where("knowledge_base_name = ?", testKBName).Delete(&schema.KnowledgeBaseInfo{})
 
 		// 清理向量集合
-		rag.DeleteCollection(db, testKBName)
+		vectorstore.DeleteCollection(db, testKBName)
 	}()
 
 	// 准备测试数据
@@ -468,7 +468,7 @@ func testFilteredQuery(t *testing.T, kb *knowledgebase.KnowledgeBase) {
 	resultCh2, err := kb.SearchKnowledgeEntriesWithEnhance(query,
 		knowledgebase.WithCtx(ctx2),
 		knowledgebase.WithLimit(5),
-		knowledgebase.WithFilter(func(key string, docGetter func() *rag.Document, entryGetter func() (*schema.KnowledgeBaseEntry, error)) bool {
+		knowledgebase.WithFilter(func(key string, docGetter func() *vectorstore.Document, entryGetter func() (*schema.KnowledgeBaseEntry, error)) bool {
 			entry, err := entryGetter()
 			if err != nil {
 				return false

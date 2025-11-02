@@ -99,7 +99,7 @@ func TestMUSTPASS_MemoryVectorStore(t *testing.T) {
 	store := NewMemoryVectorStore(mockEmbed)
 
 	// 准备测试文档
-	docs := []vectorstore.Document{
+	docs := []*vectorstore.Document{
 		{
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",
@@ -157,7 +157,7 @@ func TestMUSTPASS_RAGSystem(t *testing.T) {
 	ragSystem := NewRAGSystem(mockEmbed, store)
 
 	// 准备测试文档
-	docs := []vectorstore.Document{
+	docs := []*vectorstore.Document{
 		{
 			ID:       "doc1",
 			Content:  "Yaklang是一种安全研究编程语言",

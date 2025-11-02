@@ -7,7 +7,7 @@ import (
 	"io"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -119,11 +119,11 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 	reportProgress(70, "知识库条目导出完成，开始导出向量库数据", "info")
 
 	// 写入向量库
-	ragBinaryReader, err := rag.ExportRAGToBinary(kbInfo.KnowledgeBaseName,
-		rag.WithContext(ctx),
-		rag.WithImportExportDB(db),
-		rag.WithDocumentHandler(opts.ExportRAGDocumentHandler),
-		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
+	ragBinaryReader, err := vectorstore.ExportRAGToBinary(kbInfo.KnowledgeBaseName,
+		vectorstore.WithContext(ctx),
+		vectorstore.WithImportExportDB(db),
+		vectorstore.WithDocumentHandler(opts.ExportRAGDocumentHandler),
+		vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 			// 将RAG导出进度映射到70-90%范围
 			ragProgress := 70 + (percent/100)*20
 			reportProgress(ragProgress, message, messageType)
@@ -353,18 +353,18 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 		reportProgress(75, "正在导入向量库数据", "info")
 		ragReader := bytes.NewReader(ragBinaryBytes)
 
-		opts := []rag.RAGExportOptionFunc{
-			rag.WithContext(ctx),
-			rag.WithImportExportDB(db),
-			rag.WithOverwriteExisting(opts.OverwriteExisting),
-			rag.WithCollectionName(finalKbName),
-			rag.WithDocumentHandler(opts.ImportRAGDocumentHandler),
-			rag.WithProgressHandler(func(percent float64, message string, messageType string) {
+		opts := []vectorstore.RAGExportOptionFunc{
+			vectorstore.WithContext(ctx),
+			vectorstore.WithImportExportDB(db),
+			vectorstore.WithOverwriteExisting(opts.OverwriteExisting),
+			vectorstore.WithCollectionName(finalKbName),
+			vectorstore.WithDocumentHandler(opts.ImportRAGDocumentHandler),
+			vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 				ragProgress := 75 + (percent/100)*15
 				reportProgress(ragProgress, message, messageType)
 			}),
 		}
-		if err := rag.ImportRAGFromReader(ragReader, opts...); err != nil {
+		if err := vectorstore.ImportRAGFromReader(ragReader, opts...); err != nil {
 			return utils.Wrap(err, "import rag data")
 		}
 		reportProgress(90, "向量库数据导入完成", "info")

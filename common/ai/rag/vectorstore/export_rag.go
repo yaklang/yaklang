@@ -1,4 +1,4 @@
-package rag
+package vectorstore
 
 import (
 	"bytes"
@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -720,7 +719,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 				PQCode:          exportDoc.PQCode,
 				Content:         exportDoc.Content,
 				DocumentType:    schema.RAGDocumentType(exportDoc.DocumentType),
-				UID:             vectorstore.GetLazyNodeUIDByMd5(collection.Name, exportDoc.DocumentID),
+				UID:             GetLazyNodeUIDByMd5(collection.Name, exportDoc.DocumentID),
 				EntityID:        exportDoc.EntityID,
 				RelatedEntities: exportDoc.RelatedEntities,
 				CollectionID:    collectionID,
@@ -773,7 +772,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 		reportProgress(95, "HNSW索引导入完成", "info")
 	} else {
 		reportProgress(92, "HNSW索引重建开始", "info")
-		err := vectorstore.MigrateHNSWGraph(db, collection)
+		err := MigrateHNSWGraph(db, collection)
 		if err != nil {
 			return utils.Wrap(err, "failed to migrate HNSW graph")
 		}

@@ -1,4 +1,4 @@
-package rag
+package vectorstore
 
 import (
 	"strings"
@@ -10,6 +10,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+// testEmbedder 测试用的嵌入器函数
+func testEmbedder(text string) ([]float32, error) {
+	// 简单地生成一个固定的向量作为嵌入
+	// 根据文本内容生成不同的向量
+	if len(text) > 10 {
+		return []float32{1.0, 0.0, 0.0}, nil
+	} else if len(text) > 5 {
+		return []float32{0.0, 1.0, 0.0}, nil
+	}
+	return []float32{0.0, 0.0, 1.0}, nil
+}
 
 // TestBuildVectorIndexForKnowledgeBase 测试知识库向量索引构建功能
 func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
@@ -92,7 +104,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	// 6. 验证索引构建结果
 	// 检查RAG集合是否已创建
 	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
-	assert.True(t, CollectionIsExists(db, ragCollectionName))
+	assert.True(t, HasCollection(db, ragCollectionName))
 
 	// 7. 测试搜索功能
 	// 创建真实的RAG系统来进行测试
@@ -101,15 +113,13 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.NoError(t, err)
 	defer store.Remove()
 
-	ragSystem := NewRAGSystem(mockEmbedder, store)
-
 	// 测试文档计数
-	docCount, err := ragSystem.CountDocuments()
+	docCount, err := store.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 3, docCount) // 应该有3个文档
 
 	// 测试搜索Yaklang相关内容
-	searchResults, err := ragSystem.QueryWithPage("什么是Yaklang", 1, 5)
+	searchResults, err := store.QueryWithPage("什么是Yaklang", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults)
 
@@ -125,7 +135,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.True(t, found, "应该能够找到Yaklang相关的知识条目")
 
 	// 测试搜索RAG相关内容
-	ragSearchResults, err := ragSystem.QueryWithPage("RAG技术", 1, 5)
+	ragSearchResults, err := store.QueryWithPage("RAG技术", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, ragSearchResults)
 
@@ -154,7 +164,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证文档数量减少
-	docCountAfterDelete, err := ragSystem.CountDocuments()
+	docCountAfterDelete, err := store.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, docCountAfterDelete) // 应该剩下2个文档
 
@@ -202,15 +212,13 @@ func TestMUSTPASS_BuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 
 	// 验证空索引
 	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
-	if CollectionIsExists(db, ragCollectionName) {
+	if HasCollection(db, ragCollectionName) {
 		mockEmbedder := NewMockEmbedder(testEmbedder)
 		store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 		assert.NoError(t, err)
 		defer store.Remove()
 
-		ragSystem := NewRAGSystem(mockEmbedder, store)
-
-		docCount, err := ragSystem.CountDocuments()
+		docCount, err := store.Count()
 		assert.NoError(t, err)
 		assert.Equal(t, 0, docCount) // 应该没有文档
 	}
@@ -302,7 +310,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	// 6. 验证索引构建结果
 	// 检查RAG集合是否已创建
 	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
-	assert.True(t, CollectionIsExists(db, ragCollectionName))
+	assert.True(t, HasCollection(db, ragCollectionName))
 
 	// 7. 测试搜索功能
 	// 创建RAG系统来进行测试
@@ -311,15 +319,13 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	assert.NoError(t, err)
 	defer store.Remove()
 
-	ragSystem := NewRAGSystem(mockEmbedder, store)
-
 	// 测试文档计数
-	docCount, err := ragSystem.CountDocuments()
+	docCount, err := store.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, docCount) // 应该有1个文档
 
 	// 测试搜索功能
-	searchResults, err := ragSystem.QueryWithPage("什么是Go语言", 1, 5)
+	searchResults, err := store.QueryWithPage("什么是Go语言", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults)
 
@@ -351,7 +357,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证更新后的内容
-	updatedSearchResults, err := ragSystem.QueryWithPage("Go语言微服务", 1, 5)
+	updatedSearchResults, err := store.QueryWithPage("Go语言微服务", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, updatedSearchResults)
 
@@ -503,7 +509,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	// 6. 验证索引构建结果
 	// 检查RAG集合是否已创建
 	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
-	assert.True(t, CollectionIsExists(db, ragCollectionName))
+	assert.True(t, HasCollection(db, ragCollectionName))
 
 	// 7. 创建RAG系统来进行测试
 	mockEmbedder := NewMockEmbedder(test1024Embedder)
@@ -511,15 +517,13 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	assert.NoError(t, err)
 	defer store.Remove()
 
-	ragSystem := NewRAGSystem(mockEmbedder, store)
-
 	// 验证初始文档数量
-	docCount, err := ragSystem.CountDocuments()
+	docCount, err := store.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 3, docCount) // 应该有3个文档
 
 	// 8. 转换为PQ模式
-	err = ragSystem.ConvertToPQMode()
+	err = store.ConvertToPQMode()
 	assert.NoError(t, err)
 
 	// 9. 查询所有VectorStoreDocument文档，检查embedding字段是否存在
@@ -538,7 +542,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	}
 
 	// 10. 删除embedding数据
-	err = ragSystem.DeleteEmbeddingData()
+	err = store.DeleteEmbeddingData()
 	assert.NoError(t, err)
 
 	// 11. 再次查询所有VectorStoreDocument文档，验证embedding字段已被删除
@@ -555,7 +559,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 
 	// 12. 测试PQ模式下的查询功能
 	// 验证在删除embedding数据后，PQ模式查询仍然能正常工作
-	searchResults, err := ragSystem.QueryWithPage("什么是机器学习", 1, 5)
+	searchResults, err := store.QueryWithPage("什么是机器学习", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults, "PQ模式下应该能够正常进行查询")
 
@@ -564,7 +568,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	assert.True(t, found, "PQ模式下应该能够找到机器学习相关的知识条目")
 
 	// 测试另一个查询
-	nlpSearchResults, err := ragSystem.QueryWithPage("自然语言处理", 1, 5)
+	nlpSearchResults, err := store.QueryWithPage("自然语言处理", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, nlpSearchResults, "PQ模式下应该能够查询NLP相关内容")
 
@@ -573,25 +577,25 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	assert.True(t, nlpFound, "PQ模式下应该能够找到NLP相关的知识条目")
 
 	// 13. 验证文档计数在删除embedding后保持一致
-	finalDocCount, err := ragSystem.CountDocuments()
+	finalDocCount, err := store.Count()
 	assert.NoError(t, err)
 	assert.Equal(t, 3, finalDocCount, "删除embedding数据后文档数量应该保持不变")
 
 	// 14. 验证归档检查
-	err = ragSystem.SetArchived(true)
+	err = store.SetArchived(true)
 	assert.NoError(t, err)
-	assert.True(t, ragSystem.GetArchived(), "归档检查应该返回true")
+	assert.True(t, store.GetArchived(), "归档检查应该返回true")
 
-	err = ragSystem.Add("test_document_id", "test_content")
+	err = store.AddWithOptions("test_document_id", "test_content")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "archived")
 
-	err = ragSystem.DeleteDocuments("test_document_id")
+	err = store.Delete("test_document_id")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "archived")
 
 	// 15. 验证修复embedding数据
-	err = ragSystem.ConvertToStandardMode()
+	err = store.ConvertToStandardMode()
 	assert.NoError(t, err)
 
 	var vectorDocsAfterConvertToStandardMode []schema.VectorStoreDocument
@@ -607,15 +611,13 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	assert.NoError(t, err)
 	defer store.Remove()
 
-	ragSystem = NewRAGSystem(mockEmbedder, store)
-
-	searchResults, err = ragSystem.QueryWithPage("什么是机器学习", 1, 5)
+	searchResults, err = store.QueryWithPage("什么是机器学习", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults, "标准模式下应该能够正常进行查询")
 
 	assert.Equal(t, "机器学习基础", searchResults[0].Document.Metadata["knowledge_title"], "标准模式下应该能够找到机器学习相关的知识条目")
 
-	searchResults, err = ragSystem.QueryWithPage("什么是自然语言处理", 1, 5)
+	searchResults, err = store.QueryWithPage("什么是自然语言处理", 1, 5)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, searchResults, "标准模式下应该能够正常进行查询")
 

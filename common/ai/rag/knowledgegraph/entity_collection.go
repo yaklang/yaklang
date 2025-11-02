@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +14,7 @@ import (
 
 // EntityCollection RAG实体集合管理器
 type EntityCollection struct {
-	ragSystem      *rag.RAGSystem
+	collectionMg   *vectorstore.SQLiteVectorStoreHNSW
 	collectionName string
 	db             *gorm.DB
 }
@@ -24,13 +24,13 @@ func NewEntityCollection(db *gorm.DB, collectionName string) (*EntityCollection,
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	description := fmt.Sprintf("知识图谱实体集合：%s - 专门存储和检索知识图谱中的实体信息，支持基于实体名称、类型、描述和属性的语义搜索，为知识图谱应用提供高效的实体发现和关联分析能力。", collectionName)
 
-	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, description)
+	collectionMg, err := vectorstore.GetCollection(db, collectionName, description)
 	if err != nil {
 		return nil, utils.Errorf("failed to create entity collection: %v", err)
 	}
 
 	return &EntityCollection{
-		ragSystem:      ragSystem,
+		collectionMg:   collectionMg,
 		collectionName: collectionName,
 		db:             db,
 	}, nil
@@ -45,7 +45,7 @@ func (ec *EntityCollection) AddEntities(entities ...*Entity) error {
 		doc := entity.ToRAGDocument()
 
 		// 添加到RAG系统
-		err := ec.ragSystem.Add(doc.ID, doc.Content, rag.WithDocumentRawMetadata(doc.Metadata))
+		err := ec.collectionMg.AddWithOptions(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
 		if err != nil {
 			log.Errorf("failed to import entity %s: %v", entity.ID, err)
 			return utils.Errorf("failed to import entity %s: %v", entity.ID, err)
@@ -59,14 +59,14 @@ func (ec *EntityCollection) SearchEntities(query string, limit int) ([]*Entity, 
 	log.Infof("searching entities in collection %s for: %s", ec.collectionName, query)
 
 	// 使用RAG系统搜索
-	results, err := ec.ragSystem.QueryTopN(query, limit)
+	results, err := ec.collectionMg.QueryTopN(query, limit)
 	if err != nil {
 		return nil, utils.Errorf("failed to search entities: %v", err)
 	}
 
 	var entities []*Entity
 	for _, result := range results {
-		entity, err := ec.documentToEntity(&result.Document)
+		entity, err := ec.documentToEntity(result.Document)
 		if err != nil {
 			log.Warnf("failed to convert document to entity: %v", err)
 			continue
@@ -83,7 +83,7 @@ func (ec *EntityCollection) SearchEntitiesByType(entityType EntityType, query st
 	log.Infof("searching entities by type %s in collection %s for: %s", entityType, ec.collectionName, query)
 
 	// 使用过滤器限制实体类型
-	results, err := ec.ragSystem.QueryWithFilter(query, 1, limit, func(key string, getDoc func() *rag.Document) bool {
+	results, err := ec.collectionMg.QueryWithFilter(query, 1, limit, func(key string, getDoc func() *vectorstore.Document) bool {
 		doc := getDoc()
 		if doc == nil {
 			return false
@@ -101,7 +101,7 @@ func (ec *EntityCollection) SearchEntitiesByType(entityType EntityType, query st
 
 	var entities []*Entity
 	for _, result := range results {
-		entity, err := ec.documentToEntity(&result.Document)
+		entity, err := ec.documentToEntity(result.Document)
 		if err != nil {
 			log.Warnf("failed to convert document to entity: %v", err)
 			continue
@@ -115,7 +115,7 @@ func (ec *EntityCollection) SearchEntitiesByType(entityType EntityType, query st
 
 // GetEntity 根据ID获取实体
 func (ec *EntityCollection) GetEntity(entityID string) (*Entity, error) {
-	doc, exists, err := ec.ragSystem.GetDocument(entityID)
+	doc, exists, err := ec.collectionMg.Get(entityID)
 	if err != nil {
 		return nil, utils.Errorf("failed to get entity %s: %v", entityID, err)
 	}
@@ -124,7 +124,7 @@ func (ec *EntityCollection) GetEntity(entityID string) (*Entity, error) {
 		return nil, utils.Errorf("entity %s not found", entityID)
 	}
 
-	return ec.documentToEntity(&doc)
+	return ec.documentToEntity(doc)
 }
 
 // UpdateEntity 更新实体
@@ -135,13 +135,13 @@ func (ec *EntityCollection) UpdateEntity(entity *Entity) error {
 	doc := entity.ToRAGDocument()
 
 	// 删除旧文档
-	err := ec.ragSystem.DeleteDocuments(entity.ID)
+	err := ec.collectionMg.Delete(entity.ID)
 	if err != nil {
 		log.Warnf("failed to delete old entity document %s: %v", entity.ID, err)
 	}
 
 	// 添加新文档
-	err = ec.ragSystem.Add(doc.ID, doc.Content, rag.WithDocumentRawMetadata(doc.Metadata))
+	err = ec.collectionMg.AddWithOptions(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
 	if err != nil {
 		return utils.Errorf("failed to update entity %s: %v", entity.ID, err)
 	}
@@ -152,7 +152,7 @@ func (ec *EntityCollection) UpdateEntity(entity *Entity) error {
 
 // DeleteEntity 删除实体
 func (ec *EntityCollection) DeleteEntity(entityID string) error {
-	err := ec.ragSystem.DeleteDocuments(entityID)
+	err := ec.collectionMg.Delete(entityID)
 	if err != nil {
 		return utils.Errorf("failed to delete entity %s: %v", entityID, err)
 	}
@@ -163,19 +163,19 @@ func (ec *EntityCollection) DeleteEntity(entityID string) error {
 
 // CountEntities 获取实体总数
 func (ec *EntityCollection) CountEntities() (int, error) {
-	return ec.ragSystem.CountDocuments()
+	return ec.collectionMg.Count()
 }
 
 // ListAllEntities 列出所有实体
 func (ec *EntityCollection) ListAllEntities() ([]*Entity, error) {
-	docs, err := ec.ragSystem.ListDocuments()
+	docs, err := ec.collectionMg.List()
 	if err != nil {
 		return nil, utils.Errorf("failed to list entities: %v", err)
 	}
 
 	var entities []*Entity
 	for _, doc := range docs {
-		entity, err := ec.documentToEntity(&doc)
+		entity, err := ec.documentToEntity(doc)
 		if err != nil {
 			log.Warnf("failed to convert document to entity: %v", err)
 			continue
@@ -187,7 +187,7 @@ func (ec *EntityCollection) ListAllEntities() ([]*Entity, error) {
 }
 
 // documentToEntity 将RAG文档转换为实体
-func (ec *EntityCollection) documentToEntity(doc *rag.Document) (*Entity, error) {
+func (ec *EntityCollection) documentToEntity(doc *vectorstore.Document) (*Entity, error) {
 	entity := &Entity{
 		ID:         doc.ID,
 		Properties: make(map[string]interface{}),

@@ -824,7 +824,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			res := &ScoredResult{
 				QueryMethod: query.Method,
 				QueryOrigin: query.Query,
-				Document:    &result.Document,
+				Document:    result.Document,
 				Score:       result.Score,
 				Source:      source,
 			}
@@ -920,7 +920,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 							if exist {
 								continue
 							}
-							sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
+							sendMidResult(idx, subquery.Method, subquery.Query, result.Document, result.Score, ragSystem.Name)
 						}
 					} else {
 						searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit, func(key string, getDoc func() *vectorstore.Document) bool {
@@ -960,7 +960,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 							if exist {
 								continue
 							}
-							sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
+							sendMidResult(idx, subquery.Method, subquery.Query, result.Document, result.Score, ragSystem.Name)
 						}
 					}
 
@@ -1046,7 +1046,7 @@ func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) (
 		if result.Type == RAGResultTypeResult && result.Data != nil {
 			if doc, ok := result.Data.(*vectorstore.Document); ok {
 				results = append(results, &vectorstore.SearchResult{
-					Document: *doc,
+					Document: doc,
 					Score:    result.Score,
 				})
 			}

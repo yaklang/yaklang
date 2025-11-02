@@ -1,22 +1,24 @@
-package rag
+package vectorstore
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, id string, opts ...any) (*RAGSystem, error) {
+func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, id string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, knowledgeBaseId)
 	if err != nil {
 		return nil, err
 	}
 
-	rag, err := CreateOrLoadCollection(db, knowledgeBase.KnowledgeBaseName, knowledgeBase.KnowledgeBaseDescription, opts...)
+	defaultOptions := []any{
+		WithDescription(knowledgeBase.KnowledgeBaseDescription),
+	}
+	collectionMg, err := GetCollection(db, knowledgeBase.KnowledgeBaseName, append(defaultOptions, opts...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -49,33 +51,36 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, i
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 添加文档到RAG系统
-	doc := vectorstore.Document{
+	doc := &Document{
 		ID:       documentID,
 		Content:  content,
 		Metadata: metadata,
 	}
 
-	err = rag.addDocuments(doc)
+	err = collectionMg.Add(doc)
 	if err != nil {
-		count, err := rag.CountDocuments()
+		count, err := collectionMg.Count()
 		if err != nil {
 			return nil, utils.Errorf("获取文档数量失败: %v", err)
 		}
 		println(count)
 		return nil, utils.Errorf("添加文档到RAG系统失败 (ID: %s): %v", documentID, err)
 	}
-	return rag, nil
+	return collectionMg, nil
 }
 
 // BuildVectorIndexForKnowledgeBase 构建向量索引
-func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGSystem, error) {
+func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*SQLiteVectorStoreHNSW, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, id)
 	if err != nil {
 		return nil, err
 	}
 
-	rag, err := CreateOrLoadCollection(db, knowledgeBase.KnowledgeBaseName, knowledgeBase.KnowledgeBaseDescription, opts...)
+	defaultOptions := []any{
+		WithDescription(knowledgeBase.KnowledgeBaseDescription),
+	}
+	collectionMg, err := GetCollection(db, knowledgeBase.KnowledgeBaseName, append(defaultOptions, opts...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +88,7 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGS
 	log.Infof("loaded knowledge base: %s, id: %d", knowledgeBase.KnowledgeBaseName, id)
 
 	// 清空所有索引并重建索引
-	err = rag.ClearDocuments()
+	err = collectionMg.Clear()
 	if err != nil {
 		return nil, utils.Errorf("清空索引失败: %v", err)
 	}
@@ -137,15 +142,15 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGS
 			documentID := utils.InterfaceToString(entry.ID)
 
 			// 添加文档到RAG系统
-			doc := vectorstore.Document{
+			doc := &Document{
 				ID:       documentID,
 				Content:  content,
 				Metadata: metadata,
 			}
 
-			err = rag.addDocuments(doc)
+			err = collectionMg.Add(doc)
 			if err != nil {
-				count, coutnErr := rag.CountDocuments()
+				count, coutnErr := collectionMg.Count()
 				if coutnErr != nil {
 					return nil, utils.Errorf("获取文档数量失败: %v", coutnErr)
 				}
@@ -163,5 +168,5 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*RAGS
 		page++
 	}
 
-	return rag, nil
+	return collectionMg, nil
 }

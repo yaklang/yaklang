@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -85,10 +86,10 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 }
 
 type EntityRepository struct {
-	db        *gorm.DB
-	info      *schema.EntityRepository
-	ragSystem *rag.RAGSystem
-
+	db   *gorm.DB
+	info *schema.EntityRepository
+	// ragSystem *rag.RAGSystem
+	collectionMg  *vectorstore.SQLiteVectorStoreHNSW
 	wg            sync.WaitGroup
 	bulkProcessor *bulkProcessor
 	runtimeConfig *EntityRepositoryRuntimeConfig
@@ -108,11 +109,11 @@ func (r *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
 	return r.info, nil
 }
 
-func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
-	return r.ragSystem
+func (r *EntityRepository) GetCollectionMg() *vectorstore.SQLiteVectorStoreHNSW {
+	return r.collectionMg
 }
 
-func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...rag.DocumentOption) error {
+func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...vectorstore.DocumentOption) error {
 	if r.bulkProcessor != nil {
 		r.bulkProcessor.addRequest(docId, content, opts...)
 		return nil
@@ -129,7 +130,7 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 		}()
 
 		ragAddStart := time.Now()
-		err = r.GetRAGSystem().Add(docId, content, opts...)
+		err = r.GetCollectionMg().AddWithOptions(docId, content, opts...)
 		ragAddDuration := time.Since(ragAddStart)
 		close(finishCh)
 
@@ -157,12 +158,12 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 	}
 }
 
-func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResult, error) {
+func (r *EntityRepository) QueryVector(query string, top int) ([]vectorstore.SearchResult, error) {
 	queryStartTime := time.Now()
 
 	// 实现读锁超时机制防止死锁
 	resultCh := make(chan struct {
-		results []rag.SearchResult
+		results []vectorstore.SearchResult
 		err     error
 	}, 1)
 
@@ -174,7 +175,7 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 		}()
 
 		actualQueryStart := time.Now()
-		results, err := r.GetRAGSystem().Query(query, top)
+		results, err := r.GetCollectionMg().Query(query, top)
 		queryDuration := time.Since(actualQueryStart)
 
 		totalDuration := time.Since(queryStartTime)
@@ -204,7 +205,7 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 
 		select {
 		case resultCh <- struct {
-			results []rag.SearchResult
+			results []vectorstore.SearchResult
 			err     error
 		}{results, err}:
 		default:
@@ -920,9 +921,9 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 
 	collectionExists := rag.CollectionIsExists(db, name)
 
-	var ragSystem *rag.RAGSystem
+	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
 	if !collectionExists {
-		ragSystem, err = rag.CreateCollection(db, name, entityBaseInfo.Description, opts...)
+		collectionMg, err = vectorstore.CreateCollection(db, name, entityBaseInfo.Description, opts...)
 		if err != nil {
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
@@ -930,7 +931,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		ragSystem, err = rag.LoadCollection(db, name, opts...)
+		collectionMg, err = vectorstore.LoadCollection(db, name, opts...)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
