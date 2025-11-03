@@ -1,0 +1,92 @@
+## Output Format Example
+
+Your response should be in JSON format with the following structure:
+
+```json
+{
+  "human_readable_thought": "Brief explanation of your reasoning and plan",
+  "@action": "action_name",
+  "param1": "value1",
+  "param2": "value2"
+}
+```
+
+### Example 1: Decompiling a JAR file
+```json
+{
+  "human_readable_thought": "Starting by decompiling the JAR file to extract Java source files",
+  "@action": "decompile_jar",
+  "jar_path": "/path/to/input.jar",
+  "output_dir": "/path/to/output"
+}
+```
+
+### Example 2: Listing files to find issues
+```json
+{
+  "human_readable_thought": "Listing all Java files to identify which ones need inspection",
+  "@action": "list_files",
+  "directory_path": "/path/to/decompiled"
+}
+```
+
+### Example 3: Reading a problematic file
+```json
+{
+  "human_readable_thought": "Reading the file that was reported to have syntax errors",
+  "@action": "read_java_file",
+  "file_path": "/path/to/decompiled/com/example/Class.java"
+}
+```
+
+### Example 4: Fixing a Java file (Partial Rewrite)
+```json
+{
+  "human_readable_thought": "Fixing the generic type issue on lines 45-50 using partial rewrite",
+  "@action": "rewrite_java_file",
+  "file_path": "/path/to/decompiled/com/example/Class.java",
+  "rewrite_start_line": 45,
+  "rewrite_end_line": 50,
+  "reason": "Fix generic type erasure - replace raw type List with List<String> based on usage context",
+  "java_code": "    private List<String> items = new ArrayList<>();\n    \n    public List<String> getItems() {\n        return items;\n    }"
+}
+```
+
+### Example 4b: Fixing a Java file (Full Rewrite)
+```json
+{
+  "human_readable_thought": "The file has multiple issues throughout - using full rewrite for comprehensive fix",
+  "@action": "rewrite_java_file",
+  "file_path": "/path/to/decompiled/com/example/Class.java",
+  "reason": "Multiple issues throughout file: generic type erasure, lambda syntax errors, and unnecessary casts. Full rewrite provides cleaner solution.",
+  "java_code": "package com.example;\n\nimport java.util.*;\n\npublic class Class {\n    private List<String> items = new ArrayList<>();\n    \n    public List<String> getItems() {\n        return items;\n    }\n    \n    public void processItems() {\n        items.forEach(item -> System.out.println(item));\n    }\n}"
+}
+```
+
+### Example 5: Checking syntax
+```json
+{
+  "human_readable_thought": "Verifying that the fixes resolved the compilation errors",
+  "@action": "check_syntax",
+  "file_path": "/path/to/decompiled/com/example/Class.java"
+}
+```
+
+### Example 6: Completing the task
+```json
+{
+  "human_readable_thought": "All Java files have been decompiled and fixed successfully. No remaining issues.",
+  "@action": "finish",
+  "summary": "Successfully decompiled JAR file and fixed 3 Java files with syntax errors. All files now compile without issues."
+}
+```
+
+## Important Notes
+
+- Always include `human_readable_thought` to explain your reasoning
+- Use `@action` to specify which action to take
+- Provide all required parameters for the chosen action
+- Be specific and detailed in your modifications
+- Always explain why you're making changes in `reason` parameter
+- For `rewrite_java_file`: Use partial rewrite for localized fixes, full rewrite for extensive changes
+
