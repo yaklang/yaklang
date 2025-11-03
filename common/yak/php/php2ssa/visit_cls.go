@@ -544,7 +544,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 		return nil
 	}
 
-	panic("CLASS CONSTANT TODO")
+	log.Errorf("Class constant todo")
 
 	return nil
 }

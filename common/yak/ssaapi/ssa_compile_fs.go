@@ -182,8 +182,16 @@ func (c *Config) parseProjectWithFS(
 			preHandlerProcess() // notify the process
 			// handler
 			if language := c.LanguageBuilder; language != nil {
-				language.InitHandler(builder)
-				language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
+					language.InitHandler(builder)
+					language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+				}()
 			}
 		}
 		preHandlerTime = time.Since(start)
@@ -239,18 +247,18 @@ func (c *Config) parseProjectWithFS(
 			path := fileContent.Path
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
-			defer func() {
-				if r := recover(); r != nil {
-					log.Errorf("parse [%s] error %v  ", path, r)
-					utils.PrintCurrentGoroutineRuntimeStack()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Errorf("parse [%s] error %v  ", path, r)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				// build
+				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
+					log.Errorf("parse %#v failed: %v", path, err)
 				}
 			}()
-
-			// build
-			if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
-				log.Errorf("parse %#v failed: %v", path, err)
-				continue
-			}
 		}
 		fileContents = make([]*ssareducer.FileContent, 0)
 		parseTime = time.Since(start)
