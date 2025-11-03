@@ -20,5 +20,5 @@ func WithGeneralConfigStreamableFieldWithNodeId(nodeId string, fieldKey string) 
 }
 
 func WithGeneralConfigStreamableField(fieldKey string) GeneralKVConfigOption {
-	return WithGeneralConfigStreamableFieldWithNodeId("thought", fieldKey)
+	return WithGeneralConfigStreamableFieldWithNodeId("re-act-loop-thought", fieldKey)
 }
