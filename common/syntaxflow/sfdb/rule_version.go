@@ -24,7 +24,7 @@ var ruleVersions []byte
 
 var ruleVersionMap map[string]*RuleInfo
 
-func GetVersion(ruleId string) (string, error) {
+func GetVersionFromEmbed(ruleId string) (string, error) {
 	if ruleId == "" {
 		return "", fmt.Errorf("ruleId is empty")
 	}
@@ -124,4 +124,21 @@ func generateVersion(now time.Time, existingVersion string) string {
 	}
 
 	return currentDate + ".0001"
+}
+
+func UpdateVersion(existingVersion string) string {
+	now := time.Now()
+	version := generateVersion(now, existingVersion)
+	return version
+}
+
+func CheckNewerVersion(base, check string) bool {
+	if check == "" { // base is newer
+		return true
+	}
+
+	if base == "" { // check is newer
+		return false
+	}
+	return base >= check
 }
