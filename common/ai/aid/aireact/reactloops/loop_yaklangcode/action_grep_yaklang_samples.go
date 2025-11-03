@@ -352,7 +352,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			// 显示搜索参数
 			searchInfo := fmt.Sprintf("Grep pattern: %s, case_sensitive: %v, context: %d lines",
 				pattern, caseSensitive, contextLines)
-			emitter.EmitThought(op.GetTask().GetId(), searchInfo)
+			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
 			loop.GetEmitter().EmitTextPlainTextStreamEvent(
 				"grep_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
@@ -511,7 +511,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 				}
 			}
 
-			emitter.EmitThought("grep_samples_result", "Search Result:\n"+resultStr)
+			emitter.EmitThoughtStream("grep_samples_result", "Search Result:\n"+resultStr)
 			invoker.AddToTimeline("grep_search_results", fmt.Sprintf("Found %d matches for pattern: %s\n%s", len(results), pattern, resultStr))
 
 			// 根据结果数量生成不同的建议，添加到Timeline

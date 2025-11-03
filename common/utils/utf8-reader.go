@@ -48,16 +48,32 @@ func (r *utf8Reader) Read(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	// 找到最后一个完整UTF-8字符的结束位置
-	validLen := r.findLastValidUTF8Boundary(totalData, len(p))
+	// 决定要返回多少数据
+	var validLen int
+	if err == io.EOF {
+		// 在EOF时，尽可能返回所有数据（因为不会再有更多数据了）
+		// 但不能超过输出缓冲区大小
+		if len(totalData) <= len(p) {
+			validLen = len(totalData)
+		} else {
+			// 如果totalData太大，只能返回len(p)，剩余部分保存到buffer
+			validLen = len(p)
+			// 保存剩余数据，下次读取时返回
+			r.buffer = append(r.buffer, totalData[validLen:]...)
+			// 因为还有数据要返回，所以这次不应该返回EOF
+			err = nil
+		}
+	} else {
+		// 非EOF情况，找到最后一个完整UTF-8字符的结束位置
+		validLen = r.findLastValidUTF8Boundary(totalData, len(p))
+		// 将剩余数据保存到内部缓冲区
+		if validLen < len(totalData) {
+			r.buffer = append(r.buffer, totalData[validLen:]...)
+		}
+	}
 
 	// 复制有效数据到输出缓冲区
 	copy(p, totalData[:validLen])
-
-	// 将剩余数据保存到内部缓冲区
-	if validLen < len(totalData) {
-		r.buffer = append(r.buffer, totalData[validLen:]...)
-	}
 
 	return validLen, err
 }

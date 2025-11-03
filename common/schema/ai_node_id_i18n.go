@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"java_decompiler": {
+		Zh: "Java反编译器",
+		En: "Java Decompiler",
+	},
 	"fast-memory-fetch": {
 		Zh: "快速记忆检索",
 		En: "Fast Memory Fetch",

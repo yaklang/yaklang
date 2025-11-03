@@ -76,6 +76,31 @@ defer reader.Close()
 
 ---
 
+### 示例 4: `batch_regex_replace` 动作（批量正则替换）
+
+**场景**: 代码中有多处使用了错误的变量名或表达式，需要批量替换。
+
+```json
+{"@action": "batch_regex_replace", 
+ "pattern": "len\\(openPorts\\)", 
+ "replaced_string": "openCount", 
+ "replace_reason": "修复变量初始化和递增的语法错误，使用openCount变量替代len(openPorts)进行计数",
+ "human_readable_thought": "需要批量替换所有使用len(openPorts)的地方为openCount变量"}
+```
+
+**注意：`batch_regex_replace` 动作不需要 `<|GEN_CODE...|>` 代码块。它直接对整个文件进行正则替换。**
+
+**适用场景**：
+- 批量重命名变量或函数名
+- 修改配置参数或常量值
+- 统一代码风格
+
+**不适用场景**：
+- 需要跨行匹配的复杂替换（只支持单行匹配）
+- 需要添加或删除整行代码（应使用 `insert_lines` 或 `delete_lines`）
+
+---
+
 ### **备选示例: `query_document` 动作（更全面的文档查询）**
 
 **场景**: 同样是 synscan API 错误，但需要更详细的文档说明。
@@ -93,7 +118,7 @@ defer reader.Close()
 
 ---
 
-### 示例 4: `grep_yaklang_samples` 动作（当遇到语法错误时）
+### 示例 5: `grep_yaklang_samples` 动作（当遇到语法错误时）
 
 **场景**: AI 尝试编写错误处理，但反复收到 `SyntaxError`。
 

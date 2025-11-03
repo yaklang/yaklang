@@ -166,6 +166,13 @@ func init() {
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},
+		// Register metadata for better AI understanding
+		reactloops.WithLoopDescription("Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking"),
+		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: search_yaklang_samples, grep_yaklang_samples, write_code, modify_code, insert_code, delete_code, batch_regex_replace with real-time syntax validation"),
+		reactloops.WithLoopOutputExample(`
+* When user requests to write Yaklang code:
+  {"@action": "write_yaklang_code", "human_readable_thought": "I need to write Yaklang code with proper syntax and access to code examples"}
+`),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG)

@@ -305,6 +305,10 @@ var decompileJarAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 
 【下一步行动】：使用 read_java_file 或 list_files 开始检查问题文件`, len(compilationErrors), totalFiles, filesWithIssues)
 				invoker.AddToTimeline("decompile_success_with_issues", timelineMsg)
+
+				// Disallow loop exit since there are compilation errors that need fixing
+				// Similar to yaklang code loop's behavior: prevent finishing until errors are resolved
+				op.DisallowNextLoopExit()
 			} else {
 				msg += "\nNo obvious compilation issues detected.\n"
 				invoker.AddToTimeline("decompile_success", fmt.Sprintf("成功反编译 %d 个文件，未检测到明显编译问题。工作目录：%s", totalFiles, outputDir))
