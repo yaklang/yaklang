@@ -66,7 +66,8 @@ func NewIfStmt[T versionedValue](global ScopedVersionedTableIF[T]) *IfStmt[T] {
 // BuildItem build the if item using the provided Condition and Body functions.
 func (i *IfStmt[T]) BuildItem(Condition func(ScopedVersionedTableIF[T]), Body func(ScopedVersionedTableIF[T]) ScopedVersionedTableIF[T]) {
 	if i.hasElse {
-		panic("cannot add item after else")
+		log.Errorf("cannot add item after else")
+		return
 	}
 
 	// create new condition and body scope

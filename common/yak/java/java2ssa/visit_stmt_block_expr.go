@@ -648,7 +648,6 @@ func (y *singleFileBuilder) VisitExpression(raw javaparser.IExpressionContext) s
 	default:
 		// 默认情况，可能是不支持的表达式类型
 		log.Errorf("unsupported expression type: %T", ret)
-		panic("unsupported expression type")
 	}
 	return y.EmitConstInstNil()
 }
