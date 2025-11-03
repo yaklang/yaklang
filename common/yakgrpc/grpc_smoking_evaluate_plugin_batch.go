@@ -74,14 +74,6 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 		for rule := range ch {
 			check(rule)
 		}
-	case schema.SCRIPT_TYPE_YAK:
-		ch := yakit.YieldYakScripts(
-			bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
-			stream.Context(),
-		)
-		for ins := range ch {
-			check(ins)
-		}
 	default:
 		ch := yakit.YieldYakScripts(
 			bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
