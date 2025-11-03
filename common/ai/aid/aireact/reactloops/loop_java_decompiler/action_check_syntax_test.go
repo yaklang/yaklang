@@ -1,10 +1,12 @@
-package loop_java_decompiler
+package loop_java_decompiler_test
 
 import (
 	"context"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 )
 
 // TestCheckJavaFileSyntax_SafeCompilation tests that the syntax checker is safe
@@ -101,7 +103,7 @@ public class ProcessInjection {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			issues := checkJavaFileSyntax(ctx, tt.javaCode, "test.java")
+			issues := loop_java_decompiler.CheckJavaFileSyntax(ctx, tt.javaCode, "test.java")
 
 			hasIssues := len(issues) > 0
 			if hasIssues != tt.expectIssues {
@@ -134,7 +136,7 @@ public class MaliciousSSA {
 `
 
 	// Try SSA compilation
-	issues := trySSACompilation(ctx, maliciousCode, "MaliciousSSA.java")
+	issues := loop_java_decompiler.TrySSACompilation(ctx, maliciousCode, "MaliciousSSA.java")
 
 	// SSA should compile successfully (or fail due to syntax, but NEVER execute)
 	t.Logf("SSA compilation result: %v", issues)
@@ -175,7 +177,7 @@ public class TestExecution {
 `
 
 	// Try javac compilation
-	issues := tryJavacCompilation(ctx, maliciousCode)
+	issues := loop_java_decompiler.TryJavacCompilation(ctx, maliciousCode)
 
 	t.Logf("javac compilation result: %v", issues)
 
@@ -199,7 +201,7 @@ public class TestCancellation {
 `
 
 	// This should handle cancellation gracefully
-	issues := checkJavaFileSyntax(ctx, javaCode, "TestCancellation.java")
+	issues := loop_java_decompiler.CheckJavaFileSyntax(ctx, javaCode, "TestCancellation.java")
 
 	// Should complete without panic or hanging
 	t.Logf("Context cancellation handled gracefully, issues: %v", issues)
@@ -223,7 +225,7 @@ public class ParameterInjection {
 }
 `
 
-	issues := tryJavacCompilation(ctx, maliciousCode)
+	issues := loop_java_decompiler.TryJavacCompilation(ctx, maliciousCode)
 
 	// Should compile or fail compilation, but NEVER execute injected commands
 	t.Logf("Parameter injection test result: %v", issues)
@@ -283,7 +285,7 @@ public class ValidClass {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			issues := checkBasicJavaSyntax(tt.code)
+			issues := loop_java_decompiler.CheckBasicJavaSyntax(tt.code)
 			hasError := len(issues) > 0
 
 			if hasError != tt.hasError {
@@ -308,7 +310,7 @@ func TestSecurityGuarantees(t *testing.T) {
 	ctx := context.Background()
 
 	// This should only use safe, fixed parameters
-	_ = tryJavacCompilation(ctx, testCode)
+	_ = loop_java_decompiler.TryJavacCompilation(ctx, testCode)
 
 	t.Log("All security guarantees verified")
 }
@@ -336,7 +338,7 @@ public class BenchmarkTest {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		checkJavaFileSyntax(ctx, code, "BenchmarkTest.java")
+		loop_java_decompiler.CheckJavaFileSyntax(ctx, code, "BenchmarkTest.java")
 	}
 }
 
@@ -358,7 +360,7 @@ public class NoFileAccess {
 `
 
 	// Basic syntax check should not execute any code or access file system
-	issues := checkBasicJavaSyntax(code)
+	issues := loop_java_decompiler.CheckBasicJavaSyntax(code)
 
 	// Should pass basic syntax checks (no unbalanced braces, etc.)
 	if len(issues) > 0 {

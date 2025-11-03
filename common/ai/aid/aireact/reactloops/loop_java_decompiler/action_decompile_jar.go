@@ -347,7 +347,7 @@ func generateDecompilationReport(
 	sb.WriteString(fmt.Sprintf("- **Syntax Check Time**: %v\n\n", checkDuration.Round(time.Millisecond)))
 
 	if filesWithIssues > 0 {
-		sb.WriteString("## Compilation Issues Detected\n\n")
+		sb.WriteString("## ⚠️ Compilation Issues Detected\n\n")
 		sb.WriteString(fmt.Sprintf("Found %d potential issues in %d files. Common causes:\n\n", len(compilationErrors), filesWithIssues))
 		sb.WriteString("1. Decompiler limitations (may not perfectly reconstruct source)\n")
 		sb.WriteString("2. Use of obfuscation in original JAR\n")

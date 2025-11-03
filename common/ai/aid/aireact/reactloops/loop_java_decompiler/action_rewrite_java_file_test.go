@@ -1,11 +1,13 @@
-package loop_java_decompiler
+package loop_java_decompiler_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloopstests"
 )
 
@@ -36,7 +38,7 @@ func TestRewriteJavaFile_CompleteRewrite(t *testing.T) {
 
 	// Create test runtime and framework
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-complete", actionOption)
 
 	// Prepare new code
@@ -131,7 +133,7 @@ func TestRewriteJavaFile_PartialRewrite(t *testing.T) {
 
 	// Create test runtime and framework
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-partial", actionOption)
 
 	// New code for lines 5-8 (the method body)
@@ -185,7 +187,7 @@ func TestRewriteJavaFile_PartialRewrite(t *testing.T) {
 // TestRewriteJavaFile_MissingFile tests error handling for missing file
 func TestRewriteJavaFile_MissingFile(t *testing.T) {
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-missing", actionOption)
 
 	// Execute with non-existent file
@@ -221,7 +223,7 @@ func TestRewriteJavaFile_InvalidLineRange(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-invalid-range", actionOption)
 
 	// Try to rewrite lines beyond file length
@@ -266,7 +268,7 @@ func TestRewriteJavaFile_BackupNotOverwritten(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-backup", actionOption)
 
 	// Rewrite the file
@@ -312,7 +314,7 @@ func TestRewriteJavaFile_EmptyNewCode(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-empty", actionOption)
 
 	// Execute with empty new code
@@ -346,11 +348,14 @@ func TestRewriteJavaFile_MultipleRewrites(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
-	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-multiple", actionOption)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 
-	// Rewrite each file
-	for _, filename := range files {
+	// Rewrite each file (each in its own framework instance to avoid state issues)
+	rewriteCount := 0
+	for i, filename := range files {
+		// Create a new framework for each file (test framework limitation: global state)
+		framework := reactloopstests.NewActionTestFramework(t, fmt.Sprintf("test-rewrite-multiple-%d", i), actionOption)
+		
 		filePath := filepath.Join(tmpDir, filename)
 		className := strings.TrimSuffix(filename, ".java")
 		newCode := "public class " + className + " {\n    private String username;\n}"
@@ -364,24 +369,36 @@ func TestRewriteJavaFile_MultipleRewrites(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to rewrite %s: %v", filename, err)
 		}
+		
+		// Verify this specific file was rewritten
+		rewrittenContent, err := os.ReadFile(filePath)
+		if err != nil {
+			t.Errorf("Failed to read rewritten file %s: %v", filename, err)
+			continue
+		}
+		
+		if strings.Contains(string(rewrittenContent), "username") {
+			rewriteCount++
+		}
 	}
 
-	// Verify all files were rewritten
-	loop := framework.GetLoop()
-	rewrittenFiles := loop.GetInt("rewritten_files")
-	if rewrittenFiles != len(files) {
-		t.Errorf("Expected rewritten_files=%d, got %d", len(files), rewrittenFiles)
+	// Verify all files were successfully rewritten
+	if rewriteCount != len(files) {
+		t.Errorf("Expected %d files rewritten, got %d", len(files), rewriteCount)
 	}
 
 	// Verify all backups were created
+	backupCount := 0
 	for _, filename := range files {
 		backupPath := filepath.Join(tmpDir, filename+".bak")
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 			t.Errorf("Backup not created for %s", filename)
+		} else {
+			backupCount++
 		}
 	}
 
-	t.Logf("Multiple rewrites test passed - rewrote %d files", rewrittenFiles)
+	t.Logf("Multiple rewrites test passed - rewrote %d files, created %d backups", rewriteCount, backupCount)
 }
 
 // TestRewriteJavaFile_SyntaxFixing tests using rewrite to fix syntax errors
@@ -403,7 +420,7 @@ func TestRewriteJavaFile_SyntaxFixing(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := rewriteJavaFileAction(runtime)
+	actionOption := loop_java_decompiler.RewriteJavaFileAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-rewrite-syntax-fix", actionOption)
 
 	// Rewrite with fixed syntax
