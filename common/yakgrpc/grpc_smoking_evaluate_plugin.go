@@ -83,13 +83,6 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 			}
 			pluginCode = rule.Content
 			pluginType = "syntaxflow"
-		case schema.SCRIPT_TYPE_YAK:
-			ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
-			if err != nil {
-				return nil, err
-			}
-			pluginCode = ins.Content
-			pluginType = ins.Type
 		default:
 			ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
 			if err != nil {
