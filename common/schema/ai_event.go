@@ -22,8 +22,9 @@ const (
 )
 
 const (
-	AI_REACT_LOOP_NAME_DEFAULT       = "default"
-	AI_REACT_LOOP_NAME_WRITE_YAKLANG = "write_yaklang_code"
+	AI_REACT_LOOP_NAME_DEFAULT         = "default"
+	AI_REACT_LOOP_NAME_WRITE_YAKLANG   = "write_yaklang_code"
+	AI_REACT_LOOP_NAME_JAVA_DECOMPILER = "java_decompiler"
 )
 
 const (

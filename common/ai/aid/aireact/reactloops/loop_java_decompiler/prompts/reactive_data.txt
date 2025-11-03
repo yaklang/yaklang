@@ -1,0 +1,45 @@
+## Current Status
+
+### Working Directory
+{{.WorkingDirectory}}
+
+### Current Task
+{{.CurrentTask}}
+
+{{if .CurrentFile}}
+### Current File Being Processed
+**File**: {{.CurrentFile}}
+
+**Content with Line Numbers**:
+```java
+{{.CurrentFileWithLineNumber}}
+```
+{{end}}
+
+{{if .FeedbackMessages}}
+### Previous Action Feedback
+{{.FeedbackMessages}}
+
+**Important**: Please carefully review the feedback above and take appropriate action to address any issues or continue with the next steps.
+{{end}}
+
+### Statistics
+- Total Files: {{.TotalFiles}}
+- Files with Issues: {{.FilesWithIssues}}
+- Fixed Files: {{.FixedFiles}}
+
+## Guidelines for Next Action
+
+1. If there are feedback messages, address them first
+2. If working on a file with issues, focus on fixing them
+3. If no current file, list files or check for issues
+4. Always verify fixes before moving to next file
+5. Use `compare_with_backup` to verify changes against original .bak files
+6. Complete the task only when all issues are resolved
+
+## Backup System Reminder
+
+- **All decompiled files have .bak backups** (e.g., MyClass.java.bak = original, MyClass.java = modified)
+- Use `compare_with_backup` action to verify changes and ensure nothing was lost
+- This helps track what modifications were made and verify correctness
+
