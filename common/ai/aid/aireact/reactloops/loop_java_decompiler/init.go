@@ -30,7 +30,7 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithAITagFieldWithAINodeId("JAVA_CODE", "java_code", "re-act-loop-answer-payload"),
+				reactloops.WithAITagFieldWithAINodeId("JAVA_CODE", "java_code", "re-act-loop-answer-payload", "code/java"),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {

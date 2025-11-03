@@ -22,6 +22,16 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 		{FieldName: `plan_request_payload`},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		// Check if there's already a plan execution task running
+		invoker := loop.GetInvoker()
+		if reactInvoker, ok := invoker.(interface {
+			GetCurrentPlanExecutionTask() aicommon.AIStatefulTask
+		}); ok {
+			if reactInvoker.GetCurrentPlanExecutionTask() != nil {
+				return utils.Errorf("another plan execution task is already running, please wait for it to complete or use directly_answer to provide the result")
+			}
+		}
+
 		improveQuery := action.GetString("plan_request_payload")
 		if improveQuery == "" {
 			improveQuery = action.GetInvokeParams("next_action").GetString("plan_request_payload")

@@ -146,15 +146,23 @@ func WithAITagField(tagName, variableName string) ReActLoopOption {
 	}
 }
 
-func WithAITagFieldWithAINodeId(tagName, variableName, nodeId string) ReActLoopOption {
+func WithAITagFieldWithAINodeId(tagName, variableName, nodeId string, contentType ...string) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.aiTagFields == nil {
 			r.aiTagFields = omap.NewEmptyOrderedMap[string, *LoopAITagField]()
+		}
+		ct := ""
+		if len(contentType) > 0 {
+			ct = contentType[0]
+		}
+		if ct != "" {
+			log.Infof("Register AITagField [%v/%v] with content type: %s", tagName, variableName, ct)
 		}
 		r.aiTagFields.Set(tagName, &LoopAITagField{
 			TagName:      tagName,
 			VariableName: variableName,
 			AINodeId:     nodeId,
+			ContentType:  ct,
 		})
 	}
 }
