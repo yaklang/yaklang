@@ -30,7 +30,7 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithAITagField("JAVA_CODE", "java_code"),
+				reactloops.WithAITagFieldWithAINodeId("JAVA_CODE", "java_code", "re-act-loop-answer-payload"),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
@@ -72,6 +72,16 @@ func init() {
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_JAVA_DECOMPILER, r, preset...)
 		},
+		// Register metadata for better AI understanding
+		reactloops.WithLoopDescription("进入 Java 反编译专家模式：自动反编译 JAR 包，分析导出的 Java 源码，发现并修复语法及编译错误，支持单文件/批量增量修复，适合 JAR 二进制分析和源码重构。"),
+		reactloops.WithLoopUsagePrompt(`当用户输入一般为 JAR 文件修复导出需求，如：
+- "请帮我反编译 /tmp/xxx.jar 并输出至 ./xxx"
+- "请检查导出的 Java 文件，并一并修复编译错误"
+调用本流程，将启用如下专用工具：decompile_jar（反编译 JAR）、list_files（枚举文件）、read_java_file（查看源码）、rewrite_java_file（修正/重写源码）、check_syntax（检测语法错误）、compare_with_backup（对比备份版本）。human_readable_thought 字段会详细描述用户意图与 jar 路径，辅助 AI 做出针对性决策。`),
+		reactloops.WithLoopOutputExample(`
+* 用户请求反编译 jar 并自动修复导出的 Java 代码。例如：
+  {"@action": "java_decompiler", "human_readable_thought": "请将 /tmp/xxx.jar 反编译输出到 ./xxx，并修复所有导出的 Java 文件中的语法和常见反编译问题"}
+`),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_JAVA_DECOMPILER, err)

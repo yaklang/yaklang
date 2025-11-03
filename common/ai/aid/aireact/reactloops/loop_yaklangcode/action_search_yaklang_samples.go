@@ -360,7 +360,7 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 			// 显示搜索参数
 			searchInfo := fmt.Sprintf("RAG search query: %s, top_n: %d, score_threshold: %.2f",
 				query, topN, scoreThreshold)
-			emitter.EmitThought(op.GetTask().GetId(), searchInfo)
+			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
 			loop.GetEmitter().EmitTextPlainTextStreamEvent(
 				"search_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
@@ -503,7 +503,7 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 				}
 			}
 
-			emitter.EmitThought("search_samples_result", "Search Result:\n"+resultStr)
+			emitter.EmitThoughtStream("search_samples_result", "Search Result:\n"+resultStr)
 			invoker.AddToTimeline("search_results", fmt.Sprintf("Found %d relevant code snippets for query: %s\n%s", len(results), query, resultStr))
 
 			// 根据结果数量生成不同的建议，添加到Timeline

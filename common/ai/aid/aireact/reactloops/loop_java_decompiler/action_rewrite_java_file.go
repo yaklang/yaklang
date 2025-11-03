@@ -207,12 +207,12 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			// Get rewritten content from AI-generated code
 			// Try to get from loop context (from <JAVA_CODE> tag) first
 			newCode := loop.Get("java_code")
-			
+
 			// Fall back to action parameter (for testing scenarios)
 			if newCode == "" {
 				newCode = action.GetString("new_code")
 			}
-			
+
 			if newCode == "" {
 				r.AddToTimeline("rewrite_no_code", `【缺少重写代码】未提供新的Java代码
 
@@ -322,6 +322,20 @@ public class Example {
 			rewrittenFiles := loop.GetInt("rewritten_files")
 			loop.Set("rewritten_files", rewrittenFiles+1)
 
+			// Automatically check syntax after rewriting (similar to yaklang code loop)
+			ctx := op.GetContext()
+			if ctx == nil {
+				ctx = invoker.GetConfig().GetContext()
+			}
+			syntaxIssues := checkJavaFileSyntax(ctx, finalContent, filePath)
+			hasSyntaxErrors := len(syntaxIssues) > 0
+
+			// If there are syntax errors, prevent loop exit and provide feedback
+			if hasSyntaxErrors {
+				op.DisallowNextLoopExit()
+				log.Infof("rewrite_java_file completed but has syntax errors, will not allow loop exit")
+			}
+
 			// Prepare feedback
 			preview := utils.ShrinkTextBlock(newCode, 800)
 			feedback := fmt.Sprintf(`成功重写 Java 文件：%s
@@ -337,12 +351,7 @@ public class Example {
 
 【统计】：
 - 本次重写：第 %d 个文件
-- 新代码长度：%d 字节
-
-【下一步建议】：
-1. 使用 check_syntax 验证语法正确性
-2. 使用 compare_with_backup 查看具体改动
-3. 继续处理其他文件或使用 finish 结束`,
+- 新代码长度：%d 字节`,
 				filePath,
 				mode,
 				filePath,
@@ -351,23 +360,59 @@ public class Example {
 				rewrittenFiles+1,
 				len(finalContent))
 
+			// Add syntax check results to feedback
+			if hasSyntaxErrors {
+				feedback += "\n\n--[语法检查]--\n重写后的代码仍存在语法问题：\n" + strings.Join(syntaxIssues, "\n")
+				feedback += "\n\n【必须修复】：代码存在语法错误，无法结束任务。请继续修复这些问题。"
+			} else {
+				feedback += "\n\n--[语法检查]--\n✓ 语法检查通过，代码没有明显错误。"
+			}
+
+			feedback += "\n\n【下一步建议】："
+			if hasSyntaxErrors {
+				feedback += "\n1. 分析上述语法错误信息"
+				feedback += "\n2. 使用 rewrite_java_file 再次修复代码"
+				feedback += "\n3. 或使用 read_java_file 重新查看文件内容"
+			} else {
+				feedback += "\n1. 使用 compare_with_backup 查看具体改动"
+				feedback += "\n2. 继续处理其他文件"
+				feedback += "\n3. 或使用 check_syntax 对所有文件进行最终验证"
+			}
+
 			if rewriteReason != "" {
 				feedback += "\n\n【重写原因】：" + rewriteReason
 			}
 
-			timelineMsg := fmt.Sprintf(`【重写成功】%s
+			var syntaxStatus, nextAction string
+			if hasSyntaxErrors {
+				syntaxStatus = "存在错误，需要继续修复"
+				nextAction = "必须修复语法错误"
+			} else {
+				syntaxStatus = "检查通过"
+				nextAction = "可以处理其他文件或验证全部文件"
+			}
+
+			timelineMsg := fmt.Sprintf(`【重写完成】%s
 
 【模式】：%s
 【文件】：已重写 %d 个文件
 【代码】：%d 字节
+【语法】：%s
 
-【下一步】：验证语法或继续处理其他文件`,
+【下一步】：%s`,
 				filePath,
 				mode,
 				rewrittenFiles+1,
-				len(finalContent))
+				len(finalContent),
+				syntaxStatus,
+				nextAction)
 
-			r.AddToTimeline("rewrite_success", timelineMsg)
+			if hasSyntaxErrors {
+				r.AddToTimeline("rewrite_with_errors", timelineMsg)
+			} else {
+				r.AddToTimeline("rewrite_success", timelineMsg)
+			}
+
 			op.Feedback(feedback)
 			op.Continue()
 		},

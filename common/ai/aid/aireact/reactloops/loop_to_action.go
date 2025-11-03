@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,9 +17,15 @@ func ConvertReActLoopFactoryToActionFactory(
 			return nil, utils.Errorf("runtime is nil when creating loop action: %s", name)
 		}
 
+		// Get metadata for better description
+		description := "focus on solving the problem using [" + name + "] loop"
+		if meta, ok := GetLoopMetadata(name); ok && meta.Description != "" {
+			description = meta.Description
+		}
+
 		action := &LoopAction{
 			ActionType:   name,
-			Description:  "focus on solving the problem using [" + name + "] loop",
+			Description:  description,
 			StreamFields: []*LoopStreamField{},
 			ActionVerifier: func(oldLoop *ReActLoop, action *aicommon.Action) error {
 				_, ok := oldLoop.actions.Get(name)

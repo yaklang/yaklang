@@ -79,7 +79,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		var initialSamples string
 		if docSearcher != nil && len(searchPatterns) > 0 {
 			log.Infof("init task step 2: searching code samples with %d patterns", len(searchPatterns))
-			emitter.EmitThought(task.GetIndex(), "Searching for relevant code examples in Yaklang sample library...")
+			emitter.EmitThoughtStream(task.GetIndex(), "Searching for relevant code examples in Yaklang sample library...")
 
 			var allResults strings.Builder
 			searchedCount := 0
@@ -163,7 +163,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				initialSamples = compressSearchResults(rawResults, patternsStr.String(), r, nil, 6, 5, 20, "【精选初始代码样例】", true)
 
 				if initialSamples != "" {
-					emitter.EmitThought(task.GetIndex(), "Found relevant code samples:\n"+initialSamples)
+					emitter.EmitThoughtStream(task.GetIndex(), "Found relevant code samples:\n"+initialSamples)
 					r.AddToTimeline("initial_code_samples", initialSamples)
 					log.Infof("initial samples collected successfully, size: %d bytes", len(initialSamples))
 				}
