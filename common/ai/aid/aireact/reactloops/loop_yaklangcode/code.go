@@ -20,7 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
-var defaultYaklangRagCollection = "yak"
 var defaultYaklangAIKBRagCollectionName = "yaklang_aikb_rag"
 
 // createDocumentSearcher creates a document searcher from aikb path
