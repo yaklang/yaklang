@@ -236,6 +236,32 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.NotContains(t, rsp.GetRule()[0].GetGroupName(), group1)
 	})
 
+	t.Run("test dirty update", func(t *testing.T) {
+
+		ruleName := fmt.Sprintf("test_%s.sf", uuid.NewString())
+		err = createSfRule(client, ruleName)
+		require.NoError(t, err)
+
+		flag := uuid.NewString()
+		err = updateRuleByNames(client, []string{ruleName}, flag)
+		require.NoError(t, err)
+
+		rsp, err := client.QuerySyntaxFlowRule(context.Background(), &ypb.QuerySyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Keyword: flag,
+			},
+			Pagination: &ypb.Paging{Limit: -1},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(rsp.GetRule()))
+
+		updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), ruleName)
+		require.Equal(t, updateRule.Dirty, true)
+
+		err = deleteRuleByNames(client, []string{ruleName})
+		require.NoError(t, err)
+	})
+
 	t.Run("test query syntax rule by key word", func(t *testing.T) {
 		ruleName := uuid.NewString()
 		token := uuid.NewString()
