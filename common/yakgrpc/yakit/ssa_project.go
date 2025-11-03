@@ -104,10 +104,9 @@ func QuerySSAProject(db *gorm.DB, req *ypb.QuerySSAProjectRequest) (*bizhelper.P
 		}
 	}
 
-	// db = bizhelper.OrderByPaging(db, p)
 	db = FilterSSAProject(db, req.GetFilter())
-	var projects []*schema.SSAProject
-	paging, db := bizhelper.YakitPagingQuery(db, p, projects)
+	projects := make([]*schema.SSAProject, 0)
+	paging, db := bizhelper.YakitPagingQuery(db, p, &projects)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}

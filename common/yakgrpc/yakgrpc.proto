@@ -8390,7 +8390,7 @@ message CreateSSAProjectRequest {
 }
 
 message CreateSSAProjectResponse {
-  SSAProject Project = 1; // why ? 
+  SSAProject Project = 1;
   DbOperateMessage Message = 2;
 }
 
