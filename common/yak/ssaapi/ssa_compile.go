@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -43,6 +44,26 @@ func (c *Config) isStop() bool {
 
 func (c *Config) parseFile() (ret *Program, err error) {
 	var prog *ssa.Program
+	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
+	defer func() {
+		if r := recover(); r != nil {
+			err = utils.Errorf("compile panic: %v", r)
+			log.Errorf("compile panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			// panic时清理已保存的Program数据
+			if prog != nil && prog.Name != "" && prog.DatabaseKind != ssa.ProgramCacheMemory {
+				log.Infof("cleaning up program data due to panic: %s", prog.Name)
+				ssadb.DeleteProgram(ssadb.GetDB(), prog.Name)
+			}
+		} else if err != nil {
+			// 编译出错时清理已保存的Program数据
+			if prog != nil && prog.Name != "" && prog.DatabaseKind != ssa.ProgramCacheMemory {
+				log.Infof("cleaning up program data due to error: %s", prog.Name)
+				ssadb.DeleteProgram(ssadb.GetDB(), prog.Name)
+			}
+		}
+	}()
+
 	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err

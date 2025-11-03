@@ -43,7 +43,26 @@ func ParseProject(opts ...Option) (prog Programs, err error) {
 	return
 }
 
-func (c *Config) parseProject() (Programs, error) {
+func (c *Config) parseProject() (progs Programs, err error) {
+	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
+	defer func() {
+		if r := recover(); r != nil {
+			err = utils.Errorf("compile panic: %v", r)
+			log.Errorf("compile panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			// panic时清理已保存的Program数据
+			if c.ProgramName != "" {
+				log.Infof("cleaning up program data due to panic: %s", c.ProgramName)
+				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			}
+		} else if err != nil {
+			// 编译出错时清理已保存的Program数据
+			if c.ProgramName != "" {
+				log.Infof("cleaning up program data due to error: %s", c.ProgramName)
+				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			}
+		}
+	}()
 
 	if c.GetCompileReCompile() {
 		c.Processf(0, "recompile project, delete old data...")
@@ -54,7 +73,7 @@ func (c *Config) parseProject() (Programs, error) {
 	c.Processf(0, "recompile project, start compile")
 	if c.GetCompilePeepholeSize() != 0 {
 		// peephole compile
-		if progs, err := c.peephole(); err != nil {
+		if progs, err = c.peephole(); err != nil {
 			return nil, err
 		} else {
 			SaveConfig(c, nil)
