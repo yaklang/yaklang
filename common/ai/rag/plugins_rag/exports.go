@@ -54,7 +54,7 @@ func SearchPlugins(query string, limit int) ([]*PluginSearchResult, error) {
 
 func IsReady() bool {
 	db := consts.GetGormProfileDatabase()
-	return rag.IsReadyCollection(db, PLUGIN_RAG_COLLECTION_NAME)
+	return rag.CollectionIsExists(db, PLUGIN_RAG_COLLECTION_NAME)
 }
 
 // 导出函数列表

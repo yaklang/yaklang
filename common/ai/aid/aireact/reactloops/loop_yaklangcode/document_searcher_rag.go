@@ -20,7 +20,7 @@ func handleRAGQueryDocument(
 	collectionName string,
 	payloads aitool.InvokeParams,
 ) (string, bool) {
-	ragSys, err := rag.LoadCollection(db, collectionName)
+	ragSys, err := rag.GetRagSystem(collectionName, rag.WithDB(db))
 	if err != nil {
 		log.Warn("rag db not available, rag query action will be skipped")
 		return fmt.Sprintf("please check yaklang enhance collection[%v]", collectionName), false

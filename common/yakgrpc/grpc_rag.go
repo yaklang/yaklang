@@ -239,7 +239,7 @@ func (s *Server) CreateVectorStoreEntry(ctx context.Context, req *ypb.CreateVect
 	}
 
 	// 加载RAG系统
-	ragSystem, err := rag.LoadCollection(db, collectionName)
+	ragSystem, err := rag.GetRagSystem(collectionName, rag.WithDB(db))
 	if err != nil {
 		return &ypb.GeneralResponse{
 			Ok:     false,

@@ -2,8 +2,9 @@ package aimem
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"

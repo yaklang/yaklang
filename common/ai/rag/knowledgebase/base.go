@@ -20,11 +20,15 @@ type KnowledgeBase struct {
 	db          *gorm.DB
 	name        string
 	vectorStore *vectorstore.SQLiteVectorStoreHNSW
+	kbInfo      *schema.KnowledgeBaseInfo
 	id          int64
 }
 
 func (kb *KnowledgeBase) GetID() int64 {
 	return kb.id
+}
+func (kb *KnowledgeBase) GetKnowledgeBaseInfo() *schema.KnowledgeBaseInfo {
+	return kb.kbInfo
 }
 
 func AutoMigrate(db *gorm.DB) error {
@@ -32,8 +36,8 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 // NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
-func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
-	defaultOpts := []any{vectorstore.WithLazyLoadEmbeddingClient()}
+func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
+	defaultOpts := []vectorstore.CollectionConfigFunc{vectorstore.WithLazyLoadEmbeddingClient()}
 	newOpts := slices.Clone(opts)
 	newOpts = append(defaultOpts, opts...)
 	opts = newOpts
@@ -58,15 +62,12 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 
 	// 如果都不存在，创建新的知识库
 	if needCreateInfo && !collectionExists {
-		// 使用事务创建 KnowledgeBaseInfo
-		err = utils.GormTransaction(db, func(tx *gorm.DB) error {
-			knowledgeBaseInfo = schema.KnowledgeBaseInfo{
-				KnowledgeBaseName:        name,
-				KnowledgeBaseDescription: description,
-				KnowledgeBaseType:        kbType,
-			}
-			return yakit.CreateKnowledgeBase(tx, &knowledgeBaseInfo)
-		})
+		knowledgeBaseInfo = schema.KnowledgeBaseInfo{
+			KnowledgeBaseName:        name,
+			KnowledgeBaseDescription: description,
+			KnowledgeBaseType:        kbType,
+		}
+		err := yakit.CreateKnowledgeBase(db, &knowledgeBaseInfo)
 		if err != nil {
 			return nil, utils.Errorf("创建知识库信息失败: %v", err)
 		}
@@ -85,6 +86,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 			db:          db,
 			name:        name,
 			vectorStore: collectionMg,
+			kbInfo:      &knowledgeBaseInfo,
 			id:          int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
@@ -100,6 +102,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 			db:          db,
 			name:        name,
 			vectorStore: collectionMg,
+			kbInfo:      &knowledgeBaseInfo,
 			id:          int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
@@ -129,12 +132,13 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		db:          db,
 		name:        name,
 		vectorStore: collectionMg,
+		kbInfo:      &knowledgeBaseInfo,
 		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
 // CreateKnowledgeBase 创建全新的知识库（如果已存在会返回错误）
-func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
+func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}
@@ -181,12 +185,13 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 		db:          db,
 		name:        name,
 		vectorStore: collectionMg,
+		kbInfo:      &knowledgeBaseInfo,
 		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
 // LoadKnowledgeBase 加载已存在的知识库
-func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, error) {
+func LoadKnowledgeBase(db *gorm.DB, name string, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}
@@ -205,10 +210,11 @@ func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, e
 		db:          db,
 		name:        name,
 		vectorStore: collectionMg,
+		kbInfo:      &knowledgeBaseInfo,
 		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
 }
-func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...any) (*KnowledgeBase, error) {
+func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}

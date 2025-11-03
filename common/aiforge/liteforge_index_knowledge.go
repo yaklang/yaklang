@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
@@ -60,7 +61,7 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) (<-c
 	return _buildIndex(analyzeResult, option...)
 }
 
-func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...rag.RAGSystemConfigOption) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
 	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType, options...)

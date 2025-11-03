@@ -17,6 +17,7 @@ import (
 type EntityRepository struct {
 	gorm.Model
 
+	RAGID          string `gorm:"index"`
 	Uuid           string `gorm:"unique_index"`
 	EntityBaseName string `gorm:"index"`
 	Description    string

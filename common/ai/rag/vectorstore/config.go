@@ -35,12 +35,12 @@ type CollectionConfig struct {
 	buildGraphFilter *yakit.VectorDocumentFilter
 	buildGraphPolicy string
 
-	otherOptions []any
+	// otherOptions []any
 
 	DB *gorm.DB
 }
 
-func NewCollectionConfig(options ...any) *CollectionConfig {
+func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 	defaultConfig := &CollectionConfig{
 		ModelName:                  "Qwen3-Embedding-0.6B-Q4_K_M",
 		Dimension:                  1024,
@@ -53,11 +53,7 @@ func NewCollectionConfig(options ...any) *CollectionConfig {
 	}
 
 	for _, option := range options {
-		if ragOption, ok := option.(CollectionConfigFunc); ok {
-			ragOption(defaultConfig)
-		} else {
-			defaultConfig.otherOptions = append(defaultConfig.otherOptions, option)
-		}
+		option(defaultConfig)
 	}
 	if defaultConfig.DB == nil {
 		defaultConfig.DB = consts.GetGormProfileDatabase()
@@ -65,7 +61,7 @@ func NewCollectionConfig(options ...any) *CollectionConfig {
 	return defaultConfig
 }
 
-func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, options ...any) *CollectionConfig {
+func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, options ...CollectionConfigFunc) *CollectionConfig {
 	loadBasicConfig := &CollectionConfig{
 		ModelName:                  collection.ModelName,
 		Dimension:                  collection.Dimension,
@@ -79,11 +75,7 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		EnableAutoUpdateGraphInfos: true,
 	}
 	for _, option := range options {
-		if ragOption, ok := option.(CollectionConfigFunc); ok {
-			ragOption(loadBasicConfig)
-		} else {
-			loadBasicConfig.otherOptions = append(loadBasicConfig.otherOptions, option)
-		}
+		option(loadBasicConfig)
 	}
 	return loadBasicConfig
 }

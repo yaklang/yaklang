@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -33,6 +32,8 @@ type EntityRepositoryRuntimeConfig struct {
 	disableBulkProcess  bool
 
 	entityRagQueryCache *utils.CacheEx[*schema.ERModelEntity]
+
+	vectorStoreOptions []vectorstore.CollectionConfigFunc
 }
 
 type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
@@ -67,6 +68,12 @@ func WithContext(ctx context.Context) RuntimeConfigOption {
 	}
 }
 
+func WithVectorStoreOptions(opts ...vectorstore.CollectionConfigFunc) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.vectorStoreOptions = opts
+	}
+}
+
 func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 	config := &EntityRepositoryRuntimeConfig{
 		similarityThreshold: 0.6, // 降低相似度阈值，减少low_score问题
@@ -75,9 +82,11 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 		ctx:                 context.Background(),
 	}
 	for _, opt := range opts {
-		switch configOpt := opt.(type) {
+		switch opt := opt.(type) {
 		case RuntimeConfigOption:
-			configOpt(config)
+			opt(config)
+		case vectorstore.CollectionConfigFunc:
+			config.vectorStoreOptions = append(config.vectorStoreOptions, opt)
 		}
 	}
 	config.entityRagQueryCache = utils.NewCacheEx[*schema.ERModelEntity]()
@@ -86,9 +95,8 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 }
 
 type EntityRepository struct {
-	db   *gorm.DB
-	info *schema.EntityRepository
-	// ragSystem *rag.RAGSystem
+	db            *gorm.DB
+	info          *schema.EntityRepository
 	collectionMg  *vectorstore.SQLiteVectorStoreHNSW
 	wg            sync.WaitGroup
 	bulkProcessor *bulkProcessor
@@ -330,7 +338,7 @@ func (r *EntityRepository) VectorSearch(query string, top int, scoreLimit ...flo
 		}
 	}()
 
-	if r.ragSystem == nil {
+	if r.collectionMg == nil {
 		return nil, nil, utils.Errorf("RAG system is not initialized")
 	}
 
@@ -409,7 +417,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 		}
 	}()
 
-	if r.ragSystem == nil {
+	if r.collectionMg == nil {
 		log.Errorf("RAG system not initialized for entity [%s]", entity.EntityName)
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
@@ -538,12 +546,12 @@ func min(a, b int) int {
 }
 
 // VectorYieldEntity 使用向量搜索实体，注意这里使用增强查询，不能在实时性高的过程调用！
-func (r *EntityRepository) VectorYieldEntity(ctx context.Context, query string) (<-chan *rag.RAGSearchResult, error) {
-	return rag.Query(r.db, query,
-		rag.WithRAGLimit(r.runtimeConfig.queryTop),
-		rag.WithRAGCtx(ctx),
-		rag.WithRAGCollectionName(r.info.EntityBaseName),
-		rag.WithRAGCollectionScoreLimit(r.runtimeConfig.similarityThreshold),
+func (r *EntityRepository) VectorYieldEntity(ctx context.Context, query string) (<-chan *vectorstore.RAGSearchResult, error) {
+	return vectorstore.Query(r.db, query,
+		vectorstore.WithRAGLimit(r.runtimeConfig.queryTop),
+		vectorstore.WithRAGCtx(ctx),
+		vectorstore.WithRAGCollectionName(r.info.EntityBaseName),
+		vectorstore.WithRAGCollectionScoreLimit(r.runtimeConfig.similarityThreshold),
 	)
 }
 
@@ -573,12 +581,12 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 		META_EntityType:        entry.EntityType,
 	}
 
-	var opts []rag.DocumentOption
+	var opts []vectorstore.DocumentOption
 
-	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
-		rag.WithDocumentType(schema.RAGDocumentType_Entity),
-		rag.WithDocumentEntityID(entry.Uuid), // let RAG system generate embedding
-		rag.WithDocumentRuntimeID(entry.RuntimeID),
+	opts = append(opts, vectorstore.WithDocumentRawMetadata(metadata),
+		vectorstore.WithDocumentType(schema.RAGDocumentType_Entity),
+		vectorstore.WithDocumentEntityID(entry.Uuid), // let RAG system generate embedding
+		vectorstore.WithDocumentRuntimeID(entry.RuntimeID),
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
@@ -616,10 +624,10 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 	}
 
 	return r.AddVectorIndex(relationship.Uuid, content,
-		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
-		rag.WithDocumentRelatedEntities(relationship.SourceEntityIndex, relationship.TargetEntityIndex),
-		rag.WithDocumentRuntimeID(relationship.RuntimeID),
-		rag.WithDocumentRawMetadata(metadata))
+		vectorstore.WithDocumentType(schema.RAGDocumentType_Relationship),
+		vectorstore.WithDocumentRelatedEntities(relationship.SourceEntityIndex, relationship.TargetEntityIndex),
+		vectorstore.WithDocumentRuntimeID(relationship.RuntimeID),
+		vectorstore.WithDocumentRawMetadata(metadata))
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
@@ -907,23 +915,24 @@ func (r *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 }
 
 func (r *EntityRepository) StartBulkProcessor() error {
-	bp := startBulkProcessor(r.runtimeConfig.ctx, r.ragSystem, 10, 3*time.Second)
+	bp := startBulkProcessor(r.runtimeConfig.ctx, r.collectionMg, 10, 3*time.Second)
 	r.bulkProcessor = bp
 	return nil
 }
 
 func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRepository, error) {
+	runtimeConfig := NewRuntimeConfig(opts...)
 	var entityBaseInfo schema.EntityRepository
 	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
 	if err != nil {
 		return nil, err
 	}
 
-	collectionExists := rag.CollectionIsExists(db, name)
+	collectionExists := vectorstore.HasCollection(db, name)
 
 	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
 	if !collectionExists {
-		collectionMg, err = vectorstore.CreateCollection(db, name, entityBaseInfo.Description, opts...)
+		collectionMg, err = vectorstore.CreateCollection(db, name, entityBaseInfo.Description, runtimeConfig.vectorStoreOptions...)
 		if err != nil {
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
@@ -931,7 +940,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		collectionMg, err = vectorstore.LoadCollection(db, name, opts...)
+		collectionMg, err = vectorstore.LoadCollection(db, name, runtimeConfig.vectorStoreOptions...)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
@@ -939,7 +948,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 	var repos = &EntityRepository{
 		db:            db,
 		info:          &entityBaseInfo,
-		ragSystem:     ragSystem,
+		collectionMg:  collectionMg,
 		runtimeConfig: NewRuntimeConfig(opts...),
 	}
 	if !repos.runtimeConfig.disableBulkProcess {
@@ -953,6 +962,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 }
 
 func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
+	runtimeConfig := NewRuntimeConfig(opts...)
 	var entityBaseInfo schema.EntityRepository
 	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
 	if err != nil {
@@ -971,11 +981,11 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 		}
 	}
 
-	collectionExists := rag.CollectionIsExists(db, name)
+	collectionExists := vectorstore.HasCollection(db, name)
 
-	var ragSystem *rag.RAGSystem
+	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
 	if !collectionExists {
-		ragSystem, err = rag.CreateCollection(db, name, description, opts...)
+		collectionMg, err = vectorstore.CreateCollection(db, name, description, runtimeConfig.vectorStoreOptions...)
 		if err != nil {
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
@@ -983,7 +993,7 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		ragSystem, err = rag.LoadCollection(db, name)
+		collectionMg, err = vectorstore.LoadCollection(db, name, runtimeConfig.vectorStoreOptions...)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
@@ -991,8 +1001,8 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 	var repos = &EntityRepository{
 		db:            db,
 		info:          &entityBaseInfo,
-		ragSystem:     ragSystem,
-		runtimeConfig: NewRuntimeConfig(opts...),
+		collectionMg:  collectionMg,
+		runtimeConfig: runtimeConfig,
 	}
 
 	if !repos.runtimeConfig.disableBulkProcess {

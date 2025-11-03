@@ -2,13 +2,14 @@ package entityrepos
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -17,9 +18,9 @@ func TestEntityRepository_Basic(t *testing.T) {
 
 	repoName := "test_repo"
 	repoDesc := "desc"
-	mockEmbedding := rag.NewDefaultMockEmbedding()
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
 
-	repo, err := GetOrCreateEntityRepository(db, repoName, repoDesc, WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
+	repo, err := GetOrCreateEntityRepository(db, repoName, repoDesc, WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -68,9 +69,9 @@ func TestEntityRepository_Basic(t *testing.T) {
 func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := rag.NewDefaultMockEmbedding()
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
 
-	repo, err := GetOrCreateEntityRepository(db, "vector_repo", "desc", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
+	repo, err := GetOrCreateEntityRepository(db, "vector_repo", "desc", WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -104,8 +105,8 @@ func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := rag.NewDefaultMockEmbedding()
-	repo, err := GetOrCreateEntityRepository(db, "merge_repo", "desc", rag.WithEmbeddingClient(mockEmbedding), WithDisableBulkProcess(), WithSimilarityThreshold(0.6))
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	repo, err := GetOrCreateEntityRepository(db, "merge_repo", "desc", vectorstore.WithEmbeddingClient(mockEmbedding), WithDisableBulkProcess(), WithSimilarityThreshold(0.6))
 	if err != nil {
 		t.Fatalf("failed to create repo: %v", err)
 	}
@@ -165,8 +166,8 @@ func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 func TestSaveEndpoint_Basic(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := rag.NewDefaultMockEmbedding()
-	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo", "desc", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo", "desc", WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -213,8 +214,8 @@ func TestSaveEndpoint_Basic(t *testing.T) {
 func TestSaveEndpoint_WaitIndex(t *testing.T) {
 	db := setupTestDB(t)
 
-	mockEmbedding := rag.NewDefaultMockEmbedding()
-	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo2", "desc", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo2", "desc", WithDisableBulkProcess(), vectorstore.WithEmbeddingClient(mockEmbedding))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

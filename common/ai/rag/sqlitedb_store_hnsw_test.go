@@ -65,7 +65,7 @@ func mockVector() []float32 {
 
 func TestAddPerformance(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
-	ragSys, _ := LoadCollection(consts.GetGormProfileDatabase(), "测试")
+	ragSys, _ := NewRAGSystem(WithDB(consts.GetGormProfileDatabase()), WithName("测试"))
 	startTime := time.Now()
 	ragSys.VectorStore.Add(&vectorstore.Document{
 		ID:        "doc1",
