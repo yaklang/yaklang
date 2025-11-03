@@ -8,14 +8,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, id string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, id string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, knowledgeBaseId)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultOptions := []any{
+	defaultOptions := []CollectionConfigFunc{
 		WithDescription(knowledgeBase.KnowledgeBaseDescription),
 	}
 	collectionMg, err := GetCollection(db, knowledgeBase.KnowledgeBaseName, append(defaultOptions, opts...)...)
@@ -70,14 +70,14 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, i
 }
 
 // BuildVectorIndexForKnowledgeBase 构建向量索引
-func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 
 	knowledgeBase, err := yakit.GetKnowledgeBase(db, id)
 	if err != nil {
 		return nil, err
 	}
 
-	defaultOptions := []any{
+	defaultOptions := []CollectionConfigFunc{
 		WithDescription(knowledgeBase.KnowledgeBaseDescription),
 	}
 	collectionMg, err := GetCollection(db, knowledgeBase.KnowledgeBaseName, append(defaultOptions, opts...)...)

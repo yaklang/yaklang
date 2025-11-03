@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func CreateCollection(db *gorm.DB, name string, description string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func CreateCollection(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	// 创建RAG配置
 	// 检查集合是否存在
@@ -35,7 +35,7 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 	return collection, nil
 }
 
-func LoadCollection(db *gorm.DB, name string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func LoadCollection(db *gorm.DB, name string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := LoadSQLiteVectorStoreHNSW(db, name, opts...)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func HasCollection(db *gorm.DB, name string) bool {
 	return col != nil && err == nil
 }
 
-func GetCollection(db *gorm.DB, collectionName string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func GetCollection(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	if HasCollection(db, collectionName) {
 		log.Infof("collection '%s' exists, loading it", collectionName)
 		return LoadCollection(db, collectionName, opts...)

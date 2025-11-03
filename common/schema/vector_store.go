@@ -167,7 +167,8 @@ type VectorStoreCollection struct {
 
 	Archived bool `gorm:"default:false" json:"archived"`
 
-	UUID string
+	UUID  string
+	RAGID string `gorm:"index"`
 
 	GraphBinary    []byte `gorm:"type:blob" json:"graph_binary"`
 	CodeBookBinary []byte `gorm:"type:blob" json:"code_book_binary"`
@@ -294,6 +295,7 @@ func (s *StringArray) Scan(value interface{}) error {
 type KnowledgeBaseInfo struct {
 	gorm.Model
 
+	RAGID string `gorm:"index"`
 	// 知识库名称(唯一)
 	KnowledgeBaseName string `gorm:"unique_index;not null" json:"knowledge_base_name"`
 

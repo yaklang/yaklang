@@ -311,7 +311,7 @@ func BuildKnowledgeEntryFromKHop(hop *entityrepos.KHopPath, option ...any) ([]*s
 }
 
 func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.KnowledgeBaseEntry, relationalEntityUUID []string, options ...any) error { //todo return knowledge uuid
-	documentOption := []rag.DocumentOption{rag.WithDocumentRelatedEntities(relationalEntityUUID...)}
+	documentOption := []rag.RAGSystemConfigOption{rag.WithDocumentRelatedEntities(relationalEntityUUID...)}
 
 	refineConfig := NewRefineConfig(options...)
 	for _, entry := range entries {

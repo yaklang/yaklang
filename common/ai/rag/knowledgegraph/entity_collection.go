@@ -24,7 +24,7 @@ func NewEntityCollection(db *gorm.DB, collectionName string) (*EntityCollection,
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	description := fmt.Sprintf("知识图谱实体集合：%s - 专门存储和检索知识图谱中的实体信息，支持基于实体名称、类型、描述和属性的语义搜索，为知识图谱应用提供高效的实体发现和关联分析能力。", collectionName)
 
-	collectionMg, err := vectorstore.GetCollection(db, collectionName, description)
+	collectionMg, err := vectorstore.GetCollection(db, collectionName, vectorstore.WithDescription(description))
 	if err != nil {
 		return nil, utils.Errorf("failed to create entity collection: %v", err)
 	}

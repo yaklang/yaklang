@@ -15,6 +15,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// testEmbedder 测试用的嵌入器函数
+func testEmbedder(text string) ([]float32, error) {
+	// 简单地生成一个固定的向量作为嵌入
+	// 根据文本内容生成不同的向量
+	if len(text) > 10 {
+		return []float32{1.0, 0.0, 0.0}, nil
+	} else if len(text) > 5 {
+		return []float32{0.0, 1.0, 0.0}, nil
+	}
+	return []float32{0.0, 0.0, 1.0}, nil
+}
+
 // getMapKeys 获取map的所有键
 func getMapKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))
@@ -118,7 +130,7 @@ func TestRAGQuery(t *testing.T) {
 
 	for i, col := range collections {
 		t.Logf("Creating collection %d: %s", i+1, col.name)
-		ragSystem, err := CreateCollection(db, col.name, col.description, WithEmbeddingModel("test"))
+		ragSystem, err := GetRagSystem(col.name, WithDB(db), WithEmbeddingModel("test"))
 		if err != nil {
 			t.Logf("Failed to create collection %s (may be expected if embedding service is not available): %v", col.name, err)
 			t.Skip("skipping test due to collection creation failure")
@@ -130,7 +142,7 @@ func TestRAGQuery(t *testing.T) {
 
 		// 添加该集合的文档
 		for _, doc := range col.documents {
-			err = ragSystem.Add(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
+			err = ragSystem.Add(doc.ID, doc.Content, WithDocumentRawMetadata(doc.Metadata))
 			if err != nil {
 				t.Fatalf("Failed to add document %s to collection %s: %v", doc.ID, col.name, err)
 			}
@@ -318,13 +330,13 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 
 	mockEmbed := vectorstore.NewMockEmbedder(testEmbedder)
 
-	ragSystem, err := CreateCollection(db, "test", "test", WithEmbeddingClient(mockEmbed))
+	ragSystem, err := NewRAGSystem(WithDB(db), WithEmbeddingModel("test"), WithEmbeddingClient(mockEmbed))
 	if err != nil {
 		t.Errorf("Failed to create collection: %v", err)
 		return
 	}
 
-	ragSystem.Add("test", "test", vectorstore.WithDocumentRawMetadata(map[string]any{
+	ragSystem.Add("test", "test", WithDocumentRawMetadata(map[string]any{
 		"type": "test",
 	}))
 
@@ -365,7 +377,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		test 2：相似度阈值设置为0.6，确保只有Hypothetical Answer和Generalize Query生成的文本能命中。预期 应得到 两个集合的两个文档
 		test 3：相似度阈值设置为0.8，确保只有Hypothetical Answer生成的文本能命中。预期 应得到 一个集合的一个文档
 	*/
-	mockEmbedding := NewDefaultMockEmbedding()
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
 	HighSimilarThresh := 0.8
 	MidSimilarThresh := 0.6
 	LowSimilarThresh := 0.4
@@ -442,7 +454,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 
 	for i, col := range collections {
 		t.Logf("Creating collection %d: %s", i+1, col.name)
-		ragSystem, err := CreateCollection(db, col.name, col.description, WithEmbeddingClient(mockEmbedding))
+		ragSystem, err := NewRAGSystem(WithDB(db), WithName(col.name), WithDescription(col.description), WithEmbeddingClient(mockEmbedding))
 		if err != nil {
 			t.Logf("Failed to create collection %s (may be expected if embedding service is not available): %v", col.name, err)
 			t.Skip("skipping test due to collection creation failure")
@@ -453,7 +465,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		collectionNames = append(collectionNames, col.name)
 
 		doc := col.document
-		err = ragSystem.Add(doc.ID, doc.Content, vectorstore.WithDocumentRawMetadata(doc.Metadata))
+		err = ragSystem.Add(doc.ID, doc.Content, WithDocumentRawMetadata(doc.Metadata))
 		if err != nil {
 			t.Fatalf("Failed to add document %s to collection %s: %v", doc.ID, col.name, err)
 		}
@@ -471,7 +483,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test low", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
 			WithRAGSimilarityThreshold(LowSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 3)
@@ -483,7 +495,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test mid", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
 			WithRAGSimilarityThreshold(MidSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 2)
@@ -495,7 +507,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test high", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
 			WithRAGSimilarityThreshold(HighSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 1)

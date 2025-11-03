@@ -26,7 +26,7 @@ var SimpleLiteForge contracts.LiteForge
 
 func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISearcher[T], error) {
 	db := consts.GetGormProfileDatabase()
-	ragSystem, err := rag.LoadCollection(db, name)
+	ragSystem, err := rag.GetRagSystem(name, rag.WithDB(db))
 	if err != nil {
 		return nil, utils.Errorf("load collection failed: %v", err)
 	}
@@ -128,7 +128,7 @@ func BuildVectorIndexForSearcher[T searchtools.AISearchable](db *gorm.DB, collec
 		return nil, utils.Errorf("index items failed: %v", err)
 	}
 
-	ragSystem, err := rag.LoadCollection(db, collectionName)
+	ragSystem, err := rag.GetRagSystem(collectionName, rag.WithDB(db))
 	if err != nil {
 		return nil, utils.Errorf("load collection failed: %v", err)
 	}

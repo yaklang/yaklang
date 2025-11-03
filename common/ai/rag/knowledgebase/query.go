@@ -173,8 +173,8 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 	resultCh := make(chan *SearchKnowledgebaseResult)
 
 	// 构造RAG查询选项
-	ragOpts := []vectorstore.CollectionConfigFunc{
-		vectorstore.WithLimit(config.Limit),
+	ragOpts := []vectorstore.CollectionQueryOption{
+		vectorstore.WithRAGLimit(config.Limit),
 		vectorstore.WithRAGEnhance(config.EnhancePlan),
 		vectorstore.WithRAGCtx(config.Ctx),
 	}
@@ -250,7 +250,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		return nil, utils.Errorf("get knowledge base name list failed: %v", err)
 	}
 
-	ragOpts = append(ragOpts, vectorstore.WithCollectionName(kbNames...))
+	ragOpts = append(ragOpts, vectorstore.WithRAGCollectionNames(kbNames...))
 
 	ragOpts = append(ragOpts, vectorstore.WithRAGMsgCallBack(ragMsgCallback))
 

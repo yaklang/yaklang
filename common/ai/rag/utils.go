@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 )
 
@@ -111,4 +112,18 @@ func TextToDocuments(text string, maxChunkSize int, overlap int, metadata map[st
 	}
 
 	return docs
+}
+
+func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
+	config := NewRAGSystemConfig(opts...)
+
+	if config.embeddingClient != nil {
+		return true
+	}
+	modelName := "Qwen3-Embedding-0.6B-Q4_K_M"
+	if config.modelName != "" {
+		modelName = config.modelName
+	}
+	_, err := localmodel.GetModelPath(modelName)
+	return err == nil
 }

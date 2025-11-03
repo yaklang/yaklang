@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -16,7 +18,7 @@ import (
 type Config struct {
 	invoker         aicommon.AIInvokeRuntime
 	contextProvider func() (string, error)
-	ragOptions      []any
+	ragOptions      []rag.RAGSystemConfigOption
 	database        *gorm.DB
 }
 
@@ -64,7 +66,7 @@ func WithInvoker(invoker aicommon.AIInvokeRuntime) Option {
 }
 
 // WithRAGOptions 设置RAG选项（主要用于测试时注入mock embedding）
-func WithRAGOptions(opts ...any) Option {
+func WithRAGOptions(opts ...rag.RAGSystemConfigOption) Option {
 	return func(config *Config) {
 		config.ragOptions = append(config.ragOptions, opts...)
 	}
