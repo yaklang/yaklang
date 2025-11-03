@@ -2,15 +2,18 @@ package coreplugin
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestSSAAutoDetective(t *testing.T) {
@@ -19,7 +22,7 @@ func TestSSAAutoDetective(t *testing.T) {
 	})
 
 	check := func(t *testing.T, input string) *programInfo {
-		info, prog, err := ParseProjectWithAutoDetective(context.Background(), input, "")
+		info, prog, err := ParseProjectWithAutoDetective(context.Background(), input, "", true)
 		_ = err
 		_ = prog
 		return info
@@ -94,5 +97,67 @@ func TestSSAAutoDetective(t *testing.T) {
 		info := check(t, "http://127.0.0.1:7777/1123/5"+uuid.NewString())
 		require.NotNil(t, info.Error)
 		require.Equal(t, info.Error.Kind, "connectFailException")
+	})
+
+	t.Run("create SSA project via gRPC with params raw data", func(t *testing.T) {
+		// 创建一个临时目录
+		tempDir := path.Join(os.TempDir(), uuid.NewString())
+		err := os.MkdirAll(tempDir, 0755)
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// 创建测试文件
+		javaFile := path.Join(tempDir, "Main.java")
+		err = os.WriteFile(javaFile, []byte("public class Main { public static void main(String[] args) {} }"), 0644)
+		require.NoError(t, err)
+
+		// 使用 SSA 探测获取 params
+		info, prog, err := ParseProjectWithAutoDetective(
+			context.Background(),
+			tempDir,
+			"",
+			false,
+		)
+		require.NoError(t, err)
+		require.Nil(t, prog)
+
+		// 将 info 转换为 JSON
+		paramsJSON, err := json.Marshal(info)
+		require.NoError(t, err)
+		log.Infof("Creating SSA project with params:\n%s", string(paramsJSON))
+
+		// 通过 gRPC 创建 SSA 项目
+		req := &ypb.CreateSSAProjectRequest{
+			ProjectRawData: string(paramsJSON),
+		}
+
+		db := consts.GetGormProfileDatabase()
+		project, err := yakit.CreateSSAProject(db, req)
+		require.NoError(t, err)
+		require.NotNil(t, project)
+
+		log.Infof("SSA Project created successfully:")
+		log.Infof("  ID: %d", project.ID)
+		log.Infof("  ProjectName: %s", project.ProjectName)
+		log.Infof("  Language: %s", project.Language)
+		log.Infof("  Description: %s", project.Description)
+		// Check
+		require.Equal(t, info.ProjectName, project.ProjectName)
+		require.Equal(t, info.Language, string(project.Language))
+		require.Equal(t, info.Description, project.Description)
+
+		defer func() {
+			deleteReq := &ypb.DeleteSSAProjectRequest{
+				Filter: &ypb.SSAProjectFilter{
+					IDs: []int64{int64(project.ID)},
+				},
+			}
+			count, err := yakit.DeleteSSAProject(db, deleteReq)
+			if err != nil {
+				log.Errorf("Failed to delete SSA project: %v", err)
+			} else {
+				log.Infof("Deleted %d SSA project(s)", count)
+			}
+		}()
 	})
 }
