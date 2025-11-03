@@ -21,3 +21,11 @@
 * 如果用户请求编写 yaklang 代码，那么请你使用
   `{"@action:"write_yaklang_code", "human_readable_thought": "想要编写什么样的代码？有什么功能？需要用到什么大致的功能？流程是什么？", "cumulative_summary": "..."}`
   使用这个 action 会进入专注编写代码的模式，会获得更多的代码上下文和基础文档语法补充
+* 如果用户请求反编译 JAR 文件、修复反编译后的 Java 代码、或处理 Java 相关问题，请优先使用专用工具而不是 bash：
+  - `decompile_jar`: 反编译 JAR 文件到指定目录
+  - `list_files`: 列出反编译后的 Java 文件
+  - `read_java_file`: 读取 Java 文件内容
+  - `rewrite_java_file`: 修复或重写 Java 文件
+  - `check_syntax`: 检查 Java 语法错误
+  - `compare_with_backup`: 对比修改前后的差异
+  这些工具专门为 Java 反编译场景优化，比使用 bash 命令更可靠和安全
