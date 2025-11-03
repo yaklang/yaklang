@@ -208,6 +208,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.OpCodes = dbRule.OpCodes
 	updateRule.Hash = dbRule.CalcHash()
 	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
+	updateRule.Dirty = true
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
