@@ -27,7 +27,16 @@ func buildSchema(actions ...*LoopAction) string {
 	var actionDesc []string
 	for _, action := range actions {
 		actionNames = append(actionNames, action.ActionType)
-		actionDesc = append(actionDesc, action.ActionType+": "+action.Description)
+
+		// Build description with metadata if available
+		desc := action.ActionType + ": " + action.Description
+
+		// Check if this is a loop action and has metadata with usage prompt
+		if meta, ok := GetLoopMetadata(action.ActionType); ok && meta.UsagePrompt != "" {
+			desc = action.ActionType + ": " + meta.UsagePrompt
+		}
+
+		actionDesc = append(actionDesc, desc)
 	}
 	var opts = []any{
 		aitool.WithStringParam(

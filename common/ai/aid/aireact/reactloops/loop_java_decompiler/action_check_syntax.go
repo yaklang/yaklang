@@ -140,6 +140,12 @@ var checkJavaSyntaxAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			// Update statistics
 			loop.Set("files_with_issues", filesWithIssues)
 
+			// If there are syntax issues, prevent loop exit (similar to yaklang code loop)
+			if filesWithIssues > 0 {
+				op.DisallowNextLoopExit()
+				log.Infof("check_syntax found %d files with issues, will not allow loop exit", filesWithIssues)
+			}
+
 			// Prepare feedback
 			var msg string
 			if filesWithIssues == 0 {

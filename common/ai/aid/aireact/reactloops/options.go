@@ -178,7 +178,26 @@ func WithReflectionOutputExample(example string) ReActLoopOption {
 			return "", utils.Errorf("get basic prompt info failed: %v", err)
 		}
 		result["Nonce"] = nonce
-		return utils.RenderTemplate(example, result)
+		baseExample, err := utils.RenderTemplate(example, result)
+		if err != nil {
+			return "", err
+		}
+
+		// Append loop-specific output examples from registered loops
+		var loopExamples string
+		for _, actionName := range loop.loopActions.Keys() {
+			if meta, ok := GetLoopMetadata(actionName); ok && meta.OutputExamplePrompt != "" {
+				rendered, err := utils.RenderTemplate(meta.OutputExamplePrompt, result)
+				if err == nil && rendered != "" {
+					loopExamples += "\n" + rendered
+				}
+			}
+		}
+
+		if loopExamples != "" {
+			return baseExample + loopExamples, nil
+		}
+		return baseExample, nil
 	})
 }
 

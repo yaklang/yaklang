@@ -11,6 +11,45 @@ Your response should be in JSON format with the following structure:
 }
 ```
 
+---
+
+### ⚠️⚠️⚠️ CRITICAL - Java Code Generation Rules ⚠️⚠️⚠️
+
+**ABSOLUTELY CRITICAL when using `rewrite_java_file`:**
+
+1. [MUST] You MUST ALWAYS include `<|JAVA_CODE_{{ .Nonce }}|>` code block in your response
+2. [MUST] You CANNOT put Java code in JSON! Must output: JSON line + code block
+3. [FORBIDDEN] Never include line number prefixes (like `45 |`, `46 |`, `47 |`) in generated code
+4. [FORBIDDEN] Never include any `|` separator in generated code
+5. [FORBIDDEN] Never copy line-numbered display format into generation area
+6. [CORRECT] Only generate clean, directly executable Java code
+7. [CORRECT] `rewrite_start_line` and `rewrite_end_line` are only for identifying replacement range, not for code itself
+
+**Response Format Requirement:**
+```
+{"@action": "rewrite_java_file", "file_path": "...", "rewrite_reason": "..."}
+
+<|JAVA_CODE_{{ .Nonce }}|>
+Your Java code
+<|JAVA_CODE_END_{{ .Nonce }}|>
+```
+
+**WRONG Example (Absolutely Forbidden!):**
+```
+45 | // Fix generic type
+46 | private List<String> items = new ArrayList<>();
+47 | 
+```
+
+**CORRECT Example (Must be like this!):**
+```
+// Fix generic type
+private List<String> items = new ArrayList<>();
+
+```
+
+---
+
 ### Example 1: Decompiling a JAR file
 ```json
 {
@@ -47,10 +86,17 @@ Your response should be in JSON format with the following structure:
   "file_path": "/path/to/decompiled/com/example/Class.java",
   "rewrite_start_line": 45,
   "rewrite_end_line": 50,
-  "reason": "Fix generic type erasure - replace raw type List with List<String> based on usage context",
-  "java_code": "    private List<String> items = new ArrayList<>();\n    \n    public List<String> getItems() {\n        return items;\n    }"
+  "rewrite_reason": "Fix generic type erasure - replace raw type List with List<String> based on usage context"
 }
 ```
+
+<|JAVA_CODE_{{ .Nonce }}|>
+    private List<String> items = new ArrayList<>();
+    
+    public List<String> getItems() {
+        return items;
+    }
+<|JAVA_CODE_END_{{ .Nonce }}|>
 
 ### Example 4b: Fixing a Java file (Full Rewrite)
 ```json
@@ -58,10 +104,27 @@ Your response should be in JSON format with the following structure:
   "human_readable_thought": "The file has multiple issues throughout - using full rewrite for comprehensive fix",
   "@action": "rewrite_java_file",
   "file_path": "/path/to/decompiled/com/example/Class.java",
-  "reason": "Multiple issues throughout file: generic type erasure, lambda syntax errors, and unnecessary casts. Full rewrite provides cleaner solution.",
-  "java_code": "package com.example;\n\nimport java.util.*;\n\npublic class Class {\n    private List<String> items = new ArrayList<>();\n    \n    public List<String> getItems() {\n        return items;\n    }\n    \n    public void processItems() {\n        items.forEach(item -> System.out.println(item));\n    }\n}"
+  "rewrite_reason": "Multiple issues throughout file: generic type erasure, lambda syntax errors, and unnecessary casts. Full rewrite provides cleaner solution."
 }
 ```
+
+<|JAVA_CODE_{{ .Nonce }}|>
+package com.example;
+
+import java.util.*;
+
+public class Class {
+    private List<String> items = new ArrayList<>();
+    
+    public List<String> getItems() {
+        return items;
+    }
+    
+    public void processItems() {
+        items.forEach(item -> System.out.println(item));
+    }
+}
+<|JAVA_CODE_END_{{ .Nonce }}|>
 
 ### Example 5: Checking syntax
 ```json
@@ -85,8 +148,20 @@ Your response should be in JSON format with the following structure:
 
 - Always include `human_readable_thought` to explain your reasoning
 - Use `@action` to specify which action to take
-- Provide all required parameters for the chosen action
-- Be specific and detailed in your modifications
-- Always explain why you're making changes in `reason` parameter
+- Provide all required parameters for the chosen action in JSON
+- **CRITICAL**: When using `rewrite_java_file`, you MUST include the `<|JAVA_CODE_{{ .Nonce }}|>` code block
+- **DO NOT** put Java code in JSON! Use the AITAG format: JSON line + JAVA_CODE block
+- Always explain why you're making changes in `rewrite_reason` parameter
 - For `rewrite_java_file`: Use partial rewrite for localized fixes, full rewrite for extensive changes
+- **FORBIDDEN**: Do not include any line numbers in the JAVA_CODE block (like `45 |`, `46 |`)
+- **CORRECT**: Only generate clean, directly usable Java code in JAVA_CODE blocks
+
+**Response Format Requirement for rewrite_java_file:**
+```
+{"@action": "rewrite_java_file", ...}
+
+<|JAVA_CODE_{{ .Nonce }}|>
+Your Java code here
+<|JAVA_CODE_END_{{ .Nonce }}|>
+```
 
