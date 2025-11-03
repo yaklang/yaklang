@@ -11,7 +11,6 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -51,12 +50,7 @@ func NewSQLitePluginsRagManager(db *gorm.DB, collectionName string, modelName st
 		collectionName = PLUGIN_RAG_COLLECTION_NAME
 	}
 
-	ragOptions := []any{}
-	for _, opt := range opts {
-		ragOptions = append(ragOptions, opt)
-	}
-
-	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, "用于储存 Yaklang 插件的 RAG 系统", ragOptions...)
+	ragSystem, err := rag.GetRagSystem(collectionName, rag.WithDB(db), rag.WithDescription("用于储存 Yaklang 插件的 RAG 系统"), rag.WithAIOptions(opts...))
 	if err != nil {
 		return nil, utils.Errorf("创建基于 SQLite 的 RAG 系统失败: %v", err)
 	}
@@ -344,7 +338,7 @@ func (m *PluginsRagManager) indexSinglePlugin(meta *PluginMetadata) error {
 
 func (m *PluginsRagManager) indexSinglePluginOnce(meta *PluginMetadata) error {
 	// 添加到 RAG 系统
-	err := m.RagSystem.Add(meta.DocID, meta.DocumentContent, vectorstore.WithDocumentRawMetadata(meta.Metadata))
+	err := m.RagSystem.Add(meta.DocID, meta.DocumentContent, rag.WithDocumentRawMetadata(meta.Metadata))
 	if err != nil {
 		return utils.Errorf("添加插件文档到 RAG 系统失败: %v", err)
 	}

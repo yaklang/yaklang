@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -34,7 +34,7 @@ func listCollection(c *cli.Context) error {
 	fmt.Println(strings.Repeat("=", 80))
 
 	for i, collection := range collections {
-		info, err := rag.GetCollectionInfo(db, collection.Name)
+		info, err := vectorstore.GetCollectionInfo(db, collection.Name)
 		if err != nil {
 			fmt.Printf("获取知识库 %s 信息失败: %v\n", collection.Name, err)
 			continue

@@ -351,7 +351,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBase(ctx context.Context, req *ypb.
 		aispec.WithModel(req.GetModelName()),
 		aispec.WithProxy(req.GetProxy()),
 	}
-	ragOpts := []rag.RAGOption{
+	ragOpts := []rag.CollectionConfigFunc{
 		rag.WithEmbeddingModel(req.GetModelName()),
 		rag.WithModelDimension(int(req.GetDimension())),
 		rag.WithHNSWParameters(int(req.GetM()), float64(req.GetMl()), int(req.GetEfSearch()), int(req.GetEfConstruct())),
@@ -386,7 +386,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 		aispec.WithModel(req.GetModelName()),
 		aispec.WithProxy(req.GetProxy()),
 	}
-	ragOpts := []rag.RAGOption{
+	ragOpts := []rag.CollectionConfigFunc{
 		rag.WithEmbeddingModel(req.GetModelName()),
 		rag.WithModelDimension(int(req.GetDimension())),
 		rag.WithHNSWParameters(int(req.GetM()), float64(req.GetMl()), int(req.GetEfSearch()), int(req.GetEfConstruct())),

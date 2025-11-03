@@ -45,15 +45,11 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragOpts...)
 	//  检查是否有默认的嵌入模型可用
 	if embeddingAvailable {
-		system, err = rag.LoadCollection(db, name, ragOpts...)
+		system, err = rag.GetRagSystem(name, append([]rag.RAGSystemConfigOption{rag.WithDB(db)}, ragOpts...)...)
 		if err != nil {
-			log.Infof("collection not found, creating new one: %s", name)
-			system, err = rag.CreateCollection(db, name, fmt.Sprintf("AI Memory for session %s", sessionId), ragOpts...)
-			if err != nil {
-				log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
-				system = nil
-				embeddingAvailable = false
-			}
+			log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
+			system = nil
+			embeddingAvailable = false
 		}
 	}
 

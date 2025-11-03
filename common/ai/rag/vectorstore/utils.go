@@ -429,3 +429,16 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 
 	return db, nil
 }
+
+func BuildDocument(docId, content string, opts ...DocumentOption) *Document {
+	doc := &Document{
+		ID:        docId,
+		Content:   content,
+		Metadata:  make(map[string]any),
+		Embedding: nil,
+	}
+	for _, opt := range opts {
+		opt(doc)
+	}
+	return doc
+}
