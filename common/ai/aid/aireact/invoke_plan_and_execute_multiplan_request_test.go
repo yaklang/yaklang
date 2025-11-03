@@ -22,6 +22,19 @@ import (
 func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	fmt.Println(prompt)
+
+	// If the prompt contains the error message about another plan execution task running,
+	// return a directly_answer action instead
+	if utils.MatchAllOfSubString(prompt, "another plan execution task is already running") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "` + "mocked answer directly after plan" + `" },
+"human_readable_thought": "mocked thought for answer", "cumulative_summary": "..cumulative-mocked for answer after plan and exec.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`

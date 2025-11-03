@@ -10,4 +10,5 @@ type LoopAITagField struct {
 	TagName      string
 	VariableName string
 	AINodeId     string
+	ContentType  string
 }

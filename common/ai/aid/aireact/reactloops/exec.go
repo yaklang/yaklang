@@ -33,19 +33,22 @@ func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicom
 			aicommon.WithActionTagToKey(v.TagName, v.VariableName),
 			aicommon.WithActionFieldStreamHandler([]string{v.VariableName}, func(key string, fieldReader io.Reader) {
 				nodeId := v.AINodeId
+				contentType := v.ContentType
 				if nodeId == "" {
 					nodeId = "re-act-loop-answer-payload"
 				}
+
+				if contentType == "" {
+					contentType = "text/plain"
+				}
+
 				callbackStart := time.Now()
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
 				wg := sync.WaitGroup{}
 				wg.Add(1)
-				emitter.EmitStreamEvent(
-					nodeId,
-					time.Now(),
-					fieldReader,
-					taskIndex,
+				emitter.EmitStreamEventWithContentType(
+					nodeId, fieldReader, taskIndex, contentType,
 					func() {
 						defer wg.Done()
 						// Use parseStart instead of callbackStart to measure the whole streaming process
@@ -416,17 +419,17 @@ LOOP:
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 		streamWg.Wait()
 
-		utils.Debug(func() {
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			fmt.Printf("AI decide to exec action[%v]: %v", actionParams.ActionType(), actionParams.GetParams().Dump())
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-		})
-
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			break LOOP
 		}
+
+		utils.Debug(func() {
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			fmt.Printf("AI decide to exec action[%v]: %v", actionParams.ActionType(), actionParams.GetParams().Dump())
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+		})
 
 		if utils.IsNil(actionParams) {
 			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))

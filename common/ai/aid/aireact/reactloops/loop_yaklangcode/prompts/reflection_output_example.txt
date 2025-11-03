@@ -139,16 +139,39 @@ defer reader.Close()
 ```
 ---
 
-### **示例5: `rag_search_payload` 动作（当编写代码有疑问的时候）**
+### 示例 6: `rag_search_payload` 动作（当编写代码有疑问的时候）
 
 **场景**: AI 需要实现一个功能：通过 HTTP GET 请求获取一个网站的标题，但不确定具体应该使用哪个库、哪个函数，以及如何从返回结果中解析出标题。
 
 ```json
 {"@action": "rag_search_payload", "human_readable_thought": "我需要编写代码来获取一个URL的网页标题。我对Yaklang中处理HTTP请求和HTML解析的库不熟悉。因此，我将使用关键词搜索与HTTP请求和HTML解析相关的函数，并直接提问如何组合它们来实现我的目标。", "keywords": ["http get", "fuzz.http", "html", "title", "获取标题"], "questions": ["如何用Yaklang发送一个HTTP GET请求并获取返回网页的标题？"]}
 ```
+
+**注意：`rag_search_payload` 动作也不需要 `<|GEN_CODE...|>` 代码块。**
+
 ---
 
-### 错误示例 2：包含行号前缀（绝对禁止！）
+## 📋 Action 类型总结
+
+### 需要 `<|GEN_CODE...|>` 标签的 Actions：
+- ✅ `write_code` - 创建新代码文件
+- ✅ `modify_code` - 修改现有代码片段
+- ✅ `insert_lines` - 插入新代码行
+
+### 不需要 `<|GEN_CODE...|>` 标签的 Actions：
+- ❌ `batch_regex_replace` - 批量正则替换（直接操作文件）
+- ❌ `delete_lines` - 删除代码行（无需生成代码）
+- ❌ `grep_yaklang_samples` - 搜索代码样例（查询类操作）
+- ❌ `query_document` - 查询文档（查询类操作）
+- ❌ `rag_search_payload` - RAG搜索（查询类操作）
+
+**记忆口诀**: 只有需要你"生成或提供代码片段"的 actions 才需要 `<|GEN_CODE...|>` 标签！
+
+---
+
+## ❌ 常见错误示例
+
+### 错误示例 1：包含行号前缀（绝对禁止！）
 ```json
 {"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
 ```
@@ -157,9 +180,25 @@ defer reader.Close()
 18 | // 打开ZIP文件
 19 | reader, err := zip.OpenReader(zipFilePath)
 <|GEN_CODE_END_{{ .Nonce }}|>
-️ 这种格式是错误的！包含行号会导致语法解析失败！
 
-### 示例 5: grep_yaklang_samples 完整工作流
+⚠️ **这种格式是错误的！包含行号会导致语法解析失败！**
+
+### 错误示例 2：在 batch_regex_replace 中使用 GEN_CODE（错误！）
+```json
+{"@action": "batch_regex_replace", "pattern": "oldVar", "replaced_string": "newVar"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+# 这里不应该有代码！
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+⚠️ **这是错误的！`batch_regex_replace` 不需要也不应该使用 GEN_CODE 标签。**
+
+---
+
+## ✅ 完整工作流示例
+
+### 示例 7: grep_yaklang_samples 完整工作流
 
 **场景**: 用户要求编写端口扫描脚本，AI 需要完整实现。
 
@@ -204,7 +243,7 @@ for result in results {
 
 ---
 
-### [错误示例] 错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止）
+### 错误示例 3: 收到 API 错误后仍盲目修改（绝对禁止）
 
 **场景**: 收到 `lint error: ExternLib [synscan] don't has [timeout]`。
 
@@ -234,7 +273,9 @@ for result in results {
 
 ---
 
-### [正确做法] 第一次错误后立即 grep
+## ✅ 正确做法对比
+
+### 示例 8: 第一次错误后立即 grep
 
 ```json
 // 第1次尝试
