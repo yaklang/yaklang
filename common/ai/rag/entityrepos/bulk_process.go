@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/asynchelper"
@@ -16,25 +15,23 @@ import (
 type addRequest struct {
 	DocID   string
 	Content string
-	Options []rag.DocumentOption
+	Options []vectorstore.DocumentOption
 }
 
 // bulkProcessor 是内部的异步批量处理器
 type bulkProcessor struct {
-	ragSystem *rag.RAGSystem // 直接依赖底层的RAG系统
-
 	queue        *chanx.UnlimitedChan[*addRequest]
 	batchSize    int
 	batchTimeout time.Duration
-
-	wg     sync.WaitGroup
-	stopCh chan struct{}
+	collectionMg *vectorstore.SQLiteVectorStoreHNSW
+	wg           sync.WaitGroup
+	stopCh       chan struct{}
 }
 
 // newBulkProcessor 创建一个新的内部处理器
-func startBulkProcessor(ctx context.Context, ragSystem *rag.RAGSystem, batchSize int, batchTimeout time.Duration) *bulkProcessor {
+func startBulkProcessor(ctx context.Context, collectionMg *vectorstore.SQLiteVectorStoreHNSW, batchSize int, batchTimeout time.Duration) *bulkProcessor {
 	p := &bulkProcessor{
-		ragSystem:    ragSystem,
+		collectionMg: collectionMg,
 		batchSize:    batchSize,
 		batchTimeout: batchTimeout,
 		queue:        chanx.NewUnlimitedChan[*addRequest](ctx, 10),
@@ -94,7 +91,7 @@ func (p *bulkProcessor) stop() {
 	log.Println("Internal bulk processor stopped gracefully")
 }
 
-func (p *bulkProcessor) addRequest(docId string, content string, opts ...rag.DocumentOption) {
+func (p *bulkProcessor) addRequest(docId string, content string, opts ...vectorstore.DocumentOption) {
 	req := &addRequest{
 		DocID:   docId,
 		Content: content,
@@ -105,14 +102,14 @@ func (p *bulkProcessor) addRequest(docId string, content string, opts ...rag.Doc
 
 func (p *bulkProcessor) processBatch(ctx context.Context, batch []*addRequest) {
 	log.Infof("[Processor] Processing a batch of %d items.\n", len(batch))
-	documents := make([]vectorstore.Document, 0)
+	documents := make([]*vectorstore.Document, 0)
 	for _, req := range batch {
-		documents = append(documents, rag.BuildDocument(req.DocID, req.Content, req.Options...))
+		documents = append(documents, vectorstore.BuildDocument(req.DocID, req.Content, req.Options...))
 	}
 	helper := asynchelper.NewAsyncPerformanceHelper("add index batch", asynchelper.WithCtx(ctx), asynchelper.WithLogRequireTime(1*time.Second), asynchelper.WithTriggerTime(1*time.Second))
 	defer helper.Close()
 
-	err := p.ragSystem.AddDocuments(documents...)
+	err := p.collectionMg.Add(documents...)
 	if err != nil {
 		log.Errorf("[Processor] Failed to add documents: %v.\n", err)
 		return

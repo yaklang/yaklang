@@ -39,10 +39,9 @@ var RagExports = map[string]interface{}{
 	"queryConcurrent": rag.WithRAGConcurrent,
 	"queryScoreLimit": rag.WithRAGCollectionScoreLimit,
 
-	"AddDocument":                 _addDocument,
-	"DeleteDocument":              _deleteDocument,
-	"QueryDocuments":              _queryDocuments,
-	"QueryDocumentsWithAISummary": _queryDocumentsWithAISummary,
+	"AddDocument":    _addDocument,
+	"DeleteDocument": _deleteDocument,
+	"QueryDocuments": _queryDocuments,
 
 	"ragForceNew":       rag.WithForceNew,
 	"ragDescription":    rag.WithDescription,
@@ -53,7 +52,7 @@ var RagExports = map[string]interface{}{
 
 	"docMetadata":        rag.WithDocumentMetadataKeyValue,
 	"docRawMetadata":     rag.WithDocumentRawMetadata,
-	"NewRagDatabase":     rag.NewRagDatabase,
+	"NewRagDatabase":     vectorstore.NewVectorStoreDatabase,
 	"NewTempRagDatabase": _newTempRagDatabase,
 	"EnableMockMode":     _enableMockMode,
 
@@ -115,7 +114,7 @@ func _deleteCollection(name string) error {
 //	})
 //
 // ```
-func _embeddingHandle(handle func(text string) any) rag.RAGOption {
+func _embeddingHandle(handle func(text string) any) rag.RAGSystemConfigOption {
 	embedder := vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
 		ires := handle(text)
 		resSlice, err := utils.InterfaceToSliceInterfaceE(ires)
@@ -148,8 +147,8 @@ func _listCollection() []string {
 //	info, err = rag.GetCollectionInfo("my_collection")
 //
 // ```
-func _getCollectionInfo(name string) (*rag.CollectionInfo, error) {
-	return rag.GetCollectionInfo(consts.GetGormProfileDatabase(), name)
+func _getCollectionInfo(name string) (*vectorstore.CollectionInfo, error) {
+	return vectorstore.GetCollectionInfo(consts.GetGormProfileDatabase(), name)
 }
 
 // _hasCollection 检查指定集合是否存在
@@ -170,7 +169,7 @@ func _hasCollection(name string) bool {
 //	err = rag.AddDocument("my_collection", "doc1", "content", {"key": "value"})
 //
 // ```
-func _addDocument(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
+func _addDocument(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...rag.RAGSystemConfigOption) error {
 	return rag.AddDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, document, metadata, opts...)
 }
 
@@ -181,7 +180,7 @@ func _addDocument(knowledgeBaseName, documentName string, document string, metad
 //	err = rag.DeleteDocument("my_collection", "doc1")
 //
 // ```
-func _deleteDocument(knowledgeBaseName, documentName string, opts ...any) error {
+func _deleteDocument(knowledgeBaseName, documentName string, opts ...rag.RAGSystemConfigOption) error {
 	return rag.DeleteDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, opts...)
 }
 
@@ -192,19 +191,8 @@ func _deleteDocument(knowledgeBaseName, documentName string, opts ...any) error 
 //	results, err = rag.QueryDocuments("my_collection", "query", 10)
 //
 // ```
-func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...any) ([]vectorstore.SearchResult, error) {
+func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...rag.RAGSystemConfigOption) ([]vectorstore.SearchResult, error) {
 	return rag.QueryDocuments(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
-}
-
-// _queryDocumentsWithAISummary 在指定集合中查询文档并生成 AI 摘要
-// Example:
-// ```
-//
-//	summary, err = rag.QueryDocumentsWithAISummary("my_collection", "query", 10)
-//
-// ```
-func _queryDocumentsWithAISummary(knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
-	return rag.QueryDocumentsWithAISummary(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
 }
 
 // _newTempRagDatabase 创建临时 RAG 数据库
@@ -216,7 +204,7 @@ func _queryDocumentsWithAISummary(knowledgeBaseName, query string, limit int, op
 // ```
 func _newTempRagDatabase() (*gorm.DB, error) {
 	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-	return rag.NewRagDatabase(path)
+	return vectorstore.NewVectorStoreDatabase(path)
 }
 
 // _enableMockMode 启用模拟模式

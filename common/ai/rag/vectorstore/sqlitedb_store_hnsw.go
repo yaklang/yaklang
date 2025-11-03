@@ -51,7 +51,7 @@ const (
 	Policy_None        = "None"
 )
 
-func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
 		return nil, utils.Wrap(err, fmt.Sprintf("query rag collection [%#v]", collectionName))
@@ -288,7 +288,7 @@ func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 	return nil
 }
 
-func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	cfg := NewCollectionConfig(opts...)
 
 	if cfg.Description != "" {
@@ -334,7 +334,7 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 }
 
 // NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
-func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...any) (*SQLiteVectorStoreHNSW, error) {
+func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	options = append(options, WithModelName(modelName))
 	options = append(options, WithModelDimension(dimension))
 	options = append(options, WithEmbeddingClient(embedder))
@@ -816,6 +816,10 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	})
 
 	return nil
+}
+
+func (s *SQLiteVectorStoreHNSW) GetName() string {
+	return s.collection.Name
 }
 
 // Get 根据 ID 获取文档

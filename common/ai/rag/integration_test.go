@@ -16,7 +16,7 @@ func TestAddAndQuery(t *testing.T) {
 	}
 
 	// 创建RAG集合
-	ragSystem, err := CreateCollection(tempDB, "test", "测试知识库")
+	ragSystem, err := GetRagSystem("test", WithDB(tempDB), WithEmbeddingClient(vectorstore.NewDefaultMockEmbedding()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestAddAndQuery(t *testing.T) {
 
 	// 添加文档到RAG系统
 	for _, doc := range testDocs {
-		err := ragSystem.Add(doc.id, doc.content, vectorstore.WithDocumentRawMetadata(doc.metadata))
+		err := ragSystem.Add(doc.id, doc.content, WithDocumentRawMetadata(doc.metadata))
 		if err != nil {
 			t.Fatalf("添加文档失败 %s: %v", doc.id, err)
 		}
@@ -274,7 +274,7 @@ func TestAddAndQuery(t *testing.T) {
 		})
 	})
 
-	testCollection, err := LoadCollection(tempDB, "test")
+	testCollection, err := GetRagSystem("test", WithDB(tempDB))
 	if err != nil {
 		t.Fatalf("获取集合失败: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestAddAndQuery(t *testing.T) {
 		t.Fatalf("转换为PQ模式失败: %v", err)
 	}
 
-	testCollection, err = LoadCollection(tempDB, "test")
+	testCollection, err = GetRagSystem("test", WithDB(tempDB))
 	if err != nil {
 		t.Fatalf("获取集合失败: %v", err)
 	}

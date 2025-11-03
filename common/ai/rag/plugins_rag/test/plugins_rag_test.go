@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -100,10 +101,13 @@ func createMockRagManager(t *testing.T, collectionName string) *plugins_rag.Plug
 	mockEmbedder := &MockEmbedder{}
 
 	// 创建内存向量存储
-	store := rag.NewMemoryVectorStore(mockEmbedder)
+	store := vectorstore.NewMemoryVectorStore(mockEmbedder)
 
 	// 创建RAG系统
-	ragSystem := rag.NewRAGSystem(mockEmbedder, store)
+	ragSystem, err := rag.NewRAGSystem(rag.WithVectorStore(store), rag.WithEmbeddingClient(mockEmbedder))
+	if err != nil {
+		t.Fatalf("failed to create rag system: %v", err)
+	}
 
 	// 创建插件RAG管理器
 	manager := plugins_rag.NewPluginsRagManager(consts.GetGormProfileDatabase(), ragSystem, collectionName, "")

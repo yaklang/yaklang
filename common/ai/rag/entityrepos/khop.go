@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -825,11 +824,11 @@ func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
 		META_K:                 kHop.K,
 	}
 
-	var opts []rag.DocumentOption
-	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
-		rag.WithDocumentType(schema.RAGDocumentType_KHop),
-		rag.WithDocumentRelatedEntities(kHop.GetRelatedEntityUUIDs()...),
-		rag.WithDocumentRuntimeID(r.runtimeConfig.runtimeID),
+	var opts []vectorstore.DocumentOption
+	opts = append(opts, vectorstore.WithDocumentRawMetadata(metadata),
+		vectorstore.WithDocumentType(schema.RAGDocumentType_KHop),
+		vectorstore.WithDocumentRelatedEntities(kHop.GetRelatedEntityUUIDs()...),
+		vectorstore.WithDocumentRuntimeID(r.runtimeConfig.runtimeID),
 	)
 	metadataDuration := time.Since(metadataStart)
 

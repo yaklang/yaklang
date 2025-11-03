@@ -16,7 +16,7 @@ func CreateIndexManager(db *gorm.DB, collectionName, description string, optFunc
 	options := ApplyOptions(nil, optFuncs...)
 
 	// 创建RAG系统
-	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, description)
+	ragSystem, err := rag.GetRagSystem(collectionName, rag.WithDB(db), rag.WithDescription(description))
 	if err != nil {
 		return nil, utils.Errorf("创建RAG系统失败: %v", err)
 	}
@@ -36,7 +36,7 @@ func CreateIndexManagerWithAI(db *gorm.DB, collectionName, description string, a
 	}
 
 	// 创建RAG系统
-	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, description, ragOptions...)
+	ragSystem, err := rag.GetRagSystem(collectionName, rag.WithDB(db), rag.WithDescription(description), rag.WithAIOptions(aiOpts...))
 	if err != nil {
 		return nil, utils.Errorf("创建RAG系统失败: %v", err)
 	}
