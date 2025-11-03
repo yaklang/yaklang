@@ -179,10 +179,13 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 	rule.Language = language
 	rule.Tag = strings.Join(tags, "|")
 	rule.IsBuildInRule = buildIn
-	version, err := GetVersion(rule.RuleId)
+	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {
 		rule.Version = version
+	} else {
+		rule.Version = UpdateVersion("")
 	}
+
 	if buildIn {
 		// build in rule, use rule.title if exist
 		if rule.TitleZh != "" {

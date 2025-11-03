@@ -207,6 +207,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.TitleZh = dbRule.TitleZh
 	updateRule.OpCodes = dbRule.OpCodes
 	updateRule.Hash = dbRule.CalcHash()
+	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
@@ -247,6 +248,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	rule.Title = ruleInput.RuleName
 	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
 	rule.Description = ruleInput.Description
+	rule.Version = sfdb.UpdateVersion(rule.Version)
 	for s, message := range ruleInput.AlertMsg {
 		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
 	}
