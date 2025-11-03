@@ -14,13 +14,12 @@ languages = cli.StringSlice(
 )
 
 
-noCompile := cli.Bool("no-compile",
+compile_immediately := cli.Bool("compile-immediately",
     cli.setDefault(false),
-    cli.setVerboseName("跳过编译"),
-    cli.setHelp("跳过编译步骤，只产生分析结果。"),
+    cli.setVerboseName("是否立即编译"),
+    cli.setHelp("是否对项目探测到的信息立即编译"),
+    cli.setCliGroup("significant"),
 )
-
-
 
 concurrency := cli.Int("concurrency",
     cli.setVerboseName("并发数"),
@@ -85,7 +84,8 @@ params = {
     "error": {
         "kind": "",
         "msg": ""
-    }
+    },
+    "compile_immediately":false
 }
 func setLanguage(language) {
     if params.language == ""{
@@ -151,7 +151,7 @@ func generateFileName(kind, filename) {
     filename2 = str.Split(filename2, "\\")[-1]
     name := sprintf("%s(%s)",  filename2, time.Now().Format("2006-0102-15:04"))
     params.program_name = name
-    params.project_name = filename2 
+    params.project_name = filename2
 }
 func AutoParseLanguage() {
     maxinfo = {"key": "", "value": 0}
@@ -360,6 +360,10 @@ if params.language == "" {
     AutoParseLanguage()
 }
 
+if compile_immediately{
+    params.compile_immediately = true
+}
+
 yakit.Code(params)
 if params.error.kind != "" {
     return
@@ -367,7 +371,7 @@ if params.error.kind != "" {
 
 generateDesc()
 
-if noCompile {
+if !compile_immediately{
     yakit.Info("跳过编译步骤，仅产生分析结果。")
     return
 }

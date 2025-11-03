@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,11 +13,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func ParseProjectWithAutoDetective(ctx context.Context, path, language string, input ...map[string]any) (*programInfo, *ssaapi.Program, error) {
+func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, input ...map[string]any) (*programInfo, *ssaapi.Program, error) {
 	pluginName := "SSA 项目探测"
 	param := make(map[string]string)
 	param["target"] = path
 	param["language"] = language
+	param["compile_immediately"] = strconv.FormatBool(compileImmediately)
 	for _, input := range input {
 		for key, value := range input {
 			param[key] = codec.AnyToString(value)
@@ -46,7 +48,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, i
 		return progInfo, nil, err
 	}
 
-	switch progInfo.Info.Kind {
+	switch progInfo.Error.Kind {
 	case "languageNeedSelectException":
 		return progInfo, nil, utils.Errorf("language need select")
 	case "fileNotFoundException":
@@ -55,6 +57,10 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, i
 		return progInfo, nil, utils.Errorf("input file type")
 	case "connectFailException":
 		return progInfo, nil, utils.Errorf("connect fail")
+	}
+
+	if !compileImmediately {
+		return progInfo, nil, nil
 	}
 
 	if prog, err := ssaapi.FromDatabase(progInfo.ProgramName); err != nil {
@@ -75,16 +81,23 @@ type msg struct {
 }
 type programInfo struct {
 	ProgramName string `json:"program_name"`
+	ProjectName string `json:"project_name"`
 	Language    string `json:"language"`
 	Info        struct {
 		Kind      string `json:"kind"`
 		LocalFile string `json:"local_file"`
 		URL       string `json:"url"`
-	}
+		Branch    string `json:"branch"`
+		Path      string `json:"path"`
+		Proxy     struct {
+			Proxy bool   `json:"proxy"`
+			URL   string `json:"url"`
+		} `json:"proxy"`
+	} `json:"info"`
 	Description string `json:"description"`
 	FileCount   int    `json:"file_count"`
 	Error       struct {
 		Kind string `json:"kind"`
 		Msg  string `json:"msg"`
-	}
+	} `json:"error"`
 }
