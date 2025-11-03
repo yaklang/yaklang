@@ -102,38 +102,38 @@ func (r *ReAct) reviewAIForge(
 
 func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.InvokeParams, error) {
 	manager := r.config.AiForgeManager
-	
+
 	// 首先检查 Forge 是否存在
 	ins, err := manager.GetAIForge(forgeName)
 	if err != nil {
 		// 记录详细的错误信息到 Timeline，使用明显的标识符
-		r.AddToTimeline("❌[BLUEPRINT_NOT_FOUND]", fmt.Sprintf("AI Blueprint '%s' does not exist. Error: %v", forgeName, err))
+		resultMsg := fmt.Sprintf("无法找到 AI 智能应用 '%s'，请检查应用名称是否正确。可用的应用可以通过工具搜索查看。", forgeName)
+		r.AddToTimeline("[BLUEPRINT_NOT_FOUND]", fmt.Sprintf("AI Blueprint '%s' does not exist. Error: %v\n%s", forgeName, err, resultMsg))
 		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' not found", forgeName))
-		r.EmitResult(fmt.Sprintf("❌ 无法找到 AI 智能应用 '%s'，请检查应用名称是否正确。可用的应用可以通过工具搜索查看。", forgeName))
 		return nil, nil, utils.Errorf("AI Blueprint '%s' not found: %v", forgeName, err)
 	}
-	
+
 	// 验证 Forge 实例的完整性
 	if ins == nil {
-		r.AddToTimeline("❌[BLUEPRINT_NULL_INSTANCE]", fmt.Sprintf("AI Blueprint '%s' returned nil instance", forgeName))
+		r.AddToTimeline("[BLUEPRINT_NULL_INSTANCE]", fmt.Sprintf(
+			"AI Blueprint '%s' returned nil instance. 配置异常可能导致无法执行。", forgeName))
 		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' configuration error", forgeName))
-		r.EmitResult(fmt.Sprintf("❌ AI 智能应用 '%s' 配置异常，无法执行。", forgeName))
 		return nil, nil, utils.Errorf("AI Blueprint '%s' instance is nil", forgeName)
 	}
-	
+
 	// 记录成功找到 Forge
-	r.AddToTimeline("✅[BLUEPRINT_FOUND]", fmt.Sprintf("AI Blueprint: %s (%s)", ins.ForgeName, ins.ForgeVerboseName))
+	r.AddToTimeline("[BLUEPRINT_FOUND]", fmt.Sprintf("AI Blueprint: %s (%s)", ins.ForgeName, ins.ForgeVerboseName))
 
 	forgeSchema, err := manager.GenerateAIJSONSchemaFromSchemaAIForge(ins)
 	if err != nil {
-		r.AddToTimeline("❌[BLUEPRINT_SCHEMA_ERROR]", fmt.Sprintf("Failed to generate schema for '%s'", forgeName))
+		r.AddToTimeline("[BLUEPRINT_SCHEMA_ERROR]", fmt.Sprintf("Failed to generate schema for '%s'", forgeName))
 		r.Emitter.EmitError(fmt.Sprintf("Failed to generate schema for AI Blueprint '%s'", forgeName))
 		return nil, nil, utils.Errorf("generate ai json schema from schema ai forge failed: %v", err)
 	}
-	
+
 	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPrompt(ins, forgeSchema)
 	if err != nil {
-		r.AddToTimeline("❌[BLUEPRINT_PROMPT_ERROR]", fmt.Sprintf("Failed to generate prompt for '%s'", forgeName))
+		r.AddToTimeline("[BLUEPRINT_PROMPT_ERROR]", fmt.Sprintf("Failed to generate prompt for '%s'", forgeName))
 		r.Emitter.EmitError(fmt.Sprintf("Failed to generate prompt for AI Blueprint '%s'", forgeName))
 		return nil, nil, utils.Errorf("generate prompt (for ai-forge) failed: %v", err)
 	}
@@ -148,18 +148,18 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 				stream, "call-ai-blueprint",
 			)
 			if err != nil {
-				r.AddToTimeline("❌[BLUEPRINT_PARAM_EXTRACT_FAILED]", 
+				r.AddToTimeline("[BLUEPRINT_PARAM_EXTRACT_FAILED]",
 					fmt.Sprintf("Failed to extract parameters for '%s': %v", forgeName, err))
 				return utils.Errorf("extract action from call-ai-blueprint failed: %v", err)
 			}
 			forgeParams = action.GetInvokeParams("params")
 			if len(forgeParams) <= 0 {
-				r.AddToTimeline("❌[BLUEPRINT_EMPTY_PARAMS]", 
+				r.AddToTimeline("[BLUEPRINT_EMPTY_PARAMS]",
 					fmt.Sprintf("AI Blueprint '%s' returned empty parameters", forgeName))
 				return utils.Error("forge params is empty, require at least one param")
 			}
 			// 记录成功提取参数
-			r.AddToTimeline("✅[BLUEPRINT_PARAMS_READY]", 
+			r.AddToTimeline("[BLUEPRINT_PARAMS_READY]",
 				fmt.Sprintf("Parameters for '%s': %v", forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 200)))
 			return nil
 		},
@@ -171,11 +171,11 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 
 	ins, forgeParams, _, err = r.reviewAIForge(ins, forgeParams)
 	if err != nil {
-		r.AddToTimeline("❌[BLUEPRINT_REVIEW_FAILED]", fmt.Sprintf("Review failed for '%s': %v", forgeName, err))
+		r.AddToTimeline("[BLUEPRINT_REVIEW_FAILED]", fmt.Sprintf("Review failed for '%s': %v", forgeName, err))
 		return nil, nil, err
 	}
 	if utils.IsNil(forgeParams) {
-		r.AddToTimeline("❌[BLUEPRINT_NIL_PARAMS_AFTER_REVIEW]", "Parameters became nil after review")
+		r.AddToTimeline("[BLUEPRINT_NIL_PARAMS_AFTER_REVIEW]", "Parameters became nil after review")
 		r.Emitter.EmitError("ai-forge params is nil after review")
 		return nil, nil, utils.Errorf("ai-forge params is nil after review")
 	}

@@ -408,12 +408,6 @@ LOOP:
 			return finalError
 		}
 
-		utils.Debug(func() {
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-			fmt.Println(prompt)
-			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-		})
-
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)

@@ -17,5 +17,6 @@
 {{ if .AllowPlan }}如果这个任务本身比较复杂：
     * 如果你发现有对应的 AI Blueprint(Forge) 可以使用，请你输出: `{"@action": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]", ...}` 可以启动一个已经存在 AI 预设应用执行这个任务。
     * 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，输出：`{"@action": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan]..", ""human_readable_thought": "..."}
-{{end}}
+
 同时你需要注意 '@action' 中的其他 @action 优先级为 '@action > tool_call > require_ai_blueprint > request_plan_and_execution'。
+{{end}}
