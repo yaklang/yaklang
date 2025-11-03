@@ -3,6 +3,7 @@ package reactloopstests
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -170,21 +171,19 @@ func (f *ActionTestFramework) RegisterTestAction(
 
 // ExecuteAction executes a specific action with given parameters
 func (f *ActionTestFramework) ExecuteAction(actionName string, params map[string]interface{}) error {
-	// Build action JSON
-	actionJSON := fmt.Sprintf(`{"@action": "%s"`, actionName)
+	// Build action map
+	actionMap := make(map[string]interface{})
+	actionMap["@action"] = actionName
 	for key, value := range params {
-		switch v := value.(type) {
-		case string:
-			actionJSON += fmt.Sprintf(`, "%s": "%s"`, key, v)
-		case int:
-			actionJSON += fmt.Sprintf(`, "%s": %d`, key, v)
-		case bool:
-			actionJSON += fmt.Sprintf(`, "%s": %t`, key, v)
-		default:
-			actionJSON += fmt.Sprintf(`, "%s": %v`, key, v)
-		}
+		actionMap[key] = value
 	}
-	actionJSON += "}"
+	
+	// Marshal to JSON (this properly escapes strings, handles newlines, etc.)
+	actionBytes, err := json.Marshal(actionMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal action JSON: %v", err)
+	}
+	actionJSON := string(actionBytes)
 
 	// Set the action JSON for the first AI call
 	f.setFirstActionJSON(actionJSON)

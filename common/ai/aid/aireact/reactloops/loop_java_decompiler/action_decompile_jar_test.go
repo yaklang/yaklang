@@ -1,4 +1,4 @@
-package loop_java_decompiler
+package loop_java_decompiler_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactloopstests"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -125,7 +126,7 @@ func TestDecompileJar_RealDecompilation(t *testing.T) {
 	runtime := &testRuntime{timeline: make(map[string]string)}
 
 	// Get the actual action option
-	actionOption := decompileJarAction(runtime)
+	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
 
 	// Create framework with the actual action
 	framework := reactloopstests.NewActionTestFramework(t, "test-decompile-real", actionOption)
@@ -220,7 +221,7 @@ func TestDecompileJar_MissingJarFile(t *testing.T) {
 	runtime := &testRuntime{timeline: make(map[string]string)}
 
 	// Get the actual action option
-	actionOption := decompileJarAction(runtime)
+	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
 
 	// Create framework with the actual action
 	framework := reactloopstests.NewActionTestFramework(t, "test-decompile-missing", actionOption)
@@ -251,7 +252,7 @@ func TestDecompileJar_AutoOutputDirectory(t *testing.T) {
 	}
 
 	runtime := &testRuntime{timeline: make(map[string]string)}
-	actionOption := decompileJarAction(runtime)
+	actionOption := loop_java_decompiler.DecompileJarAction(runtime)
 	framework := reactloopstests.NewActionTestFramework(t, "test-decompile-auto", actionOption)
 
 	// Execute without specifying output_dir
@@ -320,7 +321,7 @@ func TestGenerateDecompilationReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			report := generateDecompilationReport(
+			report := loop_java_decompiler.GenerateDecompilationReport(
 				"/path/to/test.jar",
 				"/output/dir",
 				tt.totalFiles,

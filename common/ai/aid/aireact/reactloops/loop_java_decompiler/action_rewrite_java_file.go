@@ -205,7 +205,14 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			}
 
 			// Get rewritten content from AI-generated code
+			// Try to get from loop context (from <JAVA_CODE> tag) first
 			newCode := loop.Get("java_code")
+			
+			// Fall back to action parameter (for testing scenarios)
+			if newCode == "" {
+				newCode = action.GetString("new_code")
+			}
+			
 			if newCode == "" {
 				r.AddToTimeline("rewrite_no_code", `【缺少重写代码】未提供新的Java代码
 
