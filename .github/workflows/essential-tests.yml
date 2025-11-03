@@ -20,7 +20,6 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       wip_detected: ${{ steps.check-wip.outputs.wip_detected }}
-      should_skip: ${{ steps.check-wip.outputs.should_skip }}
     steps:
       - name: Check if PR is WIP
         id: check-wip
@@ -38,26 +37,16 @@ jobs:
           labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
           title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
           
-          # Define WIP indicators
-          wip_labels="do-not-merge,work in progress,wip,rfc"
-          
           # Function to check if current state has WIP
           check_current_wip() {
-            # Check for WIP indicators in labels
-            IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
-            for wip_label in "${LABEL_ARRAY[@]}"; do
-              if [[ "$labels_lower" == *"$wip_label"* ]]; then
-                return 0  # WIP found
-              fi
-            done
-            
-            # Check for WIP indicators in title
-            IFS=',' read -ra KEYWORD_ARRAY <<< "$wip_labels"
-            for wip_keyword in "${KEYWORD_ARRAY[@]}"; do
-              if [[ "$title_lower" == *"$wip_keyword"* ]]; then
-                return 0  # WIP found
-              fi
-            done
+            # Check for WIP indicators in labels and title (combined check)
+            local combined="$labels_lower $title_lower"
+            if [[ "$combined" == *"do-not-merge"* ]] || \
+               [[ "$combined" == *"work in progress"* ]] || \
+               [[ "$combined" == *"wip"* ]] || \
+               [[ "$combined" == *"rfc"* ]]; then
+              return 0  # WIP found
+            fi
             
             return 1  # No WIP found
           }
@@ -67,26 +56,21 @@ jobs:
             label_name='${{ github.event.label.name }}'
             label_name_lower=$(echo "$label_name" | tr '[:upper:]' '[:lower:]')
             
-            echo "Label changed: $label_name"
+            echo "Label changed: $label_name (lowercase: $label_name_lower)"
             
             # Check if the changed label is WIP-related
             is_wip_label=false
-            IFS=',' read -ra WIP_LABEL_ARRAY <<< "$wip_labels"
-            for wip_label in "${WIP_LABEL_ARRAY[@]}"; do
-              if [[ "$label_name_lower" == *"$wip_label"* ]]; then
-                is_wip_label=true
-                break
-              fi
-            done
-            
-            if [[ "$is_wip_label" == "false" ]]; then
-              echo "Label change is not WIP-related, skipping CI"
-              echo "should_skip=true" >> $GITHUB_OUTPUT
-              echo "wip_detected=false" >> $GITHUB_OUTPUT
-              exit 0
+            if [[ "$label_name_lower" == *"do-not-merge"* ]] || \
+               [[ "$label_name_lower" == *"work in progress"* ]] || \
+               [[ "$label_name_lower" == *"wip"* ]] || \
+               [[ "$label_name_lower" == *"rfc"* ]]; then
+              is_wip_label=true
+              echo "WIP-related label changed, checking current state..."
+            else
+              echo "Non-WIP label changed, checking current PR state..."
             fi
             
-            # WIP-related label changed, check current state
+            # Always check current WIP state for label changes
             if check_current_wip; then
               if [[ "$event_action" == "labeled" ]]; then
                 echo "WIP label added, stopping CI"
@@ -121,14 +105,8 @@ jobs:
             fi
           fi
 
-      - name: Skip CI if not WIP-related change
-        if: steps.check-wip.outputs.should_skip == 'true'
-        run: |
-          echo "::notice::Label change is not WIP-related, skipping CI to save resources."
-          exit 0
-
       - name: Fail if WIP detected
-        if: steps.check-wip.outputs.wip_detected == 'true' && steps.check-wip.outputs.should_skip != 'true'
+        if: steps.check-wip.outputs.wip_detected == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
@@ -150,7 +128,7 @@ jobs:
 
   setup:
     needs: check-wip
-    if: needs.check-wip.outputs.should_skip != 'true'
+    if: needs.check-wip.outputs.wip_detected != 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Set Cache Key
@@ -204,7 +182,7 @@ jobs:
   test:
     name: ${{ matrix.name }}
     needs: [check-wip, setup]
-    if: needs.check-wip.outputs.should_skip != 'true'
+    if: needs.check-wip.outputs.wip_detected != 'true'
     runs-on: ubuntu-22.04
     strategy:
       matrix:
