@@ -94,6 +94,7 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 	opts = append(opts, mutate.Fuzz_WithResultHandler(func(origin string, payloads []string) bool {
 		select {
 		case <-ctx.Done():
+			log.Errorf("context cancel!!!")
 			return false
 		default:
 			if max > 0 && counter >= max {
@@ -108,6 +109,7 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 		req.GetTemplate(),
 		opts...,
 	)
+	log.Errorf("string fuzzer return ")
 	return &ypb.StringFuzzerResponse{Results: res}, nil
 }
 
