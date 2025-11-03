@@ -24,12 +24,13 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 			forgeName = action.GetInvokeParams("next_action").GetString("blueprint_payload")
 		}
 		if forgeName == "" {
-			loop.GetInvoker().AddToTimeline("❌[BLUEPRINT_MISSING_NAME]", "require_ai_blueprint action is missing 'blueprint_payload' field")
+			loop.GetInvoker().AddToTimeline("[BLUEPRINT_MISSING_NAME]", "require_ai_blueprint action is missing 'blueprint_payload' field")
+			loop.GetInvoker().AddToTimeline("[ACTION_VERIFIER]", "Failed to verify require_ai_blueprint action due to missing blueprint_payload")
 			return utils.Error("require_ai_blueprint action must have 'blueprint_payload' field")
 		}
-		
+
 		// 记录准备调用的 Blueprint
-		loop.GetInvoker().AddToTimeline("🔄[BLUEPRINT_ACTION_VERIFIED]", "Blueprint name: "+forgeName)
+		loop.GetInvoker().AddToTimeline("[BLUEPRINT_ACTION_VERIFIED]", "Verified require_ai_blueprint action with blueprint_payload: '"+forgeName+"'. The action passed ActionVerifier and is ready for execution with the specified AI Blueprint.")
 		loop.Set("blueprint_payload", forgeName)
 		return nil
 	},

@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak"
@@ -36,38 +37,39 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 
 	// 验证 forgeName 不为空
 	if forgeName == "" {
-		r.AddToTimeline("❌[BLUEPRINT_EMPTY_NAME]", "AI Blueprint name is empty, cannot execute")
-		r.Emitter.EmitError("AI Blueprint name is empty")
-		r.EmitResult("❌ AI 智能应用名称为空，无法执行。请指定正确的应用名称。")
-		done(utils.Error("AI Blueprint name is empty, cannot execute"))
+		errMsg := "AI Blueprint name is empty, cannot execute; AI 智能应用名称为空，无法执行。请指定正确的应用名称。"
+		r.AddToTimeline("[BLUEPRINT_EMPTY_NAME]", errMsg)
+		r.Emitter.EmitError(errMsg)
+		done(utils.Error(errMsg))
 		return
 	}
 
 	// 记录尝试调用 Blueprint
-	r.AddToTimeline("🔄[BLUEPRINT_INVOKE_START]", fmt.Sprintf("Invoking AI Blueprint: %s", forgeName))
+	r.AddToTimeline("[BLUEPRINT_INVOKE_START]", fmt.Sprintf("Invoking AI Blueprint: %s", forgeName))
 
 	ins, forgeParams, err := r.invokeBlueprint(forgeName)
 	if err != nil {
 		// invokeBlueprint 已经记录了详细错误，这里只需要记录最终失败状态
-		r.AddToTimeline("❌[BLUEPRINT_INVOKE_FAILED]", fmt.Sprintf("Failed to invoke '%s': %v", forgeName, err))
+		r.AddToTimeline("[BLUEPRINT_INVOKE_FAILED]", fmt.Sprintf("Failed to invoke '%s': %v", forgeName, err))
 		r.Emitter.EmitError(fmt.Sprintf("Failed to invoke AI Blueprint '%s'", forgeName))
-		r.EmitResult(fmt.Sprintf("AI 智能应用 '%s' 调用失败，请检查应用名称和配置是否正确。错误详情：%v", forgeName, err))
+		// Merge result into timeline, do not emit result externally
+		r.AddToTimeline("[BLUEPRINT_RESULT]", fmt.Sprintf("AI 智能应用 '%s' 调用失败，请检查应用名称和配置是否正确。错误详情：%v", forgeName, err))
 		done(fmt.Errorf("failed to invoke ai-blueprint[%v]: %w", forgeName, err))
 		return
 	}
-	
+
 	// 再次验证返回的实例
 	if ins == nil {
-		r.AddToTimeline("❌[BLUEPRINT_NULL_AFTER_INVOKE]", fmt.Sprintf("AI Blueprint '%s' returned nil after invoke", forgeName))
+		r.AddToTimeline("[BLUEPRINT_NULL_AFTER_INVOKE]", fmt.Sprintf("AI Blueprint '%s' returned nil after invoke", forgeName))
 		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' returned invalid instance", forgeName))
-		r.EmitResult(fmt.Sprintf("❌ AI 智能应用 '%s' 执行异常。", forgeName))
+		r.AddToTimeline("[BLUEPRINT_RESULT]", fmt.Sprintf("AI 智能应用 '%s' 执行异常。", forgeName))
 		done(utils.Error(fmt.Sprintf("AI Blueprint '%s' returned nil after successful invoke", forgeName)))
 		return
 	}
-	
+
 	forgeName = ins.ForgeName
 
-	r.AddToTimeline("✅[BLUEPRINT_INVOKE_SUCCESS]", fmt.Sprintf("AI Blueprint '%s' (%s) ready with params: %v", forgeName, ins.ForgeVerboseName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256)))
+	r.AddToTimeline("[BLUEPRINT_INVOKE_SUCCESS]", fmt.Sprintf("AI Blueprint '%s' (%s) ready with params: %v", forgeName, ins.ForgeVerboseName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256)))
 
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
