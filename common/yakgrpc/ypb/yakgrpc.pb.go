@@ -62884,7 +62884,7 @@ func (x *CreateSSAProjectRequest) GetProjectRawData() string {
 
 type CreateSSAProjectResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"` // why ?
+	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
 	Message       *DbOperateMessage      `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
