@@ -29,7 +29,8 @@ func ForEachCapturedSideEffect[T versionedValue](
 
 func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 	if scope == nil {
-		panic("cover scope is nil")
+		log.Errorf("cover scope is nil")
+		return
 	}
 
 	baseScope := ScopedVersionedTableIF[T](base)

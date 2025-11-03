@@ -273,7 +273,8 @@ func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
 		if v.parentId <= 0 {
 			return nil
 		}
-		panic("UNFINISHED for loading parent from database")
+		log.Errorf("UNFINISHED for loading parent from database")
+		return nil
 	}
 	return v._parent
 }

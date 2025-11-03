@@ -352,7 +352,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 		}
 		// check
 		if pre.Condition <= 0 {
-			// panic(fmt.Sprintf("this cond is null: %s", pre.Name))
+			log.Errorf("this condition is null: %s", pre.GetName())
 			return nil
 		}
 		// calc
