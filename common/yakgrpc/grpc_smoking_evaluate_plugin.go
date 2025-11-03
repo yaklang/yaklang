@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"math/rand"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -76,12 +77,19 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		// full plugin code by name
 		switch pluginType {
 		case schema.SCRIPT_TYPE_SYNTAXFLOW:
-			rule, err := sfdb.QueryRuleByName(s.GetSSADatabase(), pluginName)
+			rule, err := sfdb.QueryRuleByName(s.GetProfileDatabase(), pluginName)
 			if err != nil {
 				return nil, err
 			}
 			pluginCode = rule.Content
 			pluginType = "syntaxflow"
+		case schema.SCRIPT_TYPE_YAK:
+			ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
+			if err != nil {
+				return nil, err
+			}
+			pluginCode = ins.Content
+			pluginType = ins.Type
 		default:
 			ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
 			if err != nil {
