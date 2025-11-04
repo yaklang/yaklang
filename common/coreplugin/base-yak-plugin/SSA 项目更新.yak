@@ -140,11 +140,6 @@ projectData = cli.Json("project_data",
               "title": "使用内存",
               "type": "boolean",
               "default": false
-            },
-            "result_save_kind": {
-              "title": "结果保存类型",
-              "type": "integer",
-              "default": 0
             }
           }
         },
@@ -169,7 +164,7 @@ JSON
 )
 
 cli.check()
-
+yakit.Code(projectData)
 yakit.Info("开始更新SSA项目，项目ID: %d", projectId)
 
 yakit.Info("加载项目...")
@@ -182,61 +177,52 @@ if err != nil {
 yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
 
 // 2. 更新项目基础字段（用于数据库索引）
-if projectData["project_name"] != nil && projectData["project_name"] != undefined && projectData["project_name"] != "" {
-    project.ProjectName = sprint(projectData["project_name"])
+if  projectData["project_name"] != "" {
+    project.ProjectName = projectData["project_name"]
     yakit.Info("更新项目名称: %s", project.ProjectName)
 }
 
-if projectData["description"] != nil && projectData["description"] != undefined {
-    project.Description = sprint(projectData["description"])
+if projectData["description"] != ""  {
+    project.Description = projectData["description"]
     yakit.Info("更新项目描述: %s", project.Description)
 }
 
-if projectData["language"] != nil && projectData["language"] != undefined && projectData["language"] != "" {
-    project.Language = sprint(projectData["language"])
+if projectData["language"] != "" {
+    project.Language = projectData["language"]
     yakit.Info("更新项目语言: %s", project.Language)
 }
+
+if projectData["tags"]!=""{
+    project.Tags = str.Split(projectData["tags"],",")
+}
+
 
 // 3. 处理配置数据
 configObj = projectData["config"]
 if configObj != nil  {
     yakit.Info("更新项目配置...")
     
-    configBytes = []byte(configObj)
-    config,err = ssa.NewSSAConfigByJSON(configBytes)
-    if err != nil {
-        yakit.Error(tmp /*type: string*/, items...)
+    // 同步项目基础信息到配置
+    configObj["BaseInfo"] = {
+        "project_name": project.ProjectName,
+        "project_description": project.Description,
+        "language": project.Language,
+        "tags": project.Tags,
     }
-    
-    newConfig, err = ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJSONRawConfig(configBytes))
+
+    configBytes,err = json.Marshal(configObj)
+    if err != nil {
+        yakit.Error("序列化配置失败: %v", err)
+        return
+    }
+    newConfig,err = ssa.NewSSAConfigByJSON(configBytes)
     if err != nil {
         yakit.Error("解析配置失败: %v", err)
         return
     }
-    
-    // 确保配置中的基础信息与 SSAProject 字段保持同步
-    if newConfig.BaseInfo == nil {
-        newConfig.BaseInfo = {}
-    }
-    newConfig.BaseInfo.ProjectID = projectId
-    newConfig.BaseInfo.ProjectName = project.ProjectName
-    newConfig.BaseInfo.ProjectDescription = project.Description
-    newConfig.BaseInfo.Language = project.Language
-    newConfig.BaseInfo.Tags = project.Tags
-    
     project.Config = newConfig
     yakit.Info("配置已更新")
-} else {
-    yakit.Info("未提供配置数据，保持原配置不变")
-    // 即使不更新配置，也要确保现有配置中的基础信息同步
-    if project.Config != nil && project.Config.BaseInfo != nil {
-        project.Config.BaseInfo.ProjectID = projectId
-        project.Config.BaseInfo.ProjectName = project.ProjectName
-        project.Config.BaseInfo.ProjectDescription = project.Description
-        project.Config.BaseInfo.Language = project.Language
-        project.Config.BaseInfo.Tags = project.Tags
-    }
-}
+} 
 
 // 4. 保存项目
 yakit.Info("保存项目到数据库...")
