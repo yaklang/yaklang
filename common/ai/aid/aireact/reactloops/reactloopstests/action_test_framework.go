@@ -84,6 +84,8 @@ func NewActionTestFrameworkEx(
 			rsp.Close()
 			return rsp, nil
 		}),
+		// Auto-approve all tool uses in tests (no manual review required)
+		aicommon.WithAgreeAuto(),
 	}
 
 	// Append user-provided AI config options
