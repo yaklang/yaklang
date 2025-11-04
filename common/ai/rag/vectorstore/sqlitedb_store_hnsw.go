@@ -475,6 +475,9 @@ func (s *SQLiteVectorStoreHNSW) embedDocuments(docs ...*Document) ([]*Document, 
 
 // Add 添加文档到向量存储
 func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
+	if err := s.requireWriteCollection(); err != nil {
+		return utils.Wrap(err, "require write vector store")
+	}
 	docs, err := s.embedDocuments(docs...)
 	if err != nil {
 		return utils.Wrap(err, "embed documents")

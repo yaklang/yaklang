@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -61,12 +60,19 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) (<-c
 	return _buildIndex(analyzeResult, option...)
 }
 
-func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...rag.RAGSystemConfigOption) (<-chan *schema.KnowledgeBaseEntry, error) {
+func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType, options...)
+	opts := []rag.RAGSystemConfigOption{
+		rag.WithDB(refineConfig.Database),
+		rag.WithDescription(refineConfig.KnowledgeBaseDesc),
+		rag.WithKnowledgeBaseType(refineConfig.KnowledgeBaseType),
+	}
+
+	opts = append(opts, refineConfig.ragSystemOptions...)
+	ragSystem, err := rag.GetRagSystem(knowledgeDatabaseName, opts...)
 	if err != nil {
-		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
+		return nil, utils.Errorf("failed to create rag system: %v", err)
 	}
 
 	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
@@ -90,7 +96,7 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...rag.RAGSystemC
 
 				for _, entry := range entries {
 					output.SafeFeed(entry)
-					err := kb.AddKnowledgeEntryQuestion(entry)
+					err := ragSystem.AddKnowledgeEntryQuestion(entry)
 					if err != nil {
 						log.Errorf("failed to create knowledge base entry: %v", err)
 						return

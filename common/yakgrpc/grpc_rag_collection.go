@@ -1,12 +1,13 @@
 package yakgrpc
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream ypb.Yak_RAGCollectionSearchServer) (err error) {
@@ -101,10 +102,10 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 	return nil
 }
 
-func parseOption(req *ypb.RAGCollectionSearchRequest) []rag.RAGQueryOption {
-	var options []rag.RAGQueryOption
+func parseOption(req *ypb.RAGCollectionSearchRequest) []rag.RAGSystemConfigOption {
+	var options []rag.RAGSystemConfigOption
 	if req.GetCollectionName() != "" {
-		options = append(options, rag.WithRAGCollectionNames(req.GetCollectionName()))
+		options = append(options, rag.WithRAGCollectionName(req.GetCollectionName()))
 	}
 
 	if req.GetLimit() > 0 {
