@@ -285,11 +285,11 @@ func (m *IndexManager) processAndIndexStreaming(ctx context.Context, items []Ind
 				mu.Unlock()
 
 				// 第三步：立即生成向量并索引到RAG系统
-				var ragOptions []vectorstore.DocumentOption
+				var ragOptions []rag.RAGSystemConfigOption
 				if m.options.IncludeMetadata {
 					metadata := item.GetMetadata()
 					if metadata != nil {
-						ragOptions = append(ragOptions, vectorstore.WithDocumentRawMetadata(metadata))
+						ragOptions = append(ragOptions, rag.WithDocumentRawMetadata(metadata))
 					}
 				}
 
@@ -491,11 +491,11 @@ func (m *IndexManager) indexToRAG(ctx context.Context, items []IndexableItem, pr
 				processedContent := processedContents[key]
 
 				// 准备RAG选项
-				var ragOptions []vectorstore.DocumentOption
+				var ragOptions []rag.RAGSystemConfigOption
 				if m.options.IncludeMetadata {
 					metadata := item.GetMetadata()
 					if metadata != nil {
-						ragOptions = append(ragOptions, vectorstore.WithDocumentRawMetadata(metadata))
+						ragOptions = append(ragOptions, rag.WithDocumentRawMetadata(metadata))
 					}
 				}
 

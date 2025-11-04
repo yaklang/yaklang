@@ -267,7 +267,7 @@ type CollectionQueryConfig struct {
 	Ctx                  context.Context
 	Limit                int // 单次子查询的结果限制。
 	CollectionNumLimit   int
-	CollectionNames      []string
+	QueryCollectionNames []string
 	CollectionScoreLimit float64
 	EnhancePlan          []string // 默认开启 HyDE 、 泛化查询 、拆分查询
 	Filter               func(key string, getDoc func() *Document) bool
@@ -350,7 +350,7 @@ func WithRAGSystemLoadConfig(loadConfig ...CollectionConfigFunc) CollectionQuery
 // WithRAGCollectionName 指定搜索的集合名称
 func WithRAGCollectionName(collectionName string) CollectionQueryOption {
 	return func(config *CollectionQueryConfig) {
-		config.CollectionNames = append(config.CollectionNames, collectionName)
+		config.QueryCollectionNames = append(config.QueryCollectionNames, collectionName)
 	}
 }
 
@@ -365,9 +365,9 @@ func WithRAGQueryStatus(i func(label string, i any, tags ...string)) CollectionQ
 	}
 }
 
-func WithRAGCollectionNames(collectionNames ...string) CollectionQueryOption {
+func WithRAGQueryCollectionNames(collectionNames ...string) CollectionQueryOption {
 	return func(config *CollectionQueryConfig) {
-		config.CollectionNames = append(config.CollectionNames, collectionNames...)
+		config.QueryCollectionNames = append(config.QueryCollectionNames, collectionNames...)
 	}
 }
 

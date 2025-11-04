@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -20,6 +21,7 @@ type MemoryVectorStore struct {
 // NewMemoryVectorStore 创建一个新的内存向量存储
 func NewMemoryVectorStore(embedder EmbeddingClient) *SQLiteVectorStoreHNSW {
 	db, _ := utils.CreateTempTestDatabaseInMemory()
+	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	store, _ := NewSQLiteVectorStoreHNSW("memory", "memory", "memory", 1024, embedder, db)
 	return store
 }
