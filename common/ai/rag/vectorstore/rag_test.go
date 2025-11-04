@@ -222,7 +222,7 @@ func TestMUSTPASS_BigTextPlan(t *testing.T) {
 	}
 
 	// 创建RAG系统
-	collectionMg := NewMemoryVectorStore(mockEmbed)
+	collectionMg := NewMemoryVectorStore(mockEmbed, WithMaxChunkSize(30), WithOverlap(10), WithBigTextPlan(BigTextPlanChunkText))
 	defer collectionMg.Remove()
 
 	// 准备一个长文本（会触发BigTextPlan）

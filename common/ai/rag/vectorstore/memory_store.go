@@ -19,10 +19,10 @@ type MemoryVectorStore struct {
 }
 
 // NewMemoryVectorStore 创建一个新的内存向量存储
-func NewMemoryVectorStore(embedder EmbeddingClient) *SQLiteVectorStoreHNSW {
+func NewMemoryVectorStore(embedder EmbeddingClient, opts ...CollectionConfigFunc) *SQLiteVectorStoreHNSW {
 	db, _ := utils.CreateTempTestDatabaseInMemory()
 	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	store, _ := NewSQLiteVectorStoreHNSW("memory", "memory", "memory", 1024, embedder, db)
+	store, _ := NewSQLiteVectorStoreHNSW("memory", "memory", "memory", 1024, embedder, db, opts...)
 	return store
 }
 

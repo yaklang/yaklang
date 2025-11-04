@@ -15,6 +15,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// testEmbedder 测试用的嵌入器函数
+func testEmbedder(text string) ([]float32, error) {
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	return mockEmbedding.Embedding(text)
+}
+
 // getMapKeys 获取map的所有键
 func getMapKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))

@@ -85,6 +85,8 @@ var RagExports = map[string]interface{}{
 	"importRebuildGraph": rag.WithImportRebuildHNSWIndex,
 	"documentHandler":    rag.WithExportDocumentHandler,
 	"progressHandler":    rag.WithExportOnProgressHandler,
+	"aiServiceName":      rag.WithAIServiceName,
+	"aiServiceConfig":    rag.WithAIServiceConfig,
 
 	"Export":        rag.ExportRAGToFile,
 	"noHNSWGraph":   rag.WithExportNoHNSWIndex,
