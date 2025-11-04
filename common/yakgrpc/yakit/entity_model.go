@@ -84,6 +84,10 @@ func UpdateEntity(db *gorm.DB, id uint, entity *schema.ERModelEntity) error {
 	return db.Model(&schema.ERModelEntity{}).Where("id = ?", id).Updates(entity).Error
 }
 
+func UpdateEntityByUUID(db *gorm.DB, uuid string, entity *schema.ERModelEntity) error {
+	return db.Model(&schema.ERModelEntity{}).Where("uuid = ?", uuid).Updates(entity).Error
+}
+
 func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
 	return db.Create(entity).Error
 }
@@ -191,8 +195,26 @@ func CreateOrUpdateRelationship(db *gorm.DB, relationship *schema.ERModelRelatio
 	return db.Model(&existingRelationship).Updates(relationship).Error
 }
 
-func UpdateRelationship(db *gorm.DB, uuid string, relationship *schema.ERModelRelationship) error {
+func UpdateRelationshipByUUID(db *gorm.DB, uuid string, relationship *schema.ERModelRelationship) error {
 	return db.Model(&schema.ERModelRelationship{}).Where("uuid = ?", uuid).Updates(relationship).Error
+}
+
+func UpdateRelationship(db *gorm.DB, id uint, relationship *schema.ERModelRelationship) error {
+	return db.Model(&schema.ERModelRelationship{}).Where("id = ?", id).Updates(relationship).Error
+}
+
+func CreateRelationship(db *gorm.DB, relationship *schema.ERModelRelationship) error {
+	relationship.Hash = relationship.CalcHash()
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		findErr := tx.Where("hash = ?", relationship.Hash).First(&relationship).Error
+		if findErr == nil {
+			return nil // 事务成功结束
+		}
+		if gorm.IsRecordNotFoundError(findErr) {
+			return tx.Create(&relationship).Error
+		}
+		return findErr
+	})
 }
 
 func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, typeVerbose string, attrs map[string]any, runtimeID string) (*schema.ERModelRelationship, error) {
@@ -218,6 +240,11 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 		return findErr
 	})
 	return &Relationship, err
+}
+
+func DeleteRelationships(db *gorm.DB, filter *ypb.RelationshipFilter) error {
+	db = FilterRelationships(db, filter)
+	return db.Unscoped().Delete(&schema.ERModelRelationship{}).Error
 }
 
 func GetRelationshipByUUID(db *gorm.DB, uuid string) (*schema.ERModelRelationship, error) {

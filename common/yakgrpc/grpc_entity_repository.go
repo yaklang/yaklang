@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
@@ -28,7 +30,15 @@ func (s *Server) ListEntityRepository(ctx context.Context, req *ypb.Empty) (*ypb
 // QueryEntity 查询实体
 func (s *Server) QueryEntity(ctx context.Context, req *ypb.QueryEntityRequest) (*ypb.QueryEntityResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	paging, i, err := yakit.QueryEntitiesPaging(db, req.GetFilter(), req.GetPagination())
+	pagination := req.GetPagination()
+	if pagination == nil {
+		pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   20,
+			OrderBy: "id",
+		}
+	}
+	paging, i, err := yakit.QueryEntitiesPaging(db, req.GetFilter(), pagination)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +71,16 @@ func (s *Server) DeleteEntity(ctx context.Context, req *ypb.DeleteEntityRequest)
 // QueryRelationship 查询关系
 func (s *Server) QueryRelationship(ctx context.Context, req *ypb.QueryRelationshipRequest) (*ypb.QueryRelationshipResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	paging, i, err := yakit.QueryRelationshipPaging(db, req.GetFilter(), req.GetPagination())
+	pagination := req.GetPagination()
+	if pagination == nil {
+		pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   20,
+			OrderBy: "id",
+		}
+	}
+
+	paging, i, err := yakit.QueryRelationshipPaging(db, req.GetFilter(), pagination)
 	if err != nil {
 		return nil, err
 	}
@@ -105,5 +124,120 @@ func (s *Server) QuerySubERM(ctx context.Context, req *ypb.QuerySubERMRequest) (
 		Entities: lo.Map(ERM.Entities, func(e *schema.ERModelEntity, _ int) *ypb.Entity {
 			return e.ToGRPC()
 		}),
+	}, nil
+}
+
+// UpdateEntity 更新或创建实体（根据 yakit 实现）
+func (s *Server) UpdateEntity(ctx context.Context, req *ypb.Entity) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+
+	if req.ID > 0 {
+		err := yakit.UpdateEntity(db, uint(req.GetID()), schema.EntityGRPCToModel(req))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := yakit.UpdateEntityByUUID(db, req.GetHiddenIndex(), schema.EntityGRPCToModel(req))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ypb.DbOperateMessage{
+		Operation:  DbOperationUpdate,
+		EffectRows: 1,
+	}, nil
+}
+
+// CreateEntity 创建实体，如果 req.ID 提供则会尝试更新
+func (s *Server) CreateEntity(ctx context.Context, req *ypb.Entity) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	model := schema.EntityGRPCToModel(req)
+
+	// If client provided ID, treat as update
+	if req.GetID() > 0 {
+		if err := yakit.UpdateEntity(db, uint(req.GetID()), model); err != nil {
+			return nil, err
+		}
+		return &ypb.DbOperateMessage{
+			Operation:  DbOperationUpdate,
+			EffectRows: 1,
+			CreateID:   int64(req.GetID()),
+		}, nil
+	}
+	// create new entity
+	err := yakit.CreateEntity(db, model)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		Operation:  DbOperationCreate,
+		EffectRows: 1,
+		CreateID:   int64(model.ID),
+	}, nil
+}
+
+// CreateRelationship 创建关系，如果 req.ID 提供则会尝试更新
+func (s *Server) CreateRelationship(ctx context.Context, req *ypb.Relationship) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	model := schema.RelationshipGRPCToModel(req)
+
+	// If client provided ID, treat as update
+	if req.GetID() > 0 {
+		if err := yakit.UpdateRelationship(db, uint(req.GetID()), model); err != nil {
+			return nil, err
+		}
+		return &ypb.DbOperateMessage{
+			Operation:  DbOperationUpdate,
+			EffectRows: 1,
+			CreateID:   int64(req.GetID()),
+		}, nil
+	}
+
+	// create new relationship
+	err := yakit.CreateRelationship(db, model)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		Operation:  DbOperationCreate,
+		EffectRows: 1,
+		CreateID:   int64(model.ID),
+	}, nil
+}
+
+// UpdateRelationship 更新或创建关系（根据 yakit 实现）
+// 使用 profile 数据库，调用 yakit.UpdateRelationshipByUUID 来执行具体的 DB 操作
+func (s *Server) UpdateRelationship(ctx context.Context, req *ypb.Relationship) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	model := schema.RelationshipGRPCToModel(req)
+
+	if req.ID > 0 {
+		if err := yakit.UpdateRelationship(db, uint(req.GetID()), model); err != nil {
+			return nil, err
+		}
+	} else if req.GetUUID() != "" {
+		if err := yakit.UpdateRelationshipByUUID(db, req.GetUUID(), model); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, errors.New("missing relationship identifier (ID or UUID)")
+	}
+
+	return &ypb.DbOperateMessage{
+		Operation:  DbOperationUpdate,
+		EffectRows: 1,
+	}, nil
+}
+
+// DeleteRelationship 删除关系
+func (s *Server) DeleteRelationship(ctx context.Context, req *ypb.DeleteRelationshipRequest) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	err := yakit.DeleteRelationships(db, req.GetFilter())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		Operation: DbOperationDelete,
 	}, nil
 }
