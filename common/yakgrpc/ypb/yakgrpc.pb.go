@@ -31341,13 +31341,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -40896,8 +40896,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -62318,8 +62318,9 @@ func (x *PluginTraceStats) GetCancelledTraces() int64 {
 // SSA Report Messages
 type GenerateSSAReportRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TaskID        string                 `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`         // SSA扫描TaskID
-	ReportName    string                 `protobuf:"bytes,2,opt,name=ReportName,proto3" json:"ReportName,omitempty"` // 报告名称
+	TaskID        string                 `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`           // SSA扫描TaskID
+	ReportName    string                 `protobuf:"bytes,2,opt,name=ReportName,proto3" json:"ReportName,omitempty"`   // 报告名称
+	RiskIDs       []int64                `protobuf:"varint,3,rep,packed,name=RiskIDs,proto3" json:"RiskIDs,omitempty"` // 指定的RiskID列表，如果提供则只生成这些Risk的报告
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62366,6 +62367,13 @@ func (x *GenerateSSAReportRequest) GetReportName() string {
 		return x.ReportName
 	}
 	return ""
+}
+
+func (x *GenerateSSAReportRequest) GetRiskIDs() []int64 {
+	if x != nil {
+		return x.RiskIDs
+	}
+	return nil
 }
 
 type GenerateSSAReportResponse struct {
@@ -68601,12 +68609,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rRunningTraces\x18\x02 \x01(\x03R\rRunningTraces\x12(\n" +
 	"\x0fCompletedTraces\x18\x03 \x01(\x03R\x0fCompletedTraces\x12\"\n" +
 	"\fFailedTraces\x18\x04 \x01(\x03R\fFailedTraces\x12(\n" +
-	"\x0fCancelledTraces\x18\x05 \x01(\x03R\x0fCancelledTraces\"R\n" +
+	"\x0fCancelledTraces\x18\x05 \x01(\x03R\x0fCancelledTraces\"l\n" +
 	"\x18GenerateSSAReportRequest\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x1e\n" +
 	"\n" +
 	"ReportName\x18\x02 \x01(\tR\n" +
-	"ReportName\"o\n" +
+	"ReportName\x12\x18\n" +
+	"\aRiskIDs\x18\x03 \x03(\x03R\aRiskIDs\"o\n" +
 	"\x19GenerateSSAReportResponse\x12\x18\n" +
 	"\aSuccess\x18\x01 \x01(\bR\aSuccess\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
