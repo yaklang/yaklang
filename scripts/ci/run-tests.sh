@@ -157,6 +157,24 @@ run_test() {
     # 创建一个临时函数来同时输出到屏幕和日志
     exec 3>&1  # 保存原始 stdout
     
+    # 启动后台计时器 - 异步更新最后一行显示状态和已过时间
+    local timer_pid=""
+    local start_time=$(date +%s)
+    
+    # 启动计时器 - 输出到 stderr
+    (
+      while true; do
+        local elapsed=$(( $(date +%s) - start_time ))
+        local mins=$(( elapsed / 60 ))
+        local secs=$(( elapsed % 60 ))
+        # 使用 \r 回到行首，始终覆盖同一行（如果是 TTY）
+        # 如果不是 TTY，\r 会被忽略，每次都输出新行（也可以看到进度）
+        printf "\r⏱️  [%02d:%02d] Running: %s (Package: %s)..." "$mins" "$secs" "$name" "$pkg_path" >&2
+        sleep 1
+      done
+    ) &
+    timer_pid=$!
+    
     # 使用子shell而不是代码块，这样可以正确捕获exit code
     (
       # 第一行：最重要的信息 - 运行命令
@@ -175,6 +193,26 @@ run_test() {
     } >&3
     
     local code=${PIPESTATUS[0]}
+    
+    # 停止计时器
+    if [[ -n "$timer_pid" ]]; then
+      kill "$timer_pid" 2>/dev/null || true
+      wait "$timer_pid" 2>/dev/null || true
+    fi
+    
+    # 清除计时器行并显示最终时间
+    printf "\r\033[K" >&2  # 清除计时器行（如果是 TTY 会清除，否则只是换行）
+    
+    local final_elapsed=$(( $(date +%s) - start_time ))
+    local final_mins=$(( final_elapsed / 60 ))
+    local final_secs=$(( final_elapsed % 60 ))
+    
+    if [[ $code -eq 0 ]]; then
+      echo "✅ Completed in ${final_mins}m${final_secs}s"
+    else
+      echo "❌ Failed after ${final_mins}m${final_secs}s (exit code: $code)"
+    fi
+    
     exec 3>&-  # 关闭文件描述符
     
     if [[ $code -eq 0 ]]; then

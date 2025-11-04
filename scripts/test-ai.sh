@@ -308,7 +308,6 @@ else
         echo "Timeout: $timeout | Parallel: $parallel"
         [[ -n "$run_pattern" ]] && echo "Run pattern: $run_pattern"
         echo "----------------------------------------------------------------"
-        echo "[STARTING] Initializing test binary..."
         
         test_start=$(date +%s)
         test_exit_code=0
@@ -317,13 +316,47 @@ else
         # Use process substitution to avoid subshell issues
         exec 3>&1  # Save stdout
         
+        # 启动后台计时器 - 异步更新最后一行显示状态和已过时间
+        timer_pid=""
+        
+        # 启动计时器 - 输出到 stderr
+        (
+            while true; do
+                elapsed=$(( $(date +%s) - test_start ))
+                mins=$(( elapsed / 60 ))
+                secs=$(( elapsed % 60 ))
+                # 使用 \r 回到行首，始终覆盖同一行（如果是 TTY）
+                # 如果不是 TTY，\r 会被忽略，每次都输出新行（也可以看到进度）
+                printf "\r⏱️  [%02d:%02d] Running: %s..." "$mins" "$secs" "$pkg_path" >&2
+                sleep 1
+            done
+        ) &
+        timer_pid=$!
+        
         (cd "$test_dir" && "$bin" "${args[@]}") 2>&1 | tee "$log" >&3
         test_exit_code=${PIPESTATUS[0]}
         
-        exec 3>&-  # Close fd
+        # 停止计时器
+        if [[ -n "$timer_pid" ]]; then
+            kill "$timer_pid" 2>/dev/null || true
+            wait "$timer_pid" 2>/dev/null || true
+        fi
         
         test_end=$(date +%s)
         test_duration=$((test_end - test_start))
+        
+        # 清除计时器行并显示最终时间
+        printf "\r\033[K" >&2  # 清除计时器行（如果是 TTY 会清除，否则只是换行）
+        
+        final_mins=$(( test_duration / 60 ))
+        final_secs=$(( test_duration % 60 ))
+        if [[ $test_exit_code -eq 0 ]]; then
+            echo "✅ Completed in ${final_mins}m${final_secs}s"
+        else
+            echo "❌ Failed after ${final_mins}m${final_secs}s"
+        fi
+        
+        exec 3>&-  # Close fd
         
         # Parse actual test runtime from go test output
         # Format: "PASS" or "ok  	package_name	1.234s"
