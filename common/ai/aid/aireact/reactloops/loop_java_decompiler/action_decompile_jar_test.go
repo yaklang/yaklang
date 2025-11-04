@@ -364,6 +364,10 @@ func (r *testRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name strin
 	return nil, false, nil
 }
 
+func (r *testRuntime) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+	return nil, false, nil
+}
+
 func (r *testRuntime) AskForClarification(ctx context.Context, question string, payloads []string) string {
 	if len(payloads) > 0 {
 		return payloads[0]

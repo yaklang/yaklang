@@ -65,6 +65,7 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	basicOption := []aicommon.ConfigOption{
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithEnableSelfReflection(false),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(
