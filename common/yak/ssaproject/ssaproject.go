@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type SSAProjectBuilder struct {
+type SSAProject struct {
 	ID          uint
 	ProjectName string `json:"project_name"`
 	Description string `json:"description"`
@@ -22,8 +22,8 @@ type SSAProjectBuilder struct {
 	Info        *ssaconfig.CodeSourceInfo `json:"info"`
 }
 
-func NewSSAProjectBuilderByRawData(rawData string) (*SSAProjectBuilder, error) {
-	builder := &SSAProjectBuilder{}
+func NewSSAProjectByRawData(rawData string) (*SSAProject, error) {
+	builder := &SSAProject{}
 	if rawData == "" {
 		return nil, utils.Errorf("failed to new SSA project builder: raw data is empty")
 	}
@@ -34,11 +34,11 @@ func NewSSAProjectBuilderByRawData(rawData string) (*SSAProjectBuilder, error) {
 	return builder, nil
 }
 
-func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, error) {
+func NewSSAProjectByProto(proto *ypb.SSAProject) (*SSAProject, error) {
 	if proto == nil {
 		return nil, utils.Errorf("failed to new SSA project builder: proto is nil")
 	}
-	builder := &SSAProjectBuilder{
+	builder := &SSAProject{
 		ID:          uint(proto.ID),
 		ProjectName: proto.ProjectName,
 		Description: proto.Description,
@@ -91,7 +91,7 @@ func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, err
 	return builder, nil
 }
 
-func (s *SSAProjectBuilder) ToSchemaSSAProject() (*schema.SSAProject, error) {
+func (s *SSAProject) toSchemaData() (*schema.SSAProject, error) {
 	if s == nil {
 		return nil, utils.Errorf("to schema SSA project failed: ssa project builder is nil")
 	}
@@ -108,18 +108,30 @@ func (s *SSAProjectBuilder) ToSchemaSSAProject() (*schema.SSAProject, error) {
 	return &result, nil
 }
 
-func (s *SSAProjectBuilder) Save() error {
+func (s *SSAProject) Save(dbs ...*gorm.DB) error {
 	if s == nil {
 		return utils.Errorf("save SSA project failed: ssa project builder is nil")
 	}
-	schemaProject, err := s.ToSchemaSSAProject()
+	schemaProject, err := s.toSchemaData()
 	if err != nil {
 		return err
 	}
 
-	db := consts.GetGormProfileDatabase()
+	var db *gorm.DB
+	if len(dbs) > 0 && dbs[0] != nil {
+		db = dbs[0]
+	} else {
+		db = consts.GetGormProfileDatabase()
+	}
+
+	// just create
+	if schemaProject.ID == 0 {
+		return db.Create(schemaProject).Error
+	}
+
+	// update
 	var existingProject schema.SSAProject
-	err = db.Where("project_name = ?", schemaProject.ProjectName).First(&existingProject).Error
+	err = db.First(&existingProject, schemaProject.ID).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(schemaProject).Error
@@ -134,11 +146,11 @@ func (s *SSAProjectBuilder) Save() error {
 	return nil
 }
 
-func (s *SSAProjectBuilder) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
+func (s *SSAProject) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
 	return s.Config.GetRuleFilter()
 }
 
-func (s *SSAProjectBuilder) Validate() error {
+func (s *SSAProject) Validate() error {
 	if s == nil {
 		return utils.Errorf("validate SSA project failed: ssa project builder is nil")
 	}
@@ -154,7 +166,7 @@ func (s *SSAProjectBuilder) Validate() error {
 	return nil
 }
 
-func (s *SSAProjectBuilder) GetCompileConfig() *ssaconfig.SSACompileConfig {
+func (s *SSAProject) GetCompileConfig() *ssaconfig.SSACompileConfig {
 	if s == nil {
 		return nil
 	}
@@ -164,7 +176,7 @@ func (s *SSAProjectBuilder) GetCompileConfig() *ssaconfig.SSACompileConfig {
 	return s.Config.SSACompile
 }
 
-func (s *SSAProjectBuilder) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
+func (s *SSAProject) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
 	if s == nil {
 		return nil
 	}
@@ -174,12 +186,12 @@ func (s *SSAProjectBuilder) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
 	return s.Config.SyntaxFlow
 }
 
-func NewSSAProjectBuilder(opts ...ssaconfig.Option) (*SSAProjectBuilder, error) {
+func NewSSAProjectBuilder(opts ...ssaconfig.Option) (*SSAProject, error) {
 	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
 		return nil, utils.Errorf("failed to new SSA project builder: %s", err)
 	}
-	builder := &SSAProjectBuilder{
+	builder := &SSAProject{
 		ProjectName: config.GetProjectName(),
 		Description: config.GetProjectDescription(),
 		Tags:        config.GetTags(),
@@ -192,8 +204,8 @@ func NewSSAProjectBuilder(opts ...ssaconfig.Option) (*SSAProjectBuilder, error) 
 	return builder, nil
 }
 
-func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProjectBuilder, error) {
-	builder := &SSAProjectBuilder{
+func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProject, error) {
+	builder := &SSAProject{
 		ID:          project.ID,
 		ProjectName: project.ProjectName,
 		Description: project.Description,
@@ -208,7 +220,7 @@ func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProjectBuilder, err
 	return builder, nil
 }
 
-func LoadSSAProjectBuilderByName(projectName string) (*SSAProjectBuilder, error) {
+func LoadSSAProjectBuilderByName(projectName string) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
 	if err := db.Where("project_name = ?", projectName).First(&project).Error; err != nil {
@@ -217,7 +229,7 @@ func LoadSSAProjectBuilderByName(projectName string) (*SSAProjectBuilder, error)
 	return loadSSAProjectBySchema(&project)
 }
 
-func LoadSSAProjectBuilderByID(id uint) (*SSAProjectBuilder, error) {
+func LoadSSAProjectBuilderByID(id uint) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
 	if err := db.Where("id = ?", id).First(&project).Error; err != nil {
