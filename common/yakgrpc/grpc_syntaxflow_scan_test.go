@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -62,19 +63,28 @@ func prepareProgram(t *testing.T, progID string) func() {
 	}
 }
 
-func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handlerStatus func(status string), handlerProcess func(process float64)) {
+func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handlerStatus func(status string), handlerProcess func(process float64)) *utils.SafeMap[*ypb.SyntaxFlowScanActiveTask] {
+	ruleActive := utils.NewSafeMap[*ypb.SyntaxFlowScanActiveTask]()
 	for {
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
 				log.Errorf("finish sf-scan stream %v", err)
-				return
+				return ruleActive
 			}
 			t.Fatalf("err : %v", err.Error())
-			return
+			return ruleActive
 		}
 		require.NoError(t, err)
-		// log.Infof("resp %v", resp)
+		log.Infof("resp %v", resp)
+
+		if len(resp.ActiveTask) != 0 {
+			for _, active := range resp.ActiveTask {
+				index := active.ProgramName + "/" + active.RuleName
+				ruleActive.Set(index, active)
+			}
+		}
+
 		handlerStatus(resp.Status)
 		if resp.ExecResult != nil && resp.ExecResult.IsMessage {
 			rawMsg := resp.ExecResult.GetMessage()
