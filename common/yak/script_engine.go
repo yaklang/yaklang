@@ -4,15 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/netstack_exports"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/yaklang/yaklang/common/aiforge"
 
@@ -326,7 +324,12 @@ func initYaklangLib() {
 	yaklang.Import("bin", binx.Exports)
 
 	// ssa
-	yaklang.Import("ssa", ssaapi.Exports)
+	ssaExports := []map[string]any{
+		ssaapi.Exports,
+		ssaproject.Exports,
+		ssaconfig.Exports,
+	}
+	yaklang.Import("ssa", lo.Assign(ssaExports...))
 	yaklang.Import("syntaxflow", syntaxflow.Exports)
 
 	// openapi

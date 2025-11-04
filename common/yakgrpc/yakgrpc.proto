@@ -8356,6 +8356,8 @@ message SSAProject {
   SSAProjectScanConfig ScanConfig = 10;
   // 规则策略配置
   SSAProjectScanRuleConfig RuleConfig = 11;
+
+  string JSONStringConfig = 12;
 }
 
 message SSAProjectCompileConfig{
