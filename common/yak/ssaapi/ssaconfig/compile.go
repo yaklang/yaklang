@@ -1,6 +1,8 @@
 package ssaconfig
 
 import (
+	"github.com/samber/lo"
+	"strings"
 	"time"
 )
 
@@ -192,7 +194,11 @@ func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
 	if c.SSACompile == nil {
 		c.SSACompile = defaultSSACompileConfig()
 	}
-	c.SSACompile.ExcludeFiles = excludeFiles
+	// 支持逗号分隔多个文件模式
+	allFiles := lo.FlatMap(excludeFiles, func(item string, index int) []string {
+		return strings.Split(item, ",")
+	})
+	c.SSACompile.ExcludeFiles = allFiles
 }
 
 func (c *Config) GetCompileReCompile() bool {
