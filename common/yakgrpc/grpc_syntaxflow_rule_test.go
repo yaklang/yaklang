@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -256,7 +257,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		require.Equal(t, 1, len(rsp.GetRule()))
 
 		updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), ruleName)
-		require.Equal(t, updateRule.Dirty, true)
+		require.Equal(t, updateRule.NeedUpdate, true)
 
 		err = deleteRuleByNames(client, []string{ruleName})
 		require.NoError(t, err)
@@ -677,99 +678,16 @@ func TestGRPCMUSTPASS_Query_Lib_Rule(t *testing.T) {
 }
 
 func TestUploadSyntaxFlowRule(t *testing.T) {
-	t.Run("normal - new rules upload", func(t *testing.T) {
-		ruleName1 := uuid.NewString()
-		ruleName2 := uuid.NewString()
-		ruleHash1 := uuid.NewString()
-		ruleHash2 := uuid.NewString()
-		onlineRules := []*schema.SyntaxFlowRule{
-			{
-				RuleName: ruleName1,
-				RuleId:   ruleHash1,
-				Content:  "aaa",
-			},
-		}
-
-		testRules := []*schema.SyntaxFlowRule{
-			{
-				RuleName: ruleName2,
-				RuleId:   ruleHash2,
-				Content:  "bbb",
-			},
-		}
-
-		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
-		}).Build()
-		defer guard1.UnPatch()
-
-		uploadCount := 0
-		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
-			uploadCount++
-			for i, r := range onlineRules {
-				if r.RuleName == rule.RuleName {
-					onlineRules[i] = rule
-				} else {
-					onlineRules = append(onlineRules, rule)
-				}
-			}
-			return nil
-		}).Build()
-		defer guard2.UnPatch()
-
-		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
-			return testRules, nil
-		}).Build()
-		defer guard3.UnPatch()
-
-		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]string, error) {
-			ret := make(map[string]string)
-			for _, r := range onlineRules {
-				ret[r.RuleName] = r.Version
-			}
-			return ret, nil
-		}).Build()
-		defer guard4.UnPatch()
-
-		server := &Server{}
-		req := &ypb.SyntaxFlowRuleToOnlineRequest{
-			Token: "valid-token",
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: []string{ruleName2},
-			},
-		}
-		stream := &TestProgressStream{ctx: context.Background()}
-
-		err := server.SyntaxFlowRuleToOnline(req, stream)
-		assert.NoError(t, err)
-		require.Equal(t, 1, uploadCount)
-
-		require.Equal(t, 2, len(onlineRules))
-		byName := make(map[string]string)
-		for _, r := range onlineRules {
-			byName[r.RuleName] = r.Content
-		}
-		require.Equal(t, "aaa", byName[ruleName1])
-		require.Equal(t, "bbb", byName[ruleName2])
-	})
-
-	t.Run("skip upload - online version is newer", func(t *testing.T) {
+	// 场景1: 远程规则不存在 → 上传规则（首次发布）
+	t.Run("upload - remote not exists (first publish)", func(t *testing.T) {
 		ruleName := uuid.NewString()
-		ruleHash := uuid.NewString()
-		onlineRules := []*schema.SyntaxFlowRule{
-			{
-				RuleName: ruleName,
-				RuleId:   ruleHash,
-				Content:  "aaa",
-				Version:  "20251015.0002",
-			},
-		}
+		ruleId := uuid.NewString()
+		onlineRules := []*schema.SyntaxFlowRule{}
 
 		testRules := []*schema.SyntaxFlowRule{
 			{
 				RuleName: ruleName,
-				RuleId:   ruleHash,
+				RuleId:   ruleId,
 				Content:  "bbb",
 				Version:  "20251015.0001",
 			},
@@ -777,21 +695,14 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 
 		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
 			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
+			log.Infof("[%s] %s", msgType, msg)
 		}).Build()
 		defer guard1.UnPatch()
 
 		uploadCount := 0
 		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
 			uploadCount++
-
-			for i, r := range onlineRules {
-				if r.RuleName == rule.RuleName {
-					onlineRules[i] = rule
-				} else {
-					onlineRules = append(onlineRules, rule)
-				}
-			}
+			onlineRules = append(onlineRules, rule)
 			return nil
 		}).Build()
 		defer guard2.UnPatch()
@@ -801,88 +712,16 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		}).Build()
 		defer guard3.UnPatch()
 
-		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]string, error) {
-			ret := make(map[string]string)
+		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+			ret := make(map[string]*yaklib.OnlineSyntaxFlowRule)
 			for _, r := range onlineRules {
-				ret[r.RuleName] = r.Version
-			}
-			return ret, nil
-		}).Build()
-		defer guard4.UnPatch()
-
-		server := &Server{}
-		req := &ypb.SyntaxFlowRuleToOnlineRequest{
-			Token: "valid-token",
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: []string{ruleName},
-			},
-		}
-		stream := &TestProgressStream{ctx: context.Background()}
-
-		err := server.SyntaxFlowRuleToOnline(req, stream)
-		assert.NoError(t, err)
-		require.Equal(t, 0, uploadCount)
-
-		require.Equal(t, 1, len(onlineRules))
-		byName := make(map[string]string)
-		for _, r := range onlineRules {
-			byName[r.RuleName] = r.Content
-		}
-		require.Equal(t, "aaa", byName[ruleName])
-	})
-
-	t.Run("upload - local version is newer", func(t *testing.T) {
-		ruleName := uuid.NewString()
-		ruleHash := uuid.NewString()
-		onlineRules := []*schema.SyntaxFlowRule{
-			{
-				RuleName: ruleName,
-				RiskType: ruleHash,
-				Content:  "aaa",
-				Version:  "20251015.0002",
-			},
-		}
-
-		testRules := []*schema.SyntaxFlowRule{
-			{
-				RuleName: ruleName,
-				RiskType: ruleHash,
-				Content:  "bbb",
-				Version:  "20251015.0003",
-			},
-		}
-
-		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
-		}).Build()
-		defer guard1.UnPatch()
-
-		uploadCount := 0
-		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
-			uploadCount++
-
-			for i, r := range onlineRules {
-				if r.RuleName == rule.RuleName {
-					onlineRules[i] = rule
-				} else {
-					onlineRules = append(onlineRules, rule)
+				ret[r.RuleId] = &yaklib.OnlineSyntaxFlowRule{
+					RuleName: r.RuleName,
+					RuleId:   r.RuleId,
+					Content:  r.Content,
+					Version:  r.Version,
 				}
 			}
-			return nil
-		}).Build()
-		defer guard2.UnPatch()
-
-		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
-			return testRules, nil
-		}).Build()
-		defer guard3.UnPatch()
-
-		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]string, error) {
-			ret := make(map[string]string)
-			for _, r := range onlineRules {
-				ret[r.RuleName] = r.Version
-			}
 			return ret, nil
 		}).Build()
 		defer guard4.UnPatch()
@@ -891,7 +730,7 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		req := &ypb.SyntaxFlowRuleToOnlineRequest{
 			Token: "valid-token",
 			Filter: &ypb.SyntaxFlowRuleFilter{
-				RuleNames: []string{ruleName},
+				RuleIds: []string{ruleId},
 			},
 		}
 		stream := &TestProgressStream{ctx: context.Background()}
@@ -899,139 +738,543 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		err := server.SyntaxFlowRuleToOnline(req, stream)
 		assert.NoError(t, err)
 		require.Equal(t, 1, uploadCount)
-
 		require.Equal(t, 1, len(onlineRules))
-		byName := make(map[string]string)
-		for _, r := range onlineRules {
-			byName[r.RuleName] = r.Content
+		require.Equal(t, "bbb", onlineRules[0].Content)
+	})
+
+	// 场景2: 远程存在，本地 v3.0 > 远程 v2.0，NeedUpdate=true → 覆盖上传
+	t.Run("upload - local version newer with NeedUpdate=true", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+		onlineRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Content:  "aaa",
+				Version:  "20251015.0002",
+			},
 		}
-		require.Equal(t, "bbb", byName[ruleName])
+
+		testRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName:   ruleName,
+				RuleId:     ruleId,
+				Content:    "bbb-modified",
+				Version:    "20251015.0003",
+				NeedUpdate: true, // 本地有修改
+			},
+		}
+
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+		}).Build()
+		defer guard1.UnPatch()
+
+		uploadCount := 0
+		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
+			uploadCount++
+			for i, r := range onlineRules {
+				if r.RuleName == rule.RuleName {
+					onlineRules[i] = rule
+					break
+				}
+			}
+			return nil
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+			return testRules, nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+			ret := make(map[string]*yaklib.OnlineSyntaxFlowRule)
+			for _, r := range onlineRules {
+				ret[r.RuleId] = &yaklib.OnlineSyntaxFlowRule{
+					RuleName: r.RuleName,
+					RuleId:   r.RuleId,
+					Content:  r.Content,
+					Version:  r.Version,
+				}
+			}
+			return ret, nil
+		}).Build()
+		defer guard4.UnPatch()
+
+		server := &Server{}
+		req := &ypb.SyntaxFlowRuleToOnlineRequest{
+			Token: "valid-token",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}
+		stream := &TestProgressStream{ctx: context.Background()}
+
+		err := server.SyntaxFlowRuleToOnline(req, stream)
+		assert.NoError(t, err)
+		require.Equal(t, 1, uploadCount)
+		require.Equal(t, "bbb-modified", onlineRules[0].Content)
+	})
+
+	// 场景3: 远程存在，本地 v3.0 > 远程 v2.0，NeedUpdate=false → 逻辑错误
+	t.Run("error - local version newer with NeedUpdate=false", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+		onlineRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Content:  "aaa",
+				Version:  "20251015.0002",
+			},
+		}
+
+		testRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName:   ruleName,
+				RuleId:     ruleId,
+				Content:    "bbb",
+				Version:    "20251015.0003",
+				NeedUpdate: false, // 逻辑错误：版本更新但没有修改标记
+			},
+		}
+
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+		}).Build()
+		defer guard1.UnPatch()
+
+		uploadCount := 0
+		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
+			uploadCount++
+			return nil
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+			return testRules, nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+			ret := make(map[string]*yaklib.OnlineSyntaxFlowRule)
+			for _, r := range onlineRules {
+				ret[r.RuleId] = &yaklib.OnlineSyntaxFlowRule{
+					RuleName: r.RuleName,
+					RuleId:   r.RuleId,
+					Content:  r.Content,
+					Version:  r.Version,
+				}
+			}
+			return ret, nil
+		}).Build()
+		defer guard4.UnPatch()
+
+		server := &Server{}
+		req := &ypb.SyntaxFlowRuleToOnlineRequest{
+			Token: "valid-token",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}
+		stream := &TestProgressStream{ctx: context.Background()}
+
+		err := server.SyntaxFlowRuleToOnline(req, stream)
+		assert.NoError(t, err)
+		require.Equal(t, 0, uploadCount) // 不应该上传
+	})
+
+	// 场景4: 远程存在，本地 v1.0 < 远程 v2.0，NeedUpdate=true → 冲突-跳过
+	t.Run("conflict - remote version newer with NeedUpdate=true", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+
+		onlineRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Content:  "aaa",
+				Version:  "20251015.0002",
+			},
+		}
+
+		testRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName:   ruleName,
+				RuleId:     ruleId,
+				Content:    "bbb-modified",
+				Version:    "20251015.0001",
+				NeedUpdate: true, // 本地有修改，但远程版本更新
+			},
+		}
+
+		var conflictInfo conflictInfo
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+			if msgType == string(DATA) {
+				err := json.Unmarshal([]byte(msg), &conflictInfo)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}).Build()
+		defer guard1.UnPatch()
+
+		uploadCount := 0
+		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
+			uploadCount++
+			return nil
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+			return testRules, nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+			ret := make(map[string]*yaklib.OnlineSyntaxFlowRule)
+			for _, r := range onlineRules {
+				ret[r.RuleId] = &yaklib.OnlineSyntaxFlowRule{
+					RuleName: r.RuleName,
+					RuleId:   r.RuleId,
+					Content:  r.Content,
+					Version:  r.Version,
+				}
+			}
+			return ret, nil
+		}).Build()
+		defer guard4.UnPatch()
+
+		server := &Server{}
+		req := &ypb.SyntaxFlowRuleToOnlineRequest{
+			Token: "valid-token",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}
+		stream := &TestProgressStream{ctx: context.Background()}
+
+		err := server.SyntaxFlowRuleToOnline(req, stream)
+		assert.NoError(t, err)
+		require.Equal(t, 0, uploadCount) // 冲突，跳过上传
+		require.Equal(t, conflictInfo.Local, testRules[0].Content)
+		require.Equal(t, conflictInfo.Remote, onlineRules[0].Content)
+	})
+
+	// 场景5: 远程存在，本地 v1.0 < 远程 v2.0，NeedUpdate=false → 跳过上传（提示需要更新）
+	t.Run("skip - remote version newer with NeedUpdate=false", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+		onlineRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Content:  "aaa",
+				Version:  "20251015.0002",
+			},
+		}
+
+		testRules := []*schema.SyntaxFlowRule{
+			{
+				RuleName:   ruleName,
+				RuleId:     ruleId,
+				Content:    "bbb",
+				Version:    "20251015.0001",
+				NeedUpdate: false, // 本地无修改，远程版本更新
+			},
+		}
+
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+		}).Build()
+		defer guard1.UnPatch()
+
+		uploadCount := 0
+		guard2 := mockey.Mock(uploadRule).To(func(ctx context.Context, client *yaklib.OnlineClient, token string, rule *schema.SyntaxFlowRule) error {
+			uploadCount++
+			return nil
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock(yakit.AllSyntaxFlowRule).To(func(*gorm.DB, *ypb.SyntaxFlowRuleFilter) ([]*schema.SyntaxFlowRule, error) {
+			return testRules, nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		guard4 := mockey.Mock(fetchRemoteRuleVersionMap).To(func(context.Context, *yaklib.OnlineClient, string, []string) (map[string]*yaklib.OnlineSyntaxFlowRule, error) {
+			ret := make(map[string]*yaklib.OnlineSyntaxFlowRule)
+			for _, r := range onlineRules {
+				ret[r.RuleId] = &yaklib.OnlineSyntaxFlowRule{
+					RuleName: r.RuleName,
+					RuleId:   r.RuleId,
+					Content:  r.Content,
+					Version:  r.Version,
+				}
+			}
+			return ret, nil
+		}).Build()
+		defer guard4.UnPatch()
+
+		server := &Server{}
+		req := &ypb.SyntaxFlowRuleToOnlineRequest{
+			Token: "valid-token",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}
+		stream := &TestProgressStream{ctx: context.Background()}
+
+		err := server.SyntaxFlowRuleToOnline(req, stream)
+		assert.NoError(t, err)
+		require.Equal(t, 0, uploadCount) // 跳过上传
 	})
 }
 
 func TestDownloadSyntaxFlowRule(t *testing.T) {
-	buildRule := func(ruleName, ruleId, version string) {
+	buildRule := func(ruleName, ruleId, version string, needUpdate bool) {
 		rule, err := sfdb.CheckSyntaxFlowRuleContent("aaa")
 		rule.RuleName = ruleName
 		rule.RuleId = ruleId
 		rule.Version = version
+		rule.NeedUpdate = needUpdate
+		rule.Content = "local-content"
 		require.NoError(t, err)
 		err = sfdb.MigrateSyntaxFlow(rule.CalcHash(), rule)
 		require.NoError(t, err)
 	}
 
-	t.Run("normal - new rules download", func(t *testing.T) {
-		ruleName1 := uuid.NewString()
-		ruleName2 := uuid.NewString()
-		ruleHash1 := uuid.NewString()
-		ruleHash2 := uuid.NewString()
+	// 场景1: 本地规则不存在 → 下载规则（首次下载）
+	t.Run("download - local not exists (first download)", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
 
 		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
+			log.Infof("[%s] %s", msgType, msg)
 		}).Build()
 		defer guard1.UnPatch()
 
+		saveCount := 0
 		guard2 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
 			*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
 		) *yaklib.OnlineDownloadFlowRuleStream {
-			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 2)
+			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
-				RuleName: ruleName1,
-				RuleId:   ruleHash1,
-			}, Total: 2}
-			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
-				RuleName: ruleName2,
-				RuleId:   ruleHash2,
-			}, Total: 2}
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Version:  "20251015.0001",
+				Content:  "new-content",
+			}, Total: 1}
 			close(ch)
-			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 2}
+			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 1}
 		}).Build()
 		defer guard2.UnPatch()
 
 		guard3 := mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+			saveCount++
 			return nil
 		}).Build()
 		defer guard3.UnPatch()
 
 		server := &Server{}
 		stream := &TestProgressStream{ctx: context.Background()}
-		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{}, stream)
+		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}, stream)
 		assert.NoError(t, err)
+		require.Equal(t, 1, saveCount)
 	})
 
-	t.Run("skip download - local version is newer", func(t *testing.T) {
+	// 场景2: 本地存在，在线 v2.0 > 本地 v1.0，NeedUpdate=false → 更新规则
+	t.Run("download - online version newer with NeedUpdate=false", func(t *testing.T) {
 		ruleName := uuid.NewString()
-		ruleHash := uuid.NewString()
-		buildRule(ruleName, ruleHash, "20251015.0002")
+		ruleId := uuid.NewString()
+		buildRule(ruleName, ruleId, "20251015.0001", false)
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 
-		guard4 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
 		}).Build()
-		defer guard4.UnPatch()
+		defer guard1.UnPatch()
 
-		guard5 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
+		saveCount := 0
+		guard2 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
 			*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
 		) *yaklib.OnlineDownloadFlowRuleStream {
 			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName,
-				RuleId:   ruleHash,
-				Version:  "20251015.0001",
-				Content:  "bbb",
+				RuleId:   ruleId,
+				Version:  "20251015.0002",
+				Content:  "updated-content",
 			}, Total: 1}
 			close(ch)
 			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 1}
 		}).Build()
-		defer guard5.UnPatch()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+			saveCount++
+			return nil
+		}).Build()
+		defer guard3.UnPatch()
 
 		server := &Server{}
 		stream := &TestProgressStream{ctx: context.Background()}
-		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{}, stream)
+		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}, stream)
 		assert.NoError(t, err)
-
-		localRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), ruleName)
-		assert.NoError(t, err)
-		require.Equal(t, localRule.Content, "aaa")
+		require.Equal(t, 1, saveCount)
 	})
 
-	t.Run("download - online version is newer", func(t *testing.T) {
+	// 场景3: 本地存在，本地 v3.0 > 在线 v2.0，NeedUpdate=false → 跳过更新
+	t.Run("skip - local version newer with NeedUpdate=false", func(t *testing.T) {
 		ruleName := uuid.NewString()
-		ruleHash := uuid.NewString()
-		buildRule(ruleName, ruleHash, "20251015.0002")
+		ruleId := uuid.NewString()
+		buildRule(ruleName, ruleId, "20251015.0003", false)
 		defer sfdb.DeleteRuleByRuleName(ruleName)
 
-		guard7 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
-			assert.True(t, progress >= 0 && progress <= 1)
-			log.Info(msg)
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
 		}).Build()
-		defer guard7.UnPatch()
+		defer guard1.UnPatch()
 
-		guard8 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
+		saveCount := 0
+		guard2 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
 			*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
 		) *yaklib.OnlineDownloadFlowRuleStream {
 			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
 			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
 				RuleName: ruleName,
-				RuleId:   ruleHash,
-				Version:  "20251015.0003",
-				Content:  "ccc",
+				RuleId:   ruleId,
+				Version:  "20251015.0002",
+				Content:  "old-content",
 			}, Total: 1}
 			close(ch)
 			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 1}
 		}).Build()
-		defer guard8.UnPatch()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+			saveCount++
+			return nil
+		}).Build()
+		defer guard3.UnPatch()
 
 		server := &Server{}
 		stream := &TestProgressStream{ctx: context.Background()}
-		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{}, stream)
+		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}, stream)
 		assert.NoError(t, err)
+		require.Equal(t, 0, saveCount) // 跳过下载
+	})
 
-		localRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), ruleName)
+	// 场景4: 本地存在，在线 v2.0 >= 本地 v1.0/v2.0，NeedUpdate=true → 冲突-跳过
+	t.Run("conflict - online version newer with NeedUpdate=true", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+		buildRule(ruleName, ruleId, "20251015.0001", true) // 本地有修改
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+
+		var conflictInfo conflictInfo
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+			if msgType == string(DATA) {
+				err := json.Unmarshal([]byte(msg), &conflictInfo)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		}).Build()
+		defer guard1.UnPatch()
+
+		saveCount := 0
+		guard2 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
+			*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
+		) *yaklib.OnlineDownloadFlowRuleStream {
+			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
+			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Version:  "20251015.0002",
+				Content:  "online-content",
+			}, Total: 1}
+			close(ch)
+			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 1}
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+			saveCount++
+			return nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		server := &Server{}
+		stream := &TestProgressStream{ctx: context.Background()}
+		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}, stream)
 		assert.NoError(t, err)
-		require.Equal(t, localRule.Content, "ccc")
+		require.Equal(t, 0, saveCount) // 冲突，跳过下载
+		require.Equal(t, conflictInfo.Local, "local-content")
+		require.Equal(t, conflictInfo.Remote, "online-content")
+	})
+
+	// 场景5: 本地存在，本地 v3.0 > 在线 v2.0，NeedUpdate=true → 逻辑错误
+	t.Run("error - local version newer with NeedUpdate=true", func(t *testing.T) {
+		ruleName := uuid.NewString()
+		ruleId := uuid.NewString()
+		buildRule(ruleName, ruleId, "20251015.0003", true) // 逻辑错误：本地版本更新但有修改标记
+		defer sfdb.DeleteRuleByRuleName(ruleName)
+
+		guard1 := mockey.Mock(sendProgress).To(func(stream ProgressStream, progress float64, msg, msgType string) {
+			log.Infof("[%s] %s", msgType, msg)
+		}).Build()
+		defer guard1.UnPatch()
+
+		saveCount := 0
+		guard2 := mockey.Mock((*yaklib.OnlineClient).DownloadOnlineSyntaxFlowRule).To(func(
+			*yaklib.OnlineClient, context.Context, string, *ypb.DownloadSyntaxFlowRuleRequest,
+		) *yaklib.OnlineDownloadFlowRuleStream {
+			ch := make(chan *yaklib.OnlineSyntaxFlowRuleItem, 1)
+			ch <- &yaklib.OnlineSyntaxFlowRuleItem{Rule: &yaklib.OnlineSyntaxFlowRule{
+				RuleName: ruleName,
+				RuleId:   ruleId,
+				Version:  "20251015.0002",
+				Content:  "old-content",
+			}, Total: 1}
+			close(ch)
+			return &yaklib.OnlineDownloadFlowRuleStream{Chan: ch, Total: 1}
+		}).Build()
+		defer guard2.UnPatch()
+
+		guard3 := mockey.Mock((*yaklib.OnlineClient).SaveSyntaxFlowRule).To(func(*yaklib.OnlineClient, *gorm.DB, ...*yaklib.OnlineSyntaxFlowRule) error {
+			saveCount++
+			return nil
+		}).Build()
+		defer guard3.UnPatch()
+
+		server := &Server{}
+		stream := &TestProgressStream{ctx: context.Background()}
+		err := server.DownloadSyntaxFlowRule(&ypb.DownloadSyntaxFlowRuleRequest{
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				RuleIds: []string{ruleId},
+			},
+		}, stream)
+		assert.NoError(t, err)
+		require.Equal(t, 0, saveCount) // 逻辑错误，跳过下载
 	})
 }
 

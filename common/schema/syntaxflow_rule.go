@@ -342,10 +342,10 @@ type SyntaxFlowRule struct {
 	// false: 未验证的规则，可能需要进一步测试
 	Verified bool
 
-	// Dirty 规则相较于远端是否有改动
+	// NeedUpdate 规则相较于远端是否有改动
 	// true: 远端下载到本地后有新的改动（需要进行冲突检测）
 	// false: 远端下载到本地后没有改动（可以直接覆盖最新版本）
-	Dirty bool
+	NeedUpdate bool
 
 	// ============ 核心内容 ============
 

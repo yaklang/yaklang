@@ -140,5 +140,5 @@ func CheckNewerVersion(base, check string) bool {
 	if base == "" { // check is newer
 		return false
 	}
-	return base >= check
+	return base > check
 }
