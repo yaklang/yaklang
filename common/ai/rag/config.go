@@ -5,12 +5,14 @@ import (
 	"io"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -155,6 +157,17 @@ func WithExportNoOriginInput(noOriginInput bool) RAGSystemConfigOption {
 func WithImportRebuildHNSWIndex(rebuildHNSWIndex bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.rebuildHNSWIndex = rebuildHNSWIndex
+	}
+}
+
+func WithAIServiceName(aiServiceName string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		chatter, err := ai.LoadChater(aiServiceName)
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+			return
+		}
+		config.aiOptions = append(config.aiOptions, aispec.WithAIServiceName(aiServiceName))
 	}
 }
 
