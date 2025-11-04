@@ -191,7 +191,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 			if utils.MatchAllOfSubString(request.GetPrompt(), `["require-tool", "direct-answer"]`, ``) {
 				if utils.MatchAllOfSubString(request.GetPrompt(), "当前任务: \"步骤三") {
 					canSync = true
-					time.Sleep(2 * time.Second)
+					time.Sleep(100 * time.Millisecond)
 				}
 				if taskExecRequestCount < 3 { //  前三次echo调用工具
 					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "echo"}`))
@@ -251,7 +251,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 	var sendSync = false
 
-	ctx := utils.TimeoutContextSeconds(5)
+	ctx := utils.TimeoutContextSeconds(3)
 
 LOOP:
 	for {

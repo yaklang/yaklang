@@ -32,7 +32,7 @@ func mockedToolCallingForCancel(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 
 	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 5.0 }}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 2.0 }}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -64,20 +64,20 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 		aitool.WithNumberParam("seconds"),
 		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			toolCalled = true
-			sleepDuration := params.GetFloat("seconds", 5.0)
-			if sleepDuration <= 0 {
-				sleepDuration = 5.0
+			sleepDuration := params.GetFloat("seconds", 2.0)
+			if sleepDuration <= 0 || sleepDuration > 2.0 {
+				sleepDuration = 2.0
 			}
 
 			fmt.Printf("Long task started, will run for %.1f seconds\n", sleepDuration)
 
 			// 使用小的时间片来检测取消
-			for i := 0; i < int(sleepDuration*10); i++ {
+			for i := 0; i < int(sleepDuration*20); i++ {
 				select {
 				case <-ctx.Done():
 					fmt.Println("Long task was cancelled")
 					return nil, ctx.Err()
-				case <-time.After(100 * time.Millisecond):
+				case <-time.After(50 * time.Millisecond):
 					// 继续执行
 				}
 			}
@@ -115,7 +115,7 @@ func TestReAct_CancelCurrentTask_StatusChanges(t *testing.T) {
 		}
 	}()
 
-	after := time.After(8 * time.Second)
+	after := time.After(3 * time.Second)
 
 	var taskId string
 	taskCreated := false
@@ -154,7 +154,7 @@ LOOP:
 
 				// 立即发送取消请求
 				go func() {
-					time.Sleep(100 * time.Millisecond) // 稍微等待确保工具开始
+					time.Sleep(50 * time.Millisecond) // 稍微等待确保工具开始
 					fmt.Println("Sending cancel request")
 					in <- &ypb.AIInputEvent{
 						IsSyncMessage: true,
