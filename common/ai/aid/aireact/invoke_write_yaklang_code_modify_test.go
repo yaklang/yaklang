@@ -144,7 +144,7 @@ func TestReAct_WriteYaklangCodeAndThenModify(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(50)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
 		du = time.Duration(5)
 	}

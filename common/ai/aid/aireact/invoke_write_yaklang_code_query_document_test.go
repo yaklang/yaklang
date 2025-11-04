@@ -234,9 +234,9 @@ println(parts)
 		}
 	}()
 
-	du := time.Duration(50)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
-		du = time.Duration(10)
+		du = time.Duration(5)
 	}
 	after := time.After(du * time.Second)
 

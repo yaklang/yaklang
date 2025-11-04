@@ -125,9 +125,9 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(50)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
-		du = time.Duration(5)
+		du = time.Duration(1)
 	}
 	after := time.After(du * time.Second)
 
