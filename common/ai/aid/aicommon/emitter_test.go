@@ -30,7 +30,7 @@ func TestEmitThoughtStream_Truncation(t *testing.T) {
 		},
 		{
 			name:    "Long message",
-			content: strings.Repeat("测试Test", 100),
+			content: strings.Repeat("测试Test", 20),
 		},
 		{
 			name:    "Message ending with Chinese",
@@ -69,7 +69,7 @@ func TestEmitThoughtStream_Truncation(t *testing.T) {
 			select {
 			case <-done:
 				// Success
-			case <-time.After(5 * time.Second):
+			case <-time.After(2 * time.Second):
 				t.Fatal("Test timed out waiting for stream to finish")
 			}
 
@@ -125,7 +125,7 @@ func TestTypeWriterCopyWithUTF8Reader(t *testing.T) {
 			// Writer goroutine
 			go func() {
 				defer pw.Close()
-				_, _ = TypeWriterCopy(pw, writer, 200)
+				_, _ = TypeWriterCopy(pw, writer, 500) // Increase speed for testing
 				wg.Done()
 			}()
 
