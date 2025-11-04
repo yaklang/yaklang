@@ -92,7 +92,7 @@ configData = cli.Json("config_data",
           "items": {
             "type": "string"
           },
-          "default": ["**/vendor/**", "**/classes/**", "**/target/**"]
+          "default": ["**/vendor/**,**/classes/**,",  "**/target/**"],
         },
         "re_compile": {
           "title": "重新编译",
