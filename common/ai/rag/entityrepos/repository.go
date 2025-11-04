@@ -842,7 +842,7 @@ func (r *EntityRepository) MergeAndSaveRelationship(newRelationship *schema.ERMo
 }
 
 func (r *EntityRepository) UpdateRelationship(uuid string, relationship *schema.ERModelRelationship) error {
-	err := yakit.UpdateRelationship(r.db, uuid, relationship)
+	err := yakit.UpdateRelationshipByUUID(r.db, uuid, relationship)
 	if err != nil {
 		return err
 	}
