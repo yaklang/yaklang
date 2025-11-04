@@ -102,20 +102,25 @@ type SSAProjectReport struct {
 	// 规则列表
 	Rules         map[string]*SSAReportRule `json:"rules"`
 	EngineVersion string                    `json:"engine_version"`
+
+	// 标志：是否是从用户选择的RiskIDs生成的报告
+	// 如果为true，表示报告数据来源于用户选择的Risk，项目信息字段会被简化
+	FromRiskSelection bool `json:"from_risk_selection"`
 }
 
 // GetProjectInfo 获取项目信息结构体
 func (r *SSAProjectReport) GetProjectInfo() *ProjectInfo {
 	return &ProjectInfo{
-		ProgramName:   r.ProgramName,
-		Language:      r.Language,
-		Description:   r.Description,
-		RepositoryURL: r.RepositoryURL,
-		FileCount:     r.FileCount,
-		CodeLineCount: r.CodeLineCount,
-		ScanStartTime: r.ScanStartTime,
-		ScanEndTime:   r.ScanEndTime,
-		TotalRules:    r.TotalRules,
+		ProgramName:       r.ProgramName,
+		Language:          r.Language,
+		Description:       r.Description,
+		RepositoryURL:     r.RepositoryURL,
+		FileCount:         r.FileCount,
+		CodeLineCount:     r.CodeLineCount,
+		ScanStartTime:     r.ScanStartTime,
+		ScanEndTime:       r.ScanEndTime,
+		TotalRules:        r.TotalRules,
+		FromRiskSelection: r.FromRiskSelection,
 	}
 }
 
@@ -218,19 +223,30 @@ type RiskInstance struct {
 
 // ProjectInfo 项目基本信息
 type ProjectInfo struct {
-	ProgramName   string
-	Language      ssaconfig.Language
-	Description   string
-	RepositoryURL string
-	FileCount     int
-	CodeLineCount int
-	ScanStartTime time.Time
-	ScanEndTime   time.Time
-	TotalRules    int
+	ProgramName       string
+	Language          ssaconfig.Language
+	Description       string
+	RepositoryURL     string
+	FileCount         int
+	CodeLineCount     int
+	ScanStartTime     time.Time
+	ScanEndTime       time.Time
+	TotalRules        int
+	FromRiskSelection bool // 是否从Risk选择生成
 }
 
 // ToMarkdownTable 将项目信息转换为Markdown表格
 func (p *ProjectInfo) ToMarkdownTable() string {
+	// 如果是从用户选择的Risk生成，只显示项目名称和检测规则数
+	if p.FromRiskSelection {
+		return fmt.Sprintf(`# 一、检测项目信息
+| 项目名称     | %s  |
+| :------------: | :---: |
+| 检测规则数   | %d  |`,
+			p.ProgramName, p.TotalRules)
+	}
+
+	// 从任务生成的完整报告，显示所有项目信息
 	baseTable := fmt.Sprintf(`# 一、检测项目信息
 | 项目名称     | %s  |
 | :------------: | :---: |
@@ -810,6 +826,132 @@ func GenerateSSAProjectReportFromTask(ctx context.Context, task *schema.SyntaxFl
 	}
 
 	return report, nil
+}
+
+// GenerateSSAProjectReportFromRiskIDs 基于用户选择的RiskID列表生成SSA项目报告数据
+// 这是一个独立的报告生成路径，与基于Task的生成逻辑分离
+// 报告数据完全基于用户选择的Risk，不依赖Task的统计信息
+func GenerateSSAProjectReportFromRiskIDs(ctx context.Context, riskIDs []int64) (*SSAProjectReport, error) {
+	if len(riskIDs) == 0 {
+		return nil, utils.Errorf("riskIDs is empty")
+	}
+
+	// 通过RiskID获取风险数据
+	risks, err := getRisksByIDs(riskIDs)
+	if err != nil {
+		return nil, utils.Wrapf(err, "get risks by ids failed")
+	}
+
+	if len(risks) == 0 {
+		return nil, utils.Errorf("no risks found for the given risk ids")
+	}
+
+	// 从Risk列表中提取所有涉及的ProgramName，用 | 分隔
+	programNameSet := make(map[string]bool)
+	for _, risk := range risks {
+		if risk.ProgramName != "" {
+			programNameSet[risk.ProgramName] = true
+		}
+	}
+
+	// 组合ProgramName（使用换行分隔，在markdown表格中更清晰）
+	var programNames []string
+	for name := range programNameSet {
+		programNames = append(programNames, name)
+	}
+	sort.Strings(programNames) // 排序保证顺序一致
+	// 使用 <br/> 换行符组合项目名称，在markdown表格中会换行显示
+	combinedProgramName := strings.Join(programNames, "<br/>")
+
+	// 创建报告结构（基于用户选择的Risk）
+	report := &SSAProjectReport{
+		ProgramName:       combinedProgramName,
+		ReportTime:        time.Now(),
+		Rules:             make(map[string]*SSAReportRule),
+		FromRiskSelection: true, // 标记为从Risk选择生成
+	}
+
+	// 从Risk数据中统计规则数量
+	ruleSet := make(map[string]bool)
+	for _, risk := range risks {
+		if risk.FromRule != "" {
+			ruleSet[risk.FromRule] = true
+		}
+	}
+	report.TotalRules = len(ruleSet)
+
+	// 批量处理风险数据（一次遍历完成所有统计）
+	err = processRisksAndStats(report, risks)
+	if err != nil {
+		return nil, utils.Wrapf(err, "process risks and stats failed")
+	}
+
+	// 从处理后的风险中计算统计信息（完全基于用户选择的Risk）
+	report.TotalRisksCount = len(risks)
+	report.CriticalRisksCount = 0
+	report.HighRisksCount = 0
+	report.MiddleRisksCount = 0
+	report.LowRisksCount = 0
+
+	// 统计各等级风险数量和时间范围
+	var minTime, maxTime time.Time
+	for i, risk := range risks {
+		// 统计风险等级
+		switch strings.ToLower(string(risk.Severity)) {
+		case severityCritical:
+			report.CriticalRisksCount++
+		case severityHigh:
+			report.HighRisksCount++
+		case severityMiddle:
+			report.MiddleRisksCount++
+		case severityLow:
+			report.LowRisksCount++
+		}
+
+		// 统计时间范围
+		if i == 0 {
+			minTime = risk.CreatedAt
+			maxTime = risk.UpdatedAt
+		} else {
+			if risk.CreatedAt.Before(minTime) {
+				minTime = risk.CreatedAt
+			}
+			if risk.UpdatedAt.After(maxTime) {
+				maxTime = risk.UpdatedAt
+			}
+		}
+	}
+
+	report.ScanStartTime = minTime
+	report.ScanEndTime = maxTime
+
+	// 日志输出使用未转义的格式，更易读
+	logProgramName := strings.Join(programNames, " | ")
+	log.Infof("Generated report from %d selected risks, covering %d programs: %s",
+		len(risks), len(programNames), logProgramName)
+
+	return report, nil
+}
+
+// getRisksByIDs 通过RiskID列表获取风险
+func getRisksByIDs(riskIDs []int64) ([]*schema.SSARisk, error) {
+	if len(riskIDs) == 0 {
+		return nil, utils.Errorf("riskIDs is empty")
+	}
+
+	log.Infof("getRisksByIDs: querying %d risks", len(riskIDs))
+	filter := &ypb.SSARisksFilter{
+		ID: riskIDs,
+	}
+
+	risks, err := getRisks(filter)
+	if err != nil {
+		log.Errorf("getRisksByIDs: failed to get risks, error: %v", err)
+		return nil, err
+	}
+
+	log.Infof("getRisksByIDs: successfully retrieved %d risks", len(risks))
+	return risks, nil
 }
 
 // GenerateYakitReportContent 生成yakit报告内容

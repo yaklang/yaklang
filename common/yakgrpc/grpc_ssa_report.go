@@ -15,17 +15,13 @@ import (
 )
 
 // GenerateSSAReport 生成SSA扫描报告
+// 支持两种生成方式：
+// 1. 基于TaskID：生成整个扫描任务的完整报告
+// 2. 基于RiskIDs：生成用户选择的Risk的报告
 func (s *Server) GenerateSSAReport(ctx context.Context, req *ypb.GenerateSSAReportRequest) (*ypb.GenerateSSAReportResponse, error) {
-	// 参数验证
-	if req.GetTaskID() == "" {
-		return nil, utils.Errorf("taskID is required")
-	}
-	// 根据TaskID获取扫描任务信息
-	db := s.GetSSADatabase()
-	task, err := schema.GetSyntaxFlowScanTaskById(db, req.GetTaskID())
-	if err != nil {
-		log.Errorf("get syntax flow scan task failed: %v", err)
-		return nil, utils.Wrapf(err, "get syntax flow scan task failed")
+	// 参数验证：TaskID和RiskIDs至少需要一个
+	if req.GetTaskID() == "" && len(req.GetRiskIDs()) == 0 {
+		return nil, utils.Errorf("taskID or riskIDs is required")
 	}
 
 	// 设置报告名称
@@ -34,11 +30,33 @@ func (s *Server) GenerateSSAReport(ctx context.Context, req *ypb.GenerateSSARepo
 		reportName = fmt.Sprintf("%s_%s", "SSA项目扫描报告", time.Now().Format("20060102150405"))
 	}
 
-	// 生成SSA项目报告数据
-	ssaReport, err := sfreport.GenerateSSAProjectReportFromTask(ctx, task)
-	if err != nil {
-		log.Errorf("generate ssa project report failed: %v", err)
-		return nil, utils.Wrapf(err, "generate ssa project report failed")
+	var ssaReport *sfreport.SSAProjectReport
+	var err error
+
+	// 两种独立的报告生成路径
+	if len(req.GetRiskIDs()) > 0 {
+		// 路径1：基于用户选择的RiskIDs生成报告（新功能）
+		log.Infof("generating report from %d selected risk IDs", len(req.GetRiskIDs()))
+		ssaReport, err = sfreport.GenerateSSAProjectReportFromRiskIDs(ctx, req.GetRiskIDs())
+		if err != nil {
+			log.Errorf("generate ssa project report from risk ids failed: %v", err)
+			return nil, utils.Wrapf(err, "generate ssa project report from risk ids failed")
+		}
+	} else {
+		// 路径2：基于TaskID生成完整扫描任务报告（原有功能）
+		log.Infof("generating report from task ID: %s", req.GetTaskID())
+		db := s.GetSSADatabase()
+		task, err := schema.GetSyntaxFlowScanTaskById(db, req.GetTaskID())
+		if err != nil {
+			log.Errorf("get syntax flow scan task failed: %v", err)
+			return nil, utils.Wrapf(err, "get syntax flow scan task failed")
+		}
+
+		ssaReport, err = sfreport.GenerateSSAProjectReportFromTask(ctx, task)
+		if err != nil {
+			log.Errorf("generate ssa project report failed: %v", err)
+			return nil, utils.Wrapf(err, "generate ssa project report failed")
+		}
 	}
 
 	// 创建IRify报告实例
