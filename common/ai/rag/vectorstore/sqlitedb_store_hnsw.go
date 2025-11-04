@@ -43,6 +43,8 @@ type SQLiteVectorStoreHNSW struct {
 	UIDType                    string
 
 	cacheSize int
+
+	config *CollectionConfig
 }
 
 const (
@@ -74,6 +76,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 		ctx:                        context.Background(),
 		embedder:                   collectionConfig.EmbeddingClient,
 		cacheSize:                  10000,
+		config:                     collectionConfig,
 	}
 
 	hnswGraph := NewHNSWGraph(collectionName,
@@ -297,7 +300,7 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 	// 创建集合配置
 	collection := schema.VectorStoreCollection{
 		Name:             name,
-		Description:      cfg.Description,
+		Description:      description,
 		ModelName:        cfg.ModelName,
 		Dimension:        cfg.Dimension,
 		M:                cfg.MaxNeighbors,
@@ -323,6 +326,7 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 		collection:                 &collection,
 		hnsw:                       hnswGraph,
 		cacheSize:                  10000,
+		config:                     cfg,
 	}
 
 	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
@@ -441,13 +445,16 @@ func (s *SQLiteVectorStoreHNSW) embedDocuments(docs ...*Document) ([]*Document, 
 
 	// 为每个文档生成嵌入向量
 	for i := range docs {
+		if len(docs[i].Content) == 0 {
+			log.Errorf("document %s has no content", docs[i].ID)
+		}
 		//log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
 		// 首先尝试直接生成嵌入
 		embeddingData, err := s.embedder.Embedding(docs[i].Content)
 		if err != nil {
 			if errors.Is(err, embedding.ErrInputTooLarge) {
 				// 如果失败且是由于文本过大，使用BigTextPlan处理
-				processedDocs, processErr := processBigText(s.embedder, docs[i], defaultMaxChunkSize, defaultChunkOverlap, defaultBigTextPlan)
+				processedDocs, processErr := processBigText(s.embedder, docs[i], s.config.MaxChunkSize, s.config.Overlap, s.config.BigTextPlan)
 				if processErr != nil {
 					log.Errorf("failed to process big text for document %s: %v", docs[i].ID, processErr)
 					return nil, utils.Errorf("failed to process document %s: %v", docs[i].ID, processErr)
