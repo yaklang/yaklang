@@ -82,6 +82,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 			Group("syntax_flow_rules.id")
 	}
 
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_id", filter.GetRuleIds())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", filter.GetSeverity())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
@@ -208,7 +209,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.OpCodes = dbRule.OpCodes
 	updateRule.Hash = dbRule.CalcHash()
 	updateRule.Version = sfdb.UpdateVersion(updateRule.Version)
-	updateRule.Dirty = true
+	updateRule.NeedUpdate = true
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
