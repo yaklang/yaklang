@@ -67,6 +67,15 @@ func NewActionTestFrameworkEx(
 
 			rsp := i.NewAIResponse()
 
+			// Check if this is a verification prompt
+			prompt := req.GetPrompt()
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				// Return verification response
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// For the first call, extract the action from the test request
 			// This is set via framework's context
 			if callNum == 1 {
@@ -85,7 +94,7 @@ func NewActionTestFrameworkEx(
 			return rsp, nil
 		}),
 		// Auto-approve all tool uses in tests (no manual review required)
-		aicommon.WithAgreeAuto(),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
 	}
 
 	// Append user-provided AI config options

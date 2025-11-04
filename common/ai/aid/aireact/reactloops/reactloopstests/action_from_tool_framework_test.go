@@ -143,10 +143,20 @@ func TestActionFromTool_MultipleParameters(t *testing.T) {
 		t.Fatalf("Failed to create calculator tool: %v", err)
 	}
 
-	// Create framework and register the tool-based action
-	framework := NewActionTestFramework(t, "calc-test")
+	// Create test framework with AI config options to add the tool
+	framework := NewActionTestFrameworkEx(
+		t,
+		"calc-test",
+		nil, // No loop options
+		[]aicommon.ConfigOption{
+			aicommon.WithTools(calcTool),
+		},
+	)
 
+	// Convert the tool to a LoopAction and register it
 	loopAction := reactloops.ConvertAIToolToLoopAction(calcTool)
+
+	// Register the action with the framework's loop
 	registerOption := reactloops.WithRegisterLoopAction(
 		loopAction.ActionType,
 		loopAction.Description,
