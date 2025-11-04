@@ -2,14 +2,15 @@ package aicommon
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
-
 
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
 
 	ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error)
+	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error)
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)

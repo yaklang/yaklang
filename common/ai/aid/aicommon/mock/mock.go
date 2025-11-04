@@ -196,6 +196,10 @@ func (m *MockInvoker) ExecuteToolRequiredAndCall(ctx context.Context, name strin
 	return nil, false, nil
 }
 
+func (m *MockInvoker) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+	return nil, false, nil
+}
+
 func (m *MockInvoker) AskForClarification(ctx context.Context, question string, payloads []string) string {
 	return ""
 }

@@ -371,12 +371,17 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		}
 	}()
 
+	needSummary := utils.NewBool(false)
+	defer func() {
+
+	}()
 LOOP:
 	for {
 		iterationCount++
 		if iterationCount > maxIterations {
 			r.finishIterationLoopWithError(iterationCount, task, utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations))
 			log.Warnf("Reached max iterations (%d), stopping code generation loop", maxIterations)
+			needSummary.SetTo(true)
 			break LOOP
 		}
 
@@ -405,6 +410,7 @@ LOOP:
 		if finalError != nil {
 			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			log.Errorf("Failed to generate prompt: %v", finalError)
+			needSummary.SetTo(true)
 			return finalError
 		}
 
@@ -416,6 +422,7 @@ LOOP:
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
+			needSummary.SetTo(true)
 			break LOOP
 		}
 
@@ -428,6 +435,7 @@ LOOP:
 		if utils.IsNil(actionParams) {
 			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))
 			log.Error("action is nil in ReActLoop")
+			needSummary.SetTo(true)
 			break LOOP
 		}
 		actionName := actionParams.Name()
@@ -464,6 +472,7 @@ LOOP:
 			// ActionHandler 必须存在
 			finalError = utils.Errorf("action[%s] has no ActionHandler", actionName)
 			r.finishIterationLoopWithError(iterationCount, task, finalError)
+			needSummary.SetTo(true)
 			return finalError
 		}
 
