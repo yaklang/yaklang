@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"testing"
-	"time"
 )
 
 func mockedRequestPlanAndExecuting_Normal(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
@@ -96,7 +97,7 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(50)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
 		du = time.Duration(5)
 	}

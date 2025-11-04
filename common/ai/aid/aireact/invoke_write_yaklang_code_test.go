@@ -16,6 +16,33 @@ import (
 
 func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Handle init task: analyze-requirement-and-search
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["println"],
+  "reason": "Simple test code"
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Handle compress search results: extract-ranked-lines
+	if utils.MatchAllOfSubString(prompt, "extract-ranked-lines", "ranges", "rank", "reason") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "extract-ranked-lines",
+  "ranges": [
+    {"range": "1-3", "rank": 1, "reason": "Test code"}
+  ]
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -33,7 +60,7 @@ func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, `"query_document"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
 		// extract nonce from <|GEN_CODE_{{.Nonce}}|>
 		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
 		matches := re.FindStringSubmatch(prompt)
@@ -93,7 +120,7 @@ func TestReAct_WriteYaklangCode(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(50)
+	du := time.Duration(10)
 	if utils.InGithubActions() {
 		du = time.Duration(5)
 	}

@@ -67,9 +67,9 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 		"sleep",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			sleepInt := params.GetFloat("seconds", 0.3)
+			sleepInt := params.GetFloat("seconds", 0.01) // Reduce sleep from 0.3s to 0.01s for faster tests
 			if sleepInt <= 0 {
-				sleepInt = 0.3
+				sleepInt = 0.01
 			}
 			time.Sleep(time.Duration(sleepInt) * time.Second)
 			return "done", nil
@@ -153,9 +153,9 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 		"sleep",
 		aitool.WithNumberParam("seconds"),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			sleepInt := params.GetFloat("seconds", 0.3)
+			sleepInt := params.GetFloat("seconds", 0.01) // Reduce sleep from 0.3s to 0.01s for faster tests
 			if sleepInt <= 0 {
-				sleepInt = 0.3
+				sleepInt = 0.01
 			}
 			time.Sleep(time.Duration(sleepInt) * time.Second)
 			return "done", nil
@@ -258,7 +258,7 @@ for i = 0; i < 5; i++ {
 	}
 
 	// 给异步流处理更多时间
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // Reduced from 500ms for faster tests
 
 	// 验证代码是否被提取
 	code := loop.Get("generated_code")
@@ -562,6 +562,9 @@ func TestReActLoop_ErrorHandling(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return nil, fmt.Errorf("simulated AI error")
 		}),
+		// Reduce retry counts to speed up test
+		aicommon.WithAIAutoRetry(1),            // Only retry once (default 5)
+		aicommon.WithAITransactionAutoRetry(1), // Only 1 transaction retry (default 5)
 	)
 	if err != nil {
 		t.Fatalf("Failed to create ReAct: %v", err)
@@ -639,7 +642,7 @@ func TestReActLoop_ContextCancellation(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			// 模拟长时间运行
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond) // Reduced from 100ms for faster tests
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
 			rsp.Close()
@@ -659,7 +662,7 @@ func TestReActLoop_ContextCancellation(t *testing.T) {
 
 	// 在另一个 goroutine 中取消上下文
 	go func() {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond) // Reduced from 50ms for faster tests
 		cancel()
 	}()
 

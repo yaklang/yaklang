@@ -50,6 +50,7 @@ func TestActionFromTool_WithFramework(t *testing.T) {
 		nil, // No loop options
 		[]aicommon.ConfigOption{
 			aicommon.WithTools(echoTool),
+			aicommon.WithAIAutoRetry(1), // Reduce retry for faster tests
 		},
 	)
 
@@ -150,6 +151,7 @@ func TestActionFromTool_MultipleParameters(t *testing.T) {
 		nil, // No loop options
 		[]aicommon.ConfigOption{
 			aicommon.WithTools(calcTool),
+			aicommon.WithAIAutoRetry(1), // Reduce retry for faster tests
 		},
 	)
 
