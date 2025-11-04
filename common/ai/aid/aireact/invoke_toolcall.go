@@ -11,8 +11,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// ExecuteToolRequiredAndCall handles tool requirement action using aicommon.ToolCaller
-func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string) (*aitool.ToolResult, bool, error) {
+// executeToolCallInternal is the internal implementation that handles both regular and preset-parameter tool calls.
+// If params is nil, it will use AI to generate parameters (require phase).
+// If params is provided, it will skip the require phase and use the provided parameters directly.
+func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, params aitool.InvokeParams, skipRequire bool) (*aitool.ToolResult, bool, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
@@ -24,6 +26,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 	default:
 	}
 
+	// Setup task-aware event emitter
 	var taskId string
 	if !utils.IsNil(r.currentTask) {
 		taskId = r.currentTask.GetId()
@@ -37,17 +40,21 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 	defer func() {
 		r.config.Emitter = r.config.Emitter.PopEventProcesser()
 	}()
+
 	// Find the required tool
 	tool, err := r.config.AiToolManager.GetToolByName(toolName)
 	if err != nil {
 		return nil, false, utils.Errorf("tool '%s' not found: %v", toolName, err)
 	}
 
-	log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+	if skipRequire {
+		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
+	} else {
+		log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+	}
 
+	// Create ToolCaller with appropriate options
 	var toolCaller *aicommon.ToolCaller
-	// Create ToolCaller with parameter generation prompt builder
-	// Use current task if available for proper context handling
 	currentTask := r.GetCurrentTask()
 
 	var toolCallerOptions []aicommon.ToolCallerOption
@@ -58,15 +65,14 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		aicommon.WithToolCaller_Emitter(r.config.Emitter),
 	)
 
-	// Only add task if we have a current task (for proper context cancellation)
+	// Add task context
 	if currentTask != nil {
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(currentTask))
 	} else {
-		// Fall back to config.task if available
 		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.DefaultTask))
 	}
 
-	// Add the remaining options
+	// Add callback handlers
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
 			toolCaller.SetEmitter(r.config.Emitter.AssociativeAIProcess(&schema.AiProcess{
@@ -77,20 +83,35 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
 			toolCaller.SetEmitter(toolCaller.GetEmitter().PopEventProcesser())
 		}),
-		aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
-			return r.generateToolParamsPrompt(tool, toolName)
-		}),
 		aicommon.WithToolCaller_ReviewWrongTool(r._invokeToolCall_ReviewWrongTool),
 		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
 	)
+
+	// Only add parameter generation builder if we need AI to generate params
+	if !skipRequire {
+		toolCallerOptions = append(toolCallerOptions,
+			aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
+				return r.generateToolParamsPrompt(tool, toolName)
+			}),
+		)
+	}
 
 	toolCaller, err = aicommon.NewToolCaller(ctx, toolCallerOptions...)
 	if err != nil {
 		return nil, false, utils.Errorf("failed to create tool caller: %v", err)
 	}
 
-	// Call the tool using ToolCaller
-	result, directlyAnswer, err := toolCaller.CallTool(tool)
+	// Call the tool with appropriate method
+	var result *aitool.ToolResult
+	var directlyAnswer bool
+	if skipRequire {
+		// Call with preset parameters, skipping the require phase
+		result, directlyAnswer, err = toolCaller.CallToolWithExistedParams(tool, true, params)
+	} else {
+		// Call with AI parameter generation (require phase included)
+		result, directlyAnswer, err = toolCaller.CallTool(tool)
+	}
+
 	if err != nil {
 		return nil, false, utils.Errorf("tool call failed: %v", err)
 	}
@@ -109,6 +130,19 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 		r.EmitInfo("Tool execution completed: %s", result.Name)
 	}
 	return result, directlyAnswer, nil
+}
+
+// ExecuteToolRequiredAndCall handles tool requirement action using aicommon.ToolCaller.
+// It uses AI to generate tool parameters (require phase) before calling the tool.
+func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string) (*aitool.ToolResult, bool, error) {
+	return r.executeToolCallInternal(ctx, toolName, nil, false)
+}
+
+// ExecuteToolRequiredAndCallWithoutRequired handles tool execution with provided parameters,
+// skipping the parameter generation (require) phase. It directly calls the tool with the given params.
+// This is useful when parameters are already known and don't need to be generated by AI.
+func (r *ReAct) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
+	return r.executeToolCallInternal(ctx, toolName, params, true)
 }
 
 // generateToolParamsPrompt generates the prompt for tool parameter generation

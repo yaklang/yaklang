@@ -167,19 +167,20 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
-		invoker:         invoker,
-		loopName:        name,
-		config:          config,
-		emitter:         config.GetEmitter(),
-		maxIterations:   100,
-		actions:         omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:     omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:    omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:     omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:            omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:       new(sync.Mutex),
-		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit: 10 * 1024,
+		invoker:              invoker,
+		loopName:             name,
+		config:               config,
+		emitter:              config.GetEmitter(),
+		maxIterations:        100,
+		actions:              omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:          omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:         omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:          omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:                 omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:            new(sync.Mutex),
+		currentMemories:      omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
+		memorySizeLimit:      10 * 1024,
+		enableSelfReflection: true,
 	}
 
 	for _, action := range []*LoopAction{
