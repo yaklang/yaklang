@@ -398,7 +398,7 @@ func WithProgramName(name string) Option {
 
 func WithProjectName(name string) Option {
 	return func(c *Config) error {
-		project, err := ssaproject.LoadSSAProjectBuilderByName(name)
+		project, err := ssaproject.LoadSSAProjectByName(name)
 		if err != nil {
 			return err
 		}
@@ -450,6 +450,13 @@ func WithSSAConfig(sc *ssaconfig.Config) Option {
 				return err
 			}
 		}
+		return nil
+	}
+}
+
+func WithJSONConfig(str string) Option {
+	return func(c *Config) error {
+		// TODO:这个要返回ssaconfig option
 		return nil
 	}
 }
@@ -609,6 +616,7 @@ var Exports = map[string]any{
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
 	"withMemory":             WithMemory,
 	"withSSAConfig":          WithSSAConfig,
+	"withJSONConfig":         WithJSONConfig,
 
 	//diff compare
 	// "withDiffProgName":          DiffWithProgram,

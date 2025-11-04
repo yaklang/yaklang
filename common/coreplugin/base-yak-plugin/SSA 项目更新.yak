@@ -1,0 +1,258 @@
+yakit.AutoInitYakit()
+
+// 接收项目ID
+projectId = cli.Int(
+    "project_id",
+    cli.setRequired(true),
+    cli.setVerboseName("项目ID"),
+    cli.setHelp("需要更新的SSA项目ID"),
+)
+
+// 使用JSON Schema定义项目数据（匹配 schema.SSAProject 结构）
+projectData = cli.Json("project_data",
+    cli.setVerboseName("项目数据"),
+    cli.setRequired(true),
+    cli.setJsonSchema(<<<JSON
+{
+  "type": "object",
+  "properties": {
+    "project_name": {
+      "title": "项目名称",
+      "type": "string"
+    },
+    "description": {
+      "title": "项目描述",
+      "type": "string"
+    },
+    "tags": {
+      "title": "项目标签",
+      "type": "string",
+      "description": "多个标签用逗号分隔"
+    },
+    "language": {
+      "title": "项目语言",
+      "type": "string",
+      "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
+    },
+    "config": {
+      "title": "项目配置",
+      "type": "object",
+      "properties": {
+        "BaseInfo": {
+          "title": "基础信息",
+          "type": "object",
+          "properties": {
+            "project_name": {
+              "title": "项目名称",
+              "type": "string"
+            },
+            "project_description": {
+              "title": "项目描述",
+              "type": "string"
+            },
+            "language": {
+              "title": "项目语言",
+              "type": "string",
+              "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
+            },
+            "tags": {
+              "title": "项目标签",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "CodeSource": {
+          "title": "代码源配置",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "title": "源码类型",
+              "type": "string",
+              "enum": ["local", "compression", "jar", "git", "svn"]
+            },
+            "local_file": {
+              "title": "本地路径",
+              "type": "string",
+              "yakit_type": "folder"
+            },
+            "url": {
+              "title": "远程URL",
+              "type": "string"
+            },
+            "branch": {
+              "title": "分支",
+              "type": "string"
+            },
+            "path": {
+              "title": "子路径",
+              "type": "string"
+            }
+          }
+        },
+        "SSACompile": {
+          "title": "编译配置",
+          "type": "object",
+          "properties": {
+            "strict_mode": {
+              "title": "严格模式",
+              "type": "boolean",
+              "default": false
+            },
+            "peephole_size": {
+              "title": "窥视孔大小",
+              "type": "integer",
+              "default": 0,
+              "description": "项目分片大小，0表示关闭"
+            },
+            "exclude_files": {
+              "title": "排除文件",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": ["**/vendor/**", "**/classes/**", "**/target/**"]
+            },
+            "re_compile": {
+              "title": "重新编译",
+              "type": "boolean",
+              "default": true
+            },
+            "memory_compile": {
+              "title": "内存编译",
+              "type": "boolean",
+              "default": false
+            },
+            "compile_concurrency": {
+              "title": "编译并发数",
+              "type": "integer",
+              "default": 10
+            }
+          }
+        },
+        "SyntaxFlow": {
+          "title": "SyntaxFlow配置",
+          "type": "object",
+          "properties": {
+            "memory": {
+              "title": "使用内存",
+              "type": "boolean",
+              "default": false
+            },
+            "result_save_kind": {
+              "title": "结果保存类型",
+              "type": "integer",
+              "default": 0
+            }
+          }
+        },
+        "SyntaxFlowScan": {
+          "title": "扫描配置",
+          "type": "object",
+          "properties": {
+            "concurrency": {
+              "title": "扫描并发数",
+              "type": "integer",
+              "default": 5
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["project_name", "language"]
+}
+JSON
+    ),
+)
+
+cli.check()
+
+yakit.Info("开始更新SSA项目，项目ID: %d", projectId)
+
+yakit.Info("加载项目...")
+project, err = ssa.GetSSAProjectByID(projectId)
+if err != nil {
+    yakit.Error("加载SSA项目失败: %v", err)
+    return
+}
+
+yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
+
+// 2. 更新项目基础字段（用于数据库索引）
+if projectData["project_name"] != nil && projectData["project_name"] != undefined && projectData["project_name"] != "" {
+    project.ProjectName = sprint(projectData["project_name"])
+    yakit.Info("更新项目名称: %s", project.ProjectName)
+}
+
+if projectData["description"] != nil && projectData["description"] != undefined {
+    project.Description = sprint(projectData["description"])
+    yakit.Info("更新项目描述: %s", project.Description)
+}
+
+if projectData["language"] != nil && projectData["language"] != undefined && projectData["language"] != "" {
+    project.Language = sprint(projectData["language"])
+    yakit.Info("更新项目语言: %s", project.Language)
+}
+
+// 3. 处理配置数据
+configObj = projectData["config"]
+if configObj != nil  {
+    yakit.Info("更新项目配置...")
+    
+    configBytes = []byte(configObj)
+    config,err = ssa.NewSSAConfigByJSON(configBytes)
+    if err != nil {
+        yakit.Error(tmp /*type: string*/, items...)
+    }
+    
+    newConfig, err = ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJSONRawConfig(configBytes))
+    if err != nil {
+        yakit.Error("解析配置失败: %v", err)
+        return
+    }
+    
+    // 确保配置中的基础信息与 SSAProject 字段保持同步
+    if newConfig.BaseInfo == nil {
+        newConfig.BaseInfo = {}
+    }
+    newConfig.BaseInfo.ProjectID = projectId
+    newConfig.BaseInfo.ProjectName = project.ProjectName
+    newConfig.BaseInfo.ProjectDescription = project.Description
+    newConfig.BaseInfo.Language = project.Language
+    newConfig.BaseInfo.Tags = project.Tags
+    
+    project.Config = newConfig
+    yakit.Info("配置已更新")
+} else {
+    yakit.Info("未提供配置数据，保持原配置不变")
+    // 即使不更新配置，也要确保现有配置中的基础信息同步
+    if project.Config != nil && project.Config.BaseInfo != nil {
+        project.Config.BaseInfo.ProjectID = projectId
+        project.Config.BaseInfo.ProjectName = project.ProjectName
+        project.Config.BaseInfo.ProjectDescription = project.Description
+        project.Config.BaseInfo.Language = project.Language
+        project.Config.BaseInfo.Tags = project.Tags
+    }
+}
+
+// 4. 保存项目
+yakit.Info("保存项目到数据库...")
+err = project.Save()
+if err != nil {
+    yakit.Error("保存SSA项目失败: %v", err)
+    return
+}
+
+yakit.Info("SSA项目更新成功!")
+yakit.Output({
+    "success": true,
+    "project_id": project.ID,
+    "project_name": project.ProjectName,
+    "description": project.Description,
+    "language": project.Language,
+    "tags": project.Tags,
+})
+

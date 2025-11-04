@@ -1,6 +1,9 @@
 package ssaconfig
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 type Config struct {
 	ctx            context.Context
@@ -29,6 +32,7 @@ const (
 	ModeCodeSource            Mode = 1 << iota // 5 - 源码配置模式
 
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
+	ModeProjectCompile      = ModeProjectBase | ModeCodeSource | ModeSSACompile
 	// all
 	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
 )
@@ -47,12 +51,43 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 	}
 	return cfg, nil
 }
+
+func NewConfigByJSON(raw []byte) (*Config, error) {
+	cfg := &Config{
+		ExtraInfo: map[string]any{},
+	}
+	cfg.Mode = ModeAll
+	err := WithJSONRawConfig(raw)(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 func NewSyntaxFlowScanConfig(opts ...Option) (*Config, error) {
 	return New(ModeSyntaxFlowScan, opts...)
 }
 
 func (c *Config) IsSyntaxFlowScanConfig() bool {
 	return c.Mode == ModeSyntaxFlowScan
+}
+
+func (c *Config) ToJSONRaw() ([]byte, error) {
+	if c == nil {
+		return nil, nil
+	}
+	return json.Marshal(c)
+}
+
+func (c *Config) ToJSONString() (string, error) {
+	if c == nil {
+		return "", nil
+	}
+	data, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // default factory functions - used by With... option helpers to create nested configs
@@ -186,5 +221,15 @@ func (c *Config) IsContextCancel() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func WithJSONRawConfig(raw []byte) Option {
+	return func(c *Config) error {
+		err := json.Unmarshal(raw, &c)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 }

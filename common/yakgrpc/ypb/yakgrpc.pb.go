@@ -62462,9 +62462,10 @@ type SSAProject struct {
 	// 扫描配置选项
 	ScanConfig *SSAProjectScanConfig `protobuf:"bytes,10,opt,name=ScanConfig,proto3" json:"ScanConfig,omitempty"`
 	// 规则策略配置
-	RuleConfig    *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	RuleConfig       *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
+	JSONStringConfig string                    `protobuf:"bytes,12,opt,name=JSONStringConfig,proto3" json:"JSONStringConfig,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SSAProject) Reset() {
@@ -62572,6 +62573,13 @@ func (x *SSAProject) GetRuleConfig() *SSAProjectScanRuleConfig {
 		return x.RuleConfig
 	}
 	return nil
+}
+
+func (x *SSAProject) GetJSONStringConfig() string {
+	if x != nil {
+		return x.JSONStringConfig
+	}
+	return ""
 }
 
 type SSAProjectCompileConfig struct {
@@ -68639,7 +68647,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
 	"\n" +
 	"ReportData\x18\x03 \x01(\tR\n" +
-	"ReportData\"\xb6\x03\n" +
+	"ReportData\"\xe2\x03\n" +
 	"\n" +
 	"SSAProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
@@ -68657,7 +68665,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ScanConfig\x12=\n" +
 	"\n" +
 	"RuleConfig\x18\v \x01(\v2\x1d.ypb.SSAProjectScanRuleConfigR\n" +
-	"RuleConfig\"\xd9\x01\n" +
+	"RuleConfig\x12*\n" +
+	"\x10JSONStringConfig\x18\f \x01(\tR\x10JSONStringConfig\"\xd9\x01\n" +
 	"\x17SSAProjectCompileConfig\x12\x1e\n" +
 	"\n" +
 	"StrictMode\x18\x01 \x01(\bR\n" +
