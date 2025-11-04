@@ -42,7 +42,7 @@ type CodeSourceInfo struct {
 	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
 }
 
-func (c *CodeSourceInfo) JsonString() string {
+func (c *CodeSourceInfo) ToJSONString() string {
 	json, err := json.Marshal(c)
 	if err != nil {
 		return ""
