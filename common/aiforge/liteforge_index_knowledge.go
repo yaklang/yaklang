@@ -172,7 +172,12 @@ func BuildIndexFormAnalyzeResult(res AnalysisResult, option ...any) ([]*schema.K
 		return nil, err
 	}
 
-	indexResult, err := _executeLiteForgeTemp(query, refineConfig.ForgeExecOption(indexBuildSchema)...)
+	ragConfig := rag.NewRAGSystemConfig(refineConfig.ragSystemOptions...)
+	aiService := ragConfig.GetAIService()
+
+	refineOpts := refineConfig.ForgeExecOption(indexBuildSchema)
+	refineOpts = append(refineOpts, aicommon.WithAICallback(aiService))
+	indexResult, err := _executeLiteForgeTemp(query, refineOpts...)
 	if err != nil {
 		return nil, err
 	}

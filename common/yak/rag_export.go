@@ -18,6 +18,7 @@ import (
 
 // 导出的公共函数
 var RagExports = map[string]interface{}{
+	"Get":           rag.Get,
 	"GetCollection": rag.Get,
 
 	"embeddingHandle": _embeddingHandle,
@@ -76,23 +77,57 @@ var RagExports = map[string]interface{}{
 
 	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeFromEntityReposByName,
 
-	"BuildIndexKnowledgeFromFile": aiforge.BuildIndexKnowledgeFromFile,
+	"BuildIndexKnowledgeFromFile": BuildIndexKnowledgeFromFile,
 
-	"Import":             rag.ImportRAGFromFile,
+	"Import":             rag.ImportRAG,
 	"db":                 rag.WithDB,
 	"importOverwrite":    rag.WithExportOverwriteExisting,
 	"importName":         rag.WithRAGCollectionName,
 	"importRebuildGraph": rag.WithImportRebuildHNSWIndex,
 	"documentHandler":    rag.WithExportDocumentHandler,
 	"progressHandler":    rag.WithExportOnProgressHandler,
-	"aiServiceName":      rag.WithAIServiceName,
-	"aiServiceConfig":    rag.WithAIServiceConfig,
+	"aiServiceType":      rag.WithAIServiceType,
+	"aiService":          rag.WithAIService,
 
-	"Export":        rag.ExportRAGToFile,
-	"noHNSWGraph":   rag.WithExportNoHNSWIndex,
-	"noMetadata":    rag.WithExportNoMetadata,
-	"noOriginInput": rag.WithExportNoOriginInput,
-	"onlyPQCode":    rag.WithExportOnlyPQCode,
+	"Export":             rag.ExportRAG,
+	"noHNSWGraph":        rag.WithExportNoHNSWIndex,
+	"noMetadata":         rag.WithExportNoMetadata,
+	"noOriginInput":      rag.WithExportNoOriginInput,
+	"onlyPQCode":         rag.WithExportOnlyPQCode,
+	"noEntityRepository": _noEntityRepository,
+	"noKnowledgeBase":    _noKnowledgeBase,
+}
+
+func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {
+	entries, err := aiforge.BuildIndexKnowledgeFromFile(kbName, path, option...)
+	if err != nil {
+		return err
+	}
+	for range entries {
+	}
+	return nil
+}
+
+// _noEntityRepository 禁用实体仓库
+// Example:
+// ```
+//
+//	rag.noEntityRepository()
+//
+// ```
+func _noEntityRepository() rag.RAGSystemConfigOption {
+	return rag.WithEnableEntityRepository(false)
+}
+
+// _noKnowledgeBase 禁用知识库
+// Example:
+// ```
+//
+//	rag.noKnowledgeBase()
+//
+// ```
+func _noKnowledgeBase() rag.RAGSystemConfigOption {
+	return rag.WithEnableKnowledgeBase(false)
 }
 
 // _deleteCollection 删除指定的 RAG 集合
@@ -192,7 +227,7 @@ func _deleteDocument(knowledgeBaseName, documentName string, opts ...rag.RAGSyst
 //	results, err = rag.QueryDocuments("my_collection", "query", 10)
 //
 // ```
-func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...rag.RAGSystemConfigOption) ([]vectorstore.SearchResult, error) {
+func _queryDocuments(knowledgeBaseName, query string, limit int, opts ...rag.RAGSystemConfigOption) ([]*rag.SearchResult, error) {
 	return rag.QueryDocuments(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
 }
 
@@ -216,5 +251,5 @@ func _newTempRagDatabase() (*gorm.DB, error) {
 //
 // ```
 func _enableMockMode() {
-	rag.IsMockMode = true
+	vectorstore.IsMockMode = true
 }

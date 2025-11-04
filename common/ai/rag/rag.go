@@ -1,9 +1,6 @@
 package rag
 
 import (
-	"bytes"
-	"io"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 )
@@ -25,30 +22,36 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...RAGSystemCo
 	return vectorstore.BuildVectorIndexForKnowledgeBase(db, id, colOpts...)
 }
 
-func ImportRAGFromReader(reader io.Reader, optFuncs ...RAGSystemConfigOption) error {
-	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
-	return vectorstore.ImportRAGFromReader(reader, importOpts...)
-}
+// func ImportRAGFromReader(reader io.Reader, optFuncs ...RAGSystemConfigOption) error {
+// 	config := NewRAGSystemConfig(optFuncs...)
 
-func LoadRAGFromReader(reader io.Reader) (*vectorstore.RAGBinaryData, error) {
-	return vectorstore.LoadRAGFromBinary(reader)
-}
+// 	knowledgebase.ImportKnowledgeBase(context.Background(), config.db, reader, &knowledgebase.ImportKnowledgeBaseOptions{
+// 		OverwriteExisting:    true,
+// 		NewKnowledgeBaseName: config.Name,
+// 	})
+// 	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
+// 	return vectorstore.ImportRAGFromReader(reader, importOpts...)
+// }
 
-func ImportRAGFromBinary(binary []byte, optFuncs ...RAGSystemConfigOption) error {
-	return ImportRAGFromReader(bytes.NewReader(binary), optFuncs...)
-}
+// func LoadRAGFromReader(reader io.Reader) (*vectorstore.RAGBinaryData, error) {
+// 	return vectorstore.LoadRAGFromBinary(reader)
+// }
 
-func ImportRAGFromFile(inputPath string, optFuncs ...RAGSystemConfigOption) error {
-	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
-	return vectorstore.ImportRAGFromFile(inputPath, importOpts...)
-}
+// func ImportRAGFromBinary(binary []byte, optFuncs ...RAGSystemConfigOption) error {
+// 	return ImportRAGFromReader(bytes.NewReader(binary), optFuncs...)
+// }
 
-func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io.Reader, error) {
-	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
-	return vectorstore.ExportRAGToBinary(collectionName, exportOpts...)
-}
+// func ImportRAGFromFile(inputPath string, optFuncs ...RAGSystemConfigOption) error {
+// 	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
+// 	return vectorstore.ImportRAGFromFile(inputPath, importOpts...)
+// }
 
-func ExportRAGToFile(collectionName string, fileName string, opts ...RAGSystemConfigOption) error {
-	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
-	return vectorstore.ExportRAGToFile(collectionName, fileName, exportOpts...)
-}
+// func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io.Reader, error) {
+// 	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
+// 	return vectorstore.ExportRAGToBinary(collectionName, exportOpts...)
+// }
+
+// func ExportRAGToFile(collectionName string, fileName string, opts ...RAGSystemConfigOption) error {
+// 	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
+// 	return vectorstore.ExportRAGToFile(collectionName, fileName, exportOpts...)
+// }

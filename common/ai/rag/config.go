@@ -6,6 +6,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
@@ -14,11 +15,12 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type RAGSystemConfig struct {
-	CollectionName                       string
+	Name                                 string
 	CollectionDescription                string
 	CollectionModelName                  string
 	CollectionModelDimension             int
@@ -31,7 +33,6 @@ type RAGSystemConfig struct {
 	embeddingModel string
 
 	db                     *gorm.DB
-	name                   string
 	description            string
 	knowledgeBaseType      string
 	embeddingClient        aispec.EmbeddingCaller
@@ -83,7 +84,6 @@ type RAGSystemConfig struct {
 	documentRuntimeID        string
 	importExportDB           *gorm.DB
 	overwriteExisting        bool
-	collectionName           string
 	rebuildHNSWIndex         bool
 	documentHandler          func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
 	progressHandler          func(percent float64, message string, messageType string) // 进度回调
@@ -102,6 +102,25 @@ type RAGSystemConfig struct {
 	hnswEfConstruct int
 
 	lazyLoadEmbeddingClient bool
+
+	// VectorStore configuration fields
+	maxChunkSize               int
+	overlap                    int
+	bigTextPlan                string
+	buildGraphFilter           *yakit.VectorDocumentFilter
+	buildGraphPolicy           string
+	enablePQ                   bool
+	enableAutoUpdateGraphInfos bool
+
+	// EntityRepository configuration fields
+	queryTop           int
+	runtimeID          string
+	disableBulkProcess bool
+	vectorStoreOptions []vectorstore.CollectionConfigFunc
+
+	aiService aicommon.AICallbackType
+
+	ragID string
 }
 
 var defaultRAGSystemName = "default"
@@ -109,12 +128,17 @@ var defaultRAGSystemDescription = "default description"
 
 func NewRAGSystemConfig(options ...RAGSystemConfigOption) *RAGSystemConfig {
 	config := &RAGSystemConfig{
-		db:                     consts.GetGormProfileDatabase(),
-		name:                   defaultRAGSystemName,
-		description:            defaultRAGSystemDescription,
-		knowledgeBaseType:      "default",
-		enableEntityRepository: false,
-		enableKnowledgeBase:    false,
+		ctx:                        context.Background(),
+		db:                         consts.GetGormProfileDatabase(),
+		Name:                       defaultRAGSystemName,
+		description:                defaultRAGSystemDescription,
+		knowledgeBaseType:          "default",
+		enableEntityRepository:     true,
+		enableKnowledgeBase:        true,
+		maxChunkSize:               800,
+		overlap:                    100,
+		bigTextPlan:                "chunk_text",
+		enableAutoUpdateGraphInfos: true,
 	}
 	for _, option := range options {
 		option(config)
@@ -160,14 +184,30 @@ func WithImportRebuildHNSWIndex(rebuildHNSWIndex bool) RAGSystemConfigOption {
 	}
 }
 
-func WithAIServiceName(aiServiceName string) RAGSystemConfigOption {
+func WithAIServiceType(aiServiceName string, aiServiceConfig ...aispec.AIConfigOption) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
-		chatter, err := ai.LoadChater(aiServiceName)
+		chatter, err := ai.LoadChater(aiServiceName, aiServiceConfig...)
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
 			return
 		}
-		config.aiOptions = append(config.aiOptions, aispec.WithAIServiceName(aiServiceName))
+		config.aiService = aicommon.AIChatToAICallbackType(chatter)
+	}
+}
+
+func (config *RAGSystemConfig) GetAIService() aicommon.AICallbackType {
+	return config.aiService
+}
+
+func WithAIService(aiService aicommon.AICallbackType) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.aiService = aiService
+	}
+}
+
+func WithRAGID(ragID string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.ragID = ragID
 	}
 }
 
@@ -242,9 +282,76 @@ func WithDB(db *gorm.DB) RAGSystemConfigOption {
 		config.db = db
 	}
 }
+
+func WithMaxChunkSize(maxChunkSize int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.maxChunkSize = maxChunkSize
+	}
+}
+
+func WithOverlap(overlap int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.overlap = overlap
+	}
+}
+
+func WithBigTextPlan(bigTextPlan string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.bigTextPlan = bigTextPlan
+	}
+}
+
+func WithBuildGraphFilter(filter *yakit.VectorDocumentFilter) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.buildGraphFilter = filter
+	}
+}
+
+func WithBuildGraphPolicy(policy string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.buildGraphPolicy = policy
+	}
+}
+
+func WithEnablePQ(enable bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.enablePQ = enable
+	}
+}
+
+func WithEnableAutoUpdateGraphInfos(enable bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.enableAutoUpdateGraphInfos = enable
+	}
+}
+
+func WithQueryTop(queryTop int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.queryTop = queryTop
+	}
+}
+
+func WithRuntimeID(runtimeID string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.runtimeID = runtimeID
+	}
+}
+
+func WithDisableBulkProcess(disableBulkProcess bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.disableBulkProcess = disableBulkProcess
+	}
+}
+
+func WithVectorStoreOptions(vectorStoreOptions ...vectorstore.CollectionConfigFunc) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.vectorStoreOptions = vectorStoreOptions
+	}
+}
+
 func WithName(name string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
-		config.name = name
+		config.Name = name
 	}
 }
 
@@ -271,8 +378,8 @@ func (config *RAGSystemConfig) ConvertToExportOptions() []vectorstore.RAGExportO
 	if config.progressHandler != nil {
 		options = append(options, vectorstore.WithProgressHandler(config.progressHandler))
 	}
-	if config.collectionName != "" {
-		options = append(options, vectorstore.WithCollectionName(config.collectionName))
+	if config.Name != "" {
+		options = append(options, vectorstore.WithCollectionName(config.Name))
 	}
 	if config.importExportDB != nil {
 		options = append(options, vectorstore.WithImportExportDB(config.importExportDB))
@@ -291,33 +398,85 @@ func (config *RAGSystemConfig) ConvertToExportOptions() []vectorstore.RAGExportO
 
 func (config *RAGSystemConfig) ConvertToVectorStoreOptions() []vectorstore.CollectionConfigFunc {
 	options := []vectorstore.CollectionConfigFunc{}
+
+	// Embedding configuration
 	if config.embeddingClient != nil {
 		options = append(options, vectorstore.WithEmbeddingClient(config.embeddingClient))
 	}
+	if config.lazyLoadEmbeddingClient {
+		options = append(options, vectorstore.WithLazyLoadEmbeddingClient())
+	}
+
+	// Basic configuration
 	if config.description != "" {
 		options = append(options, vectorstore.WithDescription(config.description))
 	}
 	if config.forceNew {
 		options = append(options, vectorstore.WithForceNew(config.forceNew))
 	}
+
+	// Model configuration
 	if config.modelDimension > 0 {
 		options = append(options, vectorstore.WithModelDimension(config.modelDimension))
 	}
 	if config.modelName != "" {
 		options = append(options, vectorstore.WithModelName(config.modelName))
 	}
+
+	// Distance function
 	if config.cosineDistance {
 		options = append(options, vectorstore.WithCosineDistance())
 	}
-	// if config.hnswM > 0 {
-	// 	options = append(options, vectorstore.WithHNSWParameters(config.hnswM))
-	// }
-	// if config.hnswMl > 0 {
-	// 	options = append(options, vectorstore.WithHNSWParameters(config.hnswMl))
-	// }
-	// if config.hnswEfSearch > 0 {
-	// 	options = append(options, vectorstore.WithHNSWParameters(config.hnswEfSearch))
-	// }
+
+	// HNSW parameters
+	if config.hnswM > 0 || config.hnswMl > 0 || config.hnswEfSearch > 0 || config.hnswEfConstruct > 0 {
+		// Use individual hnsw fields if set, otherwise use defaults
+		m := config.hnswM
+		if m <= 0 {
+			m = 16 // default value
+		}
+		ml := config.hnswMl
+		if ml <= 0 {
+			ml = 0.25 // default value
+		}
+		efSearch := config.hnswEfSearch
+		if efSearch <= 0 {
+			efSearch = 20 // default value
+		}
+		efConstruct := config.hnswEfConstruct
+		if efConstruct <= 0 {
+			efConstruct = 200 // default value
+		}
+		options = append(options, vectorstore.WithHNSWParameters(m, ml, efSearch, efConstruct))
+	}
+
+	// Database
+	if config.db != nil {
+		options = append(options, vectorstore.WithDB(config.db))
+	}
+
+	// Chunk configuration
+	if config.maxChunkSize > 0 {
+		options = append(options, vectorstore.WithMaxChunkSize(config.maxChunkSize))
+	}
+	if config.overlap >= 0 {
+		options = append(options, vectorstore.WithOverlap(config.overlap))
+	}
+	if config.bigTextPlan != "" {
+		options = append(options, vectorstore.WithBigTextPlan(config.bigTextPlan))
+	}
+
+	// Graph building configuration
+	if config.buildGraphFilter != nil {
+		options = append(options, vectorstore.WithBuildGraphFilter(config.buildGraphFilter))
+	}
+	if config.buildGraphPolicy != "" {
+		options = append(options, vectorstore.WithBuildGraphPolicy(config.buildGraphPolicy))
+	}
+
+	// PQ and auto-update configuration
+	options = append(options, vectorstore.WithEnablePQ(config.enablePQ))
+	options = append(options, vectorstore.WithEnableAutoUpdateGraphInfos(config.enableAutoUpdateGraphInfos))
 
 	return options
 }
@@ -404,6 +563,9 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 	if config.filterCallback != nil {
 		options = append(options, vectorstore.WithRAGFilter(config.filterCallback))
 	}
+	if config.Name != "" {
+		options = append(options, vectorstore.WithRAGCollectionName(config.Name))
+	}
 	if len(config.documentTypes) > 0 {
 		options = append(options, vectorstore.WithRAGDocumentType(config.documentTypes...))
 	}
@@ -413,6 +575,26 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 
 func (config *RAGSystemConfig) ConvertToEntityRepositoryOptions() []entityrepos.RuntimeConfigOption {
 	options := []entityrepos.RuntimeConfigOption{}
+
+	if config.similarityThreshold > 0 {
+		options = append(options, entityrepos.WithSimilarityThreshold(config.similarityThreshold))
+	}
+	if config.queryTop > 0 {
+		options = append(options, entityrepos.WithQueryTop(config.queryTop))
+	}
+	if config.runtimeID != "" {
+		options = append(options, entityrepos.WithRuntimeID(config.runtimeID))
+	}
+	if config.disableBulkProcess {
+		options = append(options, entityrepos.WithDisableBulkProcess())
+	}
+	if config.ctx != nil {
+		options = append(options, entityrepos.WithContext(config.ctx))
+	}
+	if len(config.vectorStoreOptions) > 0 {
+		options = append(options, entityrepos.WithVectorStoreOptions(config.vectorStoreOptions...))
+	}
+
 	return options
 }
 
@@ -549,7 +731,7 @@ func WithRAGOnlyResults(onlyResults bool) RAGSystemConfigOption {
 // WithRAGCollectionName sets the specific collection name to query
 func WithRAGCollectionName(collectionName string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
-		config.name = collectionName
+		config.Name = collectionName
 	}
 }
 

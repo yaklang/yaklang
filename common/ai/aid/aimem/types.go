@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aimem/memory_type"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 

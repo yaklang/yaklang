@@ -3,13 +3,11 @@ package loop_yaklangcode
 import (
 	"bytes"
 	_ "embed"
-	"os"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -63,7 +61,7 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 
 	// 集合不存在则导入
 	if !rag.CollectionIsExists(db, collectionName) {
-		err := rag.ImportRAGFromFile(aikbPath, rag.WithCollectionName(collectionName))
+		err := rag.ImportRAG(aikbPath, rag.WithRAGCollectionName(collectionName))
 		if err != nil {
 			return nil, utils.Wrap(err, "failed to import rag collection")
 		}
@@ -73,38 +71,11 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 		return rag.Get(collectionName, rag.WithDB(db))
 	}
 
-	// 文件存在则加载文件
-	file, err := os.OpenFile(aikbPath, os.O_RDONLY, 0644)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to open aikb file")
-	}
-	defer file.Close()
-	ragData, err := rag.LoadRAGFileHeader(file)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to load rag file header")
-	}
-
-	// v1 版本直接更新，v2版本需要检查版本是否一致
-	var updateCollection bool
-	if ragData.Version == 2 {
-		collectionInfo, err := yakit.GetRAGCollectionInfoByName(db, collectionName)
-		if err != nil || collectionInfo == nil {
-			return nil, utils.Wrap(err, "failed to get rag collection info")
-		}
-		if collectionInfo.SerialVersionUID != ragData.Collection.SerialVersionUID {
-			updateCollection = true
-		}
-
-	} else {
-		updateCollection = true
-	}
-
-	if updateCollection {
-		err = rag.ImportRAGFromReader(file, rag.WithCollectionName(collectionName))
-		if err != nil {
-			return nil, utils.Wrap(err, "failed to import rag collection")
-		}
-	}
+	// // 文件存在则导入
+	// err := rag.ImportRAG(aikbPath, rag.WithRAGCollectionName(collectionName))
+	// if err != nil {
+	// 	return nil, utils.Wrap(err, "failed to import rag collection")
+	// }
 
 	return rag.Get(collectionName, rag.WithDB(db))
 }
