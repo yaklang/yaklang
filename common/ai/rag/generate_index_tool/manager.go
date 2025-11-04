@@ -9,7 +9,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -545,7 +544,7 @@ func (m *IndexManager) indexToRAG(ctx context.Context, items []IndexableItem, pr
 }
 
 // SearchItems 搜索项目
-func (m *IndexManager) SearchItems(query string, page, limit int) ([]vectorstore.SearchResult, error) {
+func (m *IndexManager) SearchItems(query string, page, limit int) ([]*rag.SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

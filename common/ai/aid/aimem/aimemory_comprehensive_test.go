@@ -2,11 +2,12 @@ package aimem
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -188,6 +189,13 @@ func (m *AdvancedMockInvoker) EmitResult(any) {
 func (m *AdvancedMockInvoker) EmitStreamResult(any) {
 }
 
+type EmptyEmbedding struct {
+}
+
+func (e *EmptyEmbedding) Embedding(text string) ([]float32, error) {
+	return nil, nil
+}
+
 // TestAIMemoryTriage_NewAIMemory 测试创建AI记忆系统
 func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 
@@ -249,12 +257,12 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 	}
 
 	t.Run("embedding-check", func(t *testing.T) {
-		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithEmbeddingClient(rag.EmptyEmbedding{})))
+		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithEmbeddingClient(&EmptyEmbedding{})))
 		require.NoError(t, err)
 		require.NotNil(t, m)
 		require.Equal(t, true, m.embeddingAvailable)
-		switch m.rag.Embedder.(type) {
-		case rag.EmptyEmbedding:
+		switch m.rag.GetEmbedder().(type) {
+		case *EmptyEmbedding:
 		default:
 			t.Errorf("expected EmptyEmbedding type for embedder")
 		}

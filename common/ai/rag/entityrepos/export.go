@@ -135,6 +135,9 @@ func ExportEntityRepository(ctx context.Context, db *gorm.DB, opts *ExportEntity
 	processedRelationships := uint64(0)
 
 	for {
+		if relationshipCount == 0 {
+			break
+		}
 		var relationships []*schema.ERModelRelationship
 
 		_, paginatedDB := bizhelper.Paging(
@@ -283,6 +286,7 @@ type ImportEntityRepositoryOptions struct {
 	OverwriteExisting         bool
 	NewRepositoryName         string
 	OnProgressHandler         func(percent float64, message string, messageType string)
+	RAGID                     string
 }
 
 // ImportEntityRepository 从二进制数据导入实体仓库
@@ -339,6 +343,7 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 		// 更新现有实体仓库信息
 		existingRepos.EntityBaseName = finalReposName
 		existingRepos.Description = reposDesc
+		existingRepos.RAGID = opts.RAGID
 		if err := db.Save(&existingRepos).Error; err != nil {
 			return utils.Wrap(err, "update existing entity repository")
 		}
@@ -356,6 +361,7 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 		reposInfo = &schema.EntityRepository{
 			EntityBaseName: finalReposName,
 			Description:    reposDesc,
+			RAGID:          opts.RAGID,
 		}
 		if err := yakit.CreateEntityBaseInfo(db, reposInfo); err != nil {
 			return utils.Wrap(err, "create entity repository")
@@ -474,6 +480,7 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 			vectorstore.WithImportExportDB(db),
 			vectorstore.WithOverwriteExisting(opts.OverwriteExisting),
 			vectorstore.WithCollectionName(finalReposName),
+			vectorstore.WithRAGID(opts.RAGID),
 			vectorstore.WithDocumentHandler(opts.ImportRAGDocumentHandler),
 			vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 				ragProgress := 70 + (percent/100)*25

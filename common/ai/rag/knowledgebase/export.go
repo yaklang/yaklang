@@ -20,6 +20,7 @@ type ExportKnowledgeBaseOptions struct {
 	ExportRAGDocumentHandler        func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
 	OnProgressHandler               func(percent float64, message string, messageType string)
 	ExtraDataReader                 io.Reader // 额外数据的 reader，会在导出时一起导出
+	VectorStoreName                 string
 }
 
 func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledgeBaseOptions) (io.Reader, error) {
@@ -118,8 +119,12 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 
 	reportProgress(70, "知识库条目导出完成，开始导出向量库数据", "info")
 
+	vectorStoreName := opts.VectorStoreName
+	if vectorStoreName == "" {
+		vectorStoreName = kbInfo.KnowledgeBaseName
+	}
 	// 写入向量库
-	ragBinaryReader, err := vectorstore.ExportRAGToBinary(kbInfo.KnowledgeBaseName,
+	ragBinaryReader, err := vectorstore.ExportRAGToBinary(vectorStoreName,
 		vectorstore.WithContext(ctx),
 		vectorstore.WithImportExportDB(db),
 		vectorstore.WithDocumentHandler(opts.ExportRAGDocumentHandler),
@@ -220,6 +225,7 @@ type ImportKnowledgeBaseOptions struct {
 	NewKnowledgeBaseName            string
 	OnProgressHandler               func(percent float64, message string, messageType string)
 	ExtraDataHandler                func(extraData io.Reader) error // 额外数据处理回调函数
+	RAGID                           string
 }
 
 // ImportKnowledgeBase 从二进制数据导入知识库
@@ -286,6 +292,7 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 		existingKB.KnowledgeBaseName = finalKbName
 		existingKB.KnowledgeBaseDescription = kbDesc
 		existingKB.KnowledgeBaseType = kbType
+		existingKB.RAGID = opts.RAGID
 		if err := yakit.UpdateKnowledgeBaseInfo(db, int64(existingKB.ID), existingKB); err != nil {
 			return utils.Wrap(err, "update existing knowledge base")
 		}
@@ -301,6 +308,7 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 			KnowledgeBaseName:        finalKbName,
 			KnowledgeBaseDescription: kbDesc,
 			KnowledgeBaseType:        kbType,
+			RAGID:                    opts.RAGID,
 		}
 		if err := yakit.CreateKnowledgeBase(db, kbInfo); err != nil {
 			return utils.Wrap(err, "create knowledge base")
@@ -359,6 +367,7 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 			vectorstore.WithOverwriteExisting(opts.OverwriteExisting),
 			vectorstore.WithCollectionName(finalKbName),
 			vectorstore.WithDocumentHandler(opts.ImportRAGDocumentHandler),
+			vectorstore.WithRAGID(opts.RAGID),
 			vectorstore.WithProgressHandler(func(percent float64, message string, messageType string) {
 				ragProgress := 75 + (percent/100)*15
 				reportProgress(ragProgress, message, messageType)

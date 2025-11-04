@@ -35,20 +35,37 @@ func newDefaultRAGSystem() *RAGSystem {
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	ragConfig := NewRAGSystemConfig(options...)
 	ragSystem := newDefaultRAGSystem()
+	err := autoMigrateRAGSystem(ragConfig.db)
+	if err != nil {
+		return nil, utils.Errorf("auto migrate rag system failed: %v", err)
+	}
 	ragSystem.config = ragConfig
 
 	// 创建collection
 	if ragConfig.vectorStore != nil {
 		ragSystem.VectorStore = ragConfig.vectorStore
 	} else {
-		collection, err := vectorstore.GetCollection(ragConfig.db, ragConfig.name, ragConfig.ConvertToVectorStoreOptions()...)
-		if err != nil {
-			return nil, err
+		if ragSystem.config.ragID != "" {
+			var collection schema.VectorStoreCollection
+			err := ragConfig.db.Model(&schema.VectorStoreCollection{}).Where("rag_id = ?", ragSystem.config.ragID).First(&collection).Error
+			if err != nil {
+				return nil, utils.Errorf("get collection by rag_id %s failed: %v", ragSystem.config.ragID, err)
+			}
+			collectionMg, err := vectorstore.GetCollection(ragConfig.db, collection.Name, ragConfig.ConvertToVectorStoreOptions()...)
+			if err != nil {
+				return nil, utils.Errorf("get collection failed: %v", err)
+			}
+			ragSystem.VectorStore = collectionMg
+		} else {
+			collection, err := vectorstore.GetCollection(ragConfig.db, ragConfig.Name, ragConfig.ConvertToVectorStoreOptions()...)
+			if err != nil {
+				return nil, err
+			}
+			ragSystem.VectorStore = collection
 		}
-		ragSystem.VectorStore = collection
 	}
 
-	// 检查rag_id
+	// 检查ragid
 	ragId := ragSystem.VectorStore.GetCollectionInfo().RAGID
 	if ragId == "" {
 		ragId = uuid.NewString()
@@ -65,13 +82,13 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 		if ragConfig.knowledgeBase != nil {
 			ragSystem.KnowledgeBase = ragConfig.knowledgeBase
 		} else {
-			knowledgeBase, err := knowledgebase.NewKnowledgeBase(ragConfig.db, ragConfig.name, ragConfig.description, ragConfig.knowledgeBaseType, ragConfig.ConvertToVectorStoreOptions()...)
+			knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragConfig.db, ragConfig.Name, ragConfig.description, ragConfig.knowledgeBaseType, ragSystem.VectorStore)
 			if err != nil {
 				return nil, err
 			}
 			info := knowledgeBase.GetKnowledgeBaseInfo()
 			if info.RAGID == "" {
-				info.RAGID = uuid.NewString()
+				info.RAGID = ragSystem.RAGID
 			}
 			err = ragConfig.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", info.ID).Update("rag_id", info.RAGID).Error
 			if err != nil {
@@ -86,7 +103,7 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 		if ragConfig.entityRepository != nil {
 			ragSystem.EntityRepository = ragConfig.entityRepository
 		} else {
-			entityRepository, err := entityrepos.GetEntityRepositoryByName(ragConfig.db, ragConfig.name)
+			entityRepository, err := entityrepos.GetEntityRepositoryWithVectorStore(ragConfig.db, ragConfig.Name, ragConfig.description, ragSystem.VectorStore)
 			if err != nil {
 				return nil, err
 			}
@@ -95,7 +112,7 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 				return nil, err
 			}
 			if info.RAGID == "" {
-				info.RAGID = uuid.NewString()
+				info.RAGID = ragSystem.RAGID
 			}
 			err = ragConfig.db.Model(&schema.EntityRepository{}).Where("id = ?", info.ID).Update("rag_id", info.RAGID).Error
 			if err != nil {
@@ -116,8 +133,23 @@ func HasRagSystem(db *gorm.DB, name string) bool {
 	if collection == nil {
 		return false
 	}
-	// 集合存在并且有rag_id
+	// 集合存在并且有ragid
 	return collection.RAGID != ""
+}
+
+func LoadRAGSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, error) {
+	config := NewRAGSystemConfig(opts...)
+	if !HasRagSystem(config.db, name) {
+		return nil, utils.Errorf("rag collection[%v] not existed", name)
+	}
+
+	collection, err := yakit.GetRAGCollectionInfoByName(config.db, name)
+	if err != nil {
+		return nil, fmt.Errorf("get collection failed: %v", err)
+	}
+
+	options := append(opts, WithRAGID(collection.RAGID))
+	return NewRAGSystem(options...)
 }
 
 func GetRagSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, error) {
@@ -126,7 +158,7 @@ func GetRagSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, error
 	}
 	config := NewRAGSystemConfig(opts...)
 	if HasRagSystem(config.db, name) {
-		return NewRAGSystem(append(defaultOptions, opts...)...)
+		return LoadRAGSystem(name, opts...)
 	} else {
 		return NewRAGSystem(append(defaultOptions, opts...)...)
 	}
@@ -177,6 +209,10 @@ func (r *RAGSystem) Add(docId string, content string, opts ...RAGSystemConfigOpt
 	return r.VectorStore.AddWithOptions(docId, content, docOpts...)
 }
 
+func (r *RAGSystem) GetEmbedder() vectorstore.EmbeddingClient {
+	return r.VectorStore.GetEmbedder()
+}
+
 func BuildDocument(docId, content string, opts ...RAGSystemConfigOption) *vectorstore.Document {
 	docOpts := NewRAGSystemConfig(opts...).ConvertToDocumentOptions()
 	doc := &vectorstore.Document{
@@ -208,33 +244,95 @@ func (r *RAGSystem) ConvertToStandardMode() error {
 }
 
 // QueryWithPage 根据查询文本检索相关文档并返回结果
-func (r *RAGSystem) QueryWithPage(query string, page, limit int) ([]vectorstore.SearchResult, error) {
-	return r.VectorStore.QueryWithPage(query, page, limit)
+func (r *RAGSystem) QueryWithPage(query string, page, limit int) ([]*SearchResult, error) {
+	res, err := r.VectorStore.QueryWithPage(query, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*SearchResult, 0)
+	for _, result := range res {
+		results = append(results, r.fillSearchResult(&result))
+	}
+	return results, nil
 }
 
-func (r *RAGSystem) QueryWithFilter(query string, page, limit int, filter func(key string, getDoc func() *vectorstore.Document) bool) ([]vectorstore.SearchResult, error) {
-	return r.VectorStore.QueryWithFilter(query, page, limit, filter)
+func (r *RAGSystem) QueryWithFilter(query string, page, limit int, filter func(key string, getDoc func() *vectorstore.Document) bool) ([]*SearchResult, error) {
+	res, err := r.VectorStore.QueryWithFilter(query, page, limit, filter)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*SearchResult, 0)
+	for _, result := range res {
+		results = append(results, r.fillSearchResult(&result))
+	}
+	return results, nil
+}
+
+func (r *RAGSystem) fillSearchResult(result *vectorstore.SearchResult) *SearchResult {
+	res := &SearchResult{
+		Document: result.Document,
+		Score:    result.Score,
+	}
+	doc := result.Document
+	dataUUID, ok := doc.Metadata.GetDataUUID()
+	if ok {
+		entity, err := yakit.GetEntityByIndex(r.config.db, dataUUID)
+		if err == nil {
+			res.Entity = entity
+		}
+		knowledgeEntry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(r.config.db, dataUUID)
+		if err == nil {
+			res.KnowledgeBaseEntry = knowledgeEntry
+		}
+	}
+
+	return res
 }
 
 // FuzzRawSearch Sql 文本模糊搜索（非语义）
-func (r *RAGSystem) FuzzRawSearch(ctx context.Context, keywords string, limit int) (<-chan vectorstore.SearchResult, error) {
+func (r *RAGSystem) FuzzRawSearch(ctx context.Context, keywords string, limit int) (<-chan *SearchResult, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("failed to query with page query: %s: %v", keywords, err)
 			fmt.Println(utils.ErrorStack(err))
 		}
 	}()
-	return r.VectorStore.FuzzSearch(ctx, keywords, limit)
+	res, err := r.VectorStore.FuzzSearch(ctx, keywords, limit)
+	if err != nil {
+		return nil, err
+	}
+	outputCh := make(chan *SearchResult)
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("failed to query with page query: %s: %v", keywords, err)
+				fmt.Println(utils.ErrorStack(err))
+			}
+		}()
+		for result := range res {
+			outputCh <- r.fillSearchResult(&result)
+		}
+		close(outputCh)
+	}()
+	return outputCh, nil
 }
 
 // Query is short for QueryTopN
-func (r *RAGSystem) Query(query string, topN int, limits ...float64) ([]vectorstore.SearchResult, error) {
+func (r *RAGSystem) Query(query string, topN int, limits ...float64) ([]*SearchResult, error) {
 	return r.QueryTopN(query, topN, limits...)
 }
 
 // QueryTopN 根据查询文本检索相关文档并返回结果
-func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]vectorstore.SearchResult, error) {
-	return r.VectorStore.QueryTopN(query, topN, limits...)
+func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]*SearchResult, error) {
+	res, err := r.VectorStore.QueryTopN(query, topN, limits...)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*SearchResult, 0)
+	for _, result := range res {
+		results = append(results, r.fillSearchResult(&result))
+	}
+	return results, nil
 }
 
 // DeleteDocuments 删除文档

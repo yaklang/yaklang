@@ -961,7 +961,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 	return repos, nil
 }
 
-func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
+func GetEntityRepositoryWithVectorStore(db *gorm.DB, name, description string, vectorStore *vectorstore.SQLiteVectorStoreHNSW, opts ...any) (*EntityRepository, error) {
 	runtimeConfig := NewRuntimeConfig(opts...)
 	var entityBaseInfo schema.EntityRepository
 	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
@@ -980,28 +980,10 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 			return nil, utils.Errorf("create entity repository err: %v", err)
 		}
 	}
-
-	collectionExists := vectorstore.HasCollection(db, name)
-
-	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
-	if !collectionExists {
-		collectionMg, err = vectorstore.CreateCollection(db, name, description, runtimeConfig.vectorStoreOptions...)
-		if err != nil {
-			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
-				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
-			})
-			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
-		}
-	} else {
-		collectionMg, err = vectorstore.LoadCollection(db, name, runtimeConfig.vectorStoreOptions...)
-		if err != nil {
-			return nil, utils.Errorf("加载RAG集合失败: %v", err)
-		}
-	}
 	var repos = &EntityRepository{
 		db:            db,
 		info:          &entityBaseInfo,
-		collectionMg:  collectionMg,
+		collectionMg:  vectorStore,
 		runtimeConfig: runtimeConfig,
 	}
 
@@ -1012,8 +994,28 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 
 		}
 	}
-
 	return repos, nil
+}
+
+func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
+	runtimeConfig := NewRuntimeConfig(opts...)
+	var err error
+	collectionExists := vectorstore.HasCollection(db, name)
+
+	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
+	if !collectionExists {
+		collectionMg, err = vectorstore.CreateCollection(db, name, description, runtimeConfig.vectorStoreOptions...)
+		if err != nil {
+			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
+		}
+	} else {
+		collectionMg, err = vectorstore.LoadCollection(db, name, runtimeConfig.vectorStoreOptions...)
+		if err != nil {
+			return nil, utils.Errorf("加载RAG集合失败: %v", err)
+		}
+	}
+
+	return GetEntityRepositoryWithVectorStore(db, name, description, collectionMg, opts...)
 }
 
 // Export 导出实体仓库

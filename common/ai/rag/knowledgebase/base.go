@@ -35,12 +35,7 @@ func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}).Error
 }
 
-// NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
-func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
-	defaultOpts := []vectorstore.CollectionConfigFunc{vectorstore.WithLazyLoadEmbeddingClient()}
-	newOpts := slices.Clone(opts)
-	newOpts = append(defaultOpts, opts...)
-	opts = newOpts
+func NewKnowledgeBaseWithVectorStore(db *gorm.DB, name, description, kbType string, vectorStore *vectorstore.SQLiteVectorStoreHNSW) (*KnowledgeBase, error) {
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}
@@ -57,11 +52,8 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vec
 		}
 	}
 
-	// 检查 RAG Collection 是否存在
-	collectionExists := vectorstore.HasCollection(db, name)
-
 	// 如果都不存在，创建新的知识库
-	if needCreateInfo && !collectionExists {
+	if needCreateInfo {
 		knowledgeBaseInfo = schema.KnowledgeBaseInfo{
 			KnowledgeBaseName:        name,
 			KnowledgeBaseDescription: description,
@@ -73,68 +65,50 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vec
 		}
 
 		// 创建 RAG Collection
-		collectionMg, err := vectorstore.CreateCollection(db, name, description, opts...)
-		if err != nil {
-			// 如果 RAG 创建失败，删除已创建的 KnowledgeBaseInfo
-			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
-				return yakit.DeleteKnowledgeBase(tx, int64(knowledgeBaseInfo.ID))
-			})
-			return nil, utils.Errorf("创建RAG集合失败: %v", err)
-		}
-
 		return &KnowledgeBase{
 			db:          db,
 			name:        name,
-			vectorStore: collectionMg,
+			vectorStore: vectorStore,
 			kbInfo:      &knowledgeBaseInfo,
 			id:          int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
-
-	// 如果知识库信息存在但 RAG Collection 不存在，创建 RAG Collection
-	if !needCreateInfo && !collectionExists {
-		collectionMg, err := vectorstore.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, opts...)
-		if err != nil {
-			return nil, utils.Errorf("创建RAG集合失败: %v", err)
-		}
-
-		return &KnowledgeBase{
-			db:          db,
-			name:        name,
-			vectorStore: collectionMg,
-			kbInfo:      &knowledgeBaseInfo,
-			id:          int64(knowledgeBaseInfo.ID),
-		}, nil
-	}
-
-	// 如果知识库信息不存在但 RAG Collection 存在，创建知识库信息
-	if needCreateInfo && collectionExists {
-		err = utils.GormTransaction(db, func(tx *gorm.DB) error {
-			knowledgeBaseInfo = schema.KnowledgeBaseInfo{
-				KnowledgeBaseName:        name,
-				KnowledgeBaseDescription: description,
-				KnowledgeBaseType:        kbType,
-			}
-			return yakit.CreateKnowledgeBase(tx, &knowledgeBaseInfo)
-		})
-		if err != nil {
-			return nil, utils.Errorf("创建知识库信息失败: %v", err)
-		}
-	}
-
-	// 如果都存在，直接加载
-	collectionMg, err := vectorstore.LoadCollection(db, name, opts...)
-	if err != nil {
-		return nil, utils.Errorf("加载RAG集合失败: %v", err)
-	}
-
 	return &KnowledgeBase{
 		db:          db,
 		name:        name,
-		vectorStore: collectionMg,
+		vectorStore: vectorStore,
 		kbInfo:      &knowledgeBaseInfo,
 		id:          int64(knowledgeBaseInfo.ID),
 	}, nil
+}
+
+// NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
+func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vectorstore.CollectionConfigFunc) (*KnowledgeBase, error) {
+	defaultOpts := []vectorstore.CollectionConfigFunc{vectorstore.WithLazyLoadEmbeddingClient()}
+	newOpts := slices.Clone(opts)
+	newOpts = append(defaultOpts, opts...)
+	opts = newOpts
+	if err := AutoMigrate(db); err != nil {
+		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
+	}
+
+	// 检查 RAG Collection 是否存在
+	collectionExists := vectorstore.HasCollection(db, name)
+
+	var collectionMg *vectorstore.SQLiteVectorStoreHNSW
+	var err error
+	if !collectionExists {
+		collectionMg, err = vectorstore.CreateCollection(db, name, description, opts...)
+		if err != nil {
+			return nil, utils.Errorf("创建RAG集合失败: %v", err)
+		}
+	} else {
+		collectionMg, err = vectorstore.LoadCollection(db, name, opts...)
+		if err != nil {
+			return nil, utils.Errorf("加载RAG集合失败: %v", err)
+		}
+	}
+	return NewKnowledgeBaseWithVectorStore(db, name, description, kbType, collectionMg)
 }
 
 // CreateKnowledgeBase 创建全新的知识库（如果已存在会返回错误）
