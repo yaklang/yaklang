@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -32,16 +31,15 @@ func (p *SSAProject) SetTagsList(tags []string) {
 }
 
 func (p *SSAProject) GetConfig() (*ssaconfig.Config, error) {
-	var config ssaconfig.Config
-	err := json.Unmarshal(p.Config, &config)
+	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJSONRawConfig(p.Config))
 	if err != nil {
 		return nil, err
 	}
-	return &config, nil
+	return config, nil
 }
 
 func (p *SSAProject) SetConfig(config *ssaconfig.Config) error {
-	data, err := json.Marshal(config)
+	data, err := config.ToJSONRaw()
 	if err != nil {
 		return err
 	}
@@ -61,7 +59,7 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		UpdatedAt:        p.UpdatedAt.Unix(),
 		ProjectName:      p.ProjectName,
 		Language:         string(p.Language),
-		CodeSourceConfig: config.CodeSource.JsonString(),
+		CodeSourceConfig: config.CodeSource.ToJSONString(),
 		Description:      p.Description,
 		Tags:             p.GetTagsList(),
 	}
@@ -83,5 +81,6 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 	result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
 		RuleFilter: config.GetRuleFilter(),
 	}
+	result.JSONStringConfig = string(p.Config)
 	return result
 }
