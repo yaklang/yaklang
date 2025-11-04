@@ -36,6 +36,7 @@ type RAGExportConfig struct {
 	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
 
 	SerialVersionUID string // 序列化版本号（导入时使用）
+	RAGID            string // RAGID（导入时使用）
 }
 
 type RAGExportOptionFunc func(*RAGExportConfig)
@@ -50,6 +51,12 @@ func WithSerialVersionUID(version string) RAGExportOptionFunc {
 func WithContext(ctx context.Context) RAGExportOptionFunc {
 	return func(opts *RAGExportConfig) {
 		opts.Ctx = ctx
+	}
+}
+
+func WithRAGID(ragID string) RAGExportOptionFunc {
+	return func(opts *RAGExportConfig) {
+		opts.RAGID = ragID
 	}
 }
 

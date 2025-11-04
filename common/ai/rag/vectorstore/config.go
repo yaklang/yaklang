@@ -199,6 +199,18 @@ func WithCosineDistance() CollectionConfigFunc {
 	}
 }
 
+func WithEnablePQ(enable bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.EnablePQ = enable
+	}
+}
+
+func WithEnableAutoUpdateGraphInfos(enable bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.EnableAutoUpdateGraphInfos = enable
+	}
+}
+
 // WithDB 设置数据库
 func WithDB(db *gorm.DB) CollectionConfigFunc {
 	return func(config *CollectionConfig) {

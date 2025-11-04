@@ -3,21 +3,10 @@ package vectorstore
 import (
 	"testing"
 
-	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
-
-func createTempTestDatabase() (*gorm.DB, error) {
-	db, err := utils.CreateTempTestDatabaseInMemory()
-	if err != nil {
-		return nil, err
-	}
-	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	return db, nil
-
-}
 
 func TestMUSTPASS_LoadCollectionWithInvalidGraphBinary(t *testing.T) {
 	// 创建临时测试数据库

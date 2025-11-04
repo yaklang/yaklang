@@ -684,6 +684,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 			"ef_search":          collection.EfSearch,
 			"ef_construct":       collection.EfConstruct,
 			"distance_func_type": collection.DistanceFuncType,
+			"rag_id":             collection.RAGID,
 		}).Error
 		if err != nil {
 			return utils.Wrap(err, "failed to update collection")
@@ -695,6 +696,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGExportOptionFunc) 
 		if collection.UUID == "" {
 			collection.UUID = uuid.NewString()
 		}
+		collection.RAGID = opts.RAGID
 		err := db.Create(collection).Error
 		if err != nil {
 			return utils.Wrap(err, "failed to create collection")

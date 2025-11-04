@@ -55,7 +55,7 @@ func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISear
 		if err != nil {
 			return nil, err
 		}
-		results = lo.Filter(results, func(item vectorstore.SearchResult, _ int) bool {
+		results = lo.Filter(results, func(item *rag.SearchResult, _ int) bool {
 			return item.Score > 0.5
 		})
 		resTools := []T{}
