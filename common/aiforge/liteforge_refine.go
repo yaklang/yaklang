@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -93,7 +92,13 @@ func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<
 func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	opts := []rag.RAGSystemConfigOption{
+		rag.WithDB(refineConfig.Database),
+		rag.WithDescription(refineConfig.KnowledgeBaseDesc),
+		rag.WithKnowledgeBaseType(refineConfig.KnowledgeBaseType),
+	}
+	opts = append(opts, refineConfig.ragSystemOptions...)
+	ragSystem, err := rag.GetRagSystem(knowledgeDatabaseName, opts...)
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
@@ -103,10 +108,10 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-cha
 		return nil, utils.Errorf("failed to start build erm from input: %v", err)
 	}
 
-	return BuildKnowledgeFromEntityRepository(er, kb, append(option, entityrepos.WithRuntimeBuildOnly(true))...)
+	return BuildKnowledgeFromEntityRepository(er, ragSystem, append(option, entityrepos.WithRuntimeBuildOnly(true))...)
 }
 
-func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *knowledgebase.KnowledgeBase, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, ragSystem *rag.RAGSystem, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
 	refineConfig.AnalyzeLog("start build knowledge from entity repository use default qc")
 
@@ -243,7 +248,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 				feedbackKnowledgeDoneAll()
 				// 保存知识条目
 				saveStart := time.Now()
-				err = SaveKnowledgeEntries(kb, entries, currentHop.GetRelatedEntityUUIDs(), option...)
+				err = SaveKnowledgeEntries(ragSystem, entries, currentHop.GetRelatedEntityUUIDs(), option...)
 				saveTime := time.Since(saveStart)
 				atomic.AddInt64(&saveDuration, int64(saveTime))
 
@@ -310,12 +315,12 @@ func BuildKnowledgeEntryFromKHop(hop *entityrepos.KHopPath, option ...any) ([]*s
 	return entries, nil
 }
 
-func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.KnowledgeBaseEntry, relationalEntityUUID []string, options ...any) error { //todo return knowledge uuid
+func SaveKnowledgeEntries(ragSystem *rag.RAGSystem, entries []*schema.KnowledgeBaseEntry, relationalEntityUUID []string, options ...any) error { //todo return knowledge uuid
 	documentOption := []rag.RAGSystemConfigOption{rag.WithDocumentRelatedEntities(relationalEntityUUID...)}
 
 	refineConfig := NewRefineConfig(options...)
 	for _, entry := range entries {
-		entry.KnowledgeBaseID = kb.GetID()
+		entry.KnowledgeBaseID = ragSystem.GetKnowledgeBaseID()
 		entry.RelatedEntityUUIDS = strings.Join(relationalEntityUUID, ",")
 		if len(entry.KnowledgeDetails) <= 0 {
 			continue
@@ -326,7 +331,7 @@ func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.Kno
 				return utils.Errorf("fail to split knowledge details: %v", err)
 			}
 			for _, detail := range detailList {
-				err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
+				err := ragSystem.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
 					KnowledgeBaseID:    entry.KnowledgeBaseID,
 					KnowledgeTitle:     entry.KnowledgeTitle,
 					KnowledgeType:      entry.KnowledgeType,
@@ -341,7 +346,7 @@ func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.Kno
 				}
 			}
 		} else {
-			err := kb.AddKnowledgeEntry(entry, documentOption...)
+			err := ragSystem.AddKnowledgeEntry(entry, documentOption...)
 			if err != nil {
 				return utils.Errorf("failed to create knowledge base entry: %v", err)
 			}
@@ -358,10 +363,15 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 	if err != nil {
 		return nil, utils.Errorf("failed to load entity repository: %v", err)
 	}
-	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, name, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	opts := []rag.RAGSystemConfigOption{
+		rag.WithDB(refineConfig.Database),
+		rag.WithDescription(refineConfig.KnowledgeBaseDesc),
+		rag.WithKnowledgeBaseType(refineConfig.KnowledgeBaseType),
+	}
+	ragSystem, err := rag.GetRagSystem(name, opts...)
 	if err != nil {
-		return nil, utils.Errorf("failed to create knowledge base: %v", err)
+		return nil, utils.Errorf("failed to create rag system: %v", err)
 	}
 
-	return BuildKnowledgeFromEntityRepository(er, kb, append(option, WithAllowMultiHopAIRefine(true))...)
+	return BuildKnowledgeFromEntityRepository(er, ragSystem, append(option, WithAllowMultiHopAIRefine(true))...)
 }

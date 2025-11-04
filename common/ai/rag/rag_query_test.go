@@ -15,18 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// testEmbedder 测试用的嵌入器函数
-func testEmbedder(text string) ([]float32, error) {
-	// 简单地生成一个固定的向量作为嵌入
-	// 根据文本内容生成不同的向量
-	if len(text) > 10 {
-		return []float32{1.0, 0.0, 0.0}, nil
-	} else if len(text) > 5 {
-		return []float32{0.0, 1.0, 0.0}, nil
-	}
-	return []float32{0.0, 0.0, 1.0}, nil
-}
-
 // getMapKeys 获取map的所有键
 func getMapKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))
@@ -154,7 +142,7 @@ func TestRAGQuery(t *testing.T) {
 	// 清理资源
 	defer func() {
 		for _, name := range collectionNames {
-			DeleteCollection(db, name)
+			vectorstore.DeleteCollection(db, name)
 		}
 	}()
 
@@ -476,7 +464,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	// 清理资源
 	defer func() {
 		for _, name := range collectionNames {
-			DeleteCollection(db, name)
+			vectorstore.DeleteCollection(db, name)
 		}
 	}()
 

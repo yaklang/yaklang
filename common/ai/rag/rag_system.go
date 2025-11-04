@@ -265,3 +265,17 @@ func (r *RAGSystem) CountDocuments() (int, error) {
 func (r *RAGSystem) DeleteEmbeddingData() error {
 	return r.VectorStore.DeleteEmbeddingData()
 }
+
+func (r *RAGSystem) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
+	docOpts := NewRAGSystemConfig(options...).ConvertToDocumentOptions()
+	return r.KnowledgeBase.AddKnowledgeEntryQuestion(entry, docOpts...)
+}
+
+func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
+	docOpts := NewRAGSystemConfig(options...).ConvertToDocumentOptions()
+	return r.KnowledgeBase.AddKnowledgeEntry(entry, docOpts...)
+}
+
+func (r *RAGSystem) GetKnowledgeBaseID() int64 {
+	return r.KnowledgeBase.GetID()
+}

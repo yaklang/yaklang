@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -126,4 +128,25 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 	}
 	_, err := localmodel.GetModelPath(modelName)
 	return err == nil
+}
+func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", path)
+	if err != nil {
+		return db, err
+	}
+	db = db.AutoMigrate(
+		&schema.KnowledgeBaseEntry{},
+		&schema.KnowledgeBaseInfo{},
+		&schema.VectorStoreCollection{},
+		&schema.VectorStoreDocument{},
+
+		&schema.ERModelEntity{},
+		&schema.ERModelRelationship{},
+		&schema.EntityRepository{},
+
+		&schema.VectorStoreDocument{},
+		&schema.VectorStoreCollection{},
+	)
+
+	return db, nil
 }

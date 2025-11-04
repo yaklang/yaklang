@@ -475,7 +475,7 @@ func (s *Server) IsSearchVectorDatabaseReady(ctx context.Context, req *ypb.IsSea
 	notReadyCollectionNames := []string{}
 	db := consts.GetGormProfileDatabase()
 	for _, collectionName := range req.GetCollectionNames() {
-		if !rag.IsReadyCollection(db, collectionName) {
+		if !rag.CollectionIsExists(db, collectionName) {
 			notReadyCollectionNames = append(notReadyCollectionNames, collectionName)
 		}
 	}
@@ -499,45 +499,7 @@ func (s *Server) DeleteSearchVectorDatabase(ctx context.Context, req *ypb.Delete
 	}, utils.JoinErrors(errs...)
 }
 func (s *Server) InitSearchVectorDatabase(req *ypb.InitSearchVectorDatabaseRequest, stream ypb.Yak_InitSearchVectorDatabaseServer) error {
-	collectionNames := req.GetCollectionNames()
-	for _, collectionName := range collectionNames {
-		if _, ok := buildInVectorDBLink[collectionName]; !ok {
-			return utils.Errorf("不支持的集合类型: %s", collectionName)
-		}
-	}
-
-	for _, collection := range collectionNames {
-		stream.Send(&ypb.ExecResult{
-			IsMessage: true,
-			Message:   []byte(fmt.Sprintf("开始下载 %s 向量数据", collection)),
-		})
-		tmpFileName := fmt.Sprintf("tmp_%s.zip", collection)
-		err := s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-			return buildInVectorDBLink[collection].DownloadURL, tmpFileName, nil
-		}, stream)
-		if err != nil {
-			return err
-		}
-
-		stream.Send(&ypb.ExecResult{
-			IsMessage: true,
-			Message:   []byte(fmt.Sprintf("下载完成，开始导入 %s 向量数据", collection)),
-		})
-
-		zipPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "libs", tmpFileName)
-		db := consts.GetGormProfileDatabase()
-		err = rag.ImportVectorDataFullUpdate(db, zipPath)
-		if err != nil {
-			return err
-		}
-		os.Remove(zipPath)
-		stream.Send(&ypb.ExecResult{
-			IsMessage: true,
-			Message:   []byte(fmt.Sprintf("导入 %s 向量数据完成，已删除临时文件 %s", collection, zipPath)),
-		})
-	}
-
-	return nil
+	return fmt.Errorf("deprecated interface, use ImportKnowledgeBase instead")
 }
 
 func (s *Server) AddLocalModel(ctx context.Context, req *ypb.AddLocalModelRequest) (*ypb.GeneralResponse, error) {
