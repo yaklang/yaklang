@@ -50,7 +50,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	if skipRequire {
 		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
 	} else {
-		log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+	log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
 	}
 
 	// Create ToolCaller with appropriate options

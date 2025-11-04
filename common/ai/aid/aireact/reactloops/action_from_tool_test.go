@@ -1,9 +1,13 @@
 package reactloops
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // TestConvertAIToolToLoopAction_Basic tests the basic conversion of an AI Tool to a LoopAction
@@ -145,14 +149,91 @@ func TestConvertAIToolToLoopAction_Roundtrip(t *testing.T) {
 		t.Error("Options should not be nil")
 	}
 
-	// Verify that ActionVerifier and ActionHandler are nil (will be set later)
-	if action.ActionVerifier != nil {
-		t.Error("ActionVerifier should be nil after conversion")
+	// Verify that ActionVerifier and ActionHandler are set by ConvertAIToolToLoopAction
+	if action.ActionVerifier == nil {
+		t.Error("ActionVerifier should be set after conversion")
 	}
 
-	if action.ActionHandler != nil {
-		t.Error("ActionHandler should be nil after conversion")
+	if action.ActionHandler == nil {
+		t.Error("ActionHandler should be set after conversion")
 	}
 
 	t.Logf("Roundtrip successful for action: %s", action.ActionType)
+}
+
+// TestConvertAIToolToLoopAction_EchoTool_Lifecycle tests the complete lifecycle of an echo tool
+// This ensures that a Tool can be converted to LoopAction and executed through the full ReAct loop
+func TestConvertAIToolToLoopAction_EchoTool_Lifecycle(t *testing.T) {
+	// Create an echo tool with callback
+	echoTool, err := aitool.New(
+		"echo_test",
+		aitool.WithDescription("Echo the input message back for testing"),
+		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, config *aitool.ToolRuntimeConfig, stdout, stderr io.Writer) (any, error) {
+			message, ok := params["message"]
+			if !ok {
+				return nil, fmt.Errorf("missing required parameter 'message'")
+			}
+			receivedMessage := utils.InterfaceToString(message)
+
+			// Write to stdout as many tools do
+			if stdout != nil {
+				fmt.Fprintf(stdout, "Echoing: %s\n", receivedMessage)
+			}
+
+			return map[string]any{
+				"echoed": receivedMessage,
+			}, nil
+		}),
+		aitool.WithStringParam("message",
+			aitool.WithParam_Description("The message to echo"),
+			aitool.WithParam_Required(true),
+		),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create echo tool: %v", err)
+	}
+
+	// Convert to LoopAction
+	action := ConvertAIToolToLoopAction(echoTool)
+
+	// Verify basic properties
+	if action.ActionType != "echo_test" {
+		t.Errorf("Expected ActionType 'echo_test', got '%s'", action.ActionType)
+	}
+
+	if action.Description != "Echo the input message back for testing" {
+		t.Errorf("Expected Description 'Echo the input message back for testing', got '%s'", action.Description)
+	}
+
+	// Verify ActionVerifier is set
+	if action.ActionVerifier == nil {
+		t.Fatal("ActionVerifier should be set")
+	}
+
+	// Verify ActionHandler is set
+	if action.ActionHandler == nil {
+		t.Fatal("ActionHandler should be set")
+	}
+
+	// Verify options are converted (ToolOption is a function type, so we verify via the tool's schema)
+	propertyKeys := echoTool.Tool.InputSchema.Properties.Keys()
+	if len(propertyKeys) != 1 {
+		t.Errorf("Expected 1 property in tool schema, got %d", len(propertyKeys))
+	}
+
+	// Verify the schema has the message property
+	messageProperty, hasMessage := echoTool.Tool.InputSchema.Properties.Get("message")
+	if !hasMessage || messageProperty == nil {
+		t.Error("Expected tool schema to have 'message' property")
+	}
+
+	// Verify it's required
+	if len(echoTool.Tool.InputSchema.Required) != 1 || echoTool.Tool.InputSchema.Required[0] != "message" {
+		t.Errorf("Expected 'message' to be required, got required: %v", echoTool.Tool.InputSchema.Required)
+	}
+
+	t.Logf("Echo tool successfully converted to LoopAction: %s", action.ActionType)
+
+	// Note: Full lifecycle execution test is in reactloopstests/action_from_tool_lifecycle_test.go
+	// to avoid circular import issues
 }

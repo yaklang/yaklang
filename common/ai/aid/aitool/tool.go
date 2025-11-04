@@ -381,10 +381,43 @@ func WithStructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 	if temp.InputSchema.Properties != nil && temp.InputSchema.Properties.Len() > 0 {
 		schema["properties"] = temp.InputSchema.Properties
 	}
+
+	// Save the nested required array (required fields inside this struct)
+	var nestedRequired []string
 	if len(temp.InputSchema.Required) > 0 {
-		schema["required"] = temp.InputSchema.Required
+		nestedRequired = temp.InputSchema.Required
 	}
-	return WithRawParam(name, schema, opts...)
+
+	// Create a ToolOption that applies PropertyOptions and preserves nested required
+	return func(t *Tool) {
+		// Apply PropertyOptions to the schema
+		for _, opt := range opts {
+			opt(schema)
+		}
+
+		// Restore nested required array if it was set
+		// This must happen AFTER applying PropertyOptions to avoid being overwritten
+		if len(nestedRequired) > 0 {
+			schema["required"] = nestedRequired
+		}
+
+		// Handle top-level required (whether this struct parameter itself is required)
+		if required, ok := schema["required"].(bool); ok && required {
+			// If PropertyOptions set required=true, this struct param is required at top level
+			delete(schema, "required")
+			if t.InputSchema.Required == nil {
+				t.InputSchema.Required = []string{name}
+			} else {
+				t.InputSchema.Required = append(t.InputSchema.Required, name)
+			}
+			// Re-add nested required array if it exists
+			if len(nestedRequired) > 0 {
+				schema["required"] = nestedRequired
+			}
+		}
+
+		t.InputSchema.Properties.Set(name, schema)
+	}
 }
 
 func WithNullParam(name string, opts ...PropertyOption) ToolOption {
@@ -478,14 +511,19 @@ func WithRawParam(name string, object map[string]any, opts ...PropertyOption) To
 			opt(object)
 		}
 
-		// Remove required from property schema and add to InputSchema.required
-		if required, ok := object["required"].(bool); ok && required {
-			delete(object, "required")
-			if t.InputSchema.Required == nil {
-				t.InputSchema.Required = []string{name}
-			} else {
-				t.InputSchema.Required = append(t.InputSchema.Required, name)
+		// Handle required field - can be bool (for simple params) or []string (for nested structs)
+		if requiredVal, exists := object["required"]; exists {
+			// Check if it's a bool (simple parameter)
+			if required, ok := requiredVal.(bool); ok && required {
+				delete(object, "required")
+				if t.InputSchema.Required == nil {
+					t.InputSchema.Required = []string{name}
+				} else {
+					t.InputSchema.Required = append(t.InputSchema.Required, name)
+				}
 			}
+			// If it's a []string (nested struct), keep it in the schema
+			// It will be handled by buildStructOptionsFromMap during rebuild
 		}
 
 		t.InputSchema.Properties.Set(name, object)
