@@ -93,11 +93,13 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 				}
 				activeTasks = append(activeTasks, item)
 			}
-			safeStream.Send(&ypb.SyntaxFlowScanResponse{
-				TaskID:     tid,
-				Status:     s,
-				ActiveTask: activeTasks,
-			})
+			if len(activeTasks) > 0 {
+				safeStream.Send(&ypb.SyntaxFlowScanResponse{
+					TaskID:     tid,
+					Status:     s,
+					ActiveTask: activeTasks,
+				})
+			}
 
 			// sendExecResult(tid, s, yaklib.NewYakitLogExecResult("code", info)) // 发送 rules info
 

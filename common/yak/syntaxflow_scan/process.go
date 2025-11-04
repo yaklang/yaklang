@@ -127,7 +127,7 @@ func (pm *processMonitor) StartMonitor() {
 		ticker := time.NewTicker(pm.monitorTTL)
 		defer ticker.Stop()
 
-		defer pm.reportProcess() // final event
+		defer pm.reportProcess(true) // final event
 		defer pm.drainResults()
 
 		for {
@@ -138,7 +138,7 @@ func (pm *processMonitor) StartMonitor() {
 				if !ok {
 					return
 				}
-				pm.reportProcess()
+				pm.reportProcess(false)
 				ticker.Reset(pm.monitorTTL)
 			case res, ok := <-pm.resultCh:
 				if !ok {
@@ -146,7 +146,7 @@ func (pm *processMonitor) StartMonitor() {
 				}
 				pm.handleResult(res)
 			case <-ticker.C:
-				pm.reportProcess()
+				pm.reportProcess(true)
 			}
 		}
 	}()
@@ -177,9 +177,9 @@ func (pm *processMonitor) drainResults() {
 	}
 }
 
-func (p *processMonitor) reportProcess() {
+func (p *processMonitor) reportProcess(withRule bool) {
 	if p.processCallBack != nil {
-		info := p.snapshotInfoList()
+		info := p.snapshotInfoList(withRule)
 		// log.Errorf("process report process: %v ", info.Progress)
 		p.processCallBack(info.Progress, info)
 	}
@@ -219,7 +219,7 @@ func (p *processMonitor) PublishResult(res *ssaapi.SyntaxFlowResult) {
 	}
 }
 
-func (p *processMonitor) snapshotInfoList() *RuleProcessInfoList {
+func (p *processMonitor) snapshotInfoList(withRule bool) *RuleProcessInfoList {
 	ret := &RuleProcessInfoList{
 		Time:          time.Now().UnixMicro(),
 		FailedQuery:   p.FailedQuery.Load(),
@@ -236,6 +236,11 @@ func (p *processMonitor) snapshotInfoList() *RuleProcessInfoList {
 		ret.Progress = float64(ret.FinishedQuery) / float64(total)
 	}
 	// rule
+	if !withRule {
+		// not include rule details
+		return ret
+	}
+
 	ret.Rules = make([]*RuleProcessInfo, 0, p.Status.Len())
 	p.Status.ForEach(func(i string, rpi *RuleProcessInfo) bool {
 		if rpi.Finished && rpi.Report {
