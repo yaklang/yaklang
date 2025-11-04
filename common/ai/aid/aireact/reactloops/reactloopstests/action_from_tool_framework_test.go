@@ -6,6 +6,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,11 +43,15 @@ func TestActionFromTool_WithFramework(t *testing.T) {
 		t.Fatalf("Failed to create echo tool: %v", err)
 	}
 
-	// Create test framework
-	framework := NewActionTestFramework(t, "tool-test")
-
-	// Add the tool to the invoker
-	framework.GetLoop().GetInvoker().GetConfig().GetToolManager().Add(echoTool)
+	// Create test framework with AI config options to add the tool
+	framework := NewActionTestFrameworkEx(
+		t,
+		"tool-test",
+		nil, // No loop options
+		[]aicommon.ConfigOption{
+			aicommon.WithTools(echoTool),
+		},
+	)
 
 	// Convert the tool to a LoopAction and register it
 	loopAction := reactloops.ConvertAIToolToLoopAction(echoTool)
