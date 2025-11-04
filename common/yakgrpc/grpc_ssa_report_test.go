@@ -488,6 +488,165 @@ func TestGenerateSSAReport_ProgramNotFound(t *testing.T) {
 	t.Logf("程序不存在情况下报告生成成功! 报告ID: %s", resp.ReportData)
 }
 
+// TestGenerateSSAReport_FromRiskIDs 测试从RiskIDs生成报告
+func TestGenerateSSAReport_FromRiskIDs(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+
+	server, err := NewTestServer()
+	if err != nil {
+		t.Fatalf("创建测试服务器失败: %v", err)
+	}
+
+	taskId := uuid.New().String()
+	programName1 := "test-program-1"
+	programName2 := "test-program-2"
+
+	defer cleanupMockData(taskId, programName1)
+	defer cleanupMockData(taskId, programName2)
+
+	// 创建两个不同的程序
+	createMockProgram(programName1, "java", "测试项目1", 5, 1000)
+	createMockProgram(programName2, "php", "测试项目2", 3, 500)
+
+	// 创建任务
+	riskCounts := map[string]int64{
+		"total": 6, "critical": 1, "high": 2, "middle": 2, "low": 1, "info": 0,
+	}
+	createMockTask(taskId, programName1, schema.SYNTAXFLOWSCAN_DONE, riskCounts, 10)
+
+	// 在不同项目中创建Risk
+	var riskIDs []int64
+
+	// 项目1的Risk
+	risk1 := createMockRisk(taskId, programName1, "SQL注入", "critical", "sql-rule",
+		"SQL Injection", "SQL注入漏洞", "存在SQL注入风险", "使用参数化查询",
+		"/src/User.java", "getUser", "SELECT * FROM users WHERE id = "+"id", 10)
+	riskIDs = append(riskIDs, int64(risk1.ID))
+
+	risk2 := createMockRisk(taskId, programName1, "XSS", "high", "xss-rule",
+		"XSS", "跨站脚本", "存在XSS风险", "对输出进行编码",
+		"/src/Display.java", "showUser", "out.print(userInput)", 20)
+	riskIDs = append(riskIDs, int64(risk2.ID))
+
+	// 项目2的Risk
+	risk3 := createMockRisk(taskId, programName2, "文件上传", "high", "upload-rule",
+		"File Upload", "文件上传漏洞", "未验证文件类型", "验证文件类型和大小",
+		"/upload.php", "handleUpload", "move_uploaded_file($_FILES['file'])", 15)
+	riskIDs = append(riskIDs, int64(risk3.ID))
+
+	risk4 := createMockRisk(taskId, programName2, "弱密码", "middle", "weak-pwd-rule",
+		"Weak Password", "弱密码", "密码强度不足", "增强密码策略",
+		"/auth.php", "validatePwd", "strlen($pwd) > 6", 30)
+	riskIDs = append(riskIDs, int64(risk4.ID))
+
+	// 测试：使用RiskIDs生成报告
+	req := &ypb.GenerateSSAReportRequest{
+		RiskIDs:    riskIDs,
+		ReportName: "用户选择的风险报告",
+	}
+
+	ctx := context.Background()
+	resp, err := server.GenerateSSAReport(ctx, req)
+	if err != nil {
+		t.Fatalf("生成SSA报告失败: %v", err)
+	}
+
+	if !resp.Success {
+		t.Fatalf("报告生成失败: %s", resp.Message)
+	}
+
+	t.Logf("✅ 从RiskIDs生成报告成功!")
+	t.Logf("   报告ID: %s", resp.ReportData)
+	t.Logf("   包含 %d 个Risk，涉及 2 个项目", len(riskIDs))
+}
+
+// TestGenerateSSAReport_FromTaskID 测试从TaskID生成报告（原有功能）
+func TestGenerateSSAReport_FromTaskID(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+
+	server, err := NewTestServer()
+	if err != nil {
+		t.Fatalf("创建测试服务器失败: %v", err)
+	}
+
+	taskId := uuid.New().String()
+	programName := "test-task-program"
+
+	defer cleanupMockData(taskId, programName)
+
+	// 创建程序
+	createMockProgram(programName, "java", "测试任务项目", 10, 2000)
+
+	// 创建任务
+	riskCounts := map[string]int64{
+		"total": 3, "critical": 0, "high": 2, "middle": 1, "low": 0, "info": 0,
+	}
+	createMockTask(taskId, programName, schema.SYNTAXFLOWSCAN_DONE, riskCounts, 5)
+
+	// 创建Risk
+	for i := 0; i < 3; i++ {
+		severity := "high"
+		if i == 2 {
+			severity = "middle"
+		}
+		createMockRisk(taskId, programName,
+			fmt.Sprintf("风险类型%d", i+1), severity, fmt.Sprintf("rule-%d", i+1),
+			fmt.Sprintf("Risk %d", i+1), fmt.Sprintf("风险%d", i+1),
+			fmt.Sprintf("描述%d", i+1), fmt.Sprintf("解决方案%d", i+1),
+			fmt.Sprintf("/src/File%d.java", i+1), fmt.Sprintf("method%d", i+1),
+			fmt.Sprintf("code snippet %d", i+1), int64(10+i*10))
+	}
+
+	// 测试：使用TaskID生成报告（原有功能）
+	req := &ypb.GenerateSSAReportRequest{
+		TaskID:     taskId,
+		ReportName: "任务扫描报告",
+	}
+
+	ctx := context.Background()
+	resp, err := server.GenerateSSAReport(ctx, req)
+	if err != nil {
+		t.Fatalf("生成SSA报告失败: %v", err)
+	}
+
+	if !resp.Success {
+		t.Fatalf("报告生成失败: %s", resp.Message)
+	}
+
+	t.Logf("✅ 从TaskID生成报告成功!")
+	t.Logf("   报告ID: %s", resp.ReportData)
+}
+
+// TestGenerateSSAReport_Validation 测试参数验证
+func TestGenerateSSAReport_Validation(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+
+	server, err := NewTestServer()
+	if err != nil {
+		t.Fatalf("创建测试服务器失败: %v", err)
+	}
+
+	// 测试：既没有TaskID也没有RiskIDs
+	req := &ypb.GenerateSSAReportRequest{
+		ReportName: "无参数报告",
+	}
+
+	ctx := context.Background()
+	_, err = server.GenerateSSAReport(ctx, req)
+
+	if err == nil {
+		t.Fatal("期望返回错误，但没有返回错误")
+	}
+
+	t.Logf("✅ 参数验证正确: %v", err)
+}
+
 // TestGenerateSSAReport 冒烟测试
 func TestGenerateSSAReport(t *testing.T) {
 	if utils.InGithubActions() {
