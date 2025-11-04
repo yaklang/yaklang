@@ -1,8 +1,6 @@
 package yakit
 
 import (
-	"errors"
-
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
 	"github.com/jinzhu/gorm"
@@ -13,29 +11,47 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func SSAProjectToSchemaData(s *ssaproject.SSAProject) (*schema.SSAProject, error) {
+	if s == nil {
+		return nil, utils.Errorf("to schema SSA project failed: SSA project is nil")
+	}
+	var result schema.SSAProject
+	result.ID = s.ID
+	result.ProjectName = s.ProjectName
+	result.Description = s.Description
+	result.Language = s.Language
+	result.SetTagsList(s.Tags)
+	err := result.SetConfig(s.Config)
+	if err != nil {
+		return nil, utils.Errorf("to schema SSA project failed: %s", err)
+	}
+	return &result, nil
+}
+
 func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SSAProject, error) {
 	if req == nil {
 		return nil, utils.Errorf("create SSA project failed: project is nil")
 	}
 
-	var projectBuilder *ssaproject.SSAProjectBuilder
+	var projectBuilder *ssaproject.SSAProject
 	var err error
 	if req.Project != nil {
-		projectBuilder, err = ssaproject.NewSSAProjectBuilderByProto(req.Project)
+		projectBuilder, err = ssaproject.NewSSAProjectByProto(req.Project)
 	} else if req.ProjectRawData != "" {
-		projectBuilder, err = ssaproject.NewSSAProjectBuilderByRawData(req.ProjectRawData)
+		projectBuilder, err = ssaproject.NewSSAProjectByRawData(req.ProjectRawData)
 	} else {
 		return nil, utils.Errorf("create SSA project failed: project data is missing")
 	}
+	if projectBuilder == nil {
+		return nil, utils.Errorf("create SSA project failed: project builder is nil")
+	}
 
+	err = projectBuilder.Save(db)
 	if err != nil {
 		return nil, utils.Errorf("create SSA project failed: %s", err)
 	}
-	schemaProject, err := projectBuilder.ToSchemaSSAProject()
+	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
 	if err != nil {
-		return nil, utils.Errorf("create SSA project failed: %s", err)
-	}
-	if err := db.Create(schemaProject).Error; err != nil {
 		return nil, utils.Errorf("create SSA project failed: %s", err)
 	}
 	return schemaProject, nil
@@ -50,25 +66,20 @@ func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject,
 		return nil, utils.Errorf("update SSA project failed: project ID is required")
 	}
 
-	projectBuilder, err := ssaproject.NewSSAProjectBuilderByProto(project)
+	projectBuilder, err := ssaproject.NewSSAProjectByProto(project)
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
+	if projectBuilder == nil {
+		return nil, utils.Errorf("update SSA project failed: project builder is nil")
+	}
 
-	schemaProject, err := projectBuilder.ToSchemaSSAProject()
+	err = projectBuilder.Save(db)
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
-
-	var existingProject schema.SSAProject
-	if err := db.First(&existingProject, schemaProject.ID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, utils.Errorf("project with ID %d not found", schemaProject.ID)
-		}
-		return nil, utils.Errorf("check project existence failed: %s", err)
-	}
-
-	if err := db.Model(&existingProject).Updates(schemaProject).Error; err != nil {
+	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
+	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
 	return schemaProject, nil
