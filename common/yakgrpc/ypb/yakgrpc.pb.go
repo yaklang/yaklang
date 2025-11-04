@@ -52386,12 +52386,13 @@ type SyntaxFlowRuleFilter struct {
 	// 是否包含作为库的规则  这些规则只提供相关数据并被其他规则引用 默认不包含
 	IncludeLibraryRule bool `protobuf:"varint,8,opt,name=includeLibraryRule,proto3" json:"includeLibraryRule,omitempty"` // default false // 废弃
 	// for infinite list
-	FromId            int64  `protobuf:"varint,9,opt,name=FromId,proto3" json:"FromId,omitempty"`    // 废弃
-	UntilId           int64  `protobuf:"varint,10,opt,name=UntilId,proto3" json:"UntilId,omitempty"` // 废弃
-	AfterId           int64  `protobuf:"varint,11,opt,name=AfterId,proto3" json:"AfterId,omitempty"`
-	BeforeId          int64  `protobuf:"varint,12,opt,name=BeforeId,proto3" json:"BeforeId,omitempty"`
-	FilterRuleKind    string `protobuf:"bytes,13,opt,name=FilterRuleKind,proto3" json:"FilterRuleKind,omitempty"`       // "buildIn"内置规则，"unBuildIn"非内置规则组, 空为所有规则
-	FilterLibRuleKind string `protobuf:"bytes,14,opt,name=FilterLibRuleKind,proto3" json:"FilterLibRuleKind,omitempty"` // "lib"library规则，"noLib"非library规则，空为所有规则
+	FromId            int64    `protobuf:"varint,9,opt,name=FromId,proto3" json:"FromId,omitempty"`    // 废弃
+	UntilId           int64    `protobuf:"varint,10,opt,name=UntilId,proto3" json:"UntilId,omitempty"` // 废弃
+	AfterId           int64    `protobuf:"varint,11,opt,name=AfterId,proto3" json:"AfterId,omitempty"`
+	BeforeId          int64    `protobuf:"varint,12,opt,name=BeforeId,proto3" json:"BeforeId,omitempty"`
+	FilterRuleKind    string   `protobuf:"bytes,13,opt,name=FilterRuleKind,proto3" json:"FilterRuleKind,omitempty"`       // "buildIn"内置规则，"unBuildIn"非内置规则组, 空为所有规则
+	FilterLibRuleKind string   `protobuf:"bytes,14,opt,name=FilterLibRuleKind,proto3" json:"FilterLibRuleKind,omitempty"` // "lib"library规则，"noLib"非library规则，空为所有规则
+	RuleIds           []string `protobuf:"bytes,15,rep,name=RuleIds,proto3" json:"RuleIds,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -52522,6 +52523,13 @@ func (x *SyntaxFlowRuleFilter) GetFilterLibRuleKind() string {
 		return x.FilterLibRuleKind
 	}
 	return ""
+}
+
+func (x *SyntaxFlowRuleFilter) GetRuleIds() []string {
+	if x != nil {
+		return x.RuleIds
+	}
+	return nil
 }
 
 type SSAProgram struct {
@@ -67417,7 +67425,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bAlertMsg\x18\a \x03(\v2&.ypb.SyntaxFlowRuleInput.AlertMsgEntryR\bAlertMsg\x1aN\n" +
 	"\rAlertMsgEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12'\n" +
-	"\x05value\x18\x02 \x01(\v2\x11.ypb.AlertMessageR\x05value:\x028\x01\"\xc0\x03\n" +
+	"\x05value\x18\x02 \x01(\v2\x11.ypb.AlertMessageR\x05value:\x028\x01\"\xda\x03\n" +
 	"\x14SyntaxFlowRuleFilter\x12\x1c\n" +
 	"\tRuleNames\x18\x01 \x03(\tR\tRuleNames\x12\x1a\n" +
 	"\bLanguage\x18\x02 \x03(\tR\bLanguage\x12\x1e\n" +
@@ -67435,7 +67443,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aAfterId\x18\v \x01(\x03R\aAfterId\x12\x1a\n" +
 	"\bBeforeId\x18\f \x01(\x03R\bBeforeId\x12&\n" +
 	"\x0eFilterRuleKind\x18\r \x01(\tR\x0eFilterRuleKind\x12,\n" +
-	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\"\xd0\x03\n" +
+	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\x12\x18\n" +
+	"\aRuleIds\x18\x0f \x03(\tR\aRuleIds\"\xd0\x03\n" +
 	"\n" +
 	"SSAProgram\x12\x1a\n" +
 	"\bCreateAt\x18\x01 \x01(\x03R\bCreateAt\x12\x1a\n" +
