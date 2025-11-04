@@ -917,6 +917,8 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				require.Equal(t, conflictInfo.Local, testRules[0].Content)
+				require.Equal(t, conflictInfo.Remote, onlineRules[0].Content)
 			}
 		}).Build()
 		defer guard1.UnPatch()
@@ -959,8 +961,6 @@ func TestUploadSyntaxFlowRule(t *testing.T) {
 		err := server.SyntaxFlowRuleToOnline(req, stream)
 		assert.NoError(t, err)
 		require.Equal(t, 0, uploadCount) // 冲突，跳过上传
-		require.Equal(t, conflictInfo.Local, testRules[0].Content)
-		require.Equal(t, conflictInfo.Remote, onlineRules[0].Content)
 	})
 
 	// 场景5: 远程存在，本地 v1.0 < 远程 v2.0，NeedUpdate=false → 跳过上传（提示需要更新）
@@ -1193,6 +1193,8 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				require.Equal(t, conflictInfo.Local, "local-content")
+				require.Equal(t, conflictInfo.Remote, "online-content")
 			}
 		}).Build()
 		defer guard1.UnPatch()
@@ -1228,8 +1230,6 @@ func TestDownloadSyntaxFlowRule(t *testing.T) {
 		}, stream)
 		assert.NoError(t, err)
 		require.Equal(t, 0, saveCount) // 冲突，跳过下载
-		require.Equal(t, conflictInfo.Local, "local-content")
-		require.Equal(t, conflictInfo.Remote, "online-content")
 	})
 
 	// 场景5: 本地存在，本地 v3.0 > 在线 v2.0，NeedUpdate=true → 逻辑错误
