@@ -152,7 +152,7 @@ const jsCode = "test js code";
 	// 等待所有异步处理完成，最多等待500ms
 	var yakCode, pyCode, jsCode string
 	for i := 0; i < 5; i++ {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond) // Reduced from 100ms for faster tests
 		yakCode = loop.Get("yak_code")
 		pyCode = loop.Get("py_code")
 		jsCode = loop.Get("js_code")
@@ -207,7 +207,7 @@ func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Reduced from 200ms for faster tests
 
 	// 空标签不应该设置变量（因为有 if code == "" { return } 检查）
 	code := loop.Get("empty_code")
@@ -284,7 +284,7 @@ func multiLineFunc() {
 	// 等待异步处理，最多等待500ms
 	var code string
 	for i := 0; i < 5; i++ {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond) // Reduced from 100ms for faster tests
 		code = loop.Get("code_with_newlines")
 		if code != "" {
 			break
@@ -323,7 +323,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 添加小延迟确保processing状态能被捕获
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond) // Reduced from 50ms for faster tests
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
 			rsp.Close()
 			return rsp, nil
@@ -371,7 +371,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 						// 如果已经完成，等待一小段时间再退出，确保状态被记录
 						if currentStatus == aicommon.AITaskState_Completed ||
 							currentStatus == aicommon.AITaskState_Aborted {
-							time.Sleep(10 * time.Millisecond)
+							time.Sleep(5 * time.Millisecond) // Reduced from 10ms for faster tests
 							return
 						}
 					}
@@ -496,7 +496,7 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 	// Panic应该被recover，状态可能是Aborted或Completed
 	_ = loop.Execute("abort-task", context.Background(), "test abort")
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Reduced from 200ms for faster tests
 
 	if capturedTask != nil {
 		finalStatus = capturedTask.GetStatus()
