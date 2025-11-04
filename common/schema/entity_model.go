@@ -102,6 +102,25 @@ func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 	}
 }
 
+func EntityGRPCToModel(e *ypb.Entity) *ERModelEntity {
+	attributes := MetadataMap{}
+	for _, attr := range e.Attributes {
+		attributes[attr.GetKey()] = attr.GetValue()
+	}
+
+	return &ERModelEntity{
+		Model: gorm.Model{
+			ID: uint(e.GetID()),
+		},
+		Uuid:           e.GetHiddenIndex(),
+		EntityName:     e.GetName(),
+		EntityType:     e.GetType(),
+		Description:    e.GetDescription(),
+		Attributes:     attributes,
+		RepositoryUUID: e.GetBaseIndex(),
+	}
+}
+
 func (e *ERModelEntity) String() string {
 	attrString := strings.Builder{}
 	for name, attr := range e.Attributes {
@@ -176,6 +195,25 @@ type ERModelRelationship struct {
 	RuntimeID string
 }
 
+func RelationshipGRPCToModel(r *ypb.Relationship) *ERModelRelationship {
+	attributes := MetadataMap{}
+	for _, attr := range r.Attributes {
+		attributes[attr.GetKey()] = attr.GetValue()
+	}
+
+	return &ERModelRelationship{
+		Model: gorm.Model{
+			ID: uint(r.GetID()),
+		},
+		Uuid:              r.GetUUID(),
+		SourceEntityIndex: r.GetSourceEntityIndex(),
+		TargetEntityIndex: r.GetTargetEntityIndex(),
+		RelationshipType:  r.GetType(),
+		Attributes:        attributes,
+		RepositoryUUID:    r.GetRepositoryUUID(),
+	}
+}
+
 const ERModelRelationshipBroadcastType = "er_model_relationship"
 
 func (r *ERModelRelationship) AfterCreate(tx *gorm.DB) (err error) {
@@ -226,6 +264,8 @@ func (r *ERModelRelationship) String() string {
 
 func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
 	return &ypb.Relationship{
+		RepositoryUUID:    r.RepositoryUUID,
+		UUID:              r.Uuid,
 		ID:                uint64(r.ID),
 		Type:              r.RelationshipType,
 		SourceEntityIndex: r.SourceEntityIndex,
