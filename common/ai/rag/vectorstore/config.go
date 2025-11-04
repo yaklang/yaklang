@@ -38,6 +38,10 @@ type CollectionConfig struct {
 	// otherOptions []any
 
 	DB *gorm.DB
+
+	MaxChunkSize int
+	Overlap      int
+	BigTextPlan  string
 }
 
 func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
@@ -50,6 +54,9 @@ func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 		EfSearch:                   20,
 		EfConstruct:                200,
 		EnableAutoUpdateGraphInfos: true,
+		MaxChunkSize:               defaultMaxChunkSize,
+		Overlap:                    defaultChunkOverlap,
+		BigTextPlan:                defaultBigTextPlan,
 	}
 
 	for _, option := range options {
@@ -73,6 +80,9 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		Description:                collection.Description,
 		EnablePQ:                   collection.EnablePQMode,
 		EnableAutoUpdateGraphInfos: true,
+		MaxChunkSize:               defaultMaxChunkSize,
+		Overlap:                    defaultChunkOverlap,
+		BigTextPlan:                defaultBigTextPlan,
 	}
 	for _, option := range options {
 		option(loadBasicConfig)
@@ -103,6 +113,24 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 }
 
 type CollectionConfigFunc func(config *CollectionConfig)
+
+func WithMaxChunkSize(maxChunkSize int) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.MaxChunkSize = maxChunkSize
+	}
+}
+
+func WithOverlap(overlap int) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.Overlap = overlap
+	}
+}
+
+func WithBigTextPlan(bigTextPlan string) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.BigTextPlan = bigTextPlan
+	}
+}
 
 // WithEmbeddingClient 设置embedding客户端
 func WithEmbeddingClient(client aispec.EmbeddingCaller) CollectionConfigFunc {
