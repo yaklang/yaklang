@@ -19,7 +19,6 @@ type SSAProject struct {
 	Tags        []string
 	Language    ssaconfig.Language `json:"language"`
 	Config      *ssaconfig.Config
-	Info        *ssaconfig.CodeSourceInfo `json:"info"`
 }
 
 func NewSSAProjectByRawData(rawData string) (*SSAProject, error) {
@@ -186,7 +185,7 @@ func (s *SSAProject) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
 	return s.Config.SyntaxFlow
 }
 
-func NewSSAProjectBuilder(opts ...ssaconfig.Option) (*SSAProject, error) {
+func NewSSAProject(opts ...ssaconfig.Option) (*SSAProject, error) {
 	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
 		return nil, utils.Errorf("failed to new SSA project builder: %s", err)
@@ -220,7 +219,7 @@ func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProject, error) {
 	return builder, nil
 }
 
-func LoadSSAProjectBuilderByName(projectName string) (*SSAProject, error) {
+func LoadSSAProjectByName(projectName string) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
 	if err := db.Where("project_name = ?", projectName).First(&project).Error; err != nil {
@@ -229,7 +228,7 @@ func LoadSSAProjectBuilderByName(projectName string) (*SSAProject, error) {
 	return loadSSAProjectBySchema(&project)
 }
 
-func LoadSSAProjectBuilderByID(id uint) (*SSAProject, error) {
+func LoadSSAProjectByID(id uint) (*SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	var project schema.SSAProject
 	if err := db.Where("id = ?", id).First(&project).Error; err != nil {
