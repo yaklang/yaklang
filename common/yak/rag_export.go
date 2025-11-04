@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
@@ -52,7 +51,7 @@ var RagExports = map[string]interface{}{
 
 	"docMetadata":        rag.WithDocumentMetadataKeyValue,
 	"docRawMetadata":     rag.WithDocumentRawMetadata,
-	"NewRagDatabase":     vectorstore.NewVectorStoreDatabase,
+	"NewRagDatabase":     rag.NewVectorStoreDatabase,
 	"NewTempRagDatabase": _newTempRagDatabase,
 	"EnableMockMode":     _enableMockMode,
 
@@ -62,13 +61,13 @@ var RagExports = map[string]interface{}{
 	"extraPrompt":     aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
 	"entryLength":     aiforge.RefineWithKnowledgeEntryLength,
 	"chunkSize":       chunkmaker.WithChunkSize,
-	"khopk":           entityrepos.WithKHopK,
-	"khopLimit":       entityrepos.WithKHopLimit,
-	"khopkMin":        entityrepos.WithKHopKMin,
-	"khopkMax":        entityrepos.WithKHopKMax,
-	"buildQuery":      entityrepos.WithRagQuery,
-	"buildFilter":     entityrepos.WithStartEntityFilter,
-	"pathDepth":       entityrepos.WithPathDepth,
+	"khopk":           rag.WithKHopK,
+	"khopLimit":       rag.WithKHopLimit,
+	"khopkMin":        rag.WithKHopKMin,
+	"khopkMax":        rag.WithKHopKMax,
+	"buildQuery":      rag.WithKHopRagQuery,
+	"buildFilter":     rag.WithKHopStartFilter,
+	"pathDepth":       rag.WithKHopPathDepth,
 	"getEntityFilter": schema.SimpleBuildEntityFilter,
 
 	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
@@ -80,18 +79,18 @@ var RagExports = map[string]interface{}{
 	"BuildIndexKnowledgeFromFile": aiforge.BuildIndexKnowledgeFromFile,
 
 	"Import":             rag.ImportRAGFromFile,
-	"db":                 rag.WithImportExportDB,
-	"importOverwrite":    rag.WithOverwriteExisting,
-	"importName":         rag.WithCollectionName,
-	"importRebuildGraph": rag.WithRebuildHNSWIndex,
-	"documentHandler":    rag.WithDocumentHandler,
-	"progressHandler":    rag.WithProgressHandler,
+	"db":                 rag.WithDB,
+	"importOverwrite":    rag.WithExportOverwriteExisting,
+	"importName":         rag.WithRAGCollectionName,
+	"importRebuildGraph": rag.WithImportRebuildHNSWIndex,
+	"documentHandler":    rag.WithExportDocumentHandler,
+	"progressHandler":    rag.WithExportOnProgressHandler,
 
 	"Export":        rag.ExportRAGToFile,
-	"noHNSWGraph":   rag.WithNoHNSWGraph,
-	"noMetadata":    rag.WithNoMetadata,
-	"noOriginInput": rag.WithNoOriginInput,
-	"onlyPQCode":    rag.WithOnlyPQCode,
+	"noHNSWGraph":   rag.WithExportNoHNSWIndex,
+	"noMetadata":    rag.WithExportNoMetadata,
+	"noOriginInput": rag.WithExportNoOriginInput,
+	"onlyPQCode":    rag.WithExportOnlyPQCode,
 }
 
 // _deleteCollection 删除指定的 RAG 集合

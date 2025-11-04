@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type RAGSystemConfig struct {
@@ -61,6 +62,16 @@ type RAGSystemConfig struct {
 	filterCallback           func(key string, getDoc func() *vectorstore.Document) bool
 	documentTypes            []string
 
+	// KHop configuration fields
+	kHopK              int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
+	kHopKMin           int // default 2 (minimum 2-hop paths)
+	kHopKMax           int
+	kHopLimit          int
+	kHopPathDepth      int
+	kHopStartFilter    *ypb.EntityFilter
+	kHopRagQuery       string
+	kHopIsRuntimeBuild bool // 是否只查询当前运行时的关系
+
 	// Document and import/export configuration fields
 	documentMetadataKeyValue map[string]any
 	documentRawMetadata      map[string]any
@@ -72,8 +83,8 @@ type RAGSystemConfig struct {
 	overwriteExisting        bool
 	collectionName           string
 	rebuildHNSWIndex         bool
-	documentHandler          func(*vectorstore.Document)
-	progressHandler          func(progress, total int, message string)
+	documentHandler          func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
+	progressHandler          func(percent float64, message string, messageType string) // 进度回调
 	noHNSWGraph              bool
 	noMetadata               bool
 	noOriginInput            bool
@@ -110,6 +121,54 @@ func NewRAGSystemConfig(options ...RAGSystemConfigOption) *RAGSystemConfig {
 }
 
 type RAGSystemConfigOption func(*RAGSystemConfig)
+
+func WithExportNoHNSWIndex(noHNSWGraph bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.noHNSWGraph = noHNSWGraph
+	}
+}
+
+func WithExportOnlyPQCode(onlyPQCode bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.onlyPQCode = onlyPQCode
+	}
+}
+
+func WithExportNoMetadata(noMetadata bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.noMetadata = noMetadata
+	}
+}
+
+func WithExportOverwriteExisting(overwriteExisting bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.overwriteExisting = overwriteExisting
+	}
+}
+
+func WithExportNoOriginInput(noOriginInput bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.noOriginInput = noOriginInput
+	}
+}
+
+func WithImportRebuildHNSWIndex(rebuildHNSWIndex bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.rebuildHNSWIndex = rebuildHNSWIndex
+	}
+}
+
+func WithExportDocumentHandler(documentHandler func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.documentHandler = documentHandler
+	}
+}
+
+func WithExportOnProgressHandler(progressHandler func(percent float64, message string, messageType string)) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.progressHandler = progressHandler
+	}
+}
 
 func WithKnowledgeBaseType(knowledgeBaseType string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
@@ -174,6 +233,47 @@ func WithName(name string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.name = name
 	}
+}
+
+func (config *RAGSystemConfig) ConvertToExportOptions() []vectorstore.RAGExportOptionFunc {
+	options := []vectorstore.RAGExportOptionFunc{}
+	if config.noHNSWGraph {
+		options = append(options, vectorstore.WithNoHNSWGraph(config.noHNSWGraph))
+	}
+	if config.noMetadata {
+		options = append(options, vectorstore.WithNoMetadata(config.noMetadata))
+	}
+	if config.noOriginInput {
+		options = append(options, vectorstore.WithNoOriginInput(config.noOriginInput))
+	}
+	if config.onlyPQCode {
+		options = append(options, vectorstore.WithOnlyPQCode(config.onlyPQCode))
+	}
+	if config.rebuildHNSWIndex {
+		options = append(options, vectorstore.WithRebuildHNSWIndex(config.rebuildHNSWIndex))
+	}
+	if config.documentHandler != nil {
+		options = append(options, vectorstore.WithDocumentHandler(config.documentHandler))
+	}
+	if config.progressHandler != nil {
+		options = append(options, vectorstore.WithProgressHandler(config.progressHandler))
+	}
+	if config.collectionName != "" {
+		options = append(options, vectorstore.WithCollectionName(config.collectionName))
+	}
+	if config.importExportDB != nil {
+		options = append(options, vectorstore.WithImportExportDB(config.importExportDB))
+	}
+	if config.overwriteExisting {
+		options = append(options, vectorstore.WithOverwriteExisting(config.overwriteExisting))
+	}
+	if config.ctx != nil {
+		options = append(options, vectorstore.WithContext(config.ctx))
+	}
+	if config.db != nil {
+		options = append(options, vectorstore.WithImportExportDB(config.db))
+	}
+	return options
 }
 
 func (config *RAGSystemConfig) ConvertToVectorStoreOptions() []vectorstore.CollectionConfigFunc {
@@ -280,7 +380,7 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 		options = append(options, vectorstore.WithRAGOnlyResults(config.onlyResults))
 	}
 	if len(config.collectionNames) > 0 {
-		options = append(options, vectorstore.WithRAGCollectionNames(config.collectionNames...))
+		options = append(options, vectorstore.WithRAGQueryCollectionNames(config.collectionNames...))
 	}
 	if config.collectionScoreLimit > 0 {
 		options = append(options, vectorstore.WithRAGCollectionScoreLimit(config.collectionScoreLimit))
@@ -300,6 +400,37 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 
 func (config *RAGSystemConfig) ConvertToEntityRepositoryOptions() []entityrepos.RuntimeConfigOption {
 	options := []entityrepos.RuntimeConfigOption{}
+	return options
+}
+
+func (config *RAGSystemConfig) ConvertToKHopOptions() []entityrepos.KHopQueryOption {
+	options := []entityrepos.KHopQueryOption{}
+
+	if config.kHopLimit > 0 {
+		options = append(options, entityrepos.WithKHopLimit(config.kHopLimit))
+	}
+	if config.kHopK >= 0 {
+		options = append(options, entityrepos.WithKHopK(config.kHopK))
+	}
+	if config.kHopKMin >= 2 {
+		options = append(options, entityrepos.WithKHopKMin(config.kHopKMin))
+	}
+	if config.kHopKMax > 0 {
+		options = append(options, entityrepos.WithKHopKMax(config.kHopKMax))
+	}
+	if config.kHopPathDepth > 0 {
+		options = append(options, entityrepos.WithPathDepth(config.kHopPathDepth))
+	}
+	if config.kHopStartFilter != nil {
+		options = append(options, entityrepos.WithStartEntityFilter(config.kHopStartFilter))
+	}
+	if config.kHopRagQuery != "" {
+		options = append(options, entityrepos.WithRagQuery(config.kHopRagQuery))
+	}
+	if config.kHopIsRuntimeBuild {
+		options = append(options, entityrepos.WithRuntimeBuildOnly(config.kHopIsRuntimeBuild))
+	}
+
 	return options
 }
 
@@ -491,76 +622,6 @@ func WithDocumentRuntimeID(runtimeID string) RAGSystemConfigOption {
 	}
 }
 
-// WithImportExportDB sets the database for import/export operations
-func WithImportExportDB(db *gorm.DB) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.importExportDB = db
-	}
-}
-
-// WithOverwriteExisting sets whether to overwrite existing data
-func WithOverwriteExisting(overwrite bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.overwriteExisting = overwrite
-	}
-}
-
-// WithCollectionName sets the collection name
-func WithCollectionName(name string) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.collectionName = name
-	}
-}
-
-// WithRebuildHNSWIndex sets whether to rebuild the HNSW index
-func WithRebuildHNSWIndex(rebuild bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.rebuildHNSWIndex = rebuild
-	}
-}
-
-// WithDocumentHandler sets the document handler function
-func WithDocumentHandler(handler func(*vectorstore.Document)) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.documentHandler = handler
-	}
-}
-
-// WithProgressHandler sets the progress handler function
-func WithProgressHandler(handler func(progress, total int, message string)) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.progressHandler = handler
-	}
-}
-
-// WithNoHNSWGraph sets whether to skip HNSW graph creation
-func WithNoHNSWGraph(noGraph bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.noHNSWGraph = noGraph
-	}
-}
-
-// WithNoMetadata sets whether to exclude metadata
-func WithNoMetadata(noMetadata bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.noMetadata = noMetadata
-	}
-}
-
-// WithNoOriginInput sets whether to exclude original input
-func WithNoOriginInput(noOriginInput bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.noOriginInput = noOriginInput
-	}
-}
-
-// WithOnlyPQCode sets whether to only include PQ code
-func WithOnlyPQCode(onlyPQCode bool) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.onlyPQCode = onlyPQCode
-	}
-}
-
 // WithModelDimension sets the model dimension
 func WithModelDimension(dimension int) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
@@ -576,9 +637,9 @@ func WithModelName(name string) RAGSystemConfigOption {
 }
 
 // WithCosineDistance sets whether to use cosine distance
-func WithCosineDistance(useCosine bool) RAGSystemConfigOption {
+func WithCosineDistance() RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
-		config.cosineDistance = useCosine
+		config.cosineDistance = true
 	}
 }
 
@@ -603,5 +664,70 @@ func WithForceNew(force bool) RAGSystemConfigOption {
 func WithLazyLoadEmbeddingClient(lazy bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.lazyLoadEmbeddingClient = lazy
+	}
+}
+
+// KHop configuration functions
+
+// WithKHopK 设置k-hop的跳数，k>=2时返回k-hop路径，k=0返回所有路径
+func WithKHopK(k int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		if k < 0 {
+			k = 0
+		}
+		config.kHopK = k
+	}
+}
+
+// WithKHopKMin 设置最小路径长度，最小值为2
+func WithKHopKMin(kMin int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		if kMin < 2 {
+			kMin = 2
+		}
+		config.kHopKMin = kMin
+	}
+}
+
+// WithKHopKMax 设置最大路径长度，最小值为2
+func WithKHopKMax(kMax int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.kHopKMax = kMax
+	}
+}
+
+func WithKHopLimit(k int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		if k < 0 {
+			k = 0
+		}
+		config.kHopLimit = k
+	}
+}
+
+func WithKHopPathDepth(deep int) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		if deep < 1 { // 至少1层
+			deep = 1
+		}
+		config.kHopPathDepth = deep
+	}
+}
+
+func WithKHopStartFilter(filter *ypb.EntityFilter) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.kHopStartFilter = filter
+	}
+}
+
+func WithKHopRagQuery(query string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.kHopRagQuery = query
+	}
+}
+
+func WithKHopRuntimeBuildOnly(isRuntime bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.kHopIsRuntimeBuild = isRuntime
 	}
 }

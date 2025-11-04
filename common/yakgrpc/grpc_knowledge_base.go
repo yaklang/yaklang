@@ -344,17 +344,17 @@ func KnowledgeBaseEntryToGrpcModel(entry *schema.KnowledgeBaseEntry) *ypb.Knowle
 }
 
 func (s *Server) BuildVectorIndexForKnowledgeBase(ctx context.Context, req *ypb.BuildVectorIndexForKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
-	opts := []any{}
 	aiOptions := []aispec.AIConfigOption{
 		aispec.WithBaseURL(req.GetBaseUrl()),
 		aispec.WithAPIKey(req.GetApiKey()),
 		aispec.WithModel(req.GetModelName()),
 		aispec.WithProxy(req.GetProxy()),
 	}
-	ragOpts := []rag.CollectionConfigFunc{
+	ragOpts := []rag.RAGSystemConfigOption{
 		rag.WithEmbeddingModel(req.GetModelName()),
 		rag.WithModelDimension(int(req.GetDimension())),
 		rag.WithHNSWParameters(int(req.GetM()), float64(req.GetMl()), int(req.GetEfSearch()), int(req.GetEfConstruct())),
+		rag.WithAIOptions(aiOptions...),
 	}
 
 	switch req.GetDistanceFuncType() {
@@ -363,13 +363,8 @@ func (s *Server) BuildVectorIndexForKnowledgeBase(ctx context.Context, req *ypb.
 	default:
 		return nil, utils.Errorf("invalid distance function type: %s", req.GetDistanceFuncType())
 	}
-	for _, opt := range aiOptions {
-		opts = append(opts, opt)
-	}
-	for _, opt := range ragOpts {
-		opts = append(opts, opt)
-	}
-	_, err := rag.BuildVectorIndexForKnowledgeBase(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), opts...)
+
+	_, err := rag.BuildVectorIndexForKnowledgeBase(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), ragOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -379,17 +374,17 @@ func (s *Server) BuildVectorIndexForKnowledgeBase(ctx context.Context, req *ypb.
 }
 
 func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req *ypb.BuildVectorIndexForKnowledgeBaseEntryRequest) (*ypb.GeneralResponse, error) {
-	opts := []any{}
 	aiOptions := []aispec.AIConfigOption{
 		aispec.WithBaseURL(req.GetBaseUrl()),
 		aispec.WithAPIKey(req.GetApiKey()),
 		aispec.WithModel(req.GetModelName()),
 		aispec.WithProxy(req.GetProxy()),
 	}
-	ragOpts := []rag.CollectionConfigFunc{
+	ragOpts := []rag.RAGSystemConfigOption{
 		rag.WithEmbeddingModel(req.GetModelName()),
 		rag.WithModelDimension(int(req.GetDimension())),
 		rag.WithHNSWParameters(int(req.GetM()), float64(req.GetMl()), int(req.GetEfSearch()), int(req.GetEfConstruct())),
+		rag.WithAIOptions(aiOptions...),
 	}
 
 	switch req.GetDistanceFuncType() {
@@ -398,13 +393,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 	default:
 		return nil, utils.Errorf("invalid distance function type: %s", req.GetDistanceFuncType())
 	}
-	for _, opt := range aiOptions {
-		opts = append(opts, opt)
-	}
-	for _, opt := range ragOpts {
-		opts = append(opts, opt)
-	}
-	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), req.GetKnowledgeBaseEntryHiddenIndex(), opts...)
+	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), req.GetKnowledgeBaseEntryHiddenIndex(), ragOpts...)
 	if err != nil {
 		return nil, err
 	}

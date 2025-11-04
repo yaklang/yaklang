@@ -587,11 +587,15 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 	assert.True(t, store.GetArchived(), "归档检查应该返回true")
 
 	err = store.AddWithOptions("test_document_id", "test_content")
-	assert.Error(t, err)
+	if err == nil {
+		t.Fatalf("should be error: %v", err)
+	}
 	assert.Contains(t, err.Error(), "archived")
 
 	err = store.Delete("test_document_id")
-	assert.Error(t, err)
+	if err == nil {
+		t.Fatalf("should be error: %v", err)
+	}
 	assert.Contains(t, err.Error(), "archived")
 
 	// 15. 验证修复embedding数据

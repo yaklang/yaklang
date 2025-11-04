@@ -3,6 +3,7 @@ package aiforge
 import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 )
 
@@ -18,6 +19,8 @@ type RefineConfig struct {
 	Database *gorm.DB
 
 	*AnalysisConfig
+
+	ragSystemOptions []rag.RAGSystemConfigOption
 }
 
 func NewRefineConfig(opts ...any) *RefineConfig {
@@ -30,13 +33,17 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 	}
 	otherOption := make([]any, 0)
 	for _, opt := range opts {
-		if optFunc, ok := opt.(RefineOption); ok {
-			optFunc(cfg)
-		} else {
+		switch opt.(type) {
+		case rag.RAGSystemConfigOption:
+			cfg.ragSystemOptions = append(cfg.ragSystemOptions, opt.(rag.RAGSystemConfigOption))
+		case RefineOption:
+			opt.(RefineOption)(cfg)
+		default:
 			otherOption = append(otherOption, opt)
 		}
 	}
 	cfg.AnalysisConfig = NewAnalysisConfig(otherOption...)
+	cfg.ragSystemOptions = append(cfg.ragSystemOptions, rag.WithRAGCtx(cfg.Ctx))
 	return cfg
 }
 

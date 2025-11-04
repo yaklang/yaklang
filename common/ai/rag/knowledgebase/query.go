@@ -250,7 +250,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		return nil, utils.Errorf("get knowledge base name list failed: %v", err)
 	}
 
-	ragOpts = append(ragOpts, vectorstore.WithRAGCollectionNames(kbNames...))
+	ragOpts = append(ragOpts, vectorstore.WithRAGQueryCollectionNames(kbNames...))
 
 	ragOpts = append(ragOpts, vectorstore.WithRAGMsgCallBack(ragMsgCallback))
 
