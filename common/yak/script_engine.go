@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,8 +14,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/aiforge"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils/pandocutils"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
@@ -329,8 +328,8 @@ func initYaklangLib() {
 
 	yaklang.Import("sandbox", SandboxExports)
 
-	aiExports := maps.Clone(ai.Exports)
-	aiExports["LoadAIService"] = aicommon.LoadAIService
+	aiExports := ai.Exports
+	aiExports["MockAIService"] = rag.MockAIService
 	yaklang.Import("ai", aiExports)
 
 	yaklang.Import("aiagent", AIAgentExport)

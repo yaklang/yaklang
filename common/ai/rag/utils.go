@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
@@ -134,7 +135,16 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	if err != nil {
 		return db, err
 	}
-	db = db.AutoMigrate(
+	err = autoMigrateRAGSystem(db)
+	if err != nil {
+		return db, err
+	}
+
+	return db, nil
+}
+
+func autoMigrateRAGSystem(db *gorm.DB) error {
+	return db.AutoMigrate(
 		&schema.KnowledgeBaseEntry{},
 		&schema.KnowledgeBaseInfo{},
 		&schema.VectorStoreCollection{},
@@ -146,7 +156,15 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 
 		&schema.VectorStoreDocument{},
 		&schema.VectorStoreCollection{},
-	)
+	).Error
+}
 
-	return db, nil
+func MockAIService(handle func(message string) string) aicommon.AICallbackType {
+	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		rsp := config.NewAIResponse()
+		rspMsg := handle(req.GetPrompt())
+		rsp.EmitOutputStream(strings.NewReader(rspMsg))
+		rsp.Close()
+		return rsp, nil
+	}
 }

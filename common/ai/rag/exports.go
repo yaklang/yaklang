@@ -9,8 +9,6 @@ import (
 // CollectionIsExists 检查知识库是否存在，别名
 var CollectionIsExists = vectorstore.HasCollection
 
-var IsMockMode = false
-
 var ListCollections = vectorstore.ListCollections
 
 // AddDocument 添加文档
@@ -45,7 +43,7 @@ func DeleteDocument(db *gorm.DB, knowledgeBaseName, documentName string, opts ..
 }
 
 // QueryDocuments 查询文档
-func QueryDocuments(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...RAGSystemConfigOption) ([]vectorstore.SearchResult, error) {
+func QueryDocuments(db *gorm.DB, knowledgeBaseName, query string, limit int, opts ...RAGSystemConfigOption) ([]*SearchResult, error) {
 	defaultOpts := []RAGSystemConfigOption{
 		WithDB(db),
 	}

@@ -304,6 +304,8 @@ type KnowledgeBaseInfo struct {
 
 	// 知识库类型
 	KnowledgeBaseType string `gorm:"index;not null" json:"knowledge_base_type"`
+
+	SerialVersionUID string `gorm:"index" json:"serial_version_uid"`
 }
 
 func (v *KnowledgeBaseInfo) TableName() string {
