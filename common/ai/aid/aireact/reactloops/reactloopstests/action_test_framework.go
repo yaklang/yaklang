@@ -40,14 +40,25 @@ type ActionHandlerCapture struct {
 
 // NewActionTestFramework creates a new action testing framework
 func NewActionTestFramework(t *testing.T, loopName string, options ...reactloops.ReActLoopOption) *ActionTestFramework {
+	return NewActionTestFrameworkEx(t, loopName, options, nil)
+}
+
+// NewActionTestFrameworkEx creates a new action testing framework with extended options
+// It supports both ReActLoop options and AI config options
+func NewActionTestFrameworkEx(
+	t *testing.T,
+	loopName string,
+	loopOptions []reactloops.ReActLoopOption,
+	aiConfigOptions []aicommon.ConfigOption,
+) *ActionTestFramework {
 	framework := &ActionTestFramework{
 		t:              t,
 		aiCallCount:    0,
 		actionHandlers: make(map[string]*ActionHandlerCapture),
 	}
 
-	// Create a test ReAct instance with a callback that handles action execution
-	reactIns, err := aireact.NewTestReAct(
+	// Prepare AI config options with the callback
+	allAIOptions := []aicommon.ConfigOption{
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			framework.mu.Lock()
 			framework.aiCallCount++
@@ -73,22 +84,36 @@ func NewActionTestFramework(t *testing.T, loopName string, options ...reactloops
 			rsp.Close()
 			return rsp, nil
 		}),
-	)
+	}
+
+	// Append user-provided AI config options
+	if len(aiConfigOptions) > 0 {
+		allAIOptions = append(allAIOptions, aiConfigOptions...)
+	}
+
+	// Create a test ReAct instance with all AI config options
+	reactIns, err := aireact.NewTestReAct(allAIOptions...)
 	if err != nil {
 		t.Fatalf("Failed to create test ReAct instance: %v", err)
 	}
 
 	framework.reactInstance = reactIns
 
+	// Prepare loop options with task created callback
+	allLoopOptions := make([]reactloops.ReActLoopOption, 0)
+	if len(loopOptions) > 0 {
+		allLoopOptions = append(allLoopOptions, loopOptions...)
+	}
+
 	// Add task created callback
-	options = append(options, reactloops.WithOnTaskCreated(func(task aicommon.AIStatefulTask) {
+	allLoopOptions = append(allLoopOptions, reactloops.WithOnTaskCreated(func(task aicommon.AIStatefulTask) {
 		framework.mu.Lock()
 		framework.capturedTask = task
 		framework.mu.Unlock()
 	}))
 
-	// Create the loop with provided options
-	loop, err := reactloops.NewReActLoop(loopName, reactIns, options...)
+	// Create the loop with all options
+	loop, err := reactloops.NewReActLoop(loopName, reactIns, allLoopOptions...)
 	if err != nil {
 		t.Fatalf("Failed to create ReActLoop: %v", err)
 	}
@@ -177,7 +202,7 @@ func (f *ActionTestFramework) ExecuteAction(actionName string, params map[string
 	for key, value := range params {
 		actionMap[key] = value
 	}
-	
+
 	// Marshal to JSON (this properly escapes strings, handles newlines, etc.)
 	actionBytes, err := json.Marshal(actionMap)
 	if err != nil {
