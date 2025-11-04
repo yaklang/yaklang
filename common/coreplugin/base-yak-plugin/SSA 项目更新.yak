@@ -8,163 +8,140 @@ projectId = cli.Int(
     cli.setHelp("需要更新的SSA项目ID"),
 )
 
-// 使用JSON Schema定义项目数据（匹配 schema.SSAProject 结构）
-projectData = cli.Json("project_data",
-    cli.setVerboseName("项目数据"),
+// 使用JSON Schema定义配置数据（匹配 ssaconfig.Config 结构）
+configData = cli.Json("config_data",
+    cli.setVerboseName("配置数据"),
     cli.setRequired(true),
     cli.setJsonSchema(<<<JSON
 {
   "type": "object",
   "properties": {
-    "project_name": {
-      "title": "项目名称",
-      "type": "string"
-    },
-    "description": {
-      "title": "项目描述",
-      "type": "string"
-    },
-    "tags": {
-      "title": "项目标签",
-      "type": "string",
-      "description": "多个标签用逗号分隔"
-    },
-    "language": {
-      "title": "项目语言",
-      "type": "string",
-      "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
-    },
-    "config": {
-      "title": "项目配置",
+    "BaseInfo": {
+      "title": "基础信息",
       "type": "object",
       "properties": {
-        "BaseInfo": {
-          "title": "基础信息",
-          "type": "object",
-          "properties": {
-            "project_name": {
-              "title": "项目名称",
-              "type": "string"
-            },
-            "project_description": {
-              "title": "项目描述",
-              "type": "string"
-            },
-            "language": {
-              "title": "项目语言",
-              "type": "string",
-              "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
-            },
-            "tags": {
-              "title": "项目标签",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
+        "project_name": {
+          "title": "项目名称",
+          "type": "string"
         },
-        "CodeSource": {
-          "title": "代码源配置",
-          "type": "object",
-          "properties": {
-            "kind": {
-              "title": "源码类型",
-              "type": "string",
-              "enum": ["local", "compression", "jar", "git", "svn"]
-            },
-            "local_file": {
-              "title": "本地路径",
-              "type": "string",
-              "yakit_type": "folder"
-            },
-            "url": {
-              "title": "远程URL",
-              "type": "string"
-            },
-            "branch": {
-              "title": "分支",
-              "type": "string"
-            },
-            "path": {
-              "title": "子路径",
-              "type": "string"
-            }
-          }
+        "project_description": {
+          "title": "项目描述",
+          "type": "string"
         },
-        "SSACompile": {
-          "title": "编译配置",
-          "type": "object",
-          "properties": {
-            "strict_mode": {
-              "title": "严格模式",
-              "type": "boolean",
-              "default": false
-            },
-            "peephole_size": {
-              "title": "窥视孔大小",
-              "type": "integer",
-              "default": 0,
-              "description": "项目分片大小，0表示关闭"
-            },
-            "exclude_files": {
-              "title": "排除文件",
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": ["**/vendor/**", "**/classes/**", "**/target/**"]
-            },
-            "re_compile": {
-              "title": "重新编译",
-              "type": "boolean",
-              "default": true
-            },
-            "memory_compile": {
-              "title": "内存编译",
-              "type": "boolean",
-              "default": false
-            },
-            "compile_concurrency": {
-              "title": "编译并发数",
-              "type": "integer",
-              "default": 10
-            }
-          }
+        "language": {
+          "title": "项目语言",
+          "type": "string",
+          "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
         },
-        "SyntaxFlow": {
-          "title": "SyntaxFlow配置",
-          "type": "object",
-          "properties": {
-            "memory": {
-              "title": "使用内存",
-              "type": "boolean",
-              "default": false
-            }
+        "tags": {
+          "title": "项目标签",
+          "type": "array",
+          "items": {
+            "type": "string"
           }
+        }
+      },
+      "required": ["project_name", "language"]
+    },
+    "CodeSource": {
+      "title": "代码源配置",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "title": "源码类型",
+          "type": "string",
+          "enum": ["local", "compression", "jar", "git", "svn"]
         },
-        "SyntaxFlowScan": {
-          "title": "扫描配置",
-          "type": "object",
-          "properties": {
-            "concurrency": {
-              "title": "扫描并发数",
-              "type": "integer",
-              "default": 5
-            }
-          }
+        "local_file": {
+          "title": "本地路径",
+          "type": "string",
+          "yakit_type": "folder"
+        },
+        "url": {
+          "title": "远程URL",
+          "type": "string"
+        },
+        "branch": {
+          "title": "分支",
+          "type": "string"
+        },
+        "path": {
+          "title": "子路径",
+          "type": "string"
+        }
+      }
+    },
+    "SSACompile": {
+      "title": "编译配置",
+      "type": "object",
+      "properties": {
+        "strict_mode": {
+          "title": "严格模式",
+          "type": "boolean",
+          "default": false
+        },
+        "peephole_size": {
+          "title": "窥视孔大小",
+          "type": "integer",
+          "default": 0,
+          "description": "项目分片大小，0表示关闭"
+        },
+        "exclude_files": {
+          "title": "排除文件",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["**/vendor/**", "**/classes/**", "**/target/**"]
+        },
+        "re_compile": {
+          "title": "重新编译",
+          "type": "boolean",
+          "default": true
+        },
+        "memory_compile": {
+          "title": "内存编译",
+          "type": "boolean",
+          "default": false
+        },
+        "compile_concurrency": {
+          "title": "编译并发数",
+          "type": "integer",
+          "default": 10
+        }
+      }
+    },
+    "SyntaxFlow": {
+      "title": "SyntaxFlow配置",
+      "type": "object",
+      "properties": {
+        "memory": {
+          "title": "使用内存",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "SyntaxFlowScan": {
+      "title": "扫描配置",
+      "type": "object",
+      "properties": {
+        "concurrency": {
+          "title": "扫描并发数",
+          "type": "integer",
+          "default": 5
         }
       }
     }
   },
-  "required": ["project_name", "language"]
+  "required": ["BaseInfo"]
 }
 JSON
     ),
 )
 
 cli.check()
-yakit.Code(projectData)
+yakit.Code(configData)
 yakit.Info("开始更新SSA项目，项目ID: %d", projectId)
 
 yakit.Info("加载项目...")
@@ -176,53 +153,62 @@ if err != nil {
 
 yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
 
-// 2. 更新项目基础字段（用于数据库索引）
-if  projectData["project_name"] != "" {
-    project.ProjectName = projectData["project_name"]
+// 2. 从 BaseInfo 提取基础信息
+baseInfo = configData["BaseInfo"]
+if baseInfo == nil {
+    yakit.Error("配置数据缺少 BaseInfo")
+    return
+}
+
+// 更新项目基础字段（用于数据库索引）
+if baseInfo["project_name"] != nil && baseInfo["project_name"] != "" {
+    project.ProjectName = sprint(baseInfo["project_name"])
     yakit.Info("更新项目名称: %s", project.ProjectName)
 }
 
-if projectData["description"] != ""  {
-    project.Description = projectData["description"]
+if baseInfo["project_description"] != nil {
+    project.Description = sprint(baseInfo["project_description"])
     yakit.Info("更新项目描述: %s", project.Description)
 }
 
-if projectData["language"] != "" {
-    project.Language = projectData["language"]
+if baseInfo["language"] != nil && baseInfo["language"] != "" {
+    project.Language = sprint(baseInfo["language"])
     yakit.Info("更新项目语言: %s", project.Language)
 }
 
-if projectData["tags"]!=""{
-    project.Tags = str.Split(projectData["tags"],",")
+if baseInfo["tags"] != nil {
+    tags = baseInfo["tags"]
+    tagsList = make([]string,0)
+    for _,tag := range tags {
+        tagsList = append(tagsList, tag)
+    }
+    project.Tags = tagsList
+    yakit.Info("更新项目标签: %v", project.Tags)
 }
 
+// 3. 使用完整的配置数据创建新的 Config
+yakit.Info("更新项目配置...")
 
-// 3. 处理配置数据
-configObj = projectData["config"]
-if configObj != nil  {
-    yakit.Info("更新项目配置...")
-    
-    // 同步项目基础信息到配置
-    configObj["BaseInfo"] = {
-        "project_name": project.ProjectName,
-        "project_description": project.Description,
-        "language": project.Language,
-        "tags": project.Tags,
-    }
+configBytes, err = json.Marshal(configData)
+if err != nil {
+    yakit.Error("序列化配置失败: %v", err)
+    return
+}
 
-    configBytes,err = json.Marshal(configObj)
-    if err != nil {
-        yakit.Error("序列化配置失败: %v", err)
-        return
-    }
-    newConfig,err = ssa.NewSSAConfigByJSON(configBytes)
-    if err != nil {
-        yakit.Error("解析配置失败: %v", err)
-        return
-    }
-    project.Config = newConfig
-    yakit.Info("配置已更新")
-} 
+newConfig, err = ssa.NewSSAConfigByJSON(configBytes)
+if err != nil {
+    yakit.Error("解析配置失败: %v", err)
+    return
+}
+
+// 确保 Config.BaseInfo 与 Project 字段同步
+newConfig.BaseInfo.ProjectName = project.ProjectName
+newConfig.BaseInfo.ProjectDescription = project.Description
+newConfig.BaseInfo.Language = project.Language
+newConfig.BaseInfo.Tags = project.Tags
+
+project.Config = newConfig
+yakit.Info("配置已更新")
 
 // 4. 保存项目
 yakit.Info("保存项目到数据库...")

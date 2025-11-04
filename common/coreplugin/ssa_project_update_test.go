@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -83,8 +84,14 @@ func TestSSAProjectUpdate(t *testing.T) {
 			log.Infof("Deleted SSA project: ID=%d", schemaProject.ID)
 		}()
 
-		// 3. 准备更新数据
-		updateConfig := map[string]interface{}{
+		// 3. 准备更新配置数据
+		updateConfigData := map[string]interface{}{
+			"BaseInfo": map[string]interface{}{
+				"project_name":        projectName,
+				"project_description": "更新后的描述",
+				"language":            "java",
+				"tags":                []string{"tag1", "tag2", "tag3"},
+			},
 			"CodeSource": map[string]interface{}{
 				"kind":       "local",
 				"local_file": tempDir,
@@ -105,24 +112,16 @@ func TestSSAProjectUpdate(t *testing.T) {
 			},
 		}
 
-		projectDataMap := map[string]interface{}{
-			"project_name": projectName,
-			"description":  "更新后的描述",
-			"language":     "java",
-			"config":       updateConfig,
-			"tags":         "tag1,tag2,tag3",
-		}
-
-		projectDataJSON, err := json.Marshal(projectDataMap)
+		configDataJSON, err := json.Marshal(updateConfigData)
 		require.NoError(t, err)
 
-		log.Infof("Updating SSA project with data:\n%s", string(projectDataJSON))
+		log.Infof("Updating SSA project with config data:\n%s", string(configDataJSON))
 
 		// 4. 调用 SSA 项目更新脚本
 		pluginName := "SSA 项目更新"
 		param := make(map[string]string)
 		param["project_id"] = strconv.Itoa(int(schemaProject.ID))
-		param["project_data"] = string(projectDataJSON)
+		param["config_data"] = string(configDataJSON)
 
 		err = yakgrpc.ExecScriptWithParam(context.Background(), pluginName, param,
 			"", func(exec *ypb.ExecResult) error {
@@ -161,10 +160,12 @@ func TestSSAProjectUpdate(t *testing.T) {
 		require.Equal(t, ssaconfig.JAVA, updatedConfig.BaseInfo.Language)
 		require.Equal(t, []string{"tag1", "tag2", "tag3"}, updatedConfig.BaseInfo.Tags)
 
+		require.Equal(t, strings.Join([]string{"tag1", "tag2", "tag3"}, ","), updatedProject.Tags)
+
 		log.Infof("SSA project updated successfully!")
 		log.Infof("  ProjectName: %s", updatedProject.ProjectName)
 		log.Infof("  Description: %s", updatedProject.Description)
-		log.Infof("  Tags: %s", updatedProject.Tags)
+		log.Infof("  Tags: %v", updatedProject.Tags)
 		log.Infof("  StrictMode: %v", updatedConfig.GetCompileStrictMode())
 		log.Infof("  PeepholeSize: %d", updatedConfig.GetCompilePeepholeSize())
 		log.Infof("  Concurrency: %d", updatedConfig.GetCompileConcurrency())
