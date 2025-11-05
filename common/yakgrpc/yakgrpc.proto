@@ -811,6 +811,7 @@ service Yak {
   rpc DeleteSSARisks(DeleteSSARisksRequest)returns(DbOperateMessage);
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
+  rpc GetSSARiskFieldGroupEx(GetSSARiskFieldGroupRequest) returns(SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
   rpc ExportSSARisk(ExportSSARiskRequest) returns(stream ExportSSARiskResponse);
   rpc ImportSSARisk(ImportSSARiskRequest) returns(stream ImportSSARiskResponse);
@@ -7703,6 +7704,10 @@ message DeleteSSARisksRequest {
 message UpdateSSARiskTagsRequest {
   int64 ID = 1;
   repeated string Tags = 2;
+}
+
+message GetSSARiskFieldGroupRequest{
+  SSARisksFilter Filter = 1;
 }
 
 message SSARiskFieldGroupResponse {

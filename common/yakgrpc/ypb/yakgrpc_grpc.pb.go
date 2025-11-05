@@ -466,6 +466,7 @@ const (
 	Yak_DeleteSSARisks_FullMethodName                             = "/ypb.Yak/DeleteSSARisks"
 	Yak_UpdateSSARiskTags_FullMethodName                          = "/ypb.Yak/UpdateSSARiskTags"
 	Yak_GetSSARiskFieldGroup_FullMethodName                       = "/ypb.Yak/GetSSARiskFieldGroup"
+	Yak_GetSSARiskFieldGroupEx_FullMethodName                     = "/ypb.Yak/GetSSARiskFieldGroupEx"
 	Yak_NewSSARiskRead_FullMethodName                             = "/ypb.Yak/NewSSARiskRead"
 	Yak_ExportSSARisk_FullMethodName                              = "/ypb.Yak/ExportSSARisk"
 	Yak_ImportSSARisk_FullMethodName                              = "/ypb.Yak/ImportSSARisk"
@@ -1171,6 +1172,7 @@ type YakClient interface {
 	DeleteSSARisks(ctx context.Context, in *DeleteSSARisksRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTagsRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetSSARiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error)
+	GetSSARiskFieldGroupEx(ctx context.Context, in *GetSSARiskFieldGroupRequest, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error)
 	NewSSARiskRead(ctx context.Context, in *NewSSARiskReadRequest, opts ...grpc.CallOption) (*NewSSARiskReadResponse, error)
 	ExportSSARisk(ctx context.Context, in *ExportSSARiskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportSSARiskResponse], error)
 	ImportSSARisk(ctx context.Context, in *ImportSSARiskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportSSARiskResponse], error)
@@ -6462,6 +6464,16 @@ func (c *yakClient) GetSSARiskFieldGroup(ctx context.Context, in *Empty, opts ..
 	return out, nil
 }
 
+func (c *yakClient) GetSSARiskFieldGroupEx(ctx context.Context, in *GetSSARiskFieldGroupRequest, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SSARiskFieldGroupResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSARiskFieldGroupEx_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) NewSSARiskRead(ctx context.Context, in *NewSSARiskReadRequest, opts ...grpc.CallOption) (*NewSSARiskReadResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(NewSSARiskReadResponse)
@@ -8464,6 +8476,7 @@ type YakServer interface {
 	DeleteSSARisks(context.Context, *DeleteSSARisksRequest) (*DbOperateMessage, error)
 	UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error)
 	GetSSARiskFieldGroup(context.Context, *Empty) (*SSARiskFieldGroupResponse, error)
+	GetSSARiskFieldGroupEx(context.Context, *GetSSARiskFieldGroupRequest) (*SSARiskFieldGroupResponse, error)
 	NewSSARiskRead(context.Context, *NewSSARiskReadRequest) (*NewSSARiskReadResponse, error)
 	ExportSSARisk(*ExportSSARiskRequest, grpc.ServerStreamingServer[ExportSSARiskResponse]) error
 	ImportSSARisk(*ImportSSARiskRequest, grpc.ServerStreamingServer[ImportSSARiskResponse]) error
@@ -9959,6 +9972,9 @@ func (UnimplementedYakServer) UpdateSSARiskTags(context.Context, *UpdateSSARiskT
 }
 func (UnimplementedYakServer) GetSSARiskFieldGroup(context.Context, *Empty) (*SSARiskFieldGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskFieldGroup not implemented")
+}
+func (UnimplementedYakServer) GetSSARiskFieldGroupEx(context.Context, *GetSSARiskFieldGroupRequest) (*SSARiskFieldGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskFieldGroupEx not implemented")
 }
 func (UnimplementedYakServer) NewSSARiskRead(context.Context, *NewSSARiskReadRequest) (*NewSSARiskReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewSSARiskRead not implemented")
@@ -17774,6 +17790,24 @@ func _Yak_GetSSARiskFieldGroup_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetSSARiskFieldGroupEx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSSARiskFieldGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSARiskFieldGroupEx(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSARiskFieldGroupEx_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSARiskFieldGroupEx(ctx, req.(*GetSSARiskFieldGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_NewSSARiskRead_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NewSSARiskReadRequest)
 	if err := dec(in); err != nil {
@@ -21270,6 +21304,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSSARiskFieldGroup",
 			Handler:    _Yak_GetSSARiskFieldGroup_Handler,
+		},
+		{
+			MethodName: "GetSSARiskFieldGroupEx",
+			Handler:    _Yak_GetSSARiskFieldGroupEx_Handler,
 		},
 		{
 			MethodName: "NewSSARiskRead",
