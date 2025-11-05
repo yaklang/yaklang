@@ -202,6 +202,9 @@ type Config struct {
 
 	// other Options
 	OtherOption []any
+
+	// focus config
+	Focus string
 }
 
 // NewConfig creates a new Config with options
@@ -1376,6 +1379,15 @@ func WithEventInputChan(ch chan *ypb.AIInputEvent) ConfigOption {
 				}
 			}()
 		}
+		return nil
+	}
+}
+
+func WithFocus(focus string) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.Focus = focus
+		c.m.Unlock()
 		return nil
 	}
 }

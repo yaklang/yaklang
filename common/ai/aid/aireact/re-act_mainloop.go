@@ -78,8 +78,12 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
+	defaultFocus := r.config.Focus
+	if defaultFocus == "" {
+		defaultFocus = schema.AI_REACT_LOOP_NAME_DEFAULT
+	}
 	mainloop, err := reactloops.CreateLoopByName(
-		schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+		defaultFocus, r,
 		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithMemoryPool(r.memoryPool),
 		reactloops.WithMemorySizeLimit(int(r.config.MemoryPoolSize)),
