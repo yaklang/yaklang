@@ -305,7 +305,7 @@ func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 	if elapsed > 250*time.Millisecond {
 		logMsg := fmt.Sprintf("slow RPC: %s, took %v\n", info.FullMethod, elapsed)
 
-		log.Warnf(logMsg)
+		log.Warn(logMsg)
 		// 打开文件，如果文件不存在则创建，如果文件存在则在文件末尾追加
 		f, err := os.OpenFile("debug-slow.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {

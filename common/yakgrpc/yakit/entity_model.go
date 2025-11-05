@@ -92,6 +92,18 @@ func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
 	return db.Create(entity).Error
 }
 
+func GetEntityRepositoryByRAGID(db *gorm.DB, ragID string) (*schema.EntityRepository, error) {
+	var entityRepository schema.EntityRepository
+	db = db.Model(&schema.EntityRepository{})
+	if err := db.Where("rag_id = ?", ragID).First(&entityRepository).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, utils.Errorf("entity repository not found")
+		}
+		return nil, err
+	}
+	return &entityRepository, nil
+}
+
 func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
