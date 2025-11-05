@@ -28,7 +28,16 @@ func CreateOrUpdateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 	if err := db.Model(&schema.MCPServer{}).Where("name = ?", server.Name).First(&existing).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			// 不存在则创建
-			return db.Model(&schema.MCPServer{}).Create(server).Error
+			// 保存Enable的原始值，因为Create后可能会被数据库默认值覆盖
+			enableValue := server.Enable
+			if err := db.Create(server).Error; err != nil {
+				return err
+			}
+			// 如果Enable为false，需要显式更新（因为数据库默认值是true）
+			if !enableValue {
+				return db.Model(&schema.MCPServer{}).Where("id = ?", server.ID).Update("enable", false).Error
+			}
+			return nil
 		}
 		return utils.Errorf("query mcp server failed: %s", err)
 	}
@@ -64,7 +73,20 @@ func CreateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 		return utils.Errorf("mcp server name already exists")
 	}
 
-	return db.Model(&schema.MCPServer{}).Create(server).Error
+	// 保存Enable的原始值，因为Create后可能会被数据库默认值覆盖
+	enableValue := server.Enable
+
+	// 直接创建，GORM会处理所有字段包括Enable
+	if err := db.Create(server).Error; err != nil {
+		return err
+	}
+
+	// 如果Enable为false，需要显式更新（因为数据库默认值是true）
+	if !enableValue {
+		return db.Model(&schema.MCPServer{}).Where("id = ?", server.ID).Update("enable", false).Error
+	}
+
+	return nil
 }
 
 // UpdateMCPServer 更新MCP服务器
