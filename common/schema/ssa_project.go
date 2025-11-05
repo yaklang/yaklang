@@ -31,7 +31,7 @@ func (p *SSAProject) SetTagsList(tags []string) {
 }
 
 func (p *SSAProject) GetConfig() (*ssaconfig.Config, error) {
-	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJSONRawConfig(p.Config))
+	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig(p.Config))
 	if err != nil {
 		return nil, err
 	}
