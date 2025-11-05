@@ -3,13 +3,14 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"path/filepath"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -88,7 +89,11 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	currentTask := r.GetCurrentTask()
 	currentTask.SetUserInput(userQuery)
-	return r.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_DEFAULT, currentTask)
+	defaultFocus := r.config.Focus
+	if defaultFocus == "" {
+		defaultFocus = schema.AI_REACT_LOOP_NAME_DEFAULT
+	}
+	return r.ExecuteLoopTask(defaultFocus, currentTask)
 }
 
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {

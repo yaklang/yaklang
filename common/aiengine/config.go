@@ -2,10 +2,10 @@ package aiengine
 
 import (
 	"context"
-	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -14,6 +14,7 @@ import (
 type AIEngineConfig struct {
 	// 基础配置
 	Context context.Context
+	Timeout float64
 
 	// AI 服务配置
 	AIService string // AI 服务名称，如 "openai", "deepseek" 等
@@ -42,12 +43,15 @@ type AIEngineConfig struct {
 	DebugMode bool // 调试模式
 
 	// 事件处理回调
-	OnEvent         func(*schema.AiOutputEvent)                                     // 事件回调
-	OnStream        func(react *aireact.ReAct, eventType string, reader io.Reader)  // 流式输出回调
-	OnFinished      func(react *aireact.ReAct, success bool, result map[string]any) // 完成回调
-	OnInputRequired func(react *aireact.ReAct, question string) string              // 需要用户输入回调
+	OnEvent            func(*schema.AiOutputEvent)                                                     // 事件回调
+	OnStream           func(react *aireact.ReAct, data []byte)                                         // 流式输出回调
+	OnData             func(react *aireact.ReAct, data []byte)                                         // 数据回调
+	OnFinished         func(react *aireact.ReAct, success bool, result map[string]any)                 // 完成回调
+	OnInputRequiredRaw func(react *aireact.ReAct, event *schema.AiOutputEvent, question string) string // 需要用户输入回调
+	OnInputRequired    func(react *aireact.ReAct, question string) string                              // 需要用户输入回调
 
 	// 高级配置
+	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
 	Workdir  string // 工作目录
 	Language string // 响应语言偏好
 }
@@ -65,8 +69,10 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		ReviewPolicy:          "yolo",
 		EnableForgeSearchTool: true,
 		OnEvent:               func(*schema.AiOutputEvent) {},
-		OnStream:              func(*aireact.ReAct, string, io.Reader) {},
+		OnStream:              func(*aireact.ReAct, []byte) {},
+		OnData:                func(*aireact.ReAct, []byte) {},
 		OnFinished:            func(*aireact.ReAct, bool, map[string]any) {},
+		OnInputRequiredRaw:    func(*aireact.ReAct, *schema.AiOutputEvent, string) string { return "" },
 		OnInputRequired:       func(*aireact.ReAct, string) string { return "" },
 	}
 
@@ -75,10 +81,27 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		opt(config)
 	}
 
+	if config.Timeout > 0 {
+		config.Context, _ = context.WithTimeout(config.Context, utils.FloatSecondDuration(config.Timeout))
+	}
+
 	return config
 }
 
 // ========== 基础配置选项 ==========
+
+// WithFocus 设置焦点
+func WithFocus(focus string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.Focus = focus
+	}
+}
+
+func WithTimeout(timeout float64) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.Timeout = timeout
+	}
+}
 
 // WithContext 设置上下文
 func WithContext(ctx context.Context) AIEngineConfigOption {
@@ -216,9 +239,16 @@ func WithOnEvent(callback func(*schema.AiOutputEvent)) AIEngineConfigOption {
 }
 
 // WithOnStream 设置流式输出回调
-func WithOnStream(callback func(react *aireact.ReAct, eventType string, reader io.Reader)) AIEngineConfigOption {
+func WithOnStream(callback func(react *aireact.ReAct, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnStream = callback
+	}
+}
+
+// WithOnData 设置数据回调
+func WithOnData(callback func(react *aireact.ReAct, data []byte)) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.OnData = callback
 	}
 }
 
@@ -226,6 +256,13 @@ func WithOnStream(callback func(react *aireact.ReAct, eventType string, reader i
 func WithOnFinished(callback func(react *aireact.ReAct, success bool, result map[string]any)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnFinished = callback
+	}
+}
+
+// WithOnInputRequiredRaw 设置需要用户输入回调
+func WithOnInputRequiredRaw(callback func(react *aireact.ReAct, event *schema.AiOutputEvent, question string) string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.OnInputRequiredRaw = callback
 	}
 }
 
