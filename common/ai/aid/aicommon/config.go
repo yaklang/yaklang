@@ -297,6 +297,8 @@ func newConfig(ctx context.Context) *Config {
 			if err != nil {
 				log.Errorf("load ai service failed: %v", err)
 			}
+		} else {
+			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
 		}
 	}
 
