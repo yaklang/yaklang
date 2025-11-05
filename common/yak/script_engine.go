@@ -293,6 +293,9 @@ func initYaklangLib() {
 	// l2tp
 	yaklang.Import("l2tp", yaklib.L2TPExports)
 
+	// wireguard
+	yaklang.Import("wg", yaklib.WireGuardExports)
+
 	// bot
 	yaklang.Import("bot", yaklib.BotExports)
 

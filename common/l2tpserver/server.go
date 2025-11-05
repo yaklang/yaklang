@@ -279,14 +279,23 @@ func (s *Server) handleControlMessage(header *L2TPHeader, payload []byte, remote
 func (s *Server) handleSCCRQ(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPAddr) {
 	log.Infof("Handling SCCRQ from %s", remoteAddr)
 
-	// Extract peer tunnel ID
+	// Extract peer tunnel ID and other info
 	var peerTunnelID uint16
+	var hostname string
+	var vendorName string
 	for _, avp := range avps {
-		if avp.Type == AVPAssignedTunnelID {
+		switch avp.Type {
+		case AVPAssignedTunnelID:
 			peerTunnelID, _ = avp.GetUint16()
-			break
+		case AVPHostName:
+			hostname = avp.GetString()
+		case AVPVendorName:
+			vendorName = avp.GetString()
 		}
 	}
+
+	log.Debugf("Client connection request: addr=%s, hostname=%s, vendor=%s, peer_tunnel_id=%d",
+		remoteAddr, hostname, vendorName, peerTunnelID)
 
 	// Allocate our tunnel ID
 	ourTunnelID := s.allocateTunnelID()
@@ -312,7 +321,7 @@ func (s *Server) handleSCCCN(header *L2TPHeader, avps []AVP, remoteAddr *net.UDP
 	tunnel := s.getTunnel(remoteAddr.String())
 	if tunnel != nil {
 		tunnel.UpdateActivity()
-		log.Infof("Tunnel %d established", tunnel.tunnelID)
+		log.Infof("L2TP tunnel %d established with %s", tunnel.tunnelID, remoteAddr)
 	}
 }
 
@@ -342,7 +351,7 @@ func (s *Server) handleICRQ(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPA
 	session := NewSession(ourSessionID, peerSessionID, tunnel)
 	tunnel.AddSession(session)
 
-	log.Infof("Created session: our_id=%d, peer_id=%d", ourSessionID, peerSessionID)
+	log.Infof("Created session: our_id=%d, peer_id=%d, tunnel_id=%d", ourSessionID, peerSessionID, tunnel.tunnelID)
 
 	// Send ICRP
 	s.sendICRP(tunnel, session)
@@ -360,7 +369,7 @@ func (s *Server) handleICCN(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPA
 	session, ok := tunnel.GetSession(header.SessionID)
 	if ok {
 		session.UpdateActivity()
-		log.Infof("Session %d established", session.sessionID)
+		log.Infof("Session %d established, ready for authentication", session.sessionID)
 	}
 }
 
@@ -370,6 +379,13 @@ func (s *Server) handleCDN(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPAd
 
 	tunnel := s.getTunnel(remoteAddr.String())
 	if tunnel != nil {
+		session, ok := tunnel.GetSession(header.SessionID)
+		if ok {
+			clientIP := session.GetClientIP()
+			log.Infof("Session %d disconnected, releasing IP %s", header.SessionID, clientIP)
+			log.Debugf("Call disconnect: session=%d, tunnel=%d, client_ip=%s",
+				header.SessionID, tunnel.tunnelID, clientIP)
+		}
 		tunnel.RemoveSession(header.SessionID)
 	}
 }
@@ -377,6 +393,13 @@ func (s *Server) handleCDN(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPAd
 // handleStopCCN handles Stop-Control-Connection-Notification
 func (s *Server) handleStopCCN(header *L2TPHeader, avps []AVP, remoteAddr *net.UDPAddr) {
 	log.Infof("Handling StopCCN from %s", remoteAddr)
+
+	tunnel := s.getTunnel(remoteAddr.String())
+	if tunnel != nil {
+		log.Infof("Closing tunnel %d from %s", tunnel.tunnelID, remoteAddr)
+		log.Debugf("Tunnel shutdown: tunnel_id=%d, remote_addr=%s, active_sessions=%d",
+			tunnel.tunnelID, remoteAddr, len(tunnel.sessions))
+	}
 
 	s.removeTunnel(remoteAddr.String())
 }

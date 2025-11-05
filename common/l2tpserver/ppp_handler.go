@@ -36,11 +36,12 @@ func (s *Server) handlePPPFrame(session *Session, pppFrame []byte) {
 	if protocol == 0x0021 {
 		// This is an IPv4 packet
 		ipPacket := pppFrame[offset+2:]
-		log.Infof("Received IP packet from session %d: %d bytes", session.sessionID, len(ipPacket))
+		log.Debugf("Received IP packet from session %d: %d bytes, protocol=0x%04x", session.sessionID, len(ipPacket), protocol)
 
 		// Call packet callback if set
 		if s.onPacket != nil {
 			s.onPacket(ipPacket)
+			log.Debugf("IP packet delivered to callback handler")
 		}
 
 		// Inject into network stack
@@ -48,6 +49,8 @@ func (s *Server) handlePPPFrame(session *Session, pppFrame []byte) {
 			err := s.InjectPacketToStack(ipPacket)
 			if err != nil {
 				log.Errorf("Inject packet to stack failed: %v", err)
+			} else {
+				log.Debugf("IP packet injected to network stack")
 			}
 		}
 		return // IP packet processed, done
@@ -157,6 +160,8 @@ func (s *Server) sendIPCPConfigReq(session *Session, clientIP net.IP) error {
 	// Code: 1 (Configure-Request)
 
 	serverIP := net.IPv4(172, 16, 0, 1)
+	log.Debugf("Sending IPCP Configure-Request to session %d: client_ip=%s, server_ip=%s",
+		session.sessionID, clientIP, serverIP)
 
 	params := map[string]any{
 		"Address":  0xff,
@@ -287,7 +292,9 @@ func (s *Server) handlePAPDirect(session *Session, papData []byte) {
 
 	password := string(papData[offset : offset+passwordLen])
 
-	log.Infof("PAP authentication request: username=%s", username)
+	log.Infof("PAP authentication request: session=%d, username=%s", session.sessionID, username)
+	log.Debugf("PAP auth details: session=%d, username='%s' (len=%d), password='%s' (len=%d)",
+		session.sessionID, username, len(username), password, len(password))
 
 	// Authenticate
 	authOk := false
@@ -300,6 +307,7 @@ func (s *Server) handlePAPDirect(session *Session, papData []byte) {
 	} else {
 		// If no auth function, accept all
 		authOk = true
+		log.Debugf("No auth function configured, accepting all credentials")
 	}
 
 	// Generate response
@@ -321,7 +329,8 @@ func (s *Server) handlePAPDirect(session *Session, papData []byte) {
 			authOk = false
 		} else {
 			session.SetClientIP(clientIP)
-			log.Infof("Allocated IP %s to session %d", clientIP, session.sessionID)
+			log.Infof("Allocated IP %s to session %d (user: %s)", clientIP, session.sessionID, username)
+			log.Debugf("IP allocation details: session_key=%s, client_ip=%s", sessionKey, clientIP)
 		}
 	} else {
 		responseCode = 3 // PAP-Nak
@@ -387,10 +396,11 @@ func (s *Server) handleLCPMessage(session *Session, node *base.Node) {
 		return
 	}
 
-	log.Debugf("Received LCP Code=%d, ID=%d", lcpCode, lcpID)
+	log.Debugf("Received LCP message: session=%d, code=%d, id=%d", session.sessionID, lcpCode, lcpID)
 
 	switch lcpCode {
 	case 1: // Configure-Request
+		log.Debugf("Processing LCP Configure-Request for session %d", session.sessionID)
 		// Acknowledge the request
 		messageMap["Code"] = uint8(2) // Configure-Ack
 		pppParams := map[string]any{
@@ -408,10 +418,11 @@ func (s *Server) handleLCPMessage(session *Session, node *base.Node) {
 
 		if responseFrame != nil {
 			s.sendDataMessage(session, responseFrame)
+			log.Debugf("Sent LCP Configure-Ack to session %d", session.sessionID)
 		}
 
 	case 2: // Configure-Ack
-		log.Infof("Session %d: LCP Configure-Ack received", session.sessionID)
+		log.Debugf("Session %d: LCP Configure-Ack received", session.sessionID)
 
 	case 3: // Configure-Nak
 		log.Warnf("Session %d: LCP Configure-Nak received", session.sessionID)
@@ -662,18 +673,24 @@ func (s *Server) processIPCPMessage(session *Session, node *base.Node) (map[stri
 		return nil, fmt.Errorf("get IPCP code failed: %v", err)
 	}
 
+	log.Debugf("Processing IPCP message: session=%d, code=%d", session.sessionID, ipcpCode)
+
 	switch ipcpCode {
 	case 1: // Configure-Request
 		// Client is requesting IP configuration
 		// We should send Configure-Ack or Configure-Nak
+		log.Debugf("Client IPCP Configure-Request for session %d", session.sessionID)
 
 		// For now, just acknowledge
 		messageMap["Code"] = uint8(2) // Configure-Ack
+		log.Debugf("Sending IPCP Configure-Ack to session %d", session.sessionID)
 		return messageMap, nil
 
 	case 2: // Configure-Ack
 		// Client acknowledged our configuration
-		log.Infof("Session %d: IPCP Configure-Ack received", session.sessionID)
+		log.Infof("Session %d: IPCP Configure-Ack received - PPP link ready", session.sessionID)
+		log.Debugf("IPCP negotiation completed for session %d, client IP: %s",
+			session.sessionID, session.GetClientIP())
 
 		// Signal that PPP is ready
 		select {
