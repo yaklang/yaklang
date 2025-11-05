@@ -511,3 +511,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	})
 
 }
+
+func TestMUSTPASS_ImportRAG(t *testing.T) {
+	ImportRAG("/Users/z3/Downloads/update-rag.rag", WithName("test1"))
+}
