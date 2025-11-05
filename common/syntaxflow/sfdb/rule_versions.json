@@ -1046,8 +1046,8 @@
   {
     "rule_id": "718cb86d-8629-4382-be43-03ce36c07a3b",
     "rule_name": "检测Java反射setAccessible函数滥用漏洞",
-    "hash": "9ecffe41032e54cba780a9d2f4c759a3fe17a7687b572477d4afdfb20a743d8a",
-    "version": "20251015.0001"
+    "hash": "80d0c4ad762639534433300e78abbbc01ad6f78cb52f7b6a29bccc2504f088b9",
+    "version": "20251105.0001"
   },
   {
     "rule_id": "31093d24-ee2b-448b-ba5a-111d99bbf77c",
@@ -1238,8 +1238,8 @@
   {
     "rule_id": "d8a2e488-f0d9-4e74-b2fb-3d9e41c198d5",
     "rule_name": "检测Java不安全的字节数组到字符串转换",
-    "hash": "adc06ceb80190c1c8be3de1d2f7e56badc39d9487a61b013f32f4b721d6c9c9c",
-    "version": "20251015.0001"
+    "hash": "423300fc7d33fdc69cf5da808bee33457a7b722b66c3f0497cc16dba379c9488",
+    "version": "20251105.0001"
   },
   {
     "rule_id": "0018c56b-b5f7-49fc-80f4-d1b9a5f718e5",
