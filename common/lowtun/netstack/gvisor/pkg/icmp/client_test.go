@@ -1,13 +1,15 @@
-package icmp
+package icmp_test
 
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"testing"
 )
 
 func TestClient_ICMP(t *testing.T) {
@@ -34,7 +36,7 @@ func TestClient_ICMP(t *testing.T) {
 	//target := "183.2.172.185/24,192.168.3.1/24"
 	target := "183.2.172.42/24"
 	//target := "192.168.3.1/24"
-	res, err := NewClient(userStack.GetStack()).PingScan(context.Background(), target)
+	res, err := icmp.NewClient(userStack.GetStack()).PingScan(context.Background(), target)
 	require.NoError(t, err)
 	count := 0
 	for r := range res {

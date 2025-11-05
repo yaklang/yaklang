@@ -290,6 +290,9 @@ func initYaklangLib() {
 	// rdp
 	yaklang.Import("rdp", yaklib.RdpExports)
 
+	// l2tp
+	yaklang.Import("l2tp", yaklib.L2TPExports)
+
 	// bot
 	yaklang.Import("bot", yaklib.BotExports)
 
