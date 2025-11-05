@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -222,4 +223,56 @@ func BenchmarkNewAIEngine(b *testing.B) {
 func TestMain(m *testing.M) {
 	// 设置测试环境
 	os.Exit(m.Run())
+}
+
+// 伪代码
+// result = {
+//     "ok": false,
+//     "reason": "",
+//     "result": "",
+// }
+// err = aim.InvokeReAct(
+//     "你的任务是编写一个 Yaklang 代码，进行端口扫描",
+//     aim.focus("yaklang_code"), // default general
+//     aim.iteratiomMax(10),
+//     aim.onOutputStream((react, loop, isSystem, isReason, reader) => {
+//         // handle event.
+//         yakit.Stream(reader)
+//     }),
+//     aim.onOutput((react, loop, event) => {
+//         // 隐藏逻辑，把 event 转换成合理的 ypb.ExecResult 或者想办法让前端触发普通插件下的 AI 输出
+//         yakit.Output(event)
+//     }),
+//     aim.onFinished(loop => {
+//         code = loop.Get("full_code")
+//         if code != "" {
+//             result.ok = true
+//             result.result = ""
+//         }
+//     })
+// )
+// if err != nil {
+//     result.reason = "%v" % err
+// }
+
+func TestInvokeReAct(t *testing.T) {
+	err := InvokeReAct("你好",
+		WithMaxIteration(5),
+		WithYOLOMode(),
+
+		WithAIService("aibalance"),
+		WithOnStream(func(react *aireact.ReAct, data []byte) {
+			t.Logf("Received stream: %s", string(data))
+		}),
+		WithOnData(func(react *aireact.ReAct, data []byte) {
+			t.Logf("Received data: %s", string(data))
+		}),
+		WithOnFinished(func(react *aireact.ReAct, success bool, result map[string]any) {
+			t.Logf("Received finished: success=%v, result=%v", success, result)
+		}),
+	)
+	if err != nil {
+		t.Fatalf("failed to invoke ReAct: %v", err)
+	}
+	time.Sleep(10 * time.Hour)
 }

@@ -295,6 +295,13 @@ func (e *AiOutputEvent) String() string {
 	return fmt.Sprintf("event: %s", strings.Join(parts, ", "))
 }
 
+func (e *AiOutputEvent) ToExecResult() *ypb.ExecResult {
+	return &ypb.ExecResult{
+		IsMessage: true,
+		Message:   e.Content,
+	}
+}
+
 func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 	return &ypb.AIOutputEvent{
 		CoordinatorId:   e.CoordinatorId,
