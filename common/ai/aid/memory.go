@@ -332,7 +332,7 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 	if m.CurrentTask == nil {
 		return m.Timeline()
 	}
-	stl := m.timeline.CreateSubTimeline(m.CurrentTask.toolCallResultIds.Keys()...)
+	stl := m.timeline.CreateSubTimeline(m.CurrentTask.ToolCallResultsID()...)
 	if stl == nil {
 		return "no-toolcall, so not timeline"
 	}
@@ -430,7 +430,7 @@ func (m *PromptContextProvider) ToolsList() string {
 }
 
 func (m *PromptContextProvider) CurrentTaskToolCallResults() []*aitool.ToolResult {
-	return m.CurrentTask.toolCallResultIds.Values()
+	return m.CurrentTask.GetAllToolCallResults()
 }
 
 func (m *PromptContextProvider) StoreCliParameter(param []*ypb.ExecParamItem) {

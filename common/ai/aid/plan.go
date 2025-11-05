@@ -3,13 +3,17 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type planRequest struct {
@@ -82,27 +86,12 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 			return nil
 		}
 
-		i.Subtasks = append(i.Subtasks, &AiTask{
-			Coordinator: p.RootTask.Coordinator,
-			Name:        name,
-			Goal:        goal,
-			ParentTask:  i,
-		})
+		thisTask := p.RootTask.Coordinator.generateAITaskWithName(name, goal)
+		thisTask.ParentTask = i
+
+		i.Subtasks = append(i.Subtasks, thisTask)
 		return utils.Error("normal exit")
 	}, utils.NewBool(false))
-}
-
-// GenerateFirstPlanPrompt 根据PlanRequest生成prompt
-func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
-	if pr.cod.AllowPlanUserInteract && !pr.disableInteract {
-		return pr.cod.quickBuildPrompt(__prompt_GenerateTaskListPromptWithUserInteract, map[string]any{
-			"Memory": pr.cod.Memory,
-		})
-	} else {
-		return pr.cod.quickBuildPrompt(__prompt_GenerateTaskListPrompt, map[string]any{
-			"Memory": pr.cod.Memory,
-		})
-	}
 }
 
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
@@ -114,11 +103,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		}
 		return planRes, nil
 	}
-	// 生成 Prompt
-	prompt, err := pr.GenerateFirstPlanPrompt()
-	if err != nil {
-		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
-	}
 
 	var rootTask = &AiTask{}
 	defer func() {
@@ -129,9 +113,6 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 				return
 			}
 			task.Coordinator = pr.cod
-			if task.toolCallResultIds == nil {
-				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
-			}
 			for _, sub := range task.Subtasks {
 				sub.ParentTask = task // Ensure parent is set
 				propagateConfig(sub)
@@ -141,62 +122,67 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		rootTask.GenerateIndex()
 	}()
 
-	var interactAction *aicommon.Action
-
-	needInteract := func() bool {
-		return interactAction != nil && interactAction.ActionType() == "require-user-interact"
-	}
-
-	err = pr.cod.CallAiTransaction(
-		prompt, pr.CallAI,
-		func(rsp *aicommon.AIResponse) error {
-			stream := rsp.GetOutputStreamReader("plan", false, pr.cod.GetEmitter())
-			//stream = io.TeeReader(stream, os.Stdout)
-			//raw, err := io.ReadAll(stream)
-			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
-			action, err := aicommon.ExtractActionFromStream(pr.cod.Ctx, stream, "plan", aicommon.WithActionAlias("require-user-interact"))
-			if err != nil {
-				return utils.Error("parse @action field from AI response failed: " + err.Error())
-			}
-			switch action.ActionType() {
-			case "plan":
+	planTask := aicommon.NewStatefulTaskBase(
+		"plan-task",
+		pr.rawInput,
+		pr.cod.Ctx,
+		pr.cod.Emitter,
+	)
+	err := pr.cod.ExecuteLoopTask(
+		schema.AI_REACT_LOOP_NAME_PLAN,
+		planTask,
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+			if isDone {
+				planData := loop.Get(loop_plan.PLAN_DATA_KEY)
+				action, err := aicommon.ExtractAction(planData, "generate_plan", "plan")
+				if err != nil {
+					log.Errorf("extract action from plan data failed: %v", err)
+					return
+				}
 				rootTask.Name = action.GetAnyToString("main_task")
 				rootTask.Goal = action.GetAnyToString("main_task_goal")
+				rootTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
+					"root-task"+uuid.NewString(),
+					fmt.Sprintf("任务名称: %s\n任务目标: %s", rootTask.Name, rootTask.Goal),
+					pr.cod.Ctx,
+					pr.cod.Emitter,
+				)
 				for _, subtask := range action.GetInvokeParamsArray("tasks") {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					rootTask.Subtasks = append(rootTask.Subtasks, &AiTask{
-						Coordinator: pr.cod,
-						Name:        subtask.GetAnyToString("subtask_name"),
-						Goal:        subtask.GetAnyToString("subtask_goal"),
-					})
+					rootTask.Subtasks = append(rootTask.Subtasks, pr.cod.generateAITask(subtask))
 				}
 				if rootTask.Name == "" {
-					return fmt.Errorf("AI response does not contain any tasks, please check your AI model or prompt")
+					log.Errorf("plan action missing main_task")
 				}
-				return nil
-			case "require-user-interact":
-				interactAction = action
-				return nil
 			}
-			return utils.Error("no any ai callback is set, cannot found ai config")
-		},
-	)
+		}))
 	if err != nil {
-		pr.cod.EmitError(err.Error())
 		return nil, err
 	}
-
-	if needInteract() {
-		return pr.handlePlanWithUserInteract(interactAction)
-	}
-
-	if rootTask.Name == "" {
-		return nil, utils.Error("cannot found any task in AI response, please check your AI model or prompt")
-	}
-
 	return pr.cod.newPlanResponse(rootTask), nil
+}
+
+func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
+	return c.generateAITaskWithName(params.GetAnyToString("subtask_name"), params.GetAnyToString("subtask_goal"))
+}
+
+func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
+	task := &AiTask{
+		Coordinator: c,
+		Name:        name,
+		Goal:        goal,
+	}
+
+	taskBase := aicommon.NewStatefulTaskBase(
+		"plan-subtask-"+uuid.NewString(),
+		fmt.Sprintf("任务名称: %s\n任务目标: %s", task.Name, task.Goal),
+		c.Ctx,
+		c.Emitter,
+	)
+	task.AIStatefulTaskBase = taskBase
+	return task
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {

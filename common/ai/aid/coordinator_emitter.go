@@ -80,8 +80,6 @@ func (c *Coordinator) EmitUpdateTaskStatus(task *AiTask) {
 			"goal":         task.Goal,
 			"summary":      task.ShortSummary,
 			"long_summary": task.LongSummary,
-			"executing":    task.executing,
-			"executed":     task.executed,
 		},
 	})
 }

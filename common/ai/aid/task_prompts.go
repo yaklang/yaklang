@@ -8,10 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 
 	_ "embed"
 )
@@ -66,37 +64,6 @@ func (t *AiTask) generateTaskPrompt() (string, error) {
 	return promptBuilder.String(), nil
 }
 
-// generateRequireToolResponsePrompt 生成描述工具参数的 Prompt
-func (t *AiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
-	if targetTool == nil {
-		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
-	}
-
-	// 生成工具的JSONSchema描述
-	toolJSONSchema := targetTool.ToJSONSchemaString()
-	// 创建模板数据
-	templateData := map[string]interface{}{
-		"Memory":         t.Memory,
-		"Tool":           targetTool,
-		"ToolJSONSchema": toolJSONSchema,
-	}
-
-	// 解析工具描述模板
-	tmpl, err := template.New("call-tool").Parse(__prompt_ToolParamSchemaPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing tool description template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing tool description template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
-}
-
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
 func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
@@ -116,18 +83,18 @@ func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targe
 	return promptBuilder.String(), nil
 }
 
-func (t *AiTask) generateToolCallResultsPrompt() (string, error) {
-	templatedata := map[string]interface{}{
-		"ToolCallResults": t.toolCallResultIds.Values(),
+func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
+	templatedata := map[string]any{
+		"Memory": t.Memory,
 	}
-	temp, err := template.New("tool-result-history").Parse(__prompt_ToolResultHistoryPromptTemplate)
+	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
 	if err != nil {
-		return "", fmt.Errorf("error parsing tool result history template: %w", err)
+		return "", fmt.Errorf("error parsing tool result template: %w", err)
 	}
 	var promptBuilder strings.Builder
 	err = temp.Execute(&promptBuilder, templatedata)
 	if err != nil {
-		return "", fmt.Errorf("error executing tool result history template: %w", err)
+		return "", fmt.Errorf("error executing tool result template: %w", err)
 	}
 	return promptBuilder.String(), nil
 }
@@ -176,9 +143,6 @@ func (t *AiTask) DeepThink(suggestion string) error {
 				return
 			}
 			task.Coordinator = t.Coordinator
-			if task.toolCallResultIds == nil {
-				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
-			}
 			for _, sub := range task.Subtasks {
 				sub.ParentTask = task // Ensure parent is set
 				propagateConfig(sub)
@@ -203,11 +167,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					t.Subtasks = append(t.Subtasks, &AiTask{
-						Coordinator: t.Coordinator,
-						Name:        subtask.GetAnyToString("subtask_name"),
-						Goal:        subtask.GetAnyToString("subtask_goal"),
-					})
+					t.Subtasks = append(t.Subtasks, t.generateAITask(subtask))
 				}
 				if t.Name == "" {
 					return fmt.Errorf("AI response does not contain any tasks, please check your AI model or prompt")
@@ -239,9 +199,6 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 				return
 			}
 			task.Coordinator = t.Coordinator
-			if task.toolCallResultIds == nil {
-				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
-			}
 			for _, sub := range task.Subtasks {
 				sub.ParentTask = task // Ensure parent is set
 				propagateConfig(sub)

@@ -20,14 +20,8 @@ var __prompt_GenerateTaskListPromptWithUserInteract string
 //go:embed prompts/task/task-execute.txt
 var __prompt_ExecuteTaskPromptTemplate string
 
-//go:embed prompts/tool/tool-param-schema.txt
-var __prompt_ToolParamSchemaPromptTemplate string
-
 //go:embed prompts/tool/tool-result-to-decision.txt
 var __prompt_ToolResultToDecisionPromptTemplate string
-
-//go:embed prompts/tool/tool-result-history.txt
-var __prompt_ToolResultHistoryPromptTemplate string
 
 //go:embed prompts/task/task-summary.txt
 var __prompt_TaskSummary string

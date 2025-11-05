@@ -1,7 +1,16 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aiexec"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -78,10 +87,15 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
-	mainloop, err := reactloops.CreateLoopByName(
-		schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+	currentTask := r.GetCurrentTask()
+	currentTask.SetUserInput(userQuery)
+	return r.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_DEFAULT, currentTask)
+}
+
+func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
+	defaultOptions := []reactloops.ReActLoopOption{
 		reactloops.WithMemoryTriage(r.memoryTriage),
-		reactloops.WithMemoryPool(r.memoryPool),
+		reactloops.WithMemoryPool(r.config.MemoryPool),
 		reactloops.WithMemorySizeLimit(int(r.config.MemoryPoolSize)),
 		reactloops.WithEnableSelfReflection(r.config.EnableSelfReflection),
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
@@ -92,7 +106,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		}),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			r.wg.Add(1)
-			diffStr, err := r.timelineDiffer.Diff()
+			diffStr, err := r.config.TimelineDiffer.Diff()
 			if err != nil {
 				log.Warnf("timeline differ call failed: %v", err)
 				r.wg.Done()
@@ -178,21 +192,103 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 				}
 			}()
 		}),
+	}
+
+	defaultOptions = append(defaultOptions, options...)
+
+	mainloop, err := reactloops.CreateLoopByName(
+		taskTypeName, r,
+		defaultOptions...,
 	)
 	if err != nil {
 		return false, utils.Errorf("failed to create main loop runtime instance: %v", err)
 	}
 
-	currentTask := r.GetCurrentTask()
-	currentTask.SetUserInput(userQuery)
 	if r.GetCurrentPlanExecutionTask() != nil {
 		// have async plan execution task running, disable plan and exec in main loop
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
 	}
-	err = mainloop.ExecuteWithExistedTask(currentTask)
+	err = mainloop.ExecuteWithExistedTask(task)
 	if err != nil {
 		return false, err
 	}
-	return currentTask.IsAsyncMode(), nil
+	return task.IsAsyncMode(), nil
+}
+
+func init() {
+	aiexec.RegisterDefaultAIRuntimeInvoker(BuildReActInvoker)
+}
+
+func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
+	cfg := aicommon.NewConfig(ctx, options...)
+	dirname := consts.TempAIDir(cfg.GetRuntimeId())
+	if existed, _ := utils.PathExists(dirname); !existed {
+		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
+	}
+	invoker := &ReAct{
+		config:               cfg,
+		Emitter:              cfg.Emitter, // Use the emitter from config
+		taskQueue:            NewTaskQueue("react-main-queue"),
+		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
+		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
+		artifacts:            filesys.NewRelLocalFs(dirname),
+		wg:                   new(sync.WaitGroup),
+	}
+
+	if cfg.MemoryTriage != nil {
+		invoker.memoryTriage = cfg.MemoryTriage
+	} else {
+		var err error
+		invoker.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(invoker))
+		if err != nil {
+			return nil, utils.Errorf("create memory triage failed: %v", err)
+		}
+		invoker.config.MemoryTriage = invoker.memoryTriage
+	}
+
+	if cfg.Timeline == nil {
+		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
+	}
+	if cfg.TimelineDiffer == nil {
+		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
+	}
+	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
+	// Initialize prompt manager
+	workdir := cfg.Workdir
+	if workdir == "" {
+		workdir, _ = invoker.artifacts.Getwd()
+		if workdir == "" {
+			workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
+			if utils.GetFirstExistedFile(workdir) == "" {
+				os.MkdirAll(workdir, os.ModePerm)
+			}
+		}
+	}
+	invoker.promptManager = NewPromptManager(invoker, workdir)
+
+	// Register pending context providers
+	for _, entry := range cfg.PendingContextProviders {
+		if entry.Traced {
+			invoker.promptManager.cpm.RegisterTracedContent(entry.Name, entry.Provider)
+		} else {
+			invoker.promptManager.cpm.Register(entry.Name, entry.Provider)
+		}
+	}
+	// Clear pending list after registration
+	cfg.PendingContextProviders = nil
+
+	wd, err := invoker.artifacts.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	invoker.Emitter.EmitPinDirectory(wd)
+
+	// Start the event loop in background
+	mainloopDone := make(chan struct{})
+	invoker.startEventLoop(cfg.Ctx, mainloopDone)
+	<-mainloopDone // Ensure the event loop has started
+	invoker.config.StartHotPatchLoop(cfg.Ctx)
+
+	return invoker, nil
 }

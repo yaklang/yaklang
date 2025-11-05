@@ -7,18 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"strconv"
-	"strings"
-	"sync/atomic"
-
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 )
 
 // TaskResponseCallback 定义Task执行过程中响应回调函数类型
@@ -33,35 +28,28 @@ type TaskProgress struct {
 }
 
 type AiTask struct {
-	*aicommon.Emitter
 	*Coordinator
-
+	*aicommon.AIStatefulTaskBase
 	Index      string    `json:"index"`
 	Name       string    `json:"name"`
 	Goal       string    `json:"goal"`
 	ParentTask *AiTask   `json:"parent_task"`
 	Subtasks   []*AiTask `json:"subtasks"`
 
-	ResponseCallback TaskResponseCallback `json:"-"` // 响应回调函数
+	StatusSummary string `json:"status_summary"`
+	TaskSummary   string `json:"task_summary"`
+	ShortSummary  string `json:"short_summary"`
+	LongSummary   string `json:"long_summary"`
 
-	// 新增字段，存储默认工具和元数据
-	metadata map[string]interface{}
-
-	executing bool
-	executed  bool
-
-	// runtime
-	//ToolCallResults   []*aitool.ToolResult `json:"tool_call_results"`
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
-	StatusSummary     string `json:"status_summary"`
-	TaskSummary       string `json:"task_summary"`
-	ShortSummary      string `json:"short_summary"`
-	LongSummary       string `json:"long_summary"`
+}
 
-	ToolCallCount int64 `json:"tool_call_count"`
+func (t *AiTask) executed() bool {
+	return t.GetStatus() == aicommon.AITaskState_Completed
+}
 
-	// task continue count
-	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
+func (t *AiTask) executing() bool {
+	return t.GetStatus() == aicommon.AITaskState_Processing
 }
 
 func (t *AiTask) GetSummary() string {
@@ -82,23 +70,21 @@ func (t *AiTask) GetSummary() string {
 
 func (t *AiTask) GetSuccessCallCount() int {
 	count := 0
-	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+	for _, v := range t.GetAllToolCallResults() {
 		if v.Success {
 			count++
 		}
-		return true
-	})
+	}
 	return count
 }
 
 func (t *AiTask) GetFailCallCount() int {
 	count := 0
-	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+	for _, v := range t.GetAllToolCallResults() {
 		if !v.Success {
 			count++
 		}
-		return true
-	})
+	}
 	return count
 }
 
@@ -110,42 +96,13 @@ func (t *AiTask) GetEmitter() *aicommon.Emitter {
 
 }
 
-func (t *AiTask) GetIndex() string {
-	return t.Index
-}
-
-func (t *AiTask) GetName() string {
-	return t.Name
-}
-
-
-func (t *AiTask) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-	for _, cb := range []aicommon.AICallbackType{
-		t.Coordinator.QualityPriorityAICallback,
-		t.Coordinator.SpeedPriorityAICallback,
-		t.Coordinator.OriginalAICallback,
-	} {
-		if cb == nil {
-			continue
-		}
-		return cb(t.Coordinator, request)
-	}
-	return nil, utils.Error("no any ai callback is set, cannot found ai config")
-}
-
-func (t *AiTask) PushToolCallResult(i *aitool.ToolResult) {
-	t.toolCallResultIds.Set(i.GetID(), i)
-	t.Coordinator.Memory.PushToolCallResults(i)
-	atomic.AddInt64(&t.ToolCallCount, 1)
-}
-
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
 func (t *AiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
 	var progress string
-	if t.executed {
+	if t.GetStatus() == aicommon.AITaskState_Completed {
 		progress = "success"
-	} else if t.executing {
+	} else if t.GetStatus() == aicommon.AITaskState_Processing {
 		progress = "in-progress"
 	}
 
@@ -167,7 +124,7 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Subtasks:             t.Subtasks,
 		Progress:             progress,
 		Summary:              t.GetSummary(),
-		TotalToolCallCount:   t.ToolCallCount,
+		TotalToolCallCount:   int64(len(t.GetAllToolCallResults())),
 		SuccessToolCallCount: t.GetSuccessCallCount(),
 		FailToolCallCount:    t.GetFailCallCount(),
 	})
@@ -191,9 +148,11 @@ func (t *AiTask) UnmarshalJSON(data []byte) error {
 	t.Name = aux.Name
 	t.Goal = aux.Goal
 	t.Subtasks = aux.Subtasks
-	if t.toolCallResultIds == nil {
-		t.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
-	}
+	t.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
+		fmt.Sprintf("pe-task-%s", t.Index),
+		aux.Goal,
+		t.Ctx,
+		nil)
 	return nil
 }
 
@@ -206,20 +165,17 @@ func ExtractPlan(c *Coordinator, rawResponse string) (*PlanResponse, error) {
 }
 
 func ExtractNextPlanTaskFromRawResponse(c *Coordinator, rawResponse string) ([]*AiTask, error) {
-	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
-		start, end := item[0], item[1]
-		taskJSON := rawResponse[start:end]
+	action, err := aicommon.ExtractAction(rawResponse, "re-plan")
+	if err != nil {
+		return nil, err
+	}
 
-		// 尝试解析为新的 aiTask schema 结构
-		var planObj struct {
-			Action       string    `json:"@action"`
-			NextPlanTask []*AiTask `json:"next_plans"`
-		}
-
-		err := json.Unmarshal([]byte(taskJSON), &planObj)
-		if err == nil && planObj.Action == "re-plan" && len(planObj.NextPlanTask) > 0 {
-			return planObj.NextPlanTask, nil
-		}
+	var taskList []*AiTask
+	for _, params := range action.GetInvokeParamsArray("next_plans") {
+		taskList = append(taskList, c.generateAITask(params))
+	}
+	if len(taskList) <= 0 {
+		return nil, errors.New("no aiTask found in next-plan")
 	}
 	return nil, errors.New("no aiTask found in next-plans")
 }
@@ -232,6 +188,7 @@ func _assignHierarchicalIndicesRecursive(currentTask *AiTask, currentIndex strin
 		return
 	}
 	currentTask.Index = currentIndex
+	currentTask.SetID(currentIndex)
 
 	for i, subTask := range currentTask.Subtasks {
 		// 子任务的索引是父任务索引加上自己的序号 (1-based)
@@ -244,12 +201,12 @@ func _assignHierarchicalIndicesRecursive(currentTask *AiTask, currentIndex strin
 // GenerateIndex 为任务树生成层级索引。
 // 调用此方法的任务 (a) 所在树的根节点索引将被设为 "1"。
 // 其子任务将相应地获得如 "1-1", "1-2" 等索引，孙任务如 "1-1-1" 等。
-func (a *AiTask) GenerateIndex() {
-	if a == nil {
+func (t *AiTask) GenerateIndex() {
+	if t == nil {
 		return
 	}
 
-	root := a
+	root := t
 	// 向上遍历以找到树的实际根节点。
 	// 包含一个针对极深树或潜在循环依赖的安全中断。
 	for i := 0; i < 1000 && root.ParentTask != nil; i++ {
@@ -276,9 +233,6 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 				return
 			}
 			task.Coordinator = c
-			if task.toolCallResultIds == nil {
-				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
-			}
 			for _, sub := range task.Subtasks {
 				sub.ParentTask = task // Ensure parent is set
 				propagateConfig(sub)
@@ -289,134 +243,31 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 	}()
 	var extraReason bytes.Buffer
 	_ = extraReason
-	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
-		start, end := item[0], item[1]
-		taskJSON := rawResponse[start:end]
 
-		// 尝试解析为新的 aiTask schema 结构
-		var planObj struct {
-			Action       string `json:"@action"`
-			Query        string `json:"query"`
-			MainTask     string `json:"main_task"`
-			MainTaskGoal string `json:"main_task_goal"`
-			Tasks        []struct {
-				SubtaskName string `json:"subtask_name"`
-				SubtaskGoal string `json:"subtask_goal"`
-			} `json:"tasks"`
-		}
-
-		err = json.Unmarshal([]byte(taskJSON), &planObj)
-		if err != nil {
-			log.Debugf("Failed to parse taskJSON as planObj structure: %v. JSON: %s", err, taskJSON)
-		}
-		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
-			// 创建主任务
-			mainTask := &AiTask{
-				Coordinator: c,
-				Name:        planObj.MainTask,
-				Goal:        planObj.MainTaskGoal,
-				Subtasks:    make([]*AiTask, 0),
-				metadata: map[string]interface{}{
-					"query": planObj.Query,
-				},
-				toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
+	action, err := aicommon.ExtractAction(rawResponse, "plan")
+	if err != nil {
+		log.Errorf("extract action from plan data failed: %v", err)
+		return
+	}
+	switch action.ActionType() {
+	case "plan":
+		retTask = &AiTask{}
+		retTask.Name = action.GetAnyToString("main_task")
+		retTask.Goal = action.GetAnyToString("main_task_goal")
+		for _, subtask := range action.GetInvokeParamsArray("tasks") {
+			if subtask.GetAnyToString("subtask_name") == "" {
+				continue
 			}
-
-			// 如果主任务名称为空，则使用第一个子任务的名称
-			if mainTask.Name == "" {
-				mainTask.Name = planObj.Tasks[0].SubtaskName
-				mainTask.Goal = planObj.Tasks[0].SubtaskGoal
-
-				// 如果有多个子任务，使用除第一个外的所有任务作为子任务
-				if len(planObj.Tasks) > 1 {
-					for _, subtask := range planObj.Tasks[1:] {
-						mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
-							Coordinator:       c,
-							Name:              subtask.SubtaskName,
-							Goal:              subtask.SubtaskGoal,
-							ParentTask:        mainTask,
-							metadata:          map[string]interface{}{},
-							toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
-						})
-					}
-				}
-			} else {
-				// 主任务名称存在，将所有任务作为子任务
-				for _, subtask := range planObj.Tasks {
-					mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
-						Coordinator:       c,
-						Name:              subtask.SubtaskName,
-						Goal:              subtask.SubtaskGoal,
-						ParentTask:        mainTask,
-						metadata:          map[string]interface{}{},
-						toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
-					})
-				}
-			}
-
-			retTask = mainTask
-			err = nil
-			return
+			retTask.Subtasks = append(retTask.Subtasks, c.generateAITask(subtask))
 		}
-
-		// 尝试直接解析为单个 aiTask 对象
-		var simpleTask AiTask
-		err = json.Unmarshal([]byte(taskJSON), &simpleTask)
-		if err != nil {
-			log.Debugf("Failed to parse taskJSON as simpleTask: %v. JSON: %s", err, taskJSON)
-		}
-		if err == nil && simpleTask.Name != "" {
-			retTask = &simpleTask
-			err = nil
-			return
-		}
-
-		// 尝试解析为一个简单的 map 并创建 aiTask
-		var taskMap map[string]interface{}
-		err = json.Unmarshal([]byte(taskJSON), &taskMap)
-		if err != nil {
-			log.Debugf("Failed to parse taskJSON as taskMap: %v. JSON: %s", err, taskJSON)
-		}
-		if err == nil {
-			if name, ok := taskMap["name"].(string); ok && name != "" {
-				taskIns := &AiTask{
-					Name:              name,
-					Coordinator:       c,
-					metadata:          map[string]interface{}{},
-					toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
-				}
-
-				if goal, ok := taskMap["goal"].(string); ok {
-					taskIns.Goal = goal
-				}
-
-				if subtasks, ok := taskMap["subtasks"].([]interface{}); ok {
-					for _, st := range subtasks {
-						if subtaskMap, ok := st.(map[string]interface{}); ok {
-							if stName, ok := subtaskMap["name"].(string); ok && stName != "" {
-								subtask := &AiTask{
-									Name:              stName,
-									metadata:          map[string]interface{}{},
-									toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
-								}
-
-								if stGoal, ok := subtaskMap["goal"].(string); ok {
-									subtask.Goal = stGoal
-								}
-
-								taskIns.Subtasks = append(taskIns.Subtasks, subtask)
-							}
-						}
-					}
-				}
-				retTask = taskIns
-				err = nil
-				return
-			}
+		if retTask.Name == "" {
+			log.Errorf("plan action missing main_task")
 		}
 	}
-	err = errors.New("no aiTask found in raw response")
-	retTask = nil
+	if retTask == nil {
+		return nil, errors.New("no valid plan action found in response")
+	}
+
 	return
 }
 
@@ -433,5 +284,5 @@ func (t *AiTask) QuoteGoal() string {
 }
 
 func (t *AiTask) CanContinue() bool {
-	return t.TaskContinueCount < t.Coordinator.MaxTaskContinue
+	return 0 < t.Coordinator.MaxTaskContinue
 }

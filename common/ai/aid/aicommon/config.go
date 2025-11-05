@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"math/rand/v2"
 	"os"
 	"sync"
@@ -142,12 +143,14 @@ type Config struct {
 	*/
 	// timeline
 	Timeline                  *Timeline
+	TimelineDiffer            *TimelineDiffer
 	TimelineContentSizeLimit  int
 	TimelineTotalContentLimit int
 
 	// triage
 	MemoryTriage         MemoryTriage
 	MemoryPoolSize       int64
+	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
 	EnableSelfReflection bool
 
 	// other context
@@ -269,6 +272,7 @@ func newConfig(ctx context.Context) *Config {
 		AllowRequireForUserInteract:        true,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024,
+		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 	}
@@ -288,9 +292,6 @@ func newConfig(ctx context.Context) *Config {
 	// Initialize endpoint manager
 	config.Epm = NewEndpointManagerContext(ctx)
 	config.Epm.SetConfig(config)
-	config.Timeline = NewTimeline(nil, nil)
-	config.Timeline.BindConfig(config, config)
-
 	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
 		if config.AiServerName != "" {
 			err := config.LoadAIServiceByName(config.AiServerName)
@@ -301,6 +302,9 @@ func newConfig(ctx context.Context) *Config {
 			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
 		}
 	}
+	config.Timeline = NewTimeline(config, nil)
+	config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
+	config.Timeline.BindConfig(config, config)
 
 	return config
 }
@@ -382,6 +386,19 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		c.QualityPriorityAICallback = cb
 		c.SpeedPriorityAICallback = cb
 		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.QualityPriorityAICallback = cb
+		c.SpeedPriorityAICallback = cb
 		return nil
 	}
 }
@@ -1398,6 +1415,18 @@ func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
+func (c *Config) CallOriginalAI(request *AIRequest) (*AIResponse, error) {
+	for _, cb := range []AICallbackType{
+		c.OriginalAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(c, request)
+	}
+	return nil, utils.Error("no any ai callback is set, cannot found ai config")
+}
+
 func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {
 	if c.Epm != nil {
 		c.Epm.Feed(endpointId, params)
@@ -1615,6 +1644,22 @@ func (c *Config) SetAICallback(callback AICallbackType) {
 	c.SpeedPriorityAICallback = wCb
 }
 
+func (c *Config) SetContext(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+
+	c.m.Lock()
+	defer c.m.Unlock()
+	subCtx, cancel := context.WithCancel(ctx)
+	c.Ctx = subCtx
+	c.cancel = cancel
+}
+
 func (c *Config) CallAiTransaction(
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
@@ -1624,6 +1669,25 @@ func (c *Config) CallAiTransaction(
 	return CallAITransaction(c, prompt, callAi, postHandler, requestOpts...)
 }
 
+//	func (c *Config) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {
+//		r.mirrorMutex.Lock()
+//		defer r.mirrorMutex.Unlock()
+//		r.mirrorOfAIInputEvent[id] = f
+//	}
+//
+//	func (c *Config) CallMirrorOfAIInputEvent(event *ypb.AIInputEvent) {
+//		r.mirrorMutex.RLock()
+//		defer r.mirrorMutex.RUnlock()
+//		for _, f := range r.mirrorOfAIInputEvent {
+//			f(event)
+//		}
+//	}
+//
+//	func (c *Config) UnregisterMirrorOfAIInputEvent(id string) {
+//		r.mirrorMutex.Lock()
+//		defer r.mirrorMutex.Unlock()
+//		delete(r.mirrorOfAIInputEvent, id)
+//	}
 func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// Return nil for nil input
 	if i == nil {
@@ -1651,18 +1715,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	// Agree policy mapping
-	switch i.AgreePolicy {
-	case AgreePolicyYOLO:
-		opts = append(opts, WithAgreeYOLO())
-	case AgreePolicyAI:
-		opts = append(opts, WithAIAgree())
-	case AgreePolicyAuto:
-		opts = append(opts, WithAgreeAuto())
-	case AgreePolicyManual:
-		fallthrough
-	default:
-		opts = append(opts, WithAgreeManual())
-	}
+	opts = append(opts, WithAgreePolicy(i.AgreePolicy))
 
 	// Other boolean/flag options
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
@@ -1715,6 +1768,15 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.Workdir != "" {
 		opts = append(opts, WithWorkdir(i.Workdir))
+	}
+
+	if i.EventHandler != nil {
+		opts = append(opts, WithEventHandler(i.EventHandler))
+	}
+
+	if i.HotPatchBroadcaster != nil {
+		hotPatchChan := i.HotPatchBroadcaster.Subscribe()
+		opts = append(opts, WithHotPatchOptionChan(hotPatchChan))
 	}
 
 	return opts

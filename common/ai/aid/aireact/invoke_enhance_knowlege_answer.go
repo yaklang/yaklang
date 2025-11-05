@@ -58,3 +58,50 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 	}
 	return finalResult, err
 }
+
+func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+
+	currentTask := r.GetCurrentTask()
+	enhanceID := uuid.NewString()
+	config := r.config
+
+	if config.EnhanceKnowledgeManager == nil {
+		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
+	}
+
+	enhanceData, err := config.EnhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
+	if err != nil {
+		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
+	}
+
+	for enhanceDatum := range enhanceData {
+		r.EmitKnowledge(enhanceID, enhanceDatum)
+		config.EnhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
+	}
+
+	var queryBuf bytes.Buffer
+	queryBuf.WriteString(userQuery)
+
+	enhance := r.DumpCurrentEnhanceData()
+	if enhance != "" {
+		enhancePayload, err := utils.RenderTemplate(`<|ENHANCE_DATA_{{ .Nonce }}|>
+{{ .EnhanceData }}
+<|ENHANCE_DATA_{{ .Nonce }}|>
+`, map[string]interface{}{
+			"Nonce":       nonce(),
+			"EnhanceData": enhance,
+		})
+		if err != nil {
+			log.Warnf("enhanceKnowledgeAnswer.DumpCurrentEnhanceData() failed: %v", err)
+		}
+		if enhancePayload != "" {
+			queryBuf.WriteString("\n\n")
+			queryBuf.WriteString(enhancePayload)
+		}
+	}
+
+	return enhance, nil
+}

@@ -435,6 +435,16 @@ func InterfaceToString(i interface{}) string {
 	return codec.AnyToString(i)
 }
 
+func FilterInterface[T any](i []any) []T {
+	var result []T
+	for _, v := range i {
+		if val, ok := v.(T); ok {
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
 // Reverse the string
 func StringReverse(s string) string {
 	n := 0

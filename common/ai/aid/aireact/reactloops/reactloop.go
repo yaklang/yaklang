@@ -77,6 +77,10 @@ type ReActLoop struct {
 	enableSelfReflection bool
 }
 
+func (r *ReActLoop) GetMaxIterations() int {
+	return r.maxIterations
+}
+
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 	var tools []*aitool.Tool
 	if r.toolsGetter == nil {
@@ -97,14 +101,13 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 
 	allowPlanRaw, ok := info["AllowPlan"]
 	if ok && utils.InterfaceToBoolean(allowPlanRaw) {
-		if r.allowPlanAndExec != nil && r.allowPlanAndExec() {
-			if r.GetCurrentTask() != nil && r.GetCurrentTask().IsAsyncMode() {
-				info["AllowPlan"] = false
+		if r.allowPlanAndExec != nil {
+			allowPE := r.allowPlanAndExec()
+			if allowPE && r.GetCurrentTask() != nil && r.GetCurrentTask().IsAsyncMode() {
+				allowPE = false
 				info["PlanInProgress"] = true
-			} else {
-				info["PlanInProgress"] = false
-				info["AllowPlan"] = true
 			}
+			info["AllowPlan"] = allowPE
 		}
 	}
 
@@ -112,6 +115,12 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 		info["AllowKnowledgeEnhanceAnswer"] = true
 	} else {
 		info["AllowKnowledgeEnhanceAnswer"] = false
+	}
+
+	if r.allowToolCall != nil && !r.allowToolCall() { // default allow tool call
+		info["AllowToolCall"] = false
+	} else {
+		info["AllowToolCall"] = true
 	}
 
 	result, err := utils.RenderTemplate(temp, info)
