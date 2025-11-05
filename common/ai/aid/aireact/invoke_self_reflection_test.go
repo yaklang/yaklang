@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -25,9 +26,52 @@ var iterationCount int
 var verifyCount int
 var iterationMutex sync.Mutex
 
+// extractNonceFromPrompt extracts nonce from prompt patterns like <background_{nonce}>, <schema_{nonce}>, <|SCHEMA_{nonce}|>, etc.
+func extractNonceFromPrompt(prompt string) string {
+	// Pattern 1: <background_{nonce}> or <schema_{nonce}> (liteforge style)
+	patterns := []string{
+		`<background_([a-zA-Z0-9]+)>`,
+		`<schema_([a-zA-Z0-9]+)>`,
+		`<timeline_([a-zA-Z0-9]+)>`,
+		`<params_([a-zA-Z0-9]+)>`,
+		// Pattern 2: <|SCHEMA_{nonce}|> or <|USER_QUERY_{nonce}|> (ReAct loop style)
+		`<\|SCHEMA_([A-Za-z0-9]+)\|>`,
+		`<\|USER_QUERY_([A-Za-z0-9]+)\|>`,
+		`<\|REFLECTION_([A-Za-z0-9]+)\|>`,
+		`<\|PERSISTENT_([A-Za-z0-9]+)\|>`,
+		// Pattern 3: <|USER_INPUT_{nonce}|> (task init style)
+		`<\|USER_INPUT_([A-Za-z0-9]+)\|>`,
+		// Pattern 4: <|SELF_REFLECTION_TASK_{nonce}|> (self-reflection prompt style)
+		`<\|SELF_REFLECTION_TASK_([A-Za-z0-9]+)\|>`,
+		`<\|ACTION_DETAILS_([A-Za-z0-9]+)\|>`,
+		`<\|ENVIRONMENTAL_IMPACT_([A-Za-z0-9]+)\|>`,
+		`<\|RELEVANT_MEMORIES_([A-Za-z0-9]+)\|>`,
+		`<\|PREVIOUS_REFLECTIONS_([A-Za-z0-9]+)\|>`,
+		`<\|ANALYSIS_REQUIREMENTS_([A-Za-z0-9]+)\|>`,
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		if matches := re.FindStringSubmatch(prompt); len(matches) > 1 {
+			if matches[1] != "" {
+				return matches[1] // Return first captured group (nonce)
+			}
+		}
+	}
+
+	return "" // No nonce found
+}
+
 // mockedSelfReflectionToolCalling mocks AI responses for self-reflection test
-func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, nonce string) (*aicommon.AIResponse, error) {
+func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Extract nonce from prompt (if available)
+	nonce := extractNonceFromPrompt(prompt)
+	if nonce == "" {
+		// Use default nonce for mock responses when extraction fails
+		nonce = "test123"
+	}
 
 	// Mock decision to call tool - continue until we reach 7 iterations (> 5)
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
@@ -107,8 +151,9 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	// Mock memory system - memory extraction/summarization
-	if utils.MatchAllOfSubString(prompt, "background_imcvoh", "schema_imcvoh", "INPUT_CpSo") ||
-		utils.MatchAllOfSubString(prompt, "是一个输出JSON的数据处理和总结提示小助手") {
+	// Match pattern: <background_{nonce}>, <schema_{nonce}>, or liteforge prompt signature
+	if utils.MatchAllOfSubString(prompt, "是一个输出JSON的数据处理和总结提示小助手") ||
+		strings.Contains(prompt, "<background_") && strings.Contains(prompt, "<schema_") {
 		rsp := i.NewAIResponse()
 		// Return minimal memory extraction response
 		rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -120,8 +165,8 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	// Mock memory system - knowledge graph extraction
-	if utils.MatchAllOfSubString(prompt, "background_aalael", "schema_aalael") ||
-		utils.MatchAllOfSubString(prompt, "working dir:", "facts") {
+	// Match pattern: facts extraction prompts
+	if strings.Contains(prompt, "working dir:") && strings.Contains(prompt, "facts") {
 		rsp := i.NewAIResponse()
 		// Return minimal knowledge graph response
 		rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -194,7 +239,7 @@ func TestReAct_SelfReflection(t *testing.T) {
 	// Create ReAct instance with self-reflection enabled
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedSelfReflectionToolCalling(i, r, "test_echo_tool", nonce)
+			return mockedSelfReflectionToolCalling(i, r, "test_echo_tool")
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -242,9 +287,9 @@ func TestReAct_SelfReflection(t *testing.T) {
 		}
 	}()
 
-	timeout := time.After(60 * time.Second)
+	timeout := time.After(10 * time.Second)
 	if utils.InGithubActions() {
-		timeout = time.After(60 * time.Second)
+		timeout = time.After(10 * time.Second)
 	}
 
 	// Track review interactions
@@ -268,7 +313,8 @@ LOOP:
 			}
 
 			// Handle review requests (approve all to continue iterations)
-			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+			// Only process structured JSON events to avoid parsing incomplete stream data
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) && e.IsJson {
 				reviewCount++
 				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
 				in <- &ypb.AIInputEvent{
@@ -280,7 +326,8 @@ LOOP:
 			}
 
 			// Track iteration numbers
-			if strings.Contains(e.String(), "iteration") {
+			// Only extract from structured JSON events, not from streaming deltas
+			if e.IsJson && strings.Contains(e.String(), "iteration") {
 				// Extract iteration number from event content
 				iterStr := jsonpath.FindFirst(e.GetContent(), "$..react_iteration")
 				if iterStr != nil {
@@ -308,7 +355,8 @@ LOOP:
 			}
 
 			// Check for task completion
-			if e.NodeId == "react_task_status_changed" {
+			// Only process structured JSON events to avoid parsing incomplete stream data
+			if e.NodeId == "react_task_status_changed" && e.IsJson {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
 					t.Logf("Task completed, breaking loop")
@@ -455,4 +503,5 @@ LOOP:
 	}
 
 	t.Log("[SUCCESS] Self-reflection test completed successfully!")
+	fmt.Println(timeline) // don't delete this, great for debugging
 }

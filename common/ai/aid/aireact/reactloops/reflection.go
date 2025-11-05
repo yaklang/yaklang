@@ -336,21 +336,11 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 
 	params := action.GetParams()
 
-	// action 自动解析了 learning_insights 数组
-	learningRaw := params.GetObjectArray("learning_insights")
-	for _, item := range learningRaw {
-		if insight := utils.InterfaceToString(item); insight != "" {
-			reflection.LearningInsights = append(reflection.LearningInsights, insight)
-		}
-	}
+	// action 自动解析了 learning_insights 数组 (直接作为字符串数组)
+	reflection.LearningInsights = params.GetStringSlice("learning_insights")
 
-	// action 自动解析了 future_suggestions 数组
-	suggestionsRaw := params.GetObjectArray("future_suggestions")
-	for _, item := range suggestionsRaw {
-		if suggestion := utils.InterfaceToString(item); suggestion != "" {
-			reflection.FutureSuggestions = append(reflection.FutureSuggestions, suggestion)
-		}
-	}
+	// action 自动解析了 future_suggestions 数组 (直接作为字符串数组)
+	reflection.FutureSuggestions = params.GetStringSlice("future_suggestions")
 
 	// action 自动解析了字符串字段
 	reflection.ImpactAssessment = params.GetString("impact_assessment")
