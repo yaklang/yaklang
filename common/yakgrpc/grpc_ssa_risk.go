@@ -93,6 +93,18 @@ func (s *Server) GetSSARiskFieldGroup(ctx context.Context, req *ypb.Empty) (*ypb
 	}, nil
 }
 
+func (s *Server) GetSSARiskFieldGroupEx(ctx context.Context, req *ypb.GetSSARiskFieldGroupRequest) (*ypb.SSARiskFieldGroupResponse, error) {
+	if req == nil {
+		return nil, utils.Errorf("GetSSARiskFieldGroupRequest is nil")
+	}
+	db := yakit.FilterSSARisk(s.GetSSADatabase(), req.GetFilter())
+	return &ypb.SSARiskFieldGroupResponse{
+		FileField:     yakit.SSARiskColumnGroupCount(db, "code_source_url"),
+		SeverityField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "severity"), severityVerbose),
+		RiskTypeField: FieldGroup2FiledGroupName(yakit.SSARiskColumnGroupCount(db, "risk_type"), schema.SSARiskTypeVerbose),
+	}, nil
+}
+
 func (s *Server) NewSSARiskRead(ctx context.Context, req *ypb.NewSSARiskReadRequest) (*ypb.NewSSARiskReadResponse, error) {
 	err := yakit.NewSSARiskReadRequest(s.GetSSADatabase(), req.GetFilter())
 	if err != nil {
