@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java反射setAccessible函数滥用漏洞"
 	type: Vulnerability
 	severity: High
-	risk: High
+	risk: "反序列化漏洞"
 	desc: <<<DESC
 ### 漏洞描述
 
