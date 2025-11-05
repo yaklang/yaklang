@@ -55,18 +55,6 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 	return cfg, nil
 }
 
-func NewConfigByJSON(raw []byte) (*Config, error) {
-	cfg := &Config{
-		ExtraInfo: map[string]any{},
-	}
-	cfg.Mode = ModeAll
-	err := WithJSONRawConfig(raw)(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
-
 func NewSyntaxFlowScanConfig(opts ...Option) (*Config, error) {
 	return New(ModeSyntaxFlowScan, opts...)
 }
@@ -247,7 +235,7 @@ func WithConfigJson(jsonStr string) Option {
 	}
 }
 
-func WithJSONRawConfig(raw []byte) Option {
+func WithJsonRawConfig(raw []byte) Option {
 	return func(c *Config) error {
 		err := json.Unmarshal(raw, &c)
 		if err != nil {

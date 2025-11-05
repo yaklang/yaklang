@@ -107,22 +107,23 @@ func (s *SSAProject) toSchemaData() (*schema.SSAProject, error) {
 	return &result, nil
 }
 
-func (s *SSAProject) Save(dbs ...*gorm.DB) error {
+func (s *SSAProject) Save(options ...ssaconfig.Option) error {
 	if s == nil {
 		return utils.Errorf("save SSA project failed: ssa project builder is nil")
 	}
+
+	db := consts.GetGormProfileDatabase()
+	for _, opt := range options {
+		err := opt(s.Config)
+		if err != nil {
+			return err
+		}
+	}
+	s.coverBaseInfo()
 	schemaProject, err := s.toSchemaData()
 	if err != nil {
 		return err
 	}
-
-	var db *gorm.DB
-	if len(dbs) > 0 && dbs[0] != nil {
-		db = dbs[0]
-	} else {
-		db = consts.GetGormProfileDatabase()
-	}
-
 	// just create
 	if schemaProject.ID == 0 {
 		return db.Create(schemaProject).Error
@@ -143,6 +144,16 @@ func (s *SSAProject) Save(dbs ...*gorm.DB) error {
 		return utils.Errorf("update SSA project failed: %s", err)
 	}
 	return nil
+}
+
+func (s *SSAProject) coverBaseInfo() {
+	if s == nil || s.Config == nil {
+		return
+	}
+	s.ProjectName = s.Config.GetProjectName()
+	s.Description = s.Config.GetProjectDescription()
+	s.Tags = s.Config.GetTags()
+	s.Language = s.Config.GetLanguage()
 }
 
 func (s *SSAProject) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
