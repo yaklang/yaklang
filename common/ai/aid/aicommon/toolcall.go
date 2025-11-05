@@ -352,5 +352,21 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Success = false
 	}
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
+
+	t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
+
 	return toolResult, false, nil
+}
+
+func SummaryRank(task AITask, callResult *aitool.ToolResult) string {
+	if callResult.ShrinkResult != "" {
+		return callResult.ShrinkResult
+	}
+	if callResult.ShrinkSimilarResult != "" {
+		return callResult.ShrinkSimilarResult
+	}
+	if task.GetSummary() != "" {
+		return task.GetSummary()
+	}
+	return string(utils.Jsonify(callResult.Data))
 }

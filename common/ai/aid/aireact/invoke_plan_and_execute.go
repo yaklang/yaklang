@@ -174,14 +174,14 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	}
 
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](r.config.Ctx, 10)
-	r.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
+	r.config.InputEventManager.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
 			log.Infof("Received AI input event: %v", event)
 			inputChannel.SafeFeed(event)
 		}()
 	})
 	defer func() {
-		r.UnregisterMirrorOfAIInputEvent(uid)
+		r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(uid)
 	}()
 
 	hotpatchChan := r.config.HotPatchBroadcaster.Subscribe()

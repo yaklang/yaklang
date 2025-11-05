@@ -68,7 +68,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		aicommon.WithToolCaller_AICallerConfig(t),
 		aicommon.WithToolCaller_Emitter(t.GetEmitter()),
 		aicommon.WithToolCaller_AICaller(t),
-		aicommon.WithToolCaller_GenerateToolParamsBuilder(t.generateRequireToolResponsePrompt),
+		aicommon.WithToolCaller_GenerateToolParamsBuilder(nil),
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
 			caller.SetEmitter(t.Emitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,

@@ -162,6 +162,9 @@ func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, 
 func (m *AdvancedMockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }
+func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+	return "", nil
+}
 
 func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
 	return true, nil

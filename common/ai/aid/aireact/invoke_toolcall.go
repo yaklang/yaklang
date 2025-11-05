@@ -28,17 +28,20 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 
 	// Setup task-aware event emitter
 	var taskId string
-	if !utils.IsNil(r.currentTask) {
-		taskId = r.currentTask.GetId()
+	currentTask := r.GetCurrentTask()
+	if !utils.IsNil(r.GetCurrentTask()) {
+		taskId = r.GetCurrentTask().GetId()
 	}
-	r.config.Emitter = r.config.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-		if event != nil && event.TaskIndex == "" {
-			event.TaskIndex = taskId
-		}
-		return event
-	})
+	currentTask.SetEmitter(
+		currentTask.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+			if event != nil && event.TaskIndex == "" {
+				event.TaskIndex = taskId
+			}
+			return event
+		}),
+	)
 	defer func() {
-		r.config.Emitter = r.config.Emitter.PopEventProcesser()
+		currentTask.SetEmitter(currentTask.GetEmitter().PopEventProcesser())
 	}()
 
 	// Find the required tool
@@ -50,19 +53,18 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	if skipRequire {
 		log.Infof("preparing tool with preset params: %s - %s", tool.Name, tool.Description)
 	} else {
-	log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
+		log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
 	}
 
 	// Create ToolCaller with appropriate options
 	var toolCaller *aicommon.ToolCaller
-	currentTask := r.GetCurrentTask()
 
 	var toolCallerOptions []aicommon.ToolCallerOption
 	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
 		aicommon.WithToolCaller_RuntimeId(r.config.Id),
-		aicommon.WithToolCaller_Emitter(r.config.Emitter),
+		aicommon.WithToolCaller_Emitter(currentTask.GetEmitter()),
 	)
 
 	// Add task context
@@ -124,6 +126,8 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		if result.GetID() <= 0 {
 			result.ID = r.config.AcquireId()
 		}
+		// task save call tool result
+		currentTask.PushToolCallResult(result)
 		// Store the result in memory
 		r.config.Timeline.PushToolResult(result)
 		// Emit the result

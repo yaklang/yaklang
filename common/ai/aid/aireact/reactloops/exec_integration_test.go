@@ -551,6 +551,10 @@ func (m *MockMemoryTriageForTesting) SearchByTags(tags []string, matchAll bool, 
 	return []*aicommon.MemoryEntity{}, nil
 }
 
+func (m *MockMemoryTriageForTesting) GetSessionID() string {
+	return ""
+}
+
 func (m *MockMemoryTriageForTesting) HandleMemory(i any) error {
 	return nil
 }

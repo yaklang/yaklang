@@ -36,9 +36,9 @@ func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 		allFinished := true
 		haveExecutedTask := false
 		for _, subtask := range t.Subtasks {
-			if !subtask.executed {
+			if !subtask.executed() {
 				allFinished = false
-			} else if !haveExecutedTask && subtask.executed {
+			} else if !haveExecutedTask && subtask.executed() {
 				haveExecutedTask = true
 			}
 		}
@@ -48,7 +48,7 @@ func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 			finished = true
 		}
 	} else {
-		finished = t.executed
+		finished = t.executed()
 	}
 
 	var fill = " "
@@ -63,7 +63,7 @@ func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 		note = " (部分完成)"
 	}
 
-	if t.executing {
+	if t.executing() {
 		fill = "-"
 		note = " (执行中)"
 		if ret := t.SingleLineStatusSummary(); ret != "" {
@@ -128,7 +128,6 @@ func (r *runtime) invokeSubtask(idx int, task *AiTask) error {
 	if r.RootTask == nil {
 		r.RootTask = task
 	}
-	task.executing = true
 	r.config.EmitInfo("invoke subtask: %v", task.Name)
 
 	r.Stack.Push(task)
@@ -137,8 +136,6 @@ func (r *runtime) invokeSubtask(idx int, task *AiTask) error {
 	r.statusMutex.Unlock()
 	defer func() {
 		r.statusMutex.Lock()
-		task.executed = true
-		task.executing = false
 		r.Stack.Pop()
 		r.config.EmitUpdateTaskStatus(task)
 		r.config.EmitPopTask(task)

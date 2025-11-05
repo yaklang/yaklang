@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"io"
-	"sync/atomic"
 	"text/template"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -22,228 +22,31 @@ var (
 )
 
 func (t *AiTask) execute() error {
+	t.Memory.StoreCurrentTask(t)
+	err := t.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_PE_TASK, t, reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+		t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
+		if isDone {
+			if t.TaskSummary == "" {
+				err := t.iterationTaskSummary()
+				if err != nil {
+					log.Errorf("iteration task summary failed: %v", err)
+				}
+			}
+		} else {
+			go func() {
+				err := t.iterationTaskSummary()
+				if err != nil {
+					log.Errorf("iteration task summary failed: %v", err)
+				}
+			}()
+		}
+	}))
+
+	if err != nil {
+		return err
+	}
 	if t.IsCtxDone() {
 		return utils.Errorf("context is done")
-	}
-	t.Memory.StoreCurrentTask(t)
-	// 生成初始执行任务的prompt
-	prompt, err := t.generateTaskPrompt()
-	if err != nil {
-		return fmt.Errorf("error generating aiTask prompt: %w", err)
-	}
-
-	// 调用AI回调函数
-	t.EmitPrompt("task_execute", prompt)
-
-	var response string
-	var action *aicommon.Action
-	var directlyAnswer string
-	var directlyAnswerLong string
-	err = t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		request.SetTaskIndex(t.Index)
-		return t.CallAI(request)
-	}, func(rsp *aicommon.AIResponse) error {
-		stream := rsp.GetOutputStreamReader("execute", false, t.Emitter)
-		responseBytes, err := io.ReadAll(stream)
-		if err != nil {
-			return fmt.Errorf("error reading AI response: %w", err)
-		}
-		response = string(responseBytes)
-		if len(response) <= 0 {
-			return utils.Errorf("AI response is empty, retry it or check your AI model")
-		}
-
-		action, err = aicommon.ExtractAction(response, "direct-answer", `require-tool`)
-		if err != nil {
-			return utils.Errorf("error extracting @action (direct-answer/require-tool): %w， check miss \"@action\" field in object or @action bad str value", err)
-		}
-
-		if action.GetString("@action") == "direct-answer" {
-			// 直接回答的情况
-			directlyAnswer = action.GetString("direct_answer")
-			if directlyAnswer == "" {
-				return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
-			}
-			t.ProcessExtendedActionCallback(directlyAnswer)
-			directlyAnswerLong = action.GetString("direct_answer_long")
-			if directlyAnswerLong == "" {
-				log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
-			}
-			t.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
-		} else if action.GetString("@action") == "require-tool" {
-			toolName := action.GetString("tool")
-			if toolName == "" {
-				return utils.Errorf("error: tool name is empty, retry it until tool name finished")
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return utils.Errorf("call ai transaction failed: %v", err)
-	}
-
-	// 处理工具调用, 直到没有工具调用为止
-	toolCallCount := new(int64)
-TOOLREQUIRED:
-	for {
-		toolRequired := t.getToolRequired(response)
-		if len(toolRequired) == 0 {
-			t.EmitInfo("no tool required in task: %#v", t.Name)
-			break
-		}
-
-		atomic.AddInt64(toolCallCount, 1)
-
-		targetTool := toolRequired[0]
-		result, directlyAnswerFlag, err := t.callTool(targetTool)
-		if directlyAnswerFlag {
-			prompt, err := t.generateDirectAnswerPrompt()
-			if err != nil {
-				return fmt.Errorf("error generating aiTask prompt: %w", err)
-			}
-			err = t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				request.SetTaskIndex(t.Index)
-				return t.CallAI(request)
-			}, func(rsp *aicommon.AIResponse) error {
-				responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.Emitter))
-				if err != nil {
-					return fmt.Errorf("error reading AI response: %w", err)
-				}
-				response = string(responseBytes)
-				if len(response) <= 0 {
-					return utils.Errorf("AI response is empty, retry it or check your AI model")
-				}
-
-				action, err = aicommon.ExtractAction(response, "direct-answer")
-				if err != nil {
-					return utils.Errorf("error extracting @action (direct-answer): %w， check miss \"@action\" field in object or @action bad str value", err)
-				}
-				directlyAnswer = action.GetString("direct_answer")
-				if directlyAnswer == "" {
-					return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
-				}
-				t.ProcessExtendedActionCallback(directlyAnswer)
-				directlyAnswerLong = action.GetString("direct_answer_long")
-				if directlyAnswerLong == "" {
-					log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
-				}
-				t.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
-				return nil
-			})
-			break TOOLREQUIRED
-		}
-		if err != nil || result == nil {
-			t.EmitError("error calling tool: %v with result %v:", err, result)
-			return err
-		}
-		if !targetTool.NoNeedTimelineRecorded {
-			result.ID = t.AcquireId()
-			t.PushToolCallResult(result)
-		}
-
-		action, err := t.toolResultDecision(result, targetTool)
-		if err != nil {
-			t.EmitError("error calling tool: %v", err)
-			return err
-		}
-
-		t.EmitToolCallSummary(result.ToolCallID, SelectSummary(t, result))
-
-		switch action {
-		case taskContinue:
-			atomic.AddInt64(&t.TaskContinueCount, 1)
-			t.EmitInfo("require more tool in task: %#v", t.Name)
-			moreToolPrompt, err := t.generateTaskPrompt()
-			if err != nil {
-				log.Errorf("error generating aiTask prompt: %v", err)
-				break TOOLREQUIRED
-			}
-			err = t.CallAiTransaction(moreToolPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				request.SetTaskIndex(t.Index)
-				return t.CallAI(request)
-			}, func(responseReader *aicommon.AIResponse) error {
-				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.GetEmitter()))
-				if err != nil {
-					return fmt.Errorf("error reading AI response: %w", err)
-				}
-				response = string(responseBytes)
-				if len(response) <= 0 {
-					return utils.Errorf("AI response is empty, retry it or check your AI model")
-				}
-				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("error calling AI transaction: %w", err)
-			}
-			continue
-		case taskProceedNext:
-			t.EmitInfo("task[%v] finished", t.Name)
-			break TOOLREQUIRED
-		case taskFailed:
-			t.EmitError("task[%v] failed", t.Name)
-			break TOOLREQUIRED
-		case taskSkipped:
-			t.EmitInfo("task[%v] skipped, continue to next task", t.Name)
-			break TOOLREQUIRED
-		default:
-			t.EmitError("unknown action: %v, skip tool require", action)
-			break TOOLREQUIRED
-		}
-	}
-
-	if directlyAnswer != "" {
-		t.TaskSummary = directlyAnswer
-		t.ShortSummary = directlyAnswer
-		t.LongSummary = directlyAnswer
-	}
-
-	if t.TaskSummary == "" {
-		var taskSummary = ""
-		var shortSummary = ""
-		var longSummary = ""
-
-		t.EmitInfo("start to execute task-summary action")
-		// 处理总结回调
-		summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
-		if err != nil {
-			t.EmitError("error generating summary prompt: %v", err)
-			return fmt.Errorf("error generating summary prompt: %w", err)
-		}
-
-		err = t.CallAiTransaction(summaryPromptWellFormed, t.CallAI, func(summaryReader *aicommon.AIResponse) error {
-			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.GetEmitter()))
-			if err != nil {
-				t.EmitError("error reading summary: %v", err)
-				return fmt.Errorf("error reading summary: %w", err)
-			}
-
-			action, err := aicommon.ExtractAction(string(summaryBytes), "summary")
-			if err != nil {
-				t.EmitError("error extracting action: %v", err)
-			}
-
-			if action != nil {
-				shortSummary = action.GetString("short_summary")
-			}
-			if shortSummary != "" {
-				taskSummary = shortSummary
-			}
-			if action != nil {
-				longSummary = action.GetString("long_summary")
-			}
-			if longSummary != "" && taskSummary == "" {
-				taskSummary = longSummary
-			}
-
-			if shortSummary == "" {
-				return utils.Errorf("error: short summary is empty, retry it until summary finished")
-			}
-			return nil
-		})
-		t.TaskSummary = taskSummary
-		t.ShortSummary = shortSummary
-		t.LongSummary = longSummary
 	}
 	return nil
 }
@@ -286,6 +89,60 @@ func (t *AiTask) executeTask() error {
 		log.Warnf("error handling review result: %v", err)
 	}
 
+	return nil
+}
+
+func (t *AiTask) iterationTaskSummary() error {
+	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
+	if err != nil {
+		t.EmitError("error generating summary prompt: %v", err)
+		return fmt.Errorf("error generating summary prompt: %w", err)
+	}
+
+	var shortSummary, statusSummary, taskSummary, longSummary string
+
+	err = t.CallAiTransaction(summaryPromptWellFormed, t.CallOriginalAI, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
+		summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.GetEmitter()))
+		if err != nil {
+			t.EmitError("error reading summary: %v", err)
+			return fmt.Errorf("error reading summary: %w", err)
+		}
+
+		action, err := aicommon.ExtractAction(string(summaryBytes), "summary")
+		if err != nil {
+			t.EmitError("error extracting action: %v", err)
+		}
+
+		if action == nil {
+			return utils.Errorf("error: summary is empty, retry it until summary finished")
+		}
+		statusSummary = action.GetString("status_summary")
+		shortSummary = action.GetString("task_short_summary")
+		longSummary = action.GetString("task_long_summary")
+
+		if shortSummary != "" {
+			taskSummary = shortSummary
+		}
+		if longSummary != "" && taskSummary == "" {
+			taskSummary = longSummary
+		}
+		if shortSummary == "" && statusSummary == "" && longSummary == "" {
+			return utils.Errorf("error: short summary ,stats summary ,long summary are empty, retry it until summary finished")
+		}
+		return nil
+	})
+	if statusSummary != "" {
+		t.StatusSummary = statusSummary
+	}
+	if taskSummary != "" {
+		t.TaskSummary = taskSummary
+	}
+	if shortSummary != "" {
+		t.ShortSummary = shortSummary
+	}
+	if longSummary != "" {
+		t.LongSummary = longSummary
+	}
 	return nil
 }
 

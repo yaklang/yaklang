@@ -87,10 +87,12 @@ type ReAct struct {
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
 
-	wg             *sync.WaitGroup
-	timelineDiffer *aicommon.TimelineDiffer
-	memoryTriage   aicommon.MemoryTriage
-	memoryPool     *omap.OrderedMap[string, *aicommon.MemoryEntity]
+	wg           *sync.WaitGroup
+	memoryTriage aicommon.MemoryTriage
+}
+
+func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
+	r.setCurrentTask(task)
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -200,7 +202,6 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
-		memoryPool:           omap.NewOrderedMap(make(map[string]*aicommon.MemoryEntity)),
 	}
 
 	if cfg.MemoryTriage != nil {
@@ -214,8 +215,13 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		react.config.MemoryTriage = react.memoryTriage
 	}
 
-	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
+	if cfg.Timeline == nil {
+		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
+	}
+	if cfg.TimelineDiffer == nil {
+		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
+	}
 	// Initialize prompt manager
 	workdir := cfg.Workdir
 	if workdir == "" {
@@ -249,6 +255,8 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	done := make(chan struct{})
 	react.startQueueProcessor(cfg.Ctx, done)
 	<-done // Ensure the queue processor has started
+
+	react.config.StartHotPatchLoop(cfg.Ctx)
 
 	err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
@@ -439,56 +447,25 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 // startEventLoop starts the background event processing loop
 func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 	doneOnce := new(sync.Once)
-
-	r.config.StartInputEventOnce.Do(func() {
-		go func() {
-			defer func() {
-				doneOnce.Do(func() {
-					if done != nil {
-						close(done)
-					}
-				})
-			}()
-			if r.config.DebugEvent {
-				log.Infof("ReAct event loop started for instance: %s", r.config.Id)
-			}
-
+	r.config.InputEventManager.SetFreeInputCallback(r.handleFreeValue)
+	r.RegisterReActSyncEvent()
+	r.config.StartEventLoopEx(ctx,
+		func() {
 			doneOnce.Do(func() {
 				if done != nil {
 					close(done)
 				}
 			})
-			for {
-				select {
-				case event, ok := <-r.config.EventInputChan.OutputChannel():
-					if !ok {
-						log.Errorf("ReAct event input channel closed for instance: %s", r.config.Id)
-						return
-					}
-					if event == nil {
-						continue
-					}
-
-					if r.config.DebugEvent {
-						log.Infof("ReAct event loop processing event: IsFreeInput=%v, IsInteractive=%v",
-							event.IsFreeInput, event.IsInteractiveMessage)
-					}
-
-					// Process the event in the background (non-blocking)
-					go func(event *ypb.AIInputEvent) {
-						if err := r.processInputEvent(event); err != nil {
-							log.Errorf("ReAct event processing failed: %v", err)
-						}
-					}(event)
-				case <-ctx.Done():
-					if r.config.DebugEvent {
-						log.Infof("ReAct event loop stopped for instance: %s", r.config.Id)
-					}
-					return
+		},
+		func() {
+			r.UnRegisterReActSyncEvent()
+			doneOnce.Do(func() {
+				if done != nil {
+					close(done)
 				}
-			}
-		}()
-	})
+
+			})
+		})
 }
 
 func (r *ReAct) IsFinished() bool {
