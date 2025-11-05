@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -135,6 +137,22 @@ func GetMCPServer(db *gorm.DB, id int64) (*schema.MCPServer, error) {
 	return &server, nil
 }
 
+func GetMCPServerByName(db *gorm.DB, name string) (*schema.MCPServer, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+
+	var server schema.MCPServer
+	if err := db.Model(&schema.MCPServer{}).Where("name = ?", name).First(&server).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, utils.Errorf("mcp server not found")
+		}
+		return nil, utils.Errorf("query mcp server failed: %s", err)
+	}
+
+	return &server, nil
+}
+
 // QueryMCPServers 查询MCP服务器列表（支持分页和关键词搜索）
 func QueryMCPServers(db *gorm.DB, req *ypb.GetAllMCPServersRequest) (*bizhelper.Paginator, []*schema.MCPServer, error) {
 	if db == nil {
@@ -182,4 +200,10 @@ func QueryMCPServers(db *gorm.DB, req *ypb.GetAllMCPServersRequest) (*bizhelper.
 	}
 
 	return p, servers, nil
+}
+
+// YieldEnabledMCPServers 生成器函数，用于遍历所有启用的MCP服务器
+func YieldEnabledMCPServers(ctx context.Context, db *gorm.DB) chan *schema.MCPServer {
+	db = db.Model(&schema.MCPServer{}).Where("enable = ?", true)
+	return bizhelper.YieldModel[*schema.MCPServer](ctx, db)
 }
