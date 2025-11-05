@@ -8,6 +8,41 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// CreateOrUpdateMCPServer 创建或更新MCP服务器（根据name）
+func CreateOrUpdateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if server == nil {
+		return utils.Errorf("mcp server is nil")
+	}
+	if server.Name == "" {
+		return utils.Errorf("mcp server name cannot be empty")
+	}
+	if server.Type == "" {
+		return utils.Errorf("mcp server type cannot be empty")
+	}
+
+	// 检查名称是否已存在
+	var existing schema.MCPServer
+	if err := db.Model(&schema.MCPServer{}).Where("name = ?", server.Name).First(&existing).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			// 不存在则创建
+			return db.Model(&schema.MCPServer{}).Create(server).Error
+		}
+		return utils.Errorf("query mcp server failed: %s", err)
+	}
+
+	// 存在则更新，使用map避免默认值问题
+	updateData := map[string]interface{}{
+		"type":    server.Type,
+		"url":     server.URL,
+		"command": server.Command,
+		"enable":  server.Enable,
+	}
+	return db.Model(&schema.MCPServer{}).Where("name = ?", server.Name).Updates(updateData).Error
+}
+
 // CreateMCPServer 创建MCP服务器
 func CreateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 	if db == nil {
@@ -40,9 +75,16 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 	if server == nil {
 		return utils.Errorf("mcp server is nil")
 	}
-	copyServer := *server
-	copyServer.ID = uint(id)
-	return db.Model(&schema.MCPServer{}).Save(&copyServer).Error
+
+	// 使用map避免默认值问题
+	updateData := map[string]interface{}{
+		"name":    server.Name,
+		"type":    server.Type,
+		"url":     server.URL,
+		"command": server.Command,
+		"enable":  server.Enable,
+	}
+	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(updateData).Error
 }
 
 // DeleteMCPServer 删除MCP服务器
