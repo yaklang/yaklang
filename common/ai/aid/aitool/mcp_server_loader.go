@@ -30,12 +30,17 @@ func LoadAIToolFromMCPServers(name string, db *gorm.DB) ([]*Tool, error) {
 
 	// 从数据库查询指定名称的 MCP 服务器
 	var mcpServer schema.MCPServer
-	err := db.Where("name = ? AND enable = ?", name, true).First(&mcpServer).Error
+	err := db.Where("name = ?", name).First(&mcpServer).Error
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Errorf("mcp server not found: %s", name)
 		}
 		return nil, utils.Errorf("query mcp server failed: %v", err)
+	}
+
+	// 检查服务器是否启用
+	if !mcpServer.Enable {
+		return nil, utils.Errorf("mcp server not found or not enabled: %s", name)
 	}
 
 	// 创建 MCP 客户端
