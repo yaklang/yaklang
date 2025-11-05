@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"mcp-loader": {
+		Zh: "MCP加载器",
+		En: "MCP Loader",
+	},
 	"java_decompiler": {
 		Zh: "Java反编译器",
 		En: "Java Decompiler",

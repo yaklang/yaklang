@@ -118,6 +118,7 @@ type Config struct {
 	DisableToolUse      bool
 	AiToolManagerOption []buildinaitools.ToolManagerOption
 	EnableAISearch      bool
+	DisallowMCPServers  bool // 禁用 MCP Servers，默认为 false（即默认启用）
 
 	// Interactive(review/require_user/sync) features
 	// endpoint manager
@@ -269,6 +270,7 @@ func newConfig(ctx context.Context) *Config {
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024,
 		MaxTaskContinue:                    3,
+		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 	}
 
 	// Initialize emitter
@@ -664,6 +666,18 @@ func WithEnableToolManagerAISearch(enable bool) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.EnableAISearch = enable
+		return nil
+	}
+}
+
+func WithDisallowMCPServers(disallow bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.DisallowMCPServers = disallow
 		return nil
 	}
 }
