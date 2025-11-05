@@ -3,6 +3,7 @@ package aitool
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -85,42 +86,26 @@ func TestLoadAIToolFromMCPServers(t *testing.T) {
 		sseServer := server.NewSSEServer(mcpServer, baseURL)
 
 		// 在后台启动服务器
-		serverErrChan := make(chan error, 1)
+		serverStarted := make(chan struct{})
 		go func() {
-			err := sseServer.Start(hostPort)
-			if err != nil {
-				serverErrChan <- err
+			close(serverStarted) // 标记服务器 goroutine 已启动
+			if err := sseServer.Start(hostPort); err != nil && err != http.ErrServerClosed {
+				log.Errorf("SSE server error: %v", err)
 			}
 		}()
 
-		// 等待服务器启动
+		// 等待服务器 goroutine 启动并等待服务器就绪
+		<-serverStarted
+		time.Sleep(50 * time.Millisecond) // 等待一小段时间确保 server 对象被初始化
 		err := utils.WaitConnect(hostPort, 5)
 		require.NoError(t, err, "failed to wait for server to start")
 
 		log.Infof("SSE MCP server started successfully on %s", sseURL)
 
-		// 确保测试结束时关闭服务器
-		defer func() {
-			log.Infof("Shutting down SSE MCP server")
-			// 使用一个新的 context，因为原来的可能已经过期
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			
-			// 在 goroutine 中关闭，避免阻塞太久
-			done := make(chan struct{})
-			go func() {
-				defer close(done)
-				_ = sseServer.Shutdown(shutdownCtx)
-			}()
-			
-			// 等待关闭完成或超时
-			select {
-			case <-done:
-				log.Info("SSE MCP server shutdown completed")
-			case <-time.After(3 * time.Second):
-				log.Warn("SSE MCP server shutdown timed out")
-			}
-		}()
+		// 注意：我们不显式调用 Shutdown，因为：
+		// 1. MCP 客户端连接可能仍然打开，导致 Shutdown 超时
+		// 2. 测试进程结束时会自动清理所有资源（socket、goroutine 等）
+		// 3. 在生产环境中，应该先关闭所有 MCP 客户端，然后再关闭服务器
 
 		// Step 2: 保存 MCP Server 配置到数据库
 		t.Run("SaveMCPServerToDB", func(t *testing.T) {
