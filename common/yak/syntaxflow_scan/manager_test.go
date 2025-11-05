@@ -111,29 +111,30 @@ func TestManager(t *testing.T) {
 
 	t.Run("test SSA project configuration initialization", func(t *testing.T) {
 		// 创建测试用的SSA项目
-		testProject := &ypb.SSAProject{
-			ProjectName:      "test-project-" + uuid.NewString(),
-			Description:      "Test project for SSA configuration",
-			Language:         "java",
-			CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
-			CompileConfig: &ypb.SSAProjectCompileConfig{
-				StrictMode:   true,
-				PeepholeSize: 10,
-				ReCompile:    false,
-			},
-			ScanConfig: &ypb.SSAProjectScanConfig{
-				Concurrency:    8,
-				Memory:         true,
-				IgnoreLanguage: true,
-			},
-			RuleConfig: &ypb.SSAProjectScanRuleConfig{
-				RuleFilter: &ypb.SyntaxFlowRuleFilter{
-					Language: []string{"java", "go"},
-					Severity: []string{"high", "critical"},
+		testProject := &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      "test-project-" + uuid.NewString(),
+				Description:      "Test project for SSA configuration",
+				Language:         "java",
+				CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
+				CompileConfig: &ypb.SSAProjectCompileConfig{
+					StrictMode:   true,
+					PeepholeSize: 10,
+					ReCompile:    false,
+				},
+				ScanConfig: &ypb.SSAProjectScanConfig{
+					Concurrency:    8,
+					Memory:         true,
+					IgnoreLanguage: true,
+				},
+				RuleConfig: &ypb.SSAProjectScanRuleConfig{
+					RuleFilter: &ypb.SyntaxFlowRuleFilter{
+						Language: []string{"java", "go"},
+						Severity: []string{"high", "critical"},
+					},
 				},
 			},
 		}
-
 		// 创建项目到数据库
 		schemaProject, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), testProject)
 		require.NoError(t, err)
@@ -213,15 +214,17 @@ func TestManager(t *testing.T) {
 		}()
 
 		// 创建测试用的SSA项目，配置规则过滤器
-		testProject := &ypb.SSAProject{
-			ProjectName:      "test-project-rules-" + uuid.NewString(),
-			Description:      "Test project for rule configuration",
-			CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
-			Language:         "java",
-			RuleConfig: &ypb.SSAProjectScanRuleConfig{
-				RuleFilter: &ypb.SyntaxFlowRuleFilter{
-					Language: []string{"java"},
-					Severity: []string{"high"},
+		testProject := &ypb.CreateSSAProjectRequest{
+			Project: &ypb.SSAProject{
+				ProjectName:      "test-project-rules-" + uuid.NewString(),
+				Description:      "Test project for rule configuration",
+				CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
+				Language:         "java",
+				RuleConfig: &ypb.SSAProjectScanRuleConfig{
+					RuleFilter: &ypb.SyntaxFlowRuleFilter{
+						Language: []string{"java"},
+						Severity: []string{"high"},
+					},
 				},
 			},
 		}
