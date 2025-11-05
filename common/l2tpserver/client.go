@@ -305,6 +305,15 @@ func (c *Client) connect() error {
 	c.ns++
 
 	log.Info("L2TP Client: Connection established successfully")
+
+	// Send PAP authentication request if username and password are provided
+	if c.username != "" && c.password != "" {
+		log.Info("L2TP Client: Sending PAP authentication request")
+		if err := c.sendPAPRequest(); err != nil {
+			return fmt.Errorf("failed to send PAP request: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -447,9 +456,93 @@ func (c *Client) handleLCP(data []byte) error {
 	return nil
 }
 
+// sendPAPRequest sends a PAP authentication request
+func (c *Client) sendPAPRequest() error {
+	c.mu.RLock()
+	username := c.username
+	password := c.password
+	peerTunnelID := c.peerTunnelID
+	peerSessionID := c.peerSessionID
+	c.mu.RUnlock()
+
+	if peerSessionID == 0 {
+		return fmt.Errorf("session not established")
+	}
+
+	// Build PAP request
+	// PAP format: Code(1) + ID(1) + Length(2) + PeerIDLength(1) + PeerID + PasswordLength(1) + Password
+	papID := uint8(1)
+	usernameBytes := []byte(username)
+	passwordBytes := []byte(password)
+	usernameLen := uint8(len(usernameBytes))
+	passwordLen := uint8(len(passwordBytes))
+
+	papLength := uint16(4 + 1 + len(usernameBytes) + 1 + len(passwordBytes))
+
+	papData := make([]byte, papLength)
+	papData[0] = 1                                      // Code: Authenticate-Request
+	papData[1] = papID                                  // Identifier
+	binary.BigEndian.PutUint16(papData[2:4], papLength) // Length
+	papData[4] = usernameLen                            // Peer-ID Length
+	copy(papData[5:], usernameBytes)                    // Peer-ID (username)
+	papData[5+usernameLen] = passwordLen                // Password Length
+	copy(papData[6+usernameLen:], passwordBytes)        // Password
+
+	// Wrap in PPP frame
+	// PPP format: Address(0xFF) + Control(0x03) + Protocol(0xC023 for PAP) + Data
+	pppFrame := make([]byte, 4+len(papData))
+	pppFrame[0] = 0xFF                                // Address
+	pppFrame[1] = 0x03                                // Control
+	binary.BigEndian.PutUint16(pppFrame[2:4], 0xC023) // Protocol: PAP
+	copy(pppFrame[4:], papData)
+
+	// Build L2TP data message
+	header := &L2TPHeader{
+		Flags:     L2TPVersion, // Data message
+		TunnelID:  peerTunnelID,
+		SessionID: peerSessionID,
+	}
+
+	headerData := header.Serialize()
+	l2tpPacket := append(headerData, pppFrame...)
+
+	_, err := c.conn.Write(l2tpPacket)
+	if err != nil {
+		return fmt.Errorf("failed to send PAP request: %w", err)
+	}
+
+	log.Infof("L2TP Client: Sent PAP request for user: %s", username)
+	return nil
+}
+
 // handlePAP handles PAP authentication
 func (c *Client) handlePAP(data []byte) error {
-	log.Debug("L2TP Client: PAP packet received")
+	if len(data) < 4 {
+		return fmt.Errorf("PAP packet too short: %d bytes", len(data))
+	}
+
+	code := data[0]
+	identifier := data[1]
+	length := binary.BigEndian.Uint16(data[2:4])
+
+	log.Debugf("L2TP Client: PAP packet received - Code: %d, ID: %d, Length: %d", code, identifier, length)
+
+	switch code {
+	case 2: // PAP-Ack (Authentication successful)
+		log.Info("L2TP Client: PAP authentication successful")
+		c.mu.Lock()
+		c.authenticated = true
+		c.mu.Unlock()
+	case 3: // PAP-Nak (Authentication failed)
+		log.Warn("L2TP Client: PAP authentication failed")
+		c.mu.Lock()
+		c.authenticated = false
+		c.mu.Unlock()
+		return fmt.Errorf("PAP authentication failed")
+	default:
+		log.Debugf("L2TP Client: Unknown PAP code: %d", code)
+	}
+
 	return nil
 }
 
