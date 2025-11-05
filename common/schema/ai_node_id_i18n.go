@@ -414,6 +414,28 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "ReAct 任务",
 		En: "ReAct Task",
 	},
+
+	// 自省相关的 nodeId
+	"self-reflection": {
+		Zh: "自我反思",
+		En: "Self Reflection",
+	},
+	"self-reflection-learning_insights": {
+		Zh: "学习洞察",
+		En: "Learning Insights",
+	},
+	"self-reflection-future_suggestions": {
+		Zh: "未来建议",
+		En: "Future Suggestions",
+	},
+	"self-reflection-impact_assessment": {
+		Zh: "影响评估",
+		En: "Impact Assessment",
+	},
+	"self-reflection-effectiveness_rating": {
+		Zh: "效果评级",
+		En: "Effectiveness Rating",
+	},
 }
 
 func NodeIdToI18n(nodeId string, isStream bool) *I18n {
