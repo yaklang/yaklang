@@ -23,15 +23,16 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...Coll
 		return nil, utils.Errorf("创建SQLite向量存储失败: %v", err)
 	}
 
-	collection.Add(&Document{
-		ID:      DocumentTypeCollectionInfo,
-		Content: fmt.Sprintf("collection_name: %s\ncollection_description: %s", name, description),
-		Metadata: map[string]any{
-			"collection_name": name,
-			"collection_id":   collection.GetCollectionInfo().ID,
-		},
-	})
-
+	if !collection.config.DisableEmbedCollectionInfo {
+		collection.Add(&Document{
+			ID:      DocumentTypeCollectionInfo,
+			Content: fmt.Sprintf("collection_name: %s\ncollection_description: %s", name, description),
+			Metadata: map[string]any{
+				"collection_name": name,
+				"collection_id":   collection.GetCollectionInfo().ID,
+			},
+		})
+	}
 	return collection, nil
 }
 
