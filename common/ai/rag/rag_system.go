@@ -82,7 +82,14 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 		if ragConfig.knowledgeBase != nil {
 			ragSystem.KnowledgeBase = ragConfig.knowledgeBase
 		} else {
-			knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragConfig.db, ragConfig.Name, ragConfig.description, ragConfig.knowledgeBaseType, ragSystem.VectorStore)
+			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByRAGID(ragConfig.db, ragSystem.RAGID)
+			var knowledgeBaseName string
+			if err != nil || knowledgeBaseInfo == nil {
+				knowledgeBaseName = uuid.NewString()
+			} else {
+				knowledgeBaseName = knowledgeBaseInfo.KnowledgeBaseName
+			}
+			knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragConfig.db, knowledgeBaseName, ragConfig.description, ragConfig.knowledgeBaseType, ragSystem.VectorStore)
 			if err != nil {
 				return nil, err
 			}
@@ -103,7 +110,14 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 		if ragConfig.entityRepository != nil {
 			ragSystem.EntityRepository = ragConfig.entityRepository
 		} else {
-			entityRepository, err := entityrepos.GetEntityRepositoryWithVectorStore(ragConfig.db, ragConfig.Name, ragConfig.description, ragSystem.VectorStore)
+			entityRepositoryInfo, err := yakit.GetEntityRepositoryByRAGID(ragConfig.db, ragSystem.RAGID)
+			var entityRepositoryName string
+			if err != nil || entityRepositoryInfo == nil {
+				entityRepositoryName = uuid.NewString()
+			} else {
+				entityRepositoryName = entityRepositoryInfo.EntityBaseName
+			}
+			entityRepository, err := entityrepos.GetEntityRepositoryWithVectorStore(ragConfig.db, entityRepositoryName, ragConfig.description, ragSystem.VectorStore)
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +162,11 @@ func LoadRAGSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, erro
 		return nil, fmt.Errorf("get collection failed: %v", err)
 	}
 
-	options := append(opts, WithRAGID(collection.RAGID))
+	defaultOpts := []RAGSystemConfigOption{
+		WithRAGID(collection.RAGID),
+		WithName(name),
+	}
+	options := append(defaultOpts, opts...)
 	return NewRAGSystem(options...)
 }
 
