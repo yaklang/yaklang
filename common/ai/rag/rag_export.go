@@ -58,7 +58,7 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 	buf := new(bytes.Buffer)
 	db := cfg.db
 
-	ragSystem, err := LoadRAGSystem(collectionName, opts...)
+	ragSystem, err := LoadRAGSystem(collectionName, append(opts, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to load rag system")
 	}
@@ -918,7 +918,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		ragData.Collection.Name = ragSystemConfig.Name
 	}
 
-	ragSystem, err := GetRagSystem(ragData.Collection.Name, optFuncs...)
+	ragSystem, err := GetRagSystem(ragData.Collection.Name, append(optFuncs, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
 	if err != nil {
 		return utils.Wrap(err, "get rag system")
 	}
