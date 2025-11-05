@@ -40,6 +40,11 @@ type ScanTaskCallback struct {
 
 	Reporter       sfreport.IReport `json:"-"`
 	ReporterWriter io.Writer        `json:"-"`
+	
+	// EnableRulePerformanceLog 是否启用规则级别的详细性能日志
+	// 默认为 false，只显示任务级别的性能统计（编译时间等）
+	// 设置为 true 时，会显示每个规则在每个程序上的详细执行时间
+	EnableRulePerformanceLog bool `json:"-"`
 }
 
 const (

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -51,6 +52,9 @@ type scanManager struct {
 	// process
 	processMonitor *processMonitor
 	callback       *ScanTaskCallbacks
+
+	// 规则级别的性能统计（独立的 profile map）
+	ruleProfileMap *utils.SafeMap[*ssaprofile.Profile]
 }
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
@@ -96,12 +100,13 @@ func createEmptySyntaxFlowTaskByID(
 
 	var rootctx, cancel = context.WithCancel(ctx)
 	m := &scanManager{
-		taskID:       taskId,
-		ctx:          rootctx,
-		status:       schema.SYNTAXFLOWSCAN_EXECUTING,
-		resumeSignal: sync.NewCond(&sync.Mutex{}),
-		cancel:       cancel,
-		callback:     NewScanTaskCallbacks(),
+		taskID:         taskId,
+		ctx:            rootctx,
+		status:         schema.SYNTAXFLOWSCAN_EXECUTING,
+		resumeSignal:   sync.NewCond(&sync.Mutex{}),
+		cancel:         cancel,
+		callback:       NewScanTaskCallbacks(),
+		ruleProfileMap: utils.NewSafeMap[*ssaprofile.Profile](),
 	}
 	m.callback.Set(runningID, config.ScanTaskCallback)
 	// syntaxFlowScanManagerMap.Set(taskId, m)

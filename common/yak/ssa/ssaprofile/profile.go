@@ -70,7 +70,24 @@ func ProfileAdd(enable bool, name string, fs ...func()) {
 	ProfileAddWithError(enable, name, fsWithErr...)
 }
 
+func ProfileAddToMap(profileMap *utils.SafeMap[*Profile], enable bool, name string, fs ...func()) {
+	fsWithErr := lo.FilterMap(fs, func(f func(), _ int) (func() error, bool) {
+		if f == nil {
+			return nil, false
+		}
+		return func() error {
+			f()
+			return nil
+		}, true
+	})
+	ProfileAddWithErrorToMap(profileMap, enable, name, fsWithErr...)
+}
+
 func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
+	return ProfileAddWithErrorToMap(profileListMap, enable, name, fs...)
+}
+
+func ProfileAddWithErrorToMap(profileMap *utils.SafeMap[*Profile], enable bool, name string, fs ...func() error) error {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Infof("err: %v", err)
@@ -84,7 +101,7 @@ func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 	var p *Profile
 	if enable {
 		var ok bool
-		p, ok = profileListMap.Get(name)
+		p, ok = profileMap.Get(name)
 		if !ok {
 			p = &Profile{
 				Name:       name,
@@ -93,7 +110,7 @@ func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 				ErrorCount: 0,
 				Times:      make([]uint64, 0, len(fs)),
 			}
-			profileListMap.Set(name, p)
+			profileMap.Set(name, p)
 		}
 	}
 
