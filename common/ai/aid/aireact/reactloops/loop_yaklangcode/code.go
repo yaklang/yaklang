@@ -59,25 +59,7 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 		aikbPath = path
 	}
 
-	// 集合不存在则导入
-	if !rag.CollectionIsExists(db, collectionName) {
-		err := rag.ImportRAG(aikbPath, rag.WithRAGCollectionName(collectionName))
-		if err != nil {
-			return nil, utils.Wrap(err, "failed to import rag collection")
-		}
-	}
-	// 文件不存在则直接获取集合
-	if !utils.FileExists(aikbPath) {
-		return rag.Get(collectionName, rag.WithDB(db))
-	}
-
-	// // 文件存在则导入
-	// err := rag.ImportRAG(aikbPath, rag.WithRAGCollectionName(collectionName))
-	// if err != nil {
-	// 	return nil, utils.Wrap(err, "failed to import rag collection")
-	// }
-
-	return rag.Get(collectionName, rag.WithDB(db))
+	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
 }
 
 //go:embed prompts/persistent_instruction.txt

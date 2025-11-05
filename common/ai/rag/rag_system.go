@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -31,8 +32,38 @@ func newDefaultRAGSystem() *RAGSystem {
 	return &RAGSystem{}
 }
 
-// NewRAGSystem 创建一个新的 RAG 系统
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
+	ragSystem, err := _newRAGSystem(options...)
+	if err != nil {
+		return nil, err
+	}
+
+	if ragSystem.config.importFile != "" {
+		file, err := os.Open(ragSystem.config.importFile)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to open aikb file")
+		}
+		defer file.Close()
+		header, err := LoadRAGFileHeader(file)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to import rag collection")
+		}
+
+		colInfo := ragSystem.VectorStore.GetCollectionInfo()
+		if colInfo.SerialVersionUID != header.Collection.SerialVersionUID {
+			err := ImportRAG(ragSystem.config.importFile, WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
+			if err != nil {
+				return nil, utils.Wrap(err, "failed to import rag collection")
+			}
+		}
+		return _newRAGSystem(options...)
+	}
+
+	return ragSystem, nil
+}
+
+// NewRAGSystem 创建一个新的 RAG 系统
+func _newRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	ragConfig := NewRAGSystemConfig(options...)
 	ragSystem := newDefaultRAGSystem()
 	err := autoMigrateRAGSystem(ragConfig.db)
