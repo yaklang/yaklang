@@ -8,12 +8,16 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	defer func() {
+		// 输出性能统计报告
+		m.showScanPerformance()
+
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()
@@ -75,34 +79,52 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
+	// 语言匹配检查
 	if !m.Config.GetScanIgnoreLanguage() {
 		if rule.Language != ssaconfig.General && rule.Language != prog.GetLanguage() {
 			m.markRuleSkipped()
 			return
 		}
 	}
-	option := []ssaapi.QueryOption{}
-	option = append(option,
-		ssaapi.QueryWithContext(m.ctx),
-		ssaapi.QueryWithTaskID(m.taskID),
-		ssaapi.QueryWithProcessCallback(func(f float64, info string) {
-			m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
-		}),
-		ssaapi.QueryWithSave(m.kind),
-	)
-	if m.Config.GetSyntaxFlowMemory() {
-		option = append(option, ssaapi.QueryWithMemory())
+
+	// 检查是否启用规则级别的详细性能监控
+	enableRulePerf := m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableRulePerformanceLog
+
+	// 将查询逻辑包装到函数中
+	f := func() {
+		option := []ssaapi.QueryOption{}
+		option = append(option,
+			ssaapi.QueryWithContext(m.ctx),
+			ssaapi.QueryWithTaskID(m.taskID),
+			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
+				m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
+			}),
+			ssaapi.QueryWithSave(m.kind),
+		)
+		if m.Config.GetSyntaxFlowMemory() {
+			option = append(option, ssaapi.QueryWithMemory())
+		}
+
+		// 执行规则查询
+		if res, err := prog.SyntaxFlowRule(rule, option...); err == nil {
+			m.StatusTask(res)
+			m.markRuleSuccess()
+		} else {
+			m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
+			m.StatusTask(nil)
+			m.markRuleFailed()
+			m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
+		}
 	}
 
-	// if language match or ignore language
-	if res, err := prog.SyntaxFlowRule(rule, option...); err == nil {
-		m.StatusTask(res)
-		m.markRuleSuccess()
+	// 根据配置决定是否记录规则级别的详细性能
+	if enableRulePerf {
+		// 构建 profile 名称：Rule[规则名].Prog[程序名]
+		profileName := fmt.Sprintf("Rule[%s].Prog[%s]", rule.RuleName, prog.GetProgramName())
+		ssaprofile.ProfileAddToMap(m.ruleProfileMap, true, profileName, f)
 	} else {
-		m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
-		m.StatusTask(nil)
-		m.markRuleFailed()
-		m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
+		// 不启用性能监控时，直接执行
+		f()
 	}
 }
 
@@ -132,4 +154,32 @@ func (m *scanManager) saveReport() {
 func (m *scanManager) errorCallback(format string, a ...interface{}) {
 	m.callback.Error(m.taskID, m.status, format, a...)
 	log.Errorf(format, a...)
+}
+
+// showScanPerformance 显示扫描性能统计报告
+// 分为两部分：
+//  1. 整体扫描任务级别的统计（编译时间等）- 始终显示
+//  2. 规则级别的性能详情（每个规则在每个程序上的执行时间）- 需要配置启用
+func (m *scanManager) showScanPerformance() {
+	log.Infof("========================================")
+	log.Infof("SyntaxFlow Scan Performance Report")
+	log.Infof("========================================")
+
+	// 1. 显示整体编译和任务级别的性能统计（始终显示）
+	log.Infof("")
+	log.Infof("=== Task-Level Performance (Compilation & Overall) ===")
+	ssaprofile.ShowCacheCost() // 显示编译相关的性能
+
+	// 2. 显示规则级别的性能统计（仅在启用时显示）
+	if m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableRulePerformanceLog {
+		if m.ruleProfileMap != nil && m.ruleProfileMap.Count() > 0 {
+			log.Infof("")
+			log.Infof("=== Rule-Level Performance (Individual Rule Execution) ===")
+			log.Infof("Total Rules Executed: %d", m.ruleProfileMap.Count())
+			log.Infof("")
+			ssaprofile.ShowCacheCost(m.ruleProfileMap) // 显示规则扫描的详细性能
+		}
+	}
+
+	log.Infof("========================================")
 }
