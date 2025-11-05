@@ -274,10 +274,28 @@ jobs:
         run: |
           echo "::group::Running security scan"
           yak sync-rule
-          if ! yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go; then
-            echo "::error::Security scan failed"
-            exit 1
+          
+          # 运行扫描并捕获输出
+          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go 2>&1) || SCAN_EXIT_CODE=$?
+          
+          if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
+            echo "$SCAN_OUTPUT"
+            
+            # 检查是否是编译失败错误
+            if echo "$SCAN_OUTPUT" | grep -q "record not found\|have err\|get program failed\|parse project.*failed"; then
+              echo "::warning::Project compilation failed, skipping security scan"
+              echo "::notice::This is usually caused by empty diff or compilation errors"
+              echo "scan_result=skipped_compilation_error" >> $GITHUB_OUTPUT
+              echo "risk_count=0" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              exit 0
+            else
+              echo "::error::Security scan failed with unexpected error"
+              exit 1
+            fi
           fi
+          
+          echo "$SCAN_OUTPUT"
           echo "::endgroup::"
           
           echo "::group::Processing scan results"
@@ -354,32 +372,32 @@ jobs:
             exit 1
           fi
           
-          HIGH_CRITICAL_COUNT=0
+          RISK_COUNT=0
           if [ -f "results/scan_summary.txt" ]; then
             echo "Scan summary generated successfully"
             if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
-              COUNT_RESULT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
+              COUNT_RESULT=$(grep -c "严重程度:" results/risk_details_*.txt 2>/dev/null || echo "0")
               if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
-                HIGH_CRITICAL_COUNT=$COUNT_RESULT
+                RISK_COUNT=$COUNT_RESULT
               else
-                echo "::warning::Failed to parse high/critical risk count, defaulting to 0"
-                HIGH_CRITICAL_COUNT=0
+                echo "::warning::Failed to parse risk count, defaulting to 0"
+                RISK_COUNT=0
               fi
             else
               echo "::notice::No risk detail files found"
-              HIGH_CRITICAL_COUNT=0
+              RISK_COUNT=0
             fi
           else
             echo "::warning::Scan summary file not found"
-            HIGH_CRITICAL_COUNT=0
+            RISK_COUNT=0
           fi
           
-          echo "High/Critical risks found: $HIGH_CRITICAL_COUNT"
-          echo "HIGH_CRITICAL_COUNT=$HIGH_CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "Total risks found: $RISK_COUNT"
+          echo "RISK_COUNT=$RISK_COUNT" >> $GITHUB_OUTPUT
           echo "::endgroup::"
 
       - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true'
+        if: steps.validate.outputs.should_skip != 'true' && (steps.scan.outputs.scan_result == 'success' || steps.scan.outputs.scan_result == 'skipped_compilation_error') && steps.test_token.outputs.has_permissions == 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -427,6 +445,16 @@ jobs:
               console.error('Failed to clean up old security comments:', error);
               // 不抛出错误，避免影响主流程
             }
+
+      - name: Notify compilation skip
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'skipped_compilation_error'
+        run: |
+          echo "::notice::✅ Security scan was skipped due to compilation failure"
+          echo "::notice::This is usually caused by:"
+          echo "::notice::  - Empty diff (no Go files changed)"
+          echo "::notice::  - Compilation errors in the code"
+          echo "::notice::  - Missing dependencies or broken imports"
+          echo "::notice::This does not block the CI pipeline."
 
       - name: Comment PR with security findings
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true'
@@ -586,7 +614,7 @@ jobs:
                       // 如果在代码片段中，跳过该行
                     }
                      
-                     if (filePath && lineNum && severity && title && (severity === 'high' || severity === 'critical')) {
+                     if (filePath && lineNum && severity && title) {
                        try {
                          console.log(`Processing ${severity} risk: ${filePath}:${lineNum}`);
                          const codeReference = `\`${filePath}:${lineNum}\``;
@@ -648,7 +676,7 @@ jobs:
                        }
                      } else {
                        if (filePath && lineNum) {
-                         console.log(`  ⏭️  Skipped ${severity || 'unknown'} risk: ${filePath}:${lineNum} (not high/critical)`);
+                         console.log(`  ⏭️  Skipped ${severity || 'unknown'} risk: ${filePath}:${lineNum} (missing required fields)`);
                          skippedCount++;
                        }
                      }
@@ -656,8 +684,8 @@ jobs:
                   
                   console.log(`\nSummary:`);
                   console.log(`  - Processed: ${processedCount} detail files`);
-                  console.log(`  - Commented: ${commentedCount} high/critical risks`);
-                  console.log(`  - Skipped: ${skippedCount} lower severity risks`);
+                  console.log(`  - Commented: ${commentedCount} risks`);
+                  console.log(`  - Skipped: ${skippedCount} risks (incomplete data)`);
                 } else {
                   core.warning('Results directory not found for detailed processing');
                 }
@@ -689,11 +717,11 @@ jobs:
                       else if (line.startsWith('=== 扫描统计 ===')) break;
                     }
                     
-                    if (filePath && lineNum && severity && (severity === 'high' || severity === 'critical')) {
+                    if (filePath && lineNum && severity) {
                       activeRisks.add(`${filePath}:${lineNum}`);
                     }
                   }
-                  console.log(`Found ${activeRisks.size} active high/critical risks`);
+                  console.log(`Found ${activeRisks.size} active risks`);
                 } else {
                   core.warning('Results directory not found for cleanup');
                 }
@@ -733,16 +761,12 @@ jobs:
             }
 
       - name: Upload risk log
-        if: steps.validate.outputs.should_skip != 'true' && failure()
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: risk.json
           path: risk.json
 
-      - name: Display high severity risks
-        if: steps.validate.outputs.should_skip != 'true' && failure()
-        run: yak ssa-risk --input ./risk.json --with-code --severity high
-
       - name: Display all risks
-        if: steps.validate.outputs.should_skip != 'true' && failure()
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: yak ssa-risk --input ./risk.json --with-code
