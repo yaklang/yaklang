@@ -113,10 +113,11 @@ type RAGSystemConfig struct {
 	enableAutoUpdateGraphInfos bool
 
 	// EntityRepository configuration fields
-	queryTop           int
-	runtimeID          string
-	disableBulkProcess bool
-	vectorStoreOptions []vectorstore.CollectionConfigFunc
+	queryTop                   int
+	runtimeID                  string
+	disableBulkProcess         bool
+	vectorStoreOptions         []vectorstore.CollectionConfigFunc
+	disableEmbedCollectionInfo bool
 
 	aiService aicommon.AICallbackType
 
@@ -485,7 +486,7 @@ func (config *RAGSystemConfig) ConvertToVectorStoreOptions() []vectorstore.Colle
 	// PQ and auto-update configuration
 	options = append(options, vectorstore.WithEnablePQ(config.enablePQ))
 	options = append(options, vectorstore.WithEnableAutoUpdateGraphInfos(config.enableAutoUpdateGraphInfos))
-
+	options = append(options, vectorstore.WithDisableEmbedCollectionInfo(config.disableEmbedCollectionInfo))
 	return options
 }
 
@@ -860,6 +861,13 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGSystemC
 func WithForceNew(force bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.forceNew = force
+	}
+}
+
+// WithEmbedCollectionInfo sets whether to embed collection info
+func WithDisableEmbedCollectionInfo(disable bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.disableEmbedCollectionInfo = disable
 	}
 }
 
