@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,11 +18,36 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func LoadAllEnabledAIToolsFromMCPServers(db *gorm.DB, ctx context.Context) ([]*Tool, error) {
+	swg := utils.NewSizedWaitGroup(10)
+	var results []*Tool
+	var m sync.Mutex
+	for server := range yakit.YieldEnabledMCPServers(ctx, db) {
+		if err := swg.AddWithContext(ctx, 1); err != nil {
+			return results, utils.Errorf("load mcp servers cancelled: %v", err)
+		}
+		mcpServer := server
+		go func() {
+			defer swg.Done()
+			tools, err := LoadAIToolFromMCPServers(db, ctx, mcpServer.Name)
+			if err != nil {
+				log.Errorf("load aitools from mcp server %s failed: %v", mcpServer.Name, err)
+				return
+			}
+			m.Lock()
+			results = append(results, tools...)
+			m.Unlock()
+		}()
+	}
+	swg.Wait()
+	return results, nil
+}
+
 // LoadAIToolFromMCPServers 从数据库中加载指定名称的 MCP 服务器，并将其工具转换为 AITool
 // name: MCP 服务器名称
 // db: 数据库连接，如果为 nil 则使用默认的 profile 数据库
 // 返回: 从该 MCP 服务器加载的所有 AITool 列表
-func LoadAIToolFromMCPServers(name string, db *gorm.DB) ([]*Tool, error) {
+func LoadAIToolFromMCPServers(db *gorm.DB, ctx context.Context, name string) ([]*Tool, error) {
 	if db == nil {
 		// 使用默认的 profile 数据库
 		db = consts.GetGormProfileDatabase()
@@ -28,23 +56,16 @@ func LoadAIToolFromMCPServers(name string, db *gorm.DB) ([]*Tool, error) {
 		}
 	}
 
-	// 从数据库查询指定名称的 MCP 服务器
-	var mcpServer schema.MCPServer
-	err := db.Where("name = ?", name).First(&mcpServer).Error
+	mcpServer, err := yakit.GetMCPServerByName(db, name)
 	if err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			return nil, utils.Errorf("mcp server not found: %s", name)
-		}
-		return nil, utils.Errorf("query mcp server failed: %v", err)
+		return nil, utils.Errorf("get mcp server by name failed: %v", err)
 	}
-
-	// 检查服务器是否启用
 	if !mcpServer.Enable {
 		return nil, utils.Errorf("mcp server not found or not enabled: %s", name)
 	}
 
 	// 创建 MCP 客户端
-	mcpClient, err := createMCPClient(&mcpServer)
+	mcpClient, err := createMCPClient(mcpServer)
 	if err != nil {
 		return nil, utils.Errorf("create mcp client failed: %v", err)
 	}
@@ -77,7 +98,7 @@ func LoadAIToolFromMCPServers(name string, db *gorm.DB) ([]*Tool, error) {
 	// 转换为 AITool
 	var aiTools []*Tool
 	for _, mcpTool := range toolsResult.Tools {
-		aiTool, err := convertMCPToolToAITool(mcpTool, &mcpServer, mcpClient)
+		aiTool, err := convertMCPToolToAITool(mcpTool, mcpServer, mcpClient)
 		if err != nil {
 			log.Errorf("convert mcp tool to aitool failed: %v", err)
 			continue
