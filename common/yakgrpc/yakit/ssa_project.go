@@ -143,7 +143,7 @@ func FilterSSAProject(db *gorm.DB, filter *ypb.SSAProjectFilter) *gorm.DB {
 	return db
 }
 
-func QuerySSAProjectById(id uint64) (*schema.SSAProject, error) {
+func GetSSAProjectById(id uint64) (*schema.SSAProject, error) {
 	if id == 0 {
 		return nil, utils.Errorf("get SSA project failed: id is required")
 	}
@@ -151,6 +151,20 @@ func QuerySSAProjectById(id uint64) (*schema.SSAProject, error) {
 	db = db.Model(&schema.SSAProject{})
 	var project schema.SSAProject
 	db = db.Where("id = ?", id).First(&project)
+	if db.Error != nil {
+		return nil, utils.Errorf("get SSA project failed: %s", db.Error)
+	}
+	return &project, nil
+}
+
+func GetSSAProjectByName(name string) (*schema.SSAProject, error) {
+	if name == "" {
+		return nil, utils.Errorf("get SSA project failed: name is required")
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SSAProject{})
+	var project schema.SSAProject
+	db = db.Where("project_name = ?", name).First(&project)
 	if db.Error != nil {
 		return nil, utils.Errorf("get SSA project failed: %s", db.Error)
 	}
