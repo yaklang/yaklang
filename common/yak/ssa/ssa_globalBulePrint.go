@@ -97,6 +97,11 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 	prog := b.GetProgram()
 
 	if utils.IsNil(prog.GlobalVariablesBlueprint) {
+		log.Errorf("global variables blueprint is nil")
+		return
+	}
+
+	if utils.IsNil(prog.GlobalVariablesBlueprint.Container()) {
 		initContainer(b)
 	}
 
