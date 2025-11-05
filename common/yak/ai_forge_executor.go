@@ -2,7 +2,6 @@ package yak
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aiexec"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -125,8 +124,4 @@ import (
 
 func AIForgeExec(forgeName string, forgeParams any, opts ...aicommon.ConfigOption) (any, error) {
 	return ExecuteForge(forgeName, forgeParams, utils.InterfaceToSliceInterface(opts)...)
-}
-
-func init() {
-	aiexec.RegisterForgeRunner(AIForgeExec)
 }

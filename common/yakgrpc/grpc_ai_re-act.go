@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"sync"
 	"time"
 
@@ -118,7 +117,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 
 	persistentSession := startParams.GetTimelineSessionID()
 	if persistentSession == "" {
-		persistentSession = uuid.NewString()
+		persistentSession = "default"
 	}
 	var hotpatchChan = chanx.NewUnlimitedChan[aicommon.ConfigOption](baseCtx, 10)
 	var configOptions = []aicommon.ConfigOption{
