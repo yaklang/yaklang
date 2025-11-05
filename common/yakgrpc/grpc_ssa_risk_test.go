@@ -97,6 +97,126 @@ func TestGetSSARiskFieldGroup(t *testing.T) {
 	}
 	checkFieldGroup(fgs.FileField)
 }
+
+func TestGetSSARiskFieldGroupEx(t *testing.T) {
+	local, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	taskID := uuid.NewString()
+
+	defer func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID},
+		})
+	}()
+
+	createRisk := func(filePath, severity, risk_type string) {
+		err := yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+			CodeSourceUrl: filePath,
+			Severity:      schema.ValidSeverityType(severity),
+			RiskType:      risk_type,
+			RuntimeId:     taskID,
+		})
+		require.NoError(t, err, "创建风险数据失败: %s-%s-%s", filePath, severity, risk_type)
+	}
+
+	riskType1 := "sql-injection"
+	riskType2 := "xss"
+	riskType3 := "path-traversal"
+
+	createRisk(fmt.Sprintf("ssadb://prog1/%s.go", uuid.NewString()), "high", riskType1)
+	createRisk(fmt.Sprintf("ssadb://prog1/%s.go", uuid.NewString()), "high", riskType2)
+	createRisk(fmt.Sprintf("ssadb://prog1/%s.go", uuid.NewString()), "low", riskType1)
+	createRisk(fmt.Sprintf("ssadb://prog2/%s.go", uuid.NewString()), "medium", riskType2)
+	createRisk(fmt.Sprintf("ssadb://prog2/%s.go", uuid.NewString()), "low", riskType3)
+	createRisk(fmt.Sprintf("ssadb://prog3/%s.go", uuid.NewString()), "critical", riskType1)
+
+	t.Run("test filter by runtime_id", func(t *testing.T) {
+		fgs, err := local.GetSSARiskFieldGroupEx(context.Background(), &ypb.GetSSARiskFieldGroupRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{taskID},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, fgs)
+
+		// 验证文件数量：6个不同的文件
+		require.Len(t, fgs.FileField, 6, "应该有6个不同的文件")
+
+		// 验证严重等级数量：critical, high, medium, low
+		require.Len(t, fgs.SeverityField, 4, "应该有4种不同的严重等级")
+
+		// 验证风险类型数量：sql-injection, xss, path-traversal
+		require.Len(t, fgs.RiskTypeField, 3, "应该有3种不同的风险类型")
+	})
+
+	t.Run("test filter by severity", func(t *testing.T) {
+		// 过滤 high: prog1下的2个high风险 (2条)
+		fgs, err := local.GetSSARiskFieldGroupEx(context.Background(), &ypb.GetSSARiskFieldGroupRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{taskID},
+				Severity:  []string{"high"},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, fgs)
+
+		// 有2个文件
+		require.Len(t, fgs.FileField, 2, "过滤high等级后有2个文件")
+
+		// 严重等级应该只有 high
+		require.Len(t, fgs.SeverityField, 1, "过滤单个严重等级后应该只有1个等级")
+		require.Equal(t, "high", fgs.SeverityField[0].Name)
+
+		// 风险类型有2个：sql-injection, xss
+		require.Len(t, fgs.RiskTypeField, 2, "high等级包含2种风险类型")
+	})
+
+	t.Run("test filter by risk_type", func(t *testing.T) {
+		// 过滤 sql-injection: prog1-high, prog1-low, prog3-critical (3条)
+		fgs, err := local.GetSSARiskFieldGroupEx(context.Background(), &ypb.GetSSARiskFieldGroupRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{taskID},
+				RiskType:  []string{riskType1},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, fgs)
+
+		// 有3个文件
+		require.Len(t, fgs.FileField, 3, "sql-injection类型分布在3个文件中")
+
+		// 风险类型应该只有1个（sql-injection）
+		require.Len(t, fgs.RiskTypeField, 1, "过滤单个风险类型后应该只有1个类型")
+		require.Equal(t, riskType1, fgs.RiskTypeField[0].Name)
+
+		// 严重等级有3个：high, low, critical
+		require.Len(t, fgs.SeverityField, 3, "sql-injection包含3种严重等级")
+	})
+
+	t.Run("test filter by multiple conditions", func(t *testing.T) {
+		fgs, err := local.GetSSARiskFieldGroupEx(context.Background(), &ypb.GetSSARiskFieldGroupRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{taskID},
+				Severity:  []string{"high", "critical"},
+				RiskType:  []string{riskType1},
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, fgs)
+
+		// 有2个文件
+		require.Len(t, fgs.FileField, 2, "多条件过滤匹配2个文件")
+
+		// 严重等级有2个：high, critical
+		require.Len(t, fgs.SeverityField, 2, "多条件过滤匹配2种严重等级")
+
+		// 只有1个风险类型：sql-injection
+		require.Len(t, fgs.RiskTypeField, 1, "过滤后应该只有1个风险类型")
+		require.Equal(t, riskType1, fgs.RiskTypeField[0].Name)
+	})
+}
+
 func TestSSARisk_MarkRead(t *testing.T) {
 	taskID := uuid.NewString()
 
