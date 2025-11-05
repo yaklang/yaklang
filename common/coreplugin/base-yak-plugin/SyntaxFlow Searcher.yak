@@ -165,9 +165,11 @@ CODE as $const
 
 func fileProcess(content) {
     if fuzzSearch {
+        escapedContent = re.QuoteMeta(content)
+        regexPattern = sprintf("(?i).*%s.*", escapedContent)
         return sprintf(
         `<getFullFileName(filename="%s")> as $file`,
-        sprintf("**%s**", content)
+        regexPattern
         )
     } else {
         return sprintf(
