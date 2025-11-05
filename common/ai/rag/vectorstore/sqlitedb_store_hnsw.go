@@ -177,6 +177,14 @@ func (s *SQLiteVectorStoreHNSW) GetCollectionInfo() *schema.VectorStoreCollectio
 }
 
 func (s *SQLiteVectorStoreHNSW) GetEmbedder() EmbeddingClient {
+	if s.embedder == nil {
+		s.config.LazyLoadEmbeddingClient = false
+		err := s.config.FixEmbeddingClient()
+		if err != nil {
+			log.Errorf("fix embedding client err: %v", err)
+		}
+		s.embedder = s.config.EmbeddingClient
+	}
 	return s.embedder
 }
 
@@ -441,6 +449,7 @@ func (s *SQLiteVectorStoreHNSW) AddWithOptions(docId, content string, opts ...Do
 }
 
 func (s *SQLiteVectorStoreHNSW) embedDocuments(docs ...*Document) ([]*Document, error) {
+	s.embedder = s.GetEmbedder()
 	var finalDocs []*Document
 
 	// 为每个文档生成嵌入向量

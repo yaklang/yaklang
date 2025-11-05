@@ -99,7 +99,6 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 		if c.routeHandler == nil {
 			c.routeHandler = make(map[string]http.HandlerFunc)
 		}
-
 		var routes = make([]string, 0, 2)
 		routes = append(routes, route)
 		if !strings.HasSuffix(route, "/") {

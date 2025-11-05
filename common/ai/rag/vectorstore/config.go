@@ -30,6 +30,7 @@ type CollectionConfig struct {
 
 	EnablePQ                   bool
 	EnableAutoUpdateGraphInfos bool
+	DisableEmbedCollectionInfo bool
 	LazyLoadEmbeddingClient    bool
 
 	buildGraphFilter *yakit.VectorDocumentFilter
@@ -91,6 +92,9 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 }
 
 func (c *CollectionConfig) FixEmbeddingClient() error {
+	if c.LazyLoadEmbeddingClient {
+		return nil
+	}
 	if IsMockMode {
 		// 使用模拟的嵌入服务
 		mockRagDataForTest, err := getMockRagDataForTest()
@@ -208,6 +212,12 @@ func WithEnablePQ(enable bool) CollectionConfigFunc {
 func WithEnableAutoUpdateGraphInfos(enable bool) CollectionConfigFunc {
 	return func(config *CollectionConfig) {
 		config.EnableAutoUpdateGraphInfos = enable
+	}
+}
+
+func WithDisableEmbedCollectionInfo(enable bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.DisableEmbedCollectionInfo = enable
 	}
 }
 
