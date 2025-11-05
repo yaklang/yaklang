@@ -491,6 +491,7 @@ func init() {
 	// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
 	// <getFullFileName(filename="xxx")>
 	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		// TODO:目前使用的是文件整个路径去匹配，而不是仅文件名匹配，后续可以考虑优化、并支持搜索文件夹名
 		var rs []sfvm.ValueOperator
 		targetName := params.GetString("filename")
 		if targetName == "" {
