@@ -142,7 +142,7 @@ func TestLoadAIToolFromMCPServers(t *testing.T) {
 			time.Sleep(500 * time.Millisecond)
 
 			// 加载 AITool
-			aiTools, err := LoadAIToolFromMCPServers(serverName, nil)
+			aiTools, err := LoadAIToolFromMCPServers(nil, context.Background(), serverName)
 			require.NoError(t, err, "failed to load ai tools from mcp server")
 			require.NotEmpty(t, aiTools, "no ai tools loaded")
 
@@ -224,7 +224,7 @@ func (w *testWriter) String() string {
 
 // TestLoadAIToolFromMCPServers_NotFound 测试服务器不存在的情况
 func TestLoadAIToolFromMCPServers_NotFound(t *testing.T) {
-	_, err := LoadAIToolFromMCPServers("non_existent_server", nil)
+	_, err := LoadAIToolFromMCPServers(nil, context.Background(), "non_existent_server")
 	require.Error(t, err, "should return error for non-existent server")
 	assert.Contains(t, err.Error(), "not found", "error should indicate server not found")
 }
@@ -259,7 +259,229 @@ func TestLoadAIToolFromMCPServers_Disabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// 尝试加载工具
-	_, err = LoadAIToolFromMCPServers(serverName, nil)
+	_, err = LoadAIToolFromMCPServers(nil, context.Background(), serverName)
 	require.Error(t, err, "should return error for disabled server")
 	assert.Contains(t, err.Error(), "not found", "error should indicate server not found")
+}
+
+// TestLoadAllEnabledAIToolsFromMCPServers 测试加载所有启用的 MCP 服务器的工具
+func TestLoadAllEnabledAIToolsFromMCPServers(t *testing.T) {
+	// 测试服务器名称
+	serverName1 := "test_all_enabled_server_1"
+	serverName2 := "test_all_enabled_server_2"
+	serverName3 := "test_all_enabled_server_disabled"
+
+	// 测试初始化：清理可能存在的旧数据
+	db := consts.GetGormProfileDatabase()
+	require.NotNil(t, db, "profile database is nil")
+
+	// 清理函数
+	defer func() {
+		db := consts.GetGormProfileDatabase()
+		if db != nil {
+			for _, name := range []string{serverName1, serverName2, serverName3} {
+				var server schema.MCPServer
+				if err := db.Where("name = ?", name).First(&server).Error; err == nil {
+					db.Unscoped().Delete(&server)
+					log.Infof("cleaned up test mcp server: %s", name)
+				}
+			}
+		}
+	}()
+
+	// 启动两个 SSE MCP 服务器
+	var sseURL1, sseURL2 string
+
+	// 启动第一个服务器
+	t.Run("StartServer1", func(t *testing.T) {
+		mcpServer := server.NewMCPServer("Test MCP Server 1", "1.0.0")
+
+		// 添加测试工具
+		testTool := mcp.NewTool(
+			"test_tool_1",
+			mcp.WithDescription("Test tool from server 1"),
+			mcp.WithString("input", mcp.Description("Input parameter"), mcp.Required()),
+		)
+
+		mcpServer.AddTool(testTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{
+				Content: []any{mcp.TextContent{Type: "text", Text: "Response from server 1"}},
+				IsError: false,
+			}, nil
+		})
+
+		port := utils.GetRandomAvailableTCPPort()
+		host := "127.0.0.1"
+		hostPort := utils.HostPort(host, port)
+		baseURL := fmt.Sprintf("http://%s", hostPort)
+		sseURL1 = baseURL + "/sse"
+
+		sseServer := server.NewSSEServer(mcpServer, baseURL)
+
+		serverStarted := make(chan struct{})
+		go func() {
+			close(serverStarted)
+			if err := sseServer.Start(hostPort); err != nil && err != http.ErrServerClosed {
+				log.Errorf("SSE server 1 error: %v", err)
+			}
+		}()
+
+		<-serverStarted
+		time.Sleep(50 * time.Millisecond)
+		err := utils.WaitConnect(hostPort, 5)
+		require.NoError(t, err, "failed to wait for server 1 to start")
+
+		log.Infof("SSE MCP server 1 started on %s", sseURL1)
+	})
+
+	// 启动第二个服务器
+	t.Run("StartServer2", func(t *testing.T) {
+		mcpServer := server.NewMCPServer("Test MCP Server 2", "1.0.0")
+
+		// 添加测试工具
+		testTool := mcp.NewTool(
+			"test_tool_2",
+			mcp.WithDescription("Test tool from server 2"),
+			mcp.WithString("input", mcp.Description("Input parameter"), mcp.Required()),
+		)
+
+		mcpServer.AddTool(testTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{
+				Content: []any{mcp.TextContent{Type: "text", Text: "Response from server 2"}},
+				IsError: false,
+			}, nil
+		})
+
+		port := utils.GetRandomAvailableTCPPort()
+		host := "127.0.0.1"
+		hostPort := utils.HostPort(host, port)
+		baseURL := fmt.Sprintf("http://%s", hostPort)
+		sseURL2 = baseURL + "/sse"
+
+		sseServer := server.NewSSEServer(mcpServer, baseURL)
+
+		serverStarted := make(chan struct{})
+		go func() {
+			close(serverStarted)
+			if err := sseServer.Start(hostPort); err != nil && err != http.ErrServerClosed {
+				log.Errorf("SSE server 2 error: %v", err)
+			}
+		}()
+
+		<-serverStarted
+		time.Sleep(50 * time.Millisecond)
+		err := utils.WaitConnect(hostPort, 5)
+		require.NoError(t, err, "failed to wait for server 2 to start")
+
+		log.Infof("SSE MCP server 2 started on %s", sseURL2)
+	})
+
+	// 保存服务器配置到数据库
+	t.Run("SaveServersToDatabase", func(t *testing.T) {
+		// 保存第一个启用的服务器
+		mcpServerConfig1 := &schema.MCPServer{
+			Name:   serverName1,
+			Type:   "sse",
+			URL:    sseURL1,
+			Enable: true,
+		}
+		err := yakit.CreateMCPServer(db, mcpServerConfig1)
+		require.NoError(t, err, "failed to create mcp server 1")
+
+		// 保存第二个启用的服务器
+		mcpServerConfig2 := &schema.MCPServer{
+			Name:   serverName2,
+			Type:   "sse",
+			URL:    sseURL2,
+			Enable: true,
+		}
+		err = yakit.CreateMCPServer(db, mcpServerConfig2)
+		require.NoError(t, err, "failed to create mcp server 2")
+
+		// 保存一个禁用的服务器
+		mcpServerConfig3 := &schema.MCPServer{
+			Name:   serverName3,
+			Type:   "sse",
+			URL:    "http://localhost:9999/sse",
+			Enable: false,
+		}
+		err = yakit.CreateMCPServer(db, mcpServerConfig3)
+		require.NoError(t, err, "failed to create mcp server 3")
+
+		log.Infof("All test MCP servers saved to database")
+	})
+
+	// 测试加载所有启用的服务器的工具
+	t.Run("LoadAllEnabledTools", func(t *testing.T) {
+		// 等待数据库写入完成
+		time.Sleep(500 * time.Millisecond)
+
+		ctx := context.Background()
+		aiTools, err := LoadAllEnabledAIToolsFromMCPServers(db, ctx)
+		require.NoError(t, err, "failed to load all enabled ai tools")
+		require.NotEmpty(t, aiTools, "no ai tools loaded")
+
+		log.Infof("Loaded %d AI tools from all enabled MCP servers", len(aiTools))
+
+		// 验证加载的工具数量（应该是2个，因为有2个启用的服务器，每个有1个工具）
+		assert.GreaterOrEqual(t, len(aiTools), 2, "should load at least 2 tools from 2 enabled servers")
+
+		// 验证工具来自不同的服务器
+		serverNames := make(map[string]bool)
+		for _, tool := range aiTools {
+			// 工具名称格式: mcp_{server_name}_{tool_name}
+			if utils.MatchAnyOfSubString(tool.Name, serverName1) {
+				serverNames[serverName1] = true
+			}
+			if utils.MatchAnyOfSubString(tool.Name, serverName2) {
+				serverNames[serverName2] = true
+			}
+			// 不应该包含禁用的服务器
+			assert.False(t, utils.MatchAnyOfSubString(tool.Name, serverName3),
+				"should not load tools from disabled server")
+
+			log.Infof("Loaded tool: %s", tool.Name)
+		}
+
+		// 验证至少从两个不同的服务器加载了工具
+		assert.True(t, serverNames[serverName1], "should load tools from server 1")
+		assert.True(t, serverNames[serverName2], "should load tools from server 2")
+	})
+}
+
+// TestLoadAllEnabledAIToolsFromMCPServers_Empty 测试没有启用的服务器时的情况
+func TestLoadAllEnabledAIToolsFromMCPServers_Empty(t *testing.T) {
+	db := consts.GetGormProfileDatabase()
+	require.NotNil(t, db)
+
+	// 创建一个临时的禁用服务器
+	serverName := "test_empty_disabled_server"
+	defer func() {
+		var server schema.MCPServer
+		if err := db.Where("name = ?", serverName).First(&server).Error; err == nil {
+			db.Unscoped().Delete(&server)
+		}
+	}()
+
+	mcpServerConfig := &schema.MCPServer{
+		Name:   serverName,
+		Type:   "sse",
+		URL:    "http://localhost:9999/sse",
+		Enable: false,
+	}
+	err := yakit.CreateMCPServer(db, mcpServerConfig)
+	require.NoError(t, err)
+
+	// 加载所有启用的工具（应该不包含这个禁用的服务器）
+	ctx := context.Background()
+	aiTools, err := LoadAllEnabledAIToolsFromMCPServers(db, ctx)
+
+	// 不应该报错，只是返回空列表或不包含禁用服务器的工具
+	require.NoError(t, err)
+
+	// 验证不包含禁用服务器的工具
+	for _, tool := range aiTools {
+		assert.False(t, utils.MatchAnyOfSubString(tool.Name, serverName),
+			"should not load tools from disabled server")
+	}
 }
