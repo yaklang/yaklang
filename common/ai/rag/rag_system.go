@@ -85,7 +85,7 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByRAGID(ragConfig.db, ragSystem.RAGID)
 			var knowledgeBaseName string
 			if err != nil || knowledgeBaseInfo == nil {
-				knowledgeBaseName = uuid.NewString()
+				knowledgeBaseName = ragConfig.Name
 			} else {
 				knowledgeBaseName = knowledgeBaseInfo.KnowledgeBaseName
 			}
@@ -113,7 +113,7 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 			entityRepositoryInfo, err := yakit.GetEntityRepositoryByRAGID(ragConfig.db, ragSystem.RAGID)
 			var entityRepositoryName string
 			if err != nil || entityRepositoryInfo == nil {
-				entityRepositoryName = uuid.NewString()
+				entityRepositoryName = ragConfig.Name
 			} else {
 				entityRepositoryName = entityRepositoryInfo.EntityBaseName
 			}

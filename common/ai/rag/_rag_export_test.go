@@ -182,31 +182,7 @@ func TestExportRAG_CollectionNotFound(t *testing.T) {
 
 	// 应该返回错误
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "get collection failed")
-}
-
-// TestExportRAG_NoKnowledgeBase 测试导出时没有知识库的情况
-func TestExportRAG_NoKnowledgeBase(t *testing.T) {
-	db, err := createTempTestDatabase()
-	assert.NoError(t, err)
-
-	// 创建集合但不创建知识库
-	collectionName := "test_collection_no_kb_" + utils.RandStringBytes(8)
-	_, err = createTestRAGCollection(db, collectionName)
-	assert.NoError(t, err)
-
-	tempFile, err := os.CreateTemp("", "test_export_rag_*.zip")
-	if err != nil {
-		t.Fatalf("create temp file failed: %v", err)
-	}
-	defer tempFile.Close()
-	err = ExportRAG(collectionName, tempFile.Name(), WithDB(db))
-	// 应该返回错误，因为没有知识库
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "knowledge base not found")
-
-	// 清理
-	vectorstore.DeleteCollection(db, collectionName)
+	assert.Contains(t, err.Error(), "not existed")
 }
 
 // TestExportRAG_Success 测试成功导出 RAG
