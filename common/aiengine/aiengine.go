@@ -2,9 +2,6 @@ package aiengine
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -64,11 +61,25 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	// 启动输出处理器
 	go engine.handleOutputEvents()
 
+	// 发送初始化配置
+	err = engine.sendInitConfig()
+	if err != nil {
+		return nil, utils.Errorf("send init config failed: %v", err)
+	}
 	return engine, nil
 }
 
-// Invoke 执行 AI 任务（阻塞直到完成）
-func (e *AIEngine) Invoke(input string) error {
+// sendInitConfig 发送初始化配置
+func (e *AIEngine) sendInitConfig() error {
+	event := &ypb.AIInputEvent{
+		IsStart: true,
+		Params:  e.config.ConvertToYPBAIStartParams(),
+	}
+	return e.react.SendInputEvent(event)
+}
+
+// SendMsg 执行 AI 任务（阻塞直到完成）
+func (e *AIEngine) SendMsg(input string) error {
 	if input == "" {
 		return utils.Error("input cannot be empty")
 	}
@@ -94,8 +105,8 @@ func (e *AIEngine) Invoke(input string) error {
 	return nil
 }
 
-// InvokeAsync 异步执行 AI 任务（立即返回）
-func (e *AIEngine) InvokeAsync(input string) error {
+// SendMsgAsync 异步执行 AI 任务（立即返回）
+func (e *AIEngine) SendMsgAsync(input string) error {
 	if input == "" {
 		return utils.Error("input cannot be empty")
 	}
@@ -106,6 +117,21 @@ func (e *AIEngine) InvokeAsync(input string) error {
 	}
 
 	return e.react.SendInputEvent(event)
+}
+
+// InvokeReActAsync 异步执行 ReAct 任务，并返回引擎实例
+func InvokeReActAsync(input string, options ...AIEngineConfigOption) (*AIEngine, error) {
+	engine, err := NewAIEngine(options...)
+	if err != nil {
+		return nil, err
+	}
+	defer engine.Close()
+
+	if err := engine.SendMsgAsync(input); err != nil {
+		return nil, err
+	}
+
+	return engine, nil
 }
 
 // SendInteractiveResponse 发送交互式响应
@@ -171,21 +197,26 @@ func (e *AIEngine) handleOutputEvents() {
 
 // processOutputEvent 处理单个输出事件
 func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
-	switch event.Type {
-	case schema.EVENT_TYPE_STREAM:
-		// 流式文本输出
-		if e.config.OnStream != nil && len(event.Content) > 0 {
-			reader := strings.NewReader(string(event.Content))
-			e.config.OnStream(e.react, string(event.Type), reader)
-		}
-
-	case schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE:
-		// 需要用户输入
+	if event.IsInteractive() {
 		if e.config.OnInputRequired != nil {
 			response := e.config.OnInputRequired(e.react, string(event.Content))
 			if response != "" {
 				_ = e.SendInteractiveResponse(response)
 			}
+		}
+		if e.config.OnInputRequiredRaw != nil {
+			response := e.config.OnInputRequiredRaw(e.react, event, string(event.Content))
+			if response != "" {
+				_ = e.SendInteractiveResponse(response)
+			}
+		}
+		return
+	}
+	switch event.Type {
+	case schema.EVENT_TYPE_STREAM:
+		// 流式文本输出
+		if e.config.OnStream != nil && len(event.Content) > 0 {
+			e.config.OnStream(e.react, event.Content)
 		}
 
 	case schema.EVENT_TYPE_OBSERVATION:
@@ -293,7 +324,12 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		}
 	}
 
-	// 工作目录和语言
+	// 高级配置
+
+	if config.Focus != "" {
+		options = append(options, aicommon.WithFocus(config.Focus))
+	}
+
 	if config.Workdir != "" {
 		options = append(options, aicommon.WithWorkdir(config.Workdir))
 	}
@@ -313,10 +349,6 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	return options
 }
 
-// ========== 便捷函数 ==========
-
-// InvokeReAct 快速执行 ReAct 任务（一次性调用）
-// 这是一个便捷函数，用于简单场景
 func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	engine, err := NewAIEngine(options...)
 	if err != nil {
@@ -324,7 +356,7 @@ func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	}
 	defer engine.Close()
 
-	return engine.Invoke(input)
+	return engine.SendMsg(input)
 }
 
 // InvokeReActWithResult 快速执行 ReAct 任务并返回结果
@@ -335,7 +367,7 @@ func InvokeReActWithResult(input string, options ...AIEngineConfigOption) (succe
 	}
 	defer engine.Close()
 
-	if err := engine.Invoke(input); err != nil {
+	if err := engine.SendMsg(input); err != nil {
 		return false, nil, err
 	}
 
@@ -352,58 +384,4 @@ func InvokeReActWithTimeout(input string, timeout time.Duration, options ...AIEn
 	options = append([]AIEngineConfigOption{WithContext(ctx)}, options...)
 
 	return InvokeReAct(input, options...)
-}
-
-// InvokeReActWithStream 执行 ReAct 任务，并实时输出流式内容
-func InvokeReActWithStream(input string, output io.Writer, options ...AIEngineConfigOption) error {
-	// 添加流式输出回调
-	streamOption := WithOnStream(func(react *aireact.ReAct, eventType string, reader io.Reader) {
-		if output != nil {
-			_, _ = io.Copy(output, reader)
-		}
-	})
-
-	options = append([]AIEngineConfigOption{streamOption}, options...)
-
-	return InvokeReAct(input, options...)
-}
-
-// Example 示例函数，展示如何使用 AIEngine
-func Example() {
-	// 方式 1: 使用便捷函数，简单快速
-	err := InvokeReAct("帮我分析一下当前目录的代码结构",
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithDebugMode(true),
-	)
-	if err != nil {
-		log.Errorf("invoke failed: %v", err)
-	}
-
-	// 方式 2: 创建引擎实例，更灵活的控制
-	engine, err := NewAIEngine(
-		WithAIService("deepseek"),
-		WithMaxIteration(10),
-		WithSessionID("my-session"),
-		WithOnEvent(func(event *schema.AiOutputEvent) {
-			fmt.Printf("[%s] %s\n", event.Type, event.Content)
-		}),
-	)
-	if err != nil {
-		log.Errorf("create engine failed: %v", err)
-		return
-	}
-	defer engine.Close()
-
-	// 异步执行
-	_ = engine.InvokeAsync("编写一个 HTTP 服务器")
-
-	// 等待完成
-	engine.Wait()
-
-	// 获取结果
-	success, result := engine.GetLastResult()
-	if success {
-		fmt.Printf("Task completed successfully: %v\n", result)
-	}
 }
