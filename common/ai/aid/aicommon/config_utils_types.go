@@ -30,6 +30,8 @@ type MemoryTriage interface {
 	SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error)
 
 	Close() error
+
+	GetSessionID() string
 }
 
 type ForgeQueryConfig struct {

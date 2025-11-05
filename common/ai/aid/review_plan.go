@@ -381,11 +381,6 @@ func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rs
 	if err != nil {
 		return nil, utils.Error(err.Error())
 	}
-	//request := NewAIRequest(planPrompt.String())
-	//response, err := p.callAI(request)
-	//if err != nil {
-	//	return nil, utils.Errorf("error calling AI: %v", err)
-	//}
 	return pr.cod.newPlanResponse(task), nil
 }
 

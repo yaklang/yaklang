@@ -383,6 +383,10 @@ func (r *testRuntime) EnhanceKnowledgeAnswer(ctx context.Context, query string) 
 	return "", nil
 }
 
+func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+	return "", nil
+}
+
 func (r *testRuntime) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
 	return true, nil
 }

@@ -634,6 +634,10 @@ func (m *Timeline) Dump() string {
 	return ""
 }
 
+func (m *Timeline) String() string {
+	return m.Dump()
+}
+
 func (m *Timeline) DumpBefore(beforeId int64) string {
 	buf := bytes.NewBuffer(nil)
 	initOnce := sync.Once{}

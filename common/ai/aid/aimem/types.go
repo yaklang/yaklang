@@ -153,6 +153,10 @@ func (m *MockMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicomm
 	return []*aicommon.SearchResult{result}, nil
 }
 
+func (m *MockMemoryTriage) GetSessionID() string {
+	return ""
+}
+
 func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*aicommon.MemoryEntity, error) {
 	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-id",

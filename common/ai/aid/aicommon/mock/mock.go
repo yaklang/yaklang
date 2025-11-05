@@ -212,6 +212,10 @@ func (m *MockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (str
 	return "", nil
 }
 
+func (m *MockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+	return "", nil
+}
+
 func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
 	return true, nil
 }

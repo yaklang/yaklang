@@ -1,20 +1,27 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "本 Schema 用于 AI 汇报当前子任务的执行状态。它管理任务流程、总结进展，并优化上下文。",
   "type": "object",
-  "required": ["short_summary", "long_summary"],
+  "required": ["@action"],
   "properties": {
     "@action": {
       "type": "string",
       "const": "summary"
     },
-    "short_summary": {
+    "status_summary": {
       "type": "string",
-      "maxLength": 300,
-      "description": "summary description for task, which will show always in next steps"
+      "description": "【执行中状态】简要记录当前子任务在执行过程中的状态。用于辅助决策，例如记录尝试次数、中间结果或已发生的错误。此字段在任务活跃时更新，对于复杂任务尤其重要。",
+      "examples": ["尝试1/3：API调用超时。", "数据校验中：70%已完成。", "等待用户确认关键步骤。"]
     },
-    "long_summary": {
+    "task_long_summary": {
       "type": "string",
-      "description": "more details about task, which will show in some special cases, can review it anytime"
+      "description": "【任务完成- 详细版】当任务满足用户需求且任务成果需要详细说明时（如复杂分析、重要发现），提供约300字的详细总结。如果任务简单或 'task_short_summary' 已足够，则此字段可省略。",
+      "examples": ["情感分析任务处理了1500条评论，正面65%，负面25%，中性10%。负面评论主要提及“产品耐久性”和“客服响应慢”。此信息将用于改进产品。"]
+    },
+    "task_short_summary": {
+      "type": "string",
+      "description": "【任务完成- 精简版】用最精炼的语言总结任务的最终成果或跳过原因，保留核心信息。此总结会用于后续所有进度展示, 也可包含对后续任务的关键建议。",
+      "examples": ["情感分析完成，65%正面。下一步：生成报告。", "因API配额限制跳过图像生成，继续文本内容。", "用户认证成功。提示：用户权限为只读。"]
     }
-  }
+  },
+  "additionalProperties": false
 }

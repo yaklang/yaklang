@@ -3,6 +3,8 @@ package aicommon
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"sync"
 	"time"
 
@@ -13,6 +15,10 @@ import (
 type AITask interface {
 	GetIndex() string
 	GetName() string
+	PushToolCallResult(result *aitool.ToolResult)
+	GetAllToolCallResults() []*aitool.ToolResult
+	GetSummary() string
+	SetSummary(summary string)
 }
 
 type AITaskState string
@@ -43,9 +49,13 @@ type AIStatefulTask interface {
 	Finish(i error)
 	SetAsyncMode(async bool)
 	IsAsyncMode() bool
+	GetEmitter() *Emitter
+	SetEmitter(emitter *Emitter)
 }
 
 type AIStatefulTaskBase struct {
+	*Emitter
+
 	id        string
 	name      string
 	userInput string
@@ -53,10 +63,42 @@ type AIStatefulTaskBase struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	taskMutex *sync.Mutex
-	emitter   *Emitter
 	status    AITaskState
 	createdAt time.Time
 	asyncMode bool
+
+	summary       string
+	statusSummary string
+
+	// index info
+	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+}
+
+func (s *AIStatefulTaskBase) PushToolCallResult(result *aitool.ToolResult) {
+	if s.toolCallResultIds == nil {
+		s.toolCallResultIds = omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult))
+	}
+	s.toolCallResultIds.Set(result.ID, result)
+}
+
+func (s *AIStatefulTaskBase) GetAllToolCallResults() []*aitool.ToolResult {
+	results := make([]*aitool.ToolResult, 0, s.toolCallResultIds.Len())
+	for _, result := range s.toolCallResultIds.Values() {
+		results = append(results, result)
+	}
+	return results
+}
+
+func (s *AIStatefulTaskBase) ToolCallResultsID() []int64 {
+	return s.toolCallResultIds.Keys()
+}
+
+func (s *AIStatefulTaskBase) GetSummary() string {
+	return s.summary
+}
+
+func (s *AIStatefulTaskBase) SetSummary(summary string) {
+	s.summary = summary
 }
 
 func (s *AIStatefulTaskBase) AppendErrorToResult(i error) {
@@ -175,8 +217,8 @@ func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	// 输出调试日志记录状态变化
 	if old != status {
 		log.Debugf("Task %s status changed: %s -> %s", s.GetId(), old, status)
-		if s.emitter != nil {
-			s.emitter.EmitStructured("react_task_status_changed", map[string]any{
+		if s.Emitter != nil {
+			s.Emitter.EmitStructured("react_task_status_changed", map[string]any{
 				"react_task_id":         s.GetId(),
 				"react_task_old_status": old,
 				"react_task_now_status": status,
@@ -189,13 +231,25 @@ func (s *AIStatefulTaskBase) GetCreatedAt() time.Time {
 	return s.createdAt
 }
 
+func (s *AIStatefulTaskBase) SetID(id string) {
+	s.id = id
+}
+
+func (s *AIStatefulTaskBase) GetEmitter() *Emitter {
+	return s.Emitter
+}
+
+func (s *AIStatefulTaskBase) SetEmitter(emitter *Emitter) {
+	s.Emitter = emitter
+}
+
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)
 
 func NewStatefulTaskBase(
 	taskId string,
 	userInput string,
 	ctx context.Context,
-	emitter *Emitter,
+	Emitter *Emitter,
 ) *AIStatefulTaskBase {
 	if ctx == nil {
 		ctx = context.Background()
@@ -203,17 +257,18 @@ func NewStatefulTaskBase(
 	ctx, cancel := context.WithCancel(ctx)
 
 	base := &AIStatefulTaskBase{
-		id:        taskId,
-		userInput: userInput,
-		ctx:       ctx,
-		cancel:    cancel,
-		taskMutex: &sync.Mutex{},
-		emitter:   emitter,
-		status:    AITaskState_Created,
-		createdAt: time.Now(),
+		id:                taskId,
+		userInput:         userInput,
+		ctx:               ctx,
+		cancel:            cancel,
+		taskMutex:         &sync.Mutex{},
+		Emitter:           Emitter,
+		status:            AITaskState_Created,
+		createdAt:         time.Now(),
+		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 	}
-	if base.emitter != nil {
-		base.emitter.EmitStructured(
+	if base.Emitter != nil {
+		base.Emitter.EmitStructured(
 			"react_task_created",
 			map[string]any{
 				"react_task_status": base.status,
