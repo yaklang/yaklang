@@ -121,6 +121,8 @@ type RAGSystemConfig struct {
 	aiService aicommon.AICallbackType
 
 	ragID string
+
+	importFile string
 }
 
 var defaultRAGSystemName = "default"
@@ -151,6 +153,12 @@ type RAGSystemConfigOption func(*RAGSystemConfig)
 func WithExportNoHNSWIndex(noHNSWGraph bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.noHNSWGraph = noHNSWGraph
+	}
+}
+
+func WithImportFile(importFile string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.importFile = importFile
 	}
 }
 

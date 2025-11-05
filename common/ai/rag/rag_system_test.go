@@ -2,6 +2,7 @@ package rag
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -613,4 +615,64 @@ func TestRAGSystem_FuzzSearch(t *testing.T) {
 
 	// 清理
 	vectorstore.DeleteCollection(db, collectionName)
+}
+
+func TestNewRAGSystem_WithImportFile(t *testing.T) {
+	// 生成导出数据
+	// db, err := createTempTestDatabaseForRAGSystem()
+	// assert.NoError(t, err)
+	db := consts.GetGormProfileDatabase()
+	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
+	ragSystem, err := Get(exportCollectionName, WithDB(db))
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	ragSystem.VectorStore.AddWithOptions("test_doc", "test_content")
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_export_rag_*.zip")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	tempFile.Close()
+
+	err = ExportRAG(exportCollectionName, tempFile.Name(), WithDB(db))
+	assert.NoError(t, err)
+
+	// 测试自动导入
+	ragSystem, err = Get(exportCollectionName+"_new",
+		WithImportFile(tempFile.Name()),
+		WithDB(db),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	num, err := ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, num)
+
+	// 测试序列一致
+	file, err := os.Open(tempFile.Name())
+	if err != nil {
+		t.Fatalf("open temp file failed: %v", err)
+	}
+	defer file.Close()
+
+	ragSystem, _ = Get(exportCollectionName+"_new1",
+		WithDB(db),
+	)
+
+	headerIndo, err := LoadRAGFileHeader(file)
+	assert.NoError(t, err)
+	assert.NotNil(t, headerIndo)
+	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", exportCollectionName+"_new1").Update("serial_version_uid", headerIndo.Collection.SerialVersionUID)
+	ragSystem, err = Get(exportCollectionName+"_new1",
+		WithImportFile(tempFile.Name()),
+		WithDB(db),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	num, err = ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, num)
 }

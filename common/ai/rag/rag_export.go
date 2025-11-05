@@ -98,7 +98,7 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 		return nil, utils.Wrap(err, "failed to write version")
 	}
 
-	if err := pbWriteBytes(buf, []byte(collection.SerialVersionUID)); err != nil {
+	if err := pbWriteBytes(buf, []byte(uuid.NewString())); err != nil {
 		return nil, utils.Wrap(err, "failed to write serialVersionUID")
 	}
 
@@ -897,7 +897,6 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 }
 
 func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
-
 	// 读取二进制文件
 	file, err := os.Open(inputPath)
 	if err != nil {
