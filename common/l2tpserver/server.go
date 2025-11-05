@@ -51,6 +51,9 @@ type Server struct {
 
 	// IP address pool
 	ipPool *IPPool
+
+	// Packet callback
+	onPacket func([]byte)
 }
 
 // Config holds server configuration
@@ -63,6 +66,7 @@ type Config struct {
 	NICID       tcpip.NICID
 	IPPoolStart net.IP
 	IPPoolEnd   net.IP
+	OnPacket    func([]byte)
 }
 
 // NewServer creates a new L2TP server
@@ -103,6 +107,7 @@ func NewServer(config *Config) (*Server, error) {
 		stack:         config.NetStack,
 		nicID:         config.NICID,
 		ipPool:        ipPool,
+		onPacket:      config.OnPacket,
 	}
 
 	// Create channel endpoint for network stack integration

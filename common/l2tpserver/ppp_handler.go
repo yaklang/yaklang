@@ -31,7 +31,29 @@ func (s *Server) handlePPPFrame(session *Session, pppFrame []byte) {
 		return
 	}
 
-	// Parse PPP using bin-parser
+	// Check for IP packets (PPP protocol 0x0021 for IPv4) first
+	protocol := binary.BigEndian.Uint16(pppFrame[offset : offset+2])
+	if protocol == 0x0021 {
+		// This is an IPv4 packet
+		ipPacket := pppFrame[offset+2:]
+		log.Infof("Received IP packet from session %d: %d bytes", session.sessionID, len(ipPacket))
+
+		// Call packet callback if set
+		if s.onPacket != nil {
+			s.onPacket(ipPacket)
+		}
+
+		// Inject into network stack
+		if s.endpoint != nil {
+			err := s.InjectPacketToStack(ipPacket)
+			if err != nil {
+				log.Errorf("Inject packet to stack failed: %v", err)
+			}
+		}
+		return // IP packet processed, done
+	}
+
+	// Parse PPP using bin-parser for control messages (LCP, IPCP, etc.)
 	reader := bytes.NewReader(pppFrame)
 	node, err := parser.ParseBinary(reader, "ppp", "PPP")
 	if err != nil {
@@ -85,22 +107,6 @@ func (s *Server) handlePPPFrame(session *Session, pppFrame []byte) {
 		}
 	default:
 		// No auth result yet
-	}
-
-	// Check for IP packets (PPP protocol 0x0021 for IPv4)
-	protocol := binary.BigEndian.Uint16(pppFrame[offset : offset+2])
-	if protocol == 0x0021 && session.IsAuthenticated() {
-		// This is an IPv4 packet
-		ipPacket := pppFrame[offset+2:]
-		log.Infof("Received IP packet from session %d: %d bytes", session.sessionID, len(ipPacket))
-
-		// Inject into network stack
-		if s.endpoint != nil {
-			err := s.InjectPacketToStack(ipPacket)
-			if err != nil {
-				log.Errorf("Inject packet to stack failed: %v", err)
-			}
-		}
 	}
 }
 

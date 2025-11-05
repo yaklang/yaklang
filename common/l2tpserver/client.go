@@ -184,6 +184,11 @@ func NewL2TPClient(serverAddr string, opts ...ClientOption) (*Client, error) {
 	// Start receiving packets
 	go client.receiveLoop()
 
+	// Start endpoint read loop if network stack is configured
+	if client.endpoint != nil {
+		go client.endpointReadLoop()
+	}
+
 	return client, nil
 }
 
@@ -670,4 +675,39 @@ func (c *Client) buildControlMessage(header *L2TPHeader, avps []AVP) []byte {
 	}
 
 	return append(headerData, avpData...)
+}
+
+// endpointReadLoop reads packets from the network stack endpoint and sends them through L2TP
+func (c *Client) endpointReadLoop() {
+	log.Info("L2TP Client: Starting endpoint read loop")
+	defer log.Info("L2TP Client: Endpoint read loop stopped")
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
+
+		// Read packet from endpoint (this blocks until a packet is available)
+		pkt := c.endpoint.ReadContext(c.ctx)
+		if pkt == nil {
+			// Context was cancelled or endpoint closed
+			return
+		}
+
+		// Extract the IP packet data from all slices
+		var ipPacket []byte
+		for _, slice := range pkt.AsSlices() {
+			ipPacket = append(ipPacket, slice...)
+		}
+
+		// Send the packet through L2TP tunnel
+		if err := c.InjectPacket(ipPacket); err != nil {
+			log.Errorf("L2TP Client: Failed to send packet from endpoint: %v", err)
+		}
+
+		// Release the packet buffer
+		pkt.DecRef()
+	}
 }

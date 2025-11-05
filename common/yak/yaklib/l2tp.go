@@ -180,6 +180,11 @@ func _l2tpServe(opts ...L2TPServerOpt) (*L2TPServer, error) {
 	serverOpts = append(serverOpts, l2tpserver.WithAuthFunc(config.authFunc))
 	serverOpts = append(serverOpts, l2tpserver.WithIPPool(config.ipPoolStart, config.ipPoolEnd))
 
+	// Add packet callback if provided
+	if config.packetCallback != nil {
+		serverOpts = append(serverOpts, l2tpserver.WithServerOnPacket(config.packetCallback))
+	}
+
 	var endpoint *channel.Endpoint
 	var packetCallbacks []func([]byte)
 

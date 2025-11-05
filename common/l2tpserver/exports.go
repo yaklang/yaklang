@@ -60,6 +60,14 @@ func WithIPPool(start, end net.IP) ServerOption {
 	}
 }
 
+// WithServerOnPacket sets the packet callback for the server
+func WithServerOnPacket(callback func([]byte)) ServerOption {
+	return func(c *Config) error {
+		c.OnPacket = callback
+		return nil
+	}
+}
+
 // NewL2TPServer creates a new L2TP server with functional options
 func NewL2TPServer(opts ...ServerOption) (*Server, error) {
 	config := &Config{}
