@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
+	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 
@@ -268,6 +269,11 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	}
 	react.Emitter.EmitPinDirectory(wd)
 
+	if !react.config.DisallowMCPServers {
+		// load mcp servers into ai-tool
+		react.loadMCPServers()
+	}
+
 	return react, nil
 }
 
@@ -497,6 +503,65 @@ func (r *ReAct) Wait() {
 		return
 	}
 	r.wg.Wait()
+}
+
+// loadMCPServers loads AI tools from enabled MCP servers asynchronously
+func (r *ReAct) loadMCPServers() {
+	go func() {
+		emitter := r.config.GetEmitter()
+		startLoadingPR, startLoadingPW := utils.NewPipe()
+		defer startLoadingPW.Close()
+		doneLoadingPR, doneLoadingPW := utils.NewPipe()
+		defer doneLoadingPW.Close()
+
+		m := new(sync.Mutex)
+		promptStartLoadingOnce := utils.NewOnce()
+		promptDoneLoadingOnce := utils.NewOnce()
+
+		tools, err := aitool.LoadAllEnabledAIToolsFromMCPServersWithCallback(
+			consts.GetGormProfileDatabase(),
+			r.config.Ctx,
+			func(mcpServer *schema.MCPServer) {
+				m.Lock()
+				defer m.Unlock()
+
+				promptStartLoadingOnce.Do(func() {
+					emitter.EmitTextPlainTextStreamEvent(
+						"mcp-loader",
+						startLoadingPR,
+						r.config.GetRuntimeId(),
+					)
+					startLoadingPW.WriteString("Loading AI tools from MCP server: ")
+				})
+				startLoadingPW.WriteString(mcpServer.Name + " ")
+			}, func(mcpServer *schema.MCPServer, tools []*aitool.Tool, err error) {
+				m.Lock()
+				defer m.Unlock()
+
+				if len(tools) > 0 {
+					promptDoneLoadingOnce.Do(func() {
+						emitter.EmitTextPlainTextStreamEvent(
+							"mcp-loader",
+							doneLoadingPR,
+							r.config.GetRuntimeId(),
+						)
+						doneLoadingPW.WriteString("Loaded AI tools from MCP servers: ")
+					})
+					doneLoadingPW.WriteString(fmt.Sprintf("@mcp[%v](%v tools) ", mcpServer.Name, len(tools)))
+				}
+			}, func(tools []*aitool.Tool, err error) {
+				startLoadingPW.Close()
+				doneLoadingPW.Close()
+			},
+		)
+		if err != nil {
+			log.Errorf("load tools failed: %v", err)
+		}
+		if len(tools) > 0 {
+			mng := r.config.GetAiToolManager()
+			mng.AppendTools(tools...)
+		}
+	}()
 }
 
 // cycle import issue
