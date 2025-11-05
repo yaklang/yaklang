@@ -44,7 +44,7 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 // Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
 func (l *LazyBuilder) Build() {
 	if l == nil {
-		log.Errorf("LazyBuilder is nil")
+		// log.Errorf("LazyBuilder is nil")
 		return
 	}
 
