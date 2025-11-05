@@ -255,10 +255,18 @@ func (m *scanManager) initByConfig() error {
 		return utils.Errorf("config is nil")
 	}
 
-	projectId := config.GetProjectID()
-	if projectId != 0 && len(config.GetProgramNames()) == 0 {
-		// init by project info in db
-		project, err := yakit.QuerySSAProjectById((projectId))
+	if projectId := config.GetProjectID(); projectId != 0 {
+		project, err := yakit.GetSSAProjectById(projectId)
+		if err != nil || project == nil {
+			return utils.Errorf("query ssa project by id failed: %s", err)
+		}
+		config, err := project.GetConfig()
+		if config == nil || err != nil {
+			return utils.Errorf("scan config error: %v", err)
+		}
+		m.Config.Config = config
+	} else if projectName := config.GetProjectName(); projectName != "" {
+		project, err := yakit.GetSSAProjectByName(projectName)
 		if err != nil || project == nil {
 			return utils.Errorf("query ssa project by id failed: %s", err)
 		}
@@ -267,11 +275,7 @@ func (m *scanManager) initByConfig() error {
 			return utils.Errorf("scan config error: %v", err)
 		}
 
-		// m.programs = []string{project.ProjectName}
 		m.Config.Config = config
-		// m.ignoreLanguage = scanConfig.IgnoreLanguage
-		// m.memory = scanConfig.Memory
-		// m.concurrency = scanConfig.Concurrency
 	} else {
 		// init by stream config
 		// if len(config.GetProgramName()) == 0 {
@@ -314,18 +318,6 @@ func (m *scanManager) initByConfig() error {
 		m.rulesCount = 1
 		m.kind = schema.SFResultKindDebug
 	} else if config.GetRuleFilter() != nil {
-		if err := setRuleChan(config.GetRuleFilter()); err != nil {
-			return err
-		}
-	} else if projectId != 0 {
-		project, err := yakit.QuerySSAProjectById(projectId)
-		if err != nil {
-			return utils.Errorf("load ssa project by id failed: %s", err)
-		}
-		config, err := project.GetConfig()
-		if err != nil {
-			return utils.Errorf("get rule filter from project config failed: %s", err)
-		}
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
 		}
