@@ -96,6 +96,7 @@ var RagExports = map[string]interface{}{
 	"onlyPQCode":         rag.WithExportOnlyPQCode,
 	"noEntityRepository": _noEntityRepository,
 	"noKnowledgeBase":    _noKnowledgeBase,
+	"ragImportFile":      rag.WithImportFile,
 }
 
 func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {

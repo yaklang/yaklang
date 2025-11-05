@@ -13,7 +13,7 @@ import (
 )
 
 func selectRAGCollectionCoreFields(db *gorm.DB) *gorm.DB {
-	return db.Model(&schema.VectorStoreCollection{}).Select("id, name, description, model_name, dimension, m, ml, ef_search, ef_construct, distance_func_type, enable_pq_mode, graph_binary, code_book_binary, uuid, rag_id")
+	return db.Model(&schema.VectorStoreCollection{}).Select("id, name, description, model_name, dimension, m, ml, ef_search, ef_construct, distance_func_type, enable_pq_mode, graph_binary, code_book_binary, uuid, rag_id, serial_version_uid")
 }
 
 func QueryRAGCollectionByName(db *gorm.DB, name string) (*schema.VectorStoreCollection, error) {
