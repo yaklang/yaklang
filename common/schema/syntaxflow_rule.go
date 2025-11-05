@@ -258,6 +258,18 @@ func (info *SyntaxFlowDescInfo) String() string {
 	return fmt.Sprintf("%s: %s", info.Title, info.Description)
 }
 
+func (info *SyntaxFlowDescInfo) ShortMessage() string {
+	if info.OnlyMsg {
+		return info.Msg
+	}
+	title := info.TitleZh
+	if title == "" {
+		title = info.Title
+	}
+	return fmt.Sprintf("%s: %s", info.TitleZh, info.Msg)
+}
+
+
 // SyntaxFlowRule SyntaxFlow 规则定义
 // 用于存储和管理静态代码分析规则，支持多语言代码扫描和漏洞检测
 type SyntaxFlowRule struct {
