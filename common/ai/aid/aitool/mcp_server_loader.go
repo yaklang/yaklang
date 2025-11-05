@@ -19,17 +19,50 @@ import (
 )
 
 func LoadAllEnabledAIToolsFromMCPServers(db *gorm.DB, ctx context.Context) ([]*Tool, error) {
+	return LoadAllEnabledAIToolsFromMCPServersWithCallback(db, ctx, nil, nil, nil)
+}
+
+func LoadAllEnabledAIToolsFromMCPServersWithCallback(
+	db *gorm.DB, ctx context.Context,
+	onStart func(mcpServer *schema.MCPServer),
+	onDone func(mcpServer *schema.MCPServer, tools []*Tool, err error),
+	onAllDone func(tools []*Tool, err error),
+) ([]*Tool, error) {
 	swg := utils.NewSizedWaitGroup(10)
 	var results []*Tool
 	var m sync.Mutex
+	var finalError error
+	defer func() {
+		if onAllDone != nil {
+			onAllDone(results, finalError)
+		}
+	}()
+
 	for server := range yakit.YieldEnabledMCPServers(ctx, db) {
 		if err := swg.AddWithContext(ctx, 1); err != nil {
-			return results, utils.Errorf("load mcp servers cancelled: %v", err)
+			finalError = utils.Errorf("load mcp servers cancelled: %v", err)
+			return results, finalError
 		}
 		mcpServer := server
+		if onStart != nil {
+			onStart(mcpServer)
+		}
 		go func() {
 			defer swg.Done()
+			done := utils.NewOnce()
+			defer func() {
+				done.Do(func() {
+					if onDone != nil {
+						onDone(mcpServer, results, nil)
+					}
+				})
+			}()
 			tools, err := LoadAIToolFromMCPServers(db, ctx, mcpServer.Name)
+			done.Do(func() {
+				if onDone != nil {
+					onDone(mcpServer, tools, err)
+				}
+			})
 			if err != nil {
 				log.Errorf("load aitools from mcp server %s failed: %v", mcpServer.Name, err)
 				return
