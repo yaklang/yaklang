@@ -58,6 +58,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
+	"github.com/yaklang/yaklang/common/hotspot"
 	"github.com/yaklang/yaklang/common/iiop"
 	"github.com/yaklang/yaklang/common/ja3"
 	"github.com/yaklang/yaklang/common/log"
@@ -387,6 +388,9 @@ func initYaklangLib() {
 
 	yaklang.Import("rag", RagExports)
 	yaklang.Import("diff", yakdiff.Exports)
+
+	// hotspot - WiFi Hotspot Control
+	yaklang.Import("hotspot", hotspot.Exports)
 }
 
 type ScriptEngine struct {

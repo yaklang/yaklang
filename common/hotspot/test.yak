@@ -1,0 +1,37 @@
+// Simple test for hotspot module
+
+// Test GetStatus
+status, err = hotspot.GetStatus()
+if err != nil {
+    die("GetStatus failed: %v", err)
+}
+println("Current status:", status)
+
+// Test Enable
+status, err = hotspot.Enable()
+if err != nil {
+    die("Enable failed: %v", err)
+}
+println("Enable result:", status)
+
+// Test GetStatus again
+status, err = hotspot.GetStatus()
+if err != nil {
+    die("GetStatus failed: %v", err)
+}
+println("Status after enable:", status)
+
+// Test Disable
+err = hotspot.Disable()
+if err != nil {
+    die("Disable failed: %v", err)
+}
+println("Hotspot disabled")
+
+// Test GetStatus after disable
+status, err = hotspot.GetStatus()
+if err != nil {
+    die("GetStatus failed: %v", err)
+}
+println("Status after disable:", status)
+
