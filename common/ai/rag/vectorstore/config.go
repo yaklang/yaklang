@@ -92,6 +92,9 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 }
 
 func (c *CollectionConfig) FixEmbeddingClient() error {
+	if c.EmbeddingClient != nil {
+		return nil
+	}
 	if c.LazyLoadEmbeddingClient {
 		return nil
 	}
