@@ -58,7 +58,7 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 	buf := new(bytes.Buffer)
 	db := cfg.db
 
-	ragSystem, err := LoadRAGSystem(collectionName, opts...)
+	ragSystem, err := LoadRAGSystem(collectionName, append(opts, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to load rag system")
 	}
@@ -333,18 +333,30 @@ func writeDocumentToBinary(writer io.Writer, doc *schema.VectorStoreDocument, ra
 		var knowledgeEntry schema.KnowledgeBaseEntry
 		err := db.Model(&schema.KnowledgeBaseEntry{}).Where("hidden_index = ?", uuid).First(&knowledgeEntry).Error
 		if err == nil && knowledgeEntry.ID != 0 {
-			writeKnowledgeEntryToBinary(knowledgeBuffer, &knowledgeEntry)
+			err = writeKnowledgeEntryToBinary(knowledgeBuffer, &knowledgeEntry)
+			if err != nil {
+				return utils.Wrap(err, "write knowledge entry")
+			}
 		}
 		var entity schema.ERModelEntity
 		err = db.Model(&schema.ERModelEntity{}).Where("uuid = ?", doc.EntityID).First(&entity).Error
 		if err == nil && entity.ID != 0 {
-			writeEntityToBinary(entityBuffer, &entity)
+			err = writeEntityToBinary(entityBuffer, &entity)
+			if err != nil {
+				return utils.Wrap(err, "write entity")
+			}
 		}
 	}
 
 	pbWriteVarint(writer, 2)
-	writeExtraDataToBinary("knowledge_entry", writer, knowledgeBuffer)
-	writeExtraDataToBinary("entity", writer, entityBuffer)
+	err = writeExtraDataToBinary("knowledge_entry", writer, knowledgeBuffer)
+	if err != nil {
+		return utils.Wrap(err, "write knowledge entry")
+	}
+	err = writeExtraDataToBinary("entity", writer, entityBuffer)
+	if err != nil {
+		return utils.Wrap(err, "write entity")
+	}
 	return nil
 }
 
@@ -918,7 +930,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		ragData.Collection.Name = ragSystemConfig.Name
 	}
 
-	ragSystem, err := GetRagSystem(ragData.Collection.Name, optFuncs...)
+	ragSystem, err := GetRagSystem(ragData.Collection.Name, append(optFuncs, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
 	if err != nil {
 		return utils.Wrap(err, "get rag system")
 	}
@@ -935,6 +947,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		return utils.Wrap(err, "read hnsw index")
 	}
 	ragData.Collection.GraphBinary = hnswIndex
+	ragData.Collection.RAGID = ragSystem.RAGID
 	ragData.Documents = documents
 
 	// 执行导入

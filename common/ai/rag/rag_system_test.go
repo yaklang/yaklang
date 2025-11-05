@@ -623,7 +623,7 @@ func TestNewRAGSystem_WithImportFile(t *testing.T) {
 	// assert.NoError(t, err)
 	db := consts.GetGormProfileDatabase()
 	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
-	ragSystem, err := Get(exportCollectionName, WithDB(db))
+	ragSystem, err := Get(exportCollectionName, WithDB(db), WithDisableEmbedCollectionInfo(true), WithLazyLoadEmbeddingClient(true))
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
 
@@ -642,6 +642,8 @@ func TestNewRAGSystem_WithImportFile(t *testing.T) {
 	ragSystem, err = Get(exportCollectionName+"_new",
 		WithImportFile(tempFile.Name()),
 		WithDB(db),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
@@ -659,6 +661,8 @@ func TestNewRAGSystem_WithImportFile(t *testing.T) {
 
 	ragSystem, _ = Get(exportCollectionName+"_new1",
 		WithDB(db),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
 	)
 
 	headerIndo, err := LoadRAGFileHeader(file)
@@ -668,6 +672,8 @@ func TestNewRAGSystem_WithImportFile(t *testing.T) {
 	ragSystem, err = Get(exportCollectionName+"_new1",
 		WithImportFile(tempFile.Name()),
 		WithDB(db),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
