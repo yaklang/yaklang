@@ -29,12 +29,12 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	defer cancel()
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
-		aicommon.WithID(uid),
+		aicommon.WithID(c.Config.Id), // pe -> react should use same id
 		aicommon.WithWrapperedAICallback(c.QualityPriorityAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
-		aicommon.WithID(c.Config.Id),
 		aicommon.WithContext(ctx),
+		aicommon.WithConsumption(c.GetConsumptionConfig()),
 	)
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
