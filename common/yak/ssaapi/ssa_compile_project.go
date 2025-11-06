@@ -9,26 +9,27 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
+func ParseProjectFromPath(path string, opts ...ssaconfig.Option) (Programs, error) {
 	if path != "" {
 		opts = append(opts, WithLocalFs(path))
 	}
 	return ParseProject(opts...)
 }
 
-func ParseProjectWithFS(fs fi.FileSystem, opts ...Option) (Programs, error) {
+func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs))
 	return ParseProject(opts...)
 }
 
-func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, error) {
+func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
 }
 
-func ParseProject(opts ...Option) (prog Programs, err error) {
+func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	config, err := DefaultConfig(opts...)
 	if err != nil {
 		return nil, err
