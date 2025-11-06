@@ -353,8 +353,8 @@ func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary
 }
 
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
-	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex)
-	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex)
+	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, "log/tool")
+	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, "log/tool")
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
@@ -385,6 +385,20 @@ func (r *Emitter) EmitYaklangCodeStreamEvent(nodeId string, reader io.Reader, ta
 
 func (r *Emitter) EmitHTTPRequestStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
 	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "code/http-request", finishCallback...)
+}
+
+func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		isSystem:           false,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		contentType:        "",
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
 }
 
 func (r *Emitter) EmitStreamEventWithContentType(nodeId string, reader io.Reader, taskIndex string, contentType string, finishCallback ...func()) {
@@ -456,7 +470,7 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 	r.streamWG.Add(1)
 
 	if e.contentType == "" {
-		e.contentType = "text/plain"
+		e.contentType = "default"
 	}
 
 	if e.startTime.IsZero() {

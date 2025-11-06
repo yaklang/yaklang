@@ -1,9 +1,11 @@
-package aid
+package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -16,6 +18,60 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, params string) (*aicommon.AIResponse, error) {
+	prompt := req.GetPrompt()
+	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
+	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`
+{
+    "@action": "plan",
+    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
+    "main_task": "在给定路径下寻找体积最大的文件",
+    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
+    "tasks": [
+        {
+            "subtask_name": "扫描目录结构",
+            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+        },
+        {
+            "subtask_name": "计算文件大小",
+            "subtask_goal": "遍历所有文件，计算每个文件的大小"
+        }
+    ]
+}
+			`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(params))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+}
 
 func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 	riskControlCalled := false
@@ -45,7 +101,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	coordinator, err := NewCoordinator(
+	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
@@ -53,40 +109,8 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAiAgreeRiskControl(mockRiskControl),
-		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
-			defer func() {
-				rsp.Close()
-			}()
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
-				return rsp, nil
-			}
-
-			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在给定路径下寻找体积最大的文件",
-    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
-    "tasks": [
-        {
-            "subtask_name": "扫描目录结构",
-            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
-        },
-        {
-            "subtask_name": "计算文件大小",
-            "subtask_goal": "遍历所有文件，计算每个文件的大小"
-        }
-    ]
-}
-			`))
-			return rsp, nil
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "ls", `{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`)
 		}),
 		aicommon.WithAIAgree(),
 		aicommon.WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
@@ -120,7 +144,10 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				go func() {
+					time.Sleep(1 * time.Second)
+					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				}()
 				continue
 			}
 
@@ -130,7 +157,10 @@ LOOP:
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
 					a.GetString("tool") == "ls" && a.GetString("tool_description") != "" {
 					useToolReview = true
-					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+					go func() {
+						time.Sleep(1 * time.Second)
+						inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+					}()
 					continue
 				}
 			}
@@ -145,10 +175,13 @@ LOOP:
 				continue
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") && riskControlMsg >= 2 && guardianOutputPass {
-				useToolReviewPass = true
-				break LOOP
+			if utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:") {
+				if useToolReview && riskControlMsg >= 2 && guardianOutputPass {
+					useToolReviewPass = true
+					break LOOP
+				}
 			}
+
 			fmt.Println("review task result:" + result.String())
 		}
 	}
@@ -202,7 +235,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	coordinator, err := NewCoordinator(
+	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
@@ -210,40 +243,8 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAiAgreeRiskControl(mockRiskControl),
-		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
-			defer func() {
-				rsp.Close()
-			}()
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
-				return rsp, nil
-			}
-
-			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在给定路径下寻找体积最大的文件",
-    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
-    "tasks": [
-        {
-            "subtask_name": "扫描目录结构",
-            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
-        },
-        {
-            "subtask_name": "计算文件大小",
-            "subtask_goal": "遍历所有文件，计算每个文件的大小"
-        }
-    ]
-}
-			`))
-			return rsp, nil
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "ls", `{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`)
 		}),
 		aicommon.WithAIAgree(),
 		aicommon.WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
@@ -348,7 +349,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	coordinator, err := NewCoordinator(
+	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
@@ -356,39 +357,8 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAiAgreeRiskControl(mockRiskControl),
-		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
-			defer func() {
-				rsp.Close()
-			}()
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "ls"}`))
-				return rsp, nil
-			}
-
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在给定路径下寻找体积最大的文件",
-    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
-    "tasks": [
-        {
-            "subtask_name": "扫描目录结构",
-            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
-        },
-        {
-            "subtask_name": "计算文件大小",
-            "subtask_goal": "遍历所有文件，计算每个文件的大小"
-        }
-    ]
-}
-			`))
-			return rsp, nil
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "ls", `{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`)
 		}),
 		aicommon.WithAIAgree(),
 		aicommon.WithGuardianMirrorStreamMirror("test", func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {

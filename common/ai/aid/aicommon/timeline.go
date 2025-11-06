@@ -343,7 +343,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 				[]string{"reducer_memory"},
 				func(key string, reader io.Reader) {
 					reducerMem := utils.JSONStringReader(reader)
-					m.config.GetEmitter().EmitTextPlainTextStreamEvent(
+					m.config.GetEmitter().EmitDefaultStreamEvent( // need conceal
 						"memory-timeline",
 						reducerMem,
 						response.GetTaskIndex(),

@@ -9,7 +9,7 @@ import (
 
 var generate = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
-		"generate_plan",
+		"plan",
 		"Generate a detailed plan based on the user's requirements or enhance the existing plan if one is already present.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("main_task", aitool.WithParam_Description("对用户原始需求进行提炼和重述，形成一个**清晰、具体、且可直接执行的主任务**。应以**动词开头**，明确指出核心行动，例如：'创建一个营销活动计划' 或 '分析用户流失数据'。")),
@@ -26,8 +26,8 @@ var generate = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		},
 		[]*reactloops.LoopStreamField{
 			{
-				FieldName: "tasks",
-				AINodeId:  "plan_list",
+				FieldName: "subtask_name",
+				AINodeId:  "规划任务名",
 			},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {

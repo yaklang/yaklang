@@ -11,14 +11,14 @@ import (
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
-func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (bool, error) {
+func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (bool, string, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
 	// Check context cancellation early
 	select {
 	case <-ctx.Done():
-		return false, ctx.Err()
+		return false, "", ctx.Err()
 	default:
 	}
 
@@ -30,6 +30,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	}
 
 	var satisfied bool
+	var reasoning string
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 	transErr := aicommon.CallAITransaction(
 		r.config, verificationPrompt, r.config.CallAI,
@@ -40,7 +41,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				return func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
-					r.Emitter.EmitTextPlainTextStreamEvent(
+					r.Emitter.EmitDefaultStreamEvent(
 						"re-act-verify",
 						reader,
 						rsp.GetTaskIndex(),
@@ -53,12 +54,18 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				}
 			}
 
+			taskID := ""
+			if r.GetCurrentTask() != nil {
+				taskID = r.GetCurrentTask().GetId()
+			}
 			action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"human_readable_result"},
-					createReasonCallback("Result"),
+					func(key string, read io.Reader) {
+						r.Emitter.EmitThoughtStreamReader(taskID, read)
+					},
 				),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
@@ -69,14 +76,15 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			}
 			// If we found a proper @action structure, extract data from it
 			satisfied = action.GetBool("user_satisfied")
+			reasoning = action.GetString("reasoning")
 			return nil
 		},
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)
-		return false, transErr
+		return false, "", transErr
 	}
-	return satisfied, nil
+	return satisfied, reasoning, nil
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction

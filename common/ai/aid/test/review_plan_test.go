@@ -1,8 +1,9 @@
-package aid
+package test
 
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -19,7 +20,7 @@ import (
 func TestCoordinator_ReviewPlan(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
@@ -88,7 +89,7 @@ LOOP:
 func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
@@ -100,7 +101,7 @@ func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 				rsp.Close()
 			}()
 
-			if !strings.Contains(request.GetPrompt(), "incomplete") {
+			if utils.MatchAllOfSubString(request.GetPrompt(), "plan", "ask_for_clarification") {
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -192,7 +193,7 @@ func TestCoordinator_ReviewPlan_Incomplete_2(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
@@ -297,7 +298,7 @@ func TestCoordinator_ReviewPlan_CreateSubtask(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

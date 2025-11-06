@@ -3,6 +3,7 @@ package reactloops
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"strings"
 	"testing"
 	"time"
@@ -265,6 +266,29 @@ type mockSimpleTask struct {
 	id     string
 	index  string
 	status aicommon.AITaskState
+}
+
+func (m *mockSimpleTask) PushToolCallResult(result *aitool.ToolResult) {
+
+}
+
+func (m *mockSimpleTask) GetAllToolCallResults() []*aitool.ToolResult {
+	return []*aitool.ToolResult{}
+}
+
+func (m *mockSimpleTask) GetSummary() string {
+	return ""
+}
+
+func (m *mockSimpleTask) SetSummary(summary string) {
+}
+
+func (m *mockSimpleTask) GetEmitter() *aicommon.Emitter {
+	return nil
+}
+
+func (m *mockSimpleTask) SetEmitter(emitter *aicommon.Emitter) {
+
 }
 
 func (m *mockSimpleTask) GetId() string {

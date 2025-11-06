@@ -54,7 +54,7 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 	params := ep.GetParams()
 	r.config.EmitInteractiveRelease(ep.GetId(), params)
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-	suggestion := params.GetAnyToString("suggestion")
+	suggestion := utils.InterfaceToString(params)
 	r.AddToTimeline(
 		"user-clarification",
 		fmt.Sprintf("User clarification requested: %s result: %v",

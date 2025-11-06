@@ -1,21 +1,19 @@
-package aid
+package aicommon
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestEndpoint_Basic(t *testing.T) {
 	t.Run("基本等待和激活测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 启动一个 goroutine 来等待
@@ -42,7 +40,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("超时等待测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 测试超时情况
@@ -93,7 +91,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	//})
 
 	t.Run("参数更新测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 测试参数更新
@@ -110,7 +108,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("并发安全测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		const goroutines = 10
@@ -139,7 +137,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("无效 endpoint ID 测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 
 		// 测试使用不存在的 ID
 		manager.Feed("non-existent-id", aitool.InvokeParams{"test": "value"})
@@ -149,7 +147,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("空参数测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 测试传入空参数
@@ -164,7 +162,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("重复激活测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 连续多次激活同一个 endpoint
@@ -179,7 +177,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("参数竞争条件测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		const (
@@ -228,7 +226,7 @@ func TestEndpoint_Basic(t *testing.T) {
 			t.Skip("跳过长时间测试")
 		}
 
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		// 测试较短的超时时间
@@ -281,7 +279,7 @@ func TestEndpoint_Basic(t *testing.T) {
 	})
 
 	t.Run("随机延迟激活测试", func(t *testing.T) {
-		manager := aicommon.NewEndpointManager()
+		manager := NewEndpointManager()
 		endpoint := manager.CreateEndpoint()
 
 		const iterations = 50

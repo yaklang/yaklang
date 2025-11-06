@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ import (
 func TestCoordinator_SyncTask(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
@@ -160,9 +161,9 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 		uuid.NewString(),
 	}
 
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test-upgrade",
-		aicommon.WithTools(EchoTool(), ErrorTool()),
+		aicommon.WithTools(aid.EchoTool(), aid.ErrorTool()),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event

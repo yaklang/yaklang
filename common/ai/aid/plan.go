@@ -105,6 +105,12 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	var rootTask = &AiTask{}
+	rootTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
+		"root-task"+uuid.NewString(),
+		fmt.Sprintf("任务名称: %s\n任务目标: %s", rootTask.Name, rootTask.Goal),
+		pr.cod.Ctx,
+		pr.cod.Emitter,
+	)
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
 		var propagateConfig func(task *AiTask)
@@ -134,7 +140,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			if isDone {
 				planData := loop.Get(loop_plan.PLAN_DATA_KEY)
-				action, err := aicommon.ExtractAction(planData, "generate_plan", "plan")
+				action, err := aicommon.ExtractAction(planData, "plan", "plan")
 				if err != nil {
 					log.Errorf("extract action from plan data failed: %v", err)
 					return

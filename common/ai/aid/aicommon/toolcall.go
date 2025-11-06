@@ -198,6 +198,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	callToolId := t.callToolId
 
+	toolResult := &aitool.ToolResult{}
+	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
+
 	t.start.Do(func() {
 		t.m.Lock()
 		defer t.m.Unlock()
@@ -338,7 +341,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 
-	toolResult, err := t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutWriter, stderrWriter)
+	toolResult, err = t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutWriter, stderrWriter)
 	if err != nil {
 		if toolResult == nil {
 			toolResult = &aitool.ToolResult{
@@ -352,9 +355,6 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Success = false
 	}
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
-
-	t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
-
 	return toolResult, false, nil
 }
 

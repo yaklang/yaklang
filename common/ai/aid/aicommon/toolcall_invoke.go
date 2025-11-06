@@ -114,6 +114,8 @@ func (a *ToolCaller) invoke(
 		params.Set("runtime_id", a.runtimeId)
 	}
 
+	stdoutWriter.Write([]byte(fmt.Sprintf("invoking tool[%v] ...\n", tool.Name))) // 确保触发执行卡片，优化体验
+
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),

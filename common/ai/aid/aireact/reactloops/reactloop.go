@@ -24,6 +24,10 @@ type ReActLoopOption func(r *ReActLoop)
 type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
 type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
 
+type satisfactionRecord struct {
+	satisfactory bool
+	reason       string
+}
 type ReActLoop struct {
 	invoker aicommon.AIInvokeRuntime
 	config  aicommon.AICallerConfigIf
@@ -75,6 +79,24 @@ type ReActLoop struct {
 
 	// 自我反思功能开关
 	enableSelfReflection bool
+
+	// 记录历史 satisfaction 状态
+	historySatisfactionReasons []*satisfactionRecord
+}
+
+func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
+	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &satisfactionRecord{
+		satisfactory: satisfactory,
+		reason:       reason,
+	})
+}
+
+func (r *ReActLoop) GetLastSatisfactionRecord() (bool, string) {
+	if len(r.historySatisfactionReasons) == 0 {
+		return false, ""
+	}
+	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
+	return lastRecord.satisfactory, lastRecord.reason
 }
 
 func (r *ReActLoop) GetMaxIterations() int {
@@ -176,20 +198,21 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
-		invoker:              invoker,
-		loopName:             name,
-		config:               config,
-		emitter:              config.GetEmitter(),
-		maxIterations:        100,
-		actions:              omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:          omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:         omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:          omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:                 omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:            new(sync.Mutex),
-		currentMemories:      omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit:      10 * 1024,
-		enableSelfReflection: true,
+		invoker:                    invoker,
+		loopName:                   name,
+		config:                     config,
+		emitter:                    config.GetEmitter(),
+		maxIterations:              100,
+		actions:                    omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:                omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:               omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:                omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:                       omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                  new(sync.Mutex),
+		currentMemories:            omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
+		memorySizeLimit:            10 * 1024,
+		enableSelfReflection:       true,
+		historySatisfactionReasons: make([]*satisfactionRecord, 0),
 	}
 
 	for _, action := range []*LoopAction{

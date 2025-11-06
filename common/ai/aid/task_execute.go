@@ -26,19 +26,15 @@ func (t *AiTask) execute() error {
 	err := t.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_PE_TASK, t, reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 		t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
 		if isDone {
-			if t.TaskSummary == "" {
-				err := t.iterationTaskSummary()
-				if err != nil {
-					log.Errorf("iteration task summary failed: %v", err)
-				}
+			err := t.generateTaskSummary()
+			if err != nil {
+				log.Errorf("iteration task summary failed: %v", err)
 			}
 		} else {
-			go func() {
-				err := t.iterationTaskSummary()
-				if err != nil {
-					log.Errorf("iteration task summary failed: %v", err)
-				}
-			}()
+			_, summary := loop.GetLastSatisfactionRecord()
+			if summary != "" {
+				t.StatusSummary = summary
+			}
 		}
 	}))
 
@@ -92,7 +88,7 @@ func (t *AiTask) executeTask() error {
 	return nil
 }
 
-func (t *AiTask) iterationTaskSummary() error {
+func (t *AiTask) generateTaskSummary() error {
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 	if err != nil {
 		t.EmitError("error generating summary prompt: %v", err)
@@ -102,17 +98,16 @@ func (t *AiTask) iterationTaskSummary() error {
 	var shortSummary, statusSummary, taskSummary, longSummary string
 
 	err = t.CallAiTransaction(summaryPromptWellFormed, t.CallOriginalAI, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
-		summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.GetEmitter()))
+		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
+			aicommon.WithActionFieldStreamHandler(
+				[]string{"status_summary", "task_short_summary", "task_long_summary"},
+				func(key string, r io.Reader) {
+					t.EmitDefaultStreamEvent("summary", utils.UTF8Reader(r), t.GetIndex())
+				},
+			))
 		if err != nil {
-			t.EmitError("error reading summary: %v", err)
 			return fmt.Errorf("error reading summary: %w", err)
 		}
-
-		action, err := aicommon.ExtractAction(string(summaryBytes), "summary")
-		if err != nil {
-			t.EmitError("error extracting action: %v", err)
-		}
-
 		if action == nil {
 			return utils.Errorf("error: summary is empty, retry it until summary finished")
 		}

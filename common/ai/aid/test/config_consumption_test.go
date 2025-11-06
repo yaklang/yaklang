@@ -1,27 +1,65 @@
-package aid
+package test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_SyncPing(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+func TestCoordinator_Consumption_SingleTime(t *testing.T) {
+	basicTestCoordinator_Consumption(t)
+}
+
+func TestCoordinator_Consumption(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testCount := 20
+	if utils.InGithubActions() {
+		testCount = 3
+	}
+	swg := utils.NewSizedWaitGroup(400)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+				time.Sleep(time.Second)
+				log.Infof("swg wait: %v", swg.WaitingEventCount.Load())
+			}
+		}
+	}()
+	for i := 0; i < testCount; i++ {
+		swg.Add(1)
+		go func() {
+			defer swg.Done()
+			basicTestCoordinator_Consumption(t)
+		}()
+	}
+	swg.Wait()
+}
+
+func basicTestCoordinator_Consumption(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小，避免阻塞
+	outChan := chanx.NewUnlimitedChan[*schema.AiOutputEvent](context.Background(), 100)
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
+			outChan.SafeFeed(event)
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
@@ -47,7 +85,6 @@ func TestCoordinator_SyncPing(t *testing.T) {
     ]
 }
 			`))
-			time.Sleep(100 * time.Millisecond)
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -59,21 +96,31 @@ func TestCoordinator_SyncPing(t *testing.T) {
 		ins.Run()
 	}()
 
+	// 给协调器一点启动时间
+	time.Sleep(100 * time.Millisecond)
+
 	parsedTask := false
 	consumptionCheck := false
-	pingPongCheck := false
+	outChannel := outChan.OutputChannel()
+
+	// 添加调试计数器
+	eventCount := 0
+
 LOOP:
 	for {
 		select {
-		case result := <-outputChan:
+		case result := <-outChannel:
+			eventCount++
+			log.Infof("received event %d: type=%s", eventCount, result.Type)
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
-				time.Sleep(100 * time.Millisecond)
+
+				// 使用 goroutine 异步发送输入事件，避免阻塞主循环
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
-			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION && parsedTask {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -87,19 +134,17 @@ LOOP:
 				if o, ok := data["output_consumption"]; ok {
 					outputConsumption = int64(utils.InterfaceToInt(o))
 				}
+				log.Infof("consumption check: input=%d, output=%d", inputConsumption, outputConsumption)
 				if inputConsumption > 0 && outputConsumption > 0 {
 					consumptionCheck = true
-					inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PING))
-					continue
+					log.Info("consumption check passed, breaking loop")
+					break LOOP
 				}
 			}
-
-			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
-				pingPongCheck = true
-				break LOOP
-			}
-		case <-time.After(time.Second * 10):
-			t.Fatal("timeout")
+		case <-time.After(time.Second * 15):
+			log.Errorf("test timeout after 15 seconds: parsedTask=%t, consumptionCheck=%t, eventCount=%d",
+				parsedTask, consumptionCheck, eventCount)
+			t.Fatal("timeout waiting for test completion")
 		}
 	}
 
@@ -108,8 +153,5 @@ LOOP:
 	}
 	if !consumptionCheck {
 		t.Fatal("consumption check failed")
-	}
-	if !pingPongCheck {
-		t.Fatal("pingPong check failed")
 	}
 }

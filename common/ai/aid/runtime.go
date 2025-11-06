@@ -3,26 +3,27 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/linktable"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type runtime struct {
 	RootTask *AiTask
 	config   *Coordinator
-	Stack    *utils.Stack[*AiTask]
 
-	statusMutex sync.Mutex
+	currentIndex int
+	TaskLink     *linktable.LinkedList[*AiTask]
+	statusMutex  sync.Mutex
 }
 
 func (c *Coordinator) createRuntime() *runtime {
 	r := &runtime{
-		config: c,
-		Stack:  utils.NewStack[*AiTask](),
+		config:   c,
+		TaskLink: linktable.New[*AiTask](),
 	}
 	return r
 }
@@ -123,55 +124,50 @@ func (r *runtime) Progress() string {
 	return buf.String()
 }
 
-func (r *runtime) invokeSubtask(idx int, task *AiTask) error {
-	r.statusMutex.Lock()
-	if r.RootTask == nil {
-		r.RootTask = task
-	}
-	r.config.EmitInfo("invoke subtask: %v", task.Name)
-
-	r.Stack.Push(task)
-	r.config.EmitPushTask(task)
-
-	r.statusMutex.Unlock()
+func (r *runtime) NextStep() (*AiTask, bool) {
 	defer func() {
-		r.statusMutex.Lock()
-		r.Stack.Pop()
-		r.config.EmitUpdateTaskStatus(task)
-		r.config.EmitPopTask(task)
-		r.statusMutex.Unlock()
+		r.currentIndex++
 	}()
-
-	if len(task.Subtasks) > 0 {
-		return r.executeSubTask(idx, task)
-	}
-
-	return task.executeTaskPushTaskIndex()
-}
-
-func (r *runtime) executeSubTask(idx int, task *AiTask) error {
-	currentID := -1
-	for {
-		currentID++
-		if currentID >= len(task.Subtasks) {
-			break
-		}
-		subtask := task.Subtasks[currentID]
-		err := r.invokeSubtask(idx+currentID+1, subtask)
-		if err != nil {
-			r.config.EmitError("invoke subtask failed: %v", err)
-			// invoke subtask failed
-			// retry via user!
-			return err
-		}
-		r.config.EmitInfo("invoke subtask success: %v with %d tool call results", subtask.Name, subtask.toolCallResultIds.Len())
-	}
-	return nil
+	return r.TaskLink.Get(r.currentIndex)
 }
 
 func (r *runtime) Invoke(task *AiTask) {
-	err := r.invokeSubtask(1, task)
-	if err != nil {
-		r.config.EmitError("invoke subtask failed: %v", err)
+	if r.RootTask == nil {
+		r.RootTask = task
 	}
+	r.updateTaskLink()
+	r.currentIndex = 0
+
+	invokeTask := func(current *AiTask) error {
+		r.config.EmitInfo("invoke subtask: %v", current.Name)
+		r.config.EmitPushTask(current)
+		defer func() {
+			r.config.EmitUpdateTaskStatus(current)
+			r.config.EmitPopTask(current)
+		}()
+
+		if len(current.Subtasks) == 0 {
+			return current.executeTaskPushTaskIndex()
+		}
+		return nil
+	}
+
+	for {
+		currentTask, ok := r.NextStep()
+		if !ok {
+			return
+		}
+		if err := invokeTask(currentTask); err != nil {
+			r.config.EmitError("invoke subtask failed: %v", err)
+			log.Errorf("invoke subtask failed: %v", err)
+			return
+		}
+	}
+}
+
+func (r *runtime) updateTaskLink() {
+	if r.RootTask == nil {
+		return
+	}
+	r.TaskLink = DFSOrderAiTask(r.RootTask)
 }

@@ -191,9 +191,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		aicommon.WithTimeline(r.config.Timeline),
 		aicommon.WithAICallback(r.config.OriginalAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
-		aicommon.WithAgreeManual(),
 		aicommon.WithEventInputChanx(inputChannel),
-		aicommon.WithAgreePolicy(r.config.AgreePolicy),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = uid
