@@ -19,116 +19,78 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
     outputs:
-      wip_detected: ${{ steps.check-wip.outputs.wip_detected }}
+      wip_detected: ${{ steps.final_output.outputs.wip_detected }}
+      should_run_tests: ${{ steps.final_output.outputs.should_run_tests }}
     steps:
       - name: Check if PR is WIP
         id: check-wip
         run: |
           # Get current event information
-          event_action="${{ github.event.action }}"
           labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
-          title='${{ github.event.pull_request.title }}'
+          commit_sha="${{ github.event.pull_request.head.sha }}"
           
-          echo "Event Action: $event_action"
           echo "PR Labels: $labels"
-          echo "PR Title: $title"
+          echo "Commit SHA: $commit_sha"
           
           # Convert to lowercase for case-insensitive matching
           labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
-          title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+          
+          # Define WIP indicators
+          wip_labels="do-not-merge,work in progress,wip,rfc"
           
           # Function to check if current state has WIP
           check_current_wip() {
-            # Check for WIP indicators in labels and title (combined check)
-            local combined="$labels_lower $title_lower"
-            if [[ "$combined" == *"do-not-merge"* ]] || \
-               [[ "$combined" == *"work in progress"* ]] || \
-               [[ "$combined" == *"wip"* ]] || \
-               [[ "$combined" == *"rfc"* ]]; then
-              return 0  # WIP found
-            fi
-            
+            # Check for WIP indicators in labels
+            IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
+            for wip_label in "${LABEL_ARRAY[@]}"; do
+              if [[ "$labels_lower" == *"$wip_label"* ]]; then
+                return 0  # WIP found
+              fi
+            done
             return 1  # No WIP found
           }
           
-          # Handle label change events
-          if [[ "$event_action" == "labeled" || "$event_action" == "unlabeled" ]]; then
-            label_name='${{ github.event.label.name }}'
-            label_name_lower=$(echo "$label_name" | tr '[:upper:]' '[:lower:]')
+          # Check current WIP state of the PR
+          if check_current_wip; then
+            echo "::error::This PR is marked as WIP (Work In Progress). Skipping CI run to save resources."
+            echo "::error::Please remove WIP indicators from labels and title when ready for review."
             
-            echo "Label changed: $label_name (lowercase: $label_name_lower)"
+            # Use gh CLI to add a comment to the PR
+            gh pr comment ${{ github.event.pull_request.number }} --body "🚧 **WIP Detected** 🚧
             
-            # Check if the changed label is WIP-related
-            is_wip_label=false
-            if [[ "$label_name_lower" == *"do-not-merge"* ]] || \
-               [[ "$label_name_lower" == *"work in progress"* ]] || \
-               [[ "$label_name_lower" == *"wip"* ]] || \
-               [[ "$label_name_lower" == *"rfc"* ]]; then
-              is_wip_label=true
-              echo "WIP-related label changed, checking current state..."
-            else
-              echo "Non-WIP label changed, checking current PR state..."
-            fi
+            This PR has been marked as Work In Progress. CI tests have been skipped to save resources.
             
-            # Always check current WIP state for label changes
-            if check_current_wip; then
-              if [[ "$event_action" == "labeled" ]]; then
-                echo "WIP label added, stopping CI"
-                echo "wip_detected=true" >> $GITHUB_OUTPUT
-                echo "should_skip=false" >> $GITHUB_OUTPUT
-              else
-                echo "Still has WIP indicators after unlabeling"
-                echo "wip_detected=true" >> $GITHUB_OUTPUT
-                echo "should_skip=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              if [[ "$event_action" == "unlabeled" ]]; then
-                echo "WIP label removed and no other WIP indicators, proceeding with CI"
-                echo "wip_detected=false" >> $GITHUB_OUTPUT
-                echo "should_skip=false" >> $GITHUB_OUTPUT
-              else
-                echo "No WIP indicators found"
-                echo "wip_detected=false" >> $GITHUB_OUTPUT
-                echo "should_skip=false" >> $GITHUB_OUTPUT
-              fi
-            fi
-          else
-            # For other events (opened, synchronize, reopened), check current WIP state
-            if check_current_wip; then
-              echo "WIP indicator found"
-              echo "wip_detected=true" >> $GITHUB_OUTPUT
-              echo "should_skip=false" >> $GITHUB_OUTPUT
-            else
-              echo "No WIP indicators found"
-              echo "wip_detected=false" >> $GITHUB_OUTPUT
-              echo "should_skip=false" >> $GITHUB_OUTPUT
-            fi
+            **To enable CI testing:**
+            - Remove WIP-related labels: \`wip\`, \`work in progress\`, \`do-not-merge\`, \`rfc\`
+            - Remove WIP-related keywords from the PR title
+            
+            The CI will automatically run once the WIP indicators are removed." || true
+            exit 1
           fi
+          echo "No WIP indicators found"
 
-      - name: Fail if WIP detected
-        if: steps.check-wip.outputs.wip_detected == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Restore Test Result Cache
+        id: restore_test_cache
+        uses: actions/cache/restore@v3
+        with:
+          path: /tmp/test_results
+          key: test-result-${{ github.event.pull_request.head.sha }}-success
+          lookup-only: true
+
+      - name: Determine Test Execution Strategy
+        id: final_output
         run: |
-          echo "::error::This PR is marked as WIP (Work In Progress). Skipping CI run to save resources."
-          echo "::error::Please remove WIP indicators from labels and title when ready for review."
-          
-          # Use gh CLI to add a comment to the PR
-          gh pr comment ${{ github.event.pull_request.number }} --body "🚧 **WIP Detected** 🚧
-          
-          This PR has been marked as Work In Progress. CI tests have been skipped to save resources.
-          
-          **To enable CI testing:**
-          - Remove WIP-related labels: \`wip\`, \`work in progress\`, \`do-not-merge\`, \`rfc\`
-          - Remove WIP-related keywords from the PR title
-          
-          The CI will automatically run once the WIP indicators are removed." || true
-          
-          exit 1
+          if [[ "${{ steps.restore_test_cache.outputs.cache-hit }}" == "true" ]]; then
+            echo "Tests have passed for this commit before, skipping re-run"
+            echo "should_run_tests=false" >> $GITHUB_OUTPUT
+          else
+            echo "No previous test results found for this commit, will run tests"
+            echo "should_run_tests=true" >> $GITHUB_OUTPUT
+          fi
 
   setup:
     needs: check-wip
-    if: needs.check-wip.outputs.wip_detected != 'true'
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Set Cache Key
@@ -162,10 +124,7 @@ jobs:
       - name: Init Module
         run: |
           go mod tidy 
-          go work vendor
           echo "Modifying permissions to read-write for pcap-bpf.h"
-          chmod +rw $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
-          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
 
       - name: Generate Document Data
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -182,7 +141,7 @@ jobs:
   test:
     name: ${{ matrix.name }}
     needs: [check-wip, setup]
-    if: needs.check-wip.outputs.wip_detected != 'true'
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -488,6 +447,21 @@ jobs:
           export TEST_VERBOSE="1"
           export TEST_CONFIG="/tmp/test_config.json"
           ./scripts/ci/run-tests.sh
+
+      - name: Save Test Result to Cache
+        if: success()
+        run: |
+          # Create a cache marker file indicating this commit passed all tests
+          mkdir -p /tmp/test_results
+          echo "true" > /tmp/test_results/test_passed
+          echo "Test result cached successfully for commit ${{ github.event.pull_request.head.sha }}"
+
+      - name: Cache Test Results
+        if: success()
+        uses: actions/cache/save@v3
+        with:
+          path: /tmp/test_results
+          key: test-result-${{ github.event.pull_request.head.sha }}-success
 
       - name: Generate safe artifact name
         if: failure()
