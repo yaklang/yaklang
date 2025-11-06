@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/gorilla/websocket"
 	"github.com/yaklang/fastgocaptcha"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -24,6 +25,7 @@ var HttpServeExports = map[string]interface{}{
 	"context":                _httpServerOptContext,
 	"handler":                _httpServerOptCallback,
 	"routeHandler":           _httpServerOptRouteHandler,
+	"wsRouteHandler":         _httpServerOptWsRouteHandler,
 	"localFileSystemHandler": _httpServerOptLocalFileSystemHandler,
 	"LocalFileSystemServe":   _localFileSystemServe,
 	"captchaRouteHandler":    _httpServerOptCaptchaRoute,
@@ -41,6 +43,7 @@ type _httpServerConfig struct {
 
 	localFileSystemHandler map[string]http.Handler
 	routeHandler           map[string]http.HandlerFunc
+	wsRouteHandler         map[string]WebSocketHandler
 	callback               http.HandlerFunc
 
 	// _globHandler 用于存储 glob 路由处理器, is auto managed
@@ -75,11 +78,16 @@ func (c *_httpServerConfig) getGlobHandler(route string) (glob.Glob, bool) {
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
 
+// WebSocketHandler 是 WebSocket 连接处理函数类型
+type WebSocketHandler func(conn *websocket.Conn)
+
 func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		if c.localFileSystemHandler == nil {
 			c.localFileSystemHandler = make(map[string]http.Handler)
 		}
+		a := &websocket.Conn{}
+		a.WriteMessage(websocket.TextMessage, []byte("Hello world"))
 		c.localFileSystemHandler[prefix] = http.FileServer(http.Dir(dir))
 	}
 }
@@ -112,6 +120,46 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 			} else {
 				c.addGlobHandler("/" + routeHandled)
 				c.routeHandler["/"+routeHandled] = handler
+			}
+		}
+	}
+}
+
+// wsRouteHandler 用于设置 HTTP 服务器的 WebSocket 路由处理函数，第一个参数为路由路径，第二个参数为 WebSocket 处理函数
+// 此函数会自动处理 WebSocket 握手升级，并在连接建立后调用处理函数
+// Example:
+// ```
+//
+//	err = httpserver.Serve("127.0.0.1", 8888, httpserver.wsRouteHandler("/ws", func(conn) {
+//		for {
+//			messageType, message, err = conn.ReadMessage()
+//			if err != nil {
+//				return
+//			}
+//			conn.WriteMessage(messageType, message) // echo back
+//		}
+//	}))
+//
+// ```
+func _httpServerOptWsRouteHandler(route string, handler WebSocketHandler) HttpServerConfigOpt {
+	return func(c *_httpServerConfig) {
+		if c.wsRouteHandler == nil {
+			c.wsRouteHandler = make(map[string]WebSocketHandler)
+		}
+
+		var routes = make([]string, 0, 2)
+		routes = append(routes, route)
+		if !strings.HasSuffix(route, "/") {
+			routes = append(routes, route+"/")
+		}
+		for _, routeHandled := range routes {
+			log.Infof("add websocket route handler: %s", routeHandled)
+			if strings.HasPrefix(routeHandled, "/") {
+				c.addGlobHandler(routeHandled)
+				c.wsRouteHandler[routeHandled] = handler
+			} else {
+				c.addGlobHandler("/" + routeHandled)
+				c.wsRouteHandler["/"+routeHandled] = handler
 			}
 		}
 	}
@@ -309,6 +357,41 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 						handler.ServeHTTP(writer, request)
 						return
 					}
+				}
+			}
+		}
+
+		// WebSocket 路由处理
+		if config.wsRouteHandler != nil {
+			for route, handler := range config.wsRouteHandler {
+				matched := false
+				if route == request.URL.Path {
+					matched = true
+				} else if globHandler, ok := config.getGlobHandler(route); ok {
+					if globHandler.Match(request.URL.Path) {
+						matched = true
+					}
+				}
+
+				if matched {
+					// 创建 WebSocket upgrader
+					upgrader := websocket.Upgrader{
+						CheckOrigin: func(r *http.Request) bool {
+							return true // 允许所有来源，实际使用时可以根据需要限制
+						},
+					}
+
+					// 升级 HTTP 连接为 WebSocket 连接
+					conn, err := upgrader.Upgrade(writer, request, nil)
+					if err != nil {
+						log.Errorf("websocket upgrade failed: %s", err)
+						return
+					}
+					defer conn.Close()
+
+					// 调用用户定义的 WebSocket 处理函数
+					handler(conn)
+					return
 				}
 			}
 		}
