@@ -63,6 +63,7 @@ func TestJarRecompile(t *testing.T) {
 	// recompile
 	hasProcess := false
 	finish := false
+	log.Errorf("re compile")
 	err = progFromDB.Recompile(ssaapi.WithProcess(func(msg string, process float64) {
 		if 0 < process && process < 1 {
 			hasProcess = true

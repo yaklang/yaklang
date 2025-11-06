@@ -31,7 +31,7 @@ type sfProjectInfoSearcher struct {
 	t *testing.T
 }
 
-func NewSfProjectInfoSearcher(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) *sfProjectInfoSearcher {
+func NewSfProjectInfoSearcher(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig.Option) *sfProjectInfoSearcher {
 	progName := uuid.NewString()
 	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)

@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func CheckResultWithFS(t *testing.T, fs filesys_interface.FileSystem, rule string, handler func(*ssaapi.SyntaxFlowResult), opt ...ssaapi.Option) {
+func CheckResultWithFS(t *testing.T, fs filesys_interface.FileSystem, rule string, handler func(*ssaapi.SyntaxFlowResult), opt ...ssaconfig.Option) {
 	CheckWithFS(fs, t, func(p ssaapi.Programs) error {
 		res, err := p.SyntaxFlowWithError(rule)
 		require.NoError(t, err)
@@ -41,7 +41,7 @@ func CheckResultWithFS(t *testing.T, fs filesys_interface.FileSystem, rule strin
 	}, opt...)
 }
 
-func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.SyntaxFlowResult), sfOption []ssaapi.QueryOption, opt []ssaapi.Option) {
+func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.SyntaxFlowResult), sfOption []ssaapi.QueryOption, opt []ssaconfig.Option) {
 	Check(t, code, func(p *ssaapi.Program) error {
 		sfOption = append(sfOption, ssaapi.QueryWithEnableDebug())
 		res, err := p.SyntaxFlowWithError(rule, sfOption...)
@@ -137,7 +137,7 @@ func (g *GraphInTest) Check(t *testing.T, from, to string, label ...string) {
 	require.True(t, match)
 }
 
-func CheckSyntaxFlowGraphEdge(t *testing.T, code string, sfRule string, paths map[string][]PathInTest, opt ...ssaapi.Option) {
+func CheckSyntaxFlowGraphEdge(t *testing.T, code string, sfRule string, paths map[string][]PathInTest, opt ...ssaconfig.Option) {
 	checkMap := make(map[string]func(g *GraphInTest))
 	for variable, path := range paths {
 		checkMap[variable] = func(g *GraphInTest) {
@@ -154,7 +154,7 @@ func CheckSyntaxFlowGraph(
 	code string,
 	sfRule string,
 	checkFuncs map[string]func(g *GraphInTest),
-	opt ...ssaapi.Option,
+	opt ...ssaconfig.Option,
 ) {
 
 	CheckResult(t, code, sfRule, func(res *ssaapi.SyntaxFlowResult) {
@@ -170,23 +170,23 @@ func CheckSyntaxFlowGraph(
 	}, nil, opt)
 }
 
-func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
+func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaconfig.Option) {
 	checkSyntaxFlowEx(t, code, sf, false, wants, opt, nil)
 }
 func CheckSyntaxFlowPrintWithPhp(t *testing.T, code string, wants []string) {
-	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaapi.Option{ssaapi.WithLanguage(ssaconfig.PHP)}, nil)
+	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaconfig.Option{ssaapi.WithLanguage(ssaconfig.PHP)}, nil)
 }
-func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaapi.Option) {
+func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaconfig.Option) {
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
 
-func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaapi.Option) {
+func CheckSyntaxFlowWithFS(t *testing.T, fs fi.FileSystem, sf string, wants map[string][]string, contain bool, opt ...ssaconfig.Option) {
 	CheckResultWithFS(t, fs, sf, func(sfr *ssaapi.SyntaxFlowResult) {
 		CompareResult(t, contain, sfr, wants)
 	}, opt...)
 }
 
-func CheckSyntaxFlowSource(t *testing.T, code string, sf string, want map[string][]string, opt ...ssaapi.Option) {
+func CheckSyntaxFlowSource(t *testing.T, code string, sf string, want map[string][]string, opt ...ssaconfig.Option) {
 	CheckResult(t, code, sf, func(results *ssaapi.SyntaxFlowResult) {
 		results.Show(sfvm.WithShowCode())
 		require.NotNil(t, results)
@@ -202,7 +202,7 @@ func CheckSyntaxFlowSource(t *testing.T, code string, sf string, want map[string
 	}, nil, opt)
 }
 
-func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, opt ...ssaapi.Option) {
+func CheckSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, opt ...ssaconfig.Option) {
 	checkSyntaxFlowEx(t, code, sf, contain, wants, opt, nil)
 }
 
@@ -210,13 +210,13 @@ func CheckSyntaxFlowWithSFOption(t *testing.T, code string, sf string, wants map
 	checkSyntaxFlowEx(t, code, sf, false, wants, nil, opt)
 }
 
-func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaapi.Option, sfOpt []ssaapi.QueryOption) {
+func checkSyntaxFlowEx(t *testing.T, code string, sf string, contain bool, wants map[string][]string, ssaOpt []ssaconfig.Option, sfOpt []ssaapi.QueryOption) {
 	CheckResult(t, code, sf, func(sfr *ssaapi.SyntaxFlowResult) {
 		CompareResult(t, contain, sfr, wants)
 	}, sfOpt, ssaOpt)
 }
 
-func CheckBottomUser(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaapi.Option) {
+func CheckBottomUser(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaconfig.Option) {
 	rule := fmt.Sprintf("%s as $start; $start --> as $target", variable)
 	CheckResult(t, code, rule, func(result *ssaapi.SyntaxFlowResult) {
 		CompareResult(t, contain, result, map[string][]string{
@@ -225,7 +225,7 @@ func CheckBottomUser(t *testing.T, code, variable string, want []string, contain
 	}, nil, opt)
 }
 
-func CheckTopDef(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaapi.Option) {
+func CheckTopDef(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaconfig.Option) {
 	rule := fmt.Sprintf("%s as $start; $start #-> as $target", variable)
 	CheckResult(t, code, rule, func(result *ssaapi.SyntaxFlowResult) {
 		// result.GetValues("target").ShowDot()
@@ -245,7 +245,9 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 		} else {
 			require.Equal(t, len(gotVs), len(want), "key[%s] not found", name)
 		}
-		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string {
+			return v.String()
+		})
 		sort.Strings(got)
 		sort.Strings(want)
 		if contain {

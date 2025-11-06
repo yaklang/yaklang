@@ -11,7 +11,7 @@ import (
 func TestBuildInRule(t *testing.T) {
 	testCase := []RuleChecker{{
 		Name: "test git repo",
-		ConfigInfo: &ssaconfig.CodeSourceInfo{
+		codeSourceInfo: &ssaconfig.CodeSourceInfo{
 			Kind:   ssaconfig.CodeSourceGit,
 			URL:    "https://github.com/digininja/DVWA",
 			Branch: "master",

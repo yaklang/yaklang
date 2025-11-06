@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func initProgram(t *testing.T, fs filesys_interface.FileSystem, opts ...ssaapi.Option) (string, func()) {
+func initProgram(t *testing.T, fs filesys_interface.FileSystem, opts ...ssaconfig.Option) (string, func()) {
 	programID := uuid.NewString()
 	opts = append(opts, ssaapi.WithProgramName(programID))
 	_, err := ssaapi.ParseProjectWithFS(fs, opts...)

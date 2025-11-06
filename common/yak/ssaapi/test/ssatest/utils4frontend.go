@@ -27,11 +27,11 @@ type TestCase struct {
 	ExternValue map[string]any
 	ExternLib   map[string]map[string]any
 	Check       func(*ssaapi.Program, []string)
-	Option      []ssaapi.Option
+	Option      []ssaconfig.Option
 }
 
 var (
-	languageOption ssaapi.Option = nil
+	languageOption ssaconfig.Option = nil
 	language       ssaconfig.Language
 )
 
@@ -44,7 +44,7 @@ func SetLanguage(lang ssaconfig.Language, build ...ssa.CreateBuilder) {
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
-	opt := make([]ssaapi.Option, 0)
+	opt := make([]ssaconfig.Option, 0)
 	for k, v := range tc.ExternLib {
 		opt = append(opt, ssaapi.WithExternLib(k, v))
 	}
@@ -179,7 +179,7 @@ func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 	CheckTestCase(t, tc)
 }
 
-func CheckParse(t *testing.T, code string, opt ...ssaapi.Option) {
+func CheckParse(t *testing.T, code string, opt ...ssaconfig.Option) {
 	tc := TestCase{
 		Code:   code,
 		Check:  func(prog *ssaapi.Program, _ []string) {},
@@ -188,7 +188,7 @@ func CheckParse(t *testing.T, code string, opt ...ssaapi.Option) {
 	CheckTestCase(t, tc)
 }
 
-func CheckNoError(t *testing.T, code string, opt ...ssaapi.Option) {
+func CheckNoError(t *testing.T, code string, opt ...ssaconfig.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
@@ -211,7 +211,7 @@ func CheckError(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Option) {
+func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaconfig.Option) {
 	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
 	Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
@@ -228,7 +228,7 @@ func CheckTypeKind(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.O
 	}, opt...)
 }
 
-func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
+func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaconfig.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
@@ -246,7 +246,7 @@ func CheckType(t *testing.T, code string, typ ssa.Type, opt ...ssaapi.Option) {
 	CheckTestCase(t, tc)
 }
 
-func CheckTypeEx(t *testing.T, code string, typCallback func(*ssaapi.Program) *ssaapi.Type, opt ...ssaapi.Option) {
+func CheckTypeEx(t *testing.T, code string, typCallback func(*ssaapi.Program) *ssaapi.Type, opt ...ssaconfig.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {

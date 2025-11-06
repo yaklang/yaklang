@@ -10,6 +10,7 @@ import (
 type CodeSourceKind string
 
 const (
+	CodeSourceNone        CodeSourceKind = ""            // 未指定
 	CodeSourceLocal       CodeSourceKind = "local"       // 本地文件/目录
 	CodeSourceCompression CodeSourceKind = "compression" // 压缩文件
 	CodeSourceJar         CodeSourceKind = "jar"         // Jar文件
@@ -76,6 +77,13 @@ func (c *CodeSourceInfo) ValidateSourceConfig() error {
 }
 
 // --- 代码源配置 Get 方法 ---
+
+func (c *Config) GetCodeSource() *CodeSourceInfo {
+	if c == nil || c.Mode&ModeCodeSource == 0 {
+		return nil
+	}
+	return c.CodeSource
+}
 
 func (c *Config) GetCodeSourceKind() CodeSourceKind {
 	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
@@ -297,6 +305,26 @@ func WithCodeSourceJson(raw string) Option {
 		}
 		if err := c.CodeSource.ValidateSourceConfig(); err != nil {
 			return utils.Errorf("Config: Code Source JSON Validate failed: %v", err)
+		}
+		return nil
+	}
+}
+
+func WithCodeSourceMap(input map[string]any) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Map"); err != nil {
+			return err
+		}
+		raw, err := json.Marshal(input)
+		if err != nil {
+			return utils.Errorf("Config: Code Source Map Marshal failed: %v", err)
+		}
+		err = json.Unmarshal(raw, c.CodeSource)
+		if err != nil {
+			return utils.Errorf("Config: Code Source Map Unmarshal failed: %v", err)
+		}
+		if err := c.CodeSource.ValidateSourceConfig(); err != nil {
+			return utils.Errorf("Config: Code Source Map Validate failed: %v", err)
 		}
 		return nil
 	}

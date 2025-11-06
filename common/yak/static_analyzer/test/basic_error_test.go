@@ -31,7 +31,7 @@ func TestFunctionCallTypeCheck(t *testing.T) {
 		check(t, `
 		ssa.Parse("a", 1)
 		`, []string{
-			ssa4analyze.ArgumentTypeError(2, "number", "ssaapi.Option", "ssa.Parse"),
+			ssa4analyze.ArgumentTypeError(2, "number", "ssaconfig.Option", "ssa.Parse"),
 		})
 	})
 
@@ -40,7 +40,7 @@ func TestFunctionCallTypeCheck(t *testing.T) {
 		ssa.Parse(1, 1) 
 		`, []string{
 			ssa4analyze.ArgumentTypeError(1, "number", "string", "ssa.Parse"),
-			ssa4analyze.ArgumentTypeError(2, "number", "ssaapi.Option", "ssa.Parse"),
+			ssa4analyze.ArgumentTypeError(2, "number", "ssaconfig.Option", "ssa.Parse"),
 		})
 	})
 }
@@ -58,7 +58,7 @@ func TestFunctionCallParameterLength(t *testing.T) {
 		check(t, `
 		ssa.Parse()
 		`, []string{
-			ssa4analyze.NotEnoughArgument("ssa.Parse", "", "string, ...ssaapi.Option"),
+			ssa4analyze.NotEnoughArgument("ssa.Parse", "", "string, ...ssaconfig.Option"),
 		})
 	})
 

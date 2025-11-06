@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) {
+func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig.Option) {
 	type message struct {
 		msg     string
 		process float64

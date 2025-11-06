@@ -154,6 +154,9 @@ func WithDirWalkEnd(handle func(path string) error) Option {
 
 func WithContext(ctx context.Context) Option {
 	return func(config *Config) {
+		if ctx == nil {
+			return
+		}
 		config.ctx, config.ctxCancel = context.WithCancel(ctx)
 	}
 }

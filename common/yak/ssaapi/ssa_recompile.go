@@ -6,41 +6,43 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // save to Profile SSAProgram
 func SaveConfig(c *Config, prog *Program) {
-	if c.databaseKind != ssa.ProgramCacheMemory {
-		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
-		if err != nil {
-			log.Errorf("irProg is nil, save config failed: %v", err)
-			return
+	if c.databaseKind == ssa.ProgramCacheMemory {
+		if c.EnableCache && c.GetProgramName() != "" {
+			SetProgramCache(prog)
 		}
-		irProg.Description = c.ProgramDescription
-		irProg.Language = c.language
-		irProg.EngineVersion = consts.GetYakVersion()
-		irProg.ConfigInput = c.info
-		irProg.PeepholeSize = c.GetCompilePeepholeSize()
-		ssadb.UpdateProgram(irProg)
-	} else {
-		// only memory
-		if c.ProgramName != "" {
-			SetProgramCache(prog, c.programSaveTTL)
-		}
+
+		return
 	}
+	irProg, err := ssadb.GetProgram(c.GetProgramName(), ssa.Application)
+	if err != nil {
+		log.Errorf("irProg is nil, save config failed: %v", err)
+		return
+	}
+	irProg.Description = c.GetProjectDescription()
+	irProg.Language = c.GetLanguage()
+	irProg.EngineVersion = consts.GetYakVersion()
+	irProg.ConfigInput = c.JSON()
+	irProg.PeepholeSize = c.GetCompilePeepholeSize()
+	ssadb.UpdateProgram(irProg)
 }
 
 // recompile from Profile SSAProgram
-func (prog *Program) Recompile(opts ...Option) error {
+func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
+	opt := make([]ssaconfig.Option, 0)
 	// get file system
 	hasFS := false
 	// recompile from info
 	if prog.irProgram != nil {
 		if configInfo := prog.irProgram.ConfigInput; configInfo != "" {
-			opts = append(opts, WithConfigInfoRaw(configInfo))
+			opt = append(opt, ssaconfig.WithConfigJson(configInfo)) // this json as first option
 			hasFS = true
 		}
-		opts = append(opts, WithPeepholeSize(prog.irProgram.PeepholeSize))
+		opt = append(opt, WithPeepholeSize(prog.irProgram.PeepholeSize))
 	}
 	//TODO: recompile from database
 
@@ -51,12 +53,13 @@ func (prog *Program) Recompile(opts ...Option) error {
 	}
 
 	// append other options
-	opts = append(opts, WithProgramName(prog.Program.Name))
-	opts = append(opts, WithLanguage(prog.GetLanguage()))
-	opts = append(opts, WithReCompile(true))
+	opt = append(opt, WithProgramName(prog.Program.Name))
+	opt = append(opt, WithLanguage(prog.GetLanguage()))
+	opt = append(opt, WithReCompile(true))
+	opt = append(opt, inputOpt...)
 
 	// parse
-	newProg, err := ParseProject(opts...)
+	newProg, err := ParseProject(opt...)
 	_ = newProg
 
 	return err

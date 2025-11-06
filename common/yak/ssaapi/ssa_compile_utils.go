@@ -63,7 +63,7 @@ func (c *Config) GetFileHandler(
 				return nil, nil
 			}
 		}
-		return nil, utils.Errorf("not select language %s", c.language)
+		return nil, utils.Errorf("not select language %s", c.GetLanguage())
 	}
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()

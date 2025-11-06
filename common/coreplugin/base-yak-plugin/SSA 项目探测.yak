@@ -13,13 +13,6 @@ languages = cli.StringSlice(
     cli.setSelectOption("C", "c"),
 )
 
-// significant参数组为重要的参数，在前端会显示在最前面
-memory := cli.Bool("memory",
-    cli.setDefault(false),
-    cli.setVerboseName("内存编译"),
-    cli.setHelp("内存编译将会把编译中间产物存储在内存而非数据库以提升编译速度，默认缓存到内存10分钟。内存编译会占用更多的内存，但是编译速度更快。"),
-    cli.setCliGroup("significant"),
-)
 
 
 concurrency := cli.Int("concurrency",
@@ -381,12 +374,10 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(params.info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
     ssa.withConcurrency(concurrency),
 ]
-if memory{
-    opts = append(opts, ssa.withMemory())
-}
+
 if len(entry) != 0 {
     opts = append(opts, ssa.withEntryFile(entry...))
 }
