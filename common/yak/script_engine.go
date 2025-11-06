@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
 	"maps"
 	"os"
@@ -387,6 +388,9 @@ func initYaklangLib() {
 
 	yaklang.Import("rag", RagExports)
 	yaklang.Import("diff", yakdiff.Exports)
+
+	// netutils
+	yaklang.Import("netutils", netutil.Exports)
 }
 
 type ScriptEngine struct {
