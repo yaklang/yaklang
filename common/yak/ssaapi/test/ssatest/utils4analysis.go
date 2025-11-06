@@ -46,17 +46,20 @@ func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Progr
 		for i := 0; i < 3; i++ {
 			switch i {
 			case 0:
+				log.Infof("current: ssareducer.Order")
 				astSequence = ssareducer.Order
 			case 1:
+				log.Infof("current: ssareducer.ReverseOrder")
 				astSequence = ssareducer.ReverseOrder
 			case 2:
+				log.Infof("current: ssareducer.OutOfOrder")
 				astSequence = ssareducer.OutOfOrder
 			}
 
 			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithASTOrder(astSequence))...)
 			require.Nil(t, err)
 
-			log.Infof("only in memory ")
+			log.Infof("only in memory")
 			err = handler(prog)
 			require.Nil(t, err)
 		}

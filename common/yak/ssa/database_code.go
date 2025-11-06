@@ -215,9 +215,15 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if typ := value.GetType(); utils.IsNil(typ) {
 		log.Warnf("BUG: value2IrCode called (%s)[%v] with nil type", value.String(), value.GetOpcode().String())
 	} else {
-		if typ.GetId() == 0 {
-			saveTypeWithValue(value, typ)
+
+		saveTypeWithValue(value, typ)
+		if typ.GetId() <= 0 {
+			log.Errorf("[BUG] Failed to save type, ID still invalid: %d, type: %s, value: %s",
+				typ.GetId(), typ.String(), value.String())
+			ir.TypeID = -1
+			return
 		}
+
 		ir.TypeID = typ.GetId()
 		// log.Errorf("marshal instruction (%s)[%v] type id: %v", value.String(), value.GetOpcode().String(), ir.TypeID)
 	}

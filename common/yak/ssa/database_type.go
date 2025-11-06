@@ -49,8 +49,8 @@ func marshalType(typ Type, irType *ssadb.IrType) bool {
 		log.Errorf("BUG: marshalType called with nil type")
 		return false
 	}
-	if irType.GetIdInt64() == -1 {
-		log.Errorf("[BUG]: type id is -1: %s", typ.GetFullTypeNames())
+	if irType.GetIdInt64() <= 0 {
+		log.Errorf("[BUG]: type id is invalid: %d, type: %s", irType.GetIdInt64(), typ.GetFullTypeNames())
 		return false
 	}
 
@@ -111,7 +111,10 @@ func type2IrType(typ Type, ir *ssadb.IrType) {
 }
 
 func GetTypeFromDB(cache *ProgramCache, id int64) Type {
-	if id == -1 {
+	if id <= 0 {
+		if id == 0 {
+			log.Warnf("GetTypeFromDB: called with id=0, likely a serialization bug")
+		}
 		return nil
 	}
 

@@ -162,7 +162,7 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 }
 
 func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
-	if id == -1 {
+	if id <= 0 {
 		return nil
 	}
 
