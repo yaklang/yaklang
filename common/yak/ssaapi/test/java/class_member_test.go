@@ -2,6 +2,11 @@ package java
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 )
 
@@ -93,4 +98,59 @@ public class AstTaintCase001 {
 %v
 }`, code)
 	return CmdUtilCode
+}
+
+func TestJavaMemberCallRealDataFlow(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("Main.java", `
+package org.example;
+
+public class Main {
+
+private final Flags flags = new Flags();
+
+@GetMapping("/challenge/7/reset-password/{link}")
+  public ResponseEntity<String> resetPassword(@PathVariable(value = "link") String link) {
+    if (link.equals(ADMIN_PASSWORD_LINK)) {
+      ResponseEntity result = flags.getFlag(7);
+	  return result;
+    }
+  }
+}
+`)
+	vf.AddFile("Flags.java", `package org.example;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.IntStream;
+
+public class Flags {
+    private final Map<Integer, String> FLAGS = new HashMap<>();
+
+    public Flags() {
+        IntStream.range(1, 10).forEach(i -> FLAGS.put(i, UUID.randomUUID().toString()));
+    }
+
+    public String getFlag(int flagNumber) {
+        return FLAGS.get(flagNumber);
+    }
+}
+`)
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+		programs.Show()
+		// 数据流不应该追踪到参数link
+		values, err := programs.SyntaxFlowWithError(`
+		link?{opcode:param} as $link
+		result #{until:<<<UNTIL
+		* & $link
+UNTIL}-> as $result`)
+
+		require.NoError(t, err)
+
+		result := values.GetValues("result").Show()
+		require.Empty(t, result)
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+
 }
