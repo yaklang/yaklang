@@ -132,6 +132,7 @@ func (s *VulinServer) init() {
 	s.registerFastjson()
 	s.registerCsrf()
 	s.registerBrutePlayground()
+	s.registerGroupFuzzerDemo()
 
 	// 业务型
 	s.registerUserRoute()

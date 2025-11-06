@@ -50,3 +50,4 @@ gen
 .antlr/
 common/xlic/*.gzip
 .go-version
+.gocache

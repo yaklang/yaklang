@@ -107,8 +107,7 @@ Host: example.com
 				ForceFuzz:                true,
 			},
 		},
-		Concurrent:      1,
-		EnableOverrides: true,
+		Concurrent: 1,
 		Overrides: &ypb.GroupHTTPFuzzerOverrides{
 			RepeatTimes: 2,
 		},

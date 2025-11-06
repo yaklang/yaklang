@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>库存竞态演示</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; }
+    h1, h2 { color: #333; }
+    label { display: inline-block; width: 110px; }
+    input { padding: 4px 6px; margin-bottom: 8px; }
+    button { padding: 6px 12px; margin-right: 8px; cursor: pointer; }
+    section { margin-bottom: 24px; }
+    pre { background: #f7f7f7; border-radius: 4px; padding: 12px; min-height: 120px; }
+  </style>
+</head>
+<body>
+  <h1>库存竞态演示（Group HTTP Fuzzer）</h1>
+  <p>步骤：先初始化活动，拿到 <code>session_id</code>，再用多个用户并发访问 <code>/buy</code> 接口即可观察库存被超卖。</p>
+
+  <section>
+    <h2>1. 初始化活动</h2>
+    <div>
+      <label>商品名称：</label>
+      <input id="item" value="yaklang 限量周边">
+    </div>
+    <div>
+      <label>库存数量：</label>
+      <input id="stock" type="number" min="1" value="5">
+    </div>
+    <button onclick="initSession()">初始化</button>
+  </section>
+
+  <section>
+    <h2>2. 并发抢购</h2>
+    <div>
+      <label>Session ID：</label>
+      <input id="session" size="40">
+    </div>
+    <div>
+      <label>用户名：</label>
+      <input id="user" value="alice">
+    </div>
+    <button onclick="buyOnce()">单次抢购</button>
+    <button onclick="buyBatch()">连续抢购 5 次</button>
+  </section>
+
+  <section>
+    <h2>3. 查看状态</h2>
+    <button onclick="loadStatus()">刷新状态</button>
+    <pre id="output">{ }</pre>
+  </section>
+
+  <script>
+    async function api(path, options = {}) {
+      const res = await fetch(path, options);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return { ok: false, message: text };
+      }
+    }
+
+    async function initSession() {
+      const result = await api('/group-demo/inventory/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: document.getElementById('item').value,
+          stock: Number(document.getElementById('stock').value) || 5,
+        }),
+      });
+      if (result.session_id) {
+        document.getElementById('session').value = result.session_id;
+      }
+      render(result);
+    }
+
+    async function buyOnce() {
+      const session = document.getElementById('session').value.trim();
+      if (!session) {
+        alert('请先初始化，获取 session_id');
+        return;
+      }
+      const result = await api('/group-demo/inventory/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: session,
+          user: document.getElementById('user').value || 'anonymous',
+        }),
+      });
+      render(result);
+    }
+
+    async function buyBatch() {
+      for (let i = 0; i < 5; i++) {
+        await buyOnce();
+      }
+    }
+
+    async function loadStatus() {
+      const session = document.getElementById('session').value.trim();
+      if (!session) {
+        alert('请先初始化，获取 session_id');
+        return;
+      }
+      const result = await api('/group-demo/inventory/status?session_id=' + encodeURIComponent(session));
+      render(result);
+    }
+
+    function render(data) {
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    }
+  </script>
+</body>
+</html>
