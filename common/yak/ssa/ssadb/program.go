@@ -69,7 +69,7 @@ type IrProgram struct {
 }
 
 func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
-	db := GetDB().Model(&IrProgram{})
+	db := GetDB().Model(&IrProgram{}).Debug()
 	out := &IrProgram{
 		ProgramName: name,
 		Version:     version,
