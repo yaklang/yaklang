@@ -23,6 +23,7 @@ func TestCompile_Jar(t *testing.T) {
 		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithConfigInfo(info))
 		require.NoError(t, err)
 		require.NotNil(t, prog)
+		prog.Show()
 
 		vals, err := prog.SyntaxFlowWithError(`System.out.println(,* as $a)`)
 		require.NoError(t, err)

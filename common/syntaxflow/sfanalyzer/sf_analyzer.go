@@ -11,6 +11,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -331,7 +332,7 @@ func evaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule) error {
 }
 
 // checkWithFS 辅助函数遍历FS
-func checkWithFS(fs fi.FileSystem, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) error {
+func checkWithFS(fs fi.FileSystem, handler func(ssaapi.Programs) error, opt ...ssaconfig.Option) error {
 	prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
 	if err != nil {
 		return err

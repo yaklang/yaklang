@@ -58,6 +58,8 @@ func GetAllSupportedLanguages() []string {
 
 func ValidateLanguage(language string) (Language, error) {
 	switch strings.TrimSpace(strings.ToLower(language)) {
+	case "":
+		return "", nil // empty language
 	case "yak", "yaklang":
 		return Yak, nil
 	case "java":

@@ -39,13 +39,13 @@ type InputRule struct {
 	RuleContent string
 }
 type RuleChecker struct {
-	Name        string
-	ConfigInfo  *ssaconfig.CodeSourceInfo
-	RiskInfo    []*RiskInfo
-	RuleNames   []string
-	InputRules  []*InputRule
-	Language    string
-	ExcludeFile string
+	Name           string
+	codeSourceInfo *ssaconfig.CodeSourceInfo
+	RiskInfo       []*RiskInfo
+	RuleNames      []string
+	InputRules     []*InputRule
+	Language       string
+	ExcludeFile    string
 
 	//RequiredExclude only language !=nil to check
 	RequiredExclude bool
@@ -149,24 +149,24 @@ func (s *RuleChecker) getRule() []*schema.SyntaxFlowRule {
 }
 func (s *RuleChecker) run() error {
 	progName := uuid.NewString()
-	rawConfig, err := json.Marshal(s.ConfigInfo)
+	codeSourceJson, err := json.Marshal(s.codeSourceInfo)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	}()
-	if s.ConfigInfo == nil {
+	if s.codeSourceInfo == nil {
 		return utils.Error("config info is nil")
 	}
 	if s.Language == "" {
 		log.Infof("language is empty, need to detect")
 		return utils.Error("language is empty")
 	}
-	opts := []ssaapi.Option{
+	opts := []ssaconfig.Option{
 		ssaapi.WithProgramName(progName),
 		ssaapi.WithRawLanguage(s.Language),
-		ssaapi.WithConfigInfoRaw(string(rawConfig)),
+		ssaconfig.WithCodeSourceJson(string(codeSourceJson)),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			log.Infof("msg: %v", msg)
 			log.Infof("process: %v", process)
@@ -183,11 +183,7 @@ func (s *RuleChecker) run() error {
 			defaultExclude = strings.Split("**/classes/**,**/target/**", ",")
 		}
 	}
-	excludeOptions, err := ssaapi.DefaultExcludeFunc(defaultExclude)
-	if err != nil {
-		return err
-	}
-	opts = append(opts, excludeOptions)
+	opts = append(opts, ssaapi.WithExcludeFunc(defaultExclude))
 	_, err = ssaapi.ParseProject(opts...)
 	if err != nil {
 		return err

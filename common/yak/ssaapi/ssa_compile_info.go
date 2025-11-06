@@ -16,32 +16,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
-	if raw == "" {
-		return nil, utils.Errorf("info is empty ")
-	}
-
-	codeSource, err := ssaconfig.New(ssaconfig.ModeCodeSource, ssaconfig.WithCodeSourceJson(raw))
-	if err != nil {
-		return nil, utils.Errorf("failed to new code source: %v", err)
-	}
-
-	c.Processf(0, "parse info: %s", codeSource.GetCodeSourceKind())
+func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
+	c.Processf(0, "parse info: %s", c.GetCodeSourceKind())
 	defer func() {
 		c.Processf(0, "parse info finish")
 	}()
 
 	var baseFS fi.FileSystem
-	switch codeSource.GetCodeSourceKind() {
+	var err error
+	switch c.GetCodeSourceKind() {
 	case ssaconfig.CodeSourceLocal:
-		baseFS = filesys.NewRelLocalFs(codeSource.GetCodeSourceLocalFile())
+		baseFS = filesys.NewRelLocalFs(c.GetCodeSourceLocalFile())
 	case ssaconfig.CodeSourceCompression:
-		baseFS, err = getZipFile(codeSource)
+		baseFS, err = getZipFile(c)
 		if err != nil {
 			return nil, err
 		}
 	case ssaconfig.CodeSourceJar:
-		zipfs, err := getZipFile(codeSource)
+		zipfs, err := getZipFile(c)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
@@ -49,35 +41,22 @@ func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
 	case ssaconfig.CodeSourceGit:
-		baseFS, err = gitFs(codeSource, c.Processf)
+		baseFS, err = gitFs(c)
 		if err != nil {
 			return nil, err
 		}
 	case ssaconfig.CodeSourceSvn:
-		return svnFs(codeSource)
+		return svnFs(c)
+	case ssaconfig.CodeSourceNone:
+		return nil, nil
 	default:
-		return nil, utils.Errorf("unsupported kind: %s", codeSource.GetCodeSourceKind())
+		return nil, utils.Errorf("unsupported kind: %s", c.GetCodeSourceKind())
 	}
 
 	return baseFS, nil
 }
 
-// 已弃用
-// func (c *Config) wrapWithPreprocessedFS(fs fi.FileSystem) (fi.FileSystem, error) {
-// 	if c.language != consts.C {
-// 		return fs, nil
-// 	}
-
-// 	c.Processf(0, "wrapping filesystem with C preprocessor support")
-// 	preprocessedFS, err := filesys.NewPreprocessedFS(fs)
-// 	if err != nil {
-// 		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
-// 		return fs, nil
-// 	}
-// 	return preprocessedFS, nil
-// }
-
-func getZipFile(codeSource *ssaconfig.Config) (*filesys.ZipFS, error) {
+func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 	// use local
 	if codeSource.GetCodeSourceLocalFile() != "" {
 		return filesys.NewZipFSFromLocal(codeSource.GetCodeSourceLocalFile())
@@ -98,7 +77,8 @@ func getZipFile(codeSource *ssaconfig.Config) (*filesys.ZipFS, error) {
 	return filesys.NewZipFSRaw(bytes.NewReader(resp.GetBody()), int64(len(resp.GetBody())))
 }
 
-func gitFs(codeSource *ssaconfig.Config, process func(float64, string, ...any)) (fi.FileSystem, error) {
+func gitFs(codeSource *Config) (fi.FileSystem, error) {
+	process := codeSource.Processf
 	if codeSource.GetCodeSourceURL() == "" {
 		return nil, utils.Errorf("git url is empty ")
 	}
@@ -146,6 +126,6 @@ func parseAuth(auth *ssaconfig.AuthConfigInfo) yakgit.Option {
 	return nil
 }
 
-func svnFs(codeSource *ssaconfig.Config) (fi.FileSystem, error) {
+func svnFs(codeSource *Config) (fi.FileSystem, error) {
 	return nil, utils.Errorf("unimplemented ")
 }

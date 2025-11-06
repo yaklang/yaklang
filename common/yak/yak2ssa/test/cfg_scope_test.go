@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -451,12 +451,11 @@ func TestYaklangBasic_Variable_Loop(t *testing.T) {
 
 func TestYaklangParameter(t *testing.T) {
 	check := func(code string, t *testing.T) {
-		test := assert.New(t)
 		prog, err := ssaapi.Parse(code)
-		test.Nil(err)
+		require.NoError(t, err)
 		as := prog.Ref("a").ShowWithSource()
-		test.Equal(1, len(as))
-		test.Equal("a", as[0].GetRange().GetText())
+		require.Equal(t, 1, len(as))
+		require.Equal(t, "a", as[0].GetRange().GetText())
 	}
 	t.Run("test parameter used", func(t *testing.T) {
 		check(

@@ -39,7 +39,7 @@ const (
 	OnlyDatabase
 )
 
-func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
+func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaconfig.Option) {
 	// only in memory
 	{
 		var astSequence ssareducer.ASTSequenceType
@@ -100,7 +100,7 @@ func CheckWithName(
 	name string,
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
-	opt ...ssaapi.Option,
+	opt ...ssaconfig.Option,
 ) {
 	// only in memory
 	{
@@ -152,7 +152,7 @@ func CheckWithNameOnlyInMemory(
 	name string,
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
-	opt ...ssaapi.Option,
+	opt ...ssaconfig.Option,
 ) {
 	// only in memory
 	{
@@ -177,7 +177,7 @@ func CheckWithNameOnlyInMemory(
 func Check(
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
-	opt ...ssaapi.Option,
+	opt ...ssaconfig.Option,
 ) {
 	CheckWithName("", t, code, handler, opt...)
 }
@@ -185,13 +185,13 @@ func Check(
 func CheckJava(
 	t *testing.T, code string,
 	handler func(prog *ssaapi.Program) error,
-	opt ...ssaapi.Option,
+	opt ...ssaconfig.Option,
 ) {
 	opt = append(opt, ssaapi.WithLanguage(ssaconfig.JAVA))
 	CheckWithName("", t, code, handler, opt...)
 }
 
-func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaapi.Option) {
+func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, prog *ssaapi.Program, start time.Time) error, opt ...ssaconfig.Option) {
 	opt = append(opt, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 	{
@@ -236,7 +236,7 @@ func ProfileJavaCheck(t *testing.T, code string, handler func(inMemory bool, pro
 	}
 }
 
-func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaapi.Option) {
+func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p ParseStage, prog ssaapi.Programs, start time.Time) error, opt ...ssaconfig.Option) {
 	// only in memory
 	{
 		start := time.Now()
@@ -281,7 +281,7 @@ func CheckProfileWithFS(fs fi.FileSystem, t require.TestingT, handler func(p Par
 
 func CheckFSWithProgram(
 	t *testing.T, programName string,
-	codeFS, ruleFS fi.FileSystem, opt ...ssaapi.Option,
+	codeFS, ruleFS fi.FileSystem, opt ...ssaconfig.Option,
 ) {
 	if programName == "" {
 		programName = "test-" + uuid.New().String()

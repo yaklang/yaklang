@@ -138,7 +138,7 @@ type SSACompileConfig struct {
 	ExcludeFiles      []string      `json:"exclude_files"`
 	ReCompile         bool          `json:"re_compile"`
 	MemoryCompile     bool          `json:"memory_compile"`
-	Concurrency       uint32        `json:"compile_concurrency"`
+	Concurrency       int           `json:"compile_concurrency"`
 	CompileIrCacheTTL time.Duration `json:"compile_ir_cache_ttl"`
 }
 
@@ -229,14 +229,14 @@ func (c *Config) SetCompileMemory(memory bool) {
 	c.SSACompile.MemoryCompile = memory
 }
 
-func (c *Config) GetCompileConcurrency() uint32 {
+func (c *Config) GetCompileConcurrency() int {
 	if c == nil || c.SSACompile == nil {
 		return 0
 	}
 	return c.SSACompile.Concurrency
 }
 
-func (c *Config) SetCompileConcurrency(concurrency uint32) {
+func (c *Config) SetCompileConcurrency(concurrency int) {
 	if c == nil {
 		return
 	}
@@ -293,18 +293,22 @@ func WithCompileReCompile(reCompile bool) Option {
 }
 
 // WithCompileMemoryCompile 设置内存编译
-func WithCompileMemoryCompile(memoryCompile bool) Option {
+func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Memory Compile"); err != nil {
 			return err
 		}
-		c.SSACompile.MemoryCompile = memoryCompile
+		enable := true
+		if len(memoryCompile) > 0 {
+			enable = memoryCompile[0]
+		}
+		c.SSACompile.MemoryCompile = enable
 		return nil
 	}
 }
 
 // WithCompileConcurrency 设置编译并发数
-func WithCompileConcurrency(concurrency uint32) Option {
+func WithCompileConcurrency(concurrency int) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Concurrency"); err != nil {
 			return err

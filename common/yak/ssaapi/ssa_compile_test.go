@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -144,7 +143,7 @@ func TestJava_ProcessManage_Mutli_Files(t *testing.T) {
 			}),
 			ssaapi.WithContext(ctx),
 		)
-		assert.Error(t, err, "parse project error: %v", err)
+		require.Error(t, err, "parse project error: %v", err)
 		// when cancel, the process will not 1
 		require.LessOrEqual(t, maxProcess, 0.9)
 		file := make([]string, 0)

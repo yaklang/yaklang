@@ -2,6 +2,7 @@ package ssaconfig
 
 import (
 	"context"
+	"encoding/json"
 )
 
 type Config struct {
@@ -23,20 +24,23 @@ type Option func(*Config) error
 type Mode int
 
 const (
-	ModeProjectBase           Mode = 1 << iota // 0 - 基础模式
-	ModeSSACompile            Mode = 1 << iota // 1 - 编译模式
-	ModeSyntaxFlowScanManager Mode = 1 << iota // 2 - 扫描管理器模式
-	ModeSyntaxFlow            Mode = 1 << iota // 3 - SyntaxFlow模式
-	ModeSyntaxFlowRule        Mode = 1 << iota // 4 - 规则模式
-	ModeCodeSource            Mode = 1 << iota // 5 - 源码配置模式
+	ModeProjectBase           Mode = 1 << iota // - 基础模式
+	modeSSACompile            Mode = 1 << iota // - 编译模式
+	ModeSyntaxFlowScanManager Mode = 1 << iota // - 扫描管理器模式
+	ModeSyntaxFlow            Mode = 1 << iota // - SyntaxFlow模式
+	ModeSyntaxFlowRule        Mode = 1 << iota // - 规则模式
+	ModeCodeSource            Mode = 1 << iota // - 源码配置模式
+
+	ModeSSACompile = ModeProjectBase | modeSSACompile | ModeCodeSource
 
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
 	// all
-	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
+	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
 )
 
 func New(mode Mode, opts ...Option) (*Config, error) {
 	cfg := &Config{
+		ctx:       context.Background(),
 		ExtraInfo: map[string][]any{},
 	}
 	cfg.Mode = mode
@@ -95,6 +99,36 @@ func defaultSyntaxFlowRuleConfig() *SyntaxFlowRuleConfig {
 	return &SyntaxFlowRuleConfig{}
 }
 
+// --- Context Get/Set 方法 ---
+
+func WithContext(ctx context.Context) Option {
+	return func(c *Config) error {
+		c.ctx = ctx
+		return nil
+	}
+}
+
+func (c *Config) GetContext() context.Context {
+	if c == nil || c.ctx == nil {
+		return context.Background()
+	}
+	return c.ctx
+}
+
+func (c *Config) IsContextCancel() bool {
+	if c == nil || c.ctx == nil {
+		return false
+	}
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+// ## ------------------- extra option helper ------------------- ##
+
 // --- ExtraInfo 扩展信息 Get/Set 方法 ---
 
 func (c *Config) GetExtraInfo(key string) ([]any, bool) {
@@ -113,32 +147,6 @@ func (c *Config) SetExtraInfo(key string, value any) {
 		c.ExtraInfo = map[string][]any{}
 	}
 	c.ExtraInfo[key] = append(c.ExtraInfo[key], value)
-}
-
-func WithContext(ctx context.Context) Option {
-	return func(c *Config) error {
-		c.ctx = ctx
-		return nil
-	}
-}
-
-func (c *Config) GetContext() context.Context {
-	if c == nil {
-		return context.Background()
-	}
-	return c.ctx
-}
-
-func (c *Config) IsContextCancel() bool {
-	if c == nil || c.ctx == nil {
-		return false
-	}
-	select {
-	case <-c.ctx.Done():
-		return true
-	default:
-		return false
-	}
 }
 
 type ExtraOption[C any] struct {
@@ -163,7 +171,7 @@ func SetOption[TValue, TCache any](
 	name string,
 	fn func(TCache, TValue),
 ) func(TValue) Option {
-	with := func(value TValue) Option {
+	return func(value TValue) Option {
 		return func(c *Config) error {
 			c.SetExtraInfo(name, ExtraOption[TCache]{
 				fn: func(u TCache, a any) {
@@ -176,5 +184,33 @@ func SetOption[TValue, TCache any](
 			return nil
 		}
 	}
-	return with
+}
+
+// ## -------------------- json
+
+func (c *Config) JSON() string {
+	jsonBytes, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
+
+func LoadConfigFromJSON(data []byte) (*Config, error) {
+	var c Config
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func WithConfigJson(jsonStr string) Option {
+	return func(c *Config) error {
+		var temp Config
+		if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
+			return err
+		}
+		*c = temp
+		return nil
+	}
 }
