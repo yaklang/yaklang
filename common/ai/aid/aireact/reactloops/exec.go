@@ -417,7 +417,17 @@ LOOP:
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
-		streamWg.Wait()
+
+		streamDone := make(chan bool)
+		go func() {
+			streamWg.Wait()
+			defer close(streamDone)
+		}()
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-streamDone:
+			log.Warnf("stream wait too long")
+		}
 
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)

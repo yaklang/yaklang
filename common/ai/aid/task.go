@@ -69,6 +69,12 @@ func (t *AiTask) executing() bool {
 	return t.GetStatus() == aicommon.AITaskState_Processing
 }
 
+func (t *AiTask) SetID(id string) {
+	if t.AIStatefulTaskBase != nil {
+		t.AIStatefulTaskBase.SetID(id)
+	}
+}
+
 func (t *AiTask) GetSummary() string {
 	if t.TaskSummary != "" {
 		return t.TaskSummary

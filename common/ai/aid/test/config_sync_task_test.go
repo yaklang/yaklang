@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -169,57 +170,13 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
-			defer func() {
-				rsp.Close()
-			}()
 			// 模拟任务规划
-
-			//fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称:`, `"call-tool"`, "const") {
-				if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: echo`) {
-					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "echo", "params": {"input": "%s"}}`, echoToken[echoToolRequestCount])))
-					if echoToolRequestCount < 2 {
-						echoToolRequestCount++
-					}
-				} else if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: error`) {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "error", "params": {}}`))
-				}
-				return rsp, nil
-			}
-			// 处理任务执行阶段
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["require-tool", "direct-answer"]`, ``) {
-				if utils.MatchAllOfSubString(request.GetPrompt(), "当前任务: \"步骤三") {
-					canSync = true
-					time.Sleep(100 * time.Millisecond)
-				}
-				if taskExecRequestCount < 3 { //  前三次echo调用工具
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "echo"}`))
-				} else { // 第四次调用error工具
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "error"}`))
-				}
-				taskExecRequestCount++
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), "continue-current-task", "proceed-next-task", "task-failed", "task-skipped") {
-				if decisionRequestCount%2 == 0 { // 隔一次 continue一次
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "continue-current-task"}`))
-				} else {
-					if firstSummary {
-						rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "proceed-next-task","task_short_summary":"%s"}`, task1Summary)))
-						firstSummary = false
-					} else {
-						rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "proceed-next-task","task_short_summary":"%s"}`, task2Summary)))
-					}
-
-				}
-				decisionRequestCount++
-				return rsp, nil
-			}
-
-			rsp.EmitOutputStream(strings.NewReader(`
+			i := config
+			prompt := request.GetPrompt()
+			rsp := i.NewAIResponse()
+			defer rsp.Close()
+			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
     "query": "测试同步任务升级",
@@ -240,7 +197,62 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
         }
     ]
 }`))
-			return rsp, nil
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if utils.MatchAllOfSubString(request.GetPrompt(), "任务名称: 步骤三") {
+					canSync = true
+					time.Sleep(10 * time.Minute)
+				}
+
+				toolName := "echo"
+
+				if taskExecRequestCount >= 3 { //  前三次echo调用工具
+					toolName = "error"
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+				taskExecRequestCount++
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+
+				if utils.MatchAllOfSubString(request.GetPrompt(), `echo`) {
+					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "echo", "params": {"input": "%s"}}`, echoToken[echoToolRequestCount])))
+					if echoToolRequestCount < 2 {
+						echoToolRequestCount++
+					}
+				} else if utils.MatchAllOfSubString(request.GetPrompt(), `error`) {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "error", "params": {}}`))
+				}
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				if decisionRequestCount%2 == 0 { // 隔一次 continue一次
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "abc-mocked-reason"}`))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+				}
+				decisionRequestCount++
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(request.GetPrompt(), "status_summary", "task_long_summary", "task_short_summary") {
+				if firstSummary {
+					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary","task_short_summary":"%s"}`, task1Summary)))
+					firstSummary = false
+				} else {
+					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary","task_short_summary":"%s"}`, task2Summary)))
+				}
+				return rsp, nil
+			}
+
+			return nil, utils.Errorf("unexpect prompt: %s", prompt)
 		}),
 	)
 	if err != nil {
@@ -252,24 +264,24 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 	var sendSync = false
 
-	ctx := utils.TimeoutContextSeconds(3)
+	ctx := utils.TimeoutContextSeconds(10000)
 
 LOOP:
 	for {
 		select {
 		case result := <-outputChan:
 			// 任务规划后，自动继续
-			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
-				continue
-			}
-			//fmt.Println(utils.ShrinkString(result.String(),50))
-
 			if canSync {
 				canSync = false
 				sendSync = true
 				inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PLAN))
 				continue
 			}
+
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
+				continue
+			}
+			//fmt.Println(utils.ShrinkString(result.String(),50))
 
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))

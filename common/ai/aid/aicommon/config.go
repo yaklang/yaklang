@@ -1182,6 +1182,20 @@ func WithTool(tool *aitool.Tool) ConfigOption {
 	}
 }
 
+func WithConsumption(input, output *int64, logUUID string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.InputConsumption = input
+		c.OutputConsumption = output
+		c.consumptionUUID = logUUID
+		return nil
+	}
+}
+
 // WithExtendedActionCallback sets the ExtendedActionCallback map.
 func WithExtendedActionCallback(name string, callback func(config *Config, action *Action)) ConfigOption {
 	return func(c *Config) error {
@@ -1791,4 +1805,8 @@ func (c *Config) LoadAIServiceByName(name string) error {
 	c.HotPatchBroadcaster.Submit(WithAIServiceName(c.AiServerName))
 	c.HotPatchBroadcaster.Submit(WithAICallback(c.OriginalAICallback))
 	return nil
+}
+
+func (c *Config) GetConsumptionConfig() (*int64, *int64, string) {
+	return c.InputConsumption, c.OutputConsumption, c.consumptionUUID
 }

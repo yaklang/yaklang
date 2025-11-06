@@ -150,8 +150,11 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 		close(outputChan)
 	}()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ins, err := aid.NewCoordinator(
 		"test",
+		aicommon.WithContext(ctx),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event

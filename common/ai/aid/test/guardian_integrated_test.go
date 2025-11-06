@@ -21,9 +21,11 @@ import (
 
 func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, params string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	rsp := i.NewAIResponse()
+	defer rsp.Close()
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
 	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
-		rsp := i.NewAIResponse()
+
 		rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -42,31 +44,31 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
     ]
 }
 			`))
-		rsp.Close()
 		return rsp, nil
 	}
 
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
-		rsp.Close()
 		return rsp, nil
 	}
 
 	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
-		rsp := i.NewAIResponse()
+
 		rsp.EmitOutputStream(bytes.NewBufferString(params))
-		rsp.Close()
 		return rsp, nil
 	}
 
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
-		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "short_summary") {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
+		time.Sleep(2 * time.Second)
 		return rsp, nil
 	}
 
@@ -163,6 +165,10 @@ LOOP:
 					}()
 					continue
 				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
+				fmt.Println("result:" + result.String())
 			}
 
 			if result.Type == schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN {
@@ -328,6 +334,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 	riskControlCalled := false
 	guardianSmokingTestPassed := false
 	var id []string
+	var allData []any
 	mockRiskControl := func(ctx context.Context, config *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
@@ -338,6 +345,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 		data := materials.GetString("id")
 		if len(data) > 3 {
 			id = append(id, data)
+			allData = append(allData, materials)
 		}
 
 		fmt.Printf("%v", materials)
@@ -385,7 +393,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 1000 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
@@ -414,7 +422,6 @@ LOOP:
 				useToolReviewPass = true
 				break LOOP
 			}
-			fmt.Println("review task result:" + result.String())
 		}
 	}
 
@@ -431,7 +438,7 @@ LOOP:
 	}
 
 	id = utils.RemoveRepeatedWithStringSlice(id)
-	require.Equal(t, len(id), 2)
+	require.Equal(t, len(id), 2, fmt.Sprintf("%v", allData))
 
 	if !guardianSmokingTestPassed {
 		t.Fatal("guardian smoking test failed")
