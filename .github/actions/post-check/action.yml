@@ -1,0 +1,24 @@
+name: 'Post-Check Action'
+description: 'Saves test results to cache after successful test run'
+
+inputs:
+  cache-key-prefix:
+    description: 'Prefix for the test result cache key'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: "Save Test Result Marker"
+      shell: bash
+      run: |
+        # Create a cache marker file indicating this commit passed all tests
+        mkdir -p /tmp/test_results_${{ inputs.cache-key-prefix }}
+        echo "true" > /tmp/test_results_${{ inputs.cache-key-prefix }}/test_passed
+        echo "Test result marker created for commit ${{ github.event.pull_request.head.sha }}"
+
+    - name: 'Save Test Results to Cache'
+      uses: actions/cache/save@v3
+      with:
+        path: /tmp/test_results_${{ inputs.cache-key-prefix }}
+        key: test-result-${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.head.sha }}

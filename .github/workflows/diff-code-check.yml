@@ -19,114 +19,25 @@ jobs:
   check-wip:
     runs-on: ubuntu-22.04
     outputs:
-      wip_detected: ${{ steps.check-wip.outputs.wip_detected }}
-      should_skip: ${{ steps.check-wip.outputs.should_skip }}
-      skip_reason: ${{ steps.check-wip.outputs.skip_reason }}
+      should_run_tests: ${{ steps.pre_check.outputs.should_run_tests }}
     steps:
-      - name: Check if PR is WIP or has PASS-DIFF-CHECK label
-        id: check-wip
-        run: |
-          # Get PR information
-          event_action="${{ github.event.action }}"
-          labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
-          title='${{ github.event.pull_request.title }}'
-          
-          echo "Event Action: $event_action"
-          echo "PR Labels: $labels"
-          echo "PR Title: $title"
-          
-          # Convert to lowercase for case-insensitive matching
-          labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
-          title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
-          
-          # Handle label change events - only process relevant labels
-          if [[ "$event_action" == "labeled" || "$event_action" == "unlabeled" ]]; then
-            label_name='${{ github.event.label.name }}'
-            label_name_lower=$(echo "$label_name" | tr '[:upper:]' '[:lower:]')
-            
-            echo "Label changed: $label_name (lowercase: $label_name_lower)"
-            
-            # Check if the changed label is relevant (WIP-related or PASS-DIFF-CHECK)
-            is_relevant_label=false
-            
-            # Check each relevant label pattern
-            if [[ "$label_name_lower" == *"do-not-merge"* ]] || \
-               [[ "$label_name_lower" == *"wip"* ]] || \
-               [[ "$label_name_lower" == *"pass-diff-check"* ]]; then
-              is_relevant_label=true
-            fi
-            
-            if [[ "$is_relevant_label" == "false" ]]; then
-              echo "::notice::Label change is not relevant to diff-code-check, skipping workflow"
-              echo "should_skip=true" >> $GITHUB_OUTPUT
-              echo "skip_reason=label_not_relevant" >> $GITHUB_OUTPUT
-              echo "wip_detected=false" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            
-            echo "Label is relevant, continuing with checks..."
-          fi
-          
-          # Check for PASS-DIFF-CHECK label (skip security check for false positives)
-          if [[ "$labels_lower" == *"pass-diff-check"* ]]; then
-            echo "::notice::PASS-DIFF-CHECK label found, skipping security check"
-            echo "should_skip=true" >> $GITHUB_OUTPUT
-            echo "skip_reason=pass-diff-check" >> $GITHUB_OUTPUT
-            echo "wip_detected=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          # Define WIP indicators
-          wip_labels="do-not-merge,work in progress,wip,rfc"
-          
-          # Check for WIP indicators
-          wip_found=false
-          IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
-          for wip_label in "${LABEL_ARRAY[@]}"; do
-            if [[ "$labels_lower" == *"$wip_label"* ]] || [[ "$title_lower" == *"$wip_label"* ]]; then
-              wip_found=true
-              break
-            fi
-          done
-          
-          if [ "$wip_found" = true ]; then
-            echo "WIP indicator found"
-            echo "wip_detected=true" >> $GITHUB_OUTPUT
-            echo "should_skip=false" >> $GITHUB_OUTPUT
-            echo "skip_reason=none" >> $GITHUB_OUTPUT
-          else
-            echo "No WIP indicators found"
-            echo "wip_detected=false" >> $GITHUB_OUTPUT
-            echo "should_skip=false" >> $GITHUB_OUTPUT
-            echo "skip_reason=none" >> $GITHUB_OUTPUT
-          fi
+      - name: 'Check Out'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Skip if irrelevant label change
-        if: steps.check-wip.outputs.should_skip == 'true' && steps.check-wip.outputs.skip_reason == 'label_not_relevant'
-        run: |
-          echo "::notice::Label change is not relevant to diff-code-check, skipping workflow to save resources."
-          exit 0
-
-      - name: Skip if PASS-DIFF-CHECK label detected
-        if: steps.check-wip.outputs.should_skip == 'true' && steps.check-wip.outputs.skip_reason == 'pass-diff-check'
-        run: |
-          echo "::notice::✅ Diff-code-check is skipped due to PASS-DIFF-CHECK label."
-          echo "::notice::This label is used to bypass security checks when there are known false positives."
-          echo "::notice::To re-enable security checks, remove the PASS-DIFF-CHECK label from this PR."
-          exit 0
-
-      - name: Fail if WIP detected
-        if: steps.check-wip.outputs.wip_detected == 'true' && steps.check-wip.outputs.should_skip != 'true'
-        run: |
-          echo "::error::This PR is marked as WIP (Work In Progress). Skipping diff-code-check to save resources."
-          echo "::error::Please remove WIP indicators from labels and title when ready for review."
-          echo "::notice::To enable security checks, remove WIP-related labels (wip, work in progress, do-not-merge, rfc) or keywords from the PR title."
-          exit 1
+      - name: Run Pre-Check
+        id: pre_check
+        uses: ./.github/actions/pre-check
+        with:
+          failed-labels: 'do-not-merge,work in progress,wip,rfc'
+          skip-labels: 'pass-diff-check'
+          cache-key-prefix: 'diff-code-check'
 
   setup:
     runs-on: ubuntu-22.04
     needs: [check-wip]
-    if: needs.check-wip.outputs.wip_detected != 'true' && needs.check-wip.outputs.should_skip != 'true'
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     permissions:
       contents: read
       pull-requests: write
@@ -770,3 +681,20 @@ jobs:
       - name: Display all risks
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: yak ssa-risk --input ./risk.json --with-code
+
+  post-check:
+    name: Save Scan Results to Cache
+    needs: setup
+    if: success()
+    runs-on: ubuntu-22.04
+    steps:
+      # checkout code for this ./.github/actions/post-check/action.yml to work
+      - name: 'Check Out'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Post-Check (Save Scan Results)
+        uses: ./.github/actions/post-check
+        with:
+          cache-key-prefix: 'diff-code-check'

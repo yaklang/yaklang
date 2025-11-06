@@ -1,0 +1,116 @@
+name: 'Pre-Check Action'
+description: 'Checks failed/skip labels and test result cache. Outputs should_run_tests flag.'
+
+inputs:
+  failed-labels:
+    description: 'Labels that cause immediate failure, comma-separated'
+    required: false 
+    default: ''
+  skip-labels:
+    description: 'Labels that skip tests but do not fail, comma-separated'
+    required: false
+    default: ''
+  cache-key-prefix:
+    description: 'Prefix for the test result cache key'
+    required: true
+
+outputs:
+  should_run_tests:
+    description: 'Whether to run tests (true/false)'
+    value: ${{ steps.final_check.outputs.should_run_tests }}
+
+runs:
+  using: 'composite'
+  steps:
+    # Step 1: Check Failed Labels - Fail immediately if detected
+    - name: 'Check Failed Labels'
+      id: check_failed
+      shell: bash
+      run: |
+        labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+        labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
+        failed_labels="${{ inputs.failed-labels }}"
+        
+        echo "PR Labels: $labels"
+        
+        if [ -z "$failed_labels" ]; then
+          echo "No failed-labels configured, skipping check"
+          exit 0
+        fi
+        
+        # Check for failed label indicators
+        IFS=',' read -ra LABEL_ARRAY <<< "$failed_labels"
+        for failed_label in "${LABEL_ARRAY[@]}"; do
+          # Trim whitespace
+          failed_label=$(echo "$failed_label" | xargs)
+          if [[ "$labels_lower" == *"$failed_label"* ]]; then
+            echo "::error::Found failed-label: $failed_label. Failing CI."
+            echo "::error::Please remove this label when ready."
+            exit 1
+          fi
+        done
+        
+        echo "No failed-labels found"
+
+    # Step 2: Check Skip Labels - Skip tests but don't fail
+    - name: 'Check Skip Labels'
+      id: check_skip
+      shell: bash
+      run: |
+        labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+        labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
+        skip_labels="${{ inputs.skip-labels }}"
+        
+        if [ -z "$skip_labels" ]; then
+          echo "No skip-labels configured"
+          echo "should_skip=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Check for skip label indicators
+        IFS=',' read -ra LABEL_ARRAY <<< "$skip_labels"
+        for skip_label in "${LABEL_ARRAY[@]}"; do
+          # Trim whitespace
+          skip_label=$(echo "$skip_label" | xargs)
+          if [[ "$labels_lower" == *"$skip_label"* ]]; then
+            echo "Found skip-label: $skip_label. Skipping tests."
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+        done
+        
+        echo "No skip-labels found"
+        echo "should_skip=false" >> $GITHUB_OUTPUT
+
+    # Step 3: Check Test Result Cache (only if not skipping)
+    - name: 'Restore Test Result Cache'
+      id: restore_cache
+      if: steps.check_skip.outputs.should_skip != 'true'
+      uses: actions/cache/restore@v3
+      with:
+        path: /tmp/test_results_${{ inputs.cache-key-prefix }}
+        key: test-result-${{ inputs.cache-key-prefix }}-${{ github.event.pull_request.head.sha }}
+        lookup-only: true
+
+    # Step 4: Determine if tests should run
+    - name: 'Determine Test Execution'
+      id: final_check
+      shell: bash
+      run: |
+        SHOULD_SKIP="${{ steps.check_skip.outputs.should_skip }}"
+        
+        # If skip label found, don't run tests
+        if [[ "$SHOULD_SKIP" == "true" ]]; then
+          echo "Skip label detected, skipping tests"
+          echo "should_run_tests=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Check if test result cache exists
+        if [[ "${{ steps.restore_cache.outputs.cache-hit }}" == "true" ]]; then
+          echo "Test result cache found, skipping tests"
+          echo "should_run_tests=false" >> $GITHUB_OUTPUT
+        else
+          echo "No test result cache found, will run tests"
+          echo "should_run_tests=true" >> $GITHUB_OUTPUT
+        fi
