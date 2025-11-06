@@ -22,12 +22,13 @@ func init() {
 }
 
 func handlerFileMonitor(ctx context.Context, request *ypb.DuplexConnectionRequest) error {
-	eventsHandler := func(eventSet *filesys.EventSet) {
-		yakit.BroadcastData(yakit.ServerPushType_File_Monitor, eventSet)
-	}
 	data := request.GetData()
 	op := gjson.Get(string(data), "operate").String()
 	id := gjson.Get(string(data), "id").String()
+	eventsHandler := func(eventSet *filesys.EventSet) {
+		eventSet.Id = id
+		yakit.BroadcastData(yakit.ServerPushType_File_Monitor, eventSet)
+	}
 	switch op {
 	case OP_NEW_MONITOR:
 		path := gjson.Get(string(data), "path").String()
