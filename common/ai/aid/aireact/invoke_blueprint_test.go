@@ -173,7 +173,7 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 	aiforgeExecuteConfirmed := false
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if utils.MatchAllOfSubString(r.GetPrompt(), `"plan"`, `"require-user-interact"`, `"main_task"`) {
+			if utils.MatchAllOfSubString(r.GetPrompt(), `"plan"`, `"main_task"`) {
 				aiforgeExecuteConfirmed = true
 				cancel()
 			}

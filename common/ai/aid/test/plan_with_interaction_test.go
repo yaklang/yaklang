@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -24,7 +25,7 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 
 	timelineShowed := false
 
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChan),
@@ -40,11 +41,11 @@ func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 				timelineShowed = true
 			}
 
-			if utils.MatchAllOfSubString(prompts, `"require-user-interact"`) {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-user-interact", "question": "你喜欢红色还是蓝色？", "options": [
+			if utils.MatchAllOfSubString(prompts, `"ask_for_clarification"`) {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "ask_for_clarification", "ask_for_clarification_payload" : { "question": "你喜欢红色还是蓝色？", "options": [
 	{"option_name": "红色", "option_description": "红色"},
 {"option_name": "蓝色", "option_description": "蓝色"}, { "option_name": "` + token + `", "option_description": "` + token + `"}
-]}`))
+]}}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -122,7 +123,7 @@ func TestCoordinator_PlanInteraction(t *testing.T) {
 
 	userInteractTrigger := false
 
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChan),

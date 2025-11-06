@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -26,7 +27,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 	fmt.Println("------------------------------------------------------------")
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小
 	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区大小
-	coordinator, err := NewFastRecoverCoordinator(
+	coordinator, err := aid.NewFastRecoverCoordinator(
 		uid,
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
@@ -152,7 +153,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小以适应CI环境
 	outputChan := make(chan *schema.AiOutputEvent, 200)                              // 增加缓冲区大小以适应CI环境
-	coordinator, err := NewCoordinator(
+	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),

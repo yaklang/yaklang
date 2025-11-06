@@ -175,31 +175,6 @@ type Coordinator struct {
 	rootTask *AiTask
 }
 
-func RunCoordinator(ctx context.Context, userInput string, options ...aicommon.ConfigOption) error {
-	config := aicommon.NewConfig(ctx, options...)
-	if utils.IsNil(config.Timeline.GetAICaller()) {
-		config.Timeline.SetAICaller(config)
-	}
-
-	config.StartEventLoop(ctx)
-	config.StartHotPatchLoop(ctx)
-	config.Guardian.SetOutputEmitter(config.Id, config.EventHandler)
-	config.Guardian.SetAICaller(config)
-	coordinator := &Coordinator{
-		Config:    config,
-		userInput: userInput,
-	}
-
-	coordinator.Memory = GetDefaultMemory()
-	coordinator.Memory.SetTimelineInstance(config.Timeline)
-	coordinator.Memory.BindCoordinator(coordinator)
-	if err := coordinator.loadToolsViaOptions(); err != nil {
-		return utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
-	}
-
-	return coordinator.Run()
-}
-
 func (c *Coordinator) getCurrentTaskPlan() *AiTask {
 	return c.runtime.RootTask
 }

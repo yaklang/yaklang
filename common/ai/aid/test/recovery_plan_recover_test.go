@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -40,7 +41,7 @@ func recoverPlan(t *testing.T, uuid string) {
 	}()
 	recoverCtx, recoverCancel := context.WithCancel(context.Background())
 	defer recoverCancel()
-	ord, err := NewFastRecoverCoordinatorContext(
+	ord, err := aid.NewFastRecoverCoordinatorContext(
 		recoverCtx,
 		uuid,
 		aicommon.WithEventInputChanx(inputChan),
@@ -149,7 +150,7 @@ func TestCoordinator_RecoverCase(t *testing.T) {
 		close(outputChan)
 	}()
 
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/test"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -224,7 +225,7 @@ func TestTaskCancel(t *testing.T) {
 
 				fmt.Println("result:" + result.String())
 				if result.IsInteractive() {
-					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+					inputChan.SafeFeed(test.ContinueSuggestionInputEvent(result.GetInteractiveId()))
 					continue
 				}
 			}

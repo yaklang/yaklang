@@ -1,25 +1,32 @@
-package aid
+package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_TaskReview(t *testing.T) {
+func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent)
-	coordinator, err := NewCoordinator(
+	outputChan := make(chan *schema.AiOutputEvent, 10)
+
+	lsReviewed := false
+	nowReviewed := false
+	toolName1 := "ls"
+	toolName2 := "now"
+
+	coordinator, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
@@ -27,19 +34,12 @@ func TestCoordinator_TaskReview(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
-			defer func() {
-				time.Sleep(100 * time.Millisecond)
-				rsp.Close()
-			}()
-			fmt.Println("===========" + "request:" + "===========\n" + request.GetPrompt())
+			i := config
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `["short_summary", "long_summary"]`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "short_summary": "short", "long_summary": "long"}`))
-				return rsp, nil
-			}
+			prompt := request.GetPrompt()
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `"@action"`, `"plan"`) {
+			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -58,22 +58,46 @@ func TestCoordinator_TaskReview(t *testing.T) {
     ]
 }
 			`))
+				rsp.Close()
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), "continue-current-task", "proceed-next-task") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
+			if utils.MatchAllOfSubString(prompt, "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName1 + `" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+				rsp.Close()
+				return rsp, nil
+
+			}
+
+			if utils.MatchAllOfSubString(prompt, "require-tool", "abandon") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": ` + toolName2 + `}`))
+				rsp.Close()
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: now`, `"call-tool"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "now", "params": {}}`))
-				return rsp, nil
-			} else if utils.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "require-tool", "tool": "now"}`))
+
+			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
+				rsp.Close()
 				return rsp, nil
 			}
-			rsp.EmitOutputStream(strings.NewReader(`TODO`))
-			return rsp, nil
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			fmt.Println("Unexpected prompt:", prompt)
+
+			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+
 		}),
 	)
 	if err != nil {
@@ -83,8 +107,6 @@ func TestCoordinator_TaskReview(t *testing.T) {
 
 	useToolReview := false
 	useToolReviewPass := false
-	taskReview := false
-	taskReviewPass := false
 	count := 0
 LOOP:
 	for {
@@ -93,17 +115,11 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 1000 {
 				break LOOP
 			}
-
-			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
-				continue
-			}
-
 			fmt.Println("result:" + result.String())
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				time.Sleep(100 * time.Millisecond)
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
@@ -111,35 +127,25 @@ LOOP:
 			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
-				if a.GetString("tool") == "now" && a.GetString("tool_description") != "" {
+				toolname := a.GetString("tool")
+				if toolname == "ls" {
+					lsReviewed = true
 					useToolReview = true
-					time.Sleep(100 * time.Millisecond)
+					inputChan.SafeFeed(SuggestionInputEventEx(result.GetInteractiveId(), map[string]any{
+						"suggestion":      "wrong_tool",
+						"suggestion_tool": "tree,now",
+					}))
+				} else if toolname == "now" {
+					nowReviewed = true
 					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
-					continue
 				}
 			}
 
 			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "now") {
 				useToolReviewPass = true
+				break LOOP
 			}
-
-			if useToolReviewPass {
-				if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
-					fmt.Println("task result:" + result.String())
-					time.Sleep(200 * time.Millisecond)
-					inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
-					taskReview = true
-					continue
-				}
-			}
-
-			if taskReview {
-				fmt.Println("task result:" + result.String())
-				if utils.MatchAllOfSubString(string(result.Content), "start to handle review task event:") {
-					taskReviewPass = true
-					break LOOP
-				}
-			}
+			fmt.Println("review task result:" + result.String())
 		}
 	}
 
@@ -151,11 +157,11 @@ LOOP:
 		t.Fatal("tool review not finished")
 	}
 
-	if !taskReview {
-		t.Fatal("task review fail")
+	if !lsReviewed {
+		t.Fatal("ls tool review not finished")
 	}
 
-	if !taskReviewPass {
-		t.Fatal("task review not finished")
+	if !nowReviewed {
+		t.Fatal("now tool review not finished")
 	}
 }

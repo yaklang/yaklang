@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
@@ -15,7 +16,7 @@ type AIInvokeRuntime interface {
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
 	EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error)
-	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error)
+	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error)
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
@@ -33,4 +34,12 @@ type AITaskInvokeRuntime interface {
 	AIInvokeRuntime
 	SetCurrentTask(task AIStatefulTask)
 	GetCurrentTask() AIStatefulTask
+}
+
+var AIRuntimeInvokerGetter = func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error) {
+	return nil, utils.Errorf("not registered default AI runtime invoker")
+}
+
+func RegisterDefaultAIRuntimeInvoker(getter func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error)) {
+	AIRuntimeInvokerGetter = getter
 }

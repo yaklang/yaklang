@@ -3,7 +3,6 @@ package aireact
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aiexec"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -217,7 +216,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 }
 
 func init() {
-	aiexec.RegisterDefaultAIRuntimeInvoker(BuildReActInvoker)
+	aicommon.RegisterDefaultAIRuntimeInvoker(BuildReActInvoker)
 }
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {

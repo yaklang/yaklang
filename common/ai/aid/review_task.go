@@ -18,8 +18,8 @@ type ReviewSuggestion struct {
 	PromptEnglish    string `json:"prompt_english"`
 	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 
-	ResponseCallback func(reader io.Reader)          `json:"-"`
-	ParamSchema      string                          `json:"param_schema"`
+	ResponseCallback func(reader io.Reader) `json:"-"`
+	ParamSchema      string                 `json:"param_schema"`
 }
 
 /*
@@ -59,6 +59,8 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 }
 
 func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
+	defer t.runtime.updateTaskLink()
+
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -77,11 +79,9 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),
 		})
-
-		return t.runtime.executeSubTask(1, t)
 	case "inaccurate":
 		t.EmitInfo("inaccurate")
-		return t.executeTask()
+		return t.executeTask() // 重新执行
 	case "continue":
 		t.EmitInfo("continue")
 		return nil

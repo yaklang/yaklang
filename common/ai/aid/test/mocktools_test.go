@@ -1,8 +1,9 @@
-package aid
+package test
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,7 +13,7 @@ import (
 
 // 测试所有模拟工具
 func TestAllMockTools(t *testing.T) {
-	tools := GetAllMockTools()
+	tools := aid.GetAllMockTools()
 
 	// 验证工具数量
 	if len(tools) != 5 {
@@ -30,7 +31,7 @@ func TestAllMockTools(t *testing.T) {
 
 // 测试天气工具
 func TestWeatherTool(t *testing.T) {
-	tool := WeatherTool()
+	tool := aid.WeatherTool()
 
 	// 验证工具名称和描述
 	if tool.Name != "WeatherAPI" {
@@ -87,7 +88,7 @@ func TestWeatherTool(t *testing.T) {
 
 // 测试景点工具
 func TestAttractionTool(t *testing.T) {
-	tool := AttractionTool()
+	tool := aid.AttractionTool()
 
 	// 准备测试数据
 	inputJSON := `{
@@ -134,7 +135,7 @@ func TestAttractionTool(t *testing.T) {
 
 // 测试餐厅工具
 func TestRestaurantTool(t *testing.T) {
-	tool := RestaurantTool()
+	tool := aid.RestaurantTool()
 
 	// 准备测试数据
 	inputJSON := `{
@@ -225,7 +226,7 @@ func TestRestaurantTool(t *testing.T) {
 
 // 测试交通工具
 func TestTransportTool(t *testing.T) {
-	tool := TransportTool()
+	tool := aid.TransportTool()
 
 	// 准备测试数据
 	inputJSON := `{
@@ -296,7 +297,7 @@ func TestTransportTool(t *testing.T) {
 
 // 测试时间估算工具
 func TestTimeEstimateTool(t *testing.T) {
-	tool := TimeEstimateTool()
+	tool := aid.TimeEstimateTool()
 
 	// 准备测试数据
 	inputJSON := `{
@@ -378,7 +379,7 @@ func TestToolParameterValidation(t *testing.T) {
 	}{
 		{
 			name:     "天气工具缺少必要参数",
-			toolFunc: WeatherTool,
+			toolFunc: aid.WeatherTool,
 			inputJSON: `{
 				"tool": "WeatherAPI",
 				"@action": "invoke",
@@ -390,7 +391,7 @@ func TestToolParameterValidation(t *testing.T) {
 		},
 		{
 			name:     "景点工具缺少必要参数",
-			toolFunc: AttractionTool,
+			toolFunc: aid.AttractionTool,
 			inputJSON: `{
 				"tool": "AttractionAPI",
 				"@action": "invoke",
@@ -402,7 +403,7 @@ func TestToolParameterValidation(t *testing.T) {
 		},
 		{
 			name:     "时间估算工具参数不匹配",
-			toolFunc: TimeEstimateTool,
+			toolFunc: aid.TimeEstimateTool,
 			inputJSON: `{
 				"tool": "TimeEstimateAPI",
 				"@action": "invoke",

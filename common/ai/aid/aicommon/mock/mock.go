@@ -216,8 +216,8 @@ func (m *MockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery stri
 	return "", nil
 }
 
-func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
-	return true, nil
+func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error) {
+	return true, "", nil
 }
 
 func (m *MockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {

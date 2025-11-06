@@ -10,6 +10,17 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	AI_CONTEN_MAIN_TEXT  = "text"
+	AI_CONTENT_MAIN_CODE = "code"
+	AI_CONTENT_LOG       = "log"
+)
+
+const (
+	AI_CONTEN_SUB_PLAIN     = "plain"
+	AI_CONTENT_SUB_MARKDOWN = "markdown"
+)
+
 type EventType string
 
 const (
