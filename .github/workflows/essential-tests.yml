@@ -19,74 +19,19 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
     outputs:
-      wip_detected: ${{ steps.final_output.outputs.wip_detected }}
-      should_run_tests: ${{ steps.final_output.outputs.should_run_tests }}
+      should_run_tests: ${{ steps.pre_check.outputs.should_run_tests }}
     steps:
-      - name: Check if PR is WIP
-        id: check-wip
-        run: |
-          # Get current event information
-          labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
-          commit_sha="${{ github.event.pull_request.head.sha }}"
-          
-          echo "PR Labels: $labels"
-          echo "Commit SHA: $commit_sha"
-          
-          # Convert to lowercase for case-insensitive matching
-          labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
-          
-          # Define WIP indicators
-          wip_labels="do-not-merge,work in progress,wip,rfc"
-          
-          # Function to check if current state has WIP
-          check_current_wip() {
-            # Check for WIP indicators in labels
-            IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
-            for wip_label in "${LABEL_ARRAY[@]}"; do
-              if [[ "$labels_lower" == *"$wip_label"* ]]; then
-                return 0  # WIP found
-              fi
-            done
-            return 1  # No WIP found
-          }
-          
-          # Check current WIP state of the PR
-          if check_current_wip; then
-            echo "::error::This PR is marked as WIP (Work In Progress). Skipping CI run to save resources."
-            echo "::error::Please remove WIP indicators from labels and title when ready for review."
-            
-            # Use gh CLI to add a comment to the PR
-            gh pr comment ${{ github.event.pull_request.number }} --body "🚧 **WIP Detected** 🚧
-            
-            This PR has been marked as Work In Progress. CI tests have been skipped to save resources.
-            
-            **To enable CI testing:**
-            - Remove WIP-related labels: \`wip\`, \`work in progress\`, \`do-not-merge\`, \`rfc\`
-            - Remove WIP-related keywords from the PR title
-            
-            The CI will automatically run once the WIP indicators are removed." || true
-            exit 1
-          fi
-          echo "No WIP indicators found"
-
-      - name: Restore Test Result Cache
-        id: restore_test_cache
-        uses: actions/cache/restore@v3
+      - name: 'Check Out'
+        uses: actions/checkout@v3
         with:
-          path: /tmp/test_results
-          key: test-result-${{ github.event.pull_request.head.sha }}-success
-          lookup-only: true
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Determine Test Execution Strategy
-        id: final_output
-        run: |
-          if [[ "${{ steps.restore_test_cache.outputs.cache-hit }}" == "true" ]]; then
-            echo "Tests have passed for this commit before, skipping re-run"
-            echo "should_run_tests=false" >> $GITHUB_OUTPUT
-          else
-            echo "No previous test results found for this commit, will run tests"
-            echo "should_run_tests=true" >> $GITHUB_OUTPUT
-          fi
+      - name: Run Pre-Check
+        id: pre_check
+        uses: ./.github/actions/pre-check
+        with:
+          failed-labels: 'do-not-merge,work in progress,wip,rfc'
+          cache-key-prefix: 'essential-tests'
 
   setup:
     needs: check-wip
@@ -448,21 +393,6 @@ jobs:
           export TEST_CONFIG="/tmp/test_config.json"
           ./scripts/ci/run-tests.sh
 
-      - name: Save Test Result to Cache
-        if: success()
-        run: |
-          # Create a cache marker file indicating this commit passed all tests
-          mkdir -p /tmp/test_results
-          echo "true" > /tmp/test_results/test_passed
-          echo "Test result cached successfully for commit ${{ github.event.pull_request.head.sha }}"
-
-      - name: Cache Test Results
-        if: success()
-        uses: actions/cache/save@v3
-        with:
-          path: /tmp/test_results
-          key: test-result-${{ github.event.pull_request.head.sha }}-success
-
       - name: Generate safe artifact name
         if: failure()
         id: artifact_name
@@ -478,3 +408,19 @@ jobs:
           name: ${{ steps.artifact_name.outputs.name }}
           path: /tmp/*.log
           if-no-files-found: warn
+
+  post-check:
+    name: Save Test Results to Cache
+    needs: test
+    if: success()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 'Check Out'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Post-Check (Save Test Results)
+        uses: ./.github/actions/post-check
+        with:
+          cache-key-prefix: 'essential-tests'
