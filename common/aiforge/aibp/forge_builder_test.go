@@ -1,14 +1,16 @@
-package aibp
+package aibp_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-
-	"github.com/go-rod/rod/lib/utils"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
@@ -17,6 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
 )
+
+func init() {
+	depinjector.DependencyInject()
+}
 
 var planJson = `{
   "@action": "plan",
@@ -43,28 +49,62 @@ var finishJson = `{
 var summaryJson = `result is 2`
 
 func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
-	step := 0
-	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		rsp := config.NewAIResponse()
+	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		prompt := req.GetPrompt()
+		rsp := i.NewAIResponse()
 		defer rsp.Close()
-		switch step {
-		case 0:
+		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
 			if initFlag != "" && !strings.Contains(req.GetPrompt(), initFlag) {
 				t.Fatalf("init flag not found in prompt: %s", req.GetPrompt())
 			}
 			if planFlag != "" && !strings.Contains(req.GetPrompt(), planFlag) {
 				t.Fatalf("plan flag not found in prompt: %s", req.GetPrompt())
 			}
-			rsp.EmitOutputStream(strings.NewReader(planJson))
-		case 1:
+			rsp.EmitOutputStream(strings.NewReader(`
+{
+  "@action": "plan",
+  "main_task": "计算1+1的值",
+  "main_task_goal": "计算1+1的值",
+  "tasks": [
+    {
+      "subtask_name": "计算1+1的值",
+      "subtask_goal": "计算1+1的值"
+    }
+  ]
+}
+			`))
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "result is 2" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "short_summary") {
 			if persistentFlag != "" && !strings.Contains(req.GetPrompt(), persistentFlag) {
 				t.Fatalf("persistent flag not found in prompt: %s", req.GetPrompt())
 			}
-			rsp.EmitOutputStream(strings.NewReader(finishJson))
-		default:
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "summary",
+  "status_summary": "已完成计算1+1的值任务，成功计算了1+1的值。",
+  "task_long_summary": "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
+  "task_short_summary": "result is 2",
+}`))
+			return rsp, nil
 		}
-		step++
-		return rsp, nil
+
+		fmt.Println("Unexpected prompt:", prompt)
+
+		return nil, utils.Errorf("unexpected prompt: %s", prompt)
 	}
 }
 
@@ -96,7 +136,7 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 func TestBuildForgeFromYak(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName: forgeName,
 		ForgeContent: `query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
@@ -137,7 +177,7 @@ forgeHandle = func(params) {
 func TestBuildForgeFromYakWithDefaultPrompt(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -177,7 +217,7 @@ forgeHandle = func(params) {
 func TestBuildForgeFromYakWithDefaultForgeHandle(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -197,7 +237,7 @@ cli.check()`,
 func TestBuildForgeFromYakWithWarpDefaultForgeHandle(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -222,7 +262,7 @@ forgeHandle = func(params,opts...) {
 func TestBuildForgeFromYakWithRewriteDefaultPrompt(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName: forgeName,
 		ForgeContent: `query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
@@ -243,7 +283,7 @@ __PERSISTENT_PROMPT__ = "一定要算准一点" + "` + persistentFlag + `"
 func TestBuildForgeFromYakNoCheck(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -262,7 +302,7 @@ func TestBuildForgeFromYakNoCheck(t *testing.T) {
 func TestBuildForgeFromYakNoQuery(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -280,7 +320,7 @@ func TestBuildForgeFromYakNoQuery(t *testing.T) {
 func TestNewForgeExecutor(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forge := &schema.AIForge{
 		ForgeName:        forgeName,
 		PersistentPrompt: "一定要算准一点" + persistentFlag,
@@ -319,7 +359,7 @@ forgeHandle = func(params,opts...) {
 func TestNewForgeExecutorFromJson(t *testing.T) {
 	var initFlag = uuid.New().String()
 	var persistentFlag = uuid.New().String()
-	forgeName := utils.RandString(10)
+	forgeName := utils.RandStringBytes(10)
 	forgeData := map[string]any{
 		"name":              forgeName,
 		"persistent_prompt": "一定要算准一点" + persistentFlag,

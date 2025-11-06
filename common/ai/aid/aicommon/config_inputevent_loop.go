@@ -19,7 +19,9 @@ func (c *Config) StartEventLoop(ctx context.Context) {
 func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCall func()) {
 	c.RegisterBasicSyncHandlers()
 	c.StartInputEventOnce.Do(func() {
-		c.consumptionUUID = ksuid.New().String()
+		if c.consumptionUUID == "" {
+			c.consumptionUUID = ksuid.New().String()
+		}
 		validator := make(chan struct{})
 		go func() {
 			//log.Infof("config %s started, start to handle receiving loop", c.id)
