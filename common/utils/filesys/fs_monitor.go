@@ -31,6 +31,7 @@ type Event struct {
 }
 
 type EventSet struct {
+	Id           string
 	CreateEvents []Event
 	DeleteEvents []Event
 	ChangeEvents []Event
@@ -166,19 +167,19 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	return m, nil
 }
 
-func CompareFileTree(perv, current *FileNode) *EventSet {
+func CompareFileTree(prev, current *FileNode) *EventSet {
 	var events = &EventSet{
 		CreateEvents: make([]Event, 0),
 		DeleteEvents: make([]Event, 0),
 		ChangeEvents: make([]Event, 0),
 	}
-	if perv == nil || current == nil {
+	if prev == nil || current == nil {
 		return events
 	}
-	if !(perv.IsDir() && current.IsDir()) {
+	if !(prev.IsDir() && current.IsDir()) {
 		return events
 	}
-	pervNode := utils.CopyMapShallow(perv.Children)
+	pervNode := utils.CopyMapShallow(prev.Children)
 	currentNode := utils.CopyMapShallow(current.Children)
 	for {
 		nextDepthPervNode := make(map[string]*FileNode, 0)

@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
@@ -46,17 +45,17 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	// Wait for the event
 	select {
 	case events := <-eventsChan:
-		assert.NotNil(t, events)
+		require.NotNil(t, events)
 		found := false
 		for _, event := range events.CreateEvents {
 			if event.Path == testFile {
 				found = true
-				assert.Equal(t, filesys.FsMonitorCreate, event.Op)
-				assert.False(t, event.IsDir)
+				require.Equal(t, filesys.FsMonitorCreate, event.Op)
+				require.False(t, event.IsDir)
 				break
 			}
 		}
-		assert.True(t, found, "Should detect file creation")
+		require.True(t, found, "Should detect file creation")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Timeout waiting for create event")
 	}
@@ -68,16 +67,16 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	// Wait for the delete event
 	select {
 	case events := <-eventsChan:
-		assert.NotNil(t, events)
+		require.NotNil(t, events)
 		found := false
 		for _, event := range events.DeleteEvents {
 			if event.Path == testFile {
 				found = true
-				assert.Equal(t, filesys.FsMonitorDelete, event.Op)
+				require.Equal(t, filesys.FsMonitorDelete, event.Op)
 				break
 			}
 		}
-		assert.True(t, found, "Should detect file deletion")
+		require.True(t, found, "Should detect file deletion")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Timeout waiting for delete event")
 	}
@@ -114,17 +113,17 @@ func TestHandlerFileMonitor_DirectoryChanges(t *testing.T) {
 	// Wait for the event
 	select {
 	case events := <-eventsChan:
-		assert.NotNil(t, events)
+		require.NotNil(t, events)
 		found := false
 		for _, event := range events.CreateEvents {
 			if event.Path == testDir {
 				found = true
-				assert.Equal(t, filesys.FsMonitorCreate, event.Op)
-				assert.True(t, event.IsDir)
+				require.Equal(t, filesys.FsMonitorCreate, event.Op)
+				require.True(t, event.IsDir)
 				break
 			}
 		}
-		assert.True(t, found, "Should detect directory creation")
+		require.True(t, found, "Should detect directory creation")
 	case <-time.After(5 * time.Second):
 		t.Fatal("Timeout waiting for create event")
 	}
@@ -167,16 +166,16 @@ func TestHandlerFileMonitor_NestedFiles(t *testing.T) {
 	// Wait for file creation event
 	select {
 	case events := <-eventsChan:
-		assert.NotNil(t, events)
+		require.NotNil(t, events)
 		found := false
 		for _, event := range events.CreateEvents {
 			if event.Path == nestedFile {
 				found = true
-				assert.False(t, event.IsDir)
+				require.False(t, event.IsDir)
 				break
 			}
 		}
-		assert.True(t, found, "Should detect nested file creation")
+		require.True(t, found, "Should detect nested file creation")
 	case <-time.After(3 * time.Second):
 		t.Fatal("Timeout waiting for nested file creation event")
 	}
