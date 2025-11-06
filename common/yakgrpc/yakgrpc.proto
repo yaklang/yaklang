@@ -7459,8 +7459,7 @@ message SyntaxFlowScanActiveTask {
   // progress 
   double Progress = 5; 
 
-  // update 
-  int64 UpdateTime = 6;
+  int64 RunningTime = 6;
   string Info = 7;
 }
 

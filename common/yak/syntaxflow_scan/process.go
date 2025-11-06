@@ -139,7 +139,6 @@ func (pm *processMonitor) StartMonitor() {
 					return
 				}
 				pm.reportProcess(false)
-				ticker.Reset(pm.monitorTTL)
 			case res, ok := <-pm.resultCh:
 				if !ok {
 					return

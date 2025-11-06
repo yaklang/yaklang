@@ -55253,7 +55253,7 @@ type SyntaxFlowScanActiveTask struct {
 	// progress
 	Progress float64 `protobuf:"fixed64,5,opt,name=Progress,proto3" json:"Progress,omitempty"`
 	// update
-	UpdateTime    int64  `protobuf:"varint,6,opt,name=UpdateTime,proto3" json:"UpdateTime,omitempty"`
+	RunningTime   int64  `protobuf:"varint,6,opt,name=RunningTime,proto3" json:"RunningTime,omitempty"`
 	Info          string `protobuf:"bytes,7,opt,name=Info,proto3" json:"Info,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -55310,9 +55310,9 @@ func (x *SyntaxFlowScanActiveTask) GetProgress() float64 {
 	return 0
 }
 
-func (x *SyntaxFlowScanActiveTask) GetUpdateTime() int64 {
+func (x *SyntaxFlowScanActiveTask) GetRunningTime() int64 {
 	if x != nil {
-		return x.UpdateTime
+		return x.RunningTime
 	}
 	return 0
 }
@@ -67825,14 +67825,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bSSARisks\x18\x06 \x03(\v2\f.ypb.SSARiskR\bSSARisks\x12=\n" +
 	"\n" +
 	"ActiveTask\x18\a \x03(\v2\x1d.ypb.SyntaxFlowScanActiveTaskR\n" +
-	"ActiveTask\"\xa8\x01\n" +
+	"ActiveTask\"\xaa\x01\n" +
 	"\x18SyntaxFlowScanActiveTask\x12\x1a\n" +
 	"\bRuleName\x18\x03 \x01(\tR\bRuleName\x12 \n" +
 	"\vProgramName\x18\x04 \x01(\tR\vProgramName\x12\x1a\n" +
-	"\bProgress\x18\x05 \x01(\x01R\bProgress\x12\x1e\n" +
-	"\n" +
-	"UpdateTime\x18\x06 \x01(\x03R\n" +
-	"UpdateTime\x12\x12\n" +
+	"\bProgress\x18\x05 \x01(\x01R\bProgress\x12 \n" +
+	"\vRunningTime\x18\x06 \x01(\x03R\vRunningTime\x12\x12\n" +
 	"\x04Info\x18\a \x01(\tR\x04Info\"\xae\x02\n" +
 	"\x16SyntaxFlowResultFilter\x12\x18\n" +
 	"\aTaskIDs\x18\x01 \x03(\tR\aTaskIDs\x12\x1c\n" +
