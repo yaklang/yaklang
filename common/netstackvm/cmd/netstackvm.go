@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 	"io"
 	"math/rand"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/icmp"
 
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
@@ -231,7 +232,6 @@ func main() {
 				return nil
 			},
 		},
-
 		{
 			Name:  "pingscan",
 			Usage: "pingscan <ip>",
