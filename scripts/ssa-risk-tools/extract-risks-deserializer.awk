@@ -429,6 +429,11 @@ function output_risk() {
         return
     }
     
+    # 过滤严重程度，只保留 critical 和 high
+    if (risk_data["severity"] != "critical" && risk_data["severity"] != "high") {
+        return
+    }
+    
         risk_count++
         
     # 提取短文件路径（从第二个斜杠开始）
@@ -500,6 +505,11 @@ function output_risk() {
 }
 
 END {
+    # 输出最后一个风险（如果存在）
+    if (current_risk != "") {
+        output_risk()
+    }
+    
     summary_file = results_dir "/scan_summary.txt"
     print "=== 安全扫描总结报告 ===" > summary_file
     print "扫描时间: " strftime("%Y-%m-%d %H:%M:%S") > summary_file
