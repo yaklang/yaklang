@@ -3,7 +3,11 @@ package aiengine
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -17,7 +21,8 @@ type AIEngineConfig struct {
 	Timeout float64
 
 	// AI 服务配置
-	AIService string // AI 服务名称，如 "openai", "deepseek" 等
+	AIService  string // AI 服务名称，如 "openai", "deepseek" 等
+	AICallback aicommon.AICallbackType
 
 	// 执行配置
 	MaxIteration int    // 最大迭代次数，默认 10
@@ -25,6 +30,7 @@ type AIEngineConfig struct {
 
 	// 工具配置
 	DisableToolUse        bool     // 禁用工具调用
+	DisableMCPServers     bool     // 禁用 MCPServers
 	EnableAISearchTool    bool     // 启用 AI 搜索工具
 	EnableForgeSearchTool bool     // 启用 Forge 搜索工具，默认启用
 	IncludeToolNames      []string // 包含的工具名称
@@ -43,17 +49,20 @@ type AIEngineConfig struct {
 	DebugMode bool // 调试模式
 
 	// 事件处理回调
-	OnEvent            func(*schema.AiOutputEvent)                                                     // 事件回调
-	OnStream           func(react *aireact.ReAct, data []byte)                                         // 流式输出回调
-	OnData             func(react *aireact.ReAct, data []byte)                                         // 数据回调
-	OnFinished         func(react *aireact.ReAct, success bool, result map[string]any)                 // 完成回调
-	OnInputRequiredRaw func(react *aireact.ReAct, event *schema.AiOutputEvent, question string) string // 需要用户输入回调
-	OnInputRequired    func(react *aireact.ReAct, question string) string                              // 需要用户输入回调
+	OnEvent            func(react *aireact.ReAct, event *schema.AiOutputEvent)                             // 事件回调
+	OnStream           func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte) // 流式输出回调
+	OnStreamEnd        func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string)              // 流式输出结束
+	OnData             func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte) // 数据回调
+	OnFinished         func(react *aireact.ReAct)                                                          // 完成回调, 不返回结果
+	OnInputRequiredRaw func(react *aireact.ReAct, event *schema.AiOutputEvent, question string) string     // 需要用户输入回调
+	OnInputRequired    func(react *aireact.ReAct, question string) string                                  // 需要用户输入回调
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
 	Workdir  string // 工作目录
 	Language string // 响应语言偏好
+
+	ExtOptions []aicommon.ConfigOption
 }
 
 // AIEngineConfigOption 配置选项函数
@@ -68,10 +77,10 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		AllowUserInteract:     true,
 		ReviewPolicy:          "yolo",
 		EnableForgeSearchTool: true,
-		OnEvent:               func(*schema.AiOutputEvent) {},
-		OnStream:              func(*aireact.ReAct, []byte) {},
-		OnData:                func(*aireact.ReAct, []byte) {},
-		OnFinished:            func(*aireact.ReAct, bool, map[string]any) {},
+		OnEvent:               func(*aireact.ReAct, *schema.AiOutputEvent) {},
+		OnStream:              func(*aireact.ReAct, *schema.AiOutputEvent, string, []byte) {},
+		OnData:                func(*aireact.ReAct, *schema.AiOutputEvent, string, []byte) {},
+		OnFinished:            func(*aireact.ReAct) {},
 		OnInputRequiredRaw:    func(*aireact.ReAct, *schema.AiOutputEvent, string) string { return "" },
 		OnInputRequired:       func(*aireact.ReAct, string) string { return "" },
 	}
@@ -154,6 +163,12 @@ func WithDisableToolUse(disable bool) AIEngineConfigOption {
 	}
 }
 
+func WithDisableMCPServers(disable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.DisableMCPServers = disable
+	}
+}
+
 // WithEnableAISearchTool 启用 AI 搜索工具
 func WithEnableAISearchTool(enable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
@@ -232,28 +247,28 @@ func WithDebugMode(debug bool) AIEngineConfigOption {
 // ========== 事件处理回调选项 ==========
 
 // WithOnEvent 设置事件回调
-func WithOnEvent(callback func(*schema.AiOutputEvent)) AIEngineConfigOption {
+func WithOnEvent(callback func(*aireact.ReAct, *schema.AiOutputEvent)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnEvent = callback
 	}
 }
 
 // WithOnStream 设置流式输出回调
-func WithOnStream(callback func(react *aireact.ReAct, data []byte)) AIEngineConfigOption {
+func WithOnStream(callback func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnStream = callback
 	}
 }
 
 // WithOnData 设置数据回调
-func WithOnData(callback func(react *aireact.ReAct, data []byte)) AIEngineConfigOption {
+func WithOnData(callback func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnData = callback
 	}
 }
 
 // WithOnFinished 设置完成回调
-func WithOnFinished(callback func(react *aireact.ReAct, success bool, result map[string]any)) AIEngineConfigOption {
+func WithOnFinished(callback func(react *aireact.ReAct)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnFinished = callback
 	}
@@ -296,6 +311,29 @@ func WithAIReviewMode() AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.ReviewPolicy = "ai"
 		c.AllowUserInteract = true
+	}
+}
+
+// WithAICallback 设置 AI 回调
+func WithAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AICallback = callback
+	}
+}
+
+func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		chatter, err := ai.LoadChater(typeName, opts...)
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		}
+		c.AICallback = aicommon.AIChatToAICallbackType(chatter)
+	}
+}
+
+func WithExtOptions(opts ...aicommon.ConfigOption) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.ExtOptions = opts
 	}
 }
 
