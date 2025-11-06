@@ -489,8 +489,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					oldIDs = []uint{uint(historyID)}
 				}
 				_, _, getMirrorHTTPFlowParams, _, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
-				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
+					var extractorResults []*ypb.KVPair
 					respModel, err := resp.ToGRPCModel()
 					if err != nil || respModel == nil {
 						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
@@ -551,6 +551,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						continue
 					}
 					respModel.TaskId = int64(historyID)
+					respModel.ExtractedResults = extractorResults
 					feedbackResponse(respModel, true)
 				}
 
