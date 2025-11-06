@@ -413,7 +413,9 @@ type baseType struct {
 }
 
 func NewBaseType() *baseType {
-	return &baseType{}
+	return &baseType{
+		id: -1,
+	}
 }
 
 func (b *baseType) SetId(id int64) {
