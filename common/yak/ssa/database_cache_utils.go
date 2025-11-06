@@ -145,6 +145,11 @@ func marshalIrCode(s Instruction) (*ssadb.IrCode, error) {
 
 func marshalIrType(name string) func(s Type) (*ssadb.IrType, error) {
 	return func(s Type) (*ssadb.IrType, error) {
+		if s.GetId() <= 0 {
+			log.Errorf("[BUG] marshalIrType: type ID is invalid: %d, type: %s",
+				s.GetId(), s.String())
+		}
+
 		ret := ssadb.EmptyIrType(name, uint64(s.GetId()))
 		marshalType(s, ret)
 		return ret, nil
