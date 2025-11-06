@@ -260,6 +260,13 @@ func WithOnStream(callback func(react *aireact.ReAct, event *schema.AiOutputEven
 	}
 }
 
+// WithOnStreamEnd 设置流式输出结束回调
+func WithOnStreamEnd(callback func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string)) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.OnStreamEnd = callback
+	}
+}
+
 // WithOnData 设置数据回调
 func WithOnData(callback func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
