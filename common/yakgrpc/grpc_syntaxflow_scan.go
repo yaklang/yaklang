@@ -88,9 +88,10 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 					RuleName:    rule.RuleName,
 					ProgramName: rule.ProgramName,
 					Progress:    rule.Progress,
-					UpdateTime:  rule.UpdateTime,
+					RunningTime: rule.UpdateTime - rule.StartTime,
 					Info:        rule.Info,
 				}
+
 				activeTasks = append(activeTasks, item)
 			}
 			if len(activeTasks) > 0 {
