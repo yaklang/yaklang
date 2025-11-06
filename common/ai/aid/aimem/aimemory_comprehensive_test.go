@@ -166,8 +166,8 @@ func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQu
 	return "", nil
 }
 
-func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
-	return true, nil
+func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error) {
+	return true, "", nil
 }
 
 func (m *AdvancedMockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {

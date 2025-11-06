@@ -1,10 +1,10 @@
 package aid
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aiexec"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -25,17 +25,19 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	defer func() {
 		c.InputEventManager.UnregisterMirrorOfAIInputEvent(uid)
 	}()
-
+	ctx, cancel := context.WithCancel(c.Ctx)
+	defer cancel()
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
 		aicommon.WithWrapperedAICallback(c.QualityPriorityAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
-		aicommon.WithAgreeManual(),
 		aicommon.WithEventInputChanx(inputChannel),
+		aicommon.WithID(c.Config.Id),
+		aicommon.WithContext(ctx),
 	)
 
-	invoker, err := aiexec.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
+	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
 	if err != nil {
 		return fmt.Errorf("创建 AI 调用运行时失败: %v", err)
 	}

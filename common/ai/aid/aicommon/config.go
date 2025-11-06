@@ -179,7 +179,7 @@ type Config struct {
 	HijackPERequest   func(ctx context.Context, planPayload string) error
 
 	// default Task for call tool directly
-	DefaultTask AITask
+	DefaultTask AIStatefulTask
 
 	// iteration limit
 	MaxIterationCount int64
@@ -243,7 +243,6 @@ func newConfig(ctx context.Context) *Config {
 	config := &Config{
 		HotPatchBroadcaster: chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
 		KeyValueConfig:      NewKeyValueConfig(),
-		DefaultTask:         &AIStatefulTaskBase{name: "ai-task"},
 		Ctx:                 ctx,
 		cancel:              cancel,
 		StartInputEventOnce: sync.Once{},
@@ -306,6 +305,14 @@ func newConfig(ctx context.Context) *Config {
 	config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
 	config.Timeline.BindConfig(config, config)
 
+	// init default task
+	config.DefaultTask = NewStatefulTaskBase(
+		"default-task",
+		"",
+		config.Ctx,
+		config.Emitter,
+	)
+
 	return config
 }
 
@@ -336,8 +343,8 @@ func WithContext(ctx context.Context) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		ctx, cancel := context.WithCancel(ctx)
 		defer c.m.Unlock()
+		ctx, cancel := context.WithCancel(ctx)
 		c.Ctx = ctx
 		c.cancel = cancel
 		return nil
@@ -967,18 +974,6 @@ func WithHijackPERequest(fn func(ctx context.Context, planPayload string) error)
 	}
 }
 
-func WithDefaultTask(t AITask) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.DefaultTask = t
-		c.m.Unlock()
-		return nil
-	}
-}
-
 // Misc / meta
 func WithMaxIterationCount(n int64) ConfigOption {
 	return func(c *Config) error {
@@ -1536,10 +1531,6 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 		return
 	default:
 	}
-	if c.m != nil {
-		c.m.Lock()
-		defer c.m.Unlock()
-	}
 
 	if e.ShouldSave() {
 		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
@@ -1716,6 +1707,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	// Agree policy mapping
 	opts = append(opts, WithAgreePolicy(i.AgreePolicy))
+	if i.AiAgreeRiskControl != nil {
+		opts = append(opts, WithAiAgreeRiskControl(i.AiAgreeRiskControl))
+	}
 
 	// Other boolean/flag options
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
@@ -1778,6 +1772,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		hotPatchChan := i.HotPatchBroadcaster.Subscribe()
 		opts = append(opts, WithHotPatchOptionChan(hotPatchChan))
 	}
+
+	opts = append(opts, WithContext(i.Ctx))
 
 	return opts
 }

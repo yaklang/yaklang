@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,7 +22,7 @@ func TestCoordinator_ConfigHotpatch(t *testing.T) {
 	hotpatchOptionChan := chanx.NewUnlimitedChan[aicommon.ConfigOption](ctx, 10)
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

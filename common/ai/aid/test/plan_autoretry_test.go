@@ -1,9 +1,10 @@
-package aid
+package test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -20,7 +21,7 @@ func TestPlanRetry(t *testing.T) {
 	count := 0
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区
 	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区
-	ins, err := NewCoordinator(
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -121,7 +122,7 @@ func testRecoverPlanRetry(t *testing.T, uid string) {
 	count := 0
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区
 	outputChan := make(chan *schema.AiOutputEvent, 100)                              // 增加缓冲区
-	ins, err := NewFastRecoverCoordinator(
+	ins, err := aid.NewFastRecoverCoordinator(
 		uid,
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

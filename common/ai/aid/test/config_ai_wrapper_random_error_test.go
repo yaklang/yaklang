@@ -1,34 +1,97 @@
-package aid
+package test
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
+func init() {
+	aicommon.RegisterDefaultAIRuntimeInvoker(aireact.BuildReActInvoker)
+}
+
+func Map2Json(m map[string]any) string {
+	b, _ := json.Marshal(m)
+	return string(b)
+}
+
+func ContinueSuggestionInputEvent(id string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(map[string]any{
+			"suggestion": "continue",
+		}),
+	}
+}
+
+func SuggestionInputEvent(id string, suggestion string, extra string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(map[string]any{
+			"suggestion":   suggestion,
+			"extra_prompt": extra,
+		}),
+	}
+}
+
+func SuggestionInputEventEx(id string, params map[string]any) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        id,
+		InteractiveJSONInput: Map2Json(params),
+	}
+}
+
+func SyncInputEvent(syncType string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      syncType,
+	}
+}
+
+func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
-	ins, err := NewCoordinator(
+
+	m := new(sync.Mutex)
+	var errLimit int64 = 2
+	var count = new(int64)
+
+	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			rsp := config.NewAIResponse()
+			m.Lock()
+			defer m.Unlock()
+
+			countInt64 := atomic.AddInt64(count, 1)
+			if countInt64 <= errLimit {
+				return nil, utils.Errorf("mock, unknown err[%v]", count)
+			} else {
+				count = new(int64)
+			}
+
+			rsp := aicommon.NewAIResponse(config)
 			rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -51,7 +114,6 @@ func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
     ]
 }
 			`))
-			time.Sleep(100 * time.Millisecond)
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -67,17 +129,28 @@ func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
 	consumptionCheck := false
 	pingPongCheck := false
 	syncTaskCheck := false
-
 LOOP:
 	for {
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				parsedTask = true
-				time.Sleep(100 * time.Millisecond)
-				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
-				continue
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				// 解析JSON数据
+				var data = map[string]any{}
+				err := json.Unmarshal([]byte(result.Content), &data)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// 检查是否包含预期的任务描述
+				if plansRaw, ok := data["plans"]; ok {
+					plansJson, _ := json.Marshal(plansRaw)
+					if strings.Contains(string(plansJson), `将最大文件的路径和大小以可读格式输出`) {
+						parsedTask = true
+						inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+						continue
+					}
+				}
 			}
 			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
@@ -139,26 +212,4 @@ LOOP:
 	if !syncTaskCheck {
 		t.Fatal("sync check failed")
 	}
-
-	rt, err := yakit.GetAgentRuntime(ins.Config.GetDB(), ins.Config.Id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, rt.Uuid, ins.Config.Id)
-	t.Logf("rt: %+v", rt)
-	count := 0
-	aiInteractivity := 0
-	reviewCount := 0
-	for i := range yakit.YieldCheckpoint(context.Background(), ins.Config.GetDB(), ins.Config.Id) {
-		t.Logf("i: %+v", i)
-		count++
-		if i.Type == schema.AiCheckpointType_AIInteractive {
-			aiInteractivity++
-		} else if i.Type == schema.AiCheckpointType_Review {
-			reviewCount++
-		}
-	}
-	assert.Greater(t, count, 2)
-	assert.Greater(t, aiInteractivity, 0)
-	assert.Greater(t, reviewCount, 0)
 }

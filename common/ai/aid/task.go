@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -45,10 +46,26 @@ type AiTask struct {
 }
 
 func (t *AiTask) executed() bool {
+	if len(t.Subtasks) > 0 {
+		for _, subtask := range t.Subtasks {
+			if !subtask.executed() { // 子任务有没有已完成的，本任务也视为未完成
+				return false
+			}
+		}
+		return true
+	}
 	return t.GetStatus() == aicommon.AITaskState_Completed
 }
 
 func (t *AiTask) executing() bool {
+	if len(t.Subtasks) > 0 {
+		for _, subtask := range t.Subtasks {
+			if subtask.executing() { // 子任务有执行中的时候 本任务也为执行中
+				return true
+			}
+		}
+		return false
+	}
 	return t.GetStatus() == aicommon.AITaskState_Processing
 }
 
@@ -243,7 +260,13 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 	}()
 	var extraReason bytes.Buffer
 	_ = extraReason
-
+	retTask = &AiTask{}
+	retTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
+		"root-task"+uuid.NewString(),
+		fmt.Sprintf("任务名称: %s\n任务目标: %s", retTask.Name, retTask.Goal),
+		c.Ctx,
+		c.Emitter,
+	)
 	action, err := aicommon.ExtractAction(rawResponse, "plan")
 	if err != nil {
 		log.Errorf("extract action from plan data failed: %v", err)
@@ -251,9 +274,14 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 	}
 	switch action.ActionType() {
 	case "plan":
-		retTask = &AiTask{}
 		retTask.Name = action.GetAnyToString("main_task")
 		retTask.Goal = action.GetAnyToString("main_task_goal")
+		retTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
+			"root-task"+uuid.NewString(),
+			fmt.Sprintf("任务名称: %s\n任务目标: %s", retTask.Name, retTask.Goal),
+			c.Ctx,
+			c.Emitter,
+		)
 		for _, subtask := range action.GetInvokeParamsArray("tasks") {
 			if subtask.GetAnyToString("subtask_name") == "" {
 				continue
@@ -281,8 +309,4 @@ func (t *AiTask) QuoteName() string {
 
 func (t *AiTask) QuoteGoal() string {
 	return strconv.Quote(t.Goal)
-}
-
-func (t *AiTask) CanContinue() bool {
-	return 0 < t.Coordinator.MaxTaskContinue
 }

@@ -69,11 +69,12 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 
 		task := loop.GetCurrentTask()
-		satisfied, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
+		satisfied, reason, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
 		if err != nil {
 			operator.Fail(err)
 			return
 		}
+		loop.PushSatisfactionRecord(satisfied, reason)
 
 		if satisfied {
 			operator.Exit()

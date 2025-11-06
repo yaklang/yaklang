@@ -387,8 +387,8 @@ func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery stri
 	return "", nil
 }
 
-func (r *testRuntime) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, error) {
-	return true, nil
+func (r *testRuntime) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error) {
+	return true, "", nil
 }
 
 func (r *testRuntime) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {

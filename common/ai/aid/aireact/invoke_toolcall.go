@@ -32,6 +32,9 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	if !utils.IsNil(r.GetCurrentTask()) {
 		taskId = r.GetCurrentTask().GetId()
 	}
+	if currentTask == nil {
+		currentTask = r.config.DefaultTask
+	}
 	currentTask.SetEmitter(
 		currentTask.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 			if event != nil && event.TaskIndex == "" {
