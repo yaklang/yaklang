@@ -124,7 +124,7 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 			log.Errorf("clone fuzzer request failed")
 			continue
 		}
-		if req.GetEnableOverrides() {
+		if req.GetOverrides() != nil {
 			applyGroupOverrides(req.GetOverrides(), request)
 		}
 		request.FuzzerSequenceIndex = uuid.NewString()
