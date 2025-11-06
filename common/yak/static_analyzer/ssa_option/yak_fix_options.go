@@ -3,9 +3,10 @@ package ssa_option
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func fixFunctionOption() []ssaapi.Option {
+func fixFunctionOption() []ssaconfig.Option {
 	callableBuilder := func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
 		// callable(anyFunc) bool
 		f := ssa.NewFunctionWithType(id,
@@ -17,7 +18,7 @@ func fixFunctionOption() []ssaapi.Option {
 		f.SetRange(b.CurrentRange)
 		return f
 	}
-	return []ssaapi.Option{
+	return []ssaconfig.Option{
 		ssaapi.WithExternBuildValueHandler("callable", callableBuilder),
 		ssaapi.WithExternBuildValueHandler("dyn.IsYakFunc", callableBuilder),
 	}

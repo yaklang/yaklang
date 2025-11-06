@@ -270,7 +270,7 @@ var ssaCompile = &cli.Command{
 			}
 		}
 
-		opt := make([]ssaapi.Option, 0, 3)
+		opt := make([]ssaconfig.Option, 0, 3)
 		// set database
 		if databaseDialect != "" {
 			// if set dialect, open gorm and set db

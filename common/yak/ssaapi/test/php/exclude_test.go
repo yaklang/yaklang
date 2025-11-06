@@ -56,9 +56,7 @@ println(2);
 	values := result.GetValues("param")
 	require.True(t, values.Len() != 0)
 
-	filterFunc, err := ssaapi.DefaultExcludeFunc([]string{"**/vendor/**", "vendor/**"})
-	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), filterFunc)
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithExcludeFunc([]string{"**/vendor/**", "vendor/**"}))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -114,7 +112,7 @@ func CMD1(c *gin.Context) {
 	values := result.GetValues("param")
 	require.True(t, values.Len() != 0)
 
-	filterFunc, err := ssaapi.DefaultExcludeFunc([]string{"**temp**"})
+	filterFunc := ssaapi.WithExcludeFunc([]string{"**temp**"})
 	require.NoError(t, err)
 	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)
@@ -124,7 +122,7 @@ func CMD1(c *gin.Context) {
 	values = result.GetValues("param")
 	require.True(t, values.Len() == 0)
 
-	filterFunc, err = ssaapi.DefaultExcludeFunc([]string{"**temp/**"})
+	filterFunc = ssaapi.WithExcludeFunc([]string{"**temp/**"})
 	require.NoError(t, err)
 	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)

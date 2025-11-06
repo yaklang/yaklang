@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // AnalysisTask 表示一个分析任务
@@ -234,7 +235,7 @@ func (es *EditScheduler) processTask(task *AnalysisTask) {
 // compileDocument 编译文档
 func (es *EditScheduler) compileDocument(content string, scriptType string, needReparseAST bool, syntaxCache *SyntaxCache) (*ssaapi.Program, error) {
 	// 复用现有的编译逻辑
-	opts := []ssaapi.Option{
+	opts := []ssaconfig.Option{
 		ssaapi.WithEnableCache(),
 	}
 

@@ -276,7 +276,7 @@ func trySSACompilation(ctx context.Context, content string, filePath string) []s
 	_, err := ssaapi.Parse(
 		content,
 		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithMemory(1*time.Hour), // In-memory only, cache for 1 hour
+		ssaapi.WithMemory(), // In-memory only, cache for 1 hour
 		ssaapi.WithContext(compileCtx),
 	)
 

@@ -367,7 +367,7 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
     ssa.withConcurrency(concurrency),
 ]
 if len(entry) != 0{

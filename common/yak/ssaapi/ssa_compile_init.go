@@ -11,7 +11,7 @@ import (
 )
 
 func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
-	programName := c.ProgramName
+	programName := c.GetProgramName()
 	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
 	application.Language = c.GetLanguage()
 	application.ProjectName = c.GetProjectName()

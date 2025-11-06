@@ -51,6 +51,7 @@ func TestParseMemory(t *testing.T) {
 			ssaapi.WithRawLanguage("yak"),
 			ssaapi.WithProgramName(progName),
 			ssaapi.WithMemory(),
+			ssaapi.WithEnableCache(),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, prog)

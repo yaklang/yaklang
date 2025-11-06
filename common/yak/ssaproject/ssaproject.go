@@ -54,7 +54,7 @@ func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, err
 		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles))
 		opts = append(opts, ssaconfig.WithCompileReCompile(cc.ReCompile))
 		opts = append(opts, ssaconfig.WithCompileMemoryCompile(cc.Memory))
-		opts = append(opts, ssaconfig.WithCompileConcurrency(cc.Concurrency))
+		opts = append(opts, ssaconfig.WithCompileConcurrency(int(cc.Concurrency)))
 	}
 	if sc := proto.ScanConfig; sc != nil {
 		opts = append(opts, ssaconfig.WithScanConcurrency(sc.Concurrency))

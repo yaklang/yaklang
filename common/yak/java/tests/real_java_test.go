@@ -286,8 +286,8 @@ func TestA(t *testing.T) {
 	fs := filesys.NewRelLocalFs(path)
 
 	ctx := context.Background()
-	config := ssaapi.Config{}
-	for _, opt := range []ssaapi.Option{
+
+	config, err := ssaapi.DefaultConfig(
 		ssaapi.WithContext(ctx),
 		ssaapi.WithFileSystem(fs),
 		ssaapi.WithLanguage(ssaconfig.GO),
@@ -295,9 +295,8 @@ func TestA(t *testing.T) {
 			log.Infof("Process: %s, %.2f%%", msg, process*100)
 		}),
 		ssaapi.WithConcurrency(runtime.NumCPU()),
-	} {
-		opt(&config)
-	}
+	)
+	require.NoError(t, err)
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})

@@ -9,33 +9,31 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func ParseProjectFromPath(path string, opts ...Option) (Programs, error) {
+func ParseProjectFromPath(path string, opts ...ssaconfig.Option) (Programs, error) {
 	if path != "" {
 		opts = append(opts, WithLocalFs(path))
 	}
 	return ParseProject(opts...)
 }
 
-func ParseProjectWithFS(fs fi.FileSystem, opts ...Option) (Programs, error) {
+func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs))
 	return ParseProject(opts...)
 }
 
-func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, error) {
+func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
 }
 
-func ParseProject(opts ...Option) (prog Programs, err error) {
+func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	config, err := DefaultConfig(opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		ssaprofile.ShowCompileProfiles()
-	}()
 	f1 := func() {
 		prog, err = config.parseProject()
 	}
@@ -45,28 +43,29 @@ func ParseProject(opts ...Option) (prog Programs, err error) {
 
 func (c *Config) parseProject() (progs Programs, err error) {
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
+	programName := c.GetProgramName()
 	defer func() {
 		if r := recover(); r != nil {
 			err = utils.Errorf("compile panic: %v", r)
 			log.Errorf("compile panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			// panic时清理已保存的Program数据
-			if c.ProgramName != "" {
-				log.Infof("cleaning up program data due to panic: %s", c.ProgramName)
-				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			if programName != "" {
+				log.Infof("cleaning up program data due to panic: %s", programName)
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
 			}
 		} else if err != nil {
 			// 编译出错时清理已保存的Program数据
-			if c.ProgramName != "" {
-				log.Infof("cleaning up program data due to error: %s", c.ProgramName)
-				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			if programName != "" {
+				log.Infof("cleaning up program data due to error: %s", programName)
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
 			}
 		}
 	}()
 
 	if c.GetCompileReCompile() {
 		c.Processf(0, "recompile project, delete old data...")
-		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
+		ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
 		c.Processf(0, "recompile project, delete old data finish")
 	}
 

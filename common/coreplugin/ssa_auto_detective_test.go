@@ -25,6 +25,15 @@ func TestSSAAutoDetective(t *testing.T) {
 		return info
 	}
 
+	t.Run("check compile jar", func(t *testing.T) {
+		jarPath, err := ssatest.GetJarFile()
+		require.NoError(t, err)
+		info, prog, err := ParseProjectWithAutoDetective(context.Background(), jarPath, "")
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+		log.Infof("info: %v", info)
+	})
+
 	t.Run("check jar", func(t *testing.T) {
 		jarPath, err := ssatest.GetJarFile()
 		require.NoError(t, err)

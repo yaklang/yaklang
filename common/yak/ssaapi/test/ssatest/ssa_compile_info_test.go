@@ -78,7 +78,7 @@ func checkFilelist(t *testing.T, language string, info map[string]any) {
 	progName := uuid.NewString()
 	res, err := ssaapi.ParseProject(
 		ssaapi.WithRawLanguage(language),
-		ssaapi.WithConfigInfo(info),
+		ssaconfig.WithCodeSourceMap(info),
 		ssaapi.WithProgramName(progName),
 	)
 	defer func() {
