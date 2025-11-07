@@ -215,6 +215,14 @@ const (
 	SideEffectOut
 )
 
+// ReExportInfo stores re-export information
+type ReExportInfo struct {
+	FilePath          string // source file path
+	ExportName        string // exported name
+	IsNameSpaceExport bool
+	IsWildCardExport  bool
+}
+
 // both instruction and value
 type Program struct {
 	// project
@@ -270,6 +278,7 @@ type Program struct {
 	BlueprintStack *utils.Stack[*Blueprint]
 	ExportValue    map[string]Value
 	ExportType     map[string]Type
+	ReExportTable  map[string]*ReExportInfo // re-export name/type --from--> filepath
 
 	// GlobalVariablesBlueprint is a virtual Blueprint that wraps global variables,
 	// enabling them to be lazily built through the LazyBuilder mechanism

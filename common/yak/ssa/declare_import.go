@@ -64,6 +64,11 @@ func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
 				if ok && ret != nil {
 					break
 				}
+				lib.GlobalVariablesBlueprint.Build()
+				if _, ok = lib.GetGlobalVariable(name); ok {
+					ret = lib.GlobalVariablesBlueprint
+					return true
+				}
 			}
 
 		}
