@@ -352,9 +352,17 @@ func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary
 	})
 }
 
+const (
+	TypeLogTool         = "log/tool"
+	TypeTextPlain       = "text/plain"
+	TypeTextMarkdown    = "text/markdown"
+	TypeCodeYaklang     = "code/yaklang"
+	TypeCodeHTTPRequest = "code/http-request"
+)
+
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
-	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, "log/tool")
-	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, "log/tool")
+	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, TypeLogTool)
+	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, TypeLogTool)
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
@@ -367,7 +375,7 @@ func (r *Emitter) EmitTextPlainTextStreamEvent(
 	taskIndex string,
 	finishCallback ...func(),
 ) {
-	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "text/plain", finishCallback...)
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, TypeTextPlain, finishCallback...)
 }
 
 func (r *Emitter) EmitTextMarkdownStreamEvent(
@@ -376,15 +384,15 @@ func (r *Emitter) EmitTextMarkdownStreamEvent(
 	taskIndex string,
 	finishCallback ...func(),
 ) {
-	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "text/markdown", finishCallback...)
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, TypeTextMarkdown, finishCallback...)
 }
 
 func (r *Emitter) EmitYaklangCodeStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
-	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "code/yaklang", finishCallback...)
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, TypeCodeYaklang, finishCallback...)
 }
 
 func (r *Emitter) EmitHTTPRequestStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
-	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "code/http-request", finishCallback...)
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, TypeCodeHTTPRequest, finishCallback...)
 }
 
 func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {

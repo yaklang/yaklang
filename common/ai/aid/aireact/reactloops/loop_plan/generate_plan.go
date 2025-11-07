@@ -27,7 +27,7 @@ var generate = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 		[]*reactloops.LoopStreamField{
 			{
 				FieldName: "subtask_name",
-				AINodeId:  "规划任务名",
+				AINodeId:  "plan",
 			},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {

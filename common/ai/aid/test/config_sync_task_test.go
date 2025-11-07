@@ -80,7 +80,7 @@ LOOP:
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
-			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
+			if parsedTask && result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
