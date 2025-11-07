@@ -117,7 +117,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 
 	irType := ssadb.GetIrTypeById(cache.DB, cache.program.GetProgramName(), id)
 	if utils.IsNil(irType) {
-		log.Errorf("GetTypeFromDB: failed type is nil: id: %v", id)
+		log.Warnf("GetTypeFromDB: failed type is nil: id: %v", id)
 		return nil
 	}
 	kind, str, extra := irType.Kind, irType.String, irType.ExtraInformation

@@ -186,7 +186,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterCall:
-			v, exists := se.Get(c)
+			v, exists := se.GetActualParam(c)
 			if !exists || utils.IsNil(v) {
 				continue
 			}
@@ -209,7 +209,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterMemberCall:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}
@@ -225,7 +225,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				continue
 			}
 		case CallMemberCall:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}
@@ -241,7 +241,7 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				continue
 			}
 		default:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}
@@ -316,7 +316,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterCall:
-			v, exists := se.Get(c)
+			v, exists := se.GetActualParam(c)
 			if !exists || utils.IsNil(v) {
 				continue
 			}
@@ -339,7 +339,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterMemberCall:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}
@@ -355,7 +355,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				continue
 			}
 		case CallMemberCall:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}
@@ -378,7 +378,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 		default:
-			obj, ok := se.Get(c)
+			obj, ok := se.GetActualParam(c)
 			if !ok {
 				continue
 			}

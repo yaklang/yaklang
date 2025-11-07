@@ -614,23 +614,74 @@ var (
 type ParameterMemberCallKind int
 
 const (
+	// NoMemberCall 表示不涉及成员调用，通常用于直接对变量的操作
 	NoMemberCall ParameterMemberCallKind = iota
+
+	// ParameterMemberCall 表示参数的成员访问，例如: param.field
+	// 通过 MemberCallObjectIndex 指向参数索引
 	ParameterMemberCall
+
+	// FreeValueMemberCall 表示自由变量的成员访问（闭包场景）
+	// 通过 MemberCallObjectName 指向自由变量名称
 	FreeValueMemberCall
+
+	// CallMemberCall 表示调用对象本身作为成员访问的对象
+	// 用于函数调用返回值的成员访问场景
 	CallMemberCall
+
+	// SideEffectMemberCall 表示副作用变量的成员访问
+	// 通过 MemberCallObjectName 指向副作用变量名称
 	SideEffectMemberCall
 
+	// ParameterCall 表示直接参数调用（非成员访问）
+	// 通过 MemberCallObjectIndex 指向参数索引
 	ParameterCall
 
+	// MoreParameterMember 表示多层参数成员访问，例如: param.field.subfield
+	// 通过 MemberCallObjectIndex 指向上一层 ParameterMember 的索引
 	MoreParameterMember
 )
 
 type parameterMemberInner struct {
-	ObjectName            string
-	MemberCallKind        ParameterMemberCallKind
-	MemberCallObjectIndex int    // for Parameter
-	MemberCallObjectName  string // for FreeValue
-	MemberCallKey         int64  // value
+	// ObjectName 表示 ParameterMember 的名称
+	// 通常是成员访问的完整路径，如 "param.field" 或 "this.field.subfield"
+	ObjectName string
+
+	// MemberCallKind 表示参数成员调用的类型
+	// 决定了如何解析和定位成员访问的对象
+	MemberCallKind ParameterMemberCallKind
+
+	// MemberCallObjectIndex 表示在产生 ParameterMember 时，用于标识由哪个 Object 产生。
+	// 一般在 ParameterMemberCall，ParameterCall 和 MoreParameterMember 两种情况下会使用。
+	//
+	// 一般情况下，这个 Object 可能是一个Param，
+	// 也可能本身就是一个 ParameterMember。
+	//
+	// 示例 1：MemberCallKind = ParameterMemberCall
+	//   方法 foo(this, param) 中会产生 parameterMember：
+	//       this.field1, param.field2
+	//   则：
+	//       this.field1 的 MemberCallObjectIndex = 0 （对应参数 this）
+	//       param.field2 的 MemberCallObjectIndex = 1 （对应参数 param）
+	//
+	// 示例 2：MemberCallKind = MoreParameterMember
+	//   方法 bar(this, param) 中会产生 parameterMember：
+	//       this.field1, param.field2.subfield
+	//   则：
+	//       this.field1 的 MemberCallObjectIndex = 0 （对应参数 this）
+	//       param.field2.subfield 的 MemberCallObjectIndex = 1
+	//       （对应参数 param.field2 这个 ParameterMember）
+	MemberCallObjectIndex int
+
+	// MemberCallObjectName 表示成员调用对象的名称
+	// 主要用于 FreeValueMemberCall 和 SideEffectMemberCall 场景
+	// 存储自由变量或副作用变量的名称
+	MemberCallObjectName string
+
+	// MemberCallKey 表示成员访问的键值的 ID
+	// 存储被访问成员（字段或方法）对应的 Value ID
+	// 可通过 GetValueById 获取实际的 Value 对象
+	MemberCallKey int64
 }
 
 func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
@@ -659,7 +710,102 @@ func newMoreParameterMember(member *ParameterMember, key Value) *parameterMember
 	return p
 }
 
-func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
+// GetFormalParam 从函数对象 Function 中获取 ParameterMember 对应的形参
+//
+// 该方法根据 MemberCallKind 的不同类型，从 Function 的不同字段中提取对应的形参：
+//   - ParameterMemberCall: 从 fun.Params 中根据 MemberCallObjectIndex 获取参数
+//   - MoreParameterMember: 递归找到最顶级的 ParameterMember，然后从其 MemberCallObjectIndex 获取形参
+//     例如: param.field.subfield，需要递归找到 param.field，再找到 param
+//   - FreeValueMemberCall: 从 fun.FreeValues 中根据 MemberCallObjectName 获取自由变量
+//   - 其他类型: 返回 nil
+//
+// 参数:
+//   - fun: 函数对象，包含参数、参数成员和自由变量等信息
+//
+// 返回值:
+//   - para: 获取到的形参 Value 对象
+//   - ok: 是否成功获取到形参
+func (p *parameterMemberInner) GetFormalParam(fun *Function) (para Value, ok bool) {
+	visited := make(map[int64]bool)
+	return p.getParameterWithVisited(fun, visited)
+}
+
+// getParameterWithVisited 是 GetFormalParam 的内部实现，支持循环检测
+func (p *parameterMemberInner) getParameterWithVisited(fun *Function, visited map[int64]bool) (para Value, ok bool) {
+	if fun == nil {
+		return nil, false
+	}
+
+	switch p.MemberCallKind {
+	case ParameterMemberCall:
+		// 从函数参数列表中获取对应索引的参数
+		if p.MemberCallObjectIndex >= len(fun.Params) {
+			return nil, false
+		}
+		para, ok = fun.GetValueById(fun.Params[p.MemberCallObjectIndex])
+		return para, ok
+
+	case MoreParameterMember:
+		// MoreParameterMember 需要递归找到最顶级的 ParameterMember
+		if p.MemberCallObjectIndex >= len(fun.ParameterMembers) {
+			return nil, false
+		}
+
+		memberID := fun.ParameterMembers[p.MemberCallObjectIndex]
+		// 保护编程，一般SSA构建正常不会递归
+		if visited[memberID] {
+			log.Errorf("Circular reference detected in ParameterMember chain at index %d (id=%d)",
+				p.MemberCallObjectIndex, memberID)
+			return nil, false
+		}
+		visited[memberID] = true
+
+		parentMember, ok := fun.GetValueById(memberID)
+		if !ok || parentMember == nil {
+			return nil, false
+		}
+
+		paramMember, ok := ToParameterMember(parentMember)
+		if !ok {
+			return nil, false
+		}
+
+		// 递归调用，找到最顶级的形参
+		return paramMember.getParameterWithVisited(fun, visited)
+	case FreeValueMemberCall:
+		// 从自由变量映射中根据名称获取自由变量
+		for variable, id := range fun.FreeValues {
+			if variable.GetName() == p.MemberCallObjectName {
+				para, ok = fun.GetValueById(id)
+				return para, ok
+			}
+		}
+		return nil, false
+
+	default:
+		// 其他类型不支持获取形参
+		return nil, false
+	}
+}
+
+// GetActualParam 从调用对象 Call 中获取 ParameterMember 对应的实际 Value
+//
+// 该方法根据 MemberCallKind 的不同类型，从 Call 的不同字段中提取对应的 Value：
+//   - NoMemberCall: 不进行任何操作，直接返回
+//   - ParameterMemberCall: 从 c.Args 中根据 MemberCallObjectIndex 获取参数
+//   - MoreParameterMember: 从 c.ArgMember 中根据 MemberCallObjectIndex 获取嵌套参数成员
+//   - FreeValueMemberCall: 从 c.Binding 中根据 MemberCallObjectName 获取自由变量
+//   - CallMemberCall: 直接返回调用对象本身
+//   - SideEffectMemberCall: 从 c.SideEffectValue 中根据 MemberCallObjectName 获取副作用值
+//   - ParameterCall: 从 c.Args 中根据 MemberCallObjectIndex 获取参数（直接调用场景）
+//
+// 参数:
+//   - c: 调用对象，包含参数、绑定和副作用等信息
+//
+// 返回值:
+//   - obj: 获取到的 Value 对象
+//   - ok: 是否成功获取到对象
+func (p *parameterMemberInner) GetActualParam(c *Call) (obj Value, ok bool) {
 	if utils.IsNil(c) {
 		return nil, false
 	}
@@ -708,9 +854,40 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 type ParameterMember struct {
 	*anValue
 
+	// FormalParameterIndex	用来标识当前ParameterMember的索引
+	// 其和Call的ArgMemberIndex 对应
 	FormalParameterIndex int
 
 	*parameterMemberInner
+}
+
+// GetActualCallParam 从调用对象 Call 中获取 ParameterMember 对应的实际传入值
+//
+// 该方法使用 FormalParameterIndex 作为索引，从 Call.ArgMember 中获取实际传入的参数值。
+// ArgMember 数组是在 Call.handleCalleeFunction() 中填充的，按照 ParameterMember 的定义顺序。
+//
+// 示例：
+//   - 函数定义: func foo(obj) { return obj.field }
+//   - 调用: foo(myObject)
+//   - 则 obj.field 这个 ParameterMember 对应的 ActualCallParam 是 myObject.field 的值
+//
+// 参数:
+//   - c: 调用对象，包含实际传入的参数和成员值
+//
+// 返回值:
+//   - obj: 获取到的实际传入的 Value 对象
+//   - ok: 是否成功获取到对象
+func (pm *ParameterMember) GetActualCallParam(c *Call) (obj Value, ok bool) {
+	if utils.IsNil(c) || pm == nil {
+		return nil, false
+	}
+
+	if pm.FormalParameterIndex >= len(c.ArgMember) {
+		return nil, false
+	}
+
+	obj, ok = c.GetValueById(c.ArgMember[pm.FormalParameterIndex])
+	return obj, ok
 }
 
 var (

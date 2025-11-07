@@ -364,98 +364,86 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return vals
 	case *ssa.ParameterMember:
-		var vals Values
 		getParameter := func() Values {
-			fun := i.GetFunction()
-			if fun == nil {
+			funVal := i.GetFunction()
+			if funVal == nil {
 				return Values{i}
 			}
-			switch inst.MemberCallKind {
-			case ssa.MoreParameterMember:
-				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					memberKey, ok := inst.GetValueById(inst.MemberCallKey)
-					if !ok {
-						memberKey = nil
-					}
-					actx.pushObject(para, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-					return para.getTopDefs(actx, opt...)
-				}
-			case ssa.ParameterMemberCall:
-				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
-					memberKey, ok := inst.GetValueById(inst.MemberCallKey)
-					if !ok {
-						memberKey = nil
-					}
-					actx.pushObject(para, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-					return para.getTopDefs(actx, opt...)
-				}
-			case ssa.FreeValueMemberCall:
-				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
-					memberKey, ok := inst.GetValueById(inst.MemberCallKey)
-					if !ok {
-						memberKey = nil
-					}
-					actx.pushObject(fv, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-					return fv.getTopDefs(actx, opt...)
-				}
+
+			fun, ok := ssa.ToFunction(funVal.getInstruction())
+			if !ok || fun == nil {
+				return Values{i}
 			}
-			return Values{i}
+
+			para, ok := inst.GetFormalParam(fun)
+			if !ok || para == nil {
+				return Values{i}
+			}
+
+			memberKey, ok := inst.GetValueById(inst.MemberCallKey)
+			if !ok {
+				memberKey = nil
+			}
+			actx.pushObject(i.NewValue(para), i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
+			return i.NewValue(para).getTopDefs(actx, opt...)
 		}
-		getCalledByValue := func(called *Value) Values {
+		getActualValueByCall := func(called *Value) Values {
 			if called == nil {
 				return nil
 			}
 			calledInstance, ok := ssa.ToCall(called.innerValue)
 			if !ok {
-				log.Warnf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
+				log.Warnf("BUG: Parameter getActualValueByCall called is not callInstruction %s", called.GetOpcode())
 				return Values{}
 			}
-			if inst.FormalParameterIndex >= len(calledInstance.ArgMember) {
-				return getParameter()
-			}
-			actualParam, ok := inst.GetValueById(calledInstance.ArgMember[inst.FormalParameterIndex])
+
+			// 获取实际传入的参数值
+			actualParam, ok := inst.GetActualCallParam(calledInstance)
 			if !ok {
-				actualParam = nil
+				return Values{}
 			}
 			traced := i.NewValue(actualParam)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
 			ret := traced.getTopDefs(actx, opt...)
-			if !actx.needCrossProcess(i, traced) {
-				ret = append(ret, i)
-			}
 			if len(ret) > 0 {
 				return ret
 			} else {
-				return Values{traced}
+				return Values{}
 			}
 		}
-		called := actx.getLastCauseCall(TopDefAnalysis)
-		if called != nil {
-			actx.setRollBack()
-			calledByValue := getCalledByValue(called)
-			vals = append(vals, calledByValue...)
+
+		// 拿上一个调用栈的call
+		getLastCall := func() *Value {
+			called := actx.getLastCauseCall(TopDefAnalysis)
+			if called != nil {
+				actx.setRollBack()
+			}
+			return called
 		}
-		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
+
+		called := getLastCall()
+		result = append(result, getActualValueByCall(called)...)
+
+		if actx.AllowIgnoreCallStack() && len(result) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				// if call2fun.Len() > 50 {
-				// }
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
 						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), call2fun.Len())
 						break
 					}
-					val := getCalledByValue(call)
-					vals = append(vals, val...)
+					val := getActualValueByCall(call)
+					result = append(result, val...)
 				}
 			}
 		}
-		if len(vals) == 0 {
+
+		if len(result) == 0 {
 			return getParameter()
 		}
-		return vals
+		return result
 	case *ssa.Parameter:
 		getCalledByValue := func(called *Value, isInners ...bool) Values {
 			if called == nil {
