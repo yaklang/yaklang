@@ -32,6 +32,10 @@ func UnexpectedRightValueForObjectPropertyAccess() string {
 	return "unexpected right value for object property access"
 }
 
+func UnexpectedLeftValueForObjectPropertyAccess() string {
+	return "unexpected left value for object property access"
+}
+
 func NoOperandFoundForPrefixUnaryExp() string {
 	return "missing operand for prefix unary expression"
 }

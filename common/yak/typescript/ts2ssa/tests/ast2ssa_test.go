@@ -1869,13 +1869,24 @@ func TestClass(t *testing.T) {
 				A.a = par;
 			}
 		}
+		println(A.a)
 		println(A.getA());
 		A.setA(1);
 		println(A.getA());
 		`, []string{
-			"Function-A.getA()",
-			"Function-A.getA()",
+			"0",
+			"Function-A.getA() binding[A] member[0]",
+			"Function-A.getA() binding[A] member[side-effect(Parameter-par, A.a)]",
 		}, t)
+	})
+
+	t.Run("static method call", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+class Calc {
+	static add(a: number) { return a; }
+}
+println(Calc.add(1))
+`, []string{"Function-Calc.add(1)"}, t)
 	})
 
 	t.Run("simple class with constructor and method", func(t *testing.T) {
