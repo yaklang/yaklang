@@ -208,7 +208,7 @@ func (v *YakVariables) ToMap() map[string]any {
 			if err != nil {
 				return s.Data, err
 			} else {
-				return results[0], nil
+				return results, nil
 			}
 		case NucleiDslType:
 			ret, err := execNucleiDSL(codec.AnyToString(s.Data), func(s string) (any, error) {
