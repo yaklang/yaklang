@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,21 +29,37 @@ func TestVerifiedRule(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("is_build_in_rule = ? ", true)
 	failedRules := make([]string, 0)
+	var failedMu sync.Mutex
+
+	capture, err := utils.StartGoroutineLogCapture(os.Stdout, utils.WithGoroutineLogFailedOnly(true))
+	require.NoError(t, err)
+	bufferWriter := capture.Buffer
+	t.Cleanup(func() {
+		capture.Stop()
+	})
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
-		f, err := sfvm.NewSyntaxFlowVirtualMachine().Debug(false).Compile(rule.Content)
+		caseName := strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/")
+		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
 			t.Fatalf("compile rule %s error: %s", rule.RuleName, err)
 		}
 		if len(f.VerifyFsInfo) == 0 {
 			continue
 		}
-		success := t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+		success := t.Run(caseName, func(t *testing.T) {
 			t.Parallel()
+			buf, detach := bufferWriter.Attach()
+			defer func() {
+				bufferWriter.Flush(caseName, buf, t.Failed())
+				detach()
+			}()
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false, sfvm.WithEnableDebug(true))
 			if err != nil {
-				failedRules = append(failedRules, strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"))
-				require.NoError(t, err)
+				failedMu.Lock()
+				failedRules = append(failedRules, caseName)
+				failedMu.Unlock()
+				t.Fatal(err)
 			}
 		})
 		if !success {
@@ -76,7 +94,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false, sfvm.WithEnableDebug(true))
 			if err != nil {
 				require.NoError(t, err)
 			}
