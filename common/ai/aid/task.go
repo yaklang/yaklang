@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -117,7 +118,6 @@ func (t *AiTask) GetIndex() string {
 func (t *AiTask) GetName() string {
 	return t.Name
 }
-
 
 func (t *AiTask) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{

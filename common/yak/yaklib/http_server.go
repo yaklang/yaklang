@@ -86,8 +86,6 @@ func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOp
 		if c.localFileSystemHandler == nil {
 			c.localFileSystemHandler = make(map[string]http.Handler)
 		}
-		a := &websocket.Conn{}
-		a.WriteMessage(websocket.TextMessage, []byte("Hello world"))
 		c.localFileSystemHandler[prefix] = http.FileServer(http.Dir(dir))
 	}
 }

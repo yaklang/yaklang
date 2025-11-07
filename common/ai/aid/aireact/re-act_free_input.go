@@ -6,6 +6,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -32,6 +33,8 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 }
 
 func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
+	r.lastTask = r.currentTask
+
 	r.currentTask = task
 	if r.config.DebugEvent {
 		if task != nil {
@@ -44,6 +47,16 @@ func (r *ReAct) IsProcessingReAct() bool {
 	return r.currentTask != nil
 }
 
+func (r *ReAct) GetLastTask() aicommon.AIStatefulTask {
+	if r.lastTask == nil {
+		return nil
+	}
+	if r.config.DebugEvent {
+		log.Infof("Last task retrieved: %s", r.lastTask.GetId())
+	}
+	return r.lastTask
+}
+
 func (r *ReAct) GetCurrentTask() aicommon.AIStatefulTask {
 	if r.currentTask == nil {
 		return nil
@@ -52,6 +65,18 @@ func (r *ReAct) GetCurrentTask() aicommon.AIStatefulTask {
 		log.Infof("Current task retrieved: %s", r.currentTask.GetId())
 	}
 	return r.currentTask
+}
+
+func (r *ReAct) GetCurrentLoop() *reactloops.ReActLoop {
+	currentTask := r.GetCurrentTask()
+	if currentTask == nil {
+		return nil
+	}
+	currentLoop := currentTask.GetReActLoop().(*reactloops.ReActLoop)
+	if currentLoop == nil {
+		return nil
+	}
+	return currentLoop
 }
 
 func (r *ReAct) DumpCurrentEnhanceData() string {

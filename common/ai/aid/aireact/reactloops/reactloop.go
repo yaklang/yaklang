@@ -137,6 +137,7 @@ func (r *ReActLoop) SetCurrentTask(t aicommon.AIStatefulTask) {
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()
 	r.currentTask = t
+	t.SetReActLoop(r)
 }
 
 func (r *ReActLoop) GetInvoker() aicommon.AIInvokeRuntime {

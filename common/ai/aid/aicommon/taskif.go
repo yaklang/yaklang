@@ -43,6 +43,8 @@ type AIStatefulTask interface {
 	Finish(i error)
 	SetAsyncMode(async bool)
 	IsAsyncMode() bool
+	SetReActLoop(loop ReActLoopIF)
+	GetReActLoop() ReActLoopIF
 }
 
 type AIStatefulTaskBase struct {
@@ -57,6 +59,7 @@ type AIStatefulTaskBase struct {
 	status    AITaskState
 	createdAt time.Time
 	asyncMode bool
+	reActLoop ReActLoopIF
 }
 
 func (s *AIStatefulTaskBase) AppendErrorToResult(i error) {
@@ -187,6 +190,14 @@ func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 
 func (s *AIStatefulTaskBase) GetCreatedAt() time.Time {
 	return s.createdAt
+}
+
+func (s *AIStatefulTaskBase) GetReActLoop() ReActLoopIF {
+	return s.reActLoop
+}
+
+func (s *AIStatefulTaskBase) SetReActLoop(loop ReActLoopIF) {
+	s.reActLoop = loop
 }
 
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)
