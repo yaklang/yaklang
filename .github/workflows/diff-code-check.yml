@@ -255,6 +255,7 @@ jobs:
       
       - name: Generate security report
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
+        id: generate_report
         run: |
           echo "::group::Preparing report generation"
           rm -rf results
@@ -305,6 +306,10 @@ jobs:
           
           echo "Total risks found: $RISK_COUNT"
           echo "RISK_COUNT=$RISK_COUNT" >> $GITHUB_OUTPUT
+          if [ "$RISK_COUNT" -eq 0 ]; then
+            echo "::notice::Risk count is 0. Skipping remaining risk processing steps."
+            echo "::endgroup::"
+          fi
           echo "::endgroup::"
 
       - name: Clean up old security comments (No vulnerabilities found)
@@ -368,7 +373,7 @@ jobs:
           echo "::notice::This does not block the CI pipeline."
 
       - name: Comment PR with security findings
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && steps.generate_report.outputs.RISK_COUNT != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -672,6 +677,7 @@ jobs:
             }
 
       - name: Upload risk log
+        continue-on-error: true
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         uses: actions/upload-artifact@v4
         with:
@@ -679,6 +685,7 @@ jobs:
           path: risk.json
 
       - name: Display all risks
+        continue-on-error: true
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: yak ssa-risk --input ./risk.json --with-code
 
