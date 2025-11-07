@@ -128,7 +128,7 @@ var rewriteJavaFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 				return utils.Error("rewrite_java_file requires valid line range (start <= end, both > 0) or no line numbers for full file rewrite")
 			}
 
-			l.GetEmitter().EmitTextPlainTextStreamEvent(
+			l.GetEmitter().EmitDefaultStreamEvent(
 				"thought",
 				bytes.NewReader([]byte(fmt.Sprintf("Preparing to rewrite Java file %s", filePath))),
 				l.GetCurrentTask().GetIndex())

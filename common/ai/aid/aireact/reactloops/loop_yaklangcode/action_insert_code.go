@@ -33,7 +33,7 @@ var insertLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			if line <= 0 {
 				return utils.Error("insert_lines action must have valid 'insert_line' parameter")
 			}
-			l.GetEmitter().EmitTextPlainTextStreamEvent(
+			l.GetEmitter().EmitDefaultStreamEvent(
 				"thought",
 				bytes.NewReader([]byte(fmt.Sprintf("Preparing insert at line:%v", line))), l.GetCurrentTask().GetIndex())
 			return nil

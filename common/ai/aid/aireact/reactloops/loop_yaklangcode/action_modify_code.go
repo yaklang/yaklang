@@ -35,7 +35,7 @@ var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			if start <= 0 || end <= 0 || end < start {
 				return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters")
 			}
-			l.GetEmitter().EmitTextPlainTextStreamEvent(
+			l.GetEmitter().EmitDefaultStreamEvent(
 				"thought",
 				bytes.NewReader([]byte(fmt.Sprintf("Preparing modify line:%v-%v", start, end))), l.GetCurrentTask().GetIndex())
 			return nil

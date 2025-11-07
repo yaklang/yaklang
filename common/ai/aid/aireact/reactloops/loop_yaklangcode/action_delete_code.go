@@ -45,7 +45,7 @@ var deleteLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			} else {
 				msg = fmt.Sprintf("Preparing delete line:%v", startLine)
 			}
-			l.GetEmitter().EmitTextPlainTextStreamEvent(
+			l.GetEmitter().EmitDefaultStreamEvent(
 				"thought",
 				bytes.NewReader([]byte(msg)), l.GetCurrentTask().GetIndex())
 			return nil
