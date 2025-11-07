@@ -25,9 +25,10 @@ func TestWebSocketRouteHandler(t *testing.T) {
 	go func() {
 		err := _httpServe(host, port,
 			_httpServerOptContext(ctx),
-			_httpServerOptWsRouteHandler("/ws", func(conn *websocket.Conn) {
+			_httpServerOptWsRouteHandler("/ws", func(conn *WebSocketConn) {
 				defer conn.Close()
 				log.Info("WebSocket connection established")
+				log.Infof("Raw request size: %d bytes", len(conn.GetRawRequest()))
 
 				for {
 					// 读取消息
@@ -55,7 +56,10 @@ func TestWebSocketRouteHandler(t *testing.T) {
 	}()
 
 	// 等待服务器启动
-	time.Sleep(time.Second)
+	err := utils.WaitConnect(utils.HostPort(host, port), 3)
+	if err != nil {
+		t.Fatalf("wait connect error: %s", err)
+	}
 
 	// 测试 WebSocket 连接
 	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", host, port), Path: "/ws"}
@@ -102,7 +106,7 @@ func TestWebSocketMultipleRoutes(t *testing.T) {
 		err := _httpServe(host, port,
 			_httpServerOptContext(ctx),
 			// 第一个 WebSocket 路由：echo
-			_httpServerOptWsRouteHandler("/ws/echo", func(conn *websocket.Conn) {
+			_httpServerOptWsRouteHandler("/ws/echo", func(conn *WebSocketConn) {
 				defer conn.Close()
 				for {
 					messageType, message, err := conn.ReadMessage()
@@ -113,7 +117,7 @@ func TestWebSocketMultipleRoutes(t *testing.T) {
 				}
 			}),
 			// 第二个 WebSocket 路由：uppercase
-			_httpServerOptWsRouteHandler("/ws/upper", func(conn *websocket.Conn) {
+			_httpServerOptWsRouteHandler("/ws/upper", func(conn *WebSocketConn) {
 				defer conn.Close()
 				for {
 					messageType, message, err := conn.ReadMessage()
@@ -130,7 +134,10 @@ func TestWebSocketMultipleRoutes(t *testing.T) {
 	}()
 
 	// 等待服务器启动
-	time.Sleep(time.Second)
+	err := utils.WaitConnect(utils.HostPort(host, port), 3)
+	if err != nil {
+		t.Fatalf("wait connect error: %s", err)
+	}
 
 	// 测试第一个路由
 	t.Run("echo route", func(t *testing.T) {
@@ -191,7 +198,7 @@ func TestWebSocketGlobPattern(t *testing.T) {
 	go func() {
 		err := _httpServe(host, port,
 			_httpServerOptContext(ctx),
-			_httpServerOptWsRouteHandler("/ws/*", func(conn *websocket.Conn) {
+			_httpServerOptWsRouteHandler("/ws/*", func(conn *WebSocketConn) {
 				defer conn.Close()
 				for {
 					messageType, message, err := conn.ReadMessage()
@@ -209,7 +216,10 @@ func TestWebSocketGlobPattern(t *testing.T) {
 	}()
 
 	// 等待服务器启动
-	time.Sleep(time.Second)
+	err := utils.WaitConnect(utils.HostPort(host, port), 3)
+	if err != nil {
+		t.Fatalf("wait connect error: %s", err)
+	}
 
 	// 测试不同的路径都能匹配
 	testPaths := []string{"/ws/test1", "/ws/test2", "/ws/abc"}
@@ -236,4 +246,129 @@ func TestWebSocketGlobPattern(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWebSocketGetRawRequest(t *testing.T) {
+	// 获取随机端口
+	port := utils.GetRandomAvailableTCPPort()
+	host := "127.0.0.1"
+
+	// 创建上下文用于控制服务器生命周期
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var capturedRawRequest []byte
+
+	// 启动 HTTP 服务器，测试 GetRawRequest
+	go func() {
+		err := _httpServe(host, port,
+			_httpServerOptContext(ctx),
+			_httpServerOptWsRouteHandler("/ws/test", func(conn *WebSocketConn) {
+				defer conn.Close()
+				// 获取原始请求
+				capturedRawRequest = conn.GetRawRequest()
+				log.Infof("Captured raw request: %d bytes", len(capturedRawRequest))
+
+				// 发送确认消息
+				conn.WriteMessage(websocket.TextMessage, []byte("OK"))
+			}),
+		)
+		if err != nil {
+			log.Errorf("http serve error: %s", err)
+		}
+	}()
+
+	// 等待服务器启动
+	err := utils.WaitConnect(utils.HostPort(host, port), 3)
+	if err != nil {
+		t.Fatalf("wait connect error: %s", err)
+	}
+
+	// 测试 WebSocket 连接，添加自定义 header
+	customHeader := map[string][]string{
+		"X-Custom-Header":  {"test-value"},
+		"X-Request-ID":     {"12345"},
+		"User-Agent":       {"YakLang-Test-Client/1.0"},
+		"X-Test-Timestamp": {fmt.Sprintf("%d", time.Now().Unix())},
+	}
+
+	u := url.URL{Scheme: "ws", Host: fmt.Sprintf("%s:%d", host, port), Path: "/ws/test"}
+	dialer := websocket.Dialer{}
+	conn, _, err := dialer.Dial(u.String(), customHeader)
+	if err != nil {
+		t.Fatalf("dial error: %s", err)
+	}
+	defer conn.Close()
+
+	// 读取确认消息
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read message error: %s", err)
+	}
+
+	if string(message) != "OK" {
+		t.Fatalf("expected 'OK', got '%s'", string(message))
+	}
+
+	// 等待一下确保 capturedRawRequest 已经被设置
+	err = utils.WaitConnect(utils.HostPort(host, port), 0.1)
+	if err == nil {
+		// 连接正常，继续
+	}
+
+	// 验证原始请求已被捕获
+	if len(capturedRawRequest) == 0 {
+		t.Fatal("raw request should not be empty")
+	}
+
+	// 验证原始请求包含预期的内容
+	rawRequestStr := string(capturedRawRequest)
+	log.Infof("Raw request content:\n%s", rawRequestStr)
+
+	// 验证请求行
+	if !contains(rawRequestStr, "GET /ws/test") {
+		t.Fatalf("raw request should contain 'GET /ws/test', got: %s", rawRequestStr)
+	}
+
+	// 验证 WebSocket 升级相关的 header
+	if !contains(rawRequestStr, "Upgrade: websocket") && !contains(rawRequestStr, "Upgrade: Websocket") {
+		t.Fatalf("raw request should contain 'Upgrade: websocket', got: %s", rawRequestStr)
+	}
+
+	if !contains(rawRequestStr, "Connection: Upgrade") && !contains(rawRequestStr, "Connection: upgrade") {
+		t.Fatalf("raw request should contain 'Connection: Upgrade', got: %s", rawRequestStr)
+	}
+
+	// 验证自定义 header (注意：HTTP header 会被规范化，如 X-Request-ID 会变成 X-Request-Id)
+	if !contains(rawRequestStr, "X-Custom-Header: test-value") {
+		t.Fatalf("raw request should contain custom header 'X-Custom-Header: test-value', got: %s", rawRequestStr)
+	}
+
+	// HTTP 规范化后可能是 X-Request-Id 而不是 X-Request-ID
+	if !contains(rawRequestStr, "X-Request-Id: 12345") && !contains(rawRequestStr, "X-Request-ID: 12345") {
+		t.Fatalf("raw request should contain custom header 'X-Request-Id: 12345', got: %s", rawRequestStr)
+	}
+
+	if !contains(rawRequestStr, "User-Agent: YakLang-Test-Client/1.0") {
+		t.Fatalf("raw request should contain custom header 'User-Agent: YakLang-Test-Client/1.0', got: %s", rawRequestStr)
+	}
+
+	if !contains(rawRequestStr, "X-Test-Timestamp:") {
+		t.Fatalf("raw request should contain custom header 'X-Test-Timestamp', got: %s", rawRequestStr)
+	}
+
+	log.Infof("test passed, raw request captured successfully (%d bytes) with all custom headers", len(capturedRawRequest))
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
