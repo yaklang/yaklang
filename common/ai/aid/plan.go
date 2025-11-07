@@ -104,13 +104,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return planRes, nil
 	}
 
-	var rootTask = &AiTask{}
-	rootTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
-		"root-task"+uuid.NewString(),
-		fmt.Sprintf("任务名称: %s\n任务目标: %s", rootTask.Name, rootTask.Goal),
-		pr.cod.Ctx,
-		pr.cod.Emitter,
-	)
+	var rootTask = pr.cod.generateAITaskWithName("root-default", "root-default")
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
 		var propagateConfig func(task *AiTask)
@@ -145,14 +139,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 					log.Errorf("extract action from plan data failed: %v", err)
 					return
 				}
-				rootTask.Name = action.GetAnyToString("main_task")
-				rootTask.Goal = action.GetAnyToString("main_task_goal")
-				rootTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
-					"root-task"+uuid.NewString(),
-					fmt.Sprintf("任务名称: %s\n任务目标: %s", rootTask.Name, rootTask.Goal),
-					pr.cod.Ctx,
-					pr.cod.Emitter,
-				)
+				rootTask = pr.cod.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
 				for _, subtask := range action.GetInvokeParamsArray("tasks") {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
@@ -182,10 +169,11 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 	}
 
 	taskBase := aicommon.NewStatefulTaskBase(
-		"plan-subtask-"+uuid.NewString(),
+		"plan-task"+uuid.NewString(),
 		fmt.Sprintf("任务名称: %s\n任务目标: %s", task.Name, task.Goal),
 		c.Ctx,
 		c.Emitter,
+		true,
 	)
 	task.AIStatefulTaskBase = taskBase
 	return task
