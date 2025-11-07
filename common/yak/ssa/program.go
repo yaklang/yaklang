@@ -125,6 +125,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.ExternLib = prog.ExternLib
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
+	subProg.ReExportTable = make(map[string]*ReExportInfo)
 
 	// up-down stream and application
 	prog.AddUpStream(subProg)

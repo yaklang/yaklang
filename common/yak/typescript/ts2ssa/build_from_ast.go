@@ -33,28 +33,17 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	defer recoverRange()
 
 	prog := b.GetProgram()
-	application := prog.Application
+
 	fileName := b.GetEditor().GetFilename()
 	folderPath := b.GetEditor().GetFolderPath()
 	fileUrl := path.Join([]string{folderPath, fileName}...)
-
-	ssaGlobal := application.GlobalVariablesBlueprint.Container()
-	if ssaGlobal == nil {
-		return nil
-	}
 
 	if b.PreHandler() {
 		lib, _ := prog.GetLibrary(fileUrl)
 		if lib == nil {
 			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
-			variable := b.CreateMemberCallVariable(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
-			emptyContainer := b.EmitEmptyContainer()
-			b.AssignVariable(variable, emptyContainer)
-			if lib.GlobalVariablesBlueprint != nil {
-				moduleScope := b.ReadMemberCallValue(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
-				lib.GlobalVariablesBlueprint.InitializeWithContainer(moduleScope)
-			}
 		}
+
 		defer func() {
 			lib.VisitAst(sourcefile)
 		}()
@@ -80,31 +69,20 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 				if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
 					b.useStrict = true
 				}
-				if ast.IsImportDeclaration(statement) {
-					b.VisitStatement(statement)
-				}
 			}
 			for _, statement := range sourcefile.Statements.Nodes {
-				if ast.IsFunctionDeclaration(statement) || ast.IsVariableStatement(statement) || ast.IsEnumDeclaration(statement) || ast.IsClassDeclaration(statement) || ast.IsInterfaceDeclaration(statement) {
+				// 这些顶层AST节点可能包含导入导出信息
+				if ast.IsImportDeclaration(statement) || ast.IsImportEqualsDeclaration(statement) ||
+					ast.IsFunctionDeclaration(statement) || ast.IsVariableStatement(statement) ||
+					ast.IsEnumDeclaration(statement) || ast.IsClassDeclaration(statement) ||
+					ast.IsInterfaceDeclaration(statement) || ast.IsExportAssignment(statement) ||
+					ast.IsExportDeclaration(statement) {
 					b.VisitStatement(statement)
 				}
 
 			}
 		}
 
-		for exportValueName, exportedObjectName := range b.namedValueExports {
-			exportedObjectVal := b.PeekValue(exportedObjectName)
-			if exportedObjectVal != nil {
-				lib.SetExportValue(exportValueName, exportedObjectVal)
-			}
-		}
-
-		for exportTypeName, exportedTypeName := range b.namedValueExports {
-			exportedObjectVal := b.PeekValue(exportedTypeName)
-			if exportedObjectVal != nil {
-				lib.SetExportType(exportTypeName, exportedObjectVal.GetType())
-			}
-		}
 		return nil
 	}
 
@@ -223,8 +201,12 @@ func (b *builder) VisitStatement(node *ast.Node) interface{} {
 		b.VisitClassDeclaration(node.AsClassDeclaration())
 	case ast.KindImportDeclaration:
 		b.VisitImportDeclaration(node.AsImportDeclaration())
+	case ast.KindImportEqualsDeclaration:
+		b.VisitImportEqualsDeclaration(node.AsImportEqualsDeclaration())
 	case ast.KindExportAssignment:
 		b.VisitExportAssignment(node.AsExportAssignment())
+	case ast.KindExportDeclaration:
+		b.VisitExportDeclaration(node.AsExportDeclaration())
 	case ast.KindEnumDeclaration:
 		b.VisitEnumDeclaration(node.AsEnumDeclaration())
 	case ast.KindInterfaceDeclaration:
@@ -246,10 +228,6 @@ func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{
 	// 使用 AST 提供的辅助方法检查修饰符
 	nodePtr := node.AsNode()
 	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
-
-	if !ShouldVisit(b.PreHandler(), isExport) {
-		return nil
-	}
 
 	if decList := node.DeclarationList; decList != nil {
 		b.VisitVariableDeclarationList(decList, isExport)
@@ -1000,6 +978,11 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 		return nil
 	}
 
+	// 顶层Class声明我们在Prehandle阶段就构建完毕了 这里避免重复再次创建
+	if b.IsTopLevelNodeInAST(node.AsNode()) != b.PreHandler() {
+		return nil
+	}
+
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
@@ -1015,22 +998,16 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
 	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
 
-	if !ShouldVisit(b.PreHandler(), isExport) {
-		return nil
-	}
+	blueprint = b.CreateBlueprint(className)
+	blueprint.SetKind(ssa.BlueprintClass)
 
 	if isExport {
 		if !isDefault {
-			b.namedTypeExports[className] = className
-			b.namedValueExports[className] = className
+			b.GetProgram().ExportType[className] = blueprint
 		} else {
-			b.namedTypeExports["default"] = className
-			b.namedValueExports["default"] = className
+			b.GetProgram().ExportType["default"] = blueprint
 		}
 	}
-
-	blueprint = b.CreateBlueprint(className)
-	blueprint.SetKind(ssa.BlueprintClass)
 
 	if node.HeritageClauses != nil && len(node.HeritageClauses.Nodes) != 0 {
 		parent := node.HeritageClauses.Nodes[0].AsHeritageClause()
@@ -1046,8 +1023,10 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 		该lazyBuilder顺序按照cls解析顺序
 	*/
 	store := b.StoreFunctionBuilder()
+	storeImportTBL := b.importTbl
 	blueprint.AddLazyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
+		b.importTbl = storeImportTBL
 		defer switchHandler()
 
 		if extendName != "" {
@@ -1062,10 +1041,10 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 	})
 
 	container := blueprint.Container()
-	b.MarkedThisClassBlueprint = blueprint
-	defer func() {
-		b.MarkedThisClassBlueprint = nil
-	}()
+	//b.MarkedThisClassBlueprint = blueprint
+	//defer func() {
+	//	b.MarkedThisClassBlueprint = nil
+	//}()
 
 	if node.Members != nil && len(node.Members.Nodes) > 0 {
 		for _, memberNode := range node.Members.Nodes {
@@ -1137,7 +1116,8 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 
 	// 获取声明的初始化值（如果有的话）
 	var initValue ssa.Value
-	if decl.Initializer != nil {
+
+	if !b.PreHandler() && decl.Initializer != nil {
 		initValue = b.VisitRightValueExpression(decl.Initializer)
 	}
 
@@ -1154,26 +1134,21 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	switch {
 	case ast.IsIdentifier(name): // 简单变量: let x = value
 		identifier := b.VisitIdentifier(name.AsIdentifier())
-		if isExport {
-			b.namedValueExports[identifier] = identifier
-		}
-		var variable *ssa.Variable
-		if isLocal {
-			variable = b.CreateLocalVariable(identifier)
-		} else {
-			variable = b.CreateJSVariable(identifier)
+		if b.PreHandler() {
+			if isExport {
+				b.GetProgram().ExportValue[identifier] = b.EmitUndefined(identifier)
+			}
+			return nil
 		}
 
 		if initValue == nil {
 			initValue = b.EmitUndefined(identifier)
 		}
-
 		if decl.Initializer != nil { // 定义变量
 			if explicitType != nil {
 				mergedType := b.MergeTypeWithAnnotation(initValue.GetType(), explicitType)
 				initValue.SetType(mergedType)
 			}
-			b.AssignVariable(variable, initValue)
 		} else { // 仅声明变量
 			// 仅声明，使用显式类型或默认类型
 			var finalType ssa.Type
@@ -1182,10 +1157,19 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 			} else {
 				finalType = ssa.CreateAnyType() // TypeScript的默认类型
 			}
+			initValue.SetType(finalType)
+		}
 
-			undefinedValue := b.EmitUndefined(identifier)
-			undefinedValue.SetType(finalType)
-			b.AssignVariable(variable, undefinedValue)
+		var variable *ssa.Variable
+		if isLocal {
+			variable = b.CreateLocalVariable(identifier)
+		} else {
+			variable = b.CreateJSVariable(identifier)
+		}
+		b.AssignVariable(variable, initValue)
+		if isExport {
+			ssa.ReplaceAllValue(b.GetProgram().ExportValue[identifier], initValue)
+			b.GetProgram().ExportValue[identifier] = initValue
 		}
 
 	case ast.IsBindingPattern(name): // 解构模式: let {a, b} = obj 或 let [x, y] = arr
@@ -1224,6 +1208,10 @@ func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{
 	defer recoverRange()
 
 	// 提取模块路径
+	if node.ModuleSpecifier == nil {
+		return nil
+	}
+
 	modulePath := b.extractModuleSpecifierText(node.ModuleSpecifier)
 	if modulePath == "" {
 		b.NewError(ssa.Warn, TAG, "empty import module specifier")
@@ -1244,6 +1232,13 @@ func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{
 }
 
 // VisitImportClause 访问导入子句
+/*
+名称	示例	用法特点
+默认导入 Default Import	import fs from 'fs'	导入默认导出，名称可改
+命名导入 Named Import	import { readFile } from 'fs'	只导一部分导出
+命名空间导入 Namespace Import	import * as fs from 'fs'	所有命名导出聚合为对象
+混合导入 Combined Import	import fs, { readFile } from 'fs'	默认导出 + 指定命名导出
+*/
 func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string, isExternal bool) interface{} {
 	if node == nil || b.IsStop() {
 		return nil
@@ -1261,7 +1256,7 @@ func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string,
 	if binding := node.Name(); binding != nil {
 		localName := b.getDeclarationNameText(binding)
 		if localName != "" {
-			b.assignImportedValue(localName, "default", resolvedPath, isExternal)
+			b.addImport(resolvedPath, "default", localName)
 		}
 	}
 
@@ -1275,7 +1270,7 @@ func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string,
 			if namespace != nil && namespace.Name() != nil {
 				alias := b.getDeclarationNameText(namespace.Name())
 				if alias != "" {
-					b.bindNamespaceImport(alias, resolvedPath, isExternal)
+					b.addImport(resolvedPath, "*", alias)
 				}
 			}
 
@@ -1306,8 +1301,7 @@ func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string,
 							originalName = strings.Trim(spec.PropertyName.AsStringLiteral().Text, `"'`)
 						}
 					}
-
-					b.assignImportedValue(localName, originalName, resolvedPath, isExternal)
+					b.addImport(resolvedPath, originalName, localName)
 				}
 			}
 		}
@@ -1316,16 +1310,101 @@ func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string,
 	return nil
 }
 
-// VisitNamespaceImport 访问命名空间导入
-func (b *builder) VisitNamespaceImport(node *ast.NamespaceImport) interface{} { return nil }
+// VisitImportEqualsDeclaration 访问 import equals 声明
+/*
+TypeScript 专有的 CommonJS 互操作语法，用于兼容 export = 和 module.exports
 
-// VisitNamedImports 访问命名导入
-func (b *builder) VisitNamedImports(node *ast.NamedImports) interface{} { return nil }
+两种形式：
+1. 内部模块引用（EntityName）：
+   - import A = B
+   - import A = B.C.D
+   这种形式用于引用内部命名空间或类型别名
 
-// VisitImportSpecifier 访问导入说明符
-func (b *builder) VisitImportSpecifier(node *ast.ImportSpecifier) interface{} { return nil }
+2. 外部模块引用（ExternalModuleReference）：
+   - import sum = require('./math')
+   这种形式等价于 const sum = require('./math')，用于导入 export = 导出的模块
 
+示例：
+- import sum = require('./math')  // 外部模块引用，导入 CommonJS 风格的导出
+- import A = B                     // 内部模块引用，类型别名或命名空间引用
+
+语义：
+- 外部模块引用会导入整个模块的默认导出（对应 export = 或 module.exports）
+- 导入的值绑定到指定的标识符上
+*/
 func (b *builder) VisitImportEqualsDeclaration(node *ast.ImportEqualsDeclaration) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 跳过类型导入
+	if node.IsTypeOnly {
+		return nil
+	}
+
+	// 获取导入的本地名称
+	localName := b.getDeclarationNameText(node.Name())
+	if localName == "" {
+		return nil
+	}
+
+	// 判断是外部模块引用还是内部模块引用
+	if ast.IsExternalModuleReference(node.ModuleReference) {
+		// 外部模块引用: import sum = require('./math')
+		externalRef := node.ModuleReference.AsExternalModuleReference()
+		if externalRef == nil || externalRef.Expression == nil {
+			return nil
+		}
+
+		// 提取模块路径
+		modulePath := b.extractModuleSpecifierText(externalRef.Expression)
+		if modulePath == "" {
+			b.NewError(ssa.Warn, TAG, "empty module specifier in import equals declaration")
+			return nil
+		}
+
+		// 解析导入路径
+		resolvedPath, isExternal := b.resolveImportLibPath(modulePath)
+		if resolvedPath == "" || isExternal {
+			return nil
+		}
+
+		// 导入模块的默认导出（对应 export = 的值）
+		// 在 TypeScript 中，export = 导出的值会作为模块的整体导出
+		// 类似于 CommonJS 的 module.exports
+
+		// 这里我们需要导入模块的 cjsExport（对应 export = 的导出）
+		// 如果没有 cjsExport，则尝试导入 default 导出
+		if b.PreHandler() {
+			log.Infof("Import equals (external): %s = require('%s') -> %s", localName, modulePath, resolvedPath)
+		}
+		b.addImport(resolvedPath, EXPORT_EQUAL_VALUE, localName)
+		b.ImportExternLibValue(localName, EXPORT_EQUAL_VALUE, resolvedPath, isExternal)
+	} else {
+		// 内部模块引用: import A = B 或 import A = B.C.D
+		// 这种情况通常用于类型别名或命名空间引用
+		// 在运行时层面，这相当于创建一个别名指向现有的值
+
+		// 获取引用的实体名称
+		entityValue := b.VisitRightValueExpression(node.ModuleReference)
+		entityName := b.getEntityNameText(node.ModuleReference)
+		if utils.IsNil(entityValue) {
+			return nil
+		}
+
+		if b.PreHandler() {
+			log.Infof("Import equals (internal): %s = %s", localName, entityName)
+			vari := b.CreateJSVariable(localName)
+			b.AssignVariable(vari, entityValue)
+		} else {
+			vari := b.CreateJSVariable(localName)
+			b.AssignVariable(vari, entityValue)
+		}
+	}
+
 	return nil
 }
 
@@ -1367,13 +1446,23 @@ func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} 
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	if !node.IsExportEquals { // export default
-		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
-			b.namedValueExports["default"] = variable.GetName()
+	if b.PreHandler() {
+		if !node.IsExportEquals { // export default expression; // ES写法
+			b.GetProgram().ExportValue["default"] = b.EmitUndefined("default")
+		} else { // export = expression; // TS写法
+			b.GetProgram().ExportValue[EXPORT_EQUAL_VALUE] = b.EmitUndefined(EXPORT_EQUAL_VALUE)
 		}
+
 	} else {
-		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
-			b.cjsExport = variable.GetName()
+		runTimeValue := b.VisitRightValueExpression(node.Expression)
+		if !utils.IsNil(runTimeValue) {
+			if !node.IsExportEquals { // export default expression; // ES写法
+				ssa.ReplaceAllValue(b.GetProgram().ExportValue["default"], runTimeValue)
+				b.GetProgram().ExportValue["default"] = runTimeValue
+			} else { // export = expression; // TS写法
+				ssa.ReplaceAllValue(b.GetProgram().ExportValue[EXPORT_EQUAL_VALUE], runTimeValue)
+				b.GetProgram().ExportValue[EXPORT_EQUAL_VALUE] = runTimeValue
+			}
 		}
 	}
 	return nil
@@ -1381,9 +1470,24 @@ func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} 
 
 // VisitExportDeclaration 导出声明
 /*
-export { foo }
-export { foo as bar }
-export { foo } from './mod'
+两种情况：
+1. 本地导出(Local Export): export { foo, bar }
+   - 从当前文件导出本地绑定
+   - 不需要 from 子句
+   - 直接将本地变量添加到导出表
+
+2. 导出转发(Re-Export): export { foo } from "./mod" 或 export * from "./mod"
+   - 从其他模块导入并重新导出
+   - 包含 from 子句(ModuleSpecifier)
+   - 需要先导入模块中的值，然后再导出
+
+示例:
+- export { foo }                    // 本地导出
+- export { foo as bar }             // 本地导出并重命名
+- export { foo } from './mod'       // 转发导出
+- export { foo as bar } from './mod' // 转发导出并重命名
+- export * from './mod'             // 转发所有导出
+- export * as ns from './mod'       // 命名空间转发导出
 */
 func (b *builder) VisitExportDeclaration(decl *ast.ExportDeclaration) interface{} {
 	if decl == nil || b.IsStop() {
@@ -1393,17 +1497,153 @@ func (b *builder) VisitExportDeclaration(decl *ast.ExportDeclaration) interface{
 	recoverRange := b.GetRecoverRange(b.sourceFile, &decl.Loc, "")
 	defer recoverRange()
 
-	if exportClause := decl.ExportClause; exportClause != nil {
-		if ast.IsNamedExports(exportClause) {
-			namedExports := exportClause.AsNamedExports()
-			b.VisitNamedExports(namedExports)
-		} else if ast.IsNamespaceExport(exportClause) {
-			namespaceExport := exportClause.AsNamespaceExport()
-			_ = namespaceExport
-			log.Warn("unimplemented Namespace export")
+	// TODO: 暂时跳过类型导出
+	if decl.IsTypeOnly {
+		return nil
+	}
+
+	// 判断是否是转发导出（Re-Export）
+	isReExport := decl.ModuleSpecifier != nil
+	var resolvedPath string
+	var isExternal bool
+
+	if isReExport {
+		// 转发导出：需要先从其他模块导入
+		modulePath := b.extractModuleSpecifierText(decl.ModuleSpecifier)
+		if modulePath == "" {
+			b.NewError(ssa.Warn, TAG, "empty import module specifier in export declaration statement")
+			return nil
+		}
+
+		// 解析导入路径
+		resolvedPath, isExternal = b.resolveImportLibPath(modulePath)
+		if resolvedPath == "" || isExternal {
+			return nil
+		}
+
+		// 处理转发导出
+		b.handleReExport(decl, resolvedPath, isExternal)
+	} else {
+		// 本地导出：直接处理导出子句
+		if exportClause := decl.ExportClause; exportClause != nil {
+			if ast.IsNamedExports(exportClause) {
+				namedExports := exportClause.AsNamedExports()
+				b.VisitNamedExports(namedExports)
+			} else if ast.IsNamespaceExport(exportClause) {
+				namespaceExport := exportClause.AsNamespaceExport()
+				_ = namespaceExport
+				log.Warn("unimplemented Namespace export")
+			}
 		}
 	}
+
 	return nil
+}
+
+// handleReExport 处理转发导出
+func (b *builder) handleReExport(decl *ast.ExportDeclaration, resolvedPath string, isExternal bool) {
+	if exportClause := decl.ExportClause; exportClause != nil {
+		if ast.IsNamedExports(exportClause) {
+			// 命名转发导出: export { foo, bar as baz } from './mod'
+			namedExports := exportClause.AsNamedExports()
+			b.handleNamedReExport(namedExports, resolvedPath, isExternal)
+		} else if ast.IsNamespaceExport(exportClause) {
+			// 命名空间转发导出: export * as ns from './mod'
+			namespaceExport := exportClause.AsNamespaceExport()
+			b.handleNamespaceReExport(namespaceExport, resolvedPath, isExternal)
+		}
+	} else {
+		// export * from './mod' - 转发所有导出
+		b.handleWildcardReExport(resolvedPath, isExternal)
+	}
+}
+
+// handleNamedReExport 处理命名转发导出
+// export { foo, bar as baz } from './mod'
+func (b *builder) handleNamedReExport(namedExports *ast.NamedExports, resolvedPath string, isExternal bool) {
+	if namedExports == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &namedExports.Loc, "")
+	defer recoverRange()
+
+	for _, element := range namedExports.Elements.Nodes {
+		if element == nil {
+			continue
+		}
+
+		spec := element.AsExportSpecifier()
+		if spec == nil || spec.IsTypeOnly {
+			continue
+		}
+
+		// 获取导入的原始名称（从源模块）
+		var originalName string
+		if spec.PropertyName != nil {
+			// export { foo as bar } from './mod'
+			// PropertyName 是 'foo'（从源模块导入的名称）
+			originalName = b.VisitModuleExportName(spec.PropertyName)
+		} else {
+			// export { foo } from './mod'
+			// Name 既是导入名也是导出名
+			originalName = b.VisitModuleExportName(spec.Name())
+		}
+
+		// 获取导出的名称（对外暴露的名称）
+		exportName := b.VisitModuleExportName(spec.Name())
+
+		if originalName == "" || exportName == "" {
+			continue
+		}
+
+		if b.PreHandler() {
+			b.GetProgram().SetReExportInfo(exportName, resolvedPath, originalName, false, false)
+			log.Infof("Re-export: %s from %s as %s", originalName, resolvedPath, exportName)
+			continue
+		}
+	}
+}
+
+// handleNamespaceReExport 处理命名空间转发导出
+// export * as ns from './mod'
+func (b *builder) handleNamespaceReExport(namespaceExport *ast.NamespaceExport, resolvedPath string, isExternal bool) {
+	if namespaceExport == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &namespaceExport.Loc, "")
+	defer recoverRange()
+
+	// 获取命名空间名称
+	exportName := b.getDeclarationNameText(namespaceExport.Name())
+	if exportName == "" {
+		return
+	}
+
+	if b.PreHandler() {
+		b.GetProgram().SetReExportInfo(exportName, resolvedPath, "", true, false)
+		log.Infof("Namespace re-export: * as %s from %s", exportName, resolvedPath)
+		return
+	}
+}
+
+// handleWildcardReExport 处理通配符转发导出
+// export * from './mod'
+func (b *builder) handleWildcardReExport(resolvedPath string, isExternal bool) {
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+
+	if isExternal {
+		return
+	}
+	if b.PreHandler() {
+		b.GetProgram().SetWildCardReExportInfo(resolvedPath)
+		log.Infof("Wildcard re-export: * from %s", resolvedPath)
+		return
+	}
 }
 
 // VisitNamedExports 访问命名导出
@@ -1424,12 +1664,21 @@ func (b *builder) VisitNamedExports(namedExports *ast.NamedExports) interface{} 
 		if exportName == "" {
 			exportName = exportedItemName
 		}
-		if exportName == "default" { // export { ChildNewApp as default }
-			b.namedValueExports["default"] = exportedItemName
-		} else {
-			b.namedValueExports[exportName] = exportedItemName
+		// set undefined as placeholder for value top-def seek
+		if b.PreHandler() {
+			b.GetProgram().ExportValue[exportName] = b.EmitUndefined(exportedItemName)
+			log.Infof("NamedExport: ExportName as %s mapped LocalName as %s from %s", exportName, exportedItemName, b.GetProgram().Name)
+			return nil
 		}
-
+		// later set value to chain use-def
+		runtimeValue := b.VisitRightValueExpression(element.AsExportSpecifier().Name())
+		if !utils.IsNil(runtimeValue) {
+			if bp, ok := ssa.ToClassBluePrintType(runtimeValue.GetType()); ok {
+				b.GetProgram().ExportType[exportName] = bp
+			}
+			ssa.ReplaceAllValue(b.GetProgram().ExportValue[exportName], runtimeValue)
+			b.GetProgram().ExportValue[exportName] = runtimeValue
+		}
 	}
 	return nil
 }
@@ -1465,13 +1714,23 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	prog := b.GetProgram()
+
 	switch node.Kind {
 	// 需要区分L/R Value的类型
 	case ast.KindIdentifier:
+		// prog := b.GetProgram()
 		class := b.MarkedThisClassBlueprint
 		identifierName := b.VisitIdentifier(node.AsIdentifier())
+
+		// 默认从当前符号表就近读取
+		readValue := b.PeekValue(identifierName)
+
 		if isLval {
 			if class == nil {
+				if !utils.IsNil(readValue) {
+					return b.CreateJSVariable(identifierName), nil
+				}
 				return b.CreateJSVariable(identifierName), nil
 			}
 			if class.GetNormalMember(identifierName) != nil {
@@ -1487,6 +1746,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			return nil, b.EmitUndefined("")
 		}
 
+		// 如果当前正在构建类 在这个构建类的上下文环境中(比如你在构建某个类的方法) 则采用这套机制
 		if class != nil {
 			if method := class.GetStaticMethod(identifierName); !utils.IsNil(method) {
 				return nil, method
@@ -1505,56 +1765,90 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			}
 		}
 
-		bp := b.GetBluePrint(identifierName)
-		if bp != nil {
-			bp.Build()
-			return nil, bp.Container()
-		}
-		if importType, ok := b.GetProgram().TryReadImportDeclare(identifierName); ok {
-			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
-				blueprint.Build()
-				return nil, blueprint.Container()
-			}
-		}
-		readValue := b.ReadValue(identifierName)
 		if !utils.IsNil(readValue) {
 			if function, ok := ssa.ToFunction(readValue); ok && !utils.IsNil(function.LazyBuilder) {
 				function.Build()
 			}
+			if bp, ok := ssa.ToClassBluePrintType(readValue.GetType()); ok {
+				bp.Build()
+			}
+			return nil, readValue
 		}
-		return nil, readValue
+		// 尝试从当前prog关联的蓝图列表选取
+		bp := b.GetBluePrint(identifierName)
+		if bp != nil {
+			if !b.PreHandler() {
+				bp.Build()
+			}
+			return nil, bp.Container()
+		}
+		// 处理特殊的 ES Modules（ECMAScript Modules）中的 默认导入（default import）
+		/*
+			导出方式 (const.ts)	导入方式 (colors.ts)	含义
+			export default PI	import GG from './const'	允许模块只导出一个默认值，导入时可随意命名
+
+			默认导入不需要花括号 {}，且变量名 GG 可以自由命名。
+		*/
+		var libPath string
+		var isNameSpaceImport bool
+		for importedLibPath, importItemMap := range b.importTbl {
+			for importItemName, aliasName := range importItemMap {
+				if aliasName == identifierName {
+					// 检查是否为命名空间导入 (import * as xxx)
+					if importItemName == "*" {
+						isNameSpaceImport = true
+					} else {
+						identifierName = importItemName
+					}
+					libPath = importedLibPath
+					break
+				}
+			}
+		}
+		lib, foundLib := prog.GetLibrary(libPath)
+		if foundLib {
+			// 递归解析导出值和类型
+			externValue, externalType := b.resolveExportValueAndType(prog, lib, identifierName)
+			if !utils.IsNil(externalType) {
+				if lazyBluePrint, ok := ssa.ToClassBluePrintType(externalType); ok {
+					lazyBluePrint.Build()
+					return nil, lazyBluePrint.Container()
+				}
+			} else if !utils.IsNil(externValue) {
+				if lazyFunc, ok := (externValue).(*ssa.Function); ok {
+					lazyFunc.Build()
+					return nil, lazyFunc
+				}
+				return nil, externValue
+			} else if isNameSpaceImport { // wildcard import as *
+				container := b.EmitEmptyContainer()
+				for name, value := range lib.ExportValue {
+					vari := b.CreateMemberCallVariable(container, b.EmitConstInst(name))
+					b.AssignVariable(vari, value)
+				}
+				vari := b.CreateVariable(identifierName)
+				b.AssignVariable(vari, container)
+				return nil, container
+			} else {
+				_ = externalType
+				vari := b.CreateVariable(identifierName)
+				valToBeReplaced := b.EmitUndefined(identifierName)
+				b.AssignVariable(vari, valToBeReplaced)
+				lib.ExportValue[identifierName] = valToBeReplaced
+				return nil, valToBeReplaced
+			}
+		}
+		undefinedVairbale := b.CreateJSVariable(identifierName)
+		val := b.EmitUndefined(identifierName)
+		b.AssignVariable(undefinedVairbale, val)
+		return nil, b.ReadValue(identifierName)
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
-		obj, propName := b.VisitPropertyAccessExpression(propertyAccessExp)
-		var objName string
-		if ast.IsIdentifier(propertyAccessExp.Expression) {
-			objName = propertyAccessExp.Expression.AsIdentifier().Text
-		}
-
-		bp := b.GetBluePrint(objName) // 处理静态方法调用
-		if importType, ok := b.GetProgram().TryReadImportDeclare(objName); ok {
-			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
-				bp = blueprint
-			}
-		}
-		if (obj == nil && bp == nil) || propName == "" {
-			return nil, nil
-		}
-		name := b.EmitConstInstPlaceholder(propName)
 		if isLval {
-			return b.CreateMemberCallVariable(obj, name), nil
+			return b.VisitPropertyAccessExpressionLeft(propertyAccessExp), nil
+		} else {
+			return nil, b.VisitPropertyAccessExpressionRight(propertyAccessExp)
 		}
-		if obj == nil {
-			val := bp.GetStaticMember(propName)
-			if !utils.IsNil(val) {
-				return nil, val
-			}
-			return nil, nil
-		}
-		if b.IsPromiseType(obj.GetType()) && (propName == "then" || propName == "catch" || propName == "finally") {
-			return nil, obj // let call handle async call for Promise with Promise<T>.then()
-		}
-		return nil, b.ReadMemberCallMethodOrValue(obj, name)
 	case ast.KindElementAccessExpression:
 		obj, arg := b.VisitElementAccessExpression(node.AsElementAccessExpression())
 		if obj == nil || arg == nil {
@@ -1874,26 +2168,21 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 	case ast.KindCommaToken:
 		return right
 	case ast.KindInKeyword:
-		if left != nil && right != nil && (b.IsListLike(right) || b.IsMapLike(right) || b.IsObjectLike(right)) {
+		if b.IsListLike(right) || b.IsMapLike(right) || b.IsObjectLike(right) {
 			_, ok := right.GetMember(left)
 			return b.EmitConstInst(ok)
 		}
 		return b.EmitUndefined("")
 	case ast.KindInstanceOfKeyword:
-		if left != nil && right != nil {
-			if right.GetType() == nil || left.GetType() == nil {
+		if right.GetType() == nil || left.GetType() == nil {
+			return b.EmitConstInst(true)
+		} else {
+			if ssa.TypeCompare(left.GetType(), right.GetType()) {
 				return b.EmitConstInst(true)
 			} else {
-				if ssa.TypeCompare(left.GetType(), right.GetType()) {
-					return b.EmitConstInst(true)
-				} else {
-					return b.EmitConstInst(false)
-				}
+				return b.EmitConstInst(false)
 			}
 		}
-		b.NewError(ssa.Error, TAG, InstanceOfGotNilValue())
-		return b.EmitUndefined("")
-
 	// 处理其他运算符...
 	default:
 		// 未实现的操作符处理
@@ -2373,26 +2662,61 @@ func (b *builder) VisitPostfixUnaryExpression(node *ast.PostfixUnaryExpression) 
 }
 
 // VisitPropertyAccessExpression 访问属性访问表达式
-func (b *builder) VisitPropertyAccessExpression(node *ast.PropertyAccessExpression) (ssa.Value, string) {
+func (b *builder) VisitPropertyAccessExpressionRight(node *ast.PropertyAccessExpression) ssa.Value {
 	if node == nil || b.IsStop() {
-		return nil, ""
+		return nil
 	}
 
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	obj := b.VisitRightValueExpression(node.Expression)
-	if obj == nil {
-		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedRightValueForObjectPropertyAccess())
-		return nil, ""
-	}
 	// 获取属性名
 	propName := ""
 	if node.Name() != nil {
 		propName = b.ProcessMemberName(node.Name())
 	}
 
-	return obj, propName
+	obj := b.VisitRightValueExpression(node.Expression)
+	if obj == nil {
+		var objName string
+		if ast.IsIdentifier(node.Expression) {
+			objName = node.Expression.AsIdentifier().Text
+		}
+		bp := b.GetBluePrint(objName) // 处理静态方法调用
+		if !utils.IsNil(bp) {
+			return bp.GetStaticMember(propName)
+		}
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedRightValueForObjectPropertyAccess())
+		return nil
+	}
+
+	if b.IsPromiseType(obj.GetType()) && (propName == "then" || propName == "catch" || propName == "finally") {
+		return obj // let call handle async call for Promise with Promise<T>.then()
+	}
+	return b.ReadMemberCallMethodOrValue(obj, b.EmitConstInst(propName))
+}
+
+func (b *builder) VisitPropertyAccessExpressionLeft(node *ast.PropertyAccessExpression) *ssa.Variable {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 获取属性名
+	propName := ""
+	if node.Name() != nil {
+		propName = b.ProcessMemberName(node.Name())
+	}
+
+	obj := b.VisitRightValueExpression(node.Expression)
+	if obj == nil {
+		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, UnexpectedLeftValueForObjectPropertyAccess())
+		return nil
+	}
+
+	return b.CreateMemberCallVariable(obj, b.EmitConstInst(propName))
 }
 
 // VisitElementAccessExpression 访问元素访问表达式
@@ -2437,9 +2761,14 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 		return nil
 	}
 
-	class := b.GetBluePrint(className)
+	classVal := b.VisitRightValueExpression(node.Expression)
 	obj := b.EmitUndefined(className)
-	if class == nil {
+	var isBP bool
+	var class *ssa.Blueprint
+	if !utils.IsNil(classVal) {
+		class, isBP = ssa.ToClassBluePrintType(classVal.GetType())
+	}
+	if utils.IsNil(classVal) || !isBP {
 		class = b.CreateBlueprint(className)
 		defaultCtorFunc := b.NewFunc(fmt.Sprintf("%s_%s", className, "default_ctor_func"))
 		class.RegisterMagicMethod(ssa.Constructor, defaultCtorFunc)
@@ -2516,16 +2845,19 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
 	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
 	isAsync := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsAsync)
-	if !ShouldVisit(b.PreHandler(), isExport) {
-		return nil
-	}
-	if isExport {
-		if !isDefault {
-			b.namedValueExports[funcName] = funcName
-		} else {
-			b.namedValueExports["default"] = funcName
+
+	if b.PreHandler() {
+		if !isExport {
+			return nil
 		}
 
+		if !isDefault {
+			b.GetProgram().ExportValue[funcName] = b.EmitUndefined(fmt.Sprintf("func_%s", funcName))
+		} else {
+			b.GetProgram().ExportValue["default"] = b.EmitUndefined(fmt.Sprintf("func_%s", funcName))
+		}
+
+		return nil
 	}
 
 	// 创建新的函数对象
@@ -2565,6 +2897,15 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 		}
 		b.FunctionBuilder = b.PopFunction()
 	})
+	if isExport {
+		if !isDefault {
+			ssa.ReplaceAllValue(b.GetProgram().ExportValue[funcName], newFunc)
+			b.GetProgram().ExportValue[funcName] = newFunc
+		} else {
+			ssa.ReplaceAllValue(b.GetProgram().ExportValue["default"], newFunc)
+			b.GetProgram().ExportValue["default"] = newFunc
+		}
+	}
 	// 在当前作用域中创建函数变量
 	variable := b.CreateJSVariable(funcName)
 	b.AssignVariable(variable, newFunc)
@@ -3401,8 +3742,10 @@ func (b *builder) VisitSuperExpression(node *ast.Node) ssa.Value {
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, SuperKeywordNotAvailableInCurrentContext())
 		return b.EmitUndefined("")
 	}
-	cls := b.MarkedThisClassBlueprint.GetSuperBlueprint()
-	parent.SetType(cls)
+	if !utils.IsNil(b.MarkedThisClassBlueprint) {
+		cls := b.MarkedThisClassBlueprint.GetSuperBlueprint()
+		parent.SetType(cls)
+	}
 	return parent
 }
 
@@ -3673,7 +4016,14 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 			// 简单变量: let { a } = obj 或 let { a: b } = obj
 			varName := bindingElement.Name().AsIdentifier().Text
 			if isExport {
-				b.namedValueExports[varName] = varName
+				if b.PreHandler() {
+					b.GetProgram().ExportValue[varName] = b.EmitUndefined(varName)
+				} else {
+					if !utils.IsNil(propValue) {
+						ssa.ReplaceAllValue(b.GetProgram().ExportValue[varName], propValue)
+						b.GetProgram().ExportValue[varName] = propValue
+					}
+				}
 			}
 			var variable *ssa.Variable
 			if isLocal {
@@ -3765,7 +4115,14 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 			// 标识符: let [a] = arr
 			varName := bindingElement.Name().AsIdentifier().Text
 			if isExport {
-				b.namedValueExports[varName] = varName
+				if b.PreHandler() {
+					b.GetProgram().ExportValue[varName] = b.EmitUndefined(varName)
+				} else {
+					if !utils.IsNil(elementValue) {
+						ssa.ReplaceAllValue(b.GetProgram().ExportValue[varName], elementValue)
+						b.GetProgram().ExportValue[varName] = elementValue
+					}
+				}
 			}
 			var variable *ssa.Variable
 			if isLocal {
@@ -3862,8 +4219,10 @@ func (b *builder) ProcessClassMember(member *ast.ClassElement, class *ssa.Bluepr
 		undefined := b.EmitUndefined(nameVal)
 		setMember(nameVal, undefined, false)
 		store := b.StoreFunctionBuilder()
+		storeImportTBL := b.importTbl
 		class.AddLazyBuilder(func() {
 			switchHandler := b.SwitchFunctionBuilder(store)
+			b.importTbl = storeImportTBL
 			defer switchHandler()
 			if propDecl.Initializer != nil {
 				value := b.VisitRightValueExpression(propDecl.Initializer)
@@ -3974,10 +4333,12 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 	}
 
 	store := b.StoreFunctionBuilder()
+	storeImportTBL := b.importTbl
 
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazybuild: %s %s ", funcName, methodName)
+		log.Infof("lazybuild class method for uuidName and method name: %s : %s ", funcName, methodName)
 		switchHandler := b.SwitchFunctionBuilder(store)
+		b.importTbl = storeImportTBL
 		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
@@ -3986,6 +4347,9 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 			this.SetType(class)
 		}
 		b.MarkedThisClassBlueprint = class
+		defer func() {
+			b.MarkedThisClassBlueprint = nil
+		}()
 
 		// 处理函数参数
 		if params != nil && len(params.Nodes) > 0 {
@@ -4130,6 +4494,11 @@ func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} {
 		return nil
 	}
 
+	// 顶层Enum声明我们在Prehandle阶段就构建完毕了 这里避免重复再次创建
+	if b.IsTopLevelNodeInAST(node.AsNode()) != b.PreHandler() {
+		return nil
+	}
+
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
@@ -4147,9 +4516,6 @@ func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} {
 	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
 	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
 
-	if !ShouldVisit(b.PreHandler(), isExport) {
-		return nil
-	}
 	// PreHandle阶段：创建Blueprint和基础对象，立即设置导出
 	enumBlueprint := b.CreateBlueprint(enumName)
 	enumBlueprint.SetKind(ssa.BlueprintClass)
@@ -4165,23 +4531,19 @@ func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} {
 	// 处理导出 - 在PreHandle阶段就设置导出值
 	if isExport {
 		if !isDefault {
-			b.namedTypeExports[enumName] = enumName
-			b.namedValueExports[enumName] = enumName
+			b.GetProgram().ExportType[enumName] = enumBlueprint
 		} else {
-			b.namedTypeExports["default"] = enumName
-			b.namedValueExports["default"] = enumName
+			b.GetProgram().ExportType["default"] = enumBlueprint
 		}
 	}
 
 	// 添加LazyBuilder来处理枚举成员
 	store := b.StoreFunctionBuilder()
+	storeImportTBL := b.importTbl
 	enumBlueprint.AddLazyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
+		b.importTbl = storeImportTBL
 		defer switchHandler()
-		if enumName == "Color" {
-			b.GetBluePrint("Palette")
-		}
-
 		// 处理枚举成员
 		if node.Members != nil && len(node.Members.Nodes) > 0 {
 			b.VisitEnumMembers(node.Members, enumBlueprint)
@@ -4292,6 +4654,11 @@ func (b *builder) VisitInterfaceDeclaration(node *ast.InterfaceDeclaration) inte
 		return nil
 	}
 
+	// 顶层Interface声明我们在Prehandle阶段就构建完毕了 这里避免重复再次创建
+	if b.IsTopLevelNodeInAST(node.AsNode()) != b.PreHandler() {
+		return nil
+	}
+
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
@@ -4309,10 +4676,6 @@ func (b *builder) VisitInterfaceDeclaration(node *ast.InterfaceDeclaration) inte
 	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
 	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
 
-	if !ShouldVisit(b.PreHandler(), isExport) {
-		return nil
-	}
-
 	// PreHandle阶段：创建Blueprint和基础对象，立即设置导出
 	interfaceBlueprint := b.CreateBlueprint(interfaceName)
 	interfaceBlueprint.SetKind(ssa.BlueprintInterface)
@@ -4328,18 +4691,18 @@ func (b *builder) VisitInterfaceDeclaration(node *ast.InterfaceDeclaration) inte
 	// 处理导出 - 在PreHandle阶段就设置导出值
 	if isExport {
 		if !isDefault {
-			b.namedTypeExports[interfaceName] = interfaceName
-			b.namedValueExports[interfaceName] = interfaceName
+			b.GetProgram().ExportType[interfaceName] = interfaceBlueprint
 		} else {
-			b.namedTypeExports["default"] = interfaceName
-			b.namedValueExports["default"] = interfaceName
+			b.GetProgram().ExportType["default"] = interfaceBlueprint
 		}
 	}
 
 	// 添加LazyBuilder来处理接口成员和继承
 	store := b.StoreFunctionBuilder()
+	storeImportTBL := b.importTbl
 	interfaceBlueprint.AddLazyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
+		b.importTbl = storeImportTBL
 		defer switchHandler()
 
 		// 处理继承的接口

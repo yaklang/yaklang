@@ -25,3 +25,41 @@ func (p *Program) SetExportValue(name string, v Value) {
 	}
 	p.ExportValue[name] = v
 }
+
+func (p *Program) SetReExportInfo(reexportName, from, exportName string, isNameSpaceExport, isWildCardExport bool) {
+	if p.ReExportTable == nil {
+		p.ReExportTable = make(map[string]*ReExportInfo)
+	}
+	p.ReExportTable[reexportName] = &ReExportInfo{
+		FilePath:          from,
+		ExportName:        exportName,
+		IsNameSpaceExport: isNameSpaceExport,
+		IsWildCardExport:  isWildCardExport,
+	}
+}
+
+func (p *Program) SetWildCardReExportInfo(from string) {
+	if p.ReExportTable == nil {
+		p.ReExportTable = make(map[string]*ReExportInfo)
+	}
+	p.ReExportTable["*"] = &ReExportInfo{
+		FilePath:          from,
+		ExportName:        "*",
+		IsNameSpaceExport: false,
+		IsWildCardExport:  true,
+	}
+}
+
+func (p *Program) GetReExportInfo(reexportName string) *ReExportInfo {
+	if info, ok := p.ReExportTable[reexportName]; ok {
+		return info
+	}
+	return nil
+}
+
+func (p *Program) GetWildCardReExportInfo() *ReExportInfo {
+	if info, ok := p.ReExportTable["*"]; ok {
+		return info
+	}
+	return nil
+}
