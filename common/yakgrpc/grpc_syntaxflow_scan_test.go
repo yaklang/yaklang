@@ -796,8 +796,8 @@ alert $high for {
 		task := rsp.Data[0]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(11))
-		require.Equal(t, task.NewRiskCount, int64(11)) // 规则更新会导致所有的risk为新增值
+		require.Equal(t, task.RiskCount, int64(10))
+		require.Equal(t, task.NewRiskCount, int64(10)) // 规则更新会导致所有的risk为新增值
 		task = rsp.Data[1]
 		require.Equal(t, task.Programs, []string{progID})
 		require.Equal(t, task.Status, "done")
@@ -964,8 +964,8 @@ alert $high for {
 			if task.TaskId == taskID3 {
 				require.Equal(t, task.Programs, []string{progID})
 				require.Equal(t, task.Status, "done")
-				require.Equal(t, task.RiskCount, int64(11))
-				require.Equal(t, task.NewRiskCount, int64(11))
+				require.Equal(t, task.RiskCount, int64(10))
+				require.Equal(t, task.NewRiskCount, int64(10))
 			}
 			if task.TaskId == taskID2 {
 				require.Equal(t, task.Programs, []string{progID})

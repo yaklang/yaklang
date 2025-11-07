@@ -398,7 +398,7 @@ func (c *Call) handleCalleeFunction() {
 				if !ok || utils.IsNil(key) {
 					continue
 				}
-				object, ok := p.Get(c)
+				object, ok := p.GetActualParam(c)
 				if !ok {
 					continue
 				}
