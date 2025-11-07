@@ -440,7 +440,7 @@ func checkRuleResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRul
 
 	return
 }
-func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.TestingT, isStrict bool) error {
+func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.TestingT, isStrict bool, opts ...sfvm.Option) error {
 
 	/*
 		// TODO:
