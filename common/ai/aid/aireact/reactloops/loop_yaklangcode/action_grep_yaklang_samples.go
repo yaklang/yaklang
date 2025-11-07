@@ -353,7 +353,7 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			searchInfo := fmt.Sprintf("Grep pattern: %s, case_sensitive: %v, context: %d lines",
 				pattern, caseSensitive, contextLines)
 			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
-			loop.GetEmitter().EmitTextPlainTextStreamEvent(
+			loop.GetEmitter().EmitDefaultStreamEvent(
 				"grep_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
 				loop.GetCurrentTask().GetIndex(),

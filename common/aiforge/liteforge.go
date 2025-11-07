@@ -239,7 +239,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 					utils.Debug(func() {
 						r = io.TeeReader(r, os.Stdout)
 					})
-					l.emitter.EmitTextPlainTextStreamEvent(i.AINodeId, r, response.GetTaskIndex())
+					l.emitter.EmitDefaultStreamEvent(i.AINodeId, r, response.GetTaskIndex())
 				}))
 			}
 

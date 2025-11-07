@@ -361,7 +361,7 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 			searchInfo := fmt.Sprintf("RAG search query: %s, top_n: %d, score_threshold: %.2f",
 				query, topN, scoreThreshold)
 			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
-			loop.GetEmitter().EmitTextPlainTextStreamEvent(
+			loop.GetEmitter().EmitDefaultStreamEvent(
 				"search_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
 				loop.GetCurrentTask().GetIndex(),

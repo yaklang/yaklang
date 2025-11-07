@@ -504,7 +504,7 @@ func (r *ReAct) loadMCPServers() {
 				defer m.Unlock()
 
 				promptStartLoadingOnce.Do(func() {
-					emitter.EmitTextPlainTextStreamEvent(
+					emitter.EmitDefaultStreamEvent(
 						"mcp-loader",
 						startLoadingPR,
 						r.config.GetRuntimeId(),
@@ -518,7 +518,7 @@ func (r *ReAct) loadMCPServers() {
 
 				if len(tools) > 0 {
 					promptDoneLoadingOnce.Do(func() {
-						emitter.EmitTextPlainTextStreamEvent(
+						emitter.EmitDefaultStreamEvent(
 							"mcp-loader",
 							doneLoadingPR,
 							r.config.GetRuntimeId(),

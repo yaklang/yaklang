@@ -120,7 +120,7 @@ var batchRegexReplace = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 				return err
 			}
 
-			l.GetEmitter().EmitTextPlainTextStreamEvent(
+			l.GetEmitter().EmitDefaultStreamEvent(
 				"thought",
 				bytes.NewReader([]byte(fmt.Sprintf("Preparing batch regex replace: pattern=%s, group=%d", pattern, group))),
 				l.GetCurrentTask().GetIndex())
