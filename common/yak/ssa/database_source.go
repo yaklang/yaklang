@@ -10,6 +10,7 @@ import (
 func (p *Program) CreateEditor(raw []byte, filepath string, save ...bool) *memedit.MemEditor {
 	edit := memedit.NewMemEditorByBytes(raw)
 	folder, file := path.Split(filepath)
+
 	edit.SetFolderPath(folder)
 	edit.SetFileName(file)
 	edit.SetProgramName(p.GetProgramName())
@@ -24,7 +25,9 @@ func (p *Program) SaveEditor(e *memedit.MemEditor) {
 		return
 	}
 	ir := ssadb.MarshalFile(e)
-	p.Cache.editorCache.Add(e.GetIrSourceHash(), ir)
+	hash := e.GetIrSourceHash()
+	log.Debugf("SaveEditor: program=%s, path=%s, hash=%s", p.GetProgramName(), e.GetFolderPath()+e.GetFilename(), hash)
+	p.Cache.editorCache.Add(hash, ir)
 }
 
 func (p *Program) SaveFolder(folderPath []string) {

@@ -109,7 +109,8 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 				return err
 			}
 
-			err = prog.Build(ast, memedit.NewMemEditor(info.GetContent()), fb)
+			templateEditor := prog.CreateEditor([]byte(info.GetContent()), path)
+			err = prog.Build(ast, templateEditor, fb)
 			if err != nil {
 				return err
 			}
