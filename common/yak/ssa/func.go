@@ -129,7 +129,7 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
 	paraMember := NewParamMember(name, f, obj, key)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
-	paraMember.FormalParameterIndex = obj.FormalParameterIndex
+	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
 		f.MarkedThisObject.GetId() == obj.GetDefault().GetId() {
@@ -144,7 +144,7 @@ func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterM
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, paraMember)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
-	paraMember.FormalParameterIndex = member.FormalParameterIndex
+	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
 	return paraMember
 }
 

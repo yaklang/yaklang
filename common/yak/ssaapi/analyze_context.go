@@ -317,3 +317,10 @@ func (g *AnalyzeContext) CurrentObjectStack() *objectItem {
 func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) (bool, func()) {
 	return a.objectShould(object, key, member)
 }
+
+func (g *AnalyzeContext) AllowIgnoreCallStack() bool {
+	if g == nil || g.config == nil {
+		return false
+	}
+	return g.config.AllowIgnoreCallStack
+}
