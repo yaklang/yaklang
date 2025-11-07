@@ -3,10 +3,11 @@ package aicommon
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -51,6 +52,8 @@ type AIStatefulTask interface {
 	IsAsyncMode() bool
 	GetEmitter() *Emitter
 	SetEmitter(emitter *Emitter)
+	SetReActLoop(loop ReActLoopIF)
+	GetReActLoop() ReActLoopIF
 }
 
 type AIStatefulTaskBase struct {
@@ -72,6 +75,7 @@ type AIStatefulTaskBase struct {
 
 	// index info
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+	reActLoop         ReActLoopIF
 }
 
 func (s *AIStatefulTaskBase) PushToolCallResult(result *aitool.ToolResult) {
@@ -241,6 +245,13 @@ func (s *AIStatefulTaskBase) GetEmitter() *Emitter {
 
 func (s *AIStatefulTaskBase) SetEmitter(emitter *Emitter) {
 	s.Emitter = emitter
+}
+func (s *AIStatefulTaskBase) GetReActLoop() ReActLoopIF {
+	return s.reActLoop
+}
+
+func (s *AIStatefulTaskBase) SetReActLoop(loop ReActLoopIF) {
+	s.reActLoop = loop
 }
 
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)

@@ -82,6 +82,10 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	return engine, nil
 }
 
+func (e *AIEngine) GetReAct() *aireact.ReAct {
+	return e.react
+}
+
 // sendInitConfig 发送初始化配置
 func (e *AIEngine) sendInitConfig() error {
 	event := &ypb.AIInputEvent{

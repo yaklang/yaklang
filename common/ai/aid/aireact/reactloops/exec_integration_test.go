@@ -263,9 +263,10 @@ func TestActionVerifier_FailureFlow(t *testing.T) {
 
 // mockSimpleTask 是一个简化的 task 实现，只用于测试不需要完整 runtime 的场景
 type mockSimpleTask struct {
-	id     string
-	index  string
-	status aicommon.AITaskState
+	id        string
+	index     string
+	status    aicommon.AITaskState
+	reActLoop aicommon.ReActLoopIF
 }
 
 func (m *mockSimpleTask) PushToolCallResult(result *aitool.ToolResult) {
@@ -361,6 +362,14 @@ func (m *mockSimpleTask) IsAsyncMode() bool {
 }
 
 func (m *mockSimpleTask) SetAsyncMode(async bool) {
+}
+
+func (m *mockSimpleTask) GetReActLoop() aicommon.ReActLoopIF {
+	return m.reActLoop
+}
+
+func (m *mockSimpleTask) SetReActLoop(loop aicommon.ReActLoopIF) {
+	m.reActLoop = loop
 }
 
 // TestOperatorFail 测试操作符的失败处理
