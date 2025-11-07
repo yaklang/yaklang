@@ -3,9 +3,10 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
-	"io"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -65,6 +66,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 	caller, err = aicommon.NewToolCaller(
 		t.Coordinator.GetContext(),
 		aicommon.WithToolCaller_Task(t),
+		aicommon.WithToolCaller_CallToolID(t.GetIndex()),
 		aicommon.WithToolCaller_AICallerConfig(t),
 		aicommon.WithToolCaller_Emitter(t.GetEmitter()),
 		aicommon.WithToolCaller_AICaller(t),

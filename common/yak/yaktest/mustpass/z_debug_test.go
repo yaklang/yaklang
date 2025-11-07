@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func TestMustPassDebug(t *testing.T) {
@@ -15,9 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	yakit.RegisterLowHTTPSaveCallback()
-
-	debugName := "build_kb_from_file.yak"
+	debugName := "httpserver_allbasic.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
