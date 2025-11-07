@@ -180,8 +180,17 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 }
 
 func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
+	// 对于 Undefined、ExternLib 或外部库类型的值，允许源代码缺失
+	// 这些类型的值通常引用外部库或未定义的符号，不需要完整的源代码
+	isUndefinedOrExtern := (r.OpcodeName == "Undefined" || r.OpcodeName == "ExternLib") || r.IsExternal
+
 	editor, err := GetEditorByHash(r.SourceCodeHash)
 	if err != nil {
+		if isUndefinedOrExtern {
+			log.Debugf("GetStartAndEndPositions: source code not found for external/undefined value (opcode=%s, name=%s, hash=%s), this is expected",
+				r.OpcodeName, r.Name, r.SourceCodeHash)
+			return nil, nil, nil, nil
+		}
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
 	start, end := editor.GetPositionByOffset(int(r.SourceCodeStartOffset)), editor.GetPositionByOffset(int(r.SourceCodeEndOffset))

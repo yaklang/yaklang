@@ -28,7 +28,7 @@ func TestVerifiedRule(t *testing.T) {
 	db = db.Where("is_build_in_rule = ? ", true)
 	failedRules := make([]string, 0)
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
-		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
+		f, err := sfvm.NewSyntaxFlowVirtualMachine().Debug(false).Compile(rule.Content)
 		if err != nil {
 			t.Fatalf("compile rule %s error: %s", rule.RuleName, err)
 		}
@@ -41,7 +41,7 @@ func TestVerifiedRule(t *testing.T) {
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
 				failedRules = append(failedRules, strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"))
-				t.Fatal(err)
+				require.NoError(t, err)
 			}
 		})
 		if !success {
@@ -62,23 +62,23 @@ func TestVerify_DEBUG(t *testing.T) {
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "检测PHP反序列化漏洞"
+	ruleName := "检测Java FastJson依赖漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
 		t.Skip(err)
 	}
 
-	f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
+	f, err := sfvm.NewSyntaxFlowVirtualMachine().Debug(true).Compile(rule.Content)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
-				t.Fatal(err)
+				require.NoError(t, err)
 			}
 		})
 	}

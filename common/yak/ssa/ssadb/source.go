@@ -99,6 +99,7 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {
+		log.Debugf("GetEditorByHash: found in cache, hash=%s", hash)
 		return result, nil
 	}
 
@@ -108,9 +109,13 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 
 	var source IrSource
 	if err := db.Where("source_code_hash = ?", hash).First(&source).Error; err != nil {
+		var count int64
+		db.Model(&IrSource{}).Count(&count)
+		log.Debugf("GetEditorByHash: source not found for hash=%s, total_ir_source_count=%d, error=%v (this is expected for external/undefined values)", hash, count, err)
 		return nil, utils.Wrapf(err, "query source via hash: %v failed", hash)
 	}
 
+	log.Debugf("GetEditorByHash: loaded from database, hash=%s, program=%s, path=%s", hash, source.ProgramName, source.FolderPath+source.FileName)
 	return irSource2Editor(&source), nil
 }
 

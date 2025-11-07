@@ -45,7 +45,7 @@ func EmptyIrType(progName string, id uint64) *IrType {
 }
 
 func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
-	if id <= 0 {
+	if id < 0 {
 		return nil
 	}
 	// check cache

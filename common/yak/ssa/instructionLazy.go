@@ -500,7 +500,9 @@ func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
 			log.Warnf("LazyInstruction(%T).GetRange failed: %v", inst, err)
 			return nil
 		}
-		inst.SetRange(editor.GetRangeByPosition(start, end))
+		if editor != nil && start != nil && end != nil {
+			inst.SetRange(editor.GetRangeByPosition(start, end))
+		}
 	}
 	return inst.GetRange()
 }
