@@ -54,6 +54,12 @@ func WithToolCaller_ReviewWrongParam(
 	}
 }
 
+func WithToolCaller_CallToolID(callToolId string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.callToolId = callToolId
+	}
+}
+
 func WithToolCaller_Task(task AITask) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.task = task

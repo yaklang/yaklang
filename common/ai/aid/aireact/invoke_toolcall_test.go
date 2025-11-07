@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -181,4 +182,107 @@ LOOP:
 		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	fmt.Println("--------------------------------------")
+}
+
+func TestReAct_ToolUse_WithCallbackRuntimeID(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var capturedRuntimeID string
+
+	toolCalled := false
+	testTool, err := aitool.New(
+		"test_tool",
+		aitool.WithNumberParam("value"),
+		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+			toolCalled = true
+			if runtimeConfig != nil {
+				capturedRuntimeID = runtimeConfig.RuntimeID
+			}
+			return "test result", nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "test_tool")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(testTool),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test input",
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+	var taskID string
+	var iid string
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			// Capture task ID from task creation or status change events
+			if e.NodeId == "react_task_created" || e.NodeId == "react_task_status_changed" {
+				if tid := jsonpath.FindFirst(e.GetContent(), "$..react_task_id"); tid != nil {
+					taskID = utils.InterfaceToString(tid)
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !toolCalled {
+		t.Fatal("Tool was not called")
+	}
+
+	// Verify that the RuntimeID in the tool callback matches the task ID
+	if capturedRuntimeID == "" {
+		t.Fatal("RuntimeID was not captured in tool callback")
+	}
+
+	if taskID == "" {
+		t.Fatal("Task ID is empty - task ID was not captured from events")
+	}
+
+	if capturedRuntimeID != taskID {
+		t.Fatalf("RuntimeID mismatch: expected %s, got %s", taskID, capturedRuntimeID)
+	}
+
+	fmt.Printf("✓ RuntimeID matches Task ID: %s\n", taskID)
 }

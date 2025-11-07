@@ -75,7 +75,10 @@ type ReAct struct {
 	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
-	currentTask          aicommon.AIStatefulTask // 当前正在处理的任务
+	currentTask aicommon.AIStatefulTask // 当前正在处理的任务
+
+	lastTask aicommon.AIStatefulTask // 上一个完成的任务
+
 	currentPlanExecution aicommon.AIStatefulTask
 	taskQueue            *TaskQueue // 任务队列
 	queueProcessor       sync.Once  // 确保队列处理器只启动一次
