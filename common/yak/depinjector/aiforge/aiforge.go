@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -29,7 +30,7 @@ func (s *SimpleAiForge) SimpleExecute(ctx context.Context, input string, aitoolO
 			Key:   "input",
 			Value: input,
 		},
-	}, aicommon.WithToolManager(&buildinaitools.AiToolManager{}))
+	}, aicommon.WithToolManager(buildinaitools.NewToolManager()))
 	if err != nil {
 		return nil, err
 	}
