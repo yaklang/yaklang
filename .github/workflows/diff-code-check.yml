@@ -287,17 +287,23 @@ jobs:
           RISK_COUNT=0
           if [ -f "results/scan_summary.txt" ]; then
             echo "Scan summary generated successfully"
-            if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
-              COUNT_RESULT=$(grep -c "严重程度:" results/risk_details_*.txt 2>/dev/null || echo "0")
-              if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
-                RISK_COUNT=$COUNT_RESULT
+            SUMMARY_COUNT=$(grep -E "^总风险数:" results/scan_summary.txt | tail -n1 | awk -F':' '{gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}')
+            if [[ "$SUMMARY_COUNT" =~ ^[0-9]+$ ]]; then
+              RISK_COUNT=$SUMMARY_COUNT
+            else
+              echo "::warning::Failed to parse total risk count from scan_summary.txt"
+              if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
+                FILE_COUNT=$(ls results/risk_details_*.txt | wc -l | tr -d ' ')
+                if [[ "$FILE_COUNT" =~ ^[0-9]+$ ]]; then
+                  RISK_COUNT=$FILE_COUNT
+                else
+                  echo "::warning::Failed to derive risk count from detail files"
+                  RISK_COUNT=0
+                fi
               else
-                echo "::warning::Failed to parse risk count, defaulting to 0"
+                echo "::notice::No risk detail files found"
                 RISK_COUNT=0
               fi
-            else
-              echo "::notice::No risk detail files found"
-              RISK_COUNT=0
             fi
           else
             echo "::warning::Scan summary file not found"
@@ -372,6 +378,22 @@ jobs:
           echo "::notice::  - Missing dependencies or broken imports"
           echo "::notice::This does not block the CI pipeline."
 
+      - name: Upload risk log
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk.json
+          path: risk.json
+          if-no-files-found: ignore
+
+      - name: Upload risk results
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-results
+          path: results/
+          if-no-files-found: ignore
+
       - name: Comment PR with security findings
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && steps.generate_report.outputs.RISK_COUNT != '0'
         uses: actions/github-script@v6
@@ -431,12 +453,51 @@ jobs:
               console.log('::group::Posting/Updating main security report');
               const reportWithIdentifier = commentIdentifier + '\n\n' + report;
               
+              let riskSummary = [];
+              if (fs.existsSync(resultsDir)) {
+                const detailFiles = fs.readdirSync(resultsDir).filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
+                for (const detailFile of detailFiles) {
+                  const detailPath = path.join(resultsDir, detailFile);
+                  const content = fs.readFileSync(detailPath, 'utf8');
+                  const lines = content.split('\n');
+                  let title = '';
+                  let filePath = '';
+                  let lineNum = '';
+                  for (const line of lines) {
+                    if (line.startsWith('中文标题:')) {
+                      title = line.replace('中文标题:', '').trim();
+                    } else if (line.startsWith('标题:') && !title) {
+                      title = line.replace('标题:', '').trim();
+                    } else if (line.startsWith('文件路径:')) {
+                      filePath = line.replace('文件路径:', '').trim();
+                    } else if (line.startsWith('行号:')) {
+                      lineNum = line.replace('行号:', '').trim();
+                    }
+                  }
+                  if (title && filePath && lineNum) {
+                    const commitSha = process.env.HEAD_SHA || context.sha;
+                    const normalizedPath = filePath.replace(/^\.\//, '');
+                    const lineAnchor = `#L${lineNum}`;
+                    const codeLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${commitSha}/${normalizedPath}${lineAnchor}`;
+                    const linkText = `${normalizedPath}:${lineNum}`;
+                    riskSummary.push(`${riskSummary.length + 1}. ${title}: [${linkText}](${codeLink})`);
+                  }
+                }
+              }
+
+              const summarySection = riskSummary.length > 0
+                ? `\n\n${riskSummary.join('\n')}`
+                : '';
+              const artifactsUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}#artifacts`;
+              const artifactsSection = `\n\n[下载 risk.json](${artifactsUrl})`;
+              const finalReport = reportWithIdentifier + summarySection + artifactsSection;
+
               if (existingMainComment) {
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: existingMainComment.id,
-                  body: reportWithIdentifier
+                  body: finalReport
                 });
                 console.log(`✅ Security report comment updated (ID: ${existingMainComment.id})`);
               } else {
@@ -444,172 +505,36 @@ jobs:
                   issue_number: Number(process.env.PR_NUMBER),
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  body: reportWithIdentifier
+                  body: finalReport
                 });
                 console.log(`✅ Security report comment created (ID: ${newComment.data.id})`);
               }
               console.log('::endgroup::');
               
-              // 然后尝试在具体的代码行上添加评论
-              // 读取 results 目录中的风险详情文件
-              
-              console.log('::group::Processing detailed risk files');
-              try {
-                if (fs.existsSync(resultsDir)) {
-                  const files = fs.readdirSync(resultsDir);
-                  const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
-                  console.log(`Found ${detailFiles.length} risk detail files`);
-                  
-                  let processedCount = 0;
-                  let skippedCount = 0;
-                  let commentedCount = 0;
-                  
-                  for (const detailFile of detailFiles) {
-                    const detailPath = path.join(resultsDir, detailFile);
-                    const content = fs.readFileSync(detailPath, 'utf8');
-                    processedCount++;
-                    
-                    // 解析文件内容
-                    const lines = content.split('\n');
-                    let filePath = '';
-                    let lineNum = '';
-                    let severity = '';
-                    let title = '';
-                    let description = '';
-                    let solution = '';
-                    
-                    // 解析文件内容，处理多行字段
-                    let inDescription = false;
-                    let inSolution = false;
-                    let inCodeFragment = false;
-                    
-                    for (let i = 0; i < lines.length; i++) {
-                      const line = lines[i];
-                      
-                      if (line.startsWith('文件路径:')) {
-                        filePath = line.replace('文件路径:', '').trim();
-                      } else if (line.startsWith('行号:')) {
-                        lineNum = line.replace('行号:', '').trim();
-                      } else if (line.startsWith('严重程度:')) {
-                        severity = line.replace('严重程度:', '').trim();
-                      } else if (line.startsWith('中文标题:')) {
-                        title = line.replace('中文标题:', '').trim();
-                      } else if (line.startsWith('标题:') && !title) {
-                        title = line.replace('标题:', '').trim();
-                      } else if (line.startsWith('代码片段:')) {
-                        // 跳过代码片段部分
-                        inCodeFragment = true;
-                        inDescription = false;
-                        inSolution = false;
-                      } else if (line.startsWith('描述:')) {
-                        description = '';
-                        inDescription = true;
-                        inSolution = false;
-                        inCodeFragment = false;
-                      } else if (line.startsWith('解决方案:')) {
-                        solution = '';
-                        inDescription = false;
-                        inSolution = true;
-                        inCodeFragment = false;
-                      } else if (line.startsWith('=== 扫描统计 ===')) {
-                        inDescription = false;
-                        inSolution = false;
-                        inCodeFragment = false;
-                        break;
-                      } else if (inDescription) {
-                        if (description !== '') {
-                          description += '\n';
-                        }
-                        description += line;
-                      } else if (inSolution) {
-                        if (solution !== '') {
-                          solution += '\n';
-                        }
-                        solution += line;
-                      }
-                      // 如果在代码片段中，跳过该行
-                    }
-                     
-                     if (filePath && lineNum && severity && title) {
-                       try {
-                         console.log(`Processing ${severity} risk: ${filePath}:${lineNum}`);
-                         const codeReference = `\`${filePath}:${lineNum}\``;
-                         const lineCommentIdentifier = `<!-- security-line-comment:${filePath}:${lineNum} -->`;
-                         const lineLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/${filePath}#L${lineNum}`;
-                         const cleanedDescription = description.trim();
-                         const cleanedSolution = solution.trim();
-                         
-                         const lineComment = [
-                           lineCommentIdentifier,
-                           '',
-                           '## ⚠️ 安全风险检测',
-                           '',
-                           `**问题:** ${title}`,
-                           `**严重程度:** ${severity}`,
-                           `**文件位置:** ${codeReference}`,
-                           `**代码链接:** [查看代码](${lineLink})`,
-                           '',
-                           '### 📋 描述',
-                           '',
-                           cleanedDescription,
-                           '',
-                           '### 💡 建议解决方案',
-                           '',
-                           cleanedSolution,
-                           '',
-                           '---',
-                           '*此评论由代码安全检查工具自动生成*'
-                         ].join('\n');
-                         
-                         let existingLineComment = null;
-                         for (const comment of comments.data) {
-                           if (comment.user.type === 'Bot' && comment.body.includes(lineCommentIdentifier)) {
-                             existingLineComment = comment;
-                             break;
-                           }
-                         }
-                         
-                         if (existingLineComment) {
-                           await github.rest.issues.updateComment({
-                             owner: context.repo.owner,
-                             repo: context.repo.repo,
-                             comment_id: existingLineComment.id,
-                             body: lineComment
-                           });
-                           console.log(`  ✅ Updated comment for ${filePath}:${lineNum}`);
-                         } else {
-                           await github.rest.issues.createComment({
-                             issue_number: Number(process.env.PR_NUMBER),
-                             owner: context.repo.owner,
-                             repo: context.repo.repo,
-                             body: lineComment
-                           });
-                           console.log(`  ✅ Created comment for ${filePath}:${lineNum}`);
-                         }
-                         commentedCount++;
-                       } catch (lineError) {
-                         core.warning(`Failed to post comment for ${filePath}:${lineNum}: ${lineError.message}`);
-                       }
-                     } else {
-                       if (filePath && lineNum) {
-                         console.log(`  ⏭️  Skipped ${severity || 'unknown'} risk: ${filePath}:${lineNum} (missing required fields)`);
-                         skippedCount++;
-                       }
-                     }
-                  }
-                  
-                  console.log(`\nSummary:`);
-                  console.log(`  - Processed: ${processedCount} detail files`);
-                  console.log(`  - Commented: ${commentedCount} risks`);
-                  console.log(`  - Skipped: ${skippedCount} risks (incomplete data)`);
-                } else {
-                  core.warning('Results directory not found for detailed processing');
-                }
-              } catch (resultsError) {
-                core.error(`Failed to process results directory: ${resultsError.message}`);
-                console.error(resultsError);
-              }
-              console.log('::endgroup::');
+              // console.log('::group::Processing detailed risk files');
+              // 逐条风险评论逻辑已按要求注释，若需恢复，请取消以下整段注释
+              // try {
+              //   if (fs.existsSync(resultsDir)) {
+              //     const files = fs.readdirSync(resultsDir);
+              //     const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
+              //     console.log(`Found ${detailFiles.length} risk detail files`);
+              //     
+              //     let processedCount = 0;
+              //     let skippedCount = 0;
+              //     let commentedCount = 0;
+              //     
+              //     for (const detailFile of detailFiles) {
+              //       const detailPath = path.join(resultsDir, detailFile);
+              //       const content = fs.readFileSync(detailPath, 'utf8');
+              //       processedCount++;
+              //       
+              //       // 解析文件内容...
+              //     }
+              //   }
+              // } catch (resultsError) {
+              //   core.error(`Failed to process results directory: ${resultsError.message}`);
+              // }
+              // console.log('::endgroup::');
               
               console.log('::group::Cleaning up outdated comments');
               try {
@@ -676,16 +601,7 @@ jobs:
               throw error;
             }
 
-      - name: Upload risk log
-        continue-on-error: true
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: risk.json
-          path: risk.json
-
       - name: Display all risks
-        continue-on-error: true
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: yak ssa-risk --input ./risk.json --with-code
 
