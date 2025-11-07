@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -266,13 +265,7 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 	}()
 	var extraReason bytes.Buffer
 	_ = extraReason
-	retTask = &AiTask{}
-	retTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
-		"root-task"+uuid.NewString(),
-		fmt.Sprintf("任务名称: %s\n任务目标: %s", retTask.Name, retTask.Goal),
-		c.Ctx,
-		c.Emitter,
-	)
+	retTask = c.generateAITaskWithName("root-default", "root-default")
 	action, err := aicommon.ExtractAction(rawResponse, "plan")
 	if err != nil {
 		log.Errorf("extract action from plan data failed: %v", err)
@@ -280,14 +273,7 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 	}
 	switch action.ActionType() {
 	case "plan":
-		retTask.Name = action.GetAnyToString("main_task")
-		retTask.Goal = action.GetAnyToString("main_task_goal")
-		retTask.AIStatefulTaskBase = aicommon.NewStatefulTaskBase(
-			"root-task"+uuid.NewString(),
-			fmt.Sprintf("任务名称: %s\n任务目标: %s", retTask.Name, retTask.Goal),
-			c.Ctx,
-			c.Emitter,
-		)
+		retTask = c.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
 		for _, subtask := range action.GetInvokeParamsArray("tasks") {
 			if subtask.GetAnyToString("subtask_name") == "" {
 				continue

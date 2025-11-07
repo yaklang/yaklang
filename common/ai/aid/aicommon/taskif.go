@@ -250,6 +250,7 @@ func NewStatefulTaskBase(
 	userInput string,
 	ctx context.Context,
 	Emitter *Emitter,
+	skipEvent ...bool,
 ) *AIStatefulTaskBase {
 	if ctx == nil {
 		ctx = context.Background()
@@ -268,14 +269,18 @@ func NewStatefulTaskBase(
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 	}
 	if base.Emitter != nil {
-		base.Emitter.EmitStructured(
-			"react_task_created",
-			map[string]any{
-				"react_task_status": base.status,
-				"react_user_input":  userInput,
-				"react_task_id":     taskId,
-			},
-		)
+		if len(skipEvent) > 0 && skipEvent[0] {
+
+		} else {
+			base.Emitter.EmitStructured(
+				"react_task_created",
+				map[string]any{
+					"react_task_status": base.status,
+					"react_user_input":  userInput,
+					"react_task_id":     taskId,
+				},
+			)
+		}
 	}
 	return base
 }

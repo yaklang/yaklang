@@ -111,12 +111,9 @@ LOOP:
 		select {
 		case result := <-outChannel:
 			eventCount++
-			log.Infof("received event %d: type=%s", eventCount, result.Type)
 			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
-
-				// 使用 goroutine 异步发送输入事件，避免阻塞主循环
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}

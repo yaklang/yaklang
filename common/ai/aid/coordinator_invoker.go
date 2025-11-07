@@ -35,6 +35,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithContext(ctx),
 		aicommon.WithConsumption(c.GetConsumptionConfig()),
+		aicommon.WithEnablePlanAndExec(false),
 	)
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)

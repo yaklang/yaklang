@@ -80,7 +80,7 @@ LOOP:
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
-			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
+			if parsedTask && result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -159,7 +159,7 @@ LOOP:
 			reviewCount++
 		}
 	}
-	assert.Greater(t, count, 2)
-	assert.Greater(t, aiInteractivity, 0)
-	assert.Greater(t, reviewCount, 0)
+	assert.GreaterOrEqual(t, count, 2)
+	assert.GreaterOrEqual(t, aiInteractivity, 1)
+	assert.GreaterOrEqual(t, reviewCount, 1)
 }

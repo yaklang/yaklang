@@ -284,13 +284,17 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["Language"] = pm.react.config.GetLanguage()
 
 	// Use getters instead of direct field access
-	result["AllowPlan"] = pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
+
+	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
+
+	result["AllowPlan"] = allowPlanAndExec
+	if allowPlanAndExec {
+		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
+	}
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
 	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
 	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
-
-	result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	if len(tools) > 0 {
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
