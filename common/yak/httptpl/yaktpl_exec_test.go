@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -1940,6 +1941,51 @@ http:
 	}))
 	_, err = ytpl.ExecWithUrl(addr, config)
 	require.Truef(t, ok, "not matched, Response:\n%s", string(rspRaw))
+}
+
+func TestHTTPTpl_Variable_With_List_Fuzztag(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(request.Header["A"][0]))
+	})
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+
+	var randFlags []string
+	for i := 0; i < 10; i++ {
+		randFlags = append(randFlags, utils.RandStringBytes(5))
+	}
+	sort.Strings(randFlags)
+	randFlagsStr := strings.Join(randFlags, "|")
+	tmpl := fmt.Sprintf(`
+variables:
+  payload1: '@fuzztag{{list(%s)}}'
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    GET / HTTP/1.1
+    Host: {{Hostname}}
+    A: {{payload1}}
+  max-redirects: 3
+`, randFlagsStr)
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 所有请求提取到的Header A
+	var allHeadersA []string
+
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		for _, r := range rsp {
+			val := lowhttp.GetHTTPPacketHeader(r.RawRequest, "A")
+			if val == "" {
+				continue
+			}
+			allHeadersA = append(allHeadersA, val)
+		}
+	}))
+	_, err = ytpl.ExecWithUrl(addr, config)
+
+	sort.Strings(allHeadersA)
+	require.ElementsMatch(t, allHeadersA, randFlags)
 }
 
 func TestHTTPTpl_Path_Support_Variable(t *testing.T) {

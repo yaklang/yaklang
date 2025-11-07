@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -42,6 +43,68 @@ func (y *YakTemplate) GenerateRequestSequences(u string, renderPayload bool) []*
 	vars := utils.InterfaceToMapInterface(utils2.ExtractorVarsFromUrl(u))
 	utils.MergeToMap(vars, y.Variables.ToMap())
 
+	// 分离出数组类型的变量和非数组类型的变量
+	arrayVars := make(map[string][]string)
+	staticVars := make(map[string]interface{})
+	arrayVarKeys := make([]string, 0)
+
+	for k, v := range vars {
+		// 尝试转换为 []string
+		if strSlice, ok := v.([]string); ok && len(strSlice) > 0 {
+			arrayVars[k] = strSlice
+			arrayVarKeys = append(arrayVarKeys, k)
+		} else if strSlice := utils.StringArrayFilterEmpty(utils.InterfaceToStringSlice(v)); len(strSlice) > 0 {
+			// 尝试通过 InterfaceToStringSlice 转换
+			arrayVars[k] = strSlice
+			arrayVarKeys = append(arrayVarKeys, k)
+		} else {
+			staticVars[k] = v
+		}
+	}
+
+	// 如果没有数组变量，直接调用原函数
+	if len(arrayVars) == 0 {
+		return y._generateRequestSequences(u, renderPayload, vars)
+	}
+
+	// 准备笛卡尔积的输入
+	cartesianInput := make([][]interface{}, len(arrayVarKeys))
+	for i, key := range arrayVarKeys {
+		values := arrayVars[key]
+		cartesianInput[i] = make([]interface{}, len(values))
+		for j, v := range values {
+			cartesianInput[i][j] = v
+		}
+	}
+
+	// 生成笛卡尔积并调用 _generateRequestSequences
+	allBulks := make([]*RequestBulk, 0)
+	err := cartesian.ProductEx(cartesianInput, func(combination []interface{}) error {
+		// 创建当前组合的 vars
+		currentVars := make(map[string]interface{})
+		// 先复制静态变量
+		for k, v := range staticVars {
+			currentVars[k] = v
+		}
+		// 添加当前组合的数组变量值
+		for i, key := range arrayVarKeys {
+			currentVars[key] = combination[i]
+		}
+
+		// 调用原函数生成请求
+		bulks := y._generateRequestSequences(u, renderPayload, currentVars)
+		allBulks = append(allBulks, bulks...)
+		return nil
+	})
+
+	if err != nil {
+		log.Errorf("cartesian product failed: %v", err)
+		return y._generateRequestSequences(u, renderPayload, vars)
+	}
+
+	return allBulks
+}
+func (y *YakTemplate) _generateRequestSequences(u string, renderPayload bool, vars map[string]interface{}) []*RequestBulk {
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		var payloads map[string][]string
