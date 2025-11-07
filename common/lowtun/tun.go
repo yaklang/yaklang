@@ -5,10 +5,6 @@
 
 package lowtun
 
-import (
-	"os"
-)
-
 type Event int
 
 const (
@@ -19,7 +15,7 @@ const (
 
 type Device interface {
 	// File returns the file descriptor of the device.
-	File() *os.File
+	// File() *os.File
 
 	// Read one or more packets from the Device (without any additional headers).
 	// On a successful read it returns the number of packets read, and sets
