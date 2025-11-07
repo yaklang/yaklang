@@ -65,6 +65,9 @@ func (b *FunctionBuilder) SetEmptyRange() {
 	editor := b.GetEditor()
 	if editor == nil {
 		editor = memedit.NewMemEditor("")
+		// if b.GetProgram() != nil {
+		// 	editor.SetProgramName(b.GetProgram().GetProgramName())
+		// }
 	}
 	r := editor.GetFullRange()
 	b.CurrentRange = r

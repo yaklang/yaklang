@@ -49,7 +49,7 @@ func marshalType(typ Type, irType *ssadb.IrType) bool {
 		log.Errorf("BUG: marshalType called with nil type")
 		return false
 	}
-	if irType.GetIdInt64() <= 0 {
+	if irType.GetIdInt64() < 0 {
 		log.Errorf("[BUG]: type id is invalid: %d, type: %s", irType.GetIdInt64(), typ.GetFullTypeNames())
 		return false
 	}

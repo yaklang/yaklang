@@ -79,7 +79,12 @@ func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range) {
 		return
 	}
 	editor := rangeIns.GetEditor()
-	c.SourceCodeHash = editor.GetIrSourceHash()
+	hash := editor.GetIrSourceHash()
+	c.SourceCodeHash = hash
+	if hash != "" {
+		log.Debugf("fitRange: instruction=%s, opcode=%s, hash=%s, program=%s, path=%s",
+			c.Name, c.OpcodeName, hash, editor.GetProgramName(), editor.GetFolderPath()+editor.GetFilename())
+	}
 	// start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(rangeIns.GetStartOffset())
 	c.SourceCodeEndOffset = int64(rangeIns.GetEndOffset())
@@ -214,17 +219,19 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	if typ := value.GetType(); utils.IsNil(typ) {
 		log.Warnf("BUG: value2IrCode called (%s)[%v] with nil type", value.String(), value.GetOpcode().String())
+		ir.TypeID = -1
 	} else {
+		if typ.GetId() <= 0 {
+			saveTypeWithValue(value, typ)
+		}
 
-		saveTypeWithValue(value, typ)
 		if typ.GetId() <= 0 {
 			log.Errorf("[BUG] Failed to save type, ID still invalid: %d, type: %s, value: %s",
 				typ.GetId(), typ.String(), value.String())
 			ir.TypeID = -1
-			return
+		} else {
+			ir.TypeID = typ.GetId()
 		}
-
-		ir.TypeID = typ.GetId()
 		// log.Errorf("marshal instruction (%s)[%v] type id: %v", value.String(), value.GetOpcode().String(), ir.TypeID)
 	}
 	// ir.String = value.String()
