@@ -78,8 +78,19 @@ func (c *_httpServerConfig) getGlobHandler(route string) (glob.Glob, bool) {
 
 type HttpServerConfigOpt func(c *_httpServerConfig)
 
+// WebSocketConn 是 WebSocket 连接的包装结构体，继承了 websocket.Conn 的所有方法
+type WebSocketConn struct {
+	*websocket.Conn
+	rawRequest []byte
+}
+
+// GetRawRequest 返回原始的 HTTP 请求数据
+func (w *WebSocketConn) GetRawRequest() []byte {
+	return w.rawRequest
+}
+
 // WebSocketHandler 是 WebSocket 连接处理函数类型
-type WebSocketHandler func(conn *websocket.Conn)
+type WebSocketHandler func(conn *WebSocketConn)
 
 func _httpServerOptLocalFileSystemHandler(prefix, dir string) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
@@ -129,6 +140,7 @@ func _httpServerOptRouteHandler(route string, handler http.HandlerFunc) HttpServ
 // ```
 //
 //	err = httpserver.Serve("127.0.0.1", 8888, httpserver.wsRouteHandler("/ws", func(conn) {
+//		rawReq := conn.GetRawRequest() // 获取原始 HTTP 请求
 //		for {
 //			messageType, message, err = conn.ReadMessage()
 //			if err != nil {
@@ -379,6 +391,13 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 						},
 					}
 
+					// 序列化原始 HTTP 请求
+					rawRequest, err := utils.DumpHTTPRequest(request, true)
+					if err != nil {
+						log.Errorf("dump http request failed: %s", err)
+						rawRequest = []byte{}
+					}
+
 					// 升级 HTTP 连接为 WebSocket 连接
 					conn, err := upgrader.Upgrade(writer, request, nil)
 					if err != nil {
@@ -387,8 +406,14 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 					}
 					defer conn.Close()
 
+					// 创建包装的 WebSocket 连接
+					wsConn := &WebSocketConn{
+						Conn:       conn,
+						rawRequest: rawRequest,
+					}
+
 					// 调用用户定义的 WebSocket 处理函数
-					handler(conn)
+					handler(wsConn)
 					return
 				}
 			}
