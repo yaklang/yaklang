@@ -56,7 +56,11 @@ BEGIN {
     
     # 创建 results 目录
     results_dir = "results"
-    system("mkdir -p " results_dir)
+    if (system("[ -d '" results_dir "' ]") != 0) {
+        if (system("mkdir -p '" results_dir "'") != 0) {
+            system("powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path '" results_dir "' | Out-Null\"")
+        }
+    }
 }
 
 # 通用JSON字符串解析函数
@@ -220,8 +224,7 @@ in_risks && /^\s*\}\s*,?\s*$/ {
 }
 
 # 在Risks字段内，检测到新的风险项
-in_risks && /"[a-f0-9]{40}"\s*:\s*\{/ {
-    # 如果有之前的风险，先输出
+/"[a-f0-9]{40}"\s*:\s*\{/ {
     if (current_risk != "") {
         output_risk()
     }
@@ -258,7 +261,11 @@ in_risks && /"[a-f0-9]{40}"\s*:\s*\{/ {
 in_risk && /"(code_source_url|severity|title|title_verbose|rule_name|function_name|program_name|language|risk_type|cve|time|latest_disposal_status)"[[:space:]]*:[[:space:]]*"[^"]*"/ {
     # 检测并提取各种简单字段
     if (value = extract_simple_field($0, "code_source_url")) risk_data["file"] = value
-    else if (value = extract_simple_field($0, "severity")) risk_data["severity"] = value
+    else if (value = extract_simple_field($0, "severity")) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        value = tolower(value)
+        risk_data["severity"] = value
+    }
     else if (value = extract_simple_field($0, "title")) risk_data["title"] = value
     else if (value = extract_simple_field($0, "title_verbose")) risk_data["title_verbose"] = value
     else if (value = extract_simple_field($0, "rule_name")) risk_data["rule_name"] = value
@@ -502,6 +509,11 @@ function output_risk() {
         print "总风险数: " risk_count > detail_file
         print "当前风险: " risk_count " / " risk_count > detail_file
         print "扫描完成时间: " strftime("%Y-%m-%d %H:%M:%S") > detail_file
+
+    current_risk = ""
+    for (key in risk_data) {
+        risk_data[key] = ""
+    }
 }
 
 END {
