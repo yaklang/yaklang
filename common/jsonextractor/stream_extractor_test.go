@@ -555,8 +555,8 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				require.NoError(t, readErr)
 			}
 		},
-			func(key string, parents []string) {
-				// startCallback：在 goroutine 启动前同步调用，保证顺序
+			func(key string, reader io.Reader, parents []string) {
+				// syncHandler：在 goroutine 启动前同步调用，保证顺序
 				startOrder <- key
 			},
 		),
@@ -575,8 +575,8 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 				}
 				require.NoError(t, readErr)
 			}
-		}, func(key string, parents []string) {
-			// startCallback：在 goroutine 启动前同步调用，保证顺序
+		}, func(key string, reader io.Reader, parents []string) {
+			// syncHandler：在 goroutine 启动前同步调用，保证顺序
 			startOrder <- key
 		}),
 	)
@@ -605,7 +605,7 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 	assert.Equal(t, `"ABCDEFGHIJKLMNOP"`, string(field1Chars))
 	assert.Equal(t, `"1234567890"`, string(field2Chars))
 
-	// 验证启动顺序（通过 startCallback 记录，保证可靠）
+	// 验证启动顺序（通过 syncHandler 记录，保证可靠）
 	var order []string
 	for field := range startOrder {
 		order = append(order, field)

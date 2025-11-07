@@ -425,8 +425,8 @@ LOOP:
 		}()
 		select {
 		case <-time.After(500 * time.Millisecond):
-		case <-streamDone:
 			log.Warnf("stream wait too long")
+		case <-streamDone:
 		}
 
 		if transactionErr != nil {
