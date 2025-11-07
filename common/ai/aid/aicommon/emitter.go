@@ -353,16 +353,17 @@ func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary
 }
 
 const (
-	TypeLogTool         = "log/tool"
-	TypeTextPlain       = "text/plain"
-	TypeTextMarkdown    = "text/markdown"
-	TypeCodeYaklang     = "code/yaklang"
-	TypeCodeHTTPRequest = "code/http-request"
+	TypeLogTool            = "log/tool"
+	TypeLogToolErrorOutput = "log/tool-error-output"
+	TypeTextPlain          = "text/plain"
+	TypeTextMarkdown       = "text/markdown"
+	TypeCodeYaklang        = "code/yaklang"
+	TypeCodeHTTPRequest    = "code/http-request"
 )
 
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
 	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, TypeLogTool)
-	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, TypeLogTool)
+	r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, TypeLogToolErrorOutput)
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
