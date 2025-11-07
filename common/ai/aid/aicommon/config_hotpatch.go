@@ -14,6 +14,7 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 			for {
 				select {
 				case <-ctx.Done():
+					return
 				case hotPatchOption := <-c.HotPatchOptionChan.OutputChannel():
 					if hotPatchOption == nil {
 						log.Errorf("hotpatch option is nil, will return")
@@ -29,7 +30,6 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 		}()
 	})
 }
-
 
 func (c *Config) SimpleInfoMap() map[string]interface{} {
 	return map[string]interface{}{
