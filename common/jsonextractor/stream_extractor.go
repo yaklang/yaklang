@@ -52,7 +52,7 @@ type FieldStreamHandler struct {
 	pattern    string         // 匹配模式：可以是字段名、正则表达式或glob模式
 	fieldNames []string       // 多字段匹配时使用
 
-	startCallback func(key string, parents []string)
+	syncHandler func(key string, reader io.Reader, parents []string)
 	// 统一的回调函数
 	handler func(key string, reader io.Reader, parents []string) // 回调函数，包含字段名和父路径
 }
@@ -181,16 +181,16 @@ func WithRegisterGlobFieldStreamHandler(pattern string, handler func(key string,
 	}
 }
 
-func WithRegisterFieldStreamHandlerAndStartCallback(fieldName string, handler func(key string, reader io.Reader, parents []string), callback func(key string, parents []string)) CallbackOption {
+func WithRegisterFieldStreamHandlerAndStartCallback(fieldName string, handler func(key string, reader io.Reader, parents []string), callback func(key string, reader io.Reader, parents []string)) CallbackOption {
 	return func(c *callbackManager) {
 		if c.fieldStreamHandlers == nil {
 			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
 		}
 		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
-			matchType:     FieldMatchExact,
-			pattern:       fieldName,
-			handler:       handler,
-			startCallback: callback,
+			matchType:   FieldMatchExact,
+			pattern:     fieldName,
+			handler:     handler,
+			syncHandler: callback,
 		})
 	}
 }
@@ -289,9 +289,9 @@ func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStre
 	// 保存写入器，用于后续写入数据
 	c.activeFieldStreams[fieldName] = writer
 
-	if handler.startCallback != nil {
+	if handler.syncHandler != nil {
 		// 调用开始回调函数 用于强同步
-		handler.startCallback(fieldName, parents)
+		handler.syncHandler(fieldName, reader, parents)
 	}
 
 	// 在新的 goroutine 中调用处理函数

@@ -409,26 +409,16 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			}
 		}))
 
-		jsonStreamWriterMap := map[string]io.WriteCloser{}
-		writerMu := sync.Mutex{}
-
 		for name, _ := range fieldHandlerMap { // register field stream handlers for json field type
-			opts = append(opts, jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback(name, func(key string, reader io.Reader, parents []string) {
-				writerMu.Lock()
-				w := jsonStreamWriterMap[key]
-				writerMu.Unlock()
-				if w != nil {
+			opts = append(opts, jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback(name, nil, func(key string, reader io.Reader, parents []string) { // sync create writer
+				w := mirrorPipe(key)
+				go func() {
 					defer w.Close()
 					_, err := io.Copy(w, reader)
 					if err != nil {
 						log.Errorf("Failed to write field stream for key %s: %v", key, err)
 					}
-				}
-			}, func(key string, parents []string) { // sync create writer
-				writer := mirrorPipe(key)
-				writerMu.Lock()
-				jsonStreamWriterMap[key] = writer
-				writerMu.Unlock()
+				}()
 			}))
 		}
 
