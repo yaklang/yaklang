@@ -3,51 +3,102 @@ package lowtun
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/privileged"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-// 单例模式保存密码
-var (
-	privilegedDeviceSecret     string
-	privilegedDeviceSecretOnce sync.Once
-	privilegedDeviceSecretMu   sync.RWMutex
+const (
+	// 用于存储高权限进程密码的 key（使用固定的 MD5 值）
+	privilegedProcessSecretKey = "yaklang_tun_privileged_secret_a3f8c9d2e1b7"
 )
 
-// GetPrivilegedDeviceSecret 获取当前的 privileged device 密码
-func GetPrivilegedDeviceSecret() string {
-	privilegedDeviceSecretMu.RLock()
-	defer privilegedDeviceSecretMu.RUnlock()
-	return privilegedDeviceSecret
-}
-
-// setPrivilegedDeviceSecret 设置 privileged device 密码（内部使用）
-func setPrivilegedDeviceSecret(secret string) {
-	privilegedDeviceSecretMu.Lock()
-	defer privilegedDeviceSecretMu.Unlock()
-	privilegedDeviceSecret = secret
-}
-
-// generateRandomSecret 生成12位随机密码
-func generateRandomSecret() (string, error) {
-	// 生成 9 字节的随机数据，base64 编码后正好是 12 个字符
-	bytes := make([]byte, 9)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", utils.Errorf("failed to generate random secret: %v", err)
+// getOrCreatePrivilegedSecret 获取或创建高权限进程的密码
+// 这个密码会被持久化存储在数据库中，保证同一台机器上的多个进程可以复用
+func getOrCreatePrivilegedSecret() string {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		// 如果数据库不可用，生成临时密码
+		hash := md5.Sum([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+		return hex.EncodeToString(hash[:])
 	}
-	return base64.RawURLEncoding.EncodeToString(bytes), nil
+
+	// 尝试从数据库获取已存储的密码
+	secret := yakit.GetKey(db, privilegedProcessSecretKey)
+	if secret != "" {
+		log.Infof("using existing privileged secret from database")
+		return secret
+	}
+
+	// 生成新密码并存储
+	hash := md5.Sum([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	secret = hex.EncodeToString(hash[:])
+
+	err := yakit.SetKey(db, privilegedProcessSecretKey, secret)
+	if err != nil {
+		log.Errorf("failed to store privileged secret: %v", err)
+	} else {
+		log.Infof("generated and stored new privileged secret")
+	}
+
+	return secret
+}
+
+// killProcessPrivileged 使用高权限方式 kill 指定的进程
+// 返回 true 表示用户确认 kill，false 表示用户取消
+func killProcessPrivileged(pid int, socketPath string) (bool, error) {
+	log.Infof("attempting to kill privileged process with PID %d", pid)
+
+	executor := privileged.NewExecutor("KillPrivilegedProcess")
+	_, err := executor.Execute(
+		context.Background(),
+		fmt.Sprintf("kill -9 %d", pid),
+		privileged.WithTitle("Kill Privileged TUN Process"),
+		privileged.WithDescription(fmt.Sprintf("Kill the privileged process (PID: %d) that is blocking socket: %s", pid, socketPath)),
+	)
+
+	if err != nil {
+		// 检查是否是用户取消
+		if strings.Contains(err.Error(), "User canceled") ||
+			strings.Contains(err.Error(), "user cancelled") ||
+			strings.Contains(err.Error(), "cancelled") {
+			log.Infof("user cancelled kill operation")
+			return false, nil
+		}
+		log.Errorf("failed to kill process with privilege: %v", err)
+		return false, err
+	}
+
+	log.Infof("successfully killed process %d", pid)
+	return true, nil
+}
+
+// readPIDFromLockFile 从 PID lock 文件读取 PID
+func readPIDFromLockFile(lockPath string) (int, error) {
+	data, err := os.ReadFile(lockPath)
+	if err != nil {
+		return 0, err
+	}
+
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return 0, utils.Errorf("invalid PID in lock file: %s", pidStr)
+	}
+
+	return pid, nil
 }
 
 func CreatePrivilegedDevice(mtu int) (Device, string, error) {
@@ -61,27 +112,85 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 
 	log.Infof("attempting to create privileged device with socket path: %s", socketPath)
 
-	// 生成或获取密码（单例模式）
-	var secret string
-	privilegedDeviceSecretOnce.Do(func() {
-		var err error
-		secret, err = generateRandomSecret()
-		if err != nil {
-			log.Errorf("failed to generate secret: %v", err)
-			secret = "" // 如果生成失败，使用空密码
-		}
-		setPrivilegedDeviceSecret(secret)
-		log.Infof("generated privileged device secret: %s", secret)
-	})
-	secret = GetPrivilegedDeviceSecret()
+	// 获取或创建固定的密码（从数据库持久化存储）
+	secret := getOrCreatePrivilegedSecret()
 
-	tDev, tunName, _ := CreateDeviceFromSocket(socketPath, mtu, secret)
-	if !utils.IsNil(tDev) {
-		log.Infof("found existing device from socket: %s, utun: %s", socketPath, tunName)
+	// 首先尝试用当前密码连接已有的高权限进程
+	tDev, tunName, err := CreateDeviceFromSocket(socketPath, mtu, secret)
+	if !utils.IsNil(tDev) && err == nil {
+		log.Infof("successfully reused existing privileged process: socket=%s, utun=%s", socketPath, tunName)
 		return tDev, tunName, nil
 	}
 
-	log.Infof("no existing device found, preparing privileged executor")
+	// 如果 socket 文件存在，需要判断具体情况
+	pidLockPath := socketPath + ".pid.lock"
+	if _, statErr := os.Stat(socketPath); statErr == nil {
+		// 检查是否是 connection refused（说明没有进程监听）
+		if err != nil && (strings.Contains(err.Error(), "connection refused") ||
+			strings.Contains(err.Error(), "connect: no such file")) {
+			// socket 文件存在但没有进程监听，删除旧的 socket 文件
+			log.Warnf("socket file exists but no process is listening, removing stale socket: %s", socketPath)
+			if removeErr := os.Remove(socketPath); removeErr != nil {
+				log.Errorf("failed to remove stale socket: %v", removeErr)
+				return nil, "", utils.Errorf("failed to remove stale socket %s: %v", socketPath, removeErr)
+			}
+			// 同时删除 PID lock 文件
+			os.Remove(pidLockPath)
+			log.Infof("removed stale socket and PID lock, will create new privileged process")
+		} else if err != nil && strings.Contains(err.Error(), "authentication failed") {
+			// 真正的认证失败：能连接但密码错误
+			log.Errorf("socket exists and process is running, but authentication failed")
+			log.Errorf("this means the privileged process is using a different secret")
+
+			// 尝试从 PID lock 文件读取 PID
+			if pid, readErr := readPIDFromLockFile(pidLockPath); readErr == nil {
+				log.Infof("found PID lock file with PID: %d", pid)
+				log.Infof("attempting to kill the privileged process with user confirmation...")
+
+				// 使用 privileged 方式 kill 进程（会弹出用户确认对话框）
+				confirmed, killErr := killProcessPrivileged(pid, socketPath)
+				if !confirmed {
+					// 用户取消了 kill 操作
+					log.Errorf("user cancelled the kill operation, cannot proceed")
+					return nil, "", utils.Errorf("authentication failed and user cancelled killing the existing process (PID: %d)\n"+
+						"Cannot start new privileged process while old one is running.\n"+
+						"Socket: %s", pid, socketPath)
+				}
+
+				if killErr != nil {
+					log.Errorf("failed to kill process: %v", killErr)
+					return nil, "", utils.Errorf("failed to kill existing privileged process (PID: %d): %v\n"+
+						"Please manually kill the process and try again.", pid, killErr)
+				}
+
+				// Kill 成功，删除 socket 和 PID lock 文件
+				log.Infof("successfully killed process %d, cleaning up files...", pid)
+				os.Remove(socketPath)
+				os.Remove(pidLockPath)
+				log.Infof("cleaned up socket and PID lock files, will create new privileged process")
+			} else {
+				// 没有 PID lock 文件或读取失败
+				log.Warnf("cannot read PID lock file: %v", readErr)
+				log.Errorf("authentication failed but cannot determine process PID")
+				return nil, "", utils.Errorf("cannot authenticate to existing privileged process at %s: %v\n\n"+
+					"A privileged process is running but using a different password.\n"+
+					"Cannot determine the process PID (no PID lock file found).\n"+
+					"Please manually kill the existing process and try again.\n"+
+					"You can find the process with: ps aux | grep 'forward-tun-to-socks'\n"+
+					"Then kill it with: sudo kill -9 <PID>", socketPath, err)
+			}
+		} else if err != nil {
+			// 其他未知错误
+			log.Warnf("socket exists but connection failed with error: %v", err)
+			log.Warnf("will try to remove socket and create new process")
+			if removeErr := os.Remove(socketPath); removeErr != nil {
+				log.Errorf("failed to remove socket: %v", removeErr)
+			}
+			os.Remove(pidLockPath)
+		}
+	} else {
+		log.Infof("no existing socket found, will start new privileged process")
+	}
 
 	currentBinary, err := os.Executable()
 	if err != nil {

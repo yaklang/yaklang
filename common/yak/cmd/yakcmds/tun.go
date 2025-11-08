@@ -20,11 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
-	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
@@ -61,6 +56,63 @@ var TunCommands = []*cli.Command{
 	},
 }
 
+// testSocketConnection 测试是否可以用给定的密码连接到 socket
+func testSocketConnection(socketPath, secret string) (bool, string, error) {
+	// 尝试连接到 socket
+	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+	if err != nil {
+		return false, "", err
+	}
+	defer conn.Close()
+
+	// 如果需要认证，发送认证请求
+	if secret != "" {
+		authReq := map[string]string{"secret": secret}
+		data, err := json.Marshal(authReq)
+		if err != nil {
+			return false, "", utils.Errorf("failed to marshal auth request: %v", err)
+		}
+
+		// 发送长度前缀和数据
+		length := uint32(len(data))
+		if err := binary.Write(conn, binary.BigEndian, length); err != nil {
+			return false, "", utils.Errorf("failed to write auth length: %v", err)
+		}
+		if _, err := conn.Write(data); err != nil {
+			return false, "", utils.Errorf("failed to write auth data: %v", err)
+		}
+	}
+
+	// 读取响应
+	var respLength uint32
+	if err := binary.Read(conn, binary.BigEndian, &respLength); err != nil {
+		return false, "", utils.Errorf("failed to read response length: %v", err)
+	}
+
+	if respLength > 1024*1024 {
+		return false, "", utils.Errorf("response too large: %d bytes", respLength)
+	}
+
+	respData := make([]byte, respLength)
+	if _, err := io.ReadFull(conn, respData); err != nil {
+		return false, "", utils.Errorf("failed to read response: %v", err)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(respData, &resp); err != nil {
+		return false, "", utils.Errorf("failed to unmarshal response: %v", err)
+	}
+
+	ok, _ := resp["ok"].(bool)
+	if !ok {
+		errMsg, _ := resp["error"].(string)
+		return false, "", utils.Errorf("authentication failed: %s", errMsg)
+	}
+
+	utunName, _ := resp["utun"].(string)
+	return true, utunName, nil
+}
+
 func forwardTunToSocks(c *cli.Context) error {
 	socketPath := c.String("socket-path")
 	mtu := c.Int("mtu")
@@ -72,15 +124,42 @@ func forwardTunToSocks(c *cli.Context) error {
 		log.Infof("authentication disabled (no secret provided)")
 	}
 
+	// 0. 启动前先检查是否已有高权限进程在运行
+	if _, err := os.Stat(socketPath); err == nil {
+		log.Infof("found existing socket at %s, testing connection...", socketPath)
+		if ok, utunName, err := testSocketConnection(socketPath, secret); ok {
+			log.Infof("successfully connected to existing privileged process (utun: %s), exiting", utunName)
+			os.Exit(0)
+		} else {
+			log.Warnf("socket exists but connection test failed: %v, will try to create new one", err)
+			// 尝试删除旧的 socket 文件
+			if err := os.Remove(socketPath); err != nil {
+				log.Warnf("failed to remove stale socket: %v", err)
+			}
+		}
+	}
+
 	// 1. 首先创建 socket 监听器（快速失败）
 	listener, err := lowtun.ListenSocket(socketPath)
 	if err != nil {
 		return utils.Errorf("failed to create socket listener: %v", err)
 	}
+
+	// 创建 PID lock 文件
+	pidLockPath := socketPath + ".pid.lock"
+	pid := os.Getpid()
+	if err := os.WriteFile(pidLockPath, []byte(fmt.Sprintf("%d", pid)), 0644); err != nil {
+		log.Warnf("failed to create PID lock file: %v", err)
+	} else {
+		log.Infof("created PID lock file: %s (PID: %d)", pidLockPath, pid)
+	}
+
 	defer func() {
 		listener.Close()
 		os.Remove(socketPath)
+		os.Remove(pidLockPath)
 		log.Infof("cleaned up socket file: %s", socketPath)
+		log.Infof("cleaned up PID lock file: %s", pidLockPath)
 	}()
 	log.Infof("socket listening on: %s", socketPath)
 
@@ -859,14 +938,6 @@ func testTunSocketDevice(c *cli.Context) error {
 	}
 }
 
-// min 返回两个整数中的较小值
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // getPublicNetworkInterface 获取公网网卡和IP地址
 func getPublicNetworkInterface() (interfaceName string, ipAddr string, err error) {
 	interfaces, err := net.Interfaces()
@@ -979,96 +1050,6 @@ func dialWithSourceIP(targetAddr string, sourceIP string, timeout time.Duration)
 
 	log.Infof("dialing %s from source %s", remoteAddr.String(), localAddr.String())
 	return dialer.Dial("tcp", remoteAddr.String())
-}
-
-// initNetStackForTun 初始化网络栈（复制自 netstackvm.defaultInitNetStack）
-func initNetStackForTun(s *stack.Stack) error {
-	// 设置默认 TTL
-	opt := tcpip.DefaultTTLOption(64)
-	if err := s.SetNetworkProtocolOption(ipv4.ProtocolNumber, &opt); err != nil {
-		return utils.Errorf("set ipv4 default TTL: %s", err)
-	}
-	if err := s.SetNetworkProtocolOption(ipv6.ProtocolNumber, &opt); err != nil {
-		return utils.Errorf("set ipv6 default TTL: %s", err)
-	}
-
-	// 启用转发
-	if err := s.SetForwardingDefaultAndAllNICs(ipv4.ProtocolNumber, true); err != nil {
-		return utils.Errorf("set ipv4 forwarding: %s", err)
-	}
-	if err := s.SetForwardingDefaultAndAllNICs(ipv6.ProtocolNumber, true); err != nil {
-		return utils.Errorf("set ipv6 forwarding: %s", err)
-	}
-
-	// 设置 ICMP 限制
-	s.SetICMPBurst(50)
-	s.SetICMPLimit(1000)
-
-	// 设置 TCP 发送缓冲区大小范围
-	sndOpt := tcpip.TCPSendBufferSizeRangeOption{
-		Min:     tcp.MinBufferSize,
-		Default: tcp.DefaultSendBufferSize,
-		Max:     tcp.MaxBufferSize,
-	}
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &sndOpt); err != nil {
-		return utils.Errorf("set TCP send buffer size range: %s", err)
-	}
-
-	// 设置 TCP 接收缓冲区大小范围
-	rcvOpt := tcpip.TCPReceiveBufferSizeRangeOption{
-		Min:     tcp.MinBufferSize,
-		Default: tcp.DefaultReceiveBufferSize,
-		Max:     tcp.MaxBufferSize,
-	}
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &rcvOpt); err != nil {
-		return utils.Errorf("set TCP receive buffer size range: %s", err)
-	}
-
-	// 设置 TCP 拥塞控制算法
-	tcpOpt := tcpip.CongestionControlOption("reno")
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpOpt); err != nil {
-		return utils.Errorf("set TCP congestion control algorithm: %s", err)
-	}
-
-	// 禁用 TCP delay (Nagle's algorithm)
-	delayOpt := tcpip.TCPDelayEnabled(false)
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &delayOpt); err != nil {
-		return utils.Errorf("set TCP delay enabled: %s", err)
-	}
-
-	// 禁用 TCP 接收缓冲区自动调整
-	tcpModerateReceiveBufferOpt := tcpip.TCPModerateReceiveBufferOption(false)
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpModerateReceiveBufferOpt); err != nil {
-		return utils.Errorf("set TCP moderate receive buffer: %s", err)
-	}
-
-	// 启用 TCP SACK
-	sackOpt := tcpip.TCPSACKEnabled(true)
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &sackOpt); err != nil {
-		return utils.Errorf("set TCP SACK enabled: %s", err)
-	}
-
-	// 设置 TCP 恢复算法
-	recoveryOpt := tcpip.TCPRACKLossDetection
-	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &recoveryOpt); err != nil {
-		return utils.Errorf("set TCP Recovery: %s", err)
-	}
-
-	return nil
-}
-
-// addRouteToInterface 添加路由到指定接口
-func addRouteToInterface(ip, interfaceName string) error {
-	return netutil.AddSpecificIPRouteToNetInterface(ip, interfaceName)
-}
-
-// deleteRoute 删除指定 IP 的路由
-func deleteRoute(ip string) error {
-	err := netutil.DeleteSpecificIPRoute(ip)
-	if err != nil {
-		log.Warnf("failed to delete route for %s: %v", ip, err)
-	}
-	return err
 }
 
 // authenticateConnection 服务器端认证：读取 {"secret": "..."} 并验证，然后回复 {"ok": true, "utun": "..."} 或 {"ok": false, "error": "..."}
