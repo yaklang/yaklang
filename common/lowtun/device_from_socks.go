@@ -20,6 +20,7 @@ import (
 type socketDevice struct {
 	conn      net.Conn
 	mtu       int
+	utunName  string // actual TUN device name (e.g., "utun3")
 	events    chan Event
 	closeChan chan struct{}
 	closeOnce sync.Once
@@ -68,6 +69,7 @@ func CreateDeviceFromSocket(socketPath string, mtu int, secret string) (Device, 
 	dev := &socketDevice{
 		conn:      conn,
 		mtu:       mtu,
+		utunName:  tunName,
 		events:    make(chan Event, 10),
 		closeChan: make(chan struct{}),
 		closed:    false,
@@ -269,9 +271,9 @@ func (d *socketDevice) MTU() (int, error) {
 	return d.mtu, nil
 }
 
-// Name returns the name of the device (socket path).
+// Name returns the name of the actual TUN device (e.g., "utun3").
 func (d *socketDevice) Name() (string, error) {
-	return "socket", nil
+	return d.utunName, nil
 }
 
 // Events returns the event channel.
