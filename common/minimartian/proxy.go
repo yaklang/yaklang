@@ -15,6 +15,7 @@
 package minimartian
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -94,6 +95,28 @@ type Proxy struct {
 
 	// connection pool for remote server connections
 	connPool *lowhttp.LowHttpConnPool
+
+	extraIncomingConnCh chan net.Conn
+}
+
+func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan net.Conn) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case conn, ok := <-ch:
+				if !ok {
+					return
+				}
+				select {
+				case p.extraIncomingConnCh <- conn:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -134,13 +157,14 @@ func (p *Proxy) deleteCache(req *http.Request) {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	proxy := &Proxy{
-		timeout:          5 * time.Minute,
-		closing:          make(chan bool),
-		reqmod:           noop,
-		resmod:           noop,
-		ctxCacheInitOnce: new(sync.Once),
-		ctxCacheLock:     new(sync.Mutex),
-		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
+		timeout:             5 * time.Minute,
+		closing:             make(chan bool),
+		reqmod:              noop,
+		resmod:              noop,
+		ctxCacheInitOnce:    new(sync.Once),
+		ctxCacheLock:        new(sync.Mutex),
+		ctxCache:            utils.NewTTLCache[*Context](5 * time.Minute),
+		extraIncomingConnCh: make(chan net.Conn),
 	}
 	return proxy
 }

@@ -682,3 +682,10 @@ func MITM_SetDialer(dialer func(duration time.Duration, target string) (net.Conn
 		return nil
 	}
 }
+
+func MITM_SetExtraIncomingConectionChannel(ch chan net.Conn) MITMConfig {
+	return func(server *MITMServer) error {
+		server.extraIncomingConnChans = append(server.extraIncomingConnChans, ch)
+		return nil
+	}
+}
