@@ -56,6 +56,28 @@ func getOrCreatePrivilegedSecret() string {
 	return secret
 }
 
+// ResetPrivilegedSecret 重置高权限进程的密码
+// 这会生成一个新的密码并存储到数据库中，导致旧的高权限进程无法被复用
+func ResetPrivilegedSecret() (string, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return "", utils.Errorf("database not available")
+	}
+
+	// 生成新密码
+	hash := md5.Sum([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
+	newSecret := hex.EncodeToString(hash[:])
+
+	// 存储到数据库
+	err := yakit.SetKey(db, privilegedProcessSecretKey, newSecret)
+	if err != nil {
+		return "", utils.Errorf("failed to store new privileged secret: %v", err)
+	}
+
+	log.Infof("successfully reset privileged secret: %s", newSecret)
+	return newSecret, nil
+}
+
 // killProcessPrivileged 使用高权限方式 kill 指定的进程
 // 返回 true 表示用户确认 kill，false 表示用户取消
 func killProcessPrivileged(pid int, socketPath string) (bool, error) {

@@ -26,7 +26,7 @@ type ExecuteConfig struct {
 func DefaultExecuteConfig() *ExecuteConfig {
 	return &ExecuteConfig{
 		Title:                          "privilege execute",
-		Prompt:                         "This operation requires administrator privileges",
+		Prompt:                         "",
 		Description:                    "",
 		DiscardStdoutStderr:            false,
 		SkipConfirmDialog:              false,

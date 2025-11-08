@@ -54,6 +54,12 @@ var TunCommands = []*cli.Command{
 		Flags:  []cli.Flag{},
 		Action: testTunSocketDevice,
 	},
+	{
+		Name:   "reset-forward-tun-to-socks-password",
+		Usage:  "Reset the password for forward-tun-to-socks privileged process (for testing authentication failure)",
+		Flags:  []cli.Flag{},
+		Action: resetForwardTunPassword,
+	},
 }
 
 // testSocketConnection 测试是否可以用给定的密码连接到 socket
@@ -1177,4 +1183,21 @@ func (w *protocolWriter) Write(p []byte) (n int, err error) {
 
 	// 写入数据包内容
 	return w.conn.Write(p)
+}
+
+// resetForwardTunPassword 重置 forward-tun-to-socks 高权限进程的密码
+func resetForwardTunPassword(c *cli.Context) error {
+	fmt.Println("[*] Resetting forward-tun-to-socks password...")
+
+	newSecret, err := lowtun.ResetPrivilegedSecret()
+	if err != nil {
+		fmt.Printf("[!] Failed to reset password: %v\n", err)
+		return err
+	}
+
+	fmt.Printf("[+] Successfully reset password to: %s\n", newSecret)
+	fmt.Println("[*] The old privileged process will no longer be able to authenticate.")
+	fmt.Println("[*] Next time you try to use TUN, it will trigger the privileged kill process.")
+
+	return nil
 }
