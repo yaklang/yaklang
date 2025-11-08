@@ -1,0 +1,94 @@
+// Simple test for extraIncomingConn functionality
+// This test verifies that MITM can accept connections forwarded through a channel
+
+ctx, cancel = context.WithTimeout(context.New(), time.ParseDuration("30s")~)
+
+// Create a channel for forwarding connections
+connChan = make(chan any)
+
+// Setup MITM server
+mitmPort = os.GetRandomAvailableTCPPort()
+hijacked = false
+
+go func {
+    defer func {
+        err = recover()
+        // Ignore context cancellation errors
+    }
+    
+    err = mitm.Start(mitmPort,
+        mitm.hijackHTTPRequest((isHttps, url, req, forward, drop) => {
+            println("[MITM] Hijacked request to:", url)
+            hijacked = true
+            forward(req)
+        }),
+        mitm.extraIncomingConn(connChan),
+        mitm.context(ctx)
+    )
+}
+
+// Wait for MITM to start
+sleep(1)
+
+// Create a TCP server that forwards connections to MITM
+tcpPort = os.GetRandomAvailableTCPPort()
+println("[TEST] TCP server listening on port:", tcpPort)
+println("[TEST] MITM server on port:", mitmPort)
+
+go func {
+    defer func {
+        err = recover()
+        // Ignore context cancellation errors
+    }
+    
+    err = tcp.Serve("127.0.0.1", tcpPort, 
+        tcp.serverCallback((conn) => {
+            println("[TCP] Received connection, forwarding to MITM")
+            connChan <- conn
+        }), 
+        tcp.serverContext(ctx)
+    )
+}
+
+// Wait for TCP server to start
+sleep(1)
+
+// Connect to the TCP server and send an HTTP request
+println("[TEST] Connecting to TCP server...")
+conn, err = tcp.Connect("127.0.0.1", tcpPort)
+if err != nil {
+    die(f"tcp.Connect failed: ${err}")
+}
+
+println("[TEST] Sending HTTP request...")
+httpReq = "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n"
+err = conn.Send(httpReq)
+if err != nil {
+    die(f"conn.Send failed: ${err}")
+}
+
+println("[TEST] Waiting for response...")
+response, err = conn.RecvTimeout(5)
+if err != nil {
+    die(f"Failed to receive response: ${err}")
+}
+
+println("[TEST] Response received:", len(response), "bytes")
+
+// Verify response
+assert len(response) > 0, "Response should not be empty"
+assert str.Contains(string(response), "HTTP/1.1 200"), "Response should contain HTTP 200 status"
+assert str.Contains(string(response), "Example Domain"), "Response should contain Example Domain content"
+
+// Verify the request was hijacked
+assert hijacked, "Request should have been hijacked by MITM"
+
+// Close connection
+conn.Close()
+
+// Cancel context to clean up servers
+cancel()
+sleep(0.5)
+
+println("[TEST] ✓ All assertions passed!")
+

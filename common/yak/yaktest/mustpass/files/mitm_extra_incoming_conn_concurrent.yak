@@ -1,0 +1,119 @@
+// Test extraIncomingConn with concurrent connections
+// This test verifies MITM can handle multiple concurrent forwarded connections
+
+ctx, cancel = context.WithTimeout(context.New(), time.ParseDuration("30s")~)
+
+// Create a channel for forwarding connections
+connChan = make(chan any, 10) // Buffered channel for concurrent connections
+
+// Setup MITM server
+mitmPort = os.GetRandomAvailableTCPPort()
+hijackCount = 0
+lock = sync.NewLock()
+
+go func {
+    defer func {
+        err = recover()
+    }
+    
+    err = mitm.Start(mitmPort,
+        mitm.hijackHTTPRequest((isHttps, url, req, forward, drop) => {
+            lock.Lock()
+            hijackCount++
+            count = hijackCount
+            lock.Unlock()
+            println(f"[MITM] Hijacked request #${count} to: ${url}")
+            forward(req)
+        }),
+        mitm.extraIncomingConn(connChan),
+        mitm.context(ctx)
+    )
+}
+
+sleep(1)
+
+// Create TCP server
+tcpPort = os.GetRandomAvailableTCPPort()
+println("[TEST] TCP server on port:", tcpPort)
+println("[TEST] MITM server on port:", mitmPort)
+
+go func {
+    defer func {
+        err = recover()
+    }
+    
+    err = tcp.Serve("127.0.0.1", tcpPort, 
+        tcp.serverCallback((conn) => {
+            connChan <- conn
+        }), 
+        tcp.serverContext(ctx)
+    )
+}
+
+sleep(1)
+
+// Test concurrent connections
+println("\n[TEST] Sending 5 concurrent requests...")
+wg = sync.NewWaitGroup()
+successCount = 0
+successLock = sync.NewLock()
+
+for i in 5 {
+    wg.Add(1)
+    go func(idx) {
+        defer wg.Done()
+        defer func {
+            err = recover()
+            if err != nil {
+                println(f"[TEST] Request ${idx} failed: ${err}")
+            }
+        }
+        
+        conn, err = tcp.Connect("127.0.0.1", tcpPort)
+        if err != nil {
+            println(f"[TEST] Connect ${idx} failed: ${err}")
+            return
+        }
+        defer conn.Close()
+        
+        httpReq = f"GET /test${idx} HTTP/1.1\r\nHost: www.example.com\r\n\r\n"
+        err = conn.Send(httpReq)
+        if err != nil {
+            println(f"[TEST] Send ${idx} failed: ${err}")
+            return
+        }
+        
+        response, err = conn.RecvTimeout(5)
+        if err != nil {
+            println(f"[TEST] Recv ${idx} failed: ${err}")
+            return
+        }
+        
+        if len(response) > 0 && str.Contains(string(response), "HTTP/1.1") {
+            successLock.Lock()
+            successCount++
+            successLock.Unlock()
+            println(f"[TEST] Request ${idx} succeeded: ${len(response)} bytes")
+        }
+    }(i)
+    
+    // Small delay between requests
+    sleep(0.1)
+}
+
+println("[TEST] Waiting for all requests to complete...")
+wg.Wait()
+
+// Verify results
+println(f"\n[TEST] Success count: ${successCount}/5")
+println(f"[TEST] Hijack count: ${hijackCount}")
+
+assert successCount >= 4, f"At least 4 requests should succeed, got ${successCount}"
+assert hijackCount >= 4, f"At least 4 requests should be hijacked, got ${hijackCount}"
+
+// Cleanup
+cancel()
+sleep(0.5)
+
+println("\n[TEST] ✓ Concurrent test passed!")
+
