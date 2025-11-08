@@ -48,23 +48,33 @@ set dialogString to decodeHex("{{ .Description }}")
 set cmd to decodeHex("{{ .Command }}")
 set promptString to decodeHex("{{ .Prompt }}")
 set iconPathString to decodeHex("{{ .IconPath }}")
+set skipConfirm to "{{ .SkipConfirm }}"
 
--- 根据图标路径是否存在来决定使用自定义图标还是默认图标
-if iconPathString is not "" then
-    try
-        set iconFile to POSIX file iconPathString
-        display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon iconFile
-    on error
-        -- 如果自定义图标加载失败，使用默认警告图标
-        display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon caution
-    end try
-else
-display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon caution
-end if
-
-if button returned of result is "OK" then
+-- 根据 skipConfirm 参数决定是否显示确认对话框
+if skipConfirm is "1" then
+    -- 跳过确认对话框，直接执行命令
+    log "PRIVILEGED_PROCESS_START"
     do shell script cmd with administrator privileges with prompt promptString
 else
-    error "User cancelled operation"
+    -- 显示确认对话框
+    set dialogResult to missing value
+    if iconPathString is not "" then
+        try
+            set iconFile to POSIX file iconPathString
+            set dialogResult to display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon iconFile
+        on error
+            -- 如果自定义图标加载失败，使用默认警告图标
+            set dialogResult to display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon caution
+        end try
+    else
+        set dialogResult to display dialog dialogString with title titleString buttons {"Cancel", "OK"} default button "OK" with icon caution
+    end if
+    
+    if button returned of dialogResult is "OK" then
+        log "PRIVILEGED_PROCESS_START"
+        do shell script cmd with administrator privileges with prompt promptString
+    else
+        error "User cancelled operation"
+    end if
 end if
 
