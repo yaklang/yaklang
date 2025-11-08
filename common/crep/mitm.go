@@ -366,6 +366,9 @@ type MITMServer struct {
 	connPool       *lowhttp.LowHttpConnPool
 	connPoolCtx    context.Context
 	connPoolCancel context.CancelFunc
+
+	// extra incoming connection channels
+	extraIncomingConnChans []chan net.Conn
 }
 
 func (m *MITMServer) GetMaxContentLength() int {

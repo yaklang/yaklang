@@ -131,31 +131,69 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	var delay time.Duration
 
 	log.Infof("(mitm) ready for recv connection from: %v", l.Addr().String())
+
+	incomming := make(chan net.Conn)
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	// start listener to start accept connection
+	go func() {
+		defer func() {
+			wg.Done()
+		}()
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+					if delay == 0 {
+						delay = 5 * time.Millisecond
+					} else {
+						delay *= 2
+					}
+					if max := time.Second; delay > max {
+						delay = max
+					}
+
+					log.Debugf("mitm: temporary error on accept: %v", err)
+					time.Sleep(delay)
+					continue
+				}
+				log.Errorf("mitm: failed to accept: %v", err)
+				return
+			}
+			incomming <- conn
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case conn, ok := <-p.extraIncomingConnCh:
+				if !ok {
+					return
+				}
+				incomming <- conn
+			}
+		}
+	}()
+	defer wg.Wait()
+
 	for {
 		if p.Closing() {
 			l.Close()
 			return nil
 		}
 
-		conn, err := l.Accept()
-		if err != nil {
-			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-				if delay == 0 {
-					delay = 5 * time.Millisecond
-				} else {
-					delay *= 2
-				}
-				if max := time.Second; delay > max {
-					delay = max
-				}
-
-				log.Debugf("mitm: temporary error on accept: %v", err)
-				time.Sleep(delay)
-				continue
+		var conn net.Conn
+		select {
+		case rawConn, ok := <-incomming:
+			if !ok {
+				return utils.Errorf("incomming channel closed")
 			}
-			log.Errorf("mitm: failed to accept: %v", err)
-			return err
+			conn = rawConn
 		}
+
 		if conn == nil {
 			continue
 		}
