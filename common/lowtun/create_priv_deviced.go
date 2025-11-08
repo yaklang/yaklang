@@ -3,11 +3,14 @@ package lowtun
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,6 +18,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/privileged"
 )
+
+// 单例模式保存密码
+var (
+	privilegedDeviceSecret     string
+	privilegedDeviceSecretOnce sync.Once
+	privilegedDeviceSecretMu   sync.RWMutex
+)
+
+// GetPrivilegedDeviceSecret 获取当前的 privileged device 密码
+func GetPrivilegedDeviceSecret() string {
+	privilegedDeviceSecretMu.RLock()
+	defer privilegedDeviceSecretMu.RUnlock()
+	return privilegedDeviceSecret
+}
+
+// setPrivilegedDeviceSecret 设置 privileged device 密码（内部使用）
+func setPrivilegedDeviceSecret(secret string) {
+	privilegedDeviceSecretMu.Lock()
+	defer privilegedDeviceSecretMu.Unlock()
+	privilegedDeviceSecret = secret
+}
+
+// generateRandomSecret 生成12位随机密码
+func generateRandomSecret() (string, error) {
+	// 生成 9 字节的随机数据，base64 编码后正好是 12 个字符
+	bytes := make([]byte, 9)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", utils.Errorf("failed to generate random secret: %v", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
 
 func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 	var socketName string
@@ -27,10 +61,24 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 
 	log.Infof("attempting to create privileged device with socket path: %s", socketPath)
 
-	tDev, _ := CreateDeviceFromSocket(socketPath, mtu)
+	// 生成或获取密码（单例模式）
+	var secret string
+	privilegedDeviceSecretOnce.Do(func() {
+		var err error
+		secret, err = generateRandomSecret()
+		if err != nil {
+			log.Errorf("failed to generate secret: %v", err)
+			secret = "" // 如果生成失败，使用空密码
+		}
+		setPrivilegedDeviceSecret(secret)
+		log.Infof("generated privileged device secret: %s", secret)
+	})
+	secret = GetPrivilegedDeviceSecret()
+
+	tDev, tunName, _ := CreateDeviceFromSocket(socketPath, mtu, secret)
 	if !utils.IsNil(tDev) {
-		log.Infof("found existing device from socket: %s", socketPath)
-		return tDev, socketPath, nil
+		log.Infof("found existing device from socket: %s, utun: %s", socketPath, tunName)
+		return tDev, tunName, nil
 	}
 
 	log.Infof("no existing device found, preparing privileged executor")
@@ -63,12 +111,12 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 	go func() {
 		log.Infof("starting privileged executor goroutine")
 		executor := privileged.NewExecutor("CreateLowTunDevice")
-		log.Infof("executing privileged command: %s forward-tun-to-socks --socket-path %s", currentBinary, socketPath)
+		log.Infof("executing privileged command: %s forward-tun-to-socks --socket-path %s --secret %s", currentBinary, socketPath, secret)
 		_, err := executor.Execute(
 			context.Background(),
 			fmt.Sprintf(
-				"%v forward-tun-to-socks --socket-path %#v",
-				currentBinary, socketPath,
+				"%v forward-tun-to-socks --socket-path %#v --secret %#v",
+				currentBinary, socketPath, secret,
 			),
 			privileged.WithSkipConfirmDialog(),
 			privileged.WithTitle("CreateHijackTUNDevice"),
@@ -106,10 +154,10 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 			}
 
 			// 尝试连接 socket
-			tDev, err := CreateDeviceFromSocket(socketPath, mtu)
+			tDev, tunName, err := CreateDeviceFromSocket(socketPath, mtu, secret)
 			if err == nil && !utils.IsNil(tDev) {
-				log.Infof("successfully connected to privileged device via socket: %s", socketPath)
-				return tDev, socketPath, nil
+				log.Infof("successfully connected to privileged device via socket: %s, utun: %s", socketPath, tunName)
+				return tDev, tunName, nil
 			}
 
 			// 检查超时
