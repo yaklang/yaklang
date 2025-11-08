@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"
+	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
@@ -43,6 +45,11 @@ var TunCommands = []*cli.Command{
 				Usage: "MTU size for TUN device",
 				Value: 1500,
 			},
+			cli.StringFlag{
+				Name:  "secret",
+				Usage: "Secret for socket authentication (if set, clients must authenticate)",
+				Value: "",
+			},
 		},
 		Action: forwardTunToSocks,
 	},
@@ -57,6 +64,13 @@ var TunCommands = []*cli.Command{
 func forwardTunToSocks(c *cli.Context) error {
 	socketPath := c.String("socket-path")
 	mtu := c.Int("mtu")
+	secret := c.String("secret")
+
+	if secret != "" {
+		log.Infof("authentication enabled with secret: %s", secret)
+	} else {
+		log.Infof("authentication disabled (no secret provided)")
+	}
 
 	// 1. 首先创建 socket 监听器（快速失败）
 	listener, err := lowtun.ListenSocket(socketPath)
@@ -210,6 +224,26 @@ func forwardTunToSocks(c *cli.Context) error {
 					log.Errorf("failed to accept connection: %v", err)
 					continue
 				}
+			}
+
+			// 发送初始响应（包含 utun 名称）
+			// 如果设置了密码，先进行认证；否则直接发送欢迎消息
+			if secret != "" {
+				log.Infof("new connection, waiting for authentication...")
+				if err := authenticateConnection(conn, secret, actualName); err != nil {
+					log.Errorf("authentication failed: %v", err)
+					conn.Close()
+					continue
+				}
+				log.Infof("authentication successful")
+			} else {
+				// 未认证模式也需要发送初始响应
+				if err := sendAuthResponse(conn, true, "", actualName); err != nil {
+					log.Errorf("failed to send initial response: %v", err)
+					conn.Close()
+					continue
+				}
+				log.Infof("sent initial response to client")
 			}
 
 			clientsMu.Lock()
@@ -373,12 +407,12 @@ func configureTunDevice(tunName, tunIP string, mtu int) error {
 func testTunSocketDevice(c *cli.Context) error {
 	log.Infof("creating privileged TUN device with MTU 1400")
 
-	// 1. 创建 privileged device 并获取 socket path
-	device, socketPath, err := lowtun.CreatePrivilegedDevice(1400)
+	// 1. 创建 privileged device 并获取 TUN 设备名称
+	device, tunName, err := lowtun.CreatePrivilegedDevice(1400)
 	if err != nil {
 		return utils.Errorf("failed to create privileged device: %v", err)
 	}
-	log.Infof("privileged device created successfully, socket path: %s", socketPath)
+	log.Infof("privileged device created successfully, TUN device name: %s", tunName)
 
 	// 2. 设置信号处理
 	ctx, cancel := context.WithCancel(context.Background())
@@ -403,56 +437,177 @@ func testTunSocketDevice(c *cli.Context) error {
 	log.Infof("network stack virtual machine created successfully")
 	log.Infof("tunnel name: %s", tvm.GetTunnelName())
 
-	// 4. 监控网络栈信息
+	// 4. 添加路由规则，将 1.1.1.1 劫持到 TUN 设备
+	log.Infof("adding route for 1.1.1.1 to %s", tunName)
+	err = netutil.AddIPRouteToNetInterface("1.1.1.1", tunName)
+	if err != nil {
+		log.Errorf("failed to add route: %v", err)
+		return utils.Errorf("failed to add route: %v", err)
+	}
+	log.Infof("route added successfully")
+
+	// 5. 设置 TCP 劫持处理器
+	tcpConnReceived := make(chan bool, 1)
+	err = tvm.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+		remoteAddr := conn.RemoteAddr()
+		localAddr := conn.LocalAddr()
+		log.Infof("=== TCP Connection Hijacked ===")
+		log.Infof("Remote: %s", remoteAddr)
+		log.Infof("Local: %s", localAddr)
+		log.Infof("===============================")
+
+		// 通知测试收到了连接
+		select {
+		case tcpConnReceived <- true:
+		default:
+		}
+
+		// 读取一些数据
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Errorf("failed to read from connection: %v", err)
+		} else {
+			log.Infof("received %d bytes from connection: %s", n, string(buf[:n]))
+		}
+
+		// 关闭连接
+		conn.Close()
+	})
+	if err != nil {
+		return utils.Errorf("failed to set hijack TCP handler: %v", err)
+	}
+	log.Infof("TCP hijack handler set successfully")
+
+	// 6. 发送测试数据包到 1.1.1.1:80
+	go func() {
+		// 等待一下，确保路由生效
+		time.Sleep(2 * time.Second)
+
+		log.Infof("sending test TCP packet to 1.1.1.1:80")
+		conn, err := net.DialTimeout("tcp", "1.1.1.1:80", 5*time.Second)
+		if err != nil {
+			log.Errorf("failed to dial 1.1.1.1:80: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		// 发送 HTTP GET 请求
+		httpRequest := "GET / HTTP/1.1\r\nHost: 1.1.1.1\r\nConnection: close\r\n\r\n"
+		_, err = conn.Write([]byte(httpRequest))
+		if err != nil {
+			log.Errorf("failed to write to connection: %v", err)
+			return
+		}
+		log.Infof("test packet sent successfully")
+
+		// 等待响应
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Infof("read from connection completed (expected): %v", err)
+		} else {
+			log.Infof("received response (%d bytes): %s", n, string(buf[:n]))
+		}
+	}()
+
+	// 7. 等待接收到 TCP 连接
+	go func() {
+		select {
+		case <-tcpConnReceived:
+			log.Infof("✓ Test PASSED: TCP connection successfully hijacked!")
+		case <-time.After(10 * time.Second):
+			log.Errorf("✗ Test FAILED: No TCP connection received within 10 seconds")
+		case <-ctx.Done():
+			return
+		}
+	}()
+
+	// 8. 监控网络栈信息（仅在数据变化时显示）
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
+
+		// 保存上次的统计数据
+		var lastIPPacketsReceived, lastIPPacketsSent uint64
+		var lastTCPActiveOpens, lastTCPEstablished uint64
+		var lastUDPPacketsReceived, lastUDPPacketsSent uint64
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				// 获取路由表
-				netStack := tvm.GetStack()
-				routes := netStack.GetRouteTable()
-				log.Infof("=== Network Stack Monitoring ===")
-				log.Infof("Route table (%d routes):", len(routes))
-				for i, route := range routes {
-					log.Infof("  Route %d: NIC=%d, Destination=%s, Gateway=%s, MTU=%d",
-						i+1, route.NIC, route.Destination, route.Gateway, route.MTU)
-				}
-
-				// 获取 NIC 信息
-				nicInfo := netStack.NICInfo()
-				log.Infof("NIC info (%d NICs):", len(nicInfo))
-				for nicID, info := range nicInfo {
-					log.Infof("  NIC %d:", nicID)
-					log.Infof("    Name: %s", info.Name)
-					log.Infof("    LinkAddress: %s", info.LinkAddress)
-					log.Infof("    Flags: %v", info.Flags)
-					log.Infof("    MTU: %d", info.MTU)
-					log.Infof("    Protocol addresses (%d):", len(info.ProtocolAddresses))
-					for _, addr := range info.ProtocolAddresses {
-						log.Infof("      %s/%d", addr.AddressWithPrefix.Address, addr.AddressWithPrefix.PrefixLen)
-					}
-				}
-
 				// 获取网络栈统计信息
+				netStack := tvm.GetStack()
 				stats := netStack.Stats()
-				log.Infof("Stack statistics:")
-				log.Infof("  IP: PacketsReceived=%d, PacketsSent=%d, OutgoingPacketErrors=%d, MalformedPacketsReceived=%d",
-					stats.IP.PacketsReceived.Value(), stats.IP.PacketsSent.Value(), stats.IP.OutgoingPacketErrors.Value(), stats.IP.MalformedPacketsReceived.Value())
-				log.Infof("  TCP: ActiveConnectionOpenings=%d, CurrentEstablished=%d, EstablishedResets=%d",
-					stats.TCP.ActiveConnectionOpenings.Value(), stats.TCP.CurrentEstablished.Value(), stats.TCP.EstablishedResets.Value())
-				log.Infof("  UDP: PacketsReceived=%d, PacketsSent=%d, ReceiveBufferErrors=%d",
-					stats.UDP.PacketsReceived.Value(), stats.UDP.PacketsSent.Value(), stats.UDP.ReceiveBufferErrors.Value())
-				log.Infof("===================================")
+
+				// 当前统计数据
+				currentIPPacketsReceived := stats.IP.PacketsReceived.Value()
+				currentIPPacketsSent := stats.IP.PacketsSent.Value()
+				currentTCPActiveOpens := stats.TCP.ActiveConnectionOpenings.Value()
+				currentTCPEstablished := stats.TCP.CurrentEstablished.Value()
+				currentUDPPacketsReceived := stats.UDP.PacketsReceived.Value()
+				currentUDPPacketsSent := stats.UDP.PacketsSent.Value()
+
+				// 检查是否有变化
+				hasChange := currentIPPacketsReceived != lastIPPacketsReceived ||
+					currentIPPacketsSent != lastIPPacketsSent ||
+					currentTCPActiveOpens != lastTCPActiveOpens ||
+					currentTCPEstablished != lastTCPEstablished ||
+					currentUDPPacketsReceived != lastUDPPacketsReceived ||
+					currentUDPPacketsSent != lastUDPPacketsSent
+
+				// 只在有变化时显示
+				if hasChange {
+					log.Infof("=== Network Stack Monitoring (Data Changed) ===")
+
+					// 获取路由表
+					routes := netStack.GetRouteTable()
+					log.Infof("Route table (%d routes):", len(routes))
+					for i, route := range routes {
+						log.Infof("  Route %d: NIC=%d, Destination=%s, Gateway=%s, MTU=%d",
+							i+1, route.NIC, route.Destination, route.Gateway, route.MTU)
+					}
+
+					// 获取 NIC 信息
+					nicInfo := netStack.NICInfo()
+					log.Infof("NIC info (%d NICs):", len(nicInfo))
+					for nicID, info := range nicInfo {
+						log.Infof("  NIC %d:", nicID)
+						log.Infof("    Name: %s", info.Name)
+						log.Infof("    LinkAddress: %s", info.LinkAddress)
+						log.Infof("    Flags: %v", info.Flags)
+						log.Infof("    MTU: %d", info.MTU)
+						log.Infof("    Protocol addresses (%d):", len(info.ProtocolAddresses))
+						for _, addr := range info.ProtocolAddresses {
+							log.Infof("      %s/%d", addr.AddressWithPrefix.Address, addr.AddressWithPrefix.PrefixLen)
+						}
+					}
+
+					// 显示统计信息
+					log.Infof("Stack statistics:")
+					log.Infof("  IP: PacketsReceived=%d, PacketsSent=%d, OutgoingPacketErrors=%d, MalformedPacketsReceived=%d",
+						currentIPPacketsReceived, currentIPPacketsSent, stats.IP.OutgoingPacketErrors.Value(), stats.IP.MalformedPacketsReceived.Value())
+					log.Infof("  TCP: ActiveConnectionOpenings=%d, CurrentEstablished=%d, EstablishedResets=%d",
+						currentTCPActiveOpens, currentTCPEstablished, stats.TCP.EstablishedResets.Value())
+					log.Infof("  UDP: PacketsReceived=%d, PacketsSent=%d, ReceiveBufferErrors=%d",
+						currentUDPPacketsReceived, currentUDPPacketsSent, stats.UDP.ReceiveBufferErrors.Value())
+					log.Infof("===================================")
+
+					// 更新上次的统计数据
+					lastIPPacketsReceived = currentIPPacketsReceived
+					lastIPPacketsSent = currentIPPacketsSent
+					lastTCPActiveOpens = currentTCPActiveOpens
+					lastTCPEstablished = currentTCPEstablished
+					lastUDPPacketsReceived = currentUDPPacketsReceived
+					lastUDPPacketsSent = currentUDPPacketsSent
+				}
 			}
 		}
 	}()
 
-	// 5. 监听设备事件
+	// 9. 监听设备事件
 	go func() {
 		for {
 			select {
@@ -479,7 +634,7 @@ func testTunSocketDevice(c *cli.Context) error {
 
 	log.Infof("network stack virtual machine is ready (press Ctrl+C to stop)...")
 
-	// 6. 等待退出信号
+	// 10. 等待退出信号
 	<-ctx.Done()
 	log.Infof("shutting down network stack virtual machine...")
 
@@ -581,6 +736,85 @@ func deleteRoute(ip string) error {
 		log.Warnf("failed to delete route for %s: %v", ip, err)
 	}
 	return err
+}
+
+// authenticateConnection 服务器端认证：读取 {"secret": "..."} 并验证，然后回复 {"ok": true, "utun": "..."} 或 {"ok": false, "error": "..."}
+func authenticateConnection(conn net.Conn, expectedSecret string, tunName string) error {
+	// 1. 读取认证请求
+	var lengthBuf [4]byte
+	if _, err := io.ReadFull(conn, lengthBuf[:]); err != nil {
+		return utils.Errorf("failed to read auth request length: %v", err)
+	}
+
+	reqLen := int(binary.BigEndian.Uint32(lengthBuf[:]))
+	if reqLen <= 0 || reqLen > 1024 {
+		return utils.Errorf("invalid auth request length: %d", reqLen)
+	}
+
+	reqData := make([]byte, reqLen)
+	if _, err := io.ReadFull(conn, reqData); err != nil {
+		return utils.Errorf("failed to read auth request: %v", err)
+	}
+
+	log.Debugf("received auth request: %s", string(reqData))
+
+	// 2. 解析认证请求
+	var authReq map[string]string
+	if err := json.Unmarshal(reqData, &authReq); err != nil {
+		sendAuthResponse(conn, false, "invalid auth request format", tunName)
+		return utils.Errorf("failed to unmarshal auth request: %v", err)
+	}
+
+	// 3. 验证密码
+	clientSecret, exists := authReq["secret"]
+	if !exists {
+		sendAuthResponse(conn, false, "missing secret field", tunName)
+		return utils.Errorf("missing secret field in auth request")
+	}
+
+	if clientSecret != expectedSecret {
+		sendAuthResponse(conn, false, "invalid secret", tunName)
+		return utils.Errorf("invalid secret: expected %s, got %s", expectedSecret, clientSecret)
+	}
+
+	// 4. 认证成功，发送响应
+	if err := sendAuthResponse(conn, true, "", tunName); err != nil {
+		return utils.Errorf("failed to send auth response: %v", err)
+	}
+
+	log.Debugf("authentication successful")
+	return nil
+}
+
+// sendAuthResponse 发送认证响应，包含 utun 名称
+func sendAuthResponse(conn net.Conn, ok bool, errMsg string, tunName string) error {
+	resp := map[string]interface{}{
+		"ok":   ok,
+		"utun": tunName,
+	}
+	if errMsg != "" {
+		resp["error"] = errMsg
+	}
+
+	respData, err := json.Marshal(resp)
+	if err != nil {
+		return utils.Errorf("failed to marshal auth response: %v", err)
+	}
+
+	// 写入长度前缀
+	var lengthBuf [4]byte
+	binary.BigEndian.PutUint32(lengthBuf[:], uint32(len(respData)))
+	if _, err := conn.Write(lengthBuf[:]); err != nil {
+		return utils.Errorf("failed to write auth response length: %v", err)
+	}
+
+	// 写入响应数据
+	if _, err := conn.Write(respData); err != nil {
+		return utils.Errorf("failed to write auth response: %v", err)
+	}
+
+	log.Debugf("sent auth response: %s", string(respData))
+	return nil
 }
 
 // protocolReader 实现 io.Reader，自动处理 4 字节长度前缀
