@@ -513,6 +513,12 @@ func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error
 		}
 	}()
 
+	// Merge extra incoming connection channels (e.g., from TUN device)
+	for _, ch := range m.extraIncomingConnChans {
+		log.Infof("mitm: merging extra incoming connection channel")
+		m.proxy.MergeExtraIncomingConectionChannel(ctx, ch)
+	}
+
 	m.setHijackHandler(ctx)
 	err := m.proxy.Serve(lis, ctx)
 	if err != nil {
