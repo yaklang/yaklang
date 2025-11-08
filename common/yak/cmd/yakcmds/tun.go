@@ -12,15 +12,19 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv4"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/network/ipv6"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
+	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/transport/tcp"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 )
 
@@ -43,30 +47,9 @@ var TunCommands = []*cli.Command{
 		Action: forwardTunToSocks,
 	},
 	{
-		Name:  "test-tun-socket-device",
-		Usage: "Test TUN device created from socket connection",
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "socket-path",
-				Usage: "Socket path to connect to",
-				Value: "/tmp/hijack-tun.sock",
-			},
-			cli.IntFlag{
-				Name:  "mtu",
-				Usage: "MTU size for the device",
-				Value: 1500,
-			},
-			cli.StringFlag{
-				Name:  "test-ip",
-				Usage: "Test IP address to add route and send traffic (default: 1.1.1.1)",
-				Value: "1.1.1.1",
-			},
-			cli.StringFlag{
-				Name:     "utun",
-				Usage:    "Server-side TUN interface name (REQUIRED, e.g., utun12)",
-				Required: true,
-			},
-		},
+		Name:   "test-tun-socket-device",
+		Usage:  "Test TUN device created from socket connection",
+		Flags:  []cli.Flag{},
 		Action: testTunSocketDevice,
 	},
 }
@@ -388,53 +371,16 @@ func configureTunDevice(tunName, tunIP string, mtu int) error {
 }
 
 func testTunSocketDevice(c *cli.Context) error {
-	socketPath := c.String("socket-path")
-	mtu := c.Int("mtu")
-	testIP := c.String("test-ip")
-	tunInterface := c.String("utun")
+	log.Infof("creating privileged TUN device with MTU 1400")
 
-	log.Infof("testing TUN device from socket: %s", socketPath)
-	log.Infof("target TUN interface: %s", tunInterface)
-
-	// 1. 从 socket 创建 Device
-	device, err := lowtun.CreateDeviceFromSocket(socketPath, mtu)
+	// 1. 创建 privileged device 并获取 socket path
+	device, socketPath, err := lowtun.CreatePrivilegedDevice(1400)
 	if err != nil {
-		return utils.Errorf("failed to create device from socket: %v", err)
+		return utils.Errorf("failed to create privileged device: %v", err)
 	}
-	defer device.Close()
+	log.Infof("privileged device created successfully, socket path: %s", socketPath)
 
-	// 2. 获取设备信息
-	deviceMTU, err := device.MTU()
-	if err != nil {
-		return utils.Errorf("failed to get device MTU: %v", err)
-	}
-	log.Infof("device MTU: %d", deviceMTU)
-
-	deviceName, err := device.Name()
-	if err != nil {
-		return utils.Errorf("failed to get device name: %v", err)
-	}
-	log.Infof("device name: %s (this is socket device, routes will be added to server-side TUN)", deviceName)
-
-	batchSize := device.BatchSize()
-	log.Infof("device batch size: %d", batchSize)
-
-	// 3. 添加路由（如果指定了测试 IP）
-	if testIP != "" {
-		log.Infof("adding route for test IP: %s -> %s", testIP, tunInterface)
-		if err := addRouteToInterface(testIP, tunInterface); err != nil {
-			log.Warnf("failed to add route: %v", err)
-			log.Infof("please manually add route with: sudo route add %s -interface %s", testIP, tunInterface)
-		} else {
-			log.Infof("✓ route added successfully: %s -> %s", testIP, tunInterface)
-			defer func() {
-				log.Infof("cleaning up route for %s", testIP)
-				deleteRoute(testIP)
-			}()
-		}
-	}
-
-	// 4. 设置信号处理
+	// 2. 设置信号处理
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -446,70 +392,73 @@ func testTunSocketDevice(c *cli.Context) error {
 		cancel()
 	}()
 
-	// 6. 创建统计信息
-	var (
-		txBytes atomic.Uint64 // TUN -> Socket
-		rxBytes atomic.Uint64 // Socket -> TUN
-		txPkts  atomic.Uint64
-		rxPkts  atomic.Uint64
-	)
+	// 3. 使用 NewTunVirtualMachineFromDevice 创建网络栈虚拟机
+	log.Infof("creating network stack virtual machine from device...")
+	tvm, err := netstackvm.NewTunVirtualMachineFromDevice(ctx, device)
+	if err != nil {
+		return utils.Errorf("failed to create TUN virtual machine from device: %v", err)
+	}
+	defer tvm.Close()
 
-	// 7. 启动接收数据包的goroutine（监听从服务端转发来的数据包）
+	log.Infof("network stack virtual machine created successfully")
+	log.Infof("tunnel name: %s", tvm.GetTunnelName())
+
+	// 4. 监控网络栈信息
 	go func() {
-		log.Infof("starting packet receiver goroutine...")
-		bufs := make([][]byte, batchSize)
-		sizes := make([]int, batchSize)
-		for i := range bufs {
-			bufs[i] = make([]byte, deviceMTU+4)
-		}
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				// 从设备读取数据包（服务端转发过来的）
-				n, err := device.Read(bufs, sizes, 4)
-				if err != nil {
-					if ctx.Err() != nil {
-						return
-					}
-					if err != io.EOF {
-						log.Errorf("device read error: %v", err)
-					}
-					continue
+			case <-ticker.C:
+				// 获取路由表
+				netStack := tvm.GetStack()
+				routes := netStack.GetRouteTable()
+				log.Infof("=== Network Stack Monitoring ===")
+				log.Infof("Route table (%d routes):", len(routes))
+				for i, route := range routes {
+					log.Infof("  Route %d: NIC=%d, Destination=%s, Gateway=%s, MTU=%d",
+						i+1, route.NIC, route.Destination, route.Gateway, route.MTU)
 				}
 
-				// 处理接收到的数据包
-				for i := 0; i < n; i++ {
-					packet := bufs[i][4 : 4+sizes[i]]
-
-					// 记录统计
-					rxPkts.Add(1)
-					rxBytes.Add(uint64(sizes[i]))
-
-					// 打印数据包信息（仅前几个包）
-					if rxPkts.Load() <= 10 {
-						log.Infof("← RX packet #%d: %d bytes", rxPkts.Load(), sizes[i])
-						if sizes[i] >= 20 && packet[0]>>4 == 4 {
-							srcIP := net.IPv4(packet[12], packet[13], packet[14], packet[15])
-							dstIP := net.IPv4(packet[16], packet[17], packet[18], packet[19])
-							protocol := packet[9]
-							log.Infof("  IPv4: %s -> %s, protocol: %d", srcIP, dstIP, protocol)
-						}
+				// 获取 NIC 信息
+				nicInfo := netStack.NICInfo()
+				log.Infof("NIC info (%d NICs):", len(nicInfo))
+				for nicID, info := range nicInfo {
+					log.Infof("  NIC %d:", nicID)
+					log.Infof("    Name: %s", info.Name)
+					log.Infof("    LinkAddress: %s", info.LinkAddress)
+					log.Infof("    Flags: %v", info.Flags)
+					log.Infof("    MTU: %d", info.MTU)
+					log.Infof("    Protocol addresses (%d):", len(info.ProtocolAddresses))
+					for _, addr := range info.ProtocolAddresses {
+						log.Infof("      %s/%d", addr.AddressWithPrefix.Address, addr.AddressWithPrefix.PrefixLen)
 					}
 				}
+
+				// 获取网络栈统计信息
+				stats := netStack.Stats()
+				log.Infof("Stack statistics:")
+				log.Infof("  IP: PacketsReceived=%d, PacketsSent=%d, OutgoingPacketErrors=%d, MalformedPacketsReceived=%d",
+					stats.IP.PacketsReceived.Value(), stats.IP.PacketsSent.Value(), stats.IP.OutgoingPacketErrors.Value(), stats.IP.MalformedPacketsReceived.Value())
+				log.Infof("  TCP: ActiveConnectionOpenings=%d, CurrentEstablished=%d, EstablishedResets=%d",
+					stats.TCP.ActiveConnectionOpenings.Value(), stats.TCP.CurrentEstablished.Value(), stats.TCP.EstablishedResets.Value())
+				log.Infof("  UDP: PacketsReceived=%d, PacketsSent=%d, ReceiveBufferErrors=%d",
+					stats.UDP.PacketsReceived.Value(), stats.UDP.PacketsSent.Value(), stats.UDP.ReceiveBufferErrors.Value())
+				log.Infof("===================================")
 			}
 		}
 	}()
 
-	// 8. 监听 events
+	// 5. 监听设备事件
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case event, ok := <-device.Events():
+			case event, ok := <-tvm.GetTunnelDevice().Events():
 				if !ok {
 					log.Infof("device events channel closed")
 					return
@@ -528,97 +477,87 @@ func testTunSocketDevice(c *cli.Context) error {
 		}
 	}()
 
-	// 9. 定期打印统计信息
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
+	log.Infof("network stack virtual machine is ready (press Ctrl+C to stop)...")
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				tx := txPkts.Load()
-				rx := rxPkts.Load()
-				txB := txBytes.Load()
-				rxB := rxBytes.Load()
-				log.Infof("Stats: TX %d pkts (%.2f KB), RX %d pkts (%.2f KB)",
-					tx, float64(txB)/1024, rx, float64(rxB)/1024)
-			}
-		}
-	}()
+	// 6. 等待退出信号
+	<-ctx.Done()
+	log.Infof("shutting down network stack virtual machine...")
 
-	log.Infof("device is ready, bidirectional forwarding started (press Ctrl+C to stop)...")
+	return nil
+}
 
-	// 10. 如果指定了测试 IP，执行自动化测试
-	if testIP != "" {
-		go func() {
-			time.Sleep(2 * time.Second) // 等待路由生效
-
-			log.Infof("\n========================================")
-			log.Infof("Starting automated HTTP test to %s", testIP)
-			log.Infof("Sending HTTP GET request...")
-			log.Infof("========================================\n")
-
-			// 记录测试前的流量统计
-			txBefore := txPkts.Load()
-			rxBefore := rxPkts.Load()
-			log.Infof("Traffic before test - TX: %d pkts, RX: %d pkts", txBefore, rxBefore)
-
-			// 使用 lowhttp.HTTP 发送 HTTP 请求
-			log.Infof("Requesting: http://%s/", testIP)
-
-			// 构建 HTTP GET 请求包
-			packet := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", testIP)
-
-			rsp, err := lowhttp.HTTP(
-				lowhttp.WithPacketBytes([]byte(packet)),
-				lowhttp.WithTimeout(5*time.Second),
-			)
-			if err != nil {
-				log.Warnf("HTTP request failed: %v", err)
-			} else {
-				log.Infof("✓ HTTP request completed successfully")
-				if rsp != nil && len(rsp.RawPacket) > 0 {
-					log.Infof("Response: %d bytes received", len(rsp.RawPacket))
-				}
-			}
-
-			// 等待一小段时间看统计
-			time.Sleep(1 * time.Second)
-
-			// 检查流量变化
-			txAfter := txPkts.Load()
-			rxAfter := rxPkts.Load()
-			txDelta := txAfter - txBefore
-			rxDelta := rxAfter - rxBefore
-
-			log.Infof("\nTraffic after test:")
-			log.Infof("  TX: %d pkts (Δ +%d), RX: %d pkts (Δ +%d)", txAfter, txDelta, rxAfter, rxDelta)
-
-			if txDelta > 0 && rxDelta > 0 {
-				log.Infof("\n✓✓✓ SUCCESS! Bidirectional traffic forwarding works! ✓✓✓")
-				log.Infof("Both TX and RX traffic detected during test\n")
-			} else if rxDelta > 0 && txDelta == 0 {
-				log.Warnf("\n⚠ WARNING: Only RX traffic detected (%d packets), no TX traffic", rxDelta)
-				log.Warnf("Packets received from server but not sent back. Check client forwarding.\n")
-			} else if txDelta > 0 && rxDelta == 0 {
-				log.Warnf("\n⚠ WARNING: Only TX traffic detected (%d packets), no RX traffic", txDelta)
-				log.Warnf("Packets sent but no response received.\n")
-			} else {
-				log.Warnf("\n✗✗✗ WARNING: No traffic detected during test. ✗✗✗\n")
-			}
-		}()
+// initNetStackForTun 初始化网络栈（复制自 netstackvm.defaultInitNetStack）
+func initNetStackForTun(s *stack.Stack) error {
+	// 设置默认 TTL
+	opt := tcpip.DefaultTTLOption(64)
+	if err := s.SetNetworkProtocolOption(ipv4.ProtocolNumber, &opt); err != nil {
+		return utils.Errorf("set ipv4 default TTL: %s", err)
+	}
+	if err := s.SetNetworkProtocolOption(ipv6.ProtocolNumber, &opt); err != nil {
+		return utils.Errorf("set ipv6 default TTL: %s", err)
 	}
 
-	// 11. 等待退出信号
-	<-ctx.Done()
-	log.Infof("shutting down...")
+	// 启用转发
+	if err := s.SetForwardingDefaultAndAllNICs(ipv4.ProtocolNumber, true); err != nil {
+		return utils.Errorf("set ipv4 forwarding: %s", err)
+	}
+	if err := s.SetForwardingDefaultAndAllNICs(ipv6.ProtocolNumber, true); err != nil {
+		return utils.Errorf("set ipv6 forwarding: %s", err)
+	}
 
-	// 打印最终统计
-	log.Infof("\nFinal Statistics:")
-	log.Infof("  TX: %d packets, %.2f KB", txPkts.Load(), float64(txBytes.Load())/1024)
-	log.Infof("  RX: %d packets, %.2f KB", rxPkts.Load(), float64(rxBytes.Load())/1024)
+	// 设置 ICMP 限制
+	s.SetICMPBurst(50)
+	s.SetICMPLimit(1000)
+
+	// 设置 TCP 发送缓冲区大小范围
+	sndOpt := tcpip.TCPSendBufferSizeRangeOption{
+		Min:     tcp.MinBufferSize,
+		Default: tcp.DefaultSendBufferSize,
+		Max:     tcp.MaxBufferSize,
+	}
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &sndOpt); err != nil {
+		return utils.Errorf("set TCP send buffer size range: %s", err)
+	}
+
+	// 设置 TCP 接收缓冲区大小范围
+	rcvOpt := tcpip.TCPReceiveBufferSizeRangeOption{
+		Min:     tcp.MinBufferSize,
+		Default: tcp.DefaultReceiveBufferSize,
+		Max:     tcp.MaxBufferSize,
+	}
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &rcvOpt); err != nil {
+		return utils.Errorf("set TCP receive buffer size range: %s", err)
+	}
+
+	// 设置 TCP 拥塞控制算法
+	tcpOpt := tcpip.CongestionControlOption("reno")
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpOpt); err != nil {
+		return utils.Errorf("set TCP congestion control algorithm: %s", err)
+	}
+
+	// 禁用 TCP delay (Nagle's algorithm)
+	delayOpt := tcpip.TCPDelayEnabled(false)
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &delayOpt); err != nil {
+		return utils.Errorf("set TCP delay enabled: %s", err)
+	}
+
+	// 禁用 TCP 接收缓冲区自动调整
+	tcpModerateReceiveBufferOpt := tcpip.TCPModerateReceiveBufferOption(false)
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &tcpModerateReceiveBufferOpt); err != nil {
+		return utils.Errorf("set TCP moderate receive buffer: %s", err)
+	}
+
+	// 启用 TCP SACK
+	sackOpt := tcpip.TCPSACKEnabled(true)
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &sackOpt); err != nil {
+		return utils.Errorf("set TCP SACK enabled: %s", err)
+	}
+
+	// 设置 TCP 恢复算法
+	recoveryOpt := tcpip.TCPRACKLossDetection
+	if err := s.SetTransportProtocolOption(tcp.ProtocolNumber, &recoveryOpt); err != nil {
+		return utils.Errorf("set TCP Recovery: %s", err)
+	}
 
 	return nil
 }

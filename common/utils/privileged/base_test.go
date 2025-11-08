@@ -1,6 +1,7 @@
 package privileged
 
 import (
+	"context"
 	"os"
 	"syscall"
 	"testing"
@@ -54,4 +55,28 @@ func TestReleaseIconToTemp(t *testing.T) {
 	}
 
 	t.Logf("Icon file size: %d bytes", info.Size())
+}
+
+func TestExecutorWithSkipConfirmDialog(t *testing.T) {
+	// 这个测试演示如何使用 WithSkipConfirmDialog 选项
+	// 注意：这个测试需要用户交互（输入管理员密码），所以标记为 Skip
+	t.Skip("This test requires user interaction (admin password)")
+
+	executor := NewExecutor("TestApp")
+
+	// 使用 WithSkipConfirmDialog() 选项，跳过第一个确认对话框
+	// 直接弹出系统的管理员权限验证对话框
+	_, err := executor.Execute(
+		context.Background(),
+		"echo 'Hello from privileged mode'",
+		WithTitle("Test Skip Confirm Dialog"),
+		WithDescription("This should skip the confirm dialog and go directly to admin auth"),
+		WithSkipConfirmDialog(), // 关键选项：跳过确认对话框
+	)
+
+	if err != nil {
+		t.Logf("Execution failed (expected if user cancelled): %v", err)
+	} else {
+		t.Log("Execution succeeded")
+	}
 }
