@@ -412,6 +412,27 @@ func testTunSocketDevice(c *cli.Context) error {
 	if err != nil {
 		return utils.Errorf("failed to create privileged device: %v", err)
 	}
+
+	// 用于存储需要清理的路由
+	var routesToCleanup []string
+
+	defer func() {
+		// 清理路由
+		if len(routesToCleanup) > 0 {
+			log.Infof("cleaning up %d routes", len(routesToCleanup))
+			err := netutil.DeleteIPRoute(routesToCleanup)
+			if err != nil {
+				log.Errorf("failed to cleanup routes: %v", err)
+			} else {
+				log.Infof("routes cleaned up successfully")
+			}
+		}
+
+		// 关闭设备
+		log.Infof("closing TUN device: %s", tunName)
+		device.Close()
+		log.Infof("TUN device closed")
+	}()
 	log.Infof("privileged device created successfully, TUN device name: %s", tunName)
 
 	// 2. 设置信号处理
@@ -437,17 +458,59 @@ func testTunSocketDevice(c *cli.Context) error {
 	log.Infof("network stack virtual machine created successfully")
 	log.Infof("tunnel name: %s", tvm.GetTunnelName())
 
-	// 4. 添加路由规则，将 1.1.1.1 劫持到 TUN 设备
-	log.Infof("adding route for 1.1.1.1 to %s", tunName)
-	err = netutil.AddIPRouteToNetInterface("1.1.1.1", tunName)
+	// 4. 获取主机的公网网卡和IP地址（用于绑定源地址）
+	log.Infof("getting host public network interface and IP...")
+	hostInterface, hostIP, err := getPublicNetworkInterface()
 	if err != nil {
-		log.Errorf("failed to add route: %v", err)
-		return utils.Errorf("failed to add route: %v", err)
+		log.Errorf("failed to get public network interface: %v", err)
+		return utils.Errorf("failed to get public network interface: %v", err)
 	}
-	log.Infof("route added successfully")
+	log.Infof("host public interface: %s, IP: %s", hostInterface, hostIP)
 
-	// 5. 设置 TCP 劫持处理器
-	tcpConnReceived := make(chan bool, 1)
+	// 5. DNS 解析 yaklang.com 的所有 IP 并劫持
+	log.Infof("resolving all IPs for yaklang.com...")
+	exampleIPs, err := net.LookupIP("yaklang.com")
+	if err != nil {
+		log.Errorf("failed to resolve yaklang.com: %v", err)
+		return utils.Errorf("failed to resolve yaklang.com: %v", err)
+	}
+
+	var exampleIPv4s []string
+	for _, ip := range exampleIPs {
+		ipStr := ip.String()
+		// 只处理 IPv4 地址
+		if strings.Contains(ipStr, ":") {
+			continue
+		}
+		exampleIPv4s = append(exampleIPv4s, ipStr)
+		log.Infof("resolved yaklang.com to: %s", ipStr)
+	}
+
+	if len(exampleIPv4s) == 0 {
+		return utils.Errorf("failed to resolve yaklang.com to any IPv4 address")
+	}
+
+	// 6. 批量添加路由：1.1.1.1 和所有 yaklang.com 的 IP 都劫持到 TUN
+	allIPs := append([]string{"1.1.1.1"}, exampleIPv4s...)
+	log.Infof("batch adding routes for %d IPs to %s: %v", len(allIPs), tunName, allIPs)
+	err = netutil.AddIPRouteToNetInterface(allIPs, tunName)
+	if err != nil {
+		log.Errorf("failed to batch add routes: %v", err)
+		return utils.Errorf("failed to batch add routes: %v", err)
+	}
+	routesToCleanup = allIPs // 记录需要清理的路由
+	log.Infof("successfully added %d routes to %s", len(allIPs), tunName)
+
+	// 7. 设置 TCP 劫持处理器（中间人代理模式）
+	// 生成两个 nonce：一个用于测试1，一个用于测试2
+	nonce1 := fmt.Sprintf("NONCE1_%d_%s", time.Now().UnixNano(), utils.RandNumberStringBytes(16))
+	nonce2 := fmt.Sprintf("NONCE2_%d_%s", time.Now().UnixNano(), utils.RandNumberStringBytes(16))
+	log.Infof("generated test nonce1 (for 1.1.1.1 test): %s", nonce1)
+	log.Infof("generated test nonce2 (for yaklang.com test): %s", nonce2)
+
+	test1Passed := make(chan bool, 1)
+	test2Passed := make(chan bool, 1)
+
 	err = tvm.SetHijackTCPHandler(func(conn netstack.TCPConn) {
 		remoteAddr := conn.RemoteAddr()
 		localAddr := conn.LocalAddr()
@@ -456,158 +519,284 @@ func testTunSocketDevice(c *cli.Context) error {
 		log.Infof("Local: %s", localAddr)
 		log.Infof("===============================")
 
-		// 通知测试收到了连接
-		select {
-		case tcpConnReceived <- true:
-		default:
-		}
-
-		// 读取一些数据
-		buf := make([]byte, 1024)
+		// 读取客户端请求
+		buf := make([]byte, 8192)
 		n, err := conn.Read(buf)
 		if err != nil {
 			log.Errorf("failed to read from connection: %v", err)
-		} else {
-			log.Infof("received %d bytes from connection: %s", n, string(buf[:n]))
+			conn.Close()
+			return
 		}
 
-		// 关闭连接
+		clientRequest := string(buf[:n])
+		log.Infof("received client request (%d bytes):\n%s", n, clientRequest)
+
+		// 提取请求中的 nonce（如果有）
+		var extractedNonce string
+		var testType string // "test1" or "test2"
+		lines := strings.Split(clientRequest, "\r\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "X-Test-Nonce: ") {
+				extractedNonce = strings.TrimPrefix(line, "X-Test-Nonce: ")
+				if strings.HasPrefix(extractedNonce, "NONCE1_") {
+					testType = "test1"
+				} else if strings.HasPrefix(extractedNonce, "NONCE2_") {
+					testType = "test2"
+				}
+				log.Infof("extracted nonce from request: %s (type: %s)", extractedNonce, testType)
+				break
+			}
+		}
+
+		// 判断是访问哪个目标（通过 localAddr 判断）
+		localIPPort := localAddr.String()
+		targetHost := ""
+		targetPort := "80"
+
+		if strings.HasPrefix(localIPPort, "1.1.1.1:") {
+			// 测试1：1.1.1.1 → yaklang.com（需要绑定源地址，否则会再次被劫持）
+			targetHost = "yaklang.com"
+			log.Infof("[Test 1] Connection to 1.1.1.1, will forward to yaklang.com with source binding")
+		} else {
+			// 测试2：yaklang.com IP → yaklang.com（需要绑定源地址绕过路由表）
+			for _, ip := range exampleIPv4s {
+				if strings.HasPrefix(localIPPort, ip+":") {
+					targetHost = ip
+					log.Infof("[Test 2] Connection to yaklang.com IP %s, will forward with source binding", ip)
+					break
+				}
+			}
+		}
+
+		if targetHost == "" {
+			log.Errorf("unknown target host for local address: %s", localIPPort)
+			conn.Close()
+			return
+		}
+
+		// 连接到真实服务器（两个测试都使用源地址绑定，以绕过路由表劫持）
+		log.Infof("connecting to %s:%s with source binding to %s...", targetHost, targetPort, hostIP)
+		realConn, err := dialWithSourceIP(targetHost+":"+targetPort, hostIP, 5*time.Second)
+
+		if err != nil {
+			log.Errorf("failed to connect to real server: %v", err)
+			errorResponse := fmt.Sprintf("HTTP/1.1 502 Bad Gateway\r\nX-Proxy-Nonce: %s\r\nConnection: close\r\n\r\nProxy Error: %v", extractedNonce, err)
+			conn.Write([]byte(errorResponse))
+			conn.Close()
+			return
+		}
+		defer realConn.Close()
+
+		// 转发客户端请求到真实服务器
+		_, err = realConn.Write(buf[:n])
+		if err != nil {
+			log.Errorf("failed to forward request: %v", err)
+			conn.Close()
+			return
+		}
+		log.Infof("request forwarded to real server")
+
+		// 读取真实服务器的响应
+		realBuf := make([]byte, 8192)
+		totalRead := 0
+		realConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		for totalRead < len(realBuf) {
+			n, err := realConn.Read(realBuf[totalRead:])
+			if err != nil {
+				if err != io.EOF {
+					log.Errorf("error reading from real server: %v", err)
+				}
+				break
+			}
+			totalRead += n
+			// 如果读到了完整的响应头，就可以开始处理
+			if totalRead > 0 && strings.Contains(string(realBuf[:totalRead]), "\r\n\r\n") {
+				break
+			}
+		}
+
+		if totalRead == 0 {
+			log.Errorf("no response from real server")
+			conn.Close()
+			return
+		}
+
+		realResponse := string(realBuf[:totalRead])
+		log.Infof("received response from real server (%d bytes)", totalRead)
+
+		// 修改响应，添加 X-Proxy-Nonce 头
+		headerEndPos := strings.Index(realResponse, "\r\n\r\n")
+		if headerEndPos == -1 {
+			log.Errorf("invalid HTTP response from real server")
+			conn.Close()
+			return
+		}
+
+		// 在响应头末尾插入自定义头
+		modifiedResponse := realResponse[:headerEndPos] +
+			fmt.Sprintf("\r\nX-Proxy-Nonce: %s", extractedNonce) +
+			realResponse[headerEndPos:]
+
+		// 发送修改后的响应给客户端
+		_, err = conn.Write([]byte(modifiedResponse))
+		if err != nil {
+			log.Errorf("failed to send response to client: %v", err)
+		} else {
+			log.Infof("sent proxied response with nonce header to client (%d bytes)", len(modifiedResponse))
+		}
+
+		// 通知对应测试通过
+		if testType == "test1" {
+			select {
+			case test1Passed <- true:
+			default:
+			}
+		} else if testType == "test2" {
+			select {
+			case test2Passed <- true:
+			default:
+			}
+		}
+
 		conn.Close()
 	})
 	if err != nil {
 		return utils.Errorf("failed to set hijack TCP handler: %v", err)
 	}
-	log.Infof("TCP hijack handler set successfully")
+	log.Infof("TCP hijack handler (MITM proxy) set successfully")
 
-	// 6. 发送测试数据包到 1.1.1.1:80
+	// 8. 启动测试1：访问 1.1.1.1:80（Host: yaklang.com）
 	go func() {
-		// 等待一下，确保路由生效
-		time.Sleep(2 * time.Second)
+		time.Sleep(2 * time.Second) // 等待路由生效
 
-		log.Infof("sending test TCP packet to 1.1.1.1:80")
-		conn, err := net.DialTimeout("tcp", "1.1.1.1:80", 5*time.Second)
+		log.Infof("===========================================")
+		log.Infof("║ Starting Test 1: 1.1.1.1 → yaklang.com ║")
+		log.Infof("===========================================")
+
+		conn, err := net.DialTimeout("tcp", "1.1.1.1:80", 10*time.Second)
 		if err != nil {
-			log.Errorf("failed to dial 1.1.1.1:80: %v", err)
+			log.Errorf("[Test 1] failed to dial 1.1.1.1:80: %v", err)
 			return
 		}
 		defer conn.Close()
 
-		// 发送 HTTP GET 请求
-		httpRequest := "GET / HTTP/1.1\r\nHost: 1.1.1.1\r\nConnection: close\r\n\r\n"
+		httpRequest := fmt.Sprintf("GET / HTTP/1.1\r\nHost: yaklang.com\r\nX-Test-Nonce: %s\r\nConnection: close\r\n\r\n", nonce1)
 		_, err = conn.Write([]byte(httpRequest))
 		if err != nil {
-			log.Errorf("failed to write to connection: %v", err)
+			log.Errorf("[Test 1] failed to write request: %v", err)
 			return
 		}
-		log.Infof("test packet sent successfully")
+		log.Infof("[Test 1] request sent with nonce: %s", nonce1)
 
-		// 等待响应
-		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
-		if err != nil {
-			log.Infof("read from connection completed (expected): %v", err)
-		} else {
-			log.Infof("received response (%d bytes): %s", n, string(buf[:n]))
-		}
-	}()
-
-	// 7. 等待接收到 TCP 连接
-	go func() {
-		select {
-		case <-tcpConnReceived:
-			log.Infof("✓ Test PASSED: TCP connection successfully hijacked!")
-		case <-time.After(10 * time.Second):
-			log.Errorf("✗ Test FAILED: No TCP connection received within 10 seconds")
-		case <-ctx.Done():
-			return
-		}
-	}()
-
-	// 8. 监控网络栈信息（仅在数据变化时显示）
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-
-		// 保存上次的统计数据
-		var lastIPPacketsReceived, lastIPPacketsSent uint64
-		var lastTCPActiveOpens, lastTCPEstablished uint64
-		var lastUDPPacketsReceived, lastUDPPacketsSent uint64
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				// 获取网络栈统计信息
-				netStack := tvm.GetStack()
-				stats := netStack.Stats()
-
-				// 当前统计数据
-				currentIPPacketsReceived := stats.IP.PacketsReceived.Value()
-				currentIPPacketsSent := stats.IP.PacketsSent.Value()
-				currentTCPActiveOpens := stats.TCP.ActiveConnectionOpenings.Value()
-				currentTCPEstablished := stats.TCP.CurrentEstablished.Value()
-				currentUDPPacketsReceived := stats.UDP.PacketsReceived.Value()
-				currentUDPPacketsSent := stats.UDP.PacketsSent.Value()
-
-				// 检查是否有变化
-				hasChange := currentIPPacketsReceived != lastIPPacketsReceived ||
-					currentIPPacketsSent != lastIPPacketsSent ||
-					currentTCPActiveOpens != lastTCPActiveOpens ||
-					currentTCPEstablished != lastTCPEstablished ||
-					currentUDPPacketsReceived != lastUDPPacketsReceived ||
-					currentUDPPacketsSent != lastUDPPacketsSent
-
-				// 只在有变化时显示
-				if hasChange {
-					log.Infof("=== Network Stack Monitoring (Data Changed) ===")
-
-					// 获取路由表
-					routes := netStack.GetRouteTable()
-					log.Infof("Route table (%d routes):", len(routes))
-					for i, route := range routes {
-						log.Infof("  Route %d: NIC=%d, Destination=%s, Gateway=%s, MTU=%d",
-							i+1, route.NIC, route.Destination, route.Gateway, route.MTU)
-					}
-
-					// 获取 NIC 信息
-					nicInfo := netStack.NICInfo()
-					log.Infof("NIC info (%d NICs):", len(nicInfo))
-					for nicID, info := range nicInfo {
-						log.Infof("  NIC %d:", nicID)
-						log.Infof("    Name: %s", info.Name)
-						log.Infof("    LinkAddress: %s", info.LinkAddress)
-						log.Infof("    Flags: %v", info.Flags)
-						log.Infof("    MTU: %d", info.MTU)
-						log.Infof("    Protocol addresses (%d):", len(info.ProtocolAddresses))
-						for _, addr := range info.ProtocolAddresses {
-							log.Infof("      %s/%d", addr.AddressWithPrefix.Address, addr.AddressWithPrefix.PrefixLen)
-						}
-					}
-
-					// 显示统计信息
-					log.Infof("Stack statistics:")
-					log.Infof("  IP: PacketsReceived=%d, PacketsSent=%d, OutgoingPacketErrors=%d, MalformedPacketsReceived=%d",
-						currentIPPacketsReceived, currentIPPacketsSent, stats.IP.OutgoingPacketErrors.Value(), stats.IP.MalformedPacketsReceived.Value())
-					log.Infof("  TCP: ActiveConnectionOpenings=%d, CurrentEstablished=%d, EstablishedResets=%d",
-						currentTCPActiveOpens, currentTCPEstablished, stats.TCP.EstablishedResets.Value())
-					log.Infof("  UDP: PacketsReceived=%d, PacketsSent=%d, ReceiveBufferErrors=%d",
-						currentUDPPacketsReceived, currentUDPPacketsSent, stats.UDP.ReceiveBufferErrors.Value())
-					log.Infof("===================================")
-
-					// 更新上次的统计数据
-					lastIPPacketsReceived = currentIPPacketsReceived
-					lastIPPacketsSent = currentIPPacketsSent
-					lastTCPActiveOpens = currentTCPActiveOpens
-					lastTCPEstablished = currentTCPEstablished
-					lastUDPPacketsReceived = currentUDPPacketsReceived
-					lastUDPPacketsSent = currentUDPPacketsSent
+		// 读取响应
+		buf := make([]byte, 16384)
+		totalRead := 0
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		for totalRead < len(buf) {
+			n, err := conn.Read(buf[totalRead:])
+			if err != nil {
+				if err != io.EOF {
+					log.Errorf("[Test 1] read error: %v", err)
 				}
+				break
+			}
+			totalRead += n
+			if totalRead > 0 && strings.Contains(string(buf[:totalRead]), "\r\n\r\n") {
+				time.Sleep(200 * time.Millisecond)
 			}
 		}
+
+		if totalRead > 0 {
+			response := string(buf[:totalRead])
+			headerEndPos := strings.Index(response, "\r\n\r\n")
+			if headerEndPos == -1 {
+				log.Errorf("[Test 1] ✗ FAILED: Invalid HTTP response")
+				return
+			}
+
+			headers := response[:headerEndPos]
+			expectedHeader := fmt.Sprintf("X-Proxy-Nonce: %s", nonce1)
+			if strings.Contains(headers, expectedHeader) {
+				log.Infof("[Test 1] ✓ PASSED - Nonce verified!")
+				select {
+				case test1Passed <- true:
+				default:
+				}
+			} else {
+				log.Errorf("[Test 1] ✗ FAILED - Nonce not found in response")
+			}
+		} else {
+			log.Errorf("[Test 1] ✗ FAILED: No response received")
+		}
 	}()
 
-	// 9. 监听设备事件
+	// 9. 启动测试2：直接访问 yaklang.com（不绑定源地址，会被劫持）
+	go func() {
+		time.Sleep(3 * time.Second) // 稍晚启动，避免冲突
+
+		log.Infof("===========================================")
+		log.Infof("║ Starting Test 2: yaklang.com (hijacked) ║")
+		log.Infof("===========================================")
+
+		// 不绑定源地址，直接连接 yaklang.com → 会被劫持到 TUN
+		conn, err := net.DialTimeout("tcp", "yaklang.com:80", 10*time.Second)
+		if err != nil {
+			log.Errorf("[Test 2] failed to dial yaklang.com:80: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		httpRequest := fmt.Sprintf("GET / HTTP/1.1\r\nHost: yaklang.com\r\nX-Test-Nonce: %s\r\nConnection: close\r\n\r\n", nonce2)
+		_, err = conn.Write([]byte(httpRequest))
+		if err != nil {
+			log.Errorf("[Test 2] failed to write request: %v", err)
+			return
+		}
+		log.Infof("[Test 2] request sent with nonce: %s (will be hijacked)", nonce2)
+
+		// 读取响应
+		buf := make([]byte, 16384)
+		totalRead := 0
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		for totalRead < len(buf) {
+			n, err := conn.Read(buf[totalRead:])
+			if err != nil {
+				if err != io.EOF {
+					log.Errorf("[Test 2] read error: %v", err)
+				}
+				break
+			}
+			totalRead += n
+			if totalRead > 0 && strings.Contains(string(buf[:totalRead]), "\r\n\r\n") {
+				time.Sleep(200 * time.Millisecond)
+			}
+		}
+
+		if totalRead > 0 {
+			response := string(buf[:totalRead])
+			headerEndPos := strings.Index(response, "\r\n\r\n")
+			if headerEndPos == -1 {
+				log.Errorf("[Test 2] ✗ FAILED: Invalid HTTP response")
+				return
+			}
+
+			headers := response[:headerEndPos]
+			expectedHeader := fmt.Sprintf("X-Proxy-Nonce: %s", nonce2)
+			if strings.Contains(headers, expectedHeader) {
+				log.Infof("[Test 2] ✓ PASSED - Nonce verified! (Source binding worked)")
+				select {
+				case test2Passed <- true:
+				default:
+				}
+			} else {
+				log.Errorf("[Test 2] ✗ FAILED - Nonce not found in response")
+			}
+		} else {
+			log.Errorf("[Test 2] ✗ FAILED: No response received")
+		}
+	}()
+
+	// 10. 监听设备事件
 	go func() {
 		for {
 			select {
@@ -615,7 +804,6 @@ func testTunSocketDevice(c *cli.Context) error {
 				return
 			case event, ok := <-tvm.GetTunnelDevice().Events():
 				if !ok {
-					log.Infof("device events channel closed")
 					return
 				}
 				switch event {
@@ -625,20 +813,172 @@ func testTunSocketDevice(c *cli.Context) error {
 					log.Infof("device event: DOWN")
 				case lowtun.EventMTUUpdate:
 					log.Infof("device event: MTU UPDATE")
-				default:
-					log.Infof("device event: UNKNOWN (%d)", event)
 				}
 			}
 		}
 	}()
 
-	log.Infof("network stack virtual machine is ready (press Ctrl+C to stop)...")
+	// 11. 等待两个测试都完成
+	log.Infof("waiting for both tests to complete...")
 
-	// 10. 等待退出信号
-	<-ctx.Done()
-	log.Infof("shutting down network stack virtual machine...")
+	test1Done := false
+	test2Done := false
+	timeout := time.After(30 * time.Second)
 
-	return nil
+	for {
+		select {
+		case <-test1Passed:
+			test1Done = true
+			if test2Done {
+				log.Infof("===========================================")
+				log.Infof("║ ✓ ALL TESTS PASSED - SHUTTING DOWN... ║")
+				log.Infof("===========================================")
+				time.Sleep(500 * time.Millisecond)
+				return nil
+			}
+		case <-test2Passed:
+			test2Done = true
+			if test1Done {
+				log.Infof("===========================================")
+				log.Infof("║ ✓ ALL TESTS PASSED - SHUTTING DOWN... ║")
+				log.Infof("===========================================")
+				time.Sleep(500 * time.Millisecond)
+				return nil
+			}
+		case <-timeout:
+			log.Errorf("===========================================")
+			log.Errorf("║ ✗ TEST TIMEOUT AFTER 30s              ║")
+			log.Errorf("===========================================")
+			log.Errorf("  Test 1 (1.1.1.1): %v", test1Done)
+			log.Errorf("  Test 2 (yaklang.com): %v", test2Done)
+			return utils.Errorf("test timeout")
+		case <-ctx.Done():
+			log.Infof("test interrupted by user")
+			return nil
+		}
+	}
+}
+
+// min 返回两个整数中的较小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// getPublicNetworkInterface 获取公网网卡和IP地址
+func getPublicNetworkInterface() (interfaceName string, ipAddr string, err error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", "", err
+	}
+
+	// 优先查找非 lo、非 utun、非 bridge 的网卡
+	for _, iface := range interfaces {
+		// 跳过 loopback、down 状态、utun、bridge、docker 等虚拟网卡
+		if iface.Flags&net.FlagLoopback != 0 ||
+			iface.Flags&net.FlagUp == 0 ||
+			strings.HasPrefix(iface.Name, "lo") ||
+			strings.HasPrefix(iface.Name, "utun") ||
+			strings.HasPrefix(iface.Name, "bridge") ||
+			strings.HasPrefix(iface.Name, "docker") ||
+			strings.HasPrefix(iface.Name, "veth") {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+
+			// 只处理 IPv4 地址，排除私有地址
+			ip := ipNet.IP
+			if ip.To4() == nil {
+				continue
+			}
+
+			// 优先返回公网 IP，但私有 IP 也可以用于绑定
+			// 私有地址：10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+			ipStr := ip.String()
+			isPrivate := ip.IsPrivate() || strings.HasPrefix(ipStr, "169.254.")
+
+			// 如果找到非私有 IP，立即返回
+			if !isPrivate {
+				return iface.Name, ipStr, nil
+			}
+
+			// 记录私有 IP 作为备选
+			if interfaceName == "" {
+				interfaceName = iface.Name
+				ipAddr = ipStr
+			}
+		}
+	}
+
+	if interfaceName != "" {
+		return interfaceName, ipAddr, nil
+	}
+
+	return "", "", utils.Errorf("no suitable network interface found")
+}
+
+// dialWithSourceIP 使用指定的源 IP 地址连接目标服务器
+func dialWithSourceIP(targetAddr string, sourceIP string, timeout time.Duration) (net.Conn, error) {
+	// 解析目标地址
+	targetHost, targetPort, err := net.SplitHostPort(targetAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	// 解析目标主机（可能是域名或 IP）
+	targetIPs, err := net.LookupIP(targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	var targetIP net.IP
+	for _, ip := range targetIPs {
+		if ip.To4() != nil {
+			targetIP = ip
+			break
+		}
+	}
+
+	if targetIP == nil {
+		return nil, utils.Errorf("no IPv4 address found for %s", targetHost)
+	}
+
+	// 创建本地地址（绑定源 IP，端口由系统分配）
+	localAddr := &net.TCPAddr{
+		IP: net.ParseIP(sourceIP),
+	}
+
+	// 创建远程地址
+	port, err := strconv.Atoi(targetPort)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteAddr := &net.TCPAddr{
+		IP:   targetIP,
+		Port: port,
+	}
+
+	// 创建 dialer 并绑定本地地址
+	dialer := &net.Dialer{
+		LocalAddr: localAddr,
+		Timeout:   timeout,
+	}
+
+	log.Infof("dialing %s from source %s", remoteAddr.String(), localAddr.String())
+	return dialer.Dial("tcp", remoteAddr.String())
 }
 
 // initNetStackForTun 初始化网络栈（复制自 netstackvm.defaultInitNetStack）
@@ -715,13 +1055,6 @@ func initNetStackForTun(s *stack.Stack) error {
 	}
 
 	return nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // addRouteToInterface 添加路由到指定接口
