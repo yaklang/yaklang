@@ -36,6 +36,7 @@ var MitmExports = map[string]interface{}{
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
 	"randomJA3":            mitmConfigRandomJA3,
+	"extraIncomingConn":    mitmConfigExtraIncomingConn,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -74,6 +75,9 @@ type mitmConfig struct {
 	hijackWebsocketDataFrame func(isHttps bool, urlStr string, req []byte, forward func([]byte), reject func())
 	hijackResponse           func(isHttps bool, urlStr string, rsp []byte, forward func([]byte), reject func())
 	hijackResponseEx         func(isHttps bool, urlStr string, req, rsp []byte, forward func([]byte), reject func())
+
+	// extra incoming connection channels
+	extraIncomingConnChans []chan net.Conn
 }
 
 type MitmConfigOpt func(config *mitmConfig)
@@ -299,6 +303,39 @@ func mitmConfigRandomJA3(b bool) MitmConfigOpt {
 	}
 }
 
+// extraIncomingConn 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道
+// 通过该选项，可以将外部的 net.Conn 连接注入到 MITM 服务器中进行劫持处理
+// Example:
+// ```
+// connChan = make(chan net.Conn)
+// mitm.Start(8080, mitm.extraIncomingConn(connChan))
+// ```
+func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		// Handle both chan net.Conn and chan interface{} (from Yak scripts)
+		switch c := ch.(type) {
+		case chan net.Conn:
+			config.extraIncomingConnChans = append(config.extraIncomingConnChans, c)
+		case chan interface{}:
+			// Create a converter goroutine for Yak script channels
+			convertedChan := make(chan net.Conn)
+			go func() {
+				for v := range c {
+					if conn, ok := v.(net.Conn); ok {
+						convertedChan <- conn
+					} else {
+						log.Errorf("extraIncomingConn: received non-net.Conn value: %T", v)
+					}
+				}
+				close(convertedChan)
+			}()
+			config.extraIncomingConnChans = append(config.extraIncomingConnChans, convertedChan)
+		default:
+			log.Errorf("extraIncomingConn: unsupported channel type: %T", ch)
+		}
+	}
+}
+
 var MITMConfigTunMode = mitmConfigTunMode
 
 // set tunmode ,not process proxy proto
@@ -400,13 +437,22 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		config.ctx = context.Background()
 	}
 
-	return crep.NewMITMServer(
+	var mitmOpts []crep.MITMConfig
+	mitmOpts = append(mitmOpts,
 		crep.MITM_SetDialer(config.dialer),
 		crep.MITM_SetTunMode(config.tunMode),
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
 		crep.MITM_RandomJA3(config.randomJA3),
+	)
+
+	// Add extra incoming connection channels
+	for _, ch := range config.extraIncomingConnChans {
+		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConectionChannel(ch))
+	}
+
+	mitmOpts = append(mitmOpts,
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetForceTextFrame(config.wsForceTextFrame),
 		crep.MITM_SetWebsocketRequestHijackRaw(func(req []byte, r *http.Request, rspIns *http.Response, t int64) []byte {
@@ -586,4 +632,6 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 			return after
 		}),
 	)
+
+	return crep.NewMITMServer(mitmOpts...)
 }
