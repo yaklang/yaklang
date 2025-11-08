@@ -230,6 +230,164 @@ func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
 	return tvm, nil
 }
 
+// NewTunVirtualMachineFromDevice creates a TUN virtual machine from an existing device.
+// It uses the provided device to create a network stack virtual machine.
+func NewTunVirtualMachineFromDevice(ctx context.Context, device tun.Device) (*TunVirtualMachine, error) {
+	start := time.Now()
+	defer func() {
+		log.Infof("NewTunVirtualMachineFromDevice took %v", time.Since(start))
+	}()
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if device == nil {
+		return nil, utils.Error("device cannot be nil")
+	}
+
+	baseCtx, cancel := context.WithCancel(ctx)
+
+	mtu := uint32(TUN_MTU)
+	offset := 4
+	log.Infof("Creating TUN endpoint with MTU: %d", mtu)
+	tunEp, err := rwendpoint.NewReadWriteCloserEndpointContext(
+		ctx, rwendpoint.NewWireGuardReadWriteCloserWrapper(device, mtu, offset),
+		uint32(TUN_MTU),
+		offset,
+	)
+	if err != nil {
+		cancel()
+		device.Close()
+		return nil, utils.Errorf("create tun endpoint failed: %v", err)
+	}
+
+	// 172.16.0.0/12 choose 2 random ip as tunnel ip
+	ipMin, err := utils.IPv4ToUint32(net.ParseIP("172.16.0.1").To4())
+	if err != nil {
+		cancel()
+		device.Close()
+		return nil, utils.Errorf("IPv4ToUint32(%s) failed: %v", "172.16.0.1", err)
+	}
+	ipMax, err := utils.IPv4ToUint32(net.ParseIP("172.31.255.254").To4())
+	if err != nil {
+		cancel()
+		device.Close()
+		return nil, utils.Errorf("IPv4ToUint32(%s) failed: %v", "172.31.255.254", err)
+	}
+	delta := int(ipMax - ipMin)
+	ip1 := ipMin + uint32(rand.Intn(delta))
+	ip2 := ipMin + uint32(rand.Intn(delta))
+	ip1Str := net.ParseIP(utils.Uint32ToIPv4(ip1).String())
+	ip2Str := net.ParseIP(utils.Uint32ToIPv4(ip2).String())
+	log.Infof("Tunnel IP: %s -> %s", ip1Str, ip2Str)
+
+	log.Infof("Initializing network stack")
+	s := stack.New(stack.Options{
+		NetworkProtocols: []stack.NetworkProtocolFactory{
+			ipv4.NewProtocol,
+			ipv6.NewProtocol,
+		},
+		TransportProtocols: []stack.TransportProtocolFactory{
+			tcp.NewProtocol,
+			udp.NewProtocol,
+			icmp.NewProtocol4,
+			icmp.NewProtocol6,
+		},
+		HandleLocal: false,
+	})
+	err = defaultInitNetStack(s)
+	if err != nil {
+		cancel()
+		device.Close()
+		return nil, utils.Errorf("defaultInitNetStack failed: %v", err)
+	}
+	mainNICId := s.NextNICID()
+	if tErr := s.CreateNIC(mainNICId, tunEp); tErr != nil {
+		cancel()
+		device.Close()
+		return nil, utils.Errorf("create NIC failed: %v", tErr)
+	}
+	// Set NIC to promiscuous mode and spoofing mode to receive all packets and feedback them.
+	s.SetPromiscuousMode(mainNICId, true)
+	s.SetSpoofing(mainNICId, true)
+	log.Infof("Setting up route table for NIC: %d", mainNICId)
+	for _, ipAddr := range []net.IP{ip1Str, ip2Str} {
+		s.AddProtocolAddress(mainNICId, tcpip.ProtocolAddress{
+			Protocol: header.IPv4ProtocolNumber,
+			AddressWithPrefix: tcpip.AddressWithPrefix{
+				Address:   tcpip.AddrFrom4([4]byte(ipAddr.To4())),
+				PrefixLen: 32,
+			},
+		}, stack.AddressProperties{})
+	}
+
+	s.SetRouteTable([]tcpip.Route{
+		{
+			Destination: header.IPv4EmptySubnet,
+			NIC:         mainNICId,
+			MTU:         uint32(TUN_MTU),
+		},
+	})
+
+	// Get device name for logging
+	deviceName, _ := device.Name()
+	tvm := &TunVirtualMachine{
+		ctx:          baseCtx,
+		cancel:       cancel,
+		tunnelDevice: device,
+		tunnelName:   deviceName,
+		tunEp:        tunEp,
+		stack:        s,
+		mainNicID:    mainNICId,
+	}
+
+	tcpForwarder := tcp.NewForwarder(tvm.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
+		var (
+			wq  waiter.Queue
+			ep  tcpip.Endpoint
+			err tcpip.Error
+			id  = r.ID()
+		)
+
+		defer func() {
+			if err != nil {
+				log.Debugf("forward tcp request: %s:%d->%s:%d: %s",
+					id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort, err)
+			}
+		}()
+
+		log.Infof("hijack tcp connection: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
+
+		// Perform a TCP three-way handshake.
+		ep, err = r.CreateEndpoint(&wq)
+		if err != nil {
+			log.Errorf("create endpoint failed: %v, reset it", err)
+			// RST: prevent potential half-open TCP connection leak.
+			r.Complete(true)
+			return
+		}
+		defer r.Complete(false)
+
+		log.Infof("start to set socket options: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
+		err = setSocketOptions(tvm.stack, ep)
+
+		log.Infof("start to create tcp connection instance for userland: %s:%d->%s:%d", id.RemoteAddress, id.RemotePort, id.LocalAddress, id.LocalPort)
+		conn := &tcpConn{
+			TCPConn: gonet.NewTCPConn(&wq, ep),
+			id:      id,
+		}
+
+		tvm.hijackedMutex.RLock()
+		defer tvm.hijackedMutex.RUnlock()
+		if tvm.hijackedHandler != nil {
+			tvm.hijackedHandler(conn)
+		}
+	})
+	tvm.stack.SetTransportProtocolHandler(header.TCPProtocolNumber, tcpForwarder.HandlePacket)
+	return tvm, nil
+}
+
 func (t *TunVirtualMachine) Close() error {
 	t.stack.Close()
 	return t.tunnelDevice.Close()
@@ -258,4 +416,14 @@ func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPCon
 	}
 	t.hijackedHandler = handle
 	return nil
+}
+
+// GetStack returns the network stack instance.
+func (t *TunVirtualMachine) GetStack() *stack.Stack {
+	return t.stack
+}
+
+// GetTunnelDevice returns the tunnel device instance.
+func (t *TunVirtualMachine) GetTunnelDevice() tun.Device {
+	return t.tunnelDevice
 }

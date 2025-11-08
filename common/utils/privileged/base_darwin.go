@@ -1,6 +1,7 @@
 package privileged
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
@@ -124,24 +125,120 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 		// 如果释放失败，iconPath 保持为空，AppleScript 将使用默认图标
 	}
 
+	// 准备模板参数
+	skipConfirm := "0"
+	if config.SkipConfirmDialog {
+		skipConfirm = "1"
+	}
+
 	script, err := utils.RenderTemplate(darwinAppleScriptTemplate, map[string]string{
 		"Title":       hex.EncodeToString([]byte(config.Title)),
 		"Description": hex.EncodeToString([]byte(config.Description)),
 		"Command":     hex.EncodeToString([]byte(cmd)),
 		"Prompt":      hex.EncodeToString([]byte(config.Prompt)),
 		"IconPath":    hex.EncodeToString([]byte(iconPath)),
+		"SkipConfirm": skipConfirm,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render AppleScript template: %v", err)
 	}
 
 	cmder := exec.CommandContext(ctx, "osascript", "-e", script)
+
+	// 如果设置了 BeforePrivilegedProcessExecute 回调，我们需要监控 osascript 的输出
+	// 以捕获 "PRIVILEGED_PROCESS_START" 标志
+	if config.BeforePrivilegedProcessExecute != nil {
+		// 创建管道来捕获 stderr（osascript 的 log 输出到 stderr）
+		stderrPipe, err := cmder.StderrPipe()
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to create stderr pipe")
+		}
+
+		// 如果需要收集输出，也创建 stdout 管道
+		var stdoutBuf bytes.Buffer
+		if !config.DiscardStdoutStderr {
+			cmder.Stdout = &stdoutBuf
+		}
+
+		// 启动命令
+		if err := cmder.Start(); err != nil {
+			return nil, utils.Wrapf(err, "failed to start osascript")
+		}
+
+		// 在 goroutine 中扫描 stderr 寻找启动标志
+		startFlagDetected := make(chan struct{})
+		go func() {
+			scanner := bufio.NewScanner(stderrPipe)
+			for scanner.Scan() {
+				line := scanner.Text()
+				// 检查是否包含启动标志
+				if strings.Contains(line, "PRIVILEGED_PROCESS_START") {
+					close(startFlagDetected)
+					break
+				}
+			}
+			// 继续读取剩余内容，避免管道阻塞
+			for scanner.Scan() {
+			}
+		}()
+
+		// 等待启动标志或超时
+		select {
+		case <-startFlagDetected:
+			// 检测到启动标志，调用回调
+			if config.BeforePrivilegedProcessExecute != nil {
+				config.BeforePrivilegedProcessExecute()
+			}
+		case <-time.After(30 * time.Second):
+			// 超时，可能用户取消了授权
+			cmder.Process.Kill()
+			return nil, utils.Errorf("timeout waiting for privileged process to start")
+		case <-ctx.Done():
+			// 上下文取消
+			cmder.Process.Kill()
+			return nil, ctx.Err()
+		}
+
+		// 等待命令完成
+		err = cmder.Wait()
+		if err != nil {
+			if utils.MatchAllOfSubString(strings.ToLower(err.Error()), "sig", "killed") {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				_ = exec.CommandContext(ctx, "osascript", "-e", `display dialog "Authorization failed due to inactivity or abnormal exit(KILL signal). Please retry if needed." with title "Authorization Failed" buttons {"OK"} default button "OK" with icon caution`).Run()
+			}
+			return stdoutBuf.Bytes(), utils.Wrapf(err, "run osascript->'%v' failed", utils.ShrinkString(cmd, 30))
+		}
+
+		if config.DiscardStdoutStderr {
+			return nil, nil
+		}
+		return stdoutBuf.Bytes(), nil
+	}
+
+	// 没有 BeforeExecute 回调的情况，使用原来的简单逻辑
+	if config.DiscardStdoutStderr {
+		cmder.Stdout = nil
+		cmder.Stderr = nil
+		err = cmder.Run()
+		if err != nil {
+			if utils.MatchAllOfSubString(strings.ToLower(err.Error()), "sig", "killed") {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				_ = exec.CommandContext(ctx, "osascript", "-e", `display dialog "Authorization failed due to inactivity or abnormal exit(KILL signal). Please retry if needed." with title "Authorization Failed" buttons {"OK"} default button "OK" with icon caution`).Run()
+			}
+			return nil, utils.Wrapf(err, "run osascript->'%v' failed", utils.ShrinkString(cmd, 30))
+		}
+		return nil, nil
+	}
+
+	// 默认行为：收集所有输出
 	var out bytes.Buffer
 	cmder.Stdout = &out
 	cmder.Stderr = &out
 	err = cmder.Run()
 	if err != nil {
-		if utils.MatchAllOfSubString(strings.ToLower(string(err.Error())), "sig", "killed") {
+		if utils.MatchAllOfSubString(strings.ToLower(err.Error()), "sig", "killed") {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			_ = exec.CommandContext(ctx, "osascript", "-e", `display dialog "Authorization failed due to inactivity or abnormal exit(KILL signal). Please retry if needed." with title "Authorization Failed" buttons {"OK"} default button "OK" with icon caution`).Run()
