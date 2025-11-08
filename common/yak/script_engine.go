@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netstack_exports"
+	"github.com/yaklang/yaklang/common/utils/netutil"
 
 	"github.com/yaklang/yaklang/common/aiforge"
 
@@ -395,6 +397,9 @@ func initYaklangLib() {
 
 	// netutils
 	yaklang.Import("netutils", netutil.Exports)
+
+	// netstack (TUN device and network stack VM)
+	yaklang.Import("netstack", netstack_exports.Exports)
 }
 
 type ScriptEngine struct {

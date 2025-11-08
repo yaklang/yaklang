@@ -1,0 +1,59 @@
+// Test channel comparison operators (== and !=)
+// This test verifies that channels are correctly compared with nil, undefined, and other channels
+
+// Test 1: Channel vs nil
+ch1 = make(chan any, 10)
+assert ch1 != nil, "channel should not equal nil"
+assert !(ch1 == nil), "channel should not equal nil (negated)"
+
+// Test 2: Channel vs undefined
+assert ch1 != undefined, "channel should not equal undefined"
+assert !(ch1 == undefined), "channel should not equal undefined (negated)"
+
+// Test 3: Two different channels
+ch2 = make(chan any, 10)
+assert ch1 != ch2, "two different channels should not be equal"
+assert !(ch1 == ch2), "two different channels should not be equal (negated)"
+
+// Test 4: Same channel (assignment)
+ch3 = ch1
+assert ch1 == ch3, "same channel should be equal"
+assert !(ch1 != ch3), "same channel should be equal (negated)"
+
+// Test 5: Channel can be used normally after comparison
+go func {
+    ch1 <- "test message"
+}
+
+msg = <- ch1
+assert msg == "test message", "channel should work normally after comparison"
+
+// Test 6: Buffered vs unbuffered channels
+unbuffered = make(chan int)
+buffered = make(chan int, 5)
+assert unbuffered != buffered, "buffered and unbuffered channels should not be equal"
+assert unbuffered != nil, "unbuffered channel should not equal nil"
+assert buffered != nil, "buffered channel should not equal nil"
+
+// Test 7: Channels with different types
+intChan = make(chan int, 1)
+strChan = make(chan string, 1)
+assert intChan != strChan, "channels with different types should not be equal"
+
+// Test 8: Channel equality is identity-based, not value-based
+ch4 = make(chan int, 10)
+ch5 = make(chan int, 10)
+assert ch4 != ch5, "two channels with same capacity should not be equal (identity-based)"
+
+// Test 9: Channel assigned to variable and compared
+var ch6 = ch1
+assert ch6 == ch1, "channel assigned to variable should be equal"
+
+// Test 10: Multiple assignments
+ch7 = ch1
+ch8 = ch7
+assert ch8 == ch1, "channel through multiple assignments should be equal"
+assert ch8 == ch7, "intermediate assignment should maintain equality"
+
+println("All channel comparison tests passed!")
+
