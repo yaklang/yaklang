@@ -1194,6 +1194,24 @@ func (_v *Value) Equal(value *Value) bool {
 		}
 	}
 
+	// Special handling for channel comparison
+	// Channels should only be equal to themselves or nil, not to undefined
+	if _v.IsChannel() || value.IsChannel() {
+		// If both are channels, use reflect.DeepEqual
+		if _v.IsChannel() && value.IsChannel() {
+			return funk.Equal(_v.Value, value.Value)
+		}
+		// If one is a channel and the other is nil/undefined, they are not equal
+		// unless the channel itself is nil (which shouldn't happen in normal usage)
+		if _v.IsChannel() && value.IsUndefined() {
+			return _v.Value == nil
+		}
+		if value.IsChannel() && _v.IsUndefined() {
+			return value.Value == nil
+		}
+		return false
+	}
+
 	// 如果任意又一个值为 undefined 的话
 	if _v.IsUndefined() || value.IsUndefined() {
 		return _v.False() == value.False()
