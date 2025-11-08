@@ -14,7 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "httpserver_allbasic.yak"
+	debugName := "mitm_extra_incoming_conn_simple.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
