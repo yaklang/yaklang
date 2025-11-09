@@ -529,11 +529,11 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 
 	// Add extra incoming connection channels (legacy)
 	for _, ch := range config.extraIncomingConnChans {
-		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConectionChannelLegacy(ch))
+		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConnectionChannelLegacy(ch))
 	}
 	// Add extra incoming connection channels (new with wrapperedConn)
 	for _, ch := range config.extraIncomingConnChansEx {
-		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConectionChannel(ch))
+		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConnectionChannel(ch))
 	}
 
 	mitmOpts = append(mitmOpts,

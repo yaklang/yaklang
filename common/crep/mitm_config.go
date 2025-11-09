@@ -683,15 +683,15 @@ func MITM_SetDialer(dialer func(duration time.Duration, target string) (net.Conn
 	}
 }
 
-func MITM_SetExtraIncomingConectionChannel(ch chan *minimartian.WrapperedConn) MITMConfig {
+func MITM_SetExtraIncomingConnectionChannel(ch chan *minimartian.WrapperedConn) MITMConfig {
 	return func(server *MITMServer) error {
 		server.extraIncomingConnChans = append(server.extraIncomingConnChans, ch)
 		return nil
 	}
 }
 
-// MITM_SetExtraIncomingConectionChannelLegacy 兼容旧版本的 net.Conn channel
-func MITM_SetExtraIncomingConectionChannelLegacy(ch chan net.Conn) MITMConfig {
+// MITM_SetExtraIncomingConnectionChannelLegacy 兼容旧版本的 net.Conn channel
+func MITM_SetExtraIncomingConnectionChannelLegacy(ch chan net.Conn) MITMConfig {
 	return func(server *MITMServer) error {
 		// Convert chan net.Conn to chan *wrapperedConn
 		wrappedChan := make(chan *minimartian.WrapperedConn)
