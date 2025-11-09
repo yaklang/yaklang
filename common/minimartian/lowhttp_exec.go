@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -109,19 +110,24 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	// The host should be taken from ConnectedToHost which preserves the original host header
 	isStrongHostMode := httpctx.GetIsStrongHostMode(req)
 	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+
+	// Determine the hostname to use for strong host mode
+	var strongHostName string
 	if connectedHost != "" {
 		opts = append(opts, lowhttp.WithHost(connectedHost))
+		strongHostName = connectedHost
 		if isStrongHostMode {
 			log.Debugf("mitm: using strong host mode, dialing with original host: %s", connectedHost)
 		}
+	} else if isStrongHostMode && req.Host != "" {
+		// In strong host mode, prefer using the request's Host header if ConnectedToHost is not set
+		strongHostName = req.Host
+		log.Debugf("mitm: using strong host mode, dialing with request Host header: %s", req.Host)
 	}
 
-	if isStrongHostMode {
-		// In strong host mode, prefer using the request's Host header if ConnectedToHost is not set
-		if req.Host != "" {
-			opts = append(opts, lowhttp.WithExtendDialXOption())
-			log.Debugf("mitm: using strong host mode, dialing with request Host header: %s", req.Host)
-		}
+	// Pass strong host mode to netx dial layer
+	if isStrongHostMode && strongHostName != "" {
+		opts = append(opts, lowhttp.WithExtendDialXOption(netx.DialX_WithStrongHostMode(strongHostName)))
 	}
 
 	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {

@@ -117,6 +117,8 @@ RETRY:
 		if err != nil {
 			return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
 		}
+
+		// Resolve hostname to IP for dialing
 		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
@@ -133,10 +135,46 @@ RETRY:
 			}
 		}
 
+		dialTarget := utils.HostPort(ip, port)
+
+		// Handle strong host mode: bind to specific local IP address
+		var localAddr *net.TCPAddr
+		if config.StrongHostMode && config.StrongLocalAddrIP != "" {
+			// Validate that StrongLocalAddrIP is actually an IP address
+			localIP := net.ParseIP(utils.FixForParseIP(config.StrongLocalAddrIP))
+			if localIP == nil {
+				log.Warnf("strong host mode: StrongLocalAddrIP '%s' is not a valid IP address, ignoring", config.StrongLocalAddrIP)
+			} else {
+				localAddr = &net.TCPAddr{
+					IP:   localIP,
+					Port: 0, // Let system choose port
+				}
+				if config.Debug {
+					log.Debugf("strong host mode: binding to local address %s", localAddr.String())
+				}
+			}
+		}
+
+		// Use TCPLocalAddr if explicitly set (takes precedence over strong host mode)
+		if config.TCPLocalAddr != nil {
+			localAddr = config.TCPLocalAddr
+			if config.Debug {
+				log.Debugf("using explicit TCPLocalAddr: %s", localAddr.String())
+			}
+		}
+
+		// Dial with local address binding if specified
 		if config.Dialer != nil {
-			conn, err = config.Dialer(config.Timeout, utils.HostPort(ip, port))
+			conn, err = config.Dialer(config.Timeout, dialTarget)
+		} else if localAddr != nil {
+			// Use net.Dialer to bind to local address
+			dialer := &net.Dialer{
+				Timeout:   config.Timeout,
+				LocalAddr: localAddr,
+			}
+			conn, err = dialer.Dial("tcp", dialTarget)
 		} else {
-			conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
+			conn, err = net.DialTimeout("tcp", dialTarget, config.Timeout)
 		}
 		if err != nil {
 			if config.Debug {
