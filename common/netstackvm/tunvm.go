@@ -44,8 +44,9 @@ type TunVirtualMachine struct {
 	tcpHijacked *utils.AtomicBool
 
 	// hijackedTCPHandler
-	hijackedMutex   sync.RWMutex
-	hijackedHandler func(conn netstack.TCPConn)
+	hijackedMutex      sync.RWMutex
+	hijackedHandler    func(conn netstack.TCPConn)
+	hijackedHandlerSet bool // flag to mark if hijackedHandler has been set
 }
 
 func NewTunVirtualMachine(ctx context.Context) (*TunVirtualMachine, error) {
@@ -411,10 +412,45 @@ func (t *TunVirtualMachine) SetHijackTCPHandler(handle func(conn netstack.TCPCon
 	t.hijackedMutex.Lock()
 	defer t.hijackedMutex.Unlock()
 
-	if t.hijackedHandler != nil {
+	if t.hijackedHandlerSet {
 		return utils.Error("hijackedHandler already set")
 	}
 	t.hijackedHandler = handle
+	t.hijackedHandlerSet = true
+	return nil
+}
+
+// StartToMergeTCPConnectionChannel starts merging TCP connections from TUN device to an external channel.
+// This is a high-level wrapper of SetHijackTCPHandler that uses an external channel + ctx for safety.
+// The channel can be read from other places (e.g., crep MITM system).
+// existedChannel should be of type chan net.Conn.
+func (t *TunVirtualMachine) StartToMergeTCPConnectionChannel(ctx context.Context, existedChannel chan net.Conn) error {
+	if existedChannel == nil {
+		return utils.Error("existedChannel cannot be nil")
+	}
+
+	// Set the hijack handler to send connections to the external channel
+	err := t.SetHijackTCPHandler(func(conn netstack.TCPConn) {
+		// netstack.TCPConn implements net.Conn, so we can directly send it
+		select {
+		case <-ctx.Done():
+			// Context cancelled, close the connection
+			conn.Close()
+			return
+		case existedChannel <- conn:
+			// Successfully sent to channel
+		default:
+			// Channel is full or closed, log and close the connection
+			log.Warnf("failed to send TCP connection to channel (channel may be full or closed), closing connection")
+			conn.Close()
+		}
+	})
+
+	if err != nil {
+		return utils.Errorf("failed to set hijack TCP handler: %v", err)
+	}
+
+	log.Infof("StartToMergeTCPConnectionChannel: TCP connection channel merge started")
 	return nil
 }
 
