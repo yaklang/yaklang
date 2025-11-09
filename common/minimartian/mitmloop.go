@@ -272,6 +272,11 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				session := proxyContext.Session()
 				if wrapped.IsStrongHostMode() {
 					session.Set("StrongHostMode", true)
+					// Get localAddr from WrapperedConn (required for strong host mode)
+					localAddr := wrapped.GetStrongHostLocalAddr()
+					if localAddr != "" {
+						session.Set("StrongHostLocalAddr", localAddr)
+					}
 				}
 				metaInfo := wrapped.GetMetaInfo()
 				if len(metaInfo) > 0 {
@@ -304,6 +309,11 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					session := proxyContext.Session()
 					if wrapped.IsStrongHostMode() {
 						session.Set("StrongHostMode", true)
+						// Get localAddr from WrapperedConn (required for strong host mode)
+						localAddr := wrapped.GetStrongHostLocalAddr()
+						if localAddr != "" {
+							session.Set("StrongHostLocalAddr", localAddr)
+						}
 					}
 					metaInfo := wrapped.GetMetaInfo()
 					if len(metaInfo) > 0 {
@@ -684,6 +694,19 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 			existingTags = append(existingTags, "IsStrongHostMode")
 			httpctx.SetFlowTags(req, existingTags)
 		}
+
+		// Get local IP address from session for strong host mode binding
+		// This is set from WrapperedConn's GetStrongHostLocalAddr() method
+		localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
+
+		// Set local IP address to httpctx if found
+		if localAddrIP != "" {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_StrongHostLocalAddr, localAddrIP)
+			log.Debugf("mitm: set StrongHostLocalAddr in httpctx: %s for request from extraIncomingConn: %v", localAddrIP, req.URL)
+		} else {
+			log.Debugf("mitm: strong host mode enabled but no StrongHostLocalAddr found in session for request: %v", req.URL)
+		}
+
 		log.Debugf("mitm: set IsStrongHostMode in httpctx for request from extraIncomingConn: %v", req.URL)
 	}
 

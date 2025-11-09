@@ -9,9 +9,10 @@ import (
 // 主要用于支持强主机模式和其他连接级别的配置
 type WrapperedConn struct {
 	net.Conn
-	strongHostMode bool
-	metaInfo       map[string]any
-	mu             sync.RWMutex
+	strongHostMode      bool
+	strongHostLocalAddr string // Local IP address for strong host mode binding
+	metaInfo            map[string]any
+	mu                  sync.RWMutex
 }
 
 // NewWrapperedConn 创建一个新的 WrapperedConn
@@ -26,11 +27,31 @@ func NewWrapperedConn(conn net.Conn, strongHostMode bool, metaInfo map[string]an
 	}
 }
 
+// NewWrapperedConnWithStrongLocalHost 创建一个新的 WrapperedConn，并设置强主机模式的本地地址
+func NewWrapperedConnWithStrongLocalHost(conn net.Conn, localAddr string, metaInfo map[string]any) *WrapperedConn {
+	if metaInfo == nil {
+		metaInfo = make(map[string]any)
+	}
+	return &WrapperedConn{
+		Conn:                conn,
+		strongHostMode:      true, // 强制启用强主机模式
+		strongHostLocalAddr: localAddr,
+		metaInfo:            metaInfo,
+	}
+}
+
 // IsStrongHostMode 返回是否启用强主机模式
 func (w *WrapperedConn) IsStrongHostMode() bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.strongHostMode
+}
+
+// GetStrongHostLocalAddr 返回强主机模式的本地地址
+func (w *WrapperedConn) GetStrongHostLocalAddr() string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.strongHostLocalAddr
 }
 
 // GetMetaInfo 返回连接的元数据信息
