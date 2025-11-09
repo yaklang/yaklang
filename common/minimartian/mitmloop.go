@@ -449,7 +449,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 	for {
 		conn.SetDeadline(time.Time{})
 		log.Debugf("waiting conn: %v", conn.RemoteAddr())
-		err := p.handle(ctx, timer, conn, brw)
+		err := p.handle(ctx, timer, conn, brw, "")
 		if timer == nil {
 			timer = time.AfterFunc(timerInterval, func() {
 				conn.Close()
@@ -528,8 +528,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		return err
 	}
 	// 22 is the TLS handshake.
-	isTLS = isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS)
-	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS)
+	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS))
 	if parsedConnectedToPort == 0 {
 		if isTLS {
 			parsedConnectedToPort = 443
@@ -598,15 +597,15 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		}
 		brw.Writer.Reset(tlsConn)
 		brw.Reader.Reset(tlsConn)
-		return p.handle(ctx, timer, tlsConn, brw)
+		return p.handle(ctx, timer, tlsConn, brw, connectedTo)
 	}
 	// -> Client Connection <- is plain HTTP connection
 	// Prepend the previously read data to be read again.
 	brw.Reader.Reset(conn)
-	return p.handle(ctx, timer, conn, brw) // should read next request from client
+	return p.handle(ctx, timer, conn, brw, connectedTo) // should read next request from client
 }
 
-func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufio.ReadWriter) error {
+func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufio.ReadWriter, connectedTo string) error {
 	log.Debugf("mitm: waiting for request: %v", conn.RemoteAddr())
 	defer func() {
 		if err := recover(); err != nil {
@@ -671,6 +670,18 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 
 	httpctx.SetMITMFrontendReadWriter(req, brw)
+
+	if httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo) == "" {
+		if connectedTo != "" {
+			host, port, parseErr := utils.ParseStringToHostPort(connectedTo)
+			_ = parseErr
+			if port > 0 && host != "" {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, host)
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
+			}
+		}
+	}
 
 	link(req, ctx, p)
 	defer unlink(req, p)

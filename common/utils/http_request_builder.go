@@ -245,7 +245,7 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 		}
 	}
 
-	if !https && !IsNil(t.TLS) {
+	if !https && !IsNil(t.TLS) && t.Method != "CONNECT" {
 		https = true
 	}
 
