@@ -145,6 +145,11 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 			cancel()
 		}()
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			conn, err := l.Accept()
 			if err != nil {
 				if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
@@ -164,7 +169,12 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				log.Errorf("mitm: failed to accept: %v", err)
 				return
 			}
-			incomming <- conn
+			select {
+			case incomming <- conn:
+			case <-ctx.Done():
+				conn.Close()
+				return
+			}
 		}
 	}()
 	go func() {
@@ -177,7 +187,12 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				if !ok {
 					return
 				}
-				incomming <- conn
+				select {
+				case incomming <- conn:
+				case <-ctx.Done():
+					conn.Close()
+					return
+				}
 			}
 		}
 	}()
@@ -191,6 +206,10 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 
 		var conn net.Conn
 		select {
+		case <-ctx.Done():
+			log.Info("closing martian proxying...")
+			l.Close()
+			return nil
 		case rawConn, ok := <-incomming:
 			if !ok {
 				return utils.Errorf("incomming channel closed")
