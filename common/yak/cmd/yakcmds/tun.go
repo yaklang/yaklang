@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,9 +18,10 @@ import (
 	"time"
 
 	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun"
-	"github.com/yaklang/yaklang/common/lowtun/netstack"
+	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
@@ -543,7 +545,7 @@ func testTunSocketDevice(c *cli.Context) error {
 	log.Infof("network stack virtual machine created successfully")
 	log.Infof("tunnel name: %s", tvm.GetTunnelName())
 
-	// 4. 获取主机的公网网卡和IP地址（用于绑定源地址）
+	// 4. 获取主机的公网网卡和IP地址（用于绑定源地址和强主机模式）
 	log.Infof("getting host public network interface and IP...")
 	hostInterface, hostIP, err := getPublicNetworkInterface()
 	if err != nil {
@@ -586,302 +588,214 @@ func testTunSocketDevice(c *cli.Context) error {
 	routesToCleanup = allIPs // 记录需要清理的路由
 	log.Infof("successfully added %d routes to %s", len(allIPs), tunName)
 
-	// 7. 设置 TCP 劫持处理器（中间人代理模式）
-	// 生成两个 nonce：一个用于测试1，一个用于测试2
-	nonce1 := fmt.Sprintf("NONCE1_%d_%s", time.Now().UnixNano(), utils.RandNumberStringBytes(16))
-	nonce2 := fmt.Sprintf("NONCE2_%d_%s", time.Now().UnixNano(), utils.RandNumberStringBytes(16))
-	log.Infof("generated test nonce1 (for 1.1.1.1 test): %s", nonce1)
-	log.Infof("generated test nonce2 (for yaklang.com test): %s", nonce2)
+	// 7. 创建 channel 用于接收 TUN 的连接
+	connChan := make(chan net.Conn, 1000)
 
-	test1Passed := make(chan bool, 1)
-	test2Passed := make(chan bool, 1)
-
-	err = tvm.SetHijackTCPHandler(func(conn netstack.TCPConn) {
-		remoteAddr := conn.RemoteAddr()
-		localAddr := conn.LocalAddr()
-		log.Infof("=== TCP Connection Hijacked ===")
-		log.Infof("Remote: %s", remoteAddr)
-		log.Infof("Local: %s", localAddr)
-		log.Infof("===============================")
-
-		// 读取客户端请求
-		buf := make([]byte, 8192)
-		n, err := conn.Read(buf)
-		if err != nil {
-			log.Errorf("failed to read from connection: %v", err)
-			conn.Close()
-			return
-		}
-
-		clientRequest := string(buf[:n])
-		log.Infof("received client request (%d bytes):\n%s", n, clientRequest)
-
-		// 提取请求中的 nonce（如果有）
-		var extractedNonce string
-		var testType string // "test1" or "test2"
-		lines := strings.Split(clientRequest, "\r\n")
-		for _, line := range lines {
-			if strings.HasPrefix(line, "X-Test-Nonce: ") {
-				extractedNonce = strings.TrimPrefix(line, "X-Test-Nonce: ")
-				if strings.HasPrefix(extractedNonce, "NONCE1_") {
-					testType = "test1"
-				} else if strings.HasPrefix(extractedNonce, "NONCE2_") {
-					testType = "test2"
-				}
-				log.Infof("extracted nonce from request: %s (type: %s)", extractedNonce, testType)
-				break
-			}
-		}
-
-		// 判断是访问哪个目标（通过 localAddr 判断）
-		localIPPort := localAddr.String()
-		targetHost := ""
-		targetPort := "80"
-
-		if strings.HasPrefix(localIPPort, "1.1.1.1:") {
-			// 测试1：1.1.1.1 → yaklang.com（需要绑定源地址，否则会再次被劫持）
-			targetHost = "yaklang.com"
-			log.Infof("[Test 1] Connection to 1.1.1.1, will forward to yaklang.com with source binding")
-		} else {
-			// 测试2：yaklang.com IP → yaklang.com（需要绑定源地址绕过路由表）
-			for _, ip := range exampleIPv4s {
-				if strings.HasPrefix(localIPPort, ip+":") {
-					targetHost = ip
-					log.Infof("[Test 2] Connection to yaklang.com IP %s, will forward with source binding", ip)
-					break
-				}
-			}
-		}
-
-		if targetHost == "" {
-			log.Errorf("unknown target host for local address: %s", localIPPort)
-			conn.Close()
-			return
-		}
-
-		// 连接到真实服务器（两个测试都使用源地址绑定，以绕过路由表劫持）
-		log.Infof("connecting to %s:%s with source binding to %s...", targetHost, targetPort, hostIP)
-		realConn, err := dialWithSourceIP(targetHost+":"+targetPort, hostIP, 5*time.Second)
-
-		if err != nil {
-			log.Errorf("failed to connect to real server: %v", err)
-			errorResponse := fmt.Sprintf("HTTP/1.1 502 Bad Gateway\r\nX-Proxy-Nonce: %s\r\nConnection: close\r\n\r\nProxy Error: %v", extractedNonce, err)
-			conn.Write([]byte(errorResponse))
-			conn.Close()
-			return
-		}
-		defer realConn.Close()
-
-		// 转发客户端请求到真实服务器
-		_, err = realConn.Write(buf[:n])
-		if err != nil {
-			log.Errorf("failed to forward request: %v", err)
-			conn.Close()
-			return
-		}
-		log.Infof("request forwarded to real server")
-
-		// 读取真实服务器的响应
-		realBuf := make([]byte, 8192)
-		totalRead := 0
-		realConn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		for totalRead < len(realBuf) {
-			n, err := realConn.Read(realBuf[totalRead:])
-			if err != nil {
-				if err != io.EOF {
-					log.Errorf("error reading from real server: %v", err)
-				}
-				break
-			}
-			totalRead += n
-			// 如果读到了完整的响应头，就可以开始处理
-			if totalRead > 0 && strings.Contains(string(realBuf[:totalRead]), "\r\n\r\n") {
-				break
-			}
-		}
-
-		if totalRead == 0 {
-			log.Errorf("no response from real server")
-			conn.Close()
-			return
-		}
-
-		realResponse := string(realBuf[:totalRead])
-		log.Infof("received response from real server (%d bytes)", totalRead)
-
-		// 修改响应，添加 X-Proxy-Nonce 头
-		headerEndPos := strings.Index(realResponse, "\r\n\r\n")
-		if headerEndPos == -1 {
-			log.Errorf("invalid HTTP response from real server")
-			conn.Close()
-			return
-		}
-
-		// 在响应头末尾插入自定义头
-		modifiedResponse := realResponse[:headerEndPos] +
-			fmt.Sprintf("\r\nX-Proxy-Nonce: %s", extractedNonce) +
-			realResponse[headerEndPos:]
-
-		// 发送修改后的响应给客户端
-		_, err = conn.Write([]byte(modifiedResponse))
-		if err != nil {
-			log.Errorf("failed to send response to client: %v", err)
-		} else {
-			log.Infof("sent proxied response with nonce header to client (%d bytes)", len(modifiedResponse))
-		}
-
-		// 通知对应测试通过
-		if testType == "test1" {
-			select {
-			case test1Passed <- true:
-			default:
-			}
-		} else if testType == "test2" {
-			select {
-			case test2Passed <- true:
-			default:
-			}
-		}
-
-		conn.Close()
-	})
+	// 使用 StartToMergeTCPConnectionChannel 将 TUN 连接发送到 channel
+	log.Infof("starting to merge TCP connection channel...")
+	err = tvm.StartToMergeTCPConnectionChannel(ctx, connChan)
 	if err != nil {
-		return utils.Errorf("failed to set hijack TCP handler: %v", err)
+		return utils.Errorf("failed to start merge TCP connection channel: %v", err)
 	}
-	log.Infof("TCP hijack handler (MITM proxy) set successfully")
+	log.Infof("TCP connection channel merge started successfully")
 
-	// 8. 启动测试1：访问 1.1.1.1:80（Host: yaklang.com）
+	// 8. 创建 WrapperedConn channel，使用强主机模式避免环回
+	// 将 net.Conn 转换为 *minimartian.WrapperedConn，并设置强主机模式的本地地址为公网 IP
+	wrappedConnChan := make(chan *minimartian.WrapperedConn, 1000)
 	go func() {
-		time.Sleep(2 * time.Second) // 等待路由生效
-
-		log.Infof("===========================================")
-		log.Infof("║ Starting Test 1: 1.1.1.1 → yaklang.com ║")
-		log.Infof("===========================================")
-
-		conn, err := net.DialTimeout("tcp", "1.1.1.1:80", 10*time.Second)
-		if err != nil {
-			log.Errorf("[Test 1] failed to dial 1.1.1.1:80: %v", err)
-			return
-		}
-		defer conn.Close()
-
-		httpRequest := fmt.Sprintf("GET / HTTP/1.1\r\nHost: yaklang.com\r\nX-Test-Nonce: %s\r\nConnection: close\r\n\r\n", nonce1)
-		_, err = conn.Write([]byte(httpRequest))
-		if err != nil {
-			log.Errorf("[Test 1] failed to write request: %v", err)
-			return
-		}
-		log.Infof("[Test 1] request sent with nonce: %s", nonce1)
-
-		// 读取响应
-		buf := make([]byte, 16384)
-		totalRead := 0
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		for totalRead < len(buf) {
-			n, err := conn.Read(buf[totalRead:])
-			if err != nil {
-				if err != io.EOF {
-					log.Errorf("[Test 1] read error: %v", err)
-				}
-				break
-			}
-			totalRead += n
-			if totalRead > 0 && strings.Contains(string(buf[:totalRead]), "\r\n\r\n") {
-				time.Sleep(200 * time.Millisecond)
-			}
-		}
-
-		if totalRead > 0 {
-			response := string(buf[:totalRead])
-			headerEndPos := strings.Index(response, "\r\n\r\n")
-			if headerEndPos == -1 {
-				log.Errorf("[Test 1] ✗ FAILED: Invalid HTTP response")
-				return
-			}
-
-			headers := response[:headerEndPos]
-			expectedHeader := fmt.Sprintf("X-Proxy-Nonce: %s", nonce1)
-			if strings.Contains(headers, expectedHeader) {
-				log.Infof("[Test 1] ✓ PASSED - Nonce verified!")
-				select {
-				case test1Passed <- true:
-				default:
-				}
-			} else {
-				log.Errorf("[Test 1] ✗ FAILED - Nonce not found in response")
-			}
-		} else {
-			log.Errorf("[Test 1] ✗ FAILED: No response received")
+		defer close(wrappedConnChan)
+		for conn := range connChan {
+			// 使用 NewWrapperedConnWithStrongLocalHost 创建带有强主机模式的连接
+			// 设置公网 IP 作为本地地址，这样 MITM 发送数据包时会绑定到这个 IP，避免环回
+			wrapped := minimartian.NewWrapperedConnWithStrongLocalHost(conn, hostIP, nil)
+			wrappedConnChan <- wrapped
 		}
 	}()
 
-	// 9. 启动测试2：直接访问 yaklang.com（不绑定源地址，会被劫持）
-	go func() {
-		time.Sleep(3 * time.Second) // 稍晚启动，避免冲突
+	// 9. 创建 crep MITM 服务器，使用 ExtraIncomingConnection Ex 接口（支持强主机模式）
+	// 生成测试 nonce 用于验证劫持是否生效
+	testNonce := fmt.Sprintf("TUN_MITM_TEST_%d_%s", time.Now().UnixNano(), utils.RandNumberStringBytes(16))
+	log.Infof("generated test nonce: %s", testNonce)
+	log.Infof("using strong host mode with local address: %s", hostIP)
 
-		log.Infof("===========================================")
-		log.Infof("║ Starting Test 2: yaklang.com (hijacked) ║")
-		log.Infof("===========================================")
+	testPassed := make(chan bool, 1)
+	hijackedURLs := make(map[string]bool)
+	hijackedURLsMu := sync.Mutex{}
 
-		// 不绑定源地址，直接连接 yaklang.com → 会被劫持到 TUN
-		conn, err := net.DialTimeout("tcp", "yaklang.com:80", 10*time.Second)
-		if err != nil {
-			log.Errorf("[Test 2] failed to dial yaklang.com:80: %v", err)
-			return
-		}
-		defer conn.Close()
+	// 创建 MITM 服务器，使用支持强主机模式的 EX 接口
+	mitmServer, err := crep.NewMITMServer(
+		crep.MITM_SetExtraIncomingConnectionChannel(wrappedConnChan),
+		crep.MITM_SetTunMode(true),
+		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rspIns *http.Response, rsp []byte, remoteAddr string) []byte {
+			// 验证劫持是否生效：在响应中添加测试 nonce
+			urlStr := ""
+			if req != nil && req.URL != nil {
+				urlStr = req.URL.String()
+			}
 
-		httpRequest := fmt.Sprintf("GET / HTTP/1.1\r\nHost: yaklang.com\r\nX-Test-Nonce: %s\r\nConnection: close\r\n\r\n", nonce2)
-		_, err = conn.Write([]byte(httpRequest))
-		if err != nil {
-			log.Errorf("[Test 2] failed to write request: %v", err)
-			return
-		}
-		log.Infof("[Test 2] request sent with nonce: %s (will be hijacked)", nonce2)
+			hijackedURLsMu.Lock()
+			hijackedURLs[urlStr] = true
+			hijackedURLsMu.Unlock()
 
-		// 读取响应
-		buf := make([]byte, 16384)
-		totalRead := 0
-		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		for totalRead < len(buf) {
-			n, err := conn.Read(buf[totalRead:])
+			log.Infof("[MITM] Hijacked response for URL: %s (HTTPS: %v)", urlStr, isHttps)
+
+			// 解析响应以获取状态码和 header
+			rspParsed, err := utils.ReadHTTPResponseFromBytes(rsp, req)
 			if err != nil {
-				if err != io.EOF {
-					log.Errorf("[Test 2] read error: %v", err)
-				}
-				break
-			}
-			totalRead += n
-			if totalRead > 0 && strings.Contains(string(buf[:totalRead]), "\r\n\r\n") {
-				time.Sleep(200 * time.Millisecond)
-			}
-		}
-
-		if totalRead > 0 {
-			response := string(buf[:totalRead])
-			headerEndPos := strings.Index(response, "\r\n\r\n")
-			if headerEndPos == -1 {
-				log.Errorf("[Test 2] ✗ FAILED: Invalid HTTP response")
-				return
+				log.Errorf("[MITM] Failed to parse response: %v", err)
+				return rsp
 			}
 
-			headers := response[:headerEndPos]
-			expectedHeader := fmt.Sprintf("X-Proxy-Nonce: %s", nonce2)
-			if strings.Contains(headers, expectedHeader) {
-				log.Infof("[Test 2] ✓ PASSED - Nonce verified! (Source binding worked)")
-				select {
-				case test2Passed <- true:
-				default:
+			// 打印完整的响应头（状态行 + 所有 header）
+			log.Infof("[MITM] ==========================================")
+			log.Infof("[MITM] Response Status: %s", rspParsed.Status)
+			log.Infof("[MITM] Response Headers:")
+			for key, values := range rspParsed.Header {
+				for _, value := range values {
+					log.Infof("[MITM]   %s: %s", key, value)
 				}
-			} else {
-				log.Errorf("[Test 2] ✗ FAILED - Nonce not found in response")
 			}
-		} else {
-			log.Errorf("[Test 2] ✗ FAILED: No response received")
+			log.Infof("[MITM] ==========================================")
+
+			// 检查状态码，如果不是 200，记录警告
+			if rspParsed.StatusCode != 200 {
+				log.Warnf("[MITM] Response status code is %d, expected 200 OK", rspParsed.StatusCode)
+			}
+
+			// 检查是否是 yaklang.com 的请求
+			if strings.Contains(urlStr, "yaklang.com") {
+				// 在响应头中添加测试 nonce
+				rspStr := string(rsp)
+				headerEndPos := strings.Index(rspStr, "\r\n\r\n")
+				if headerEndPos != -1 {
+					// 检查是否已经包含 nonce header，避免重复添加
+					headerPart := rspStr[:headerEndPos]
+					if !strings.Contains(headerPart, "X-TUN-MITM-Test:") {
+						modifiedRsp := headerPart +
+							fmt.Sprintf("\r\nX-TUN-MITM-Test: %s", testNonce) +
+							rspStr[headerEndPos:]
+						log.Infof("[MITM] Added test nonce to response for yaklang.com")
+						log.Infof("[MITM] Modified Response Headers (with nonce):")
+						// 重新解析修改后的响应以打印
+						modifiedRspParsed, err := utils.ReadHTTPResponseFromBytes([]byte(modifiedRsp), req)
+						if err == nil {
+							log.Infof("[MITM]   Status: %s", modifiedRspParsed.Status)
+							for key, values := range modifiedRspParsed.Header {
+								for _, value := range values {
+									log.Infof("[MITM]   %s: %s", key, value)
+								}
+							}
+						}
+						select {
+						case testPassed <- true:
+						default:
+						}
+						return []byte(modifiedRsp)
+					} else {
+						log.Infof("[MITM] Test nonce already present in response")
+					}
+				}
+			}
+
+			return rsp
+		}),
+	)
+	if err != nil {
+		return utils.Errorf("failed to create MITM server: %v", err)
+	}
+
+	// 10. 启动 MITM 服务器（监听本地端口，但实际上会从 channel 接收连接）
+	mitmPort := 0 // 使用 0 表示不监听端口，只从 channel 接收连接
+	mitmListener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", mitmPort))
+	if err != nil {
+		return utils.Errorf("failed to create MITM listener: %v", err)
+	}
+	actualPort := mitmListener.Addr().(*net.TCPAddr).Port
+	log.Infof("MITM server listening on port: %d", actualPort)
+
+	// 启动 MITM 服务器
+	go func() {
+		defer mitmListener.Close()
+		err := mitmServer.ServerListener(ctx, mitmListener)
+		if err != nil && ctx.Err() == nil {
+			log.Errorf("MITM server error: %v", err)
 		}
 	}()
 
-	// 10. 监听设备事件
+	// 等待 MITM 服务器启动
+	time.Sleep(1 * time.Second)
+
+	// 11. 启动测试：访问 https://yaklang.com
+	go func() {
+		time.Sleep(2 * time.Second) // 等待路由和 MITM 服务器生效
+
+		log.Infof("===========================================")
+		log.Infof("║ Starting Test: https://yaklang.com      ║")
+		log.Infof("===========================================")
+
+		// 使用 HTTP 客户端访问 https://yaklang.com
+		// 由于路由表劫持，这个请求会被发送到 TUN 设备
+		client := &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					// 直接连接，会被路由表劫持到 TUN
+					return net.DialTimeout(network, addr, 10*time.Second)
+				},
+			},
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", "https://yaklang.com", nil)
+		if err != nil {
+			log.Errorf("[Test] failed to create request: %v", err)
+			return
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Errorf("[Test] failed to send request: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		// 打印完整的 HTTP Response Header（包括状态行和所有 header）
+		log.Infof("[Test] ==========================================")
+		log.Infof("[Test] HTTP Response Status: %s", resp.Status)
+		log.Infof("[Test] HTTP Response Headers:")
+		for key, values := range resp.Header {
+			for _, value := range values {
+				log.Infof("[Test]   %s: %s", key, value)
+			}
+		}
+		log.Infof("[Test] ==========================================")
+
+		// 检查状态码，必须是 200 OK
+		if resp.StatusCode != 200 {
+			log.Errorf("[Test] ✗ FAILED - Response status is %s, expected 200 OK", resp.Status)
+			return
+		}
+
+		// 检查响应头中是否有测试 nonce
+		testHeader := resp.Header.Get("X-TUN-MITM-Test")
+		if testHeader == testNonce {
+			log.Infof("[Test] ✓ PASSED - Test nonce found in response header: %s", testHeader)
+			select {
+			case testPassed <- true:
+			default:
+			}
+		} else {
+			log.Errorf("[Test] ✗ FAILED - Test nonce not found in response header (got: %s, expected: %s)", testHeader, testNonce)
+		}
+
+		// 读取响应体的一部分用于验证
+		buf := make([]byte, 1024)
+		n, _ := resp.Body.Read(buf)
+		if n > 0 {
+			log.Infof("[Test] received %d bytes of response body", n)
+		}
+	}()
+
+	// 12. 监听设备事件
 	go func() {
 		for {
 			select {
@@ -903,39 +817,28 @@ func testTunSocketDevice(c *cli.Context) error {
 		}
 	}()
 
-	// 11. 等待两个测试都完成
-	log.Infof("waiting for both tests to complete...")
-
-	test1Done := false
-	test2Done := false
+	// 13. 等待测试完成
+	log.Infof("waiting for test to complete...")
 	timeout := time.After(30 * time.Second)
 
 	for {
 		select {
-		case <-test1Passed:
-			test1Done = true
-			if test2Done {
-				log.Infof("===========================================")
-				log.Infof("║ ✓ ALL TESTS PASSED - SHUTTING DOWN... ║")
-				log.Infof("===========================================")
-				time.Sleep(500 * time.Millisecond)
-				return nil
-			}
-		case <-test2Passed:
-			test2Done = true
-			if test1Done {
-				log.Infof("===========================================")
-				log.Infof("║ ✓ ALL TESTS PASSED - SHUTTING DOWN... ║")
-				log.Infof("===========================================")
-				time.Sleep(500 * time.Millisecond)
-				return nil
-			}
+		case <-testPassed:
+			log.Infof("===========================================")
+			log.Infof("║ ✓ TEST PASSED - SHUTTING DOWN...       ║")
+			log.Infof("===========================================")
+			hijackedURLsMu.Lock()
+			log.Infof("Hijacked URLs: %v", hijackedURLs)
+			hijackedURLsMu.Unlock()
+			time.Sleep(500 * time.Millisecond)
+			return nil
 		case <-timeout:
 			log.Errorf("===========================================")
 			log.Errorf("║ ✗ TEST TIMEOUT AFTER 30s              ║")
 			log.Errorf("===========================================")
-			log.Errorf("  Test 1 (1.1.1.1): %v", test1Done)
-			log.Errorf("  Test 2 (yaklang.com): %v", test2Done)
+			hijackedURLsMu.Lock()
+			log.Infof("Hijacked URLs: %v", hijackedURLs)
+			hijackedURLsMu.Unlock()
 			return utils.Errorf("test timeout")
 		case <-ctx.Done():
 			log.Infof("test interrupted by user")
