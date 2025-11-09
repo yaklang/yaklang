@@ -101,7 +101,10 @@ func (p *Proxy) startConnLog(statusContext context.Context) (func(string, net.Co
 }
 
 // Serve accepts connections from the listener and handles the requests.
-func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
+func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
+	ctx, cancel := context.WithCancel(baseCtx)
+	defer cancel()
+
 	defer l.Close()
 	s5config := NewSocks5Config()
 	if !p.tunMode {
@@ -124,8 +127,8 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			s5config.DownstreamHTTPProxy = urlIns.String()
 		}
 	}
-	statusContext, cancel := context.WithCancel(ctx)
-	defer cancel()
+	statusContext, statusCancel := context.WithCancel(ctx)
+	defer statusCancel()
 	cacheConns, removeConns := p.startConnLog(statusContext)
 
 	var delay time.Duration
@@ -139,6 +142,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	go func() {
 		defer func() {
 			wg.Done()
+			cancel()
 		}()
 		for {
 			conn, err := l.Accept()
