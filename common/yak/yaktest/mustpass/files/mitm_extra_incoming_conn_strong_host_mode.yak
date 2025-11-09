@@ -1,108 +1,179 @@
-// Test for IsStrongHostMode tag in httpctx
-// This test verifies that requests from extraIncomingConnEx with strongHostMode=true
-// get the "IsStrongHostMode" tag set in httpctx
+// Test for strong host mode functionality
+// Tests verify:
+// 1. Strong host mode with correct localAddr succeeds
+// 2. Strong host mode with invalid localAddr (non-routable IP) fails
 
-ctx, cancel = context.WithTimeout(context.New(), time.ParseDuration("30s")~)
+ctx, cancel = context.WithTimeout(context.New(), time.ParseDuration("10s")~)
 
-// Create a channel for forwarding connections
-connChan = make(chan any)
-
-// Setup MITM server with strongHostMode enabled
-mitmPort = os.GetRandomAvailableTCPPort()
-hijacked = false
-hasStrongHostModeTag = false
+// ============================================
+// Test 1: Correct localAddr - should succeed
+// ============================================
+println("[TEST 1] Testing correct localAddr (127.0.0.1)...")
+mitmPort1 = os.GetRandomAvailableTCPPort()
+connChan1 = make(chan any)
 
 go func {
     defer func {
         err = recover()
-        // Ignore context cancellation errors
     }
-    
-    err = mitm.Start(mitmPort,
-        mitm.hijackHTTPRequest((isHttps, url, req, forward, drop) => {
-            println("[MITM] Hijacked request to:", url)
-            hijacked = true
-            
-            // Note: httpctx is not directly accessible in yak scripts
-            // The IsStrongHostMode tag is set in Go code and will be visible
-            // in HTTP flows and can be checked via flow tags
-            // For this test, we verify the functionality works by checking
-            // that requests are properly processed
-            
-            forward(req)
-        }),
-        mitm.extraIncomingConnEx(true, connChan), // Enable strongHostMode
+    err = mitm.Start(mitmPort1,
+        mitm.extraIncomingConnChanWithStrongLocalHost("127.0.0.1", connChan1),
         mitm.context(ctx)
     )
 }
 
-// Wait for MITM to start
-sleep(1)
+sleep(0.1)
 
-// Create a TCP server that forwards connections to MITM
-tcpPort = os.GetRandomAvailableTCPPort()
-println("[TEST] TCP server listening on port:", tcpPort)
-println("[TEST] MITM server on port:", mitmPort)
-
+// Create a local HTTP server
+targetPort1 = os.GetRandomAvailableTCPPort()
 go func {
     defer func {
         err = recover()
-        // Ignore context cancellation errors
     }
-    
-    err = tcp.Serve("127.0.0.1", tcpPort, 
+    err = httpserver.Serve("127.0.0.1", targetPort1, 
+        httpserver.handler((rsp, req) => {
+            rsp.WriteHeader(200)
+            rsp.Write("OK")
+        }),
+        httpserver.context(ctx)
+    )
+}
+
+sleep(0.1)
+
+// Forward connection through MITM
+tcpPort1 = os.GetRandomAvailableTCPPort()
+go func {
+    defer func {
+        err = recover()
+    }
+    err = tcp.Serve("127.0.0.1", tcpPort1, 
         tcp.serverCallback((conn) => {
-            println("[TCP] Received connection, forwarding to MITM")
-            connChan <- conn
+            connChan1 <- conn
         }), 
         tcp.serverContext(ctx)
     )
 }
 
-// Wait for TCP server to start
-sleep(1)
+sleep(0.1)
 
-// Connect to the TCP server and send an HTTP request
-println("[TEST] Connecting to TCP server...")
-conn, err = tcp.Connect("127.0.0.1", tcpPort)
+// Send request
+conn1, err = tcp.Connect("127.0.0.1", tcpPort1)
 if err != nil {
-    die(f"tcp.Connect failed: ${err}")
+    die(f"Test 1: tcp.Connect failed: ${err}")
 }
 
-println("[TEST] Sending HTTP request...")
-httpReq = "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n"
-err = conn.Send(httpReq)
+httpReq1 = f"GET / HTTP/1.1\r\nHost: 127.0.0.1:{targetPort1}\r\nConnection: close\r\n\r\n"
+err = conn1.Send(httpReq1)
 if err != nil {
-    die(f"conn.Send failed: ${err}")
+    die(f"Test 1: conn.Send failed: ${err}")
 }
 
-println("[TEST] Waiting for response...")
-response, err = conn.RecvTimeout(5)
+response1, err = conn1.RecvTimeout(1)
 if err != nil {
-    die(f"Failed to receive response: ${err}")
+    die(f"Test 1: Failed to receive response: ${err}")
 }
 
-println("[TEST] Response received:", len(response), "bytes")
+conn1.Close()
 
-// Verify response
-assert len(response) > 0, "Response should not be empty"
-assert str.Contains(string(response), "HTTP/1.1"), "Response should contain HTTP status"
+// Assert: Request should succeed with correct localAddr
+assert len(response1) > 0, "Test 1: Response should not be empty"
+assert str.Contains(string(response1), "HTTP/1.1"), "Test 1: Response should contain HTTP status"
 
-// Verify the request was hijacked
-assert hijacked, "Request should have been hijacked by MITM"
+println("[TEST 1] ✓ Passed: Correct localAddr succeeds")
 
-// Note: The IsStrongHostMode tag is set in Go code at mitmloop.go
-// It will be visible in HTTP flows and can be accessed via flow tags
-// The tag is critical for transparent hijacking of tun-generated data
-// This test verifies that extraIncomingConnEx with strongHostMode works correctly
+// ============================================
+// Test 2: Invalid localAddr (non-routable IP) - should fail
+// ============================================
+println("[TEST 2] Testing invalid localAddr (non-routable IP 192.0.2.1)...")
+mitmPort2 = os.GetRandomAvailableTCPPort()
+connChan2 = make(chan any)
+dialError2 = false
 
-// Close connection
-conn.Close()
+go func {
+    defer func {
+        err = recover()
+    }
+    err = mitm.Start(mitmPort2,
+        mitm.extraIncomingConnChanWithStrongLocalHost("192.0.2.1", connChan2), // Invalid: non-routable IP
+        mitm.context(ctx)
+    )
+}
 
-// Cancel context to clean up servers
+sleep(0.1)
+
+targetPort2 = os.GetRandomAvailableTCPPort()
+go func {
+    defer func {
+        err = recover()
+    }
+    err = httpserver.Serve("127.0.0.1", targetPort2, 
+        httpserver.handler((rsp, req) => {
+            rsp.WriteHeader(200)
+            rsp.Write("OK")
+        }),
+        httpserver.context(ctx)
+    )
+}
+
+sleep(0.1)
+
+tcpPort2 = os.GetRandomAvailableTCPPort()
+go func {
+    defer func {
+        err = recover()
+    }
+    err = tcp.Serve("127.0.0.1", tcpPort2, 
+        tcp.serverCallback((conn) => {
+            connChan2 <- conn
+        }), 
+        tcp.serverContext(ctx)
+    )
+}
+
+sleep(0.1)
+
+conn2, err = tcp.Connect("127.0.0.1", tcpPort2)
+if err != nil {
+    die(f"Test 2: tcp.Connect failed: ${err}")
+}
+
+httpReq2 = f"GET / HTTP/1.1\r\nHost: 127.0.0.1:{targetPort2}\r\nConnection: close\r\n\r\n"
+err = conn2.Send(httpReq2)
+if err != nil {
+    die(f"Test 2: conn.Send failed: ${err}")
+}
+
+response2, err = conn2.RecvTimeout(1)
+if err != nil {
+    dialError2 = true
+    println(f"[TEST 2] Expected error occurred: ${err}")
+} else {
+    println(f"[TEST 2] Response received: {len(response2)} bytes")
+}
+
+conn2.Close()
+
+// Assert: Non-routable IP as localAddr should fail or produce error
+// If strong host mode works correctly, binding to 192.0.2.1 should fail
+// because this IP is not available on the local machine
+// However, some systems may allow binding even if the IP is not available,
+// so we check if the response contains an error or if dial failed
+hasError = dialError2
+if !hasError && len(response2) > 0 {
+    // Check if response contains error indicators
+    responseStr = string(response2)
+    hasError = str.Contains(responseStr, "500") || str.Contains(responseStr, "502") || str.Contains(responseStr, "503") || str.Contains(responseStr, "504") || str.Contains(responseStr, "error") || str.Contains(responseStr, "Error")
+}
+assert hasError, "Test 2: Dial should fail or produce error with invalid localAddr (non-routable IP 192.0.2.1) - strong host mode should prevent binding to unavailable IP"
+
+println("[TEST 2] ✓ Passed: Invalid localAddr (non-routable IP) fails as expected")
+
+// Cleanup
 cancel()
-sleep(0.5)
+sleep(0.1)
 
-println("[TEST] ✓ All assertions passed!")
-println("[TEST] ✓ IsStrongHostMode tag correctly set in httpctx!")
-
+println("\n[TEST] ✓ All tests passed!")
+println("[TEST] ✓ Strong host mode functionality verified:")
+println("  - Correct localAddr: Succeeds")
+println("  - Invalid localAddr (non-routable IP): Fails as expected")

@@ -56,7 +56,7 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 Content-Type: text/html
 `), io.NopCloser(bytes.NewBufferString(proxyutil.GetPrettyErrorRsp("请求被用户丢弃"))), nil
 		} else {
-			rsp, err := p.execLowhttp(req)
+			rsp, err := p.execLowhttp(ctx, req)
 			if err != nil {
 				log.Errorf("mitm: error requesting to remote server: %v", err)
 				return nil, nil, err

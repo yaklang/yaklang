@@ -38,7 +38,7 @@ var MitmExports = map[string]interface{}{
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
 	"randomJA3":            mitmConfigRandomJA3,
 	"extraIncomingConn":    mitmConfigExtraIncomingConn,
-	"extraIncomingConnEx":  mitmConfigExtraIncomingConnEx,
+	"extraIncomingConnChanWithStrongLocalHost": mitmConfigExtraIncomingConnChanWithStrongLocalHost,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -340,20 +340,21 @@ func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
 	}
 }
 
-// extraIncomingConnEx 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道（增强版）
-// 支持强主机模式和元数据信息
+// extraIncomingConnChanWithStrongLocalHost 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道
+// 强制要求设置强主机模式的本地地址，用于透明劫持 TUN 生成的流量
 // Example:
 // ```
 // connChan = make(chan net.Conn)
-// mitm.Start(8080, mitm.extraIncomingConnEx(true, connChan))  // 启用强主机模式
-// mitm.Start(8080, mitm.extraIncomingConnEx(true, connChan, {"key": "value"}))  // 启用强主机模式并设置元数据
+// mitm.Start(8080, mitm.extraIncomingConnChanWithStrongLocalHost("192.168.1.100", connChan))  // 设置强主机模式本地地址
+// mitm.Start(8080, mitm.extraIncomingConnChanWithStrongLocalHost("192.168.1.100", connChan, {"key": "value"}))  // 设置强主机模式本地地址并设置元数据
 // ```
-func mitmConfigExtraIncomingConnEx(mode interface{}, ch interface{}, kv ...interface{}) MitmConfigOpt {
+func mitmConfigExtraIncomingConnChanWithStrongLocalHost(localAddr interface{}, ch interface{}, kv ...interface{}) MitmConfigOpt {
 	return func(config *mitmConfig) {
-		// Convert mode to bool
-		isStrongHostMode := false
-		if mode != nil {
-			isStrongHostMode = utils.InterfaceToBoolean(mode)
+		// Convert localAddr to string (required)
+		localAddrStr := utils.InterfaceToString(localAddr)
+		if localAddrStr == "" {
+			log.Errorf("extraIncomingConnChanWithStrongLocalHost: localAddr is required and cannot be empty")
+			return
 		}
 
 		// Convert kv to map
@@ -370,7 +371,7 @@ func mitmConfigExtraIncomingConnEx(mode interface{}, ch interface{}, kv ...inter
 			go func() {
 				defer close(wrappedChan)
 				for conn := range c {
-					wrapped := minimartian.NewWrapperedConn(conn, isStrongHostMode, metaInfo)
+					wrapped := minimartian.NewWrapperedConnWithStrongLocalHost(conn, localAddrStr, metaInfo)
 					wrappedChan <- wrapped
 				}
 			}()
@@ -382,36 +383,35 @@ func mitmConfigExtraIncomingConnEx(mode interface{}, ch interface{}, kv ...inter
 				defer close(wrappedChan)
 				for v := range c {
 					if conn, ok := v.(net.Conn); ok {
-						wrapped := minimartian.NewWrapperedConn(conn, isStrongHostMode, metaInfo)
+						wrapped := minimartian.NewWrapperedConnWithStrongLocalHost(conn, localAddrStr, metaInfo)
 						wrappedChan <- wrapped
 					} else {
-						log.Errorf("extraIncomingConnEx: received non-net.Conn value: %T", v)
+						log.Errorf("extraIncomingConnChanWithStrongLocalHost: received non-net.Conn value: %T", v)
 					}
 				}
 			}()
 			config.extraIncomingConnChansEx = append(config.extraIncomingConnChansEx, wrappedChan)
 		case chan *minimartian.WrapperedConn:
-			// If already a wrapperedConn channel, merge metaInfo into each connection
+			// If already a wrapperedConn channel, create new ones with strong local host
 			wrappedChan := make(chan *minimartian.WrapperedConn)
 			go func() {
 				defer close(wrappedChan)
 				for wrapped := range c {
+					// Merge existing metaInfo
+					mergedMetaInfo := wrapped.GetMetaInfo()
 					if len(metaInfo) > 0 {
-						wrapped.MergeMetaInfo(metaInfo)
+						for k, v := range metaInfo {
+							mergedMetaInfo[k] = v
+						}
 					}
-					if isStrongHostMode {
-						// Note: we can't change strongHostMode after creation, so we need to create a new one
-						newWrapped := minimartian.NewWrapperedConn(wrapped.Conn, isStrongHostMode, wrapped.GetMetaInfo())
-						newWrapped.MergeMetaInfo(metaInfo)
-						wrappedChan <- newWrapped
-					} else {
-						wrappedChan <- wrapped
-					}
+					// Create new wrapperedConn with strong local host
+					newWrapped := minimartian.NewWrapperedConnWithStrongLocalHost(wrapped.Conn, localAddrStr, mergedMetaInfo)
+					wrappedChan <- newWrapped
 				}
 			}()
 			config.extraIncomingConnChansEx = append(config.extraIncomingConnChansEx, wrappedChan)
 		default:
-			log.Errorf("extraIncomingConnEx: unsupported channel type: %T", ch)
+			log.Errorf("extraIncomingConnChanWithStrongLocalHost: unsupported channel type: %T", ch)
 		}
 	}
 }
