@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -37,6 +38,7 @@ var MitmExports = map[string]interface{}{
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
 	"randomJA3":            mitmConfigRandomJA3,
 	"extraIncomingConn":    mitmConfigExtraIncomingConn,
+	"extraIncomingConnEx":  mitmConfigExtraIncomingConnEx,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -76,8 +78,10 @@ type mitmConfig struct {
 	hijackResponse           func(isHttps bool, urlStr string, rsp []byte, forward func([]byte), reject func())
 	hijackResponseEx         func(isHttps bool, urlStr string, req, rsp []byte, forward func([]byte), reject func())
 
-	// extra incoming connection channels
+	// extra incoming connection channels (legacy, for backward compatibility)
 	extraIncomingConnChans []chan net.Conn
+	// extra incoming connection channels with wrapperedConn
+	extraIncomingConnChansEx []chan *minimartian.WrapperedConn
 }
 
 type MitmConfigOpt func(config *mitmConfig)
@@ -336,6 +340,82 @@ func mitmConfigExtraIncomingConn(ch interface{}) MitmConfigOpt {
 	}
 }
 
+// extraIncomingConnEx 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道（增强版）
+// 支持强主机模式和元数据信息
+// Example:
+// ```
+// connChan = make(chan net.Conn)
+// mitm.Start(8080, mitm.extraIncomingConnEx(true, connChan))  // 启用强主机模式
+// mitm.Start(8080, mitm.extraIncomingConnEx(true, connChan, {"key": "value"}))  // 启用强主机模式并设置元数据
+// ```
+func mitmConfigExtraIncomingConnEx(mode interface{}, ch interface{}, kv ...interface{}) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		// Convert mode to bool
+		isStrongHostMode := false
+		if mode != nil {
+			isStrongHostMode = utils.InterfaceToBoolean(mode)
+		}
+
+		// Convert kv to map
+		metaInfo := make(map[string]interface{})
+		if len(kv) > 0 && kv[0] != nil {
+			metaInfo = utils.InterfaceToGeneralMap(kv[0])
+		}
+
+		// Handle different channel types
+		switch c := ch.(type) {
+		case chan net.Conn:
+			// Convert chan net.Conn to chan *wrapperedConn
+			wrappedChan := make(chan *minimartian.WrapperedConn)
+			go func() {
+				defer close(wrappedChan)
+				for conn := range c {
+					wrapped := minimartian.NewWrapperedConn(conn, isStrongHostMode, metaInfo)
+					wrappedChan <- wrapped
+				}
+			}()
+			config.extraIncomingConnChansEx = append(config.extraIncomingConnChansEx, wrappedChan)
+		case chan interface{}:
+			// Create a converter goroutine for Yak script channels
+			wrappedChan := make(chan *minimartian.WrapperedConn)
+			go func() {
+				defer close(wrappedChan)
+				for v := range c {
+					if conn, ok := v.(net.Conn); ok {
+						wrapped := minimartian.NewWrapperedConn(conn, isStrongHostMode, metaInfo)
+						wrappedChan <- wrapped
+					} else {
+						log.Errorf("extraIncomingConnEx: received non-net.Conn value: %T", v)
+					}
+				}
+			}()
+			config.extraIncomingConnChansEx = append(config.extraIncomingConnChansEx, wrappedChan)
+		case chan *minimartian.WrapperedConn:
+			// If already a wrapperedConn channel, merge metaInfo into each connection
+			wrappedChan := make(chan *minimartian.WrapperedConn)
+			go func() {
+				defer close(wrappedChan)
+				for wrapped := range c {
+					if len(metaInfo) > 0 {
+						wrapped.MergeMetaInfo(metaInfo)
+					}
+					if isStrongHostMode {
+						// Note: we can't change strongHostMode after creation, so we need to create a new one
+						newWrapped := minimartian.NewWrapperedConn(wrapped.Conn, isStrongHostMode, wrapped.GetMetaInfo())
+						newWrapped.MergeMetaInfo(metaInfo)
+						wrappedChan <- newWrapped
+					} else {
+						wrappedChan <- wrapped
+					}
+				}
+			}()
+			config.extraIncomingConnChansEx = append(config.extraIncomingConnChansEx, wrappedChan)
+		default:
+			log.Errorf("extraIncomingConnEx: unsupported channel type: %T", ch)
+		}
+	}
+}
+
 var MITMConfigTunMode = mitmConfigTunMode
 
 // set tunmode ,not process proxy proto
@@ -447,8 +527,12 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_RandomJA3(config.randomJA3),
 	)
 
-	// Add extra incoming connection channels
+	// Add extra incoming connection channels (legacy)
 	for _, ch := range config.extraIncomingConnChans {
+		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConectionChannelLegacy(ch))
+	}
+	// Add extra incoming connection channels (new with wrapperedConn)
+	for _, ch := range config.extraIncomingConnChansEx {
 		mitmOpts = append(mitmOpts, crep.MITM_SetExtraIncomingConectionChannel(ch))
 	}
 
