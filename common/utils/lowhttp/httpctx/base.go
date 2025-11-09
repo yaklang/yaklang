@@ -308,7 +308,8 @@ const (
 	REQUEST_CONTEXT_KEY_PluginContext                = "pluginContext"
 	REQUEST_CONTEXT_KEY_PluginContextCancelFunc      = "pluginContextCancelFunc"
 	REQUEST_CONTEXT_KEY_MITMTaskID                   = "mitmTaskID"
-	REQUEST_CONTEXT_KEY_IsStrongHostMode             = "isStrongHostMode" // Used for transparent hijacking of tun-generated data
+	REQUEST_CONTEXT_KEY_IsStrongHostMode             = "isStrongHostMode"    // Used for transparent hijacking of tun-generated data
+	REQUEST_CONTEXT_KEY_StrongHostLocalAddr          = "strongHostLocalAddr" // Local IP address for strong host mode binding
 )
 
 func SetRequestMITMTaskID(req *http.Request, id string) {

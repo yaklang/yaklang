@@ -2,6 +2,7 @@ package minimartian
 
 import (
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -35,10 +36,10 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	return p.execLowhttp(req)
+	return p.execLowhttp(ctx, req)
 }
 
-func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
+func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, error) {
 	bareBytes := httpctx.GetRequestBytes(req)
 	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
 
@@ -67,6 +68,15 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	if p.GetMaxContentLength() != 0 {
 		MaxContentLength = p.maxContentLength
 	}
+
+	// In strong host mode, we must use the original host from the request
+	// This is critical for transparent hijacking of tun-generated data
+	// The host should be taken from ConnectedToHost which preserves the original host header
+	isStrongHostMode := httpctx.GetIsStrongHostMode(req)
+
+	// In strong host mode, disable connection pool
+	// Strong host connections must not be reused from pool
+	useConnPool := !isStrongHostMode
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
@@ -75,14 +85,15 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
 		lowhttp.WithGmTLSPrefer(p.gmPrefer),
-		lowhttp.WithConnPool(true),
+		lowhttp.WithConnPool(useConnPool),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
-	// Use custom connection pool if available
-	if p.connPool != nil {
+	// Use custom connection pool if available and not in strong host mode
+	// In strong host mode, connections must not be reused from pool
+	if p.connPool != nil && !isStrongHostMode {
 		opts = append(opts, lowhttp.ConnPool(p.connPool))
 	}
 
@@ -105,29 +116,43 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		opts = append(opts, lowhttp.WithPort(connectedPort))
 	}
 
-	// In strong host mode, we must use the original host from the request
-	// This is critical for transparent hijacking of tun-generated data
-	// The host should be taken from ConnectedToHost which preserves the original host header
-	isStrongHostMode := httpctx.GetIsStrongHostMode(req)
 	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 
 	// Determine the hostname to use for strong host mode
-	var strongHostName string
 	if connectedHost != "" {
 		opts = append(opts, lowhttp.WithHost(connectedHost))
-		strongHostName = connectedHost
 		if isStrongHostMode {
 			log.Debugf("mitm: using strong host mode, dialing with original host: %s", connectedHost)
 		}
-	} else if isStrongHostMode && req.Host != "" {
-		// In strong host mode, prefer using the request's Host header if ConnectedToHost is not set
-		strongHostName = req.Host
-		log.Debugf("mitm: using strong host mode, dialing with request Host header: %s", req.Host)
+
 	}
 
-	// Pass strong host mode to netx dial layer
-	if isStrongHostMode && strongHostName != "" {
-		opts = append(opts, lowhttp.WithExtendDialXOption(netx.DialX_WithStrongHostMode(strongHostName)))
+	// In strong host mode, get localAddr from httpctx request context
+	// The strong host mode configuration IP is the localAddr, which must be a local IP address
+	if isStrongHostMode {
+		// Get localAddr from httpctx - this is set from WrapperedConn's metaInfo
+		localAddrIP := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_StrongHostLocalAddr)
+
+		// Validate that localAddr is an IP address (not a hostname)
+		if localAddrIP != "" {
+			// Extract IP from host:port format if needed
+			host, _, err := utils.ParseStringToHostPort(localAddrIP)
+			if err == nil {
+				localAddrIP = host
+			}
+			// Validate it's an IP address
+			ip := net.ParseIP(utils.FixForParseIP(localAddrIP))
+			if ip != nil {
+				// Pass strong host mode with localAddr IP to netx dial layer
+				// DialX_WithStrongHostMode expects the local IP address to bind to
+				opts = append(opts, lowhttp.WithExtendDialXOption(netx.DialX_WithStrongHostMode(localAddrIP)))
+				log.Debugf("mitm: strong host mode with localAddr: %s", localAddrIP)
+			} else {
+				log.Warnf("mitm: strong host mode localAddr '%s' is not a valid IP address, ignoring", localAddrIP)
+			}
+		} else {
+			log.Debugf("mitm: strong host mode enabled but no localAddr found in httpctx")
+		}
 	}
 
 	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
