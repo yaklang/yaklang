@@ -96,10 +96,10 @@ type Proxy struct {
 	// connection pool for remote server connections
 	connPool *lowhttp.LowHttpConnPool
 
-	extraIncomingConnCh chan net.Conn
+	extraIncomingConnCh chan *WrapperedConn
 }
 
-func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan net.Conn) {
+func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan *WrapperedConn) {
 	go func() {
 		for {
 			select {
@@ -111,6 +111,29 @@ func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan 
 				}
 				select {
 				case p.extraIncomingConnCh <- conn:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+}
+
+// MergeExtraIncomingConectionChannelLegacy 兼容旧版本的 net.Conn channel
+// 自动将 net.Conn 包装为 wrapperedConn
+func (p *Proxy) MergeExtraIncomingConectionChannelLegacy(ctx context.Context, ch chan net.Conn) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case conn, ok := <-ch:
+				if !ok {
+					return
+				}
+				wrapped := NewWrapperedConn(conn, false, nil)
+				select {
+				case p.extraIncomingConnCh <- wrapped:
 				case <-ctx.Done():
 					return
 				}
@@ -164,7 +187,7 @@ func NewProxy() *Proxy {
 		ctxCacheInitOnce:    new(sync.Once),
 		ctxCacheLock:        new(sync.Mutex),
 		ctxCache:            utils.NewTTLCache[*Context](5 * time.Minute),
-		extraIncomingConnCh: make(chan net.Conn),
+		extraIncomingConnCh: make(chan *WrapperedConn),
 	}
 	return proxy
 }

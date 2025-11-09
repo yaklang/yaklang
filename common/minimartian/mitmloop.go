@@ -135,7 +135,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 
 	log.Infof("(mitm) ready for recv connection from: %v", l.Addr().String())
 
-	incomming := make(chan net.Conn)
+	incomming := make(chan *WrapperedConn)
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 	// start listener to start accept connection
@@ -169,8 +169,10 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				log.Errorf("mitm: failed to accept: %v", err)
 				return
 			}
+			// Wrap the accepted connection
+			wrapped := NewWrapperedConn(conn, false, nil)
 			select {
-			case incomming <- conn:
+			case incomming <- wrapped:
 			case <-ctx.Done():
 				conn.Close()
 				return
@@ -183,14 +185,14 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return
-			case conn, ok := <-p.extraIncomingConnCh:
+			case wrappedConn, ok := <-p.extraIncomingConnCh:
 				if !ok {
 					return
 				}
 				select {
-				case incomming <- conn:
+				case incomming <- wrappedConn:
 				case <-ctx.Done():
-					conn.Close()
+					wrappedConn.Close()
 					return
 				}
 			}
@@ -204,7 +206,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 			return nil
 		}
 
-		var conn net.Conn
+		var wrappedConn *WrapperedConn
 		select {
 		case <-ctx.Done():
 			log.Info("closing martian proxying...")
@@ -214,12 +216,14 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 			if !ok {
 				return utils.Errorf("incomming channel closed")
 			}
-			conn = rawConn
+			wrappedConn = rawConn
 		}
 
-		if conn == nil {
+		if wrappedConn == nil || wrappedConn.Conn == nil {
 			continue
 		}
+
+		conn := wrappedConn.Conn
 
 		// generate ksuid
 		uid := ksuid.New().String()
@@ -237,7 +241,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 		delay = 0
 
 		log.Debugf("mitm: accepted connection from %s", conn.RemoteAddr())
-		go func(uidStr string, originConn net.Conn) {
+		go func(uidStr string, originConn net.Conn, wrapped *WrapperedConn) {
 			subCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			defer func() {
@@ -262,6 +266,23 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				log.Error(err)
 				return
 			}
+
+			// Apply metaInfo and strongHostMode from wrapperedConn to session
+			if wrapped != nil {
+				session := proxyContext.Session()
+				if wrapped.IsStrongHostMode() {
+					session.Set("StrongHostMode", true)
+				}
+				metaInfo := wrapped.GetMetaInfo()
+				if len(metaInfo) > 0 {
+					session.Set("ConnMetaInfo", metaInfo)
+					// Also set individual meta info keys for easy access
+					for k, v := range metaInfo {
+						session.Set("ConnMetaInfo_"+k, v)
+					}
+				}
+			}
+
 			if !p.tunMode && isS5 {
 				dstHost, dstPort, err := s5config.ServerConnect(handledConnection)
 				if err != nil {
@@ -278,10 +299,24 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					log.Error(err)
 					return
 				}
+				// Re-apply metaInfo after recreating context
+				if wrapped != nil {
+					session := proxyContext.Session()
+					if wrapped.IsStrongHostMode() {
+						session.Set("StrongHostMode", true)
+					}
+					metaInfo := wrapped.GetMetaInfo()
+					if len(metaInfo) > 0 {
+						session.Set("ConnMetaInfo", metaInfo)
+						for k, v := range metaInfo {
+							session.Set("ConnMetaInfo_"+k, v)
+						}
+					}
+				}
 				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
 			}
 			p.handleLoop(isTls, handledConnection, proxyContext)
-		}(uid, conn)
+		}(uid, conn, wrappedConn)
 	}
 }
 
