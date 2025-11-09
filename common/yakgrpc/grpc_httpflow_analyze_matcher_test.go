@@ -179,8 +179,11 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MatcherActions(t *testing.T) {
 							if json.Unmarshal([]byte(msg.Content.Data), &contentData) == nil {
 								if contentData.ID == "跳过分析数" {
 									if count, err := strconv.ParseInt(contentData.Data, 10, 64); err == nil {
-										discardCount = count
-										t.Logf("Found discard count: %d", discardCount)
+										// 由于并发处理，消息可能乱序到达，取最大值作为最终值
+										if count > discardCount {
+											discardCount = count
+										}
+										t.Logf("Found discard count: %d (current max: %d)", count, discardCount)
 									}
 								}
 							}
@@ -397,8 +400,11 @@ func TestGRPCMUSTPASS_AnalyzeHTTPFlow_MultipleMatchers(t *testing.T) {
 							if json.Unmarshal([]byte(msg.Content.Data), &contentData) == nil {
 								if contentData.ID == "跳过分析数" {
 									if count, err := strconv.ParseInt(contentData.Data, 10, 64); err == nil {
-										discardCount = count
-										t.Logf("Found discard count: %d", discardCount)
+										// 由于并发处理，消息可能乱序到达，取最大值作为最终值
+										if count > discardCount {
+											discardCount = count
+										}
+										t.Logf("Found discard count: %d (current max: %d)", count, discardCount)
 									}
 								}
 							}
