@@ -4,6 +4,8 @@ Content-Length: 1
 
 d`)
 check = false
+log.info("mitmProxyPort: " + string(mitmProxyPort))
+log.info("mockHostPort: " + str.HostPort(host, port))
 go func{
     mitm.Start(mitmProxyPort, mitm.callback((isHttps, url, req, rsp) => {
         check = true
@@ -17,5 +19,8 @@ Host: localhost
 a`, poc.proxy(mitmAddr), poc.host(host), poc.port(port))~
 dump(rsp)
 if string(poc.Split(rsp)[1]) != "d" {
+    dump(rsp)
+    println("==================")
+    println(rsp)
     die("mitm is not working well (connected to host)")
 }
