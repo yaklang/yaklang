@@ -96,6 +96,56 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 		opt(config)
 	}
 
+	// 如果当前进程已经具备 root 权限，直接执行命令而不通过 AppleScript
+	if isPrivileged() {
+		// 直接通过 shell 执行命令
+		cmder := exec.CommandContext(ctx, "sh", "-c", cmd)
+		
+		if config.DiscardStdoutStderr {
+			cmder.Stdout = nil
+			cmder.Stderr = nil
+		} else {
+			// 收集输出
+			var out bytes.Buffer
+			cmder.Stdout = &out
+			cmder.Stderr = &out
+		}
+
+		// 启动命令
+		if err := cmder.Start(); err != nil {
+			return nil, utils.Wrapf(err, "failed to start command '%v'", utils.ShrinkString(cmd, 30))
+		}
+
+		// 在进程启动后，调用 BeforePrivilegedProcessExecute 回调（如果设置了）
+		// 这与 AppleScript 路径的行为保持一致：在特权进程真正启动后才调用
+		if config.BeforePrivilegedProcessExecute != nil {
+			config.BeforePrivilegedProcessExecute()
+		}
+
+		// 等待命令完成
+		err := cmder.Wait()
+		if err != nil {
+			if config.DiscardStdoutStderr {
+				return nil, utils.Wrapf(err, "run command '%v' failed", utils.ShrinkString(cmd, 30))
+			}
+			// 从 Stdout 中获取输出
+			if out, ok := cmder.Stdout.(*bytes.Buffer); ok {
+				return out.Bytes(), utils.Wrapf(err, "run command '%v' failed, output: %v", utils.ShrinkString(cmd, 30), out.String())
+			}
+			return nil, utils.Wrapf(err, "run command '%v' failed", utils.ShrinkString(cmd, 30))
+		}
+
+		if config.DiscardStdoutStderr {
+			return nil, nil
+		}
+		
+		// 从 Stdout 中获取输出
+		if out, ok := cmder.Stdout.(*bytes.Buffer); ok {
+			return out.Bytes(), nil
+		}
+		return nil, nil
+	}
+
 	if config.Title == "" {
 		config.Title = p.AppName
 	}
