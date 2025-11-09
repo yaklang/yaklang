@@ -667,6 +667,26 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	// set plugin context
 	httpctx.SetPluginContext(req, consts.NewPluginContext())
 
+	// Set IsStrongHostMode in httpctx from session if enabled
+	// This is critical for transparent hijacking of tun-generated data
+	if ctx.GetSessionBoolValue("StrongHostMode") {
+		httpctx.SetIsStrongHostMode(req, true)
+		// Also set tag for backward compatibility and visibility
+		existingTags := httpctx.GetFlowTags(req)
+		hasTag := false
+		for _, tag := range existingTags {
+			if tag == "IsStrongHostMode" {
+				hasTag = true
+				break
+			}
+		}
+		if !hasTag {
+			existingTags = append(existingTags, "IsStrongHostMode")
+			httpctx.SetFlowTags(req, existingTags)
+		}
+		log.Debugf("mitm: set IsStrongHostMode in httpctx for request from extraIncomingConn: %v", req.URL)
+	}
+
 	if p.tunMode { // tunnel mode
 		return p.handleRequest(conn, req, ctx)
 	}
@@ -788,6 +808,26 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 
 // handleRequest handles an ordinary HTTP request.
 func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) error {
+	// Set IsStrongHostMode in httpctx from session if enabled (for tunnel mode and other paths)
+	// This is critical for transparent hijacking of tun-generated data
+	if ctx.GetSessionBoolValue("StrongHostMode") {
+		httpctx.SetIsStrongHostMode(req, true)
+		// Also set tag for backward compatibility and visibility
+		existingTags := httpctx.GetFlowTags(req)
+		hasTag := false
+		for _, tag := range existingTags {
+			if tag == "IsStrongHostMode" {
+				hasTag = true
+				break
+			}
+		}
+		if !hasTag {
+			existingTags = append(existingTags, "IsStrongHostMode")
+			httpctx.SetFlowTags(req, existingTags)
+		}
+		log.Debugf("mitm: set IsStrongHostMode in httpctx for request in handleRequest: %v", req.URL)
+	}
+
 	if httpctx.GetRequestHTTPS(req) || ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_ConnectToHTTPS) {
 		req.URL.Scheme = "https"
 		httpctx.SetRequestHTTPS(req, true)

@@ -104,8 +104,24 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		opts = append(opts, lowhttp.WithPort(connectedPort))
 	}
 
-	if connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); connectedHost != "" {
+	// In strong host mode, we must use the original host from the request
+	// This is critical for transparent hijacking of tun-generated data
+	// The host should be taken from ConnectedToHost which preserves the original host header
+	isStrongHostMode := httpctx.GetIsStrongHostMode(req)
+	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+	if connectedHost != "" {
 		opts = append(opts, lowhttp.WithHost(connectedHost))
+		if isStrongHostMode {
+			log.Debugf("mitm: using strong host mode, dialing with original host: %s", connectedHost)
+		}
+	}
+
+	if isStrongHostMode {
+		// In strong host mode, prefer using the request's Host header if ConnectedToHost is not set
+		if req.Host != "" {
+			opts = append(opts, lowhttp.WithExtendDialXOption())
+			log.Debugf("mitm: using strong host mode, dialing with request Host header: %s", req.Host)
+		}
 	}
 
 	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
