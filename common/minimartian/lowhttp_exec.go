@@ -222,10 +222,6 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 	}
 
 	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
-	if err != nil {
-		return nil, err
-	}
-
 	if rsp != nil {
 		rsp.Request = req
 	}
