@@ -99,7 +99,7 @@ type Proxy struct {
 	extraIncomingConnCh chan *WrapperedConn
 }
 
-func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan *WrapperedConn) {
+func (p *Proxy) MergeExtraIncomingConnectionChannel(ctx context.Context, ch chan *WrapperedConn) {
 	go func() {
 		for {
 			select {
@@ -119,9 +119,9 @@ func (p *Proxy) MergeExtraIncomingConectionChannel(ctx context.Context, ch chan 
 	}()
 }
 
-// MergeExtraIncomingConectionChannelLegacy 兼容旧版本的 net.Conn channel
+// MergeExtraIncomingConnectionChannelLegacy 兼容旧版本的 net.Conn channel
 // 自动将 net.Conn 包装为 wrapperedConn
-func (p *Proxy) MergeExtraIncomingConectionChannelLegacy(ctx context.Context, ch chan net.Conn) {
+func (p *Proxy) MergeExtraIncomingConnectionChannelLegacy(ctx context.Context, ch chan net.Conn) {
 	go func() {
 		for {
 			select {
