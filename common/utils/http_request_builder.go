@@ -245,6 +245,10 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 		}
 	}
 
+	if !https && !IsNil(t.TLS) {
+		https = true
+	}
+
 	if port <= 0 {
 		if https {
 			port = 443
