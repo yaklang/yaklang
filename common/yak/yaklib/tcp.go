@@ -2,13 +2,14 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -114,6 +115,7 @@ type _tcpDialer struct {
 	proxy     string
 	timeout   time.Duration
 	localAddr *net.TCPAddr
+	err       error // Error from invalid localAddr
 }
 
 type dialerOpt func(d *_tcpDialer)
@@ -124,14 +126,36 @@ func _tcpConnect(host string, port interface{}, opts ...dialerOpt) (*tcpConnecti
 		opt(tcpDialer)
 	}
 
+	// Check for errors from options (e.g., invalid localAddr)
+	if tcpDialer.err != nil {
+		return nil, tcpDialer.err
+	}
+
 	var conn net.Conn
 	var err error
 	addr := utils.HostPort(fmt.Sprint(host), port)
-	if tcpDialer.tlsConfig != nil {
-		conn, err = netx.DialTLSTimeout(tcpDialer.timeout, addr, tcpDialer.tlsConfig, tcpDialer.proxy)
-	} else {
-		conn, err = netx.DialTCPTimeout(tcpDialer.timeout, addr, tcpDialer.proxy)
+
+	// Build DialX options
+	dialOpts := []netx.DialXOption{
+		netx.DialX_WithTimeout(tcpDialer.timeout),
 	}
+
+	// Add local address if specified
+	if tcpDialer.localAddr != nil {
+		dialOpts = append(dialOpts, netx.DialX_WithTCPLocalAddr(tcpDialer.localAddr))
+	}
+
+	// Add proxy if specified
+	if tcpDialer.proxy != "" {
+		dialOpts = append(dialOpts, netx.DialX_WithProxy(tcpDialer.proxy))
+	}
+
+	// Add TLS config if specified
+	if tcpDialer.tlsConfig != nil {
+		dialOpts = append(dialOpts, netx.DialX_WithTLS(true), netx.DialX_WithGMTLSConfig(tcpDialer.tlsConfig))
+	}
+
+	conn, err = netx.DialX(addr, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,17 +169,36 @@ func _tcpTimeout(i float64) dialerOpt {
 }
 
 func _tcpLocalAddr(i interface{}) dialerOpt {
-	host, port, err := utils.ParseStringToHostPort(fmt.Sprint(i))
-	if err != nil {
-		log.Errorf("parse local addr failed: %s, ORIGIN: %v", err, i)
-		return func(*_tcpDialer) {}
+	addrStr := fmt.Sprint(i)
+
+	// Try to parse as IP address first (e.g., "192.168.0.1")
+	ip := net.ParseIP(utils.FixForParseIP(addrStr))
+	if ip != nil {
+		return func(d *_tcpDialer) {
+			d.localAddr = &net.TCPAddr{
+				IP:   ip,
+				Port: 0, // Let system choose port
+			}
+		}
 	}
 
-	return func(d *_tcpDialer) {
-		d.localAddr = &net.TCPAddr{
-			IP:   net.ParseIP(host),
-			Port: port,
+	// Try to parse as host:port format (e.g., "192.168.0.1:0")
+	host, port, err := utils.ParseStringToHostPort(addrStr)
+	if err == nil {
+		ip = net.ParseIP(utils.FixForParseIP(host))
+		if ip != nil {
+			return func(d *_tcpDialer) {
+				d.localAddr = &net.TCPAddr{
+					IP:   ip,
+					Port: port,
+				}
+			}
 		}
+	}
+
+	// If not a valid IP, return error - DNS resolution is not allowed for localAddr
+	return func(d *_tcpDialer) {
+		d.err = fmt.Errorf("localAddr '%s' is not a valid IP address, DNS resolution is not allowed", addrStr)
 	}
 }
 

@@ -2,10 +2,11 @@ package netx
 
 import (
 	"crypto/tls"
-	"github.com/yaklang/yaklang/common/consts"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	utls "github.com/refraction-networking/utls"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -88,11 +89,19 @@ type dialXConfig struct {
 
 	LocalAddr *net.UDPAddr
 
+	TCPLocalAddr *net.TCPAddr // TCP local address for binding to specific network interface
+
 	JustListen bool // just listen udp , not connect .
 
 	TraceInfo *DialXTraceInfo
 
 	Dialer func(duration time.Duration, target string) (net.Conn, error)
+
+	// StrongHostMode: In strong host mode, bind to a specific local IP address
+	// This is critical for transparent proxy scenarios where the connection must
+	// be bound to a specific network interface
+	StrongHostMode    bool
+	StrongLocalAddrIP string // The local IP address to bind to (must be an IP, not hostname)
 }
 
 type DialXOption func(c *dialXConfig)
@@ -299,6 +308,24 @@ func DialX_WithUdpJustListen(b bool) DialXOption {
 func DialX_WithDialer(dialer func(duration time.Duration, target string) (net.Conn, error)) DialXOption {
 	return func(c *dialXConfig) {
 		c.Dialer = dialer
+	}
+}
+
+// DialX_WithTCPLocalAddr sets the local TCP address for binding to a specific network interface
+func DialX_WithTCPLocalAddr(addr *net.TCPAddr) DialXOption {
+	return func(c *dialXConfig) {
+		c.TCPLocalAddr = addr
+	}
+}
+
+// DialX_WithStrongHostMode enables strong host mode for dialing
+// In strong host mode, the connection will be bound to a specific local IP address
+// This is important for transparent proxy scenarios where the connection must
+// be bound to a specific network interface
+func DialX_WithStrongHostMode(localIP string) DialXOption {
+	return func(c *dialXConfig) {
+		c.StrongHostMode = true
+		c.StrongLocalAddrIP = localIP
 	}
 }
 
