@@ -91,8 +91,6 @@ type Proxy struct {
 
 	forceDisableKeepAlive bool
 
-	tunMode bool
-
 	// connection pool for remote server connections
 	connPool *lowhttp.LowHttpConnPool
 
@@ -273,10 +271,6 @@ func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 
 func (p *Proxy) SetFindProcessName(b bool) {
 	p.findProcessName = b
-}
-
-func (p *Proxy) SetTunMode(b bool) {
-	p.tunMode = b
 }
 
 // SetConnPool sets the connection pool for remote server connections
