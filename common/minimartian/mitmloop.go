@@ -107,26 +107,26 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 
 	defer l.Close()
 	s5config := NewSocks5Config()
-	if !p.tunMode {
-		host, port, err := utils.ParseStringToHostPort(l.Addr().String())
-		if err != nil {
-			return err
-		}
-		if host == "0.0.0.0" || host == `[::]` {
-			host = "127.0.0.1"
-		}
-		s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
-		s5config.ProxyPassword = p.proxyPassword
-		s5config.ProxyUsername = p.proxyUsername
-		if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
-			urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
-			if err != nil {
-				return utils.Errorf("parse s5 downstream url failed, err: %v", err)
-			}
-			urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
-			s5config.DownstreamHTTPProxy = urlIns.String()
-		}
+
+	host, port, err := utils.ParseStringToHostPort(l.Addr().String())
+	if err != nil {
+		return err
 	}
+	if host == "0.0.0.0" || host == `[::]` {
+		host = "127.0.0.1"
+	}
+	s5config.DownstreamHTTPProxy = "http://" + utils.HostPort(host, port)
+	s5config.ProxyPassword = p.proxyPassword
+	s5config.ProxyUsername = p.proxyUsername
+	if s5config.ProxyPassword != "" || s5config.ProxyUsername != "" {
+		urlIns, err := url.Parse(s5config.DownstreamHTTPProxy)
+		if err != nil {
+			return utils.Errorf("parse s5 downstream url failed, err: %v", err)
+		}
+		urlIns.User = url.UserPassword(s5config.ProxyUsername, s5config.ProxyPassword)
+		s5config.DownstreamHTTPProxy = urlIns.String()
+	}
+
 	statusContext, statusCancel := context.WithCancel(ctx)
 	defer statusCancel()
 	cacheConns, removeConns := p.startConnLog(statusContext)
@@ -288,7 +288,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				}
 			}
 
-			if !p.tunMode && isS5 {
+			if isS5 {
 				dstHost, dstPort, err := s5config.ServerConnect(handledConnection)
 				if err != nil {
 					log.Errorf("server s5 connect failed: %s", err)
@@ -528,7 +528,8 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		return err
 	}
 	// 22 is the TLS handshake.
-	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS))
+	isTLS = isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS)
+	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS)
 	if parsedConnectedToPort == 0 {
 		if isTLS {
 			parsedConnectedToPort = 443
@@ -710,9 +711,6 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		log.Debugf("mitm: set IsStrongHostMode in httpctx for request from extraIncomingConn: %v", req.URL)
 	}
 
-	if p.tunMode { // tunnel mode
-		return p.handleRequest(conn, req, ctx)
-	}
 	return p.handleProxyAuth(conn, req, timer, ctx) // mitm mode should process proxy proto
 }
 

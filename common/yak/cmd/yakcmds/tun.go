@@ -625,7 +625,7 @@ func testTunSocketDevice(c *cli.Context) error {
 	// 创建 MITM 服务器，使用支持强主机模式的 EX 接口
 	mitmServer, err := crep.NewMITMServer(
 		crep.MITM_SetExtraIncomingConnectionChannel(wrappedConnChan),
-		crep.MITM_SetTunMode(true),
+		// crep.MITM_SetTunMode(true),
 		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rspIns *http.Response, rsp []byte, remoteAddr string) []byte {
 			// 验证劫持是否生效：在响应中添加测试 nonce
 			urlStr := ""
