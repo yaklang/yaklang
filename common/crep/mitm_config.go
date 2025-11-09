@@ -669,13 +669,6 @@ func MITM_SetWebsocketResponseMirrorRaw(f func(req []byte)) MITMConfig {
 	}
 }
 
-func MITM_SetTunMode(b bool) MITMConfig {
-	return func(server *MITMServer) error {
-		server.tunMode = b
-		return nil
-	}
-}
-
 func MITM_SetDialer(dialer func(duration time.Duration, target string) (net.Conn, error)) MITMConfig {
 	return func(server *MITMServer) error {
 		server.dialer = dialer
