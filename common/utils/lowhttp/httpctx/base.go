@@ -308,6 +308,7 @@ const (
 	REQUEST_CONTEXT_KEY_PluginContext                = "pluginContext"
 	REQUEST_CONTEXT_KEY_PluginContextCancelFunc      = "pluginContextCancelFunc"
 	REQUEST_CONTEXT_KEY_MITMTaskID                   = "mitmTaskID"
+	REQUEST_CONTEXT_KEY_IsStrongHostMode             = "isStrongHostMode" // Used for transparent hijacking of tun-generated data
 )
 
 func SetRequestMITMTaskID(req *http.Request, id string) {
@@ -723,4 +724,15 @@ func SetProcessName(r *http.Request, name string) {
 
 func GetProcessName(r *http.Request) string {
 	return GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ProcessName)
+}
+
+// SetIsStrongHostMode sets the strong host mode flag in httpctx
+// This is critical for transparent hijacking of tun-generated data
+func SetIsStrongHostMode(r *http.Request, b bool) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsStrongHostMode, b)
+}
+
+// GetIsStrongHostMode gets the strong host mode flag from httpctx
+func GetIsStrongHostMode(r *http.Request) bool {
+	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsStrongHostMode)
 }
