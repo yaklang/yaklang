@@ -69,7 +69,6 @@ type mitmConfig struct {
 	gmtlsOnly              bool
 	randomJA3              bool
 	dialer                 func(timeout time.Duration, target string) (net.Conn, error)
-	tunMode                bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -416,15 +415,6 @@ func mitmConfigExtraIncomingConnChanWithStrongLocalHost(localAddr interface{}, c
 	}
 }
 
-var MITMConfigTunMode = mitmConfigTunMode
-
-// set tunmode ,not process proxy proto
-func mitmConfigTunMode(b bool) MitmConfigOpt {
-	return func(config *mitmConfig) {
-		config.tunMode = b
-	}
-}
-
 var MITMConfigDialer = mitmConfigDialer
 
 // setDialer for proxy
@@ -520,7 +510,6 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 	var mitmOpts []crep.MITMConfig
 	mitmOpts = append(mitmOpts,
 		crep.MITM_SetDialer(config.dialer),
-		crep.MITM_SetTunMode(config.tunMode),
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),

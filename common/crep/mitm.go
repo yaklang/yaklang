@@ -360,8 +360,6 @@ type MITMServer struct {
 	// random JA3 fingerprint
 	randomJA3 bool
 
-	tunMode bool
-
 	// connection pool for remote server connections
 	connPool       *lowhttp.LowHttpConnPool
 	connPoolCtx    context.Context

@@ -202,6 +202,7 @@ func batchAddSpecificIPRouteToNetInterface(ipList []string, interfaceName string
 		utils.TimeoutContextSeconds(120), combinedCmd,
 		privileged.WithTitle(title),
 		privileged.WithDescription(description),
+		// privileged.WithSkipConfirmDialog(),
 	)
 	if err != nil {
 		spew.Dump(err)
@@ -272,6 +273,7 @@ func batchDeleteSpecificIPRoute(ipList []string, isSingle bool) (success []strin
 		utils.TimeoutContextSeconds(120), combinedCmd,
 		privileged.WithTitle(title),
 		privileged.WithDescription(description),
+		// privileged.WithSkipConfirmDialog(),
 	)
 	if err != nil {
 		spew.Dump(err)
