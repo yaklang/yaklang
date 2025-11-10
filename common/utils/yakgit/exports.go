@@ -44,6 +44,7 @@ var Exports = map[string]any{
 	"checkoutKeep":   WithCheckoutKeep,
 	"noFetchTags":    WithNoFetchTags,
 	"fetchAllTags":   WithFetchAllTags,
+	"withBranch":     WithBranch,
 
 	// inspect
 	"handleCommit":    WithHandleGitCommit,

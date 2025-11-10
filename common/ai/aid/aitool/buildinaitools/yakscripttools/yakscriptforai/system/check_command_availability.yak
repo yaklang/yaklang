@@ -117,7 +117,7 @@ if verbose {
     pathEnv := os.Getenv("PATH")
     if pathEnv != "" {
         yakit.Info("当前PATH环境变量:")
-        pathList := str.Split(pathEnv, string(os.PathSeparator))
+        pathList := str.Split(pathEnv, string(file.SEPARATOR))
         for i, path := range pathList {
             yakit.Info("  [%d] %s", i+1, path)
         }

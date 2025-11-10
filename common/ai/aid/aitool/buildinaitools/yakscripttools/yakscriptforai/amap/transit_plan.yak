@@ -7,7 +7,7 @@ dst = cli.String("destination",cli.setHelp("Ending point of the route planning")
 city = cli.String("city",cli.setHelp("City where the route is located"))
 cli.check()
 
-res = amap.GetTransitPlan(ori,dst,amap.city(city))
+res, err  = amap.GetTransitPlan(ori,dst,amap.city(city))
 if err {
     log.error("invoke GetTransitPlan failed: %v" % err)
     return
