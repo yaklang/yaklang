@@ -166,6 +166,92 @@ if err != nil {
 
 ---
 
+## 🔍 search_yaklang_samples - 语义搜索工具
+
+### 什么时候使用 search_yaklang_samples？
+
+`search_yaklang_samples` 是基于 RAG（检索增强生成）的语义搜索工具，与 `grep_yaklang_samples` 互补使用：
+
+**使用场景：**
+1. **不确定关键词时** - 当你想搜索某个功能，但不知道确切的函数名或关键词
+2. **关键词搜索失败时** - 使用 `grep_yaklang_samples` 搜索不到结果时
+3. **需要宽泛搜索时** - 想要查找某类功能的相关代码，但不确定具体实现方式
+4. **概念性搜索时** - 通过描述功能需求来搜索相关代码示例
+
+**grep vs search 的区别：**
+```
+grep_yaklang_samples:
+- 精确文本匹配
+- 适合已知函数名/关键词
+- 速度快，结果精确
+- 示例: "servicescan.Scan"
+
+search_yaklang_samples:
+- 语义理解搜索
+- 适合模糊概念查询
+- 通过 RAG 理解意图
+- 示例: "如何进行端口扫描？"
+```
+
+### search_yaklang_samples 使用方法
+
+**基础参数：**
+- `query` - 搜索查询（可以是自然语言描述或关键词）
+- `top_k` - 返回结果数量（默认 5，可根据需要调整）
+
+**使用示例：**
+
+**场景1：不知道确切函数名**
+```json
+{"@action": "search_yaklang_samples",
+ "query": "如何发送HTTP请求并处理响应？",
+ "top_k": 5,
+ "human_readable_thought": "我不确定 Yaklang 中 HTTP 请求的具体 API 名称，使用语义搜索查找相关示例"}
+```
+
+**场景2：grep 搜索失败后**
+```json
+{"@action": "search_yaklang_samples",
+ "query": "如何进行数据库操作？如何查询和插入数据？",
+ "top_k": 8,
+ "human_readable_thought": "grep 搜索 'database' 没有结果，尝试用语义搜索查找数据库相关功能"}
+```
+
+**场景3：宽泛的功能搜索**
+```json
+{"@action": "search_yaklang_samples",
+ "query": "如何处理文件？如何读取和解析文件？",
+ "top_k": 10,
+ "human_readable_thought": "需要了解 Yaklang 中文件处理的各种方式，使用语义搜索获取更全面的示例"}
+```
+
+### 推荐搜索策略
+
+**优先级流程：**
+```
+1. 如果知道确切的函数名/关键词
+   → 使用 grep_yaklang_samples
+
+2. 如果不确定关键词或 grep 搜索失败
+   → 使用 search_yaklang_samples
+
+3. 结合使用：
+   search 找到相关概念 → grep 精确查找具体用法
+```
+
+**示例工作流：**
+```
+需求：实现一个网络扫描功能
+  ↓
+【步骤1】search_yaklang_samples "网络扫描"
+  ↓（发现 servicescan 相关）
+【步骤2】grep_yaklang_samples "servicescan.Scan"
+  ↓（获取精确用法）
+【步骤3】write_code 基于样例编写代码
+```
+
+---
+
 ## 生成代码的正确性
 
 在你第一次生成代码时，务必确保代码的正确性和完整性。请遵循以下指导原则：

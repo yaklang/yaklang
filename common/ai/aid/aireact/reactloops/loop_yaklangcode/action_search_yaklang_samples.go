@@ -468,20 +468,16 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 					i+1, len(results), result.Score))
 
 				// 显示文档内容
-				content := result.Document.Content
+				var content string
+				if result.KnowledgeBaseEntry != nil {
+					content = result.KnowledgeBaseEntry.KnowledgeDetails
+				} else {
+					content = result.Document.Content
+				}
 				if len(content) > 1000 {
 					content = content[:1000] + "\n[... 内容已截断 ...]"
 				}
 				resultBuffer.WriteString(fmt.Sprintf("内容：\n%s\n", content))
-
-				// 显示元数据信息
-				if len(result.Document.Metadata) > 0 {
-					resultBuffer.WriteString("元数据：\n")
-					for key, value := range result.Document.Metadata {
-						resultBuffer.WriteString(fmt.Sprintf("  %s: %v\n", key, value))
-					}
-				}
-
 				resultBuffer.WriteString("\n")
 			}
 
