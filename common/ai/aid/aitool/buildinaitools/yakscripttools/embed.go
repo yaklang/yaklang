@@ -30,3 +30,8 @@ func InitEmbedFS() {
 		fs:         resourceFS,
 	}
 }
+
+func GetEmbedFS() fi.FileSystem {
+	InitEmbedFS()
+	return yakScriptFS
+}
