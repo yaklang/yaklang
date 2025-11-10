@@ -56,7 +56,7 @@ func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 
 			}
 			if !(RiskCVE || (RiskDescription && RiskSolution)) {
-				ret.NewError(funcName+" should be called with (risk.description and risk.solution) or risk.cve", v)
+				ret.NewError(ErrorRiskCheck(funcName), v)
 			}
 		})
 	}
@@ -141,6 +141,6 @@ func ErrorRiskCreateNotSave() string {
 	return "risk.CreateRisk should be saved use `risk.Save`"
 }
 
-func ErrorRiskCheck() string {
-	return "risk.NewRisk should be called with (risk.description and risk.solution) or risk.cve"
+func ErrorRiskCheck(name string) string {
+	return name + " should be called with (risk.description and risk.solution) or risk.cve"
 }

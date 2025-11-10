@@ -1,8 +1,9 @@
 package test
 
 import (
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
 )
@@ -14,7 +15,7 @@ func TestSSARuleMustPassRiskOption(t *testing.T) {
 			"abc"
 		)
 			`, []string{
-			rules.ErrorRiskCheck(),
+			rules.ErrorRiskCheck("risk.NewRisk"),
 		})
 	})
 	t.Run("risk with cve", func(t *testing.T) {
@@ -41,7 +42,7 @@ func TestSSARuleMustPassRiskOption(t *testing.T) {
 			risk.description("abc")
 		)
 			`, []string{
-			rules.ErrorRiskCheck(),
+			rules.ErrorRiskCheck("risk.NewRisk"),
 		})
 	})
 	t.Run("risk with solution", func(t *testing.T) {
@@ -51,7 +52,7 @@ func TestSSARuleMustPassRiskOption(t *testing.T) {
 			risk.solution("abc")
 		)
 			`, []string{
-			rules.ErrorRiskCheck(),
+			rules.ErrorRiskCheck("risk.NewRisk"),
 		})
 	})
 	t.Run("risk with desc and solution", func(t *testing.T) {
