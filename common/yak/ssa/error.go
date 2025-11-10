@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -33,6 +34,10 @@ const (
 )
 
 func (ec ErrorComment) Skip(pos *memedit.Range) bool {
+	if utils.IsNil(pos) {
+		return false
+	}
+
 	if ec.noCheck {
 		return true
 	}
@@ -42,6 +47,19 @@ func (ec ErrorComment) Skip(pos *memedit.Range) bool {
 		}
 	}
 	return false
+}
+
+func ShouldSkipError(v Instruction) bool {
+	if utils.IsNil(v) {
+		return false
+	}
+	rng := v.GetRange()
+	fun := v.GetFunc()
+	if utils.IsNil(fun) {
+		return false
+	}
+
+	return fun.errComment.Skip(rng)
 }
 
 func (f *Function) AddErrorComment(str string, line int) error {
