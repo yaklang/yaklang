@@ -8388,7 +8388,7 @@ message SSAProjectFilter {
 
 message CreateSSAProjectRequest {
   SSAProject Project = 1;
-  string ProjectRawData = 2;  // json from ssa.yak 
+  string JSONStringConfig = 2;
 }
 
 message CreateSSAProjectResponse {

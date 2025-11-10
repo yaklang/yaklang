@@ -299,7 +299,9 @@ func WithCodeSourceJson(raw string) Option {
 		if err := c.ensureCodeSource("Code Source JSON"); err != nil {
 			return err
 		}
-		err := json.Unmarshal([]byte(raw), c.CodeSource)
+		codeSource := &CodeSourceInfo{}
+		err := json.Unmarshal([]byte(raw), codeSource)
+		c.CodeSource = codeSource
 		if err != nil {
 			return utils.Errorf("Config: Code Source JSON Unmarshal failed: %v", err)
 		}

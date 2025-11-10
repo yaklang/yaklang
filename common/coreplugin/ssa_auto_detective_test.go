@@ -128,7 +128,7 @@ func TestSSAAutoDetective(t *testing.T) {
 
 		// 通过 gRPC 创建 SSA 项目
 		req := &ypb.CreateSSAProjectRequest{
-			ProjectRawData: string(paramsJSON),
+			JSONStringConfig: string(paramsJSON),
 		}
 
 		db := consts.GetGormProfileDatabase()
