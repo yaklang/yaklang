@@ -52,6 +52,11 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	var checkError func(value ssa.Value, top ...ssa.Value)
 	errorIds := make(map[int64]struct{})
 	addError := func(value ssa.Value) {
+		if value.IsSideEffect() {
+			// skip side effect error
+			// if this error not handled, function inner will report error
+			return
+		}
 		_, ok := errorIds[value.GetId()]
 		if !ok {
 			value.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())

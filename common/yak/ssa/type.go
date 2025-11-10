@@ -1254,6 +1254,14 @@ func (s *FunctionType) RawString() string {
 		returnTypeStr = s.ReturnType.String()
 	}
 
+	sideEffect := ""
+	if len(s.SideEffects) > 0 {
+		sideEffect = " [sideEffect]"
+		for _, se := range s.SideEffects {
+			sideEffect += fmt.Sprintf(" [%s]%s", se.Name, se.VerboseName)
+		}
+	}
+
 	return fmt.Sprintf(
 		"(%s%s) -> %s",
 		strings.Join(
@@ -1261,7 +1269,7 @@ func (s *FunctionType) RawString() string {
 			", ",
 		),
 		variadic,
-		returnTypeStr,
+		returnTypeStr+sideEffect,
 	)
 }
 
