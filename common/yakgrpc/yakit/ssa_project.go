@@ -37,10 +37,13 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 	var err error
 	if req.Project != nil {
 		projectBuilder, err = ssaproject.NewSSAProjectByProto(req.Project)
-	} else if req.ProjectRawData != "" {
-		projectBuilder, err = ssaproject.NewSSAProjectByRawData(req.ProjectRawData)
+	} else if req.JSONStringConfig != "" {
+		projectBuilder, err = ssaproject.NewSSAProjectByRawConfigData([]byte(req.JSONStringConfig))
 	} else {
-		return nil, utils.Errorf("create SSA project failed: project data is missing")
+		err = utils.Errorf("create SSA project failed: request project and JSONStringConfig are both empty")
+	}
+	if err != nil {
+		return nil, utils.Errorf("create SSA project failed: %s", err)
 	}
 	if projectBuilder == nil {
 		return nil, utils.Errorf("create SSA project failed: project builder is nil")

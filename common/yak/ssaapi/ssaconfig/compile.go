@@ -90,6 +90,16 @@ func WithProjectName(name string) Option {
 	}
 }
 
+func WithProjectTags(tags []string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Tags"); err != nil {
+			return err
+		}
+		c.BaseInfo.Tags = tags
+		return nil
+	}
+}
+
 func WithProgramNames(programName ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Name"); err != nil {
