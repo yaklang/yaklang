@@ -1,7 +1,6 @@
 package ssaproject
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/jinzhu/gorm"
@@ -21,15 +20,14 @@ type SSAProject struct {
 	Config      *ssaconfig.Config
 }
 
-func NewSSAProjectByRawData(rawData string) (*SSAProject, error) {
-	builder := &SSAProject{}
-	if rawData == "" {
-		return nil, utils.Errorf("failed to new SSA project builder: raw data is empty")
-	}
-	err := json.Unmarshal([]byte(rawData), builder)
+func NewSSAProjectByRawConfigData(rawData []byte) (*SSAProject, error) {
+	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig(rawData))
 	if err != nil {
-		return nil, utils.Errorf("failed to unmarshal SSA project raw data: %s", err)
+		return nil, err
 	}
+	builder := &SSAProject{}
+	builder.Config = config
+	builder.coverBaseInfo()
 	return builder, nil
 }
 
@@ -38,25 +36,13 @@ func NewSSAProjectByProto(proto *ypb.SSAProject) (*SSAProject, error) {
 		return nil, utils.Errorf("failed to new SSA project builder: proto is nil")
 	}
 	builder := &SSAProject{
-		ID:          uint(proto.ID),
-		ProjectName: proto.ProjectName,
-		Description: proto.Description,
-		Tags:        proto.Tags,
-		// Language:     proto.Language,
-	}
-	if language, err := ssaconfig.ValidateLanguage(proto.Language); err != nil {
-		return nil, utils.Errorf("failed to new SSA project builder: invalid language %s", proto.Language)
-	} else {
-		builder.Language = language
-	}
-	var err error
-	builder.Config, err = ssaconfig.New(ssaconfig.ModeProjectBase)
-	if err != nil {
-		return nil, err
+		ID: uint(proto.ID),
 	}
 
-	if proto.CodeSourceConfig != "" {
-		json.Unmarshal([]byte(proto.CodeSourceConfig), builder.Config.CodeSource)
+	var language ssaconfig.Language
+	language, err := ssaconfig.ValidateLanguage(proto.Language)
+	if err != nil {
+		return nil, err
 	}
 
 	var opts []ssaconfig.Option
@@ -79,11 +65,20 @@ func NewSSAProjectByProto(proto *ypb.SSAProject) (*SSAProject, error) {
 	if proto.CodeSourceConfig != "" {
 		opts = append(opts, ssaconfig.WithCodeSourceJson(proto.CodeSourceConfig))
 	}
+
+	opts = append(opts, []ssaconfig.Option{
+		ssaconfig.WithProjectName(proto.ProjectName),
+		ssaconfig.WithProjectLanguage(language),
+		ssaconfig.WithProgramDescription(proto.Description),
+		ssaconfig.WithProjectTags(proto.Tags),
+	}...)
+
 	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
 	if err != nil {
 		return nil, utils.Errorf("failed to new SSA project config: %s", err)
 	}
 	builder.Config = config
+	builder.coverBaseInfo()
 	if err := builder.Validate(); err != nil {
 		return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
 	}

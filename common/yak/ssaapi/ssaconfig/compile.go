@@ -79,6 +79,26 @@ func WithProjectID(projectId uint64) Option {
 	}
 }
 
+func WithProjectName(name string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Name"); err != nil {
+			return err
+		}
+		c.BaseInfo.ProjectName = name
+		return nil
+	}
+}
+
+func WithProjectTags(tags []string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Tags"); err != nil {
+			return err
+		}
+		c.BaseInfo.Tags = tags
+		return nil
+	}
+}
+
 func WithProgramNames(programName ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Name"); err != nil {
