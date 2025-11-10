@@ -352,7 +352,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 		}
 		// check
 		if pre.Condition <= 0 {
-			log.Errorf("this condition is null: %s", pre.GetName())
+			log.Debugf("this condition is null: %s", pre.GetName())
 			return nil
 		}
 		// calc
