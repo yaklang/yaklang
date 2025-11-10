@@ -23,7 +23,7 @@ var indexBuildSchema = aitool.NewObjectSchemaWithAction(
 	aitool.WithStructArrayParam(
 		"question_list",
 		[]aitool.PropertyOption{
-			aitool.WithParam_Description("A schema for an array of question-answer pairs derived from a source document, designed for knowledge base indexing and retrieval"),
+			aitool.WithParam_Description("你是代码知识索引生成器，为代码片段生成10个以内的上下文无关、功能导向的检索问题。核心原则：1)上下文无关-禁用'该/这个/这段'等指代词，使用具体技术术语；2)技术明确-必须包含语言名称、核心技术栈、领域术语；3)检索友好-使用开发者常见搜索表达。问题类型分布：实现方法类40%(如'如何在Go中使用正则表达式提取邮箱？')、技术概念类20%(如'正则表达式预编译的性能优势是什么？')、问题解决类25%(如'如何优化大文本正则匹配性能？')、代码模式类15%(如'文本提取工具的通用架构是什么？')。优质示例：'Go语言regexp包的FindAllString方法如何使用？'；劣质示例：'这段代码的功能是什么？'。质量要求：问题独立完整、包含2-3个技术关键词、避免模糊指代、长度15-50字符、对其他开发者有参考价值。"),
 		}, nil,
 		// 定义数组中每个对象的字段
 		questionSchema...,
@@ -32,7 +32,7 @@ var indexBuildSchema = aitool.NewObjectSchemaWithAction(
 var questionSchema = []aitool.ToolOption{
 	aitool.WithStringParam(
 		"question",
-		aitool.WithParam_Description(`A high-quality, user-centric question that the answer_snippet directly addresses. This will be embedded for semantic search.`),
+		aitool.WithParam_Description(`上下文无关的检索问题。核心要求：1)禁用'该/这/上述'等指代词，使用具体技术术语(如'Go语言regexp包'而非'这个包')；2)必含语言名+技术栈+功能描述；3)问题独立完整可脱离代码理解。类型分布：实现方法40%('如何在[语言]中实现[功能]')、技术概念20%('[技术]的工作原理')、问题解决25%('如何优化[场景]性能')、代码模式15%('[功能]的通用架构')。优质例：'Go语言中正则表达式预编译的性能优势是什么？'；劣质例：'这段代码做什么？'；劣质例2：'testStr变量值是多少？'；`),
 		aitool.WithParam_Required(true),
 	),
 	aitool.WithStructParam(
