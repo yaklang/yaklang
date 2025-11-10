@@ -3,6 +3,7 @@ package ssa_option
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 var (
@@ -53,8 +54,8 @@ func setCalculateHandler(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
 		b, id, v)
 }
 
-func genericGlobalFunctionOption() []ssaapi.Option {
-	return []ssaapi.Option{
+func genericGlobalFunctionOption() []ssaconfig.Option {
+	return []ssaconfig.Option{
 		ssaapi.WithExternBuildValueHandler("append", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
 			// append([]T, T...) []T
 			return genericFuncHandler(
@@ -64,8 +65,8 @@ func genericGlobalFunctionOption() []ssaapi.Option {
 	}
 }
 
-func genericXLibraryFunctionOption() []ssaapi.Option {
-	return []ssaapi.Option{
+func genericXLibraryFunctionOption() []ssaconfig.Option {
+	return []ssaconfig.Option{
 		ssaapi.WithExternBuildValueHandler("x.Map", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
 			// Map(Or([]T | Map[U]T), func(T) -> V) []V
 			return genericFuncHandler(

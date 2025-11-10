@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -21,14 +20,7 @@ type ProcessFunc func(msg string, process float64)
 type Config struct {
 	*ssaconfig.Config // config
 
-	databaseKind   ssa.ProgramCacheKind
-	programSaveTTL time.Duration
-	// program
-	ProgramName        string
-	ProgramDescription string
-
 	// language
-	language        ssaconfig.Language
 	LanguageBuilder ssa.Builder
 
 	// other compile ssaconfig.Options
@@ -37,8 +29,6 @@ type Config struct {
 
 	// input, code or project path
 	originEditor *memedit.MemEditor
-	// project
-	info string
 	// file system
 	fs          fi.FileSystem
 	entryFile   []string
@@ -71,40 +61,36 @@ type Config struct {
 	astSequence ssareducer.ASTSequenceType
 }
 
-const (
-	enableCache = "ssa_compile/enable_cache"
-	astOrder    = "ssa_compile/ast_order"
-	cacheTTL    = "ssa_compile/cache_ttl"
-	logLevel    = "ssa_compile/log_level"
-)
+func (c *Config) CalcHash() string {
+	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.GetLanguage(), c.ignoreSyntaxErr, c.externInfo)
+}
 
-func DefaultExcludeFunc(patterns []string) (ssaconfig.Option, error) {
+var WithConfigInfo = ssaconfig.WithCodeSourceMap
+
+var withExcludeFile = ssaconfig.SetOption("ssa_compile/exclude_file", func(c *Config, v func(path, filename string) bool) {
+	c.excludeFile = v
+})
+
+func WithExcludeFunc(patterns []string) ssaconfig.Option {
 	var compile []glob.Glob
 	for _, pattern := range patterns {
 		g, err := glob.Compile(pattern)
 		if err != nil {
-			return nil, err
+			return nil
 		}
 		compile = append(compile, g)
 	}
-	return func(c *Config) error {
-		c.excludeFile = func(dir string, path string) bool {
-			for _, g := range compile {
-				if match := g.Match(dir); match {
-					return true
-				}
-				if match := g.Match(path); match {
-					return true
-				}
+	return withExcludeFile(func(dir string, path string) bool {
+		for _, g := range compile {
+			if match := g.Match(dir); match {
+				return true
 			}
-			return false
+			if match := g.Match(path); match {
+				return true
+			}
 		}
-		return nil
-	}, nil
-}
-
-func (c *Config) CalcHash() string {
-	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
+		return false
+	})
 }
 
 func (c *Config) Processf(process float64, format string, arg ...any) {
@@ -116,16 +102,16 @@ func (c *Config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
-var WithAstOrder = ssaconfig.SetOption(astOrder, func(c *Config, v ssareducer.ASTSequenceType) {
+var WithAstOrder = ssaconfig.SetOption("ssa_compile/ast_order", func(c *Config, v ssareducer.ASTSequenceType) {
 	c.astSequence = v
 })
 
-var WithLogLevel = ssaconfig.SetOption(logLevel, func(c *Config, v string) {
+var WithLogLevel = ssaconfig.SetOption("ssa_compile/log_level", func(c *Config, v string) {
 	c.logLevel = v
 	log.SetLevel(v)
 })
 
-var WithCacheTTL = ssaconfig.SetOption(cacheTTL, func(c *Config, v time.Duration) {
+var WithCacheTTL = ssaconfig.SetOption("ssa_compile/cache_ttl", func(c *Config, v time.Duration) {
 	c.cacheTTL = append(c.cacheTTL, v)
 })
 
@@ -141,79 +127,23 @@ var WithReCompile = ssaconfig.WithCompileReCompile
 
 var WithStrictMode = ssaconfig.WithCompileStrictMode
 
-func WithLocalFs(path string) ssaconfig.Option {
-	return func(c *Config) error {
-		WithConfigInfo(map[string]any{
-			"kind":       "local",
-			"local_file": path,
-		})(c)
-		return nil
+var WithFileSystem = ssaconfig.SetOption("ssa_compile/file_system", func(c *Config, fs fi.FileSystem) {
+	if fs == nil {
+		return
 	}
-}
-
-func WithFileSystem(fs fi.FileSystem) ssaconfig.Option {
-	return func(c *Config) error {
-		if fs == nil {
-			return utils.Errorf("need set filesystem")
-		}
-		c.fs = getUnifiedSeparatorFs(fs)
-		return nil
-	}
-}
-
-func WithConfigInfoRaw(info string) ssaconfig.Option {
-	return func(c *Config) error {
-		c.info = info
-		fs, err := c.parseFSFromInfo(info)
-		if err != nil {
-			return err
-		}
-		err = WithFileSystem(fs)(c)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func WithConfigInfo(input map[string]any) ssaconfig.Option {
-	return func(c *Config) error {
-		if input == nil {
-			return nil
-		}
-		// json marshal info
-		raw, err := json.Marshal(input)
-		if err != nil {
-			return err
-		}
-		info := string(raw)
-
-		return WithConfigInfoRaw(info)(c)
-	}
-}
+	c.fs = getUnifiedSeparatorFs(fs)
+})
 
 var WithRawLanguage = ssaconfig.WithProjectRawLanguage
 var WithLanguage = ssaconfig.WithProjectLanguage
 
-// func WithLanguage(language ssaconfig.Language) ssaconfig.Option {
-// 	return func(c *Config) error {
-// 		if language == "" {
-// 			return nil
-// 		}
-// 		c.language = language
-// 		if create, ok := LanguageBuilderCreater[language]; ok {
-// 			c.LanguageBuilder = create()
-// 		} else {
-// 			log.Errorf("SSA not support language %s", language)
-// 			c.LanguageBuilder = nil
-// 		}
-// 		return nil
-// 	}
-// }
-
-var WithFileSystemEntry = ssaconfig.SetOption("ssa_compile/file_system_entry", func(c *Config, v []string) {
+var withFileSystemEntry = ssaconfig.SetOption("ssa_compile/file_system_entry", func(c *Config, v []string) {
 	c.entryFile = append(c.entryFile, v...)
 })
+
+func WithFileSystemEntry(v ...string) ssaconfig.Option {
+	return withFileSystemEntry(v)
+}
 
 var WithProgramPath = ssaconfig.SetOption("ssa_compile/program_path", func(c *Config, v string) {
 	c.programPath = v
@@ -242,157 +172,72 @@ func WithExternLib(name string, table map[string]any) ssaconfig.Option {
 		})(c)
 		return nil
 	}
-	//	return func(c *Config) error {
-	//		c.externLib[name] = table
-	//		return nil
-	//	}
 }
 
-func WithExternValue(table map[string]any) ssaconfig.Option {
-	return func(c *Config) error {
-		for name, value := range table {
-			c.externValue[name] = value
-		}
-		return nil
+var WithExternValue = ssaconfig.SetOption("ssa_compile/extern_value", func(c *Config, table map[string]any) {
+	for name, value := range table {
+		c.externValue[name] = value
 	}
-}
+})
 
-func WithExternMethod(b ssa.MethodBuilder) ssaconfig.Option {
-	return func(c *Config) error {
-		c.externMethod = b
-		return nil
-	}
-}
+var WithExternMethod = ssaconfig.SetOption("ssa_compile/extern_method", func(c *Config, b ssa.MethodBuilder) {
+	c.externMethod = b
+})
 
 func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value) ssaconfig.Option {
-	return func(c *Config) error {
-		if c.externBuildValueHandler == nil {
-			c.externBuildValueHandler = make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value)
-		}
-		c.externBuildValueHandler[id] = callback
-		return nil
-	}
+	return withExternBuildValueHandler(struct {
+		id       string
+		callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value
+	}{
+		id:       id,
+		callback: callback,
+	})
 }
 
-func WithPeepholeSize(size int) ssaconfig.Option {
-	return func(c *Config) error {
-		c.SetCompilePeepholeSize(size)
-		return nil
+var withExternBuildValueHandler = ssaconfig.SetOption("ssa_compile/extern_build_value_handler", func(
+	c *Config, a struct {
+		id       string
+		callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value
+	}) {
+	if c.externBuildValueHandler == nil {
+		c.externBuildValueHandler = make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value)
 	}
-}
+	c.externBuildValueHandler[a.id] = a.callback
+})
 
-func WithIgnoreSyntaxError(b ...bool) ssaconfig.Option {
-	return func(c *Config) error {
-		if len(b) > 0 {
-			c.ignoreSyntaxErr = b[0]
-		} else {
-			c.ignoreSyntaxErr = true
-		}
-		return nil
+var WithPeepholeSize = ssaconfig.WithCompilePeepholeSize
+
+var WithIgnoreSyntaxError = ssaconfig.SetOption("ssa_compile/ignore_syntax_error", func(c *Config, v bool) {
+	c.ignoreSyntaxErr = v
+})
+
+var WithExternInfo = ssaconfig.SetOption("ssa_compile/extern_info", func(c *Config, v string) {
+	c.externInfo = v
+})
+
+var WithDefineFunc = ssaconfig.SetOption("ssa_compile/define_func", func(c *Config, table map[string]any) {
+	for name, t := range table {
+		c.defineFunc[name] = t
 	}
-}
+})
 
-func WithExternInfo(info string) ssaconfig.Option {
-	return func(c *Config) error {
-		c.externInfo = info
-		return nil
-	}
-}
+var WithFeedCode = ssaconfig.SetOption("ssa_compile/feed_code", func(c *Config, v bool) {
+	c.feedCode = v
+})
 
-func WithDefineFunc(table map[string]any) ssaconfig.Option {
-	return func(c *Config) error {
-		for name, t := range table {
-			c.defineFunc[name] = t
-		}
-		return nil
-	}
-}
+var WithProgramDescription = ssaconfig.WithProgramDescription
 
-func WithFeedCode(b ...bool) ssaconfig.Option {
-	return func(c *Config) error {
-		if len(b) > 0 {
-			c.feedCode = b[0]
-		} else {
-			c.feedCode = true
-		}
-		return nil
-	}
-}
+var WithProgramName = ssaconfig.WithProgramNames
 
-func WithProgramDescription(desc string) ssaconfig.Option {
-	return func(c *Config) error {
-		c.ProgramDescription = desc
-		return nil
-	}
-}
+var WithMemory = ssaconfig.WithCompileMemoryCompile
 
-// save to database, please set the program name
-func WithProgramName(name string) ssaconfig.Option {
-	return func(c *Config) error {
-		c.ProgramName = name
-		c.databaseKind = ssa.ProgramCacheDBWrite
-		return nil
-	}
-}
+var WithConcurrency = ssaconfig.WithCompileConcurrency
 
-func WithMemory(ttl ...time.Duration) ssaconfig.Option {
-	return func(c *Config) error {
-		c.databaseKind = ssa.ProgramCacheMemory
-		if len(ttl) > 0 {
-			c.programSaveTTL = ttl[0]
-		}
-		return nil
-	}
-}
+var WithDatabaseProgramCacheHitter = ssaconfig.SetOption("ssa_compile/database_program_cache_hitter", func(c *Config, h func(i any)) {
+	c.DatabaseProgramCacheHitter = h
+})
 
-func WithSSAConfig(sc *ssaconfig.Config) ssaconfig.Option {
-	return func(c *Config) error {
-		if sc != nil {
-			c.Config = sc
-		}
-		if sc.GetCompileMemory() {
-			err := WithMemory()(c)
-			if err != nil {
-				return err
-			}
-		}
-		if sc.GetCompileStrictMode() {
-			err := WithStrictMode(true)(c)
-			if err != nil {
-				return err
-			}
-		}
-		if sc.GetCompilePeepholeSize() > 0 {
-			err := WithPeepholeSize(sc.GetCompilePeepholeSize())(c)
-			if err != nil {
-				return err
-			}
-		}
-		if sc.GetCompileExcludeFiles() != nil {
-			_, err := DefaultExcludeFunc(sc.GetCompileExcludeFiles())
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
-func WithConcurrency(concurrency int) ssaconfig.Option {
-	return func(c *Config) error {
-		c.SetCompileConcurrency(uint32(concurrency))
-		return nil
-	}
-}
-
-func WithDatabaseProgramCacheHitter(h func(i any)) ssaconfig.Option {
-	return func(c *Config) error {
-		c.DatabaseProgramCacheHitter = h
-		return nil
-	}
-}
-
-var withEnableCache = ssaconfig.SetOption(enableCache, func(c *Config, v bool) {
+var withEnableCache = ssaconfig.SetOption("ssa_compile/enable_cache", func(c *Config, v bool) {
 	c.EnableCache = v
 })
 
@@ -410,12 +255,11 @@ func WithEnableCache(b ...bool) ssaconfig.Option {
 var WithContext = ssaconfig.WithContext
 
 func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
-	sc, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	sc, err := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
 	if err != nil {
 		return nil, err
 	}
 	c := &Config{
-		language:                   "",
 		LanguageBuilder:            nil,
 		originEditor:               memedit.NewMemEditor(""),
 		fs:                         filesys.NewLocalFs(),
@@ -434,12 +278,53 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		astSequence: ssareducer.OutOfOrder,
 		Config:      sc,
 	}
+	ssaconfig.ApplyExtraOptions(c, c.Config)
 
-	for _, opt := range opts {
-		if err := opt(c.Config); err != nil {
-			return nil, err
-		}
+	if create, ok := LanguageBuilderCreater[c.GetLanguage()]; ok {
+		c.LanguageBuilder = create()
+	} else {
+		log.Errorf("SSA not support language %s", c.GetLanguage())
+		c.LanguageBuilder = nil
 	}
-	ssaconfig.ApplyExtrassaconfig.Options(c, c.Config)
 	return c, nil
 }
+
+// func WithLocalFs(path string) ssaconfig.Option {
+// 	return func(c *Config) error {
+// 		WithConfigInfo(map[string]any{
+// 			"kind":       "local",
+// 			"local_file": path,
+// 		})(c)
+// 		return nil
+// 	}
+// }
+// func WithConfigInfoRaw(info string) ssaconfig.Option {
+// 	return func(c *Config) error {
+// 		c.info = info
+// 		fs, err := c.parseFSFromInfo(info)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		err = WithFileSystem(fs)(c)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		return nil
+// 	}
+// }
+
+// func WithConfigInfo(input map[string]any) ssaconfig.Option {
+// 	return func(c *Config) error {
+// 		if input == nil {
+// 			return nil
+// 		}
+// 		// json marshal info
+// 		raw, err := json.Marshal(input)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		info := string(raw)
+
+// 		return WithConfigInfoRaw(info)(c)
+// 	}
+// }

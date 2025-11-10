@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
@@ -39,13 +38,13 @@ func ClearCache() {
 }
 
 // Parse parse code to ssa.Program
-func Parse(code string, opts ...Option) (*Program, error) {
+func Parse(code string, opts ...ssaconfig.Option) (*Program, error) {
 	input := strings.NewReader(code)
 	return ParseFromReader(input, opts...)
 }
 
 // ParseFromReader parse simple file to ssa.Program
-func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
+func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error) {
 	config, err := DefaultConfig(opts...)
 	if err != nil {
 		return nil, err
@@ -81,7 +80,7 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 
 func (p *Program) Feed(code io.Reader) error {
 	if p.config == nil || !p.config.feedCode || p.config.LanguageBuilder == nil {
-		return utils.Errorf("not support language %s", p.config.language)
+		return utils.Errorf("not support language %s", p.config.GetLanguage())
 	}
 
 	raw, err := io.ReadAll(code)
@@ -124,7 +123,7 @@ var Exports = map[string]any{
 
 	"withConcurrency":        WithConcurrency,
 	"withLanguage":           WithRawLanguage,
-	"withConfigInfo":         WithConfigInfo,
+	"withConfigInfo":         ssaconfig.WithCodeSourceJson,
 	"withExternLib":          WithExternLib,
 	"withExternValue":        WithExternValue,
 	"withProgramName":        WithProgramName,
@@ -136,21 +135,8 @@ var Exports = map[string]any{
 	"withContext":            WithContext,
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
-	"withDefaultExcludeFunc": DefaultExcludeFunc,
+	"withDefaultExcludeFunc": WithExcludeFunc,
 	"withMemory":             WithMemory,
-	"withSSAConfig":          WithSSAConfig,
-
-	//diff compare
-	// "withDiffProgName":          DiffWithProgram,
-	// "withDiffRuleName":          DiffWithRuleName,
-	// "withDiffVariableName":      DiffWithVariableName,
-	// "withDiffRuntimeId":         DiffWithRuntimeId,
-	// "withGenerateHash":          WithSSARiskComparisonInfoGenerate,
-	// "withCompareResultCallback": WithSSARiskDiffResultHandler,
-	// "withDefaultRiskSave":       WithSSARiskDiffSaveResultHandler,
-	//diff compare kind
-	"progName":  schema.Program,
-	"runtimeId": schema.RuntimeId,
 
 	// language:
 	"Javascript": ssaconfig.JS,

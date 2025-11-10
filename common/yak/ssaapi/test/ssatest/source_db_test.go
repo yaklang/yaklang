@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func checkSource(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) {
+func checkSource(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig.Option) {
 	progName := uuid.NewString()
 	opt = append(opt,
 		ssaapi.WithProgramName(progName),

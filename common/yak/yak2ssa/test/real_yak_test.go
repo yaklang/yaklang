@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -400,7 +401,7 @@ func Test_Return_phi(t *testing.T) {
 		`
 
 		symbol := yaklang.New().GetFntable()
-		opts := make([]ssaapi.Option, 0)
+		opts := make([]ssaconfig.Option, 0)
 		tmp := reflect.TypeOf(make(map[string]interface{}))
 		for name, item := range symbol {
 			itype := reflect.TypeOf(item)

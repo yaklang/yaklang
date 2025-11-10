@@ -293,12 +293,16 @@ func WithCompileReCompile(reCompile bool) Option {
 }
 
 // WithCompileMemoryCompile 设置内存编译
-func WithCompileMemoryCompile(memoryCompile bool) Option {
+func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Memory Compile"); err != nil {
 			return err
 		}
-		c.SSACompile.MemoryCompile = memoryCompile
+		enable := true
+		if len(memoryCompile) > 0 {
+			enable = memoryCompile[0]
+		}
+		c.SSACompile.MemoryCompile = enable
 		return nil
 	}
 }

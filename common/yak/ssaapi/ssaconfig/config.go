@@ -2,6 +2,7 @@ package ssaconfig
 
 import (
 	"context"
+	"encoding/json"
 )
 
 type Config struct {
@@ -95,25 +96,7 @@ func defaultSyntaxFlowRuleConfig() *SyntaxFlowRuleConfig {
 	return &SyntaxFlowRuleConfig{}
 }
 
-// --- ExtraInfo 扩展信息 Get/Set 方法 ---
-
-func (c *Config) GetExtraInfo(key string) ([]any, bool) {
-	if c == nil || c.ExtraInfo == nil {
-		return nil, false
-	}
-	val, ok := c.ExtraInfo[key]
-	return val, ok
-}
-
-func (c *Config) SetExtraInfo(key string, value any) {
-	if c == nil {
-		return
-	}
-	if c.ExtraInfo == nil {
-		c.ExtraInfo = map[string][]any{}
-	}
-	c.ExtraInfo[key] = append(c.ExtraInfo[key], value)
-}
+// --- Context Get/Set 方法 ---
 
 func WithContext(ctx context.Context) Option {
 	return func(c *Config) error {
@@ -139,6 +122,28 @@ func (c *Config) IsContextCancel() bool {
 	default:
 		return false
 	}
+}
+
+// ## ------------------- extra option helper ------------------- ##
+
+// --- ExtraInfo 扩展信息 Get/Set 方法 ---
+
+func (c *Config) GetExtraInfo(key string) ([]any, bool) {
+	if c == nil || c.ExtraInfo == nil {
+		return nil, false
+	}
+	val, ok := c.ExtraInfo[key]
+	return val, ok
+}
+
+func (c *Config) SetExtraInfo(key string, value any) {
+	if c == nil {
+		return
+	}
+	if c.ExtraInfo == nil {
+		c.ExtraInfo = map[string][]any{}
+	}
+	c.ExtraInfo[key] = append(c.ExtraInfo[key], value)
 }
 
 type ExtraOption[C any] struct {
@@ -177,4 +182,33 @@ func SetOption[TValue, TCache any](
 		}
 	}
 	return with
+}
+
+// ## -------------------- json
+
+func (c *Config) JSON() string {
+	jsonBytes, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
+
+func LoadConfigFromJSON(data []byte) (*Config, error) {
+	var c Config
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func WithConfigJson(jsonStr string) Option {
+	return func(c *Config) error {
+		var temp Config
+		if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
+			return err
+		}
+		*c = temp
+		return nil
+	}
 }

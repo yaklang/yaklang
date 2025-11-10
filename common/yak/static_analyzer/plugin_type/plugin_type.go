@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
@@ -35,7 +36,7 @@ func ToPluginType(plugin string) PluginType {
 
 type (
 	CheckRuler      func(*ssaapi.Program) *result.StaticAnalyzeResults
-	SSAOptCollector func() []ssaapi.Option
+	SSAOptCollector func() []ssaconfig.Option
 )
 
 type PluginTypeAnalyzer struct {
@@ -67,8 +68,8 @@ func RegisterScoreCheckRuler(pluginTyp PluginType, f CheckRuler) {
 	pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp] = append(pluginTypeAnalyzer.ScoreCheckRulers[pluginTyp], f)
 }
 
-func GetPluginSSAOpt(pluginType PluginType) []ssaapi.Option {
-	ret := make([]ssaapi.Option, 0)
+func GetPluginSSAOpt(pluginType PluginType) []ssaconfig.Option {
+	ret := make([]ssaconfig.Option, 0)
 	if funcs, ok := pluginTypeAnalyzer.SSAOptCollectors[pluginType]; ok {
 		ret = append(ret, funcs()...)
 	}

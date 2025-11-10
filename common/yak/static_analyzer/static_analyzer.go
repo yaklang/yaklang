@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -104,7 +105,7 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 	return results
 }
 
-func GetPluginSSAOpt(plugin string) []ssaapi.Option {
+func GetPluginSSAOpt(plugin string) []ssaconfig.Option {
 	ret := plugin_type.GetPluginSSAOpt(plugin_type.PluginTypeYak)
 	pluginType := plugin_type.ToPluginType(plugin)
 	if pluginType != plugin_type.PluginTypeYak {
@@ -134,7 +135,7 @@ func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *re
 	return ret
 }
 
-func SSAParse(code, scriptType string, o ...ssaapi.Option) (*ssaapi.Program, error) {
+func SSAParse(code, scriptType string, o ...ssaconfig.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
 	opt = append(opt, ssaapi.WithEnableCache())
 	opt = append(opt, o...)

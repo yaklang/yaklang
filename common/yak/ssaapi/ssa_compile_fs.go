@@ -43,6 +43,7 @@ func (c *Config) parseProjectWithFS(
 
 	wg := sync.WaitGroup{}
 
+	programName := c.GetProgramName()
 	programPath := c.programPath
 	preHandlerTotal := 0
 	handlerTotal := 0
@@ -53,12 +54,12 @@ func (c *Config) parseProjectWithFS(
 	var err error
 	start := time.Now()
 
-	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.info))
+	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().JsonString()))
 	processCallback(0.0, "calculate total size of project")
 
 	folder2Save := make([][]string, 0)
-	if c.ProgramName != "" {
-		folder2Save = append(folder2Save, []string{"/", c.ProgramName})
+	if programName != "" {
+		folder2Save = append(folder2Save, []string{"/", programName})
 	}
 
 	filesystem = c.swapLanguageFs(filesystem)
@@ -73,13 +74,11 @@ func (c *Config) parseProjectWithFS(
 				return filesys.SkipDir
 			}
 
-			folders := []string{c.ProgramName}
+			folders := []string{programName}
 			folders = append(folders,
 				strings.Split(fullPath, string(c.fs.GetSeparators()))...,
 			)
-			if c.databaseKind != ssa.ProgramCacheMemory {
-				folder2Save = append(folder2Save, folders)
-			}
+			folder2Save = append(folder2Save, folders)
 			return nil
 		}),
 		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
@@ -155,7 +154,7 @@ func (c *Config) parseProjectWithFS(
 			}
 		}
 		prog.SetPreHandler(true)
-		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
+		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().JsonString())
 		start = time.Now()
 
 		ch := c.GetFileHandler(

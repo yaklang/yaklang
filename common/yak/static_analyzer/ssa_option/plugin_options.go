@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 )
 
@@ -14,8 +15,8 @@ func init() {
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypePortScan, ProtScanSSAOpt)
 }
 
-func MitmGetTypeSSAOpt() []ssaapi.Option {
-	ret := make([]ssaapi.Option, 0, 3)
+func MitmGetTypeSSAOpt() []ssaconfig.Option {
+	ret := make([]ssaconfig.Option, 0, 3)
 
 	// mitm
 	valueTable := make(map[string]interface{})
@@ -43,8 +44,8 @@ func MitmGetTypeSSAOpt() []ssaapi.Option {
 	return ret
 }
 
-func CodecSSAOpt() []ssaapi.Option {
-	ret := make([]ssaapi.Option, 0, 2)
+func CodecSSAOpt() []ssaconfig.Option {
+	ret := make([]ssaconfig.Option, 0, 2)
 	ret = append(ret, ssaapi.WithDefineFunc(map[string]any{
 		"handle": func(string) string { return "" },
 	}))
@@ -52,8 +53,8 @@ func CodecSSAOpt() []ssaapi.Option {
 	return ret
 }
 
-func ProtScanSSAOpt() []ssaapi.Option {
-	ret := make([]ssaapi.Option, 0, 2)
+func ProtScanSSAOpt() []ssaconfig.Option {
+	ret := make([]ssaconfig.Option, 0, 2)
 	ret = append(ret, ssaapi.WithDefineFunc(map[string]any{
 		"handle": func(*fp.MatchResult) {},
 	}))

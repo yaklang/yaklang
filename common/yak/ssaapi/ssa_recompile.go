@@ -6,38 +6,32 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // save to Profile SSAProgram
 func SaveConfig(c *Config, prog *Program) {
-	if c.databaseKind != ssa.ProgramCacheMemory {
-		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
-		if err != nil {
-			log.Errorf("irProg is nil, save config failed: %v", err)
-			return
-		}
-		irProg.Description = c.ProgramDescription
-		irProg.Language = c.language
-		irProg.EngineVersion = consts.GetYakVersion()
-		irProg.ConfigInput = c.info
-		irProg.PeepholeSize = c.GetCompilePeepholeSize()
-		ssadb.UpdateProgram(irProg)
-	} else {
-		// only memory
-		if c.ProgramName != "" {
-			SetProgramCache(prog, c.programSaveTTL)
-		}
+	irProg, err := ssadb.GetProgram(c.GetProgramName(), ssa.Application)
+	if err != nil {
+		log.Errorf("irProg is nil, save config failed: %v", err)
+		return
 	}
+	irProg.Description = c.GetProjectDescription()
+	irProg.Language = c.GetLanguage()
+	irProg.EngineVersion = consts.GetYakVersion()
+	irProg.ConfigInput = c.JSON()
+	irProg.PeepholeSize = c.GetCompilePeepholeSize()
+	ssadb.UpdateProgram(irProg)
 }
 
 // recompile from Profile SSAProgram
-func (prog *Program) Recompile(opts ...Option) error {
+func (prog *Program) Recompile(opts ...ssaconfig.Option) error {
 	// get file system
 	hasFS := false
 	// recompile from info
 	if prog.irProgram != nil {
 		if configInfo := prog.irProgram.ConfigInput; configInfo != "" {
-			opts = append(opts, WithConfigInfoRaw(configInfo))
+			opts = append(opts, ssaconfig.WithConfigJson(configInfo))
 			hasFS = true
 		}
 		opts = append(opts, WithPeepholeSize(prog.irProgram.PeepholeSize))

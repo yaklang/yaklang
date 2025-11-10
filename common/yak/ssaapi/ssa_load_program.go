@@ -39,7 +39,7 @@ func FromDatabase(programName string) (p *Program, err error) {
 
 func (c *Config) fromDatabase() (*Program, error) {
 	// get program from database
-	prog, err := ssa.GetProgram(c.ProgramName, ssa.Application)
+	prog, err := ssa.GetProgram(c.GetProgramName(), ssa.Application)
 	if err != nil {
 		return nil, err
 	}

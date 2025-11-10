@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -13,8 +14,8 @@ func init() {
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeYak, YakGetTypeSSAOpt)
 }
 
-func YakGetTypeSSAOpt() []ssaapi.Option {
-	opts := make([]ssaapi.Option, 0)
+func YakGetTypeSSAOpt() []ssaconfig.Option {
+	opts := make([]ssaconfig.Option, 0)
 	// yak function table
 	symbol := yaklang.New().GetFntable()
 	valueTable := make(map[string]interface{})
