@@ -29,6 +29,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "搜索Yaklang样本",
 		En: "Search Yaklang Samples",
 	},
+	"search_yaklang_samples": {
+		Zh: "RAG 语义搜索Yaklang样本",
+		En: "RAG Semantic Search Yaklang Samples",
+	},
 	"grep_samples_result": {
 		Zh: "样本搜索结果",
 		En: "Sample Search Result",
@@ -435,6 +439,10 @@ var nodeIdMapper = map[string]*I18n{
 	"self-reflection-effectiveness_rating": {
 		Zh: "效果评级",
 		En: "Effectiveness Rating",
+	},
+	"yaklang-code": {
+		Zh: "Yaklang 代码",
+		En: "Yaklang Code",
 	},
 }
 
