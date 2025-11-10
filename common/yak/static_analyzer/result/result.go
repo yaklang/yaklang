@@ -3,6 +3,7 @@ package result
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -79,6 +80,9 @@ func (e *StaticAnalyzeResults) Merge(o *StaticAnalyzeResults) {
 // NewError in v.Range or [0:0-0:1]
 func (e *StaticAnalyzeResults) NewError(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(None, Error, message, v)
+	if res == nil {
+		return nil
+	}
 	res.From = e.from
 	e.res = append(e.res, res)
 	return res
@@ -87,6 +91,9 @@ func (e *StaticAnalyzeResults) NewError(message string, v *ssaapi.Value) *Static
 // NewWarn in v.Range or [0:0-0:1]
 func (e *StaticAnalyzeResults) NewWarn(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(None, Warn, message, v)
+	if res == nil {
+		return nil
+	}
 	res.From = e.from
 	e.res = append(e.res, res)
 	return res
@@ -95,6 +102,9 @@ func (e *StaticAnalyzeResults) NewWarn(message string, v *ssaapi.Value) *StaticA
 // NewDeprecated in v.Range or [0:0-0:1]
 func (e *StaticAnalyzeResults) NewDeprecated(message string, v *ssaapi.Value) *StaticAnalyzeResult {
 	res := New(Deprecated, Hint, message, v)
+	if res == nil {
+		return nil
+	}
 	res.From = e.from
 	e.res = append(e.res, res)
 	return res
@@ -104,6 +114,9 @@ func (e *StaticAnalyzeResults) NewDeprecated(message string, v *ssaapi.Value) *S
 // Create Result from ssaapi.Value.Range,
 // if v is nil, then create a result in file [0:0-0:1]
 func New(tag MarkerTag, severity MarkerSeverity, message string, v *ssaapi.Value) *StaticAnalyzeResult {
+	if ssa.ShouldSkipError(v.GetSSAInst()) {
+		return nil
+	}
 	var ret *StaticAnalyzeResult
 	if v == nil {
 		ret = &StaticAnalyzeResult{

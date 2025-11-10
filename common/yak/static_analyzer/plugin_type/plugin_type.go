@@ -2,6 +2,7 @@ package plugin_type
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
@@ -83,6 +84,7 @@ func CheckRules(pluginType PluginType, prog *ssaapi.Program) *result.StaticAnaly
 					err := recover()
 					if err != nil {
 						log.Errorf("check ruls[%s] panic: %v", pluginType, err)
+						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()
 				ret.Merge(f(prog))
