@@ -56,5 +56,5 @@ if string(httpResponse) != "" {
     }
 }
 
-//@ssa-ignore
+// @ssa-ignore
 risk.NewRisk(target, opts...)
