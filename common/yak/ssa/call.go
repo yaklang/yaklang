@@ -35,14 +35,12 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
-	targetFuncCallee := target.GetFunc()
-
-	fixCallVariadic := func(args []Value, callee *Function) []Value {
-		if utils.IsNil(callee) || !callee.hasEllipsis || callee.ParamLength <= 0 || args == nil {
+	fixCallVariadic := func(args []Value, funcType *FunctionType) []Value {
+		if utils.IsNil(funcType) || !funcType.IsVariadic || len(args) < funcType.ParameterLen || args == nil {
 			return args
 		}
 
-		fixedCount := callee.ParamLength - 1 // 最后一个是 variadic
+		fixedCount := funcType.ParameterLen - 1 // 最后一个是 variadic
 		if fixedCount > len(args) {
 			fixedCount = len(args)
 		}
@@ -71,8 +69,10 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 		return newArgs
 	}
 
-	args = fixCallVariadic(args, targetFuncCallee)
-
+	targetFuncType, ok := ToFunctionType(target.GetType())
+	if ok {
+		args = fixCallVariadic(args, targetFuncType)
+	}
 	// 创建 Call 指令
 	call := NewCall(target, args, nil, f.CurrentBlock)
 	return call

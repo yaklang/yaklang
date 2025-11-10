@@ -1599,6 +1599,12 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 		v = append(v, b.buildExpression(expr.(*yak.ExpressionContext)))
 	}
 	if ellipsis != nil {
+		// for yaklang | del: f = func(a,b,c) | call: f([1,2,3]...)
+		ellipsisValue := v[len(v)-1]
+		v = v[:len(v)-1]
+		for _, val := range ellipsisValue.GetAllMember() {
+			v = append(v, val)
+		}
 		hasEll = true
 	}
 	return
