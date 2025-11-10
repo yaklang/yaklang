@@ -1,6 +1,7 @@
 package ssa_test
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -80,4 +81,23 @@ func TestVariadicParameterInClosure(t *testing.T) {
 			t.Errorf("Bug still exists: %s", err.String())
 		}
 	}
+}
+
+func TestVariadicParameter(t *testing.T) {
+	ssatest.CheckNoError(t, `
+Merge_And_Ded = (A,B,C,D,D) => {
+    result = []
+    return result
+}
+
+Get_Metadata_Group = (group_Name,count...) => {
+    A = 0
+    B = 0
+    C = 0
+    D = 0
+    E = Merge_And_Ded(A,B,C,D,D)
+
+    return E
+}
+`)
 }

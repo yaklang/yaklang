@@ -441,3 +441,16 @@ cli.uiFieldGroups(
 		})
 	})
 }
+
+func TestYakEllipsis(t *testing.T) {
+	t.Run("simple yak ellipsis", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+f = func(a,b,c){
+	println(a)
+	println(b)
+	println(c)
+}
+f([1,2,3]...)
+		`)
+	})
+}
