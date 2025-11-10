@@ -144,6 +144,9 @@ func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Con
 	level := 0
 	var dfs func(v *Value) error
 	dfs = func(v *Value) error {
+		if utils.IsNil(v) {
+			return utils.Error("nil value")
+		}
 		if level++; level > MAXLevel {
 			return utils.Errorf("max level reached")
 		}
