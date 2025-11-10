@@ -263,25 +263,11 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 		}
 
-		lenOfFuncParams := len(funcTyp.Parameter)
+		//lenOfFuncParams := len(funcTyp.Parameter)
 		var got, want ssa.Type
 		for i := 0; i < gotParaLen; i++ {
 			got = gotPara[i]
-			if i >= wantParaLen-1 && funcTyp.IsVariadic {
-				obj, ok := ssa.ToObjectType(funcTyp.Parameter[lenOfFuncParams-1])
-				if !ok {
-					// ignore
-					log.Errorf("TypeCheckCall: [%s] last Parameter not a object type", funName)
-					break
-				} else if obj.Kind != ssa.SliceTypeKind {
-					// ignore
-					log.Errorf("TypeCheckCall: [%s] last Parameter not a slice type", funName)
-					break
-				}
-				want = obj.FieldType
-			} else {
-				want = funcTyp.Parameter[i]
-			}
+			want = funcTyp.Parameter[i]
 			checkParamType(i, got, want)
 		}
 	}()
