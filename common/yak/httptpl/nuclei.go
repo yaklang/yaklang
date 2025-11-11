@@ -379,7 +379,12 @@ func generateYakExtractors(rootNode *yaml.Node) ([]*YakExtractor, error) {
 	sequenceNodeForEach(extractorsNode, func(node *yaml.Node) error {
 		ext := &YakExtractor{}
 		ext.Name = nodeGetString(node, "name")
-		ext.Scope = nodeGetString(node, "part")
+		// Support both 'scope' (preferred) and 'part' (Nuclei compatible)
+		scope := nodeGetString(node, "scope")
+		if scope == "" {
+			scope = nodeGetString(node, "part")
+		}
+		ext.Scope = scope
 		ext.Id = int(nodeGetInt64(node, "id"))
 		typ := nodeGetString(node, "type")
 		switch typ {
@@ -431,7 +436,13 @@ func generateYakMatcher(rootNode *yaml.Node) (*YakMatcher, error) {
 		match.Condition = nodeGetString(node, "condition")
 		match.Id = int(nodeGetFloat64(node, "id"))
 
-		switch nodeGetString(node, "part") {
+		// Support both 'scope' (preferred) and 'part' (Nuclei compatible)
+		scopeStr := nodeGetString(node, "scope")
+		if scopeStr == "" {
+			scopeStr = nodeGetString(node, "part")
+		}
+		
+		switch scopeStr {
 		case "body":
 			match.Scope = "body"
 		case "header":
@@ -442,6 +453,21 @@ func generateYakMatcher(rootNode *yaml.Node) (*YakMatcher, error) {
 			match.Scope = "raw"
 		case "interactsh_protocol", "oob_protocol":
 			match.Scope = "interactsh_protocol"
+		case "request_header":
+			match.Scope = "request_header"
+		case "request_body":
+			match.Scope = "request_body"
+		case "request_raw":
+			match.Scope = "request_raw"
+		case "request_url":
+			match.Scope = "request_url"
+		default:
+			// If not recognized, use as-is (for future extensions)
+			if scopeStr != "" {
+				match.Scope = scopeStr
+			} else {
+				match.Scope = "raw"
+			}
 		}
 		typ := nodeGetString(node, "type")
 		switch typ {
