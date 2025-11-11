@@ -104,6 +104,18 @@ func GetEntityRepositoryByRAGID(db *gorm.DB, ragID string) (*schema.EntityReposi
 	return &entityRepository, nil
 }
 
+func GetEntityRepositoryByName(db *gorm.DB, name string) (*schema.EntityRepository, error) {
+	var entityRepository schema.EntityRepository
+	db = db.Model(&schema.EntityRepository{})
+	if err := db.Where("entity_base_name = ?", name).First(&entityRepository).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, utils.Errorf("entity repository not found")
+		}
+		return nil, err
+	}
+	return &entityRepository, nil
+}
+
 func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
