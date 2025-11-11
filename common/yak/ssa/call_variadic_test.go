@@ -1,8 +1,10 @@
 package ssa_test
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -100,4 +102,18 @@ Get_Metadata_Group = (group_Name,count...) => {
     return E
 }
 `)
+}
+
+func TestVariadicParameter_Packet_NotMarkError(t *testing.T) {
+	code := `
+print(a) 
+	`
+	ssatest.CheckError(t,
+		ssatest.TestCase{
+			Code: code,
+			Want: []string{
+				ssa.ValueUndefined("a"),
+			},
+		},
+	)
 }

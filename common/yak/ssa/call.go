@@ -64,6 +64,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 			func(i int) Value { return variadicArgs[i] },
 		)
 		obj.GetType().(*ObjectType).Kind = SliceTypeKind
+		obj.Anonymous = true // 标记为临时匿名结构体
 		newArgs = append(newArgs, obj)
 
 		return newArgs
