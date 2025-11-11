@@ -554,8 +554,13 @@ func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isL
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
 		if c := ast.CastExpression(); c != nil {
 			right, left = b.buildCastExpression(c.(*cparser.CastExpressionContext), isLeft)
-			if right != nil {
-				right.SetType(ssatype)
+		}
+		if right != nil && !isLeft && ssatype != nil {
+			existingType := right.GetType()
+			if utils.IsNil(existingType) || !ssa.TypeEqual(existingType, ssatype) {
+				if casted := b.EmitTypeCast(right, ssatype); casted != nil {
+					right = casted
+				}
 			}
 		}
 	} else if u := ast.UnaryExpression(); u != nil {

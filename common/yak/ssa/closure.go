@@ -157,15 +157,26 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		}
 
 		modify, ok := c.GetValueById(se.Modify)
-		if !ok || modify == nil {
+		if !ok || utils.IsNil(modify) {
+			continue
+		}
+		if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+			log.Warnf("[ssa.handleSideEffect] skip side effect %s: modify value missing block scope", se.Name)
 			continue
 		}
 		if p, ok := ToParameter(modify); ok && !p.IsFreeValue {
 			if p.FormalParameterIndex < len(c.Args) {
 				id := c.Args[p.FormalParameterIndex]
 				if id > 0 && se.Kind == PointerSideEffect {
-					if v, ok := c.GetValueById(id); ok {
+					if v, ok := c.GetValueById(id); ok && !utils.IsNil(v) {
 						modify = v
+						if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+							log.Warnf("[ssa.handleSideEffect] skip pointer side effect %s: resolved modify value missing block", se.Name)
+							continue
+						}
+					} else {
+						log.Warnf("[ssa.handleSideEffect] skip pointer side effect %s: actual argument missing", se.Name)
+						continue
 					}
 				}
 			}
@@ -188,12 +199,17 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		case ParameterCall:
 			v, exists := se.GetActualParam(c)
 			if !exists || utils.IsNil(v) {
+				log.Warnf("[ssa.handleSideEffect] skip parameter side effect %s: actual param missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = v
 			}
-			if v.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffect] skip parameter side effect %s: modify value missing block scope", se.Name)
+				continue
+			}
+			if v.GetType() != nil && v.GetType().GetTypeKind() == PointerKind {
 				se.Name = builder.GetOriginPointerName(v)
 			} else {
 				if v.GetName() != "" {
@@ -211,53 +227,79 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		case ParameterMemberCall:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffect] skip parameter member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffect] skip parameter member %s: modify value missing block scope", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffect] skip parameter member %s: member key missing", se.Name)
 				continue
 			}
 		case CallMemberCall:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffect] skip call member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffect] skip call member %s: modify value missing block scope", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffect] skip call member %s: member key missing", se.Name)
 				continue
 			}
 		default:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffect] skip default member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffect] skip default member %s: modify value missing block scope", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffect] skip default member %s: member key missing", se.Name)
 				continue
 			}
 		}
 
+		if variable == nil {
+			log.Warnf("[ssa.handleSideEffect] skip side effect %s: variable creation failed", se.Name)
+			continue
+		}
+		if variable == nil {
+			log.Warnf("[ssa.handleSideEffectBind] skip side effect %s: variable creation failed", se.Name)
+			continue
+		}
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
 			// TODO: handle side effect in loop scope,
 			// will replace value in scope and create new phi
@@ -270,10 +312,15 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			if strings.Contains(se.VerboseName, "this") {
 				sideEffect.SetVerboseName(se.VerboseName)
 			}
-			c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+			sideEffectId := sideEffect.GetId()
+			if sideEffectId == -1 {
+				log.Warnf("[ssa.handleSideEffect] skip side effect %s: side effect id is 0", se.Name)
+				continue
+			}
+			c.SideEffectValue[se.VerboseName] = sideEffectId
 			if buildPointer {
 				if se.parameterMemberInner.MemberCallObjectIndex < len(c.Args) {
-					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffect.GetId()
+					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffectId
 				}
 			}
 		}
@@ -291,7 +338,11 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 		}
 
 		modify, ok := c.GetValueById(se.Modify)
-		if !ok || modify == nil {
+		if !ok || utils.IsNil(modify) {
+			continue
+		}
+		if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+			log.Warnf("[ssa.handleSideEffectBind] skip side effect %s: modify value missing block scope", se.Name)
 			continue
 		}
 		var variable, bindVariable *Variable
@@ -318,12 +369,17 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 		case ParameterCall:
 			v, exists := se.GetActualParam(c)
 			if !exists || utils.IsNil(v) {
+				log.Warnf("[ssa.handleSideEffectBind] skip parameter side effect %s: actual param missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = v
 			}
-			if v.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffectBind] skip parameter side effect %s: modify value missing block", se.Name)
+				continue
+			}
+			if v.GetType() != nil && v.GetType().GetTypeKind() == PointerKind {
 				se.Name = builder.GetOriginPointerName(v)
 			} else {
 				if v.GetName() != "" {
@@ -341,33 +397,45 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 		case ParameterMemberCall:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffectBind] skip parameter member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffectBind] skip parameter member %s: modify value missing block", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffectBind] skip parameter member %s: key missing", se.Name)
 				continue
 			}
 		case CallMemberCall:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffectBind] skip call member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffectBind] skip call member %s: modify value missing block", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffectBind] skip call member %s: key missing", se.Name)
 				continue
 			}
 			if p, ok := ToParameter(modify); ok {
@@ -380,18 +448,24 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 		default:
 			obj, ok := se.GetActualParam(c)
 			if !ok {
+				log.Warnf("[ssa.handleSideEffectBind] skip default member %s: object missing", se.Name)
 				continue
 			}
 			if utils.IsNil(modify) {
 				modify = obj
 			}
-			if obj.GetType().GetTypeKind() == PointerKind {
+			if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+				log.Warnf("[ssa.handleSideEffectBind] skip default member %s: modify value missing block", se.Name)
+				continue
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
 			// is object
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
 				variable = builder.CreateMemberCallVariable(obj, key)
 			} else {
+				log.Warnf("[ssa.handleSideEffectBind] skip default member %s: key missing", se.Name)
 				continue
 			}
 		}

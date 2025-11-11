@@ -23,8 +23,14 @@ func typeEqualEx(t1, t2 Type, depth int) bool {
 
 	switch t1kind {
 	case FunctionTypeKind:
-		t1f, _ := ToFunctionType(t1)
-		t2f, _ := ToFunctionType(t2)
+		t1f, ok := ToFunctionType(t1)
+		if ok {
+			return false
+		}
+		t2f, ok := ToFunctionType(t2)
+		if ok {
+			return false
+		}
 		if t1f.IsAnyFunctionType() {
 			return t2f.IsAnyFunctionType()
 		}
@@ -39,12 +45,24 @@ func typeEqualEx(t1, t2 Type, depth int) bool {
 		}
 		return typeEqualEx(t1f.ReturnType, t2f.ReturnType, depth)
 	case SliceTypeKind:
-		t1o, _ := ToObjectType(t1)
-		t2o, _ := ToObjectType(t2)
+		t1o, ok := ToObjectType(t1)
+		if !ok {
+			return false
+		}
+		t2o, ok := ToObjectType(t2)
+		if !ok {
+			return false
+		}
 		return typeEqualEx(t1o.FieldType, t2o.FieldType, depth)
 	case MapTypeKind:
-		t1o, _ := ToObjectType(t1)
-		t2o, _ := ToObjectType(t2)
+		t1o, ok := ToObjectType(t1)
+		if !ok {
+			return false
+		}
+		t2o, ok := ToObjectType(t2)
+		if !ok {
+			return false
+		}
 		return typeEqualEx(t1o.FieldType, t2o.FieldType, depth) && typeEqualEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind, ObjectTypeKind:
 	case BytesTypeKind:
@@ -62,8 +80,14 @@ func typeEqualEx(t1, t2 Type, depth int) bool {
 
 		return t2.(*GenericType).symbol == t1.(*GenericType).symbol
 	case OrTypeKind:
-		t1o := t1.(*OrType)
-		t2o := t2.(*OrType)
+		t1o, ok := ToOrType(t1)
+		if !ok {
+			return false
+		}
+		t2o, ok := ToOrType(t2)
+		if !ok {
+			return false
+		}
 		if len(t1o.types) != len(t2o.types) {
 			return false
 		}
@@ -156,7 +180,10 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		if !ok {
 			break
 		}
-		t1o, _ := ToObjectType(t1)
+		t1o, ok := ToObjectType(t1)
+		if !ok {
+			break
+		}
 		return typeCompareEx(t1o.FieldType, t2o.FieldType, depth)
 	case MapTypeKind:
 		t2o, ok := t2.(*ObjectType)
@@ -204,7 +231,10 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 
 		return t2.(*GenericType).symbol == t1.(*GenericType).symbol
 	case OrTypeKind:
-		rt1 := t1.(*OrType)
+		rt1, ok := ToOrType(t1)
+		if !ok {
+			return false
+		}
 		for _, t := range rt1.types {
 			ok := typeCompareEx(t, t2, depth)
 			if ok {
@@ -265,11 +295,17 @@ func GetAllKey(t Type) []string {
 	ret := make([]string, 0)
 	switch t.GetTypeKind() {
 	case AliasTypeKind:
-		a, _ := ToAliasType(t)
+		a, ok := ToAliasType(t)
+		if !ok {
+			break
+		}
 		ret = append(ret, GetAllKey(a.GetType())...)
 	case FunctionTypeKind:
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
-		ot, _ := ToObjectType(t)
+		ot, ok := ToObjectType(t)
+		if !ok {
+			break
+		}
 		ret = append(ret, lo.Map(ot.Keys, func(v Value, _ int) string { return v.String() })...)
 		fallthrough
 	default:
@@ -1469,7 +1505,10 @@ func CloneType(t Type) (Type, bool) {
 		}
 		return NewFunctionType(old.Name, clonedParameter, clonedReturn, old.IsVariadic), true
 	case OrTypeKind:
-		old := t.(*OrType)
+		old, ok := ToOrType(t)
+		if !ok {
+			return nil, false
+		}
 		clonedTypes := make([]Type, 0, len(old.types))
 		for _, typ := range old.types {
 			if _, ok := CloneType(typ); !ok {

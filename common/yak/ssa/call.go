@@ -323,6 +323,10 @@ func (c *Call) handlerReturnType() {
 	if !ok {
 		return
 	}
+	if utils.IsNil(funcTyp.ReturnType) {
+		log.Warnf("[ssa.Call.handlerReturnType] skip setting type for call %s: return type is nil", method.GetName())
+		return
+	}
 	// inference call instruction type
 	if c.IsDropError {
 		if retType, ok := funcTyp.ReturnType.(*ObjectType); ok {
