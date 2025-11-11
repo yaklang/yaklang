@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -8,8 +10,9 @@ import (
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange *memedit.Range
-	UseRange map[*memedit.Range]struct{}
+	DefRange   *memedit.Range
+	UseRange   map[*memedit.Range]struct{}
+	useRangeMu sync.RWMutex
 
 	// for object.member variable  access
 	object      Value
@@ -35,9 +38,9 @@ func (variable *Variable) Replace(val, to Value) {
 	prog := variable.GetProgram()
 	if prog != nil {
 		prog.ForceSetOffsetValue(to, variable.DefRange)
-		for r := range variable.UseRange {
+		variable.ForEachUseRange(func(r *memedit.Range) {
 			prog.ForceSetOffsetValue(to, r)
-		}
+		})
 	}
 
 	variable.Versioned.Replace(val, to)
@@ -112,7 +115,9 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 	isPhi := !utils.IsNil(value) && value.GetOpcode() == SSAOpcodePhi
 
 	if force || isPhi || r.GetText() == v.verboseName {
+		v.useRangeMu.Lock()
 		v.UseRange[r] = struct{}{}
+		v.useRangeMu.Unlock()
 	}
 }
 
@@ -122,8 +127,19 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 		return
 	}
 	value.GetFunc().NewErrorWithPos(kind, tag, v.DefRange, msg)
-	for rangePos := range v.UseRange {
+	v.ForEachUseRange(func(rangePos *memedit.Range) {
 		value.GetFunc().NewErrorWithPos(kind, tag, rangePos, msg)
+	})
+}
+
+func (v *Variable) ForEachUseRange(fn func(*memedit.Range)) {
+	if v == nil || fn == nil {
+		return
+	}
+	v.useRangeMu.RLock()
+	defer v.useRangeMu.RUnlock()
+	for r := range v.UseRange {
+		fn(r)
 	}
 }
 

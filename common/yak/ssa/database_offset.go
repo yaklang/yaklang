@@ -48,8 +48,8 @@ func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*
 	}
 
 	createOffset(v.DefRange)
-	for r := range v.UseRange {
+	v.ForEachUseRange(func(r *memedit.Range) {
 		createOffset(r)
-	}
+	})
 	return ret
 }
