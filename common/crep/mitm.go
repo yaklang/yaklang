@@ -245,7 +245,7 @@ func VerifySystemCertificate() error {
 		return err
 	}
 
-	// 解析证书
+	// 解析服务器证书
 	cert, err := x509.ParseCertificate(fakeCert.Certificate[0])
 	if err != nil {
 		return err
@@ -257,9 +257,15 @@ func VerifySystemCertificate() error {
 		return err
 	}
 
-	// 验证证书是否在系统根证书池中
+	// 重要：创建一个 intermediate pool，但不包含 CA 证书
+	// 这样才能真正测试 CA 是否在系统根证书池中
+	intermediates := x509.NewCertPool()
+
+	// 验证证书链，强制从系统根证书池查找 CA
 	opts := x509.VerifyOptions{
-		Roots: pool,
+		Roots:         pool,
+		Intermediates: intermediates, // 空的中间证书池
+		DNSName:       "yaklang.com",
 	}
 	_, err = cert.Verify(opts)
 	if err != nil {
