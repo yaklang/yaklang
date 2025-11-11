@@ -18,13 +18,22 @@ type YakLSPHTTPServer struct {
 	grpcServer *yakgrpc.Server
 	addr       string
 	server     *http.Server
+
+	// 文档管理和调度
+	docMgr    *DocumentManager
+	scheduler *EditScheduler
 }
 
 // NewYakLSPHTTPServer 创建 HTTP LSP 服务器
 func NewYakLSPHTTPServer(grpcServer *yakgrpc.Server, addr string) *YakLSPHTTPServer {
+	docMgr := NewDocumentManager()
+	scheduler := NewEditScheduler(docMgr)
+
 	return &YakLSPHTTPServer{
 		grpcServer: grpcServer,
 		addr:       addr,
+		docMgr:     docMgr,
+		scheduler:  scheduler,
 	}
 }
 
@@ -116,8 +125,20 @@ func (s *YakLSPHTTPServer) handleLSP(w http.ResponseWriter, r *http.Request) {
 		result, rpcErr = s.handleReferences(req.Params)
 	case "textDocument/diagnostics":
 		result, rpcErr = s.handleDiagnostics(req.Params)
-	case "textDocument/didOpen", "textDocument/didChange", "textDocument/didSave", "textDocument/didClose":
-		// 文档同步通知，不需要响应
+	case "textDocument/didOpen":
+		s.handleDidOpen(req.Params)
+		w.WriteHeader(http.StatusOK)
+		return
+	case "textDocument/didChange":
+		s.handleDidChange(req.Params)
+		w.WriteHeader(http.StatusOK)
+		return
+	case "textDocument/didSave":
+		s.handleDidSave(req.Params)
+		w.WriteHeader(http.StatusOK)
+		return
+	case "textDocument/didClose":
+		s.handleDidClose(req.Params)
 		w.WriteHeader(http.StatusOK)
 		return
 	default:
@@ -191,14 +212,21 @@ func (s *YakLSPHTTPServer) handleCompletion(params json.RawMessage) (interface{}
 		return nil, &rpcError{Code: -32602, Message: "Invalid params"}
 	}
 
-	// 优先使用直接传递的文档内容，否则从文件读取
+	// 优先使用直接传递的文档内容，否则从 DocumentManager 或文件读取
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			log.Errorf("read document failed: %v", err)
-			return []interface{}{}, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+			log.Debugf("[LSP HTTP] using document from cache: %s", p.TextDocument.URI)
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				log.Errorf("read document failed: %v", err)
+				return []interface{}{}, nil
+			}
 		}
 	}
 
@@ -316,10 +344,16 @@ func (s *YakLSPHTTPServer) handleHover(params json.RawMessage) (interface{}, *rp
 
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			return nil, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				return nil, nil
+			}
 		}
 	}
 
@@ -379,10 +413,16 @@ func (s *YakLSPHTTPServer) handleSignatureHelp(params json.RawMessage) (interfac
 
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			return nil, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				return nil, nil
+			}
 		}
 	}
 
@@ -443,10 +483,16 @@ func (s *YakLSPHTTPServer) handleDefinition(params json.RawMessage) (interface{}
 
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			return nil, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				return nil, nil
+			}
 		}
 	}
 
@@ -507,10 +553,16 @@ func (s *YakLSPHTTPServer) handleReferences(params json.RawMessage) (interface{}
 
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			return []interface{}{}, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				return []interface{}{}, nil
+			}
 		}
 	}
 
@@ -566,10 +618,16 @@ func (s *YakLSPHTTPServer) handleDiagnostics(params json.RawMessage) (interface{
 	// 使用提供的文本，如果没有则尝试从 URI 读取
 	code := p.TextDocument.Text
 	if code == "" {
-		var err error
-		code, err = readDocumentContent(p.TextDocument.URI)
-		if err != nil {
-			return []interface{}{}, nil
+		// 尝试从 DocumentManager 获取
+		if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+			code = doc.GetContent()
+		} else {
+			// 最后从文件系统读取
+			var err error
+			code, err = readDocumentContent(p.TextDocument.URI)
+			if err != nil {
+				return []interface{}{}, nil
+			}
 		}
 	}
 
@@ -608,6 +666,93 @@ func (s *YakLSPHTTPServer) handleDiagnostics(params json.RawMessage) (interface{
 	}
 
 	return diagnostics, nil
+}
+
+// handleDidOpen 处理文档打开事件
+func (s *YakLSPHTTPServer) handleDidOpen(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI        string `json:"uri"`
+			LanguageID string `json:"languageId"`
+			Version    int    `json:"version"`
+			Text       string `json:"text"`
+		} `json:"textDocument"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP HTTP] failed to parse didOpen params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP HTTP] didOpen: %s (version: %d)", p.TextDocument.URI, p.TextDocument.Version)
+	s.docMgr.OpenDocument(p.TextDocument.URI, p.TextDocument.Version, p.TextDocument.Text)
+	s.scheduler.ScheduleAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidChange 处理文档变更事件
+func (s *YakLSPHTTPServer) handleDidChange(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI     string `json:"uri"`
+			Version int    `json:"version"`
+		} `json:"textDocument"`
+		ContentChanges []struct {
+			Text string `json:"text"` // 全量同步模式
+		} `json:"contentChanges"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP HTTP] failed to parse didChange params: %v", err)
+		return
+	}
+
+	if len(p.ContentChanges) == 0 {
+		return
+	}
+
+	// 全量更新（LSP 配置为 Full sync）
+	newText := p.ContentChanges[0].Text
+	log.Debugf("[LSP HTTP] didChange: %s (version: %d, size: %d bytes)",
+		p.TextDocument.URI, p.TextDocument.Version, len(newText))
+
+	s.docMgr.UpdateDocument(p.TextDocument.URI, p.TextDocument.Version, newText)
+	s.scheduler.ScheduleAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidSave 处理文档保存事件
+func (s *YakLSPHTTPServer) handleDidSave(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI string `json:"uri"`
+		} `json:"textDocument"`
+		Text string `json:"text,omitempty"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP HTTP] failed to parse didSave params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP HTTP] didSave: %s", p.TextDocument.URI)
+	// 保存时立即触发高优先级分析
+	s.scheduler.ScheduleImmediateAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidClose 处理文档关闭事件
+func (s *YakLSPHTTPServer) handleDidClose(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI string `json:"uri"`
+		} `json:"textDocument"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP HTTP] failed to parse didClose params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP HTTP] didClose: %s", p.TextDocument.URI)
+	s.docMgr.CloseDocument(p.TextDocument.URI)
 }
 
 // StartLSPHTTPServer 启动 HTTP LSP 服务器的便捷函数

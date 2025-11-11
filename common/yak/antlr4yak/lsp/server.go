@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -40,14 +41,23 @@ type YakLSPServer struct {
 	grpcServer *yakgrpc.Server
 	reader     *bufio.Reader
 	writer     io.Writer
+
+	// 文档管理和调度
+	docMgr    *DocumentManager
+	scheduler *EditScheduler
 }
 
 // NewYakLSPServer 创建 LSP 服务器
 func NewYakLSPServer(grpcServer *yakgrpc.Server) *YakLSPServer {
+	docMgr := NewDocumentManager()
+	scheduler := NewEditScheduler(docMgr)
+
 	return &YakLSPServer{
 		grpcServer: grpcServer,
 		reader:     bufio.NewReader(os.Stdin),
 		writer:     os.Stdout,
+		docMgr:     docMgr,
+		scheduler:  scheduler,
 	}
 }
 
@@ -131,8 +141,17 @@ func (s *YakLSPServer) handleRequest(content []byte) {
 		result, rpcErr = s.handleDefinition(req.Params)
 	case "textDocument/references":
 		result, rpcErr = s.handleReferences(req.Params)
-	case "textDocument/didOpen", "textDocument/didChange", "textDocument/didSave", "textDocument/didClose":
-		// 文档同步通知，不需要响应
+	case "textDocument/didOpen":
+		s.handleDidOpen(req.Params)
+		return
+	case "textDocument/didChange":
+		s.handleDidChange(req.Params)
+		return
+	case "textDocument/didSave":
+		s.handleDidSave(req.Params)
+		return
+	case "textDocument/didClose":
+		s.handleDidClose(req.Params)
 		return
 	default:
 		log.Warnf("unhandled LSP method: %s", req.Method)
@@ -193,10 +212,39 @@ func (s *YakLSPServer) handleCompletion(params json.RawMessage) (interface{}, *r
 	}
 
 	// 读取文档内容
-	code, err := readDocumentContent(p.TextDocument.URI)
+	code, err := s.getDocumentContent(p.TextDocument.URI)
 	if err != nil {
 		log.Errorf("read document failed: %v", err)
 		return []interface{}{}, nil
+	}
+
+	// P0 高优先级请求：尝试使用缓存快速响应，后台更新
+	// 检查是否有文档状态
+	if doc, ok := s.docMgr.GetDocument(p.TextDocument.URI); ok {
+		ssaCache := doc.GetSSACache()
+		// 计算当前代码的哈希
+		currentHash := ComputeCodeHash(code)
+
+		// 如果有 SSA 缓存且语义哈希匹配（或缓存不太旧），可以直接使用
+		if ssaCache != nil {
+			cacheAge := time.Since(ssaCache.CreatedAt)
+			// 对于 Completion，允许使用稍旧的缓存（5秒内）
+			if ssaCache.Hash == currentHash.Semantic || (ssaCache.Stale && cacheAge < 5*time.Second) {
+				log.Debugf("[LSP] using cached SSA for completion (age: %v, stale: %v)", cacheAge, ssaCache.Stale)
+				// 使用缓存，后台触发更新
+				if ssaCache.Hash != currentHash.Semantic {
+					go s.scheduler.ScheduleAnalysis(p.TextDocument.URI, "yak")
+				}
+			} else {
+				// 缓存过期太久，请求驱动立即编译（但有超时）
+				log.Debugf("[LSP] cache too stale, requesting immediate compilation")
+				_, _ = s.scheduler.RequestDrivenAnalysis(p.TextDocument.URI, "yak", 3*time.Second)
+			}
+		} else {
+			// 没有缓存，触发编译但不等待
+			log.Debugf("[LSP] no cache available, triggering background compilation")
+			go s.scheduler.ScheduleImmediateAnalysis(p.TextDocument.URI, "yak")
+		}
 	}
 
 	// 调用 gRPC 服务获取补全
@@ -269,10 +317,13 @@ func (s *YakLSPServer) handleHover(params json.RawMessage) (interface{}, *rpcErr
 		return nil, &rpcError{Code: -32602, Message: "Invalid params"}
 	}
 
-	code, err := readDocumentContent(p.TextDocument.URI)
+	code, err := s.getDocumentContent(p.TextDocument.URI)
 	if err != nil {
 		return nil, nil
 	}
+
+	// P0 请求：快速响应
+	s.ensureSSACache(p.TextDocument.URI, code, 5*time.Second)
 
 	req := &ypb.YaklangLanguageSuggestionRequest{
 		InspectType:   yakgrpc.HOVER,
@@ -327,10 +378,13 @@ func (s *YakLSPServer) handleSignatureHelp(params json.RawMessage) (interface{},
 		return nil, &rpcError{Code: -32602, Message: "Invalid params"}
 	}
 
-	code, err := readDocumentContent(p.TextDocument.URI)
+	code, err := s.getDocumentContent(p.TextDocument.URI)
 	if err != nil {
 		return nil, nil
 	}
+
+	// P0 请求：快速响应
+	s.ensureSSACache(p.TextDocument.URI, code, 5*time.Second)
 
 	req := &ypb.YaklangLanguageSuggestionRequest{
 		InspectType:   yakgrpc.SIGNATURE,
@@ -381,7 +435,139 @@ func (s *YakLSPServer) handleReferences(params json.RawMessage) (interface{}, *r
 	return []interface{}{}, nil
 }
 
+// handleDidOpen 处理文档打开事件
+func (s *YakLSPServer) handleDidOpen(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI        string `json:"uri"`
+			LanguageID string `json:"languageId"`
+			Version    int    `json:"version"`
+			Text       string `json:"text"`
+		} `json:"textDocument"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP] failed to parse didOpen params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP] didOpen: %s (version: %d)", p.TextDocument.URI, p.TextDocument.Version)
+	s.docMgr.OpenDocument(p.TextDocument.URI, p.TextDocument.Version, p.TextDocument.Text)
+	s.scheduler.ScheduleAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidChange 处理文档变更事件
+func (s *YakLSPServer) handleDidChange(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI     string `json:"uri"`
+			Version int    `json:"version"`
+		} `json:"textDocument"`
+		ContentChanges []struct {
+			Text string `json:"text"` // 全量同步模式
+		} `json:"contentChanges"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP] failed to parse didChange params: %v", err)
+		return
+	}
+
+	if len(p.ContentChanges) == 0 {
+		return
+	}
+
+	// 全量更新（LSP 配置为 Full sync）
+	newText := p.ContentChanges[0].Text
+	log.Debugf("[LSP] didChange: %s (version: %d, size: %d bytes)",
+		p.TextDocument.URI, p.TextDocument.Version, len(newText))
+
+	s.docMgr.UpdateDocument(p.TextDocument.URI, p.TextDocument.Version, newText)
+	s.scheduler.ScheduleAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidSave 处理文档保存事件
+func (s *YakLSPServer) handleDidSave(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI string `json:"uri"`
+		} `json:"textDocument"`
+		Text string `json:"text,omitempty"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP] failed to parse didSave params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP] didSave: %s", p.TextDocument.URI)
+	// 保存时立即触发高优先级分析
+	s.scheduler.ScheduleImmediateAnalysis(p.TextDocument.URI, "yak")
+}
+
+// handleDidClose 处理文档关闭事件
+func (s *YakLSPServer) handleDidClose(params json.RawMessage) {
+	var p struct {
+		TextDocument struct {
+			URI string `json:"uri"`
+		} `json:"textDocument"`
+	}
+
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Errorf("[LSP] failed to parse didClose params: %v", err)
+		return
+	}
+
+	log.Debugf("[LSP] didClose: %s", p.TextDocument.URI)
+	s.docMgr.CloseDocument(p.TextDocument.URI)
+}
+
+// getDocumentContent 从 DocumentManager 或文件系统获取文档内容
+func (s *YakLSPServer) getDocumentContent(uri string) (string, error) {
+	// 优先从 DocumentManager 获取
+	if doc, ok := s.docMgr.GetDocument(uri); ok {
+		return doc.GetContent(), nil
+	}
+
+	// 如果不在缓存中，从文件系统读取
+	return readDocumentContentFromFile(uri)
+}
+
+// ensureSSACache 确保 SSA 缓存可用（智能策略）
+func (s *YakLSPServer) ensureSSACache(uri string, code string, maxStaleAge time.Duration) {
+	doc, ok := s.docMgr.GetDocument(uri)
+	if !ok {
+		return
+	}
+
+	ssaCache := doc.GetSSACache()
+	currentHash := ComputeCodeHash(code)
+
+	if ssaCache != nil {
+		cacheAge := time.Since(ssaCache.CreatedAt)
+		// 如果缓存匹配或不太旧，可以使用
+		if ssaCache.Hash == currentHash.Semantic || (ssaCache.Stale && cacheAge < maxStaleAge) {
+			// 使用缓存，后台触发更新（如果需要）
+			if ssaCache.Hash != currentHash.Semantic {
+				go s.scheduler.ScheduleAnalysis(uri, "yak")
+			}
+			return
+		}
+		// 缓存过期太久，请求驱动立即编译
+		go func() {
+			_, _ = s.scheduler.RequestDrivenAnalysis(uri, "yak", 3*time.Second)
+		}()
+	} else {
+		// 没有缓存，触发编译但不等待
+		go s.scheduler.ScheduleImmediateAnalysis(uri, "yak")
+	}
+}
+
 func readDocumentContent(uri string) (string, error) {
+	return readDocumentContentFromFile(uri)
+}
+
+func readDocumentContentFromFile(uri string) (string, error) {
 	// 移除 file:// 前缀
 	filePath := strings.TrimPrefix(uri, "file://")
 
