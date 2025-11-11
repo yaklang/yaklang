@@ -836,6 +836,10 @@ func NewNucleiDSLYakSandbox() *NucleiDSL {
 }
 
 func LoadVarFromRawResponse(rsp []byte, duration float64, sufs ...string) map[string]interface{} {
+	return LoadVarFromRawResponseWithRequest(rsp, nil, duration, false, sufs...)
+}
+
+func LoadVarFromRawResponseWithRequest(rsp []byte, req []byte, duration float64, isHttps bool, sufs ...string) map[string]interface{} {
 	rs := make(map[string]interface{})
 	var (
 		contentLength = 0
@@ -864,6 +868,24 @@ func LoadVarFromRawResponse(rsp []byte, duration float64, sufs ...string) map[st
 	rs["body"] = string(body)
 	rs["raw"] = raw
 	rs["duration"] = duration
+
+	// Add request variables if request is provided
+	if len(req) > 0 {
+		reqHeaderRaw, reqBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rs["request_raw"] = string(req)
+		rs["request_headers"] = reqHeaderRaw
+		rs["request_body"] = string(reqBody)
+		rs["is_https"] = isHttps
+
+		// Extract URL from request using correct isHttps value
+		if reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps); err == nil {
+			rs["request_url"] = reqUrl.String()
+		} else {
+			rs["request_url"] = ""
+		}
+	} else {
+		rs["is_https"] = false
+	}
 
 	if len(sufs) > 0 {
 		vars := utils.CopyMapInterface(rs)
