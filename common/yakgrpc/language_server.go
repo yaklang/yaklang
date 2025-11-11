@@ -1,10 +1,13 @@
 package yakgrpc
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -44,7 +47,8 @@ func (r *LanguageServerAnalyzerResult) Clone() *LanguageServerAnalyzerResult {
 	}
 }
 
-var fallbackAnalyzeCache = utils.NewTTLCache[*LanguageServerAnalyzerResult](30 * time.Second)
+var fallbackAnalyzeCache = utils.NewTTLCache[*LanguageServerAnalyzerResult](5 * time.Minute) // 延长缓存时间到5分钟
+var ssaProgramCache = utils.NewTTLCache[*ssaapi.Program](5 * time.Minute)                    // 新增：基于代码哈希的 SSA Program 缓存
 
 func LanguageServerAnalyzeProgram(req *ypb.YaklangLanguageSuggestionRequest) (*LanguageServerAnalyzerResult, error) {
 	// from database
@@ -97,6 +101,40 @@ func languageServerAnalyzeFromDatabase(req *ypb.YaklangLanguageSuggestionRequest
 	return ret, nil
 }
 
+// 计算代码哈希用于缓存
+func getCodeHash(code string) string {
+	h := sha256.New()
+	h.Write([]byte(code))
+	return hex.EncodeToString(h.Sum(nil))[:16] // 使用前16个字符
+}
+
+// 检查代码是否只是简单的库调用添加（不需要重新解析 SSA）
+func isSimpleLibraryAddition(oldCode, newCode string) bool {
+	// 如果新代码更短，肯定不是简单添加
+	if len(newCode) < len(oldCode) {
+		return false
+	}
+
+	// 检查是否只是在末尾添加了简单的库调用模式
+	// 例如：添加 "rag." 或 "\nrag." 这样的模式
+	diff := newCode[len(oldCode):]
+	diffTrimmed := strings.TrimSpace(diff)
+
+	// 只允许添加简单的标识符或点号
+	if len(diffTrimmed) > 0 && len(diffTrimmed) <= 20 {
+		// 检查是否只包含字母、数字、点号、换行符
+		for _, ch := range diffTrimmed {
+			if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+				(ch >= '0' && ch <= '9') || ch == '.' || ch == '_' || ch == '\n' || ch == ' ') {
+				return false
+			}
+		}
+		return true
+	}
+
+	return false
+}
+
 func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) (*LanguageServerAnalyzerResult, error) {
 	// from source code
 	code := req.GetYakScriptCode()
@@ -109,7 +147,18 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 	rangeWordText := ssaRange.GetWordText()
 	word, containPoint, pointSuffix := trimSourceCode(rangeWordText)
 
+	// 计算代码哈希用于缓存
+	codeHash := getCodeHash(code)
+	cacheKey := scriptType + ":" + codeHash
+
 	getProgram := func() (*ssaapi.Program, error) {
+		// 先检查缓存
+		if cached, ok := ssaProgramCache.Get(cacheKey); ok {
+			log.Debugf("[LSP Cache] SSA program cache hit for %s (hash: %s)", scriptType, codeHash[:8])
+			return cached, nil
+		}
+
+		log.Debugf("[LSP Cache] SSA program cache miss, parsing code (hash: %s, size: %d bytes)", codeHash[:8], len(code))
 		prog, err := static_analyzer.SSAParse(code, scriptType)
 		if err == nil {
 			return prog, nil
@@ -167,6 +216,9 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 			return nil, utils.Wrap(err, "language server analyze program error")
 		}
 	}
+
+	// 将成功解析的 program 保存到缓存
+	ssaProgramCache.Set(cacheKey, prog)
 
 	// prog.Program.ShowOffsetMap()
 

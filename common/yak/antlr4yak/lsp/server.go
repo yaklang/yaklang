@@ -106,7 +106,7 @@ func (s *YakLSPServer) handleRequest(content []byte) {
 		return
 	}
 
-	log.Infof("LSP request: %s", req.Method)
+	log.Debugf("[LSP] request: %s", req.Method)
 
 	var result interface{}
 	var rpcErr *rpcError
@@ -219,9 +219,17 @@ func (s *YakLSPServer) handleCompletion(params json.RawMessage) (interface{}, *r
 		return []interface{}{}, nil
 	}
 
-	// 转换为 LSP CompletionItem
+	// 转换为 LSP CompletionItem 并去重
 	items := make([]map[string]interface{}, 0, len(resp.SuggestionMessage))
+	seen := make(map[string]bool) // 用于去重
+
 	for _, item := range resp.SuggestionMessage {
+		// 使用 label 作为去重键
+		if seen[item.Label] {
+			continue
+		}
+		seen[item.Label] = true
+
 		completionItem := map[string]interface{}{
 			"label":  item.Label,
 			"kind":   convertCompletionKind(item.Kind),
@@ -237,6 +245,10 @@ func (s *YakLSPServer) handleCompletion(params json.RawMessage) (interface{}, *r
 			}
 		}
 		items = append(items, completionItem)
+	}
+
+	if len(seen) < len(resp.SuggestionMessage) {
+		log.Debugf("[LSP Completion] deduplicated: %d -> %d items", len(resp.SuggestionMessage), len(items))
 	}
 
 	return items, nil
