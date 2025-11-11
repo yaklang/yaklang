@@ -57,6 +57,10 @@ type YakExtractor struct {
 // group2 for value
 
 func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[string]any, error) {
+	return y.ExecuteWithRequest(rsp, nil, false, previous...)
+}
+
+func (y *YakExtractor) ExecuteWithRequest(rsp []byte, req []byte, isHttps bool, previous ...map[string]any) (map[string]any, error) {
 	tag := y.Name
 	if tag == "" {
 		tag = "data"
@@ -75,6 +79,36 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	case "header":
 		header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
 		material = header
+	case "request_header":
+		if len(req) > 0 {
+			header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+			material = header
+		} else {
+			material = ""
+		}
+	case "request_body":
+		if len(req) > 0 {
+			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+			material = string(body)
+		} else {
+			material = ""
+		}
+	case "request_raw":
+		if len(req) > 0 {
+			material = string(req)
+		} else {
+			material = ""
+		}
+	case "request_url":
+		if len(req) > 0 {
+			if reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps); err == nil {
+				material = reqUrl.String()
+			} else {
+				material = ""
+			}
+		} else {
+			material = ""
+		}
 	default:
 		material = string(rsp)
 	}
@@ -209,8 +243,10 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 		}
 	case "nuclei-dsl", "nuclei", "dsl":
 		box := NewNucleiDSLYakSandbox()
-		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-		previousMap := make(map[string]any)
+		// Load all built-in variables from response (including status_code, headers, etc.)
+		previousMap := LoadVarFromRawResponseWithRequest(rsp, req, 0, isHttps)
+
+		// Merge previous extraction results
 		for _, p := range previous {
 			for k, v := range p {
 				switch reflect.TypeOf(v).Kind() {
@@ -221,14 +257,15 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 				}
 			}
 		}
-		previousMap["body"] = body
+
+		// Also keep the old variable names for backward compatibility
+		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
 		previousMap["body_1"] = body
-		previousMap["header"] = header
 		previousMap["header_1"] = header
-		previousMap["raw"] = string(rsp)
 		previousMap["raw_1"] = string(rsp)
 		previousMap["response"] = string(rsp)
 		previousMap["response_1"] = string(rsp)
+
 		for _, group := range y.Groups {
 			if group != "" {
 				data, err := box.Execute(group, previousMap)

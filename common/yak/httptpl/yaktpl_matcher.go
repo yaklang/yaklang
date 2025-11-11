@@ -1,11 +1,12 @@
 package httptpl
 
 import (
+	"strings"
+	"time"
+
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
-	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,6 +62,10 @@ const (
 	SCOPE_RAW                 = "raw"
 	SCOPE_INTERACTSH_PROTOCOL = "interactsh_protocol"
 	SCOPE_INTERACTSH_REQUEST  = "interactsh_request"
+	SCOPE_REQUEST_HEADER      = "request_header"
+	SCOPE_REQUEST_BODY        = "request_body"
+	SCOPE_REQUEST_RAW         = "request_raw"
+	SCOPE_REQUEST_URL         = "request_url"
 )
 
 const (
@@ -155,8 +160,10 @@ func (y *YakMatcher) ExecuteRawWithConfig(config *Config, rsp []byte, vars map[s
 }
 
 type RespForMatch struct {
-	RawPacket []byte
-	Duration  float64
+	RawPacket     []byte
+	Duration      float64
+	RequestPacket []byte // optional request packet for request_* variables
+	IsHttps       bool   // whether the request is HTTPS
 }
 
 func (y *YakMatcher) Execute(rsp *RespForMatch, vars map[string]interface{}, suf ...string) (bool, error) {
@@ -193,6 +200,10 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *RespForMatch, vars m
 }
 
 func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
+	return y.executeRawWithRequest(name, config, packet, nil, duration, false, vars, sufs...)
+}
+
+func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet []byte, reqPacket []byte, duration float64, isHttps bool, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
 	interactsh_protocol := utils.MapGetString(vars, "interactsh_protocol")
@@ -273,6 +284,36 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 							material = string(request)
 						}
 					}
+				}
+			case SCOPE_REQUEST_HEADER:
+				if len(reqPacket) > 0 {
+					header, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(reqPacket)
+					material = header
+				} else {
+					material = ""
+				}
+			case SCOPE_REQUEST_BODY:
+				if len(reqPacket) > 0 {
+					_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(reqPacket)
+					material = string(body)
+				} else {
+					material = ""
+				}
+			case SCOPE_REQUEST_RAW:
+				if len(reqPacket) > 0 {
+					material = string(reqPacket)
+				} else {
+					material = ""
+				}
+			case SCOPE_REQUEST_URL:
+				if len(reqPacket) > 0 {
+					if reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqPacket, isHttps); err == nil {
+						material = reqUrl.String()
+					} else {
+						material = ""
+					}
+				} else {
+					material = ""
 				}
 			case SCOPE_RAW:
 				fallthrough
@@ -390,7 +431,7 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 		case EXPR_TYPE_NUCLEI_DSL, "nuclei":
 			dslEngine := NewNucleiDSLYakSandbox()
 			matcherFunc = func(fullResponse string, sub string) bool {
-				loadVars := LoadVarFromRawResponse(packet, duration, sufs...)
+				loadVars := LoadVarFromRawResponseWithRequest(packet, reqPacket, duration, isHttps, sufs...)
 				// 加载 resp 中的变量
 				for k, v := range vars { // 合并若有重名以 vars 为准
 					loadVars[k] = v
@@ -457,6 +498,8 @@ func (y *YakMatcher) executeRaw(name string, config *Config, packet []byte, dura
 
 func (y *YakMatcher) execute(config *Config, rspIns *RespForMatch, vars map[string]interface{}, sufs ...string) (bool, error) {
 	rsp := utils.CopyBytes(rspIns.RawPacket)
+	req := utils.CopyBytes(rspIns.RequestPacket)
 	duration := rspIns.Duration
-	return y.executeRaw(y.TemplateName, config, rsp, duration, vars, sufs...)
+	isHttps := rspIns.IsHttps
+	return y.executeRawWithRequest(y.TemplateName, config, rsp, req, duration, isHttps, vars, sufs...)
 }
