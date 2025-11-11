@@ -3,10 +3,7 @@ package c2ssa
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
@@ -154,136 +151,9 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func PreprocessCMacros(src string) (string, error) {
-	/* TODO: 未来改进：
-	   1. 将 gcc/clang 集成到项目中（可选）
-	   2. 提供在不同平台上构建 gcc/clang 的脚本
-	   3. 添加编译选项，让用户决定是否自动扩展宏
-	   4. 支持用户指定额外的 include 路径（-I 选项）
-	*/
-
-	// Remove all preprocessor directives to avoid errors
-	lines := strings.Split(src, "\n")
-	cleanedLines := make([]string, 0, len(lines))
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		trimmedLower := strings.ToLower(trimmed)
-
-		// Skip ALL include directives (case-insensitive)
-		if strings.HasPrefix(trimmedLower, "#include") {
-			cleanedLines = append(cleanedLines, "/* removed include */")
-			continue
-		}
-		// Skip #error directives
-		if strings.HasPrefix(trimmedLower, "#error") {
-			cleanedLines = append(cleanedLines, "/* removed error */")
-			continue
-		}
-		// Skip #warning directives
-		if strings.HasPrefix(trimmedLower, "#warning") {
-			cleanedLines = append(cleanedLines, "/* removed warning */")
-			continue
-		}
-		// // Skip ALL conditional compilation directives
-		// if strings.HasPrefix(trimmedLower, "#if") ||
-		// 	strings.HasPrefix(trimmedLower, "#elif") ||
-		// 	strings.HasPrefix(trimmedLower, "#else") ||
-		// 	strings.HasPrefix(trimmedLower, "#endif") {
-		// 	cleanedLines = append(cleanedLines, "/* removed directive */")
-		// 	continue
-		// }
-		// Skip #pragma directives
-		if strings.HasPrefix(trimmedLower, "#pragma") {
-			cleanedLines = append(cleanedLines, "/* removed pragma */")
-			continue
-		}
-		cleanedLines = append(cleanedLines, line)
-	}
-	cleanedSrc := strings.Join(cleanedLines, "\n")
-
-	var preprocessorCmd string
-	candidates := []string{"gcc", "clang", "cc"}
-	for _, cmd := range candidates {
-		if _, err := exec.LookPath(cmd); err == nil {
-			preprocessorCmd = cmd
-			break
-		}
-	}
-
-	if preprocessorCmd == "" {
-		return "", fmt.Errorf("c preprocessor not found: please install gcc, clang, or compatible C compiler (platform: %s/%s)", runtime.GOOS, runtime.GOARCH)
-	}
-
-	tmpDir := globalTempDir
-	if tmpDir == "" {
-		tmpDir = os.TempDir()
-	}
-
-	tmpFile, err := os.CreateTemp(tmpDir, "c_preprocess_*.c")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpFileName := tmpFile.Name()
-	defer os.Remove(tmpFileName)
-
-	if _, err := tmpFile.WriteString(cleanedSrc); err != nil {
-		tmpFile.Close()
-		return "", fmt.Errorf("failed to write source to temp file: %w", err)
-	}
-	tmpFile.Close()
-
-	// Build preprocessor arguments with include paths
-	preprocessorArgs := []string{
-		"-E",
-		// "-P",
-		"-nostdinc",
-		"-Wno-everything",
-	}
-
-	if globalTempDir != "" {
-		preprocessorArgs = append(preprocessorArgs, "-I", globalTempDir)
-	}
-
-	preprocessorArgs = append(preprocessorArgs, tmpFileName)
-
-	cmd := exec.Command(preprocessorCmd, preprocessorArgs...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Truncate output to first 500 characters to reduce log noise
-		outputStr := string(output)
-		if len(outputStr) > 500 {
-			outputStr = outputStr[:500] + "... (truncated)"
-		}
-		return src, fmt.Errorf("preprocessor failed: %w\nOutput: %s", err, outputStr)
-	}
-
-	result := string(output)
-	resultLines := strings.Split(result, "\n")
-	finalLines := make([]string, 0, len(resultLines))
-
-	for _, line := range resultLines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
-			finalLines = append(finalLines, line)
-		} else if strings.HasPrefix(trimmed, "#include") {
-			finalLines = append(finalLines, line)
-		}
-	}
-
-	return strings.Join(finalLines, "\n"), nil
-}
-
 func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
-
-	preprocessedSrc := src
-	if preprocessed, err := PreprocessCMacros(src); err == nil {
-		preprocessedSrc = preprocessed
-	} else {
-		log.Warnf("C macro preprocessing failed: %v, using original source", err)
-	}
-
 	errListener := antlr4util.NewErrorListener()
-	lexer := cparser.NewCLexer(antlr.NewInputStream(preprocessedSrc))
+	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)

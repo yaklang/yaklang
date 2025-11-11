@@ -4,7 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/c2ssa"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -272,11 +273,14 @@ func TestPreprocess_DirectAPI(t *testing.T) {
 #define MAX_SIZE 1024
 int buffer[MAX_SIZE];
 `
-		result, err := c2ssa.PreprocessCMacros(src)
-		if err != nil {
-			t.Skipf("Preprocessor not available: %v", err)
-			return
-		}
+
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("src/main/main.c", src)
+		cfs, err := filesys.NewPreprocessedCFs(fs)
+		require.NoError(t, err)
+
+		result, err := cfs.PreprocessCSource(src)
+		require.NoError(t, err)
 
 		if !strings.Contains(result, "1024") {
 			t.Errorf("Expected macro to be expanded to 1024, got:\n%s", result)
@@ -288,11 +292,13 @@ int buffer[MAX_SIZE];
 #define MIN(a,b) ((a)<(b)?(a):(b))
 int min = MIN(x, y);
 `
-		result, err := c2ssa.PreprocessCMacros(src)
-		if err != nil {
-			t.Skipf("Preprocessor not available: %v", err)
-			return
-		}
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("src/main/main.c", src)
+		cfs, err := filesys.NewPreprocessedCFs(fs)
+		require.NoError(t, err)
+
+		result, err := cfs.PreprocessCSource(src)
+		require.NoError(t, err)
 
 		if !strings.Contains(result, "((x)<(y)?(x):(y))") && !strings.Contains(result, "?") {
 			t.Logf("Function macro expansion result:\n%s", result)
@@ -308,11 +314,13 @@ int debug_mode = 1;
 int debug_mode = 0;
 #endif
 `
-		result, err := c2ssa.PreprocessCMacros(src)
-		if err != nil {
-			t.Skipf("Preprocessor not available: %v", err)
-			return
-		}
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("src/main/main.c", src)
+		cfs, err := filesys.NewPreprocessedCFs(fs)
+		require.NoError(t, err)
+
+		result, err := cfs.PreprocessCSource(src)
+		require.NoError(t, err)
 
 		if !strings.Contains(result, "debug_mode = 1") && !strings.Contains(result, "debug_mode") {
 			t.Logf("Conditional compilation result:\n%s", result)
