@@ -297,7 +297,7 @@ func (fr *FrameReader) resetFlate() {
 	}
 	fr.flateTail.Reset(compressionTail)
 
-	fr.flateReader = getFlateReader(io.MultiReader(fr.fragmentBuffer, fr.limitReader, fr.flateTail), buf)
+	fr.flateReader = getFlateReader(io.MultiReader(fr.fragmentBuffer, fr.flateTail), buf)
 }
 
 func (fr *FrameReader) putFlateReader() {
@@ -314,9 +314,25 @@ func (fr *FrameReader) readPayloadN(n uint64) ([]byte, error) {
 		err error
 	)
 	frame := fr.frame
-	if fr.flateReader != nil && frame.FIN() && !frame.IsControl() {
-		frame.UnsetRSV1()
 
+	p = make([]byte, n)
+	nn, err = io.ReadFull(fr.r, p)
+	p = p[:nn]
+
+	frame.rawPayload = make([]byte, len(p))
+	copy(frame.rawPayload, p)
+
+	if frame.mask {
+		maskBytes(frame.maskingKey, p, len(p))
+	}
+
+	if fr.fragmentBuffer != nil {
+		fr.fragmentBuffer.Grow(nn)
+		fr.fragmentBuffer.Write(p)
+	}
+
+	if fr.flateReader != nil && frame.FIN() && !frame.IsControl() { // 如果是压缩的帧，则需要考虑流式问题，需要在存储流式的帧然后进行最后统一解压
+		frame.UnsetRSV1()
 		c := fr.c
 		p, err = io.ReadAll(fr.flateReader)
 		if len(p) > 0 && errors.Is(err, io.ErrUnexpectedEOF) {
@@ -328,16 +344,6 @@ func (fr *FrameReader) readPayloadN(n uint64) ([]byte, error) {
 		}
 
 		fr.putFlateReader()
-	} else {
-		p = make([]byte, n)
-		nn, err = io.ReadFull(fr.r, p)
-
-		p = p[:nn]
-		if !frame.FIN() && fr.fragmentBuffer != nil {
-			fr.fragmentBuffer.Grow(nn)
-			fr.fragmentBuffer.Write(p)
-		}
-
 	}
 
 	return p, err
