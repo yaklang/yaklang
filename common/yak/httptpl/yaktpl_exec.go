@@ -378,13 +378,26 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	}
 	var matchResults []bool
 	var responses []*lowhttp.LowhttpResponse
+	var requestPackets [][]byte // store request packets for matcher
+	var requestIsHttps []bool   // store isHttps for each request
 	cacheRes := make(map[string]bool)
 	runtimeVars := map[string]any{}
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
 		var tempMatchersResult []any
 		for matcherIndex, matcher := range matchers {
 			if matcher.Id == 0 {
-				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: rsp.RawPacket, Duration: rsp.GetDurationFloat()}, runtimeVars)
+				var reqPacket []byte
+				var isHttps bool
+				if index < len(requestPackets) {
+					reqPacket = requestPackets[index]
+					isHttps = requestIsHttps[index]
+				}
+				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{
+					RawPacket:     rsp.RawPacket,
+					Duration:      rsp.GetDurationFloat(),
+					RequestPacket: reqPacket,
+					IsHttps:       isHttps,
+				}, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
@@ -399,7 +412,18 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 						if targetIndex >= len(responses) {
 							tempMatchersResult = append(tempMatchersResult, false)
 						} else {
-							matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: responses[targetIndex].RawPacket, Duration: responses[targetIndex].GetDurationFloat()}, runtimeVars)
+							var reqPacket []byte
+							var isHttps bool
+							if targetIndex < len(requestPackets) {
+								reqPacket = requestPackets[targetIndex]
+								isHttps = requestIsHttps[targetIndex]
+							}
+							matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{
+								RawPacket:     responses[targetIndex].RawPacket,
+								Duration:      responses[targetIndex].GetDurationFloat(),
+								RequestPacket: reqPacket,
+								IsHttps:       isHttps,
+							}, runtimeVars)
 							if err != nil {
 								log.Error("matcher execute failed: ", err)
 							}
@@ -409,7 +433,18 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 					}
 					continue
 				}
-				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{RawPacket: rsp.RawPacket, Duration: rsp.GetDurationFloat()}, runtimeVars)
+				var reqPacket []byte
+				var isHttps bool
+				if index < len(requestPackets) {
+					reqPacket = requestPackets[index]
+					isHttps = requestIsHttps[index]
+				}
+				matchResult, err := matcher.ExecuteWithConfig(config, &RespForMatch{
+					RawPacket:     rsp.RawPacket,
+					Duration:      rsp.GetDurationFloat(),
+					RequestPacket: reqPacket,
+					IsHttps:       isHttps,
+				}, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
@@ -453,6 +488,8 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			}
 			if err == nil {
 				responses = append(responses, rsp)
+				requestPackets = append(requestPackets, []byte(reqRaw))
+				requestIsHttps = append(requestIsHttps, req.IsHttps)
 			} else {
 				// log.Error(err)
 				continue
@@ -466,7 +503,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				if extractor.Id != 0 && extractor.Id != index+1 {
 					continue
 				}
-				varIns, err := extractor.Execute(rsp.RawPacket, y.Variables.ToMap())
+				varIns, err := extractor.ExecuteWithRequest(rsp.RawPacket, []byte(reqRaw), req.IsHttps, y.Variables.ToMap())
 				if err != nil {
 					log.Error("extractor execute failed: ", err)
 					continue
