@@ -2,7 +2,11 @@ package rag
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // type DocumentOption = vectorstore.DocumentOption
@@ -22,36 +26,41 @@ func BuildVectorIndexForKnowledgeBase(db *gorm.DB, id int64, opts ...RAGSystemCo
 	return vectorstore.BuildVectorIndexForKnowledgeBase(db, id, colOpts...)
 }
 
-// func ImportRAGFromReader(reader io.Reader, optFuncs ...RAGSystemConfigOption) error {
-// 	config := NewRAGSystemConfig(optFuncs...)
+// DeleteRAG 完整删除一个RAG系统，包括集合、知识库、实体仓库
+func DeleteRAG(db *gorm.DB, name string) error {
+	// 获取集合信息
+	collectionInfo, err := loadCollectionInfoByConfig(NewRAGSystemConfig(WithDB(db), WithName(name)))
+	if err != nil {
+		return utils.Errorf("failed to load collection info: %v", err)
+	}
+	err = DeleteCollection(db, collectionInfo.Name)
+	if err != nil {
+		return err
+	}
 
-// 	knowledgebase.ImportKnowledgeBase(context.Background(), config.db, reader, &knowledgebase.ImportKnowledgeBaseOptions{
-// 		OverwriteExisting:    true,
-// 		NewKnowledgeBaseName: config.Name,
-// 	})
-// 	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
-// 	return vectorstore.ImportRAGFromReader(reader, importOpts...)
-// }
+	// 生成配置，用于加载知识库和实体仓库信息
+	ragConfig := NewRAGSystemConfig(WithDB(db), WithName(collectionInfo.Name), WithRAGID(collectionInfo.RAGID))
 
-// func LoadRAGFromReader(reader io.Reader) (*vectorstore.RAGBinaryData, error) {
-// 	return vectorstore.LoadRAGFromBinary(reader)
-// }
+	// 删除知识库
+	knowledgeBaseInfo, err := loadKnowledgeBaseInfoByConfig(ragConfig)
+	if err != nil {
+		log.Errorf("failed to load knowledge base info: %v", err)
+	} else {
+		err = knowledgebase.DeleteKnowledgeBase(db, knowledgeBaseInfo.KnowledgeBaseName)
+		if err != nil {
+			log.Errorf("failed to delete knowledge base: %v, error: %v", knowledgeBaseInfo.KnowledgeBaseName, err)
+		}
+	}
 
-// func ImportRAGFromBinary(binary []byte, optFuncs ...RAGSystemConfigOption) error {
-// 	return ImportRAGFromReader(bytes.NewReader(binary), optFuncs...)
-// }
-
-// func ImportRAGFromFile(inputPath string, optFuncs ...RAGSystemConfigOption) error {
-// 	importOpts := NewRAGSystemConfig(optFuncs...).ConvertToExportOptions()
-// 	return vectorstore.ImportRAGFromFile(inputPath, importOpts...)
-// }
-
-// func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io.Reader, error) {
-// 	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
-// 	return vectorstore.ExportRAGToBinary(collectionName, exportOpts...)
-// }
-
-// func ExportRAGToFile(collectionName string, fileName string, opts ...RAGSystemConfigOption) error {
-// 	exportOpts := NewRAGSystemConfig(opts...).ConvertToExportOptions()
-// 	return vectorstore.ExportRAGToFile(collectionName, fileName, exportOpts...)
-// }
+	// 删除实体仓库
+	entityRepositoryInfo, err := loadEntityRepositoryInfoByConfig(ragConfig)
+	if err != nil {
+		log.Errorf("failed to load entity repository info: %v", err)
+	} else {
+		err = entityrepos.DeleteEntityRepository(db, entityRepositoryInfo.EntityBaseName)
+		if err != nil {
+			log.Errorf("failed to delete entity repository: %v, error: %v", entityRepositoryInfo.EntityBaseName, err)
+		}
+	}
+	return nil
+}

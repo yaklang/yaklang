@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -167,4 +170,106 @@ func MockAIService(handle func(message string) string) aicommon.AICallbackType {
 		rsp.Close()
 		return rsp, nil
 	}
+}
+
+// type ragSystemCoreTables struct {
+// 	VectorStore      *schema.VectorStoreCollection
+// 	KnowledgeBase    *schema.KnowledgeBaseInfo
+// 	EntityRepository *schema.EntityRepository
+// }
+
+// func loadRagSystemCoreTables(opts ...RAGSystemConfigOption) (*ragSystemCoreTables, error) {
+// 	config := NewRAGSystemConfig(opts...)
+// 	coreTables := &ragSystemCoreTables{}
+
+// 	// 加载集合信息
+// 	collection, _ := loadCollectionInfoByConfig(config)
+// 	if collection == nil {
+// 		vectorstore.CreateCollection(config.db, config.Name, config.Description, opts...)
+
+// 	}
+// 	coreTables.VectorStore = collection
+
+// 	// 加载知识库信息
+// 	knowledgeBase, err := loadKnowledgeBaseInfoByConfig(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	coreTables.KnowledgeBase = knowledgeBase
+
+// 	// 加载实体仓库信息
+// 	entityRepository, err := loadEntityRepositoryInfoByConfig(config)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	coreTables.EntityRepository = entityRepository
+// 	return coreTables, nil
+// }
+
+func loadCollectionInfoByConfig(config *RAGSystemConfig) (*schema.VectorStoreCollection, error) {
+	if config.vectorStore != nil {
+		return config.vectorStore.GetCollectionInfo(), nil
+	} else {
+		if config.ragID != "" {
+			var collection schema.VectorStoreCollection
+			err := config.db.Model(&schema.VectorStoreCollection{}).Where("rag_id = ?", config.ragID).First(&collection).Error
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get collection by rag_id %s failed", config.ragID))
+			}
+			return &collection, nil
+		} else if config.Name != "" {
+			collection, err := yakit.GetRAGCollectionInfoByName(config.db, config.Name)
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get collection by name %s failed", config.Name))
+			}
+			return collection, nil
+		}
+	}
+	return nil, utils.Errorf("collection name or rag_id or vector store options are required")
+}
+
+func loadKnowledgeBaseInfoByConfig(config *RAGSystemConfig) (*schema.KnowledgeBaseInfo, error) {
+	if config.knowledgeBase != nil {
+		return config.knowledgeBase.GetKnowledgeBaseInfo(), nil
+	} else {
+		if config.ragID != "" {
+			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByRAGID(config.db, config.ragID)
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get knowledge base by rag_id %s failed", config.ragID))
+			}
+			return knowledgeBaseInfo, nil
+		} else if config.Name != "" {
+			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByName(config.db, config.Name)
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get knowledge base by name %s failed", config.Name))
+			}
+			return knowledgeBaseInfo, nil
+		}
+	}
+	return nil, utils.Errorf("knowledge base name or rag_id or knowledge base options are required")
+}
+
+func loadEntityRepositoryInfoByConfig(config *RAGSystemConfig) (*schema.EntityRepository, error) {
+	if config.entityRepository != nil {
+		info, err := config.entityRepository.GetInfo()
+		if err != nil {
+			return nil, utils.Wrap(err, "get entity repository info failed")
+		}
+		return info, nil
+	} else {
+		if config.ragID != "" {
+			entityRepositoryInfo, err := yakit.GetEntityRepositoryByRAGID(config.db, config.ragID)
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get entity repository by rag_id %s failed", config.ragID))
+			}
+			return entityRepositoryInfo, nil
+		} else if config.Name != "" {
+			entityRepositoryInfo, err := yakit.GetEntityRepositoryByName(config.db, config.Name)
+			if err != nil {
+				return nil, utils.Wrap(err, fmt.Sprintf("get entity repository by name %s failed", config.Name))
+			}
+			return entityRepositoryInfo, nil
+		}
+	}
+	return nil, utils.Errorf("entity repository name or rag_id or entity repository options are required")
 }

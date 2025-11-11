@@ -43,6 +43,9 @@ type CollectionConfig struct {
 	MaxChunkSize int
 	Overlap      int
 	BigTextPlan  string
+
+	CacheSize    int
+	PreCacheSize int
 }
 
 func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
@@ -84,6 +87,8 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		MaxChunkSize:               defaultMaxChunkSize,
 		Overlap:                    defaultChunkOverlap,
 		BigTextPlan:                defaultBigTextPlan,
+		CacheSize:                  10000,
+		PreCacheSize:               0,
 	}
 	for _, option := range options {
 		option(loadBasicConfig)
@@ -120,6 +125,18 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 }
 
 type CollectionConfigFunc func(config *CollectionConfig)
+
+func WithCacheSize(cacheSize int) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.CacheSize = cacheSize
+	}
+}
+
+func WithPreCacheSize(preCacheSize int) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.PreCacheSize = preCacheSize
+	}
+}
 
 func WithMaxChunkSize(maxChunkSize int) CollectionConfigFunc {
 	return func(config *CollectionConfig) {

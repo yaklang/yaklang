@@ -197,7 +197,7 @@ type VectorStoreDocument struct {
 	EntityID        string `gorm:"index"`
 	RelatedEntities string // text split by ","
 
-	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`
+	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;index;idx_document_id;not null" json:"document_id"`
 	UID        []byte `gorm:"blob"`
 
 	// 所属集合的ID，建立外键关系
