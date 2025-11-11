@@ -1398,6 +1398,7 @@ message DeleteKnowledgeBaseEntryRequest {
 message SearchKnowledgeBaseEntryFilter {
   int64 KnowledgeBaseId = 1;
   string Keyword = 2;
+  repeated string RelatedEntityUUIDS = 3;
 }
 message SearchKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseId = 1;
