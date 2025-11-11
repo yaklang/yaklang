@@ -128,7 +128,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 				toClient.WriteDirect(f.FIN(), f.RSV1(), opcode, f.GetMask(), data)
 			}
 		case lowhttp.CloseMessage:
-			toServer.WriteCloseEx(f.GetCloseCode(), "")
+			toClient.WriteCloseEx(f.GetCloseCode(), "")
 			isServerClosed = true
 			log.Debugf("[grpc-ws] [>server] write close message: %d %s", f.GetCloseCode(), f.GetData())
 		default:
@@ -221,8 +221,14 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 
 	toServer.Start()
 	toClient.Start()
-	toClient.Wait()
-	toServer.Wait()
+
+	select { //  server or client closed , another side should be closed too
+	case <-toServer.WaitChannel():
+	case <-toClient.WaitChannel():
+	}
+	toServer.Close()
+	toClient.Close()
+
 	logger.Infof("websocket tunnel for %s closed", addr)
 	return nil
 }
