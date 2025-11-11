@@ -59,7 +59,7 @@ opts := []
 
 // 设置分支（如果指定）
 if branch != "" {
-    opts = append(opts, git.withBranch(branch))
+    opts = append(opts, git.branch(branch))
     yakit.Info("Using branch: %v", branch)
 }
 
