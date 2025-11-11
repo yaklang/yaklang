@@ -361,6 +361,11 @@ func Len(a interface{}) int {
 	if canLen, ok := a.(ILen); ok {
 		return canLen.Len()
 	}
+
+	if v, ok := a.(string); ok {
+		return len([]rune(v))
+	}
+
 	return reflect.ValueOf(a).Len()
 }
 

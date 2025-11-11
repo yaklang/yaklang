@@ -1,0 +1,10 @@
+// 本脚本用于测试 len 函数正确处理 rune 长度
+// len(str) => len([]rune(str))
+
+zhStr = "你好"
+
+// 预期长度应该是2
+assert len(zhStr) == 2
+
+// 如果 len 按照 []byte 计算长度这里会 panic
+assert zhStr[:len(zhStr)] == zhStr
