@@ -42,7 +42,8 @@ type SQLiteVectorStoreHNSW struct {
 	wg                         sync.WaitGroup
 	UIDType                    string
 
-	cacheSize int
+	cacheSize    int
+	preCacheSize int
 
 	config *CollectionConfig
 }
@@ -75,7 +76,8 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 		collection:                 collection,
 		ctx:                        context.Background(),
 		embedder:                   collectionConfig.EmbeddingClient,
-		cacheSize:                  10000,
+		cacheSize:                  collectionConfig.CacheSize,
+		preCacheSize:               collectionConfig.PreCacheSize,
 		config:                     collectionConfig,
 	}
 
@@ -130,7 +132,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 			)
 		} else {
 			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, vectorStore.cacheSize, collection.EnablePQMode, &vectorStore.wg)
+			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, vectorStore.cacheSize, vectorStore.preCacheSize, collection.EnablePQMode, &vectorStore.wg)
 			if err != nil {
 				return nil, utils.Wrap(err, "parse hnsw graph from binary")
 			}
@@ -299,7 +301,7 @@ func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 	return nil
 }
 
-func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+func CreateCollectionRecord(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*schema.VectorStoreCollection, error) {
 	cfg := NewCollectionConfig(opts...)
 
 	if cfg.Description != "" {
@@ -323,15 +325,26 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 		return nil, utils.Errorf("创建集合失败: %v", res.Error)
 	}
 
+	return &collection, nil
+}
+
+func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+	cfg := NewCollectionConfig(opts...)
+
+	collection, err := CreateCollectionRecord(db, name, description, opts...)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to create collection record")
+	}
+
 	if err := cfg.FixEmbeddingClient(); err != nil {
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
-	hnswGraph := NewHNSWGraph(name)
+	hnswGraph := NewHNSWGraph(collection.Name)
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   cfg.EmbeddingClient,
-		collection:                 &collection,
+		collection:                 collection,
 		hnsw:                       hnswGraph,
 		cacheSize:                  10000,
 		config:                     cfg,

@@ -2,6 +2,7 @@ package rag
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -33,32 +34,67 @@ func newDefaultRAGSystem() *RAGSystem {
 }
 
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
-	ragSystem, err := _newRAGSystem(options...)
+	config := NewRAGSystemConfig(options...)
+
+	colInfo, err := loadCollectionInfoByConfig(config)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			colInfo, err = vectorstore.CreateCollectionRecord(config.db, config.Name, config.description, config.ConvertToVectorStoreOptions()...)
+			if err != nil {
+				return nil, utils.Wrap(err, "failed to create collection record")
+			}
+		} else {
+			return nil, utils.Wrap(err, "failed to load collection info")
+		}
 	}
 
-	if ragSystem.config.importFile != "" {
-		file, err := os.Open(ragSystem.config.importFile)
+	runImported := false
+	importFile := func(force bool) error {
+		file, err := os.Open(config.importFile)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to open aikb file")
+			return utils.Wrap(err, "failed to open aikb file")
 		}
 		defer file.Close()
 		header, err := LoadRAGFileHeader(file)
 		if err != nil {
-			return nil, utils.Wrap(err, "failed to import rag collection")
+			return utils.Wrap(err, "failed to import rag collection")
 		}
 
-		colInfo := ragSystem.VectorStore.GetCollectionInfo()
-		if colInfo.SerialVersionUID != header.Collection.SerialVersionUID {
-			err := ImportRAG(ragSystem.config.importFile, WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
+		if colInfo.SerialVersionUID != header.Collection.SerialVersionUID || force {
+			runImported = true
+			log.Infof("collection serialVersionUID mismatch, update collection")
+			err = DeleteRAG(config.db, colInfo.Name)
 			if err != nil {
-				return nil, utils.Wrap(err, "failed to import rag collection")
+				return utils.Wrap(err, "failed to delete rag collection")
+			}
+			err := ImportRAG(config.importFile, WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
+			if err != nil {
+				return utils.Wrap(err, "failed to import rag collection")
 			}
 		}
-		return _newRAGSystem(options...)
+		return nil
 	}
-
+	if config.importFile != "" {
+		err := importFile(false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	ragSystem, err := _newRAGSystem(options...)
+	if err != nil {
+		if runImported {
+			return nil, utils.Errorf("load rag file failed: %v", err)
+		} else if config.importFile != "" {
+			log.Errorf("load rag system %s failed: %v, try to import file rag file", config.Name, err)
+			err = importFile(true)
+			if err != nil {
+				return nil, utils.Errorf("import rag file failed: %v", err)
+			}
+			return _newRAGSystem(options...)
+		} else {
+			return nil, err
+		}
+	}
 	return ragSystem, nil
 }
 
@@ -188,13 +224,7 @@ func LoadRAGSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, erro
 		return nil, utils.Errorf("rag collection[%v] not existed", name)
 	}
 
-	collection, err := yakit.GetRAGCollectionInfoByName(config.db, name)
-	if err != nil {
-		return nil, fmt.Errorf("get collection failed: %v", err)
-	}
-
 	defaultOpts := []RAGSystemConfigOption{
-		WithRAGID(collection.RAGID),
 		WithName(name),
 	}
 	options := append(defaultOpts, opts...)
