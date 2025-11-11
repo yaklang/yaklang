@@ -221,7 +221,10 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		}
 	case OrTypeKind:
 		// 拆开 OrType
-		orTyp, _ := value.GetType().(*OrType)
+		orTyp, ok := ToOrType(value.GetType())
+		if !ok {
+			return
+		}
 		var mergedTypes []Type
 		var found bool
 		for _, subTyp := range orTyp.GetTypes() {
