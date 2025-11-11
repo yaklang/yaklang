@@ -12,6 +12,16 @@ import (
 	"go.uber.org/atomic"
 )
 
+type ProgramCacheKind int
+
+const (
+	ProgramCacheMemory ProgramCacheKind = iota
+	// only load from database // for scan
+	ProgramCacheDBRead
+	// fetch and save mode  // for compile
+	ProgramCacheDBWrite
+)
+
 const (
 	defaultFetchSize = 2
 	maxFetchSize     = 40000

@@ -11,6 +11,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
@@ -35,6 +36,7 @@ type Config struct {
 	programPath string
 	includePath []string
 
+	databaseKind ssadb.ProgramKind
 	// process
 	process ProcessFunc
 
