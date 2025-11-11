@@ -188,6 +188,15 @@ func (c *WebsocketClient) Wait() {
 	}
 }
 
+func (c *WebsocketClient) WaitChannel() <-chan struct{} {
+	defaultChan := make(chan struct{})
+	defer close(defaultChan)
+	if c.StartOnce == nil || c.Context == nil {
+		return defaultChan
+	}
+	return c.Context.Done()
+}
+
 func (c *WebsocketClient) Stop() {
 	if c == nil {
 		return

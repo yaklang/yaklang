@@ -363,16 +363,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	if err != nil {
 		return frame, errors.Wrap(err, "websocket: read frame payload failed")
 	}
-
-	frame.rawPayload = make([]byte, len(data))
-	copy(frame.rawPayload, data)
-
 	rawBuf.Write(frame.rawPayload)
-	// 先对 masked payload 进行异或操作
-	if frame.mask {
-		maskBytes(frame.maskingKey, data, len(data))
-	}
-	// 保存 mask key 异或后的 payload
 	frame.payload = make([]byte, len(data))
 	copy(frame.payload, data)
 
