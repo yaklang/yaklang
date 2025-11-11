@@ -24,6 +24,7 @@ var RagExports = map[string]interface{}{
 	"embeddingHandle": _embeddingHandle,
 
 	"DeleteCollection":  _deleteCollection,
+	"DeleteRAG":         rag.DeleteRAG,
 	"ListCollection":    _listCollection,
 	"GetCollectionInfo": _getCollectionInfo,
 
