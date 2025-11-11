@@ -129,9 +129,9 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *meme
 					ranges = append(ranges, editor.ExpandWordTextRange(variable.DefRange))
 				}
 
-				for rng := range variable.UseRange {
+				variable.ForEachUseRange(func(rng *memedit.Range) {
 					ranges = append(ranges, editor.ExpandWordTextRange(rng))
-				}
+				})
 			}
 		}
 	} else {
@@ -141,9 +141,9 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *meme
 			}
 
 			if isReference {
-				for rng := range variable.UseRange {
+				variable.ForEachUseRange(func(rng *memedit.Range) {
 					ranges = append(ranges, editor.ExpandWordTextRange(rng))
-				}
+				})
 			}
 		}
 	}
