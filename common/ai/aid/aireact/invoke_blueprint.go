@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -98,6 +99,40 @@ func (r *ReAct) reviewAIForge(
 	default:
 		return nil, nil, false, utils.Error("unknown suggestion from review: " + suggestion)
 	}
+}
+
+func (r *ReAct) RequireBlueprintSchema(ctx context.Context, forgeName string) (string, error) {
+	manager := r.config.AiForgeManager
+
+	// 首先检查 Forge 是否存在
+	ins, err := manager.GetAIForge(forgeName)
+	if err != nil {
+		// 记录详细的错误信息到 Timeline，使用明显的标识符
+		resultMsg := fmt.Sprintf("无法找到 AI 智能应用 '%s'，请检查应用名称是否正确。可用的应用可以通过工具搜索查看。", forgeName)
+		r.AddToTimeline("[BLUEPRINT_NOT_FOUND]", fmt.Sprintf("AI Blueprint '%s' does not exist. Error: %v\n%s", forgeName, err, resultMsg))
+		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' not found", forgeName))
+		return "", utils.Errorf("AI Blueprint '%s' not found: %v", forgeName, err)
+	}
+
+	// 验证 Forge 实例的完整性
+	if ins == nil {
+		r.AddToTimeline("[BLUEPRINT_NULL_INSTANCE]", fmt.Sprintf(
+			"AI Blueprint '%s' returned nil instance. 配置异常可能导致无法执行。", forgeName))
+		r.Emitter.EmitError(fmt.Sprintf("AI Blueprint '%s' configuration error", forgeName))
+		return "", utils.Errorf("AI Blueprint '%s' instance is nil", forgeName)
+	}
+
+	// 记录成功找到 Forge
+	r.AddToTimeline("[BLUEPRINT_FOUND]", fmt.Sprintf("AI Blueprint: %s (%s)", ins.ForgeName, ins.ForgeVerboseName))
+
+	forgeSchema, err := manager.GenerateAIJSONSchemaFromSchemaAIForge(ins)
+	if err != nil {
+		r.AddToTimeline("[BLUEPRINT_SCHEMA_ERROR]", fmt.Sprintf("Failed to generate schema for '%s'", forgeName))
+		r.Emitter.EmitError(fmt.Sprintf("Failed to generate schema for AI Blueprint '%s'", forgeName))
+		return "", utils.Errorf("generate ai json schema from schema ai forge failed: %v", err)
+	}
+
+	return forgeSchema, nil
 }
 
 func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.InvokeParams, error) {

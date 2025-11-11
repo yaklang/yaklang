@@ -348,6 +348,10 @@ type testRuntime struct {
 	timeline map[string]string
 }
 
+func (r *testRuntime) RequireBlueprintSchema(ctx context.Context, forgeName string) (string, error) {
+	return "", nil
+}
+
 func (r *testRuntime) AddToTimeline(key, value string) {
 	r.timeline[key] = value
 }
