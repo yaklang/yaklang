@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang Insecure Transport Vulnerability"
 	title_zh: "检测Golang不安全传输漏洞"
 	type: audit
-	level: critical
+	level: mid
 	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述
@@ -85,13 +85,13 @@ REFERENCE
 
 http?{<fullTypeName>?{have: "net/http"}} as $http
 
-$http.ListenAndServe as $critical
+$http.ListenAndServe as $mid
 
-alert $critical for {
+alert $mid for {
 	type: "vuln",
 	title: "Golang Insecure Transport Vulnerability Was Detected",
 	title_zh: "检测到Golang不安全传输漏洞",
-	level: "critical",
+	level: "mid",
 	message: "检测到Golang中使用不安全的HTTP协议传输数据，建议使用HTTPS协议进行传输。",
 	solution: <<<SOLUTION
 ### 修复建议
@@ -141,13 +141,13 @@ SOLUTION
    - 数据在传输过程中可能被窃听或篡改。
    - 攻击者可能利用中间人攻击获取敏感信息。
 DESC
-	name: "critical",
+	name: "mid",
 	risk: "info-exposure",
 }
 
 desc(
 	lang: golang
-	alert_critical: 1
+	alert_mid: 1
 	'file://unsafe.go': <<<UNSAFE
 package main
 
