@@ -159,7 +159,7 @@ func (f *PreprocessedCFS) setupHeaderFiles() error {
 
 			if entry.IsDir() {
 				walkDir(filePath)
-			} else if f.underlying.Ext(entry.Name()) == ".h" {
+			} else if f.underlying.Ext(entry.Name()) == ".h" || f.underlying.Ext(entry.Name()) == ".in" {
 				if content, err := f.underlying.ReadFile(filePath); err == nil {
 					filtered := filterSystemIncludes(string(content))
 					relPath := strings.TrimPrefix(filePath, ".")
@@ -230,7 +230,7 @@ func (f *PreprocessedCFS) setupHeaderFiles() error {
 				copyIncludeDir(srcPath, dstPath)
 			} else {
 				if content, err := f.underlying.ReadFile(srcPath); err == nil {
-					if f.underlying.Ext(entry.Name()) == ".h" {
+					if f.underlying.Ext(entry.Name()) == ".h" || f.underlying.Ext(entry.Name()) == ".in" {
 						content = []byte(filterSystemIncludes(string(content)))
 					}
 					os.WriteFile(dstPath, content, 0644)
