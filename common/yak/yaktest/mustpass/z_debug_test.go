@@ -14,7 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "mitm_https_connect_assert.yak"
+	debugName := "buildin_len.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
