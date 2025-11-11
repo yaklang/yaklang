@@ -53,7 +53,9 @@ func (b *FunctionBuilder) getStaticFieldValue(object, key Value, wantFunction bo
 	return nil
 }
 
-func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value, value func(int) Value) *Make {
+func (b *FunctionBuilder) InterfaceAddFieldBuild(
+	size int, keys func(int) Value, value func(int) Value,
+) *Make {
 	// lValueLen := NewConst(size)
 	var lValueLen Value = nil
 	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
