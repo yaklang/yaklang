@@ -102,10 +102,12 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	}
 
 	purePath := path
-	if driver == SQLiteExtend || driver == SQLite {
+	switch driver {
+	case SQLiteExtend, SQLite:
 		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
-	} else {
+	case MySQL:
 		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
+	default:
 	}
 
 	db, err := gorm.Open(driver, path)
