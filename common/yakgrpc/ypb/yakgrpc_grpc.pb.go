@@ -24,6 +24,7 @@ const (
 	Yak_Echo_FullMethodName                                       = "/ypb.Yak/Echo"
 	Yak_Handshake_FullMethodName                                  = "/ypb.Yak/Handshake"
 	Yak_VerifySystemCertificate_FullMethodName                    = "/ypb.Yak/VerifySystemCertificate"
+	Yak_InstallMITMCertificate_FullMethodName                     = "/ypb.Yak/InstallMITMCertificate"
 	Yak_MITM_FullMethodName                                       = "/ypb.Yak/MITM"
 	Yak_SetMITMFilter_FullMethodName                              = "/ypb.Yak/SetMITMFilter"
 	Yak_GetMITMFilter_FullMethodName                              = "/ypb.Yak/GetMITMFilter"
@@ -602,6 +603,7 @@ type YakClient interface {
 	// 握手 用于检查前端是否可以连接当前引擎
 	Handshake(ctx context.Context, in *HandshakeRequest, opts ...grpc.CallOption) (*HandshakeResponse, error)
 	VerifySystemCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VerifySystemCertificateResponse, error)
+	InstallMITMCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error)
 	// 中间人劫持
 	MITM(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MITMRequest, MITMResponse], error)
 	SetMITMFilter(ctx context.Context, in *SetMITMFilterRequest, opts ...grpc.CallOption) (*SetMITMFilterResponse, error)
@@ -1368,6 +1370,16 @@ func (c *yakClient) VerifySystemCertificate(ctx context.Context, in *Empty, opts
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifySystemCertificateResponse)
 	err := c.cc.Invoke(ctx, Yak_VerifySystemCertificate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) InstallMITMCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_InstallMITMCertificate_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7884,6 +7896,7 @@ type YakServer interface {
 	// 握手 用于检查前端是否可以连接当前引擎
 	Handshake(context.Context, *HandshakeRequest) (*HandshakeResponse, error)
 	VerifySystemCertificate(context.Context, *Empty) (*VerifySystemCertificateResponse, error)
+	InstallMITMCertificate(context.Context, *Empty) (*GeneralResponse, error)
 	// 中间人劫持
 	MITM(grpc.BidiStreamingServer[MITMRequest, MITMResponse]) error
 	SetMITMFilter(context.Context, *SetMITMFilterRequest) (*SetMITMFilterResponse, error)
@@ -8620,6 +8633,9 @@ func (UnimplementedYakServer) Handshake(context.Context, *HandshakeRequest) (*Ha
 }
 func (UnimplementedYakServer) VerifySystemCertificate(context.Context, *Empty) (*VerifySystemCertificateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifySystemCertificate not implemented")
+}
+func (UnimplementedYakServer) InstallMITMCertificate(context.Context, *Empty) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InstallMITMCertificate not implemented")
 }
 func (UnimplementedYakServer) MITM(grpc.BidiStreamingServer[MITMRequest, MITMResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method MITM not implemented")
@@ -10420,6 +10436,24 @@ func _Yak_VerifySystemCertificate_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).VerifySystemCertificate(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_InstallMITMCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).InstallMITMCertificate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_InstallMITMCertificate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).InstallMITMCertificate(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -19796,6 +19830,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifySystemCertificate",
 			Handler:    _Yak_VerifySystemCertificate_Handler,
+		},
+		{
+			MethodName: "InstallMITMCertificate",
+			Handler:    _Yak_InstallMITMCertificate_Handler,
 		},
 		{
 			MethodName: "SetMITMFilter",
