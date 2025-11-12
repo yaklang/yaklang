@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,7 +21,11 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 		Total:      int64(p.TotalRecord),
 	}
 	for _, d := range data {
-		rsp.Projects = append(rsp.Projects, d.ToGRPCModel())
+		model := d.ToGRPCModel()
+		if model == nil {
+			continue
+		}
+		rsp.Projects = append(rsp.Projects, model)
 	}
 	return rsp, nil
 }
