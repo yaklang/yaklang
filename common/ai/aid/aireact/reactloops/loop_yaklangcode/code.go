@@ -72,24 +72,27 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 		// 如果加载失败（可能是数据损坏），尝试强制重新导入
 		log.Warnf("failed to load RAG system normally: %v, attempting force reimport", err)
 
-		// 先删除损坏的集合
+		// 先彻底删除损坏的集合（包括知识库和实体仓库）
 		if vectorstore.HasCollection(db, collectionName) {
-			log.Infof("deleting corrupted collection: %s", collectionName)
-			deleteErr := vectorstore.DeleteCollection(db, collectionName)
+			log.Infof("deleting corrupted RAG system (including collection, knowledge base, and entity repository): %s", collectionName)
+			deleteErr := rag.DeleteRAG(db, collectionName)
 			if deleteErr != nil {
-				log.Errorf("failed to delete corrupted collection: %v", deleteErr)
-				return nil, utils.Errorf("failed to delete corrupted collection: %v", deleteErr)
+				log.Errorf("failed to delete corrupted RAG system: %v", deleteErr)
+				// 即使删除失败，也继续尝试重新导入（可能是部分数据不存在）
+				log.Warnf("continuing with reimport despite deletion error")
+			} else {
+				log.Infof("corrupted RAG system deleted successfully")
 			}
-			log.Infof("corrupted collection deleted successfully")
 		}
 
-		// 强制重新导入（需要重建 HNSW 索引以匹配新的集合名称）
-		log.Infof("importing RAG data from file: %s (will rebuild HNSW index)", aikbPath)
+		// 强制重新导入（直接使用文件中的 HNSW 索引）
+		log.Infof("importing RAG data from file: %s", aikbPath)
 		importErr := rag.ImportRAG(aikbPath,
 			rag.WithRAGCollectionName(collectionName),
 			rag.WithDB(db),
 			rag.WithExportOverwriteExisting(true), // 覆盖现有数据
-			rag.WithImportRebuildHNSWIndex(true),  // 重建 HNSW 索引（因为集合名称可能不同）
+			// 注意：不使用 WithImportRebuildHNSWIndex，直接使用文件中的索引
+			// 重建索引会导致 "unsupported node code type: func() []float32" 错误
 		)
 		if importErr != nil {
 			log.Errorf("failed to force reimport RAG data: %v", importErr)
