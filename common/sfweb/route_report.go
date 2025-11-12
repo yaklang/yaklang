@@ -160,7 +160,7 @@ func (s *SyntaxFlowWebServer) registerReportRoute() {
 			return
 		}
 
-		risk, err := yakit.GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), req.RiskHash)
+		risk, err := yakit.GetSSARiskByHash(consts.GetGormSSAProjectDataBase(), req.RiskHash)
 		if err != nil {
 			writeErrorJson(w, utils.Wrap(err, "get risk error"))
 			return

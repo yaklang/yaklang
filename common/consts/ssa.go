@@ -120,7 +120,7 @@ func SetGormSSAProjectDatabase(db *gorm.DB) {
 	schema.SetDefaultSSADatabase(db)
 }
 
-func GetGormDefaultSSADataBase() *gorm.DB {
+func GetGormSSAProjectDataBase() *gorm.DB {
 	if ssaDatabase == nil {
 		initYakitDatabase()
 	}
