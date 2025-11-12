@@ -394,19 +394,9 @@ func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) err
 			doc := doc
 			doc.UID = GetLazyNodeUIDByMd5(collection.Name, doc.DocumentID)
 			db.Save(doc)
-			// 直接使用文档的嵌入向量，而不是懒加载函数
-			// 这样可以避免在导出时出现 "unsupported node code type: func() []float32" 错误
-			if len(doc.Embedding) > 0 {
-				embedding := doc.Embedding // 捕获变量，避免闭包问题
-				hnswGraph.Add(hnsw.MakeInputNodeFromVector(doc.DocumentID, func() []float32 {
-					return embedding
-				}))
-			} else {
-				// 如果没有嵌入向量，使用懒加载函数
-				hnswGraph.Add(hnsw.MakeInputNodeFromID(doc.DocumentID, hnswspec.LazyNodeID(doc.UID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
-					return getVectorByID(uid)
-				}))
-			}
+			hnswGraph.Add(hnsw.MakeInputNodeFromID(doc.DocumentID, hnswspec.LazyNodeID(doc.UID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
+				return getVectorByID(uid)
+			}))
 		}
 	}
 

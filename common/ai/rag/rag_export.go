@@ -976,8 +976,6 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 	if opts.rebuildHNSWIndex {
 		collection.GraphBinary = nil
 	}
-	// 保存原始集合名称（用于计算 UID）
-	originalCollectionName := collection.Name
 	collectionName := collection.Name
 
 	// 如果指定了集合名称，使用指定的名称
@@ -1041,14 +1039,14 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 
 		for i, exportDoc := range ragData.Documents {
 			documents[i] = &schema.VectorStoreDocument{
-				DocumentID:      exportDoc.DocumentID,
-				Metadata:        exportDoc.Metadata,
-				Embedding:       exportDoc.Embedding,
-				PQCode:          exportDoc.PQCode,
-				Content:         exportDoc.Content,
-				DocumentType:    schema.RAGDocumentType(exportDoc.DocumentType),
+				DocumentID:   exportDoc.DocumentID,
+				Metadata:     exportDoc.Metadata,
+				Embedding:    exportDoc.Embedding,
+				PQCode:       exportDoc.PQCode,
+				Content:      exportDoc.Content,
+				DocumentType: schema.RAGDocumentType(exportDoc.DocumentType),
 				// 使用原始集合名称计算 UID，确保与 HNSW 图中的 UID 匹配
-				UID:             vectorstore.GetLazyNodeUIDByMd5(originalCollectionName, exportDoc.DocumentID),
+				UID:             vectorstore.GetLazyNodeUIDByMd5(collection.Name, exportDoc.DocumentID),
 				EntityID:        exportDoc.EntityID,
 				RelatedEntities: exportDoc.RelatedEntities,
 				CollectionID:    collectionID,
@@ -1101,8 +1099,6 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 		reportProgress(95, "HNSW索引导入完成", "info")
 	} else {
 		reportProgress(92, "HNSW索引重建开始", "info")
-		// 确保使用正确的集合 ID（MigrateHNSWGraph 需要正确的 ID 来查询文档）
-		collection.ID = collectionID
 		err := vectorstore.MigrateHNSWGraph(db, collection)
 		if err != nil {
 			return utils.Wrap(err, "failed to migrate HNSW graph")
