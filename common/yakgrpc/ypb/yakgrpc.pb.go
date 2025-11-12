@@ -53200,7 +53200,8 @@ type SSAProgramFilter struct {
 	// id range
 	AfterID       int64    `protobuf:"varint,8,opt,name=AfterID,proto3" json:"AfterID,omitempty"`
 	BeforeID      int64    `protobuf:"varint,9,opt,name=BeforeID,proto3" json:"BeforeID,omitempty"`
-	ProjectNames  []string `protobuf:"bytes,10,rep,name=ProjectNames,proto3" json:"ProjectNames,omitempty"`
+	ProjectNames  []string `protobuf:"bytes,10,rep,name=ProjectNames,proto3" json:"ProjectNames,omitempty"` // abort
+	ProjectIds    []int64  `protobuf:"varint,11,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53294,6 +53295,13 @@ func (x *SSAProgramFilter) GetBeforeID() int64 {
 func (x *SSAProgramFilter) GetProjectNames() []string {
 	if x != nil {
 		return x.ProjectNames
+	}
+	return nil
+}
+
+func (x *SSAProgramFilter) GetProjectIds() []int64 {
+	if x != nil {
+		return x.ProjectIds
 	}
 	return nil
 }
@@ -62464,8 +62472,12 @@ type SSAProject struct {
 	// 规则策略配置
 	RuleConfig       *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
 	JSONStringConfig string                    `protobuf:"bytes,12,opt,name=JSONStringConfig,proto3" json:"JSONStringConfig,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// 漏洞个数
+	RiskNumber int64 `protobuf:"varint,13,opt,name=RiskNumber,proto3" json:"RiskNumber,omitempty"`
+	// 编译次数
+	CompileTimes  int64 `protobuf:"varint,14,opt,name=CompileTimes,proto3" json:"CompileTimes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SSAProject) Reset() {
@@ -62580,6 +62592,20 @@ func (x *SSAProject) GetJSONStringConfig() string {
 		return x.JSONStringConfig
 	}
 	return ""
+}
+
+func (x *SSAProject) GetRiskNumber() int64 {
+	if x != nil {
+		return x.RiskNumber
+	}
+	return 0
+}
+
+func (x *SSAProject) GetCompileTimes() int64 {
+	if x != nil {
+		return x.CompileTimes
+	}
+	return 0
 }
 
 type SSAProjectCompileConfig struct {
@@ -67877,7 +67903,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\"G\n" +
 	"\x0fSSAProgramInput\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
-	"\vDescription\x18\x02 \x01(\tR\vDescription\"\xac\x02\n" +
+	"\vDescription\x18\x02 \x01(\tR\vDescription\"\xcc\x02\n" +
 	"\x10SSAProgramFilter\x12\"\n" +
 	"\fProgramNames\x18\x01 \x03(\tR\fProgramNames\x12\x1c\n" +
 	"\tLanguages\x18\x02 \x03(\tR\tLanguages\x12\x10\n" +
@@ -67888,7 +67914,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aAfterID\x18\b \x01(\x03R\aAfterID\x12\x1a\n" +
 	"\bBeforeID\x18\t \x01(\x03R\bBeforeID\x12\"\n" +
 	"\fProjectNames\x18\n" +
-	" \x03(\tR\fProjectNames\"\x99\x01\n" +
+	" \x03(\tR\fProjectNames\x12\x1e\n" +
+	"\n" +
+	"ProjectIds\x18\v \x03(\x03R\n" +
+	"ProjectIds\"\x99\x01\n" +
 	"\x16QuerySSAProgramRequest\x12#\n" +
 	"\x06Paging\x18\x01 \x01(\v2\v.ypb.PagingR\x06Paging\x12+\n" +
 	"\n" +
@@ -68647,7 +68676,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
 	"\n" +
 	"ReportData\x18\x03 \x01(\tR\n" +
-	"ReportData\"\xe2\x03\n" +
+	"ReportData\"\xa6\x04\n" +
 	"\n" +
 	"SSAProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
@@ -68666,7 +68695,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"RuleConfig\x18\v \x01(\v2\x1d.ypb.SSAProjectScanRuleConfigR\n" +
 	"RuleConfig\x12*\n" +
-	"\x10JSONStringConfig\x18\f \x01(\tR\x10JSONStringConfig\"\xd9\x01\n" +
+	"\x10JSONStringConfig\x18\f \x01(\tR\x10JSONStringConfig\x12\x1e\n" +
+	"\n" +
+	"RiskNumber\x18\r \x01(\x03R\n" +
+	"RiskNumber\x12\"\n" +
+	"\fCompileTimes\x18\x0e \x01(\x03R\fCompileTimes\"\xd9\x01\n" +
 	"\x17SSAProjectCompileConfig\x12\x1e\n" +
 	"\n" +
 	"StrictMode\x18\x01 \x01(\bR\n" +

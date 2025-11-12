@@ -218,7 +218,7 @@ const (
 // both instruction and value
 type Program struct {
 	// project
-	ProjectName string
+	ProjectID uint64
 	// package list
 	Name            string
 	Version         string
