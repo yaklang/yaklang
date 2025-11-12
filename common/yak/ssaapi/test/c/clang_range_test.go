@@ -42,10 +42,7 @@ int main() {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
 
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
-
-		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaconfig.C))
+		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
 		require.Nil(t, err)
 
 		results, err := p.SyntaxFlowWithError(`
@@ -90,10 +87,7 @@ int main() {
 		vf.AddFile("src/config.h", headerCode)
 		vf.AddFile("src/main.c", mainCode)
 
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
-
-		p, err := ssaapi.ParseProjectWithFS(cf, ssaapi.WithLanguage(ssaconfig.C))
+		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
 		require.Nil(t, err)
 
 		results, err := p.SyntaxFlowWithError(`
