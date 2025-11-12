@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakdocument"
 	"time"
 
 	"github.com/samber/lo"
@@ -10,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yakdocument"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/davecgh/go-spew/spew"
