@@ -20,6 +20,8 @@ func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoRespo
 }
 
 var verifyFunction = verifySystemCertificate
+var installMITMCertFunc = crep.AddMITMRootCertIntoSystem
+var verifyInstalledCertFunc = crep.VerifyMITMRootCertInstalled
 
 var VerifySystemCertificateCD = utils.NewCoolDown(10 * time.Second)
 var resp *ypb.VerifySystemCertificateResponse
@@ -40,6 +42,21 @@ func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*yp
 	}
 	//return verifySystemCertificateByURL()
 	return resp, err
+}
+
+func (s *Server) InstallMITMCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.GeneralResponse, error) {
+	if err := installMITMCertFunc(); err != nil {
+		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
+	}
+
+	if err := verifyInstalledCertFunc(); err != nil {
+		reason := fmt.Sprintf("installation finished but verification failed: %v", err)
+		log.Warn(reason)
+		return &ypb.GeneralResponse{Ok: false, Reason: reason}, nil
+	}
+
+	log.Info("MITM root certificate installed and verified successfully via RPC")
+	return &ypb.GeneralResponse{Ok: true}, nil
 }
 
 func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error) {
@@ -107,11 +124,31 @@ func verify(serConfig, cliConfig *tls.Config, domain string) error {
 }
 
 func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
-	err := crep.VerifySystemCertificate()
-	if err != nil {
-		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
+	if ok, err := crep.QuickVerifyMITMRootCert(); err == nil {
+		if ok {
+			return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+		}
+		log.Info("quick certificate verification reported certificate missing; running deep verification")
+	} else {
+		log.Warnf("quick certificate verification failed: %v", err)
 	}
-	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+
+	if err := crep.VerifyMITMRootCertInstalled(); err == nil {
+		return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+	} else {
+		log.Warnf("deep certificate verification failed: %v", err)
+		legacyErr := crep.VerifySystemCertificate()
+		if legacyErr == nil {
+			log.Infof("legacy verification succeeded after deep verification failed")
+			return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+		}
+
+		reason := err.Error()
+		if legacyErr != nil {
+			reason = fmt.Sprintf("%s; legacy verification also failed: %v", reason, legacyErr)
+		}
+		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: reason}, nil
+	}
 }
 
 func (s *Server) Handshake(ctx context.Context, req *ypb.HandshakeRequest) (*ypb.HandshakeResponse, error) {
