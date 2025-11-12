@@ -18,7 +18,7 @@ import (
 const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
 
 const (
-	CONST_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"
+	ENV_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"
 )
 
 var (
@@ -32,15 +32,8 @@ const (
 	SSA_PROJECT_Default_DB_DEFAULT = "default-yakssa.db"   // yakit和命令行使用这个名字
 )
 
-func GetSSADatabaseInfoFromEnv(frontendName string) string {
-	raw := os.Getenv(CONST_SSA_DATABASE_RAW)
-	if raw == "" {
-		if frontendName == "yakit" {
-			raw = SSA_PROJECT_YAKIT_DB_RAW
-		} else {
-			raw = SSA_PROJECT_Default_DB_DEFAULT
-		}
-	}
+func GetSSADatabaseInfoFromEnv() string {
+	raw := os.Getenv(ENV_SSA_DATABASE_RAW)
 	return raw
 }
 
@@ -88,8 +81,7 @@ func SetSSADatabaseInfo(raw string) {
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
-	dialect, path := parseDatabaseURL(raw)
-	db, err := CreateSSAProjectDatabase(dialect, path)
+	db, err := CreateSSAProjectDatabaseRaw(raw)
 	if err != nil {
 		return err
 	}
@@ -97,6 +89,11 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	// 同步更新 schema 包中的默认 SSA 数据库
 	schema.SetDefaultSSADatabase(db)
 	return nil
+}
+
+func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
+	dialect, path := parseDatabaseURL(raw)
+	return CreateSSAProjectDatabase(dialect, path)
 }
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {

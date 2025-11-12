@@ -13,7 +13,7 @@ import (
 
 func init() {
 	// 初始化数据库
-	consts.InitializeYakitDatabase("", "")
+	consts.InitializeYakitDatabase("", "", "")
 }
 
 func TestYamlConfig_ToServerConfig(t *testing.T) {
