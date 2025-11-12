@@ -27,9 +27,10 @@ const (
 
 type SyntaxFlowScanTask struct {
 	gorm.Model
-	TaskId      string `gorm:"unique_index"`
-	Programs    string `gorm:"index"`
-	ProjectName string `gorm:"index"`
+	TaskId   string `gorm:"unique_index"`
+	Programs string `gorm:"index"`
+	//ProjectName string `gorm:"index"`
+	ProjectId uint64 `gorm:"index"`
 	// rules
 	RulesCount int64
 
