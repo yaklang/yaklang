@@ -343,3 +343,10 @@ func GetSSARiskLevelCount(DB *gorm.DB, filter *ypb.SSARisksFilter) ([]*SSARiskLe
 	}
 	return v, nil
 }
+
+func QuerySSARiskNumberByProjectID(DB *gorm.DB, projectID uint) int64 {
+	db := DB.Model(&schema.SSARisk{})
+	var count int64
+	db = db.Where("ssa_project_id = ?", projectID).Count(&count)
+	return count
+}
