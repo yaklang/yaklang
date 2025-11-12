@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"slices"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -63,18 +64,19 @@ var (
 	goVersion  string
 )
 
-func initializeDatabase(projectDatabase string, profileDBName string, frontendName string) error {
+func initializeDatabase(projectDatabase string, profileDBName string, ssadb string) error {
+	if isVersionCommand() {
+		return nil
+	}
 	// project and profile
-	consts.InitializeYakitDatabase(projectDatabase, profileDBName, frontendName)
+	if err := consts.InitializeYakitDatabase(projectDatabase, profileDBName, ssadb); err != nil {
+		return err
+	}
 
 	// cve
 	_, err := consts.InitializeCVEDatabase()
 	if err != nil {
 		log.Warnf("initialized cve database failed: %v", err)
-	}
-
-	if isVersionCommand() {
-		return nil
 	}
 
 	// 调用一些数据库初始化的操作
@@ -88,7 +90,7 @@ func initializeDatabase(projectDatabase string, profileDBName string, frontendNa
 func isVersionCommand() bool {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "-v", "-version":
+		case "-v", "-version", "version":
 			return true
 		default:
 			return false
@@ -143,7 +145,9 @@ func init() {
 	}
 
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
-	if len(os.Args) > 1 && os.Args[1] == "grpc" {
+	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database"}
+	switch {
+	case len(os.Args) > 1 && slices.Contains(ignoreInitDatabase, os.Args[1]):
 		log.Debug("grpc should not initialize database in func:init")
 		fmt.Printf(`
 ┓ ┳┳━┓┳┏ ┳  ┳━┓┏┓┓┏━┓
@@ -152,9 +156,11 @@ func init() {
     %v %v
 
 `, consts.GetYakVersion(), "yaklang.io")
-	} else if len(os.Args) == 2 && (os.Args[1] == "-v" || os.Args[1] == "-version") {
 
-	} else {
+	case isVersionCommand():
+		// pass
+
+	default:
 		err := initializeDatabase("", "", "")
 		if err != nil {
 			log.Warnf("initialize database failed: %s", err)
@@ -367,12 +373,20 @@ var startGRPCServerCommand = cli.Command{
 			Name: "debug",
 		},
 		cli.StringFlag{
-			Name:  "project-db",
-			Usage: "Specific Project DB Name, eg. yakit-default.db",
+			Name:   "project-db",
+			Usage:  "Specific Yakit Project DB Name, eg. yakit-default.db",
+			EnvVar: "YAK_DEFAULT_PROJECT_DATABASE_NAME",
 		},
 		cli.StringFlag{
-			Name:  "profile-db",
-			Usage: "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
+			Name:   "profile-db",
+			Usage:  "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
+			EnvVar: "YAK_DEFAULT_PROFILE_DATABASE_NAME",
+		},
+
+		cli.StringFlag{
+			Name:   "ssa-db",
+			Usage:  "Specific SSA Database  Name, eg default-yakssa.db",
+			EnvVar: "SSA_DATABASE_RAW",
 		},
 		cli.BoolFlag{
 			Name:  "disable-output",
@@ -474,8 +488,7 @@ var startGRPCServerCommand = cli.Command{
 		}
 		log.Info("start to initialize database")
 
-		frontendName := c.String("frontend")
-		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), frontendName)
+		err := initializeDatabase(c.String("project-db"), c.String("profile-db"), c.String("ssa-db"))
 		if err != nil {
 			log.Errorf("init database failed: %s", err)
 			return err
@@ -487,6 +500,8 @@ var startGRPCServerCommand = cli.Command{
 		profileDatabaseName := consts.GetDefaultYakitPluginDatabase(base)
 		log.Infof("use project db: %s", projectDatabaseName)
 		log.Infof("use profile db: %s", profileDatabaseName)
+		dialect, raw := consts.GetSSADataBaseInfo()
+		log.Infof("use irify project db: [%s] %s", dialect, raw)
 
 		yakit.TidyGeneralStorage(consts.GetGormProfileDatabase())
 
@@ -638,6 +653,14 @@ var startGRPCServerCommand = cli.Command{
 	},
 }
 
+const (
+	databaseError        = "database error"
+	dialGrpcServerFailed = "dial grpc server failed"
+	callVersionFailed    = "call Version RPC failed"
+	netListenFailed      = "net.Listen(tcp, addr) failed"
+	buildYakGrpcServer   = "build yak grpc server failed"
+)
+
 var checkSecretLocalGRPCServerCommand = cli.Command{
 	Name:  "check-secret-local-grpc",
 	Usage: "Check if local GRPC server with secret can be started and accessed",
@@ -651,6 +674,22 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			Usage: "Specific port to start local grpc server (default 9011)",
 			Value: 9011,
 		},
+		cli.StringFlag{
+			Name:   "project-db",
+			Usage:  "Specific Yakit Project DB Name, eg. yakit-default.db",
+			EnvVar: "YAK_DEFAULT_PROJECT_DATABASE_NAME",
+		},
+		cli.StringFlag{
+			Name:   "profile-db",
+			Usage:  "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
+			EnvVar: "YAK_DEFAULT_PROFILE_DATABASE_NAME",
+		},
+
+		cli.StringFlag{
+			Name:   "ssa-db",
+			Usage:  "Specific SSA Database  Name, eg default-yakssa.db",
+			EnvVar: "SSA_DATABASE_RAW",
+		},
 	},
 	Action: func(ctx *cli.Context) (finalError error) {
 		var port = ctx.Int("port")
@@ -659,26 +698,34 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 
 		clientPassword := ctx.String("client-password")
 
+		projectPath := ctx.String("project-db")
+		profilePath := ctx.String("profile-db")
+		ssaPath := ctx.String("ssa-db")
+
 		var version = consts.GetYakVersion()
 		var secret = utils.RandStringBytes(16)
+
+		var reason string
 
 		defer func() {
 			const extractorFlag = `50551aa97b5aa5ae8a3c3243ac60a8a7`
 
 			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
 				finalError = utils.Errorf("panic: %v\n%s", err, spew.Sdump(string(debug.Stack())))
 			}
 
 			m := omap.NewGeneralOrderedMap()
 			ok := utils.IsNil(finalError)
-			var reason string
+			var info string
 			if ok {
-				reason = ""
+				info = ""
 			} else {
-				reason = utils.InterfaceToString(finalError)
+				info = utils.InterfaceToString(finalError)
 			}
 			m.Set("ok", ok)
-			m.Set("reason", reason)
+			m.Set("reason", []string{reason})
+			m.Set("info", info)
 			m.Set("host", "127.0.0.1")
 			m.Set("port", port)
 			m.Set("addr", utils.HostPort("127.0.0.1", port))
@@ -717,7 +764,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("  1. Server is running on port %d\n", port)
 				fmt.Printf("  2. Local firewall is not blocking the connection\n")
 				fmt.Printf("  3. Connection timeout (10s exceeded)\n\n")
-				finalError = utils.Wrap(err, "dial grpc server failed")
+				finalError = utils.Wrap(err, dialGrpcServerFailed)
+				reason = dialGrpcServerFailed
 				return
 			}
 			defer conn.Close()
@@ -742,7 +790,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				fmt.Printf("Please check if:\n")
 				fmt.Printf("  1. The password is correct\n")
 				fmt.Printf("  2. The server is running in local-password mode\n\n")
-				finalError = utils.Wrap(err, "call Version RPC failed")
+				finalError = utils.Wrap(err, callVersionFailed)
+				reason = callVersionFailed
 				return
 			}
 
@@ -753,6 +802,15 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			fmt.Printf("  Version: %s\n\n", versionResp.Version)
 			version = versionResp.Version
 			finalError = nil
+			return
+		}
+
+		// 检查相关文件
+		if err := consts.InitializeYakitDatabase(projectPath, profilePath, ssaPath); err != nil {
+			finalError = err
+			log.Errorf("failed to open database: %s", err)
+			fmt.Printf("\nPlease run `%s fixup-database` ", os.Args[0])
+			reason = databaseError
 			return
 		}
 
@@ -769,7 +827,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			fmt.Printf("  2. Anti-virus software is preventing yak engine from starting\n")
 			fmt.Printf("  3. Another yak instance is already running\n\n")
 			err = utils.Wrapf(err, "port %d is occupied, please check local firewall or anti-virus software", port)
-			finalError = utils.Wrap(err, "net.Listen(tcp, addr) failed")
+			finalError = utils.Wrap(err, netListenFailed)
+			reason = netListenFailed
 			return
 		}
 		defer lis.Close()
@@ -804,14 +863,14 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			grpc.MaxRecvMsgSize(100*1024*1024),
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
-
 		// 初始化服务器
 		s, err := yakgrpc.NewServer(
 			yakgrpc.WithInitFacadeServer(false),
 		)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
-			finalError = utils.Wrap(err, "build yak grpc server failed")
+			finalError = utils.Wrap(err, buildYakGrpcServer)
+			reason = buildYakGrpcServer
 			return
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
@@ -847,7 +906,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		)
 		if err != nil {
 			log.Errorf("failed to dial grpc server: %s", err)
-			finalError = utils.Wrap(err, "dial grpc server failed")
+			finalError = utils.Wrap(err, dialGrpcServerFailed)
+			reason = dialGrpcServerFailed
 			return
 		}
 		defer conn.Close()
@@ -867,7 +927,8 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		versionResp, err := client.Version(rpcCtx, &ypb.Empty{})
 		if err != nil {
 			log.Errorf("failed to call Version: %s", err)
-			finalError = utils.Wrap(err, "call client.Version failed")
+			finalError = utils.Wrap(err, callVersionFailed)
+			reason = callVersionFailed
 			return
 		}
 
@@ -878,7 +939,122 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		fmt.Printf("  Version: %s\n\n", versionResp.Version)
 		version = versionResp.Version
 		finalError = nil
+
 		return
+	},
+}
+
+var fixupDatabaseCommand = cli.Command{
+	Name:  "fixup-database",
+	Usage: "Fix Yaklang Database Issues",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:   "project-db",
+			Usage:  "Specific Yakit Project DB Name, eg. yakit-default.db",
+			EnvVar: "YAK_DEFAULT_PROJECT_DATABASE_NAME",
+		},
+		cli.StringFlag{
+			Name:   "profile-db",
+			Usage:  "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
+			EnvVar: "YAK_DEFAULT_PROFILE_DATABASE_NAME",
+		},
+
+		cli.StringFlag{
+			Name:   "ssa-db",
+			Usage:  "Specific SSA Database  Name, eg default-yakssa.db",
+			EnvVar: "SSA_DATABASE_RAW",
+		},
+	},
+	Action: func(ctx *cli.Context) (finalError error) {
+		projectPath := ctx.String("project-db")
+		profilePath := ctx.String("profile-db")
+		ssaPath := ctx.String("ssa-db")
+
+		consts.SetDefaultYakitProfileDatabaseName(profilePath)
+		consts.SetDefaultYakitProjectDatabaseName(projectPath)
+		consts.SetSSADatabaseInfo(ssaPath)
+
+		needUserDeletePath := []string{}
+		defer func() {
+			if err := recover(); err != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+				finalError = utils.Errorf("panic: %v\n%s", err, spew.Sdump(string(debug.Stack())))
+			}
+			const extractorFlag = `a30b05e69086b63acff5dec94727ab5c`
+
+			m := omap.NewGeneralOrderedMap()
+			ok := utils.IsNil(finalError)
+			var info string
+			if ok {
+				info = ""
+			} else {
+				info = utils.InterfaceToString(finalError)
+			}
+			m.Set("ok", ok)
+			// failed recreate path
+			m.Set("path", needUserDeletePath) // need show in front for user  handler this file
+			m.Set("info", info)
+			result := string(m.Jsonify())
+			fmt.Printf("\n<json-%v>\n%v\n</json-%v>\n\n", extractorFlag, result, extractorFlag)
+		}()
+
+		checkAndRemove := func(
+			path string,
+			open func(string) error,
+		) error {
+			if err := open(path); err == nil {
+				log.Infof("open database success: %s", path)
+				return nil
+			}
+
+			if !utils.IsFile(path) {
+				return utils.Errorf("please check connect: %s", path)
+			}
+
+			log.Infof("remove file: %s", path)
+			if err := os.Remove(path); err != nil {
+				needUserDeletePath = append(needUserDeletePath, path)
+				return utils.Errorf("Remove path [%s] error: %s", path, err)
+			}
+			if err := open(path); err != nil {
+				// should not reach here
+				log.Infof("recreate database ok: %s", path)
+				needUserDeletePath = append(needUserDeletePath, path)
+				return utils.Errorf("recreate database failed: %s", path)
+			}
+			return nil
+		}
+		log.Debug("start to loading gorm project/profile database")
+
+		baseDir := consts.GetDefaultYakitBaseDir()
+		projectPath = consts.GetDefaultYakitProjectDatabase(baseDir)
+		profilePath = consts.GetDefaultYakitPluginDatabase(baseDir)
+		_, ssaPath = consts.GetSSADataBaseInfo()
+
+		if err := checkAndRemove(profilePath, func(s string) error {
+			_, err := consts.CreateProfileDatabase(s)
+			return err
+		}); err != nil {
+			return err
+		}
+
+		if err := checkAndRemove(projectPath, func(s string) error {
+			_, err := consts.CreateProjectDatabase(s)
+			return err
+		}); err != nil {
+			return err
+		}
+
+		if err := checkAndRemove(ssaPath, func(s string) error {
+			ssaDatabaseDialect, ssaDatabaseRaw := consts.GetSSADataBaseInfo()
+			_, err := consts.CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
+			return err
+		}); err != nil {
+			return err
+		}
+
+		log.Info("fixup database ok")
+		return nil
 	},
 }
 
@@ -1059,6 +1235,7 @@ func main() {
 		},
 		&startGRPCServerCommand,
 		&checkSecretLocalGRPCServerCommand,
+		&fixupDatabaseCommand,
 		&installSubCommand,
 		&tunnelServerCommand,
 		&mirrorGRPCServerCommand,
