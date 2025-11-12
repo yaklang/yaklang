@@ -62,6 +62,8 @@ type SSARisk struct {
 	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
 	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
+
+	SSAProjectID uint `json:"ssa_project_id" gorm:"index"`
 }
 
 func (s *SSARisk) CalcHash() string {
