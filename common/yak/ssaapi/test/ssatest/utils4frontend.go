@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/filesys"
+	_ "github.com/yaklang/yaklang/common/yak/c2ssa"
 
 	"golang.org/x/exp/slices"
 
@@ -55,14 +55,6 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
 	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
 	opt = append(opt, tc.Option...)
-	if language == ssaconfig.C {
-		cfs, err := filesys.NewPreprocessedCFs(filesys.NewVirtualFs())
-		require.NoError(t, err)
-
-		result, err := cfs.PreprocessCSource(tc.Code)
-		require.NoError(t, err)
-		tc.Code = result
-	}
 	prog, err := ssaapi.Parse(tc.Code, opt...)
 	require.Nil(t, err, "parse error")
 

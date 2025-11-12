@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"sync"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -10,9 +8,8 @@ import (
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange   *memedit.Range
-	UseRange   map[*memedit.Range]struct{}
-	useRangeMu sync.RWMutex
+	DefRange *memedit.Range
+	UseRange *utils.SafeMapWithKey[*memedit.Range, struct{}]
 
 	// for object.member variable  access
 	object      Value
@@ -26,7 +23,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
-		UseRange:  map[*memedit.Range]struct{}{},
+		UseRange:  utils.NewSafeMapWithKey[*memedit.Range, struct{}](),
 	}
 	return ret
 }
@@ -115,9 +112,7 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 	isPhi := !utils.IsNil(value) && value.GetOpcode() == SSAOpcodePhi
 
 	if force || isPhi || r.GetText() == v.verboseName {
-		v.useRangeMu.Lock()
-		v.UseRange[r] = struct{}{}
-		v.useRangeMu.Unlock()
+		v.UseRange.Set(r, struct{}{})
 	}
 }
 
@@ -133,14 +128,13 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 }
 
 func (v *Variable) ForEachUseRange(fn func(*memedit.Range)) {
-	if v == nil || fn == nil {
+	if v == nil || fn == nil || v.UseRange == nil {
 		return
 	}
-	v.useRangeMu.RLock()
-	defer v.useRangeMu.RUnlock()
-	for r := range v.UseRange {
+	v.UseRange.ForEach(func(r *memedit.Range, _ struct{}) bool {
 		fn(r)
-	}
+		return true
+	})
 }
 
 func (v *Variable) IsPointer() bool {
