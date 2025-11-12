@@ -6,12 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestPreprocess_SimpleMacro(t *testing.T) {
 	t.Run("simple define", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define MAX_SIZE 1024
 
 int main() {
@@ -19,11 +21,23 @@ int main() {
     println(size);
     return 0;
 }
-		`, []string{"1024"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"1024"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
+
 	})
 
 	t.Run("multiple defines", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define WIDTH 800
 #define HEIGHT 600
 
@@ -34,13 +48,24 @@ int main() {
     println(h);
     return 0;
 }
-		`, []string{"800", "600"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"800", "600"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_FunctionMacro(t *testing.T) {
 	t.Run("MIN macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define MIN(a,b) ((a)<(b)?(a):(b))
 
 int main() {
@@ -50,11 +75,22 @@ int main() {
     println(min);
     return 0;
 }
-		`, []string{"phi(min)[10,20]"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"phi(min)[10,20]"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("MAX macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 int main() {
@@ -64,11 +100,23 @@ int main() {
     println(max);
     return 0;
 }
-		`, []string{"phi(max)[10,20]"}, t)
+		`
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"phi(max)[10,20]"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("SQUARE macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define SQUARE(x) ((x) * (x))
 
 int main() {
@@ -77,13 +125,24 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"25"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"25"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_NestedMacro(t *testing.T) {
 	t.Run("nested macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define SQUARE(x) ((x) * (x))
 #define CUBE(x) (SQUARE(x) * (x))
 
@@ -93,11 +152,22 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"27"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"27"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("triple nested", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define DOUBLE(x) ((x) * 2)
 #define QUAD(x) (DOUBLE(DOUBLE(x)))
 #define OCT(x) (DOUBLE(QUAD(x)))
@@ -108,13 +178,24 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"8"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"8"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_ConditionalCompilation(t *testing.T) {
 	t.Run("ifdef true", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define DEBUG 1
 
 int main() {
@@ -126,11 +207,22 @@ int main() {
     println(mode);
     return 0;
 }
-		`, []string{"1"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"1"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("if condition", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define VERSION 2
 
 int main() {
@@ -142,13 +234,24 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"100"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"100"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_ArrayWithMacro(t *testing.T) {
 	t.Run("array size macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define BUFFER_SIZE 256
 
 int main() {
@@ -157,11 +260,22 @@ int main() {
     println(size);
     return 0;
 }
-		`, []string{"256"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"256"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("2d array with macro", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define ROWS 10
 #define COLS 20
 
@@ -173,13 +287,25 @@ int main() {
     println(c);
     return 0;
 }
-		`, []string{"10", "20"}, t)
+		`
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"10", "20"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_StringMacro(t *testing.T) {
 	t.Run("string constant", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define VERSION "1.0.0"
 
 int main() {
@@ -187,11 +313,22 @@ int main() {
     println(ver);
     return 0;
 }
-		`, []string{`"1.0.0"`}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {`"1.0.0"`},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("concatenation", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define CONCAT(a, b) a##b
 
 int main() {
@@ -200,13 +337,24 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"42"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"42"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_ComplexExpression(t *testing.T) {
 	t.Run("arithmetic expression", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define A 10
 #define B 20
 #define C 30
@@ -216,11 +364,22 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"610"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"610"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("bitwise operation", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define FLAG1 0x01
 #define FLAG2 0x02
 #define FLAGS (FLAG1 | FLAG2)
@@ -230,13 +389,24 @@ int main() {
     println(flags);
     return 0;
 }
-		`, []string{"3"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"3"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
 func TestPreprocess_MacroInFunction(t *testing.T) {
 	t.Run("macro in if statement", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define THRESHOLD 100
 
 int main() {
@@ -248,11 +418,22 @@ int main() {
     }
     return 0;
 }
-		`, []string{"0", "1"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"0", "1"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("macro in loop", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define COUNT 5
 
 int main() {
@@ -263,7 +444,18 @@ int main() {
     println(sum);
     return 0;
 }
-		`, []string{"phi(sum)[0,add(sum, phi(i)[0,add(i, 1)])]"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"phi(sum)[0,add(sum, phi(i)[0,add(i, 1)])]"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
 
@@ -273,13 +465,7 @@ func TestPreprocess_DirectAPI(t *testing.T) {
 #define MAX_SIZE 1024
 int buffer[MAX_SIZE];
 `
-
-		fs := filesys.NewVirtualFs()
-		fs.AddFile("src/main/main.c", src)
-		cfs, err := filesys.NewPreprocessedCFs(fs)
-		require.NoError(t, err)
-
-		result, err := cfs.PreprocessCSource(src)
+		result, err := filesys.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "1024") {
@@ -292,12 +478,7 @@ int buffer[MAX_SIZE];
 #define MIN(a,b) ((a)<(b)?(a):(b))
 int min = MIN(x, y);
 `
-		fs := filesys.NewVirtualFs()
-		fs.AddFile("src/main/main.c", src)
-		cfs, err := filesys.NewPreprocessedCFs(fs)
-		require.NoError(t, err)
-
-		result, err := cfs.PreprocessCSource(src)
+		result, err := filesys.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "((x)<(y)?(x):(y))") && !strings.Contains(result, "?") {
@@ -314,12 +495,7 @@ int debug_mode = 1;
 int debug_mode = 0;
 #endif
 `
-		fs := filesys.NewVirtualFs()
-		fs.AddFile("src/main/main.c", src)
-		cfs, err := filesys.NewPreprocessedCFs(fs)
-		require.NoError(t, err)
-
-		result, err := cfs.PreprocessCSource(src)
+		result, err := filesys.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "debug_mode = 1") && !strings.Contains(result, "debug_mode") {
@@ -330,7 +506,7 @@ int debug_mode = 0;
 
 func TestPreprocess_RealWorldScenarios(t *testing.T) {
 	t.Run("buffer overflow check", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define BUFFER_SIZE 512
 #define SAFE_COPY(dest, src) strncpy(dest, src, BUFFER_SIZE - 1)
 
@@ -340,11 +516,22 @@ int main() {
     println(size);
     return 0;
 }
-		`, []string{"512"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"512"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("error code macros", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define SUCCESS 0
 #define ERROR_NOT_FOUND -1
 #define ERROR_PERMISSION -2
@@ -354,11 +541,22 @@ int main() {
     println(result);
     return 0;
 }
-		`, []string{"0"}, t)
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"0"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 
 	t.Run("platform specific code", func(t *testing.T) {
-		test.CheckPrintlnValue(`
+		code := `
 #define PLATFORM_LINUX 1
 
 #ifdef PLATFORM_LINUX
@@ -372,6 +570,17 @@ int main() {
     println(sep);
     return 0;
 }
-		`, []string{"47"}, t) // '/' 的 ASCII 值是 47
+		`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main.c", code)
+		cf, err := filesys.NewPreprocessedCFs(vf)
+		require.Nil(t, err)
+
+		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		println(* as $target)
+			`, map[string][]string{
+			"target": {"47"},
+		}, true, ssaapi.WithLanguage(ssaconfig.C),
+		)
 	})
 }
