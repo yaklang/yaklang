@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -226,107 +227,173 @@ func compressRAGResults(resultStr string, query string, invoker aicommon.AIInvok
 	return compressRAGSearchResults(resultStr, query, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：")
 }
 
-var searchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSystem *rag.RAGSystem) reactloops.ReActLoopOption {
+var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSystem *rag.RAGSystem) reactloops.ReActLoopOption {
 	if ragSystem == nil {
-		log.Warnf("search_yaklang_samples: ragSystem is nil")
+		log.Warnf("semantic_search_yaklang_samples: ragSystem is nil")
 		return func(r *reactloops.ReActLoop) {
-			r.GetInvoker().AddToTimeline("search_yaklang_samples_error", "Yaklang AIKB RAG 系统未正确初始化或加载失败")
+			r.GetInvoker().AddToTimeline("semantic_search_yaklang_samples_error", "Yaklang AIKB RAG 系统未正确初始化或加载失败")
 		}
 	}
 	return reactloops.WithRegisterLoopActionWithStreamField(
-		"search_yaklang_samples",
-		`RAG搜索 Yaklang 代码样例库 - 基于语义向量搜索真实代码示例
+		"semantic_search_yaklang_samples",
+		`语义搜索 Yaklang 代码样例库 - 基于向量语义理解搜索真实代码示例
 
-核心原则：禁止臆造 Yaklang API！必须先通过向量搜索找到真实样例！
+核心原则：禁止臆造 Yaklang API！必须先通过语义向量搜索找到真实样例！
 
 【强制使用场景】：
-1. 编写任何代码前，先向量搜索相关函数用法
-2. 遇到 API 错误（ExternLib don't has）时 - 必须立即向量搜索
-3. 遇到语法错误（SyntaxError）时 - 必须立即向量搜索
+1. 编写任何代码前，先语义搜索相关函数用法
+2. 遇到 API 错误（ExternLib don't has）时 - 必须立即语义搜索
+3. 遇到语法错误（SyntaxError）时 - 必须立即语义搜索
 4. 不确定函数参数或返回值时
 
 【参数说明】：
-- query (必需) - 搜索查询，支持自然语言描述：
-  * 功能描述：如 "端口扫描功能", "HTTP请求处理"
-  * 关键词组合：如 "文件上传", "数据库查询"
-  * 代码意图：如 "如何处理错误", "循环遍历数组"
+- questions (必需) - 问题数组，支持多个具体问题同时搜索：
+  * 每个问题必须是完整的主谓宾句式
+  * 禁止使用代词（它、这个、那个等）
+  * 问题风格示例：
+    ✅ Good: "Yaklang中如何获取数组长度？"
+    ✅ Good: "Yaklang中append函数如何使用？"
+    ✅ Good: "Yaklang中如何配置默认的嵌入处理函数？"
+    ❌ Bad: "如何获取长度？"（缺少主语）
+    ❌ Bad: "它如何使用？"（使用代词）
+    ❌ Bad: "配置嵌入"（不完整句式）
+  * 复杂问题可拆解为多个问题：
+    例如："Yaklang数组操作" 拆解为：
+    - "Yaklang中如何创建数组？"
+    - "Yaklang数组如何访问元素？"
+    - "Yaklang中如何获取数组长度？"
 
-- top_n (可选) - 返回结果数量，默认 10
-  * 需要更多结果：设置 15-20
-  * 快速预览：设置 5-8
-  * 深入研究：设置 20-30
+- top_n (可选) - 每个问题返回结果数量，默认 30
+  * 标准搜索：20-30（推荐，默认）
+  * 深入研究：40-50
+  * 快速预览：10-15
 
-- score_threshold (可选) - 相似度阈值，默认 0.1
-  * 严格匹配：设置 0.3-0.5
-  * 宽松匹配：设置 0.05-0.1（默认）
-  * 非常宽松：设置 0.01-0.05
+- score_threshold (可选) - 相似度阈值，默认 0.3
+  * 余弦相似度范围：-1.0 到 1.0
+  * 0.6-1.0：高置信度匹配（强烈推荐）
+  * 0.4-0.6：中等置信度匹配（可接受）
+  * 0.3-0.4：低置信度匹配（需谨慎）
+  * 0.0-0.3：弱匹配（不推荐）
 
 【使用示例】：
-search_yaklang_samples(query="端口扫描和漏洞检测", top_n=15)
-search_yaklang_samples(query="HTTP请求和响应处理", score_threshold=0.2)
-search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
+semantic_search_yaklang_samples(questions=["Yaklang中如何进行端口扫描？", "Yaklang中如何检测漏洞？"])
+semantic_search_yaklang_samples(questions=["Yaklang中如何发送HTTP请求？"], top_n=40)
+semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Yaklang中如何捕获异常？"], score_threshold=0.5)
 
 记住：Yaklang 是 DSL！每个 API 都可能与 Python/Go 不同！
-先向量搜索找样例，再写代码，节省 90% 调试时间！`,
+先语义搜索找样例，再写代码，节省 90% 调试时间！`,
 		[]aitool.ToolOption{
-			aitool.WithStringParam(
-				"query",
-				aitool.WithParam_Required(true),
-				aitool.WithParam_Description(`搜索查询（必需）- 支持自然语言描述：
-1. 功能描述：如 "端口扫描功能", "HTTP请求处理", "文件操作"
-2. 业务场景：如 "漏洞检测", "数据处理", "网络通信"
-3. 技术需求：如 "错误处理", "并发编程", "数据验证"
-4. 代码意图：如 "循环遍历", "条件判断", "函数调用"
+			aitool.WithStructArrayParam(
+				"questions",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Required(true),
+					aitool.WithParam_Description(`问题数组（必需）- 支持多个具体问题同时搜索。
 
-注意：向量搜索基于语义相似度，描述越准确，结果越相关`),
+【问题格式要求】：
+1. 必须是完整的主谓宾句式
+2. 禁止使用代词（它、这个、那个等）
+3. 明确指明 Yaklang 语言
+
+【Good Cases - 正确示例】：
+✅ "Yaklang中如何获取数组长度？"
+✅ "Yaklang中append函数如何使用？"
+✅ "Yaklang中如何配置默认的嵌入处理函数？"
+✅ "Yaklang中生产环境嵌入请求如何添加TOTP验证头？"
+✅ "Yaklang中如何递归读取ZIP文件内容？"
+✅ "Yaklang中如何处理嵌入响应的JSON解析错误？"
+
+【Bad Cases - 错误示例】：
+❌ "如何获取长度？" - 缺少主语（Yaklang）
+❌ "它如何使用？" - 使用代词
+❌ "配置嵌入" - 不完整句式
+❌ "数组操作" - 过于宽泛，应拆解为多个具体问题
+
+【拆解复杂问题】：
+复杂需求应拆解为多个具体问题：
+例如："Yaklang数组综合复杂操作" 应拆解为：
+- "Yaklang中如何创建数组？"
+- "Yaklang数组如何访问元素？"
+- "Yaklang中如何获取数组长度？"`),
+				},
+				nil,
+				aitool.WithStringParam("question", aitool.WithParam_Description("具体的问题，必须是完整主谓宾句式")),
 			),
 			aitool.WithIntegerParam(
 				"top_n",
-				aitool.WithParam_Description(`返回结果数量（默认 10）- 控制返回的代码片段数量：
-• 5-8: 快速预览核心用法
-• 10-15: 标准搜索（推荐，默认）
-• 20-30: 深入研究完整实现`),
+				aitool.WithParam_Description(`每个问题返回结果数量（默认 30）- 控制每个问题返回的代码片段数量：
+• 10-15: 快速预览核心用法
+• 20-30: 标准搜索（推荐，默认）
+• 40-50: 深入研究完整实现
+
+注意：多个问题的结果会合并去重后返回`),
 			),
 			aitool.WithNumberParam(
 				"score_threshold",
-				aitool.WithParam_Description(`相似度阈值（默认 0.1）- 过滤低质量结果：
-• 0.3-0.5: 严格匹配，高质量结果
-• 0.1-0.3: 平衡质量和数量（默认）
-• 0.01-0.1: 宽松匹配，更多结果但可能包含不相关内容`),
+				aitool.WithParam_Description(`相似度阈值（默认 0.3）- 基于余弦相似度过滤结果：
+
+【评分范围】：-1.0 到 1.0（余弦相似度）
+• 0.6-1.0: 高置信度匹配 - 强烈推荐使用
+• 0.4-0.6: 中等置信度匹配 - 可接受
+• 0.3-0.4: 低置信度匹配 - 需谨慎验证
+• 0.0-0.3: 弱匹配 - 不推荐使用
+
+【建议】：
+- 默认 0.3 适合大多数场景
+- 如需高质量结果，设置 0.5-0.6
+- 如搜索无结果，可降低到 0.2`),
 			),
 		},
 		[]*reactloops.LoopStreamField{},
 		// Validator
 		func(r *reactloops.ReActLoop, action *aicommon.Action) error {
-			query := action.GetString("query")
-			if query == "" {
-				return utils.Error("search_yaklang_samples requires 'query' parameter")
+			questions := action.GetInvokeParamsArray("questions")
+			if len(questions) == 0 {
+				return utils.Error("semantic_search_yaklang_samples requires 'questions' parameter with at least one question")
+			}
+
+			// 验证每个问题格式
+			for i, q := range questions {
+				question := q.GetString("question")
+				if question == "" {
+					return utils.Errorf("question at index %d is empty", i)
+				}
+				// 检查是否包含 Yaklang 关键词
+				if !strings.Contains(question, "Yaklang") && !strings.Contains(question, "yaklang") && !strings.Contains(question, "yak") {
+					log.Warnf("question at index %d does not contain 'Yaklang' keyword: %s", i, question)
+				}
 			}
 
 			return nil
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			query := action.GetString("query")
+			questions := action.GetInvokeParamsArray("questions")
 			topN := action.GetInt("top_n")
 			scoreThreshold := action.GetFloat("score_threshold")
 
 			// 设置默认值
 			if topN == 0 {
-				topN = 10
+				topN = 30
 			}
 			if scoreThreshold == 0 {
-				scoreThreshold = 0.1
+				scoreThreshold = 0.3
 			}
 
 			invoker := loop.GetInvoker()
 
+			// 构建查询字符串用于重复检测
+			var questionTexts []string
+			for _, q := range questions {
+				questionTexts = append(questionTexts, q.GetString("question"))
+			}
+			questionsStr := strings.Join(questionTexts, "|")
+
 			// 检查重复查询
-			lastSearchQuery := loop.Get("last_search_query")
-			currentQuery := fmt.Sprintf("%s|%d|%f", query, topN, scoreThreshold)
+			lastSearchQuery := loop.Get("last_semantic_search_query")
+			currentQuery := fmt.Sprintf("%s|%d|%f", questionsStr, topN, scoreThreshold)
 
 			if lastSearchQuery == currentQuery {
-				errorMsg := fmt.Sprintf(`【严重错误】检测到重复查询！
+				errorMsg := fmt.Sprintf(`【严重错误】检测到重复语义搜索！
 
 上次查询：%s
 本次查询：%s
@@ -334,47 +401,47 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 【拒绝执行】：禁止重复相同的搜索模式！
 
 【必须调整】：
-1. 修改搜索关键词 - 使用同义词或相关词汇
-2. 调整搜索策略 - 扩大或缩小搜索范围
-3. 改变搜索方向 - 从功能角度而非API角度搜索
-4. 检查拼写错误 - 确认关键词正确性
+1. 修改问题表述 - 使用不同的问法或角度
+2. 拆解或合并问题 - 调整问题粒度
+3. 调整搜索参数 - 修改 top_n 或 score_threshold
+4. 检查问题质量 - 确保问题完整且明确
 
 【建议行动】：
-- 如果之前搜索无结果，尝试更通用的词汇
-- 如果之前结果太多，使用更精确的描述
-- 考虑从业务需求角度重新思考搜索词
+- 如果之前搜索无结果，尝试更通用的问题
+- 如果之前结果太多，使用更精确的问题
+- 考虑从不同角度提问
 
 【警告】：继续重复查询将浪费时间且无法获得新信息！`, lastSearchQuery, currentQuery)
 
-				invoker.AddToTimeline("search_duplicate_query_error", errorMsg)
-				log.Warnf("duplicate search query detected: %s", currentQuery)
+				invoker.AddToTimeline("semantic_search_duplicate_query_error", errorMsg)
+				log.Warnf("duplicate semantic search query detected: %s", currentQuery)
 				op.Continue()
 				return
 			}
 
 			// 记录当前查询
-			loop.Set("last_search_query", currentQuery)
+			loop.Set("last_semantic_search_query", currentQuery)
 
 			emitter := loop.GetEmitter()
 
 			// 显示搜索参数
-			searchInfo := fmt.Sprintf("RAG search query: %s, top_n: %d, score_threshold: %.2f",
-				query, topN, scoreThreshold)
+			searchInfo := fmt.Sprintf("Semantic RAG search - Questions: %d, top_n per question: %d, score_threshold: %.2f\nQuestions:\n%s",
+				len(questions), topN, scoreThreshold, questionsStr)
 			emitter.EmitThoughtStream(op.GetTask().GetId(), searchInfo)
 			loop.GetEmitter().EmitDefaultStreamEvent(
-				"search_yaklang_samples",
+				"semantic_search_yaklang_samples",
 				bytes.NewReader([]byte(searchInfo)),
 				loop.GetCurrentTask().GetIndex(),
 				func() {
-					log.Infof("search yaklang samples: %s", searchInfo)
+					log.Infof("semantic search yaklang samples: %s", searchInfo)
 				},
 			)
 
-			invoker.AddToTimeline("start_search_yaklang_samples", searchInfo)
+			invoker.AddToTimeline("start_semantic_search_yaklang_samples", searchInfo)
 
 			// 检查 RAG 系统
 			if ragSystem == nil {
-				errorMsg := `【系统错误】RAG搜索器不可用！
+				errorMsg := `【系统错误】语义搜索系统不可用！
 
 【错误原因】：RAG系统未正确初始化或加载失败
 
@@ -386,44 +453,74 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 【后果】：无法进行语义搜索，将导致API使用错误！
 
 【建议】：暂停编码任务，优先解决RAG系统问题`
-				log.Warn("RAG system not available")
-				invoker.AddToTimeline("search_system_error", errorMsg)
+				log.Warn("semantic search: RAG system not available")
+				invoker.AddToTimeline("semantic_search_system_error", errorMsg)
 				op.Continue()
 				return
 			}
 
-			// 执行向量搜索
-			results, err := ragSystem.QueryTopN(query, int(topN), scoreThreshold)
-
-			if err != nil {
-				errorMsg := fmt.Sprintf(`【搜索执行失败】RAG向量搜索遇到错误！
-
-【错误详情】：%v
-
-【可能原因】：
-1. 查询语句过长或格式错误
-2. 向量数据库连接问题
-3. 知识库索引损坏
-
-【立即行动】：
-1. 检查查询语句长度和格式
-2. 简化搜索查询
-3. 重试搜索操作
-
-【建议】：
-- 使用简洁的关键词组合
-- 避免特殊字符和过长描述
-- 如果持续失败，考虑重启搜索服务
-
-【警告】：搜索失败将影响代码质量，请务必解决！`, err)
-				log.Errorf("RAG search failed: %v", err)
-				invoker.AddToTimeline("search_execution_error", errorMsg)
-				op.Continue()
-				return
+			// 执行多问题向量搜索并合并结果
+			type ResultKey struct {
+				DocID string
 			}
+			allResultsMap := make(map[ResultKey]rag.SearchResult)
+			var totalSearchCount int
+
+			for idx, q := range questions {
+				question := q.GetString("question")
+				if question == "" {
+					continue
+				}
+
+				log.Infof("semantic search question %d/%d: %s", idx+1, len(questions), question)
+
+				// 执行单个问题的搜索
+				results, err := ragSystem.QueryTopN(question, int(topN), scoreThreshold)
+				if err != nil {
+					log.Errorf("semantic search failed for question '%s': %v", question, err)
+					continue
+				}
+
+				totalSearchCount += len(results)
+
+				// 合并结果，使用文档ID去重，保留最高分数
+				for _, result := range results {
+					var docID string
+					if result.KnowledgeBaseEntry != nil {
+						docID = fmt.Sprintf("kb_%d_%s", result.KnowledgeBaseEntry.ID, result.KnowledgeBaseEntry.KnowledgeTitle)
+					} else if result.Document != nil {
+						docID = result.Document.ID
+					} else {
+						continue
+					}
+
+					key := ResultKey{DocID: docID}
+					existing, exists := allResultsMap[key]
+					if !exists || result.Score > existing.Score {
+						allResultsMap[key] = *result
+					}
+				}
+			}
+
+			// 将 map 转换为切片并按分数排序
+			var results []rag.SearchResult
+			for _, result := range allResultsMap {
+				results = append(results, result)
+			}
+
+			// 按分数降序排序
+			sort.Slice(results, func(i, j int) bool {
+				return results[i].Score > results[j].Score
+			})
+
+			log.Infof("semantic search: %d questions searched, %d total results, %d unique results after deduplication",
+				len(questions), totalSearchCount, len(results))
 
 			if len(results) == 0 {
-				noResultMsg := fmt.Sprintf(`【搜索无结果】未找到相关的代码片段：%s
+				noResultMsg := fmt.Sprintf(`【语义搜索无结果】未找到相关的代码片段
+
+【搜索的问题】：
+%s
 
 【严重警告】：无法找到相关代码样例！
 
@@ -433,30 +530,31 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 ❌ 禁止假设函数存在或用法
 
 【必须立即执行】：
-1. 扩大搜索范围 - 使用更通用关键词
-2. 尝试功能性描述 - 如 "网络连接" 而不是具体函数名
-3. 降低相似度阈值 - 设置 score_threshold=0.05
-4. 中英文组合 - 如 "端口扫描|port scan"
-5. 功能性搜索 - 从需求角度思考搜索词
+1. 重新表述问题 - 使用更通用或更具体的描述
+2. 拆解复杂问题 - 将一个问题分解为多个简单问题
+3. 降低相似度阈值 - 设置 score_threshold=0.2 或更低
+4. 尝试不同角度 - 从功能、用途、场景等不同角度提问
+5. 使用 grep_yaklang_samples - 如果知道关键词，使用精确搜索
 
-【搜索策略建议】：
-- 业务功能词：如 "扫描", "请求", "解析"
-- 技术领域词：如 "http", "tcp", "file"
-- 错误处理词：如 "error", "exception", "handle"
+【问题质量检查】：
+- 是否包含 "Yaklang" 关键词？
+- 是否使用完整主谓宾句式？
+- 是否避免使用代词？
+- 是否足够具体明确？
 
-【后果警告】：不重新搜索将导致代码错误和调试失败！`, query)
-				log.Infof("no RAG search results found for query: %s", query)
-				invoker.AddToTimeline("search_no_results_warning", noResultMsg)
+【后果警告】：不重新搜索将导致代码错误和调试失败！`, questionsStr)
+				log.Infof("no semantic search results found for questions: %s", questionsStr)
+				invoker.AddToTimeline("semantic_search_no_results_warning", noResultMsg)
 				op.Continue()
 				return
 			}
 
 			// 格式化搜索结果
 			var resultBuffer bytes.Buffer
-			resultBuffer.WriteString(fmt.Sprintf("\n[RAG Search Results] 找到 %d 个相关代码片段\n\n", len(results)))
+			resultBuffer.WriteString(fmt.Sprintf("\n[Semantic Search Results] 找到 %d 个相关代码片段（来自 %d 个问题，去重后）\n\n", len(results), len(questions)))
 
 			// 限制返回结果数量，避免内容过多
-			maxResults := 20
+			maxResults := 30
 			displayCount := len(results)
 			if displayCount > maxResults {
 				displayCount = maxResults
@@ -489,60 +587,61 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 			// 将搜索结果添加到Timeline
 			resultStr := resultBuffer.String()
 
-			// 尝试压缩和优化搜索结果
+			// 尝试压缩和优化搜索结果 - 使用与 grep 相同的压缩策略
 			if len(results) > 5 {
-				log.Infof("search_yaklang_samples: attempting to compress %d results", len(results))
-				compressedResult := compressRAGResults(resultStr, query, invoker, op)
+				log.Infof("semantic_search_yaklang_samples: attempting to compress %d results", len(results))
+				compressedResult := compressRAGResults(resultStr, questionsStr, invoker, op)
 				if len(compressedResult) < len(resultStr) {
 					resultStr = compressedResult
-					log.Infof("search_yaklang_samples: successfully compressed results")
+					log.Infof("semantic_search_yaklang_samples: successfully compressed results")
 				}
 			}
 
-			emitter.EmitThoughtStream("search_samples_result", "Search Result:\n"+resultStr)
-			invoker.AddToTimeline("search_results", fmt.Sprintf("Found %d relevant code snippets for query: %s\n%s", len(results), query, resultStr))
+			emitter.EmitThoughtStream("semantic_search_samples_result", "Semantic Search Result:\n"+resultStr)
+			invoker.AddToTimeline("semantic_search_results", fmt.Sprintf("Found %d relevant code snippets for %d questions (deduplicated)\nQuestions: %s\n%s", len(results), len(questions), questionsStr, resultStr))
 
 			// 根据结果数量生成不同的建议，添加到Timeline
 			var suggestionMsg string
 			var timelineKey string
 
-			if len(results) < 3 {
-				suggestionMsg = fmt.Sprintf(`【搜索结果较少】仅找到 %d 个相关片段
+			if len(results) < 5 {
+				suggestionMsg = fmt.Sprintf(`【语义搜索结果较少】仅找到 %d 个相关片段
 
 【分析】：样例数量不足，可能影响理解完整性
 
 【强烈建议的后续行动】：
-1. 扩大搜索范围 - 使用更通用关键词
-   • 当前："%s" → 建议：去掉具体技术细节
-   • 示例：从 "TCP端口扫描超时处理" 改为 "端口扫描"
-2. 降低相似度阈值 (score_threshold=0.05)
-3. 尝试功能性搜索："网络连接|连接处理"
-4. 增加返回数量 (top_n=15-20)
+1. 重新表述问题 - 使用更通用或不同角度的问法
+   • 检查问题是否过于具体或过于宽泛
+   • 尝试从功能、用途、场景等不同角度提问
+2. 降低相似度阈值 (score_threshold=0.2 或更低)
+3. 增加问题数量 - 将一个问题拆解为多个相关问题
+4. 增加每个问题返回数量 (top_n=40-50)
+5. 使用 grep_yaklang_samples - 如果知道关键词，使用精确搜索
 
 【警告】：当前样例可能不足以完全理解用法
-【决策】：建议继续搜索更多样例，或谨慎使用现有结果`, len(results), query)
-				timelineKey = "search_few_results_suggestion"
-			} else if len(results) > 15 {
-				suggestionMsg = fmt.Sprintf(`【搜索结果丰富】找到 %d 个相关片段
+【决策】：建议继续搜索更多样例，或谨慎使用现有结果`, len(results))
+				timelineKey = "semantic_search_few_results_suggestion"
+			} else if len(results) > 20 {
+				suggestionMsg = fmt.Sprintf(`【语义搜索结果丰富】找到 %d 个相关片段
 
 【分析】：样例充足，但需要优化查看效率
 
 【推荐优化策略】：
-1. 精确化搜索描述
-   • 当前："%s" → 建议：添加更具体的限定词
-   • 示例：从 "扫描" 改为 "端口扫描和漏洞检测"
-2. 提高相似度阈值 (score_threshold=0.2)
-3. 减少返回数量 (top_n=8-12) 以查看精华
+1. 精确化问题描述
+   • 使用更具体的限定词和场景描述
+   • 避免过于宽泛的问题
+2. 提高相似度阈值 (score_threshold=0.5-0.6) 以获取高质量结果
+3. 减少每个问题返回数量 (top_n=15-20) 以查看精华
 4. 专注学习策略：
-   • 优先查看相似度最高的3-5个结果
+   • 优先查看相似度最高的前5-10个结果
    • 寻找多个样例中的共同用法模式
    • 注意参数类型和返回值的一致性
 
 【优势】：有足够样例学习最佳实践
-【建议】：可以开始编码，但要参考多个样例的共同模式`, len(results), query)
-				timelineKey = "search_rich_results_suggestion"
+【建议】：可以开始编码，但要参考多个样例的共同模式`, len(results))
+				timelineKey = "semantic_search_rich_results_suggestion"
 			} else {
-				suggestionMsg = fmt.Sprintf(`【搜索结果理想】找到 %d 个相关片段
+				suggestionMsg = fmt.Sprintf(`【语义搜索结果理想】找到 %d 个相关片段
 
 【分析】：样例数量适中，质量和数量平衡良好
 
@@ -562,13 +661,13 @@ search_yaklang_samples(query="错误处理和异常捕获", top_n=8)
 
 【状态】：有充分的参考依据，可以开始编写代码
 【原则】：严格按照样例模式编写，避免自创用法`, len(results))
-				timelineKey = "search_optimal_results_suggestion"
+				timelineKey = "semantic_search_optimal_results_suggestion"
 			}
 
 			// 将建议添加到Timeline
 			invoker.AddToTimeline(timelineKey, suggestionMsg)
 
-			log.Infof("RAG search completed: %d results found for query: %s", len(results), query)
+			log.Infof("semantic search completed: %d results found for %d questions", len(results), len(questions))
 
 			// 检查是否有语法错误 - 参考 action_modify_code.go 的实现
 			fullcode := loop.Get("full_code")
