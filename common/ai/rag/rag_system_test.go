@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -617,11 +616,10 @@ func TestRAGSystem_FuzzSearch(t *testing.T) {
 	vectorstore.DeleteCollection(db, collectionName)
 }
 
-func TestNewRAGSystem_WithImportFile(t *testing.T) {
+func TestMUSTPASS_NewRAGSystem_WithImportFile(t *testing.T) {
 	// 生成导出数据
-	// db, err := createTempTestDatabaseForRAGSystem()
-	// assert.NoError(t, err)
-	db := consts.GetGormProfileDatabase()
+	db, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
 	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
 	ragSystem, err := Get(exportCollectionName, WithDB(db), WithDisableEmbedCollectionInfo(true), WithLazyLoadEmbeddingClient(true))
 	assert.NoError(t, err)

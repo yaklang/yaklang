@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"crypto/md5"
 	"os"
 	"testing"
 
@@ -420,4 +421,42 @@ func TestImportRAG_InvalidData(t *testing.T) {
 	// 应该返回错误
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "import knowledge base failed")
+}
+
+func TestMUSTPASS_ImportRAGFile(t *testing.T) {
+	// 生成导出数据
+	db, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
+	ragSystem, err := Get(exportCollectionName, WithDB(db), WithDisableEmbedCollectionInfo(true), WithLazyLoadEmbeddingClient(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	ragSystem.VectorStore.AddWithOptions("test_doc", "test_content")
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_export_rag_*.zip")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	tempFile.Close()
+
+	err = ExportRAG(exportCollectionName, tempFile.Name(), WithDB(db))
+	assert.NoError(t, err)
+
+	// 测试导入后的uid
+	db, err = createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+	err = ImportRAG(tempFile.Name(), WithDB(db))
+	assert.NoError(t, err)
+
+	var collection schema.VectorStoreCollection
+	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", exportCollectionName).First(&collection)
+	assert.NotNil(t, collection)
+	assert.Equal(t, exportCollectionName, collection.Name)
+
+	var document schema.VectorStoreDocument
+	db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).First(&document)
+	assert.NotNil(t, document)
+	calcUID := md5.Sum([]byte(collection.UUID + document.DocumentID))
+	assert.Equal(t, calcUID[:], document.UID)
 }
