@@ -45,6 +45,7 @@ type SyntaxFlowResult struct {
 	riskCountMap map[string]int64
 	// cache
 	riskGRPCCache []*ypb.SSARisk
+	*ssaconfig.Config
 }
 
 func createEmptyResult() *SyntaxFlowResult {
@@ -87,10 +88,11 @@ func setResultToCache(kind ssaconfig.SFResultSaveKind, res *SyntaxFlowResult) {
 	}
 }
 
-func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
+func CreateResultFromQuery(res *sfvm.SFFrameResult, config *ssaconfig.Config) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.setMemoryResult(res)
 	ret.rule = res.GetRule()
+	ret.Config = config
 	return ret
 }
 

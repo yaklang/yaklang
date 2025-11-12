@@ -182,7 +182,7 @@ func (m *scanManager) SaveTask() error {
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
-
+	m.taskRecorder.ProjectId = m.Config.GetProjectID()
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 		levelCounts, _ := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},

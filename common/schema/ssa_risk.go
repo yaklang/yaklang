@@ -63,7 +63,7 @@ type SSARisk struct {
 	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 
-	SSAProjectID uint `json:"ssa_project_id" gorm:"index"`
+	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
 }
 
 func (s *SSARisk) CalcHash() string {

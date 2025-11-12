@@ -178,6 +178,7 @@ func (r *SyntaxFlowResult) SaveRisk(
 		return ""
 	}
 
+	ssaRisk.SSAProjectID = r.GetProjectID()
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
 	if save {
