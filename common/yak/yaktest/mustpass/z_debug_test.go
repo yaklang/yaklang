@@ -14,7 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "buildin_len.yak"
+	debugName := "risk_output_limit.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
