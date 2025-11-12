@@ -35,7 +35,10 @@ func newDefaultRAGSystem() *RAGSystem {
 
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	config := NewRAGSystemConfig(options...)
-
+	err := autoMigrateRAGSystem(config.db)
+	if err != nil {
+		return nil, utils.Wrap(err, "auto migrate rag system failed")
+	}
 	colInfo, err := loadCollectionInfoByConfig(config)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -102,10 +105,6 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 func _newRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	ragConfig := NewRAGSystemConfig(options...)
 	ragSystem := newDefaultRAGSystem()
-	err := autoMigrateRAGSystem(ragConfig.db)
-	if err != nil {
-		return nil, utils.Errorf("auto migrate rag system failed: %v", err)
-	}
 	ragSystem.config = ragConfig
 
 	// 创建collection
