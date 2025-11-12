@@ -7,6 +7,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -54,12 +55,58 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 	if aikbPath == "" {
 		path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb-rag")
 		if err != nil {
+			log.Errorf("failed to get yaklang-aikb-rag binary path: %v", err)
 			return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
 		}
 		aikbPath = path
+		log.Infof("using default yaklang-aikb-rag path: %s", aikbPath)
+	} else {
+		log.Infof("using custom aikb_rag_path: %s", aikbPath)
 	}
 
-	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
+	log.Infof("initializing RAG system with collection: %s, file: %s", collectionName, aikbPath)
+
+	// 先尝试正常加载
+	ragSystem, err := rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
+	if err != nil {
+		// 如果加载失败（可能是数据损坏），尝试强制重新导入
+		log.Warnf("failed to load RAG system normally: %v, attempting force reimport", err)
+
+		// 先删除损坏的集合
+		if vectorstore.HasCollection(db, collectionName) {
+			log.Infof("deleting corrupted collection: %s", collectionName)
+			deleteErr := vectorstore.DeleteCollection(db, collectionName)
+			if deleteErr != nil {
+				log.Errorf("failed to delete corrupted collection: %v", deleteErr)
+				return nil, utils.Errorf("failed to delete corrupted collection: %v", deleteErr)
+			}
+			log.Infof("corrupted collection deleted successfully")
+		}
+
+		// 强制重新导入（需要重建 HNSW 索引以匹配新的集合名称）
+		log.Infof("importing RAG data from file: %s (will rebuild HNSW index)", aikbPath)
+		importErr := rag.ImportRAG(aikbPath,
+			rag.WithRAGCollectionName(collectionName),
+			rag.WithDB(db),
+			rag.WithExportOverwriteExisting(true), // 覆盖现有数据
+			rag.WithImportRebuildHNSWIndex(true),  // 重建 HNSW 索引（因为集合名称可能不同）
+		)
+		if importErr != nil {
+			log.Errorf("failed to force reimport RAG data: %v", importErr)
+			return nil, utils.Errorf("failed to initialize RAG system: %v (reimport also failed: %v)", err, importErr)
+		}
+
+		log.Infof("force reimport succeeded, retrying to load RAG system")
+		// 重新尝试加载（不使用 WithImportFile，因为已经导入过了）
+		ragSystem, err = rag.Get(collectionName, rag.WithDB(db), rag.WithLazyLoadEmbeddingClient(true))
+		if err != nil {
+			log.Errorf("failed to load RAG system after reimport: %v", err)
+			return nil, err
+		}
+	}
+
+	log.Infof("RAG system initialized successfully for collection: %s", collectionName)
+	return ragSystem, nil
 }
 
 //go:embed prompts/persistent_instruction.txt
@@ -82,8 +129,8 @@ func init() {
 			docSearcherByRag, err := createDocumentSearcherByRag(consts.GetGormProfileDatabase(), defaultYaklangAIKBRagCollectionName, aikbRagPath)
 			if err != nil {
 				log.Errorf("failed to create document searcher by rag: %v", err)
+				docSearcherByRag = nil // 明确设置为 nil，语义搜索将不可用
 			}
-			_ = docSearcherByRag
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -108,8 +155,8 @@ func init() {
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				// queryDocumentAction(r, docSearcher), // DEPRECATED: 已被 grepYaklangSamplesAction 替代
-				grepYaklangSamplesAction(r, docSearcher),        // 快速 grep 代码样例
-				searchYaklangSamplesAction(r, docSearcherByRag), // 快速搜索 Yaklang 代码样例
+				// grepYaklangSamplesAction(r, docSearcher),                // 快速 grep 代码样例（精确文本搜索）
+				semanticSearchYaklangSamplesAction(r, docSearcherByRag), // 语义搜索 Yaklang 代码样例（基于向量相似度）
 				writeCode(r),
 				modifyCode(r),
 				insertLines(r),
