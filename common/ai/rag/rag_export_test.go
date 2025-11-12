@@ -457,6 +457,7 @@ func TestMUSTPASS_ImportRAGFile(t *testing.T) {
 	var document schema.VectorStoreDocument
 	db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).First(&document)
 	assert.NotNil(t, document)
-	calcUID := md5.Sum([]byte(collection.UUID + document.DocumentID))
+	calcUID := md5.Sum([]byte(document.CollectionUUID + document.DocumentID))
 	assert.Equal(t, calcUID[:], document.UID)
+	assert.Equal(t, collection.UUID, document.CollectionUUID)
 }
