@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -180,4 +182,59 @@ func TestVerifySystemCertificateCooldown2(t *testing.T) {
 		t.Errorf("verifySystemCertificate was called %d times; want 1", callCount)
 	}
 	mu.Unlock()
+}
+
+func TestInstallMITMCertificate(t *testing.T) {
+	defer func(origInstall func() error, origVerify func() error) {
+		installMITMCertFunc = origInstall
+		verifyInstalledCertFunc = origVerify
+	}(installMITMCertFunc, verifyInstalledCertFunc)
+
+	server := &Server{}
+	tests := []struct {
+		name           string
+		installErr     error
+		verifyErr      error
+		wantOK         bool
+		expectedReason string
+	}{
+		{
+			name:   "install success and verified",
+			wantOK: true,
+		},
+		{
+			name:           "install failed",
+			installErr:     utils.Error("install failed"),
+			wantOK:         false,
+			expectedReason: "install failed",
+		},
+		{
+			name:           "verify failed",
+			verifyErr:      utils.Error("verify failed"),
+			wantOK:         false,
+			expectedReason: "verification failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			installMITMCertFunc = func() error {
+				return tt.installErr
+			}
+			verifyInstalledCertFunc = func() error {
+				return tt.verifyErr
+			}
+
+			resp, err := server.InstallMITMCertificate(context.Background(), &ypb.Empty{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.GetOk() != tt.wantOK {
+				t.Fatalf("expected ok=%v got=%v", tt.wantOK, resp.GetOk())
+			}
+			if !tt.wantOK && tt.expectedReason != "" && !strings.Contains(resp.GetReason(), tt.expectedReason) {
+				t.Fatalf("expected reason to contain %q got %q", tt.expectedReason, resp.GetReason())
+			}
+		})
+	}
 }
