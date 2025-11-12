@@ -625,7 +625,14 @@ func TestMUSTPASS_NewRAGSystem_WithImportFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
 
+	// 添加测试文档
 	ragSystem.VectorStore.AddWithOptions("test_doc", "test_content")
+
+	// 验证导出前文档数量
+	numBefore, err := ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, numBefore)
+
 	// 执行导出
 	tempFile, err := os.CreateTemp("", "test_export_rag_*.zip")
 	if err != nil {
@@ -636,7 +643,7 @@ func TestMUSTPASS_NewRAGSystem_WithImportFile(t *testing.T) {
 	err = ExportRAG(exportCollectionName, tempFile.Name(), WithDB(db))
 	assert.NoError(t, err)
 
-	// 测试自动导入
+	// 测试自动导入到新集合
 	ragSystem, err = Get(exportCollectionName+"_new",
 		WithImportFile(tempFile.Name()),
 		WithDB(db),
@@ -646,18 +653,31 @@ func TestMUSTPASS_NewRAGSystem_WithImportFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
 
+	// 验证导入后的文档数量
 	num, err := ragSystem.CountDocuments()
 	assert.NoError(t, err)
-	assert.Equal(t, 1, num)
+	assert.Equal(t, 1, num, "导入后应该有1个文档")
 
-	// 测试序列一致
+	// 直接查询数据库验证
+	var newCollection schema.VectorStoreCollection
+	err = db.Where("name = ?", exportCollectionName+"_new").First(&newCollection).Error
+	assert.NoError(t, err)
+	assert.NotEmpty(t, newCollection.SerialVersionUID, "导入后应该设置 SerialVersionUID")
+
+	var newDocCount int64
+	err = db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", newCollection.ID).Count(&newDocCount).Error
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), newDocCount, "数据库中应该有1个文档")
+
+	// 测试序列一致：当 SerialVersionUID 相同时，不应该重新导入
 	file, err := os.Open(tempFile.Name())
 	if err != nil {
 		t.Fatalf("open temp file failed: %v", err)
 	}
 	defer file.Close()
 
-	ragSystem, _ = Get(exportCollectionName+"_new1",
+	// 创建一个新的集合用于测试
+	_, _ = Get(exportCollectionName+"_new1",
 		WithDB(db),
 		WithDisableEmbedCollectionInfo(true),
 		WithLazyLoadEmbeddingClient(true),

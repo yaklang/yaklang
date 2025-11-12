@@ -1010,6 +1010,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 			"ef_search":          collection.EfSearch,
 			"ef_construct":       collection.EfConstruct,
 			"distance_func_type": collection.DistanceFuncType,
+			"uuid":               collection.UUID,
 			"rag_id":             collection.RAGID,
 		}).Error
 		if err != nil {
