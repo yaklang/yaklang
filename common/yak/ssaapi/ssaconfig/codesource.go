@@ -43,11 +43,11 @@ type CodeSourceInfo struct {
 }
 
 func (c *CodeSourceInfo) ToJSONString() string {
-	json, err := json.Marshal(c)
+	jsonRaw, err := json.Marshal(c)
 	if err != nil {
 		return ""
 	}
-	return string(json)
+	return string(jsonRaw)
 }
 
 // ValidateSourceConfig 验证代码源配置的有效性
