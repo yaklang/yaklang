@@ -68,6 +68,53 @@ configData = cli.Json("config_data",
         "path": {
           "title": "子路径",
           "type": "string"
+        },
+        "auth": {
+          "title": "认证配置",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "title": "认证方式",
+              "type": "string",
+              "enum": ["password", "ssh_key", "token"],
+              "description": "认证方式: password=密码认证, ssh_key=SSH密钥认证, token=Token认证"
+            },
+            "user_name": {
+              "title": "用户名",
+              "type": "string"
+            },
+            "password": {
+              "title": "密码/Token",
+              "type": "string",
+              "description": "密码或Token值"
+            },
+            "key_path": {
+              "title": "SSH密钥路径",
+              "type": "string",
+              "yakit_type": "upload",
+              "description": "SSH私钥文件路径"
+            }
+          }
+        },
+        "proxy": {
+          "title": "代理配置",
+          "type": "object",
+          "properties": {
+            "url": {
+              "title": "代理URL",
+              "type": "string",
+              "description": "代理服务器地址，例如: http://127.0.0.1:8080"
+            },
+            "user": {
+              "title": "代理用户名",
+              "type": "string"
+            },
+            "password": {
+              "title": "代理密码",
+              "type": "string"
+            }
+          },
+          "required": ["url"]
         }
       }
     },
@@ -92,7 +139,7 @@ configData = cli.Json("config_data",
           "items": {
             "type": "string"
           },
-          "default": ["**/vendor/**,**/classes/**,",  "**/target/**"],
+          "default": ["**/vendor/**,**/classes/**,",  "**/target/**"]
         },
         "re_compile": {
           "title": "重新编译",
@@ -108,28 +155,6 @@ configData = cli.Json("config_data",
           "title": "编译并发数",
           "type": "integer",
           "default": 10
-        }
-      }
-    },
-    "SyntaxFlow": {
-      "title": "SyntaxFlow配置",
-      "type": "object",
-      "properties": {
-        "memory": {
-          "title": "使用内存",
-          "type": "boolean",
-          "default": false
-        }
-      }
-    },
-    "SyntaxFlowScan": {
-      "title": "扫描配置",
-      "type": "object",
-      "properties": {
-        "concurrency": {
-          "title": "扫描并发数",
-          "type": "integer",
-          "default": 5
         }
       }
     }
