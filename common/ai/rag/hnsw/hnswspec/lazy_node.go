@@ -5,6 +5,7 @@ import (
 )
 
 type LazyNodeID any
+
 type LazyLayerNode[K cmp.Ordered] struct {
 	uid          LazyNodeID
 	nodeCacheErr error
