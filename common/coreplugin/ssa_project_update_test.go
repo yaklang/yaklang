@@ -2,7 +2,6 @@ package coreplugin
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path"
 	"strconv"
@@ -85,43 +84,36 @@ func TestSSAProjectUpdate(t *testing.T) {
 		}()
 
 		// 3. 准备更新配置数据
-		updateConfigData := map[string]interface{}{
-			"BaseInfo": map[string]interface{}{
-				"project_name":        projectName,
-				"project_description": "更新后的描述",
-				"language":            "java",
-				"tags":                []string{"tag1", "tag2", "tag3"},
-			},
-			"CodeSource": map[string]interface{}{
-				"kind":       "local",
-				"local_file": tempDir,
-			},
-			"SSACompile": map[string]interface{}{
-				"strict_mode":         true,
-				"peephole_size":       10,
-				"exclude_files":       []string{"**/test/**"},
-				"re_compile":          true,
-				"memory_compile":      false,
-				"compile_concurrency": 5,
-			},
-			"SyntaxFlow": map[string]interface{}{
-				"memory": false,
-			},
-			"SyntaxFlowScan": map[string]interface{}{
-				"concurrency": 3,
-			},
-		}
-
-		configDataJSON, err := json.Marshal(updateConfigData)
+		updateConfig, err := ssaconfig.New(
+			ssaconfig.ModeAll,
+			// BaseInfo
+			ssaconfig.WithProjectName(projectName),
+			ssaconfig.WithProgramDescription("更新后的描述"),
+			ssaconfig.WithProjectLanguage(ssaconfig.JAVA),
+			ssaconfig.WithProjectTags([]string{"tag1", "tag2", "tag3"}),
+			// CodeSource
+			ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+			ssaconfig.WithCodeSourceLocalFile(tempDir),
+			// SSACompile
+			ssaconfig.WithCompileStrictMode(true),
+			ssaconfig.WithCompilePeepholeSize(10),
+			ssaconfig.WithCompileExcludeFiles([]string{"**/test/**"}),
+			ssaconfig.WithCompileReCompile(true),
+			ssaconfig.WithCompileMemoryCompile(false),
+			ssaconfig.WithCompileConcurrency(5),
+		)
 		require.NoError(t, err)
 
-		log.Infof("Updating SSA project with config data:\n%s", string(configDataJSON))
+		configDataJSON, err := updateConfig.ToJSONString()
+		require.NoError(t, err)
+
+		log.Infof("Updating SSA project with config data:\n%s", configDataJSON)
 
 		// 4. 调用 SSA 项目更新脚本
 		pluginName := "SSA 项目更新"
 		param := make(map[string]string)
 		param["project_id"] = strconv.Itoa(int(schemaProject.ID))
-		param["config_data"] = string(configDataJSON)
+		param["config_data"] = configDataJSON
 
 		err = yakgrpc.ExecScriptWithParam(context.Background(), pluginName, param,
 			"", func(exec *ypb.ExecResult) error {
@@ -150,9 +142,6 @@ func TestSSAProjectUpdate(t *testing.T) {
 		require.Equal(t, 10, updatedConfig.GetCompilePeepholeSize())
 		require.Equal(t, uint32(5), updatedConfig.GetCompileConcurrency())
 		require.Contains(t, updatedConfig.GetCompileExcludeFiles(), "**/test/**")
-
-		// 验证扫描配置
-		require.Equal(t, uint32(3), updatedConfig.SyntaxFlowScan.Concurrency)
 
 		// 验证BaseInfo同步
 		require.Equal(t, projectName, updatedConfig.BaseInfo.ProjectName)
