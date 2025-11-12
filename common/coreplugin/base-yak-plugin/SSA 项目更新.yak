@@ -198,12 +198,24 @@ if err != nil {
     return
 }
 
+path = ""
+codeSource = configData["CodeSource"]
+if codeSource != nil{
+    if codeSource["local_file"] != ""{
+        path = codeSource["local_file"]
+    }
+    if codeSource["url"]!=""{
+        path = codeSource["url"]
+    }
+}
+
 yakit.Info("SSA项目更新成功!")
 yakit.Output({
     "success": true,
     "project_id": project.ID,
     "project_name": project.ProjectName,
     "description": project.Description,
+    "path":path,
     "language": project.Language,
     "tags": project.Tags,
 })
