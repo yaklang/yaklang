@@ -559,8 +559,8 @@ alert $high for {
 		taskID1 := uuid.NewString() // 旧的扫描结果
 		taskID2 := uuid.NewString() // 新的扫描结果
 		defer func() {
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
 		}()
 
 		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
@@ -618,8 +618,8 @@ alert $high for {
 		taskID1 := uuid.NewString() // 旧的扫描结果
 		taskID2 := uuid.NewString() // 新的扫描结果
 		defer func() {
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
 		}()
 
 		yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
@@ -717,8 +717,8 @@ alert $high for {
 			require.NoError(t, err)
 			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID2)
 			require.NoError(t, err)
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
 		}()
 
 		{
@@ -853,8 +853,8 @@ alert $high for {
 			require.NoError(t, err)
 			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskID3)
 			require.NoError(t, err)
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
 		}()
 
 		{
@@ -1079,8 +1079,8 @@ alert $low for {
 	t.Run("test scan task risk level count with muti diff", func(t *testing.T) {
 		defer func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), progID)
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2, taskID3}, schema.RuntimeId)
 		}()
 		{
 			vf := filesys.NewVirtualFs()

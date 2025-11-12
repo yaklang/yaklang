@@ -57,7 +57,7 @@ func getFileExtension(language string) string {
 
 // createMockTask 创建模拟扫描任务
 func createMockTask(taskId, programName string, status string, riskCounts map[string]int64, ruleCount int64) *schema.SyntaxFlowScanTask {
-	db := consts.GetGormDefaultSSADataBase()
+	db := consts.GetGormSSAProjectDataBase()
 	task := &schema.SyntaxFlowScanTask{
 		TaskId:        taskId,
 		Programs:      programName,
@@ -85,7 +85,7 @@ func createMockRisk(taskId, programName, riskType, severity, fromRule, title, ti
 // createMockRiskWithDisposal 创建带有处置状态的模拟风险数据
 func createMockRiskWithDisposal(taskId, programName, riskType, severity, fromRule, title, titleVerbose, description, solution, filePath, functionName, codeFragment string, line int64, disposalStatus string) *schema.SSARisk {
 	// SSA风险数据存储在SSA数据库
-	db := consts.GetGormDefaultSSADataBase()
+	db := consts.GetGormSSAProjectDataBase()
 	risk := &schema.SSARisk{
 		Title:                title,
 		TitleVerbose:         titleVerbose,
@@ -114,7 +114,7 @@ func cleanupMockData(taskId, programName string) {
 	// yakit数据库 - 存储报告数据
 	//projectDB := consts.GetGormProjectDatabase()
 	// SSA数据库 - 存储程序信息和风险数据
-	ssaDB := consts.GetGormDefaultSSADataBase()
+	ssaDB := consts.GetGormSSAProjectDataBase()
 
 	// 清理扫描任务数据
 	ssaDB.Where("task_id = ?", taskId).Unscoped().Delete(&schema.SyntaxFlowScanTask{})

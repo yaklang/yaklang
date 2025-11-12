@@ -75,7 +75,7 @@ type RiskInfo struct {
 }
 
 func (r *RiskInfo) check(progName string) error {
-	db := consts.GetGormDefaultSSADataBase().Debug()
+	db := consts.GetGormSSAProjectDataBase().Debug()
 	target := filepath.Join("/", progName, r.FileName)
 	db = yakit.FilterSSARisk(db, &ypb.SSARisksFilter{
 		ProgramName:   []string{progName},
