@@ -188,8 +188,8 @@
   {
     "rule_id": "d151f41e-648c-45dd-b5e7-eebe64f59225",
     "rule_name": "检测Golang不安全传输漏洞",
-    "hash": "ac864338c7b65e4b6ac5aaa40fb5c9f83d5adccf216a6827508cf537d2089968",
-    "version": "20251024.0002"
+    "hash": "5e593709b99919a903deb988e52105dbfbc2e6f36f6c5c5aec16c3d3543bb977",
+    "version": "20251112.0001"
   },
   {
     "rule_id": "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34",
