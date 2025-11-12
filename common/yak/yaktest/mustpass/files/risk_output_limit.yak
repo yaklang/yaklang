@@ -1,8 +1,8 @@
 id = uuid()
 
 bigSize = str.Repeat("hello", 3*1024*1024/len("hello"))
-bigSize2 = str.Repeat("你好", 3*1024*1024/len("你好"))
-bigSize3 = str.Repeat("hello 你好", 3*1024*1024/len("hello 你好"))
+bigSize2 = str.Repeat("你好", 3*1024*1024/len([]byte("你好")))
+bigSize3 = str.Repeat("hello 你好", 3*1024*1024/len([]byte("hello 你好")))
 
 risk.NewRisk("www.example.com",
     risk.runtimeId(id),
@@ -14,16 +14,16 @@ risk.NewRisk("www.example.com",
 risks = risk.YieldRiskByRuntimeId(id)
 
 for r := range risks {
-    if len(r.Payload)/(1024*1024) != 2 {
+    if len([]byte(r.Payload))/(1024*1024) != 2 {
         die("payload size not match")
     }
-    if len(r.QuotedRequest)/(1024*1024) != 2 {
+    if len([]byte(r.QuotedRequest))/(1024*1024) != 2 {
         die("request size not match")
     }
-    if len(r.QuotedResponse)/(1024*1024) != 2 {
+    if len([]byte(r.QuotedResponse))/(1024*1024) != 2 {
         die("response size not match")
     }
-    if len(r.Details)/(1024*1024) != 6 {
+    if len([]byte(r.Details))/(1024*1024) != 6 {
         die("response size not match")
     }
 }
