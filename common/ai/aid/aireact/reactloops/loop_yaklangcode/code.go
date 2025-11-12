@@ -7,7 +7,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -59,57 +58,10 @@ func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath st
 			return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
 		}
 		aikbPath = path
-		log.Infof("using default yaklang-aikb-rag path: %s", aikbPath)
-	} else {
-		log.Infof("using custom aikb_rag_path: %s", aikbPath)
 	}
 
 	log.Infof("initializing RAG system with collection: %s, file: %s", collectionName, aikbPath)
-
-	// 先尝试正常加载
-	ragSystem, err := rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
-	if err != nil {
-		// 如果加载失败（可能是数据损坏），尝试强制重新导入
-		log.Warnf("failed to load RAG system normally: %v, attempting force reimport", err)
-
-		// 先彻底删除损坏的集合（包括知识库和实体仓库）
-		if vectorstore.HasCollection(db, collectionName) {
-			log.Infof("deleting corrupted RAG system (including collection, knowledge base, and entity repository): %s", collectionName)
-			deleteErr := rag.DeleteRAG(db, collectionName)
-			if deleteErr != nil {
-				log.Errorf("failed to delete corrupted RAG system: %v", deleteErr)
-				// 即使删除失败，也继续尝试重新导入（可能是部分数据不存在）
-				log.Warnf("continuing with reimport despite deletion error")
-			} else {
-				log.Infof("corrupted RAG system deleted successfully")
-			}
-		}
-
-		// 强制重新导入（直接使用文件中的 HNSW 索引）
-		log.Infof("importing RAG data from file: %s", aikbPath)
-		importErr := rag.ImportRAG(aikbPath,
-			rag.WithRAGCollectionName(collectionName),
-			rag.WithDB(db),
-			rag.WithExportOverwriteExisting(true), // 覆盖现有数据
-			// 注意：不使用 WithImportRebuildHNSWIndex，直接使用文件中的索引
-			// 重建索引会导致 "unsupported node code type: func() []float32" 错误
-		)
-		if importErr != nil {
-			log.Errorf("failed to force reimport RAG data: %v", importErr)
-			return nil, utils.Errorf("failed to initialize RAG system: %v (reimport also failed: %v)", err, importErr)
-		}
-
-		log.Infof("force reimport succeeded, retrying to load RAG system")
-		// 重新尝试加载（不使用 WithImportFile，因为已经导入过了）
-		ragSystem, err = rag.Get(collectionName, rag.WithDB(db), rag.WithLazyLoadEmbeddingClient(true))
-		if err != nil {
-			log.Errorf("failed to load RAG system after reimport: %v", err)
-			return nil, err
-		}
-	}
-
-	log.Infof("RAG system initialized successfully for collection: %s", collectionName)
-	return ragSystem, nil
+	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath))
 }
 
 //go:embed prompts/persistent_instruction.txt
