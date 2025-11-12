@@ -51,17 +51,21 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 	config, err := p.GetConfig()
 	if err != nil {
 		log.Errorf("failed to marshal code source config: %v", err)
+		return nil
 	}
 
 	result := &ypb.SSAProject{
-		ID:               int64(p.ID),
-		CreatedAt:        p.CreatedAt.Unix(),
-		UpdatedAt:        p.UpdatedAt.Unix(),
-		ProjectName:      p.ProjectName,
-		Language:         string(p.Language),
-		CodeSourceConfig: config.CodeSource.ToJSONString(),
-		Description:      p.Description,
-		Tags:             p.GetTagsList(),
+		ID:          int64(p.ID),
+		CreatedAt:   p.CreatedAt.Unix(),
+		UpdatedAt:   p.UpdatedAt.Unix(),
+		ProjectName: p.ProjectName,
+		Language:    string(p.Language),
+		Description: p.Description,
+		Tags:        p.GetTagsList(),
+	}
+
+	if codeSource := config.CodeSource; codeSource != nil {
+		result.CodeSourceConfig = config.CodeSource.ToJSONString()
 	}
 
 	result.CompileConfig = &ypb.SSAProjectCompileConfig{
