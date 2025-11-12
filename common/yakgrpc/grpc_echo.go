@@ -128,26 +128,26 @@ func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
 		if ok {
 			return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
 		}
-		log.Info("quick certificate verification reported certificate missing; running deep verification")
+		log.Info("quick certificate verification reported certificate missing; running legacy verification")
 	} else {
 		log.Warnf("quick certificate verification failed: %v", err)
 	}
 
-	if err := crep.VerifyMITMRootCertInstalled(); err == nil {
+	if err := crep.VerifySystemCertificate(); err == nil {
 		return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
 	} else {
-		log.Warnf("deep certificate verification failed: %v", err)
-		legacyErr := crep.VerifySystemCertificate()
-		if legacyErr == nil {
-			log.Infof("legacy verification succeeded after deep verification failed")
+		log.Warnf("legacy certificate verification failed: %v", err)
+		if deepErr := crep.VerifyMITMRootCertInstalled(); deepErr == nil {
+			log.Infof("deep certificate verification succeeded after legacy verification failed")
 			return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+		} else {
+			log.Warnf("deep certificate verification failed: %v", deepErr)
+			reason := err.Error()
+			if deepErr != nil {
+				reason = fmt.Sprintf("%s; deep verification also failed: %v", reason, deepErr)
+			}
+			return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: reason}, nil
 		}
-
-		reason := err.Error()
-		if legacyErr != nil {
-			reason = fmt.Sprintf("%s; legacy verification also failed: %v", reason, legacyErr)
-		}
-		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: reason}, nil
 	}
 }
 

@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/privileged"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // AddMITMRootCertIntoSystem 将 MITM 根证书添加到 Windows 系统信任库
@@ -45,11 +47,12 @@ func AddMITMRootCertIntoSystem() error {
 		privileged.WithTitle("Install MITM Certificate"),
 	)
 
+	decodedOutput := decodeWindowsConsoleOutput(output)
 	if err != nil {
-		return utils.Errorf("failed to install certificate: %s, output: %s", err, string(output))
+		return utils.Errorf("failed to install certificate: %s, output: %s", err, decodedOutput)
 	}
 
-	log.Infof("certificate installation output: %s", string(output))
+	log.Infof("certificate installation output: %s", decodedOutput)
 	return nil
 }
 
@@ -67,11 +70,12 @@ func WithdrawMITMRootCertFromSystem() error {
 		privileged.WithTitle("Remove MITM Certificate"),
 	)
 
+	decodedOutput := decodeWindowsConsoleOutput(output)
 	if err != nil {
-		return utils.Errorf("failed to remove certificate: %s, output: %s", err, string(output))
+		return utils.Errorf("failed to remove certificate: %s, output: %s", err, decodedOutput)
 	}
 
-	log.Infof("certificate removal output: %s", string(output))
+	log.Infof("certificate removal output: %s", decodedOutput)
 	return nil
 }
 
@@ -192,4 +196,18 @@ exit /b 0
 `
 
 	return script
+}
+
+func decodeWindowsConsoleOutput(output []byte) string {
+	if len(output) == 0 {
+		return ""
+	}
+	if utf8.Valid(output) {
+		return string(output)
+	}
+	decoded, err := codec.GbkToUtf8(output)
+	if err != nil {
+		return string(output)
+	}
+	return string(decoded)
 }
