@@ -31,7 +31,7 @@ type Config struct {
 	databaseKind   ssa.ProgramCacheKind
 	programSaveTTL time.Duration
 	// project
-	ProjectName string
+	ProjectID uint64
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -403,7 +403,6 @@ func WithProjectName(name string) Option {
 			return err
 		}
 		sc := project.Config
-		c.ProjectName = name
 		if sc == nil || sc.SSACompile == nil {
 			return utils.Errorf("project %s config not found", name)
 		}
@@ -423,6 +422,7 @@ func WithMemory(ttl ...time.Duration) Option {
 
 func WithSSAConfig(sc *ssaconfig.Config) Option {
 	return func(c *Config) error {
+		// TODO:这个接口等后续使用json配置项后，不再使用
 		if sc != nil {
 			c.Config = sc
 		}
@@ -449,6 +449,9 @@ func WithSSAConfig(sc *ssaconfig.Config) Option {
 			if err != nil {
 				return err
 			}
+		}
+		if sc.GetProjectID() != 0 {
+			c.ProjectID = sc.GetProjectID()
 		}
 		return nil
 	}

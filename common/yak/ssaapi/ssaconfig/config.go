@@ -214,6 +214,9 @@ func (c *Config) IsContextCancel() bool {
 
 func WithJsonRawConfig(raw []byte) Option {
 	return func(c *Config) error {
+		if raw == nil {
+			return nil
+		}
 		err := json.Unmarshal(raw, &c)
 		if err != nil {
 			return err

@@ -13,13 +13,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, input ...map[string]any) (*programInfo, *ssaapi.Program, error) {
+func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, inputs ...map[string]any) (*programInfo, *ssaapi.Program, error) {
 	pluginName := "SSA 项目探测"
 	param := make(map[string]string)
 	param["target"] = path
 	param["language"] = language
-	param["compile_immediately"] = strconv.FormatBool(compileImmediately)
-	for _, input := range input {
+	param["compile-immediately"] = strconv.FormatBool(compileImmediately)
+	for _, input := range inputs {
 		for key, value := range input {
 			param[key] = codec.AnyToString(value)
 		}
