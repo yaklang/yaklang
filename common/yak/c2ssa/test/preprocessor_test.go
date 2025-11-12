@@ -24,10 +24,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"1024"},
@@ -51,10 +49,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"800", "600"},
@@ -78,10 +74,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"phi(min)[10,20]"},
@@ -104,10 +98,8 @@ int main() {
 
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"phi(max)[10,20]"},
@@ -128,10 +120,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"25"},
@@ -155,10 +145,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"27"},
@@ -181,10 +169,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"8"},
@@ -210,10 +196,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"1"},
@@ -237,10 +221,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"100"},
@@ -263,10 +245,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"256"},
@@ -291,10 +271,8 @@ int main() {
 
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"10", "20"},
@@ -316,10 +294,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {`"1.0.0"`},
@@ -340,10 +316,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"42"},
@@ -367,10 +341,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"610"},
@@ -392,10 +364,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"3"},
@@ -421,10 +391,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"0", "1"},
@@ -447,10 +415,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"phi(sum)[0,add(sum, phi(i)[0,add(i, 1)])]"},
@@ -519,10 +485,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"512"},
@@ -544,10 +508,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"0"},
@@ -573,10 +535,8 @@ int main() {
 		`
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("src/main.c", code)
-		cf, err := filesys.NewPreprocessedCFs(vf)
-		require.Nil(t, err)
 
-		ssatest.CheckSyntaxFlowWithFS(t, cf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* as $target)
 			`, map[string][]string{
 			"target": {"47"},
