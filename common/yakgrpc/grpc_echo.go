@@ -45,6 +45,9 @@ func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*yp
 }
 
 func (s *Server) InstallMITMCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.GeneralResponse, error) {
+	if ok, reason := crep.CheckMITMAutoInstallReady(); !ok {
+		return &ypb.GeneralResponse{Ok: false, Reason: reason}, nil
+	}
 	if err := installMITMCertFunc(); err != nil {
 		return &ypb.GeneralResponse{Ok: false, Reason: err.Error()}, nil
 	}
