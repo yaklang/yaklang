@@ -70,7 +70,7 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 			if err != nil {
 				return utils.Wrap(err, "failed to delete rag collection")
 			}
-			err := ImportRAG(config.importFile, WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
+			err := ImportRAG(config.importFile, WithDB(config.db), WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
 			if err != nil {
 				return utils.Wrap(err, "failed to import rag collection")
 			}

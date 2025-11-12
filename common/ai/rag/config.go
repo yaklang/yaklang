@@ -126,14 +126,14 @@ type RAGSystemConfig struct {
 	importFile string
 }
 
-var defaultRAGSystemName = "default"
+// var defaultRAGSystemName = "default"
 var defaultRAGSystemDescription = "default description"
 
 func NewRAGSystemConfig(options ...RAGSystemConfigOption) *RAGSystemConfig {
 	config := &RAGSystemConfig{
-		ctx:                        context.Background(),
-		db:                         consts.GetGormProfileDatabase(),
-		Name:                       defaultRAGSystemName,
+		ctx: context.Background(),
+		db:  consts.GetGormProfileDatabase(),
+		// Name:                       defaultRAGSystemName,
 		description:                defaultRAGSystemDescription,
 		knowledgeBaseType:          "default",
 		enableEntityRepository:     true,
