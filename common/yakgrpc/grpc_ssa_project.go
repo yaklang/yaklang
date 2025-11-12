@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/schema"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -98,4 +100,15 @@ func (s *Server) DeleteSSAProject(ctx context.Context, req *ypb.DeleteSSAProject
 			EffectRows: count,
 		},
 	}, nil
+}
+
+func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
+	if p == nil {
+		return nil
+	}
+	db := consts.GetGormDefaultSSADataBase()
+	project := p.ToGRPCModel()
+	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
+	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
+	return project
 }
