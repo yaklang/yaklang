@@ -22,8 +22,8 @@ func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())
-
+	// db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "project_id", filter.GetProjectIds())
 	if word := filter.GetKeyword(); word != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"program_name", "description"}, word, false)
 	}
@@ -148,4 +148,10 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	db := DB.Model(&ssadb.IrProgram{})
 	db = db.Where("program_name = ?", input.GetName()).Update("description", input.Description)
 	return db.RowsAffected, db.Error
+}
+
+func QuerySSAProgramNumsByProjectName(db *gorm.DB, projectName string) int64 {
+	var count int64
+	db = db.Where("project_name = ?", projectName).Count(&count)
+	return count
 }
