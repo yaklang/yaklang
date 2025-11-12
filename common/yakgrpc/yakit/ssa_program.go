@@ -150,8 +150,8 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	return db.RowsAffected, db.Error
 }
 
-func QuerySSAProgramNumsByProjectName(db *gorm.DB, projectName string) int64 {
+func QuerySSACompileTimesByProjectID(db *gorm.DB, projectID uint) int64 {
 	var count int64
-	db = db.Where("project_name = ?", projectName).Count(&count)
+	db.Model(&ssadb.IrProgram{}).Where("project_id = ?", projectID).Count(&count)
 	return count
 }
