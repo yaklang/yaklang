@@ -14,8 +14,8 @@ func setMemberCallRelationship(obj, key, member Value) {
 		return
 	}
 	obj.AddMember(key, member)
+	//todo：fix one value for more object-key
 	if !member.IsMember() {
-		//todo：fix one value for more object-key
 		member.SetObject(obj)
 		member.SetKey(key)
 		key.AddUser(obj.(User))
