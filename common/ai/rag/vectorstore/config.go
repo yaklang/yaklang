@@ -46,6 +46,10 @@ type CollectionConfig struct {
 
 	CacheSize    int
 	PreCacheSize int
+
+	KeyAsUID bool
+
+	TryRebuildHNSWIndex bool
 }
 
 func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
@@ -61,6 +65,8 @@ func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
 		MaxChunkSize:               defaultMaxChunkSize,
 		Overlap:                    defaultChunkOverlap,
 		BigTextPlan:                defaultBigTextPlan,
+		KeyAsUID:                   false,
+		TryRebuildHNSWIndex:        false,
 	}
 
 	for _, option := range options {
@@ -89,6 +95,7 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		BigTextPlan:                defaultBigTextPlan,
 		CacheSize:                  10000,
 		PreCacheSize:               0,
+		KeyAsUID:                   false,
 	}
 	for _, option := range options {
 		option(loadBasicConfig)
@@ -125,6 +132,18 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 }
 
 type CollectionConfigFunc func(config *CollectionConfig)
+
+func WithKeyAsUID(keyAsUID bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.KeyAsUID = keyAsUID
+	}
+}
+
+func WithTryRebuildHNSWIndex(tryRebuildHNSWIndex bool) CollectionConfigFunc {
+	return func(config *CollectionConfig) {
+		config.TryRebuildHNSWIndex = tryRebuildHNSWIndex
+	}
+}
 
 func WithCacheSize(cacheSize int) CollectionConfigFunc {
 	return func(config *CollectionConfig) {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -178,7 +177,13 @@ func SplitDocumentsByMetadata(docs []Document, metadataKey string) map[any][]Doc
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
-func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize, preCacheSize int, pqmode bool, wg *sync.WaitGroup) (*hnsw.Graph[string], error) {
+func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Reader) (*hnsw.Graph[string], error) {
+	cacheMinSize := s.cacheSize
+	db := s.db
+	collectionName := s.collection.Name
+	collectionID := s.collection.ID
+	pqmode := s.collection.EnablePQMode
+
 	cacheMaxSize := cacheMinSize + 2000
 	cache := map[hnswspec.LazyNodeID]any{}
 	clearCache := func() {
@@ -208,10 +213,15 @@ func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphB
 	// }
 
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
-	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
-		uidStr := fmt.Sprint(key)
+	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, data hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+		uidStr := fmt.Sprint(data)
 
-		doc, err := getVectorDocumentByLazyNodeID(db.Select("document_id"), key)
+		var queryID any = data
+		if s.config.KeyAsUID {
+			queryID = key
+		}
+
+		doc, err := getVectorDocumentByLazyNodeID(db.Where("collection_id = ?", collectionID).Select("document_id"), queryID)
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +233,7 @@ func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphB
 					return node.([]byte), nil
 				}
 
-				doc, err := getVectorDocumentByLazyNodeID(db.Select("pq_code"), key)
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("pq_code"), data)
 				if err != nil {
 					return nil, err
 				}
@@ -237,7 +247,7 @@ func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphB
 					return node.([]float32)
 				}
 
-				doc, err := getVectorDocumentByLazyNodeID(db.Select("embedding"), key)
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("embedding"), data)
 				if err != nil {
 					log.Errorf("get vector document by lazy node id err: %v", err)
 					return nil
@@ -327,7 +337,8 @@ func getDefaultHNSWGraphOptions(collectionName string) []hnsw.GraphOption[string
 	return []hnsw.GraphOption[string]{
 		hnsw.WithNodeType[string](hnsw.InputNodeTypeLazy),
 		hnsw.WithConvertToUIDFunc[string](func(node hnswspec.LayerNode[string]) (hnswspec.LazyNodeID, error) {
-			return hnswspec.LazyNodeID(GetLazyNodeUIDByMd5(collectionName, node.GetKey())), nil
+			return node.GetKey(), nil
+			// return hnswspec.LazyNodeID(GetLazyNodeUIDByMd5(collectionName, node.GetKey())), nil
 		}),
 		hnsw.WithDeterministicRng[string](0),
 	}
