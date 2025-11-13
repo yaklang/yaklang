@@ -321,5 +321,25 @@ func FilterHTTPFlowByDomain(db *gorm.DB, domain string) *gorm.DB {
 }
 
 func FilterHTTPFlowByRuntimeID(db *gorm.DB, runtimeID string) *gorm.DB {
+	runtimeID = strings.TrimSpace(runtimeID)
+	if runtimeID == "" {
+		return db
+	}
+
+	// 支持使用逗号分隔的多个 runtime_id
+	if strings.Contains(runtimeID, ",") {
+		var cleaned []string
+		for _, id := range strings.Split(runtimeID, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				cleaned = append(cleaned, id)
+			}
+		}
+		if len(cleaned) == 0 {
+			return db
+		}
+		return db.Where("runtime_id IN (?)", cleaned)
+	}
+
 	return db.Where("runtime_id = ?", runtimeID)
 }
