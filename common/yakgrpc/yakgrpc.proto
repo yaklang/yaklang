@@ -8293,7 +8293,7 @@ message PluginTraceStats {
 message GenerateSSAReportRequest {
   string TaskID = 1;     // SSA扫描TaskID
   string ReportName = 2;    // 报告名称
-  repeated int64 RiskIDs = 3;  // 指定的RiskID列表，如果提供则只生成这些Risk的报告
+  SSARisksFilter Filter = 3;  // 风险过滤器，用于筛选要生成报告的Risk
 }
 
 message GenerateSSAReportResponse {
