@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -700,4 +701,13 @@ func TestMUSTPASS_NewRAGSystem_WithImportFile(t *testing.T) {
 	num, err = ragSystem.CountDocuments()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, num)
+}
+
+func TestMUSTPASS_RAGSystem_WithDB(t *testing.T) {
+	err := VerifyImportFile("/Users/z3/Downloads/1113.rag")
+	assert.NoError(t, err)
+	db := consts.GetGormProfileDatabase()
+	ragSystem, err := Get("test_rag_system_with_db", WithDB(db), WithImportFile("/Users/z3/Downloads/1113.rag"), WithImportRebuildHNSWIndex(true))
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
 }
