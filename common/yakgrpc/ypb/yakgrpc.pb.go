@@ -63065,8 +63065,13 @@ func (x *UpdateSSAProjectResponse) GetMessage() *DbOperateMessage {
 }
 
 type DeleteSSAProjectRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Filter        *SSAProjectFilter      `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *SSAProjectFilter      `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	// 删除模式:
+	// "clear_compile_history" - 只清空编译历史（删除 IrProgram，保留 SSAProject）
+	// "delete_all" 或 空字符串 - 清空编译历史和项目信息（删除 IrProgram 和 SSAProject）
+	// 默认为 "delete_all"
+	DeleteMode    string `protobuf:"bytes,2,opt,name=DeleteMode,proto3" json:"DeleteMode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63106,6 +63111,13 @@ func (x *DeleteSSAProjectRequest) GetFilter() *SSAProjectFilter {
 		return x.Filter
 	}
 	return nil
+}
+
+func (x *DeleteSSAProjectRequest) GetDeleteMode() string {
+	if x != nil {
+		return x.DeleteMode
+	}
+	return ""
 }
 
 type DeleteSSAProjectResponse struct {
@@ -68732,9 +68744,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\"v\n" +
 	"\x18UpdateSSAProjectResponse\x12)\n" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12/\n" +
-	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"H\n" +
+	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"h\n" +
 	"\x17DeleteSSAProjectRequest\x12-\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x15.ypb.SSAProjectFilterR\x06Filter\"K\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x15.ypb.SSAProjectFilterR\x06Filter\x12\x1e\n" +
+	"\n" +
+	"DeleteMode\x18\x02 \x01(\tR\n" +
+	"DeleteMode\"K\n" +
 	"\x18DeleteSSAProjectResponse\x12/\n" +
 	"\aMessage\x18\x01 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"t\n" +
 	"\x16QuerySSAProjectRequest\x12-\n" +
