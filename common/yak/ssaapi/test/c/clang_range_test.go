@@ -115,4 +115,158 @@ int main() {
 			ssa.ToConstInst)
 	})
 
+	t.Run("test include with leading spaces", func(t *testing.T) {
+		headerCode := `
+#ifndef CONFIG_ADVANCED_H
+#define CONFIG_ADVANCED_H
+
+#define BASE_SIZE 64
+#  include "config_extra.h"
+
+#endif
+		`
+
+		extraHeader := `
+#ifndef CONFIG_EXTRA_H
+#define CONFIG_EXTRA_H
+
+#define EXTRA_FACTOR 4
+
+#endif
+		`
+
+		mainCode := `
+#include "config_advanced.h"
+
+int main() {
+    int factor = EXTRA_FACTOR;
+    int size = BASE_SIZE * factor;
+    return size + factor;
+}
+		`
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/config_advanced.h", headerCode)
+		vf.AddFile("src/config_extra.h", extraHeader)
+		vf.AddFile("src/main.c", mainCode)
+
+		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
+		require.Nil(t, err)
+		p.Show()
+
+		results, err := p.SyntaxFlowWithError(`
+			factor #-> as $factor
+			size #-> as $size
+		`, ssaapi.QueryWithEnableDebug())
+		require.Nil(t, err)
+		require.NotNil(t, results)
+		results.Show()
+
+		factor := results.GetValues("factor")
+		check(t, factor, []string{
+			"2:18 - 2:19: 4"},
+			ssa.ToConstInst)
+
+		size := results.GetValues("size")
+		check(t, size, []string{
+			"2:18 - 2:19: 4",
+			"3:16 - 3:18: 64"},
+			ssa.ToConstInst)
+	})
+
+	t.Run("test nested include chain", func(t *testing.T) {
+		level1 := `
+#ifndef LEVEL1_H
+#define LEVEL1_H
+#include "level2.h"
+#define LEVEL1_VALUE 10
+#endif
+		`
+
+		level2 := `
+#ifndef LEVEL2_H
+#define LEVEL2_H
+#include "level3.h"
+#define LEVEL2_VALUE LEVEL3_VALUE + 5
+#endif
+		`
+
+		level3 := `
+#ifndef LEVEL3_H
+#define LEVEL3_H
+#define LEVEL3_VALUE 20
+#endif
+		`
+
+		mainCode := `
+#include "level1.h"
+
+int main() {
+    int value = LEVEL1_VALUE + LEVEL2_VALUE;
+    return value;
+}
+		`
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/level1.h", level1)
+		vf.AddFile("src/level2.h", level2)
+		vf.AddFile("src/level3.h", level3)
+		vf.AddFile("src/main.c", mainCode)
+
+		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
+		require.Nil(t, err)
+
+		results, err := p.SyntaxFlowWithError(`
+			value #-> as $value
+		`, ssaapi.QueryWithEnableDebug())
+		require.Nil(t, err)
+		require.NotNil(t, results)
+		results.Show()
+
+		value := results.GetValues("value")
+		check(t, value, []string{
+			"2:17 - 2:19: 10",
+			"2:22 - 2:24: 20",
+			"2:27 - 2:28: 5"},
+			ssa.ToConstInst)
+	})
+
+	t.Run("test system include filtered", func(t *testing.T) {
+		headerCode := `
+#ifndef PLATFORM_CONFIG_H
+#define PLATFORM_CONFIG_H
+#  include <winerror.h>
+#define PLATFORM_VALUE 7
+#endif
+		`
+
+		mainCode := `
+#include "platform_config.h"
+
+int main() {
+    int value = PLATFORM_VALUE;
+    return value;
+}
+		`
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/platform_config.h", headerCode)
+		vf.AddFile("src/main.c", mainCode)
+
+		p, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.C))
+		require.Nil(t, err)
+
+		results, err := p.SyntaxFlowWithError(`
+			value #-> as $value
+		`, ssaapi.QueryWithEnableDebug())
+		require.Nil(t, err)
+		require.NotNil(t, results)
+		results.Show()
+
+		value := results.GetValues("value")
+		check(t, value, []string{
+			"2:17 - 2:18: 7"},
+			ssa.ToConstInst)
+	})
+
 }
