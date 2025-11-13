@@ -203,15 +203,28 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 		c.handlerObjectMethod()
 		c.handleCalleeFunction()
 		c.handlerReturnType()
-	} else if index := slices.Index(c.Args, v.GetId()); index > -1 {
-		c.Args[index] = to.GetId()
-	} else if binding, ok := c.Binding[v.GetName()]; ok && binding == v.GetId() {
-		c.Binding[v.GetName()] = to.GetId()
-	} else if index := slices.Index(c.ArgMember, v.GetId()); index > -1 {
+	}
+	lo.ForEach(c.Args, func(id int64, index int) {
+		if id == v.GetId() {
+			c.Args[index] = to.GetId()
+		}
+		return
+	})
+
+	lo.ForEach(c.Args, func(id int64, index int) {
+		if id == v.GetId() {
+			c.Args[index] = to.GetId()
+		}
+		return
+	})
+
+	lo.ForEach(c.ArgMember, func(id int64, index int) {
 		c.ArgMember[index] = to.GetId()
-	} else {
-		// panic("call not use this value")
-		log.Warnf("call not use this value")
+	})
+
+	binding, ok := c.Binding[v.GetName()]
+	if ok && binding == v.GetId() {
+		c.Binding[v.GetName()] = to.GetId()
 	}
 }
 
