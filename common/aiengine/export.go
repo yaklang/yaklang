@@ -1,11 +1,14 @@
 package aiengine
 
 var Exports = map[string]interface{}{
+	// invoke re-act
 	"InvokeReAct":      InvokeReAct,
 	"InvokeReActAsync": InvokeReActAsync,
 
+	// new ai engine
 	"NewAIEngine": NewAIEngine,
 
+	// config options
 	"focus":                 WithFocus,
 	"timeout":               WithTimeout,
 	"context":               WithContext,
@@ -15,6 +18,7 @@ var Exports = map[string]interface{}{
 	"workdir":               WithWorkdir,
 	"language":              WithLanguage,
 	"disableToolUse":        WithDisableToolUse,
+	"disableAIForge":        WithDisableAIForge,
 	"disableMCPServers":     WithDisableMCPServers,
 	"enableAISearchTool":    WithEnableAISearchTool,
 	"enableForgeSearchTool": WithEnableForgeSearchTool,
@@ -38,4 +42,11 @@ var Exports = map[string]interface{}{
 	"aiReviewMode":          WithAIReviewMode,
 	"aiCallback":            WithAICallback,
 	"aiConfig":              WithAIConfig,
+
+	// ai forge
+	// "BuildAIForge":      BuildAIForge,
+	// "forgePlan":         WithForgePlan,
+	// "forgePlanTask":     WithForgePlanTask,
+	// "forgeResultSchema": WithForgeResultSchema,
+	// "extAForge":         WithExtAIForge,
 }
