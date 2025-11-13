@@ -1831,6 +1831,7 @@ message AIEventFilter {
   repeated string EventUUIDS = 1;
   repeated string  EventType = 2;
   repeated string CoordinatorId = 3;
+  repeated string TaskIndex = 4;
 }
 
 
