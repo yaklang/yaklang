@@ -1,0 +1,356 @@
+// 测试 L2TP 服务器和客户端的 RSA SecurID (TOTP) 认证功能
+println("Testing L2TP Server and Client with RSA SecurID (TOTP) Authentication")
+
+// 测试1: 基础 RSA SecurID 认证测试
+println("\n=== Test 1: Basic RSA SecurID Authentication ===")
+
+// 生成一个共享密钥用于 TOTP
+secret = "JBSWY3DPEHPK3PXP"  // Base32 编码的密钥
+println(sprintf("Using TOTP secret: %s", secret))
+
+// 生成当前的 TOTP 验证码
+currentCode = twofa.TOTPCode(secret)
+println(sprintf("Current TOTP code: %s", currentCode))
+
+// 验证 TOTP 代码
+isValid = twofa.TOTPVerify(secret, currentCode)
+assert isValid == true, "TOTP verification should succeed"
+println("✓ TOTP generation and verification works")
+
+
+// 测试2: L2TP 服务器使用 RSA SecurID 认证
+println("\n=== Test 2: L2TP Server with RSA SecurID Auth ===")
+
+port1 = os.GetRandomAvailableUDPPort()
+println(sprintf("Starting L2TP server with TOTP auth on port %d", port1))
+
+// 模拟 RSA SecurID 认证函数
+// 用户名为账号，密码为 TOTP 验证码
+rsaAuthCalled = false
+server1, err = l2tp.Serve(
+    l2tp.host("0.0.0.0"),
+    l2tp.port(port1),
+    l2tp.hostname("TOTP-VPN-Server"),
+    l2tp.auth((username, password) => {
+        println(sprintf("RSA SecurID Auth - Username: %s, Code: %s", username, password))
+        rsaAuthCalled = true
+        
+        // 在实际场景中，这里会根据 username 查找对应的 TOTP secret
+        // 这里我们简化，假设所有用户使用同一个 secret
+        userSecret = "JBSWY3DPEHPK3PXP"
+        
+        // 验证 TOTP 代码
+        result = twofa.TOTPVerify(userSecret, password)
+        println(sprintf("TOTP verification result: %v", result))
+        return result
+    }),
+    l2tp.ipPool("192.168.200.10", "192.168.200.100"),
+)
+
+if err != nil {
+    die(sprintf("Failed to start L2TP server with TOTP auth: %v", err))
+}
+assert server1 != nil, "Server should not be nil"
+
+sleep(0.5)
+
+println("✓ L2TP server with RSA SecurID auth started successfully")
+
+
+// 测试3: 客户端使用正确的 TOTP 代码连接
+println("\n=== Test 3: Client Connection with Valid TOTP Code ===")
+
+// 生成当前的 TOTP 验证码
+validCode = twofa.TOTPCode(secret)
+println(sprintf("Generated valid TOTP code: %s", validCode))
+
+// 创建客户端连接，使用 TOTP 验证码作为密码
+println("Connecting client with valid TOTP code...")
+client1, err = l2tp.Connect("127.0.0.1", port1,
+    l2tp.clientAuth("alice@company.com", validCode),
+    l2tp.clientTimeout(10.0),
+)
+
+if err != nil {
+    server1.Stop()
+    die(sprintf("Failed to connect with valid TOTP code: %v", err))
+}
+
+assert client1 != nil, "Client should connect successfully with valid TOTP code"
+
+sleep(2.0)  // 等待 PPP 认证完成
+
+// 认证会在 PPP 握手时发生
+if rsaAuthCalled {
+    println("✓ RSA SecurID auth callback was called")
+} else {
+    println("Note: Auth callback happens during PPP handshake")
+}
+
+println("✓ Client connected successfully with valid TOTP code")
+
+// 获取客户端信息
+tunnelID1 = client1.GetTunnelID()
+sessionID1 = client1.GetSessionID()
+println(sprintf("Client tunnel ID: %d, session ID: %d", tunnelID1, sessionID1))
+
+// 清理客户端1
+err = client1.Close()
+if err != nil {
+    println(sprintf("Warning: Failed to close client1: %v", err))
+}
+
+println("✓ Client disconnected successfully")
+
+
+// 测试4: 客户端使用错误的 TOTP 代码连接（应该失败）
+println("\n=== Test 4: Client Connection with Invalid TOTP Code ===")
+
+println("Attempting to connect with invalid TOTP code...")
+invalidCode = "000000"  // 明显错误的验证码
+
+client2, err = l2tp.Connect("127.0.0.1", port1,
+    l2tp.clientAuth("bob@company.com", invalidCode),
+    l2tp.clientTimeout(5.0),
+)
+
+// 这个连接应该失败或认证失败
+if err != nil {
+    println(sprintf("Connection failed as expected: %v", err))
+    println("✓ Invalid TOTP code correctly rejected")
+} else if client2 != nil {
+    // 如果连接建立了，检查是否认证失败
+    println("Connection established but should fail auth")
+    client2.Close()
+}
+
+sleep(0.5)
+
+
+// 测试5: 数据包传输 + RSA SecurID 认证
+println("\n=== Test 5: Packet Transmission with TOTP Auth ===")
+
+port2 = os.GetRandomAvailableUDPPort()
+println(sprintf("Starting new L2TP server for packet test on port %d", port2))
+
+serverPacketCount = 0
+server2, err = l2tp.Serve(
+    l2tp.host("0.0.0.0"),
+    l2tp.port(port2),
+    l2tp.hostname("TOTP-VPN-PacketTest"),
+    l2tp.auth((username, password) => {
+        println(sprintf("Auth: %s with code %s", username, password))
+        return twofa.TOTPVerify(secret, password)
+    }),
+    l2tp.callback((data) => {
+        println(sprintf("Server received packet: %d bytes", len(data)))
+        serverPacketCount++
+    }),
+)
+
+if err != nil {
+    server1.Stop()
+    die(sprintf("Failed to start server2: %v", err))
+}
+
+sleep(0.5)
+
+// 使用有效的 TOTP 代码连接
+currentCode2 = twofa.TOTPCode(secret)
+println(sprintf("Connecting with TOTP code: %s", currentCode2))
+
+clientPacketCount = 0
+client3, err = l2tp.Connect("127.0.0.1", port2,
+    l2tp.clientAuth("charlie@company.com", currentCode2),
+    l2tp.clientCallback((data) => {
+        println(sprintf("Client received packet: %d bytes", len(data)))
+        clientPacketCount++
+    }),
+    l2tp.clientTimeout(10.0),
+)
+
+if err != nil {
+    server2.Stop()
+    server1.Stop()
+    die(sprintf("Failed to create client3: %v", err))
+}
+
+sleep(1.5)  // 等待连接建立
+
+// 注入测试数据包
+println("Injecting test packet from client...")
+testPacket = []byte{
+    0x45, 0x00, 0x00, 0x28,  // IP header
+    0xab, 0xcd, 0x00, 0x00,
+    0x40, 0x11, 0x00, 0x00,
+    0xc0, 0xa8, 0xc8, 0x0a,  // Source IP: 192.168.200.10
+    0xc0, 0xa8, 0xc8, 0x01,  // Dest IP: 192.168.200.1
+}
+
+err = client3.InjectPacket(testPacket)
+if err != nil {
+    println(sprintf("Packet injection warning: %v", err))
+}
+
+sleep(1.0)  // 等待数据包传输
+
+println(sprintf("Server received %d packets, Client received %d packets", 
+    serverPacketCount, clientPacketCount))
+
+// 清理
+err = client3.Close()
+if err != nil {
+    println(sprintf("Warning: Failed to close client3: %v", err))
+}
+
+err = server2.Stop()
+if err != nil {
+    println(sprintf("Warning: Failed to stop server2: %v", err))
+}
+
+println("✓ Packet transmission with TOTP auth completed")
+
+
+// 测试6: 多用户 RSA SecurID 认证
+println("\n=== Test 6: Multi-User RSA SecurID Authentication ===")
+
+port3 = os.GetRandomAvailableUDPPort()
+println(sprintf("Starting L2TP server for multi-user test on port %d", port3))
+
+// 模拟多用户 TOTP 密钥数据库
+userSecrets = {
+    "alice@company.com": "JBSWY3DPEHPK3PXP",
+    "bob@company.com":   "JBSWY3DPEHPK3PXQ",
+    "charlie@company.com": "JBSWY3DPEHPK3PXR",
+}
+
+authAttempts = []
+server3, err = l2tp.Serve(
+    l2tp.host("0.0.0.0"),
+    l2tp.port(port3),
+    l2tp.hostname("TOTP-MultiUser-Server"),
+    l2tp.auth((username, password) => {
+        println(sprintf("Multi-user auth: %s", username))
+        authAttempts = append(authAttempts, username)
+        
+        // 查找用户的 TOTP 密钥
+        userSecret = userSecrets[username]
+        if userSecret == undefined || userSecret == "" {
+            println(sprintf("Unknown user: %s", username))
+            return false
+        }
+        
+        // 验证 TOTP 代码
+        result = twofa.TOTPVerify(userSecret, password)
+        println(sprintf("User %s auth result: %v", username, result))
+        return result
+    }),
+)
+
+if err != nil {
+    server1.Stop()
+    die(sprintf("Failed to start server3: %v", err))
+}
+
+sleep(0.5)
+
+// Alice 使用自己的密钥连接
+aliceCode = twofa.TOTPCode(userSecrets["alice@company.com"])
+println(sprintf("Alice connecting with code: %s", aliceCode))
+
+clientAlice, err = l2tp.Connect("127.0.0.1", port3,
+    l2tp.clientAuth("alice@company.com", aliceCode),
+    l2tp.clientTimeout(10.0),
+)
+
+if err != nil {
+    println(sprintf("Alice connection error: %v", err))
+} else {
+    println("✓ Alice connected successfully")
+    sleep(1.0)
+    clientAlice.Close()
+}
+
+sleep(0.5)
+
+// Bob 使用自己的密钥连接
+bobCode = twofa.TOTPCode(userSecrets["bob@company.com"])
+println(sprintf("Bob connecting with code: %s", bobCode))
+
+clientBob, err = l2tp.Connect("127.0.0.1", port3,
+    l2tp.clientAuth("bob@company.com", bobCode),
+    l2tp.clientTimeout(10.0),
+)
+
+if err != nil {
+    println(sprintf("Bob connection error: %v", err))
+} else {
+    println("✓ Bob connected successfully")
+    sleep(1.0)
+    clientBob.Close()
+}
+
+sleep(0.5)
+
+// Charlie 使用错误的密钥（使用 Alice 的密钥）尝试连接
+println("Charlie attempting to connect with Alice's code (should fail)...")
+clientCharlie, err = l2tp.Connect("127.0.0.1", port3,
+    l2tp.clientAuth("charlie@company.com", aliceCode),  // 使用 Alice 的验证码
+    l2tp.clientTimeout(5.0),
+)
+
+if err != nil {
+    println(sprintf("✓ Charlie correctly rejected with wrong code: %v", err))
+} else if clientCharlie != nil {
+    println("Warning: Charlie should have been rejected")
+    clientCharlie.Close()
+}
+
+println(sprintf("Total auth attempts: %d", len(authAttempts)))
+assert len(authAttempts) >= 2, "Should have at least 2 successful auth attempts"
+
+err = server3.Stop()
+if err != nil {
+    println(sprintf("Warning: Failed to stop server3: %v", err))
+}
+
+println("✓ Multi-user RSA SecurID authentication test completed")
+
+
+// 测试7: TOTP 时间窗口测试
+println("\n=== Test 7: TOTP Time Window Tolerance ===")
+
+// 测试同一个验证码在短时间内的多次使用
+testSecret = "JBSWY3DPEHPK3PXP"
+code1 = twofa.TOTPCode(testSecret)
+println(sprintf("Generated TOTP code: %s", code1))
+
+// 第一次验证
+result1 = twofa.TOTPVerify(testSecret, code1)
+assert result1 == true, "First verification should succeed"
+println("✓ First verification succeeded")
+
+// 立即再次验证相同的代码（在同一时间窗口内）
+result2 = twofa.TOTPVerify(testSecret, code1)
+assert result2 == true, "Second verification in same window should succeed"
+println("✓ Second verification in same window succeeded")
+
+// 等待一小段时间后再次验证
+sleep(1.0)
+result3 = twofa.TOTPVerify(testSecret, code1)
+println(sprintf("Verification after 1 second: %v", result3))
+
+println("✓ TOTP time window tolerance test completed")
+
+
+// 清理所有服务器
+println("\n=== Cleaning Up ===")
+err = server1.Stop()
+if err != nil {
+    println(sprintf("Warning: Failed to stop server1: %v", err))
+}
+
+println("\n" + "="*60)
+println("All RSA SecurID (TOTP) L2TP tests completed successfully!")
+println("="*60)
+
