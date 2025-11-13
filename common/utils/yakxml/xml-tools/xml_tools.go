@@ -80,7 +80,7 @@ func XmlLoadsOmap(v interface{}) (*orderedmap.OrderedMap, error) {
 func XmlLoads(v interface{}) map[string]any {
 	i, err := XmlLoadsOmap(v)
 	if err != nil {
-		log.Errorf("xml decode error: %v", err)
+		log.Debugf("xml decode error: %v", err)
 	}
 	return i.ToStringMap()
 }
