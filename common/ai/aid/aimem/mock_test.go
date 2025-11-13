@@ -63,6 +63,18 @@ func (m *MockEmbeddingClient) Embedding(text string) ([]float32, error) {
 	return generateDefaultVector(text), nil
 }
 
+// EmbeddingRaw 实现EmbeddingClient接口
+func (m *MockEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
+	vec, err := m.Embedding(text)
+	if err != nil {
+		return nil, err
+	}
+	if vec == nil {
+		return nil, nil
+	}
+	return [][]float32{vec}, nil
+}
+
 // generateDefaultVector 为未知文本生成一个简单的默认向量
 func generateDefaultVector(text string) []float32 {
 	// 基于文本长度和hash生成一个简单的向量
