@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -23,9 +24,12 @@ type PreprocessedCFS struct {
 var _ fi.FileSystem = (*PreprocessedCFS)(nil)
 
 var (
-	globalTempDir     string
-	globalIncludeDirs []string
-	commonCLibraries  []string
+	globalTempDir       string
+	globalIncludeDirs   []string
+	commonCLibraries    []string
+	headerCache         = make(map[string]bool)
+	includeLineRegexp   = regexp.MustCompile(`^\s*#\s*include\s*<[^>]+>`)
+	includeHeaderRegexp = regexp.MustCompile(`#\s*include\s*<([^>]+)>`)
 )
 
 func initTemp() error {
@@ -37,53 +41,65 @@ func initTemp() error {
 	return nil
 }
 
-// SetCommonCLibraries registers the common C header names that should be ensured in the preprocessed filesystem.
-func SetCommonCLibraries(libs []string) {
-	if libs == nil {
-		commonCLibraries = nil
+func ensureIncludeBase() (string, error) {
+	if globalTempDir == "" {
+		if err := initTemp(); err != nil {
+			return "", err
+		}
+	}
+	includeDir := filepath.Join(globalTempDir, "include")
+	if err := os.MkdirAll(includeDir, 0o755); err != nil {
+		return "", err
+	}
+	addIncludeDir(globalTempDir)
+	addIncludeDir(includeDir)
+	return includeDir, nil
+}
+
+func addIncludeDir(dir string) {
+	if dir == "" {
 		return
 	}
-	commonCLibraries = append([]string(nil), libs...)
-	globalIncludeDirs = nil
+	if !containsDir(globalIncludeDirs, dir) {
+		globalIncludeDirs = append(globalIncludeDirs, dir)
+	}
+}
+
+func ensureHeaderFileExists(relPath string) error {
+	if relPath == "" {
+		return nil
+	}
+	includeDir, err := ensureIncludeBase()
+	if err != nil {
+		return err
+	}
+	if headerCache[relPath] {
+		return nil
+	}
+	targetPath := filepath.Join(includeDir, relPath)
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		return err
+	}
+	if _, err := os.Stat(targetPath); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.WriteFile(targetPath, []byte{}, 0o644); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	headerCache[relPath] = true
+	return nil
 }
 
 func ensureCommonIncludeDirs() error {
 	if len(commonCLibraries) == 0 {
 		return nil
 	}
-	if globalTempDir == "" {
-		if err := initTemp(); err != nil {
-			return err
-		}
-	}
-	includeDir := filepath.Join(globalTempDir, "include")
-	if err := os.MkdirAll(includeDir, 0o755); err != nil {
-		return err
-	}
 	for _, std := range commonCLibraries {
-		targetPath := filepath.Join(includeDir, std)
-		dirPath := filepath.Dir(targetPath)
-		if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		if err := ensureHeaderFileExists(std); err != nil {
 			return err
-		}
-		if _, err := os.Stat(targetPath); err != nil {
-			if os.IsNotExist(err) {
-				if err := os.WriteFile(targetPath, []byte{}, 0o644); err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
-	if len(globalIncludeDirs) == 0 {
-		globalIncludeDirs = []string{globalTempDir, includeDir}
-	} else {
-		if !containsDir(globalIncludeDirs, globalTempDir) {
-			globalIncludeDirs = append(globalIncludeDirs, globalTempDir)
-		}
-		if !containsDir(globalIncludeDirs, includeDir) {
-			globalIncludeDirs = append(globalIncludeDirs, includeDir)
 		}
 	}
 	return nil
@@ -98,14 +114,41 @@ func containsDir(dirs []string, dir string) bool {
 	return false
 }
 
+func extractIncludeHeaders(src string) []string {
+	matches := includeHeaderRegexp.FindAllStringSubmatch(src, -1)
+	headers := make([]string, 0, len(matches))
+	seen := make(map[string]bool)
+	for _, match := range matches {
+		if len(match) > 1 {
+			header := strings.TrimSpace(match[1])
+			if header != "" && !seen[header] {
+				headers = append(headers, header)
+				seen[header] = true
+			}
+		}
+	}
+	return headers
+}
+
+func ensureHeaderFiles(headers []string) error {
+	if len(headers) == 0 {
+		return nil
+	}
+	for _, header := range headers {
+		if err := ensureHeaderFileExists(header); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func filterSystemIncludes(src string) string {
 	var builder strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(src))
 	firstLine := true
 	for scanner.Scan() {
 		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "#include") {
+		if includeLineRegexp.MatchString(line) {
 			continue
 		}
 		if !firstLine {
@@ -166,71 +209,11 @@ func setupHeaderFiles(underlying fi.FileSystem) error {
 		return err
 	}
 
-	var copyIncludeDir func(string, string) error
-	copyIncludeDir = func(srcDir, dstDir string) error {
-		for _, std := range commonCLibraries {
-			targetPath := filepath.Join(dstDir, std)
-			dirPath := filepath.Dir(targetPath)
-
-			if _, err := os.Stat(dirPath); err != nil {
-				if os.IsNotExist(err) {
-					if err := os.MkdirAll(dirPath, 0755); err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			}
-
-			if _, err := os.Stat(targetPath); err != nil {
-				if os.IsNotExist(err) {
-					if err := os.WriteFile(targetPath, []byte{}, 0644); err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			}
-		}
-
-		entries, err := underlying.ReadDir(srcDir)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			srcPath := underlying.Join(srcDir, entry.Name())
-			dstPath := filepath.Join(dstDir, entry.Name())
-
-			if entry.IsDir() {
-				os.MkdirAll(dstPath, 0755)
-				headerDirs[dstPath] = true
-				copyIncludeDir(srcPath, dstPath)
-			} else {
-				if content, err := underlying.ReadFile(srcPath); err == nil {
-					if underlying.Ext(entry.Name()) == ".h" || underlying.Ext(entry.Name()) == ".in" {
-						content = []byte(filterSystemIncludes(string(content)))
-					}
-					os.WriteFile(dstPath, content, 0644)
-					headerDirs[filepath.Dir(dstPath)] = true
-				}
-			}
-		}
-		return nil
-	}
-
-	includeDir := filepath.Join(globalTempDir, "include")
-	os.MkdirAll(includeDir, 0755)
-	headerDirs[includeDir] = true
-	copyIncludeDir("include", includeDir)
-
 	// Build includeDirs list once, combining all header directories
-	globalIncludeDirs = make([]string, 0, len(headerDirs)+1)
-	globalIncludeDirs = append(globalIncludeDirs, globalTempDir)
+	globalIncludeDirs = nil
+	addIncludeDir(globalTempDir)
 	for dir := range headerDirs {
-		if dir != globalTempDir {
-			globalIncludeDirs = append(globalIncludeDirs, dir)
-		}
+		addIncludeDir(dir)
 	}
 
 	return nil
@@ -325,6 +308,10 @@ func (f *PreprocessedCFS) ReadFile(name string) ([]byte, error) {
 	}
 
 	if f.enabled && (strings.HasSuffix(strings.ToLower(name), ".c") || strings.HasSuffix(strings.ToLower(name), ".h")) {
+		headers := extractIncludeHeaders(string(data))
+		if err := ensureHeaderFiles(headers); err != nil {
+			log.Warnf("Failed to ensure header files for %s: %v", name, err)
+		}
 		preprocessed, err := PreprocessCSource(string(data))
 		if err != nil {
 			log.Warnf("C macro preprocessing failed for %s: %v, using original source", name, err)
