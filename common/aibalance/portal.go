@@ -1801,6 +1801,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 	domainOrURL := request.PostForm.Get("domain_or_url")
 	apiKeyToValidate := request.PostForm.Get("api_key_to_validate")
 	noHTTPS := request.PostForm.Get("no_https") == "on"
+	providerMode := request.PostForm.Get("provider_mode") // 获取 provider_mode
 
 	if wrapperName == "" || modelName == "" || modelType == "" || apiKeyToValidate == "" {
 		c.logWarn("Validation request missing required fields (wrapper_name, model_name, model_type, api_key_to_validate)")
@@ -1811,15 +1812,18 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		return
 	}
 
+	c.logInfo("Validation request: wrapper=%s, model=%s, type=%s, mode=%s", wrapperName, modelName, modelType, providerMode)
+
 	// Create a temporary provider instance for validation
 	// Note: This provider is NOT saved to the database.
 	tempProvider := &Provider{
-		ModelName:   modelName,
-		TypeName:    modelType,
-		DomainOrURL: domainOrURL,
-		APIKey:      apiKeyToValidate,
-		WrapperName: wrapperName,
-		NoHTTPS:     noHTTPS,
+		ModelName:    modelName,
+		TypeName:     modelType,
+		DomainOrURL:  domainOrURL,
+		APIKey:       apiKeyToValidate,
+		WrapperName:  wrapperName,
+		NoHTTPS:      noHTTPS,
+		ProviderMode: providerMode, // 设置 ProviderMode
 		// Initialize other fields as necessary for health check logic
 		// For example, if your health check needs a DbProvider, you might need to mock it
 		// or adjust the health check to work without it for this temporary validation.

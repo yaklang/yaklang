@@ -222,11 +222,17 @@ func (p *Provider) GetEmbeddingClient() (aispec.EmbeddingCaller, error) {
 
 	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
 		if utils.IsHttpOrHttpsUrl(target) {
+			log.Infof("GetEmbeddingClient: Using BaseURL: %s", target)
 			opts = append(opts, aispec.WithBaseURL(target))
 		} else {
+			log.Infof("GetEmbeddingClient: Using Domain: %s", target)
 			opts = append(opts, aispec.WithDomain(target))
 		}
+	} else {
+		log.Warnf("GetEmbeddingClient: No domain or URL specified, will use default")
 	}
+
+	log.Infof("GetEmbeddingClient: Creating OpenAI-compatible embedding client with %d options", len(opts))
 
 	// Use the generic OpenAI-compatible embedding client
 	// This works with most providers that support OpenAI's embedding API format
@@ -234,6 +240,8 @@ func (p *Provider) GetEmbeddingClient() (aispec.EmbeddingCaller, error) {
 	if utils.IsNil(client) || client == nil {
 		return nil, errors.New("failed to create embedding client")
 	}
+
+	log.Infof("GetEmbeddingClient: Successfully created embedding client for model: %s", p.ModelName)
 	return client, nil
 }
 

@@ -75,6 +75,10 @@ var (
 
 // EmbeddingRaw 返回原始的 embedding 结果，保留服务器返回的所有向量
 func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
+	log.Infof("EmbeddingRaw called with text length: %d, model: %s", len(text), c.config.Model)
+	log.Infof("EmbeddingRaw config: BaseURL=%s, Domain=%s, NoHttps=%v",
+		c.config.BaseURL, c.config.Domain, c.config.NoHttps)
+
 	// Prepare the request
 	req := embeddingRequest{
 		Input:          text,
@@ -83,12 +87,16 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 
 	if c.config.Model != "" {
 		req.Model = c.config.Model
+		log.Infof("EmbeddingRaw: Using model from config: %s", c.config.Model)
+	} else {
+		log.Warnf("EmbeddingRaw: No model specified in config!")
 	}
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, utils.Errorf("marshal request data failed: %v", err)
 	}
+	log.Infof("Embedding request body: %s", string(jsonData))
 
 	var targetUrl string
 	if c.config.BaseURL != "" {
@@ -96,20 +104,26 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 		if err != nil {
 			targetUrl = c.config.BaseURL + "/embeddings"
 		}
+		log.Infof("Embedding URL (from BaseURL): %s (BaseURL: %s)", targetUrl, c.config.BaseURL)
 	} else if c.config.Domain != "" {
 		if c.config.NoHttps {
 			targetUrl = fmt.Sprintf("http://%s/embeddings", c.config.Domain)
 		} else {
 			targetUrl = fmt.Sprintf("https://%s/embeddings", c.config.Domain)
 		}
+		log.Infof("Embedding URL (from Domain): %s (Domain: %s, NoHttps: %v)", targetUrl, c.config.Domain, c.config.NoHttps)
 	} else {
 		targetUrl = "http://127.0.0.1:8080/embeddings"
+		log.Infof("Embedding URL (default): %s", targetUrl)
 	}
 
 	var pocOpts []poc.PocConfigOption
 
 	if c.config.APIKey != "" {
 		pocOpts = append(pocOpts, poc.WithAppendHeader("Authorization", "Bearer "+c.config.APIKey))
+		log.Infof("Embedding request: Using API Key: %s", utils.ShrinkString(c.config.APIKey, 8))
+	} else {
+		log.Warnf("Embedding request: No API Key provided!")
 	}
 
 	// Add timeout
@@ -127,6 +141,10 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 		pocOpts = append(pocOpts, poc.WithContext(c.config.Context))
 	}
 
+	log.Infof("Embedding request: Sending POST to %s", targetUrl)
+	log.Infof("Embedding request headers: Content-Type=application/json, Authorization=Bearer %s...",
+		utils.ShrinkString(c.config.APIKey, 4))
+
 	rspInst, _, err := poc.DoPOST(targetUrl,
 		append(pocOpts,
 			poc.WithBody(string(jsonData)),
@@ -137,11 +155,19 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	)
 
 	if err != nil {
+		log.Errorf("Embedding request failed: %v", err)
 		return nil, utils.Errorf("request embeddings failed: %v", err)
 	}
 
+	log.Infof("Embedding request completed, parsing response...")
+
 	// Get response body
 	body := lowhttp.GetHTTPPacketBody(rspInst.RawPacket)
+	statusCode := lowhttp.ExtractStatusCodeFromResponse(rspInst.RawPacket)
+	log.Infof("Embedding response status: %d, body length: %d", statusCode, len(body))
+	if statusCode >= 400 {
+		log.Warnf("Embedding response error body: %s", utils.ShrinkString(string(body), 500))
+	}
 
 	// 策略1: 首先尝试解析标准格式（一维向量 []float32）
 	var response embeddingResponse
