@@ -3,14 +3,18 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -692,4 +696,324 @@ func TestGenerateSSAReport(t *testing.T) {
 	t.Logf("报告ID: %s", resp.ReportData)
 	t.Logf("消息: %s", resp.Message)
 	t.Logf("请手动检查数据库中ID为 %s 的报告内容", resp.ReportData)
+}
+
+// TestGenerateSSAReport_InvalidKind 测试无效的报告类型
+func TestGenerateSSAReport_InvalidKind(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+	ctx := context.Background()
+	server := &Server{}
+
+	programName := uuid.NewString()
+
+	// 创建测试风险
+	db := server.GetSSADatabase()
+	testRisk := &schema.SSARisk{
+		Hash:        uuid.NewString(),
+		ProgramName: programName,
+		Title:       "测试风险",
+		Severity:    schema.SFR_SEVERITY_HIGH,
+	}
+	err := yakit.CreateSSARisk(db, testRisk)
+	require.NoError(t, err)
+	defer func() {
+		yakit.DeleteSSARisks(db, &ypb.SSARisksFilter{
+			Hash: []string{testRisk.Hash},
+		})
+	}()
+
+	req := &ypb.GenerateSSAReportRequest{
+		Filter: &ypb.SSARisksFilter{
+			Hash: []string{testRisk.Hash},
+		},
+		Kind:       "invalid-kind",
+		ReportName: "无效类型测试",
+	}
+
+	resp, err := server.GenerateSSAReport(ctx, req)
+	require.Error(t, err)
+	require.Nil(t, resp)
+	require.Contains(t, err.Error(), "unsupported report kind")
+	require.Contains(t, err.Error(), "yakit, irify, irify-full, sarif")
+}
+
+// TestGenerateSSAReport_LocalManualTest 本地手动测试函数
+// 使用本地已有的扫描数据进行测试
+// 注意：此测试需要本地数据库中存在指定的 TaskID 和 RiskID
+func TestGenerateSSAReport_LocalManualTest(t *testing.T) {
+	// 跳过 CI 环境中的测试
+	if utils.InGithubActions() {
+		t.Skip("跳过本地测试（CI环境）")
+	}
+
+	// 初始化服务器
+	ctx := utils.TimeoutContextSeconds(30)
+	server, err := NewServer()
+	if err != nil {
+		t.Fatalf("初始化服务器失败: %v", err)
+	}
+
+	t.Log(strings.Repeat("=", 62))
+	t.Log("本地手动测试 - 使用真实数据")
+	t.Log("=" + strings.Repeat("=", 60))
+
+	// 测试场景1: 通过 TaskID 生成报告
+	t.Run("Test_TaskID_77cd7803_Yakit", func(t *testing.T) {
+		t.Log("\n--- 测试 TaskID 77cd7803-d6f6-4f91-bdbd-6c5b356f1e08 生成 Yakit 报告 ---")
+		req := &ypb.GenerateSSAReportRequest{
+			TaskID:     "77cd7803-d6f6-4f91-bdbd-6c5b356f1e08",
+			Kind:       "yakit",
+			ReportName: "TaskID_77cd7803_扫描报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 Yakit 报告")
+		t.Logf("   报告ID: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+	})
+
+	t.Run("Test_TaskID_44babc8b_IRify", func(t *testing.T) {
+		t.Log("\n--- 测试 TaskID 44babc8b-3784-45fc-b75a-3a6812a088e8 生成 IRify 报告 ---")
+		req := &ypb.GenerateSSAReportRequest{
+			TaskID:     "44babc8b-3784-45fc-b75a-3a6812a088e8",
+			Kind:       "irify",
+			ReportName: "TaskID_44babc8b_IRify报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 IRify 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在
+		if _, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建")
+			// 不删除文件，方便手动查看
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		} else {
+			t.Logf("   ✗ 文件不存在: %v", err)
+		}
+	})
+
+	t.Run("Test_TaskID_44babc8b_IRifyFull", func(t *testing.T) {
+		t.Log("\n--- 测试 TaskID 44babc8b-3784-45fc-b75a-3a6812a088e8 生成 IRify-Full 报告 ---")
+		req := &ypb.GenerateSSAReportRequest{
+			TaskID:     "44babc8b-3784-45fc-b75a-3a6812a088e8",
+			Kind:       "irify-full",
+			ReportName: "TaskID_44babc8b_IRifyFull报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 IRify-Full 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在并显示大小
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes", info.Size())
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		} else {
+			t.Logf("   ✗ 文件不存在: %v", err)
+		}
+	})
+
+	t.Run("Test_TaskID_77cd7803_SARIF", func(t *testing.T) {
+		t.Log("\n--- 测试 TaskID 77cd7803-d6f6-4f91-bdbd-6c5b356f1e08 生成 SARIF 报告 ---")
+		req := &ypb.GenerateSSAReportRequest{
+			TaskID:     "77cd7803-d6f6-4f91-bdbd-6c5b356f1e08",
+			Kind:       "sarif",
+			ReportName: "TaskID_77cd7803_SARIF报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 SARIF 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在并检查扩展名
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes", info.Size())
+			if strings.HasSuffix(resp.ReportData, ".sarif") {
+				t.Logf("   ✓ 文件扩展名正确: .sarif")
+			}
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		} else {
+			t.Logf("   ✗ 文件不存在: %v", err)
+		}
+	})
+
+	// 测试场景2: 通过 RiskID Filter 生成报告
+	t.Run("Test_RiskIDs_Filter_IRify", func(t *testing.T) {
+		t.Log("\n--- 测试指定 RiskID 生成 IRify 报告 ---")
+		riskIDs := []int64{919, 917, 900, 494, 480, 453}
+		t.Logf("   目标 RiskID: %v", riskIDs)
+
+		req := &ypb.GenerateSSAReportRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: riskIDs,
+			},
+			Kind:       "irify",
+			ReportName: "指定RiskID_IRify报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 IRify 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes", info.Size())
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		}
+	})
+
+	t.Run("Test_RiskIDs_Filter_IRifyFull", func(t *testing.T) {
+		t.Log("\n--- 测试指定 RiskID 生成 IRify-Full 报告 ---")
+		riskIDs := []int64{919, 917, 900, 494, 480, 453}
+		t.Logf("   目标 RiskID: %v", riskIDs)
+
+		req := &ypb.GenerateSSAReportRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: riskIDs,
+			},
+			Kind:       "irify-full",
+			ReportName: "指定RiskID_IRifyFull报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 IRify-Full 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在并比较大小
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes (%.2f KB)", info.Size(), float64(info.Size())/1024)
+			t.Logf("   提示: IRify-Full 应该比 IRify 大，包含完整内容")
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		}
+	})
+
+	t.Run("Test_RiskIDs_Filter_SARIF", func(t *testing.T) {
+		t.Log("\n--- 测试指定 RiskID 生成 SARIF 报告 ---")
+		riskIDs := []int64{919, 917, 900, 494, 480, 453}
+		t.Logf("   目标 RiskID: %v", riskIDs)
+
+		req := &ypb.GenerateSSAReportRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: riskIDs,
+			},
+			Kind:       "sarif",
+			ReportName: "指定RiskID_SARIF报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			t.Logf("   提示: SARIF 需要 Risk 关联的 ResultID，如果 Risk 没有 ResultID 会失败")
+			return
+		}
+
+		t.Logf("✅ 成功生成 SARIF 报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+
+		// 验证文件存在
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes", info.Size())
+			t.Logf("   提示: 文件已保留，可用于 GitHub Code Scanning 等工具")
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		}
+	})
+
+	t.Run("Test_RiskIDs_Filter_Yakit", func(t *testing.T) {
+		t.Log("\n--- 测试指定 RiskID 生成 Yakit 报告 ---")
+		riskIDs := []int64{919, 917, 900, 494, 480, 453}
+		t.Logf("   目标 RiskID: %v", riskIDs)
+
+		req := &ypb.GenerateSSAReportRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: riskIDs,
+			},
+			Kind:       "yakit",
+			ReportName: "指定RiskID_Yakit报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成 Yakit 报告")
+		t.Logf("   报告ID: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+		t.Logf("   提示: 报告已保存到数据库，可在 Yakit 前端查看")
+	})
+
+	// 测试场景3: 混合条件过滤
+	t.Run("Test_Mixed_Filter", func(t *testing.T) {
+		t.Log("\n--- 测试混合条件过滤生成报告 ---")
+		req := &ypb.GenerateSSAReportRequest{
+			Filter: &ypb.SSARisksFilter{
+				RuntimeID: []string{"77cd7803-d6f6-4f91-bdbd-6c5b356f1e08", "44babc8b-3784-45fc-b75a-3a6812a088e8"}, // 两个 TaskID
+				Severity:  []string{"high", "critical"},                                                             // 只要高危和严重
+			},
+			Kind:       "irify-full",
+			ReportName: "混合条件_高危漏洞报告",
+		}
+
+		resp, err := server.GenerateSSAReport(ctx, req)
+		if err != nil {
+			t.Logf("❌ 错误: %v", err)
+			return
+		}
+
+		t.Logf("✅ 成功生成报告")
+		t.Logf("   文件路径: %s", resp.ReportData)
+		t.Logf("   消息: %s", resp.Message)
+		t.Logf("   提示: 此报告包含两个 TaskID 中的高危和严重漏洞")
+
+		if info, err := os.Stat(resp.ReportData); err == nil {
+			t.Logf("   ✓ 文件已创建，大小: %d bytes", info.Size())
+			t.Logf("   提示: 文件已保留，请手动查看和删除")
+		}
+	})
+
+	t.Log("\n" + strings.Repeat("=", 60))
+	t.Log("测试完成！生成的文件保存在: " + consts.GetDefaultYakitBaseTempDir())
+	t.Log("请手动检查文件内容是否符合预期")
+	t.Log(strings.Repeat("=", 60))
 }

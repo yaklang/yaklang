@@ -62321,6 +62321,7 @@ type GenerateSSAReportRequest struct {
 	TaskID        string                 `protobuf:"bytes,1,opt,name=TaskID,proto3" json:"TaskID,omitempty"`         // SSA扫描TaskID
 	ReportName    string                 `protobuf:"bytes,2,opt,name=ReportName,proto3" json:"ReportName,omitempty"` // 报告名称
 	Filter        *SSARisksFilter        `protobuf:"bytes,3,opt,name=Filter,proto3" json:"Filter,omitempty"`         // 风险过滤器，用于筛选要生成报告的Risk
+	Kind          string                 `protobuf:"bytes,4,opt,name=Kind,proto3" json:"Kind,omitempty"`             // 报告类型: "yakit"(默认,存入数据库), "sarif"(SARIF格式文件), "irify"(IRify格式文件), "irify-full"(IRify完整格式文件)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62376,11 +62377,18 @@ func (x *GenerateSSAReportRequest) GetFilter() *SSARisksFilter {
 	return nil
 }
 
+func (x *GenerateSSAReportRequest) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
 type GenerateSSAReportResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=Success,proto3" json:"Success,omitempty"`      // 是否成功
 	Message       string                 `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`       // 消息
-	ReportData    string                 `protobuf:"bytes,3,opt,name=ReportData,proto3" json:"ReportData,omitempty"` // 报告数据（当格式不是yakit时）
+	ReportData    string                 `protobuf:"bytes,3,opt,name=ReportData,proto3" json:"ReportData,omitempty"` // 报告数据: yakit类型返回报告ID，其他类型返回文件路径
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -68609,13 +68617,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rRunningTraces\x18\x02 \x01(\x03R\rRunningTraces\x12(\n" +
 	"\x0fCompletedTraces\x18\x03 \x01(\x03R\x0fCompletedTraces\x12\"\n" +
 	"\fFailedTraces\x18\x04 \x01(\x03R\fFailedTraces\x12(\n" +
-	"\x0fCancelledTraces\x18\x05 \x01(\x03R\x0fCancelledTraces\"\x7f\n" +
+	"\x0fCancelledTraces\x18\x05 \x01(\x03R\x0fCancelledTraces\"\x93\x01\n" +
 	"\x18GenerateSSAReportRequest\x12\x16\n" +
 	"\x06TaskID\x18\x01 \x01(\tR\x06TaskID\x12\x1e\n" +
 	"\n" +
 	"ReportName\x18\x02 \x01(\tR\n" +
 	"ReportName\x12+\n" +
-	"\x06Filter\x18\x03 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\"o\n" +
+	"\x06Filter\x18\x03 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\x12\x12\n" +
+	"\x04Kind\x18\x04 \x01(\tR\x04Kind\"o\n" +
 	"\x19GenerateSSAReportResponse\x12\x18\n" +
 	"\aSuccess\x18\x01 \x01(\bR\aSuccess\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +

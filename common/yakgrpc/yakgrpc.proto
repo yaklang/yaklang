@@ -8294,12 +8294,13 @@ message GenerateSSAReportRequest {
   string TaskID = 1;     // SSA扫描TaskID
   string ReportName = 2;    // 报告名称
   SSARisksFilter Filter = 3;  // 风险过滤器，用于筛选要生成报告的Risk
+  string Kind = 4;       // 报告类型: "yakit"(默认,存入数据库), "sarif"(SARIF格式文件), "irify"(IRify格式文件), "irify-full"(IRify完整格式文件)
 }
 
 message GenerateSSAReportResponse {
   bool Success = 1;         // 是否成功
   string Message = 2;       // 消息
-  string ReportData = 3;    // 报告数据（当格式不是yakit时）
+  string ReportData = 3;    // 报告数据: yakit类型返回报告ID，其他类型返回文件路径
 }
 
 // SSA Project Messages
