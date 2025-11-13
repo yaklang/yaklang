@@ -35,6 +35,15 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 	return []float32{0.1, 0.1, 0.1}, nil
 }
 
+// EmbeddingRaw 模拟实现 EmbeddingClient 接口
+func (m *MockEmbedder) EmbeddingRaw(text string) ([][]float32, error) {
+	vec, err := m.Embedding(text)
+	if err != nil {
+		return nil, err
+	}
+	return [][]float32{vec}, nil
+}
+
 // 创建测试用插件
 func createTestPlugins(t *testing.T) {
 	db := consts.GetGormProfileDatabase()

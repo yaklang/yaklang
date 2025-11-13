@@ -203,6 +203,10 @@ func (e *EmptyEmbedding) Embedding(text string) ([]float32, error) {
 	return nil, nil
 }
 
+func (e *EmptyEmbedding) EmbeddingRaw(text string) ([][]float32, error) {
+	return nil, nil
+}
+
 // TestAIMemoryTriage_NewAIMemory 测试创建AI记忆系统
 func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 

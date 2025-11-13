@@ -39,6 +39,14 @@ func (m *mockEmbeddingClient) Embedding(text string) ([]float32, error) {
 	return vec, nil
 }
 
+func (m *mockEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
+	vec, err := m.Embedding(text)
+	if err != nil {
+		return nil, err
+	}
+	return [][]float32{vec}, nil
+}
+
 // MockAIMemoryInvoker wraps the ReAct instance and mocks InvokeLiteForge for memory triage
 type MockAIMemoryInvoker struct {
 	*ReAct
