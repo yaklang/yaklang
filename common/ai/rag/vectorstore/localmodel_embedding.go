@@ -72,6 +72,25 @@ func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
 	return result, nil
 }
 
+// EmbeddingRaw 实现 EmbeddingClient 接口，返回原始的 embedding 结果
+func (l *LocalModelEmbedding) EmbeddingRaw(text string) ([][]float32, error) {
+	al := asynchelper.NewAsyncPerformanceHelper("local embedding raw")
+	defer al.Close()
+
+	if l.embedding == nil {
+		return nil, fmt.Errorf("embedding client not initialized")
+	}
+
+	// 使用内部的嵌入客户端生成向量（可能返回多个向量）
+	result, err := l.embedding.EmbeddingRaw(text)
+	if err != nil {
+		log.Errorf("failed to generate embedding: %v", err)
+		return nil, fmt.Errorf("failed to generate embedding: %w", err)
+	}
+
+	return result, nil
+}
+
 var (
 	ciMockMode = utils.NewAtomicBool()
 )
