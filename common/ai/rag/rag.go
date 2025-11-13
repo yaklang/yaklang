@@ -1,6 +1,8 @@
 package rag
 
 import (
+	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -44,7 +46,9 @@ func DeleteRAG(db *gorm.DB, name string) error {
 	// 删除知识库
 	knowledgeBaseInfo, err := loadKnowledgeBaseInfoByConfig(ragConfig)
 	if err != nil {
-		log.Errorf("failed to load knowledge base info: %v", err)
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Errorf("failed to load knowledge base info: %v", err)
+		}
 	} else {
 		err = knowledgebase.DeleteKnowledgeBase(db, knowledgeBaseInfo.KnowledgeBaseName)
 		if err != nil {
@@ -55,7 +59,9 @@ func DeleteRAG(db *gorm.DB, name string) error {
 	// 删除实体仓库
 	entityRepositoryInfo, err := loadEntityRepositoryInfoByConfig(ragConfig)
 	if err != nil {
-		log.Errorf("failed to load entity repository info: %v", err)
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Errorf("failed to load entity repository info: %v", err)
+		}
 	} else {
 		err = entityrepos.DeleteEntityRepository(db, entityRepositoryInfo.EntityBaseName)
 		if err != nil {
