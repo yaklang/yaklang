@@ -536,9 +536,6 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 	if config.enhanceSearchHandler != nil {
 		options = append(options, vectorstore.WithRAGEnhanceSearchHandler(config.enhanceSearchHandler))
 	}
-	if len(config.systemLoadConfig) > 0 {
-		options = append(options, vectorstore.WithRAGSystemLoadConfig(config.systemLoadConfig...))
-	}
 	if config.similarityThreshold > 0 {
 		options = append(options, vectorstore.WithRAGSimilarityThreshold(config.similarityThreshold))
 	}
@@ -579,6 +576,8 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 		options = append(options, vectorstore.WithRAGDocumentType(config.documentTypes...))
 	}
 
+	vectorStoreOptions := config.ConvertToVectorStoreOptions()
+	options = append(options, vectorstore.WithRAGSystemLoadConfig(vectorStoreOptions...))
 	return options
 }
 
@@ -678,13 +677,6 @@ func WithRAGEnhance(enhance ...string) RAGSystemConfigOption {
 func WithRAGEnhanceSearchHandler(handler enhancesearch.SearchHandler) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.enhanceSearchHandler = handler
-	}
-}
-
-// WithRAGSystemLoadConfig sets the system load configuration functions
-func WithRAGSystemLoadConfig(loadConfig ...vectorstore.CollectionConfigFunc) RAGSystemConfigOption {
-	return func(config *RAGSystemConfig) {
-		config.systemLoadConfig = loadConfig
 	}
 }
 
