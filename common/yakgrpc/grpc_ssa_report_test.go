@@ -488,7 +488,7 @@ func TestGenerateSSAReport_ProgramNotFound(t *testing.T) {
 	t.Logf("程序不存在情况下报告生成成功! 报告ID: %s", resp.ReportData)
 }
 
-// TestGenerateSSAReport_FromRiskIDs 测试从RiskIDs生成报告
+// TestGenerateSSAReport_FromRiskIDs 测试从Filter生成报告
 func TestGenerateSSAReport_FromRiskIDs(t *testing.T) {
 	if utils.InGithubActions() {
 		t.Skip()
@@ -541,9 +541,11 @@ func TestGenerateSSAReport_FromRiskIDs(t *testing.T) {
 		"/auth.php", "validatePwd", "strlen($pwd) > 6", 30)
 	riskIDs = append(riskIDs, int64(risk4.ID))
 
-	// 测试：使用RiskIDs生成报告
+	// 测试：使用Filter生成报告
 	req := &ypb.GenerateSSAReportRequest{
-		RiskIDs:    riskIDs,
+		Filter: &ypb.SSARisksFilter{
+			ID: riskIDs,
+		},
 		ReportName: "用户选择的风险报告",
 	}
 
@@ -557,7 +559,7 @@ func TestGenerateSSAReport_FromRiskIDs(t *testing.T) {
 		t.Fatalf("报告生成失败: %s", resp.Message)
 	}
 
-	t.Logf("✅ 从RiskIDs生成报告成功!")
+	t.Logf("✅ 从Filter生成报告成功!")
 	t.Logf("   报告ID: %s", resp.ReportData)
 	t.Logf("   包含 %d 个Risk，涉及 2 个项目", len(riskIDs))
 }
@@ -632,7 +634,7 @@ func TestGenerateSSAReport_Validation(t *testing.T) {
 		t.Fatalf("创建测试服务器失败: %v", err)
 	}
 
-	// 测试：既没有TaskID也没有RiskIDs
+	// 测试：既没有TaskID也没有Filter
 	req := &ypb.GenerateSSAReportRequest{
 		ReportName: "无参数报告",
 	}

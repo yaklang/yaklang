@@ -828,25 +828,24 @@ func GenerateSSAProjectReportFromTask(ctx context.Context, task *schema.SyntaxFl
 	return report, nil
 }
 
-// GenerateSSAProjectReportFromRiskIDs 基于用户选择的RiskID列表生成SSA项目报告数据
-// 这是一个独立的报告生成路径，与基于Task的生成逻辑分离
-// 报告数据完全基于用户选择的Risk，不依赖Task的统计信息
-func GenerateSSAProjectReportFromRiskIDs(ctx context.Context, riskIDs []int64) (*SSAProjectReport, error) {
-	if len(riskIDs) == 0 {
-		return nil, utils.Errorf("riskIDs is empty")
+// GenerateSSAProjectReportFromFilter 基于SSARisksFilter生成SSA项目报告数据
+// 支持使用完整的过滤器条件筛选风险
+func GenerateSSAProjectReportFromFilter(ctx context.Context, filter *ypb.SSARisksFilter) (*SSAProjectReport, error) {
+	if filter == nil {
+		return nil, utils.Errorf("filter is nil")
 	}
 
-	// 通过RiskID获取风险数据
-	risks, err := getRisksByIDs(riskIDs)
+	// 通过Filter获取风险数据
+	risks, err := getRisks(filter)
 	if err != nil {
-		return nil, utils.Wrapf(err, "get risks by ids failed")
+		return nil, utils.Wrapf(err, "get risks by filter failed")
 	}
 
 	if len(risks) == 0 {
-		return nil, utils.Errorf("no risks found for the given risk ids")
+		return nil, utils.Errorf("no risks found for the given filter")
 	}
 
-	// 从Risk列表中提取所有涉及的ProgramName，用 | 分隔
+	// 从Risk列表中提取所有涉及的ProgramName
 	programNameSet := make(map[string]bool)
 	for _, risk := range risks {
 		if risk.ProgramName != "" {
@@ -863,7 +862,7 @@ func GenerateSSAProjectReportFromRiskIDs(ctx context.Context, riskIDs []int64) (
 	// 使用 <br/> 换行符组合项目名称，在markdown表格中会换行显示
 	combinedProgramName := strings.Join(programNames, "<br/>")
 
-	// 创建报告结构（基于用户选择的Risk）
+	// 创建报告结构（基于过滤器选择的Risk）
 	report := &SSAProjectReport{
 		ProgramName:       combinedProgramName,
 		ReportTime:        time.Now(),
@@ -886,7 +885,7 @@ func GenerateSSAProjectReportFromRiskIDs(ctx context.Context, riskIDs []int64) (
 		return nil, utils.Wrapf(err, "process risks and stats failed")
 	}
 
-	// 从处理后的风险中计算统计信息（完全基于用户选择的Risk）
+	// 从处理后的风险中计算统计信息（完全基于过滤器选择的Risk）
 	report.TotalRisksCount = len(risks)
 	report.CriticalRisksCount = 0
 	report.HighRisksCount = 0
@@ -927,7 +926,7 @@ func GenerateSSAProjectReportFromRiskIDs(ctx context.Context, riskIDs []int64) (
 
 	// 日志输出使用未转义的格式，更易读
 	logProgramName := strings.Join(programNames, " | ")
-	log.Infof("Generated report from %d selected risks, covering %d programs: %s",
+	log.Infof("Generated report from filter, found %d risks, covering %d programs: %s",
 		len(risks), len(programNames), logProgramName)
 
 	return report, nil
