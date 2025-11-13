@@ -375,7 +375,8 @@ func TestMUSTPASS_ImportRAGFile(t *testing.T) {
 	db, err := createTempTestDatabaseForRAGSystem()
 	assert.NoError(t, err)
 	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
-	ragSystem, err := Get(exportCollectionName, WithDB(db), WithDisableEmbedCollectionInfo(true), WithLazyLoadEmbeddingClient(true))
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+	ragSystem, err := Get(exportCollectionName, WithDB(db), WithDisableEmbedCollectionInfo(true), WithLazyLoadEmbeddingClient(true), WithEmbeddingClient(mockEmbedding))
 	assert.NoError(t, err)
 	assert.NotNil(t, ragSystem)
 

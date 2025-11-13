@@ -340,6 +340,9 @@ func NewHNSWGraph(collectionName string, opts ...hnsw.GraphOption[string]) *hnsw
 
 var graphNodesIsEmpty = errors.New("hnsw graph nodes is empty")
 
+// ErrGraphNodesIsEmpty is exported for external error checking
+var ErrGraphNodesIsEmpty = graphNodesIsEmpty
+
 func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) error {
 	cacheMinSize := 100000
 	cacheMaxSize := cacheMinSize + 2000
