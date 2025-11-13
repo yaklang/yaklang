@@ -149,7 +149,7 @@ func generateFileName(kind, filename) {
     //转换为合格的file格式
     filename2 = str.Split(filename, "/")[-1]
     filename2 = str.Split(filename2, "\\")[-1]
-    name := sprintf("%s(%s)",  filename2, time.Now().Format("2006-0102-15:04"))
+    name := sprintf("%s(%s)",  filename2, time.Now().Format("2006-01-02 15:04:05"))
     params.program_name = name
     params.project_name = filename2
 }
@@ -360,25 +360,62 @@ if params.language == "" {
     AutoParseLanguage()
 }
 
-if compile_immediately{
-    params.compile_immediately = true
-}
+params.compile_immediately = compile_immediately
+generateDesc()
 
-yakit.Code(params)
-if params.error.kind != "" {
+config, err = ssa.New(
+    ssa.ModeAll,
+    ssa.withProgramNames(params.program_name),
+    ssa.withProjectName(params.project_name),
+    ssa.withProgramDescription(params.description),
+    ssa.withProjectLanguage(params.language),
+    ssa.withCodeSourceKind(params.info.kind),
+    ssa.withCodeSourceLocalFile(params.info.local_file),
+    ssa.withCodeSourceURL(params.info.url),
+    ssa.withCodeSourceBranch(params.info.branch),
+    ssa.withCodeSourcePath(params.info.path),
+    ssa.withCompileStrictMode(strictMode),
+    ssa.withCompilePeepholeSize(peepholeSize),
+    ssa.withCompileExcludeFiles(str.Split(excludeFile, ",")),
+    ssa.withCompileReCompile(reCompile),
+    ssa.withCompileMemoryCompile(memory),
+    ssa.withCompileConcurrency(concurrency),
+)
+
+if err != nil {
+    yakit.Error("创建 SSAConfig 失败: %v", err)
     return
 }
 
-generateDesc()
+// 将 SSAConfig 转换为 JSON 字符串
+configJSON, err = config.ToJSONString()
+if err != nil {
+    yakit.Error("转换 JSON 失败: %v", err)
+    return
+}
 
-if !compile_immediately{
+// 创建返回对象，添加额外信息
+result = json.loads(configJSON)
+result["error"] = params.error
+result["file_count"] = params.file_count
+result["compile_immediately"] = params.compile_immediately
+result["kind"] = params.info.kind
+
+// 转换为 JSON 字符串再返回
+resultJSON = json.dumps(result)
+yakit.Code(resultJSON)
+if params.error.kind != "" {
+    return
+}
+if !params.compile_immediately{
     yakit.Info("跳过编译步骤，仅产生分析结果。")
     return
 }
 
+// todo:立即编译后续需要指定SSAConfig json来编译
+
 programName = sprint(params.program_name)
 language = sprint(params.language)
-
 opts = [
     ssa.withProgramName(programName),
     ssa.withProcess((msg, process) => {

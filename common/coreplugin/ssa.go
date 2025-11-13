@@ -3,30 +3,33 @@ package coreplugin
 import (
 	"context"
 	"encoding/json"
-	"strconv"
-
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 )
 
-func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, inputs ...map[string]any) (*programInfo, *ssaapi.Program, error) {
+func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, inputs ...map[string]any) (*autoDetectInfo, *ssaapi.Program, error) {
 	pluginName := "SSA 项目探测"
 	param := make(map[string]string)
 	param["target"] = path
 	param["language"] = language
-	param["compile-immediately"] = strconv.FormatBool(compileImmediately)
+	if compileImmediately {
+		param["compile-immediately"] = strconv.FormatBool(compileImmediately)
+	}
 	for _, input := range inputs {
 		for key, value := range input {
 			param[key] = codec.AnyToString(value)
 		}
 	}
 
-	progInfo := &programInfo{}
-	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
+	var info *autoDetectInfo
+	var err error
+
+	err = yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
@@ -37,36 +40,45 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 			// log.Infof("msg: %v", msg)
 			if msg.Type == "log" && msg.Content.Level == "code" {
 				// start compile
-				json.Unmarshal([]byte(msg.Content.Data), progInfo)
-				log.Infof("progInfo: %v", progInfo)
+				err = json.Unmarshal([]byte(msg.Content.Data), &info)
+				if err != nil {
+					return err
+				}
 			}
 			return nil
 		},
 	)
-
 	if err != nil {
-		return progInfo, nil, err
+		return info, nil, err
 	}
-
-	switch progInfo.Error.Kind {
+	if info == nil {
+		return nil, nil, utils.Errorf("auto detective info is nil")
+	}
+	config := info.Config
+	switch info.Error.Kind {
 	case "languageNeedSelectException":
-		return progInfo, nil, utils.Errorf("language need select")
+		return info, nil, utils.Errorf("language need select")
 	case "fileNotFoundException":
-		return progInfo, nil, utils.Errorf("file not found")
+		return info, nil, utils.Errorf("file not found")
 	case "fileTypeException":
-		return progInfo, nil, utils.Errorf("input file type")
+		return info, nil, utils.Errorf("input file type")
 	case "connectFailException":
-		return progInfo, nil, utils.Errorf("connect fail")
+		return info, nil, utils.Errorf("connect fail")
 	}
 
 	if !compileImmediately {
-		return progInfo, nil, nil
+		return info, nil, nil
 	}
 
-	if prog, err := ssaapi.FromDatabase(progInfo.ProgramName); err != nil {
-		return progInfo, nil, err
+	programName := config.GetProgramName()
+	if programName == "" {
+		return info, nil, utils.Errorf("program name is empty")
+	}
+
+	if prog, err := ssaapi.FromDatabase(programName); err != nil {
+		return info, nil, err
 	} else {
-		return progInfo, prog, nil
+		return info, prog, nil
 	}
 }
 
@@ -79,24 +91,12 @@ type msg struct {
 		Process float64 `json:"progress"`
 	}
 }
-type programInfo struct {
-	ProgramName string `json:"program_name"`
-	ProjectName string `json:"project_name"`
-	Language    string `json:"language"`
-	Info        struct {
-		Kind      string `json:"kind"`
-		LocalFile string `json:"local_file"`
-		URL       string `json:"url"`
-		Branch    string `json:"branch"`
-		Path      string `json:"path"`
-		Proxy     struct {
-			Proxy bool   `json:"proxy"`
-			URL   string `json:"url"`
-		} `json:"proxy"`
-	} `json:"info"`
-	Description string `json:"description"`
-	FileCount   int    `json:"file_count"`
-	Error       struct {
+
+type autoDetectInfo struct {
+	*ssaconfig.Config
+	FileCount          int  `json:"file_Count"`
+	CompileImmediately bool `json:"compile_immediately"`
+	Error              struct {
 		Kind string `json:"kind"`
 		Msg  string `json:"msg"`
 	} `json:"error"`
