@@ -268,17 +268,20 @@ func (s *SQLiteVectorStoreHNSW) fixCollectionEmbeddingData() error {
 }
 
 func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
+	var graphInfosBytes []byte
 	graphInfos, err := ExportHNSWGraphToBinary(s.hnsw)
 	if err != nil {
 		if errors.Is(err, graphNodesIsEmpty) {
-			graphInfos = nil
+			// HNSW graph is empty, set graph_binary to empty bytes
+			graphInfosBytes = []byte{}
 		} else {
 			return utils.Wrap(err, "export hnsw graph to binary")
 		}
-	}
-	graphInfosBytes, err := io.ReadAll(graphInfos)
-	if err != nil {
-		return utils.Wrap(err, "read graph infos")
+	} else {
+		graphInfosBytes, err = io.ReadAll(graphInfos)
+		if err != nil {
+			return utils.Wrap(err, "read graph infos")
+		}
 	}
 	err = s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("graph_binary", graphInfosBytes).Error
 	if err != nil {
