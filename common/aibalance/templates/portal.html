@@ -1998,6 +1998,16 @@
                                 </select>
                             </div>
                             <div class="form-group">
+                                <label for="providerMode">模式 *</label>
+                                <select id="providerMode" name="providerMode" class="form-control" required>
+                                    <option value="chat" selected>Chat (对话)</option>
+                                    <option value="embedding">Embedding (向量化)</option>
+                                </select>
+                                <small class="form-text text-muted">选择 Provider 的工作模式</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label for="domainOrURL">域名/URL</label> <!-- 移除 * -->
                                 <input type="text" id="domainOrURL" name="domainOrURL" class="form-control autocomplete" 
                                        placeholder="例如：api.openai.com" 
@@ -2251,6 +2261,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const wrapperName = document.getElementById('wrapperName').value.trim();
             const modelName = document.getElementById('modelName').value.trim();
             const typeName = document.getElementById('typeName').value.trim();
+            const providerMode = document.getElementById('providerMode').value.trim();
             const domainOrURL = document.getElementById('domainOrURL').value.trim();
             const apiKeys = document.getElementById('apiKeys').value;
             const noHTTPS = document.getElementById('noHTTPS').checked;
@@ -2260,13 +2271,14 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 wrapper_name: wrapperName,
                 model_name: modelName,
                 model_type: typeName,
+                provider_mode: providerMode,
                 domain_or_url: domainOrURL, // Now can be empty
                 api_keys: apiKeys,
                 no_https: noHTTPS ? 'on' : ''
             });
             
             // 验证必填字段 (移除对 domainOrURL 的检查)
-            if (!wrapperName || !modelName || !typeName || !apiKeys) {
+            if (!wrapperName || !modelName || !typeName || !providerMode || !apiKeys) {
                 showToast('请填写所有带 * 的必填字段', 'error');
                 return;
             }
@@ -2290,6 +2302,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 params.append('wrapper_name', wrapperName);
                 params.append('model_name', modelName);
                 params.append('model_type', typeName);
+                params.append('provider_mode', providerMode);
                 params.append('domain_or_url', domainOrURL);
                 params.append('api_keys', apiKeys);
                 if (noHTTPS) {

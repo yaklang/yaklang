@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -32,12 +33,31 @@ type embeddingRequest struct {
 	Model          string `json:"model,omitempty"`
 }
 
+// embeddingItem 一维向量格式（标准 OpenAI 格式）
 type embeddingItem struct {
+	Index     int       `json:"index"`
+	Embedding []float32 `json:"embedding"`
+}
+
+// embeddingItem2D 二维向量格式（某些服务商的格式）
+type embeddingItem2D struct {
 	Index     int         `json:"index"`
 	Embedding [][]float32 `json:"embedding"`
 }
 
-type embeddingResponse []embeddingItem
+// embeddingResponse 标准响应格式
+type embeddingResponse struct {
+	Object string          `json:"object"`
+	Data   []embeddingItem `json:"data"`
+	Model  string          `json:"model"`
+}
+
+// embeddingResponse2D 二维向量响应格式
+type embeddingResponse2D struct {
+	Object string            `json:"object"`
+	Data   []embeddingItem2D `json:"data"`
+	Model  string            `json:"model"`
+}
 
 // 错误响应结构体
 type errorResponse struct {
@@ -53,7 +73,8 @@ var (
 	ErrInputTooLarge = utils.Error("input is too large")
 )
 
-func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
+// EmbeddingRaw 返回原始的 embedding 结果，保留服务器返回的所有向量
+func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	// Prepare the request
 	req := embeddingRequest{
 		Input:          text,
@@ -122,16 +143,38 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	// Get response body
 	body := lowhttp.GetHTTPPacketBody(rspInst.RawPacket)
 
-	// 首先尝试按正确响应解析
+	// 策略1: 首先尝试解析标准格式（一维向量 []float32）
 	var response embeddingResponse
-	if err := json.Unmarshal(body, &response); err == nil && len(response) > 0 && len(response[0].Embedding) > 0 {
-		// 成功解析为正确响应
-		last := utils.GetLastElement(response[0].Embedding)
-		last = NormalizeVector(last, 2, 1e-6)
-		return last, nil
+	if err := json.Unmarshal(body, &response); err == nil && len(response.Data) > 0 && len(response.Data[0].Embedding) > 0 {
+		// 成功解析为标准响应格式（一维向量）
+		// 将单个向量包装成二维数组返回
+		embedding := response.Data[0].Embedding
+		embedding = NormalizeVector(embedding, 2, 1e-6)
+		log.Infof("Successfully parsed embedding response as 1D format ([]float32), dimension: %d", len(embedding))
+		return [][]float32{embedding}, nil
 	}
 
-	// 如果正确响应解析失败，尝试解析错误响应
+	// 策略2: 尝试解析二维向量格式（[][]float32）
+	var response2D embeddingResponse2D
+	if err := json.Unmarshal(body, &response2D); err == nil && len(response2D.Data) > 0 && len(response2D.Data[0].Embedding) > 0 {
+		// 成功解析为二维向量格式，返回所有向量
+		embeddingVectors := response2D.Data[0].Embedding
+		vectorCount := len(embeddingVectors)
+
+		// 对所有向量进行归一化处理
+		normalizedVectors := make([][]float32, vectorCount)
+		for i, vec := range embeddingVectors {
+			if len(vec) > 0 {
+				normalizedVectors[i] = NormalizeVector(vec, 2, 1e-6)
+			}
+		}
+
+		log.Infof("Successfully parsed embedding response as 2D format ([][]float32), vector count: %d, first vector dimension: %d",
+			vectorCount, len(normalizedVectors[0]))
+		return normalizedVectors, nil
+	}
+
+	// 策略3: 尝试解析错误响应
 	var errResp errorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
 		// 检查是否包含 "input is too large" 错误
@@ -143,6 +186,30 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 			errResp.Error.Message, errResp.Error.Code, errResp.Error.Type)
 	}
 
-	// 如果两种格式都解析失败，返回通用错误
-	return nil, utils.Errorf("failed to parse response: %s", string(body))
+	// 如果所有格式都解析失败，返回通用错误
+	// 截断响应体以避免日志过长
+	bodyStr := string(body)
+	if len(bodyStr) > 500 {
+		bodyStr = bodyStr[:500] + "... (truncated)"
+	}
+	return nil, utils.Errorf("failed to parse embedding response in any known format: %s", bodyStr)
+}
+
+// Embedding 返回单个向量（保持向后兼容）
+// 如果服务器返回多个向量，只返回第一个并记录警告
+func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
+	vectors, err := c.EmbeddingRaw(text)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vectors) == 0 {
+		return nil, utils.Error("no embedding vectors returned")
+	}
+
+	if len(vectors) > 1 {
+		log.Warnf("Server returned %d embedding vectors, but Embedding() only returns the first one. Use EmbeddingRaw() to get all vectors.", len(vectors))
+	}
+
+	return vectors[0], nil
 }

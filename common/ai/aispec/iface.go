@@ -87,4 +87,8 @@ type AIClient interface {
 
 type EmbeddingCaller interface {
 	Embedding(string) ([]float32, error)
+	// EmbeddingRaw 返回原始的 embedding 结果，可能包含多个向量
+	// 如果服务器返回单个向量（[]float32），则返回 [][]float32{vector}
+	// 如果服务器返回多个向量（[][]float32），则原样返回
+	EmbeddingRaw(string) ([][]float32, error)
 }

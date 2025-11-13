@@ -32,6 +32,14 @@ func (c *MockEmbeddingClient) Embedding(text string) ([]float32, error) { // 由
 	return vector, nil
 }
 
+func (c *MockEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
+	vec, err := c.Embedding(text)
+	if err != nil {
+		return nil, err
+	}
+	return [][]float32{vec}, nil
+}
+
 func NewMockEmbedding(vocabulary []string) (*MockEmbeddingClient, error) {
 	if len(vocabulary) == 0 {
 		return nil, utils.Errorf("词典不能为空")
@@ -337,6 +345,15 @@ func NewMockEmbedder(f func(text string) ([]float32, error)) EmbeddingClient {
 // Embedding 模拟实现 EmbeddingClient 接口
 func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 	return m.MockEmbedderFunc(text)
+}
+
+// EmbeddingRaw 返回单个向量的二维数组形式
+func (m *MockEmbedder) EmbeddingRaw(text string) ([][]float32, error) {
+	vec, err := m.MockEmbedderFunc(text)
+	if err != nil {
+		return nil, err
+	}
+	return [][]float32{vec}, nil
 }
 
 // getMockRagDataForTest 在当前函数中缓存embedding数据，避免每次都读取文件

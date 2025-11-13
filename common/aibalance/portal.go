@@ -589,9 +589,15 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	wrapperName := request.PostForm.Get("wrapper_name")
 	modelName := request.PostForm.Get("model_name")
 	modelType := request.PostForm.Get("model_type")
+	providerMode := request.PostForm.Get("provider_mode")
 	domainOrURL := request.PostForm.Get("domain_or_url")
 	apiKeysStr := request.PostForm.Get("api_keys")
 	noHTTPS := request.PostForm.Get("no_https") == "on" // 获取 NoHTTPS 参数
+
+	// Set default provider mode if not provided
+	if providerMode == "" {
+		providerMode = "chat"
+	}
 
 	// Validate required fields
 	if wrapperName == "" || modelName == "" || modelType == "" || domainOrURL == "" || apiKeysStr == "" {
@@ -644,6 +650,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		dbProvider := &schema.AiProvider{
 			ModelName:             modelName,
 			TypeName:              modelType,
+			ProviderMode:          providerMode, // 设置 Provider 模式
 			DomainOrURL:           domainOrURL,
 			APIKey:                provider.APIKey,
 			WrapperName:           wrapperName, // Use WrapperName from form
