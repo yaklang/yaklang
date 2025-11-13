@@ -344,7 +344,7 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 	assert.Equal(t, 1, len(results))
 
 	// Test Query function with collection name
-	resultsCh, err := Query(db, "test", WithName(collectionName), WithRAGLimit(10))
+	resultsCh, err := Query(db, "test", WithRAGCollectionNames(collectionName), WithRAGLimit(10), WithEmbeddingClient(mockEmbed))
 	if err != nil {
 		t.Errorf("Failed to query: %v", err)
 		return
@@ -486,7 +486,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test low", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
+			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(LowSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 3)
@@ -498,7 +498,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test mid", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
+			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(MidSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 2)
@@ -510,7 +510,7 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	t.Run("test high", func(t *testing.T) {
 		results, err := SimpleQuery(db, uuid.NewString(), 5,
 			WithRAGEnhanceSearchHandler(enhanceHandler),
-			WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(mockEmbedding)),
+			WithEmbeddingClient(mockEmbedding),
 			WithRAGSimilarityThreshold(HighSimilarThresh))
 		require.NoError(t, err)
 		require.Len(t, results, 1)
