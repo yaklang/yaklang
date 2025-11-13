@@ -163,6 +163,13 @@ func (r *Emitter) EmitSyncEvent(id string, i any, syncID string) {
 	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, id, i, syncID)
 }
 
+func (r *Emitter) EmitYakitRisk(id uint, title string) {
+	r.EmitJSON(schema.EVENT_TYPE_YAKIT_RISK, "yakit", map[string]any{
+		"risk_id": id,
+		"title":   title,
+	})
+}
+
 func (r *Emitter) EmitYakitExecResult(exec *ypb.ExecResult) {
 	if exec == nil {
 		return
