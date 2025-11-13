@@ -60,7 +60,7 @@ func TestDocumentManager_EditCountTracking(t *testing.T) {
 	dm := NewDocumentManager()
 
 	uri := "file:///test.yak"
-	doc := dm.OpenDocument(uri, 1, "initial")
+	_ = dm.OpenDocument(uri, 1, "initial")
 
 	// 快速连续编辑
 	dm.UpdateDocument(uri, 2, "edit1")
