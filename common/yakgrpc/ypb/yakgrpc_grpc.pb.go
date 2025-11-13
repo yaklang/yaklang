@@ -516,6 +516,7 @@ const (
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
 	Yak_QueryAIEvent_FullMethodName                               = "/ypb.Yak/QueryAIEvent"
+	Yak_GetRandomAIMaterials_FullMethodName                       = "/ypb.Yak/GetRandomAIMaterials"
 	Yak_StartAITriage_FullMethodName                              = "/ypb.Yak/StartAITriage"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
@@ -1233,6 +1234,7 @@ type YakClient interface {
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error)
+	GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error)
 	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -7051,6 +7053,16 @@ func (c *yakClient) QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, o
 	return out, nil
 }
 
+func (c *yakClient) GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRandomAIMaterialsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetRandomAIMaterials_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_StartAITriage_FullMethodName, cOpts...)
@@ -8537,6 +8549,7 @@ type YakServer interface {
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
 	QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error)
+	GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error)
 	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
@@ -10122,6 +10135,9 @@ func (UnimplementedYakServer) DeleteAITask(context.Context, *AITaskDeleteRequest
 }
 func (UnimplementedYakServer) QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAIEvent not implemented")
+}
+func (UnimplementedYakServer) GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRandomAIMaterials not implemented")
 }
 func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
@@ -18605,6 +18621,24 @@ func _Yak_QueryAIEvent_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetRandomAIMaterials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRandomAIMaterialsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetRandomAIMaterials(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetRandomAIMaterials_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetRandomAIMaterials(ctx, req.(*GetRandomAIMaterialsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartAITriage_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITriage(&grpc.GenericServerStream[AITriageInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -21460,6 +21494,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryAIEvent",
 			Handler:    _Yak_QueryAIEvent_Handler,
+		},
+		{
+			MethodName: "GetRandomAIMaterials",
+			Handler:    _Yak_GetRandomAIMaterials_Handler,
 		},
 		{
 			MethodName: "CreateAIForge",

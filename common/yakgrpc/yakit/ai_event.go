@@ -51,3 +51,26 @@ func QueryAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) ([]*schema.AiOutputEve
 	}
 	return event, nil
 }
+
+func GetRandomAIMaterials(db *gorm.DB, limit int) ([]*schema.AIYakTool, []*schema.KnowledgeBaseEntry, []*schema.AIForge, error) {
+	var tool []*schema.AIYakTool
+	var kbEntries []*schema.KnowledgeBaseEntry
+	var forges []*schema.AIForge
+
+	_, err := bizhelper.RandomQuery(db.Model(&schema.AIYakTool{}), limit, &tool)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	_, err = bizhelper.RandomQuery(db.Model(&schema.KnowledgeBaseEntry{}), limit, &kbEntries)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	_, err = bizhelper.RandomQuery(db.Model(&schema.AIForge{}), limit, &forges)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return tool, kbEntries, forges, nil
+}
