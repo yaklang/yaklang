@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 	"time"
 
@@ -159,4 +162,27 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 
 		inputEvent.SafeFeed(event)
 	}
+}
+
+func (s *Server) GetRandomAIMaterials(ctx context.Context, req *ypb.GetRandomAIMaterialsRequest) (*ypb.GetRandomAIMaterialsResponse, error) {
+	limit := 3
+	if req.GetLimit() > 0 {
+		limit = int(req.GetLimit())
+	}
+
+	tools, kbes, forges, err := yakit.GetRandomAIMaterials(s.GetProjectDatabase(), limit)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.GetRandomAIMaterialsResponse{
+		AITools: lo.Map(tools, func(item *schema.AIYakTool, _ int) *ypb.AITool {
+			return item.ToGRPC()
+		}),
+		KnowledgeBaseEntries: lo.Map(kbes, func(item *schema.KnowledgeBaseEntry, _ int) *ypb.KnowledgeBaseEntry {
+			return KnowledgeBaseEntryToGrpcModel(item)
+		}),
+		AIForges: lo.Map(forges, func(item *schema.AIForge, _ int) *ypb.AIForge {
+			return item.ToGRPC()
+		}),
+	}, nil
 }
