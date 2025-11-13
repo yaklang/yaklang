@@ -73,6 +73,10 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 							phit.Edge = append(phit.Edge, v.GetId())
 							phit.SetName(res.name)
 							phit.GetProgram().SetVirtualRegister(phit)
+							if block := phi.GetBlock(); block != nil && !slices.Contains(block.Phis, phit.GetId()) {
+								block.Phis = append(block.Phis, phit.GetId())
+							}
+							phit.CFGEntryBasicBlock = phi.CFGEntryBasicBlock
 							retT[res.name] = phit
 						}
 					}
@@ -104,22 +108,25 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			if index := slices.Index(phi2.Edge, phiValue.GetId()); index != -1 {
 				phi2.Edge[index] = header.GetId()
 				ret[name] = phi2
-				DeleteInst(phiValue)
 				ReplaceAllValue(phiValue, phi2)
 				for name, v := range ReplaceMemberCall(phiValue, phiValue, phi2) {
 					ret[name] = v
 				}
+				DeleteInst(phiValue)
 				return
 			}
 		}
 
 		// step 3
-		phi.Edge = append(phi.Edge, header.GetId())
-		phi.Edge = append(phi.Edge, latch.GetId())
+		if headerID := header.GetId(); !slices.Contains(phi.Edge, headerID) {
+			phi.Edge = append(phi.Edge, headerID)
+		}
+		if latchID := latch.GetId(); !slices.Contains(phi.Edge, latchID) {
+			phi.Edge = append(phi.Edge, latchID)
+		}
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
 		ret[name] = phiValue
-		return
 	}()
 	return ret
 }
