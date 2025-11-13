@@ -2,14 +2,17 @@ package rag
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"slices"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -699,6 +702,9 @@ func readDocumentFromStream(reader io.Reader, ragSystem *RAGSystem) (*ExportVect
 		if len(dataBytes) == 0 {
 			continue
 		}
+		if ragSystem == nil {
+			continue
+		}
 		extReader := bytes.NewReader(dataBytes)
 		switch string(typeNameBytes) {
 		case "knowledge_entry":
@@ -1224,4 +1230,63 @@ func pbWriteBool(w io.Writer, value bool) error {
 	}
 	_, err := w.Write(i)
 	return err
+}
+
+func VerifyImportFile(importFile string) error {
+	if importFile == "" {
+		return utils.Error("import file is empty")
+	}
+	if !utils.FileExists(importFile) {
+		return utils.Error("import file not found")
+	}
+	file, err := os.Open(importFile)
+	if err != nil {
+		return utils.Wrap(err, "open import file")
+	}
+	defer file.Close()
+	header, err := LoadRAGFileHeader(file)
+	if err != nil {
+		return utils.Wrap(err, "load rag file header")
+	}
+
+	// 读取文档数据
+	documents, err := readDocumentsFromStream(file, nil)
+	if err != nil {
+		return utils.Wrap(err, "read documents")
+	}
+
+	// 所有 docUID 列表
+	collectionUUID := header.Collection.UUID
+	docUIDs := make([]string, 0)
+	for _, doc := range documents {
+		docUID := md5.Sum([]byte(collectionUUID + doc.DocumentID))
+		docUIDStr, err := uuid.FromBytes(docUID[:])
+		if err != nil {
+			return utils.Wrap(err, "convert doc uid to string")
+		}
+		docUIDs = append(docUIDs, docUIDStr.String())
+	}
+
+	// 解析图
+	pers, err := hnsw.LoadBinary[string](bytes.NewReader(header.Collection.GraphBinary))
+	if err != nil {
+		return utils.Wrap(err, "load hnsw graph")
+	}
+
+	// 遍历图节点 key ，验证节点数据是否存在
+	for _, node := range pers.OffsetToKey[1:] {
+		code := node.Code
+		bytesCode, ok := code.([]byte)
+		if !ok {
+			return utils.Error("hnsw graph node code is not []byte")
+		}
+		uuidStr, err := uuid.FromBytes(bytesCode)
+		if err != nil {
+			return utils.Wrap(err, "convert doc uid to string")
+		}
+		if !slices.Contains(docUIDs, uuidStr.String()) {
+			return utils.Errorf("hnsw graph node data not found: %s", uuidStr.String())
+		}
+	}
+	return nil
 }
