@@ -222,7 +222,7 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 }
 
 // Embedding 返回单个向量（保持向后兼容）
-// 如果服务器返回多个向量，只返回第一个并记录警告
+// 如果服务器返回多个向量，返回最后一个（使用 last 池化方法）
 func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	vectors, err := c.EmbeddingRaw(text)
 	if err != nil {
@@ -234,8 +234,9 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	}
 
 	if len(vectors) > 1 {
-		log.Warnf("Server returned %d embedding vectors, but Embedding() only returns the first one. Use EmbeddingRaw() to get all vectors.", len(vectors))
+		log.Infof("Server returned %d embedding vectors, using last pooling method (returning last vector)", len(vectors))
 	}
 
-	return vectors[0], nil
+	// 使用 last 池化方法：返回最后一个向量
+	return vectors[len(vectors)-1], nil
 }
