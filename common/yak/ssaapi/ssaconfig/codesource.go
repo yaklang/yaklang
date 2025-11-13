@@ -42,6 +42,9 @@ type CodeSourceInfo struct {
 }
 
 func (c *CodeSourceInfo) ToJSONString() string {
+	if c == nil {
+		return ""
+	}
 	jsonRaw, err := json.Marshal(c)
 	if err != nil {
 		return ""
@@ -76,6 +79,13 @@ func (c *CodeSourceInfo) ValidateSourceConfig() error {
 }
 
 // --- 代码源配置 Get 方法 ---
+
+func (c *Config) GetCodeSourceInfo() *CodeSourceInfo {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return nil
+	}
+	return c.CodeSource
+}
 
 func (c *Config) GetCodeSourceKind() CodeSourceKind {
 	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
