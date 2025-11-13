@@ -43,6 +43,9 @@ type CodeSourceInfo struct {
 }
 
 func (c *CodeSourceInfo) ToJSONString() string {
+	if c == nil {
+		return ""
+	}
 	jsonRaw, err := json.Marshal(c)
 	if err != nil {
 		return ""

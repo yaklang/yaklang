@@ -307,6 +307,12 @@ func init() {
 			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
+			"yak", "SSA 项目编译V2",
+			withPluginHelp("传入项目配置数据的JSON形式进行编译。"),
+			withPluginAuthors("intSheep"),
+			withPluginEnableGenerateParam(true),
+		)
+		registerBuildInPlugin(
 			"yak", "SyntaxFlow 规则执行",
 			withPluginHelp("执行 SyntaxFlow 规则"),
 			withPluginAuthors("令则"),
