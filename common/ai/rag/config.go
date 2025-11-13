@@ -124,6 +124,9 @@ type RAGSystemConfig struct {
 	ragID string
 
 	importFile string
+
+	importKeyAsUID      bool
+	tryRebuildHNSWIndex bool
 }
 
 // var defaultRAGSystemName = "default"
@@ -142,6 +145,8 @@ func NewRAGSystemConfig(options ...RAGSystemConfigOption) *RAGSystemConfig {
 		overlap:                    100,
 		bigTextPlan:                "chunk_text",
 		enableAutoUpdateGraphInfos: true,
+		importKeyAsUID:             true,
+		tryRebuildHNSWIndex:        false,
 	}
 	for _, option := range options {
 		option(config)
@@ -487,6 +492,8 @@ func (config *RAGSystemConfig) ConvertToVectorStoreOptions() []vectorstore.Colle
 	options = append(options, vectorstore.WithEnablePQ(config.enablePQ))
 	options = append(options, vectorstore.WithEnableAutoUpdateGraphInfos(config.enableAutoUpdateGraphInfos))
 	options = append(options, vectorstore.WithDisableEmbedCollectionInfo(config.disableEmbedCollectionInfo))
+	options = append(options, vectorstore.WithKeyAsUID(config.importKeyAsUID))
+	options = append(options, vectorstore.WithTryRebuildHNSWIndex(config.tryRebuildHNSWIndex))
 	return options
 }
 

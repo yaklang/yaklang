@@ -132,9 +132,22 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 			)
 		} else {
 			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, vectorStore.cacheSize, vectorStore.preCacheSize, collection.EnablePQMode, &vectorStore.wg)
+			hnswGraph, err = vectorStore.parseHNSWGraphFromBinary(graphBinaryReader)
 			if err != nil {
-				return nil, utils.Wrap(err, "parse hnsw graph from binary")
+				if collectionConfig.TryRebuildHNSWIndex {
+					log.Warnf("load hnsw graph from binary error: %v, try to rebuild hnsw graph, migrate hnsw graph from db", err)
+					err := MigrateHNSWGraph(db, collection)
+					if err != nil {
+						return nil, utils.Wrap(err, "migrate hnsw graph")
+					}
+					graphBinaryReader := bytes.NewReader(collection.GraphBinary)
+					hnswGraph, err = vectorStore.parseHNSWGraphFromBinary(graphBinaryReader)
+					if err != nil {
+						return nil, utils.Wrap(err, "parse hnsw graph from binary")
+					}
+				} else {
+					return nil, utils.Wrap(err, "parse hnsw graph from binary")
+				}
 			}
 		}
 

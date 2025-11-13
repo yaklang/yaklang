@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -593,7 +594,7 @@ func readCollectionFromStream(reader io.Reader) (*schema.VectorStoreCollection, 
 }
 
 // readDocumentsFromStream 从流中读取文档数据
-func readDocumentsFromStream(reader io.Reader, ragSystem *RAGSystem) ([]*ExportVectorStoreDocument, error) {
+func readDocumentsFromStream(reader io.Reader, extDataHandle func(doc *ExportVectorStoreDocument, typeName string, reader io.Reader) error) ([]*ExportVectorStoreDocument, error) {
 	// 文档数量
 	docCount, err := consumeVarint(reader)
 	if err != nil {
@@ -603,7 +604,7 @@ func readDocumentsFromStream(reader io.Reader, ragSystem *RAGSystem) ([]*ExportV
 	documents := make([]*ExportVectorStoreDocument, docCount)
 
 	for i := uint64(0); i < docCount; i++ {
-		doc, err := readDocumentFromStream(reader, ragSystem)
+		doc, err := readDocumentFromStream(reader, extDataHandle)
 		if err != nil {
 			return nil, utils.Wrap(err, "read document")
 		}
@@ -613,7 +614,7 @@ func readDocumentsFromStream(reader io.Reader, ragSystem *RAGSystem) ([]*ExportV
 	return documents, nil
 }
 
-func readDocumentFromStream(reader io.Reader, ragSystem *RAGSystem) (*ExportVectorStoreDocument, error) {
+func readDocumentFromStream(reader io.Reader, extDataHandle func(doc *ExportVectorStoreDocument, typeName string, reader io.Reader) error) (*ExportVectorStoreDocument, error) {
 	doc := &ExportVectorStoreDocument{}
 
 	// 文档ID
@@ -702,39 +703,10 @@ func readDocumentFromStream(reader io.Reader, ragSystem *RAGSystem) (*ExportVect
 		if len(dataBytes) == 0 {
 			continue
 		}
-		if ragSystem == nil {
-			continue
-		}
 		extReader := bytes.NewReader(dataBytes)
-		switch string(typeNameBytes) {
-		case "knowledge_entry":
-			knowledgeEntry, err := readKnowledgeEntryFromStream(extReader)
-			if err != nil {
-				return nil, utils.Wrap(err, "read knowledge entry")
-			}
-
-			knowledgeEntry.KnowledgeBaseID = ragSystem.KnowledgeBase.GetID()
-
-			err = yakit.CreateKnowledgeBaseEntry(ragSystem.config.db, knowledgeEntry)
-			if err != nil {
-				return nil, utils.Wrap(err, "create knowledge base entry")
-			}
-			doc.Metadata[schema.META_Data_UUID] = knowledgeEntry.HiddenIndex
-		case "entity":
-			entityRepo, err := ragSystem.EntityRepository.GetInfo()
-			if err != nil {
-				return nil, utils.Wrap(err, "get entity repository")
-			}
-			entity, err := readEntityFromStream(extReader)
-			if err != nil {
-				return nil, utils.Wrap(err, "read entity")
-			}
-			entity.RepositoryUUID = entityRepo.Uuid
-			err = yakit.CreateEntity(ragSystem.config.db, entity)
-			if err != nil {
-				return nil, utils.Wrap(err, "create entity")
-			}
-			doc.Metadata[schema.META_Data_UUID] = entity.Uuid
+		err = extDataHandle(doc, string(typeNameBytes), extReader)
+		if err != nil {
+			return nil, utils.Wrap(err, "handle extra data")
 		}
 	}
 
@@ -937,13 +909,65 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		ragData.Collection.Name = ragSystemConfig.Name
 	}
 
-	ragSystem, err := GetRagSystem(ragData.Collection.Name, append(optFuncs, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
+	DeleteRAG(ragSystemConfig.db, ragData.Collection.Name)
+
+	// 创建集合
+	ragID := uuid.NewString()
+	collection, err := vectorstore.CreateCollectionRecord(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.ConvertToVectorStoreOptions()...)
 	if err != nil {
-		return utils.Wrap(err, "get rag system")
+		return utils.Wrap(err, "create collection record")
+	}
+	err = ragSystemConfig.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Update("rag_id", ragID).Error
+	if err != nil {
+		return utils.Wrap(err, "update collection rag id")
+	}
+
+	// 创建知识库
+	knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.knowledgeBaseType, nil)
+	if err != nil {
+		return utils.Wrap(err, "create knowledge base")
+	}
+	err = ragSystemConfig.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", knowledgeBase.GetID()).Update("rag_id", ragID).Error
+	if err != nil {
+		return utils.Wrap(err, "update knowledge base rag id")
+	}
+	entityBaseInfo := &schema.EntityRepository{
+		EntityBaseName: ragSystemConfig.Name,
+		Description:    ragSystemConfig.description,
+		Uuid:           uuid.NewString(),
+	}
+	err = yakit.CreateEntityBaseInfo(ragSystemConfig.db, entityBaseInfo)
+	if err != nil {
+		return utils.Wrap(err, "create entity base info")
 	}
 
 	// 读取文档数据
-	documents, err := readDocumentsFromStream(file, ragSystem)
+	documents, err := readDocumentsFromStream(file, func(doc *ExportVectorStoreDocument, typeName string, extReader io.Reader) error {
+		switch typeName {
+		case "knowledge_entry":
+			knowledgeEntry, err := readKnowledgeEntryFromStream(extReader)
+			if err != nil {
+				return utils.Wrap(err, "read knowledge entry")
+			}
+			err = yakit.CreateKnowledgeBaseEntry(ragSystemConfig.db, knowledgeEntry)
+			if err != nil {
+				return utils.Wrap(err, "create knowledge base entry")
+			}
+			doc.Metadata[schema.META_Data_UUID] = knowledgeEntry.HiddenIndex
+		case "entity":
+			entity, err := readEntityFromStream(extReader)
+			if err != nil {
+				return utils.Wrap(err, "read entity")
+			}
+			entity.RepositoryUUID = entityBaseInfo.Uuid
+			err = yakit.CreateEntity(ragSystemConfig.db, entity)
+			if err != nil {
+				return utils.Wrap(err, "create entity")
+			}
+			doc.Metadata[schema.META_Data_UUID] = entity.Uuid
+		}
+		return nil
+	})
 	if err != nil {
 		return utils.Wrap(err, "read documents")
 	}
@@ -954,7 +978,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		return utils.Wrap(err, "read hnsw index")
 	}
 	ragData.Collection.GraphBinary = hnswIndex
-	ragData.Collection.RAGID = ragSystem.RAGID
+	ragData.Collection.RAGID = ragSystemConfig.ragID
 	ragData.Documents = documents
 
 	// 执行导入
