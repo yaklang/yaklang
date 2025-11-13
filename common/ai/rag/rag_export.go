@@ -3,6 +3,7 @@ package rag
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -1034,9 +1035,10 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 	reportProgress(20, "集合信息处理完成，开始导入向量文档", "info")
 
 	// 导入文档数据
+	var documents []*schema.VectorStoreDocument
 	if len(ragData.Documents) > 0 {
 		totalDocs := len(ragData.Documents)
-		documents := make([]*schema.VectorStoreDocument, totalDocs)
+		documents = make([]*schema.VectorStoreDocument, totalDocs)
 
 		reportProgress(30, fmt.Sprintf("正在处理 %d 个向量文档", totalDocs), "info")
 
@@ -1100,15 +1102,22 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 			log.Warnf("failed to import HNSW index: %v", err)
 		}
 		reportProgress(95, "HNSW索引导入完成", "info")
-	} else {
+	} else if len(documents) > 0 {
 		reportProgress(92, "HNSW索引重建开始", "info")
 		// 确保使用正确的集合 ID（MigrateHNSWGraph 需要正确的 ID 来查询文档）
 		collection.ID = collectionID
 		err := vectorstore.MigrateHNSWGraph(db, collection)
 		if err != nil {
-			return utils.Wrap(err, "failed to migrate HNSW graph")
+			if errors.Is(err, vectorstore.ErrGraphNodesIsEmpty) {
+				log.Warnf("HNSW graph is empty, skip migration")
+			} else {
+				return utils.Wrap(err, "failed to migrate HNSW graph")
+			}
 		}
 		reportProgress(95, "HNSW索引重建完成", "info")
+	} else {
+		log.Info("No documents to migrate, skip HNSW index rebuild")
+		reportProgress(95, "无文档需要重建HNSW索引", "info")
 	}
 
 	reportProgress(100, "向量库数据导入完成", "success")

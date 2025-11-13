@@ -323,8 +323,9 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 	}
 
 	mockEmbed := vectorstore.NewMockEmbedder(testEmbedder)
+	collectionName := "test_collection_" + utils.RandStringBytes(8)
 
-	ragSystem, err := NewRAGSystem(WithDB(db), WithEmbeddingModel("test"), WithEmbeddingClient(mockEmbed))
+	ragSystem, err := NewRAGSystem(WithDB(db), WithName(collectionName), WithEmbeddingModel("test"), WithEmbeddingClient(mockEmbed))
 	if err != nil {
 		t.Errorf("Failed to create collection: %v", err)
 		return
@@ -342,14 +343,22 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 
 	assert.Equal(t, 1, len(results))
 
-	Query(db, "test", WithRAGLimit(10))
+	// Test Query function with collection name
+	resultsCh, err := Query(db, "test", WithName(collectionName), WithRAGLimit(10))
 	if err != nil {
 		t.Errorf("Failed to query: %v", err)
 		return
 	}
 
-	assert.Equal(t, 1, len(results))
-	assert.Equal(t, "test", results[0].Document.ID)
+	// Consume the results channel
+	var queryResults []*RAGSearchResult
+	for result := range resultsCh {
+		if result.Type == RAGResultTypeResult {
+			queryResults = append(queryResults, result)
+		}
+	}
+
+	assert.Equal(t, 1, len(queryResults))
 }
 
 func TestMUSTPASS_RAGQuery(t *testing.T) {
