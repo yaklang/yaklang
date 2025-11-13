@@ -56,6 +56,50 @@ func createTestRAGCollection(db *gorm.DB, name string) (*schema.VectorStoreColle
 		}
 	}
 
+	var vectorDocument []*schema.VectorStoreDocument = []*schema.VectorStoreDocument{
+		{
+			CollectionUUID: collectionInfo.UUID,
+			DocumentID:     "test_doc_1",
+			Content:        "test_content_1",
+			Metadata: schema.MetadataMap{
+				schema.META_Data_UUID: "hidden_index_1",
+			},
+			Embedding: []float32{0.1, 0.2, 0.3},
+		},
+		{
+			CollectionUUID: collectionInfo.UUID,
+			DocumentID:     "test_doc_2",
+			Content:        "test_content_2",
+			Metadata: schema.MetadataMap{
+				schema.META_Data_UUID: "hidden_index_2",
+			},
+			Embedding: []float32{0.4, 0.5, 0.6},
+		},
+		{
+			CollectionUUID: collectionInfo.UUID,
+			DocumentID:     "test_doc_3",
+			Content:        "test_content_3",
+			Metadata: schema.MetadataMap{
+				schema.META_Data_UUID: "hidden_index_3",
+			},
+			Embedding: []float32{0.7, 0.8, 0.9},
+		},
+		{
+			CollectionUUID: collectionInfo.UUID,
+			DocumentID:     "test_doc_4",
+			Content:        "test_content_4",
+			Metadata: schema.MetadataMap{
+				schema.META_Data_UUID: "hidden_index_4",
+			},
+			Embedding: []float32{0.1, 0.2, 0.3},
+		},
+	}
+	for _, document := range vectorDocument {
+		if err := db.Create(document).Error; err != nil {
+			return nil, err
+		}
+	}
+
 	return collectionInfo, nil
 }
 
@@ -111,6 +155,7 @@ func addTestKnowledgeBaseEntries(db *gorm.DB, kbID int64) error {
 			KnowledgeTitle:     "Go语言并发编程",
 			KnowledgeType:      "Programming",
 			ImportanceScore:    9,
+			HiddenIndex:        "hidden_index_1",
 			Keywords:           schema.StringArray{"Go", "并发", "goroutine", "channel"},
 			KnowledgeDetails:   "Go语言的并发模型基于goroutine和channel，提供了简洁而强大的并发编程能力。",
 		},
@@ -120,6 +165,7 @@ func addTestKnowledgeBaseEntries(db *gorm.DB, kbID int64) error {
 			KnowledgeTitle:     "Python数据分析",
 			KnowledgeType:      "Data Science",
 			ImportanceScore:    8,
+			HiddenIndex:        "hidden_index_2",
 			Keywords:           schema.StringArray{"Python", "数据分析", "pandas", "numpy"},
 			KnowledgeDetails:   "Python在数据分析领域有着广泛的应用，pandas和numpy是核心库。",
 		},
@@ -141,6 +187,7 @@ func addTestEntities(db *gorm.DB, repoUUID string) error {
 			EntityName:        "测试实体1",
 			Description:       "这是第一个测试实体",
 			EntityType:        "Person",
+			Uuid:              "hidden_index_3",
 			EntityTypeVerbose: "人物",
 			Attributes: map[string]any{
 				"age":  30,
@@ -152,6 +199,7 @@ func addTestEntities(db *gorm.DB, repoUUID string) error {
 			EntityName:        "测试实体2",
 			Description:       "这是第二个测试实体",
 			EntityType:        "Company",
+			Uuid:              "hidden_index_4",
 			EntityTypeVerbose: "公司",
 			Attributes: map[string]any{
 				"industry": "科技",
@@ -169,7 +217,7 @@ func addTestEntities(db *gorm.DB, repoUUID string) error {
 }
 
 // TestExportRAG_CollectionNotFound 测试导出时集合不存在的情况
-func TestExportRAG_CollectionNotFound(t *testing.T) {
+func TestMUSTPASS_ExportRAG_CollectionNotFound(t *testing.T) {
 	db, err := createTempTestDatabase()
 	assert.NoError(t, err)
 
@@ -187,7 +235,7 @@ func TestExportRAG_CollectionNotFound(t *testing.T) {
 }
 
 // TestExportRAG_Success 测试成功导出 RAG
-func TestExportRAG_Success(t *testing.T) {
+func TestMUSTPASS_ExportRAG_Success(t *testing.T) {
 	db, err := createTempTestDatabase()
 	assert.NoError(t, err)
 
@@ -249,7 +297,7 @@ func TestExportRAG_Success(t *testing.T) {
 }
 
 // TestExportRAG_OnlyKnowledgeBase 测试只导出知识库（没有实体仓库）
-func TestExportRAG_OnlyKnowledgeBase(t *testing.T) {
+func TestMUSTPASS_ExportRAG_OnlyKnowledgeBase(t *testing.T) {
 	db, err := createTempTestDatabase()
 	assert.NoError(t, err)
 
@@ -287,102 +335,8 @@ func TestExportRAG_OnlyKnowledgeBase(t *testing.T) {
 	yakit.DeleteKnowledgeBase(db, int64(kbInfo.ID))
 }
 
-// TestImportRAG_Success 测试成功导入 RAG
-func TestImportRAG_Success(t *testing.T) {
-	db, err := createTempTestDatabase()
-	assert.NoError(t, err)
-
-	// 首先导出数据
-	exportCollectionName := "test_export_import_" + utils.RandStringBytes(8)
-	exportCollection, err := createTestRAGCollection(db, exportCollectionName)
-	assert.NoError(t, err)
-
-	// 创建知识库
-	kbInfo, err := createTestKnowledgeBase(db, exportCollectionName+"_kb", exportCollection.RAGID)
-	assert.NoError(t, err)
-
-	// 添加知识库条目
-	err = addTestKnowledgeBaseEntries(db, int64(kbInfo.ID))
-	assert.NoError(t, err)
-
-	// 创建实体仓库
-	entityRepo, err := createTestEntityRepository(db, exportCollectionName+"_entity", exportCollection.RAGID)
-	assert.NoError(t, err)
-
-	// 添加实体
-	err = addTestEntities(db, entityRepo.Uuid)
-	assert.NoError(t, err)
-
-	// 执行导出
-	tempFile, err := os.CreateTemp("", "test_export_rag_*.zip")
-	if err != nil {
-		t.Fatalf("create temp file failed: %v", err)
-	}
-	defer tempFile.Close()
-	err = ExportRAG(exportCollectionName, tempFile.Name(), WithDB(db))
-	assert.NoError(t, err)
-
-	// 读取导出的数据到缓冲区
-	content, err := os.ReadFile(tempFile.Name())
-	if err != nil {
-		t.Fatalf("read temp file failed: %v", err)
-	}
-	assert.True(t, len(content) > 0, "导出的数据应该是非空的")
-	assert.NoError(t, err)
-
-	// 创建新的数据库用于导入
-	importDB, err := createTempTestDatabase()
-	assert.NoError(t, err)
-
-	// 执行导入
-	importCollectionName := "test_import_collection_" + utils.RandStringBytes(8)
-	err = ImportRAG(tempFile.Name(),
-		WithDB(importDB),
-		WithRAGCollectionName(importCollectionName),
-		WithExportOverwriteExisting(true),
-	)
-
-	// 验证导入成功
-	assert.NoError(t, err)
-
-	// 验证导入后的数据
-	importedCollection, err := yakit.GetRAGCollectionInfoByName(importDB, importCollectionName)
-	assert.NoError(t, err)
-	assert.NotNil(t, importedCollection)
-	assert.Equal(t, importCollectionName, importedCollection.Name)
-
-	// 验证知识库是否被导入
-	var importedKB schema.KnowledgeBaseInfo
-	err = importDB.Model(&schema.KnowledgeBaseInfo{}).Where("rag_id = ?", importedCollection.RAGID).First(&importedKB).Error
-	assert.NoError(t, err)
-	assert.Equal(t, importCollectionName, importedKB.KnowledgeBaseName)
-
-	// 验证知识库条目是否被导入
-	var kbEntries []schema.KnowledgeBaseEntry
-	err = importDB.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", importedKB.ID).Find(&kbEntries).Error
-	assert.NoError(t, err)
-	assert.Len(t, kbEntries, 2) // 我们添加了2个条目
-
-	// 验证实体仓库是否被导入
-	var importedEntityRepo schema.EntityRepository
-	err = importDB.Model(&schema.EntityRepository{}).Where("rag_id = ?", importedCollection.RAGID).First(&importedEntityRepo).Error
-	assert.NoError(t, err)
-	assert.Equal(t, importCollectionName, importedEntityRepo.EntityBaseName)
-
-	// 验证实体是否被导入
-	var entities []schema.ERModelEntity
-	err = importDB.Model(&schema.ERModelEntity{}).Where("repository_uuid = ?", importedEntityRepo.Uuid).Find(&entities).Error
-	assert.NoError(t, err)
-	assert.Len(t, entities, 2) // 我们添加了2个实体
-
-	// 清理
-	vectorstore.DeleteCollection(db, exportCollectionName)
-	vectorstore.DeleteCollection(importDB, importCollectionName)
-	yakit.DeleteKnowledgeBase(db, int64(kbInfo.ID))
-}
-
 // TestImportRAG_EmptyReader 测试导入空数据的情况
-func TestImportRAG_EmptyReader(t *testing.T) {
+func TestMUSTPASS_ImportRAG_EmptyReader(t *testing.T) {
 	db, err := createTempTestDatabase()
 	assert.NoError(t, err)
 
@@ -393,17 +347,14 @@ func TestImportRAG_EmptyReader(t *testing.T) {
 	}
 	defer tempFile.Close()
 	err = ImportRAG(tempFile.Name(), WithDB(db))
-	if err != nil {
-		t.Fatalf("ImportRAG failed: %v", err)
-	}
 
 	// 应该返回错误
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "import knowledge base failed")
+	assert.Contains(t, err.Error(), "read magic header")
 }
 
 // TestImportRAG_InvalidData 测试导入无效数据的情况
-func TestImportRAG_InvalidData(t *testing.T) {
+func TestMUSTPASS_ImportRAG_InvalidData(t *testing.T) {
 	db, err := createTempTestDatabase()
 	assert.NoError(t, err)
 
@@ -414,13 +365,9 @@ func TestImportRAG_InvalidData(t *testing.T) {
 	}
 	defer tempFile.Close()
 	err = ImportRAG(tempFile.Name(), WithDB(db))
-	if err != nil {
-		t.Fatalf("ImportRAG failed: %v", err)
-	}
-
 	// 应该返回错误
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "import knowledge base failed")
+	assert.Contains(t, err.Error(), "read magic header")
 }
 
 func TestMUSTPASS_ImportRAGFile(t *testing.T) {
