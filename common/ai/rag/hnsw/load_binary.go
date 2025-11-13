@@ -331,7 +331,7 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			if err != nil {
 				return nil, utils.Wrap(err, "core info node code")
 			}
-			code = hnswspec.LazyNodeID(data)
+			code = hnswspec.LazyNodeID(string(data))
 		}
 		p.OffsetToKey[i] = &PersistentNode[K]{
 			Key:  key,
@@ -377,7 +377,7 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 }
 
 // BuildGraph 从 Persistent 构建 Graph[K]
-func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error), opts ...GraphOption[K]) (g *Graph[K], err error) {
+func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error), opts ...GraphOption[K]) (g *Graph[K], err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("build lazy graph panic: %v", r)
@@ -499,7 +499,22 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 				if !ok {
 					return nil, utils.Errorf("expected []byte for uid, got %T", node.Code)
 				}
-				data, err := dataLoader(id)
+				data, err := dataLoader(key, id)
+				if err != nil {
+					return nil, utils.Wrap(err, "data loader")
+				}
+				nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+					return data, nil
+				})
+			case ExportModeStrUID:
+				if dataLoader == nil {
+					return nil, utils.Error("data loader is nil")
+				}
+				id, ok := node.Code.(hnswspec.LazyNodeID)
+				if !ok {
+					return nil, utils.Errorf("expected []byte for uid, got %T", node.Code)
+				}
+				data, err := dataLoader(key, id)
 				if err != nil {
 					return nil, utils.Wrap(err, "data loader")
 				}
