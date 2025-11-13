@@ -430,6 +430,10 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		options = append(options, aicommon.WithDisableToolUse(true))
 	}
 
+	if config.DisableAIForge {
+		options = append(options, aicommon.WithDisableAIForge(true))
+	}
+
 	if config.DisableMCPServers {
 		options = append(options, aicommon.WithDisallowMCPServers(true))
 	}

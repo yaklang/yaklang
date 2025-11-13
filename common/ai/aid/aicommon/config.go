@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"math/rand/v2"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
@@ -208,6 +209,9 @@ type Config struct {
 
 	// focus config
 	Focus string
+
+	// disable forge use
+	DisableAIForge bool
 }
 
 // NewConfig creates a new Config with options
@@ -876,6 +880,18 @@ func WithAllowPlanUserInteract(v bool) ConfigOption {
 func WithDisableToolsName(toolsName ...string) ConfigOption {
 	return func(c *Config) error {
 		return WithAiToolManagerOptions(buildinaitools.WithDisableTools(toolsName))(c)
+	}
+}
+
+func WithDisableAIForge(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableAIForge = disable
+		c.m.Unlock()
+		return nil
 	}
 }
 

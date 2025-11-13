@@ -197,6 +197,9 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 			}()
 		}),
 	}
+	if r.config.DisableAIForge {
+		defaultOptions = append(defaultOptions, reactloops.WithAllowAIForge(false))
+	}
 
 	defaultOptions = append(defaultOptions, options...)
 
