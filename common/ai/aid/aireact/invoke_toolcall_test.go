@@ -384,7 +384,7 @@ LOOP:
 	fmt.Printf("✓ Task ID verified: %s\n", taskID)
 
 	// 通过 GetRisks 方法获取创建的 risks
-	risks := reAct.GetRisks()
+	risks := reAct.GetLastTask().GetRisks()
 	if len(risks) == 0 {
 		t.Fatal("No risks found")
 	}

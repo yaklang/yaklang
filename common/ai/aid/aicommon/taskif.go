@@ -2,12 +2,17 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,6 +59,9 @@ type AIStatefulTask interface {
 	SetEmitter(emitter *Emitter)
 	SetReActLoop(loop ReActLoopIF)
 	GetReActLoop() ReActLoopIF
+
+	SetDB(db *gorm.DB)
+	GetRisks() []*schema.Risk
 }
 
 type AIStatefulTaskBase struct {
@@ -76,6 +84,54 @@ type AIStatefulTaskBase struct {
 	// index info
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
 	reActLoop         ReActLoopIF
+	db                *gorm.DB
+}
+
+func (s *AIStatefulTaskBase) GetDB() *gorm.DB {
+	return s.db
+}
+
+func (s *AIStatefulTaskBase) SetDB(db *gorm.DB) {
+	if s == nil {
+		return
+	}
+	s.db = db
+}
+
+func (r *AIStatefulTaskBase) GetRisks() []*schema.Risk {
+	if r == nil {
+		return nil
+	}
+	if r.GetDB() == nil {
+		return nil
+	}
+	events, err := yakit.QueryAIEvent(r.GetDB(), &ypb.AIEventFilter{
+		TaskIndex: []string{r.GetId()},
+	})
+	if err != nil {
+		return nil
+	}
+
+	risks := []*schema.Risk{}
+	for _, event := range events {
+		if event.Type == schema.EVENT_TYPE_YAKIT_RISK {
+			riskInfo := map[string]any{}
+			err := json.Unmarshal(event.Content, &riskInfo)
+			if err != nil {
+				continue
+			}
+			riskId, ok := riskInfo["risk_id"]
+			if ok && riskId != nil {
+				id := utils.InterfaceToInt(riskId)
+				risk, err := yakit.GetRisk(r.GetDB(), int64(id))
+				if err != nil {
+					continue
+				}
+				risks = append(risks, risk)
+			}
+		}
+	}
+	return risks
 }
 
 func (s *AIStatefulTaskBase) PushToolCallResult(result *aitool.ToolResult) {
