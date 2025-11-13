@@ -2,7 +2,6 @@ package c2ssa
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -24,113 +23,6 @@ type SSABuilder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
-var (
-	globalTempDir string
-)
-
-var CommonCLibraries = []string{
-	// C 标准库与语言扩展
-	"assert.h", "complex.h", "ctype.h", "errno.h", "fenv.h", "float.h", "inttypes.h",
-	"iso646.h", "limits.h", "locale.h", "math.h", "setjmp.h", "signal.h", "stdalign.h",
-	"stdarg.h", "stdatomic.h", "stdbool.h", "stddef.h", "stdint.h", "stdio.h", "stdlib.h",
-	"stdnoreturn.h", "string.h", "tgmath.h", "threads.h", "time.h", "uchar.h", "wchar.h",
-	"wctype.h", "malloc.h", "libclidef.h", "stsdef.h", "getopt.h",
-
-	// 字符编码与国际化
-	"iconv.h", "libintl.h",
-
-	// 通用工具与数据结构
-	"apr_optional.h", "apr_optional_hooks.h", "apr_strings.h", "glib.h", "khash.h", "kvec.h", "uthash.h", "utarray.h",
-
-	// POSIX / Unix 系统接口
-	"aio.h", "arpa/inet.h", "descrip.h", "dirent.h", "dlfcn.h", "fcntl.h", "ifaddrs.h",
-	"mqueue.h", "net/if.h", "netdb.h", "netinet/in.h", "netinet/ip.h", "netinet/ip6.h",
-	"netinet/tcp.h", "poll.h", "pthread.h", "pty.h", "semaphore.h", "sched.h", "spawn.h",
-	"sys/epoll.h", "sys/event.h", "sys/eventfd.h", "sys/inotify.h", "sys/ioctl.h",
-	"sys/ipc.h", "sys/mman.h", "sys/msg.h", "sys/poll.h", "sys/resource.h", "sys/select.h",
-	"sys/sem.h", "sys/shm.h", "sys/socket.h", "sys/stat.h", "sys/statvfs.h", "sys/syscall.h",
-	"sys/time.h", "sys/times.h", "sys/types.h", "sys/uio.h", "sys/un.h", "sys/utsname.h",
-	"sys/wait.h", "sys/timerfd.h", "syslog.h", "termios.h", "ucontext.h", "unistd.h",
-
-	// 其他平台与系统扩展
-	"lnmdef.h", "qadrt.h",
-
-	// Windows 平台接口
-	"_mingw.h", "bcrypt.h", "direct.h", "io.h", "process.h", "synchapi.h", "tchar.h", "windows.h",
-	"winerror.h", "wincrypt.h", "winsock2.h", "ws2tcpip.h", "w32api.h",
-
-	// 并行与并发
-	"dispatch/dispatch.h", "mpi.h", "omp.h",
-
-	// 网络与异步 I/O
-	"ares.h", "curl/curl.h", "ev.h", "event2/event.h", "event2/event_struct.h", "http_parser.h",
-	"libcoap-2/coap.h", "libssh/libssh.h", "libssh2.h", "libuv/uv.h", "microhttpd.h", "mosquitto.h",
-	"nanomsg/nn.h", "nghttp2/nghttp2.h", "pcap/pcap.h", "rdma/rdma_cma.h", "uv.h",
-	"websocketpp/client.hpp", "zmq.h",
-
-	// 安全与密码学
-	"gnutls/gnutls.h", "gnutls/x509.h", "libgcrypt.h", "libsodium.h", "mbedtls/ssl.h",
-	"openssl/aes.h", "openssl/conf.h", "openssl/crypto.h", "openssl/dh.h", "openssl/err.h",
-	"openssl/evp.h", "openssl/opensslv.h", "openssl/pem.h", "openssl/rand.h", "openssl/rsa.h", "openssl/sha.h",
-	"openssl/ssl.h", "openssl/x509.h", "openssl/configuration.h", "openssl/safestack.h", "openssl/ui.h", "openssl/bio.h", "openssl/asn1.h", "pkcs11.h", "sodium.h", "wolfssl/options.h",
-
-	// 压缩与归档
-	"archive.h", "archive_entry.h", "brotli/decode.h", "brotli/encode.h", "bzlib.h",
-	"libtar.h", "lz4.h", "lzma.h", "minizip/unzip.h", "zconf.h", "zlib.h", "zstd.h",
-
-	// 数据库与存储
-	"hiredis/hiredis.h", "leveldb/c.h", "lmdb.h", "mongoc/mongoc.h", "mysql/mysql.h",
-	"postgresql/libpq-fe.h", "rdkafka.h", "rocksdb/c.h", "sqlite3.h", "wiredtiger.h",
-
-	// 序列化与数据交换
-	"avro.h", "bson/bson.h", "cJSON.h", "cbor.h", "expat.h", "flatbuffers/flatbuffers.h",
-	"htmlstreamparser.h", "jansson.h", "json-c/json.h", "libxml/HTMLparser.h",
-	"libxml/parser.h", "libxml/uri.h", "libxml/xpath.h", "msgpack.h", "protobuf-c/protobuf-c.h",
-	"rapidjson/document.h", "tidy/tidy.h", "tidy/tidybuffio.h", "yaml.h",
-
-	// 科学计算与数值分析
-	"cblas.h", "fftw3.h", "gsl/gsl_math.h", "gsl/gsl_matrix.h", "gsl/gsl_vector.h",
-	"lapacke.h", "mkl.h",
-
-	// 图形界面与桌面应用
-	"cairo/cairo.h", "gdk/gdk.h", "gtk/gtk.h",
-
-	// 图形渲染与多媒体
-	"GL/glew.h", "GL/gl.h", "GL/glu.h", "GLFW/glfw3.h", "GLES2/gl2.h",
-	"OpenCL/opencl.h", "SDL2/SDL.h", "SDL2/SDL_image.h", "SDL2/SDL_mixer.h",
-	"SDL2/SDL_ttf.h", "allegro5/allegro.h", "vulkan/vulkan.h",
-
-	// 图像与视频处理
-	"MagickWand/MagickWand.h", "gif_lib.h", "jpeg/jpeglib.h", "libavcodec/avcodec.h",
-	"libavdevice/avdevice.h", "libavfilter/avfilter.h", "libavformat/avformat.h",
-	"libavutil/avutil.h", "libpostproc/postprocess.h", "libswresample/swresample.h",
-	"libswscale/swscale.h", "opencv2/core/core_c.h", "opencv2/highgui/highgui_c.h",
-	"opencv2/imgproc/imgproc_c.h", "openjpeg.h", "png.h", "tiffio.h", "turbojpeg.h",
-	"webp/decode.h", "webp/encode.h",
-
-	// 音频处理
-	"alsa/asoundlib.h", "ao/ao.h", "fdk-aac/aacdecoder_lib.h", "jack/jack.h", "mpg123.h",
-	"openal/al.h", "openal/alc.h", "opus/opus.h", "portaudio.h", "pulse/pulseaudio.h",
-	"sndfile.h", "speex/speex.h", "vorbis/vorbisfile.h",
-
-	// 命令行与终端
-	"ncurses.h", "panel.h", "readline/history.h", "readline/readline.h", "regex.h", "term.h",
-
-	// 调试与性能分析
-	"execinfo.h", "gperftools/profiler.h", "libunwind.h", "sanitizer/asan_interface.h",
-	"valgrind/valgrind.h",
-
-	// 嵌入式与实时系统
-	"FreeRTOS.h", "cmsis_os.h", "lwip/init.h", "zephyr/kernel.h",
-
-	// 机器学习与 AI 接口
-	"mxnet/c_api.h", "onnxruntime_c_api.h", "tensorflow/c/c_api.h", "tflite/c/c_api.h",
-}
-
-func init() {
-	filesys.SetCommonCLibraries(CommonCLibraries)
-}
-
 func CreateBuilder() ssa.Builder {
 	builder := &SSABuilder{
 		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
@@ -150,13 +42,6 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
 		return fs
 	}
 	return cfs
-}
-
-func CleanupTempHeaders() {
-	if globalTempDir != "" {
-		os.RemoveAll(globalTempDir)
-		globalTempDir = ""
-	}
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
