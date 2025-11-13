@@ -26,8 +26,7 @@ func NewSSAProjectByRawConfigData(rawData []byte) (*SSAProject, error) {
 		return nil, err
 	}
 	builder := &SSAProject{}
-	builder.Config = config
-	builder.coverBaseInfo()
+	builder.setConfig(config)
 	return builder, nil
 }
 
@@ -77,12 +76,16 @@ func NewSSAProjectByProto(proto *ypb.SSAProject) (*SSAProject, error) {
 	if err != nil {
 		return nil, utils.Errorf("failed to new SSA project config: %s", err)
 	}
-	builder.Config = config
-	builder.coverBaseInfo()
+	builder.setConfig(config)
 	if err := builder.Validate(); err != nil {
 		return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
 	}
 	return builder, nil
+}
+
+func (s *SSAProject) setConfig(config *ssaconfig.Config) {
+	s.Config = config
+	s.coverBaseInfo()
 }
 
 func (s *SSAProject) toSchemaData() (*schema.SSAProject, error) {

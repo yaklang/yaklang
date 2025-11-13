@@ -31,10 +31,6 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 }
 
 func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProjectRequest) (*ypb.CreateSSAProjectResponse, error) {
-	if req == nil || req.Project == nil {
-		return nil, utils.Errorf("create SSA project failed: request or project is nil")
-	}
-
 	project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), req)
 	if err != nil {
 		return &ypb.CreateSSAProjectResponse{
