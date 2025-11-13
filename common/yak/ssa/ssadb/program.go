@@ -120,3 +120,12 @@ func AllPrograms(db *gorm.DB) []*IrProgram {
 	db.Model(&IrProgram{}).Order("created_at DESC").Find(&prorams)
 	return prorams
 }
+
+func GetProgramByProjectID(projectID uint64) (*IrProgram, error) {
+	var p IrProgram
+	db := GetDB().Model(&IrProgram{})
+	if err := db.Where("project_id = ?", projectID).First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
