@@ -235,22 +235,30 @@ func (q *QueryParams) SetPosition(p HttpParamPositionType) *QueryParams {
 	return q
 }
 
-func (q *QueryParams) Add(key, val string) {
+func (q *QueryParams) Add(key, val string, forceNoEncode ...bool) {
 	if q == nil {
 		return
 	}
-	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: q.NoAutoEncode})
+	noAutoEncode := q.NoAutoEncode
+	if len(forceNoEncode) > 0 {
+		noAutoEncode = forceNoEncode[0]
+	}
+	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: noAutoEncode})
 }
 
-func (q *QueryParams) Set(key, val string) {
+func (q *QueryParams) Set(key, val string, forceNoEncode ...bool) {
 	if q == nil {
 		return
+	}
+	noAutoEncode := q.NoAutoEncode
+	if len(forceNoEncode) > 0 {
+		noAutoEncode = forceNoEncode[0]
 	}
 
 	for i := 0; i < len(q.Items); i++ {
 		if q.Items[i].Key == key && q.Items[i].Position == q.Position {
 			q.Items[i].Value = val
-			q.Items[i].NoAutoEncode = q.NoAutoEncode
+			q.Items[i].NoAutoEncode = noAutoEncode
 			q.Items[i].Position = q.Position
 			return
 		}
@@ -259,7 +267,7 @@ func (q *QueryParams) Set(key, val string) {
 		&QueryParamItem{
 			Key:          key,
 			Value:        val,
-			NoAutoEncode: q.NoAutoEncode,
+			NoAutoEncode: noAutoEncode,
 			Position:     q.Position,
 		},
 	)

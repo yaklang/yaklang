@@ -104,12 +104,16 @@ func replaceFullParams(params map[string][]string, p *QueryParams) {
 	*p = *newParams
 }
 
-func replaceAllParams(params map[string]string, p *QueryParams) {
+func replaceAllParams(params map[string]string, p *QueryParams, forceNoEncode ...bool) {
+	noAutoEncode := p.NoAutoEncode
+	if len(forceNoEncode) > 0 {
+		noAutoEncode = forceNoEncode[0]
+	}
 	newParams := NewQueryParams().DisableAutoEncode(p.NoAutoEncode)
 	keys := lo.Keys(params)
 	sort.Strings(keys)
 	for _, k := range keys {
-		newParams.Add(k, params[k])
+		newParams.Add(k, params[k], noAutoEncode)
 	}
 	*p = *newParams
 }
@@ -616,8 +620,8 @@ func ReplaceFullHTTPPacketPostParamsWithoutEscape(packet []byte, values map[stri
 // poc.ReplaceHTTPPacketPostParam(raw, "a", "b") // 添加POST请求参数a，值为b
 // ```
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
-		p.Set(key, value)
+	return handleHTTPPacketPostParam(packet, true, true, func(p *QueryParams) {
+		p.Set(key, value, false)
 	})
 }
 
@@ -645,8 +649,8 @@ func ReplaceHTTPPacketPostParamWithoutEncoding(packet []byte, key, value string,
 // poc.AppendHTTPPacketPostParam(poc.BasicRequest(), "a", "b") // 向 pie.dev 发起请求，添加POST请求参数a，值为b
 // ```
 func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, false, true, func(p *QueryParams) {
-		p.Add(key, value)
+	return handleHTTPPacketPostParam(packet, true, true, func(p *QueryParams) {
+		p.Add(key, value, false)
 	})
 }
 
@@ -661,7 +665,7 @@ func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 // a=b&c=d`, "a") // 删除POST请求参数a
 // ```
 func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
-	return handleHTTPPacketPostParam(packet, false, false, func(p *QueryParams) {
+	return handleHTTPPacketPostParam(packet, true, false, func(p *QueryParams) {
 		p.Del(key)
 	})
 }

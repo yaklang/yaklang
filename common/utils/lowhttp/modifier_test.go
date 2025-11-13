@@ -1643,6 +1643,16 @@ a=1&b=2`,
 			whitelists: []string{"\r\n\r\na=3&b=2", "Content-Type: application/x-www-form-urlencoded"},
 			blacklists: []string{"a=1"},
 		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1&b=2%3D`,
+			key:        "a",
+			value:      "3=",
+			whitelists: []string{"\r\n\r\na=3%3D&b=2", "Content-Type: application/x-www-form-urlencoded"},
+			blacklists: []string{"a=1", "%25"},
+		},
 	}
 	for _, testcase := range testcases {
 
