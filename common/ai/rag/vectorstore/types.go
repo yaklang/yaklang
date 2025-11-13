@@ -8,6 +8,8 @@ import (
 
 type EmbeddingClient interface {
 	Embedding(text string) ([]float32, error)
+	// EmbeddingRaw 返回原始的 embedding 结果，可能包含多个向量
+	EmbeddingRaw(text string) ([][]float32, error)
 }
 
 // RAG 搜索结果类型常量

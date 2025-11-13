@@ -85,13 +85,46 @@ func (m *HealthCheckManager) RecordCheck(providerID uint) {
 // It does not interact with the database or the HealthCheckResult struct directly.
 // providerIdentifierForLog is used for logging purposes (e.g., wrapper name or model name).
 func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHealthy bool, latencyMs int64, checkErr error) {
-	log.Debugf("Executing health check logic for provider: %s", providerIdentifierForLog)
+	log.Debugf("Executing health check logic for provider: %s (mode: %s)", providerIdentifierForLog, p.ProviderMode)
 
 	startTime := time.Now()
 	var firstByteDuration time.Duration
 	rspOnce := new(sync.Once)
 	succeededChan := make(chan bool, 1)
 	var respErr error
+
+	// 根据 provider mode 选择不同的健康检查方式
+	if p.ProviderMode == "embedding" {
+		// Embedding 模式：使用 embedding 接口进行健康检查
+		log.Debugf("Using embedding health check for provider: %s", providerIdentifierForLog)
+
+		embClient, err := p.GetEmbeddingClient()
+		if err != nil {
+			errMsg := fmt.Errorf("failed to get embedding client for %s: %v", providerIdentifierForLog, err)
+			log.Warnf("Embedding health check preparation failed for %s: %v", providerIdentifierForLog, err)
+			return false, 0, errMsg
+		}
+
+		log.Debugf("Initiating embedding health check for: %s", providerIdentifierForLog)
+
+		go func() {
+			_, embErr := embClient.Embedding("health check test")
+			if embErr != nil {
+				respErr = embErr
+				select {
+				case succeededChan <- false:
+				default:
+				}
+			} else {
+				rspOnce.Do(func() {
+					firstByteDuration = time.Since(startTime)
+					succeededChan <- true
+				})
+			}
+		}()
+	} else {
+		// Chat 模式（默认）：使用 chat 接口进行健康检查
+		log.Debugf("Using chat health check for provider: %s", providerIdentifierForLog)
 
 	// Create AI client using the provider's GetAIClient method
 	// GetAIClient is assumed to handle its own HTTP client requirements.
@@ -132,6 +165,7 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 			}
 		}
 	}()
+	}
 
 	var succeeded bool
 	select {
@@ -252,12 +286,13 @@ func CheckAllProviders(checkManager *HealthCheckManager) ([]*HealthCheckResult, 
 
 			// 创建 Provider 实例
 			provider := &Provider{
-				ModelName:   dbp.ModelName,
-				TypeName:    dbp.TypeName,
-				DomainOrURL: dbp.DomainOrURL,
-				APIKey:      dbp.APIKey,
-				NoHTTPS:     dbp.NoHTTPS,
-				DbProvider:  dbp,
+				ModelName:    dbp.ModelName,
+				TypeName:     dbp.TypeName,
+				ProviderMode: dbp.ProviderMode,
+				DomainOrURL:  dbp.DomainOrURL,
+				APIKey:       dbp.APIKey,
+				NoHTTPS:      dbp.NoHTTPS,
+				DbProvider:   dbp,
 			}
 
 			// 执行健康检查
@@ -376,12 +411,13 @@ func RunManualHealthCheck() ([]*HealthCheckResult, error) {
 		}
 
 		provider := &Provider{
-			ModelName:   dbProvider.ModelName,
-			TypeName:    dbProvider.TypeName,
-			DomainOrURL: dbProvider.DomainOrURL,
-			APIKey:      dbProvider.APIKey,
-			NoHTTPS:     dbProvider.NoHTTPS,
-			DbProvider:  dbProvider,
+			ModelName:    dbProvider.ModelName,
+			TypeName:     dbProvider.TypeName,
+			ProviderMode: dbProvider.ProviderMode,
+			DomainOrURL:  dbProvider.DomainOrURL,
+			APIKey:       dbProvider.APIKey,
+			NoHTTPS:      dbProvider.NoHTTPS,
+			DbProvider:   dbProvider,
 		}
 
 		// 使用WrapperName作为模型名，添加到配置的模型列表中
@@ -595,12 +631,13 @@ func RunSingleProviderHealthCheck(providerID uint) (*HealthCheckResult, error) {
 
 	// 创建 Provider 实例
 	provider := &Provider{
-		ModelName:   dbProvider.ModelName,
-		TypeName:    dbProvider.TypeName,
-		DomainOrURL: dbProvider.DomainOrURL,
-		APIKey:      dbProvider.APIKey,
-		NoHTTPS:     dbProvider.NoHTTPS,
-		DbProvider:  dbProvider,
+		ModelName:    dbProvider.ModelName,
+		TypeName:     dbProvider.TypeName,
+		ProviderMode: dbProvider.ProviderMode,
+		DomainOrURL:  dbProvider.DomainOrURL,
+		APIKey:       dbProvider.APIKey,
+		NoHTTPS:      dbProvider.NoHTTPS,
+		DbProvider:   dbProvider,
 	}
 
 	// 执行健康检查

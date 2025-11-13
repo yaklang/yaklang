@@ -761,6 +761,253 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	c.logInfo("Connection closed for %s", conn.RemoteAddr())
 }
 
+// serveEmbeddings handles embedding requests
+func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
+	c.logInfo("Starting to handle new embedding request")
+
+	// Extract authorization header
+	auth := ""
+	_, body := lowhttp.SplitHTTPPacket(rawPacket, func(method string, requestUri string, proto string) error {
+		c.logInfo("Request method: %s, URI: %s, Protocol: %s", method, requestUri, proto)
+		return nil
+	}, func(proto string, code int, codeMsg string) error {
+		return nil
+	}, func(line string) string {
+		k, v := lowhttp.SplitHTTPHeader(line)
+		if k == "Authorization" || k == "authorization" {
+			auth = v
+			c.logInfo("Retrieved authentication info from request header: %s", v)
+		}
+		return line
+	})
+
+	if string(body) == "" {
+		c.logError("Request body is empty")
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
+
+	// Parse request body
+	type EmbeddingRequest struct {
+		Input          string `json:"input"`
+		Model          string `json:"model"`
+		EncodingFormat string `json:"encoding_format,omitempty"`
+	}
+
+	var reqBody EmbeddingRequest
+	err := json.Unmarshal(body, &reqBody)
+	if err != nil {
+		c.logError("Failed to parse request body: %v", err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
+
+	modelName := reqBody.Model
+	inputText := reqBody.Input
+	c.logInfo("Requested embedding model: %s, input length: %d", modelName, len(inputText))
+
+	if inputText == "" {
+		c.logError("Input text is empty")
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nX-Reason: empty input\r\n\r\n"))
+		return
+	}
+
+	// Check if it's a free model
+	isFreeModel := strings.HasSuffix(modelName, "-free")
+	if isFreeModel {
+		c.logInfo("Request is for a free embedding model, skipping key verification.")
+	}
+
+	var key *Key
+
+	if !isFreeModel {
+		value := strings.TrimPrefix(auth, "Bearer ")
+		c.logInfo("Extracted key from authentication info: %s", value)
+		if value == "" {
+			c.logError("No valid authentication info provided")
+			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+			return
+		}
+
+		var ok bool
+		key, ok = c.Keys.Get(value)
+		if !ok {
+			c.logError("No matching key configuration found: %s", value)
+			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+			return
+		}
+		c.logInfo("Successfully verified key: %s", key.Key)
+
+		// Authorization check
+		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
+		if !ok {
+			c.logError("Key[%v] has no allowed models configured", key.Key)
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+
+		isAllowed, ok := allowedModels[modelName]
+		if !ok {
+			allowedModelKeys := make([]string, 0, len(allowedModels))
+			for k := range allowedModels {
+				allowedModelKeys = append(allowedModelKeys, k)
+			}
+			c.logError("Key[%v] requested model %s is not in allowed list, allowed models: %v", key.Key, modelName, allowedModelKeys)
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+
+		if !isAllowed {
+			c.logError("Key[%v] requested model %s is not allowed", key.Key, modelName)
+			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
+			return
+		}
+	}
+
+	// Get providers for the model
+	providers := c.Entrypoints.PeekOrderedProviders(modelName)
+	if len(providers) == 0 {
+		// Try to reload from database
+		c.logWarn("No valid providers found for model %s, trying to reload from database...", modelName)
+		if err := LoadProvidersFromDatabase(c); err != nil {
+			c.logError("Failed to reload providers from database: %v", err)
+		} else {
+			c.logInfo("Successfully reloaded providers from database, retrying to find providers.")
+			providers = c.Entrypoints.PeekOrderedProviders(modelName)
+		}
+	}
+
+	if len(providers) == 0 {
+		c.logError("No valid providers found for embedding model %s", modelName)
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 404 Not Found\r\nX-Reason: no valid provider found for %v\r\n\r\n", modelName)))
+		return
+	}
+
+	c.logInfo("Found %d valid providers for embedding model %s, trying in order", len(providers), modelName)
+
+	// Try each provider until one succeeds
+	var successfulProvider *Provider
+	var lastError error
+	var embeddingResult []float32
+
+	for i, provider := range providers {
+		c.logInfo("Trying provider %d/%d for embedding model %s: %s", i+1, len(providers), modelName, provider.TypeName)
+
+		start := time.Now()
+
+		// Get embedding client
+		embClient, err := provider.GetEmbeddingClient()
+		if err != nil {
+			c.logError("Failed to get embedding client from provider %s: %v", provider.TypeName, err)
+			lastError = err
+			continue
+		}
+
+		// Call embedding
+		vectors, err := embClient.Embedding(inputText)
+		if err != nil {
+			c.logError("Embedding call failed for provider %s: %v", provider.TypeName, err)
+			lastError = err
+			latencyMs := time.Since(start).Milliseconds()
+			go func() {
+				if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
+					c.logError("Failed to update failed provider status: %v", err)
+				}
+			}()
+			continue
+		}
+
+		// Success
+		embeddingResult = vectors
+		successfulProvider = provider
+		latencyMs := time.Since(start).Milliseconds()
+		c.logInfo("Provider %s successfully generated embedding (dimension: %d, latency: %dms)", provider.TypeName, len(vectors), latencyMs)
+
+		// Update provider status
+		providerHealthy := latencyMs < 10000
+		go func() {
+			if err := provider.UpdateDbProvider(providerHealthy, latencyMs); err != nil {
+				c.logError("Failed to update provider status: %v", err)
+			} else {
+				c.logInfo("Provider status updated: healthy=%v, latency=%dms", providerHealthy, latencyMs)
+			}
+		}()
+
+		// Update API Key statistics
+		if !isFreeModel {
+			go func() {
+				inputBytes := int64(len(inputText))
+				outputBytes := int64(len(vectors) * 4) // float32 = 4 bytes
+				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, true); err != nil {
+					c.logError("Failed to update API key statistics: %v", err)
+				} else {
+					c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes",
+						utils.ShrinkString(key.Key, 8), inputBytes, outputBytes)
+				}
+			}()
+		}
+
+		break // Success, exit loop
+	}
+
+	// If all providers failed
+	if successfulProvider == nil {
+		c.logError("All providers failed for embedding model %s, last error: %v", modelName, lastError)
+		errorMsg := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\nX-Reason: all providers failed for %v, last error: %v\r\n\r\n", modelName, lastError)
+		conn.Write([]byte(errorMsg))
+		return
+	}
+
+	// Build response in OpenAI format
+	type EmbeddingData struct {
+		Object    string    `json:"object"`
+		Embedding []float32 `json:"embedding"`
+		Index     int       `json:"index"`
+	}
+
+	type EmbeddingResponse struct {
+		Object string          `json:"object"`
+		Data   []EmbeddingData `json:"data"`
+		Model  string          `json:"model"`
+		Usage  struct {
+			PromptTokens int `json:"prompt_tokens"`
+			TotalTokens  int `json:"total_tokens"`
+		} `json:"usage"`
+	}
+
+	response := EmbeddingResponse{
+		Object: "list",
+		Data: []EmbeddingData{
+			{
+				Object:    "embedding",
+				Embedding: embeddingResult,
+				Index:     0,
+			},
+		},
+		Model: modelName,
+	}
+	response.Usage.PromptTokens = len(inputText)
+	response.Usage.TotalTokens = len(inputText)
+
+	// Marshal response
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		c.logError("Failed to marshal embedding response: %v", err)
+		conn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		return
+	}
+
+	// Send response
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: application/json; charset=utf-8\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n", len(responseJSON))
+
+	conn.Write([]byte(header))
+	conn.Write(responseJSON)
+	c.logInfo("Embedding response sent successfully, %d bytes", len(responseJSON))
+}
+
 // 新增函数: 处理 /v1/models 请求，返回所有可用的 model 列表
 func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 	c.logInfo("Serving models list")
@@ -953,6 +1200,9 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/chat/completions"):
 		c.serveChatCompletions(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/embeddings"):
+		c.serveEmbeddings(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
 		c.logInfo("Processing models list request")

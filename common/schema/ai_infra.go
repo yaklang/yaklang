@@ -112,12 +112,13 @@ func (c *AiCheckpoint) BeforeSave() error {
 type AiProvider struct {
 	gorm.Model
 
-	WrapperName string `json:"wrapper_name" gorm:"index"`
-	ModelName   string `json:"model_name" gorm:"index"`
-	TypeName    string `json:"type_name" gorm:"index"`
-	DomainOrURL string `json:"domain_or_url" gorm:"index"`
-	APIKey      string `json:"api_key" gorm:"index"`
-	NoHTTPS     bool   `json:"no_https"`
+	WrapperName  string `json:"wrapper_name" gorm:"index"`
+	ModelName    string `json:"model_name" gorm:"index"`
+	TypeName     string `json:"type_name" gorm:"index"`
+	DomainOrURL  string `json:"domain_or_url" gorm:"index"`
+	APIKey       string `json:"api_key" gorm:"index"`
+	NoHTTPS      bool   `json:"no_https"`
+	ProviderMode string `json:"provider_mode" gorm:"default:'chat'"` // Provider 模式: "chat" 或 "embedding"
 
 	// 可用性指标
 	SuccessCount  int64 `json:"success_count"`  // 成功请求总数

@@ -39,6 +39,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/aibalance"
 	"github.com/yaklang/yaklang/common/utils/fileparser"
 
 	"github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
@@ -400,6 +401,9 @@ func initYaklangLib() {
 
 	// netstack (TUN device and network stack VM)
 	yaklang.Import("netstack", netstack_exports.Exports)
+
+	// aibalance - AI traffic forwarding and load balancing
+	yaklang.Import("aibalance", aibalance.Exports)
 }
 
 type ScriptEngine struct {

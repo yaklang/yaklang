@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,11 +32,12 @@ type ConfigProvider struct {
 
 // Provider is the provider structure for actual API calls
 type Provider struct {
-	ModelName   string `json:"model_name"`
-	TypeName    string `json:"type_name"`
-	DomainOrURL string `json:"domain_or_url"`
-	APIKey      string `json:"api_key"`
-	NoHTTPS     bool   `json:"no_https"`
+	ModelName    string `json:"model_name"`
+	TypeName     string `json:"type_name"`
+	ProviderMode string `json:"provider_mode"` // "chat" or "embedding"
+	DomainOrURL  string `json:"domain_or_url"`
+	APIKey       string `json:"api_key"`
+	NoHTTPS      bool   `json:"no_https"`
 	// works for qwen3
 	OptionalAllowReason  string `json:"optional_allow_reason,omitempty"`
 	OptionalReasonBudget int    `json:"optional_reason_budget,omitempty"`
@@ -202,6 +204,37 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 // GetAIClient gets the AI client
 func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
 	return p.GetAIClientWithImages(nil, onStream, onReasonStream)
+}
+
+// GetEmbeddingClient gets an embedding client for the provider
+func (p *Provider) GetEmbeddingClient() (aispec.EmbeddingCaller, error) {
+	log.Infof("GetEmbeddingClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v",
+		p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
+
+	var opts []aispec.AIConfigOption
+	opts = append(
+		opts,
+		aispec.WithNoHTTPS(p.NoHTTPS),
+		aispec.WithAPIKey(p.APIKey),
+		aispec.WithModel(p.ModelName),
+		aispec.WithTimeout(30), // 30 seconds timeout for embedding
+	)
+
+	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
+		if utils.IsHttpOrHttpsUrl(target) {
+			opts = append(opts, aispec.WithBaseURL(target))
+		} else {
+			opts = append(opts, aispec.WithDomain(target))
+		}
+	}
+
+	// Use the generic OpenAI-compatible embedding client
+	// This works with most providers that support OpenAI's embedding API format
+	client := embedding.NewOpenaiEmbeddingClient(opts...)
+	if utils.IsNil(client) || client == nil {
+		return nil, errors.New("failed to create embedding client")
+	}
+	return client, nil
 }
 
 // GetDbProvider gets the associated database AiProvider object
