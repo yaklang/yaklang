@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -45,6 +48,36 @@ func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
 
 func (r *ReAct) IsProcessingReAct() bool {
 	return r.currentTask != nil
+}
+
+func (r *ReAct) GetRisks() []*schema.Risk {
+	events, err := yakit.QueryAIEvent(r.config.GetDB(), &ypb.AIEventFilter{
+		TaskIndex: []string{r.lastTask.GetId()},
+	})
+	if err != nil {
+		return nil
+	}
+
+	risks := []*schema.Risk{}
+	for _, event := range events {
+		if event.Type == schema.EVENT_TYPE_YAKIT_RISK {
+			riskInfo := map[string]any{}
+			err := json.Unmarshal(event.Content, &riskInfo)
+			if err != nil {
+				continue
+			}
+			riskId, ok := riskInfo["risk_id"]
+			if ok && riskId != nil {
+				id := utils.InterfaceToInt(riskId)
+				risk, err := yakit.GetRisk(r.config.GetDB(), int64(id))
+				if err != nil {
+					continue
+				}
+				risks = append(risks, risk)
+			}
+		}
+	}
+	return risks
 }
 
 func (r *ReAct) GetLastTask() aicommon.AIStatefulTask {

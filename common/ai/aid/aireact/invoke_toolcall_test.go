@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -191,48 +192,111 @@ LOOP:
 	fmt.Println("--------------------------------------")
 }
 
-func TestReAct_ToolUse_WithCallbackRuntimeID(t *testing.T) {
-	t.Skip("这是一个应该被改进的测试，需要更细粒度的id控制： task id 管理多个 call tool id")
-	// todo  这是一个应该被改进的测试，需要更细粒度的id控制： task id 管理多个 call tool id
+func TestReAct_ToolUse_TaskGetRisks(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	var capturedRuntimeID string
+	// 生成唯一标识符用于验证
+	flagTitle := ksuid.New().String()
+	flagTarget := "http://test-" + ksuid.New().String() + ".example.com"
 
-	toolCalled := false
-	testTool, err := aitool.New(
-		"test_tool",
-		aitool.WithNumberParam("value"),
-		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
-			toolCalled = true
-			if runtimeConfig != nil {
-				capturedRuntimeID = runtimeConfig.RuntimeID
+	// 创建一个生成 risk 的测试工具
+	testToolScript := `
+yakit.AutoInitYakit()
+target = cli.String("target", cli.setRequired(true))
+title = cli.String("title", cli.setRequired(true))
+cli.check()
+
+risk.NewRisk(
+	target,
+	risk.title(title),
+	risk.type("baseline"),
+	risk.severity("low"),
+	risk.description("This is a test risk created by TestReAct_ToolUse_WithCallbackRuntimeID"),
+)
+`
+
+	// Params 字段应该是 JSON Schema 格式
+	paramsJSON := `{
+		"type": "object",
+		"properties": {
+			"target": {
+				"type": "string",
+				"description": "The target URL or IP address"
+			},
+			"title": {
+				"type": "string",
+				"description": "The title of the risk"
 			}
-			return "test result", nil
-		}),
-	)
-	if err != nil {
-		t.Fatal(err)
+		},
+		"required": ["target", "title"]
+	}`
+
+	tools := yak.YakTool2AITool([]*schema.AIYakTool{
+		{
+			Name:        "create_test_risk",
+			Description: "Create a test security risk",
+			Content:     testToolScript,
+			Params:      paramsJSON,
+		},
+	})
+	if len(tools) == 0 {
+		t.Fatal("tools not found")
 	}
 
-	_, err = NewTestReAct(
+	riskTool := tools[0]
+	if riskTool == nil {
+		t.Fatal("risk tool not found")
+	}
+
+	// 创建 ReAct 实例
+	reAct, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCalling(i, r, "test_tool")
+			// Mock AI 响应，让它调用 create_test_risk 工具
+			prompt := r.GetPrompt()
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "create_test_risk" },
+"human_readable_thought": "I need to create a test risk", "cumulative_summary": "Creating test risk"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+				rsp := i.NewAIResponse()
+				// 返回工具参数
+				paramsJSON := fmt.Sprintf(`{"@action": "call-tool", "params": { "target": "%s", "title": "%s" }}`, flagTarget, flagTitle)
+				rsp.EmitOutputStream(bytes.NewBufferString(paramsJSON))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test risk created successfully"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		aicommon.WithTools(testTool),
+		aicommon.WithTools(riskTool),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// 发送输入事件
 	go func() {
 		in <- &ypb.AIInputEvent{
 			IsFreeInput: true,
-			FreeInput:   "test input",
+			FreeInput:   "create a test risk",
 		}
 	}()
 
@@ -244,56 +308,109 @@ func TestReAct_ToolUse_WithCallbackRuntimeID(t *testing.T) {
 
 	var taskID string
 	var iid string
+	toolCalled := false
+	taskCompleted := false
+
 LOOP:
 	for {
 		select {
 		case e := <-out:
-			// Capture task ID from task creation or status change events
+			// 捕获 task ID
 			if e.NodeId == "react_task_created" || e.NodeId == "react_task_status_changed" {
 				if tid := jsonpath.FindFirst(e.GetContent(), "$..react_task_id"); tid != nil {
 					taskID = utils.InterfaceToString(tid)
+					fmt.Printf("Captured Task ID: %s\n", taskID)
 				}
 			}
 
+			// 处理工具审核请求
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
 				in <- &ypb.AIInputEvent{
 					IsInteractiveMessage: true,
-					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveId:        iid,
 					InteractiveJSONInput: `{"suggestion": "continue"}`,
 				}
 			}
 
+			// 检测工具是否被调用
+			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
+				toolCalled = true
+				fmt.Println("Tool call completed")
+			}
+
+			// 检测任务完成
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
+					taskCompleted = true
+					fmt.Println("Task completed")
 					break LOOP
 				}
 			}
 		case <-after:
+			t.Log("Test timeout")
 			break LOOP
 		}
 	}
 	close(in)
 
+	// 验证工具被调用
 	if !toolCalled {
 		t.Fatal("Tool was not called")
 	}
 
-	// Verify that the RuntimeID in the tool callback matches the task ID
-	if capturedRuntimeID == "" {
-		t.Fatal("RuntimeID was not captured in tool callback")
+	// 验证任务完成
+	if !taskCompleted {
+		t.Fatal("Task did not complete")
 	}
 
+	// 验证 Task ID 被捕获
 	if taskID == "" {
-		t.Fatal("Task ID is empty - task ID was not captured from events")
+		t.Fatal("Task ID was not captured from events")
 	}
 
-	if capturedRuntimeID != taskID {
-		t.Fatalf("RuntimeID mismatch: expected %s, got %s", taskID, capturedRuntimeID)
+	// 获取最后一个任务
+	lastTask := reAct.GetLastTask()
+	if lastTask == nil {
+		t.Fatal("last task not found")
 	}
 
-	fmt.Printf("✓ RuntimeID matches Task ID: %s\n", taskID)
+	// 验证 Task ID 匹配
+	if lastTask.GetId() != taskID {
+		t.Fatalf("Task ID mismatch: expected %s, got %s", taskID, lastTask.GetId())
+	}
+
+	fmt.Printf("✓ Task ID verified: %s\n", taskID)
+
+	// 通过 GetRisks 方法获取创建的 risks
+	risks := reAct.GetRisks()
+	if len(risks) == 0 {
+		t.Fatal("No risks found")
+	}
+
+	// 验证 risk 的内容
+	found := false
+	for _, risk := range risks {
+		fmt.Printf("Found risk: ID=%d, Title=%s, Target=%s, RuntimeID=%s\n",
+			risk.ID, risk.Title, risk.Url, risk.RuntimeId)
+		if risk.Title == flagTitle && risk.Url == flagTarget {
+			found = true
+			// 验证 RuntimeID 是否被正确设置
+			if risk.RuntimeId == "" {
+				t.Error("Risk RuntimeID is empty")
+			}
+			fmt.Printf("✓ Risk verified: Title=%s, Target=%s, RuntimeID=%s\n",
+				risk.Title, risk.Url, risk.RuntimeId)
+			break
+		}
+	}
+
+	if !found {
+		t.Fatalf("Expected risk not found: title=%s, target=%s", flagTitle, flagTarget)
+	}
+
+	fmt.Println("✓ Test completed successfully")
 }
 
 func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {

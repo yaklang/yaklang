@@ -94,6 +94,7 @@ const (
 	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
 
 	EVENT_TYPE_YAKIT_EXEC_RESULT = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
+	EVENT_TYPE_YAKIT_RISK        = "yak_risk"        // yakit risk event, used to emit the yakit risk information
 
 	// AI 推理过程通用事件类型
 	EVENT_TYPE_THOUGHT     EventType = "thought"     // AI 思考过程（适用于 ReAct、CoT 等推理模式）
