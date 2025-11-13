@@ -30,6 +30,7 @@ type AIEngineConfig struct {
 
 	// 工具配置
 	DisableToolUse        bool     // 禁用工具调用
+	DisableAIForge        bool     // 禁用 Forge 调用
 	DisableMCPServers     bool     // 禁用 MCPServers
 	EnableAISearchTool    bool     // 启用 AI 搜索工具
 	EnableForgeSearchTool bool     // 启用 Forge 搜索工具，默认启用
@@ -160,6 +161,12 @@ func WithLanguage(lang string) AIEngineConfigOption {
 func WithDisableToolUse(disable bool) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.DisableToolUse = disable
+	}
+}
+
+func WithDisableAIForge(disable bool) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.DisableAIForge = disable
 	}
 }
 
