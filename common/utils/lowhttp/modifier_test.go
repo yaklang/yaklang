@@ -1703,6 +1703,21 @@ c=3`,
 				"c=3",
 			},
 		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+
+c=3`,
+			values: map[string]string{"a": "1=", "b": "2="},
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na=1%3D&b=2%3D",
+			},
+			blacklists: []string{
+				"c=3",
+			},
+		},
 	}
 	for _, testcase := range testcases {
 		actual := string(ReplaceAllHTTPPacketPostParams([]byte(testcase.origin), testcase.values))
@@ -1788,6 +1803,19 @@ a=1`,
 				"Content-Type: application/x-www-form-urlencoded",
 				"\r\n\r\na=1&b=2",
 			},
+		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a=1%3D`,
+			key:   "b",
+			value: "2=",
+			whitelists: []string{
+				"Content-Type: application/x-www-form-urlencoded",
+				"\r\n\r\na=1%3D&b=2%3D",
+			},
+			blacklists: []string{"%25"},
 		},
 		{
 			origin: `POST / HTTP/1.1
