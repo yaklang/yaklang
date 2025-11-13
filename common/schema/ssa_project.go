@@ -31,7 +31,11 @@ func (p *SSAProject) SetTagsList(tags []string) {
 }
 
 func (p *SSAProject) GetConfig() (*ssaconfig.Config, error) {
-	config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig(p.Config))
+	config, err := ssaconfig.New(
+		ssaconfig.ModeAll,
+		ssaconfig.WithJsonRawConfig(p.Config),
+		ssaconfig.WithProjectID(uint64(p.ID)),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +89,6 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 	result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
 		RuleFilter: config.GetRuleFilter(),
 	}
-	result.JSONStringConfig = string(p.Config)
+	result.JSONStringConfig, _ = config.ToJSONString()
 	return result
 }
