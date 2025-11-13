@@ -126,45 +126,45 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 		// Chat 模式（默认）：使用 chat 接口进行健康检查
 		log.Debugf("Using chat health check for provider: %s", providerIdentifierForLog)
 
-	// Create AI client using the provider's GetAIClient method
-	// GetAIClient is assumed to handle its own HTTP client requirements.
-	client, err := p.GetAIClient(
-		func(reader io.Reader) {
-			io.Copy(utils.FirstWriter(func(b []byte) {
-				rspOnce.Do(func() {
-					firstByteDuration = time.Since(startTime)
-					succeededChan <- true
-				})
-			}), reader)
-		},
-		func(reader io.Reader) {
-			io.Copy(utils.FirstWriter(func(b []byte) {
-				rspOnce.Do(func() {
-					firstByteDuration = time.Since(startTime)
-					succeededChan <- true
-				})
-			}), reader)
-		},
-	)
+		// Create AI client using the provider's GetAIClient method
+		// GetAIClient is assumed to handle its own HTTP client requirements.
+		client, err := p.GetAIClient(
+			func(reader io.Reader) {
+				io.Copy(utils.FirstWriter(func(b []byte) {
+					rspOnce.Do(func() {
+						firstByteDuration = time.Since(startTime)
+						succeededChan <- true
+					})
+				}), reader)
+			},
+			func(reader io.Reader) {
+				io.Copy(utils.FirstWriter(func(b []byte) {
+					rspOnce.Do(func() {
+						firstByteDuration = time.Since(startTime)
+						succeededChan <- true
+					})
+				}), reader)
+			},
+		)
 
-	if err != nil {
-		errMsg := fmt.Errorf("failed to get AI client for %s: %v", providerIdentifierForLog, err)
-		log.Warnf("Health check preparation failed for %s: %v", providerIdentifierForLog, err)
-		return false, 0, errMsg
-	}
-
-	log.Debugf("Initiating health check (ping) for: %s", providerIdentifierForLog)
-
-	go func() {
-		_, chatErr := client.Chat(healthCheckPrompt)
-		if chatErr != nil {
-			respErr = chatErr
-			select {
-			case succeededChan <- false:
-			default:
-			}
+		if err != nil {
+			errMsg := fmt.Errorf("failed to get AI client for %s: %v", providerIdentifierForLog, err)
+			log.Warnf("Health check preparation failed for %s: %v", providerIdentifierForLog, err)
+			return false, 0, errMsg
 		}
-	}()
+
+		log.Debugf("Initiating health check (ping) for: %s", providerIdentifierForLog)
+
+		go func() {
+			_, chatErr := client.Chat(healthCheckPrompt)
+			if chatErr != nil {
+				respErr = chatErr
+				select {
+				case succeededChan <- false:
+				default:
+				}
+			}
+		}()
 	}
 
 	var succeeded bool
