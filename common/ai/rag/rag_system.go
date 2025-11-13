@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -70,7 +71,9 @@ func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 			if err != nil {
 				return utils.Wrap(err, "failed to delete rag collection")
 			}
-			err := ImportRAG(config.importFile, WithDB(config.db), WithRAGCollectionName(colInfo.Name), WithExportOverwriteExisting(true))
+			defaultOpts := slices.Clone(options)
+			defaultOpts = append(defaultOpts, WithExportOverwriteExisting(true), WithImportFile(""))
+			err := ImportRAG(config.importFile, defaultOpts...)
 			if err != nil {
 				return utils.Wrap(err, "failed to import rag collection")
 			}
