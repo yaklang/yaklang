@@ -3640,6 +3640,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const typeName = typeNameSelect.value.trim();
             const domainOrURL = domainOrURLInput.value.trim();
             const firstApiKey = apiKeysTextarea.value.split('\n')[0].trim();
+            const providerModeSelect = document.getElementById('providerMode');
+            const providerMode = providerModeSelect ? providerModeSelect.value : 'chat';
 
             if (!wrapperName || !modelName || !typeName || !firstApiKey) {
                 validationResultDiv.textContent = '请填写提供者名称、模型名称、类型和至少一个API密钥进行验证。';
@@ -3663,6 +3665,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 params.append('model_type', typeName);
                 params.append('domain_or_url', domainOrURL);
                 params.append('api_key_to_validate', firstApiKey);
+                params.append('provider_mode', providerMode); // 添加 provider_mode
                 if (noHTTPSCheckbox.checked) {
                     params.append('no_https', 'on');
                 }
