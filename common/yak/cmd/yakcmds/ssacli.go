@@ -1266,6 +1266,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
 		},
 
+		cli.BoolFlag{
+			Name:  "rule-perf-log",
+			Usage: "enable per-rule performance profiling log output",
+		},
+
 		cli.StringSliceFlag{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.
@@ -1363,6 +1368,7 @@ var ssaCodeScan = &cli.Command{
 			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
 			sfscan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
+			syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
 				if info == nil || len(info.Rules) == 0 {
@@ -1383,7 +1389,7 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		ssaprofile.ShowCacheCost()
+		ssaprofile.ShowCompileProfiles()
 		return nil
 	},
 }
