@@ -10,7 +10,7 @@ cli.check()
 
 yakit.Info("开始编译 SSA 项目")
 
-config, err = ssa.New(ssa.ModeAll, ssa.withJsonRawConfig(configJSON))
+config, err = ssa.NewConfig(ssa.ModeAll, ssa.withJsonRawConfig(configJSON))
 if err != nil {
     yakit.Error("创建配置失败: %v", err)
     return
