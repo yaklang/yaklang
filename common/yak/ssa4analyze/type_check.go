@@ -207,7 +207,10 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	}
 	// check argument number
 	func() {
-		wantParaLen := len(funcTyp.Parameter)
+		fixedLen := len(funcTyp.Parameter)
+		if funcTyp.IsVariadic {
+			fixedLen = len(funcTyp.Parameter) - 1
+		}
 		var gotPara ssa.Types = lo.FilterMap(c.Args, func(argId int64, _ int) (ssa.Type, bool) {
 			arg, ok := c.GetValueById(argId)
 			if !ok || utils.IsNil(arg) {
@@ -227,7 +230,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		switch {
 		case funcTyp.IsVariadic && !c.IsEllipsis:
 			// len:  gotParaLen >=  wantParaLen-1
-			lengthError = gotParaLen < wantParaLen-1
+			lengthError = gotParaLen < fixedLen
 		case !funcTyp.IsVariadic && c.IsEllipsis:
 			// error, con't use ellipsis in this function
 			lengthError = true
@@ -237,7 +240,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			lengthError = false
 			return // skip type check
 		case !funcTyp.IsVariadic && !c.IsEllipsis:
-			lengthError = gotParaLen != wantParaLen
+			lengthError = gotParaLen != fixedLen
 		}
 		if lengthError {
 			if gotParaLen != funcTyp.ParameterLen {
@@ -263,12 +266,27 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 		}
 
-		//lenOfFuncParams := len(funcTyp.Parameter)
+		// checkFixedParams
 		var got, want ssa.Type
-		for i := 0; i < gotParaLen; i++ {
+		for i := 0; i < fixedLen; i++ {
 			got = gotPara[i]
 			want = funcTyp.Parameter[i]
 			checkParamType(i, got, want)
+		}
+
+		// checkVariadicParams
+		if funcTyp.IsVariadic {
+			variadicType := funcTyp.Parameter[len(funcTyp.Parameter)-1]
+			objType, ok := ssa.ToObjectType(variadicType)
+			if ok {
+				if objType.GetTypeKind() == ssa.SliceTypeKind {
+					variadicType = objType.FieldType
+				}
+			}
+			for i := fixedLen; i < gotParaLen; i++ {
+				got = gotPara[i]
+				checkParamType(i, got, variadicType)
+			}
 		}
 	}()
 	if len(c.GetAllVariables()) == 0 && len(c.GetUsers()) == 0 {

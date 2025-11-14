@@ -35,45 +35,6 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
-	fixCallVariadic := func(args []Value, funcType *FunctionType) []Value {
-		if utils.IsNil(funcType) || !funcType.IsVariadic || len(args) < funcType.ParameterLen || args == nil {
-			return args
-		}
-
-		fixedCount := funcType.ParameterLen - 1 // 最后一个是 variadic
-		if fixedCount > len(args) {
-			fixedCount = len(args)
-		}
-
-		// 固定参数部分
-		newArgs := append([]Value{}, args[:fixedCount]...)
-
-		// variadic 部分
-		variadicArgs := make([]Value, 0)
-		for i := fixedCount; i < len(args); i++ {
-			variadicArgs = append(variadicArgs, args[i])
-		}
-
-		if len(variadicArgs) == 0 { // 如果没有可变参数那就不要塞一个空的make进去了
-			return args
-		}
-
-		// 打包成 slice
-		obj := f.InterfaceAddFieldBuild(len(variadicArgs),
-			func(i int) Value { return f.EmitConstInstPlaceholder(i) },
-			func(i int) Value { return variadicArgs[i] },
-		)
-		obj.GetType().(*ObjectType).Kind = SliceTypeKind
-		obj.Anonymous = true // 标记为临时匿名结构体
-		newArgs = append(newArgs, obj)
-
-		return newArgs
-	}
-
-	targetFuncType, ok := ToFunctionType(target.GetType())
-	if ok {
-		args = fixCallVariadic(args, targetFuncType)
-	}
 	// 创建 Call 指令
 	call := NewCall(target, args, nil, f.CurrentBlock)
 	return call
