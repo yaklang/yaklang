@@ -10,6 +10,7 @@ import (
 type CodeSourceKind string
 
 const (
+	CodeSourceNone        CodeSourceKind = ""            // 未指定
 	CodeSourceLocal       CodeSourceKind = "local"       // 本地文件/目录
 	CodeSourceCompression CodeSourceKind = "compression" // 压缩文件
 	CodeSourceJar         CodeSourceKind = "jar"         // Jar文件

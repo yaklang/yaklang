@@ -463,7 +463,7 @@ func Test_PhiType(t *testing.T) {
 	}`
 
 	symbol := yaklang.New().GetFntable()
-	opts := make([]ssaapi.Option, 0)
+	opts := make([]ssaconfig.Option, 0)
 	tmp := reflect.TypeOf(make(map[string]interface{}))
 	for name, item := range symbol {
 		itype := reflect.TypeOf(item)

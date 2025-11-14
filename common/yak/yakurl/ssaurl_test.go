@@ -80,7 +80,7 @@ func (s *ssaurlTest) RunDefer() {
 	}
 }
 
-func NewSSAURLTest(t *testing.T, vf filesys_interface.FileSystem, opt ...ssaapi.Option) *ssaurlTest {
+func NewSSAURLTest(t *testing.T, vf filesys_interface.FileSystem, opt ...ssaconfig.Option) *ssaurlTest {
 	local, err := yakgrpc.NewLocalClient()
 	if err != nil {
 		t.Error(err)

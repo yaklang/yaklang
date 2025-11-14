@@ -46,28 +46,29 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 
 func (c *Config) parseProject() (progs Programs, err error) {
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
+	programName := c.GetProgramName()
 	defer func() {
 		if r := recover(); r != nil {
 			err = utils.Errorf("compile panic: %v", r)
 			log.Errorf("compile panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			// panic时清理已保存的Program数据
-			if c.ProgramName != "" {
-				log.Infof("cleaning up program data due to panic: %s", c.ProgramName)
-				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			if programName != "" {
+				log.Infof("cleaning up program data due to panic: %s", programName)
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
 			}
 		} else if err != nil {
 			// 编译出错时清理已保存的Program数据
-			if c.ProgramName != "" {
-				log.Infof("cleaning up program data due to error: %s", c.ProgramName)
-				ssadb.DeleteProgram(ssadb.GetDB(), c.ProgramName)
+			if programName != "" {
+				log.Infof("cleaning up program data due to error: %s", programName)
+				ssadb.DeleteProgram(ssadb.GetDB(), programName)
 			}
 		}
 	}()
 
 	if c.GetCompileReCompile() {
 		c.Processf(0, "recompile project, delete old data...")
-		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
+		ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
 		c.Processf(0, "recompile project, delete old data finish")
 	}
 

@@ -104,7 +104,7 @@ type sfSearch struct {
 	t *testing.T
 }
 
-func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.Option) *sfSearch {
+func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig.Option) *sfSearch {
 	progName := uuid.NewString()
 	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)

@@ -287,7 +287,7 @@ func TestA(t *testing.T) {
 
 	ctx := context.Background()
 	config := ssaapi.Config{}
-	for _, opt := range []ssaapi.Option{
+	for _, opt := range []ssaconfig.Option{
 		ssaapi.WithContext(ctx),
 		ssaapi.WithFileSystem(fs),
 		ssaapi.WithLanguage(ssaconfig.GO),

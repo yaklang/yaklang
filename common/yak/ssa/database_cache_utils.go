@@ -15,7 +15,8 @@ import (
 type ProgramCacheKind int
 
 const (
-	ProgramCacheMemory ProgramCacheKind = iota
+	ProgramCacheNone ProgramCacheKind = iota
+	ProgramCacheMemory
 	// only load from database // for scan
 	ProgramCacheDBRead
 	// fetch and save mode  // for compile

@@ -48,7 +48,7 @@ func GetDB() *gorm.DB {
 
 func DeleteProgram(db *gorm.DB, program string) {
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
-		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
+		tx.Debug().Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
 		deleteProgramCodeOnly(tx, program)
 		deleteProgramAuditResult(tx, program)
 		deleteProgramRiskAndScanTask(tx, program)

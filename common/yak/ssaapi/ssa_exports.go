@@ -45,16 +45,17 @@ func Parse(code string, opts ...ssaconfig.Option) (*Program, error) {
 
 // ParseFromReader parse simple file to ssa.Program
 func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error) {
-	config, err := DefaultConfig(opts...)
-	if err != nil {
-		return nil, err
-	}
 	if input != nil {
 		raw, err := io.ReadAll(input)
 		if err != nil {
 			log.Warnf("read input error: %v", err)
 		}
-		config.originEditor = memedit.NewMemEditor(string(raw))
+		// config.originEditor = memedit.NewMemEditor(string(raw))
+		opts = append(opts, WithEditor(memedit.NewMemEditor(string(raw))))
+	}
+	config, err := DefaultConfig(opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	hash := config.CalcHash()

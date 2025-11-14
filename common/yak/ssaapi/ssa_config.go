@@ -7,11 +7,9 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
@@ -36,7 +34,7 @@ type Config struct {
 	programPath string
 	includePath []string
 
-	databaseKind ssadb.ProgramKind
+	databaseKind ssa.ProgramCacheKind
 	// process
 	process ProcessFunc
 
@@ -147,9 +145,12 @@ func WithFileSystemEntry(v ...string) ssaconfig.Option {
 	return withFileSystemEntry(v)
 }
 
-var WithProgramPath = ssaconfig.SetOption("ssa_compile/program_path", func(c *Config, v string) {
-	c.programPath = v
-})
+func WithProgramPath(v string) ssaconfig.Option {
+	return ssaconfig.WithCodeSourceMap(map[string]any{
+		"kind":       "local",
+		"local_file": v,
+	})
+}
 
 var WithIncludePath = ssaconfig.SetOption("ssa_compile/include_path", func(c *Config, v []string) {
 	c.includePath = append(c.includePath, v...)
@@ -254,6 +255,10 @@ func WithEnableCache(b ...bool) ssaconfig.Option {
 	}
 }
 
+var WithEditor = ssaconfig.SetOption("ssa_compile/editor", func(c *Config, v *memedit.MemEditor) {
+	c.originEditor = v
+})
+
 var WithContext = ssaconfig.WithContext
 
 func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
@@ -263,8 +268,6 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	}
 	c := &Config{
 		LanguageBuilder:            nil,
-		originEditor:               memedit.NewMemEditor(""),
-		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
 		entryFile:                  make([]string, 0),
 		cacheTTL:                   make([]time.Duration, 0),
@@ -282,6 +285,29 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	}
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
+	if fs, err := c.parseFSFromInfo(); err != nil {
+		return nil, err
+	} else if fs != nil {
+		c.fs = fs
+	}
+	switch c.databaseKind {
+	case ssa.ProgramCacheNone:
+		c.databaseKind = ssa.ProgramCacheMemory
+		if c.GetProgramName() != "" {
+			// if set program name, use db write
+			c.databaseKind = ssa.ProgramCacheDBWrite
+		}
+		if c.GetCompileMemory() {
+			// if set enable memory, use memory force
+			c.databaseKind = ssa.ProgramCacheMemory
+		}
+	}
+
+	// memory/write mode no need check source code
+	if c.fs == nil && c.originEditor == nil {
+		return nil, utils.Errorf("Compile Proram should set file system or origin editor ")
+	}
+
 	if create, ok := LanguageBuilderCreater[c.GetLanguage()]; ok {
 		c.LanguageBuilder = create()
 	} else {
@@ -291,42 +317,9 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	return c, nil
 }
 
-// func WithLocalFs(path string) ssaconfig.Option {
-// 	return func(c *Config) error {
-// 		WithConfigInfo(map[string]any{
-// 			"kind":       "local",
-// 			"local_file": path,
-// 		})(c)
-// 		return nil
-// 	}
-// }
-// func WithConfigInfoRaw(info string) ssaconfig.Option {
-// 	return func(c *Config) error {
-// 		c.info = info
-// 		fs, err := c.parseFSFromInfo(info)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		err = WithFileSystem(fs)(c)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return nil
-// 	}
-// }
-
-// func WithConfigInfo(input map[string]any) ssaconfig.Option {
-// 	return func(c *Config) error {
-// 		if input == nil {
-// 			return nil
-// 		}
-// 		// json marshal info
-// 		raw, err := json.Marshal(input)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		info := string(raw)
-
-// 		return WithConfigInfoRaw(info)(c)
-// 	}
-// }
+func WithLocalFs(path string) ssaconfig.Option {
+	return WithConfigInfo(map[string]any{
+		"kind":       "local",
+		"local_file": path,
+	})
+}

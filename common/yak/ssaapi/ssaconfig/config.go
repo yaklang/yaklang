@@ -24,16 +24,18 @@ type Option func(*Config) error
 type Mode int
 
 const (
-	ModeProjectBase           Mode = 1 << iota // 0 - 基础模式
-	ModeSSACompile            Mode = 1 << iota // 1 - 编译模式
-	ModeSyntaxFlowScanManager Mode = 1 << iota // 2 - 扫描管理器模式
-	ModeSyntaxFlow            Mode = 1 << iota // 3 - SyntaxFlow模式
-	ModeSyntaxFlowRule        Mode = 1 << iota // 4 - 规则模式
-	ModeCodeSource            Mode = 1 << iota // 5 - 源码配置模式
+	ModeProjectBase           Mode = 1 << iota // - 基础模式
+	modeSSACompile            Mode = 1 << iota // - 编译模式
+	ModeSyntaxFlowScanManager Mode = 1 << iota // - 扫描管理器模式
+	ModeSyntaxFlow            Mode = 1 << iota // - SyntaxFlow模式
+	ModeSyntaxFlowRule        Mode = 1 << iota // - 规则模式
+	ModeCodeSource            Mode = 1 << iota // - 源码配置模式
+
+	ModeSSACompile = ModeProjectBase | modeSSACompile | ModeCodeSource
 
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
 	// all
-	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
+	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
 )
 
 func New(mode Mode, opts ...Option) (*Config, error) {

@@ -6,18 +6,18 @@ import (
 
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
-func ReplaceMemberCall(t, v, to Value) map[string]Value {
+func ReplaceMemberCall(object, v, to Value) map[string]Value {
 	ret := make(map[string]Value)
-	builder := t.GetFunc().builder
+	builder := object.GetFunc().builder
 	if utils.IsNil(builder) {
 		return ret
 	}
-	recoverScope := builder.SetCurrent(t)
+	recoverScope := builder.SetCurrent(object)
 	defer recoverScope()
 	createPhi := generatePhi(builder, nil, nil)
 
 	// replace object member-call
-	if t.IsObject() {
+	if object.IsObject() {
 		replace := func(key, member Value) {
 			if utils.IsNil(key) || utils.IsNil(member) {
 				log.Errorf("BUG: replace member is nil key[%v] member[%v]", key, member)
@@ -26,8 +26,8 @@ func ReplaceMemberCall(t, v, to Value) map[string]Value {
 			// replace this member object to to
 			trueKey := member.GetKey()
 			// remove this member from v
-			if _, ok := t.GetMember(key); ok {
-				t.DeleteMember(key)
+			if _, ok := object.GetMember(key); ok {
+				object.DeleteMember(key)
 			}
 
 			// create member of `to` value with key
@@ -57,7 +57,7 @@ func ReplaceMemberCall(t, v, to Value) map[string]Value {
 			if key.GetId() == v.GetId() {
 				// No need for recursion
 				toKey := to
-				setMemberCallRelationship(t, toKey, member)
+				setMemberCallRelationship(object, toKey, member)
 				if utils.IsNil(toMember) {
 					toMember = member
 				}
@@ -89,7 +89,7 @@ func ReplaceMemberCall(t, v, to Value) map[string]Value {
 		}
 		// call value需要优先替换
 		callMap := make(map[Value]Value)
-		for key, member := range t.GetAllMember() {
+		for key, member := range object.GetAllMember() {
 			if _, ok := ToCall(member); ok {
 				callMap[key] = member
 				continue
@@ -102,9 +102,9 @@ func ReplaceMemberCall(t, v, to Value) map[string]Value {
 	}
 
 	// TODO : this need more test, i think this code error
-	// if t.IsMember() {
-	// 	obj := t.GetObject()
-	// 	setMemberCallRelationship(obj, t.GetKey(), t)
-	// }
+	if object.IsMember() {
+		obj := object.GetObject()
+		setMemberCallRelationship(obj, object.GetKey(), object)
+	}
 	return ret
 }

@@ -51,7 +51,7 @@ type IrProgram struct {
 }
 
 func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
-	db := GetDB().Model(&IrProgram{})
+	db := GetDB().Model(&IrProgram{}).Debug()
 	out := &IrProgram{
 		ProgramName: name,
 		Version:     version,
@@ -82,7 +82,7 @@ func GetApplicationProgram(name string) (*IrProgram, error) {
 
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
-	db := GetDB().Model(&IrProgram{})
+	db := GetDB().Model(&IrProgram{}).Debug()
 	if name == "" {
 		return nil, utils.Errorf("program name is empty")
 	}
@@ -97,7 +97,7 @@ func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 }
 
 func UpdateProgram(prog *IrProgram) {
-	GetDB().Model(&IrProgram{}).
+	GetDB().Model(&IrProgram{}).Debug().
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
 		Where("program_kind = ?", prog.ProgramKind).

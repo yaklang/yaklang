@@ -78,17 +78,13 @@ func (p *Program) Hash() (string, bool) {
 func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
 		Program:           prog,
-		config:            config,
-		enableDatabase:    config.databaseKind != ssa.ProgramCacheMemory,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
 		id:                atomic.NewInt64(0),
 	}
-
-	// if config.DatabaseProgramName == "" {
-	// 	p.DBCache = prog.Cache
-	// } else {
-	// 	p.DBCache = ssa.GetCacheFromPool(config.DatabaseProgramName)
-	// }
+	if config != nil {
+		p.config = config
+		p.enableDatabase = config.databaseKind != ssa.ProgramCacheMemory
+	}
 	return p
 }
 

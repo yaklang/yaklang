@@ -30,22 +30,18 @@ func FromDatabase(programName string) (p *Program, err error) {
 		SetProgramCache(p)
 	}()
 
-	config, err := DefaultConfig(WithProgramName(programName))
-	if err != nil {
-		return nil, err
-	}
-	return config.fromDatabase()
+	return fromDatabase(programName)
 }
 
-func (c *Config) fromDatabase() (*Program, error) {
+func fromDatabase(name string) (*Program, error) {
 	// get program from database
-	prog, err := ssa.GetProgram(c.GetProgramName(), ssa.Application)
+	prog, err := ssa.GetProgram(name, ssa.Application)
 	if err != nil {
 		return nil, err
 	}
 
 	// all function and instruction will be lazy
-	ret := NewProgram(prog, c)
+	ret := NewProgram(prog, nil)
 	ret.comeFromDatabase = true
 	ret.irProgram = prog.GetIrProgram()
 	return ret, nil
