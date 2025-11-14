@@ -15,8 +15,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
-// Universal compress function for search results
-func compressSearchResults(resultStr string, searchInfo string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator, maxRanges int, minLines int, maxLines int, title string, usePatterns bool) string {
+// Universal compress function for search results with user context
+// userContext should contain user requirements to help filter relevant code
+func compressSearchResults(resultStr string, searchInfo string, userContext string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator, maxRanges int, minLines int, maxLines int, title string, usePatterns bool) string {
 	if len(resultStr) == 0 {
 		return resultStr
 	}
@@ -25,23 +26,35 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
 	dNonce := utils.RandStringBytes(4)
 
 	promptTemplate := `
-<|GREP_RESULT_{{ .nonce }}|>
+{{ if .userContext }}<|USER_CONTEXT_{{ .nonce }}|>
+{{ .userContext }}
+<|USER_CONTEXT_END_{{ .nonce }}|>
+
+{{ end }}<|GREP_RESULT_{{ .nonce }}|>
 {{ .samples }}
 <|GREP_RESULT_END_{{ .nonce }}|>
 
 <|INSTRUCT_{{ .nonce }}|>
 【智能代码片段提取与排序】
+{{ if .userContext }}
+请严格根据上述用户需求从搜索结果中提取最有价值的代码片段，按重要性排序：
 
+【核心原则】
+- 必须与用户需求直接相关
+- 过滤掉所有无关的代码片段
+- 优先选择能直接解决用户问题的代码
+{{ else }}
 请从上述搜索结果中提取最有价值的代码片段，按重要性排序：
-
+{{ end }}
 【提取要求】
 1. 最多提取 %d 个代码片段
 2. 每个片段 %d-%d 行，确保上下文完整
 3. 按重要性从高到低排序（rank: 1最重要，数字越大越不重要）
+4. 严格过滤无关代码片段
 
 【重要性评判标准】（按优先级排序）
 🔥 最高优先级 (rank 1-3)：
-- 完整的函数调用示例 + 错误处理
+- 完整的满足用户需求的函数调用示例
 - 包含关键参数配置的典型用法
 - 展示核心API调用模式的代码
 
@@ -62,13 +75,13 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
   "rank": 数字(1-10),
   "reason": "选择理由，例如：找到xxx相关代码样本"
 }
-或者 {"range": "10-20", "rank": 8} // 不带 reason 的版本
 
 【严格要求】
 - 总行数控制在80行以内
 - 避免重复或相似的代码片段
 - 优先选择能独立理解的完整代码块
 - 确保每个片段都有实际参考价值
+{{ if .userContext }}- 必须与用户需求相关，无关代码一律排除{{ end }}
 
 请按重要性排序输出ranges数组。
 <|INSTRUCT_END_{{ .nonce }}|>
@@ -81,9 +94,10 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
 	}
 
 	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":      dNonce,
-		"samples":    utils.PrefixLinesWithLineNumbers(resultStr),
-		"searchInfo": searchInfo,
+		"nonce":       dNonce,
+		"samples":     utils.PrefixLinesWithLineNumbers(resultStr),
+		"searchInfo":  searchInfo,
+		"userContext": userContext,
 	})
 
 	if err != nil {
@@ -229,8 +243,8 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
 }
 
 // compressGrepResults is now a wrapper for compressSearchResults with specific parameters for grep
-func compressGrepResults(resultStr string, pattern string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
-	return compressSearchResults(resultStr, pattern, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
+func compressGrepResults(resultStr string, pattern string, userContext string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
+	return compressSearchResults(resultStr, pattern, userContext, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
 }
 
 var grepYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
@@ -505,7 +519,12 @@ grep_yaklang_samples(pattern="端口扫描|服务扫描", context_lines=25)
 			// 尝试压缩和优化搜索结果
 			if len(results) > 5 {
 				log.Infof("grep_yaklang_samples: attempting to compress %d results", len(results))
-				compressedResult := compressGrepResults(resultStr, pattern, invoker, op)
+
+				// 获取用户输入作为上下文，帮助过滤相关代码
+				userInput := op.GetTask().GetUserInput()
+				userContext := fmt.Sprintf("用户需求：%s\n搜索模式：%s", userInput, pattern)
+
+				compressedResult := compressGrepResults(resultStr, pattern, userContext, invoker, op)
 				if len(compressedResult) < len(resultStr) {
 					resultStr = compressedResult
 					log.Infof("grep_yaklang_samples: successfully compressed results")
