@@ -2,7 +2,6 @@ package ssaconfig
 
 import (
 	"encoding/json"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -41,12 +40,15 @@ type CodeSourceInfo struct {
 	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
 }
 
-func (c *CodeSourceInfo) JsonString() string {
-	json, err := json.Marshal(c)
+func (c *CodeSourceInfo) ToJSONString() string {
+	if c == nil {
+		return ""
+	}
+	jsonRaw, err := json.Marshal(c)
 	if err != nil {
 		return ""
 	}
-	return string(json)
+	return string(jsonRaw)
 }
 
 // ValidateSourceConfig 验证代码源配置的有效性
@@ -76,6 +78,13 @@ func (c *CodeSourceInfo) ValidateSourceConfig() error {
 }
 
 // --- 代码源配置 Get 方法 ---
+
+func (c *Config) GetCodeSourceInfo() *CodeSourceInfo {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return nil
+	}
+	return c.CodeSource
+}
 
 func (c *Config) GetCodeSourceKind() CodeSourceKind {
 	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
@@ -291,7 +300,9 @@ func WithCodeSourceJson(raw string) Option {
 		if err := c.ensureCodeSource("Code Source JSON"); err != nil {
 			return err
 		}
-		err := json.Unmarshal([]byte(raw), c.CodeSource)
+		codeSource := &CodeSourceInfo{}
+		err := json.Unmarshal([]byte(raw), codeSource)
+		c.CodeSource = codeSource
 		if err != nil {
 			return utils.Errorf("Config: Code Source JSON Unmarshal failed: %v", err)
 		}

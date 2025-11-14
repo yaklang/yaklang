@@ -167,7 +167,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}
 
 	var ret *SyntaxFlowResult
-	ret = CreateResultFromQuery(res)
+	ret = CreateResultFromQuery(res, config.Config)
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {

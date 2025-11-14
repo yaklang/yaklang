@@ -30,8 +30,6 @@ type ProcessFunc func(msg string, process float64)
 type Config struct {
 	databaseKind   ssa.ProgramCacheKind
 	programSaveTTL time.Duration
-	// project
-	ProjectName string
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -398,12 +396,11 @@ func WithProgramName(name string) Option {
 
 func WithProjectName(name string) Option {
 	return func(c *Config) error {
-		project, err := ssaproject.LoadSSAProjectBuilderByName(name)
+		project, err := ssaproject.LoadSSAProjectByName(name)
 		if err != nil {
 			return err
 		}
 		sc := project.Config
-		c.ProjectName = name
 		if sc == nil || sc.SSACompile == nil {
 			return utils.Errorf("project %s config not found", name)
 		}
@@ -423,9 +420,20 @@ func WithMemory(ttl ...time.Duration) Option {
 
 func WithSSAConfig(sc *ssaconfig.Config) Option {
 	return func(c *Config) error {
+		// todo: 后续这个接口等后续使用json配置项后，不再使用
 		if sc != nil {
 			c.Config = sc
 		}
+
+		if sc.GetLanguage() != "" {
+			WithLanguage(sc.GetLanguage())(c)
+		}
+
+		err := WithConfigInfoRaw(sc.GetCodeSourceInfo().ToJSONString())(c)
+		if err != nil {
+			return err
+		}
+
 		if sc.GetCompileMemory() {
 			err := WithMemory()(c)
 			if err != nil {
@@ -450,6 +458,12 @@ func WithSSAConfig(sc *ssaconfig.Config) Option {
 				return err
 			}
 		}
+
+		// 生成程序名
+		projectName := sc.GetProjectName()
+		currentTime := time.Now().Format("2006-01-02 15:04:05")
+		programName := fmt.Sprintf("%s(%s)", projectName, currentTime)
+		WithProgramName(programName)(c)
 		return nil
 	}
 }

@@ -1,0 +1,206 @@
+yakit.AutoInitYakit()
+
+// 接收项目ID
+projectId = cli.Int(
+    "project_id",
+    cli.setRequired(true),
+    cli.setVerboseName("项目ID"),
+    cli.setHelp("需要更新的SSA项目ID"),
+)
+
+// 使用JSON Schema定义配置数据（匹配 ssaconfig.Config 结构）
+configData = cli.Json("config_data",
+    cli.setVerboseName("配置数据"),
+    cli.setRequired(true),
+    cli.setJsonSchema(<<<JSON
+{
+  "type": "object",
+  "properties": {
+    "BaseInfo": {
+      "title": "基础信息",
+      "type": "object",
+      "properties": {
+        "project_name": {
+          "title": "项目名称",
+          "type": "string"
+        },
+        "project_description": {
+          "title": "项目描述",
+          "type": "string"
+        },
+        "language": {
+          "title": "项目语言",
+          "type": "string",
+          "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
+        },
+        "tags": {
+          "title": "项目标签",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["project_name", "language"]
+    },
+    "CodeSource": {
+      "title": "代码源配置",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "title": "源码类型",
+          "type": "string",
+          "enum": ["local", "compression", "jar", "git", "svn"]
+        },
+        "local_file": {
+          "title": "本地路径",
+          "type": "string",
+          "yakit_type": "folder"
+        },
+        "url": {
+          "title": "远程URL",
+          "type": "string"
+        },
+        "branch": {
+          "title": "分支",
+          "type": "string"
+        },
+        "path": {
+          "title": "子路径",
+          "type": "string"
+        },
+        "auth": {
+          "title": "认证配置",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "title": "认证方式",
+              "type": "string",
+              "enum": ["password", "ssh_key", "token"],
+              "description": "认证方式: password=密码认证, ssh_key=SSH密钥认证, token=Token认证"
+            },
+            "user_name": {
+              "title": "用户名",
+              "type": "string"
+            },
+            "password": {
+              "title": "密码/Token",
+              "type": "string",
+              "description": "密码或Token值"
+            },
+            "key_path": {
+              "title": "SSH密钥路径",
+              "type": "string",
+              "yakit_type": "upload",
+              "description": "SSH私钥文件路径"
+            }
+          }
+        },
+        "proxy": {
+          "title": "代理配置",
+          "type": "object",
+          "properties": {
+            "url": {
+              "title": "代理URL",
+              "type": "string",
+              "description": "代理服务器地址，例如: http://127.0.0.1:8080"
+            },
+            "user": {
+              "title": "代理用户名",
+              "type": "string"
+            },
+            "password": {
+              "title": "代理密码",
+              "type": "string"
+            }
+          },
+          "required": ["url"]
+        }
+      }
+    },
+    "SSACompile": {
+      "title": "编译配置",
+      "type": "object",
+      "properties": {
+        "strict_mode": {
+          "title": "严格模式",
+          "type": "boolean",
+          "default": false
+        },
+        "peephole_size": {
+          "title": "窥视孔大小",
+          "type": "integer",
+          "default": 0,
+          "description": "项目分片大小，0表示关闭"
+        },
+        "exclude_files": {
+          "title": "排除文件",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["**/vendor/**,**/classes/**,",  "**/target/**"]
+        },
+        "re_compile": {
+          "title": "重新编译",
+          "type": "boolean",
+          "default": true
+        },
+        "memory_compile": {
+          "title": "内存编译",
+          "type": "boolean",
+          "default": false
+        },
+        "compile_concurrency": {
+          "title": "编译并发数",
+          "type": "integer",
+          "default": 10
+        }
+      }
+    }
+  },
+  "required": ["BaseInfo"]
+}
+JSON
+    ),
+)
+
+cli.check()
+yakit.Code(configData)
+yakit.Info("开始更新SSA项目，项目ID: %d", projectId)
+
+yakit.Info("加载项目...")
+project, err = ssa.GetSSAProjectByID(projectId)
+if err != nil {
+    yakit.Error("加载SSA项目失败: %v", err)
+    return
+}
+
+yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
+
+yakit.Info("更新项目配置...")
+configBytes, err = json.Marshal(configData)
+if err != nil {
+    yakit.Error("序列化配置失败: %v", err)
+    return
+}
+
+err = project.Save(ssa.withJsonRawConfig(configBytes))
+if err != nil {
+    yakit.Error("保存SSA项目失败: %v", err)
+    return
+}
+
+
+yakit.Info("SSA项目更新成功!")
+// 这里返回数据，前端收到会进行前端更新
+yakit.Output({
+    "success": true,
+    "project_id": project.ID,
+    "project_name": project.ProjectName,
+    "description": project.Description,
+    "path":project.URL,
+    "language": project.Language,
+    "tags": project.Tags,
+})
+

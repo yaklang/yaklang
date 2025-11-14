@@ -53198,8 +53198,9 @@ type SSAProgramFilter struct {
 	// fuzz search
 	Keyword string `protobuf:"bytes,7,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	// id range
-	AfterID       int64 `protobuf:"varint,8,opt,name=AfterID,proto3" json:"AfterID,omitempty"`
-	BeforeID      int64 `protobuf:"varint,9,opt,name=BeforeID,proto3" json:"BeforeID,omitempty"`
+	AfterID       int64    `protobuf:"varint,8,opt,name=AfterID,proto3" json:"AfterID,omitempty"`
+	BeforeID      int64    `protobuf:"varint,9,opt,name=BeforeID,proto3" json:"BeforeID,omitempty"`
+	ProjectIds    []uint64 `protobuf:"varint,10,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53288,6 +53289,13 @@ func (x *SSAProgramFilter) GetBeforeID() int64 {
 		return x.BeforeID
 	}
 	return 0
+}
+
+func (x *SSAProgramFilter) GetProjectIds() []uint64 {
+	if x != nil {
+		return x.ProjectIds
+	}
+	return nil
 }
 
 type QuerySSAProgramRequest struct {
@@ -54886,8 +54894,9 @@ type SyntaxFlowScanTaskFilter struct {
 	TaskIds       []string               `protobuf:"bytes,3,rep,name=TaskIds,proto3" json:"TaskIds,omitempty"`
 	FromId        int64                  `protobuf:"varint,4,opt,name=FromId,proto3" json:"FromId,omitempty"`
 	UntilId       int64                  `protobuf:"varint,5,opt,name=UntilId,proto3" json:"UntilId,omitempty"`
-	Keyword       string                 `protobuf:"bytes,6,opt,name=Keyword,proto3" json:"Keyword,omitempty"`     // fuzz search program-name
-	Kind          []string               `protobuf:"bytes,7,rep,name=Kind,proto3" json:"Kind,omitempty"`           // "debug" | "scan";
+	Keyword       string                 `protobuf:"bytes,6,opt,name=Keyword,proto3" json:"Keyword,omitempty"` // fuzz search program-name
+	Kind          []string               `protobuf:"bytes,7,rep,name=Kind,proto3" json:"Kind,omitempty"`       // "debug" | "scan";
+	ProjectIds    []uint64               `protobuf:"varint,8,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
 	HaveRisk      bool                   `protobuf:"varint,17,opt,name=HaveRisk,proto3" json:"HaveRisk,omitempty"` // 是否有风险
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -54968,6 +54977,13 @@ func (x *SyntaxFlowScanTaskFilter) GetKeyword() string {
 func (x *SyntaxFlowScanTaskFilter) GetKind() []string {
 	if x != nil {
 		return x.Kind
+	}
+	return nil
+}
+
+func (x *SyntaxFlowScanTaskFilter) GetProjectIds() []uint64 {
+	if x != nil {
+		return x.ProjectIds
 	}
 	return nil
 }
@@ -62498,7 +62514,14 @@ type SSAProject struct {
 	// 扫描配置选项
 	ScanConfig *SSAProjectScanConfig `protobuf:"bytes,10,opt,name=ScanConfig,proto3" json:"ScanConfig,omitempty"`
 	// 规则策略配置
-	RuleConfig    *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
+	RuleConfig       *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
+	JSONStringConfig string                    `protobuf:"bytes,12,opt,name=JSONStringConfig,proto3" json:"JSONStringConfig,omitempty"`
+	// 漏洞个数
+	RiskNumber int64 `protobuf:"varint,13,opt,name=RiskNumber,proto3" json:"RiskNumber,omitempty"`
+	// 编译次数
+	CompileTimes int64 `protobuf:"varint,14,opt,name=CompileTimes,proto3" json:"CompileTimes,omitempty"`
+	// 本地路径或者远程代码仓库路径
+	URL           string `protobuf:"bytes,15,opt,name=URL,proto3" json:"URL,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62608,6 +62631,34 @@ func (x *SSAProject) GetRuleConfig() *SSAProjectScanRuleConfig {
 		return x.RuleConfig
 	}
 	return nil
+}
+
+func (x *SSAProject) GetJSONStringConfig() string {
+	if x != nil {
+		return x.JSONStringConfig
+	}
+	return ""
+}
+
+func (x *SSAProject) GetRiskNumber() int64 {
+	if x != nil {
+		return x.RiskNumber
+	}
+	return 0
+}
+
+func (x *SSAProject) GetCompileTimes() int64 {
+	if x != nil {
+		return x.CompileTimes
+	}
+	return 0
+}
+
+func (x *SSAProject) GetURL() string {
+	if x != nil {
+		return x.URL
+	}
+	return ""
 }
 
 type SSAProjectCompileConfig struct {
@@ -62867,10 +62918,11 @@ func (x *SSAProjectFilter) GetLanguages() []string {
 }
 
 type CreateSSAProjectRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Project       *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Project          *SSAProject            `protobuf:"bytes,1,opt,name=Project,proto3" json:"Project,omitempty"`
+	JSONStringConfig string                 `protobuf:"bytes,2,opt,name=JSONStringConfig,proto3" json:"JSONStringConfig,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CreateSSAProjectRequest) Reset() {
@@ -62908,6 +62960,13 @@ func (x *CreateSSAProjectRequest) GetProject() *SSAProject {
 		return x.Project
 	}
 	return nil
+}
+
+func (x *CreateSSAProjectRequest) GetJSONStringConfig() string {
+	if x != nil {
+		return x.JSONStringConfig
+	}
+	return ""
 }
 
 type CreateSSAProjectResponse struct {
@@ -63059,8 +63118,13 @@ func (x *UpdateSSAProjectResponse) GetMessage() *DbOperateMessage {
 }
 
 type DeleteSSAProjectRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Filter        *SSAProjectFilter      `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *SSAProjectFilter      `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	// 删除模式:
+	// "clear_compile_history" - 只清空编译历史（删除 IrProgram，保留 SSAProject）
+	// "delete_all" 或 空字符串 - 清空编译历史和项目信息（删除 IrProgram 和 SSAProject）
+	// 默认为 "delete_all"
+	DeleteMode    string `protobuf:"bytes,2,opt,name=DeleteMode,proto3" json:"DeleteMode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63100,6 +63164,13 @@ func (x *DeleteSSAProjectRequest) GetFilter() *SSAProjectFilter {
 		return x.Filter
 	}
 	return nil
+}
+
+func (x *DeleteSSAProjectRequest) GetDeleteMode() string {
+	if x != nil {
+		return x.DeleteMode
+	}
+	return ""
 }
 
 type DeleteSSAProjectResponse struct {
@@ -67897,7 +67968,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\"G\n" +
 	"\x0fSSAProgramInput\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
-	"\vDescription\x18\x02 \x01(\tR\vDescription\"\x88\x02\n" +
+	"\vDescription\x18\x02 \x01(\tR\vDescription\"\xa8\x02\n" +
 	"\x10SSAProgramFilter\x12\"\n" +
 	"\fProgramNames\x18\x01 \x03(\tR\fProgramNames\x12\x1c\n" +
 	"\tLanguages\x18\x02 \x03(\tR\tLanguages\x12\x10\n" +
@@ -67906,7 +67977,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eAfterUpdatedAt\x18\x06 \x01(\x03R\x0eAfterUpdatedAt\x12\x18\n" +
 	"\aKeyword\x18\a \x01(\tR\aKeyword\x12\x18\n" +
 	"\aAfterID\x18\b \x01(\x03R\aAfterID\x12\x1a\n" +
-	"\bBeforeID\x18\t \x01(\x03R\bBeforeID\"\x99\x01\n" +
+	"\bBeforeID\x18\t \x01(\x03R\bBeforeID\x12\x1e\n" +
+	"\n" +
+	"ProjectIds\x18\n" +
+	" \x03(\x04R\n" +
+	"ProjectIds\"\x99\x01\n" +
 	"\x16QuerySSAProgramRequest\x12#\n" +
 	"\x06Paging\x18\x01 \x01(\v2\v.ypb.PagingR\x06Paging\x12+\n" +
 	"\n" +
@@ -68021,7 +68096,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x125\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\x12\"\n" +
-	"\fShowDiffRisk\x18\x03 \x01(\bR\fShowDiffRisk\"\xe4\x01\n" +
+	"\fShowDiffRisk\x18\x03 \x01(\bR\fShowDiffRisk\"\x84\x02\n" +
 	"\x18SyntaxFlowScanTaskFilter\x12\x1a\n" +
 	"\bPrograms\x18\x01 \x03(\tR\bPrograms\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x18\n" +
@@ -68029,7 +68104,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06FromId\x18\x04 \x01(\x03R\x06FromId\x12\x18\n" +
 	"\aUntilId\x18\x05 \x01(\x03R\aUntilId\x12\x18\n" +
 	"\aKeyword\x18\x06 \x01(\tR\aKeyword\x12\x12\n" +
-	"\x04Kind\x18\a \x03(\tR\x04Kind\x12\x1a\n" +
+	"\x04Kind\x18\a \x03(\tR\x04Kind\x12\x1e\n" +
+	"\n" +
+	"ProjectIds\x18\b \x03(\x04R\n" +
+	"ProjectIds\x12\x1a\n" +
 	"\bHaveRisk\x18\x11 \x01(\bR\bHaveRisk\"\x91\x01\n" +
 	"\x1fQuerySyntaxFlowScanTaskResponse\x12+\n" +
 	"\n" +
@@ -68667,7 +68745,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
 	"\n" +
 	"ReportData\x18\x03 \x01(\tR\n" +
-	"ReportData\"\xb6\x03\n" +
+	"ReportData\"\xb8\x04\n" +
 	"\n" +
 	"SSAProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
@@ -68685,7 +68763,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ScanConfig\x12=\n" +
 	"\n" +
 	"RuleConfig\x18\v \x01(\v2\x1d.ypb.SSAProjectScanRuleConfigR\n" +
-	"RuleConfig\"\xd9\x01\n" +
+	"RuleConfig\x12*\n" +
+	"\x10JSONStringConfig\x18\f \x01(\tR\x10JSONStringConfig\x12\x1e\n" +
+	"\n" +
+	"RiskNumber\x18\r \x01(\x03R\n" +
+	"RiskNumber\x12\"\n" +
+	"\fCompileTimes\x18\x0e \x01(\x03R\fCompileTimes\x12\x10\n" +
+	"\x03URL\x18\x0f \x01(\tR\x03URL\"\xd9\x01\n" +
 	"\x17SSAProjectCompileConfig\x12\x1e\n" +
 	"\n" +
 	"StrictMode\x18\x01 \x01(\bR\n" +
@@ -68707,9 +68791,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03IDs\x18\x01 \x03(\x03R\x03IDs\x12\"\n" +
 	"\fProjectNames\x18\x02 \x03(\tR\fProjectNames\x12$\n" +
 	"\rSearchKeyword\x18\x03 \x01(\tR\rSearchKeyword\x12\x1c\n" +
-	"\tLanguages\x18\x04 \x03(\tR\tLanguages\"D\n" +
+	"\tLanguages\x18\x04 \x03(\tR\tLanguages\"p\n" +
 	"\x17CreateSSAProjectRequest\x12)\n" +
-	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\"v\n" +
+	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12*\n" +
+	"\x10JSONStringConfig\x18\x02 \x01(\tR\x10JSONStringConfig\"v\n" +
 	"\x18CreateSSAProjectResponse\x12)\n" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12/\n" +
 	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"D\n" +
@@ -68717,9 +68802,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\"v\n" +
 	"\x18UpdateSSAProjectResponse\x12)\n" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\x12/\n" +
-	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"H\n" +
+	"\aMessage\x18\x02 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"h\n" +
 	"\x17DeleteSSAProjectRequest\x12-\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x15.ypb.SSAProjectFilterR\x06Filter\"K\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x15.ypb.SSAProjectFilterR\x06Filter\x12\x1e\n" +
+	"\n" +
+	"DeleteMode\x18\x02 \x01(\tR\n" +
+	"DeleteMode\"K\n" +
 	"\x18DeleteSSAProjectResponse\x12/\n" +
 	"\aMessage\x18\x01 \x01(\v2\x15.ypb.DbOperateMessageR\aMessage\"t\n" +
 	"\x16QuerySSAProjectRequest\x12-\n" +

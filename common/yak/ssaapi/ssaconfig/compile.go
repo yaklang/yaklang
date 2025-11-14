@@ -1,6 +1,8 @@
 package ssaconfig
 
 import (
+	"github.com/samber/lo"
+	"strings"
 	"time"
 )
 
@@ -73,6 +75,26 @@ func WithProjectID(projectId uint64) Option {
 			return err
 		}
 		c.BaseInfo.ProjectID = projectId
+		return nil
+	}
+}
+
+func WithProjectName(name string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Name"); err != nil {
+			return err
+		}
+		c.BaseInfo.ProjectName = name
+		return nil
+	}
+}
+
+func WithProjectTags(tags []string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Project Tags"); err != nil {
+			return err
+		}
+		c.BaseInfo.Tags = tags
 		return nil
 	}
 }
@@ -181,7 +203,11 @@ func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
 	if c.SSACompile == nil {
 		c.SSACompile = defaultSSACompileConfig()
 	}
-	c.SSACompile.ExcludeFiles = excludeFiles
+	// 支持逗号分隔多个文件模式
+	allFiles := lo.FlatMap(excludeFiles, func(item string, index int) []string {
+		return strings.Split(item, ",")
+	})
+	c.SSACompile.ExcludeFiles = allFiles
 }
 
 func (c *Config) GetCompileReCompile() bool {
