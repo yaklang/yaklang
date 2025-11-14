@@ -220,6 +220,34 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		opt(config)
 	}
 
+	// Initialize checkpoint storage
+	config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(config.id, consts.GetGormProjectDatabase())
+
+	// Initialize endpoint manager
+	config.Epm = NewEndpointManagerContext(ctx)
+	config.Epm.SetConfig(config)
+	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
+		if config.AiServerName != "" {
+			err := config.LoadAIServiceByName(config.AiServerName)
+			if err != nil {
+				log.Errorf("load ai service failed: %v", err)
+			}
+		} else {
+			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
+		}
+	}
+	config.Timeline = NewTimeline(config, nil)
+	config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
+	config.Timeline.BindConfig(config, config)
+
+	// init default task
+	config.DefaultTask = NewStatefulTaskBase(
+		"default-task",
+		"",
+		config.Ctx,
+		config.Emitter,
+	)
+
 	// Initialize tool manager if not set
 	if config.AiToolManager == nil {
 		config.AiToolManager = buildinaitools.NewToolManager(config.AiToolManagerOption...)
@@ -288,34 +316,6 @@ func newConfig(ctx context.Context) *Config {
 		config.emitBaseHandler(e)
 		return nil
 	})
-
-	// Initialize checkpoint storage
-	config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(id, consts.GetGormProjectDatabase())
-
-	// Initialize endpoint manager
-	config.Epm = NewEndpointManagerContext(ctx)
-	config.Epm.SetConfig(config)
-	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
-		if config.AiServerName != "" {
-			err := config.LoadAIServiceByName(config.AiServerName)
-			if err != nil {
-				log.Errorf("load ai service failed: %v", err)
-			}
-		} else {
-			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
-		}
-	}
-	config.Timeline = NewTimeline(config, nil)
-	config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
-	config.Timeline.BindConfig(config, config)
-
-	// init default task
-	config.DefaultTask = NewStatefulTaskBase(
-		"default-task",
-		"",
-		config.Ctx,
-		config.Emitter,
-	)
 
 	return config
 }
