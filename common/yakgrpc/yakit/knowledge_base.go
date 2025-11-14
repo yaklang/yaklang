@@ -169,6 +169,10 @@ func FilterKnowledgeBaseEntry(db *gorm.DB, entryFilter *ypb.SearchKnowledgeBaseE
 		db = bizhelper.FuzzSearchEx(db, []string{"knowledge_title", "knowledge_details", "keywords"}, entryFilter.Keyword, false)
 	}
 
+	if len(entryFilter.GetHiddenIndex()) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "hidden_index", entryFilter.GetHiddenIndex())
+	}
+
 	if len(entryFilter.GetRelatedEntityUUIDS()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "related_entity_uuid_s", utils.StringArrayFilterEmpty(entryFilter.GetRelatedEntityUUIDS()))
 	}
