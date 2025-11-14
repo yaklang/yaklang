@@ -58,9 +58,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new file or modify an existing file? If user mentions specific file path, set to false."), aitool.WithParam_Required(true)),
 				aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Only when create_new_file is false. The file path to modify.")),
 				aitool.WithStringArrayParam("search_patterns", aitool.WithParam_Description("2-4 search patterns for finding relevant Yaklang code examples. Each pattern should be a regex or keyword."), aitool.WithParam_Required(true)),
-				aitool.WithStringParam("reason", aitool.WithParam_Description("Explain your decision and why these search patterns are chosen."), aitool.WithParam_Required(true)),
+				// aitool.WithStringParam("reason", aitool.WithParam_Description("Explain your decision and why these search patterns are chosen."), aitool.WithParam_Required(true)),
 			},
-			aicommon.WithGeneralConfigStreamableField("reason"),
+			// aicommon.WithGeneralConfigStreamableField("reason"),
 		)
 		if err != nil {
 			log.Errorf("failed to invoke liteforge step 1: %v", err)

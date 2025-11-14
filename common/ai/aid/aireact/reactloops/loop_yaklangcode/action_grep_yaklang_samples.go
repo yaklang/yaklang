@@ -60,8 +60,9 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
 {
   "range": "start-end", 
   "rank": 数字(1-10),
-  "reason": "选择理由"
+  "reason": "选择理由，例如：找到xxx相关代码样本"
 }
+或者 {"range": "10-20", "rank": 8} // 不带 reason 的版本
 
 【严格要求】
 - 总行数控制在80行以内
@@ -106,12 +107,12 @@ func compressSearchResults(resultStr string, searchInfo string, invoker aicommon
 					aitool.WithParam_Description("按重要性排序的代码片段范围数组"),
 				},
 				nil,
-				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end")),
+				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end，例如 18-25")),
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
-				aitool.WithStringParam("reason", aitool.WithParam_Description("选择此片段的理由")),
+				aitool.WithStringParam("code_sample_title", aitool.WithParam_Description("简明扼要，选择此片段的理由，如果太简单可以省略，例如：找到xxx相关代码样本，或xx功能实现")),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableField("reason"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("code_sample_title", "code_sample_title"),
 	)
 
 	if err != nil {
