@@ -42,7 +42,7 @@ level: high
 		},
 	})
 	defer func() {
-		yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
+		yakit.DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), &ypb.SSAProgramFilter{
 			ProgramNames: []string{baseProg},
 		})
 	}()
@@ -60,7 +60,7 @@ level: high
 
 	t.Run("base compare need equal", func(t *testing.T) {
 		defer func() {
-			yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
+			yakit.DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), &ypb.SSAProgramFilter{
 				ProgramNames: []string{newProg},
 			})
 			client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
@@ -68,9 +68,9 @@ level: high
 					RuleNames: []string{rulename},
 				},
 			})
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{baseProg, newProg}, schema.Program)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{baseProg, newProg}, schema.Program)
-			yakit.DeleteSSADiffResultByRule(consts.GetGormDefaultSSADataBase(), []string{rulename})
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{baseProg, newProg}, schema.Program)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{baseProg, newProg}, schema.Program)
+			yakit.DeleteSSADiffResultByRule(consts.GetGormSSAProjectDataBase(), []string{rulename})
 		}()
 		virtualFs := filesys.NewVirtualFs()
 		virtualFs.AddFile("tt.php", code)
@@ -104,11 +104,11 @@ level: high
 	})
 	t.Run("base compare for singal rule", func(t *testing.T) {
 		defer func() {
-			yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
+			yakit.DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), &ypb.SSAProgramFilter{
 				ProgramNames: []string{newProg},
 			})
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{baseProg, newProg}, schema.Program)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{baseProg, newProg}, schema.Program)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{baseProg, newProg}, schema.Program)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{baseProg, newProg}, schema.Program)
 		}()
 		virtualfs := filesys.NewVirtualFs()
 		virtualfs.AddFile("aa.php", `<?php
@@ -230,7 +230,7 @@ level: high
 				RuleNames: []string{rulename},
 			},
 		})
-		yakit.DeleteSSAProgram(consts.GetGormDefaultSSADataBase(), &ypb.SSAProgramFilter{
+		yakit.DeleteSSAProgram(consts.GetGormSSAProjectDataBase(), &ypb.SSAProgramFilter{
 			ProgramNames: []string{baseProg},
 		})
 	}()
@@ -310,8 +310,8 @@ level: high
 					RuleNames: []string{rulename2},
 				},
 			})
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
 		}()
 
 		// 不需要Save Risk也可以从数据库中读取Diff
@@ -379,8 +379,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_SSAReusltCompareInQuerySSARisk(t *testing.T) {
 
 	t.Run("taskid compare in QuerySSARisk", func(t *testing.T) {
 		defer func() {
-			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
-			yakit.DeleteSSADiffResultByCompare(consts.GetGormDefaultSSADataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskID1, taskID2}, schema.RuntimeId)
 		}()
 		response, err := client.QuerySSARisks(context.Background(), &ypb.QuerySSARisksRequest{
 			Filter: &ypb.SSARisksFilter{

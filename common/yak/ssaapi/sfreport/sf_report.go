@@ -1301,7 +1301,7 @@ func loadProjectInfo(report *SSAProjectReport, programName string) error {
 
 // getRisks 通用风险获取函数，获取所有匹配条件的风险（无分页限制）
 func getRisks(filter *ypb.SSARisksFilter) ([]*schema.SSARisk, error) {
-	db := consts.GetGormDefaultSSADataBase()
+	db := consts.GetGormSSAProjectDataBase()
 
 	// 直接使用FilterSSARisk进行查询，避免分页限制
 	db = db.Model(&schema.SSARisk{})

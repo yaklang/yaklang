@@ -181,7 +181,7 @@ func (r *SyntaxFlowResult) SaveRisk(
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
 	if save {
-		err := yakit.CreateSSARisk(consts.GetGormDefaultSSADataBase(), ssaRisk)
+		err := yakit.CreateSSARisk(consts.GetGormSSAProjectDataBase(), ssaRisk)
 		if err != nil {
 			log.Errorf("save risk failed: %s", err)
 			return ""

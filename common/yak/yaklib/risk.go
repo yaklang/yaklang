@@ -213,7 +213,7 @@ func DeleteRiskByID(id int64) error {
 //
 // ```
 func GetSSARiskByID(id int64) *schema.SSARisk {
-	ssaRisk, err := yakit.GetSSARiskByID(consts.GetGormDefaultSSADataBase(), id)
+	ssaRisk, err := yakit.GetSSARiskByID(consts.GetGormSSAProjectDataBase(), id)
 	if err != nil {
 		log.Errorf("获取SSARisk失败: %v", err)
 		return nil

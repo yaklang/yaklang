@@ -39,7 +39,7 @@ func init() {
 }
 
 func main() {
-	consts.InitializeYakitDatabase("", "")
+	consts.InitializeYakitDatabase("", "", "")
 
 	app := cli.NewApp()
 	app.Name = "aibalance"

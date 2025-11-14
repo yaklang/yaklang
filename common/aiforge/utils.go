@@ -3,11 +3,12 @@ package aiforge
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -84,7 +85,7 @@ func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeN
 	if string(apikey) == "" {
 		panic("apikey is empty")
 	}
-	consts.InitializeYakitDatabase("", "")
+	consts.InitializeYakitDatabase("", "", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
 	aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {

@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
@@ -11,11 +12,12 @@ import (
 )
 
 var (
-	initYakitDatabaseOnce = new(sync.Once)
-	projectDataBase       *gorm.DB
-	profileDatabase       *gorm.DB
-	debugProjectDatabase  = false
-	debugProfileDatabase  = false
+	initYakitDatabaseRetError error
+	initYakitDatabaseOnce     = new(sync.Once)
+	projectDataBase           *gorm.DB
+	profileDatabase           *gorm.DB
+	debugProjectDatabase      = false
+	debugProfileDatabase      = false
 )
 
 func DebugProjectDatabase() {
@@ -73,11 +75,7 @@ func GetGormProjectDatabase() *gorm.DB {
 	return projectDataBase
 }
 
-func InitializeYakitDatabase(projectDB string, profileDB string, frontendNames ...string) {
-	var frontendName string
-	if len(frontendNames) > 0 {
-		frontendName = frontendNames[0]
-	}
+func InitializeYakitDatabase(projectDB string, profileDB string, ssaDB string) error {
 
 	initializeYakitDirectories()
 
@@ -96,10 +94,13 @@ func InitializeYakitDatabase(projectDB string, profileDB string, frontendNames .
 	SetDefaultYakitProjectDatabaseName(projectName)
 
 	// ssa check env
-	ssaProjectDatabaseRaw := GetSSADatabaseInfoFromEnv(frontendName)
+	ssaProjectDatabaseRaw := GetSSADatabaseInfoFromEnv()
+	if ssaDB != "" {
+		ssaProjectDatabaseRaw = ssaDB
+	}
 	SetSSADatabaseInfo(ssaProjectDatabaseRaw)
 
-	initYakitDatabase()
+	return initYakitDatabase()
 }
 
 // initializeYakitDirectories 确保所有必要的Yakit目录在项目初始化时就被创建
@@ -113,8 +114,9 @@ func initializeYakitDirectories() {
 	log.Debug("yakit directories initialized")
 }
 
-func initYakitDatabase() {
+func initYakitDatabase() error {
 	initYakitDatabaseOnce.Do(func() {
+		initYakitDatabaseRetError = nil
 		log.Debug("start to loading gorm project/profile database")
 		var (
 			err                 error
@@ -126,14 +128,18 @@ func initYakitDatabase() {
 		/* 先创建插件数据库 */
 		profileDatabase, err = CreateProfileDatabase(profileDatabaseName)
 		if err != nil {
-			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
+			err = utils.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
+			log.Errorf("%s", err)
+			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
 		}
 		schema.SetGormProfileDatabase(profileDatabase)
 
 		/* 再创建项目数据库 */
 		projectDataBase, err = CreateProjectDatabase(projectDatabaseName)
 		if err != nil {
-			log.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
+			err = utils.Errorf("init project-db[%v] failed: %s", projectDatabaseName, err)
+			log.Errorf("%s", err)
+			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
 		}
 		schema.SetGormProjectDatabase(projectDataBase)
 
@@ -141,11 +147,14 @@ func initYakitDatabase() {
 		ssaDatabaseDialect, ssaDatabaseRaw := GetSSADataBaseInfo()
 		ssaprojectDatabase, err := CreateSSAProjectDatabase(ssaDatabaseDialect, ssaDatabaseRaw)
 		if err != nil {
-			log.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
+			err = utils.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
+			log.Errorf("%s", err)
+			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
 		}
 		schema.SetDefaultSSADatabase(ssaprojectDatabase)
 		SetGormSSAProjectDatabase(ssaprojectDatabase)
 	})
+	return initYakitDatabaseRetError
 }
 
 func init() {

@@ -83,7 +83,7 @@ func NewSSARiskComparisonItem(opts ...SSAComparisonItemOption) (*ComparisonItem[
 	// item.Kind = schema.RuntimeId
 	item.GetComparisonValue = func(ctx context.Context) <-chan *schema.SSARisk {
 		//TODO: 感觉db不应该在这里声明一个
-		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
+		db := consts.GetGormSSAProjectDataBase().Model(&schema.SSARisk{})
 		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
 		db = bizhelper.ExactQueryString(db, "runtime_id", s.RuntimeId)
 		db = bizhelper.ExactQueryString(db, "from_rule", s.RuleName)
@@ -101,7 +101,7 @@ func NewCompareCustomVariableItem(opts ...SSAComparisonItemOption) *ComparisonIt
 		opt(s)
 	}
 	item.GetComparisonValue = func(ctx context.Context) <-chan *ssadb.AuditNode {
-		db := consts.GetGormDefaultSSADataBase().Model(&schema.SSARisk{})
+		db := consts.GetGormSSAProjectDataBase().Model(&schema.SSARisk{})
 		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
 		db = bizhelper.ExactQueryString(db, "rule_name", s.RuleName)
 		db = bizhelper.ExactQueryString(db, "result_variable", s.VariableName)
@@ -140,7 +140,7 @@ func WithSSARiskDiffResultHandler(f func(result *ComparisonResult[*schema.SSARis
 // WithSSARiskDiffSaveResultHandler is used to set the function that handles the comparison results for SSARisk.
 func WithSSARiskDiffSaveResultHandler(baseItem, compareItem string, kind string) func(options *ComparatorConfig[*schema.SSARisk]) {
 	return WithComparatorSaveResultHandler(func(risks []*ComparisonResult[*schema.SSARisk]) {
-		utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(tx *gorm.DB) {
+		utils.GormTransactionReturnDb(consts.GetGormSSAProjectDataBase(), func(tx *gorm.DB) {
 			for _, risk := range risks {
 				result := &schema.SSADiffResult{
 					BaseLine:         baseItem,
@@ -152,7 +152,7 @@ func WithSSARiskDiffSaveResultHandler(baseItem, compareItem string, kind string)
 					CompareType:      schema.RiskDiff,
 					DiffResultKind:   kind,
 				}
-				SaveSSADiffResult(consts.GetGormDefaultSSADataBase(), result)
+				SaveSSADiffResult(consts.GetGormSSAProjectDataBase(), result)
 			}
 		})
 	})
@@ -380,7 +380,7 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 	}
 
 	diffResults, err := GetSSADiffResult(
-		consts.GetGormDefaultSSADataBase(),
+		consts.GetGormSSAProjectDataBase(),
 		base.GetRiskRuntimeId(),
 		compare.GetRiskRuntimeId(),
 	)
@@ -404,13 +404,13 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 				}
 
 				if hash := d.BaseLineRiskHash; hash != "" {
-					if value, err := GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), hash); err == nil {
+					if value, err := GetSSARiskByHash(consts.GetGormSSAProjectDataBase(), hash); err == nil {
 						compareResult.BaseValue = value
 					}
 				}
 
 				if hash := d.CompareRiskHash; hash != "" {
-					if value, err := GetSSARiskByHash(consts.GetGormDefaultSSADataBase(), hash); err == nil {
+					if value, err := GetSSARiskByHash(consts.GetGormSSAProjectDataBase(), hash); err == nil {
 						compareResult.NewValue = value
 					}
 				}
@@ -426,7 +426,7 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 	res := resultComparator.Compare(context, compareRiskItem,
 		// 对比结果保存到数据库
 		WithComparatorSaveResultHandler(func(risks []*ComparisonResult[*schema.SSARisk]) {
-			utils.GormTransactionReturnDb(consts.GetGormDefaultSSADataBase(), func(db *gorm.DB) {
+			utils.GormTransactionReturnDb(consts.GetGormSSAProjectDataBase(), func(db *gorm.DB) {
 				kind := schema.Unknown
 				if base.RiskRuntimeId != "" {
 					kind = schema.RuntimeId

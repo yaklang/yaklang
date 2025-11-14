@@ -43,7 +43,7 @@ func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 }
 func GetDB() *gorm.DB {
-	return consts.GetGormDefaultSSADataBase()
+	return consts.GetGormSSAProjectDataBase()
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
