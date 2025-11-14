@@ -124,12 +124,12 @@ func TestCodeCompile(t *testing.T) {
 	memoryCost := ssaprofile.GetProfileListMap()
 
 	if true {
-		ssaprofile.ShowCacheCost(memoryCost)
+		ssaprofile.ShowProfileMaps("memory", memoryCost)
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
-		ssaprofile.ShowCacheCost(databaseCost)
+		ssaprofile.ShowProfileMaps("database", databaseCost)
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
@@ -269,7 +269,7 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
-	ssaprofile.ShowCacheCost()
+	ssaprofile.ShowCompileProfiles()
 }
 
 func TestA(t *testing.T) {
@@ -335,5 +335,5 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
-	ssaprofile.ShowCacheCost()
+	ssaprofile.ShowCompileProfiles()
 }

@@ -34,7 +34,7 @@ func ParseProject(opts ...Option) (prog Programs, err error) {
 		return nil, err
 	}
 	defer func() {
-		ssaprofile.ShowCacheCost()
+		ssaprofile.ShowCompileProfiles()
 	}()
 	f1 := func() {
 		prog, err = config.parseProject()
