@@ -49,13 +49,14 @@ type ScanTaskCallback struct {
 }
 
 const (
-	pauseFuncKey       = "pauseFunc"
-	resultCallbackKey  = "resultCallback"
-	errorCallbackKey   = "errorCallback"
-	processCallbackKey = "processCallback"
-	reporterKey        = "reporter"
-	reporterWriterKey  = "reporterWriter"
-	processRuleKey     = "processRuleDetail"
+	pauseFuncKey          = "pauseFunc"
+	resultCallbackKey     = "resultCallback"
+	errorCallbackKey      = "errorCallback"
+	processCallbackKey    = "processCallback"
+	reporterKey           = "reporter"
+	reporterWriterKey     = "reporterWriter"
+	processRuleKey        = "processRuleDetail"
+	rulePerformanceLogKey = "rulePerformanceLog"
 )
 
 func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
@@ -98,6 +99,14 @@ func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
 func WithProcessRuleDetail(withRule bool) ssaconfig.Option {
 	return func(sc *ssaconfig.Config) error {
 		sc.SetExtraInfo(processRuleKey, withRule)
+		return nil
+	}
+}
+
+// WithRulePerformanceLog 控制是否开启规则级性能日志
+func WithRulePerformanceLog(enable bool) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(rulePerformanceLogKey, enable)
 		return nil
 	}
 }
@@ -145,6 +154,15 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if f, ok := cfg.ExtraInfo[reporterKey]; ok {
 		if reporter, ok := f.(sfreport.IReport); ok {
 			cfg.Reporter = reporter
+		}
+	}
+
+	if f, ok := cfg.ExtraInfo[rulePerformanceLogKey]; ok {
+		if enable, ok := f.(bool); ok {
+			cfg.EnableRulePerformanceLog = enable
+			if cfg.ScanTaskCallback != nil {
+				cfg.ScanTaskCallback.EnableRulePerformanceLog = enable
+			}
 		}
 	}
 
