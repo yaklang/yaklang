@@ -52,16 +52,16 @@ func TestMUSTPASS_ExportHNSW(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证使用错误的 code 导入
-	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName)
+	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithEmbeddingClient(embedding))
 	assert.Contains(t, err.Error(), "record not found")
 
 	// 验证使用Key作为code导入
-	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithKeyAsUID(true))
+	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithKeyAsUID(true), WithEmbeddingClient(embedding))
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
 
 	// 测试尝试重建HNSW索引
-	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithTryRebuildHNSWIndex(true))
+	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithTryRebuildHNSWIndex(true), WithEmbeddingClient(embedding))
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
 }
