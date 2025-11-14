@@ -3,20 +3,52 @@ package aireact
 import (
 	"archive/zip"
 	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+//go:embed reactloops/loop_yaklangcode/test_file/1114-tmp.rag
+var testRAGFileBytes []byte // 向量数据数量 17 条
+
+// Helper function to create test RAG system
+func createTestRagSystem(t *testing.T) (*rag.RAGSystem, error) {
+	// 生成临时 rag 文件
+	tempFile, err := os.CreateTemp("", "yaklang_aikb_test-*.rag")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tempFile.Name())
+	tempFile.Write(testRAGFileBytes)
+
+	// 创建 RAG 系统
+	db, err := rag.NewTemporaryRAGDB()
+	if err != nil {
+		return nil, err
+	}
+	ragSystem, err := rag.Get("yaklang_aikb", rag.WithDB(db), rag.WithImportFile(tempFile.Name()), rag.WithEmbeddingClient(vectorstore.NewDefaultMockEmbedding()))
+	if err != nil {
+		return nil, err
+	}
+	return ragSystem, nil
+}
 
 // Helper function to create test ZIP file
 func createTestZip(docs map[string]string) ([]byte, error) {
@@ -591,4 +623,288 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	}
 
 	close(in)
+}
+
+func TestRagSystem_Basic(t *testing.T) {
+	ragSystem, err := createTestRagSystem(t)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 知识数量判断
+	docCount, err := ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Greater(t, docCount, 0)
+	assert.Equal(t, docCount, 17)
+
+	// 执行语义搜索
+	queryText := ragSystem.GetEmbedder().(*vectorstore.MockEmbeddingClient).GenerateRandomText(10)
+	log.Infof("queryText: %s", queryText)
+	results, err := ragSystem.QueryTopN(queryText, 10)
+	assert.NoError(t, err)
+	assert.NotNil(t, results)
+	assert.Greater(t, len(results), 0)
+}
+
+type mockStats_forSemanticSearch struct {
+	semanticSearchDone           bool
+	codeWritten                  bool
+	matchTestRagFileSuccessfully bool
+	matchTestRagFile             func(prompt string) bool
+	compressFlag                 string
+}
+
+func mockedYaklangSemanticSearch(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forSemanticSearch) (*aicommon.AIResponse, error) {
+	prompt := req.GetPrompt()
+
+	// First call: choose write_yaklang_code action
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "write_yaklang_code", "write_yaklang_code_approach": "test semantic search samples" },
+"human_readable_thought": "mocked thought for semantic-search test", "cumulative_summary": "..cumulative-mocked for semantic-search.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Handle init task: analyze-requirement-and-search
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["http.*request", "http.Get"],
+  "reason": "User wants to create http request example using semantic search"
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Handle compress search results: extract-ranked-lines
+	if utils.MatchAllOfSubString(prompt, "extract-ranked-lines", "ranges", "rank", "reason") {
+		stat.matchTestRagFileSuccessfully = stat.matchTestRagFile(prompt)
+		compressFlag := uuid.New().String()
+		stat.compressFlag = compressFlag
+		rsp := i.NewAIResponse()
+		mockedCompressSearchResults := fmt.Sprintf(`{
+  "@action": "extract-ranked-lines",
+  "ranges": [
+    {"range": "1-8", "rank": 1, "reason": "%v"},
+    {"range": "10-15", "rank": 2, "reason": "HTTP request with headers"}
+  ]
+}`, compressFlag)
+		rsp.EmitOutputStream(bytes.NewBufferString(mockedCompressSearchResults))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Verify satisfaction
+	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "semantic-search-mocked-reason"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// Code loop: semantic_search_yaklang_samples -> write_code -> finish
+	if utils.MatchAllOfSubString(prompt, `"semantic_search_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+		// extract nonce from <|GEN_CODE_{{.Nonce}}|>
+		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
+		matches := re.FindStringSubmatch(prompt)
+		var nonceStr string
+		if len(matches) > 1 {
+			nonceStr = matches[1]
+		}
+
+		rsp := i.NewAIResponse()
+
+		// First: semantic search yaklang samples
+		if !stat.semanticSearchDone {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "semantic_search_yaklang_samples",
+  "questions": [{"question": "Yaklang中如何发送HTTP请求？"}],
+  "top_n": 10
+}`))
+			stat.semanticSearchDone = true
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// Second: write code using semantic search results
+		if !stat.codeWritten {
+			rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
+
+<|GEN_CODE_{{ .nonce }}|>
+// Code based on semantic search samples
+resp, err = http.Get("https://example.com")
+if err != nil {
+    die(err)
+}
+println(resp.Body)
+<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
+				"nonce": nonceStr,
+			})))
+			stat.codeWritten = true
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// Third: finish
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, `"@action"`, `"create_new_file"`, `"check-filepath"`, `"existed_filepath"`) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "check-filepath", "create_new_file": true}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	fmt.Println("Unexpected prompt:", prompt)
+	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+}
+
+func TestSemanticSearchYaklangSamples_BasicSearch(t *testing.T) {
+	// 创建测试 RAG 文件
+	tempFile, err := os.CreateTemp("", "yaklang_aikb_test-*.rag")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	_, err = tempFile.Write(testRAGFileBytes)
+	if err != nil {
+		t.Fatalf("Failed to write test RAG data: %v", err)
+	}
+	tempFile.Close()
+
+	// 加载测试文件内容
+	var allDocContent []string
+
+	tempDb, err := rag.NewTemporaryRAGDB()
+	if err != nil {
+		t.Fatalf("Failed to create temporary RAG DB: %v", err)
+	}
+	defer tempDb.Close()
+	ragSystem, err := rag.Get("yaklang_aikb", rag.WithDB(tempDb), rag.WithImportFile(tempFile.Name()), rag.WithEmbeddingClient(vectorstore.NewDefaultMockEmbedding()))
+	if err != nil {
+		t.Fatalf("Failed to get RAG system: %v", err)
+	}
+
+	docs, err := ragSystem.QueryTopN("", 1000)
+	if err != nil {
+		t.Fatalf("Failed to query top N documents: %v", err)
+	}
+	for _, doc := range docs {
+		if doc.KnowledgeBaseEntry != nil {
+			allDocContent = append(allDocContent, doc.KnowledgeBaseEntry.KnowledgeDetails)
+		} else if doc.Document != nil {
+			allDocContent = append(allDocContent, doc.Document.Content)
+		}
+	}
+
+	verifyPromptThreshold := 10
+
+	// 准备和执行 ReAct 测试
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 100)
+
+	stat := &mockStats_forSemanticSearch{
+		semanticSearchDone:           false,
+		codeWritten:                  false,
+		matchTestRagFileSuccessfully: false,
+		matchTestRagFile: func(prompt string) bool {
+			n := 0
+			for _, docContent := range allDocContent {
+				if utils.MatchAllOfSubString(prompt, docContent) {
+					n++
+				}
+			}
+			return n >= verifyPromptThreshold
+		},
+	}
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedYaklangSemanticSearch(i, r, stat)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithAIKBRagPath(tempFile.Name()), // Use test RAG file
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "create http request example",
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
+				if e.GetNodeId() == "semantic_search_yaklang_samples" {
+					content := string(e.GetContent())
+					// Verify semantic search results are formatted correctly
+					if !utils.MatchAllOfSubString(content, "Semantic search") {
+						t.Logf("Semantic search results: %s", content)
+					}
+				}
+				if e.GetNodeId() == "write_code" {
+					content := string(e.GetContent())
+					if !utils.MatchAllOfSubString(content, "http.Get") {
+						t.Errorf("Generated code doesn't contain expected content: %s", content)
+					}
+					// Successfully completed semantic_search_yaklang_samples -> write_code flow, exit
+					break LOOP
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	// Verify timeline
+	fmt.Println("--------------------------------------")
+	tl := ins.DumpTimeline()
+	fmt.Println(tl)
+	if !utils.MatchAllOfSubString(tl, "mocked thought for semantic-search") {
+		t.Error("Timeline doesn't contain expected thought")
+	}
+	if !utils.MatchAllOfSubString(tl, "semantic") {
+		t.Error("Timeline doesn't contain semantic search action")
+	}
+	fmt.Println("--------------------------------------")
+
+	// Verify the semantic search action was triggered
+	if !stat.semanticSearchDone {
+		t.Error("Semantic search action was not triggered")
+	}
+	if !stat.codeWritten {
+		t.Error("Code was not written after semantic search")
+	}
+
+	if !stat.matchTestRagFileSuccessfully {
+		t.Error("Failed to match test RAG file successfully")
+	}
+
+	if !strings.Contains(tl, stat.compressFlag) {
+		t.Error("Timeline doesn't contain compress flag")
+	}
 }
