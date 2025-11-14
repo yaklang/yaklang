@@ -71,28 +71,28 @@ func buildReflectionSchema() string {
 	schema := aitool.NewObjectSchemaWithAction(
 		aitool.WithStringParam(
 			"@action",
-			aitool.WithParam_Description("Action type identifier, must be 'self_reflection'"),
+			aitool.WithParam_Description("必须是 'self_reflection'"),
 			aitool.WithParam_EnumString("self_reflection"),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringArrayParam(
 			"learning_insights",
-			aitool.WithParam_Description("Key learning insights from this action execution. Each insight should be a concise, actionable observation about what worked well or what could be improved."),
-			aitool.WithParam_Required(true),
+			aitool.WithParam_Description("关键学习点（可选）：从本次执行中学到的重要经验，简洁描述即可"),
+			aitool.WithParam_Required(false),
 		),
 		aitool.WithStringArrayParam(
 			"future_suggestions",
-			aitool.WithParam_Description("Concrete suggestions for handling similar situations in the future. Focus on actionable recommendations."),
-			aitool.WithParam_Required(true),
+			aitool.WithParam_Description("未来建议（可选）：针对类似情况的改进建议，按需提供"),
+			aitool.WithParam_Required(false),
 		),
 		aitool.WithStringParam(
 			"impact_assessment",
-			aitool.WithParam_Description("Overall assessment of the action's impact on the system and task progress. Explain whether the impact was positive, negative, or neutral, and why."),
-			aitool.WithParam_Required(true),
+			aitool.WithParam_Description("影响评估（可选）：简要说明本次操作的影响，如无特殊影响可省略"),
+			aitool.WithParam_Required(false),
 		),
 		aitool.WithStringParam(
 			"effectiveness_rating",
-			aitool.WithParam_Description("Rate the action's effectiveness on a scale"),
+			aitool.WithParam_Description("效果评级（可选）：评估操作效果"),
 			aitool.WithParam_EnumString("highly_effective", "effective", "moderately_effective", "ineffective", "counterproductive"),
 			aitool.WithParam_Required(false),
 		),
