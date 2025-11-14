@@ -1006,6 +1006,7 @@ message CreateKnowledgeBaseV2Response {
 
 message ExportKnowledgeBaseRequest {
   int64 KnowledgeBaseId = 1;
+  string Name = 3;
   string TargetPath = 2;
 }
 
