@@ -471,7 +471,6 @@ func TestErrorMemberCall(t *testing.T) {
 			Want: []string{
 				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
 				ssa.ExternFieldError("Lib", "poc", "appendHeade", "appendHeader"),
-				ssa.InvalidField("any", "Location"),
 			},
 		})
 	})
@@ -1226,9 +1225,7 @@ func TestExternInstance(t *testing.T) {
 			`,
 			Want: []string{
 				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
-				ssa.InvalidField("any", "GetInt"),
 				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
-				ssa.InvalidField("any", "GetaInt"),
 				ssa.ContAssignExtern("lib.getInt"),
 				// ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),

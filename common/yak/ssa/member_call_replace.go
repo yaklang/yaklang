@@ -6,105 +6,124 @@ import (
 
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
-func ReplaceMemberCall(t, v, to Value) map[string]Value {
+func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
 	ret := make(map[string]Value)
-	builder := t.GetFunc().builder
+	if utils.IsNil(holder) || utils.IsNil(old) || utils.IsNil(replacement) {
+		return ret
+	}
+
+	builder := holder.GetFunc().builder
 	if utils.IsNil(builder) {
 		return ret
 	}
-	recoverScope := builder.SetCurrent(t)
+
+	recoverScope := builder.SetCurrent(holder)
 	defer recoverScope()
+
 	createPhi := generatePhi(builder, nil, nil)
 
-	// replace object member-call
-	if t.IsObject() {
-		replace := func(key, member Value) {
-			if utils.IsNil(key) || utils.IsNil(member) {
-				log.Errorf("BUG: replace member is nil key[%v] member[%v]", key, member)
-				return
-			}
-			// replace this member object to to
-			trueKey := member.GetKey()
-			// remove this member from v
-			if _, ok := t.GetMember(key); ok {
-				t.DeleteMember(key)
-			}
-
-			// create member of `to` value with key
-			// if fun := GetMethod(value.GetType(), key.String()); fun != nil {
-			// 	return NewClassMethod(fun, value)
-			// }
-			// re-set type
-			res := checkCanMemberCallExist(to, key)
-			trueRes := checkCanMemberCallExist(to, trueKey)
-			name, typ := res.name, res.typ
-			// toMember := builder.getOriginMember(name, typ, to, key)
-			toMember := builder.PeekValue(trueRes.name)
-
-			// then, we will replace value, `member` to `toMember`
-			if member.GetOpcode() != SSAOpcodeUndefined {
-				member.SetName(name)
-				member.SetType(typ)
-				setMemberCallRelationship(to, key, member)
-				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
-				if utils.IsNil(toMember) {
-					ret[name] = member
-				} else {
-					ret[name] = createPhi(name, []Value{toMember, member})
-				}
-			}
-
-			if key.GetId() == v.GetId() {
-				// No need for recursion
-				toKey := to
-				setMemberCallRelationship(t, toKey, member)
-				if utils.IsNil(toMember) {
-					toMember = member
-				}
-			}
-			if utils.IsNil(toMember) {
-				toMember = builder.ReadMemberCallValue(to, key)
-			}
-
-			memberT := member
-			switch member.GetOpcode() {
-			// Do nothing, it will be replaced later
-			case SSAOpcodeBinOp:
-			case SSAOpcodeUnOp:
-			default:
-				ReplaceAllValue(member, toMember)
-				DeleteInst(member)
-				memberT = toMember
-			}
-			for n, v := range ReplaceMemberCall(member, v, toMember) {
-				ret[n] = v
-			}
-			if !member.IsObject() {
-				ret[name] = memberT
-			}
-			// } else {
-			// 	log.Errorf("BUG: replace key[%v]/member[%v] is not EmptyPhi", key, member)
-			// 	return
-			// }
+	fixBranch := func(root Value, targetObj Value, rootKey Value) {
+		if utils.IsNil(root) || utils.IsNil(targetObj) {
+			return
 		}
-		// call value需要优先替换
+		if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != old.GetId() && currentObj.GetId() != holder.GetId() {
+			// already points to a valid object, no change needed
+		} else {
+			root.SetObject(targetObj)
+		}
+		if root.IsMember() {
+			currentKey := root.GetKey()
+			if utils.IsNil(currentKey) || currentKey.GetId() == old.GetId() || currentKey.GetId() == holder.GetId() {
+				root.SetKey(pickMemberKey(root, rootKey))
+			}
+		}
+	}
+
+	replace := func(container Value, key Value, member Value) {}
+	replace = func(container Value, key Value, member Value) {
+		if utils.IsNil(key) || utils.IsNil(member) {
+			return
+		}
+
+		trueKey := member.GetKey()
+		if _, ok := container.GetMember(key); ok {
+			container.DeleteMember(key)
+		}
+
+		res := checkCanMemberCallExist(replacement, key)
+		trueRes := checkCanMemberCallExist(replacement, trueKey)
+		name, typ := res.name, res.typ
+		toMember := builder.PeekValue(trueRes.name)
+
+		if member.GetOpcode() != SSAOpcodeUndefined {
+			member.SetName(name)
+			member.SetType(typ)
+			setMemberCallRelationship(replacement, key, member)
+			if utils.IsNil(toMember) {
+				ret[name] = member
+			} else {
+				if res.typ != nil {
+					toMember.SetType(res.typ)
+				}
+				ret[name] = createPhi(name, []Value{toMember, member})
+			}
+		}
+
+		if key.GetId() == old.GetId() {
+			toKey := replacement
+			setMemberCallRelationship(container, toKey, member)
+			if utils.IsNil(toMember) {
+				toMember = member
+			}
+		}
+		if utils.IsNil(toMember) {
+			toMember = builder.ReadMemberCallValue(replacement, key)
+		}
+
+		if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == old.GetId() || toMember.GetObject().GetId() == holder.GetId() {
+			fixBranch(toMember, replacement, key)
+		}
+
+		memberT := member
+		switch member.GetOpcode() {
+		case SSAOpcodeBinOp, SSAOpcodeUnOp:
+			// keep original instruction for later replacement
+		default:
+			ReplaceAllValue(member, toMember)
+			DeleteInst(member)
+			memberT = toMember
+		}
+
+		for n, v2 := range ReplaceMemberCall(member, old, toMember) {
+			ret[n] = v2
+		}
+		if !member.IsObject() {
+			ret[name] = memberT
+		}
+	}
+
+	if holder.IsObject() {
 		callMap := make(map[Value]Value)
-		for key, member := range t.GetAllMember() {
+		for key, member := range holder.GetAllMember() {
 			if _, ok := ToCall(member); ok {
 				callMap[key] = member
 				continue
 			}
-			replace(key, member)
+			replace(holder, key, member)
 		}
 		for key, member := range callMap {
-			replace(key, member)
+			replace(holder, key, member)
 		}
 	}
 
-	// TODO : this need more test, i think this code error
-	// if t.IsMember() {
-	// 	obj := t.GetObject()
-	// 	setMemberCallRelationship(obj, t.GetKey(), t)
-	// }
 	return ret
+}
+
+func pickMemberKey(member, fallback Value) Value {
+	if !utils.IsNil(member) {
+		if k := member.GetKey(); !utils.IsNil(k) {
+			return k
+		}
+	}
+	return fallback
 }
