@@ -1301,6 +1301,18 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
 		once = true
 	}
+
+	includeType := "include"
+	if once {
+		if i.IncludeOnce() != nil {
+			includeType = "include_once"
+		} else {
+			includeType = "require_once"
+		}
+	} else if i.Require() != nil {
+		includeType = "require"
+	}
+
 	expr := i.Expression()
 	value := y.VisitExpression(expr)
 	call := y.NewCall(y.ReadValue("include"), []ssa.Value{value})
@@ -1317,14 +1329,23 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 	} else {
 		//todo： __dir__ 等魔术方法的转换
 		file := value.String()
+
+		currentFile := y.GetEditor().GetFilename()
+		log.Debugf("[PHP-INCLUDE] 在文件 %s 中遇到 %s(\"%s\")", currentFile, includeType, file)
+
 		application := y.GetProgram().Application
 		includeStack := application.CurrentIncludingStack
 		includeStack.Push(file)
 		defer includeStack.Pop()
+
+		log.Debugf("[PHP-INCLUDE] 当前include栈深度: %d", includeStack.Len())
+
 		if err := y.BuildFilePackage(file, once); err != nil {
+			log.Debugf("[PHP-INCLUDE] 处理 %s 失败: %v", file, err)
 			//todo: 目前拿不到include的返回值
 			//flag = ssa.NewConst(false)
 		} else {
+			log.Debugf("[PHP-INCLUDE] 处理 %s 成功", file)
 			//flag = ssa.NewConst(true)
 		}
 	}
