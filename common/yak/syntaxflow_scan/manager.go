@@ -266,16 +266,17 @@ func (m *scanManager) initByConfig() error {
 		}
 		m.Config.Config = config
 	} else if projectName := config.GetProjectName(); projectName != "" {
-		project, err := yakit.GetSSAProjectByName(projectName)
-		if err != nil || project == nil {
-			return utils.Errorf("query ssa project by id failed: %s", err)
-		}
-		config, err := project.GetConfig()
-		if config == nil || err != nil {
-			return utils.Errorf("scan config error: %v", err)
-		}
-
-		m.Config.Config = config
+		// Aborted: disable load by project name
+		//project, err := yakit.GetSSAProjectByName(projectName)
+		//if err != nil || project == nil {
+		//	return utils.Errorf("query ssa project by id failed: %s", err)
+		//}
+		//config, err := project.GetConfig()
+		//if config == nil || err != nil {
+		//	return utils.Errorf("scan config error: %v", err)
+		//}
+		//
+		//m.Config.Config = config
 	} else {
 		// init by stream config
 		// if len(config.GetProgramName()) == 0 {

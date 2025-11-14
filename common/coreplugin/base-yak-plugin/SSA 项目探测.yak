@@ -363,7 +363,7 @@ if params.language == "" {
 params.compile_immediately = compile_immediately
 generateDesc()
 
-config, err = ssa.New(
+config, err = ssa.NewConfig(
     ssa.ModeAll,
     ssa.withProgramNames(params.program_name),
     ssa.withProjectName(params.project_name),
@@ -414,30 +414,44 @@ if !params.compile_immediately{
 
 // todo:立即编译后续需要指定SSAConfig json来编译
 
+// 如果项目存在，则直接使用，否则创建新项目
+url = params.info.local_file
+if url == "" {
+    url = params.info.url
+}
+
+ssaProject,err = ssa.GetSSAProjectByNameAndURL(params.project_name,url)
+if err != nil {
+    ssaProject,err = ssa.NewSSAProject(ssa.withJsonRawConfig([]byte(configJSON)))
+    if err != nil {
+        yakit.Error("创建项目失败: %v", err)
+        return
+    }
+}
+
+err = ssaProject.Save()
+if err != nil {
+    yakit.Error("保存项目失败: %v", err)
+    return
+}
+// 重新获取项目配置，这样配置会自动更新项目ID
+config,err = ssaProject.GetConfig()
+if err != nil {
+    yakit.Error("获取项目配置失败: %v", err)
+    return
+}
+
+// 项目探测使用探测获得的programName，而不是使用withSSAConfig配置自动生成的
 programName = sprint(params.program_name)
 language = sprint(params.language)
 opts = [
-    ssa.withProgramName(programName),
+    ssa.withSSAConfig(config),
     ssa.withProcess((msg, process) => {
         yakit.SetProgressEx("complile", process)
         yakit.Info("%s: %f", msg, process)
     }),
-    ssa.withLanguage(language),
-    ssa.withReCompile(reCompile),
-    ssa.withStrictMode(strictMode),
-    ssa.withDescription(params.description),
-    ssa.withContext(context.Background()),
-    ssa.withConfigInfo(params.info),
-    ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
-    ssa.withConcurrency(concurrency),
+    ssa.withProgramName(programName),
 ]
-
-if len(entry) != 0 {
-    opts = append(opts, ssa.withEntryFile(entry...))
-}
-
-
 progs, err := ssa.ParseProject(opts...)
 if err != nil {
     yakit.Text("编译错误信息:\n" + err.Error())

@@ -1,8 +1,7 @@
 package yakit
 
 import (
-	"errors"
-
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
 	"github.com/jinzhu/gorm"
@@ -19,7 +18,7 @@ func SSAProjectToSchemaData(s *ssaproject.SSAProject) (*schema.SSAProject, error
 		return nil, utils.Errorf("to schema SSA project failed: SSA project is nil")
 	}
 	var result schema.SSAProject
-	result.ID = s.ID
+	result.ID = uint(s.ID)
 	result.ProjectName = s.ProjectName
 	result.Description = s.Description
 	result.Language = s.Language
@@ -39,9 +38,9 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 	var projectBuilder *ssaproject.SSAProject
 	var err error
 	if req.Project != nil {
-		projectBuilder, err = ssaproject.NewSSAProjectByProto(req.Project)
+		projectBuilder, err = NewSSAProjectByProto(req.Project)
 	} else if req.JSONStringConfig != "" {
-		projectBuilder, err = ssaproject.NewSSAProjectByRawConfigData([]byte(req.JSONStringConfig))
+		projectBuilder, err = ssaproject.NewSSAProject(ssaconfig.WithJsonRawConfig([]byte(req.JSONStringConfig)))
 	} else {
 		err = utils.Errorf("create SSA project failed: request project and JSONStringConfig are both empty")
 	}
@@ -51,8 +50,12 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 	if projectBuilder == nil {
 		return nil, utils.Errorf("create SSA project failed: project builder is nil")
 	}
+
+	err = projectBuilder.Save()
+	if err != nil {
+		return nil, utils.Errorf("create SSA project failed: %s", err)
+	}
 	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
-	err = db.Model(&schema.SSAProject{}).Create(schemaProject).Error
 	if err != nil {
 		return nil, utils.Errorf("create SSA project failed: %s", err)
 	}
@@ -68,25 +71,19 @@ func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject,
 		return nil, utils.Errorf("update SSA project failed: project ID is required")
 	}
 
-	projectBuilder, err := ssaproject.NewSSAProjectByProto(project)
+	projectBuilder, err := NewSSAProjectByProto(project)
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
 	if projectBuilder == nil {
 		return nil, utils.Errorf("update SSA project failed: project builder is nil")
 	}
-	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
 
-	var existingProject schema.SSAProject
-	err = db.First(&existingProject, schemaProject.ID).Error
+	err = projectBuilder.Save()
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, db.Create(schemaProject).Error
-		} else {
-			return nil, utils.Errorf("check project existence failed: %s", err)
-		}
+		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
-	err = db.Model(&existingProject).Updates(schemaProject).Error
+	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
@@ -198,27 +195,45 @@ func GetSSAProjectById(id uint64) (*schema.SSAProject, error) {
 	return &project, nil
 }
 
-func GetSSAProjectByName(name string) (*schema.SSAProject, error) {
-	if name == "" {
-		return nil, utils.Errorf("get SSA project failed: name is required")
+func NewSSAProjectByProto(proto *ypb.SSAProject) (*ssaproject.SSAProject, error) {
+	if proto == nil {
+		return nil, utils.Errorf("failed to new SSA project builder: proto is nil")
 	}
-	db := consts.GetGormProfileDatabase()
-	db = db.Model(&schema.SSAProject{})
-	var project schema.SSAProject
-	db = db.Where("project_name = ?", name).First(&project)
-	if db.Error != nil {
-		return nil, utils.Errorf("get SSA project failed: %s", db.Error)
-	}
-	return &project, nil
-}
 
-func GetSSAProjectIDByName(name string) (uint64, error) {
-	if name == "" {
-		return 0, utils.Errorf("get SSA project ID failed: name is required")
-	}
-	project, err := GetSSAProjectByName(name)
+	var language ssaconfig.Language
+	language, err := ssaconfig.ValidateLanguage(proto.Language)
 	if err != nil {
-		return 0, utils.Errorf("get SSA project ID failed: %s", err)
+		return nil, err
 	}
-	return uint64(project.ID), nil
+
+	var opts []ssaconfig.Option
+	if cc := proto.CompileConfig; cc != nil {
+		opts = append(opts, ssaconfig.WithCompileStrictMode(cc.StrictMode))
+		opts = append(opts, ssaconfig.WithCompilePeepholeSize(int(cc.PeepholeSize)))
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles))
+		opts = append(opts, ssaconfig.WithCompileReCompile(cc.ReCompile))
+		opts = append(opts, ssaconfig.WithCompileMemoryCompile(cc.Memory))
+		opts = append(opts, ssaconfig.WithCompileConcurrency(cc.Concurrency))
+	}
+	if sc := proto.ScanConfig; sc != nil {
+		opts = append(opts, ssaconfig.WithScanConcurrency(sc.Concurrency))
+		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(sc.Memory))
+		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(sc.IgnoreLanguage))
+	}
+	if rc := proto.RuleConfig; rc != nil && rc.RuleFilter != nil {
+		opts = append(opts, ssaconfig.WithRuleFilter(rc.RuleFilter))
+	}
+	if proto.CodeSourceConfig != "" {
+		opts = append(opts, ssaconfig.WithCodeSourceJson(proto.CodeSourceConfig))
+	}
+
+	opts = append(opts, []ssaconfig.Option{
+		ssaconfig.WithProjectID(uint64(proto.ID)),
+		ssaconfig.WithProjectName(proto.ProjectName),
+		ssaconfig.WithProjectLanguage(language),
+		ssaconfig.WithProgramDescription(proto.Description),
+		ssaconfig.WithProjectTags(proto.Tags),
+	}...)
+
+	return ssaproject.NewSSAProject(opts...)
 }
