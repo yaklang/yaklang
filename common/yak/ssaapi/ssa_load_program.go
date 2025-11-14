@@ -19,7 +19,6 @@ func SetProgramCache(program *Program, ttls ...time.Duration) {
 
 // FromDatabase get program from database by program name
 func FromDatabase(programName string) (p *Program, err error) {
-
 	if prog, ok := ProgramCache.Get(programName); ok && prog != nil {
 		return prog, nil
 	}
@@ -43,6 +42,7 @@ func fromDatabase(name string) (*Program, error) {
 	// all function and instruction will be lazy
 	ret := NewProgram(prog, nil)
 	ret.comeFromDatabase = true
+	ret.enableDatabase = true // enable database
 	ret.irProgram = prog.GetIrProgram()
 	return ret, nil
 }

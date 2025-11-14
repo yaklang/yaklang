@@ -245,7 +245,9 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 		} else {
 			require.Equal(t, len(gotVs), len(want), "key[%s] not found", name)
 		}
-		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string {
+			return v.String()
+		})
 		sort.Strings(got)
 		sort.Strings(want)
 		if contain {

@@ -58,8 +58,8 @@ func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error
 		return nil, err
 	}
 
-	hash := config.CalcHash()
 	if config.EnableCache {
+		hash := config.CalcHash()
 		// Use single-flight behavior to ensure only one parsing operation per hash
 		result, err := ttlSSAParseCache.GetOrLoad(hash, func() (*programResult, error) {
 			ret, err := config.parseFile()

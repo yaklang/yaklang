@@ -56,7 +56,7 @@ func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Progr
 				astSequence = ssareducer.OutOfOrder
 			}
 
-			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithAstOrder(astSequence))...)
+			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithASTOrder(astSequence))...)
 			require.Nil(t, err)
 
 			log.Infof("only in memory")

@@ -102,7 +102,7 @@ func (c *Config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
-var WithAstOrder = ssaconfig.SetOption("ssa_compile/ast_order", func(c *Config, v ssareducer.ASTSequenceType) {
+var WithASTOrder = ssaconfig.SetOption("ssa_compile/ast_order", func(c *Config, v ssareducer.ASTSequenceType) {
 	c.astSequence = v
 })
 
@@ -145,12 +145,9 @@ func WithFileSystemEntry(v ...string) ssaconfig.Option {
 	return withFileSystemEntry(v)
 }
 
-func WithProgramPath(v string) ssaconfig.Option {
-	return ssaconfig.WithCodeSourceMap(map[string]any{
-		"kind":       "local",
-		"local_file": v,
-	})
-}
+var WithProgramPath = ssaconfig.SetOption("ssa_compile/program_path", func(c *Config, v string) {
+	c.programPath = v
+})
 
 var WithIncludePath = ssaconfig.SetOption("ssa_compile/include_path", func(c *Config, v []string) {
 	c.includePath = append(c.includePath, v...)
@@ -233,6 +230,10 @@ var WithProgramDescription = ssaconfig.WithProgramDescription
 var WithProgramName = ssaconfig.WithProgramNames
 
 var WithMemory = ssaconfig.WithCompileMemoryCompile
+
+var WithSaveCache = ssaconfig.SetOption("ssa_compile/save_cache", func(c *Config, h func(i bool)) {
+
+})
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
 
