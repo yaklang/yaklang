@@ -116,6 +116,7 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 			// log.Infof("扫描结果: TaskID=%s, Status=%s", taskID, status)
 		}),
 		ssaconfig.WithProgramNames(progID),
+		WithProcessRuleDetail(true),
 		WithProcessCallback(func(taskID, status string, progress float64, infos *RuleProcessInfoList) {
 			// log.Infof("=%s== %.2f%%, status: %s --\n%s\n", time.UnixMicro(infos.Time), progress*100, status, infos)
 			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(infos.Time), progress*100, status)

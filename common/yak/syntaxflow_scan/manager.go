@@ -112,9 +112,13 @@ func createEmptySyntaxFlowTaskByID(
 	// syntaxFlowScanManagerMap.Set(taskId, m)
 	m.Config = config
 	// 设置进度回调
+	eventWithRule := false
+	if config != nil && config.ScanTaskCallback != nil {
+		eventWithRule = config.ScanTaskCallback.ProcessWithRule
+	}
 	m.processMonitor = newProcessMonitor(ctx, 3*time.Second, func(progress float64, info *RuleProcessInfoList) {
 		m.callback.Process(m.taskID, m.status, progress, info)
-	}, m.notifyResult)
+	}, m.notifyResult, eventWithRule)
 	return m, nil
 }
 

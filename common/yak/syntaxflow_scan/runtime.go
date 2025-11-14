@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -14,9 +15,13 @@ import (
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
+	scanStart := time.Now()
 	defer func() {
 		// 输出性能统计报告
-		m.showScanPerformance()
+		enableRulePerf := m.Config != nil &&
+			m.Config.ScanTaskCallback != nil &&
+			m.Config.ScanTaskCallback.EnableRulePerformanceLog
+		ssaprofile.ShowScanPerformance(m.ruleProfileMap, enableRulePerf, time.Since(scanStart))
 
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -118,7 +123,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	}
 
 	// 根据配置决定是否记录规则级别的详细性能
-	if enableRulePerf {
+	if enableRulePerf && m.ruleProfileMap != nil {
 		// 构建 profile 名称：Rule[规则名].Prog[程序名]
 		profileName := fmt.Sprintf("Rule[%s].Prog[%s]", rule.RuleName, prog.GetProgramName())
 		ssaprofile.ProfileAddToMap(m.ruleProfileMap, true, profileName, f)
@@ -160,26 +165,3 @@ func (m *scanManager) errorCallback(format string, a ...interface{}) {
 // 分为两部分：
 //  1. 整体扫描任务级别的统计（编译时间等）- 始终显示
 //  2. 规则级别的性能详情（每个规则在每个程序上的执行时间）- 需要配置启用
-func (m *scanManager) showScanPerformance() {
-	log.Infof("========================================")
-	log.Infof("SyntaxFlow Scan Performance Report")
-	log.Infof("========================================")
-
-	// 1. 显示整体编译和任务级别的性能统计（始终显示）
-	log.Infof("")
-	log.Infof("=== Task-Level Performance (Compilation & Overall) ===")
-	ssaprofile.ShowCacheCost() // 显示编译相关的性能
-
-	// 2. 显示规则级别的性能统计（仅在启用时显示）
-	if m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableRulePerformanceLog {
-		if m.ruleProfileMap != nil && m.ruleProfileMap.Count() > 0 {
-			log.Infof("")
-			log.Infof("=== Rule-Level Performance (Individual Rule Execution) ===")
-			log.Infof("Total Rules Executed: %d", m.ruleProfileMap.Count())
-			log.Infof("")
-			ssaprofile.ShowCacheCost(m.ruleProfileMap) // 显示规则扫描的详细性能
-		}
-	}
-
-	log.Infof("========================================")
-}

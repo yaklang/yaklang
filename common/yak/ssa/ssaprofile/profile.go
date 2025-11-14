@@ -3,6 +3,7 @@ package ssaprofile
 import (
 	"fmt"
 	"slices"
+	"strings"
 	syncAtomic "sync/atomic"
 	"time"
 
@@ -21,31 +22,38 @@ type Profile struct {
 
 func (profile *Profile) String() string {
 	if profile == nil {
-		return "----------- ProfileList [nil] --------------------"
+		return "Profile [nil]"
 	}
 
-	ret := ""
-	ret += fmt.Sprintf("----------- ProfileList [%s] --------------------", profile.Name)
-	ret += fmt.Sprintf("\n-------- Profile %s\tCount %v\n", profile.Name, profile.Count)
-	if profile.Count == 0 {
-		return ret
+	var builder strings.Builder
+	totalDur := time.Duration(profile.TotalTime)
+	count := profile.Count
+	var avg time.Duration
+	if count > 0 {
+		avg = totalDur / time.Duration(count)
 	}
 
-	ret += fmt.Sprintf("%s--all\tTime: %v\tCount: %v\tAvg: %v\n",
-		profile.Name,
-		time.Duration(profile.TotalTime),
-		profile.Count,
-		time.Duration(profile.TotalTime)/time.Duration(profile.Count),
-	)
+	builder.WriteString(fmt.Sprintf("----------- ProfileList [%s] --------------------\n", profile.Name))
+	builder.WriteString(fmt.Sprintf("-------- Profile %s\tCount %v\n", profile.Name, profile.Count))
+	if count == 0 {
+		return builder.String()
+	}
+
+	builder.WriteString(fmt.Sprintf("%s--all\tTime: %v\tCount: %v\tAvg: %v\n",
+		profile.Name, totalDur, count, avg,
+	))
+
 	for index, t := range profile.Times {
-		ret += fmt.Sprintf("%s-%-4d\tTime: %v\tCount: %v\tAvg: %v\n",
-			profile.Name, index+1,
-			time.Duration(t),
-			profile.Count,
-			time.Duration(t)/time.Duration(profile.Count),
-		)
+		stepDur := time.Duration(t)
+		stepAvg := stepDur
+		if count > 0 {
+			stepAvg = stepDur / time.Duration(count)
+		}
+		builder.WriteString(fmt.Sprintf("%s-%-4d\tTime: %v\tCount: %v\tAvg: %v\n",
+			profile.Name, index+1, stepDur, count, stepAvg,
+		))
 	}
-	return ret
+	return builder.String()
 }
 
 var profileListMap = utils.NewSafeMap[*Profile]()
@@ -143,15 +151,74 @@ func ProfileAddWithErrorToMap(profileMap *utils.SafeMap[*Profile], enable bool, 
 	return nil
 }
 
-func ShowCacheCost(pprof ...*utils.SafeMap[*Profile]) {
+// ShowCompileProfiles 输出编译阶段的性能统计
+func ShowCompileProfiles() {
+	ShowProfileMaps("compile", profileListMap)
+}
 
-	show := func(index int, prof *utils.SafeMap[*Profile]) {
-		profiles := make([]*Profile, 0, prof.Count())
-		prof.ForEach(func(key string, value *Profile) bool {
+// ShowProfileMaps 按标签输出给定 Profile map 的统计信息
+func ShowProfileMaps(label string, profileMaps ...*utils.SafeMap[*Profile]) {
+	if len(profileMaps) == 0 {
+		dumpProfileMap(label, profileListMap)
+		return
+	}
+	for _, prof := range profileMaps {
+		dumpProfileMap(label, prof)
+	}
+}
+
+func dumpProfileMap(label string, prof *utils.SafeMap[*Profile]) {
+	if prof == nil || prof.Count() == 0 {
+		log.Infof("profile map %s is empty", label)
+		return
+	}
+
+	profiles := make([]*Profile, 0, prof.Count())
+	prof.ForEach(func(key string, value *Profile) bool {
+		profiles = append(profiles, value)
+		return true
+	})
+
+	slices.SortFunc(profiles, func(a, b *Profile) int {
+		if a.TotalTime < b.TotalTime {
+			return 1
+		} else if a.TotalTime > b.TotalTime {
+			return -1
+		}
+		return 0
+	})
+	log.Infof("========================================")
+	log.Infof("Profile Summary [%s]", label)
+	log.Infof("========================================")
+	for _, profile := range profiles {
+		log.Infof(profile.String())
+	}
+	log.Infof("========================================")
+}
+
+// ShowScanPerformance 输出代码扫描相关的性能日志
+func ShowScanPerformance(ruleProfileMap *utils.SafeMap[*Profile], enableRulePerformance bool, totalDuration time.Duration) {
+	ShowCompileProfiles()
+	totalCount := uint64(0)
+	if ruleProfileMap != nil {
+		ruleProfileMap.ForEach(func(key string, value *Profile) bool {
+			totalCount += value.Count
+			return true
+		})
+	}
+	if totalCount == 0 {
+		totalCount = 1
+	}
+	avgDuration := totalDuration / time.Duration(totalCount)
+	log.Infof("=== Scan Total ===")
+	log.Infof("Time: %v\tCount: %d\tAvg: %v", totalDuration, totalCount, avgDuration)
+	log.Infof("==================")
+	if enableRulePerformance && ruleProfileMap != nil && ruleProfileMap.Count() > 0 {
+		profiles := make([]*Profile, 0, ruleProfileMap.Count())
+		ruleProfileMap.ForEach(func(key string, value *Profile) bool {
 			profiles = append(profiles, value)
 			return true
 		})
-
 		slices.SortFunc(profiles, func(a, b *Profile) int {
 			if a.TotalTime < b.TotalTime {
 				return 1
@@ -160,20 +227,15 @@ func ShowCacheCost(pprof ...*utils.SafeMap[*Profile]) {
 			}
 			return 0
 		})
-		log.Infof("----------------------------------------[%d]--------------------------------------", index)
+		log.Infof("=== Rule Performance (scan) ===")
 		for _, profile := range profiles {
-			log.Infof(profile.String())
+			if profile.Count == 0 {
+				continue
+			}
+			avg := time.Duration(profile.TotalTime) / time.Duration(profile.Count)
+			log.Infof("%s Time: %v Count: %d Avg: %v", profile.Name, time.Duration(profile.TotalTime), profile.Count, avg)
 		}
-		log.Infof("-------------------------------------------------------------------------------")
-	}
-
-	if len(pprof) > 0 {
-		for i, profile := range pprof {
-			show(i, profile)
-		}
-		return
-	} else {
-		show(0, profileListMap)
+		log.Infof("================================")
 	}
 }
 

@@ -40,20 +40,23 @@ type ScanTaskCallback struct {
 
 	Reporter       sfreport.IReport `json:"-"`
 	ReporterWriter io.Writer        `json:"-"`
-	
+
 	// EnableRulePerformanceLog 是否启用规则级别的详细性能日志
 	// 默认为 false，只显示任务级别的性能统计（编译时间等）
 	// 设置为 true 时，会显示每个规则在每个程序上的详细执行时间
 	EnableRulePerformanceLog bool `json:"-"`
+	ProcessWithRule          bool `json:"-"`
 }
 
 const (
-	pauseFuncKey       = "pauseFunc"
-	resultCallbackKey  = "resultCallback"
-	errorCallbackKey   = "errorCallback"
-	processCallbackKey = "processCallback"
-	reporterKey        = "reporter"
-	reporterWriterKey  = "reporterWriter"
+	pauseFuncKey          = "pauseFunc"
+	resultCallbackKey     = "resultCallback"
+	errorCallbackKey      = "errorCallback"
+	processCallbackKey    = "processCallback"
+	reporterKey           = "reporter"
+	reporterWriterKey     = "reporterWriter"
+	processRuleKey        = "processRuleDetail"
+	rulePerformanceLogKey = "rulePerformanceLog"
 )
 
 func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
@@ -92,6 +95,22 @@ func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
 	}
 }
 
+// WithProcessRuleDetail 控制进度回调是否包含规则级别详情
+func WithProcessRuleDetail(withRule bool) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(processRuleKey, withRule)
+		return nil
+	}
+}
+
+// WithRulePerformanceLog 控制是否开启规则级性能日志
+func WithRulePerformanceLog(enable bool) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(rulePerformanceLogKey, enable)
+		return nil
+	}
+}
+
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	cfg := &Config{
 		ScanTaskCallback: &ScanTaskCallback{},
@@ -126,9 +145,24 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 		}
 	}
 
+	if f, ok := cfg.ExtraInfo[processRuleKey]; ok {
+		if withRule, ok := f.(bool); ok {
+			cfg.ProcessWithRule = withRule
+		}
+	}
+
 	if f, ok := cfg.ExtraInfo[reporterKey]; ok {
 		if reporter, ok := f.(sfreport.IReport); ok {
 			cfg.Reporter = reporter
+		}
+	}
+
+	if f, ok := cfg.ExtraInfo[rulePerformanceLogKey]; ok {
+		if enable, ok := f.(bool); ok {
+			cfg.EnableRulePerformanceLog = enable
+			if cfg.ScanTaskCallback != nil {
+				cfg.ScanTaskCallback.EnableRulePerformanceLog = enable
+			}
 		}
 	}
 
