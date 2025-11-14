@@ -1,10 +1,11 @@
 package ssaconfig
 
 var Exports = map[string]interface{}{
-	"New":                      New,
+	"NewConfig":                New,
 	"ModeAll":                  ModeAll,
 	"ModeProjectCompile":       ModeProjectCompile,
 	"withJsonRawConfig":        WithJsonRawConfig,
+	"withProjectID":            WithProjectID,
 	"withProjectName":          WithProjectName,
 	"withProgramNames":         WithProgramNames,
 	"withProgramDescription":   WithProgramDescription,

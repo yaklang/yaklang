@@ -194,6 +194,7 @@ func TestManager(t *testing.T) {
 	})
 
 	t.Run("test SSA project rule configuration", func(t *testing.T) {
+		t.Skip("Skip the test because do not use ssa project name to create task anymore")
 		// 创建测试规则
 		testRule := &schema.SyntaxFlowRule{
 			RuleName:    "test-rule-" + uuid.NewString(),

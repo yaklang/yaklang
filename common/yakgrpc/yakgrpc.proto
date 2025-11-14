@@ -8363,6 +8363,8 @@ message SSAProject {
   int64 RiskNumber = 13;
   // 编译次数
   int64 CompileTimes = 14;
+  // 本地路径或者远程代码仓库路径
+  string URL = 15;
 }
 
 message SSAProjectCompileConfig{

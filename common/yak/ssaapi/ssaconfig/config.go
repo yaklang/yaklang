@@ -81,6 +81,18 @@ func (c *Config) ToJSONString() (string, error) {
 	return string(data), nil
 }
 
+func (c *Config) Update(options ...Option) error {
+	if c == nil {
+		return nil
+	}
+	for _, option := range options {
+		if err := option(c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // default factory functions - used by With... option helpers to create nested configs
 func defaultCodeSourceConfig() *CodeSourceInfo {
 	return &CodeSourceInfo{}
