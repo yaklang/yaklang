@@ -200,6 +200,41 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 		return normalizedVectors, nil
 	}
 
+	var response3 []embeddingItem2D
+	if err := json.Unmarshal(body, &response3); err == nil && len(response3) > 0 && len(response3[0].Embedding) > 0 {
+		// 成功解析为二维向量格式，返回所有向量
+		embeddingVectors := response3[0].Embedding
+		vectorCount := len(embeddingVectors)
+
+		// 对所有向量进行归一化处理
+		normalizedVectors := make([][]float32, vectorCount)
+		for i, vec := range embeddingVectors {
+			if len(vec) > 0 {
+				normalizedVectors[i] = NormalizeVector(vec, 2, 1e-6)
+			}
+		}
+
+		log.Infof("Successfully parsed embedding response as 2D format ([][]float32), vector count: %d, first vector dimension: %d",
+			vectorCount, len(normalizedVectors[0]))
+		return normalizedVectors, nil
+	}
+
+	var response4 []embeddingItem
+	if err := json.Unmarshal(body, &response4); err == nil && len(response4) > 0 && len(response4[0].Embedding) > 0 {
+		// 成功解析为一维向量格式，返回所有向量
+		embeddingVectors := response4
+		vectorCount := len(embeddingVectors)
+		normalizedVectors := make([][]float32, vectorCount)
+		for i, item := range embeddingVectors {
+			if len(item.Embedding) > 0 {
+				normalizedVectors[i] = NormalizeVector(item.Embedding, 2, 1e-6)
+			}
+		}
+		log.Infof("Successfully parsed embedding response as 1D array format ([]embeddingItem), vector count: %d, first vector dimension: %d",
+			vectorCount, len(normalizedVectors[0]))
+		return normalizedVectors, nil
+	}
+
 	// 策略3: 尝试解析错误响应
 	var errResp errorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
@@ -215,6 +250,7 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	// 如果所有格式都解析失败，返回通用错误
 	// 截断响应体以避免日志过长
 	bodyStr := string(body)
+	fmt.Println(string(body))
 	if len(bodyStr) > 500 {
 		bodyStr = bodyStr[:500] + "... (truncated)"
 	}
