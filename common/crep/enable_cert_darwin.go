@@ -42,7 +42,7 @@ func AddMITMRootCertIntoSystem() error {
 	// 构建安装脚本
 	script := buildMacOSInstallCertScript(tmpFile)
 
-	log.Info("installing MITM root certificate into macOS system keychain")
+	log.Info("installing MITM root certificate into macOS system keychain.")
 	output, err := executor.Execute(ctx, script,
 		privileged.WithDescription("Install MITM root certificate for secure traffic inspection"),
 		privileged.WithTitle("Install MITM Certificate"),
