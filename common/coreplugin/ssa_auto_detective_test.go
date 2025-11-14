@@ -187,6 +187,74 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		require.Equal(t, info.GetProjectDescription(), project.Description)
 	})
 
+	t.Run("detective with immediate compile", func(t *testing.T) {
+		// 使用项目探测立即编译的项目应该也有一次编译次数
+		javaCode := `public class ImmediateTest {
+    public static void main(String[] args) {
+        System.out.println("Immediate Compile Test");
+    }
+}`
+		tempDir, cleanupDir := setupTempDirWithJavaFile(t, "ImmediateTest.java", javaCode)
+		defer cleanupDir()
+
+		// 使用立即编译模式探测项目
+		log.Infof("Starting SSA auto detective with immediate compile...")
+		info, prog, err := ParseProjectWithAutoDetective(
+			context.Background(),
+			tempDir,
+			"java",
+			true, // 立即编译
+		)
+		require.NoError(t, err)
+		require.NotNil(t, prog, "Program should be compiled immediately")
+		require.NotEmpty(t, info.GetProgramName(), "Program name should not be empty")
+		require.NotEmpty(t, info.GetProjectName(), "Project name should not be empty")
+
+		log.Infof("Immediate compile completed:")
+		log.Infof("  ProgramName: %s", info.GetProgramName())
+		log.Infof("  ProjectName: %s", info.GetProjectName())
+		log.Infof("  Language: %s", info.GetLanguage())
+
+		client, err := yakgrpc.NewLocalClient()
+		require.NoError(t, err)
+
+		queryReq := &ypb.QuerySSAProjectRequest{
+			Filter: &ypb.SSAProjectFilter{
+				ProjectNames: []string{info.GetProjectName()},
+			},
+		}
+
+		queryResp, err := client.QuerySSAProject(context.Background(), queryReq)
+		require.NoError(t, err)
+		require.NotNil(t, queryResp)
+		require.Equal(t, 1, len(queryResp.Projects), "Should find exactly one project")
+
+		project := queryResp.Projects[0]
+		log.Infof("Found SSA Project:")
+		log.Infof("  ID: %d", project.ID)
+		log.Infof("  ProjectName: %s", project.ProjectName)
+		log.Infof("  Language: %s", project.Language)
+		log.Infof("  CompileTimes: %d", project.CompileTimes)
+
+		// 验证项目信息
+		require.Equal(t, info.GetProjectName(), project.ProjectName)
+		require.Equal(t, string(info.GetLanguage()), project.Language)
+		require.Equal(t, int64(1), project.CompileTimes, "CompileTimes should be 1 after immediate compilation")
+
+		// 清理项目
+		defer func() {
+			deleteReq := &ypb.DeleteSSAProjectRequest{
+				DeleteMode: string(yakit.SSAProjectDeleteAll),
+				Filter: &ypb.SSAProjectFilter{
+					IDs: []int64{project.ID},
+				},
+			}
+			_, _ = client.DeleteSSAProject(context.Background(), deleteReq)
+		}()
+
+		log.Infof("✅ Test passed: SSA project compiled immediately with CompileTimes = 1")
+	})
+
 	t.Run("detective then compile and verify compile times", func(t *testing.T) {
 		javaCode := `public class HelloWorld {
     public static void main(String[] args) {

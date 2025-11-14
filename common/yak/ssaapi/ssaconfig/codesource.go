@@ -2,7 +2,6 @@ package ssaconfig
 
 import (
 	"encoding/json"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 

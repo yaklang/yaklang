@@ -113,6 +113,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, []string{"sql-injection", "xss"}, project.RuleConfig.RuleFilter.RuleNames)
 		require.False(t, project.ScanConfig.IgnoreLanguage)
 		require.Equal(t, []string{"test", "local"}, project.Tags)
+		require.Equal(t, "/tmp/test-project", project.URL)
 
 		// 保存项目ID用于后续测试
 		projectID = uint64(project.ID)
@@ -200,6 +201,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, []string{"sql-injection"}, updatedProject.RuleConfig.RuleFilter.RuleNames)
 		require.True(t, updatedProject.ScanConfig.IgnoreLanguage)
 		require.Equal(t, []string{newProjectName, "git"}, updatedProject.Tags)
+		require.Equal(t, "https://github.com/test/repo.git", updatedProject.URL)
 	})
 
 	// 4. 测试删除SSA项目
