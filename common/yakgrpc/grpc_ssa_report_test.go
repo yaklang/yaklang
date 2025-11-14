@@ -79,24 +79,30 @@ func createMockTask(taskId, programName string, status string, riskCounts map[st
 
 // createMockRisk 创建模拟风险数据
 func createMockRisk(taskId, programName, riskType, severity, fromRule, title, titleVerbose, description, solution, filePath, functionName, codeFragment string, line int64) *schema.SSARisk {
+	return createMockRiskWithDisposal(taskId, programName, riskType, severity, fromRule, title, titleVerbose, description, solution, filePath, functionName, codeFragment, line, "")
+}
+
+// createMockRiskWithDisposal 创建带有处置状态的模拟风险数据
+func createMockRiskWithDisposal(taskId, programName, riskType, severity, fromRule, title, titleVerbose, description, solution, filePath, functionName, codeFragment string, line int64, disposalStatus string) *schema.SSARisk {
 	// SSA风险数据存储在SSA数据库
 	db := consts.GetGormDefaultSSADataBase()
 	risk := &schema.SSARisk{
-		Title:         title,
-		TitleVerbose:  titleVerbose,
-		Description:   description,
-		Solution:      solution,
-		RiskType:      riskType,
-		Severity:      schema.SyntaxFlowSeverity(severity),
-		FromRule:      fromRule,
-		ProgramName:   programName,
-		RuntimeId:     taskId,
-		CodeSourceUrl: filePath,
-		CodeRange:     fmt.Sprintf("%d-%d", line, line+2),
-		CodeFragment:  codeFragment,
-		FunctionName:  functionName,
-		Line:          line,
-		Language:      "java",
+		Title:                title,
+		TitleVerbose:         titleVerbose,
+		Description:          description,
+		Solution:             solution,
+		RiskType:             riskType,
+		Severity:             schema.SyntaxFlowSeverity(severity),
+		FromRule:             fromRule,
+		ProgramName:          programName,
+		RuntimeId:            taskId,
+		CodeSourceUrl:        filePath,
+		CodeRange:            fmt.Sprintf("%d-%d", line, line+2),
+		CodeFragment:         codeFragment,
+		FunctionName:         functionName,
+		Line:                 line,
+		Language:             "java",
+		LatestDisposalStatus: disposalStatus,
 	}
 	risk.Hash = risk.CalcHash()
 	db.Save(risk)
@@ -662,9 +668,8 @@ func TestGenerateSSAReport(t *testing.T) {
 
 	// 准备测试请求
 	req := &ypb.GenerateSSAReportRequest{
-		//TaskID:     "f6c5443f-0598-421c-8454-ba6ca621dd30", // 使用用户提供的taskID
-		TaskID:     "a8c551d5-01a0-4cae-8c7f-3b799ad2cb7b", // 使用用户提供的taskID
-		ReportName: "SSA扫描报告测试",
+		TaskID:     "44babc8b-3784-45fc-b75a-3a6812a088e8", // 使用实际存在的taskID
+		ReportName: "Ecommerce-Ejherb项目扫描报告",
 	}
 
 	// 调用GenerateSSAReport方法
@@ -692,4 +697,120 @@ func TestGenerateSSAReport(t *testing.T) {
 	t.Logf("报告ID: %s", resp.ReportData)
 	t.Logf("消息: %s", resp.Message)
 	t.Logf("请手动检查数据库中ID为 %s 的报告内容", resp.ReportData)
+}
+
+// TestGenerateSSAReport_WithDisposalStatus 测试包含处置状态的报告生成
+func TestGenerateSSAReport_WithDisposalStatus(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+
+	server, err := NewTestServer()
+	if err != nil {
+		t.Fatalf("创建测试服务器失败: %v", err)
+	}
+
+	taskId := uuid.New().String()
+	programName := "test-disposal-status-project"
+
+	defer cleanupMockData(taskId, programName)
+
+	// 创建程序
+	createMockProgram(programName, "java", "测试处置状态显示项目", 5, 2000)
+
+	// 创建任务
+	riskCounts := map[string]int64{
+		"total": 4, "critical": 1, "high": 1, "middle": 1, "low": 1, "info": 0,
+	}
+	createMockTask(taskId, programName, schema.SYNTAXFLOWSCAN_DONE, riskCounts, 5)
+
+	// 创建不同处置状态的风险，并创建对应的处置记录
+	risk1 := createMockRisk(
+		taskId, programName,
+		"SQL注入", "critical", "sql-injection-rule",
+		"SQL Injection", "SQL注入漏洞",
+		"存在SQL注入风险", "使用参数化查询",
+		"/src/dao/UserDao.java", "getUserById",
+		`String sql = "SELECT * FROM users WHERE id = '" + userId + "'";`,
+		10,
+	)
+	// 创建处置记录
+	db := consts.GetGormDefaultSSADataBase()
+	db.Create(&schema.SSARiskDisposals{
+		SSARiskID:       int64(risk1.ID),
+		RiskFeatureHash: risk1.RiskFeatureHash,
+		Status:          "is_issue",
+		Comment:         "确认为SQL注入漏洞，需要立即修复",
+		TaskId:          taskId,
+	})
+
+	risk2 := createMockRisk(
+		taskId, programName,
+		"XSS", "high", "xss-rule",
+		"Cross-site Scripting", "跨站脚本攻击",
+		"输出未进行HTML编码", "对用户输入进行HTML编码",
+		"/src/web/UserController.java", "showUserInfo",
+		`response.getWriter().write("<div>" + username + "</div>");`,
+		25,
+	)
+	db.Create(&schema.SSARiskDisposals{
+		SSARiskID:       int64(risk2.ID),
+		RiskFeatureHash: risk2.RiskFeatureHash,
+		Status:          "suspicious",
+		Comment:         "需要进一步确认是否存在XSS风险",
+		TaskId:          taskId,
+	})
+
+	risk3 := createMockRisk(
+		taskId, programName,
+		"硬编码密钥", "middle", "hardcoded-key-rule",
+		"Hardcoded Key", "硬编码密钥",
+		"代码中存在硬编码的密钥", "将密钥存储在安全的配置文件中",
+		"/src/config/SecurityConfig.java", "getEncryptionKey",
+		`private static final String KEY = "abc123def456";`,
+		15,
+	)
+	db.Create(&schema.SSARiskDisposals{
+		SSARiskID:       int64(risk3.ID),
+		RiskFeatureHash: risk3.RiskFeatureHash,
+		Status:          "not_issue",
+		Comment:         "这是测试环境的密钥，不是真实密钥，不构成风险",
+		TaskId:          taskId,
+	})
+
+	_ = createMockRisk(
+		taskId, programName,
+		"HTTP头缺失", "low", "missing-header-rule",
+		"Missing Security Header", "安全头缺失",
+		"响应中缺少安全相关的HTTP头", "添加安全HTTP响应头",
+		"/src/web/SecurityFilter.java", "doFilter",
+		`response.setHeader("Content-Type", "text/html");`,
+		40,
+	)
+	// 这个风险不创建处置记录，测试未处置状态
+
+	// 测试报告生成
+	req := &ypb.GenerateSSAReportRequest{
+		TaskID:     taskId,
+		ReportName: "处置状态显示测试报告",
+	}
+
+	ctx := context.Background()
+	resp, err := server.GenerateSSAReport(ctx, req)
+	if err != nil {
+		t.Fatalf("生成SSA报告失败: %v", err)
+	}
+
+	if !resp.Success {
+		t.Fatalf("报告生成失败: %s", resp.Message)
+	}
+
+	t.Logf("✅ 处置状态显示测试报告生成成功!")
+	t.Logf("   报告ID: %s", resp.ReportData)
+	t.Logf("   包含4个不同处置状态的风险:")
+	t.Logf("   - SQL注入: 存在漏洞 (is_issue) - 确认为SQL注入漏洞，需要立即修复")
+	t.Logf("   - XSS: 疑似问题 (suspicious) - 需要进一步确认是否存在XSS风险")
+	t.Logf("   - 硬编码密钥: 不是问题 (not_issue) - 这是测试环境的密钥，不是真实密钥，不构成风险")
+	t.Logf("   - HTTP头缺失: 未处置 (not_set) - 无处置备注")
+	t.Logf("   请手动检查报告中的处置状态和备注是否正确显示")
 }
