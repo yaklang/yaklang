@@ -19,7 +19,7 @@ import (
 // 2. 使用系统证书池（不跳过验证）连接到该服务器
 // 3. 如果连接成功且 TLS 握手完成，说明证书已正确安装
 func VerifyMITMRootCertInstalled() error {
-	log.Info("verifying MITM root certificate installation...")
+	log.Debug("verifying MITM root certificate installation...")
 
 	// 初始化 MITM 证书
 	InitMITMCert()
@@ -53,7 +53,7 @@ func VerifyMITMRootCertInstalled() error {
 	defer listener.Close()
 
 	serverAddr := listener.Addr().String()
-	log.Infof("starting test HTTPS server on %s", serverAddr)
+	log.Debugf("starting test HTTPS server on %s", serverAddr)
 
 	// 创建 TLS 配置
 	tlsConfig := &tls.Config{
@@ -100,7 +100,7 @@ func VerifyMITMRootCertInstalled() error {
 	}
 
 	// 客户端连接验证
-	log.Info("attempting to connect with system certificate pool...")
+	log.Debug("attempting to connect with system certificate pool...")
 
 	// 使用系统证书池（启用证书验证）
 	systemCertPool, err := x509.SystemCertPool()
