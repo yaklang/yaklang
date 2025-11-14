@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -185,20 +187,29 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 	pqmode := s.collection.EnablePQMode
 
 	cacheMaxSize := cacheMinSize + 2000
-	cache := map[hnswspec.LazyNodeID]any{}
+	cache := &sync.Map{}
+	var cacheCount int64
+	var cacheMutex sync.Mutex
+
 	clearCache := func() {
-		if len(cache) > cacheMaxSize {
-			clearNum := len(cache) - cacheMinSize
+		cacheMutex.Lock()
+		defer cacheMutex.Unlock()
+
+		currentCount := atomic.LoadInt64(&cacheCount)
+		if int(currentCount) > cacheMaxSize {
+			clearNum := int(currentCount) - cacheMinSize
 			clearKeys := []hnswspec.LazyNodeID{}
-			for key := range cache {
-				clearKeys = append(clearKeys, key)
-				clearNum--
+			cache.Range(func(key, value interface{}) bool {
 				if clearNum <= 0 {
-					break
+					return false
 				}
-			}
+				clearKeys = append(clearKeys, key.(hnswspec.LazyNodeID))
+				clearNum--
+				return true
+			})
 			for _, key := range clearKeys {
-				delete(cache, key)
+				cache.Delete(key)
+				atomic.AddInt64(&cacheCount, -1)
 			}
 		}
 	}
@@ -228,7 +239,7 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 		var newNode hnswspec.LayerNode[string]
 		if pqmode {
 			newNode = hnswspec.NewLazyRawPQLayerNode(docId, func() ([]byte, error) {
-				if node, ok := cache[uidStr]; ok {
+				if node, ok := cache.Load(uidStr); ok {
 					return node.([]byte), nil
 				}
 
@@ -237,12 +248,13 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 					return nil, err
 				}
 				clearCache()
-				cache[uidStr] = doc.PQCode
+				cache.Store(uidStr, doc.PQCode)
+				atomic.AddInt64(&cacheCount, 1)
 				return doc.PQCode, nil
 			})
 		} else {
 			newNode = hnswspec.NewStandardLayerNode(docId, func() []float32 {
-				if node, ok := cache[uidStr]; ok {
+				if node, ok := cache.Load(uidStr); ok {
 					return node.([]float32)
 				}
 
@@ -252,7 +264,8 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 					return nil
 				}
 				clearCache()
-				cache[uidStr] = []float32(doc.Embedding)
+				cache.Store(uidStr, []float32(doc.Embedding))
+				atomic.AddInt64(&cacheCount, 1)
 				return doc.Embedding
 			})
 		}
