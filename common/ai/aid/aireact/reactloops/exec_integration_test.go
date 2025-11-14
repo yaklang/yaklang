@@ -3,10 +3,13 @@ package reactloops
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
@@ -267,6 +270,17 @@ type mockSimpleTask struct {
 	index     string
 	status    aicommon.AITaskState
 	reActLoop aicommon.ReActLoopIF
+}
+
+func (m *mockSimpleTask) GetDB() *gorm.DB {
+	return nil
+}
+
+func (m *mockSimpleTask) SetDB(db *gorm.DB) {
+}
+
+func (m *mockSimpleTask) GetRisks() []*schema.Risk {
+	return []*schema.Risk{}
 }
 
 func (m *mockSimpleTask) PushToolCallResult(result *aitool.ToolResult) {

@@ -146,6 +146,13 @@ func (r *Emitter) EmitJSON(typeName schema.EventType, id string, i any) {
 	r.emit(event)
 }
 
+func (r *Emitter) EmitYakitRisk(id uint, title string) {
+	r.EmitJSON(schema.EVENT_TYPE_YAKIT_RISK, "yakit", map[string]any{
+		"risk_id": id,
+		"title":   title,
+	})
+}
+
 func (r *Emitter) EmitYakitExecResult(exec *ypb.ExecResult) {
 	if exec == nil {
 		return

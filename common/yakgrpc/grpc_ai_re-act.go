@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -109,9 +108,6 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 			coordinatorIdOnce.Do(func() {
 				currentCoordinatorId = e.CoordinatorId
 			})
-		}
-		if e.CallToolID != "" {
-			fmt.Printf("!!!!!!!!!!!!!!!%+v\n", e)
 		}
 		err := stream.Send(e.ToGRPC())
 		if err != nil {

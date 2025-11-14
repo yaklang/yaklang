@@ -36,6 +36,9 @@ func (r *ReAct) setCurrentTask(task aicommon.AIStatefulTask) {
 	r.lastTask = r.currentTask
 
 	r.currentTask = task
+	if r.currentTask != nil {
+		r.currentTask.SetDB(r.config.GetDB())
+	}
 	if r.config.DebugEvent {
 		if task != nil {
 			log.Infof("Current task set to: %s", task.GetId())
