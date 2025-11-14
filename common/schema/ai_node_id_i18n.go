@@ -13,6 +13,14 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"semantic_search_code": {
+		Zh: "代码语义搜索",
+		En: "Semantic Code Search",
+	},
+	"init-search-code-sample": {
+		Zh: "初始化代码样本搜索",
+		En: "Initialize Code Sample Search",
+	},
 	"code_sample_title": {
 		Zh: "代码样本",
 		En: "Code Sample",
