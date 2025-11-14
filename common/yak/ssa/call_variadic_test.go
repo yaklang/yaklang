@@ -3,6 +3,9 @@ package ssa_test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -80,4 +83,37 @@ func TestVariadicParameterInClosure(t *testing.T) {
 			t.Errorf("Bug still exists: %s", err.String())
 		}
 	}
+}
+
+func TestVariadicParameter(t *testing.T) {
+	ssatest.CheckNoError(t, `
+Merge_And_Ded = (A,B,C,D,D) => {
+    result = []
+    return result
+}
+
+Get_Metadata_Group = (group_Name,count...) => {
+    A = 0
+    B = 0
+    C = 0
+    D = 0
+    E = Merge_And_Ded(A,B,C,D,D)
+
+    return E
+}
+`)
+}
+
+func TestVariadicParameter_Packet_NotMarkError(t *testing.T) {
+	code := `
+print(a) 
+	`
+	ssatest.CheckError(t,
+		ssatest.TestCase{
+			Code: code,
+			Want: []string{
+				ssa.ValueUndefined("a"),
+			},
+		},
+	)
 }

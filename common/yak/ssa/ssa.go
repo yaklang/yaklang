@@ -1134,6 +1134,9 @@ type Make struct {
 
 	// when slice or map
 	Len, Cap int64
+
+	// for temporary anonymous struct
+	Anonymous bool
 }
 
 var (

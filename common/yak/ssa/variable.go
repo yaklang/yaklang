@@ -117,6 +117,9 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 }
 
 func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
+	if !v.ShouldAddError() {
+		return
+	}
 	value := v.GetValue()
 	if utils.IsNil(value) {
 		return
@@ -238,4 +241,25 @@ func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
 		}
 	}
 	return rets
+}
+
+func (v *Variable) ShouldAddError() bool {
+	if utils.IsNil(v) {
+		return false
+	}
+	value := v.GetValue()
+	if utils.IsNil(value) {
+		return false
+	}
+
+	if v.verboseName == "_" {
+		return false
+	}
+
+	// if is anonymous struct from make
+	if make, ok := ToMake(v.object); ok && make.Anonymous {
+		return false
+	}
+
+	return true
 }
