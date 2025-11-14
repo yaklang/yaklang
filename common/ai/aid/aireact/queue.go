@@ -94,6 +94,8 @@ func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason st
 
 // GetFirst 获取并移除队列中的第一个任务
 func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
 	front := tq.queue.Front()
 	if front == nil {
 		return nil
@@ -111,8 +113,6 @@ func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 		return nil
 	}
 
-	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
 	tq.queue.Remove(front)
 
 	log.Debugf("Task queue [%s]: dequeued task [%s]", tq.queueName, task.GetId())
