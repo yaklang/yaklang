@@ -89,7 +89,7 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
-				reactloops.WithInitTask(buildInitTask(r, docSearcher)),
+				reactloops.WithInitTask(buildInitTask(r, docSearcher, docSearcherByRag)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithAITagFieldWithAINodeId("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),

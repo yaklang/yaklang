@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -13,218 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-// Universal compress function for search results
-func compressRAGSearchResults(resultStr string, searchQuery string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator, maxRanges int, minLines int, maxLines int, title string) string {
-	if len(resultStr) == 0 {
-		return resultStr
-	}
-
-	resultEditor := memedit.NewMemEditor(resultStr)
-	dNonce := utils.RandStringBytes(4)
-
-	promptTemplate := `
-<|RAG_RESULT_{{ .nonce }}|>
-{{ .samples }}
-<|RAG_RESULT_END_{{ .nonce }}|>
-
-<|INSTRUCT_{{ .nonce }}|>
-【智能代码片段提取与排序】
-
-请从上述向量搜索结果中提取最有价值的代码片段，按重要性排序：
-
-【提取要求】
-1. 最多提取 %d 个代码片段
-2. 每个片段 %d-%d 行，确保上下文完整
-3. 按重要性从高到低排序（rank: 1最重要，数字越大越不重要）
-
-【重要性评判标准】（按优先级排序）
-🔥 最高优先级 (rank 1-3)：
-- 完整的函数调用示例 + 错误处理
-- 包含关键参数配置的典型用法
-- 展示核心API调用模式的代码
-
-⭐ 高优先级 (rank 4-6)：
-- 包含重要配置或选项的示例
-- 展示常见使用场景的代码
-- 有详细注释说明的关键代码
-
-📝 中等优先级 (rank 7-10)：
-- 辅助功能或工具函数调用
-- 简单的变量赋值或初始化
-- 补充性的代码片段
-
-【输出格式】
-返回JSON数组，每个元素包含：
-{
-  "range": "start-end",
-  "rank": 数字(1-10),
-  "reason": "选择理由"
-}
-
-【严格要求】
-- 总行数控制在80行以内
-- 避免重复或相似的代码片段
-- 优先选择能独立理解的完整代码块
-- 确保每个片段都有实际参考价值
-
-请按重要性排序输出ranges数组。
-<|INSTRUCT_END_{{ .nonce }}|>
-`
-
-	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":       dNonce,
-		"samples":     utils.PrefixLinesWithLineNumbers(resultStr),
-		"searchQuery": searchQuery,
-	})
-
-	if err != nil {
-		log.Errorf("compressRAGSearchResults: template render failed: %v", err)
-		return resultStr
-	}
-
-	var context = invoker.GetConfig().GetContext()
-	if op != nil {
-		context = op.GetTask().GetContext()
-	}
-
-	forgeResult, err := invoker.InvokeLiteForge(
-		context,
-		"extract-ranked-lines",
-		materials,
-		[]aitool.ToolOption{
-			aitool.WithStructArrayParam(
-				"ranges",
-				[]aitool.PropertyOption{
-					aitool.WithParam_Description("按重要性排序的代码片段范围数组"),
-				},
-				nil,
-				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end")),
-				aitool.WithIntegerParam("rank", aitool.WithParam_Description("重要性排序，1最重要，数字越大越不重要")),
-				aitool.WithStringParam("reason", aitool.WithParam_Description("选择此片段的理由")),
-			),
-		},
-		aicommon.WithGeneralConfigStreamableField("reason"),
-	)
-
-	if err != nil {
-		log.Errorf("compressRAGSearchResults: forge failed: %v", err)
-		return resultStr
-	}
-
-	if forgeResult == nil {
-		log.Warnf("compressRAGSearchResults: forge result is nil")
-		return resultStr
-	}
-
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
-
-	if len(rangeItems) == 0 {
-		log.Warnf("compressRAGSearchResults: no ranges extracted")
-		return resultStr
-	}
-
-	// 提取并排序代码片段
-	type RankedRange struct {
-		Range  string
-		Rank   int
-		Reason string
-		Text   string
-	}
-
-	var rankedRanges []RankedRange
-	totalLines := 0
-
-	for _, item := range rangeItems {
-		rangeStr := item.GetString("range")
-		rank := item.GetInt("rank")
-		reason := item.GetString("reason")
-
-		if rangeStr == "" {
-			continue
-		}
-
-		// 解析行范围
-		parts := strings.Split(rangeStr, "-")
-		if len(parts) != 2 {
-			log.Warnf("compressRAGSearchResults: invalid range format: %s", rangeStr)
-			continue
-		}
-
-		startLine, err1 := strconv.Atoi(parts[0])
-		endLine, err2 := strconv.Atoi(parts[1])
-
-		if err1 != nil || err2 != nil {
-			log.Errorf("compressRAGSearchResults: parse range failed: %s, errors: %v, %v", rangeStr, err1, err2)
-			continue
-		}
-
-		if startLine <= 0 || endLine < startLine {
-			log.Warnf("compressRAGSearchResults: invalid range values: %s (start=%d, end=%d)", rangeStr, startLine, endLine)
-			continue
-		}
-
-		// 提取文本
-		text := resultEditor.GetTextFromPositionInt(startLine, 1, endLine, 1)
-		if text == "" {
-			log.Warnf("compressRAGSearchResults: empty text for range: %s", rangeStr)
-			continue
-		}
-
-		lineCount := strings.Count(text, "\n") + 1
-		if totalLines+lineCount > 100 {
-			log.Warnf("compressRAGSearchResults: would exceed 100 lines limit, stopping at range: %s", rangeStr)
-			break
-		}
-
-		rankedRanges = append(rankedRanges, RankedRange{
-			Range:  rangeStr,
-			Rank:   int(rank),
-			Reason: reason,
-			Text:   text,
-		})
-
-		totalLines += lineCount
-	}
-
-	if len(rankedRanges) == 0 {
-		log.Warnf("compressRAGSearchResults: no valid ranges extracted")
-		return resultStr
-	}
-
-	// 构建优化后的结果
-	var result strings.Builder
-	result.WriteString(title + "\n\n")
-
-	for i, item := range rankedRanges {
-		result.WriteString(fmt.Sprintf("=== [%d] 重要性排序: %d | 范围: %s ===\n", i+1, item.Rank, item.Range))
-		if item.Reason != "" {
-			result.WriteString(fmt.Sprintf("选择理由: %s\n", item.Reason))
-		}
-		result.WriteString(item.Text)
-		result.WriteString("\n\n")
-	}
-
-	finalResult := result.String()
-
-	// 手动截断超过100行的内容
-	lines := strings.Split(finalResult, "\n")
-	if len(lines) > 100 {
-		log.Warnf("compressRAGSearchResults: result has %d lines, truncating to 100", len(lines))
-		finalResult = strings.Join(lines[:100], "\n") + "\n\n[... 内容已截断，共提取了前100行最重要的代码片段 ...]"
-	}
-
-	log.Infof("compressRAGSearchResults: compressed from %d chars to %d chars, %d ranges",
-		len(resultStr), len(finalResult), len(rankedRanges))
-
-	return finalResult
-}
-
-// compressRAGResults is now a wrapper for compressRAGSearchResults with specific parameters for RAG search
-func compressRAGResults(resultStr string, query string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
-	return compressRAGSearchResults(resultStr, query, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：")
+// compressRAGResults is now a wrapper that uses the unified compress function
+func compressRAGResults(resultStr string, query string, userContext string, invoker aicommon.AIInvokeRuntime, op *reactloops.LoopActionHandlerOperator) string {
+	return compressSearchResults(resultStr, query, userContext, invoker, op, 10, 3, 15, "【AI智能提取】按重要性排序的代码片段：", false)
 }
 
 var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSystem *rag.RAGSystem) reactloops.ReActLoopOption {
@@ -590,7 +382,12 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 			// 尝试压缩和优化搜索结果 - 使用与 grep 相同的压缩策略
 			if len(results) > 5 {
 				log.Infof("semantic_search_yaklang_samples: attempting to compress %d results", len(results))
-				compressedResult := compressRAGResults(resultStr, questionsStr, invoker, op)
+
+				// 获取用户输入作为上下文，帮助过滤相关代码
+				userInput := op.GetTask().GetUserInput()
+				userContext := fmt.Sprintf("用户需求：%s\n搜索问题：%s", userInput, questionsStr)
+
+				compressedResult := compressRAGResults(resultStr, questionsStr, userContext, invoker, op)
 				if len(compressedResult) < len(resultStr) {
 					resultStr = compressedResult
 					log.Infof("semantic_search_yaklang_samples: successfully compressed results")
