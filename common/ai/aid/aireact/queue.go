@@ -8,6 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+var (
+	REACT_TASK_cancelled = "react_task_cancelled"
+	REACT_TASK_enqueue   = "react_task_enqueue"
+	REACT_TASK_dequeue   = "react_task_dequeue"
+)
+
 func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	if t == nil {
 		return
@@ -16,9 +22,10 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit enqueue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured("react_task_enqueue", map[string]interface{}{
+	r.EmitStructured(REACT_TASK_enqueue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
+		"queue_info":       r.GetQueueInfo(),
 	})
 }
 
@@ -30,10 +37,11 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit dequeue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured("react_task_dequeue", map[string]interface{}{
+	r.EmitStructured(REACT_TASK_dequeue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
+		"queue_info":       r.GetQueueInfo(),
 	})
 }
 
