@@ -125,8 +125,8 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 			err := jsonextractor.ExtractStructuredJSON(
 				event.InteractiveJSONInput,
 				jsonextractor.WithObjectCallback(func(data map[string]any) {
-					sug, ok := data["suggestion"]
-					if !ok || sug == "" {
+					_, ok := data["suggestion"]
+					if !ok {
 						return
 					}
 					params := aitool.InvokeParams(data)
