@@ -77,10 +77,16 @@ func (r *ReActLoop) shouldTriggerReflection(
 		return ReflectionLevel_Minimal
 	}
 
-	// 高迭代次数：增加反思级别
+	// 高迭代次数：采用间隔反思策略减少噪声
 	if iterationCount > 5 {
-		log.Infof("high iteration count[%d], increase reflection to standard level", iterationCount)
-		return ReflectionLevel_Standard
+		// 每 5 轮进行一次标准反思
+		if (iterationCount-6)%5 == 0 {
+			log.Infof("periodic reflection at iteration[%d] (interval: 5)", iterationCount)
+			return ReflectionLevel_Standard
+		}
+		// 非反思轮次：仅最小反思（不调用 AI，减少噪声）
+		log.Debugf("skip AI reflection at iteration[%d], use minimal level", iterationCount)
+		return ReflectionLevel_Minimal
 	}
 
 	// 默认情况：最小反思

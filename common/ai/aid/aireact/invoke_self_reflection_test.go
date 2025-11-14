@@ -109,24 +109,24 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	// Mock self-reflection AI analysis (CRITICAL FOR REFLECTION TEST)
-	if utils.MatchAllOfSubString(prompt, "SELF-REFLECTION", "learning_insights", "future_suggestions") {
+	// 注意：字段现在都是可选的，可以返回简化的响应
+	if utils.MatchAllOfSubString(prompt, "自我反思", "learning_insights") ||
+		utils.MatchAllOfSubString(prompt, "SELF-REFLECTION", "learning_insights") ||
+		utils.MatchAllOfSubString(prompt, "自我反思任务") {
 		rsp := i.NewAIResponse()
-		// Generate a reflection response with nonce-based content
+		// Generate a simplified reflection response (all fields optional now)
 		reflectionJSON := fmt.Sprintf(`{
   "@action": "self_reflection",
   "learning_insights": [
-    "Insight 1: Tool execution pattern with nonce %s requires careful parameter validation",
-    "Insight 2: Multiple iterations indicate potential optimization opportunities",
-    "Insight 3: Resource usage should be monitored across iterations"
+    "工具执行模式需要参数验证 (nonce: %s)",
+    "多次迭代表明有优化空间"
   ],
   "future_suggestions": [
-    "Suggestion 1: Implement caching mechanism for repeated tool calls",
-    "Suggestion 2: Add timeout handling for long-running operations",
-    "Suggestion 3: Consider batching similar requests to reduce overhead"
+    "考虑为重复调用实现缓存机制"
   ],
-  "impact_assessment": "The action executed successfully after %d iterations, demonstrating resilience but indicating room for efficiency improvements. The nonce-based validation (%s) ensures security.",
+  "impact_assessment": "操作在 %d 次迭代后成功执行",
   "effectiveness_rating": "effective"
-}`, nonce, 6, nonce)
+}`, nonce, 6)
 		rsp.EmitOutputStream(bytes.NewBufferString(reflectionJSON))
 		rsp.Close()
 		return rsp, nil
