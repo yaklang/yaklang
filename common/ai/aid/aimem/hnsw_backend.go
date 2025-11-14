@@ -5,11 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"sync"
 	"sync/atomic"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
@@ -171,7 +172,7 @@ func (b *AIMemoryHNSWBackend) loadGraphFromBinary(graphBinary []byte) (*hnsw.Gra
 	reader := bytes.NewReader(graphBinary)
 
 	// 创建节点加载函数
-	loadNodeFunc := func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+	loadNodeFunc := func(_ string, key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
 		memoryID, ok := key.(string)
 		if !ok {
 			return nil, utils.Errorf("invalid key type: %T", key)
