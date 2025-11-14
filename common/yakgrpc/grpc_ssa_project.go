@@ -21,7 +21,7 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 		Total:      int64(p.TotalRecord),
 	}
 	for _, d := range data {
-		model := d.ToGRPCModel()
+		model := SSAProjectToGRPCModel(d)
 		if model == nil {
 			continue
 		}
@@ -43,7 +43,7 @@ func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProject
 		}, err
 	}
 	return &ypb.CreateSSAProjectResponse{
-		Project: project.ToGRPCModel(),
+		Project: SSAProjectToGRPCModel(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationCreate,
@@ -70,7 +70,7 @@ func (s *Server) UpdateSSAProject(ctx context.Context, req *ypb.UpdateSSAProject
 		}, err
 	}
 	return &ypb.UpdateSSAProjectResponse{
-		Project: project.ToGRPCModel(),
+		Project: SSAProjectToGRPCModel(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationUpdate,
@@ -106,7 +106,7 @@ func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
 		return nil
 	}
 	db := consts.GetGormDefaultSSADataBase()
-	project := p.ToGRPCModel()
+	project := p.ToGRPCModelBasic()
 	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
 	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
 	return project

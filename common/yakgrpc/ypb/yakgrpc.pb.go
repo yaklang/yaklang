@@ -62475,7 +62475,9 @@ type SSAProject struct {
 	// 漏洞个数
 	RiskNumber int64 `protobuf:"varint,13,opt,name=RiskNumber,proto3" json:"RiskNumber,omitempty"`
 	// 编译次数
-	CompileTimes  int64 `protobuf:"varint,14,opt,name=CompileTimes,proto3" json:"CompileTimes,omitempty"`
+	CompileTimes int64 `protobuf:"varint,14,opt,name=CompileTimes,proto3" json:"CompileTimes,omitempty"`
+	// 本地路径或者远程代码仓库路径
+	URL           string `protobuf:"bytes,15,opt,name=URL,proto3" json:"URL,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62606,6 +62608,13 @@ func (x *SSAProject) GetCompileTimes() int64 {
 		return x.CompileTimes
 	}
 	return 0
+}
+
+func (x *SSAProject) GetURL() string {
+	if x != nil {
+		return x.URL
+	}
+	return ""
 }
 
 type SSAProjectCompileConfig struct {
@@ -68688,7 +68697,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
 	"\n" +
 	"ReportData\x18\x03 \x01(\tR\n" +
-	"ReportData\"\xa6\x04\n" +
+	"ReportData\"\xb8\x04\n" +
 	"\n" +
 	"SSAProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
@@ -68711,7 +68720,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"RiskNumber\x18\r \x01(\x03R\n" +
 	"RiskNumber\x12\"\n" +
-	"\fCompileTimes\x18\x0e \x01(\x03R\fCompileTimes\"\xd9\x01\n" +
+	"\fCompileTimes\x18\x0e \x01(\x03R\fCompileTimes\x12\x10\n" +
+	"\x03URL\x18\x0f \x01(\tR\x03URL\"\xd9\x01\n" +
 	"\x17SSAProjectCompileConfig\x12\x1e\n" +
 	"\n" +
 	"StrictMode\x18\x01 \x01(\bR\n" +

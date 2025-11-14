@@ -178,13 +178,6 @@ if err != nil {
 
 yakit.Info("成功加载项目: %s (ID: %d)", project.ProjectName, project.ID)
 
-// 2. 从 BaseInfo 提取基础信息
-baseInfo = configData["BaseInfo"]
-if baseInfo == nil {
-    yakit.Error("配置数据缺少 BaseInfo")
-    return
-}
-
 yakit.Info("更新项目配置...")
 configBytes, err = json.Marshal(configData)
 if err != nil {
@@ -198,24 +191,15 @@ if err != nil {
     return
 }
 
-path = ""
-codeSource = configData["CodeSource"]
-if codeSource != nil{
-    if codeSource["local_file"] != ""{
-        path = codeSource["local_file"]
-    }
-    if codeSource["url"]!=""{
-        path = codeSource["url"]
-    }
-}
 
 yakit.Info("SSA项目更新成功!")
+// 这里返回数据，前端收到会进行前端更新
 yakit.Output({
     "success": true,
     "project_id": project.ID,
     "project_name": project.ProjectName,
     "description": project.Description,
-    "path":path,
+    "path":project.URL,
     "language": project.Language,
     "tags": project.Tags,
 })
