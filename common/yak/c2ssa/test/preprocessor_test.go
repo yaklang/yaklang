@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -431,7 +432,7 @@ func TestPreprocess_DirectAPI(t *testing.T) {
 #define MAX_SIZE 1024
 int buffer[MAX_SIZE];
 `
-		result, err := filesys.PreprocessCSource(src)
+		result, err := c2ssa.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "1024") {
@@ -444,7 +445,7 @@ int buffer[MAX_SIZE];
 #define MIN(a,b) ((a)<(b)?(a):(b))
 int min = MIN(x, y);
 `
-		result, err := filesys.PreprocessCSource(src)
+		result, err := c2ssa.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "((x)<(y)?(x):(y))") && !strings.Contains(result, "?") {
@@ -461,7 +462,7 @@ int debug_mode = 1;
 int debug_mode = 0;
 #endif
 `
-		result, err := filesys.PreprocessCSource(src)
+		result, err := c2ssa.PreprocessCSource(src)
 		require.NoError(t, err)
 
 		if !strings.Contains(result, "debug_mode = 1") && !strings.Contains(result, "debug_mode") {

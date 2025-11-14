@@ -7,7 +7,6 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -36,12 +35,7 @@ func CreateBuilder() ssa.Builder {
 }
 
 func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
-	cfs, err := filesys.NewPreprocessedCFs(fs)
-	if err != nil {
-		log.Warnf("WrapWithPreprocessedFS: %v", err)
-		return fs
-	}
-	return cfs
+	return newCPreprocessFS(fs)
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
