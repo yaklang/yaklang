@@ -121,21 +121,28 @@ func (c *Config) processInputEvent(event *ypb.AIInputEvent) error {
 
 	if event.IsInteractiveMessage { // interactive message is fixed
 		if event.InteractiveId != "" {
+			hasSend := false
 			err := jsonextractor.ExtractStructuredJSON(
 				event.InteractiveJSONInput,
 				jsonextractor.WithObjectCallback(func(data map[string]any) {
 					sug, ok := data["suggestion"]
 					if !ok || sug == "" {
-						sug = "continue" // Default fallback if no suggestion provided
+						return
 					}
-
 					params := aitool.InvokeParams(data)
 					c.Epm.Feed(event.InteractiveId, params)
+					hasSend = true
 				}),
 			)
 			if err != nil {
 				return err
 			}
+			if !hasSend { // default continue
+				c.Epm.Feed(event.InteractiveId, aitool.InvokeParams{
+					"suggestion": "continue",
+				})
+			}
+
 		}
 	} else if c.InputEventManager != nil {
 		return c.InputEventManager.processEvent(event) // process other input events, can register different callbacks
