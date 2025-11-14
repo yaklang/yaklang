@@ -200,7 +200,29 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 		return normalizedVectors, nil
 	}
 
-	// 策略3: 尝试解析错误响应
+	// 策略3: 尝试解析旧格式（直接为 []embeddingItem2D 数组，无外层结构）
+	// 这是为了兼容旧版本的响应格式
+	var legacyResponse2D []embeddingItem2D
+	if err := json.Unmarshal(body, &legacyResponse2D); err == nil && len(legacyResponse2D) > 0 && len(legacyResponse2D[0].Embedding) > 0 {
+		// 成功解析为旧的二维向量格式
+		embeddingVectors := legacyResponse2D[0].Embedding
+		vectorCount := len(embeddingVectors)
+
+		// 对所有向量进行归一化处理
+		normalizedVectors := make([][]float32, vectorCount)
+		for i, vec := range embeddingVectors {
+			if len(vec) > 0 {
+				normalizedVectors[i] = NormalizeVector(vec, 2, 1e-6)
+			}
+		}
+
+		// 使用 last 池化方法：返回最后一个向量
+		last := normalizedVectors[len(normalizedVectors)-1]
+		log.Infof("Successfully parsed embedding response as legacy 2D format ([][]float32), vector count: %d, using last pooling", vectorCount)
+		return [][]float32{last}, nil
+	}
+
+	// 策略4: 尝试解析错误响应
 	var errResp errorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
 		// 检查是否包含 "input is too large" 错误
