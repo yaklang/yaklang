@@ -376,7 +376,7 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 				topN = 30
 			}
 			if scoreThreshold == 0 {
-				scoreThreshold = 0.3
+				scoreThreshold = -1
 			}
 
 			invoker := loop.GetInvoker()

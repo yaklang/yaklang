@@ -146,6 +146,18 @@ func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	return db, nil
 }
 
+func NewTemporaryRAGDB() (*gorm.DB, error) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	if err != nil {
+		return nil, err
+	}
+	err = autoMigrateRAGSystem(db)
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
 func autoMigrateRAGSystem(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&schema.KnowledgeBaseEntry{},
