@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -85,80 +84,23 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 
 func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
-		tx = tx.Model(&schema.KnowledgeBaseInfo{})
 
+	name := req.GetName()
+	if name == "" {
 		var info schema.KnowledgeBaseInfo
-		err := tx.Where("id = ?", req.GetKnowledgeBaseId()).First(&info).Error
+		err := db.Where("id = ?", req.GetKnowledgeBaseId()).First(&info).Error
 		if err != nil {
-			return utils.Errorf("get KnowledgeBaseInfo failed: %s", err)
+			return nil, utils.Errorf("get KnowledgeBaseInfo failed: %s", err)
 		}
 
-		err = tx.Where("id = ?", info.ID).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error
-		if err != nil {
-			return utils.Errorf("delete KnowledgeBaseInfo failed: %s", err)
-		}
-		err = tx.Where("knowledge_base_id = ?", info.ID).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error
-		if err != nil {
-			return utils.Errorf("delete KnowledgeBaseEntry failed: %s", err)
-		}
+		name = info.KnowledgeBaseName
+	}
 
-		// 删除 RAG Collection
-		var collection schema.VectorStoreCollection
-		var collectionExist bool
-		err = tx.Where("name = ?", info.KnowledgeBaseName).First(&collection).Error
-		if err != nil {
-			if gorm.IsRecordNotFoundError(err) {
-				collectionExist = false
-			} else {
-				return utils.Errorf("get VectorStoreCollection failed: %s", err)
-			}
-		} else {
-			collectionExist = true
-		}
-		if collectionExist {
-			err = tx.Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error
-			if err != nil {
-				return utils.Errorf("delete VectorStoreCollection failed: %s", err)
-			}
-			err = tx.Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error
-			if err != nil {
-				return utils.Errorf("delete VectorStoreDocument failed: %s", err)
-			}
-		}
-
-		// 删除实体库
-		var entityRepository schema.EntityRepository
-		var entityRepositoryExist bool
-		err = tx.Where("entity_base_name = ?", info.KnowledgeBaseName).First(&entityRepository).Error
-		if err != nil {
-			if gorm.IsRecordNotFoundError(err) {
-				entityRepositoryExist = false
-			} else {
-				return utils.Errorf("get EntityRepository failed: %s", err)
-			}
-		} else {
-			entityRepositoryExist = true
-		}
-		if entityRepositoryExist {
-			err = tx.Where("id = ?", entityRepository.ID).Unscoped().Delete(&schema.EntityRepository{}).Error
-			if err != nil {
-				return utils.Errorf("delete EntityRepository failed: %s", err)
-			}
-			err = tx.Where("repository_uuid = ?", entityRepository.Uuid).Unscoped().Delete(&schema.ERModelEntity{}).Error
-			if err != nil {
-				return utils.Errorf("delete ERModelEntity failed: %s", err)
-			}
-			err = tx.Where("repository_uuid = ?", entityRepository.Uuid).Unscoped().Delete(&schema.ERModelRelationship{}).Error
-			if err != nil {
-				return utils.Errorf("delete ERModelRelationship failed: %s", err)
-			}
-		}
-		return nil
-	})
+	err := rag.DeleteRAG(db, name)
 	if err != nil {
 		return nil, utils.Errorf("删除知识库失败: %v", err)
 	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
