@@ -53200,8 +53200,7 @@ type SSAProgramFilter struct {
 	// id range
 	AfterID       int64    `protobuf:"varint,8,opt,name=AfterID,proto3" json:"AfterID,omitempty"`
 	BeforeID      int64    `protobuf:"varint,9,opt,name=BeforeID,proto3" json:"BeforeID,omitempty"`
-	ProjectNames  []string `protobuf:"bytes,10,rep,name=ProjectNames,proto3" json:"ProjectNames,omitempty"` // abort
-	ProjectIds    []int64  `protobuf:"varint,11,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
+	ProjectIds    []uint64 `protobuf:"varint,10,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53292,14 +53291,7 @@ func (x *SSAProgramFilter) GetBeforeID() int64 {
 	return 0
 }
 
-func (x *SSAProgramFilter) GetProjectNames() []string {
-	if x != nil {
-		return x.ProjectNames
-	}
-	return nil
-}
-
-func (x *SSAProgramFilter) GetProjectIds() []int64 {
+func (x *SSAProgramFilter) GetProjectIds() []uint64 {
 	if x != nil {
 		return x.ProjectIds
 	}
@@ -54904,7 +54896,7 @@ type SyntaxFlowScanTaskFilter struct {
 	UntilId       int64                  `protobuf:"varint,5,opt,name=UntilId,proto3" json:"UntilId,omitempty"`
 	Keyword       string                 `protobuf:"bytes,6,opt,name=Keyword,proto3" json:"Keyword,omitempty"` // fuzz search program-name
 	Kind          []string               `protobuf:"bytes,7,rep,name=Kind,proto3" json:"Kind,omitempty"`       // "debug" | "scan";
-	ProjectNames  []string               `protobuf:"bytes,8,rep,name=ProjectNames,proto3" json:"ProjectNames,omitempty"`
+	ProjectIds    []uint64               `protobuf:"varint,8,rep,packed,name=ProjectIds,proto3" json:"ProjectIds,omitempty"`
 	HaveRisk      bool                   `protobuf:"varint,17,opt,name=HaveRisk,proto3" json:"HaveRisk,omitempty"` // 是否有风险
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -54989,9 +54981,9 @@ func (x *SyntaxFlowScanTaskFilter) GetKind() []string {
 	return nil
 }
 
-func (x *SyntaxFlowScanTaskFilter) GetProjectNames() []string {
+func (x *SyntaxFlowScanTaskFilter) GetProjectIds() []uint64 {
 	if x != nil {
-		return x.ProjectNames
+		return x.ProjectIds
 	}
 	return nil
 }
@@ -67924,7 +67916,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\"G\n" +
 	"\x0fSSAProgramInput\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
-	"\vDescription\x18\x02 \x01(\tR\vDescription\"\xcc\x02\n" +
+	"\vDescription\x18\x02 \x01(\tR\vDescription\"\xa8\x02\n" +
 	"\x10SSAProgramFilter\x12\"\n" +
 	"\fProgramNames\x18\x01 \x03(\tR\fProgramNames\x12\x1c\n" +
 	"\tLanguages\x18\x02 \x03(\tR\tLanguages\x12\x10\n" +
@@ -67933,11 +67925,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eAfterUpdatedAt\x18\x06 \x01(\x03R\x0eAfterUpdatedAt\x12\x18\n" +
 	"\aKeyword\x18\a \x01(\tR\aKeyword\x12\x18\n" +
 	"\aAfterID\x18\b \x01(\x03R\aAfterID\x12\x1a\n" +
-	"\bBeforeID\x18\t \x01(\x03R\bBeforeID\x12\"\n" +
-	"\fProjectNames\x18\n" +
-	" \x03(\tR\fProjectNames\x12\x1e\n" +
+	"\bBeforeID\x18\t \x01(\x03R\bBeforeID\x12\x1e\n" +
 	"\n" +
-	"ProjectIds\x18\v \x03(\x03R\n" +
+	"ProjectIds\x18\n" +
+	" \x03(\x04R\n" +
 	"ProjectIds\"\x99\x01\n" +
 	"\x16QuerySSAProgramRequest\x12#\n" +
 	"\x06Paging\x18\x01 \x01(\v2\v.ypb.PagingR\x06Paging\x12+\n" +
@@ -68053,7 +68044,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x125\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x1d.ypb.SyntaxFlowScanTaskFilterR\x06Filter\x12\"\n" +
-	"\fShowDiffRisk\x18\x03 \x01(\bR\fShowDiffRisk\"\x88\x02\n" +
+	"\fShowDiffRisk\x18\x03 \x01(\bR\fShowDiffRisk\"\x84\x02\n" +
 	"\x18SyntaxFlowScanTaskFilter\x12\x1a\n" +
 	"\bPrograms\x18\x01 \x03(\tR\bPrograms\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x18\n" +
@@ -68061,8 +68052,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06FromId\x18\x04 \x01(\x03R\x06FromId\x12\x18\n" +
 	"\aUntilId\x18\x05 \x01(\x03R\aUntilId\x12\x18\n" +
 	"\aKeyword\x18\x06 \x01(\tR\aKeyword\x12\x12\n" +
-	"\x04Kind\x18\a \x03(\tR\x04Kind\x12\"\n" +
-	"\fProjectNames\x18\b \x03(\tR\fProjectNames\x12\x1a\n" +
+	"\x04Kind\x18\a \x03(\tR\x04Kind\x12\x1e\n" +
+	"\n" +
+	"ProjectIds\x18\b \x03(\x04R\n" +
+	"ProjectIds\x12\x1a\n" +
 	"\bHaveRisk\x18\x11 \x01(\bR\bHaveRisk\"\x91\x01\n" +
 	"\x1fQuerySyntaxFlowScanTaskResponse\x12+\n" +
 	"\n" +
