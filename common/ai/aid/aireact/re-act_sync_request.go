@@ -124,7 +124,7 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
 
 		// 发送任务取消事件
-		r.EmitStructured("react_task_cancelled", map[string]interface{}{
+		r.EmitStructured(REACT_TASK_cancelled, map[string]interface{}{
 			"task_id":      currentTask.GetId(),
 			"user_input":   currentTask.GetUserInput(),
 			"cancelled_at": time.Now(),
@@ -135,9 +135,11 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 	}
 
 	// 发送插队成功事件
+	queueInfo := r.GetQueueInfo()
 	r.EmitStructured("react_task_jumped_queue", map[string]interface{}{
 		"jumped_task_id": targetTaskId,
 		"jumped_at":      time.Now(),
+		"queue_info":     queueInfo,
 	})
 
 	log.Infof("task %s has successfully jumped to front of queue", targetTaskId)
