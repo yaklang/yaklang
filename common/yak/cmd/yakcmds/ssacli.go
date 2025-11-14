@@ -1362,6 +1362,7 @@ var ssaCodeScan = &cli.Command{
 			ssaconfig.WithRuleFilter(ruleFilter),
 			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
 			sfscan.WithReporter(reportInstance),
+			syntaxflow_scan.WithProcessRuleDetail(true),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
 				if info == nil || len(info.Rules) == 0 {
