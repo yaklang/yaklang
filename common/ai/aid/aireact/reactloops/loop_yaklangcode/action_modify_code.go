@@ -102,10 +102,28 @@ var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				op.DisallowNextLoopExit()
 			}
 
+			// 检测防空转：连续在同一区域小幅修改
+			modifyRecord := ModifyRecord{
+				StartLine: modifyStartLine,
+				EndLine:   modifyEndLine,
+			}
+			isSpinning, spinReason := detectSpinning(loop, modifyRecord)
+			if isSpinning {
+				// 触发防空转机制
+				reflectionPrompt := generateReflectionPrompt(modifyRecord, spinReason)
+				op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+				op.Feedback(reflectionPrompt)
+				invoker.AddToTimeline("spinning_detected", spinReason)
+				log.Warnf("spinning detected in modify_code: %s", spinReason)
+			}
+
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
-				op.Feedback(errMsg)
+				if !isSpinning {
+					// 只在没有触发防空转时才反馈错误信息，避免重复
+					op.Feedback(errMsg)
+				}
 			} else {
 				msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
 			}
@@ -113,7 +131,7 @@ var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 
-			if errMsg != "" {
+			if errMsg != "" && !isSpinning {
 				invoker.AddToTimeline("advice", "use 'grep_yaklang_samples' to find more syntax sample or docs")
 			}
 		},
