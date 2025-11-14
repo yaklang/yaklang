@@ -25,7 +25,6 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	r.EmitStructured(REACT_TASK_enqueue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
-		"queue_info":       r.GetQueueInfo(),
 	})
 }
 
@@ -41,7 +40,6 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
-		"queue_info":       r.GetQueueInfo(),
 	})
 }
 
@@ -86,7 +84,7 @@ func (tq *TaskQueue) executeHooks(task aicommon.AIStatefulTask) (bool, error) {
 	return true, nil
 }
 
-// executeDequeueHooks 执行所有出队钩子
+// executeDequeueHooks 执行所有出队钩子 warning 不要在再有锁的情况下调用这个函数
 func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason string) (bool, error) {
 	for _, hook := range tq.dequeueHooks {
 		hook(task, reason)
@@ -96,9 +94,6 @@ func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason st
 
 // GetFirst 获取并移除队列中的第一个任务
 func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
-	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
-
 	front := tq.queue.Front()
 	if front == nil {
 		return nil
@@ -116,6 +111,8 @@ func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 		return nil
 	}
 
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
 	tq.queue.Remove(front)
 
 	log.Debugf("Task queue [%s]: dequeued task [%s]", tq.queueName, task.GetId())

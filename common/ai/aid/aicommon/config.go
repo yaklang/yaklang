@@ -246,6 +246,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		"",
 		config.Ctx,
 		config.Emitter,
+		true,
 	)
 
 	// Initialize tool manager if not set
