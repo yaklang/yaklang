@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -58,7 +59,15 @@ func RegisterPostInitDatabaseFunction(f func() error, notes ...string) {
 	defer __mutexForInit.Unlock()
 	__initializingDatabase = append(__initializingDatabase, &initializingCallback{
 		Note: strings.Join(notes, ";"),
-		Fn:   f,
+		Fn: func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("PostInitDatabaseFunction panic: %v\n%s", r, spew.Sdump(r))
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			return f()
+		},
 	})
 }
 

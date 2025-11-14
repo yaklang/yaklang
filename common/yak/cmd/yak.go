@@ -65,6 +65,11 @@ var (
 )
 
 func initializeDatabase(projectDatabase string, profileDBName string, ssadb string) error {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("initializeDatabase panic: %v\n%s", r, spew.Sdump(r))
+		}
+	}()
 	if isVersionCommand() {
 		return nil
 	}
