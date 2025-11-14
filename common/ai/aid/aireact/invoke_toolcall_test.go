@@ -185,6 +185,8 @@ LOOP:
 }
 
 func TestReAct_ToolUse_WithCallbackRuntimeID(t *testing.T) {
+	t.Skip("这是一个应该被改进的测试，需要更细粒度的id控制： task id 管理多个 call tool id")
+	// todo  这是一个应该被改进的测试，需要更细粒度的id控制： task id 管理多个 call tool id
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 

@@ -195,10 +195,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = uid
-			emitErr := r.config.Emit(e)
-			if emitErr != nil {
-				log.Errorf("Failed to emit event: %v", emitErr)
-			}
+			r.config.EventHandler(e)
 		}),
 	)
 
