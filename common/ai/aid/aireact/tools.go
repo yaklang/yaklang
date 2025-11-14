@@ -76,5 +76,6 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		return nil, err
 	}
 	ins.memoryTriage.SetInvoker(ins)
+	ins.config.SetConfig("test_yaklang_aikb_rag", true)
 	return ins, nil
 }
