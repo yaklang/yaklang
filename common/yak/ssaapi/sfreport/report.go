@@ -198,18 +198,19 @@ func (ssr *SSAProjectReport) convertRisks(risks map[string]*Risk) {
 	// 统计各等级风险数量
 	for _, risk := range risks {
 		ssaRisk := &SSAReportRisk{
-			Title:         risk.GetTitle(),
-			TitleVerbose:  risk.GetTitleVerbose(),
-			Description:   risk.GetDescription(),
-			Solution:      risk.GetSolution(),
-			RiskType:      risk.GetRiskType(),
-			Severity:      risk.GetSeverity(),
-			FromRule:      risk.GetRuleName(),
-			CodeSourceUrl: risk.GetCodeSourceURL(),
-			CodeRange:     risk.GetCodeRange(),
-			Line:          risk.GetLine(),
-			CodeFragment:  risk.GetCodeFragment(),
-			FunctionName:  risk.GetFunctionName(),
+			Title:                risk.GetTitle(),
+			TitleVerbose:         risk.GetTitleVerbose(),
+			Description:          risk.GetDescription(),
+			Solution:             risk.GetSolution(),
+			RiskType:             risk.GetRiskType(),
+			Severity:             risk.GetSeverity(),
+			FromRule:             risk.GetRuleName(),
+			CodeSourceUrl:        risk.GetCodeSourceURL(),
+			CodeRange:            risk.GetCodeRange(),
+			Line:                 risk.GetLine(),
+			CodeFragment:         risk.GetCodeFragment(),
+			FunctionName:         risk.GetFunctionName(),
+			LatestDisposalStatus: risk.GetLatestDisposalStatus(),
 		}
 		ssr.Risks = append(ssr.Risks, ssaRisk)
 
