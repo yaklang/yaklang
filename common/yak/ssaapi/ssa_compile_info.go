@@ -63,13 +63,13 @@ func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 }
 
 // 已弃用
-// func (c *Config) wrapWithPreprocessedCFS(fs fi.FileSystem) (fi.FileSystem, error) {
+// func (c *Config) wrapWithPreprocessedFS(fs fi.FileSystem) (fi.FileSystem, error) {
 // 	if c.language != consts.C {
 // 		return fs, nil
 // 	}
 
 // 	c.Processf(0, "wrapping filesystem with C preprocessor support")
-// 	preprocessedFS, err := filesys.NewPreprocessedCFs(fs)
+// 	preprocessedFS, err := filesys.NewPreprocessedFS(fs)
 // 	if err != nil {
 // 		log.Warnf("failed to create preprocessed C filesystem: %v, using original", err)
 // 		return fs, nil
