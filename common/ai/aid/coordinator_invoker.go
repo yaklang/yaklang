@@ -114,6 +114,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	}()
 	ctx, cancel := context.WithCancel(c.Ctx)
 	defer cancel()
+	hotpatchChan := c.Config.HotPatchBroadcaster.Subscribe()
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(c.Config.Id), // pe -> react should use same id
@@ -123,6 +124,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		aicommon.WithContext(ctx),
 		aicommon.WithConsumption(c.GetConsumptionConfig()),
 		aicommon.WithEnablePlanAndExec(false),
+		aicommon.WithHotPatchOptionChan(hotpatchChan),
 	)
 
 	invoker, err := aicommon.AIRuntimeInvokerGetter(c.GetContext(), baseOpts...)
