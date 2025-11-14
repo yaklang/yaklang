@@ -213,15 +213,14 @@ func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Re
 	// }
 
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
-	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, data hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+		var data any = uid
+		if s.config.KeyAsUID {
+			data = key
+		}
 		uidStr := fmt.Sprint(data)
 
-		var queryID any = data
-		if s.config.KeyAsUID {
-			queryID = key
-		}
-
-		doc, err := getVectorDocumentByLazyNodeID(db.Where("collection_id = ?", collectionID).Select("document_id"), queryID)
+		doc, err := getVectorDocumentByLazyNodeID(db.Where("collection_id = ?", collectionID).Select("document_id"), data)
 		if err != nil {
 			return nil, err
 		}
