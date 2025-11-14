@@ -106,7 +106,7 @@ func (p *Program) VisitAst(ast ASTIF) {
 			p.Application.ProcessInfof("program %s all ast visit done", p.Name)
 			p.Application.ProcessInfof("program %s build Instruction", p.Name)
 			p.LazyBuild() // build instruction
-			p.Application.ProcessInfof("program %s save Instruction(%d) to database", p.Name, p.Cache.CountInstruction())
+			p.Application.ProcessInfof("program %s build Instruction(%d)", p.Name, p.Cache.CountInstruction())
 			// will cause instruction not save bug
 			// p.Cache.SaveToDatabase() // save instruction
 			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
