@@ -7,7 +7,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -48,7 +48,24 @@ func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
 	log.Infof("document searcher created successfully from: %s", zipPath)
 	return searcher
 }
+func createTestDocumentSearcherByRag(collectionName string, aikbPath string) (*rag.RAGSystem, error) {
+	// 如果 aikbPath 为空，则使用默认的 yaklang-aikb-rag 二进制文件路径
+	if aikbPath == "" {
+		path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb-rag")
+		if err != nil {
+			log.Errorf("failed to get yaklang-aikb-rag binary path: %v", err)
+			return nil, utils.Wrap(err, "failed to get yaklang-aikb-rag binary")
+		}
+		aikbPath = path
+	}
 
+	log.Infof("initializing RAG system with collection: %s, file: %s", collectionName, aikbPath)
+	db, err := rag.NewTemporaryRAGDB()
+	if err != nil {
+		return nil, err
+	}
+	return rag.Get(collectionName, rag.WithDB(db), rag.WithImportFile(aikbPath), rag.WithEmbeddingClient(vectorstore.NewDefaultMockEmbedding()))
+}
 func createDocumentSearcherByRag(db *gorm.DB, collectionName string, aikbPath string) (*rag.RAGSystem, error) {
 	// 如果 aikbPath 为空，则使用默认的 yaklang-aikb-rag 二进制文件路径
 	if aikbPath == "" {
@@ -78,14 +95,28 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			config := r.GetConfig()
+			// 获取配置参数
 			aikbPath := config.GetConfigString("aikb_path")
 			aikbRagPath := config.GetConfigString("aikb_rag_path")
+			enableTestYaklangAIKBRAG := config.GetConfigBool("test_yaklang_aikb_rag")
+
+			// 创建 grep 搜索器
 			docSearcher := createDocumentSearcher(aikbPath)
-			docSearcherByRag, err := createDocumentSearcherByRag(consts.GetGormProfileDatabase(), defaultYaklangAIKBRagCollectionName, aikbRagPath)
+
+			// 创建语义搜索搜索器
+			var docSearcherByRag *rag.RAGSystem
+			var err error
+			if enableTestYaklangAIKBRAG {
+				docSearcherByRag, err = createTestDocumentSearcherByRag(defaultYaklangAIKBRagCollectionName, aikbRagPath)
+			} else {
+				docSearcherByRag, err = createDocumentSearcherByRag(config.GetDB(), defaultYaklangAIKBRagCollectionName, aikbRagPath)
+			}
 			if err != nil {
 				log.Errorf("failed to create document searcher by rag: %v", err)
 				docSearcherByRag = nil // 明确设置为 nil，语义搜索将不可用
 			}
+
+			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
