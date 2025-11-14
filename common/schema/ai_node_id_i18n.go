@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"code_sample_title": {
+		Zh: "代码样本",
+		En: "Code Sample",
+	},
 	"mcp-loader": {
 		Zh: "MCP加载器",
 		En: "MCP Loader",
