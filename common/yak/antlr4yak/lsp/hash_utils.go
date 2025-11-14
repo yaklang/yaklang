@@ -3,6 +3,7 @@ package lsp
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -47,6 +48,12 @@ func computeStructureHash(code string) string {
 
 // computeSemanticHash 计算语义哈希（提取语义 token）
 func computeSemanticHash(code string) string {
+	// 去除单行注释
+	code = removeLineComments(code)
+	// 去除块注释
+	code = removeBlockComments(code)
+	// 规范化空白
+	code = normalizeWhitespace(code)
 	tokens := extractSemanticTokens(code)
 	normalized := strings.Join(tokens, " ")
 
@@ -151,7 +158,6 @@ func extractSemanticTokens(code string) []string {
 			}
 			inString = true
 			stringChar = ch
-			tokens = append(tokens, "STRING")
 			i++
 			continue
 		}
@@ -159,6 +165,10 @@ func extractSemanticTokens(code string) []string {
 		if inString {
 			if ch == stringChar && (i == 0 || runes[i-1] != '\\') {
 				inString = false
+				tokens = append(tokens, fmt.Sprintf("STRING:%v", currentToken.String()))
+				currentToken.Reset()
+			} else {
+				currentToken.WriteRune(ch)
 			}
 			i++
 			continue
@@ -190,7 +200,7 @@ func extractSemanticTokens(code string) []string {
 				currentToken.WriteRune(runes[i])
 				i++
 			}
-			tokens = append(tokens, "NUM")
+			tokens = append(tokens, fmt.Sprintf("NUM:%v", currentToken.String()))
 			currentToken.Reset()
 			continue
 		}
