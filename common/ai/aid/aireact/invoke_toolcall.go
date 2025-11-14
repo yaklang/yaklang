@@ -79,7 +79,6 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 
 	// Add callback handlers
 	toolCallerOptions = append(toolCallerOptions,
-		aicommon.WithToolCaller_CallToolID(taskId),
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
 			toolCaller.SetEmitter(r.config.Emitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,

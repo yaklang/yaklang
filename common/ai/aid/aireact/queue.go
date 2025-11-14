@@ -8,6 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+var (
+	REACT_TASK_cancelled = "react_task_cancelled"
+	REACT_TASK_enqueue   = "react_task_enqueue"
+	REACT_TASK_dequeue   = "react_task_dequeue"
+)
+
 func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	if t == nil {
 		return
@@ -16,7 +22,7 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit enqueue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured("react_task_enqueue", map[string]interface{}{
+	r.EmitStructured(REACT_TASK_enqueue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 	})
@@ -30,7 +36,7 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		log.Warnf("ReAct task queue is not initialized, cannot emit dequeue event for task [%s]", t.GetId())
 		return
 	}
-	r.EmitStructured("react_task_dequeue", map[string]interface{}{
+	r.EmitStructured(REACT_TASK_dequeue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
@@ -78,7 +84,7 @@ func (tq *TaskQueue) executeHooks(task aicommon.AIStatefulTask) (bool, error) {
 	return true, nil
 }
 
-// executeDequeueHooks 执行所有出队钩子
+// executeDequeueHooks 执行所有出队钩子 warning 不要在再有锁的情况下调用这个函数
 func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason string) (bool, error) {
 	for _, hook := range tq.dequeueHooks {
 		hook(task, reason)
@@ -90,7 +96,6 @@ func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason st
 func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 	tq.mutex.Lock()
 	defer tq.mutex.Unlock()
-
 	front := tq.queue.Front()
 	if front == nil {
 		return nil

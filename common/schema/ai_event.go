@@ -155,7 +155,17 @@ type AiOutputEvent struct {
 }
 
 func (e *AiOutputEvent) ShouldSave() bool {
-	return !e.IsSync && e.Type != EVENT_TYPE_CONSUMPTION
+	if e.IsSystem {
+		return false
+	}
+	if e.IsSync {
+		return false
+	}
+	if e.Type == EVENT_TYPE_CONSUMPTION || e.Type == EVENT_TYPE_PONG || e.Type == EVENT_TYPE_PRESSURE ||
+		e.Type == EVENT_TYPE_AI_FIRST_BYTE_COST_MS || e.Type == EVENT_TYPE_AI_TOTAL_COST_MS {
+		return false
+	}
+	return true
 }
 
 func (e *AiOutputEvent) IsInteractive() bool {

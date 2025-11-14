@@ -35,7 +35,7 @@ func (f *ForgeBlueprint) Params(query string, userInput ...*ypb.ExecParamItem) (
 
 	arguments, err := f.AnalyzeCliParameter(userInput)
 	s := aispec.ShrinkAndSafeToFile(arguments)
-
+	s = s + aispec.ShrinkAndSafeToFile(userInput) // append raw params for better understanding
 	if err != nil {
 		return nil, utils.Errorf("AnalyzeCliParameter failed: %v", err)
 	}
