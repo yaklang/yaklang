@@ -1,6 +1,7 @@
 package loop_yaklangcode
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -112,7 +113,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		forgeOptions := []aicommon.GeneralKVConfigOption{}
 		if hasSearcher {
 			forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-search-code-sample", "reason"))
-			forgeOptions = append(forgeOptions, aicommon.WithGeneralConfigStreamableFieldWithNodeId("semantic_search_code", "semantic_questions"))
 		}
 
 		step1Result, err := r.InvokeLiteForge(
@@ -132,6 +132,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		reason := step1Result.GetString("reason")
 		searchPatterns := step1Result.GetStringSlice("search_patterns")
 		semanticQuestions := step1Result.GetStringSlice("semantic_questions")
+		for _, question := range searchPatterns {
+			emitter.EmitDefaultStreamEvent("semantic_questions", bytes.NewBufferString(question), task.GetIndex())
+		}
 
 		var userRequirements = utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
 {{.data}}
