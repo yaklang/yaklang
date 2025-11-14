@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -50,7 +51,7 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 		result,
 	)
 	ctx = utils.SetContextKey(ctx, SKIP_AI_REVIEW, true)
-	r.config.DoWaitAgree(ctx, ep)
+	r.config.DoWaitAgreeWithPolicy(ctx, aicommon.AgreePolicyManual, ep) // ask for user clarification must should be manual mode
 	params := ep.GetParams()
 	r.config.EmitInteractiveRelease(ep.GetId(), params)
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
