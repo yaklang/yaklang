@@ -23,7 +23,7 @@ func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
 	// db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "project_id", filter.GetProjectIds())
+	db = bizhelper.ExactQueryUInt64ArrayOr(db, "project_id", filter.GetProjectIds())
 	if word := filter.GetKeyword(); word != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"program_name", "description"}, word, false)
 	}
