@@ -1713,6 +1713,8 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	opts := make([]ConfigOption, 0)
 
+	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
+
 	// aiCallback
 	if i.AiServerName != "" {
 		opts = append(opts, WithAIServiceName(i.AiServerName))

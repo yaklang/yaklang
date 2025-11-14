@@ -31,6 +31,7 @@ var loopAction_DirectlyAnswer = &LoopAction{
 			TagName:      "FINAL_ANSWER",
 			VariableName: "tag_final_answer",
 			AINodeId:     "re-act-loop-answer-payload",
+			ContentType:  aicommon.TypeTextMarkdown,
 		},
 	},
 	StreamFields: []*LoopStreamField{
