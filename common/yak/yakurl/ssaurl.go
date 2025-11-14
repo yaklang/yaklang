@@ -271,6 +271,7 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 			}
 			v, err := result.GetValue(variable, index)
 			if v == nil || err != nil {
+				log.Errorf("Get Value By SSA URL Faild:%v", err)
 				continue
 			}
 			codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
@@ -293,6 +294,10 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 				res.ResourceName = v.String()
 			}
 			resources = append(resources, res)
+		}
+		if len(resources) == 0 {
+			finish = true
+			return nil, utils.Error("获取具体值失败，请确认漏洞风险数据是否与当前引擎兼容；如果数据是使用旧引擎生成的，请尝试使用新引擎再次扫描。")
 		}
 
 		if params.Page*params.PageSize >= int64(valueLen) {
