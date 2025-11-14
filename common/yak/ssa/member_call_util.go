@@ -13,13 +13,20 @@ func setMemberCallRelationship(obj, key, member Value) {
 		log.Debugf("BUG: setMemberCallRelationship called with nil value: %v, %v, %v", obj, key, member)
 		return
 	}
-	obj.AddMember(key, member)
-	//todo：fix one value for more object-key
-	if !member.IsMember() {
-		member.SetObject(obj)
-		member.SetKey(key)
-		key.AddUser(obj.(User))
+	if GetKeyString(key) == "" {
+		log.Warnf("setMemberCallRelationship empty key obj=%s typ=%v member=%s", obj.GetVerboseName(), obj.GetType(), member.GetVerboseName())
 	}
+	obj.AddMember(key, member)
+	if memberObj := member.GetObject(); utils.IsNil(memberObj) || memberObj.GetId() == obj.GetId() {
+		member.SetObject(obj)
+	}
+	if memberKey := member.GetKey(); utils.IsNil(memberKey) {
+		member.SetKey(key)
+	}
+	if user, ok := obj.(User); ok {
+		key.AddUser(user)
+	}
+	//todo：fix one value for more object-key
 
 	handlerMemberCall := func(obj Value) {
 		for _, edgeID := range obj.(*Phi).Edge {
