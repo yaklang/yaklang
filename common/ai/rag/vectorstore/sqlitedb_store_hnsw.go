@@ -169,12 +169,16 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 			vectorStore.UpdateAutoUpdateGraphInfos()
 		}
 	}
-
-	dims := hnswGraph.Dims()
-	if dims != collectionConfig.Dimension {
-		return nil, utils.Errorf("dimension mismatch: %d != %d, collection name: %s", dims, collectionConfig.Dimension, collectionName)
+	docCount, err := vectorStore.Count()
+	if err != nil {
+		return nil, utils.Wrap(err, "count documents")
 	}
-
+	if docCount > 0 {
+		dims := hnswGraph.Dims()
+		if dims != collectionConfig.Dimension {
+			return nil, utils.Errorf("dimension mismatch: %d != %d, collection name: %s", dims, collectionConfig.Dimension, collectionName)
+		}
+	}
 	return vectorStore, nil
 }
 
