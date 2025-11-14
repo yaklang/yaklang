@@ -175,6 +175,11 @@ type SSAReportRisk struct {
 	CodeFragment  string `json:"code_fragment"`
 	FunctionName  string `json:"function_name"`
 	Line          int64  `json:"line"`
+
+	// 处置信息（来自最新的处置记录）
+	LatestDisposalStatus  string `json:"latest_disposal_status"`
+	LatestDisposalComment string `json:"latest_disposal_comment"`
+	RiskID                uint   `json:"risk_id"` // 用于查询处置记录
 }
 
 // SSAReportFile SSA报告中的文件信息
@@ -214,11 +219,13 @@ type RiskGroup struct {
 
 // RiskInstance 风险实例，表示具体的风险位置
 type RiskInstance struct {
-	CodeSourceUrl string `json:"code_source_url"` // 文件路径
-	CodeRange     string `json:"code_range"`      // 代码范围
-	CodeFragment  string `json:"code_fragment"`   // 代码片段
-	FunctionName  string `json:"function_name"`   // 函数名
-	Line          int64  `json:"line"`            // 行号
+	CodeSourceUrl         string `json:"code_source_url"`         // 文件路径
+	CodeRange             string `json:"code_range"`              // 代码范围
+	CodeFragment          string `json:"code_fragment"`           // 代码片段
+	FunctionName          string `json:"function_name"`           // 函数名
+	Line                  int64  `json:"line"`                    // 行号
+	LatestDisposalStatus  string `json:"latest_disposal_status"`  // 处置状态
+	LatestDisposalComment string `json:"latest_disposal_comment"` // 处置备注
 }
 
 // ProjectInfo 项目基本信息
@@ -1001,8 +1008,8 @@ func generateRiskOverview(reportInstance *schema.Report, ssaReport *SSAProjectRe
 	// 构建Markdown表格内容
 	tableContent := `# 三、 漏洞概览
 
-| 漏洞类型 | 漏洞名称 | 位置 |
-| ---- | ---- | ---- |
+| 漏洞类型 | 漏洞名称 | 位置 | 处置状态 | 处置备注 |
+| ---- | ---- | ---- | ---- | ---- |
 `
 
 	// 注意：ssaReport.Risks 已经在 processRisksAndStats 中进行了稳定排序
@@ -1022,7 +1029,24 @@ func generateRiskOverview(reportInstance *schema.Report, ssaReport *SSAProjectRe
 		titleVerbose := strings.ReplaceAll(risk.TitleVerbose, "|", "\\|")
 		location = strings.ReplaceAll(location, "|", "\\|")
 
-		tableContent += fmt.Sprintf("| %s | %s | %s |\n", riskType, titleVerbose, location)
+		// 格式化处置状态
+		disposalStatus := formatDisposalStatus(risk.LatestDisposalStatus)
+
+		// 处理处置备注
+		disposalComment := risk.LatestDisposalComment
+		if disposalComment == "" {
+			disposalComment = "-"
+		} else {
+			// 转义特殊字符，处理换行符
+			disposalComment = strings.ReplaceAll(disposalComment, "|", "\\|")
+			disposalComment = strings.ReplaceAll(disposalComment, "\n", " ")
+			// 如果备注太长，截断并添加省略号
+			if len(disposalComment) > 50 {
+				disposalComment = disposalComment[:50] + "..."
+			}
+		}
+
+		tableContent += fmt.Sprintf("| %s | %s | %s | %s | %s |\n", riskType, titleVerbose, location, disposalStatus, disposalComment)
 	}
 
 	reportInstance.Markdown(tableContent)
@@ -1077,17 +1101,20 @@ func groupRisksByTypeAndSeverity(risks []*SSAReportRisk) []*RiskGroup {
 			}
 			groupMap[groupKey] = group
 		}
-
-		// 添加风险实例
-		instance := &RiskInstance{
-			CodeSourceUrl: risk.CodeSourceUrl,
-			CodeRange:     risk.CodeRange,
-			CodeFragment:  risk.CodeFragment,
-			FunctionName:  risk.FunctionName,
-			Line:          risk.Line,
+		if risk.CodeSourceUrl != "" || risk.CodeFragment != "" {
+			// 添加风险实例
+			instance := &RiskInstance{
+				CodeSourceUrl:         risk.CodeSourceUrl,
+				CodeRange:             risk.CodeRange,
+				CodeFragment:          risk.CodeFragment,
+				FunctionName:          risk.FunctionName,
+				Line:                  risk.Line,
+				LatestDisposalStatus:  risk.LatestDisposalStatus,
+				LatestDisposalComment: risk.LatestDisposalComment,
+			}
+			group.Instances = append(group.Instances, instance)
+			group.Count++
 		}
-		group.Instances = append(group.Instances, instance)
-		group.Count++
 	}
 
 	// 转换为切片并排序
@@ -1211,6 +1238,21 @@ func generateRiskInstancesTable(reportInstance *schema.Report, instances []*Risk
 		// 显示实例编号和文件路径信息
 		reportInstance.Markdown(fmt.Sprintf("**%d. 文件路径：** %s:%d", i+1, instance.CodeSourceUrl, instance.Line))
 
+		// 显示处置状态和备注
+		if instance.LatestDisposalStatus != "" {
+			disposalStatus := formatDisposalStatus(instance.LatestDisposalStatus)
+			disposalInfo := fmt.Sprintf("**处置状态：** %s \n", disposalStatus)
+
+			// 如果有处置备注，也显示出来
+			if instance.LatestDisposalComment != "" {
+				// 转义特殊字符
+				comment := strings.ReplaceAll(instance.LatestDisposalComment, "\n", " ")
+				disposalInfo += fmt.Sprintf("**处置备注：** %s", comment)
+			}
+
+			reportInstance.Markdown(disposalInfo)
+		}
+
 		// 显示代码片段
 		if instance.CodeFragment != "" {
 			reportInstance.Markdown("**代码片段：**")
@@ -1306,22 +1348,41 @@ func processRisksAndStats(report *SSAProjectReport, risks []*schema.SSARisk) err
 	fileMap := make(map[string]*SSAReportFile)
 	ruleMap := make(map[string]*SSAReportRule)
 
+	// 获取数据库连接
+	db := ssadb.GetDB()
+
 	// 一次遍历完成所有统计
 	for _, risk := range risks {
+		// 获取该风险的最新处置信息
+		disposalStatus := risk.LatestDisposalStatus
+		disposalComment := ""
+
+		// 通过 GetSSARiskDisposalsWithInheritance 获取完整的处置记录
+		disposals, err := yakit.GetSSARiskDisposalsWithInheritance(db, int64(risk.ID))
+		if err == nil && len(disposals) > 0 {
+			// 取第一个（最新的）处置记录
+			latestDisposal := disposals[0]
+			disposalStatus = latestDisposal.Status
+			disposalComment = latestDisposal.Comment
+		}
+
 		// 处理风险详情
 		reportRisk := &SSAReportRisk{
-			Title:         risk.Title,
-			TitleVerbose:  risk.TitleVerbose,
-			Description:   risk.Description,
-			Solution:      risk.Solution,
-			RiskType:      risk.RiskType,
-			Severity:      string(risk.Severity),
-			FromRule:      risk.FromRule,
-			CodeSourceUrl: risk.CodeSourceUrl,
-			CodeRange:     risk.CodeRange,
-			CodeFragment:  risk.CodeFragment,
-			FunctionName:  risk.FunctionName,
-			Line:          risk.Line,
+			Title:                 risk.Title,
+			TitleVerbose:          risk.TitleVerbose,
+			Description:           risk.Description,
+			Solution:              risk.Solution,
+			RiskType:              risk.RiskType,
+			Severity:              string(risk.Severity),
+			FromRule:              risk.FromRule,
+			CodeSourceUrl:         risk.CodeSourceUrl,
+			CodeRange:             risk.CodeRange,
+			CodeFragment:          risk.CodeFragment,
+			FunctionName:          risk.FunctionName,
+			Line:                  risk.Line,
+			LatestDisposalStatus:  disposalStatus,
+			LatestDisposalComment: disposalComment,
+			RiskID:                risk.ID,
 		}
 		report.Risks = append(report.Risks, reportRisk)
 
@@ -1424,5 +1485,21 @@ func updateSeverityCount(severity string, file *SSAReportFile) {
 		file.MiddleCount++
 	case severityLow:
 		file.LowCount++
+	}
+}
+
+// formatDisposalStatus 格式化处置状态为中文显示 和IRify前端保持一致
+func formatDisposalStatus(status string) string {
+	switch status {
+	case "not_issue":
+		return "不是问题"
+	case "suspicious":
+		return "存疑"
+	case "is_issue":
+		return "有问题"
+	case "not_set", "":
+		return "未处置"
+	default:
+		return "未处置"
 	}
 }

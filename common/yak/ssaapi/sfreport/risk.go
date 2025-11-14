@@ -222,6 +222,10 @@ func (r *Risk) GetRuleName() string {
 	return r.RuleName
 }
 
+func (r *Risk) GetLatestDisposalStatus() string {
+	return r.LatestDisposalStatus
+}
+
 func (r *Risk) SetRule(rule *Rule) {
 	r.RuleName = rule.RuleName
 }
