@@ -17,7 +17,7 @@ import (
 var deleteLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"delete_lines",
-		"Delete lines between the specified line numbers (inclusive). Use this action to remove unwanted lines, comments, or code blocks. The line numbers are 1-based, meaning the first line of the file is line 1. If only 'delete_start_line' is provided, only that single line will be deleted. If both 'delete_start_line' and 'delete_end_line' are provided, all lines in the range will be deleted. This is more precise than batch_regex_replace for line deletion.",
+		"Delete lines between the specified line numbers (inclusive). Use this action to remove unwanted lines, comments, or code blocks. The line numbers are 1-based, meaning the first line of the file is line 1. If only 'delete_start_line' is provided, only that single line will be deleted. If both 'delete_start_line' and 'delete_end_line' are provided, all lines in the range will be deleted. This is more precise than others for line deletion.",
 		[]aitool.ToolOption{
 			aitool.WithIntegerParam("delete_start_line"),
 			aitool.WithIntegerParam("delete_end_line", aitool.WithParam_Required(false)),
