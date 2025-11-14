@@ -1,9 +1,8 @@
-package filesys
+package c2ssa
 
 import (
 	"bufio"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,16 +11,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
-
-type PreprocessedCFS struct {
-	underlying  fi.FileSystem
-	enabled     bool
-	includeDirs []string
-}
-
-var _ fi.FileSystem = (*PreprocessedCFS)(nil)
 
 var (
 	globalTempDir       string
@@ -31,6 +23,32 @@ var (
 	includeLineRegexp   = regexp.MustCompile(`^\s*#\s*include\s*<[^>]+>`)
 	includeHeaderRegexp = regexp.MustCompile(`#\s*include\s*<([^>]+)>`)
 )
+
+func newCPreprocessFS(underlying fi.FileSystem) fi.FileSystem {
+	if err := setupHeaderFiles(underlying); err != nil {
+		log.Warnf("setupHeaderFiles failed: %v", err)
+		return underlying
+	}
+
+	hookFS := filesys.NewHookFS(underlying)
+	hookFS.AddReadHook(&filesys.ReadHook{
+		Matcher: filesys.SuffixMatcher(".c", ".h"),
+		AfterRead: func(ctx *filesys.ReadHookContext, data []byte) ([]byte, error) {
+			src := string(data)
+			headers := extractIncludeHeaders(src)
+			if err := ensureHeaderFiles(headers); err != nil {
+				log.Warnf("ensure headers for %s failed: %v", ctx.Name, err)
+			}
+			preprocessed, err := preprocessCSource(src)
+			if err != nil {
+				log.Warnf("C macro preprocessing failed for %s: %v, using original source", ctx.Name, err)
+				return data, nil
+			}
+			return []byte(preprocessed), nil
+		},
+	})
+	return hookFS
+}
 
 func initTemp() error {
 	tmpDir, err := os.MkdirTemp("", "c_headers_*")
@@ -187,19 +205,30 @@ func setupHeaderFiles(underlying fi.FileSystem) error {
 			filePath := underlying.Join(dir, entry.Name())
 
 			if entry.IsDir() {
-				walkDir(filePath)
-			} else if underlying.Ext(entry.Name()) == ".h" || underlying.Ext(entry.Name()) == ".in" {
-				if content, err := underlying.ReadFile(filePath); err == nil {
-					filtered := filterSystemIncludes(string(content))
-					relPath := strings.TrimPrefix(filePath, ".")
-					relPath = strings.TrimPrefix(relPath, string(underlying.GetSeparators()))
-					targetPath := filepath.Join(globalTempDir, relPath)
-					targetDir := filepath.Dir(targetPath)
-
-					os.MkdirAll(targetDir, 0755)
-					os.WriteFile(targetPath, []byte(filtered), 0644)
-					headerDirs[targetDir] = true
+				if err := walkDir(filePath); err != nil {
+					return err
 				}
+				continue
+			}
+
+			if underlying.Ext(entry.Name()) == ".h" || underlying.Ext(entry.Name()) == ".in" {
+				content, err := underlying.ReadFile(filePath)
+				if err != nil {
+					continue
+				}
+				filtered := filterSystemIncludes(string(content))
+				relPath := strings.TrimPrefix(filePath, ".")
+				relPath = strings.TrimPrefix(relPath, string(underlying.GetSeparators()))
+				targetPath := filepath.Join(globalTempDir, relPath)
+				targetDir := filepath.Dir(targetPath)
+
+				if err := os.MkdirAll(targetDir, 0o755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(targetPath, []byte(filtered), 0o644); err != nil {
+					return err
+				}
+				headerDirs[targetDir] = true
 			}
 		}
 		return nil
@@ -219,8 +248,8 @@ func setupHeaderFiles(underlying fi.FileSystem) error {
 	return nil
 }
 
-// PreprocessCSource performs C macro preprocessing on source code
-func PreprocessCSource(src string) (string, error) {
+// preprocessCSource performs C macro preprocessing on source code
+func preprocessCSource(src string) (string, error) {
 	var preprocessorCmd string
 	if globalTempDir == "" {
 		if err := initTemp(); err != nil {
@@ -286,130 +315,7 @@ func PreprocessCSource(src string) (string, error) {
 	return outputStr, nil
 }
 
-// NewPreprocessedCFs creates a new C preprocessor filesystem wrapper
-func NewPreprocessedCFs(underlying fi.FileSystem) (*PreprocessedCFS, error) {
-	fs := &PreprocessedCFS{
-		underlying: underlying,
-		enabled:    true,
-	}
-
-	// Copy all .h files
-	if err := setupHeaderFiles(underlying); err != nil {
-		return nil, fmt.Errorf("failed to setup header files: %w", err)
-	}
-
-	return fs, nil
-}
-
-func (f *PreprocessedCFS) ReadFile(name string) ([]byte, error) {
-	data, err := f.underlying.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	if f.enabled && (strings.HasSuffix(strings.ToLower(name), ".c") || strings.HasSuffix(strings.ToLower(name), ".h")) {
-		headers := extractIncludeHeaders(string(data))
-		if err := ensureHeaderFiles(headers); err != nil {
-			log.Warnf("Failed to ensure header files for %s: %v", name, err)
-		}
-		preprocessed, err := PreprocessCSource(string(data))
-		if err != nil {
-			log.Warnf("C macro preprocessing failed for %s: %v, using original source", name, err)
-			return data, nil
-		}
-		return []byte(preprocessed), nil
-	}
-
-	return data, nil
-}
-
-func (f *PreprocessedCFS) SetEnabled(enabled bool) {
-	f.enabled = enabled
-}
-
-func (f *PreprocessedCFS) Open(name string) (fs.File, error) {
-	return f.underlying.Open(name)
-}
-
-func (f *PreprocessedCFS) OpenFile(name string, flag int, perm os.FileMode) (fs.File, error) {
-	return f.underlying.OpenFile(name, flag, perm)
-}
-
-func (f *PreprocessedCFS) Stat(name string) (fs.FileInfo, error) {
-	return f.underlying.Stat(name)
-}
-
-func (f *PreprocessedCFS) ReadDir(dirname string) ([]fs.DirEntry, error) {
-	return f.underlying.ReadDir(dirname)
-}
-
-func (f *PreprocessedCFS) GetSeparators() rune {
-	return f.underlying.GetSeparators()
-}
-
-func (f *PreprocessedCFS) Join(paths ...string) string {
-	return f.underlying.Join(paths...)
-}
-
-func (f *PreprocessedCFS) IsAbs(name string) bool {
-	return f.underlying.IsAbs(name)
-}
-
-func (f *PreprocessedCFS) Getwd() (string, error) {
-	return f.underlying.Getwd()
-}
-
-func (f *PreprocessedCFS) Exists(path string) (bool, error) {
-	return f.underlying.Exists(path)
-}
-
-func (f *PreprocessedCFS) Rename(old string, new string) error {
-	return f.underlying.Rename(old, new)
-}
-
-func (f *PreprocessedCFS) Rel(base string, target string) (string, error) {
-	return f.underlying.Rel(base, target)
-}
-
-func (f *PreprocessedCFS) WriteFile(name string, data []byte, perm os.FileMode) error {
-	return f.underlying.WriteFile(name, data, perm)
-}
-
-func (f *PreprocessedCFS) Delete(name string) error {
-	return f.underlying.Delete(name)
-}
-
-func (f *PreprocessedCFS) MkdirAll(name string, perm os.FileMode) error {
-	return f.underlying.MkdirAll(name, perm)
-}
-
-func (f *PreprocessedCFS) String() string {
-	underlyingStr := "FileSystem"
-	if stringer, ok := f.underlying.(fmt.Stringer); ok {
-		underlyingStr = stringer.String()
-	}
-	return fmt.Sprintf("PreprocessedCFS{underlying: %s}", underlyingStr)
-}
-
-func (f *PreprocessedCFS) Root() string {
-	if rooter, ok := f.underlying.(interface{ Root() string }); ok {
-		return rooter.Root()
-	}
-	return ""
-}
-
-func (f *PreprocessedCFS) ExtraInfo(path string) map[string]any {
-	return f.underlying.ExtraInfo(path)
-}
-
-func (f *PreprocessedCFS) Base(p string) string {
-	return f.underlying.Base(p)
-}
-
-func (f *PreprocessedCFS) PathSplit(s string) (string, string) {
-	return f.underlying.PathSplit(s)
-}
-
-func (f *PreprocessedCFS) Ext(s string) string {
-	return f.underlying.Ext(s)
+// PreprocessCSource 提供对外可直接调用的 C 预处理接口。
+func PreprocessCSource(src string) (string, error) {
+	return preprocessCSource(src)
 }
