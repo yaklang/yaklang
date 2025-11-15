@@ -11,6 +11,14 @@ import (
 
 // save to Profile SSAProgram
 func SaveConfig(c *Config, prog *Program) {
+	if c.databaseKind == ssa.ProgramCacheMemory {
+		log.Errorf("enableCache: %v, progName : %s", c.EnableCache, c.GetProgramName())
+		if c.EnableCache && c.GetProgramName() != "" {
+			SetProgramCache(prog)
+		}
+
+		return
+	}
 	irProg, err := ssadb.GetProgram(c.GetProgramName(), ssa.Application)
 	if err != nil {
 		log.Errorf("irProg is nil, save config failed: %v", err)

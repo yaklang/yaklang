@@ -231,10 +231,6 @@ var WithProgramName = ssaconfig.WithProgramNames
 
 var WithMemory = ssaconfig.WithCompileMemoryCompile
 
-var WithSaveCache = ssaconfig.SetOption("ssa_compile/save_cache", func(c *Config, h func(i bool)) {
-
-})
-
 var WithConcurrency = ssaconfig.WithCompileConcurrency
 
 var WithDatabaseProgramCacheHitter = ssaconfig.SetOption("ssa_compile/database_program_cache_hitter", func(c *Config, h func(i any)) {
@@ -246,14 +242,11 @@ var withEnableCache = ssaconfig.SetOption("ssa_compile/enable_cache", func(c *Co
 })
 
 func WithEnableCache(b ...bool) ssaconfig.Option {
-	return func(c *ssaconfig.Config) error {
-		enable := true // default true
-		if len(b) > 0 {
-			enable = b[0]
-		}
-		withEnableCache(enable)
-		return nil
+	enable := true // default true
+	if len(b) > 0 {
+		enable = b[0]
 	}
+	return withEnableCache(enable)
 }
 
 var WithEditor = ssaconfig.SetOption("ssa_compile/editor", func(c *Config, v *memedit.MemEditor) {
