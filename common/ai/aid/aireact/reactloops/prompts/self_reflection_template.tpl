@@ -34,17 +34,37 @@
 {{.PreviousReflections}}
 <|PREVIOUS_REFLECTIONS_END_{{.Nonce}}|>{{end}}
 
+{{if .SpinDetection}}<|SPIN_DETECTION_{{.Nonce}}|>
+## SPIN 检测分析
+
+检测到连续 {{.SpinDetection.ConsecutiveCount}} 次执行相同的 Action 类型（{{.SpinDetection.ActionType}}）。请分析是否发生了 SPIN 情况。
+
+**SPIN 定义**：AI Agent 反复做出相同或相似的决策，没有推进任务。
+
+### 最近的 Action 执行历史
+
+{{.SpinDetection.RecentActionsText}}
+
+{{if .SpinDetection.TimelineContent}}### Timeline 上下文
+
+{{.SpinDetection.TimelineContent}}{{end}}
+
+**请分析**：
+1. 这些 Action 是否在重复执行相同的逻辑，没有推进任务？
+2. 如果发生了 SPIN，请说明原因
+3. 如果发生了 SPIN，请提供打破循环的具体建议（这些建议应整合到 `suggestions` 中）
+
+<|SPIN_DETECTION_END_{{.Nonce}}|>{{end}}
+
 <|ANALYSIS_REQUIREMENTS_{{.Nonce}}|>
 ## 分析要求
 
 请对本次操作进行简要反思，**按需提供以下内容**（所有字段均为可选）：
 
-1. **学习点**：从本次执行中学到的重要经验（如有）
-2. **未来建议**：针对类似情况的改进建议（如有）
-3. **影响评估**：操作的实际影响（如有特殊影响需要记录）
-4. **效果评级**：评估操作效果（可选）
+1. **建议**：针对类似情况的改进建议（如有）。{{if .SpinDetection}}**如果检测到 SPIN，请将打破循环的建议整合到此字段。**{{end}}
+{{if .SpinDetection}}2. **SPIN 检测**：如果提供了 SPIN 检测数据，请判断是否发生 SPIN，并说明原因{{end}}
 
-**注意**：如果是常规操作且无特殊情况，可以只返回最基本的信息。保持简洁，避免冗余。
+**注意**：如果是常规操作且无特殊情况，可以只返回最基本的信息。保持简洁，避免冗余。{{if .SpinDetection}}**如果同时进行了 SPIN 检测，请将 SPIN 相关建议整合到 `suggestions` 中。**{{end}}
 <|ANALYSIS_REQUIREMENTS_END_{{.Nonce}}|>
 
 <|OUTPUT_SCHEMA_{{.Nonce}}|>
