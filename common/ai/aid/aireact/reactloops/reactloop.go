@@ -28,6 +28,15 @@ type satisfactionRecord struct {
 	satisfactory bool
 	reason       string
 }
+
+// ActionRecord 记录每次迭代执行的 Action 信息
+type ActionRecord struct {
+	ActionType     string                 `json:"action_type"`
+	ActionName     string                 `json:"action_name"`
+	ActionParams   map[string]interface{} `json:"action_params"`
+	IterationIndex int                    `json:"iteration_index"`
+}
+
 type ReActLoop struct {
 	invoker aicommon.AIInvokeRuntime
 	config  aicommon.AICallerConfigIf
@@ -82,6 +91,11 @@ type ReActLoop struct {
 
 	// 记录历史 satisfaction 状态
 	historySatisfactionReasons []*satisfactionRecord
+
+	// action history tracking
+	actionHistory         []*ActionRecord
+	actionHistoryMutex    *sync.Mutex
+	currentIterationIndex int
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -214,6 +228,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		memorySizeLimit:            10 * 1024,
 		enableSelfReflection:       true,
 		historySatisfactionReasons: make([]*satisfactionRecord, 0),
+		actionHistory:              make([]*ActionRecord, 0),
+		actionHistoryMutex:         new(sync.Mutex),
+		currentIterationIndex:      0,
 	}
 
 	for _, action := range []*LoopAction{
@@ -403,4 +420,62 @@ func (r *ReActLoop) GetAllActions() []*LoopAction {
 		actions = append(actions, actionInstance)
 	}
 	return actions
+}
+
+// GetLastAction 获取上一次执行的 Action 记录
+func (r *ReActLoop) GetLastAction() *ActionRecord {
+	r.actionHistoryMutex.Lock()
+	defer r.actionHistoryMutex.Unlock()
+
+	if len(r.actionHistory) == 0 {
+		return nil
+	}
+	return r.actionHistory[len(r.actionHistory)-1]
+}
+
+// GetLastNAction 获取最近 N 次的 Action 记录
+func (r *ReActLoop) GetLastNAction(n int) []*ActionRecord {
+	r.actionHistoryMutex.Lock()
+	defer r.actionHistoryMutex.Unlock()
+
+	if n <= 0 {
+		return []*ActionRecord{}
+	}
+
+	historyLen := len(r.actionHistory)
+	if historyLen == 0 {
+		return []*ActionRecord{}
+	}
+
+	start := historyLen - n
+	if start < 0 {
+		start = 0
+	}
+
+	// 返回从 start 到末尾的所有记录（最近 N 条）
+	result := make([]*ActionRecord, historyLen-start)
+	copy(result, r.actionHistory[start:])
+	return result
+}
+
+// GetCurrentIterationIndex 获取当前迭代索引
+func (r *ReActLoop) GetCurrentIterationIndex() int {
+	r.actionHistoryMutex.Lock()
+	defer r.actionHistoryMutex.Unlock()
+	return r.currentIterationIndex
+}
+
+// GetAllExistedActionRecord 获取所有已存在的 Action 记录
+func (r *ReActLoop) GetAllExistedActionRecord() []*ActionRecord {
+	r.actionHistoryMutex.Lock()
+	defer r.actionHistoryMutex.Unlock()
+
+	if len(r.actionHistory) == 0 {
+		return []*ActionRecord{}
+	}
+
+	// 返回副本，避免外部修改
+	result := make([]*ActionRecord, len(r.actionHistory))
+	copy(result, r.actionHistory)
+	return result
 }
