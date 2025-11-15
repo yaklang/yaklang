@@ -375,17 +375,21 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		}
 
 		// Step 3: 处理文件路径
-		if !createNewFile || existed != "" {
+		// 完全依赖 existed 参数来决定行为，createNewFile 参数已退化
+		// 如果提供了 existed 路径，使用该路径（无论 createNewFile 是什么）
+		if existed != "" {
 			targetPath := existed
 			log.Infof("identified target path: %s", targetPath)
 			filename := utils.GetFirstExistedFile(targetPath)
 			if filename == "" {
+				// 文件不存在，创建新文件
 				createFileErr := os.WriteFile(targetPath, []byte(""), 0644)
 				if createFileErr != nil {
-					return utils.Errorf("not found existed file and cannot create file to disk, failed: %v", createFileErr)
+					return utils.Errorf("cannot create file to disk, failed: %v", createFileErr)
 				}
 				filename = targetPath
 			}
+			// 读取已有文件内容（如果存在）
 			content, _ := os.ReadFile(targetPath)
 			if len(content) > 0 {
 				log.Infof("identified target file: %s, file size: %v", targetPath, len(content))
@@ -396,7 +400,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			return nil
 		}
 
-		// 创建新文件
+		// 如果没有提供 existed 路径，创建新文件（无论 createNewFile 是什么）
 		filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 		emitter.EmitPinFilename(filename)
 		loop.Set("filename", filename)
