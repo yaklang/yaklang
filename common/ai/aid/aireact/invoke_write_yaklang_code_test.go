@@ -18,14 +18,25 @@ func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 	prompt := req.GetPrompt()
 
 	// Handle init task: analyze-requirement-and-search
-	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
+	// 支持两种情况：有搜索器（包含 search_patterns）和无搜索器（只有 create_new_file）
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{
+		// 检查是否有搜索器（通过检查 prompt 中是否包含搜索相关的任务描述）
+		if utils.MatchAllOfSubString(prompt, "search_patterns", "Grep模式") {
+			// 有搜索器的情况
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "analyze-requirement-and-search",
   "create_new_file": true,
   "search_patterns": ["println"],
   "reason": "Simple test code"
 }`))
+		} else {
+			// 无搜索器的情况，只返回 create_new_file
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true
+}`))
+		}
 		rsp.Close()
 		return rsp, nil
 	}
@@ -120,9 +131,10 @@ func TestReAct_WriteYaklangCode(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
+	// 优化：缩短超时时间，测试应该快速完成
+	du := time.Duration(3)
 	if utils.InGithubActions() {
-		du = time.Duration(5)
+		du = time.Duration(2)
 	}
 	after := time.After(du * time.Second)
 
