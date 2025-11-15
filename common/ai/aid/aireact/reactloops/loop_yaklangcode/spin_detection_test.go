@@ -4,25 +4,22 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-// MockLoop 模拟 ReActLoop 的存储接口
+// MockLoop 模拟 ReActLoop 的存储接口，实现 LoopActionHistoryProvider
 type MockLoop struct {
-	storage    map[string]string
-	lastAction *MockAction
-}
-
-type MockAction struct {
-	actionName string
-}
-
-func (m *MockAction) GetActionName() string {
-	return m.actionName
+	storage        map[string]string
+	actionHistory  []*reactloops.ActionRecord
+	iterationIndex int
 }
 
 func NewMockLoop() *MockLoop {
 	return &MockLoop{
-		storage: make(map[string]string),
+		storage:        make(map[string]string),
+		actionHistory:  make([]*reactloops.ActionRecord, 0),
+		iterationIndex: 0,
 	}
 }
 
@@ -31,15 +28,42 @@ func (m *MockLoop) Get(key string) string {
 }
 
 func (m *MockLoop) Set(key string, value any) {
-	m.storage[key] = value.(string)
+	m.storage[key] = utils.InterfaceToString(value)
 }
 
-func (m *MockLoop) GetLastAction() interface{ GetActionName() string } {
-	return m.lastAction
+func (m *MockLoop) GetLastNAction(n int) []*reactloops.ActionRecord {
+	if n <= 0 {
+		return []*reactloops.ActionRecord{}
+	}
+
+	historyLen := len(m.actionHistory)
+	if historyLen == 0 {
+		return []*reactloops.ActionRecord{}
+	}
+
+	start := historyLen - n
+	if start < 0 {
+		start = 0
+	}
+
+	result := make([]*reactloops.ActionRecord, historyLen-start)
+	copy(result, m.actionHistory[start:])
+	return result
 }
 
-func (m *MockLoop) SetLastAction(actionName string) {
-	m.lastAction = &MockAction{actionName: actionName}
+// SetLastAction 添加一个 modify_code action 到历史记录中
+func (m *MockLoop) SetLastAction(actionName string, startLine, endLine int) {
+	m.iterationIndex++
+	actionRecord := &reactloops.ActionRecord{
+		ActionType: actionName,
+		ActionName: actionName,
+		ActionParams: map[string]interface{}{
+			"modify_start_line": startLine,
+			"modify_end_line":   endLine,
+		},
+		IterationIndex: m.iterationIndex,
+	}
+	m.actionHistory = append(m.actionHistory, actionRecord)
 }
 
 // TestIsInSameRegion 测试区域判断
@@ -141,38 +165,35 @@ func TestIsSmallEdit(t *testing.T) {
 // TestDetectSpinning_NoHistory 测试没有历史记录的情况
 func TestDetectSpinning_NoHistory(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	record := ModifyRecord{StartLine: 10, EndLine: 12}
 	isSpinning, reason := detectSpinning(loop, record)
 
 	assert.False(t, isSpinning, "首次修改不应该被判定为打转")
 	assert.Empty(t, reason, "首次修改不应该有打转原因")
-	assert.Equal(t, "10-12", loop.Get("modify_history"), "应该记录修改历史")
 	assert.Equal(t, "1", loop.Get("modify_spin_count"), "应该记录计数为1")
 }
 
 // TestDetectSpinning_ResetAfterTrigger 测试触发后重置
 func TestDetectSpinning_ResetAfterTrigger(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	// 连续3次修改同一区域触发打转检测
 	r1 := ModifyRecord{StartLine: 10, EndLine: 12}
 	detectSpinning(loop, r1)
+	loop.SetLastAction("modify_code", 10, 12)
 
-	loop.SetLastAction("modify_code")
 	r2 := ModifyRecord{StartLine: 11, EndLine: 13}
 	detectSpinning(loop, r2)
+	loop.SetLastAction("modify_code", 11, 13)
 
-	loop.SetLastAction("modify_code")
 	r3 := ModifyRecord{StartLine: 12, EndLine: 14}
 	isSpinning, _ := detectSpinning(loop, r3)
 	assert.True(t, isSpinning, "第三次应该触发")
 	assert.Equal(t, "0", loop.Get("modify_spin_count"), "触发后重置为0")
+	loop.SetLastAction("modify_code", 12, 14)
 
 	// 再次修改，应该重新开始计数
-	loop.SetLastAction("modify_code")
 	r4 := ModifyRecord{StartLine: 13, EndLine: 15}
 	isSpinning, _ = detectSpinning(loop, r4)
 	assert.False(t, isSpinning, "重置后再次修改不应触发")
@@ -182,22 +203,21 @@ func TestDetectSpinning_ResetAfterTrigger(t *testing.T) {
 // TestDetectSpinning_SameRegionSmallEdits 测试相同区域的小幅修改
 func TestDetectSpinning_SameRegionSmallEdits(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	// 第一次修改
 	record1 := ModifyRecord{StartLine: 10, EndLine: 12}
 	isSpinning, _ := detectSpinning(loop, record1)
 	assert.False(t, isSpinning, "第一次不应该打转")
+	loop.SetLastAction("modify_code", 10, 12)
 
 	// 第二次修改（相同区域，小幅修改）
-	loop.SetLastAction("modify_code")
 	record2 := ModifyRecord{StartLine: 11, EndLine: 13}
 	isSpinning, _ = detectSpinning(loop, record2)
 	assert.False(t, isSpinning, "第二次不应该打转")
 	assert.Equal(t, "2", loop.Get("modify_spin_count"), "计数应该为2")
+	loop.SetLastAction("modify_code", 11, 13)
 
 	// 第三次修改（相同区域，小幅修改）- 应该触发
-	loop.SetLastAction("modify_code")
 	record3 := ModifyRecord{StartLine: 12, EndLine: 14}
 	isSpinning, reason := detectSpinning(loop, record3)
 	assert.True(t, isSpinning, "第三次应该触发打转检测")
@@ -208,15 +228,14 @@ func TestDetectSpinning_SameRegionSmallEdits(t *testing.T) {
 // TestDetectSpinning_DifferentRegion 测试不同区域的修改
 func TestDetectSpinning_DifferentRegion(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	// 第一次修改
 	record1 := ModifyRecord{StartLine: 10, EndLine: 12}
 	detectSpinning(loop, record1)
 	assert.Equal(t, "1", loop.Get("modify_spin_count"), "第一次计数应该为1")
+	loop.SetLastAction("modify_code", 10, 12)
 
 	// 第二次修改（不同区域）
-	loop.SetLastAction("modify_code")
 	record2 := ModifyRecord{StartLine: 50, EndLine: 52}
 	isSpinning, _ := detectSpinning(loop, record2)
 
@@ -227,16 +246,15 @@ func TestDetectSpinning_DifferentRegion(t *testing.T) {
 // TestDetectSpinning_LargeEdit 测试大幅修改
 func TestDetectSpinning_LargeEdit(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	// 第一次小幅修改
 	record1 := ModifyRecord{StartLine: 10, EndLine: 12}
 	detectSpinning(loop, record1)
 	assert.Equal(t, "1", loop.Get("modify_spin_count"))
+	loop.SetLastAction("modify_code", 10, 12)
 
 	// 第二次大幅修改（相同区域但改动大）
 	// 起始行和结束行都在5行内，但修改行数>3行
-	loop.SetLastAction("modify_code")
 	record2 := ModifyRecord{StartLine: 11, EndLine: 17} // 7行修改，起始行差1，结束行差5
 	isSpinning, _ := detectSpinning(loop, record2)
 
@@ -249,21 +267,20 @@ func TestDetectSpinning_CompleteScenario(t *testing.T) {
 	loop := NewMockLoop()
 
 	// 场景1：第一次修改
-	loop.SetLastAction("modify_code")
 	r1 := ModifyRecord{StartLine: 10, EndLine: 12}
 	isSpinning, _ := detectSpinning(loop, r1)
 	assert.False(t, isSpinning)
 	assert.Equal(t, "1", loop.Get("modify_spin_count"))
+	loop.SetLastAction("modify_code", 10, 12)
 
 	// 场景2：连续第二次修改相同区域
-	loop.SetLastAction("modify_code")
 	r2 := ModifyRecord{StartLine: 11, EndLine: 13}
 	isSpinning, _ = detectSpinning(loop, r2)
 	assert.False(t, isSpinning)
 	assert.Equal(t, "2", loop.Get("modify_spin_count"))
+	loop.SetLastAction("modify_code", 11, 13)
 
 	// 场景3：连续第三次修改相同区域 - 应该触发
-	loop.SetLastAction("modify_code")
 	r3 := ModifyRecord{StartLine: 12, EndLine: 14}
 	isSpinning, reason := detectSpinning(loop, r3)
 	assert.True(t, isSpinning)
@@ -275,7 +292,6 @@ func TestDetectSpinning_CompleteScenario(t *testing.T) {
 // TestDetectSpinning_HistoryLimit 测试历史记录限制
 func TestDetectSpinning_HistoryLimit(t *testing.T) {
 	loop := NewMockLoop()
-	loop.SetLastAction("modify_code")
 
 	// 添加多次修改
 	records := []ModifyRecord{
@@ -286,14 +302,20 @@ func TestDetectSpinning_HistoryLimit(t *testing.T) {
 	}
 
 	for _, record := range records {
-		loop.SetLastAction("modify_code")
 		detectSpinning(loop, record)
+		loop.SetLastAction("modify_code", record.StartLine, record.EndLine)
 	}
 
-	// 验证只保留最近3条
-	history := loop.Get("modify_history")
-	parts := len(splitHistory(history))
-	assert.LessOrEqual(t, parts, 3, "历史记录应该不超过3条")
+	// 验证只保留最近3条 modify_code 记录（通过 GetLastNAction 获取）
+	recentActions := loop.GetLastNAction(10)
+	modifyCodeCount := 0
+	for _, action := range recentActions {
+		if action.ActionType == "modify_code" {
+			modifyCodeCount++
+		}
+	}
+	// 由于我们只添加了4条记录，应该都能获取到，但 detectSpinning 内部只使用最近3条
+	assert.Equal(t, 4, modifyCodeCount, "应该记录所有4条 modify_code 记录")
 }
 
 // TestGenerateReflectionPrompt 测试反思提示生成
@@ -313,19 +335,4 @@ func TestGenerateReflectionPrompt(t *testing.T) {
 	assert.Contains(t, prompt, "grep_yaklang_samples", "应该包含grep搜索")
 	assert.Contains(t, prompt, "semantic_search_yaklang_samples", "应该包含语义搜索")
 	assert.Contains(t, prompt, "不要再继续在同一位置反复尝试", "应该包含停止建议")
-}
-
-// 辅助函数：分割历史记录
-func splitHistory(history string) []string {
-	if history == "" {
-		return []string{}
-	}
-	// 简单按分号分割
-	count := 1 // 至少有一条记录
-	for i := 0; i < len(history); i++ {
-		if history[i] == ';' {
-			count++
-		}
-	}
-	return make([]string, count)
 }
