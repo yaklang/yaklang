@@ -115,33 +115,13 @@ func (r *ReActLoop) addReflectionToTimeline(reflection *ActionReflection) {
 	timelineMsg.WriteString(fmt.Sprintf(" (iteration %d, %v, level: %s)\n\n",
 		reflection.IterationNum, reflection.ExecutionTime, reflection.ReflectionLevel))
 
-	// 添加关键学习点
-	if len(reflection.LearningInsights) > 0 {
-		timelineMsg.WriteString("CRITICAL LEARNINGS:\n")
-		for i, insight := range reflection.LearningInsights {
-			timelineMsg.WriteString(fmt.Sprintf("%d. %s\n", i+1, insight))
-		}
-		timelineMsg.WriteString("\n")
-	}
-
-	// 添加未来建议
-	if len(reflection.FutureSuggestions) > 0 {
-		timelineMsg.WriteString("MANDATORY ACTIONS FOR FUTURE:\n")
-		for i, suggestion := range reflection.FutureSuggestions {
+	// 添加建议
+	if len(reflection.Suggestions) > 0 {
+		timelineMsg.WriteString("MANDATORY RECOMMENDATIONS FOR FUTURE ACTIONS:\n")
+		for i, suggestion := range reflection.Suggestions {
 			timelineMsg.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
 		}
 		timelineMsg.WriteString("\n")
-	}
-
-	// 添加影响评估
-	if reflection.ImpactAssessment != "" {
-		timelineMsg.WriteString(fmt.Sprintf("IMPACT: %s\n\n", reflection.ImpactAssessment))
-	}
-
-	// 添加效果评级
-	if reflection.EffectivenessRating != "" {
-		timelineMsg.WriteString(fmt.Sprintf("EFFECTIVENESS: %s\n",
-			strings.ToUpper(strings.ReplaceAll(reflection.EffectivenessRating, "_", " "))))
 	}
 
 	// 根据反思级别使用不同的事件类型

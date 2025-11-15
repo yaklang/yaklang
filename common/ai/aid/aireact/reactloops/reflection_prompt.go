@@ -2,6 +2,8 @@ package reactloops
 
 import (
 	_ "embed"
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -57,6 +59,12 @@ func (r *ReActLoop) buildReflectionPrompt(
 		data["PreviousReflections"] = previousReflections
 	}
 
+	// 添加 SPIN 检测相关的数据（如果满足条件）
+	spinData := r.getSpinDetectionData()
+	if spinData != nil {
+		data["SpinDetection"] = spinData
+	}
+
 	// 使用模板渲染 prompt
 	prompt, err := utils.RenderTemplate(selfReflectionTemplate, data)
 	if err != nil {
@@ -64,6 +72,67 @@ func (r *ReActLoop) buildReflectionPrompt(
 	}
 
 	return prompt, nil
+}
+
+// getSpinDetectionData 获取 SPIN 检测相关的数据
+// 如果满足简单检测条件，返回 action 历史和 timeline 信息
+func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
+	// 首先检查是否满足简单检测条件
+	if !r.IsInSameActionTypeSpin() {
+		return nil
+	}
+
+	r.actionHistoryMutex.Lock()
+	historyLen := len(r.actionHistory)
+	if historyLen < r.sameActionTypeSpinThreshold {
+		r.actionHistoryMutex.Unlock()
+		return nil
+	}
+
+	// 获取最近的 action 记录用于分析
+	recentActions := make([]*ActionRecord, r.sameActionTypeSpinThreshold)
+	copy(recentActions, r.actionHistory[historyLen-r.sameActionTypeSpinThreshold:])
+	r.actionHistoryMutex.Unlock()
+
+	// 检查是否都是相同的 Action 类型
+	firstActionType := recentActions[0].ActionType
+	allSameType := true
+	for _, action := range recentActions {
+		if action.ActionType != firstActionType {
+			allSameType = false
+			break
+		}
+	}
+
+	if !allSameType {
+		return nil
+	}
+
+	// 获取 Timeline 信息
+	timelineContent := r.getTimelineContentForSpinDetection()
+
+	// 格式化 action 历史为字符串
+	var actionsText strings.Builder
+	for i, action := range recentActions {
+		actionsText.WriteString(fmt.Sprintf("**第 %d 次执行**（迭代 %d）：\n", i+1, action.IterationIndex))
+		actionsText.WriteString(fmt.Sprintf("- Action 类型: %s\n", action.ActionType))
+		actionsText.WriteString(fmt.Sprintf("- Action 名称: %s\n", action.ActionName))
+		actionsText.WriteString("- Action 参数:\n")
+		paramsJSON, err := json.MarshalIndent(action.ActionParams, "  ", "  ")
+		if err == nil {
+			actionsText.WriteString("  ```json\n")
+			actionsText.WriteString("  " + string(paramsJSON) + "\n")
+			actionsText.WriteString("  ```\n")
+		}
+		actionsText.WriteString("\n")
+	}
+
+	return map[string]interface{}{
+		"RecentActionsText": actionsText.String(),
+		"TimelineContent":   timelineContent,
+		"ActionType":        firstActionType,
+		"ConsecutiveCount":  len(recentActions),
+	}
 }
 
 // buildReflectionSchema 构建反思结果的 JSON Schema
@@ -75,25 +144,20 @@ func buildReflectionSchema() string {
 			aitool.WithParam_EnumString("self_reflection"),
 			aitool.WithParam_Required(true),
 		),
-		aitool.WithStringArrayParam(
-			"learning_insights",
-			aitool.WithParam_Description("关键学习点（可选）：从本次执行中学到的重要经验，简洁描述即可"),
-			aitool.WithParam_Required(false),
-		),
-		aitool.WithStringArrayParam(
-			"future_suggestions",
-			aitool.WithParam_Description("未来建议（可选）：针对类似情况的改进建议，按需提供"),
+		// SPIN 检测相关字段（仅在提供了 SPIN 检测数据时使用）
+		aitool.WithBoolParam(
+			"is_spinning",
+			aitool.WithParam_Description("是否发生了 SPIN 情况（可选）：仅在提供了 SPIN 检测数据时判断。SPIN 指 AI Agent 反复做出相同或相似的决策，没有推进任务"),
 			aitool.WithParam_Required(false),
 		),
 		aitool.WithStringParam(
-			"impact_assessment",
-			aitool.WithParam_Description("影响评估（可选）：简要说明本次操作的影响，如无特殊影响可省略"),
+			"spin_reason",
+			aitool.WithParam_Description("SPIN 原因（可选）：如果 is_spinning 为 true，说明发生 SPIN 的原因"),
 			aitool.WithParam_Required(false),
 		),
-		aitool.WithStringParam(
-			"effectiveness_rating",
-			aitool.WithParam_Description("效果评级（可选）：评估操作效果"),
-			aitool.WithParam_EnumString("highly_effective", "effective", "moderately_effective", "ineffective", "counterproductive"),
+		aitool.WithStringArrayParam(
+			"suggestions",
+			aitool.WithParam_Description("建议（可选）：针对类似情况的改进建议，按需提供。如果检测到 SPIN，请将打破循环的建议整合到此字段中"),
 			aitool.WithParam_Required(false),
 		),
 	)

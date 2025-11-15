@@ -19,13 +19,14 @@ type ActionReflection struct {
 	// 环境影响
 	EnvironmentalImpact *EnvironmentalImpact `json:"environmental_impact,omitempty"`
 
-	// 学习内容
-	LearningInsights    []string  `json:"learning_insights,omitempty"`
-	FutureSuggestions   []string  `json:"future_suggestions,omitempty"`
-	ImpactAssessment    string    `json:"impact_assessment,omitempty"`
-	EffectivenessRating string    `json:"effectiveness_rating,omitempty"`
+	// 反思内容
+	Suggestions         []string  `json:"suggestions,omitempty"`
 	ReflectionLevel     string    `json:"reflection_level"`
 	ReflectionTimestamp time.Time `json:"reflection_timestamp"`
+
+	// SPIN 检测结果（整合到自我反思中）
+	IsSpinning bool   `json:"is_spinning,omitempty"`
+	SpinReason string `json:"spin_reason,omitempty"`
 }
 
 // Dump 生成适合放入 Prompt 的格式化字符串（使用 nonce 保护）
@@ -47,28 +48,12 @@ func (r *ActionReflection) Dump(nonce string) string {
 	}
 	buf.WriteString("\n")
 
-	if len(r.LearningInsights) > 0 {
-		buf.WriteString("### Key Learnings\n")
-		for i, insight := range r.LearningInsights {
-			buf.WriteString(fmt.Sprintf("%d. %s\n", i+1, insight))
-		}
-		buf.WriteString("\n")
-	}
-
-	if len(r.FutureSuggestions) > 0 {
+	if len(r.Suggestions) > 0 {
 		buf.WriteString("### Recommendations\n")
-		for i, suggestion := range r.FutureSuggestions {
+		for i, suggestion := range r.Suggestions {
 			buf.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
 		}
 		buf.WriteString("\n")
-	}
-
-	if r.ImpactAssessment != "" {
-		buf.WriteString(fmt.Sprintf("### Impact\n%s\n\n", r.ImpactAssessment))
-	}
-
-	if r.EffectivenessRating != "" {
-		buf.WriteString(fmt.Sprintf("**Effectiveness**: %s\n", r.EffectivenessRating))
 	}
 
 	buf.WriteString(fmt.Sprintf("<|REFLECTION_HISTORY_END_%s|>\n", nonce))
@@ -95,33 +80,13 @@ func (r *ActionReflection) ToMemoryContent() string {
 	}
 	buf.WriteString("\n")
 
-	// 强语气：关键学习点
-	if len(r.LearningInsights) > 0 {
-		buf.WriteString("CRITICAL LEARNINGS - MUST REMEMBER:\n")
-		for i, insight := range r.LearningInsights {
-			buf.WriteString(fmt.Sprintf("%d. %s\n", i+1, insight))
-		}
-		buf.WriteString("\n")
-	}
-
-	// 强语气：未来指令
-	if len(r.FutureSuggestions) > 0 {
+	// 强语气：建议
+	if len(r.Suggestions) > 0 {
 		buf.WriteString("MANDATORY RECOMMENDATIONS FOR FUTURE ACTIONS:\n")
-		for i, suggestion := range r.FutureSuggestions {
+		for i, suggestion := range r.Suggestions {
 			buf.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
 		}
 		buf.WriteString("\n")
-	}
-
-	// 影响评估
-	if r.ImpactAssessment != "" {
-		buf.WriteString(fmt.Sprintf("IMPACT ANALYSIS:\n%s\n\n", r.ImpactAssessment))
-	}
-
-	// 效果评级
-	if r.EffectivenessRating != "" {
-		buf.WriteString(fmt.Sprintf("EFFECTIVENESS RATING: %s\n\n",
-			strings.ToUpper(strings.ReplaceAll(r.EffectivenessRating, "_", " "))))
 	}
 
 	// 环境影响（强语气）

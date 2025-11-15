@@ -305,3 +305,25 @@ func WithEnableSelfReflection(enable ...bool) ReActLoopOption {
 		}
 	}
 }
+
+// WithSameActionTypeSpinThreshold 设置相同任务自旋阈值
+// 当连续执行相同 Action 类型的次数达到此阈值时，触发 SPIN 检测
+// 默认值为 3
+func WithSameActionTypeSpinThreshold(threshold int) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if threshold > 0 {
+			r.sameActionTypeSpinThreshold = threshold
+		}
+	}
+}
+
+// WithSameLogicSpinThreshold 设置相同逻辑自旋阈值
+// 当连续执行相同 Action 类型的次数达到此阈值时，使用 AI 进行深度 SPIN 检测
+// 默认值为 3
+func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if threshold > 0 {
+			r.sameLogicSpinThreshold = threshold
+		}
+	}
+}
