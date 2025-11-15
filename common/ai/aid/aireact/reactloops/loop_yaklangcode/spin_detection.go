@@ -2,9 +2,10 @@ package loop_yaklangcode
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // ModifyRecord 记录单次 modify_code 操作
@@ -38,32 +39,58 @@ func isSmallEdit(record ModifyRecord) bool {
 	return lineCount <= 3
 }
 
-// detectSpinning 检测是否在打转
-// 返回: isSpinning bool, reason string
-func detectSpinning(loop interface {
+// LoopActionHistoryProvider 提供 Action 历史记录的接口
+type LoopActionHistoryProvider interface {
 	Get(string) string
 	Set(string, any)
-}, currentRecord ModifyRecord) (bool, string) {
+	GetLastNAction(int) []*reactloops.ActionRecord
+}
 
-	// 获取历史记录
-	historyStr := loop.Get("modify_history")
+// detectSpinning 检测是否在打转
+// 返回: isSpinning bool, reason string
+// 优化：使用新的 Action 历史接口替代字符串存储
+func detectSpinning(loop LoopActionHistoryProvider, currentRecord ModifyRecord) (bool, string) {
+	// 获取 spin count（仍然使用 Get/Set 存储状态信息）
 	spinCountStr := loop.Get("modify_spin_count")
-
 	spinCount := 0
 	if spinCountStr != "" {
 		fmt.Sscanf(spinCountStr, "%d", &spinCount)
 	}
 
-	// 解析历史修改记录
+	// 使用新的 Action 历史接口获取最近的 modify_code actions
+	// 获取最近 10 条记录，应该足够找到最近的 modify_code actions
+	recentActions := loop.GetLastNAction(10)
+
+	// 过滤出 modify_code 类型的 actions，并提取修改记录
 	var historyRecords []ModifyRecord
-	if historyStr != "" {
-		lines := strings.Split(historyStr, ";")
-		for _, line := range lines {
-			var record ModifyRecord
-			if n, _ := fmt.Sscanf(line, "%d-%d", &record.StartLine, &record.EndLine); n == 2 {
-				historyRecords = append(historyRecords, record)
+	for i := len(recentActions) - 1; i >= 0; i-- {
+		action := recentActions[i]
+		if action.ActionType == "modify_code" {
+			// 从 ActionParams 中提取行号信息
+			startLineRaw, hasStart := action.ActionParams["modify_start_line"]
+			endLineRaw, hasEnd := action.ActionParams["modify_end_line"]
+
+			if hasStart && hasEnd {
+				startLine := utils.InterfaceToInt(startLineRaw)
+				endLine := utils.InterfaceToInt(endLineRaw)
+				if startLine > 0 && endLine > 0 {
+					historyRecords = append(historyRecords, ModifyRecord{
+						StartLine: startLine,
+						EndLine:   endLine,
+					})
+				}
 			}
 		}
+	}
+
+	// 反转顺序，使最早的记录在前
+	for i, j := 0, len(historyRecords)-1; i < j; i, j = i+1, j-1 {
+		historyRecords[i], historyRecords[j] = historyRecords[j], historyRecords[i]
+	}
+
+	// 只保留最近3条 modify_code 记录（与之前的行为保持一致）
+	if len(historyRecords) > 3 {
+		historyRecords = historyRecords[len(historyRecords)-3:]
 	}
 
 	// 检查是否在相同区域重复修改
@@ -80,13 +107,7 @@ func detectSpinning(loop interface {
 		spinCount = 1
 		log.Infof("first modify_code record, initialize spin count to 1, lines: %d-%d",
 			currentRecord.StartLine, currentRecord.EndLine)
-		// 保存记录并返回
-		historyRecords = append(historyRecords, currentRecord)
-		var historyParts []string
-		for _, record := range historyRecords {
-			historyParts = append(historyParts, fmt.Sprintf("%d-%d", record.StartLine, record.EndLine))
-		}
-		loop.Set("modify_history", strings.Join(historyParts, ";"))
+		// 保存计数并返回（不再需要保存 modify_history，因为使用 Action 历史）
 		loop.Set("modify_spin_count", fmt.Sprintf("%d", spinCount))
 		return false, ""
 	}
@@ -107,19 +128,7 @@ func detectSpinning(loop interface {
 		}
 	}
 
-	// 保存当前记录到历史
-	historyRecords = append(historyRecords, currentRecord)
-
-	// 只保留最近3条记录
-	if len(historyRecords) > 3 {
-		historyRecords = historyRecords[len(historyRecords)-3:]
-	}
-
-	var historyParts []string
-	for _, record := range historyRecords {
-		historyParts = append(historyParts, fmt.Sprintf("%d-%d", record.StartLine, record.EndLine))
-	}
-	loop.Set("modify_history", strings.Join(historyParts, ";"))
+	// 保存 spin count（不再需要保存 modify_history，因为使用 Action 历史）
 	loop.Set("modify_spin_count", fmt.Sprintf("%d", spinCount))
 
 	// 连续3次在相同区域小幅修改，判定为打转

@@ -450,6 +450,23 @@ LOOP:
 		}
 		actionName := actionParams.Name()
 
+		// 记录当前迭代索引和 Action 信息
+		r.actionHistoryMutex.Lock()
+		r.currentIterationIndex = iterationCount
+		actionRecord := &ActionRecord{
+			ActionType:     actionParams.ActionType(),
+			ActionName:     actionName,
+			ActionParams:   make(map[string]interface{}),
+			IterationIndex: iterationCount,
+		}
+		// 复制 Action 参数（避免并发修改）
+		params := actionParams.GetParams()
+		for k, v := range params {
+			actionRecord.ActionParams[k] = v
+		}
+		r.actionHistory = append(r.actionHistory, actionRecord)
+		r.actionHistoryMutex.Unlock()
+
 		// allow iteration info to be added to timeline
 		loopName := r.loopName
 		if loopName == "" {

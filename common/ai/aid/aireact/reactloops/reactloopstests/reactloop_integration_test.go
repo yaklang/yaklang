@@ -672,6 +672,249 @@ func TestReActLoop_ContextCancellation(t *testing.T) {
 	t.Logf("Cancellation test result: %v", err)
 }
 
+// TestReActLoop_ActionHistoryTracking 测试 Action 历史记录功能
+func TestReActLoop_ActionHistoryTracking(t *testing.T) {
+	callCount := 0
+
+	reactIns, err := aireact.NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
+			rsp := i.NewAIResponse()
+
+			// 模拟多次迭代，使用自定义 action 来避免直接终止
+			if callCount <= 2 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "test_action", "param": "value"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Task completed"}`))
+			}
+
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct: %v", err)
+	}
+
+	// 注册一个自定义 action 来验证历史记录，这个 action 会继续迭代
+	loop, err := reactloops.NewReActLoop("history-test-loop", reactIns,
+		reactloops.WithRegisterLoopAction(
+			"test_action",
+			"Test action for history",
+			nil,
+			nil,
+			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+				// 在 action handler 中检查历史记录
+				lastAction := loop.GetLastAction()
+				if lastAction == nil {
+					t.Error("GetLastAction should not return nil during action execution")
+				}
+				operator.Continue() // 继续下一次迭代
+			},
+		),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create loop: %v", err)
+	}
+
+	err = loop.Execute("history-task", context.Background(), "test action history")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// 验证 GetCurrentIterationIndex
+	currentIndex := loop.GetCurrentIterationIndex()
+	if currentIndex == 0 {
+		t.Error("Current iteration index should be greater than 0 after execution")
+	}
+	t.Logf("Current iteration index: %d", currentIndex)
+
+	// 验证 GetLastAction
+	lastAction := loop.GetLastAction()
+	if lastAction == nil {
+		t.Error("GetLastAction should return the last action")
+	} else {
+		if lastAction.ActionType != "finish" {
+			t.Errorf("Expected last action type to be 'finish', got '%s'", lastAction.ActionType)
+		}
+		t.Logf("Last action: type=%s, iteration=%d", lastAction.ActionType, lastAction.IterationIndex)
+	}
+
+	// 验证 GetLastNAction
+	last3Actions := loop.GetLastNAction(3)
+	if len(last3Actions) == 0 {
+		t.Error("GetLastNAction should return actions")
+	} else {
+		t.Logf("Last %d actions:", len(last3Actions))
+		for i, action := range last3Actions {
+			t.Logf("  [%d] type=%s, iteration=%d", i, action.ActionType, action.IterationIndex)
+		}
+		// 验证返回的是最近的 N 条记录
+		if len(last3Actions) > 0 {
+			lastActionInList := last3Actions[len(last3Actions)-1]
+			if lastActionInList.ActionType != "finish" {
+				t.Errorf("Expected last action in list to be 'finish', got '%s'", lastActionInList.ActionType)
+			}
+		}
+	}
+
+	// 验证 GetAllExistedActionRecord
+	allRecords := loop.GetAllExistedActionRecord()
+	if len(allRecords) == 0 {
+		t.Error("GetAllExistedActionRecord should return all action records")
+	} else {
+		t.Logf("Total action records: %d", len(allRecords))
+		// 验证记录数量应该等于迭代次数
+		if len(allRecords) != currentIndex {
+			t.Errorf("Expected %d action records, got %d", currentIndex, len(allRecords))
+		}
+		// 验证记录的迭代索引是递增的
+		for i, record := range allRecords {
+			if record.IterationIndex != i+1 {
+				t.Errorf("Expected iteration index %d at position %d, got %d", i+1, i, record.IterationIndex)
+			}
+		}
+	}
+}
+
+// TestReActLoop_GetLastNAction_EdgeCases 测试 GetLastNAction 的边界情况
+func TestReActLoop_GetLastNAction_EdgeCases(t *testing.T) {
+	callCount := 0
+
+	reactIns, err := aireact.NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct: %v", err)
+	}
+
+	loop, err := reactloops.NewReActLoop("edge-case-loop", reactIns)
+	if err != nil {
+		t.Fatalf("Failed to create loop: %v", err)
+	}
+
+	// 测试空历史记录
+	emptyRecords := loop.GetLastNAction(5)
+	if len(emptyRecords) != 0 {
+		t.Errorf("Expected empty records for new loop, got %d", len(emptyRecords))
+	}
+
+	// 执行一次迭代
+	err = loop.Execute("edge-task", context.Background(), "test edge cases")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// 测试请求超过实际记录数
+	moreThanExists := loop.GetLastNAction(100)
+	if len(moreThanExists) > 1 {
+		t.Errorf("Expected at most 1 record, got %d", len(moreThanExists))
+	}
+
+	// 测试请求 0 或负数
+	zeroRecords := loop.GetLastNAction(0)
+	if len(zeroRecords) != 0 {
+		t.Errorf("Expected 0 records for n=0, got %d", len(zeroRecords))
+	}
+
+	negativeRecords := loop.GetLastNAction(-1)
+	if len(negativeRecords) != 0 {
+		t.Errorf("Expected 0 records for n=-1, got %d", len(negativeRecords))
+	}
+}
+
+// TestReActLoop_ActionHistoryInMultipleIterations 测试多次迭代中的 Action 历史记录
+func TestReActLoop_ActionHistoryInMultipleIterations(t *testing.T) {
+	callCount := 0
+
+	reactIns, err := aireact.NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
+			rsp := i.NewAIResponse()
+
+			// 模拟 5 次迭代
+			if callCount <= 4 {
+				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "directly_answer", "answer_payload": "Iteration %d"}`, callCount)))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Completed"}`))
+			}
+
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct: %v", err)
+	}
+
+	// 在 action handler 中验证历史记录
+	var capturedIterations []int
+	loop, err := reactloops.NewReActLoop("multi-iter-loop", reactIns,
+		reactloops.WithMaxIterations(10),
+		reactloops.WithRegisterLoopAction(
+			"verify_history",
+			"Verify history",
+			nil,
+			nil,
+			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+				currentIdx := loop.GetCurrentIterationIndex()
+				capturedIterations = append(capturedIterations, currentIdx)
+
+				// 验证每次迭代都能获取到正确的历史记录
+				lastAction := loop.GetLastAction()
+				if lastAction == nil {
+					t.Error("GetLastAction should not return nil during iteration")
+				} else if lastAction.IterationIndex != currentIdx {
+					t.Errorf("Expected iteration index %d, got %d", currentIdx, lastAction.IterationIndex)
+				}
+
+				// 验证历史记录数量
+				allRecords := loop.GetAllExistedActionRecord()
+				if len(allRecords) != currentIdx {
+					t.Errorf("Expected %d records, got %d", currentIdx, len(allRecords))
+				}
+
+				operator.Continue()
+			},
+		),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create loop: %v", err)
+	}
+
+	err = loop.Execute("multi-iter-task", context.Background(), "test multiple iterations")
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// 验证最终状态
+	finalIndex := loop.GetCurrentIterationIndex()
+	if finalIndex == 0 {
+		t.Error("Final iteration index should be greater than 0")
+	}
+
+	allRecords := loop.GetAllExistedActionRecord()
+	if len(allRecords) != finalIndex {
+		t.Errorf("Expected %d total records, got %d", finalIndex, len(allRecords))
+	}
+
+	// 验证记录的迭代索引是连续的
+	for i, record := range allRecords {
+		expectedIndex := i + 1
+		if record.IterationIndex != expectedIndex {
+			t.Errorf("Expected iteration index %d at position %d, got %d", expectedIndex, i, record.IterationIndex)
+		}
+	}
+
+	t.Logf("Completed %d iterations, captured %d iteration indices", finalIndex, len(capturedIterations))
+}
+
 // 辅助函数
 func min(a, b int) int {
 	if a < b {

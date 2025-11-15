@@ -110,23 +110,18 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 
 	// Mock self-reflection AI analysis (CRITICAL FOR REFLECTION TEST)
 	// 注意：字段现在都是可选的，可以返回简化的响应
-	if utils.MatchAllOfSubString(prompt, "自我反思", "learning_insights") ||
-		utils.MatchAllOfSubString(prompt, "SELF-REFLECTION", "learning_insights") ||
+	if utils.MatchAllOfSubString(prompt, "自我反思", "suggestions") ||
+		utils.MatchAllOfSubString(prompt, "SELF-REFLECTION", "suggestions") ||
 		utils.MatchAllOfSubString(prompt, "自我反思任务") {
 		rsp := i.NewAIResponse()
 		// Generate a simplified reflection response (all fields optional now)
 		reflectionJSON := fmt.Sprintf(`{
   "@action": "self_reflection",
-  "learning_insights": [
+  "suggestions": [
     "工具执行模式需要参数验证 (nonce: %s)",
-    "多次迭代表明有优化空间"
-  ],
-  "future_suggestions": [
-    "考虑为重复调用实现缓存机制"
-  ],
-  "impact_assessment": "操作在 %d 次迭代后成功执行",
-  "effectiveness_rating": "effective"
-}`, nonce, 6)
+    "多次迭代表明有优化空间，考虑为重复调用实现缓存机制"
+  ]
+}`, nonce)
 		rsp.EmitOutputStream(bytes.NewBufferString(reflectionJSON))
 		rsp.Close()
 		return rsp, nil
@@ -400,8 +395,8 @@ LOOP:
 			foundNonceInReflection = true
 			t.Logf("  [PASS] Found nonce in reflection stream: %s", utils.ShrinkString(capturedReflection, 150))
 		}
-		if strings.Contains(capturedReflection, "learning_insights") || strings.Contains(capturedReflection, "future_suggestions") {
-			t.Log("  [PASS] Reflection contains expected fields (learning_insights, future_suggestions)")
+		if strings.Contains(capturedReflection, "suggestions") {
+			t.Log("  [PASS] Reflection contains expected field (suggestions)")
 		}
 	} else {
 		t.Log("  [WARN] No reflection stream content captured - may not have been streamed")
@@ -417,14 +412,8 @@ LOOP:
 	t.Log("[PASS] Reflection content found in timeline")
 
 	// Extract reflection section for detailed check
-	if strings.Contains(timeline, "CRITICAL LEARNINGS") {
-		t.Log("[PASS] Timeline contains 'CRITICAL LEARNINGS' section")
-	}
-	if strings.Contains(timeline, "MANDATORY ACTIONS FOR FUTURE") {
-		t.Log("[PASS] Timeline contains 'MANDATORY ACTIONS FOR FUTURE' section")
-	}
-	if strings.Contains(timeline, "IMPACT:") {
-		t.Log("[PASS] Timeline contains 'IMPACT:' section")
+	if strings.Contains(timeline, "MANDATORY RECOMMENDATIONS FOR FUTURE ACTIONS") {
+		t.Log("[PASS] Timeline contains 'MANDATORY RECOMMENDATIONS FOR FUTURE ACTIONS' section")
 	}
 
 	// Verification 4: Check memory updates

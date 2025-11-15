@@ -77,13 +77,14 @@ func (r *ReActLoop) shouldTriggerReflection(
 		return ReflectionLevel_Minimal
 	}
 
-	// 高迭代次数：采用间隔反思策略减少噪声
+	// 高迭代次数：采用间隔反思策略减少噪声（5 次之后才开始）
 	if iterationCount > 5 {
-		// 每 5 轮进行一次标准反思
-		if (iterationCount-6)%5 == 0 {
-			log.Infof("periodic reflection at iteration[%d] (interval: 5)", iterationCount)
+		// 优先检查 SPIN 情况：如果检测到 SPIN，立即触发反思
+		if r.IsInSameActionTypeSpin() {
+			log.Infof("SPIN detected at iteration[%d], trigger immediate reflection", iterationCount)
 			return ReflectionLevel_Standard
 		}
+
 		// 非反思轮次：仅最小反思（不调用 AI，减少噪声）
 		log.Debugf("skip AI reflection at iteration[%d], use minimal level", iterationCount)
 		return ReflectionLevel_Minimal
@@ -132,6 +133,7 @@ func (r *ReActLoop) executeReflection(
 	)
 
 	// 根据反思级别决定是否需要 AI 分析
+	// SPIN 检测已整合到 AI 反思中，不再单独执行
 	if reflectionLevel >= ReflectionLevel_Standard {
 		r.performAIReflection(ctx, reflection, reflectionLevel)
 	}
@@ -275,7 +277,7 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 			// 注册字段流式处理器 - action 会自动拆解这些字段
 			if !utils.IsNil(task) {
 				actionOptions = append(actionOptions, aicommon.WithActionFieldStreamHandler(
-					[]string{"learning_insights", "future_suggestions", "impact_assessment", "effectiveness_rating"},
+					[]string{"suggestions"},
 					func(key string, reader io.Reader) {
 						// 流式输出到前端
 						nodeId := "self-reflection-" + key
@@ -316,9 +318,8 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 			// action 会自动将字段 set 到 params 中，直接读取即可
 			r.fillReflectionFromAction(action, reflection)
 
-			log.Infof("AI reflection parsed: insights[%d], suggestions[%d], assessment[%v]",
-				len(reflection.LearningInsights), len(reflection.FutureSuggestions),
-				reflection.ImpactAssessment != "")
+			log.Infof("AI reflection parsed: suggestions[%d]",
+				len(reflection.Suggestions))
 
 			return nil
 		},
@@ -342,18 +343,51 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 
 	params := action.GetParams()
 
-	// action 自动解析了 learning_insights 数组 (直接作为字符串数组)
-	reflection.LearningInsights = params.GetStringSlice("learning_insights")
+	// action 自动解析了 suggestions 数组 (直接作为字符串数组)
+	reflection.Suggestions = params.GetStringSlice("suggestions")
 
-	// action 自动解析了 future_suggestions 数组 (直接作为字符串数组)
-	reflection.FutureSuggestions = params.GetStringSlice("future_suggestions")
+	// 处理 SPIN 检测结果（整合到自我反思中）
+	reflection.IsSpinning = params.GetBool("is_spinning")
+	if reflection.IsSpinning {
+		reflection.SpinReason = params.GetString("spin_reason")
 
-	// action 自动解析了字符串字段
-	reflection.ImpactAssessment = params.GetString("impact_assessment")
-	reflection.EffectivenessRating = params.GetString("effectiveness_rating")
+		// 如果检测到 SPIN，添加到 Timeline
+		r.addSpinWarningToTimeline(reflection)
+	}
 
-	log.Infof("filled reflection from action: insights[%d], suggestions[%d]",
-		len(reflection.LearningInsights), len(reflection.FutureSuggestions))
+	log.Infof("filled reflection from action: suggestions[%d], spinning[%v]",
+		len(reflection.Suggestions), reflection.IsSpinning)
+}
+
+// addSpinWarningToTimeline 将 SPIN 警告添加到 Timeline
+func (r *ReActLoop) addSpinWarningToTimeline(reflection *ActionReflection) {
+	if !reflection.IsSpinning {
+		return
+	}
+
+	log.Warnf("SPIN detected: %s", reflection.SpinReason)
+
+	// 构建 Timeline 消息
+	var msg strings.Builder
+	msg.WriteString("⚠️ [SPIN DETECTED] 检测到 AI Agent 陷入循环\n\n")
+	msg.WriteString(fmt.Sprintf("**Action 类型**: %s\n", reflection.ActionType))
+	msg.WriteString(fmt.Sprintf("**原因**: %s\n\n", reflection.SpinReason))
+
+	// 如果 suggestions 中有内容，添加进去（可能已经整合了 SPIN 建议）
+	if len(reflection.Suggestions) > 0 {
+		msg.WriteString("**建议**:\n")
+		for i, suggestion := range reflection.Suggestions {
+			msg.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
+		}
+		msg.WriteString("\n")
+	}
+
+	// 添加到 Timeline，使用 logic_spin_warning 作为 entry type
+	invoker := r.GetInvoker()
+	if invoker != nil {
+		invoker.AddToTimeline("logic_spin_warning", msg.String())
+		log.Infof("SPIN warning added to timeline")
+	}
 }
 
 // GetReflectionHistory 获取历史反思记录
