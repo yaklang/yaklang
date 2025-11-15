@@ -96,6 +96,10 @@ type ReActLoop struct {
 	actionHistory         []*ActionRecord
 	actionHistoryMutex    *sync.Mutex
 	currentIterationIndex int
+
+	// SPIN detection thresholds
+	sameActionTypeSpinThreshold int // 相同任务自旋阈值
+	sameLogicSpinThreshold      int // 相同逻辑自旋阈值
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -213,24 +217,26 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
-		invoker:                    invoker,
-		loopName:                   name,
-		config:                     config,
-		emitter:                    config.GetEmitter(),
-		maxIterations:              100,
-		actions:                    omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:                omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:               omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:                omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:                       omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:                  new(sync.Mutex),
-		currentMemories:            omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit:            10 * 1024,
-		enableSelfReflection:       true,
-		historySatisfactionReasons: make([]*satisfactionRecord, 0),
-		actionHistory:              make([]*ActionRecord, 0),
-		actionHistoryMutex:         new(sync.Mutex),
-		currentIterationIndex:      0,
+		invoker:                     invoker,
+		loopName:                    name,
+		config:                      config,
+		emitter:                     config.GetEmitter(),
+		maxIterations:               100,
+		actions:                     omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:                 omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:                omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:                 omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:                        omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                   new(sync.Mutex),
+		currentMemories:             omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
+		memorySizeLimit:             10 * 1024,
+		enableSelfReflection:        true,
+		historySatisfactionReasons:  make([]*satisfactionRecord, 0),
+		actionHistory:               make([]*ActionRecord, 0),
+		actionHistoryMutex:          new(sync.Mutex),
+		currentIterationIndex:       0,
+		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
+		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 	}
 
 	for _, action := range []*LoopAction{
