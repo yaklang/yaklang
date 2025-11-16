@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -21,17 +22,34 @@ import (
 )
 
 func TestCoordinator_SyncTask(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := aid.NewCoordinator(
-		"test",
+		uuid.New().String(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
 			rsp := config.NewAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(`
+			defer rsp.Close()
+
+			// 调试打印：输出 prompt 的关键特征（仅在需要时启用）
+			// promptPreview := utils.ShrinkString(prompt, 800)
+			// fmt.Printf("[TEST DEBUG] AI Callback Prompt preview:\n%s\n", promptPreview)
+
+			// 处理 plan 请求 - 匹配实际的 plan prompt 特征
+			// Plan prompt 的关键标识：
+			// 1. 包含 "# 任务规划使命" 或 "你是一个输出JSON的任务规划的工具"
+			// 2. 包含 "<|PERSISTENT_NcSB|>" 标记
+			// 3. 包含 "任务设计输出要求"
+			// 4. 可能包含 "```schema"
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
+				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
@@ -53,8 +71,75 @@ func TestCoordinator_SyncTask(t *testing.T) {
     ]
 }
 			`))
-			time.Sleep(100 * time.Millisecond)
-			rsp.Close()
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 处理 summary 请求 - 必须包含所有必需字段
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
+				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
+				(strings.Contains(prompt, "@action") && strings.Contains(prompt, "summary")) {
+				// 返回完整的 summary action，包含所有必需字段
+				summaryJSON := `{
+    "@action": "summary",
+    "status_summary": "测试状态摘要：任务执行中",
+    "task_short_summary": "测试任务摘要：查找最大文件",
+    "task_long_summary": "测试详细摘要：正在遍历目录并查找最大文件"
+}`
+				rsp.EmitOutputStream(strings.NewReader(summaryJSON))
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 处理 ReAct loop 的 action 请求（包含 Background, Current Time, OS/Arch, working dir）
+			if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
+				// 返回 object action，包含 next_action
+				reactJSON := `{
+    "@action": "object",
+    "next_action": {
+        "type": "finish",
+        "answer_payload": "测试模式：任务已完成"
+    },
+    "cumulative_summary": "测试累积摘要",
+    "human_readable_thought": "测试模式：跳过子任务执行"
+}`
+				rsp.EmitOutputStream(strings.NewReader(reactJSON))
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 处理子任务执行请求 - 返回 finish 动作，避免重试
+			if utils.MatchAllOfSubString(prompt, "角色设定", "任务执行引擎") ||
+				utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") ||
+				strings.Contains(prompt, "任务状态") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "测试模式：跳过子任务执行"}`))
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 处理 verify-satisfaction 请求
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "测试模式：任务已完成"}`))
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 处理 tool call decision 请求
+			if strings.Contains(prompt, "tool") && (strings.Contains(prompt, "result") || strings.Contains(prompt, "decision")) {
+				// 返回 continue-current-task 或 proceed-next-task
+				decisionJSON := `{
+    "@action": "continue-current-task",
+    "status_summary": "工具调用完成",
+    "task_short_summary": "测试工具调用摘要"
+}`
+				rsp.EmitOutputStream(strings.NewReader(decisionJSON))
+				// 移除 sleep，加快测试速度
+				return rsp, nil
+			}
+
+			// 默认返回 finish，避免未处理的请求导致重试
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "测试模式：默认完成"}`))
+			// 移除 sleep，加快测试速度
 			return rsp, nil
 		}),
 	)
@@ -73,10 +158,9 @@ LOOP:
 	for {
 		select {
 		case result := <-outputChan:
-			fmt.Println("result:" + result.String())
 			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
-				time.Sleep(100 * time.Millisecond)
+				// 移除不必要的 sleep，加快测试速度
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
@@ -124,7 +208,8 @@ LOOP:
 				}
 			}
 		case <-time.After(time.Second * 10):
-			t.Fatal("timeout")
+			t.Fatalf("timeout: parsedTask=%v, consumptionCheck=%v, pingPongCheck=%v, syncTaskCheck=%v",
+				parsedTask, consumptionCheck, pingPongCheck, syncTaskCheck)
 		}
 	}
 
@@ -175,7 +260,16 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 			prompt := request.GetPrompt()
 			rsp := i.NewAIResponse()
 			defer rsp.Close()
-			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+			// 处理 plan 请求 - 匹配实际的 plan prompt 特征
+			// Plan prompt 的关键标识：
+			// 1. 包含 "# 任务规划使命" 或 "你是一个输出JSON的任务规划的工具"
+			// 2. 包含 "<|PERSISTENT_NcSB|>" 标记
+			// 3. 包含 "任务设计输出要求"
+			// 4. 可能包含 "```schema"
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
 				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -203,7 +297,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
 				if utils.MatchAllOfSubString(request.GetPrompt(), "任务名称: 步骤三") {
 					canSync = true
-					time.Sleep(10 * time.Minute)
+					// 移除长时间 sleep，避免测试卡住
 				}
 
 				toolName := "echo"

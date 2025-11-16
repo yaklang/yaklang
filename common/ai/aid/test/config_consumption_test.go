@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -56,14 +58,27 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10) // 增加缓冲区大小，避免阻塞
 	outChan := chanx.NewUnlimitedChan[*schema.AiOutputEvent](context.Background(), 100)
 	ins, err := aid.NewCoordinator(
-		"test",
+		uuid.New().String(),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
 			rsp := config.NewAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(`
+			defer rsp.Close()
+
+			// 处理 plan 请求 - 匹配实际的 plan prompt 特征
+			// Plan prompt 的关键标识：
+			// 1. 包含 "# 任务规划使命" 或 "你是一个输出JSON的任务规划的工具"
+			// 2. 包含 "<|PERSISTENT_NcSB|>" 标记
+			// 3. 包含 "任务设计输出要求"
+			// 4. 可能包含 "```schema"
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
+				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
@@ -85,7 +100,65 @@ func basicTestCoordinator_Consumption(t *testing.T) {
     ]
 }
 			`))
-			rsp.Close()
+				time.Sleep(100 * time.Millisecond)
+				return rsp, nil
+			}
+
+			// 处理 summary 请求 - 必须包含所有必需字段
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
+				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
+				(strings.Contains(prompt, "@action") && strings.Contains(prompt, "summary")) {
+				summaryJSON := `{
+    "@action": "summary",
+    "status_summary": "测试状态摘要：任务执行中",
+    "task_short_summary": "测试任务摘要：查找最大文件",
+    "task_long_summary": "测试详细摘要：正在遍历目录并查找最大文件"
+}`
+				rsp.EmitOutputStream(strings.NewReader(summaryJSON))
+				time.Sleep(50 * time.Millisecond)
+				return rsp, nil
+			}
+
+			// 处理 ReAct loop 的 action 请求（包含 Background, Current Time, OS/Arch, working dir）
+			if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
+				reactJSON := `{
+    "@action": "object",
+    "next_action": {
+        "type": "finish",
+        "answer_payload": "测试模式：任务已完成"
+    },
+    "cumulative_summary": "测试累积摘要",
+    "human_readable_thought": "测试模式：跳过子任务执行"
+}`
+				rsp.EmitOutputStream(strings.NewReader(reactJSON))
+				time.Sleep(50 * time.Millisecond)
+				return rsp, nil
+			}
+
+			// 处理子任务执行请求 - 返回 finish 动作，避免重试
+			if utils.MatchAllOfSubString(prompt, "角色设定", "任务执行引擎") ||
+				utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") ||
+				strings.Contains(prompt, "任务状态") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试模式：跳过子任务执行"}`))
+				time.Sleep(50 * time.Millisecond)
+				return rsp, nil
+			}
+
+			// 处理 tool call decision 请求
+			if strings.Contains(prompt, "tool") && (strings.Contains(prompt, "result") || strings.Contains(prompt, "decision")) {
+				decisionJSON := `{
+    "@action": "continue-current-task",
+    "status_summary": "工具调用完成",
+    "task_short_summary": "测试工具调用摘要"
+}`
+				rsp.EmitOutputStream(strings.NewReader(decisionJSON))
+				time.Sleep(50 * time.Millisecond)
+				return rsp, nil
+			}
+
+			// 默认返回 finish，避免未处理的请求导致重试
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "测试模式：默认完成"}`))
+			time.Sleep(50 * time.Millisecond)
 			return rsp, nil
 		}),
 	)
