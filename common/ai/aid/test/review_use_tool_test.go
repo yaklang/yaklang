@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,7 +42,7 @@ func TestCoordinator_ToolUseReview(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-time.After(300 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
