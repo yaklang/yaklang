@@ -304,3 +304,29 @@ func (t *AiTask) QuoteName() string {
 func (t *AiTask) QuoteGoal() string {
 	return strconv.Quote(t.Goal)
 }
+
+// ToolCallCount 返回工具调用次数
+func (t *AiTask) ToolCallCount() int {
+	if t == nil {
+		return 0
+	}
+	return len(t.GetAllToolCallResults())
+}
+
+// TaskContinueCount 返回任务继续执行的次数（从 ReActLoop 获取迭代次数）
+func (t *AiTask) TaskContinueCount() int {
+	if t == nil {
+		return 0
+	}
+	// 尝试从 ReActLoop 获取当前迭代次数
+	loop := t.GetReActLoop()
+	if loop == nil {
+		return 0
+	}
+	// 使用类型断言获取迭代次数（ReActLoopIF 接口中没有这个方法，需要类型断言）
+	// 如果无法获取，返回 0
+	if reactLoop, ok := loop.(interface{ GetCurrentIterationIndex() int }); ok {
+		return reactLoop.GetCurrentIterationIndex()
+	}
+	return 0
+}
