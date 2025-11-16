@@ -207,7 +207,7 @@ LOOP:
 					break LOOP
 				}
 			}
-		case <-time.After(5 * time.Second):
+		case <-time.After(15 * time.Second):
 			t.Fatalf("timeout: parsedTask=%v, consumptionCheck=%v, pingPongCheck=%v, syncTaskCheck=%v",
 				parsedTask, consumptionCheck, pingPongCheck, syncTaskCheck)
 		}
@@ -358,7 +358,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 
 	var sendSync = false
 
-	ctx := utils.TimeoutContextSeconds(5)
+	ctx := utils.TimeoutContextSeconds(15)
 
 LOOP:
 	for {

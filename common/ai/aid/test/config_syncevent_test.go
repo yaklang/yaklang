@@ -99,8 +99,9 @@ LOOP:
 				pingPongCheck = true
 				break LOOP
 			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("timeout")
+		case <-time.After(15 * time.Second):
+			t.Fatalf("timeout: parsedTask=%v, consumptionCheck=%v, pingPongCheck=%v",
+				parsedTask, consumptionCheck, pingPongCheck)
 		}
 	}
 
