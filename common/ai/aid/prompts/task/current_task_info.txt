@@ -1,8 +1,8 @@
-{{ .Memory.Progress }}
-当前任务: {{ .Memory.CurrentTask.QuoteName }}
-目标：{{ .Memory.CurrentTask.QuoteGoal }}
+{{ .ContextProvider.Progress }}
+当前任务: {{ .ContextProvider.CurrentTask.QuoteName }}
+目标：{{ .ContextProvider.CurrentTask.QuoteGoal }}
 任务次数执行信息：
-- 调用了{{ .Memory.CurrentTask.ToolCallCount }} 次工具。
-- 决策继续执行了{{ .Memory.CurrentTask.TaskContinueCount}} 次。（系统限制为{{ .Memory.TaskMaxContinue}}次）
+- 调用了{{ .ContextProvider.CurrentTask.ToolCallCount }} 次工具。
+- 决策继续执行了{{ .ContextProvider.CurrentTask.TaskContinueCount}} 次。（系统限制为{{ .ContextProvider.TaskMaxContinue}}次）
 
-{{ if .Memory.CurrentTask.SingleLineStatusSummary }}任务状态：{{ .Memory.CurrentTask.SingleLineStatusSummary }}{{end}}
+{{ if .ContextProvider.CurrentTask.SingleLineStatusSummary }}任务状态：{{ .ContextProvider.CurrentTask.SingleLineStatusSummary }}{{end}}

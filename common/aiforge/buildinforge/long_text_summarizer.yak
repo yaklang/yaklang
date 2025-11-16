@@ -20,7 +20,7 @@ forgeHandle = func(params) {
         }
 
 
-        memory = aiagent.GetDefaultMemory()
+        memory = aiagent.GetDefaultContextProvider()
         key = "前情提要"
         reducer, err := aireducer.NewReducerFromReader(reader, aireducer.reducerCallback(func(config,memory,chunk){
             textSnippet = string(chunk.Data())

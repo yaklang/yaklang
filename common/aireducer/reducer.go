@@ -23,7 +23,7 @@ type Reducer struct {
 
 func (r *Reducer) Run() error {
 	if r.config.Memory == nil {
-		r.config.Memory = aid.GetDefaultMemory()
+		r.config.Memory = aid.GetDefaultContextProvider()
 	}
 	ch := r.input.OutputChannel()
 	for {

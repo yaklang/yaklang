@@ -2,11 +2,12 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"slices"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,7 +18,7 @@ import (
 // generate task prompt just can direct answer.
 func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
 	templateData := map[string]interface{}{
-		"Memory": t.Memory,
+		"ContextProvider": t.ContextProvider,
 	}
 
 	// 解析prompt模板
@@ -44,8 +45,8 @@ func (t *AiTask) generateTaskPrompt() (string, error) {
 		return "", fmt.Errorf("error getting all tools: %w", err)
 	}
 	templateData := map[string]interface{}{
-		"Tools":  alltools,
-		"Memory": t.Memory,
+		"Tools":           alltools,
+		"ContextProvider": t.ContextProvider,
 	}
 
 	// 解析prompt模板
@@ -67,9 +68,9 @@ func (t *AiTask) generateTaskPrompt() (string, error) {
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
 func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
-		"Memory": t.Memory,
-		"Tool":   targetTool,
-		"Result": result,
+		"ContextProvider": t.ContextProvider,
+		"Tool":            targetTool,
+		"Result":          result,
 	}
 	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
 	if err != nil {
@@ -85,7 +86,7 @@ func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targe
 
 func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
 	templatedata := map[string]any{
-		"Memory": t.Memory,
+		"ContextProvider": t.ContextProvider,
 	}
 	temp, err := template.New("tool-result").Parse(__prompt_ToolResultToDecisionPromptTemplate)
 	if err != nil {
@@ -102,8 +103,8 @@ func (t *AiTask) generateStatusSummaryPrompt() (string, error) {
 func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Memory":    t.Memory,
-		"UserInput": userInput,
+		"ContextProvider": t.ContextProvider,
+		"UserInput":       userInput,
 	}
 
 	// 解析prompt模板
@@ -124,8 +125,8 @@ func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 
 func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
 	return t.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"Memory":    t.Memory,
-		"UserInput": suggestion,
+		"ContextProvider": t.ContextProvider,
+		"UserInput":       suggestion,
 	})
 }
 

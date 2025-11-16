@@ -11,12 +11,6 @@ import (
 //go:embed prompts/plan/deepthink-plan.txt
 var __prompt_DeepthinkTaskListPrompt string
 
-//go:embed prompts/plan/plan-to-task-list.txt
-var __prompt_GenerateTaskListPrompt string
-
-//go:embed prompts/plan/plan-to-task-list-with-user-interact.txt
-var __prompt_GenerateTaskListPromptWithUserInteract string
-
 //go:embed prompts/task/task-execute.txt
 var __prompt_ExecuteTaskPromptTemplate string
 
@@ -70,11 +64,11 @@ func (c *Coordinator) quickBuildPrompt(tmp string, i map[string]any) (string, er
 
 	if utils.IsNil(i) {
 		i = make(map[string]any)
-		i["Memory"] = c.Memory
+		i["ContextProvider"] = c.ContextProvider
 	}
 
-	if _, ok := i["Memory"]; !ok {
-		i["Memory"] = c.Memory
+	if _, ok := i["ContextProvider"]; !ok {
+		i["ContextProvider"] = c.ContextProvider
 	}
 
 	var buf bytes.Buffer

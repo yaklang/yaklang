@@ -66,7 +66,7 @@ func TestReducerAI(t *testing.T) {
 	yakit.InitialDatabase()
 	raw, err := os.ReadFile("我的叔叔于勒.txt")
 	require.NoError(t, err)
-	memory := aid.GetDefaultMemory()
+	memory := aid.GetDefaultContextProvider()
 
 	key := "前情提要"
 	reducer, err := aireducer.NewReducerFromString(
@@ -112,7 +112,7 @@ func TestReducerAI2(t *testing.T) {
 	yakit.InitialDatabase()
 	raw, err := os.ReadFile("我的叔叔于勒.txt")
 	require.NoError(t, err)
-	memory := aid.GetDefaultMemory()
+	memory := aid.GetDefaultContextProvider()
 
 	reducer, err := aireducer.NewReducerFromString(
 		string(raw),

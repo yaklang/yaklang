@@ -2,13 +2,14 @@ package aid
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (c *Coordinator) generateReport() (string, error) {
 	params := map[string]any{
-		"Memory": c.Memory,
+		"ContextProvider": c.ContextProvider,
 	}
 
 	tmp, err := template.New(`report-finished`).Parse(__prompt_ReportFinished)

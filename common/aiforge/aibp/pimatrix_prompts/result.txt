@@ -1,9 +1,9 @@
 # Background
 你需要根据材料和ResultSchema输出对应的JSON内容（只输出JSON就好，不用解释）。
 # Basic Progress ToolCall and Memory
-{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
-{{ .Memory.Progress }}
-{{ .Memory.PersistentMemory }}
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
 
 # ResultSchema
 根据上面的算法，只输出给出 P-I Matrix 的分析结果，要求符合 Schema:

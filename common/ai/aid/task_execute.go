@@ -23,7 +23,7 @@ var (
 )
 
 func (t *AiTask) execute() error {
-	t.Memory.StoreCurrentTask(t)
+	t.ContextProvider.StoreCurrentTask(t)
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
@@ -73,7 +73,7 @@ func (t *AiTask) execute() error {
      - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
 
 `, map[string]interface{}{
-				"Progress": t.Memory.CurrentTaskInfo(),
+				"Progress": t.ContextProvider.CurrentTaskInfo(),
 			})
 
 			return reactiveData, nil
@@ -187,7 +187,7 @@ func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 	var buf bytes.Buffer
 	err := summaryTemplate.Execute(&buf, map[string]any{
-		"Memory": t.Memory,
+		"ContextProvider": t.ContextProvider,
 	})
 	if err != nil {
 		return "", err

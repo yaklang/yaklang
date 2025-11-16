@@ -13,9 +13,9 @@
     3. 任务制定需要考虑可实现性（Achievable），结合现有工具或搜索新的工具，理性制定任务，避免过于复杂任务导致无法实现。
     4. 任务需要相关性（Relevant），任务需要有主次关系，避免无关任务的干扰
 
-{{if .Memory.PlanHelp }}
+{{if .ContextProvider.PlanHelp }}
 <<<PLAN_HELP START>>>
-{{ .Memory.PlanHelp }}
+{{ .ContextProvider.PlanHelp }}
 <<<PLAN_HELP END>>>
 {{end}}
 
@@ -26,10 +26,10 @@
 
 
 ## 总任务规划/进度
-{{ .Memory.Progress }}
+{{ .ContextProvider.Progress }}
 
 ## 当前步骤任务目标
-{{ .Memory.CurrentTask.Goal }}
+{{ .ContextProvider.CurrentTask.Goal }}
 
 {{ if .UserInput }}
 ## 用户提供的建议
@@ -44,5 +44,5 @@
 *. 在任务输出时，任务目标或者详情中只允许出现工具名和简要说明，不允许出现特殊符号，尤其是"避免破坏JSON结构
 根据下面Schema输出重新规划产生子任务的JSON
 ```schema
-{{ .Memory.Schema.PlanJsonSchema }}
+{{ .ContextProvider.Schema.PlanJsonSchema }}
 ```
