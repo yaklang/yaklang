@@ -10,15 +10,15 @@
 {{ .ExtraPrompt }}
 <extra_user_prompt_{{ .NONCE }}>{{ end }}
 
-{{ if .Memory.PlanHelp }}<plan_help_{{ .NONCE }}>
+{{ if .ContextProvider.PlanHelp }}<plan_help_{{ .NONCE }}>
 # 规划任务帮助信息
-{{ .Memory.PlanHelp }}
+{{ .ContextProvider.PlanHelp }}
 </plan_help_{{ .NONCE }}>
 {{end}}
 
 <original_user_input_{{ .NONCE }}>
 # 最原始用户输入
-{{ .Memory.Query }}
+{{ .ContextProvider.Query }}
 </original_user_input_{{ .NONCE }}>
 
 ## 需要完善的方向
@@ -54,5 +54,5 @@
 完成后，请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
-{{ .Memory.Schema.PlanCreateSubtaskSchema }}
+{{ .ContextProvider.Schema.PlanCreateSubtaskSchema }}
 ```

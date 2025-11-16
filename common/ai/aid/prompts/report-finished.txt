@@ -5,11 +5,11 @@
 需要根据任务规划的内容和执行情况，以及工具数据，来提供一个报告提供给用户。
 
 <taskexecutecontext>
-{{ .Memory.Progress }}
+{{ .ContextProvider.Progress }}
 </taskexecutecontext>
 
 # 工具调用信息
 
 <tool-call-timeline>
-{{ .Memory.Timeline }}
+{{ .ContextProvider.Timeline }}
 </tool-call-timeline>

@@ -3,11 +3,11 @@
 你在一个大型AI助手系统中扮演选择工具的角色。你的任务是根据用户需求和提出的问题，在系统给你提供的工具列表中选择最合适的工具。如果你选中了某个工具，按照后面要求的格式输出，系统会识别你的意图。
 
 ## 任务状态与进度
-{{ .Memory.CurrentTaskInfo }}
-{{ .Memory.Timeline }}
+{{ .ContextProvider.CurrentTaskInfo }}
+{{ .ContextProvider.Timeline }}
 
-{{ if .Memory.PersistentMemory }}# 牢记
-{{ .Memory.PersistentMemory}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory}}
 {{end}}
 
 # 上下文

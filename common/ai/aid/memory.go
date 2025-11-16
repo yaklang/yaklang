@@ -85,7 +85,7 @@ func (m *PromptContextProvider) CopyReducibleMemory() *PromptContextProvider {
 	return mem
 }
 
-func GetDefaultMemory() *PromptContextProvider {
+func GetDefaultContextProvider() *PromptContextProvider {
 	mem := &PromptContextProvider{
 		PlanHistory:        make([]*PlanRecord, 0),
 		PersistentData:     omap.NewOrderedMap[string, *PersistentDataRecord](make(map[string]*PersistentDataRecord)),
@@ -392,7 +392,7 @@ func (m *PromptContextProvider) PersistentMemory() string {
 
 func (m *PromptContextProvider) PlanHelp() string {
 	templateData := map[string]interface{}{
-		"Memory": m,
+		"ContextProvider": m,
 	}
 	temp, err := template.New("plan_help").Parse(__prompt_PlanHelp)
 	if err != nil {

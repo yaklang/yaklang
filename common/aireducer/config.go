@@ -181,7 +181,7 @@ func WithEnableLineNumber(enable bool) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		Memory:              aid.GetDefaultMemory(),
+		Memory:              aid.GetDefaultContextProvider(),
 		TimeTriggerInterval: 0,
 	}
 	for _, opt := range opts {

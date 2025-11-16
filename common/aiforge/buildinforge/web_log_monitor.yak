@@ -302,7 +302,7 @@ forgeHandle = func(params) {
             return nil
         }),
         aireducer.separator(separator),
-        aireducer.memory(aiagent.GetDefaultMemory()),
+        aireducer.memory(aiagent.GetDefaultContextProvider()),
     )~
 
     if len(cacheBuffer) > 0 {

@@ -22,7 +22,7 @@
 你必须以JSON格式输出结果，按照以下schema:
 
 ```schema
-{{ .Memory.Schema.KeywordSearchSchema }}
+{{ .ContextProvider.Schema.KeywordSearchSchema }}
 ```
 
 **匹配规则**:

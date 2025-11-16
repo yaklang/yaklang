@@ -10,14 +10,14 @@
 3. 新规划的任务会追加到当前任务后面，原计划未执行任务将会被替换
 
 ## 当前规划
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
-{{ .Memory.Timeline }}
+{{ .ContextProvider.Timeline }}
 
 ## 当前任务被用户反馈为 **无法完成** 需要重新规划{{ if .UserInput }}，用户额外反馈为：{{ .UserInput }}
 {{end}}
 
 根据下面Schema输出重新规划后的JSON
 ```schema
-{{ .Memory.Schema.RePlanJsonSchema }}
+{{ .ContextProvider.Schema.RePlanJsonSchema }}
 ```

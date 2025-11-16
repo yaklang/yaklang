@@ -1,9 +1,9 @@
 # 结果输出
 所有信息使用中文
 
-{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
-{{ .Memory.Progress }}
-{{ .Memory.PersistentMemory }}
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
 
 ## 输出格式规范
 
