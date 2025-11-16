@@ -3,6 +3,7 @@ package loop_plan
 import (
 	"bytes"
 	_ "embed"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -21,6 +22,9 @@ var outputExample string
 //go:embed prompts/reactive_data.txt
 var reactiveData string
 
+//go:embed prompts/persistent_instruction.txt
+var persistentInstruction string
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_PLAN,
@@ -33,7 +37,12 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithPersistentInstruction(reactiveData),
+				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
+					return utils.RenderTemplate(persistentInstruction, map[string]any{
+						"Nonce":     nonce,
+						"UserInput": loop.GetCurrentTask().GetUserInput(),
+					})
+				}),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					currentPlan := loop.Get(PLAN_DATA_KEY)

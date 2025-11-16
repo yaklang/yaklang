@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -12,6 +13,92 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+	c.Add(1)
+	diffStr, err := c.TimelineDiffer.Diff()
+	if err != nil {
+		log.Warnf("timeline differ call failed: %v", err)
+		c.Done()
+		return
+	}
+
+	// 如果没有新的时间线差异，跳过记忆处理
+	if diffStr == "" {
+		if c.DebugEvent {
+			log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
+		}
+		c.Done()
+		return
+	}
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("intelligent memory processing panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+			c.Done()
+		}()
+
+		// 使用智能记忆处理系统
+		if c.Config.DebugEvent {
+			log.Infof("processing memory for iteration %d with timeline diff: %s", iteration, utils.ShrinkString(diffStr, 200))
+		}
+
+		contextualInput := fmt.Sprintf("ReAct迭代 %d/%s: %s\n任务状态: %s\n完成状态: %v\n原因: %v",
+			iteration,
+			task.GetId(),
+			diffStr,
+			string(task.GetStatus()),
+			isDone,
+			reason)
+
+		err := c.MemoryTriage.HandleMemory(contextualInput)
+		if err != nil {
+			log.Warnf("intelligent memory processing failed: %v", err)
+			return
+		}
+
+		if c.DebugEvent {
+			log.Infof("intelligent memory processing completed for iteration %d", iteration)
+		}
+
+		if isDone {
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("memory search for completed task panic: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+
+				// 搜索与当前任务相关的记忆，限制在4KB内
+				searchResult, err := c.MemoryTriage.SearchMemory(task.GetUserInput(), 4096)
+				if err != nil {
+					log.Warnf("memory search for completed task failed: %v", err)
+					return
+				}
+
+				if len(searchResult.Memories) > 0 {
+					log.Infof("found %d relevant memories for completed task %s (total: %d bytes)",
+						len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
+					if c.DebugEvent {
+						log.Infof("memory search summary: %s", searchResult.SearchSummary)
+						for i, mem := range searchResult.Memories {
+							log.Infof("relevant memory %d: %s (tags: %v, relevance: C=%.2f, R=%.2f)",
+								i+1, utils.ShrinkString(mem.Content, 100), mem.Tags, mem.C_Score, mem.R_Score)
+						}
+					}
+				} else {
+					if c.DebugEvent {
+						log.Infof("no relevant memories found for completed task %s", task.GetId())
+					}
+				}
+			}()
+		}
+	}()
+}
 
 func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) error {
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](c.Ctx, 10)
@@ -48,91 +135,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		reactloops.WithMemoryPool(c.MemoryPool),
 		reactloops.WithMemorySizeLimit(int(c.MemoryPoolSize)),
 		reactloops.WithEnableSelfReflection(c.EnableSelfReflection),
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
-			c.Add(1)
-			diffStr, err := c.TimelineDiffer.Diff()
-			if err != nil {
-				log.Warnf("timeline differ call failed: %v", err)
-				c.Done()
-				return
-			}
-
-			// 如果没有新的时间线差异，跳过记忆处理
-			if diffStr == "" {
-				if c.DebugEvent {
-					log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
-				}
-				c.Done()
-				return
-			}
-
-			go func() {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Errorf("intelligent memory processing panic: %v", err)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-					c.Done()
-				}()
-
-				// 使用智能记忆处理系统
-				if c.Config.DebugEvent {
-					log.Infof("processing memory for iteration %d with timeline diff: %s", iteration, utils.ShrinkString(diffStr, 200))
-				}
-
-				contextualInput := fmt.Sprintf("ReAct迭代 %d/%s: %s\n任务状态: %s\n完成状态: %v\n原因: %v",
-					iteration,
-					task.GetId(),
-					diffStr,
-					string(task.GetStatus()),
-					isDone,
-					reason)
-
-				err := c.MemoryTriage.HandleMemory(contextualInput)
-				if err != nil {
-					log.Warnf("intelligent memory processing failed: %v", err)
-					return
-				}
-
-				if c.DebugEvent {
-					log.Infof("intelligent memory processing completed for iteration %d", iteration)
-				}
-
-				if isDone {
-					go func() {
-						defer func() {
-							if err := recover(); err != nil {
-								log.Errorf("memory search for completed task panic: %v", err)
-								utils.PrintCurrentGoroutineRuntimeStack()
-							}
-						}()
-
-						// 搜索与当前任务相关的记忆，限制在4KB内
-						searchResult, err := c.MemoryTriage.SearchMemory(task.GetUserInput(), 4096)
-						if err != nil {
-							log.Warnf("memory search for completed task failed: %v", err)
-							return
-						}
-
-						if len(searchResult.Memories) > 0 {
-							log.Infof("found %d relevant memories for completed task %s (total: %d bytes)",
-								len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
-							if c.DebugEvent {
-								log.Infof("memory search summary: %s", searchResult.SearchSummary)
-								for i, mem := range searchResult.Memories {
-									log.Infof("relevant memory %d: %s (tags: %v, relevance: C=%.2f, R=%.2f)",
-										i+1, utils.ShrinkString(mem.Content, 100), mem.Tags, mem.C_Score, mem.R_Score)
-								}
-							}
-						} else {
-							if c.DebugEvent {
-								log.Infof("no relevant memories found for completed task %s", task.GetId())
-							}
-						}
-					}()
-				}
-			}()
-		}),
+		reactloops.WithOnPostIteraction(c.handleMemoryGenerationInPostIteration),
 	}
 
 	defaultOptions = append(defaultOptions, options...)
