@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -95,6 +96,9 @@ func NewActionTestFrameworkEx(
 		}),
 		// Auto-approve all tool uses in tests (no manual review required)
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		// Reduce retry counts for faster tests
+		aicommon.WithAIAutoRetry(1),            // Only retry once (default 5)
+		aicommon.WithAITransactionAutoRetry(1), // Only 1 transaction retry (default 5)
 	}
 
 	// Append user-provided AI config options
@@ -207,6 +211,13 @@ func (f *ActionTestFramework) RegisterTestAction(
 
 // ExecuteAction executes a specific action with given parameters
 func (f *ActionTestFramework) ExecuteAction(actionName string, params map[string]interface{}) error {
+	return f.ExecuteActionWithTimeout(actionName, params, 0)
+}
+
+// ExecuteActionWithTimeout executes a specific action with given parameters and timeout
+// If timeout is 0 or negative, it uses context.Background() (no timeout)
+// If timeout > 0, it creates a context with the specified timeout
+func (f *ActionTestFramework) ExecuteActionWithTimeout(actionName string, params map[string]interface{}, timeout time.Duration) error {
 	// Build action map
 	actionMap := make(map[string]interface{})
 	actionMap["@action"] = actionName
@@ -224,8 +235,16 @@ func (f *ActionTestFramework) ExecuteAction(actionName string, params map[string
 	// Set the action JSON for the first AI call
 	f.setFirstActionJSON(actionJSON)
 
+	// Create context with timeout if specified
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	}
+
 	// Execute the loop
-	return f.loop.Execute("test-task-"+actionName, context.Background(), "Testing action: "+actionName)
+	return f.loop.Execute("test-task-"+actionName, ctx, "Testing action: "+actionName)
 }
 
 // GetLoop returns the underlying ReActLoop for custom operations

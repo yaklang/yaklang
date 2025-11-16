@@ -354,7 +354,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 		defer ticker.Stop()
 
 		var lastStatus aicommon.AITaskState = ""
-		timeout := time.After(3 * time.Second) // 3秒超时
+		timeout := time.After(1 * time.Second) // 1秒超时，足够捕获状态变化
 
 		for {
 			select {
@@ -379,7 +379,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 			case <-done:
 				// Execute完成后继续监控一小段时间，确保捕获最终状态
 				finalTicker := time.NewTicker(5 * time.Millisecond)
-				finalTimeout := time.After(200 * time.Millisecond)
+				finalTimeout := time.After(100 * time.Millisecond) // 减少等待时间
 				for {
 					select {
 					case <-finalTicker.C:
