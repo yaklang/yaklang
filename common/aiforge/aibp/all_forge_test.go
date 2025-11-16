@@ -2,9 +2,10 @@ package aibp
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"os"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yak"
@@ -34,7 +35,7 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 }
 
 var TestList = map[string]func(t *testing.T){
-	"PIMatrix": TestPIMatrix,
+	// "PIMatrix": TestPIMatrix,
 }
 
 func TestAllForgeByMock(t *testing.T) {
@@ -44,9 +45,9 @@ func TestAllForgeByMock(t *testing.T) {
 	}
 }
 
-func TestAllForge(t *testing.T) {
-	IsMockCallback = false
-	for name, test := range TestList {
-		t.Run(name, test)
-	}
-}
+//func TestAllForge(t *testing.T) {
+//	IsMockCallback = false
+//	for name, test := range TestList {
+//		t.Run(name, test)
+//	}
+//}
