@@ -1,8 +1,9 @@
 package aicommon
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func CallAITransaction(
@@ -37,9 +38,16 @@ func CallAITransaction(
 		if c.IsCtxDone() {
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
+		finalPrompt := c.RetryPromptBuilder(prompt, postHandlerErr)
+		// 调试打印：输出完整的 prompt（仅在测试环境或调试模式下）
+		if i == 0 {
+			emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", seq, i+1, finalPrompt)
+		} else {
+			emitter.EmitInfo("[DEBUG] AI Transaction Prompt Retry (seq=%d, attempt=%d):\n%s", seq, i+1, utils.ShrinkString(finalPrompt, 512))
+		}
 		rsp, err := callAi(
 			NewAIRequest(
-				c.RetryPromptBuilder(prompt, postHandlerErr),
+				finalPrompt,
 				append(requestOpts, WithAIRequest_SeqId(seq))...,
 			))
 		if err != nil {
@@ -57,7 +65,7 @@ func CallAITransaction(
 		}
 		postHandlerErr = postHandler(rsp)
 		if postHandlerErr != nil {
-			emitter.EmitError("ai transaction in postHandler error: %v, retry and block it", postHandlerErr)
+			emitter.EmitError("ai transaction in postHandler error: %v, retry and block it, prompts: %v", postHandlerErr, utils.ShrinkString(finalPrompt, 512))
 			select {
 			case <-c.GetContext().Done():
 				return postHandlerErr
