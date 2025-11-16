@@ -131,6 +131,8 @@ func TestIsInSameLogicSpinWithAI(t *testing.T) {
 		[]aicommon.ConfigOption{
 			aicommon.WithAICallback(aiCallback),
 			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),            // 减少重试次数以加快测试
+			aicommon.WithAITransactionAutoRetry(1), // 减少事务重试次数
 		},
 	)
 
@@ -342,6 +344,8 @@ func TestSelfReflectionInvoked(t *testing.T) {
 		[]aicommon.ConfigOption{
 			aicommon.WithAICallback(aiCallback),
 			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),            // 减少重试次数以加快测试
+			aicommon.WithAITransactionAutoRetry(1), // 减少事务重试次数
 		},
 	)
 
@@ -481,6 +485,8 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 		[]aicommon.ConfigOption{
 			aicommon.WithAICallback(aiCallback),
 			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),            // 减少重试次数以加快测试
+			aicommon.WithAITransactionAutoRetry(1), // 减少事务重试次数
 		},
 	)
 

@@ -106,7 +106,7 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 
 			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -183,7 +183,7 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 				callCount++
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
 				return rsp, nil
 			}

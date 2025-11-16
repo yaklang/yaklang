@@ -3,11 +3,12 @@ package reactloopstests
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -720,7 +721,7 @@ func main() {
 	}
 
 	// 等待异步处理完成
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // 减少等待时间，足够异步处理完成
 
 	// 检查提取的代码
 	code := loop.Get("extracted_code")
