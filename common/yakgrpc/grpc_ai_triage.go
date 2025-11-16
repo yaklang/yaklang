@@ -108,7 +108,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		return err
 	}
 
-	memory := cod.Memory
+	ctxProvider := cod.ContextProvider
 	searchHandler := func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
 		keywords := omap.NewOrderedMap[string, []string](nil)
 		forgeMap := map[string]*schema.AIForge{}
@@ -196,7 +196,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		}),
 		aireducer.WithSeparatorTrigger("\n\n"),
 		aireducer.WithContext(baseCtx),
-		aireducer.WithMemory(memory),
+		aireducer.WithMemory(ctxProvider),
 	)
 	if err != nil {
 		return err
