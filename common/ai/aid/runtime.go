@@ -3,12 +3,13 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/linktable"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/linktable"
 )
 
 type runtime struct {
@@ -74,7 +75,9 @@ func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 
 	taskNameShow := strconv.Quote(t.Name)
 	if details {
-		taskNameShow = taskNameShow + "(" + strconv.Quote(t.Goal) + ")"
+		if t.Goal != "" {
+			taskNameShow = taskNameShow + "(目标:" + strconv.Quote(t.Goal) + ")"
+		}
 		if t.Index != "" {
 			taskNameShow = t.Index + ". " + taskNameShow
 		}
@@ -91,7 +94,7 @@ func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 }
 
 func (t *AiTask) dumpProgress(i int, w io.Writer) {
-	t.dumpProgressEx(i, w, false)
+	t.dumpProgressEx(i, w, true)
 }
 
 func (t *AiTask) Progress() string {

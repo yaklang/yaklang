@@ -3,10 +3,11 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"io"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -23,20 +24,61 @@ var (
 
 func (t *AiTask) execute() error {
 	t.Memory.StoreCurrentTask(t)
-	err := t.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_PE_TASK, t, reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
-		t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
-		if isDone {
-			err := t.generateTaskSummary()
-			if err != nil {
-				log.Errorf("iteration task summary failed: %v", err)
+	err := t.ExecuteLoopTask(
+		schema.AI_REACT_LOOP_NAME_PE_TASK,
+		t,
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
+			if isDone {
+				err := t.generateTaskSummary()
+				if err != nil {
+					log.Errorf("iteration task summary failed: %v", err)
+				}
+			} else {
+				_, summary := loop.GetLastSatisfactionRecord()
+				if summary != "" {
+					t.StatusSummary = summary
+				}
 			}
-		} else {
-			_, summary := loop.GetLastSatisfactionRecord()
-			if summary != "" {
-				t.StatusSummary = summary
-			}
-		}
-	}))
+		}),
+		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
+			reactiveData := utils.MustRenderTemplate(`
+当前 Plan-Execution 模式进度信息：
+
+<|PROGRESS_TASK_{{.Nonce}}|>
+{{ .Progress }}
+<|PROGRESS_TASK_END_{{ .Nonce }}|>
+
+- 进度信息语义约定：
+  1) 任务树状态约定
+     - 标记含义：
+       - [-] 表示该节点任务“执行中”
+       - [ ] 表示该节点任务“未开始”
+       - [x] 表示该节点任务“已完成”
+     - 层级缩进表示父子任务关系；只处理与“当前任务”对应的子树。
+  2) 当前任务边界
+     - “当前任务”字段指明你唯一允许推进的任务节点。你必须严格在此节点范围内产出计划、步骤与执行说明。
+     - 禁止启动、描述或完成非当前节点的兄弟/父层/子层任务，除非该节点内部明确需要的子步骤（且这些子步骤不改变其他节点状态）。
+  3) 行为准则（必须遵守）
+     - 不要假设或回填未在进度信息中出现的状态。
+     - 不要“预完成”尚未执行的步骤；只就“当前任务”进行计划、细化与必要的状态更新建议。
+     - 工具调用与继续决策次数受系统限制（见“任务次数执行信息”），你必须在该限制下规划行为，避免无效尝试。
+     - 若需要外部信息或权限，先在输出中请求或声明前置条件，而非擅自推进其他任务。
+  4) 只读规则（重要）
+     - 进度信息对 AI 是只读的。框架会根据实际执行进度自动更新任务清单与状态。
+     - 禁止 AI 主动修改、覆盖或判定任何任务节点的状态（包括但不限于从 [ ] 改为 [-]/[x]、新增/删除任务节点、调整层级）。
+     - 如需表达状态变化的建议，请以“建议”形式描述，不得当作实际状态变更执行。
+  5) 进度的使用方式
+     - 用于理解：识别“当前任务”的上下文位置、其父任务目标与已进行的子步骤。
+     - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
+
+`, map[string]interface{}{
+				"Progress": t.Memory.CurrentTaskInfo(),
+			})
+
+			return reactiveData, nil
+		}),
+	)
 
 	if err != nil {
 		return err

@@ -264,16 +264,6 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 }
 
 func (c *Coordinator) loadToolsViaOptions() error {
-	if c.Memory != nil {
-		memoryTools, err := c.Memory.CreateBasicMemoryTools()
-		if err != nil {
-			return utils.Errorf("create memory tools: %v", err)
-		}
-		err = c.Config.AiToolManager.AppendTools(memoryTools...)
-		if err != nil {
-			return err
-		}
-	}
 	if c.AllowRequireForUserInteract {
 		userPromptTool, err := c.CreateRequireUserInteract()
 		if err != nil {
