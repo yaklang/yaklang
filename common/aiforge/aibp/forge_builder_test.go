@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/depinjector"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -151,7 +152,7 @@ forgeHandle = func(params) {
 		aiagent.initPrompt(init),
 		aiagent.agreeYOLO(true),
 		aiagent.resultHandler((config) => {
-			result = config.GetMemory().CurrentTask.TaskSummary
+			result = config.GetContextProvider().CurrentTask.TaskSummary
 		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
@@ -192,7 +193,7 @@ forgeHandle = func(params) {
 		aiagent.initPrompt(__INIT_PROMPT__),
 		aiagent.agreeYOLO(true),
 		aiagent.resultHandler((config) => {
-			result = config.GetMemory().CurrentTask.TaskSummary
+			result = config.GetContextProvider().CurrentTask.TaskSummary
 		}),
     )
     ordr,err = bp.CreateCoordinator(context.Background(),params)
@@ -334,7 +335,7 @@ forgeHandle = func(params,opts...) {
 		aiagent.initPrompt(__INIT_PROMPT__),
 		aiagent.agreeYOLO(true),
 		aiagent.resultHandler((config) => {
-			res = config.GetMemory().CurrentTask.TaskSummary
+			res = config.GetContextProvider().CurrentTask.TaskSummary
 		}),
 	)
 	excutor,err := aiagent.NewExecutor("test",params,opts...)
@@ -383,7 +384,7 @@ forgeHandle = func(params,opts...) {
 		aiagent.initPrompt(__INIT_PROMPT__),
 		aiagent.agreeYOLO(true),
 		aiagent.resultHandler((config) => {
-			res = config.GetMemory().CurrentTask.TaskSummary
+			res = config.GetContextProvider().CurrentTask.TaskSummary
 		}),
 	)
 	excutor,err := aiagent.NewExecutorFromJson(` + jsonForge + `,params,opts...)
