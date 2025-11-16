@@ -211,8 +211,8 @@ LOOP:
 					break LOOP
 				}
 			}
-		case <-time.After(time.Second * 15):
-			log.Errorf("test timeout after 15 seconds: parsedTask=%t, consumptionCheck=%t, eventCount=%d",
+		case <-time.After(5 * time.Second):
+			log.Errorf("test timeout after 5 seconds: parsedTask=%t, consumptionCheck=%t, eventCount=%d",
 				parsedTask, consumptionCheck, eventCount)
 			t.Fatal("timeout waiting for test completion")
 		}

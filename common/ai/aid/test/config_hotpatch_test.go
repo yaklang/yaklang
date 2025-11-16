@@ -93,7 +93,7 @@ LOOP:
 				continue
 			}
 
-		case <-time.After(time.Second * 10):
+		case <-time.After(5 * time.Second):
 			t.Fatal("timeout")
 		}
 	}

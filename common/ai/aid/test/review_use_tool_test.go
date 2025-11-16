@@ -30,6 +30,8 @@ func TestCoordinator_ToolUseReview(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "ls", `{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`)
 		}),
+		aicommon.WithAllowRequireForUserInteract(false),
+		aicommon.WithAllowPlanUserInteract(false),
 	)
 	if err != nil {
 		t.Fatalf("NewCoordinator failed: %v", err)
