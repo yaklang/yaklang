@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestCoordinator_SyncPing(t *testing.T) {
@@ -98,7 +99,7 @@ LOOP:
 				pingPongCheck = true
 				break LOOP
 			}
-		case <-time.After(time.Second * 10):
+		case <-time.After(5 * time.Second):
 			t.Fatal("timeout")
 		}
 	}

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"math/rand/v2"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
@@ -1738,6 +1739,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 
 	// Other boolean/flag options
+	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
 	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
 	if i.GenerateReport {
