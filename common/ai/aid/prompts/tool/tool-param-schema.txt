@@ -1,8 +1,8 @@
 ## 任务状态与进度
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
-{{ if .Memory.PersistentMemory }}# 牢记
-{{ .Memory.PersistentMemory}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory}}
 {{end}}
 
 ## 工具详情
@@ -35,7 +35,7 @@
 • 仅输出JSON对象即可，不需要输出解释/执行流程/注意事项等
 
 # History
-{{ .Memory.Timeline }}
+{{ .ContextProvider.Timeline }}
 
 ```schema
 {{ .ToolJSONSchema }}

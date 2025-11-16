@@ -178,12 +178,12 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 {{ .PROMPT }}
 </background_{{ .NONCE }}>{{end}}
 
-{{ if .MEMORY.Timeline }}<timeline_{{ .NONCE }}>
-{{ .MEMORY.Timeline }}
+{{ if .ContextProvider.Timeline }}<timeline_{{ .NONCE }}>
+{{ .ContextProvider.Timeline }}
 </timeline_{{ .NONCE }}>{{ end }}
 
-{{ if .MEMORY.PersistentMemory }}# 牢记
-{{ .MEMORY.PersistentMemory}}{{end}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory}}{{end}}
 
 {{ if .PARAMS }}<params_{{ .NONCE }}>
 {{ .PARAMS }}
@@ -198,11 +198,11 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 </schema_{{ .NONCE }}>
 `
 	var promptParam = map[string]interface{}{
-		"NONCE":  nonce,
-		"PROMPT": string(l.Prompt),
-		"PARAMS": string(call),
-		"SCHEMA": string(l.OutputSchema),
-		"MEMORY": cod.Memory,
+		"NONCE":           nonce,
+		"PROMPT":          string(l.Prompt),
+		"PARAMS":          string(call),
+		"SCHEMA":          string(l.OutputSchema),
+		"ContextProvider": cod.ContextProvider,
 	}
 	tmp, err := template.New("liteforge").Parse(temp)
 	if err != nil {

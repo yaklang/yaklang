@@ -138,7 +138,7 @@ func TestConfigOptions(t *testing.T) {
 		{
 			name: "Custom memory",
 			config: func() *Config {
-				memory := aid.GetDefaultMemory()
+				memory := aid.GetDefaultContextProvider()
 				return NewConfig(WithMemory(memory))
 			},
 			check: func(t *testing.T, c *Config) {
@@ -536,7 +536,7 @@ func TestEdgeCases(t *testing.T) {
 // Test memory functionality
 func TestMemoryIntegration(t *testing.T) {
 	testData := "data line 1\ndata line 2\ndata line 3"
-	memory := aid.GetDefaultMemory()
+	memory := aid.GetDefaultContextProvider()
 
 	var processedChunks int
 

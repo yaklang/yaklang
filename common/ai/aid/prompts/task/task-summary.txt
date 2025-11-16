@@ -4,10 +4,10 @@
 你是一个任务执行引擎，在执行之前制定的任务中的子任务，当前任务列表如下：
 
 ## 任务状态
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
-{{ if .Memory.PersistentMemory }}# 牢记
-{{ .Memory.PersistentMemory}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory }}
 {{end}}
 
 ## 当前需要做什么
@@ -16,12 +16,12 @@
 
 ## 当前任务的历史时间线
 <summary>
-{{ .Memory.CurrentTaskTimeline }}
+{{ .ContextProvider.CurrentTaskTimeline }}
 </summary>
 
 # 输出要求Schema
 
 ```schema
-{{ .Memory.Schema.TaskSummarySchema }}
+{{ .ContextProvider.Schema.TaskSummarySchema }}
 ```
 

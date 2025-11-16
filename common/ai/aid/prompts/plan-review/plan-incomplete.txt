@@ -5,9 +5,9 @@
 ## 当前计划概览
 {{ .CurrentPlan.ProgressWithDetail }}
 
-{{ if .Memory.PlanHelp }}
+{{ if .ContextProvider.PlanHelp }}
 <plan_help_># 规划任务帮助信息
-{{ .Memory.PlanHelp }}
+{{ .ContextProvider.PlanHelp }}
 </plan_help>
 {{ end }}
 
@@ -40,13 +40,13 @@
    - 添加必要的错误处理和边界情况考虑
 
 # 用户原始输入
-{{ .Memory.Query }}
+{{ .ContextProvider.Query }}
 
 # 输出要求
 
 请按照以下 Schema 输出完整的 JSON 格式计划：
 
 ```schema
-{{ .Memory.Schema.PlanJsonSchema }}
+{{ .ContextProvider.Schema.PlanJsonSchema }}
 ```
 

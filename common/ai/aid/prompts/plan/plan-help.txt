@@ -1,11 +1,11 @@
 ## 规划任务帮助信息
 以下信息可以帮助你进行任务的规划和执行。
-{{ if .Memory.ToolsList }}
-{{ .Memory.ToolsList}}
+{{ if .ContextProvider.ToolsList }}
+{{ .ContextProvider.ToolsList}}
 {{else}}{{end}}
-{{ if .Memory.ToolsKeywords }}## 任务关键词
+{{ if .ContextProvider.ToolsKeywords }}## 任务关键词
 这是一组关键词，这些关键词代表本次任务相关的工具或资源。在思考或搜索工具时，要重点围绕这些关键词进行思考。不要脱离这些关键词去构建无关的内容。
 关键词如下：
-{{ .Memory.ToolsKeywords }}
+{{ .ContextProvider.ToolsKeywords }}
 {{else}}{{end}}
 

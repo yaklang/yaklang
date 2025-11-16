@@ -1,8 +1,8 @@
 基于体检结果，请按照以下JSON格式输出主机体检报告，所有信息使用中文
 
-{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
-{{ .Memory.Progress }}
-{{ .Memory.PersistentMemory }}
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
 
 ```schema
 {

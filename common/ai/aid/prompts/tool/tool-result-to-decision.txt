@@ -3,10 +3,10 @@
 你是一个任务执行引擎，在执行之前制定的任务中的子任务，当前任务列表如下：
 
 ## 任务状态
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
-{{ if .Memory.PersistentMemory }}# 牢记
-{{ .Memory.PersistentMemory}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory}}
 {{end}}
 
 ## 当前需要做什么
@@ -14,17 +14,17 @@
 在执行完一个工具的时候，你需要重新review当前任务的执行情况，并且做出相应决策：
 
 ## 任务状态
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
-你在执行任务的过程中，刚使用了一个工具来帮助你完成任务，工具的结果如下，产生结果时间为：{{ .Memory.Now }}
+你在执行任务的过程中，刚使用了一个工具来帮助你完成任务，工具的结果如下，产生结果时间为：{{ .ContextProvider.Now }}
 
 {{ .Result.String }}
 
 在此之前，你使用过如下工具：
 
-{{ .Memory.TimelineWithout .Result.ID }}
+{{ .ContextProvider.TimelineWithout .Result.ID }}
 
-{{ if .Memory.CurrentTask.CanContinue }}
+{{ if .ContextProvider.CurrentTask.CanContinue }}
 当前任务可以继续，你需要判断是否需要继续执行当前任务，并输出符合Schema的JSON数据实例。
 1. 根据上下文判断如果当前任务已经完成，则需要将当前任务标记为完成，并且输出符合Schema的JSON数据实例，并给出相应的总结
 2. 如果当前任务的上下文你认为无法判定为结束，请你根据下面Schema，使用"continue-current-task"来进一步执行任务。
@@ -38,14 +38,14 @@
 {{ end}}
 
 ## 任务状态如下
-{{ .Memory.CurrentTaskInfo }}
+{{ .ContextProvider.CurrentTaskInfo }}
 
 # 注意
 在你执行完任务后，需要生成符合下方Schema的JSON数据实例，禁止返回Schema结构。在这次回答中，尤其要注意检查任务状态
 ```schema
-{{ if .Memory.CurrentTask.CanContinue }}
-{{ .Memory.Schema.ToolExecuteCheckSchema }}
+{{ if .ContextProvider.CurrentTask.CanContinue }}
+{{ .ContextProvider.Schema.ToolExecuteCheckSchema }}
 {{else}}
-{{ .Memory.Schema.ToolExecuteCheckSchemaWithoutContinue }}
+{{ .ContextProvider.Schema.ToolExecuteCheckSchemaWithoutContinue }}
 {{end}}
 ```

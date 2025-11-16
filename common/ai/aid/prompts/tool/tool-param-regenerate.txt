@@ -3,11 +3,11 @@
 你在一个大型AI助手系统中扮演根据用户输入修改更正工具调用参数的角色
 
 ## 任务状态与进度
-{{ .Memory.CurrentTaskInfo }}
-{{ .Memory.Timeline }}
+{{ .ContextProvider.CurrentTaskInfo }}
+{{ .ContextProvider.Timeline }}
 
-{{ if .Memory.PersistentMemory }}# 牢记
-{{ .Memory.PersistentMemory}}
+{{ if .ContextProvider.PersistentMemory }}# 牢记
+{{ .ContextProvider.PersistentMemory}}
 {{end}}
 
 # 上下文

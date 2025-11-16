@@ -5,10 +5,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -250,10 +251,10 @@ func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRe
 	}
 	nonce := utils.RandStringBytes(6)
 	params := map[string]any{
-		"Memory":      pr.cod.Memory,
-		"CurrentPlan": rsp.RootTask,
-		"ExtraPrompt": extraPrompt,
-		"NONCE":       nonce,
+		"ContextProvider": pr.cod.ContextProvider,
+		"CurrentPlan":     rsp.RootTask,
+		"ExtraPrompt":     extraPrompt,
+		"NONCE":           nonce,
 	}
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, params)
@@ -302,7 +303,7 @@ func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Pla
 
 	nonce := utils.RandStringBytes(6)
 	data := map[string]any{
-		"Memory":           pr.cod.Memory,
+		"ContextProvider":  pr.cod.ContextProvider,
 		"CurrentPlan":      rsp.RootTask,
 		"USER_REVIEW_PLAN": extraPrompt,
 		"NONCE":            nonce,
@@ -346,11 +347,11 @@ func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rs
 
 	nonce := utils.RandStringBytes(6)
 	data := map[string]any{
-		"Memory":         pr.cod.Memory,
-		"CurrentPlan":    rsp.RootTask,
-		"UserSuggestion": suggestion,
-		"ExtraPrompt":    extraPrompt,
-		"NONCE":          nonce,
+		"ContextProvider": pr.cod.ContextProvider,
+		"CurrentPlan":     rsp.RootTask,
+		"UserSuggestion":  suggestion,
+		"ExtraPrompt":     extraPrompt,
+		"NONCE":           nonce,
 	}
 
 	var planPrompt bytes.Buffer

@@ -165,10 +165,10 @@ func (c *Coordinator) enableTaskAnalyze() {
 
 type Coordinator struct {
 	*aicommon.Config
-	userInput  string
-	runtime    *runtime
-	PlanMocker func(config *Coordinator) *PlanResponse
-	Memory     *PromptContextProvider
+	userInput       string
+	runtime         *runtime
+	PlanMocker      func(config *Coordinator) *PlanResponse
+	ContextProvider *PromptContextProvider
 
 	ResultHandler func(cod *Coordinator)
 
@@ -196,7 +196,7 @@ func (c *Coordinator) HandleSearch(query string, items *omap.OrderedMap[string, 
 	var nonce = strings.ToLower(utils.RandStringBytes(6))
 	prompt, err := c.quickBuildPrompt(__prompt_KeywordSearchPrompt, map[string]any{
 		"NONCE":           nonce,
-		"Memory":          c.Memory,
+		"ContextProvider": c.ContextProvider,
 		"UserRequirement": query,
 		"ToolsLists":      toolsLists,
 	})
@@ -253,9 +253,9 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 		userInput: userInput,
 	}
 
-	c.Memory = GetDefaultMemory()
-	c.Memory.SetTimelineInstance(config.Timeline)
-	c.Memory.BindCoordinator(c)
+	c.ContextProvider = GetDefaultContextProvider()
+	c.ContextProvider.SetTimelineInstance(config.Timeline)
+	c.ContextProvider.BindCoordinator(c)
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
@@ -353,7 +353,7 @@ func (c *Coordinator) Run() error {
 	// init aiTask
 	// check tools
 	root := rsp.RootTask
-	c.Memory.StoreRootTask(root)
+	c.ContextProvider.StoreRootTask(root)
 	if len(root.Subtasks) <= 0 {
 		c.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
@@ -409,8 +409,8 @@ func (c *Coordinator) Run() error {
 	return nil
 }
 
-func (c *Coordinator) GetMemory() *PromptContextProvider {
-	return c.Memory
+func (c *Coordinator) GetPromptContextProvider() *PromptContextProvider {
+	return c.ContextProvider
 }
 
 func (c *Coordinator) registerPEModeInputEventCallback() {
