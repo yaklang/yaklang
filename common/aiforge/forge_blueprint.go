@@ -5,8 +5,9 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -181,7 +182,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
 		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
-			prompt, err := f.renderResultPrompt(cod.Memory)
+			prompt, err := f.renderResultPrompt(cod.ContextProvider)
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result prompt failed: %v", err))
 				return
