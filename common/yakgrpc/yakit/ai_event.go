@@ -3,7 +3,6 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -20,25 +19,20 @@ func CreateAIEvent(db *gorm.DB, event *schema.AiOutputEvent) error {
 }
 
 func SaveStreamAIEvent(outDb *gorm.DB, event *schema.AiOutputEvent) error {
-	return utils.GormTransaction(outDb, func(tx *gorm.DB) error {
-		var existingEvent schema.AiOutputEvent
-		if innerDB := tx.Where("event_uuid = ?", event.EventUUID).FirstOrInit(&existingEvent); innerDB.Error != nil {
-			return innerDB.Error
+	// Use FirstOrCreate pattern without transaction to avoid "database is locked" errors
+	var existingEvent schema.AiOutputEvent
+	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return outDb.Create(event).Error
 		}
-		if existingEvent.EventUUID == "" {
-			// If the event does not exist, create a new one
-			event.ID = existingEvent.ID
-			if tx = tx.Save(event); tx.Error != nil {
-				return tx.Error
-			}
-		} else {
-			existingEvent.StreamDelta = append(existingEvent.StreamDelta, event.StreamDelta...)
-			if tx = tx.Save(&existingEvent); tx.Error != nil {
-				return tx.Error
-			}
-		}
-		return nil
-	})
+		return err
+	}
+
+	// Event exists, append StreamDelta
+	existingEvent.StreamDelta = append(existingEvent.StreamDelta, event.StreamDelta...)
+	// Use Save to update the event, which handles []byte fields correctly
+	// Without transaction, this minimizes lock time and reduces "database is locked" errors
+	return outDb.Save(&existingEvent).Error
 }
 
 func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
