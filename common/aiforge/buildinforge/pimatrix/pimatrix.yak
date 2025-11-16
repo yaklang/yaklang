@@ -3,7 +3,7 @@ query = cli.String("query", cli.setHelp("用户输入"),cli.setRequired(true))
 forgeHandle = (params,opts...) => {
     res,err = __DEFAULT_FORGE_HANDLE__(params,opts...)
     if err {
-        log.error(err)
+        log.error("pimatrix forge handle failed: %v", err)
         return nil
     }
     action = res.Action
