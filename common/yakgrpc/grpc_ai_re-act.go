@@ -169,7 +169,7 @@ func (s *Server) GetRandomAIMaterials(ctx context.Context, req *ypb.GetRandomAIM
 		limit = int(req.GetLimit())
 	}
 
-	tools, kbes, forges, err := yakit.GetRandomAIMaterials(s.GetProjectDatabase(), limit)
+	tools, kbes, forges, err := yakit.GetRandomAIMaterials(s.GetProfileDatabase(), limit)
 	if err != nil {
 		return nil, err
 	}
