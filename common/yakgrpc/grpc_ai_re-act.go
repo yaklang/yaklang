@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
