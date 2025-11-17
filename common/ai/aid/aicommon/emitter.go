@@ -146,6 +146,23 @@ func (r *Emitter) EmitJSON(typeName schema.EventType, id string, i any) {
 	r.emit(event)
 }
 
+func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, syncID string) {
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          typeName,
+		NodeId:        id,
+		IsJson:        true,
+		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().Unix(),
+		SyncID:        syncID,
+	}
+	r.emit(event)
+}
+
+func (r *Emitter) EmitSyncEvent(id string, i any, syncID string) {
+	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, id, i, syncID)
+}
+
 func (r *Emitter) EmitYakitExecResult(exec *ypb.ExecResult) {
 	if exec == nil {
 		return
@@ -638,7 +655,7 @@ func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceK
 	})
 }
 
-func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge) {
+func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge, syncId string) {
 	knowledgeList := make([]map[string]any, 0, len(results))
 	for _, result := range results {
 		knowledgeMap := map[string]any{
@@ -652,10 +669,11 @@ func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, resul
 		}
 		knowledgeList = append(knowledgeList, knowledgeMap)
 	}
-	e.EmitJSON(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE, nodeId, map[string]any{
+	e.EmitSyncJSON(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE, nodeId, map[string]any{
 		"task_id":   taskID,
 		"data_list": knowledgeList,
 		"timestamp": time.Now().Unix(),
-	})
+	},
+		syncId)
 
 }
