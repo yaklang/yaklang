@@ -1477,6 +1477,33 @@ Host: www.baidu.com
 	}
 }
 
+func TestReplaceHTTPPacketQueryParamWithoutEscape(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		key      string
+		value    string
+		expected string
+	}{
+		{
+			origin: `GET /?a=1&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "a",
+			value: "%26",
+			expected: `GET /?a=%26&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceHTTPPacketQueryParamWithoutEscape([]byte(testcase.origin), testcase.key, testcase.value)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketQueryParam failed: %s", string(actual))
+		}
+	}
+}
+
 func TestReplaceAllHttpPacketQueryParams(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		_testReplaceAllHttpPacketQueryParams(t)
