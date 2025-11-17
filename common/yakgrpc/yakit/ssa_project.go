@@ -116,7 +116,7 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 	var totalDeleted int64
 	for _, project := range projects {
 		programFilter := &ypb.SSAProgramFilter{
-			ProjectIds: []int64{int64(project.ID)},
+			ProjectIds: []uint64{uint64(project.ID)},
 		}
 		count, err := DeleteSSAProgram(ssaDB, programFilter)
 		if err != nil {

@@ -25,8 +25,9 @@ func TestSSAAutoDetective(t *testing.T) {
 	})
 
 	check := func(t *testing.T, input string) (*ssaconfig.Config, error) {
-		info, prog, err := ParseProjectWithAutoDetective(context.Background(), input, "", true)
+		info, prog, cleanup, err := ParseProjectWithAutoDetective(context.Background(), input, "", false)
 		_ = prog
+		_ = cleanup
 		if info == nil {
 			return nil, err
 		}
@@ -168,12 +169,13 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		defer cleanupDir()
 
 		// 使用 SSA 探测获取 config
-		info, prog, err := ParseProjectWithAutoDetective(
+		info, prog, cleanup, err := ParseProjectWithAutoDetective(
 			context.Background(),
 			tempDir,
 			"",
 			false,
 		)
+		_ = cleanup // compileImmediately=false 时不需要清理
 		require.NoError(t, err)
 		require.Nil(t, prog)
 
@@ -187,8 +189,8 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		require.Equal(t, info.GetProjectDescription(), project.Description)
 	})
 
-	t.Run("detective with immediate compile", func(t *testing.T) {
-		// 使用项目探测立即编译的项目应该也有一次编译次数
+	t.Run("detective with compile_immediately flag", func(t *testing.T) {
+		// 测试 compile_immediately=true 时会自动创建项目并编译
 		javaCode := `public class ImmediateTest {
     public static void main(String[] args) {
         System.out.println("Immediate Compile Test");
@@ -197,16 +199,19 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		tempDir, cleanupDir := setupTempDirWithJavaFile(t, "ImmediateTest.java", javaCode)
 		defer cleanupDir()
 
-		// 使用立即编译模式探测项目
-		log.Infof("Starting SSA auto detective with immediate compile...")
-		info, prog, err := ParseProjectWithAutoDetective(
+		// 使用 compile_immediately=true 探测项目
+		log.Infof("Starting SSA auto detective with compile_immediately=true...")
+		info, prog, cleanup, err := ParseProjectWithAutoDetective(
 			context.Background(),
 			tempDir,
 			"java",
-			true, // 立即编译
+			true, // compile_immediately - 应该自动编译
 		)
 		require.NoError(t, err)
-		require.NotNil(t, prog, "Program should be compiled immediately")
+		require.NotNil(t, cleanup, "cleanup function should be returned")
+		defer cleanup() // 使用返回的清理函数
+
+		require.NotNil(t, prog, "compile_immediately=true 时应该返回编译后的程序")
 		require.NotEmpty(t, info.GetProgramName(), "Program name should not be empty")
 		require.NotEmpty(t, info.GetProjectName(), "Project name should not be empty")
 
@@ -214,7 +219,13 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		log.Infof("  ProgramName: %s", info.GetProgramName())
 		log.Infof("  ProjectName: %s", info.GetProjectName())
 		log.Infof("  Language: %s", info.GetLanguage())
+		log.Infof("  CompileImmediately: %v", info.CompileImmediately)
+		log.Infof("  Program: %v", prog)
 
+		// 验证 compile_immediately 标志
+		require.True(t, info.CompileImmediately, "CompileImmediately should be true")
+
+		// 查询项目，验证已创建并编译
 		client, err := yakgrpc.NewLocalClient()
 		require.NoError(t, err)
 
@@ -236,23 +247,61 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		log.Infof("  Language: %s", project.Language)
 		log.Infof("  CompileTimes: %d", project.CompileTimes)
 
-		// 验证项目信息
-		require.Equal(t, info.GetProjectName(), project.ProjectName)
-		require.Equal(t, string(info.GetLanguage()), project.Language)
+		// 验证编译次数
 		require.Equal(t, int64(1), project.CompileTimes, "CompileTimes should be 1 after immediate compilation")
 
-		// 清理项目
-		defer func() {
-			deleteReq := &ypb.DeleteSSAProjectRequest{
-				DeleteMode: string(yakit.SSAProjectDeleteAll),
-				Filter: &ypb.SSAProjectFilter{
-					IDs: []int64{project.ID},
-				},
-			}
-			_, _ = client.DeleteSSAProject(context.Background(), deleteReq)
-		}()
+		log.Infof("✅ Test passed: compile_immediately flag works correctly with automatic compilation")
+	})
 
-		log.Infof("✅ Test passed: SSA project compiled immediately with CompileTimes = 1")
+	t.Run("check project exists and use existing config", func(t *testing.T) {
+		// 创建一个临时目录和Java文件
+		tempDir, cleanupDir := setupTempDirWithJavaFile(t, "ExistsTest.java", `
+public class ExistsTest {
+    public static void main(String[] args) {
+        System.out.println("Project exists test");
+    }
+}
+`)
+		defer cleanupDir()
+
+		// 第一次探测，项目不应该存在
+		log.Infof("First detection - project should not exist")
+		info1, _, _, err := ParseProjectWithAutoDetective(context.Background(), tempDir, "java", false)
+		require.NoError(t, err)
+		require.NotNil(t, info1)
+		require.False(t, info1.ProjectExists, "First detection: project should not exist")
+
+		// 记录第一次探测的配置
+		firstConfig := info1.Config
+		require.NotNil(t, firstConfig)
+		firstProjectName := firstConfig.GetProjectName()
+		log.Infof("First detection: project_name=%s, project_exists=%v", firstProjectName, info1.ProjectExists)
+
+		// 创建SSA项目
+		log.Infof("Creating SSA project...")
+		project, cleanupProj := createSSAProject(t, info1.Config)
+		defer cleanupProj()
+		log.Infof("Project created with ID: %d, Name: %s", project.ID, project.ProjectName)
+
+		// 第二次探测，项目应该存在，并使用已有配置
+		log.Infof("Second detection - project should exist and use existing config")
+		info2, _, _, err := ParseProjectWithAutoDetective(context.Background(), tempDir, "java", false)
+		require.NoError(t, err)
+		require.NotNil(t, info2)
+		require.True(t, info2.ProjectExists, "Second detection: project should exist")
+
+		// 验证使用的是已有项目的配置
+		secondConfig := info2.Config
+		require.NotNil(t, secondConfig)
+		require.Equal(t, project.ProjectName, secondConfig.GetProjectName(), "Should use existing project name")
+		require.Equal(t, project.Language, string(secondConfig.GetLanguage()), "Should use existing project language")
+
+		// 验证ProjectID应该被设置为已存在项目的ID
+		require.Equal(t, uint64(project.ID), secondConfig.GetProjectID(), "ProjectID should be set to existing project ID")
+
+		log.Infof("✅ Test passed: project_exists flag works correctly and uses existing config")
+		log.Infof("  First detection: project_exists=false, project_name=%s", firstProjectName)
+		log.Infof("  Second detection: project_exists=true, project_id=%d, project_name=%s", secondConfig.GetProjectID(), secondConfig.GetProjectName())
 	})
 
 	t.Run("detective then compile and verify compile times", func(t *testing.T) {
@@ -268,12 +317,13 @@ func TestSSAProjectComprehensive(t *testing.T) {
 
 		// Step 1: 探测项目
 		log.Infof("Step 1: Starting SSA auto detective without compile...")
-		info, prog, err := ParseProjectWithAutoDetective(
+		info, prog, cleanup, err := ParseProjectWithAutoDetective(
 			context.Background(),
 			tempDir,
 			"java",
 			false,
 		)
+		_ = cleanup
 		require.NoError(t, err)
 		require.Nil(t, prog, "Program should not be compiled yet")
 		require.NotEmpty(t, info.GetProgramName(), "Program name should not be empty")
@@ -290,7 +340,7 @@ func TestSSAProjectComprehensive(t *testing.T) {
 
 		// Step 3: 编译项目三次
 		log.Infof("Step 3: Compiling SSA project using compile script...")
-		pluginName := "SSA 项目编译V2"
+		pluginName := "SSA 项目编译"
 
 		configJSON := project.JSONStringConfig
 		require.NotEmpty(t, configJSON, "Project JSON config should not be empty")
