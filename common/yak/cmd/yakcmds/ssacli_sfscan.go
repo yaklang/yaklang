@@ -158,7 +158,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 			para["memory"] = true
 			para["excludeFile"] = config.exclude
 		}
-		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, true, para)
+		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, true, para)
 		return prog, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
