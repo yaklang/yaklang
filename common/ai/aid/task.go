@@ -124,10 +124,10 @@ func (t *AiTask) GetEmitter() *aicommon.Emitter {
 func (t *AiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
 	var progress string
-	if t.GetStatus() == aicommon.AITaskState_Completed {
-		progress = "success"
-	} else if t.GetStatus() == aicommon.AITaskState_Processing {
-		progress = "in-progress"
+	if t.executed() {
+		progress = "completed"
+	} else if t.executing() {
+		progress = "running"
 	}
 
 	// 创建一个不包含AICallback的结构体
