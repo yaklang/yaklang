@@ -120,6 +120,28 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 		log.Infof("successfully initialized RAG system with mock embedding service")
 		c.EmbeddingClient = NewMockEmbedder(mockRagDataForTest)
 	} else if c.EmbeddingClient == nil {
+		// 优先尝试使用 AIBalance 免费服务（如果可用）
+		aibalanceEmbedder, err := GetAIBalanceFreeEmbeddingService()
+		if err == nil && aibalanceEmbedder != nil {
+			// 检查模型兼容性
+			if c.ModelName != "" && !IsCompatibleEmbeddingModel(c.ModelName, aibalanceEmbedder.GetModelName()) {
+				log.Warnf("collection model '%s' is not compatible with AIBalance free model '%s', falling back to local service",
+					c.ModelName, aibalanceEmbedder.GetModelName())
+			} else {
+				log.Infof("using AIBalance free embedding service (normalized model: %s, dimension: %d)",
+					aibalanceEmbedder.GetModelName(), aibalanceEmbedder.GetModelDimension())
+				c.EmbeddingClient = aibalanceEmbedder
+				// 更新模型名称为归一化名称（如果为空或兼容）
+				if c.ModelName == "" || IsCompatibleEmbeddingModel(c.ModelName, aibalanceEmbedder.GetModelName()) {
+					c.ModelName = aibalanceEmbedder.GetModelName()
+				}
+				return nil
+			}
+		} else {
+			log.Infof("AIBalance free embedding service not available: %v, trying local service", err)
+		}
+
+		// 回退到本地嵌入服务
 		localEmbedder, err := GetLocalEmbeddingService()
 		if err != nil {
 			log.Errorf("failed to get local embedding service: %v", err)

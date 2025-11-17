@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -36,6 +37,23 @@ func newDefaultRAGSystem() *RAGSystem {
 
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	config := NewRAGSystemConfig(options...)
+
+	if utils.IsNil(config.embeddingClient) {
+		embedder, err := vectorstore.GetAIBalanceFreeEmbeddingService()
+		if err != nil {
+			return nil, utils.Wrap(err, "aibalance embedder and local embedder all failed")
+		}
+		config.embeddingClient = embedder
+
+		// 设置归一化的模型名称和维度，确保与本地模型兼容
+		if config.modelName == "" {
+			config.modelName = embedder.GetModelName() // "Qwen3-Embedding-0.6B"
+		}
+		if config.modelDimension == 0 {
+			config.modelDimension = embedder.GetModelDimension() // 1024
+		}
+	}
+
 	err := autoMigrateRAGSystem(config.db)
 	if err != nil {
 		return nil, utils.Wrap(err, "auto migrate rag system failed")
@@ -248,7 +266,9 @@ func GetRagSystem(name string, opts ...RAGSystemConfigOption) (*RAGSystem, error
 // NewRAGSystemWithLocalEmbedding 创建使用本地模型嵌入的 RAG 系统
 // 自动启动本地嵌入服务，如果无法启动则报错
 func NewRAGSystemWithLocalEmbedding(store *vectorstore.SQLiteVectorStoreHNSW) (*RAGSystem, error) {
-	embedder, err := vectorstore.GetLocalEmbeddingService()
+	var embedder aispec.EmbeddingCaller
+	var err error
+	embedder, err = vectorstore.GetLocalEmbeddingService()
 	if err != nil {
 		return nil, err
 	}
