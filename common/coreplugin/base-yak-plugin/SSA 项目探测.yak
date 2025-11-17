@@ -17,8 +17,8 @@ languages = cli.StringSlice(
 compile_immediately := cli.Bool("compile-immediately",
     cli.setDefault(false),
     cli.setVerboseName("是否立即编译"),
-    cli.setHelp("是否对项目探测到的信息立即编译"),
-    cli.setCliGroup("significant"),
+    cli.setHelp("探测完成后是否立即编译项目"),
+    cli.setCliGroup("compile"),
 )
 
 concurrency := cli.Int("concurrency",
@@ -85,7 +85,7 @@ params = {
         "kind": "",
         "msg": ""
     },
-    "compile_immediately":false
+    "compile_immediately": false
 }
 func setLanguage(language) {
     if params.language == ""{
@@ -363,7 +363,28 @@ if params.language == "" {
 params.compile_immediately = compile_immediately
 generateDesc()
 
-config, err = ssa.NewConfig(
+path = ""
+if params.info.local_file != "" {
+    path = params.info.local_file
+} else {
+    path = params.info.url
+}
+
+var projectExists = false
+var config = nil
+existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
+if err == nil && existingSSAProject != nil {
+    projectExists = true
+    config, err = existingSSAProject.GetConfig()
+    if err != nil {
+        yakit.Warn("获取已存在项目配置失败: %v，将创建新配置", err)
+        config = nil
+    }
+}
+
+// 如果项目不存在或获取已有配置失败，创建新配置
+if config == nil {
+    config, err = ssa.NewConfig(
     ssa.ModeAll,
     ssa.withProgramNames(params.program_name),
     ssa.withProjectName(params.project_name),
@@ -381,10 +402,10 @@ config, err = ssa.NewConfig(
     ssa.withCompileMemoryCompile(memory),
     ssa.withCompileConcurrency(concurrency),
 )
-
 if err != nil {
     yakit.Error("创建 SSAConfig 失败: %v", err)
     return
+}
 }
 
 // 将 SSAConfig 转换为 JSON 字符串
@@ -400,6 +421,7 @@ result["error"] = params.error
 result["file_count"] = params.file_count
 result["compile_immediately"] = params.compile_immediately
 result["kind"] = params.info.kind
+result["project_exists"] = projectExists
 
 // 转换为 JSON 字符串再返回
 resultJSON = json.dumps(result)
@@ -407,55 +429,5 @@ yakit.Code(resultJSON)
 if params.error.kind != "" {
     return
 }
-if !params.compile_immediately{
-    yakit.Info("跳过编译步骤，仅产生分析结果。")
-    return
-}
 
-// todo:立即编译后续需要指定SSAConfig json来编译
-
-// 如果项目存在，则直接使用，否则创建新项目
-url = params.info.local_file
-if url == "" {
-    url = params.info.url
-}
-
-ssaProject,err = ssa.GetSSAProjectByNameAndURL(params.project_name,url)
-if err != nil {
-    ssaProject,err = ssa.NewSSAProject(ssa.withJsonRawConfig([]byte(configJSON)))
-    if err != nil {
-        yakit.Error("创建项目失败: %v", err)
-        return
-    }
-}
-
-err = ssaProject.Save()
-if err != nil {
-    yakit.Error("保存项目失败: %v", err)
-    return
-}
-// 重新获取项目配置，这样配置会自动更新项目ID
-config,err = ssaProject.GetConfig()
-if err != nil {
-    yakit.Error("获取项目配置失败: %v", err)
-    return
-}
-
-// 项目探测使用探测获得的programName，而不是使用withSSAConfig配置自动生成的
-programName = sprint(params.program_name)
-language = sprint(params.language)
-opts = [
-    ssa.withSSAConfig(config),
-    ssa.withProcess((msg, process) => {
-        yakit.SetProgressEx("complile", process)
-        yakit.Info("%s: %f", msg, process)
-    }),
-    ssa.withProgramName(programName),
-]
-progs, err := ssa.ParseProject(opts...)
-if err != nil {
-    yakit.Text("编译错误信息:\n" + err.Error())
-    yakit.Error("语言： %s", language)
-    yakit.Error("项目名：%s", programName)
-    yakit.Error("编译信息： %v", params.info)
-}
+yakit.Info("项目探测完成。")

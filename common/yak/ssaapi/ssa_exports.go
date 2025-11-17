@@ -449,10 +449,12 @@ func WithSSAConfig(sc *ssaconfig.Config) Option {
 			}
 		}
 
-		// 生成程序名
 		projectName := sc.GetProjectName()
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
-		programName := fmt.Sprintf("%s(%s)", projectName, currentTime)
+		programName := sc.GetProgramName()
+		if programName == "" {
+			currentTime := time.Now().Format("2006-01-02 15:04:05")
+			programName = fmt.Sprintf("%s(%s)", projectName, currentTime)
+		}
 		WithProgramName(programName)(c)
 		return nil
 	}
