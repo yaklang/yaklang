@@ -182,7 +182,10 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 
 		matcherParams := utils.CopyMapInterface(mergedParams)
-		httpTPLmatchersResult, hitColor, _ = MatchColor(httpTplMatcher, &httptpl.RespForMatch{RawPacket: rspRaw}, matcherParams)
+		httpTPLmatchersResult, hitColor, _ = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
+			RawPacket:     rspRaw,
+			RequestPacket: rspIns.RawRequest,
+		}, matcherParams)
 		if httpTPLmatchersResult {
 			err := yakit.AppendHTTPFlowTagsByHiddenIndexEx(rspIns.HiddenIndex, hitColor...)
 			if err != nil {
@@ -534,8 +537,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 						httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher,
 							&httptpl.RespForMatch{
-								RawPacket: respModel.ResponseRaw,
-								Duration:  float64(respModel.DurationMs),
+								RawPacket:     respModel.ResponseRaw,
+								Duration:      float64(respModel.DurationMs),
+								RequestPacket: respModel.RequestRaw,
 							},
 							matcherParams)
 						if httpTPLmatchersResult {
@@ -946,8 +950,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 				matchColorStart := time.Now()
 				httpTPLmatchersResult, hitColor, discard = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
-					RawPacket: result.ResponseRaw,
-					Duration:  lowhttpResponse.GetDurationFloat(),
+					RawPacket:     result.ResponseRaw,
+					Duration:      lowhttpResponse.GetDurationFloat(),
+					RequestPacket: result.RequestRaw,
 				}, matcherParams)
 				if du := time.Now().Sub(matchColorStart); du > time.Second {
 					log.Warnf("match color and append httpflow tags cost too much time, can someone investigate it? cost: %v", du)
@@ -1126,8 +1131,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
 						redirectMatchersResult, redirectHitColor, redirectDiscard = MatchColor(httpTplMatcher, &httptpl.RespForMatch{
-							RawPacket: redirectRes.RawPacket,
-							Duration:  redirectRes.GetDurationFloat(),
+							RawPacket:     redirectRes.RawPacket,
+							Duration:      redirectRes.GetDurationFloat(),
+							RequestPacket: redirectRes.RawRequest,
 						}, matcherParams)
 
 						if redirectDiscard && engineDropPacket {

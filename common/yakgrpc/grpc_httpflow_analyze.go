@@ -605,8 +605,9 @@ func (m *HTTPFlowAnalyzeManger) executeMatchers(flow *schema.HTTPFlow) (discard 
 	if rspRaw == "" {
 		return false
 	}
+	reqRaw := flow.GetRequest()
 
-	matched, hitColors, discard := MatchColor(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw)}, nil)
+	matched, hitColors, discard := MatchColor(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw), RequestPacket: []byte(reqRaw)}, nil)
 
 	if matched && len(hitColors) > 0 {
 		flow.AddTag(hitColors...)
