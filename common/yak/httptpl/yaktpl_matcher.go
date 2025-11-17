@@ -118,8 +118,8 @@ type YakMatcher struct {
 
 var matcherResponseCache = utils.NewTTLCache[string](1 * time.Minute)
 
-func cacheHash(rsp []byte, location string) string {
-	return utils.CalcSha1(rsp, location)
+func cacheHash(req, rsp []byte, location string) string {
+	return utils.CalcSha1(req, rsp, location)
 }
 
 func (y *YakMatcher) ExecuteRawResponse(rsp []byte, vars map[string]interface{}, suf ...string) (bool, error) {
@@ -215,7 +215,7 @@ func (y *YakMatcher) executeRawWithRequest(name string, config *Config, packet [
 		}
 		var material string
 		scope := strings.ToLower(y.Scope)
-		scopeHash := cacheHash(packet, scope)
+		scopeHash := cacheHash(reqPacket, packet, scope)
 
 		material, ok := matcherResponseCache.Get(scopeHash)
 		if !ok {

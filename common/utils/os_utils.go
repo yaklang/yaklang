@@ -724,7 +724,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 						log.Infof("write response: %#v", string(raw))
 						conn.Write(handle(raw))
 						if !keepAlive {
-							log.Infof("write response flush: %#v", string(raw))
+							//log.Infof("write response flush: %#v", string(raw))
 							time.Sleep(500 * time.Millisecond)
 							FlushWriter(conn)
 							CloseWrite(conn)

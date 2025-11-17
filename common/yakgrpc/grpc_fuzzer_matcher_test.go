@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"io"
 	"net/http"
 	"sync"
@@ -629,4 +631,73 @@ func TestFuzzerMatchMultipleAction(t *testing.T) {
 		require.Equal(t, 6, discardCount, "discard count is not 6")
 		require.Equal(t, 5, retainCount, "other count is not 5")
 	})
+}
+
+func TestFuzzerMatchHTTPRequestPacket(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 800000000*time.Second)
+	defer cancel()
+	token1 := utils.RandStringBytes(5)
+	token2 := utils.RandStringBytes(5)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n12345")
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matcher1 := &ypb.HTTPResponseMatcher{
+		MatcherType: "word",
+		Scope:       httptpl.SCOPE_REQUEST_HEADER,
+		Condition:   "and",
+		Group:       []string{token1},
+		ExprType:    "nuclei-dsl",
+		HitColor:    "red",
+	}
+	matcher2 := &ypb.HTTPResponseMatcher{
+		MatcherType: "word",
+		Scope:       httptpl.SCOPE_REQUEST_HEADER,
+		Condition:   "and",
+		Group:       []string{token2},
+		ExprType:    "nuclei-dsl",
+		HitColor:    "blue",
+	}
+
+	fuzztag := fmt.Sprintf("{{array(%s|%s)}}", token1, token2)
+
+	target := utils.HostPort(host, port)
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+X-Test: %s
+
+`, target, fuzztag),
+		ForceFuzz:   true,
+		Matchers:    []*ypb.HTTPResponseMatcher{matcher1, matcher2},
+		RepeatTimes: 5,
+	})
+	require.NoError(t, err)
+	var redCount int
+	var blueCount int
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		//fmt.Printf("----color:%s\n"+
+		//	"%s\n ", resp.HitColor, resp.RequestRaw)
+
+		if resp.MatchedByMatcher {
+			if resp.HitColor == "red" {
+				redCount++
+			}
+			if resp.HitColor == "blue" {
+				blueCount++
+			}
+		}
+	}
+	require.Equal(t, 5, redCount, "token1 count is not 5")
+	require.Equal(t, 5, blueCount, "token2 count is not 5")
 }
