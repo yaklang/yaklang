@@ -7681,6 +7681,7 @@ type AIInputEvent struct {
 	IsSyncMessage        bool           `protobuf:"varint,6,opt,name=IsSyncMessage,proto3" json:"IsSyncMessage,omitempty"`
 	SyncType             string         `protobuf:"bytes,7,opt,name=SyncType,proto3" json:"SyncType,omitempty"`
 	SyncJsonInput        string         `protobuf:"bytes,10,opt,name=SyncJsonInput,proto3" json:"SyncJsonInput,omitempty"`
+	SyncID               string         `protobuf:"bytes,13,opt,name=SyncID,proto3" json:"SyncID,omitempty"` // SyncID for sync message
 	IsFreeInput          bool           `protobuf:"varint,11,opt,name=IsFreeInput,proto3" json:"IsFreeInput,omitempty"`
 	FreeInput            string         `protobuf:"bytes,12,opt,name=FreeInput,proto3" json:"FreeInput,omitempty"`
 	unknownFields        protoimpl.UnknownFields
@@ -7783,6 +7784,13 @@ func (x *AIInputEvent) GetSyncType() string {
 func (x *AIInputEvent) GetSyncJsonInput() string {
 	if x != nil {
 		return x.SyncJsonInput
+	}
+	return ""
+}
+
+func (x *AIInputEvent) GetSyncID() string {
+	if x != nil {
+		return x.SyncID
 	}
 	return ""
 }
@@ -63986,7 +63994,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAIService\x18\x14 \x01(\tR\tAIService\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
-	"\x02En\x18\x02 \x01(\tR\x02En\"\xda\x03\n" +
+	"\x02En\x18\x02 \x01(\tR\x02En\"\xf2\x03\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
@@ -63998,7 +64006,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rIsSyncMessage\x18\x06 \x01(\bR\rIsSyncMessage\x12\x1a\n" +
 	"\bSyncType\x18\a \x01(\tR\bSyncType\x12$\n" +
 	"\rSyncJsonInput\x18\n" +
-	" \x01(\tR\rSyncJsonInput\x12 \n" +
+	" \x01(\tR\rSyncJsonInput\x12\x16\n" +
+	"\x06SyncID\x18\r \x01(\tR\x06SyncID\x12 \n" +
 	"\vIsFreeInput\x18\v \x01(\bR\vIsFreeInput\x12\x1c\n" +
 	"\tFreeInput\x18\f \x01(\tR\tFreeInput\"\xa8\x02\n" +
 	"\x12AITriageInputEvent\x12\x18\n" +

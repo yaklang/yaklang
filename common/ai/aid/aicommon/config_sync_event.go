@@ -20,8 +20,8 @@ const (
 	SyncProcessEeventID        = "sync_process_event_id"
 )
 
-func (c *Config) HandleSyncConsumptionEvent(_ *ypb.AIInputEvent) error {
-	c.EmitJSON(
+func (c *Config) HandleSyncConsumptionEvent(e *ypb.AIInputEvent) error {
+	c.EmitSyncJSON(
 		schema.EVENT_TYPE_CONSUMPTION,
 		"system",
 		map[string]any{
@@ -29,16 +29,19 @@ func (c *Config) HandleSyncConsumptionEvent(_ *ypb.AIInputEvent) error {
 			"output_consumption": c.GetOutputConsumption(),
 			"consumption_uuid":   c.consumptionUUID,
 		},
+		e.SyncID,
 	)
 	return nil
 }
 
-func (c *Config) HandleSyncPongEvent(_ *ypb.AIInputEvent) error {
-	c.EmitJSON(schema.EVENT_TYPE_PONG, "system", map[string]any{
+func (c *Config) HandleSyncPongEvent(e *ypb.AIInputEvent) error {
+	c.EmitSyncJSON(schema.EVENT_TYPE_PONG, "system", map[string]any{
 		"now":         time.Now().Format(time.RFC3339),
 		"now_unix":    time.Now().Unix(),
 		"now_unix_ms": time.Now().UnixMilli(),
-	})
+	},
+		e.SyncID,
+	)
 	return nil
 }
 
@@ -64,12 +67,14 @@ func (c *Config) HandleSyncTimelineEvent(event *ypb.AIInputEvent) error {
 	}
 
 	// 通过 Emitter 发送时间线信息事件
-	c.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", map[string]interface{}{
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "timeline", map[string]interface{}{
 		"total_entries": total,
 		"limit":         limit,
 		"entries":       c.Timeline.ToTimelineItemOutputLastN(limit),
 		"dump":          c.Timeline.Dump(),
-	})
+	},
+		event.SyncID,
+	)
 	return nil
 }
 
@@ -86,7 +91,7 @@ func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 		c.HotPatchBroadcaster.Submit(WithAgreePolicy(c.AgreePolicy))
 		updateConfig["review_policy"] = event.Params.GetReviewPolicy()
 	}
-	c.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig)
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }
 
@@ -120,7 +125,7 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 	}
 
 	// 通过 Emitter 发送 EVENT_TYPE_MEMORY_CONTEXT 事件
-	c.EmitJSON(schema.EVENT_TYPE_MEMORY_CONTEXT, "memory_context", responseData)
+	c.EmitSyncJSON(schema.EVENT_TYPE_MEMORY_CONTEXT, "memory_context", responseData, event.SyncID)
 	return nil
 }
 

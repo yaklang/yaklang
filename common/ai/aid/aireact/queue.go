@@ -25,6 +25,7 @@ func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	r.EmitStructured(REACT_TASK_enqueue, map[string]interface{}{
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
+		"queue_len":        r.taskQueue.Len(),
 	})
 }
 
@@ -40,6 +41,7 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		"react_task_id":    t.GetId(),
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
+		"queue_len":        r.taskQueue.Len(),
 	})
 }
 
@@ -66,6 +68,10 @@ func NewTaskQueue(name string) *TaskQueue {
 		dequeueHooks: make([]taskDequeueHook, 0),
 		queueName:    name,
 	}
+}
+
+func (tq *TaskQueue) Len() int {
+	return tq.queue.Len()
 }
 
 // executeHooks 执行所有预处理钩子

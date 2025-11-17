@@ -65,6 +65,6 @@ func (r *ReAct) EmitKnowledge(enhanceID string, knowledge aicommon.EnhanceKnowle
 }
 
 // EmitKnowledgeListAboutTask emits a list of knowledge items related to a specific task using the embedded Emitter, for sync
-func (r *ReAct) EmitKnowledgeListAboutTask(taskID string, knowledgeList []aicommon.EnhanceKnowledge) {
-	r.Emitter.EmitKnowledgeListAboutTask("knowledge_list", taskID, knowledgeList)
+func (r *ReAct) EmitKnowledgeListAboutTask(taskID string, knowledgeList []aicommon.EnhanceKnowledge, SyncId string) {
+	r.Emitter.EmitKnowledgeListAboutTask("knowledge_list", taskID, knowledgeList, SyncId)
 }
