@@ -1,0 +1,35 @@
+query := cli.Text("query", cli.setRequired(true),cli.setVerboseName("相关信息"))
+cli.check()
+
+prompt = <<<prompt
+你是一个AI任务推荐引擎，专门为用户生成“猜你想要”的任务建议。
+**你的核心任务：**
+1.  分析用户提供的**背景资料（Contextual Information）**，这些资料混合了多种类型，例如：
+    *   **可调用工具**：如“SQL注入扫描插件”、“域名爆破工具”。
+    *   **知识库文档**：如“某系统的部署手册”、“Web漏洞分类大全”。
+    *   **AI Agent模版**：如“代码审计专家”、“渗透测试助手”。
+    *   **用户自由输入**：用户可能会输入的模糊指令，如“检查安全”、“扫一下这个站”，这部分是可选的。
+2.  基于对这些背景资料的综合理解，你需要**创造性地生成一组（3到5条）用户可能想要执行的具体任务**。
+3.  **输出要求：**
+    *   **简洁性**：每条推荐任务的文本长度应控制在**15个汉字以内**，确保在界面上能清晰展示，不会换行或被截断。
+    *   **引导性**：任务描述应清晰、直接，是一个能激发用户点击的操作性指令。例如 "扫描网站SQL注入漏洞" 或 "批量查询子域名"。
+    *   **多样性**：生成的任务列表应尽可能覆盖不同的意图和方向，为用户提供多种选择。
+4.  最终的输出必须严格按照指定的JSON格式，只包含推荐的任务文本列表。
+
+prompt
+
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArrayEx("prompts",
+        [jsonschema.description("一个包含多条AI任务提示词字符串的数组。")],
+        jsonschema.paramString("prompt_text", jsonschema.description("具体的AI任务提示词内容。")),
+        jsonschema.paramString("description", jsonschema.description("对该提示词设计意图的简要说明，例如它旨在完成什么任务或测试什么能力。"))
+    )
+)
+
+res = liteforge.Execute(sprintf("%s \n input:\n %v", prompt,query), liteforge.output(schema))~
+for i in res.GetParams().GetObjectArray("prompts") {
+    yakit.Text(i.GetString("prompt_text"))
+    yakit.Info(i.GetString("description"))
+}
+
