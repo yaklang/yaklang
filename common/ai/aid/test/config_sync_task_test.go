@@ -154,6 +154,8 @@ func TestCoordinator_SyncTask(t *testing.T) {
 	consumptionCheck := false
 	pingPongCheck := false
 	syncTaskCheck := false
+	syncId := uuid.New().String()
+
 LOOP:
 	for {
 		select {
@@ -187,11 +189,11 @@ LOOP:
 
 			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
-				inputChan.SafeFeed(SyncInputEvent(aicommon.SYNC_TYPE_PLAN))
+				inputChan.SafeFeed(SyncInputEventEx(aicommon.SYNC_TYPE_PLAN, syncId))
 				continue
 			}
 
-			if pingPongCheck && result.Type == schema.EVENT_TYPE_PLAN {
+			if pingPongCheck && result.Type == schema.EVENT_TYPE_PLAN && result.SyncID == syncId {
 				var i = make(aitool.InvokeParams, 0)
 				if err := json.Unmarshal([]byte(result.Content), &i); err != nil {
 					t.Fatal(err)

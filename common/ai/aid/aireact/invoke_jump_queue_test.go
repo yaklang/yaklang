@@ -161,6 +161,8 @@ func TestReAct_JumpQueue_StatusChanges(t *testing.T) {
 	slowToolStarted := false
 	fastToolStarted := false
 
+	syncId := ksuid.New().String()
+
 LOOP:
 	for {
 		select {
@@ -216,6 +218,7 @@ LOOP:
 								IsSyncMessage: true,
 								SyncType:      SYNC_TYPE_REACT_JUMP_QUEUE,
 								SyncJsonInput: fmt.Sprintf(`{"task_id": "%s"}`, task2Id),
+								SyncID:        syncId,
 							}
 						}
 					}()
@@ -234,9 +237,11 @@ LOOP:
 			}
 
 			if e.NodeId == "react_task_jumped_queue" {
-				jumpEventReceived = true
-				jumpedTaskId := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.jumped_task_id"))
-				fmt.Printf("Task jumped queue: %s\n", jumpedTaskId)
+				if e.SyncID == syncId {
+					jumpEventReceived = true
+					jumpedTaskId := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.jumped_task_id"))
+					fmt.Printf("Task jumped queue: %s\n", jumpedTaskId)
+				}
 			}
 
 			// 检查是否完成

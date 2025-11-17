@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"github.com/google/uuid"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ func TestReAct_RemoveTask_StatusChanges(t *testing.T) {
 		dequeueReceived bool
 		reActFinished   bool
 	)
+	syncID := uuid.NewString()
 
 	// 使用 CondBarrier 精确控制时序
 	cb := utils.NewCondBarrier()
@@ -103,6 +105,7 @@ func TestReAct_RemoveTask_StatusChanges(t *testing.T) {
 				IsSyncMessage: true,
 				SyncType:      SYNC_TYPE_REACT_REMOVE_TASK,
 				SyncJsonInput: fmt.Sprintf(`{"task_id": "%s"}`, task2Id),
+				SyncID:        syncID,
 			}
 		}
 	}()
@@ -183,6 +186,10 @@ eventLoop:
 				case "queue_info":
 					// 检查队列信息更新
 					if task1Removed && !queueInfoSent {
+						if syncID != e.SyncID {
+							t.Fatalf("Expected syncID %s but got %s in queue_info event", syncID, e.SyncID)
+						}
+
 						queueInfoSent = true
 						fmt.Println("Queue info updated after task removal")
 

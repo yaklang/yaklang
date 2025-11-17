@@ -66,6 +66,14 @@ func SyncInputEvent(syncType string) *ypb.AIInputEvent {
 	}
 }
 
+func SyncInputEventEx(syncType string, SyncID string) *ypb.AIInputEvent {
+	return &ypb.AIInputEvent{
+		IsSyncMessage: true,
+		SyncType:      syncType,
+		SyncID:        SyncID,
+	}
+}
+
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
