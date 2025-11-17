@@ -668,11 +668,16 @@ func mockedYaklangSemanticSearch(i aicommon.AICallerConfigIf, req *aicommon.AIRe
 	}
 
 	// Handle init task: analyze-requirement-and-search
-	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file", "search_patterns") {
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "analyze-requirement-and-search",
   "create_new_file": true,
+  "semantic_questions": [
+    "Yaklang中如何发送HTTP请求？",
+    "Yaklang中如何解析HTTP响应？",
+    "Yaklang中如何设置HTTP请求头？"
+  ],
   "search_patterns": ["http.*request", "http.Get"],
   "reason": "User wants to create http request example using semantic search"
 }`))
