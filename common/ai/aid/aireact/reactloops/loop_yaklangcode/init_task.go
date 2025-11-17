@@ -132,8 +132,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		reason := step1Result.GetString("reason")
 		searchPatterns := step1Result.GetStringSlice("search_patterns")
 		semanticQuestions := step1Result.GetStringSlice("semantic_questions")
-		for _, question := range searchPatterns {
+		for _, question := range semanticQuestions {
 			emitter.EmitDefaultStreamEvent("semantic_questions", bytes.NewBufferString(question), task.GetIndex())
+		}
+		if len(searchPatterns) > 0 {
+			emitter.EmitDefaultStreamEvent("search_patterns", bytes.NewBufferString(strings.Join(searchPatterns, ",")), task.GetIndex())
 		}
 
 		var userRequirements = utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
