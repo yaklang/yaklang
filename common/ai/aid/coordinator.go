@@ -420,9 +420,11 @@ func (c *Coordinator) GetPromptContextProvider() *PromptContextProvider {
 func (c *Coordinator) registerPEModeInputEventCallback() {
 	c.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_PLAN, func(event *ypb.AIInputEvent) error {
 		if c.rootTask != nil {
-			c.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			c.EmitSyncJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 				"root_task": c.rootTask,
-			})
+			},
+				event.SyncID,
+			)
 		}
 		return nil
 	})

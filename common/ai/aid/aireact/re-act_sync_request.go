@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -52,7 +51,7 @@ func (r *ReAct) HandleSyncTypeQueueInfoEvent(event *ypb.AIInputEvent) error {
 	// 获取队列信息并通过事件发送
 	queueInfo := r.GetQueueInfo()
 	// 通过 Emitter 发送队列信息事件
-	r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "queue_info", queueInfo)
+	r.EmitSyncEvent("queue_info", queueInfo, event.SyncID)
 	return nil
 }
 
@@ -76,7 +75,7 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 	if len(knowledgeList) <= 0 {
 		log.Error("no knowledge found")
 	}
-	r.EmitKnowledgeListAboutTask(taskID, knowledgeList)
+	r.EmitKnowledgeListAboutTask(taskID, knowledgeList, event.SyncID)
 	return nil
 }
 
@@ -124,23 +123,23 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 		currentTask.SetStatus(aicommon.AITaskState_Aborted)
 
 		// 发送任务取消事件
-		r.EmitStructured(REACT_TASK_cancelled, map[string]interface{}{
+		r.EmitSyncEvent(REACT_TASK_cancelled, map[string]interface{}{
 			"task_id":      currentTask.GetId(),
 			"user_input":   currentTask.GetUserInput(),
 			"cancelled_at": time.Now(),
 			"reason":       "jump_queue",
-		})
+		}, event.SyncID)
 
 		log.Infof("current task %s has been cancelled for jump queue", currentTask.GetId())
 	}
 
 	// 发送插队成功事件
 	queueInfo := r.GetQueueInfo()
-	r.EmitStructured("react_task_jumped_queue", map[string]interface{}{
+	r.EmitSyncEvent("react_task_jumped_queue", map[string]interface{}{
 		"jumped_task_id": targetTaskId,
 		"jumped_at":      time.Now(),
 		"queue_info":     queueInfo,
-	})
+	}, event.SyncID)
 
 	log.Infof("task %s has successfully jumped to front of queue", targetTaskId)
 	return nil
@@ -163,11 +162,11 @@ func (r *ReAct) HandleSyncTypeReactCancelCurrentTaskEvent(event *ypb.AIInputEven
 	currentTask.SetStatus(aicommon.AITaskState_Aborted)
 
 	// 发送任务取消事件
-	r.EmitStructured("react_task_cancelled", map[string]interface{}{
+	r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
 		"task_id":      currentTask.GetId(),
 		"user_input":   currentTask.GetUserInput(),
 		"cancelled_at": time.Now(),
-	})
+	}, event.SyncID)
 
 	log.Infof("current task %s has been cancelled", currentTask.GetId())
 	return nil
@@ -211,5 +210,6 @@ func (r *ReAct) HandleSyncTypeReactRemoveTaskEvent(event *ypb.AIInputEvent) erro
 	return r.HandleSyncTypeQueueInfoEvent(&ypb.AIInputEvent{
 		IsSyncMessage: true,
 		SyncType:      SYNC_TYPE_QUEUE_INFO,
+		SyncID:        event.SyncID,
 	})
 }
