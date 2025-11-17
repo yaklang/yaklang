@@ -427,9 +427,11 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 		&schema.VectorStoreDocument{},
 	)
 
+	knName := uuid.New().String()
+
 	// 3. 创建测试知识库
 	knowledgeBase := &schema.KnowledgeBaseInfo{
-		KnowledgeBaseName:        "test_delete_embedding_kb",
+		KnowledgeBaseName:        knName,
 		KnowledgeBaseDescription: "测试删除嵌入数据的知识库",
 		KnowledgeBaseType:        "test",
 	}
@@ -438,7 +440,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 
 	// 获取创建的知识库ID
 	var savedKnowledgeBase schema.KnowledgeBaseInfo
-	err = db.Where("knowledge_base_name = ?", "test_delete_embedding_kb").First(&savedKnowledgeBase).Error
+	err = db.Where("knowledge_base_name = ?", knName).First(&savedKnowledgeBase).Error
 	assert.NoError(t, err)
 	knowledgeBaseID := int64(savedKnowledgeBase.ID)
 
@@ -503,7 +505,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 
 	// 5. 构建向量索引（核心测试功能）
 	// 使用模拟嵌入器配置
-	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(test1024Embedder)))
+	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(1024), WithEmbeddingClient(NewMockEmbedder(test1024Embedder)))
 	assert.NoError(t, err)
 
 	// 6. 验证索引构建结果
