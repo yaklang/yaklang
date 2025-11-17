@@ -2164,6 +2164,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceAllHTTPPacketPostParams":               lowhttp.ReplaceAllHTTPPacketPostParams,
 	"ReplaceAllHTTPPacketPostParamsWithoutEscape":  lowhttp.ReplaceAllHTTPPacketPostParamsWithoutEscape,
 	"ReplaceHTTPPacketQueryParam":                  lowhttp.ReplaceHTTPPacketQueryParam,
+	"ReplaceHTTPPacketQueryParamWithoutEscape":     lowhttp.ReplaceHTTPPacketQueryParamWithoutEscape,
 	"ReplaceHTTPPacketPostParam":                   lowhttp.ReplaceHTTPPacketPostParam,
 	"ReplaceHTTPPacketPath":                        lowhttp.ReplaceHTTPPacketPath,
 	"ReplaceHTTPPacketFormEncoded":                 lowhttp.ReplaceHTTPPacketFormEncoded,

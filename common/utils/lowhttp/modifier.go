@@ -400,6 +400,18 @@ func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	})
 }
 
+// ReplaceHTTPPacketQueryParamWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
+// 与 poc.ReplaceHTTPPacketQueryParam 类似，但是不会将参数值进行转义
+// Example:
+// ```
+// poc.ReplaceAllHTTPPacketQueryParamsWithoutEscape(poc.BasicRequest(), "a", "b") // 添加GET请求参数a，值为b
+// ```
+func ReplaceHTTPPacketQueryParamWithoutEscape(packet []byte, key, value string) []byte {
+	return handleHTTPPacketQueryParam(packet, true, func(q *QueryParams) {
+		q.Set(key, value)
+	})
+}
+
 func ReplaceHTTPPacketQueryParamWithoutEncoding(packet []byte, key, value string, n int) []byte {
 	return handleHTTPPacketQueryParam(packet, true, func(q *QueryParams) {
 		i := 0
