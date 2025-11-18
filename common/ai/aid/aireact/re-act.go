@@ -209,13 +209,19 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if cfg.MemoryTriage != nil {
 		react.memoryTriage = cfg.MemoryTriage
 	} else {
+		memoryTriageId := cfg.MemoryTriageId
+		if memoryTriageId == "" {
+			memoryTriageId = "default"
+		}
 		var err error
-		react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
+		react.memoryTriage, err = aimem.NewAIMemory(memoryTriageId, aimem.WithInvoker(react))
 		if err != nil {
 			return nil, utils.Errorf("create memory triage failed: %v", err)
 		}
 		react.config.MemoryTriage = react.memoryTriage
 	}
+
+	log.Infof("memory triage id: %s", react.memoryTriage.GetSessionID())
 
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	if cfg.Timeline == nil {
