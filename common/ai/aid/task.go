@@ -125,9 +125,9 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
 	var progress string
 	if t.executed() {
-		progress = "completed"
+		progress = string(aicommon.AITaskState_Completed)
 	} else if t.executing() {
-		progress = "running"
+		progress = string(aicommon.AITaskState_Processing)
 	}
 
 	// 创建一个不包含AICallback的结构体
