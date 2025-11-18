@@ -84,27 +84,6 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 				return
 			}
 
-			if event.IsConfigHotpatch {
-				params := event.GetParams()
-				var updateOption aicommon.ConfigOption
-				switch event.HotpatchType {
-				case "ReviewPolicy":
-					switch params.GetReviewPolicy() {
-					case "yolo":
-						updateOption = aicommon.WithAgreeYOLO()
-					case "ai":
-						updateOption = aicommon.WithAIAgree()
-					case "manual":
-						updateOption = aicommon.WithAgreeManual()
-					}
-				default:
-					log.Errorf("unknown hotpatch type: %s", event.HotpatchType)
-					continue
-				}
-				hotpatchChan.SafeFeed(updateOption)
-				continue
-			}
-
 			inputEvent.SafeFeed(event)
 		}
 	}()

@@ -92,6 +92,14 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 							event.IsFreeInput, event.IsInteractiveMessage)
 					}
 
+					if event.IsConfigHotpatch {
+						hotPatchOptions := ProcessHotPatchMessage(event)
+						for _, option := range hotPatchOptions {
+							c.HotPatchOptionChan.SafeFeed(option)
+						}
+						continue
+					}
+
 					go func(event *ypb.AIInputEvent) {
 						if err := c.processInputEvent(event); err != nil {
 							log.Errorf("ReAct event processing failed: %v", err)
@@ -107,6 +115,7 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 		}()
 		validator <- struct{}{}
 	})
+	c.StartHotPatchLoop(ctx)
 }
 
 // processInputEvent processes a single input event and triggers ReAct loop

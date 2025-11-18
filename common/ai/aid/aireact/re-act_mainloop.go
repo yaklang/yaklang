@@ -292,7 +292,6 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	mainloopDone := make(chan struct{})
 	invoker.startEventLoop(cfg.Ctx, mainloopDone)
 	<-mainloopDone // Ensure the event loop has started
-	invoker.config.StartHotPatchLoop(cfg.Ctx)
 
 	return invoker, nil
 }

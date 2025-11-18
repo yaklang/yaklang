@@ -280,6 +280,7 @@ func newConfig(ctx context.Context) *Config {
 		cancel:              cancel,
 		StartInputEventOnce: sync.Once{},
 		EventInputChan:      chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
+		HotPatchOptionChan:  chanx.NewUnlimitedChan[ConfigOption](ctx, 10),
 		InputEventManager:   NewAIInputEventProcessor(),
 		Id:                  id,
 		IdSequence:          atomic.AddInt64(idGenerator, offset), // Start with offset
