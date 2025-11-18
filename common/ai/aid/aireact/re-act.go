@@ -257,8 +257,6 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	react.startQueueProcessor(cfg.Ctx, done)
 	<-done // Ensure the queue processor has started
 
-	react.config.StartHotPatchLoop(cfg.Ctx)
-
 	err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
