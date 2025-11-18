@@ -1,6 +1,10 @@
 package searchtools
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 
 	_ "embed"
@@ -24,18 +28,37 @@ func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGette
 		),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			query := params.GetString("query")
-			rspTools, err := searcher(query, searchListGetter())
+
+			if !utils.IsNil(searcher) {
+				rspTools, err := searcher(query, searchListGetter())
+				if err != nil {
+					return nil, utils.Errorf("search failed: %v", err)
+				}
+				result := []any{}
+				for _, tool := range rspTools {
+					result = append(result, map[string]string{
+						"Name":        tool.GetName(),
+						"Description": tool.GetDescription(),
+					})
+				}
+				return result, nil
+			}
+			var buf bytes.Buffer
+
+			tools, err := yakit.SearchAIYakTool(consts.GetGormProfileDatabase(), query)
 			if err != nil {
-				return nil, utils.Errorf("search failed: %v", err)
+				return nil, utils.Errorf("search AIYakTool failed: %v", err)
 			}
-			result := []any{}
-			for _, tool := range rspTools {
-				result = append(result, map[string]string{
-					"Name":        tool.GetName(),
-					"Description": tool.GetDescription(),
-				})
+			for _, i := range tools {
+				suffix := ""
+				if i.VerboseName != "" {
+					suffix = fmt.Sprintf(" (%s)", i.VerboseName)
+				}
+				buf.WriteString(fmt.Sprintf("- `%v`: %v%v\n", i.Name, i.Description, suffix))
 			}
-			return result, nil
+
+			results := buf.String()
+			return results, nil
 		}),
 	)
 
