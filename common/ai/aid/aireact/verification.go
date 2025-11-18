@@ -70,13 +70,36 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
 					createReasonCallback("Reasoning"),
-				))
+				),
+				aicommon.WithActionFieldStreamHandler(
+					[]string{"next_movements"},
+					func(key string, rd io.Reader) {
+						r.Emitter.EmitDefaultStreamEvent(
+							"next_movements",
+							rd,
+							rsp.GetTaskIndex(),
+						)
+					},
+				),
+			)
 			if err != nil {
 				return utils.Errorf("failed to extract verification action: %v, need ...\"@action\":\"verify-satisfaction\" ", err)
 			}
 			// If we found a proper @action structure, extract data from it
 			satisfied = action.GetBool("user_satisfied")
 			reasoning = action.GetString("reasoning")
+
+			nextMovements := action.GetString("next_movements") // currently not used
+			if nextMovements != "" {
+				r.AddToTimeline("next_movements", utils.MustRenderTemplate(`
+<|NEXT_MOVEMENTS_{{.Nonce}}|>
+{{ .NextMovements }}
+<|NEXT_MOVEMENTS_END_{{.Nonce}}|>
+`, map[string]string{
+					"Nonce":         utils.RandStringBytes(4),
+					"NextMovements": nextMovements,
+				}))
+			}
 			return nil
 		},
 	)
@@ -84,6 +107,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		log.Errorf("AI transaction failed during verification: %v", transErr)
 		return false, "", transErr
 	}
+
 	return satisfied, reasoning, nil
 }
 
