@@ -249,7 +249,6 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	}
 
 	config.StartEventLoop(ctx)
-	config.StartHotPatchLoop(ctx)
 	config.Guardian.SetOutputEmitter(config.Id, config.EventHandler)
 	config.Guardian.SetAICaller(config)
 	c := &Coordinator{
