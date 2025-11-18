@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"context"
 	_ "embed"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -23,6 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -276,7 +277,6 @@ $sink #-> ?{opcode: param} as $result;
 }
 
 func TestA(t *testing.T) {
-	t.Skip()
 	go func() {
 		err := http.ListenAndServe(":18080", nil)
 		if err != nil {
@@ -285,15 +285,15 @@ func TestA(t *testing.T) {
 	}()
 	// diagnostics.StartHeapMonitor(time.Second, diagnostics.WithFileName("heap.prof"))
 
-	path := "/Users/wlz/Developer/Target/yakssaExample/wanwu"
-	fs := filesys.NewRelLocalFs(path)
-
-	ctx := context.Background()
+	path := "/home/wlz/Developer/pfsense"
+	file := "src/usr/local/pfSense/include/Services/Filesystem/Provider/SystemProvider.php"
+	parseAllFile := true
+	refFS := filesys.NewRelLocalFs(path)
+	_ = file
 
 	config, err := ssaapi.DefaultConfig(
-		ssaapi.WithContext(ctx),
-		ssaapi.WithFileSystem(fs),
-		ssaapi.WithLanguage(ssaconfig.GO),
+		ssaapi.WithFileSystem(refFS),
+		ssaapi.WithLanguage(ssaconfig.PHP),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			log.Infof("Process: %s, %.2f%%", msg, process*100)
 		}),
@@ -305,27 +305,37 @@ func TestA(t *testing.T) {
 	fileMap := make(map[string]struct{})
 	diagnostics.Track("collect file", func() error {
 		filesys.Recursive(".",
-			filesys.WithFileSystem(fs),
-			filesys.WithFileStat(func(s string, fi os.FileInfo) error {
+			filesys.WithFileSystem(refFS),
+			filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
+				// check folder folderName
+				_, folderName := refFS.PathSplit(fullPath)
+				if folderName == "test" || folderName == ".git" {
+					return filesys.SkipDir
+				}
+				return nil
+			}),
+			filesys.WithFileStat(func(fileName string, fi os.FileInfo) error {
 				if fi.IsDir() {
 					return nil
 				}
+
 				// log.Infof("file: %s", s)
-				if fs.Ext(s) == ".go" {
-					fileList = append(fileList, s)
-					fileMap[s] = struct{}{}
+				if parseAllFile || fileName == file {
+					fileList = append(fileList, fileName)
+					fileMap[fileName] = struct{}{}
 				}
 				return nil
 			}),
 		)
 		return nil
 	})
+	// log.Errorf("FileList: %+v", fileList)
 
 	var ch <-chan *ssareducer.FileContent
 
 	diagnostics.Track("getFileHandler", func() error {
 		ch = config.GetFileHandler(
-			fs,
+			refFS,
 			fileList,
 			fileMap,
 		)
@@ -377,4 +387,16 @@ func TestRuleRun(t *testing.T) {
 
 	diagnostics.LogRecorder("")
 
+}
+
+func TestPHPFront(t *testing.T) {
+	path := "/home/wlz/Developer/pfsense"
+	file := "src/etc/inc/captiveportal.inc"
+	data, err := os.ReadFile(filepath.Join(path, file))
+	require.NoError(t, err)
+	code := string(data)
+
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
 }

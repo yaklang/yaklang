@@ -345,8 +345,11 @@ mode InterpolationString;
 VarNameInInterpolation : '$' NameString -> type(VarName); // TODO: fix such cases: "$people->john"
 DollarString           : '$'            -> type(StringPart);
 CurlyDollar:
-    '{' { this.IsCurlyDollar(1) }? { this.SetInsideString(); } -> channel(SkipChannel), pushMode(PHP)
+    '{' { this.IsCurlyDollar(1) }? { this.SetInsideString(); } -> type(CurlyOpen), pushMode(PHP)
 ;
+CurlyOpen
+    : '{' { this.IsCurlyOpen() }? { this.SetInsideString(); } -> pushMode(PHP)
+    ;
 CurlyString                : '{'    -> type(StringPart);
 EscapedChar                : '\\' . -> type(StringPart);
 DoubleQuoteInInterpolation : '"'    -> type(DoubleQuote), popMode;

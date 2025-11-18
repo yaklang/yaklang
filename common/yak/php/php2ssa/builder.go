@@ -110,7 +110,7 @@ func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 
 func (s *SSABuilder) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".php"
+	return extension == ".php" || extension == ".inc"
 }
 
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {

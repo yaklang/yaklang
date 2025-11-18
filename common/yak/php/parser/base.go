@@ -1,10 +1,11 @@
 package phpparser
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"reflect"
 	"strings"
 	"unsafe"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 type PHPLexerBase struct {
@@ -185,7 +186,6 @@ func (p *PHPLexerBase) PushModeOnHtmlClose() {
 func (p *PHPLexerBase) PopModeOnCurlyBracketClose() {
 	if p._insideString {
 		p._insideString = false
-		p.SetChannel(PHPLexerSkipChannel)
 		p.PopMode()
 	}
 }
@@ -224,4 +224,14 @@ func (p *PHPLexerBase) PopVariables() {
 }
 func (p *PHPLexerBase) IsCurlyDollar(i int) bool {
 	return p.GetInputStream().LA(i) == '$'
+}
+
+func (p *PHPLexerBase) IsCurlyOpen() bool {
+	la := p.GetInputStream().LA(1)
+	switch la {
+	case ' ', '\t', '\r', '\n', '{', '$', 0:
+		return false
+	default:
+		return true
+	}
 }
