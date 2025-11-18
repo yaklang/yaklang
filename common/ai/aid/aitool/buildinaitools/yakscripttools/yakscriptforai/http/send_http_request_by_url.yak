@@ -41,6 +41,8 @@ case "post", "post_form_encoded":
     yakit.Info("apply post param into request: \n" + string(packet))
 }
 
+opts.Push(poc.fixQueryEscape(true))
+
 rsp, req, err := poc.HTTPEx(packet, opts...)
 if err != nil {
     yakit.Error("request failed: %v", err)

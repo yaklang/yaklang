@@ -284,6 +284,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
 		clientHelloSpec         = option.ClientHelloSpec
 		dialer                  = option.Dialer
+		fixQueryEscape          = option.FixQueryEscape
 	)
 
 	failureChecker := func(rsp *LowhttpResponse) error {
@@ -586,6 +587,10 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// fix CRLF
 	requestPacket = FixHTTPPacketCRLF(requestPacket, noFixContentLength)
+
+	if fixQueryEscape {
+		requestPacket = FixHTTPPacketQueryEscape(requestPacket)
+	}
 	response.RawRequest = requestPacket
 	response.Http2 = enableHttp2
 
