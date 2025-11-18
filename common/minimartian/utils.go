@@ -21,9 +21,10 @@ import (
 )
 
 const (
-	AUTH_FINISH = "authFinish"
-	PROTO_S5    = "s5"
-	PROTO_HTTP  = "HTTP"
+	AUTH_FINISH  = "authFinish"
+	PROTO_S5     = "s5"
+	PROTO_HTTP   = "HTTP"
+	PROTO_TUNNEL = "TUNNEL"
 )
 
 func CreateProxyHandleContext(ctx context.Context, conn net.Conn) (*Context, error) {

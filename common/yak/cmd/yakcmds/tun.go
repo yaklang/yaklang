@@ -547,7 +547,7 @@ func testTunSocketDevice(c *cli.Context) error {
 
 	// 4. 获取主机的公网网卡和IP地址（用于绑定源地址和强主机模式）
 	log.Infof("getting host public network interface and IP...")
-	hostInterface, hostIP, err := getPublicNetworkInterface()
+	hostInterface, hostIP, err := GetPublicNetworkInterface()
 	if err != nil {
 		log.Errorf("failed to get public network interface: %v", err)
 		return utils.Errorf("failed to get public network interface: %v", err)
@@ -847,8 +847,8 @@ func testTunSocketDevice(c *cli.Context) error {
 	}
 }
 
-// getPublicNetworkInterface 获取公网网卡和IP地址
-func getPublicNetworkInterface() (interfaceName string, ipAddr string, err error) {
+// GetPublicNetworkInterface 获取公网网卡和IP地址
+func GetPublicNetworkInterface() (interfaceName string, ipAddr string, err error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return "", "", err

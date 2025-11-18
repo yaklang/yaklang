@@ -324,6 +324,13 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					}
 				}
 				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
+			} else {
+				host, port, err := utils.ParseStringToHostPort(originConn.LocalAddr().String())
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				sessionBindConnectTo(proxyContext.Session(), PROTO_TUNNEL, host, port)
 			}
 			p.handleLoop(isTls, handledConnection, proxyContext)
 		}(uid, conn, wrappedConn)
