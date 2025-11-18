@@ -24,6 +24,10 @@
         "reasoning": {
             "description": "**支撑 `user_satisfied` 决策的【战略性分析】。在此解释 `human_readable_result` 中的事实对于完成用户的最终目标意味着什么。如果为 `false`，请解释为何任务尚未完成（例如，“这只是第一步，还需要读取文件内容”）。如果为 `true`，请解释为何此结果标志着任务的最终完成。**",
             "type": "string"
+        },
+        "next_movements": {
+            "description": "**基于当前结果的【推荐下一步行动】。如果 `user_satisfied` 为 `false`，提出面向最终目标的下一步可执行计划清单，用以在当前上下文下优先化并细化任务、触发必要的 tool call/@action/外部智能应用与专注模式，并根据实时反馈迭代调整以最短路径达成目标。**，例如：‘接下来，我需要读取xxx文件，来获取额外信息以完成XXX的阶段性目标使其更接近任务完成。’",
+            "type": "string"
         }
     },
     "additionalProperties": false
