@@ -47,6 +47,11 @@ var MitmExports = map[string]interface{}{
 	"VerifyMITMRootCertNotInstalled": crep.VerifyMITMRootCertNotInstalled,
 	"QuickVerifyMITMRootCert":        crep.QuickVerifyMITMRootCert,
 	"TestCertificateOperations":      crep.TestCertificateOperations,
+
+	"grpcMitmKey": DefaultGRPCMitmKey,
+	"GetDefaultExtraConnManager": func() *MitmExtraConnManager {
+		return DefaultMitmExtraConnManager
+	},
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为

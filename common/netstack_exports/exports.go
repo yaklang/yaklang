@@ -2,6 +2,7 @@ package netstack_exports
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"net"
 	"reflect"
 
@@ -16,6 +17,7 @@ var Exports = map[string]interface{}{
 	"CreatePrivilegedDevice":        _createPrivilegedDevice,
 	"CreatePrivilegedDeviceWithMTU": _createPrivilegedDeviceWithMTU,
 	"NewVMFromDevice":               _newVMFromDevice,
+	"NewVMFromDeviceWithContext":    _newVMFromDeviceWithContext,
 	"GetSystemRouteManager":         netstackvm.GetSystemRouteManager,
 }
 
@@ -117,6 +119,54 @@ func (vm *NetstackVM) StartForwarding(ch interface{}) error {
 	return nil
 }
 
+func (vm *NetstackVM) StartForwardingSafeChannel(ch *chanx.UnlimitedChan[net.Conn]) error {
+	log.Infof("StartForwarding called, vm=%v, listener=%v, ch=%v", vm != nil, vm.listener != nil, ch != nil)
+	if vm == nil {
+		return utils.Errorf("VM is nil")
+	}
+	if vm.listener == nil {
+		return utils.Errorf("listener not initialized")
+	}
+	if ch == nil {
+		return utils.Errorf("channel cannot be nil")
+	}
+
+	log.Infof("Starting TCP connection forwarding to channel (type: %T)...", ch)
+
+	// Start a goroutine to accept connections and forward them to the channel
+	go func() {
+		for {
+			conn, err := vm.listener.Accept()
+			if err != nil {
+				if err != net.ErrClosed {
+					log.Errorf("error accepting connection: %v", err)
+				}
+				return
+			}
+
+			select {
+			case <-vm.ctx.Done():
+				log.Info("VM context cancelled, stopping connection forwarding")
+				conn.Close()
+				return
+			default:
+				// Try to send with a timeout
+				select {
+				case <-vm.ctx.Done():
+					conn.Close()
+					return
+				default:
+					// Non-blocking send
+					ch.SafeFeed(conn)
+				}
+			}
+		}
+	}()
+
+	log.Info("TCP connection forwarding started successfully")
+	return nil
+}
+
 // Close closes the VM and all associated resources
 func (vm *NetstackVM) Close() error {
 	if vm.cancel != nil {
@@ -142,11 +192,15 @@ func (vm *NetstackVM) GetTunnelName() string {
 // _newVMFromDevice creates a network stack virtual machine from a TUN device
 // The VM will hijack TCP connections and make them available via GetTCPConnChan()
 func _newVMFromDevice(device lowtun.Device) (*NetstackVM, error) {
+	return _newVMFromDeviceWithContext(context.Background(), device)
+}
+
+func _newVMFromDeviceWithContext(ctx context.Context, device lowtun.Device) (*NetstackVM, error) {
 	if device == nil {
 		return nil, utils.Errorf("device cannot be nil")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	// Create TUN virtual machine from device
 	tvm, err := netstackvm.NewTunVirtualMachineFromDevice(ctx, device)
