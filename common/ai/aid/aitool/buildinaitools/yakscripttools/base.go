@@ -142,6 +142,11 @@ func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 	return toolCovertHandle(tools)
 }
 
+// ConvertTools 将 AIYakTool 转换为 aitool.Tool (公开接口)
+func ConvertTools(tools []*schema.AIYakTool) []*aitool.Tool {
+	return covertTools(tools)
+}
+
 func GetAllYakScriptAiTools() []*aitool.Tool {
 	db := consts.GetGormProfileDatabase()
 	allAiTools, err := yakit.SearchAIYakTool(db, "")
