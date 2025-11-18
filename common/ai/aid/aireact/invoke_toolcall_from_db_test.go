@@ -150,7 +150,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 
 // TestReAct_ToolUse_FromDB_ViaToolSearch tests calling a tool from database via tool_search
 func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
-	toolName := fmt.Sprintf("mock_db_tool_search_%d", time.Now().Unix())
+	toolName := fmt.Sprintf("mock_db_tool_search_%s", utils.RandStringBytes(16))
 
 	// Setup: create mock tool in database
 	setupMockToolInDB(t, toolName)
@@ -164,10 +164,22 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 	searchQuery := ""
 
 	// Create tool manager with search enabled and explicitly enable the mock tool
-	toolManager := buildinaitools.NewToolManager(
+	// Use a custom tool getter that always fetches fresh tools from database
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool {
+			// Get basic tools
+			basicTools := buildinaitools.GetBasicBuildInTools()
+			// Get fresh tools from database
+			dbTools := yakscripttools.GetAllYakScriptAiTools()
+			return append(basicTools, dbTools...)
+		},
 		buildinaitools.WithSearchToolEnabled(true),
 		buildinaitools.WithAIToolsSearcher(createMockToolSearcherForDB()),
 	)
+	// Enable basic tools
+	for _, tool := range buildinaitools.GetBasicBuildInTools() {
+		toolManager.EnableTool(tool.GetName())
+	}
 	// Enable the mock tool so it can be called after search
 	toolManager.EnableTool(toolName)
 
@@ -334,7 +346,7 @@ LOOP:
 
 // TestReAct_ToolUse_FromDB_DirectCall tests calling a tool from database directly by name
 func TestReAct_ToolUse_FromDB_DirectCall(t *testing.T) {
-	toolName := fmt.Sprintf("mock_db_tool_direct_%d", time.Now().Unix())
+	toolName := fmt.Sprintf("mock_db_tool_direct_%s", utils.RandStringBytes(16))
 
 	// Setup: create mock tool in database
 	setupMockToolInDB(t, toolName)
@@ -346,7 +358,20 @@ func TestReAct_ToolUse_FromDB_DirectCall(t *testing.T) {
 	mockToolCalled := false
 
 	// Create tool manager and explicitly enable the mock tool from database
-	toolManager := buildinaitools.NewToolManager()
+	// Use a custom tool getter that always fetches fresh tools from database
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool {
+			// Get basic tools
+			basicTools := buildinaitools.GetBasicBuildInTools()
+			// Get fresh tools from database
+			dbTools := yakscripttools.GetAllYakScriptAiTools()
+			return append(basicTools, dbTools...)
+		},
+	)
+	// Enable basic tools
+	for _, tool := range buildinaitools.GetBasicBuildInTools() {
+		toolManager.EnableTool(tool.GetName())
+	}
 	toolManager.EnableTool(toolName)
 
 	ins, err := NewTestReAct(
@@ -479,7 +504,7 @@ LOOP:
 
 // TestReAct_ToolUse_WithNextMovements tests that next_movements appears in timeline when verify returns false
 func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
-	toolName := fmt.Sprintf("mock_tool_next_movements_%d", time.Now().Unix())
+	toolName := fmt.Sprintf("mock_tool_next_movements_%s", utils.RandStringBytes(16))
 
 	// Setup: create mock tool in database
 	setupMockToolInDB(t, toolName)
@@ -494,7 +519,20 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 	nextMovementsContent := "Next, I need to use another tool to complete the task"
 
 	// Create tool manager and enable the tool
-	toolManager := buildinaitools.NewToolManager()
+	// Use a custom tool getter that always fetches fresh tools from database
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool {
+			// Get basic tools
+			basicTools := buildinaitools.GetBasicBuildInTools()
+			// Get fresh tools from database
+			dbTools := yakscripttools.GetAllYakScriptAiTools()
+			return append(basicTools, dbTools...)
+		},
+	)
+	// Enable basic tools
+	for _, tool := range buildinaitools.GetBasicBuildInTools() {
+		toolManager.EnableTool(tool.GetName())
+	}
 	toolManager.EnableTool(toolName)
 
 	ins, err := NewTestReAct(
@@ -562,6 +600,18 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 	after := time.After(du * time.Second)
 
 	var iid string
+
+	// Helper function to check if all requirements are met
+	checkAllRequirementsMet := func() bool {
+		return toolCalled && verifyTriggered && nextMovementsReceived
+	}
+
+	// Helper function to check if timeline contains next_movements
+	checkTimelineHasNextMovements := func() bool {
+		timeline := ins.DumpTimeline()
+		return strings.Contains(timeline, "NEXT_MOVEMENTS") && strings.Contains(timeline, nextMovementsContent)
+	}
+
 LOOP:
 	for {
 		select {
@@ -572,6 +622,24 @@ LOOP:
 				if strings.Contains(streamContent, nextMovementsContent) {
 					nextMovementsReceived = true
 					log.Infof("received next_movements in stream: %s", streamContent)
+
+					// Check if all requirements are met, if so, wait for timeline to update then exit
+					if checkAllRequirementsMet() {
+						log.Infof("all requirements met, checking timeline for next_movements")
+
+						// Check timeline every 200ms for up to 3 seconds
+						maxAttempts := 15 // 3s / 200ms = 15
+						for attempt := 1; attempt <= maxAttempts; attempt++ {
+							time.Sleep(200 * time.Millisecond)
+							if checkTimelineHasNextMovements() {
+								log.Infof("timeline updated with next_movements after %d attempts, exiting early", attempt)
+								break LOOP
+							}
+							log.Infof("timeline check attempt %d/%d", attempt, maxAttempts)
+						}
+
+						log.Warnf("timeline not updated after 3s, continuing to wait")
+					}
 				}
 			}
 
@@ -601,7 +669,7 @@ LOOP:
 				}
 			}
 		case <-after:
-			log.Warnf("test timeout - this is expected as user_satisfied=false")
+			log.Warnf("test timeout")
 			break LOOP
 		}
 	}
