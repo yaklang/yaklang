@@ -785,3 +785,129 @@ func TestTrimTestForFixCRLF_For_multipart3(t *testing.T) {
 	require.Contains(t, string(result), "ea99FhJk   \r\nContent-Length")
 	require.Contains(t, string(result), "ea99FhJk   --")
 }
+
+func TestFixHTTPPacketQueryEscape(t *testing.T) {
+	t.Run("basic query escape", func(t *testing.T) {
+		// 测试基本的 query 参数转义
+		packet := `GET /test?name=hello world&age=18 HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		// 空格应该被转义为 %20
+		require.Contains(t, resultStr, "name=hello+world", "space should be escaped")
+		require.Contains(t, resultStr, "age=18", "normal param should be kept")
+		require.NotContains(t, resultStr, "hello world", "unescaped space should not exist")
+	})
+
+	t.Run("special characters escape", func(t *testing.T) {
+		// 测试特殊字符转义
+		packet := `GET /api?key=value&special=<script>alert(1)</script>&data=a&b HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		// 特殊字符应该被转义
+		require.Contains(t, resultStr, "key=value", "normal param should be kept")
+		require.NotContains(t, resultStr, "<script>", "< should be escaped")
+		require.NotContains(t, resultStr, "</script>", "> should be escaped")
+		require.Contains(t, resultStr, "%3C", "< should be escaped to %3C")
+		require.Contains(t, resultStr, "%3E", "> should be escaped to %3E")
+	})
+
+	t.Run("chinese characters escape", func(t *testing.T) {
+		// 测试中文字符转义
+		packet := `GET /search?q=测试&lang=中文 HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		// 中文字符应该被转义
+		require.NotContains(t, resultStr, "测试", "chinese characters should be escaped")
+		require.NotContains(t, resultStr, "中文", "chinese characters should be escaped")
+		require.Contains(t, resultStr, "%", "escaped characters should contain %")
+	})
+
+	t.Run("already escaped parameters", func(t *testing.T) {
+		// 测试已经转义的参数应该被重新规范化
+		packet := `GET /test?name=hello%20world&key=%3Cvalue%3E HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		// 已转义的参数应该被保持或重新编码
+		require.Contains(t, resultStr, "name=hello", "param should exist")
+		require.Contains(t, resultStr, "key=", "key should exist")
+	})
+
+	t.Run("empty query string", func(t *testing.T) {
+		// 测试没有 query 参数的情况
+		packet := `GET /test HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		require.Contains(t, resultStr, "GET /test HTTP/1.1", "request line should be kept")
+		require.Contains(t, resultStr, "Host: www.example.com", "headers should be kept")
+	})
+
+	t.Run("multiple same key params", func(t *testing.T) {
+		// 测试多个相同 key 的参数
+		packet := `GET /api?tag=go&tag=test&tag=hello world HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		// 所有 tag 参数都应该存在
+		require.Contains(t, resultStr, "tag=go", "first tag should exist")
+		require.Contains(t, resultStr, "tag=test", "second tag should exist")
+		require.Contains(t, resultStr, "tag=hello", "third tag should exist and be escaped")
+	})
+
+	t.Run("query with equals sign in value", func(t *testing.T) {
+		// 测试值中包含等号的情况
+		packet := `GET /test?formula=a=b+c&x=1 HTTP/1.1
+Host: www.example.com
+
+`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		require.Contains(t, resultStr, "formula=", "param key should exist")
+		require.Contains(t, resultStr, "x=1", "other param should exist")
+	})
+
+	t.Run("preserve body", func(t *testing.T) {
+		// 测试应该保留 body 内容
+		packet := `GET /test?key=hello world HTTP/1.1
+Host: www.example.com
+Content-Length: 13
+
+{"test":"ok"}`
+		result := FixHTTPPacketQueryEscape([]byte(packet))
+		resultStr := string(result)
+		spew.Dump(resultStr)
+
+		require.Contains(t, resultStr, `{"test":"ok"}`, "body should be preserved")
+		require.Contains(t, resultStr, "key=hello", "query should be escaped")
+	})
+}
