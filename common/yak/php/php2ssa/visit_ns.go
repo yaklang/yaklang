@@ -1,6 +1,8 @@
 package php2ssa
 
 import (
+	"strings"
+
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"golang.org/x/exp/maps"
 )
@@ -87,13 +89,15 @@ func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext
 		return nil
 	}
 	switch {
-	case len(i.AllIdentifier()) != 0:
-		paths := y.VisitIdentifier(i.Identifier(0))
-		alias := y.VisitIdentifier(i.Identifier(1))
-		if alias == "" {
-			return map[string]string{paths: paths}
+	case i.NamespacePath() != nil:
+		pathList := y.VisitNamespacePath(i.NamespacePath())
+		path := strings.Join(pathList, "\\")
+
+		if i.Identifier() != nil {
+			alias := y.VisitIdentifier(i.Identifier())
+			return map[string]string{path: alias}
 		} else {
-			return map[string]string{paths: alias}
+			return map[string]string{path: path}
 		}
 	case len(i.AllNamespaceNameTail()) != 0:
 		var (

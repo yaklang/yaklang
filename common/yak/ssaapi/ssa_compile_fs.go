@@ -167,6 +167,13 @@ func (c *Config) parseProjectWithFS(
 			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
 
+			if fileContent.Err != nil {
+				prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
+				AstErr = utils.JoinErrors(AstErr,
+					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+				)
+			}
+
 			preHandlerProcess() // notify the process
 			// handler
 			if language := c.LanguageBuilder; language != nil {

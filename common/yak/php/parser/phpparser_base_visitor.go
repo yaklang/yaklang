@@ -411,6 +411,10 @@ func (v *BasePHPParserVisitor) VisitMatchExpression(ctx *MatchExpressionContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitStaticClassReferenceAssignmentExpression(ctx *StaticClassReferenceAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitFunctionCallExpression(ctx *FunctionCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -432,6 +436,10 @@ func (v *BasePHPParserVisitor) VisitIncludeExpression(ctx *IncludeExpressionCont
 }
 
 func (v *BasePHPParserVisitor) VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitReferenceAssignmentExpression(ctx *ReferenceAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

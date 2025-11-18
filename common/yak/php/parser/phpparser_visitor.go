@@ -310,6 +310,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#MatchExpression.
 	VisitMatchExpression(ctx *MatchExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#StaticClassReferenceAssignmentExpression.
+	VisitStaticClassReferenceAssignmentExpression(ctx *StaticClassReferenceAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#FunctionCallExpression.
 	VisitFunctionCallExpression(ctx *FunctionCallExpressionContext) interface{}
 
@@ -327,6 +330,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#IndexCallExpression.
 	VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ReferenceAssignmentExpression.
+	VisitReferenceAssignmentExpression(ctx *ReferenceAssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
