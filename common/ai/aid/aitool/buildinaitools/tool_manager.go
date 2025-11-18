@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -119,8 +120,10 @@ func WithSearchToolEnabled(enabled bool) ToolManagerOption {
 
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
-		toolsGetter: getter,
-		toolEnabled: make(map[string]bool),
+		toolsGetter:           getter,
+		toolEnabled:           make(map[string]bool),
+		enableSearchTool:      true,
+		enableForgeSearchTool: true,
 	}
 
 	// 应用选项
@@ -133,7 +136,9 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 
 // NewToolManager 创建一个新的默认工具管理器实例
 func NewToolManager(options ...ToolManagerOption) *AiToolManager {
-	basicToolsOptions := []ToolManagerOption{WithExtendTools(GetBasicBuildInTools(), true)} // 默认开启基础工具
+	basicToolsOptions := []ToolManagerOption{
+		WithExtendTools(GetBasicBuildInTools(), true),
+	} // 默认开启基础工具
 	options = append(basicToolsOptions, options...)
 	manager := NewToolManagerByToolGetter(GetAllTools, options...) //候选工具由GetAllTools提供
 	return manager
@@ -162,26 +167,22 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 		}
 	}
 	if m.enableSearchTool {
-		if m.aiToolsSearcher == nil {
-			log.Errorf("searcher is not set")
-			return enabledTools, nil
-		}
 		tool, err := m.getSearchTools()
 		if err != nil {
-			return nil, err
+			log.Errorf("getSearchTools err: %v", err)
 		}
-		enabledTools = append(enabledTools, tool...)
+		if !utils.IsNil(tool) {
+			enabledTools = append(enabledTools, tool...)
+		}
 	}
 	if m.enableForgeSearchTool {
-		if m.aiForgeSearcher == nil {
-			log.Errorf("forge searcher is not set")
-			return enabledTools, nil
-		}
 		tool, err := m.getForgeSearchTools()
 		if err != nil {
-			return nil, err
+			log.Errorf("getForgeSearchTools err: %v", err)
 		}
-		enabledTools = append(enabledTools, tool...)
+		if !utils.IsNil(tool) {
+			enabledTools = append(enabledTools, tool...)
+		}
 	}
 	return enabledTools, nil
 }
@@ -228,7 +229,21 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 			return tool, nil
 		}
 	}
-	return nil, fmt.Errorf("找不到名为 %s 的工具", name)
+
+	// 从数据库中查找工具
+	toolFromDB, err := yakit.GetAIYakTool(consts.GetGormProfileDatabase(), name)
+	if err != nil {
+		return nil, fmt.Errorf("cannot found [%v] neithor in database nor in enable tools: %v", name, err)
+	}
+
+	// 将 schema.AIYakTool 转换为 aitool.Tool
+	convertedTools := yakscripttools.ConvertTools([]*schema.AIYakTool{toolFromDB})
+	if len(convertedTools) == 0 {
+		log.Errorf("convert tool [%s] from database failed", name)
+		return nil, fmt.Errorf("convert tool [%v] from database failed", name)
+	}
+
+	return convertedTools[0], nil
 }
 
 // SearchTools 通过字符串搜索相关工具
