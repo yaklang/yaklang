@@ -78,6 +78,7 @@ type LowhttpExecConfig struct {
 	NativeHTTPRequestInstance        *http.Request
 	Username                         string
 	Password                         string
+	FixQueryEscape                   bool
 
 	// DefaultBufferSize means unexpected situation's buffer size
 	DefaultBufferSize int
@@ -724,6 +725,12 @@ func WithUseMITMRule(b bool) LowhttpOpt {
 func WithNoFixContentLength(noFixContentLength bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.NoFixContentLength = noFixContentLength
+	}
+}
+
+func WithFixQueryEscape(fixQueryEscape bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.FixQueryEscape = fixQueryEscape
 	}
 }
 

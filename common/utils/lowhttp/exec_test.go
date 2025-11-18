@@ -1096,3 +1096,127 @@ Host: `+utils.HostPort(host, port)+"\r\n\r\n")), WithContext(ctx))
 	require.Less(t, totalTime, 600*time.Millisecond)
 	require.Equal(t, "hello", string(rsp.GetBody()))
 }
+
+// TestLowhttp_HTTP_WithFixQueryEscape 测试 WithFixQueryEscape 选项
+// 默认情况下不转义 query 参数，启用后会转义特殊字符
+func TestLowhttp_HTTP_WithFixQueryEscape(t *testing.T) {
+	t.Run("default - no query escape", func(t *testing.T) {
+		// 记录接收到的原始请求 URI
+		var receivedURI string
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			receivedURI = request.RequestURI
+			writer.Write([]byte("ok"))
+		})
+
+		// 构造带有未转义特殊字符的请求
+		packet := `GET /test?name=hello world&data=<script>test</script> HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`
+		rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second))
+		require.NoError(t, err, "Request should not fail")
+		require.NotNil(t, rsp, "Response should not be nil")
+
+		// 默认情况下，特殊字符不应该被转义
+		// 注意：实际发送的请求中，空格会被服务器解析
+		t.Logf("Received URI: %s", receivedURI)
+		t.Logf("Raw Request:\n%s", string(rsp.RawRequest))
+
+		// 验证原始请求包含未转义的字符
+		rawRequest := string(rsp.RawRequest)
+		require.Contains(t, rawRequest, "hello world", "space should not be escaped by default")
+		require.Contains(t, rawRequest, "<script>", "< should not be escaped by default")
+	})
+
+	t.Run("with WithFixQueryEscape(true) - query escaped", func(t *testing.T) {
+		// 记录接收到的原始请求 URI
+		var receivedURI string
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			receivedURI = request.RequestURI
+			writer.Write([]byte("ok"))
+		})
+
+		// 构造带有未转义特殊字符的请求
+		packet := `GET /test?name=hello world&data=<script>test</script> HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`
+		// 使用 WithFixQueryEscape(true) 启用转义
+		rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithFixQueryEscape(true))
+		require.NoError(t, err, "Request should not fail")
+		require.NotNil(t, rsp, "Response should not be nil")
+
+		t.Logf("Received URI: %s", receivedURI)
+		t.Logf("Raw Request:\n%s", string(rsp.RawRequest))
+
+		// 验证特殊字符被转义
+		rawRequest := string(rsp.RawRequest)
+		require.NotContains(t, rawRequest, "hello world", "space should be escaped")
+		require.Contains(t, rawRequest, "hello+world", "space should be escaped to +")
+		require.NotContains(t, rawRequest, "<script>", "< should be escaped")
+		require.Contains(t, rawRequest, "%3Cscript%3E", "< and > should be escaped")
+	})
+
+	t.Run("with WithFixQueryEscape(false) - explicitly disabled", func(t *testing.T) {
+		// 记录接收到的原始请求 URI
+		var receivedURI string
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			receivedURI = request.RequestURI
+			writer.Write([]byte("ok"))
+		})
+
+		// 构造带有未转义特殊字符的请求
+		packet := `GET /test?name=hello world&special=<>&中文 HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`
+		// 显式禁用转义
+		rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithFixQueryEscape(false))
+		require.NoError(t, err, "Request should not fail")
+		require.NotNil(t, rsp, "Response should not be nil")
+
+		t.Logf("Received URI: %s", receivedURI)
+		t.Logf("Raw Request:\n%s", string(rsp.RawRequest))
+
+		// 验证特殊字符未被转义
+		rawRequest := string(rsp.RawRequest)
+		require.Contains(t, rawRequest, "hello world", "space should not be escaped when explicitly disabled")
+	})
+
+	t.Run("multiple params with WithFixQueryEscape(true)", func(t *testing.T) {
+		// 记录接收到的参数
+		var receivedParams map[string][]string
+		host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			receivedParams = request.URL.Query()
+			writer.Write([]byte("ok"))
+		})
+
+		// 构造多个参数的请求
+		packet := `GET /api?tag=go&tag=test&name=hello world&email=test@example.com HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+
+`
+		rsp, err := HTTP(WithPacketBytes([]byte(packet)), WithTimeout(5*time.Second), WithFixQueryEscape(true))
+		require.NoError(t, err, "Request should not fail")
+		require.NotNil(t, rsp, "Response should not be nil")
+
+		t.Logf("Received params: %+v", receivedParams)
+		t.Logf("Raw Request:\n%s", string(rsp.RawRequest))
+
+		// 验证转义后的请求
+		rawRequest := string(rsp.RawRequest)
+		require.Contains(t, rawRequest, "tag=go", "first tag should exist")
+		require.Contains(t, rawRequest, "tag=test", "second tag should exist")
+		require.Contains(t, rawRequest, "hello+world", "space should be escaped")
+		require.Contains(t, rawRequest, "test%40example.com", "@ should be escaped to %40")
+
+		// 验证服务器能正确解析参数
+		require.NotNil(t, receivedParams, "params should be parsed")
+		if receivedParams != nil {
+			require.Equal(t, 2, len(receivedParams["tag"]), "should have 2 tag values")
+			require.Contains(t, receivedParams["tag"], "go", "should contain 'go' tag")
+			require.Contains(t, receivedParams["tag"], "test", "should contain 'test' tag")
+			require.Equal(t, "hello world", receivedParams["name"][0], "name param should be correctly decoded")
+		}
+	})
+}

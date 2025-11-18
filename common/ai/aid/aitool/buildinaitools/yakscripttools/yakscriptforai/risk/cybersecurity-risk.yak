@@ -16,6 +16,7 @@ riskType := cli.String("risktype", cli.setHelp(`从后面列表中选择一个�
 severity := cli.String("severity", cli.setHelp("风险严重级别：high/low/middle/info/debug"), cli.setDefault("low"))
 description := cli.String("desc", cli.setHelp("关于这个安全风险你有什么想解释的吗？"))
 solution := cli.String("solution", cli.setHelp("关于这个安全漏洞，你认为应该用什么方式解决或者缓解？"))
+payload := cli.String("payload", cli.setHelp("用于触发或验证该漏洞的payload（攻击载荷）"))
 httpRequest := cli.String("http-request", cli.setHelp("如果这个漏洞涉及某次HTTP通信，或者是通过某次HTTP通信发现的，数据包填在这里"))
 httpRequestFile := cli.String("http-request-file", cli.setHelp("如果数据包已经保存在文件里了，通过这个函数给我"))
 httpResponse := cli.String("http-response", cli.setHelp("如果一个HTTP响应可能涉及到风险判定，通过这个存储，如果响应太大，在这里输入文件系统路径"))
@@ -26,6 +27,7 @@ opts = []
 opts.Push(risk.type(riskType))
 opts.Push(risk.description(description))
 opts.Push(risk.solution(solution))
+opts.Push(risk.payload(payload))
 
 if string(httpRequest) != "" {
     opts.Push(risk.request(httpRequest))

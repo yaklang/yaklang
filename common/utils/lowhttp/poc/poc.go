@@ -61,6 +61,7 @@ type PocConfig struct {
 	Source               string
 	Username             *string
 	Password             *string
+	FixQueryEscape       *bool
 
 	// packetHandler
 	PacketHandler []func([]byte) []byte
@@ -164,6 +165,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 
 	if c.NoFixContentLength != nil {
 		opts = append(opts, lowhttp.WithNoFixContentLength(*c.NoFixContentLength))
+	}
+	if c.FixQueryEscape != nil {
+		opts = append(opts, lowhttp.WithFixQueryEscape(*c.FixQueryEscape))
 	}
 	if c.JsRedirect != nil {
 		opts = append(opts, lowhttp.WithJsRedirect(*c.JsRedirect))
@@ -2023,6 +2027,17 @@ func WithGmTLSPrefer() PocConfigOption {
 	}
 }
 
+// fixQueryEscape 是一个请求选项参数，用于指定是否修复查询参数中的 URL 编码，默认为 false 即会自动修复URL编码
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.fixQueryEscape(true)) // 向 example.com 发起请求，如果查询参数中的 URL 编码不正确或不存在也不会自动修复URL编码
+// ```
+func WithFixQueryEscape(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.FixQueryEscape = &b
+	}
+}
+
 var PoCExports = map[string]interface{}{
 	"HTTP":          HTTP,
 	"HTTPEx":        HTTPEx,
@@ -2082,6 +2097,7 @@ var PoCExports = map[string]interface{}{
 	"gmTls":                WithGmTls,
 	"gmTlsOnly":            WithGmTlsOnly,
 	"gmTLSPrefer":          WithGmTLSPrefer,
+	"fixQueryEscape":       WithFixQueryEscape,
 
 	"json":       WithJSON,
 	"body":       WithBody,
