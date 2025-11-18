@@ -207,6 +207,52 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	return buf.Bytes()
 }
 
+func FixHTTPPacketQueryEscape(raw []byte) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(raw,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			urlIns := ForceStringToUrl(requestUri)
+			if urlIns == nil {
+				// invalid url, return as is
+				return nil
+			}
+
+			// Parse and re-encode query parameters to ensure proper escaping
+			if urlIns.RawQuery != "" {
+				queryParams := ParseQueryParams(urlIns.RawQuery, WithDisableAutoEncode(false))
+				urlIns.RawQuery = queryParams.Encode()
+			}
+
+			// Reconstruct the request URI
+			requestUri = urlIns.String()
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
 // FixHTTPRequest 尝试对传入的HTTP请求报文进行修复，并返回修复后的请求
 // Example:
 // ```
