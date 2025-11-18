@@ -99,5 +99,21 @@ IMPORTANT GUIDELINES:
 - 如果最新的步骤执行成功且产生了无可辩驳的证据，证明用户的【最终请求】已经完全解决时，通常应该设置user_satisfied为true
 - 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false
 - 重点关注用户的核心需求是否得到满足，而不是执行过程的细节
+- 当 `user_satisfied` 为 false 的时候，需要考虑 `next_movements` 设置好：
+    - “next_movements” 用于描述 AI Agent 的下一步行动计划与执行意图。
+    - 它应包含具体的任务分解、优先级、预期结果，以及为达成目标所需的调用与依赖。
+    - 在该字段中，Agent 可以：
+    - 规划并执行 tool call（包含参数与预期输出）
+    - 触发 @action 调用（如工作流/自动化动作）
+    - 调用其他智能应用（如外部模型、RPA、数据服务）
+    - 进入或切换专注模式（Focus Mode），并说明专注目标与退出条件
+    - “next_movements” 应可迭代更新：每完成或失败一步，就根据上下文与反馈调整后续步骤。
+    - GoodCase: 
+        - "接下来，我需要使用xxx工具来完成xxx的阶段性目标xxxx"
+        - "接下来我短期需要做的事情有：1. xxx; \n2. xxx; \n3. xxx; 这些工作有如下潜在风险和状态评估可能，我接下来会使用 xxx 工具来走一步看一部，随时调整工具调用。"
+        - "虽然遇到了一些问题，但是我们可以尝试新的办法，使用 xxx 工具（和之前不一样）来尝试重新解决这个问题。"
+        - "之前的任务似乎走偏了，我们尝试使用新的内容或者查询一些文件内容来决定下一步怎么走"
+
+
 
 {{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
