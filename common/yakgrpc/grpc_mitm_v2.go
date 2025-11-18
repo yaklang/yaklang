@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io"
 	"math/rand"
 	"net/http"
@@ -1387,6 +1390,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	for _, cert := range firstReq.GetCertificates() {
 		opts = append(opts, crep.MITM_MutualTLSClient(cert.CrtPem, cert.KeyPem, cert.GetCaCertificates()...))
 	}
+
+	extraIncome := yaklib.DefaultMitmExtraConnManager.Register(streamCtx, yaklib.DefaultGRPCMitmKey)
+	defer yaklib.DefaultMitmExtraConnManager.Unregister(yaklib.DefaultGRPCMitmKey)
+	wrapperConnChan := make(chan *minimartian.WrapperedConn, 100)
+	_, _, publicIP, err := netutil.GetPublicRoute()
+	if err != nil {
+		log.Errorf("get public route error: %s", err)
+	}
+	go func() {
+		for {
+			select {
+			case conn := <-extraIncome.OutputChannel():
+				wrapperConnChan <- minimartian.NewWrapperedConnWithStrongLocalHost(conn, publicIP.String(), nil)
+			case <-streamCtx.Done():
+				return
+			}
+		}
+	}()
+
 	opts = append(opts,
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
@@ -1410,6 +1432,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_SetHostMapping(hostMapping),
 		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
 		crep.MITM_SetMaxReadWaitTime(time.Duration(firstReq.GetMaxReadWaitTime())*time.Second),
+		crep.MITM_SetExtraIncomingConnectionChannel(wrapperConnChan),
 	)
 
 	// 如果 mitm 启动时进行设置，优先使用mitm中的设置
