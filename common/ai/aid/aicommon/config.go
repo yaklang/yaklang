@@ -59,6 +59,9 @@ type Config struct {
 	// session id
 	PersistentSessionId string
 
+	// memory triage id
+	MemoryTriageId string
+
 	/*
 		Event
 	*/
@@ -308,6 +311,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
+		MemoryTriageId:                     "default",
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),
@@ -1420,6 +1424,15 @@ func WithFocus(focus string) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
 		c.Focus = focus
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithMemoryTriageId(id string) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.MemoryTriageId = id
 		c.m.Unlock()
 		return nil
 	}

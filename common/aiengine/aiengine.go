@@ -403,6 +403,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 
 		// 会话配置
 		aicommon.WithPersistentSessionId(config.SessionID),
+		aicommon.WithMemoryTriageId(config.SessionID),
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithEnablePETaskAnalyze(true),
 
