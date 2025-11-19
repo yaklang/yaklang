@@ -342,7 +342,11 @@ func (m *PromptContextProvider) CurrentTaskTimeline() string {
 	if stl == nil {
 		return "no-toolcall, so not timeline"
 	}
-	return stl.Dump()
+	timelineDump := stl.Dump()
+	if timelineDump == "" {
+		timelineDump = m.TimelineDump()
+	}
+	return timelineDump
 }
 
 func (m *PromptContextProvider) TaskMaxContinue() int64 {
