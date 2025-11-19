@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -231,6 +232,48 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			}
 			r.config.Emit(e)
 		}))
+
+		// Ensure user original input is preserved in forge parameters
+		// This prevents context loss when AI rewrites the query parameter
+		currentTask := r.GetCurrentTask()
+		if currentTask != nil {
+			userOriginalInput := currentTask.GetUserInput()
+			if userOriginalInput != "" && forgeParams != nil {
+				// Check if forgeParams contains user original input
+				forgeParamsStr := utils.InterfaceToString(forgeParams)
+				if !strings.Contains(forgeParamsStr, userOriginalInput) {
+					// User original input is not in forge params, need to append it
+					log.Infof("user original input not found in forge params, appending it to preserve context")
+
+					// Try to modify forgeParams map if it's a map
+					if paramsMap, ok := forgeParams.(map[string]any); ok {
+						// Add user original input as a separate field
+						nonce := utils.RandStringBytes(4)
+						paramsMap["user_original_query"] = userOriginalInput
+
+						// If there's a "query" field, enhance it with user original input
+						if queryVal, exists := paramsMap["query"]; exists {
+							queryStr := utils.InterfaceToString(queryVal)
+							enhancedQuery := utils.MustRenderTemplate(`
+<|用户原始需求_{{.nonce}}|>
+{{ .UserOriginalInput }}
+<|用户原始需求_END_{{.nonce}}|>
+--- 
+{{ .AIGeneratedQuery }}
+`,
+								map[string]any{
+									"nonce":             nonce,
+									"UserOriginalInput": userOriginalInput,
+									"AIGeneratedQuery":  queryStr,
+								})
+							paramsMap["query"] = enhancedQuery
+							log.Infof("enhanced forge query param with user original input")
+						}
+					}
+				}
+			}
+		}
+
 		done()
 		result, err := yak.ExecuteForge(forgeName, forgeParams, opts...)
 		if err != nil {
