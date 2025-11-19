@@ -2,9 +2,11 @@ package aireact
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -167,6 +169,44 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	if err != nil {
 		r.Emitter.EmitError(fmt.Sprintf("Failed to prepare AI Blueprint '%s': %v", forgeName, err))
 		return nil, nil, err
+	}
+
+	// Ensure user original input is preserved in forge parameters before review
+	// This prevents context loss when AI rewrites the query parameter
+	currentTask := r.GetCurrentTask()
+	if currentTask != nil {
+		userOriginalInput := currentTask.GetUserInput()
+		if userOriginalInput != "" && forgeParams != nil {
+			// Check if forgeParams contains user original input
+			forgeParamsStr := utils.InterfaceToString(forgeParams)
+			if !strings.Contains(forgeParamsStr, userOriginalInput) {
+				// User original input is not in forge params, need to append it
+				log.Infof("user original input not found in forge params before review, appending it to preserve context")
+
+				// Add user original input as a separate field
+				nonce := utils.RandStringBytes(4)
+				forgeParams["user_original_query"] = userOriginalInput
+
+				// If there's a "query" field, enhance it with user original input
+				if queryVal, exists := forgeParams["query"]; exists {
+					queryStr := utils.InterfaceToString(queryVal)
+					enhancedQuery := utils.MustRenderTemplate(`
+<|用户原始需求_{{.nonce}}|>
+{{ .UserOriginalInput }}
+<|用户原始需求_END_{{.nonce}}|>
+--- 
+{{ .AIGeneratedQuery }}
+`,
+						map[string]any{
+							"nonce":             nonce,
+							"UserOriginalInput": userOriginalInput,
+							"AIGeneratedQuery":  queryStr,
+						})
+					forgeParams["query"] = enhancedQuery
+					log.Infof("enhanced forge query param with user original input before review")
+				}
+			}
+		}
 	}
 
 	ins, forgeParams, _, err = r.reviewAIForge(ins, forgeParams)
