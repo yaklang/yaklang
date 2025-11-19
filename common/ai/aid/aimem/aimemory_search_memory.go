@@ -3,9 +3,10 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -250,12 +251,13 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 	}
 
 	var selectedMemories []*aicommon.MemoryEntity
-	var contentParts []string
+	memoryTextMap := make(map[string]string)
 	totalBytes := 0
 
 	for _, memory := range memories {
 		// 构建记忆的文本表示
-		memoryText := fmt.Sprintf("【记忆】%s\n标签：%s\n内容：%s\n",
+		memoryText := fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：%s\n",
+			memory.CreatedAt.Format("2006-01-02 15:04:05"),
 			memory.Id[:8], // 只显示ID前8位
 			strings.Join(memory.Tags, ", "),
 			memory.Content)
@@ -267,14 +269,16 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 			// 如果是第一个记忆就超过限制，尝试截断
 			if len(selectedMemories) == 0 && memoryBytes > bytesLimit {
 				// 截断内容以适应限制
-				availableBytes := bytesLimit - len([]byte(fmt.Sprintf("【记忆】%s\n标签：%s\n内容：",
+				availableBytes := bytesLimit - len([]byte(fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：",
+					memory.CreatedAt.Format("2006-01-02 15:04:05"),
 					memory.Id[:8], strings.Join(memory.Tags, ", "))))
 				if availableBytes > 20 { // 至少保留20字节的内容
 					truncatedContent := string([]byte(memory.Content)[:availableBytes-10]) + "..."
-					memoryText = fmt.Sprintf("【记忆】%s\n标签：%s\n内容：%s\n",
+					memoryText = fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：%s\n",
+						memory.CreatedAt.Format("2006-01-02 15:04:05"),
 						memory.Id[:8], strings.Join(memory.Tags, ", "), truncatedContent)
 					selectedMemories = append(selectedMemories, memory)
-					contentParts = append(contentParts, memoryText)
+					memoryTextMap[memory.Id] = memoryText
 					totalBytes = len([]byte(memoryText))
 				}
 			}
@@ -282,10 +286,23 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 		}
 
 		selectedMemories = append(selectedMemories, memory)
-		contentParts = append(contentParts, memoryText)
+		memoryTextMap[memory.Id] = memoryText
 		totalBytes += memoryBytes
 	}
 
-	totalContent := strings.Join(contentParts, "\n")
+	// 对选中的记忆按时间排序 (Timeline: Oldest -> Newest)
+	sort.Slice(selectedMemories, func(i, j int) bool {
+		return selectedMemories[i].CreatedAt.Before(selectedMemories[j].CreatedAt)
+	})
+
+	// 重新构建内容字符串，确保顺序正确
+	var sortedContentParts []string
+	for _, memory := range selectedMemories {
+		if text, ok := memoryTextMap[memory.Id]; ok {
+			sortedContentParts = append(sortedContentParts, text)
+		}
+	}
+
+	totalContent := strings.Join(sortedContentParts, "\n")
 	return selectedMemories, totalContent, totalBytes
 }
