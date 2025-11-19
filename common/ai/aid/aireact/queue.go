@@ -12,6 +12,7 @@ var (
 	REACT_TASK_cancelled = "react_task_cancelled"
 	REACT_TASK_enqueue   = "react_task_enqueue"
 	REACT_TASK_dequeue   = "react_task_dequeue"
+	REACT_TASK_clear     = "react_task_cleared"
 )
 
 func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
