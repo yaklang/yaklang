@@ -2,6 +2,7 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"strings"
 
@@ -262,7 +263,9 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...aic
 	if err := c.loadToolsViaOptions(); err != nil {
 		return nil, utils.Errorf("coordinator: load tools (post-init) failed: %v", err)
 	}
-
+	if rt, _ := yakit.GetLatestAIAgentRuntimeByPersistentSession(c.Config.GetDB(), c.Config.PersistentSessionId); utils.IsNil(rt) {
+		rt = c.CreateDatabaseSchema(c.userInput)
+	}
 	return c, nil
 }
 
@@ -315,7 +318,6 @@ func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response
 func (c *Coordinator) Run() error {
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
-	c.CreateDatabaseSchema(c.userInput)
 	c.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {

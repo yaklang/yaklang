@@ -188,6 +188,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	baseOpts := aicommon.ConvertConfigToOptions(r.config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
+		aicommon.WithPersistentSessionId(r.config.PersistentSessionId),
 		aicommon.WithTimeline(r.config.Timeline),
 		aicommon.WithAICallback(r.config.OriginalAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
