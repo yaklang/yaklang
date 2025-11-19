@@ -1,0 +1,60 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+tunName := cli.String("name", cli.setVerboseName("tun设备名"),cli.setRequired(true))
+target := cli.String("target", cli.setVerboseName("目标列表"),cli.setHelp("需要劫持的目标列表，可以以逗号、换行分隔，并且会解析 CIDR 网段和域名"),cli.setRequired(true))
+cli.check()
+
+parseTarget := func(t) {
+    allTarget := str.ParseStringToHosts(t)
+    ipV4Ip := []
+    otherTarget := []
+
+    yakit.StatusCard("执行状态", "解析目标列表")
+    for i in allTarget {
+        if str.IsIPv4(i) {
+            ipV4Ip = append(ipV4Ip, i)
+        }else {
+            otherTarget = append(otherTarget, i)
+        }
+    }
+
+    lock := sync.NewLock()
+    addIp := func(i) {
+        lock.Lock()
+        defer lock.Unlock()
+        ipV4Ip = append(ipV4Ip, i)
+    }
+
+    yakit.StatusCard("执行状态", sprintf("解析域名[%d]个", len(otherTarget)))
+    wg := sync.NewSizedWaitGroup(20)
+    for i in otherTarget {
+        wg.Add(1)
+        go func(t) {
+            defer wg.Done()
+            lookipList :=os.LookupIP(i)
+            for ip in lookipList {
+                if str.IsIPv4(ip) {
+                    addIp(ip)
+                }
+            }
+        }(i)
+    }
+    wg.Wait()
+
+    return ipV4Ip
+}
+
+
+ipArray := parseTarget(target)
+
+
+yakit.StatusCard("执行状态", "正在添加路由")
+m := netstack.GetSystemRouteManager()
+err := m.AddIPRoute(ipArray, tunName )
+if err !=nil {
+    die(err)
+}
+yakit.StatusCard("成功添加路由", len(ipArray))
+yakit.Info("sucess add ip route %d", len(ipArray))

@@ -98,6 +98,17 @@ func GetPublicRoute() (*net.Interface, net.IP, net.IP, error) {
 	return iface, gw, ip, nil
 }
 
+func GetPublicHost() (net.IP, error) {
+	iface, gw, ip, err := Route(5*time.Second, "8.8.8.8")
+	if err != nil {
+		return nil, err
+	}
+	notifyOnce.Do(func() {
+		log.Infof("public interface network: %v gw: %v local: %v", iface.Name, gw.String(), ip.String())
+	})
+	return ip, nil
+}
+
 func Route(timeout time.Duration, target string) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
 	var addr = target
 	if !utils.IsIPv4(target) && !utils.IsIPv6(target) {
