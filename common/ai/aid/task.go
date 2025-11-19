@@ -248,7 +248,7 @@ func ExtractNextPlanTaskFromRawResponse(c *Coordinator, rawResponse string) ([]*
 	if len(taskList) <= 0 {
 		return nil, errors.New("no aiTask found in next-plan")
 	}
-	return nil, errors.New("no aiTask found in next-plans")
+	return taskList, nil
 }
 
 // _assignHierarchicalIndicesRecursive 递归地为任务及其子任务分配层级索引。
