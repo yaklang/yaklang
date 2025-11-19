@@ -309,6 +309,10 @@ func newConfig(ctx context.Context) *Config {
 		MaxTaskContinue:                    3,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 	}
+	config.AiToolManagerOption = append(config.AiToolManagerOption,
+		buildinaitools.WithNoToolsCache(),
+		buildinaitools.WithEnableAllTools(),
+	)
 
 	// Initialize emitter
 	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) error {

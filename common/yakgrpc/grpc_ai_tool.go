@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -134,6 +135,10 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 		Keywords:    strings.Join(req.GetKeywords(), ","),
 	}
 
+	if err := fixAIToolMetadata(tool); err != nil {
+		return nil, utils.Errorf("failed to fix AI tool metadata: %s", err)
+	}
+
 	_, err := yakit.CreateAIYakTool(db, tool)
 	if err != nil {
 		return nil, utils.Errorf("failed to create AI tool: %s", err)
@@ -159,6 +164,11 @@ func (s *Server) UpdateAITool(ctx context.Context, req *ypb.UpdateAIToolRequest)
 		Path:        req.GetToolPath(),
 		Keywords:    strings.Join(req.GetKeywords(), ","),
 	}
+
+	if err := fixAIToolMetadata(aitool); err != nil {
+		return nil, utils.Errorf("failed to fix AI tool metadata: %s", err)
+	}
+
 	aitool.ID = uint(req.GetID())
 	affected, err := yakit.UpdateAIYakToolByID(db, aitool)
 	if err != nil {
@@ -236,4 +246,29 @@ func (s *Server) ToggleAIToolFavorite(ctx context.Context, req *ypb.ToggleAITool
 		IsFavorite: isFavorite,
 		Message:    message,
 	}, nil
+}
+
+func fixAIToolMetadata(tool *schema.AIYakTool) error {
+	parsedAITool := yakscripttools.LoadYakScriptToAiTools(tool.Name, tool.Content)
+	if parsedAITool == nil {
+		// 禁止保存解析参数失败的工具，和插件行为保持一致
+		return utils.Errorf("failed to load yak script to AI tool")
+	}
+
+	if tool.Params == "" {
+		tool.Params = parsedAITool.Params
+	}
+	if tool.VerboseName == "" {
+		tool.VerboseName = parsedAITool.VerboseName
+	}
+	if tool.Keywords == "" {
+		tool.Keywords = parsedAITool.Keywords
+	}
+	if tool.Description == "" {
+		tool.Description = parsedAITool.Description
+	}
+	if tool.Path == "" {
+		tool.Path = parsedAITool.Path
+	}
+	return nil
 }
