@@ -246,7 +246,7 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 		_, err := executor.Execute(
 			context.Background(),
 			fmt.Sprintf(
-				"%v forward-tun-to-socks --socket-path %#v --secret %#v",
+				"%v forward-tun-to-socks --socket-path %#v --secret %s",
 				currentBinary, socketPath, secret,
 			),
 			privileged.WithSkipConfirmDialog(),
