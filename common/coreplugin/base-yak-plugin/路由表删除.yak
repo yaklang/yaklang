@@ -1,0 +1,51 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+ipList := cli.String("ipList", cli.setVerboseName("ip列表"),cli.setHelp("按照ip删除路由,逗号分隔"))
+tunName := cli.String("tunName", cli.setVerboseName("tun设备名"),cli.setHelp("按照转发tun设备名删除路由"))
+clearRoute := cli.Bool("clear", cli.setVerboseName("全部清理"),cli.setHelp("清理所有yak设置的路由"))
+cli.check()
+
+ipcount := 0
+interfaceCount := 0
+feedbackIpDelete := func(count) {
+    ipcount = ipcount + count
+    yakit.StatusCard("删除路由(单位:IP)", ipcount)
+}
+feedbackIpDelete := func(count) {
+    interfaceCount = interfaceCount + count
+    yakit.StatusCard("删除路由(单位:设备)", interfaceCount)
+}
+
+m := netstack.GetSystemRouteManager()
+if clearRoute {
+    for i in m.GetExistedManagedSystemTableRoute(){
+        m.DeleteIPRoute(i.IPAddr)
+        yakit.Info("delete ip route: %s", i.IPAddr)
+        feedbackIpDelete(1)
+    }
+}
+
+
+if ipList != "" {
+    ipArray := str.Split(ipList, ",")
+    if ipArray.Len() > 0{
+        err := m.DeleteIPRoute(ipArray)
+        if err != nil {
+            yakit.Error("delete route by ip fail: %s", err)
+        }else {
+            yakit.Info("delete ip route count: %d", len(ipArray))
+            feedbackIpDelete(len(ipArray))
+        }
+    }
+}
+
+if tunName != "" {
+    m.DeleteRoutesForInterface(tunName)~
+    yakit.Info("delete interface route:%s ", tunName)
+    feedbackIpDelete(1)
+}
+
+
+

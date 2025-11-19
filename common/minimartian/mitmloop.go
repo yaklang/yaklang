@@ -405,14 +405,24 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 				serverUseH2 = cached.(bool)
 			} else {
 				// TODO: should connect every connection?
-				netConn, _ := netx.DialX(
-					cacheKey,
-					netx.DialX_WithTimeout(10*time.Second),
+				basicOptions := []netx.DialXOption{
+					netx.DialX_WithTimeout(10 * time.Second),
 					netx.DialX_WithProxy(proxyStr),
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
 					netx.DialX_WithDialer(p.dialer),
+				}
+
+				if ctx.GetSessionBoolValue("StrongHostMode") {
+					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
+					if localAddrIP != "" {
+						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
+					}
+				}
+
+				netConn, _ := netx.DialX(
+					cacheKey, basicOptions...,
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {

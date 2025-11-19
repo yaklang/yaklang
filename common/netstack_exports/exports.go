@@ -50,16 +50,23 @@ type NetstackVM struct {
 	cancel   context.CancelFunc
 }
 
-// StartForwarding starts forwarding TCP connections to the provided channel
-// The channel should be created in yaklang script using: connChan = make(chan any)
-// This channel can then be passed to MITM's extraIncomingConn option
-func (vm *NetstackVM) StartForwarding(ch interface{}) error {
-	log.Infof("StartForwarding called, vm=%v, listener=%v, ch=%v", vm != nil, vm.listener != nil, ch != nil)
+func (vm *NetstackVM) startForwardCheck() error {
 	if vm == nil {
 		return utils.Errorf("VM is nil")
 	}
 	if vm.listener == nil {
 		return utils.Errorf("listener not initialized")
+	}
+
+	return nil
+}
+
+// StartForwarding starts forwarding TCP connections to the provided channel
+// The channel should be created in yaklang script using: connChan = make(chan any)
+// This channel can then be passed to MITM's extraIncomingConn option
+func (vm *NetstackVM) StartForwarding(ch interface{}) error {
+	if err := vm.startForwardCheck(); err != nil {
+		return err
 	}
 	if ch == nil {
 		return utils.Errorf("channel cannot be nil")
@@ -121,11 +128,8 @@ func (vm *NetstackVM) StartForwarding(ch interface{}) error {
 
 func (vm *NetstackVM) StartForwardingSafeChannel(ch *chanx.UnlimitedChan[net.Conn]) error {
 	log.Infof("StartForwarding called, vm=%v, listener=%v, ch=%v", vm != nil, vm.listener != nil, ch != nil)
-	if vm == nil {
-		return utils.Errorf("VM is nil")
-	}
-	if vm.listener == nil {
-		return utils.Errorf("listener not initialized")
+	if err := vm.startForwardCheck(); err != nil {
+		return err
 	}
 	if ch == nil {
 		return utils.Errorf("channel cannot be nil")
@@ -165,6 +169,43 @@ func (vm *NetstackVM) StartForwardingSafeChannel(ch *chanx.UnlimitedChan[net.Con
 
 	log.Info("TCP connection forwarding started successfully")
 	return nil
+}
+
+func (vm *NetstackVM) StartForwardingCallbackMode(handle func(conn net.Conn) error) error {
+	if err := vm.startForwardCheck(); err != nil {
+		return err
+	}
+	log.Infof("Starting TCP connection forwarding to callback function...")
+
+	for {
+		conn, err := vm.listener.Accept()
+		if err != nil {
+			if err != net.ErrClosed {
+				log.Errorf("error accepting connection: %v", err)
+			}
+			return err
+		}
+
+		select {
+		case <-vm.ctx.Done():
+			log.Info("VM context cancelled, stopping connection forwarding")
+			conn.Close()
+			return vm.ctx.Err()
+		default:
+			// Try to send with a timeout
+			select {
+			case <-vm.ctx.Done():
+				conn.Close()
+				return vm.ctx.Err()
+			default:
+				// Non-blocking send
+				if err := handle(conn); err != nil {
+					log.Errorf("error in callback function: %v", err)
+					conn.Close()
+				}
+			}
+		}
+	}
 }
 
 // Close closes the VM and all associated resources

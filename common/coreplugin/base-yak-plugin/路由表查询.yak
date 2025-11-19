@@ -1,0 +1,15 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+m := netstack.GetSystemRouteManager()
+routeInfo := m.GetExistedManagedSystemTableRoute()
+yakit.StatusCard("已设置路由数", len(routeInfo))
+tableName := "已设置路由信息"
+yakit.EnableTable(tableName, ["目标劫持IP","tun设备名"])
+for i in routeInfo {
+    yakit.TableData(tableName, {
+        "目标劫持IP":i.IPAddr,
+        "tun设备名":i.TunName,
+    })
+}
+yakit.Text(routeInfo)

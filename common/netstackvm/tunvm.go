@@ -343,6 +343,14 @@ func NewTunVirtualMachineFromDevice(ctx context.Context, device tun.Device) (*Tu
 		mainNicID:    mainNICId,
 	}
 
+	go func() {
+		select {
+		case <-baseCtx.Done():
+			log.Infof("context cancelled, closing vm: %s", tvm.tunnelName)
+			tvm.Close()
+		}
+	}()
+
 	tcpForwarder := tcp.NewForwarder(tvm.stack, defaultWndSize, maxConnAttempts, func(r *tcp.ForwarderRequest) {
 		var (
 			wq  waiter.Queue
