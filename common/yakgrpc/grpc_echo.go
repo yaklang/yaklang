@@ -131,7 +131,7 @@ func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
 		if ok {
 			return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
 		}
-		log.Info("quick certificate verification reported certificate missing; running legacy verification")
+		//log.Info("quick certificate verification reported certificate missing; running legacy verification")
 	} else {
 		log.Debugf("quick certificate verification failed: %v", err)
 	}

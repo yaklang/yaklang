@@ -1,0 +1,28 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+mtu := cli.Int("mtu", cli.setVerboseName("最大传输单元"), cli.setRequired(true),cli.setDefault(1500))
+cli.check()
+
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+device := netstack.CreatePrivilegedDeviceWithMTU(mtu)~
+defer device.Close()
+yakit.StatusCard("tunnel name", device.Name()~)
+vm := netstack.NewVMFromDeviceWithContext(ctx,device)~
+defer vm.Close()
+
+channel := mitm.GetDefaultExtraConnManager().GetExtraConnChan(mitm.grpcMitmKey)
+
+if channel == nil {
+    yakit.Error("需要先启动mitm")
+    yakit.StatusCard("启动错误", "请先启动mitm中间人劫持")
+    return
+}
+
+vm.StartForwardingCallbackMode(func(conn){
+    yakit.Info("tunnel Hijack [%s] -> [%s]", conn.RemoteAddr(), conn.LocalAddr())
+    channel.SafeFeed(conn)
+})

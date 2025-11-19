@@ -1394,7 +1394,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	extraIncome := yaklib.DefaultMitmExtraConnManager.Register(streamCtx, yaklib.DefaultGRPCMitmKey)
 	defer yaklib.DefaultMitmExtraConnManager.Unregister(yaklib.DefaultGRPCMitmKey)
 	wrapperConnChan := make(chan *minimartian.WrapperedConn, 100)
-	_, _, publicIP, err := netutil.GetPublicRoute()
+	publicIP, err := netutil.GetPublicHost()
 	if err != nil {
 		log.Errorf("get public route error: %s", err)
 	}

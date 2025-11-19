@@ -39,10 +39,7 @@ func (m *MitmExtraConnManager) Register(ctx context.Context, id string) *chanx.U
 func (m *MitmExtraConnManager) Unregister(id string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if ch, ok := m.extraConnMap[id]; ok {
-		ch.Close()
-		delete(m.extraConnMap, id)
-	}
+	delete(m.extraConnMap, id)
 }
 
 func init() {

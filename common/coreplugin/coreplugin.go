@@ -225,6 +225,35 @@ func init() {
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
 		)
+
+		registerBuildInPlugin(
+			"yak", "Tun劫持服务",
+			withPluginHelp("通过Tun设备劫持流量并转发到MITM进行处理"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+
+		registerBuildInPlugin(
+			"yak", "路由表查询",
+			withPluginHelp("查询当前tun劫持的路由信息"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+
+		registerBuildInPlugin(
+			"yak", "路由表增加",
+			withPluginHelp("增加tun劫持的路由"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+
+		registerBuildInPlugin(
+			"yak", "路由表删除",
+			withPluginHelp("删除tun劫持的路由"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+
 		//registerBuildInPlugin(
 		//	"mitm", "MITM 请求修改",
 		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
