@@ -206,6 +206,12 @@ func (m *PromptContextProvider) StoreRootTask(t *AiTask) {
 }
 
 func (m *PromptContextProvider) Progress() string {
+	if utils.IsNil(m) {
+		return "empty *PromptContextProvider maybe a BUG"
+	}
+	if utils.IsNil(m.RootTask) {
+		m.RootTask = m.CurrentTask.rootTask
+	}
 	return m.RootTask.Progress()
 }
 
@@ -355,23 +361,16 @@ func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {
 // memory tools current task info
 func (m *PromptContextProvider) CurrentTaskInfo() string {
 	if m.CurrentTask == nil {
-		return ""
+		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo`, no current task"
 	}
-	templateData := map[string]interface{}{
-		"Memory": m,
-	}
-	temp, err := template.New("current_task_info").Parse(__prompt_currentTaskInfo)
+	results, err := utils.RenderTemplate(__prompt_currentTaskInfo, map[string]interface{}{
+		"ContextProvider": m,
+	})
 	if err != nil {
-		log.Errorf("error parsing tool result history template: %v", err)
-		return ""
+		return "BUG:... currentTaskInfo cannot be generated in `CurrentTaskInfo` err: " + err.Error()
 	}
-	var promptBuilder strings.Builder
-	err = temp.Execute(&promptBuilder, templateData)
-	if err != nil {
-		log.Errorf("error executing tool result history template: %v", err)
-		return ""
-	}
-	return promptBuilder.String()
+
+	return results
 }
 
 func (m *PromptContextProvider) PersistentMemory() string {
