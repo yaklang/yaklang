@@ -419,7 +419,7 @@ func (r *Emitter) EmitDefaultStreamEvent(nodeId string, reader io.Reader, taskIn
 		startTime:          time.Now(),
 		isSystem:           false,
 		isReason:           false,
-		reader:             reader,
+		reader:             utils.UTF8Reader(reader),
 		nodeId:             nodeId,
 		contentType:        "",
 		taskIndex:          taskIndex,
