@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
@@ -31,6 +33,7 @@ type TaskProgress struct {
 
 type AiTask struct {
 	*Coordinator
+
 	*aicommon.AIStatefulTaskBase
 	Index      string    `json:"index"`
 	Name       string    `json:"name"`
@@ -44,6 +47,50 @@ type AiTask struct {
 	LongSummary   string `json:"long_summary"`
 
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+}
+
+func (t *AiTask) GetUserInput() string {
+	if utils.IsNil(t.ParentTask) {
+		return t.AIStatefulTaskBase.GetUserInput()
+	}
+	var buf bytes.Buffer
+
+	// 递归收集父任务链的 UserInput，最多20层
+	var collectParentInputs func(task *AiTask, depth int) []string
+	collectParentInputs = func(task *AiTask, depth int) []string {
+		if task == nil || depth >= 20 {
+			return nil
+		}
+
+		var inputs []string
+		if task.ParentTask != nil {
+			// 先收集更上层的父任务输入
+			inputs = collectParentInputs(task.ParentTask, depth+1)
+		}
+
+		// 添加当前任务的输入
+		if task.AIStatefulTaskBase != nil {
+			input := task.AIStatefulTaskBase.GetUserInput()
+			if input != "" {
+				inputs = append(inputs, input)
+			}
+		}
+
+		return inputs
+	}
+
+	// 收集所有父任务和当前任务的输入
+	inputs := collectParentInputs(t, 0)
+
+	// 拼接所有输入
+	for i, input := range inputs {
+		if i > 0 {
+			buf.WriteString("\n")
+		}
+		buf.WriteString(utils.PrefixLines(input, strings.Repeat("> ", i)))
+	}
+
+	return buf.String()
 }
 
 func (t *AiTask) executed() bool {

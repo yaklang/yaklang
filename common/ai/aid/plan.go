@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"strings"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -140,6 +141,26 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 					return
 				}
 				rootTask = pr.cod.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
+
+				if !strings.Contains(rootTask.GetUserInput(), pr.rawInput) {
+					// keep raw user input context
+					nonce := utils.RandStringBytes(4)
+					taskInput := rootTask.GetUserInput()
+					i := utils.MustRenderTemplate(`
+<|用户原始需求_{{.nonce}}|>
+{{ .RawUserInput }}
+<|用户原始需求_END_{{.nonce}}|>
+--- 
+{{ .Origin }}
+`,
+						map[string]any{
+							"nonce":        nonce,
+							"RawUserInput": pr.rawInput,
+							"Origin":       taskInput,
+						})
+					rootTask.SetUserInput(i)
+				}
+
 				for _, subtask := range action.GetInvokeParamsArray("tasks") {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue

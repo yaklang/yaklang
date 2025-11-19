@@ -1,6 +1,7 @@
 {{ .ContextProvider.Progress }}
-当前任务: {{ .ContextProvider.CurrentTask.QuoteName }}
-目标：{{ .ContextProvider.CurrentTask.QuoteGoal }}
+--- 当前任务 ---
+{{ .ContextProvider.CurrentTask.GetUserInput }}
+
 任务次数执行信息：
 - 调用了{{ .ContextProvider.CurrentTask.ToolCallCount }} 次工具。
 - 决策继续执行了{{ .ContextProvider.CurrentTask.TaskContinueCount}} 次。（系统限制为{{ .ContextProvider.TaskMaxContinue}}次）

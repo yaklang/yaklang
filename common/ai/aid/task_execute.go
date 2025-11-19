@@ -3,11 +3,9 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"text/template"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -24,6 +22,12 @@ var (
 
 func (t *AiTask) execute() error {
 	t.ContextProvider.StoreCurrentTask(t)
+	taskUserInput := t.GetUserInput()
+	utils.Debug(func() {
+		fmt.Println("-----------------------TASK FORMATTED USER INPUT-----------------------")
+		fmt.Println(taskUserInput)
+		fmt.Println("-----------------------------------------------------------------------")
+	})
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
@@ -47,6 +51,8 @@ func (t *AiTask) execute() error {
 
 <|PROGRESS_TASK_{{.Nonce}}|>
 {{ .Progress }}
+--- CURRENT_TASK ---
+{{ .CurrentProgress }}
 <|PROGRESS_TASK_END_{{ .Nonce }}|>
 
 - 进度信息语义约定：
@@ -73,7 +79,9 @@ func (t *AiTask) execute() error {
      - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
 
 `, map[string]interface{}{
-				"Progress": t.ContextProvider.CurrentTaskInfo(),
+				"Progress":        t.rootTask.Progress(),
+				"CurrentProgress": t.Progress(),
+				"Nonce":           nonce,
 			})
 
 			return reactiveData, nil
@@ -184,15 +192,13 @@ func (t *AiTask) generateTaskSummary() error {
 }
 
 func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
-	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
-	var buf bytes.Buffer
-	err := summaryTemplate.Execute(&buf, map[string]any{
-		"ContextProvider": t.ContextProvider,
+	results, err := utils.RenderTemplate(__prompt_TaskSummary, map[string]any{
+		"ContextProvider": t.Coordinator.ContextProvider,
 	})
 	if err != nil {
 		return "", err
 	}
-	return buf.String(), nil
+	return results, nil
 }
 
 func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
