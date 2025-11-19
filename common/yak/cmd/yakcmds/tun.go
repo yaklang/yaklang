@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -449,6 +450,14 @@ func findAvailableIP() (string, error) {
 
 // configureTunDevice 使用 ifconfig 配置 TUN 设备
 func configureTunDevice(tunName, tunIP string, mtu int) error {
+	if runtime.GOOS == "windows" {
+		return configureTunDeviceWin(tunName, tunIP, mtu)
+	} else {
+		return configureTunDeviceOther(tunName, tunIP, mtu)
+	}
+}
+
+func configureTunDeviceOther(tunName, tunIP string, mtu int) error {
 	// 在 macOS 上，utun 设备需要设置点对点地址
 	// 使用 tunIP 作为本地地址，tunIP 的下一个地址作为远端地址
 	ipParts := strings.Split(tunIP, ".")
@@ -488,6 +497,55 @@ func configureTunDevice(tunName, tunIP string, mtu int) error {
 	}
 	log.Infof("TUN device status:\n%s", string(output))
 
+	return nil
+}
+
+func configureTunDeviceWin(tunName, tunIP string, mtu int) error {
+	// 在 Windows 上，我们为接口设置 IP 和子网掩码。
+	// 对于 VPN 隧道，一个常见的子网掩码是 /24 (255.255.255.0) 或 /32 (255.255.255.255)。
+	// 这里我们使用 /24 作为示例，你可以根据需要调整。
+	subnetMask := "255.255.255.0"
+	log.Printf("Configuring TUN device '%s' on Windows...", tunName)
+	// 1. 配置 IP 地址和子网掩码
+	// 命令: netsh interface ip set address name="tunName" static tunIP subnetMask
+	// netsh 命令需要管理员权限才能执行
+	cmd := exec.Command("netsh", "interface", "ip", "set", "address",
+		fmt.Sprintf("name=%q", tunName), // 使用 %q 来为接口名称加上引号，防止名称中包含空格
+		"static",
+		tunIP,
+		subnetMask,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// 检查输出中是否包含 "Run as administrator" 错误
+		if strings.Contains(string(output), "administrator") {
+			return fmt.Errorf("permission denied. please run your application as an administrator to configure the network interface. details: %v, output: %s", err, string(output))
+		}
+		return fmt.Errorf("failed to configure IP address: %v, output: %s", err, string(output))
+	}
+	log.Printf("Configured TUN device with IP: %s, Subnet Mask: %s", tunIP, subnetMask)
+	// 2. 设置 MTU
+	// 命令: netsh interface ipv4 set subinterface "tunName" mtu=mtu store=persistent
+	cmd = exec.Command("netsh", "interface", "ipv4", "set", "subinterface",
+		fmt.Sprintf("interface=%q", tunName),
+		fmt.Sprintf("mtu=%d", mtu),
+		"store=persistent", // 使设置在重启后依然有效
+	)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to set MTU: %v, output: %s", err, string(output))
+	}
+	log.Printf("Set MTU to %d", mtu)
+	// 3. 验证设备状态 (可选，但推荐)
+	// 命令: netsh interface ip show config name="tunName"
+	cmd = exec.Command("netsh", "interface", "ip", "show", "config", fmt.Sprintf("name=%q", tunName))
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		// 即使验证失败，配置可能也已成功，所以只记录警告
+		log.Printf("Warning: failed to verify device status: %v, output: %s", err, string(output))
+	} else {
+		log.Printf("TUN device status:\n%s", string(output))
+	}
 	return nil
 }
 
