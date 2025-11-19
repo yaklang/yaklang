@@ -221,9 +221,14 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		log.Warnf("BUG: value2IrCode called (%s)[%v] with nil type", value.String(), value.GetOpcode().String())
 		ir.TypeID = -1
 	} else {
-		if typ.GetId() <= 0 {
-			saveTypeWithValue(value, typ)
-		}
+		/*
+			如果 typ.GetId() > 0 证明这个type在数据库里保存过
+			但数据库保存是异步，保存时fulltypename可能没有设置完毕
+			因此在这里选择直接强制保存
+		*/
+		// if typ.GetId() <= 0 {
+		saveTypeWithValue(value, typ)
+		// }
 
 		if typ.GetId() <= 0 {
 			log.Errorf("[BUG] Failed to save type, ID still invalid: %d, type: %s, value: %s",
