@@ -24,6 +24,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeReactCancelCurrentTaskEvent(event)
 	case SYNC_TYPE_REACT_REMOVE_TASK:
 		return r.HandleSyncTypeReactRemoveTaskEvent(event)
+	case SYNC_TYPE_REACT_CLEAR_TASK:
+		return r.HandleSyncTypeReactClearTaskEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -35,6 +37,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE, r.HandleSyncTypeReactJumpQueueEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK, r.HandleSyncTypeReactCancelCurrentTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK, r.HandleSyncTypeReactRemoveTaskEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CLEAR_TASK, r.HandleSyncTypeReactClearTaskEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -43,6 +46,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_JUMP_QUEUE)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK)
+	r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(SYNC_TYPE_REACT_CLEAR_TASK)
 }
 
 // 单独拆分的 handler 函数
@@ -212,4 +216,10 @@ func (r *ReAct) HandleSyncTypeReactRemoveTaskEvent(event *ypb.AIInputEvent) erro
 		SyncType:      SYNC_TYPE_QUEUE_INFO,
 		SyncID:        event.SyncID,
 	})
+}
+
+func (r *ReAct) HandleSyncTypeReactClearTaskEvent(event *ypb.AIInputEvent) error {
+	r.taskQueue.Clear()
+	r.EmitSyncEvent(REACT_TASK_clear, fmt.Sprintf("clear react tas queue at %s", time.Now().String()), event.SyncID)
+	return nil
 }

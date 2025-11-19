@@ -280,7 +280,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务创建",
 		En: "ReAct Task Created",
 	},
-
+	"react_task_cleared": {
+		Zh: "任务队列清空",
+		En: "ReAct Task queue Cleared",
+	},
 	// 日志级别相关的 nodeId
 	"info": {
 		Zh: "信息",

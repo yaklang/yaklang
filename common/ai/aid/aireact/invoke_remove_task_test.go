@@ -2,8 +2,13 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"io"
 	"testing"
 	"time"
 
@@ -224,4 +229,203 @@ eventLoop:
 	}
 
 	fmt.Println("[SUCCESS] Remove task test passed successfully!")
+}
+
+// TestReAct_Clear_StatusChanges 测试清理队列对任务的
+func TestReAct_Clear_StatusChanges(t *testing.T) {
+	flag := ksuid.New().String()
+	_ = flag
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 100)
+
+	// 创建慢任务工具
+	slowTool, err := aitool.New(
+		"slow_task",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithNoRuntimeCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			sleepDuration := params.GetFloat("seconds", 3.0)
+
+			fmt.Printf("Slow task started, will run for %.1f seconds\n", sleepDuration)
+
+			// 使用小的时间片来检测取消
+			for i := 0; i < int(sleepDuration*10); i++ {
+				select {
+				case <-ctx.Done():
+					fmt.Println("Slow task was cancelled")
+					return nil, ctx.Err()
+				case <-time.After(100 * time.Millisecond):
+					// 继续执行
+				}
+			}
+
+			fmt.Println("Slow task completed normally")
+			return "slow task completed", nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create slow task tool: %v", err)
+	}
+
+	// 创建快任务工具
+	fastTool, err := aitool.New(
+		"fast_task",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			sleepDuration := params.GetFloat("seconds", 0.1)
+			time.Sleep(time.Duration(sleepDuration) * time.Second)
+			fmt.Println("Fast task completed")
+			return "fast task completed", nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create fast task tool: %v", err)
+	}
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			// 根据用户输入决定使用哪个工具
+			if utils.MatchAnyOfSubString(prompt, "run fast task") {
+				return mockedToolCallingForJump(i, r, "fast_task")
+			}
+			// 默认使用 slow_task
+			return mockedToolCallingForJump(i, r, "slow_task")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(slowTool, fastTool),
+		aicommon.WithDebug(false),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO), // 跳过用户审核，直接执行工具
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ins
+
+	cb := utils.NewCondBarrierContext(context.Background())
+
+	go func() {
+		// 发送第一个任务（慢任务）
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "run slow task",
+		}
+
+		// 稍微等待一下，然后发送第二个任务（快任务）
+		time.Sleep(100 * time.Millisecond)
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "run fast task",
+		}
+
+		time.Sleep(100 * time.Millisecond)
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "run fast task",
+		}
+	}()
+
+	after := time.After(8 * time.Second)
+
+	var task1Id, task2Id, task3Id string
+	clearEventReceived := false
+	slowToolStarted := false
+	queueInfoOk := false
+
+	syncId := ksuid.New().String()
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			fmt.Println(e.String())
+
+			if e.NodeId == "react_task_created" {
+				taskId := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_id"))
+				if task1Id == "" {
+					task1Id = taskId
+					cb.CreateBarrier("task1").Done()
+				} else if task2Id == "" {
+					task2Id = taskId
+					cb.CreateBarrier("task2").Done()
+				} else if task3Id == "" {
+					task3Id = taskId
+					cb.CreateBarrier("task3").Done()
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				taskId := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_id"))
+				status := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_now_status"))
+				fmt.Printf("Task %s status changed to: %s\n", taskId, status)
+			}
+
+			if e.Type == "tool_call_start" {
+				toolName := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.tool.name"))
+				fmt.Printf("Tool call started: %s\n", toolName)
+				if toolName == "slow_task" {
+					slowToolStarted = true
+					fmt.Println("Slow tool started")
+
+					// 等待一下确保工具开始执行，然后发送插队请求
+					go func() {
+						err := cb.Wait("task1", "task2", "task3")
+						if err != nil {
+							return
+						}
+						time.Sleep(200 * time.Millisecond)
+						if task2Id != "" {
+							fmt.Printf("Sending jump queue request for task: %s\n", task2Id)
+							in <- &ypb.AIInputEvent{
+								IsSyncMessage: true,
+								SyncType:      SYNC_TYPE_REACT_CLEAR_TASK,
+								SyncID:        syncId,
+							}
+						}
+					}()
+				}
+			}
+
+			if e.NodeId == REACT_TASK_clear {
+				if e.SyncID == syncId {
+					clearEventReceived = true
+				}
+				in <- &ypb.AIInputEvent{
+					IsSyncMessage: true,
+					SyncType:      SYNC_TYPE_QUEUE_INFO,
+				}
+			}
+
+			if clearEventReceived && e.NodeId == "queue_info" {
+				if content := string(e.Content); content != "" {
+					queueInfoOk = true
+					if queueLen := jsonpath.FindFirst(content, "$.total_tasks"); queueLen != nil {
+						require.Zero(t, queueLen)
+					}
+				}
+			}
+
+			if clearEventReceived && slowToolStarted && queueInfoOk {
+				break LOOP
+			}
+
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !slowToolStarted {
+		t.Fatal("Expected slow tool to start, but it didn't")
+	}
+	if !clearEventReceived {
+		t.Fatal("Expected clear queue event to be received, but it wasn't")
+	}
+	if !queueInfoOk {
+		t.Fatal("Expected queue info to be received, but it wasn't")
+	}
+
+	fmt.Println("✅ clear queue test passed successfully!")
 }
