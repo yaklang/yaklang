@@ -1,6 +1,8 @@
 package knowledgebase
 
 import (
+	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -29,6 +31,9 @@ func DeleteKnowledgeBase(db *gorm.DB, name string) error {
 		var collection schema.VectorStoreCollection
 		err = tx.Where("name = ?", name).First(&collection).Error
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
 			return utils.Errorf("get VectorStoreCollection failed: %s", err)
 		}
 		err = tx.Where("id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreCollection{}).Error

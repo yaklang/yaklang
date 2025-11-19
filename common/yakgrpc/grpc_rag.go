@@ -170,6 +170,7 @@ func (s *Server) ListVectorStoreEntries(ctx context.Context, req *ypb.ListVector
 			Embedding:       doc.Embedding,
 			DocumentType:    string(doc.DocumentType),
 			RelatedEntities: utils.PrettifyListFromStringSplitEx(doc.RelatedEntities, ","),
+			EntityID:        doc.EntityID,
 		}
 		pbEntries = append(pbEntries, pbEntry)
 	}
