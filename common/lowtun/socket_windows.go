@@ -9,8 +9,10 @@
 package lowtun
 
 import (
+	"github.com/Microsoft/go-winio"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/natefinch/npipe.v2"
@@ -22,8 +24,14 @@ func ListenSocket(socketPath string) (net.Listener, error) {
 	// Convert path to Windows named pipe format
 	pipeName := toNamedPipePath(socketPath)
 
-	// Create named pipe listener
-	listener, err := npipe.Listen(pipeName)
+	config := &winio.PipeConfig{
+		SecurityDescriptor: "D:P(A;;GA;;;WD)", // 设置权限
+		InputBufferSize:    4096,              // 输入缓冲
+		OutputBufferSize:   4096,              // 输出缓冲
+	}
+
+	// 3. 监听管道
+	listener, err := winio.ListenPipe(pipeName, config)
 	if err != nil {
 		return nil, utils.Errorf("failed to listen on named pipe %s: %v", pipeName, err)
 	}
@@ -37,7 +45,7 @@ func DialSocket(socketPath string) (net.Conn, error) {
 	pipeName := toNamedPipePath(socketPath)
 
 	// Connect to named pipe
-	conn, err := npipe.Dial(pipeName)
+	conn, err := npipe.DialTimeout(pipeName, 2*time.Second)
 	if err != nil {
 		return nil, utils.Errorf("failed to dial named pipe %s: %v", pipeName, err)
 	}
