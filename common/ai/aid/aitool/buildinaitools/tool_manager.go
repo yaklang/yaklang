@@ -26,6 +26,8 @@ type AiToolManager struct {
 	disableTools          map[string]struct{} // 禁用的工具列表 优先级最高
 	searchTool            []*aitool.Tool
 	forgeSearchTool       []*aitool.Tool
+	noCacheTools          bool // 是否不缓存工具
+	enableAllTools        bool // 是否开启所有工具
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -35,6 +37,20 @@ type ToolManagerOption func(*AiToolManager)
 func WithAIToolsSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
 	return func(m *AiToolManager) {
 		m.aiToolsSearcher = searcher
+	}
+}
+
+// WithNoToolsCache 设置不缓存工具
+func WithNoToolsCache() ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.noCacheTools = true
+	}
+}
+
+// WithEnableAllTools 设置开启所有工具
+func WithEnableAllTools() ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.enableAllTools = true
 	}
 }
 
@@ -140,7 +156,13 @@ func NewToolManager(options ...ToolManagerOption) *AiToolManager {
 		WithExtendTools(GetBasicBuildInTools(), true),
 	} // 默认开启基础工具
 	options = append(basicToolsOptions, options...)
+
 	manager := NewToolManagerByToolGetter(GetAllTools, options...) //候选工具由GetAllTools提供
+	if manager.enableAllTools {
+		manager = NewToolManagerByToolGetter(func() []*aitool.Tool {
+			return GetAllToolsDynamically(consts.GetGormProfileDatabase())
+		}, options...)
+	}
 	return manager
 }
 
@@ -160,9 +182,10 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 
 // GetEnableTools 获取所有可用的工具
 func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
+
 	var enabledTools []*aitool.Tool
 	for _, tool := range m.safeToolsGetter() {
-		if m.toolEnabled[tool.Name] {
+		if m.enableAllTools || m.toolEnabled[tool.Name] {
 			enabledTools = append(enabledTools, tool)
 		}
 	}

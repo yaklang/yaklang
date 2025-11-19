@@ -74,7 +74,7 @@ func SearchAIYakTool(db *gorm.DB, keywords string) ([]*schema.AIYakTool, error) 
 
 func DeleteAIYakTools(db *gorm.DB, names ...string) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
-	if db := db.Where("name IN (?)", names).Delete(&schema.AIYakTool{}); db.Error != nil {
+	if db := db.Where("name IN (?)", names).Unscoped().Delete(&schema.AIYakTool{}); db.Error != nil {
 		return 0, utils.Errorf("delete AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil

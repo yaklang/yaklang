@@ -70,6 +70,8 @@ func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISear
 func NewMergeSearchr[T searchtools.AISearchable](searchs ...searchtools.AISearcher[T]) searchtools.AISearcher[T] {
 	disableSearcherIndex := []int{}
 	return func(query string, searchList []T) ([]T, error) {
+		allResults := []T{}
+		allResultsMap := map[string]T{}
 		for i, search := range searchs {
 			if slices.Contains(disableSearcherIndex, i) {
 				continue
@@ -79,12 +81,17 @@ func NewMergeSearchr[T searchtools.AISearchable](searchs ...searchtools.AISearch
 			}
 			results, err := search(query, searchList)
 			if err != nil {
-				disableSearcherIndex = append(disableSearcherIndex, i)
-				continue
+				log.Errorf("failed to search: %v", err)
 			}
-			return results, nil
+
+			for _, result := range results {
+				if _, ok := allResultsMap[result.GetName()]; !ok {
+					allResults = append(allResults, result)
+					allResultsMap[result.GetName()] = result
+				}
+			}
 		}
-		return nil, utils.Errorf("no valid searcher found")
+		return allResults, nil
 	}
 }
 
