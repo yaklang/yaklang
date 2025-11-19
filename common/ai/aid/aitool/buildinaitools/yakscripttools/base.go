@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -156,6 +157,16 @@ func GetAllYakScriptAiTools() []*aitool.Tool {
 	}
 	return covertTools(allAiTools)
 }
+
+func GetAllYakScriptAiToolsByDB(db *gorm.DB) []*aitool.Tool {
+	allAiTools, err := yakit.SearchAIYakTool(db, "")
+	if err != nil {
+		log.Errorf("search ai yak tool failed: %v", err)
+		return nil
+	}
+	return covertTools(allAiTools)
+}
+
 func GetYakScriptAiTools(names ...string) []*aitool.Tool {
 	db := consts.GetGormProfileDatabase()
 	tools := []*schema.AIYakTool{}

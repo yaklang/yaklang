@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -12,9 +13,15 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -287,4 +294,191 @@ LOOP:
 	}
 
 	fmt.Printf("✓ RuntimeID matches Task ID: %s\n", taskID)
+}
+
+func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
+	// 注册 YakScript 工具转换函数（模拟 yak 包的 init 函数）
+	yakscripttools.RegisterYakScriptAiToolsCovertHandle(func(aitools []*schema.AIYakTool) []*aitool.Tool {
+		tools := []*aitool.Tool{}
+		for _, aiTool := range aitools {
+			tool := mcp.NewTool(aiTool.Name)
+			tool.Description = aiTool.Description
+			dataMap := map[string]any{}
+			err := json.Unmarshal([]byte(aiTool.Params), &dataMap)
+			if err != nil {
+				log.Errorf("unmarshal aiTool.Params failed: %v", err)
+				continue
+			}
+			tool.InputSchema.FromMap(dataMap)
+			at, err := aitool.NewFromMCPTool(
+				tool,
+				aitool.WithDescription(aiTool.Description),
+				aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
+				aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+					// 简单的测试回调
+					return "test tool executed successfully", nil
+				}),
+			)
+			if err != nil {
+				log.Errorf("create aitool failed: %v", err)
+				continue
+			}
+			tools = append(tools, at)
+		}
+		return tools
+	})
+
+	// 生成一个唯一的工具名（UUID）
+	toolName := "test_sleep_" + ksuid.New().String()
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	_, err := NewTestReAct(
+		aicommon.WithAiToolManagerOptions(buildinaitools.WithNoToolsCache(), buildinaitools.WithEnableAllTools()),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, toolName)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithAgreeYOLO(true),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 确保数据库表结构正确
+	db := consts.GetGormProfileDatabase()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+
+	// 第一次尝试：工具不存在，应该失败
+	fmt.Printf("Phase 1: Attempting to call non-existent tool '%s'\n", toolName)
+	in <- &ypb.AIInputEvent{
+		IsFreeInput: true,
+		FreeInput:   "please use " + toolName,
+	}
+
+	after := time.After(du * time.Second)
+	firstTaskFailed := false
+	firstTaskCompleted := false
+
+LOOP1:
+	for {
+		select {
+		case e := <-out:
+			fmt.Println(e.String())
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				// 任务执行失败标志
+				if utils.InterfaceToString(result) == "aborted" {
+					firstTaskFailed = true
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				// 任务执行完成标志
+				if utils.InterfaceToString(result) == "completed" {
+					firstTaskCompleted = true
+					break LOOP1
+				}
+			}
+		case <-after:
+			break LOOP1
+		}
+	}
+
+	if !(firstTaskCompleted && firstTaskFailed) {
+		t.Fatal("first task call failed")
+	}
+
+	// 创建工具
+	fmt.Printf("\nPhase 2: Creating tool '%s'\n", toolName)
+	newTool := &schema.AIYakTool{
+		Name:        toolName,
+		VerboseName: "Test Sleep Tool",
+		Description: "A test tool that simulates sleep operation",
+		Keywords:    "test,sleep,dynamic",
+		Content: `# Test Sleep Tool
+yakit.AutoInitYakit()
+
+cli.Float("seconds", cli.setDefault(0.1), cli.setHelp("sleep duration in seconds"))
+
+seconds = cli.Float("seconds")
+sleep(seconds)
+println("Slept for", seconds, "seconds")
+`,
+		Params: `{"type":"object","properties":{"seconds":{"type":"number","description":"sleep duration in seconds","default":0.1}}}`,
+		Path:   "test/sleep",
+	}
+
+	_, err = yakit.CreateAIYakTool(db, newTool)
+	if err != nil {
+		t.Fatalf("Failed to create AI yak tool: %v", err)
+	}
+	fmt.Printf("✓ Created AI Yak Tool: %s\n", toolName)
+
+	// 第二次尝试：工具已存在，应该成功
+	fmt.Printf("\nPhase 3: Attempting to call newly created tool '%s'\n", toolName)
+	in <- &ypb.AIInputEvent{
+		IsFreeInput: true,
+		FreeInput:   "please use " + toolName,
+	}
+
+	after = time.After(du * time.Second)
+	secondTaskCompleted := false
+	toolReviewReleased := false
+	toolCallDone := false
+LOOP2:
+	for {
+		select {
+		case e := <-out:
+			fmt.Println(e.String())
+
+			// 检查工具是否被成功调用
+			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
+				fmt.Printf("✓ Tool '%s' executed successfully\n", toolName)
+				toolCallDone = true
+			}
+
+			// 检查 prompt 中是否包含工具名
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				if strings.Contains(string(e.Content), toolName) {
+					fmt.Printf("✓ Tool '%s' found in tool list (after creation)\n", toolName)
+					toolReviewReleased = true
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					secondTaskCompleted = true
+					break LOOP2
+				}
+			}
+		case <-after:
+			break LOOP2
+		}
+	}
+
+	close(in)
+
+	if !(secondTaskCompleted && toolReviewReleased && toolCallDone) {
+		t.Fatal("second task call")
+	}
+
+	// 清理：删除创建的工具
+	err = db.Where("name = ?", toolName).Delete(&schema.AIYakTool{}).Error
+	if err != nil {
+		t.Logf("Warning: failed to cleanup tool: %v", err)
+	}
+
+	fmt.Printf("\n✓ Test completed: WithNoToolsCache allows dynamic tool loading\n")
 }
