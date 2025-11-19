@@ -5,7 +5,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -36,6 +39,23 @@ type Timeline struct {
 	totalDumpContentLimit int64
 
 	compressing *utils.Once
+}
+
+func (m *Timeline) Save(db *gorm.DB, persistentId string) {
+	if utils.IsNil(m) {
+		log.Warnf("try to save nil timeline for persistentId: %v", persistentId)
+		return
+	}
+	tlstr, err := MarshalTimeline(m)
+	if err != nil {
+		log.Warnf("save(/marshal) timeline failed: %v", err)
+		return
+	}
+	result := strconv.Quote(tlstr)
+	if err := yakit.UpdateAIAgentRuntimeTimelineWithPersistentId(db, persistentId, result); err != nil {
+		log.Errorf("ReAct: save timeline to db failed: %v", err)
+		return
+	}
 }
 
 func (m *Timeline) Valid() bool {

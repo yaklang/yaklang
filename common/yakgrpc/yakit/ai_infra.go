@@ -89,6 +89,10 @@ func UpdateAIAgentRuntimeTimeline(db *gorm.DB, uuid string, timeline string) err
 	return db.Model(&schema.AIAgentRuntime{}).Where("uuid = ?", uuid).Update("quoted_timeline", timeline).Error
 }
 
+func UpdateAIAgentRuntimeTimelineWithPersistentId(db *gorm.DB, persistentId string, timeline string) error {
+	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("quoted_timeline", timeline).Error
+}
+
 // GetLatestAIAgentRuntimeByPersistentSession 获取某个持久化会话的最新运行时
 func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (*schema.AIAgentRuntime, error) {
 	var runtime schema.AIAgentRuntime
