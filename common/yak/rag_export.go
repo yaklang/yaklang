@@ -24,8 +24,9 @@ var RagExports = map[string]interface{}{
 	"embeddingHandle": _embeddingHandle,
 
 	"DeleteCollection":  _deleteCollection,
-	"DeleteRAG":         rag.DeleteRAG,
+	"DeleteRAG":         _deleteRAG,
 	"ListCollection":    _listCollection,
+	"ListRAG":           _listRAG,
 	"GetCollectionInfo": _getCollectionInfo,
 
 	"HasCollection": _hasCollection,
@@ -141,6 +142,29 @@ func _noKnowledgeBase() rag.RAGSystemConfigOption {
 // ```
 func _deleteCollection(name string) error {
 	return rag.DeleteCollection(consts.GetGormProfileDatabase(), name)
+}
+
+// _listRAG 列出所有 RAG 系统列表
+// Example:
+// ```
+//
+//	ragSystems = rag.ListRAG()
+//
+// ```
+func _listRAG() []string {
+	// return rag.ListRAGSystemNames(consts.GetGormProfileDatabase())
+	return []string{}
+}
+
+// _deleteRAG 删除指定的 RAG 系统
+// Example:
+// ```
+//
+//	err = rag.DeleteRAG("my_rag")
+//
+// ```
+func _deleteRAG(name string) error {
+	return rag.DeleteRAG(consts.GetGormProfileDatabase(), name)
 }
 
 // _embeddingHandle 创建自定义嵌入处理器
