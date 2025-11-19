@@ -1524,6 +1524,7 @@ message VectorStoreEntry {
   repeated float Embedding = 5;
   string DocumentType = 6;
   repeated string RelatedEntities = 7;
+  string EntityID = 8;
 }
 
 
