@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -32,18 +33,23 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 	}
 
 	prog := b.GetProgram()
-	currentEditor := prog.GetCurrentEditor()
-	hasFile := func(p *ssa.Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
-			if hash == currentEditor.GetIrSourceHash() {
-				return true
-			}
-		}
-		return false
+	root := prog.GetApplication()
+	var currentEditor *memedit.MemEditor
+	if root != nil {
+		currentEditor = root.GetCurrentEditor()
 	}
-	skip := hasFile(prog)
-	if skip {
-		return
+	if currentEditor != nil && root != nil {
+		hasFile := func(p *ssa.Program) bool {
+			if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+				if hash == currentEditor.GetIrSourceHash() {
+					return true
+				}
+			}
+			return false
+		}
+		if hasFile(root) {
+			return
+		}
 	}
 
 	// if prog.ProgramKind == ssa.Application {
@@ -59,6 +65,9 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 	b.Function.SetRange(b.CurrentRange)
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
+	}
+	if currentEditor != nil && root != nil {
+		root.FileList[currentEditor.GetUrl()] = currentEditor.GetIrSourceHash()
 	}
 }
 
