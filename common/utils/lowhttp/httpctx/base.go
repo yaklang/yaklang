@@ -310,6 +310,7 @@ const (
 	REQUEST_CONTEXT_KEY_MITMTaskID                   = "mitmTaskID"
 	REQUEST_CONTEXT_KEY_IsStrongHostMode             = "isStrongHostMode"    // Used for transparent hijacking of tun-generated data
 	REQUEST_CONTEXT_KEY_StrongHostLocalAddr          = "strongHostLocalAddr" // Local IP address for strong host mode binding
+	REQUEST_CONTEXT_KEY_IsListenedConn               = "listenedConn"        // exrat connection object
 )
 
 func SetRequestMITMTaskID(req *http.Request, id string) {
