@@ -93,7 +93,7 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 	log.Infof("memory search completed: %d memories, %d bytes content", len(selectedMemories), contentBytes)
 
 	if len(selectedMemories) > 0 {
-		log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkString(totalContent, 512), "Memory> "))
+		log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkTextBlock(totalContent, 512), "Memory> "))
 	}
 
 	return &aicommon.SearchMemoryResult{
@@ -269,7 +269,7 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 				tagsBuilder.WriteString(" ")
 			}
 		}
-		
+
 		memoryText := fmt.Sprintf("- %s%s\n\n  %s\n\n",
 			memory.CreatedAt.Format("2006-01-02 15:04:05"),
 			tagsBuilder.String(),
