@@ -179,6 +179,10 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 		opts = append(opts, aicommon.WithTools(f.Tools...))
 	}
 
+	if f.PlanMocker != nil {
+		opts = append(opts, aid.WithPlanMocker(f.PlanMocker))
+	}
+
 	opts = append(opts, f.AIOptions...)
 	if f.ResultPrompt != "" && f.ResultHandler != nil {
 		opts = append(opts, aid.WithResultHandler(func(cod *aid.Coordinator) {
