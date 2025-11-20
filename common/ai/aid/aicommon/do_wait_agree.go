@@ -219,13 +219,13 @@ func DefaultAIAssistantRiskControl(ctx context.Context, config *Config, ep *Endp
 		stream := rsp.GetOutputStreamReader("review", true, config.GetEmitter())
 		// stream = io.TeeReader(stream, os.Stdout)
 		var err error
-		action, err = ExtractValidActionFromStream(
+		action, err = ExtractActionFromStream(
 			ctx,
 			stream, "risk_assessment",
 			WithActionAlias("object"),
 			WithActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
 				reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-				config.GetEmitter().EmitTextMarkdownStreamEvent(
+				config.GetEmitter().EmitDefaultStreamEvent(
 					"review",
 					reader,
 					rsp.GetTaskIndex(),
