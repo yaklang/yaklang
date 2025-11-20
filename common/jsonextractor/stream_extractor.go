@@ -760,6 +760,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				pushStateWithIdx(state_objectValue, index+1)
 				continue
 			case '}':
+				writeToFieldStream() // 写入对象结束符，处理空对象
 				popStateWithIdx(index - 1)
 				if currentState() == state_jsonObj {
 					popStateWithIdx(index)
