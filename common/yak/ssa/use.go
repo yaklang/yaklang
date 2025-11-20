@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -12,9 +11,6 @@ func filterNilValue(v Value) bool {
 }
 
 func ReplaceAllValue(v Value, to Value) {
-	if utils.IsNil(v) || utils.IsNil(to) || v == to {
-		return
-	}
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
 }
 
@@ -30,9 +26,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
-		if prog := v.GetProgram(); prog != nil && prog.Cache != nil {
-			prog.Cache.RemoveVariable(variable.GetName(), v)
-		}
 		variable.Replace(v, to)
 		// variable = to
 		to.AddVariable(variable)
@@ -227,18 +220,7 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 
 	lo.ForEach(c.ArgMember, func(id int64, index int) {
 		c.ArgMember[index] = to.GetId()
-<<<<<<< HEAD
 	})
-
-	binding, ok := c.Binding[v.GetName()]
-	if ok && binding == v.GetId() {
-		c.Binding[v.GetName()] = to.GetId()
-=======
-	} else {
-		panic("call not use this value")
-		// log.Warnf("call not use this value")
->>>>>>> a50602101 (fix(ssa): fix member replace)
-	}
 }
 
 // ------------ SideEffect

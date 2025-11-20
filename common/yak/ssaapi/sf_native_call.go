@@ -605,7 +605,7 @@ func init() {
 				return false
 			}
 			for _, n := range name {
-				if strings.Contains(n, flag) || strings.Contains(n, "tmp2java_") {
+				if strings.Contains(n, flag) {
 					return true
 				}
 			}
