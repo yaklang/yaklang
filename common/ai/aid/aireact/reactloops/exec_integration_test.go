@@ -386,6 +386,10 @@ func (m *mockSimpleTask) SetReActLoop(loop aicommon.ReActLoopIF) {
 	m.reActLoop = loop
 }
 
+func (m *mockSimpleTask) GetUUID() string {
+	return m.id
+}
+
 // TestOperatorFail 测试操作符的失败处理
 func TestOperatorFail(t *testing.T) {
 	task := &mockSimpleTask{id: "test", index: "test-index"}
