@@ -1,6 +1,7 @@
 package jsonextractor
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -329,6 +330,93 @@ func TestFieldStreamHandler_LargeDataStreaming(t *testing.T) {
 	assert.Greater(t, chunkCount, 1, "Should receive data in multiple chunks")
 
 	t.Logf("Processed %d bytes in %d chunks", receivedSize, chunkCount)
+}
+
+func TestFieldStreamHandler_StreamArrayValueKeepsStructure(t *testing.T) {
+	jsonData := `{"key": ["1", "2", "3"]}`
+	var wg sync.WaitGroup
+	var received string
+
+	wg.Add(1)
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterFieldStreamHandler("key", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			data, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			received = string(data)
+		}))
+
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		var arr []string
+		require.NoError(t, json.Unmarshal([]byte(received), &arr))
+		assert.Equal(t, []string{"1", "2", "3"}, arr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for array stream callback")
+	}
+}
+
+func TestFieldStreamHandler_NestedCompositeSameKey(t *testing.T) {
+	jsonData := `{"key": {"key": 2}}`
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	type record struct {
+		data    string
+		parents []string
+	}
+	var records []record
+
+	wg.Add(2)
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterFieldStreamHandler("key", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			data, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			parentCopy := make([]string, len(parents))
+			copy(parentCopy, parents)
+			records = append(records, record{
+				data:    string(data),
+				parents: parentCopy,
+			})
+		}))
+
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		assert.Len(t, records, 2)
+		var outer, inner *record
+		for i := range records {
+			if len(records[i].parents) == 0 {
+				outer = &records[i]
+			} else {
+				inner = &records[i]
+			}
+		}
+		require.NotNil(t, outer, "outer field stream should exist")
+		require.NotNil(t, inner, "inner field stream should exist")
+		assert.Equal(t, `{"key": 2}`, outer.data)
+		assert.Equal(t, `2`, inner.data)
+		assert.Contains(t, inner.parents, "key")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for nested stream callbacks")
+	}
 }
 
 func TestFieldStreamHandler_CombinedMatchers(t *testing.T) {
