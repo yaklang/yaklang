@@ -20,9 +20,17 @@ type pluginConfig struct {
 	Author              []string
 	Tags                []string
 	EnableGenerateParam bool
+	Ignore              bool
 }
 
 type pluginOption func(*pluginConfig)
+
+// 不希望被本地插件库查看到的插件
+func withPluginIgnore(b bool) pluginOption {
+	return func(config *pluginConfig) {
+		config.Ignore = b
+	}
+}
 
 func withPluginTags(tags []string) pluginOption {
 	return func(config *pluginConfig) {
@@ -72,6 +80,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		OnlineOfficial:     true,
 		IsCorePlugin:       true,
 		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
+		Ignored:            config.Ignore,
 	}
 	buildInPlugin[name] = plugin
 	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
@@ -224,6 +233,7 @@ func init() {
 			withPluginHelp("使用ai对用户的意图进行简易识别"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
 		)
 
 		registerBuildInPlugin(
@@ -231,6 +241,7 @@ func init() {
 			withPluginHelp("通过Tun设备劫持流量并转发到MITM进行处理"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
 		)
 
 		registerBuildInPlugin(
@@ -238,6 +249,7 @@ func init() {
 			withPluginHelp("查询当前tun劫持的路由信息"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
 		)
 
 		registerBuildInPlugin(
@@ -245,6 +257,7 @@ func init() {
 			withPluginHelp("增加tun劫持的路由"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
 		)
 
 		registerBuildInPlugin(
@@ -252,6 +265,7 @@ func init() {
 			withPluginHelp("删除tun劫持的路由"),
 			withPluginAuthors("V1ll4n"),
 			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
 		)
 
 		//registerBuildInPlugin(
@@ -382,8 +396,8 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		}
 		return "", "", nil
 	}
-	pluginHash := func(code string, headImg string, tags string) string {
-		return utils.CalcSha1(string(code), headImg, tags)
+	pluginHash := func(code string, headImg string, tags string, ignore bool) string {
+		return utils.CalcSha1(string(code), headImg, tags, ignore)
 	}
 
 	codeBytes := GetCorePluginData(name)
@@ -392,7 +406,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags)
+	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored)
 
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
@@ -411,7 +425,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags) && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored) && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {
