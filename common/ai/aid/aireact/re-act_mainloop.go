@@ -119,9 +119,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 
 			// 如果没有新的时间线差异，跳过记忆处理
 			if diffStr == "" {
-				if r.config.DebugEvent {
-					log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
-				}
+				log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
 				r.wg.Done()
 				return
 			}
@@ -149,6 +147,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 					isDone,
 					reason)
 
+				log.Infof("start to handle timeline diff: %v", utils.ShrinkString(contextualInput, 1024))
 				// 使用HandleMemory进行智能记忆处理（包含去重、评分、保存）
 				err := r.memoryTriage.HandleMemory(contextualInput)
 				if err != nil {

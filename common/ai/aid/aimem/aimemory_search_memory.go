@@ -92,6 +92,10 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 
 	log.Infof("memory search completed: %d memories, %d bytes content", len(selectedMemories), contentBytes)
 
+	if len(selectedMemories) > 0 {
+		log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkString(totalContent, 512), "Memory> "))
+	}
+
 	return &aicommon.SearchMemoryResult{
 		Memories:      selectedMemories,
 		TotalContent:  totalContent,
@@ -255,11 +259,20 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 	totalBytes := 0
 
 	for _, memory := range memories {
-		// 构建记忆的文本表示
-		memoryText := fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：%s\n",
+		// 构建 Timeline 格式的记忆文本表示
+		var tagsBuilder strings.Builder
+		if len(memory.Tags) > 0 {
+			tagsBuilder.WriteString(" ")
+			for _, tag := range memory.Tags {
+				tagsBuilder.WriteString("#")
+				tagsBuilder.WriteString(tag)
+				tagsBuilder.WriteString(" ")
+			}
+		}
+		
+		memoryText := fmt.Sprintf("- %s%s\n\n  %s\n\n",
 			memory.CreatedAt.Format("2006-01-02 15:04:05"),
-			memory.Id[:8], // 只显示ID前8位
-			strings.Join(memory.Tags, ", "),
+			tagsBuilder.String(),
 			memory.Content)
 
 		memoryBytes := len([]byte(memoryText))
@@ -269,14 +282,13 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 			// 如果是第一个记忆就超过限制，尝试截断
 			if len(selectedMemories) == 0 && memoryBytes > bytesLimit {
 				// 截断内容以适应限制
-				availableBytes := bytesLimit - len([]byte(fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：",
+				headerText := fmt.Sprintf("- %s%s\n\n  ",
 					memory.CreatedAt.Format("2006-01-02 15:04:05"),
-					memory.Id[:8], strings.Join(memory.Tags, ", "))))
+					tagsBuilder.String())
+				availableBytes := bytesLimit - len([]byte(headerText))
 				if availableBytes > 20 { // 至少保留20字节的内容
 					truncatedContent := string([]byte(memory.Content)[:availableBytes-10]) + "..."
-					memoryText = fmt.Sprintf("[%s] 【记忆】%s\n标签：%s\n内容：%s\n",
-						memory.CreatedAt.Format("2006-01-02 15:04:05"),
-						memory.Id[:8], strings.Join(memory.Tags, ", "), truncatedContent)
+					memoryText = headerText + truncatedContent + "\n\n"
 					selectedMemories = append(selectedMemories, memory)
 					memoryTextMap[memory.Id] = memoryText
 					totalBytes = len([]byte(memoryText))
@@ -303,6 +315,6 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 		}
 	}
 
-	totalContent := strings.Join(sortedContentParts, "\n")
+	totalContent := strings.Join(sortedContentParts, "")
 	return selectedMemories, totalContent, totalBytes
 }
