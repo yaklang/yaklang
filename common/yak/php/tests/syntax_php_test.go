@@ -3,14 +3,22 @@ package tests
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -102,144 +110,114 @@ class foo { static $bar = 'baz'; }
 var_dump('foo'::$bar);`)
 }
 
-func TestExpressionAllInONE(t *testing.T) {
-	code := `<?php
-// Clone expression
-$originalObject = new stdClass;
-$clonedObject = clone $originalObject;
+// func TestPHPFront(t *testing.T) {
+// path := "/home/wlz/Developer/pfsense"
+// file := []string{"src/etc/inc/captiveportal.inc", "src/etc/inc/ipsec.inc", "src/usr/local/www/classes/Form/SelectInputCombo.class.php"}
+// }
 
-// New expression
-$newObject = new stdClass;
-
-// Variable name expression
-$varName = "test";
-
-// Variable expression and dynamic variable expression
-$identifier = "dynamicVar";
-$$identifier = "Hello, dynamic!";
-
-// Array creation expression
-$array = [1, 2, 3];
-$associativeArray = ["a" => 1, "b" => 2];
-
-// Print expression
-print "Hello, world!\n";
-
-// Scalar expressions
-$constant = PHP_INT_MAX;
-$string = "string";
-$label = true;
-
-// BackQuoteString expression
-$shellOutput = ` + "`ls -al`" + `;
-
-// Parenthesis expression
-$parenthesis = (5 * 3) + 2;
-
-// Yield expression
-function generator() {
-    yield 1;
-    yield 2;
+func TestPHPInterpolatedCurlyBraces(t *testing.T) {
+	phpCode := `<?php
+function build_rules($cpips, $cpiplist, $interfaces, $rdrtag, $authtag) {
+	$rules = "table <{$cpips}> { " . join(' ', $cpiplist)  . "}\n";
+	$rules .= "ether pass in on { {$interfaces} } tag \"{$rdrtag}\"\n";
+	$rules .= "pass in quick on {$interfaces} proto tcp from any to <{$cpips}> port {$rdrtag} ridentifier {$authtag}\n";
+	return $rules;
 }
 
-// Special word expressions (List, IsSet, Empty, Eval, Exit, Include, Require)
-list($a, $b) = [1, 2];
-$issetExample = isset($a);
-$emptyExample = empty($nonexistent);
-eval('$evalResult = "Evaluated";');
-// Exit; // Uncommenting this will stop the script
-include 'nonexistentfile.php'; // Warning suppressed with @
-require 'anothernonexistentfile.php'; // Warning suppressed with @
-
-// Lambda function expression
-$lambda = function($x) { return $x * 2; };
-echo $lambda(5);
-
-// Match expression (PHP 8+)
-$matchResult = match($a) {
-    1 => 'one',
-    2 => 'two',
-    default => 'other',
-};
-
-// Cast expression
-$casted = (int) "123";
-
-// Unary operator expression
-$unary = ~$a; // bitwise NOT
-$negation = !$issetExample;
-
-// Arithmetic expression
-$sum = 1 + 2;
-$product = 2 * $a;
-$exponentiation = 2 ** 3;
-
-// InstanceOf expression
-$instanceOfExample = $newObject instanceof stdClass;
-
-// Bitwise expressions
-$and = $a & $b;
-$or = $a | $b;
-$xor = $a ^ $b;
-
-// Logical expressions
-$logicalAnd = $a && $b;
-$logicalOr = $a || $b;
-$logicalXor = $a xor $b; // Note: 'xor' is not as commonly used
-
-// Conditional expression
-$ternary = $a == 2 ? "equals 2" : "does not equal 2";
-
-// Null coalescing expression
-$nullCoalesce = $undefinedVar ?? "default";
-
-// Spaceship expression
-$spaceship = 1 <=> 2;
-
-// Throw expression (PHP 7.1+)
-// throw new Exception("This is an exception");
-
-// Assignment operator expression
-$a += 5;
-
-// LogicalAnd, LogicalOr, LogicalXor
-$logicalAndSimple = $a and $b;
-$logicalOrSimple = $a or $b;
-$logicalXorSimple = $a xor $b;
-
-echo "Script execution completed.\n";
+$rules = build_rules('cpzone', ['127.0.0.1', '127.0.0.2'], 'igb0 igb1', 'rdr', 'auto');
+echo $rules;
 `
-	_ = code
-	// ssatest.MockSSA(t, code)
+
+	ast, err := php2ssa.Frontend(phpCode)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
 }
 
-func TestValidatePHPHereDoc(t *testing.T) {
-	validateSource(t, "", `<?php
+func TestPHPLexerInterpolatedCurlyTokenization(t *testing.T) {
+	input := `<?php $value = "prefix-{$interface}-suffix"; ?>`
 
+	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(input))
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	tokens.Fill()
+	all := tokens.GetAllTokens()
+	require.NotEmpty(t, all, "expected tokens from lexer")
 
-	$abb = <<<EOF
-Hello World
-EOF."CCCCCCCC";
-
-
-
-?>
-`)
+	for _, tok := range all {
+		if tok.GetText() == "{" {
+			require.Equal(t, phpparser.PHPLexerCurlyOpen, tok.GetTokenType(), "expected interpolation '{' as CurlyOpen token")
+		}
+		if tok.GetText() == "}" {
+			require.Equal(t, phpparser.PHPLexerCloseCurlyBracket, tok.GetTokenType(), "expected interpolation '}' as CloseCurlyBracket token")
+		}
+	}
 }
 
-func TestValidatePHPHereDoc_1(t *testing.T) {
-	validateSource(t, "", `<?php
- $aaa=<<<EOT 
-ac
-EOT;
-`)
+func TestPHPInterpolatedStringFunctionCall(t *testing.T) {
+	code := `<?php
+if (is_array(config_get_path("interfaces/{$interface}"))) {
+	return get_real_interface($interface, $family);
+}
+`
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
 }
 
-func TestValidatePHPHereWithVariableDoc(t *testing.T) {
-	validateSource(t, "", `<?php
-	$var=<<<EOF
-Hello World $var1
-EOF;
-?>
-`)
+type ParseError struct {
+	Duration time.Duration
+	Message  string
+}
+
+func TestProjectAst(t *testing.T) {
+	path := "/home/wlz/Developer/pfsense"
+
+	errorFiles := make(map[string]*ssareducer.FileContent)
+
+	fileList := make([]string, 0, 100)
+	fileMap := make(map[string]struct{})
+
+	refFs := filesys.NewRelLocalFs(path)
+	filesys.Recursive(".",
+		filesys.WithFileSystem(refFs),
+		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
+			if s == ".git" {
+				return fs.SkipDir
+			}
+			return nil
+		}),
+		filesys.WithFileStat(func(filePath string, fi fs.FileInfo) error {
+			extern := filepath.Ext(filePath)
+			if extern == ".php" || extern == ".inc" {
+				fileList = append(fileList, filePath)
+				fileMap[filePath] = struct{}{}
+				return nil
+			}
+			return nil
+		}),
+	)
+	log.Errorf("file to parse: %+v", fileList)
+
+	config, err := ssaapi.DefaultConfig(
+		ssaapi.WithFileSystem(refFs),
+		ssaapi.WithLanguage(ssaconfig.PHP),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	start := time.Now()
+	ch := config.GetFileHandler(
+		refFs, fileList, fileMap,
+	)
+
+	for fileContent := range ch {
+		log.Errorf("file parse: %s: size[%s] time: %s", fileContent.Path, ssaapi.Size(len(fileContent.Content)), fileContent.Duration)
+		if fileContent.Err != nil {
+			errorFiles[fileContent.Path] = fileContent
+		}
+	}
+	end := time.Since(start)
+	log.Infof("Total parse %d files cost: %v", len(fileMap), end)
+	for fname, fc := range errorFiles {
+		log.Errorf("Parse file %s failed: %v", fname, fc.Err)
+	}
 }

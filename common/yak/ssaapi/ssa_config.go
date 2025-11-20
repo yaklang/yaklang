@@ -188,6 +188,10 @@ var WithCacheTTL = ssaconfig.SetOption("ssa_compile/cache_ttl", func(c *Config, 
 
 var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 
+// WithExcludeFile is kept for backward compatibility; internally it forwards to
+// the compile-time exclude files option.
+var WithExcludeFile = ssaconfig.WithCompileExcludeFiles
+
 var WithProcess = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
 	c.process = v
 })

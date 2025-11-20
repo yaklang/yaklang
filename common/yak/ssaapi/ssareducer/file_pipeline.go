@@ -3,6 +3,7 @@ package ssareducer
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -34,12 +35,13 @@ const (
 )
 
 type FileContent struct {
-	Path    string
-	Content []byte
-	AST     ssa.FrontAST
-	Status  FileStatus
-	Err     error
-	Editor  *memedit.MemEditor
+	Path     string
+	Content  []byte
+	AST      ssa.FrontAST
+	Status   FileStatus
+	Err      error
+	Editor   *memedit.MemEditor
+	Duration time.Duration
 }
 
 func FilesHandler(
@@ -101,7 +103,9 @@ func FilesHandler(
 			if fileContent.Status == FileStatusFsError {
 				return fileContent, nil
 			}
+			start := time.Now()
 			ast, err := handler(fileContent.Path, fileContent.Content, store)
+			fileContent.Duration = time.Since(start)
 			fileContent.AST = ast
 			fileContent.Err = err
 			if err != nil {
