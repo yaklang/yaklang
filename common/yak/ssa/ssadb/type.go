@@ -4,7 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 )
 
 type IrType struct {
@@ -31,7 +31,7 @@ func (t *IrType) CalcHash(ex ...string) string {
 
 func (ir *IrType) Save(db *gorm.DB) error {
 	var err error
-	ssaprofile.ProfileAdd(true, "Database.SaveIrType", func() {
+	diagnostics.Track(true, "Database.SaveIrType", func() {
 		err = db.Save(ir).Error
 	})
 	return err

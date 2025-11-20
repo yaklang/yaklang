@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
@@ -160,7 +160,7 @@ func (c *Config) parseProjectWithFS(
 		ch := c.GetFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)
-		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
+		// diagnostics.DumpHeap(diagnostics.WithName("ast"))
 		for fileContent := range ch {
 			if fileContent.Skip {
 				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
@@ -306,7 +306,7 @@ func (c *Config) parseProjectWithFS(
 		wg.Wait()
 		return nil
 	}
-	if err := ssaprofile.ProfileAddWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
+	if _, err := diagnostics.TrackWithError(true, "ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
 		return nil, err
 	}
 

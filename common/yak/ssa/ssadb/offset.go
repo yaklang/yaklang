@@ -3,8 +3,8 @@ package ssadb
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type IrOffset struct {
@@ -34,7 +34,7 @@ func CreateOffset(rng *memedit.Range, projectName string) *IrOffset {
 func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 	// db.Save(idx)
 	var err error
-	ssaprofile.ProfileAdd(true, "Database.IrOffset", func() {
+	diagnostics.Track(true, "Database.IrOffset", func() {
 		err = db.Save(idx).Error
 	})
 	_ = err
