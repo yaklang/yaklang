@@ -1,6 +1,7 @@
 package jsonextractor
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"sync"
@@ -12,6 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 )
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (n *nopWriteCloser) Close() error {
+	return nil
+}
 
 // TestJSONExtractorOptimization 优化的测试用例集合
 func TestJSONExtractorOptimization(t *testing.T) {
@@ -106,16 +115,28 @@ func testCoverageImprovement(t *testing.T) {
 	})
 
 	t.Run("handleFieldStreamData未使用的函数", func(t *testing.T) {
-		// 直接测试handleFieldStreamData函数
+		var buf bytes.Buffer
+		writer := &nopWriteCloser{Writer: &buf}
 		cm := &callbackManager{
-			activeFieldStreams: make(map[string]io.WriteCloser),
+			fieldStreamFrameStack: []*fieldStreamFrame{
+				{
+					contexts: []*fieldStreamContext{
+						{
+							key:    "test",
+							writer: writer,
+						},
+					},
+				},
+			},
 		}
 
-		// 测试无活跃流的情况
+		// 测试写入路径
 		cm.handleFieldStreamData("test", []byte("data"))
+		assert.Equal(t, "data", buf.String())
 
-		// 这个函数在当前架构中没有被使用，但为了覆盖率测试
-		assert.NotNil(t, cm)
+		// 测试未匹配字段
+		cm.handleFieldStreamData("other", []byte("noop"))
+		assert.Equal(t, "data", buf.String())
 	})
 
 	t.Run("过时函数的兼容性测试", func(t *testing.T) {

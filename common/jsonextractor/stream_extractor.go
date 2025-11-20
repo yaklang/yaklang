@@ -57,6 +57,15 @@ type FieldStreamHandler struct {
 	handler func(key string, reader io.Reader, parents []string) // 回调函数，包含字段名和父路径
 }
 
+type fieldStreamContext struct {
+	key    string
+	writer io.WriteCloser
+}
+
+type fieldStreamFrame struct {
+	contexts []*fieldStreamContext
+}
+
 type callbackManager struct {
 	objectKeyValueCallback      func(string string, data any)
 	arrayValueCallback          func(idx int, data any)
@@ -71,8 +80,8 @@ type callbackManager struct {
 	formatKVCallback func(key, value any, parents []string)
 
 	// 字段流处理相关
-	activeFieldStreams map[string]io.WriteCloser // 当前活跃的字段流 写入器
-	activeWriters      []io.WriteCloser          // 当前活跃的写入器列表，支持多字段同时写入
+	activeWriters         []io.WriteCloser    // 当前活跃的写入器列表，支持多字段同时写入
+	fieldStreamFrameStack []*fieldStreamFrame // 字段流写入栈，用于支持嵌套结构
 }
 
 type CallbackOption func(*callbackManager)
@@ -196,7 +205,7 @@ func WithRegisterFieldStreamHandlerAndStartCallback(fieldName string, handler fu
 }
 
 // handleFieldStreamStart 开始字段流处理
-func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) []io.WriteCloser {
+func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) []*fieldStreamContext {
 	// 清理字段名中的引号和空格
 	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
 
@@ -206,34 +215,21 @@ func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *b
 		prefix = bufManager.getPrefixKey()
 	}
 
-	// 初始化活跃字段流 map
-	if c.activeFieldStreams == nil {
-		c.activeFieldStreams = make(map[string]io.WriteCloser)
-	}
-
-	var writers []io.WriteCloser
+	var contexts []*fieldStreamContext
 
 	// 检查所有字段处理器
 	if c.fieldStreamHandlers != nil {
 		for _, handler := range c.fieldStreamHandlers {
 			if c.isFieldMatch(cleanFieldName, handler) {
-				// 如果已经有这个字段的流在运行，就不再创建新的
-				if _, exists := c.activeFieldStreams[cleanFieldName]; !exists {
-					writer := c.createFieldStream(cleanFieldName, handler, prefix)
-					if writer != nil {
-						writers = append(writers, writer)
-					}
-				} else {
-					// 如果已存在，添加到活跃写入器列表
-					if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
-						writers = append(writers, writer)
-					}
+				ctx := c.createFieldStream(cleanFieldName, handler, prefix)
+				if ctx != nil {
+					contexts = append(contexts, ctx)
 				}
 			}
 		}
 	}
 
-	return writers
+	return contexts
 }
 
 // isFieldMatch 检查字段是否匹配处理器
@@ -282,12 +278,9 @@ func matchGlob(s string, pattern string) bool {
 }
 
 // createFieldStream 创建字段流
-func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStreamHandler, parents []string) io.WriteCloser {
+func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStreamHandler, parents []string) *fieldStreamContext {
 	// 创建管道
 	reader, writer := bufpipe.NewPipe()
-
-	// 保存写入器，用于后续写入数据
-	c.activeFieldStreams[fieldName] = writer
 
 	if handler.syncHandler != nil {
 		// 调用开始回调函数 用于强同步
@@ -309,43 +302,87 @@ func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStre
 	}(handler, reader, fieldName, parents)
 
 	log.Infof("started field stream for: %s", fieldName)
-	return writer
+	return &fieldStreamContext{
+		key:    fieldName,
+		writer: writer,
+	}
 }
 
 // handleFieldStreamData 写入字段流数据
 func (c *callbackManager) handleFieldStreamData(fieldName string, data []byte) {
-	if c.activeFieldStreams == nil {
-		return
-	}
-
 	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
-	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
-		_, err := writer.Write(data)
-		if err != nil {
-			log.Errorf("failed to write field stream data for %s: %v", cleanFieldName, err)
+	for _, frame := range c.fieldStreamFrameStack {
+		for _, ctx := range frame.contexts {
+			if ctx == nil || ctx.writer == nil {
+				continue
+			}
+			if ctx.key != cleanFieldName {
+				continue
+			}
+			if _, err := ctx.writer.Write(data); err != nil {
+				log.Errorf("failed to write field stream data for %s: %v", cleanFieldName, err)
+			}
 		}
 	}
 }
 
-// handleFieldStreamEnd 结束字段流处理
-func (c *callbackManager) handleFieldStreamEnd(fieldName string) {
-	if c.activeFieldStreams == nil {
+func (c *callbackManager) pushFieldStreamFrame(contexts []*fieldStreamContext) *fieldStreamFrame {
+	if len(contexts) == 0 {
+		return nil
+	}
+	frame := &fieldStreamFrame{
+		contexts: contexts,
+	}
+	c.fieldStreamFrameStack = append(c.fieldStreamFrameStack, frame)
+	for _, ctx := range contexts {
+		if ctx != nil && ctx.writer != nil {
+			c.activeWriters = append(c.activeWriters, ctx.writer)
+		}
+	}
+	return frame
+}
+
+func (c *callbackManager) popFieldStreamFrame(frame *fieldStreamFrame) {
+	if frame == nil {
+		return
+	}
+	idx := -1
+	for i := len(c.fieldStreamFrameStack) - 1; i >= 0; i-- {
+		if c.fieldStreamFrameStack[i] == frame {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
 		return
 	}
 
-	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
-	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
-		writer.Close()
-		delete(c.activeFieldStreams, cleanFieldName)
-		log.Infof("ended field stream for: %s", cleanFieldName)
+	// 移除frame
+	c.fieldStreamFrameStack = append(c.fieldStreamFrameStack[:idx], c.fieldStreamFrameStack[idx+1:]...)
 
-		// 从活跃写入器列表中移除这个写入器
-		for i, activeWriter := range c.activeWriters {
-			if activeWriter == writer {
-				c.activeWriters = append(c.activeWriters[:i], c.activeWriters[i+1:]...)
-				break
+	// 重建active writers列表
+	c.activeWriters = nil
+	for _, frm := range c.fieldStreamFrameStack {
+		for _, ctx := range frm.contexts {
+			if ctx != nil && ctx.writer != nil {
+				c.activeWriters = append(c.activeWriters, ctx.writer)
 			}
 		}
+	}
+
+	// 关闭当前frame的writer
+	for _, ctx := range frame.contexts {
+		if ctx != nil && ctx.writer != nil {
+			ctx.writer.Close()
+			log.Infof("ended field stream for: %s", ctx.key)
+		}
+	}
+}
+
+func (c *callbackManager) resetFieldStreamFrames() {
+	for len(c.fieldStreamFrameStack) > 0 {
+		frame := c.fieldStreamFrameStack[len(c.fieldStreamFrameStack)-1]
+		c.popFieldStreamFrame(frame)
 	}
 }
 
@@ -394,6 +431,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		objectValueInArray       bool
 		arrayCurrentKeyIndex     int
 		legalArrayItem           bool
+		fieldStreamFrame         *fieldStreamFrame
 	}
 
 	peekUntil := func(checkFunc func(b byte) bool) (byte, error) { // peek until meet the conditions
@@ -488,26 +526,23 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 						bufManager.PushValue(sliceValue)
 					}
 					// 字段值处理完成，清理当前活跃的写入器
-					if bufManager.callbackManager != nil {
-						bufManager.callbackManager.activeWriters = nil
+					if raw.fieldStreamFrame != nil && bufManager.callbackManager != nil {
+						bufManager.callbackManager.popFieldStreamFrame(raw.fieldStreamFrame)
+						raw.fieldStreamFrame = nil
 					}
 				case state_jsonArray:
 					bufManager.PopContainer()
 					// 数组处理完成，清理当前活跃的写入器
-					if bufManager.callbackManager != nil {
-						bufManager.callbackManager.activeWriters = nil
+					if raw.fieldStreamFrame != nil && bufManager.callbackManager != nil {
+						bufManager.callbackManager.popFieldStreamFrame(raw.fieldStreamFrame)
+						raw.fieldStreamFrame = nil
 					}
 				case state_jsonObj:
-					// 在弹出容器前，结束当前对象中的所有字段流
-					if bufManager.callbackManager != nil {
-						for fieldName := range callbackManager.activeFieldStreams {
-							callbackManager.handleFieldStreamEnd(fieldName)
-						}
-					}
 					bufManager.PopContainer()
 					// 对象处理完成，清理当前活跃的写入器
-					if bufManager.callbackManager != nil {
-						bufManager.callbackManager.activeWriters = nil
+					if raw.fieldStreamFrame != nil && bufManager.callbackManager != nil {
+						bufManager.callbackManager.popFieldStreamFrame(raw.fieldStreamFrame)
+						raw.fieldStreamFrame = nil
 					}
 					// 记录结果
 					ret, ok := objectDepthIndexTable[objectDepth]
@@ -621,18 +656,27 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			}
 		case state_objectValue:
 			switch ch {
+			case ' ', '\t', '\r':
+				writeToFieldStream() // 写入空白字符
+				continue
 			case '[':
 				currentStateIns().isArray = true
 				// 激活待处理的字段流写入器，用于处理数组类型的值
-				bufManager.activatePendingFieldWriter()
+				frame := bufManager.activatePendingFieldWriter()
 				writeToFieldStream() // 写入开始括号
 				pushState(state_jsonArray)
+				if frame != nil {
+					currentStateIns().fieldStreamFrame = frame
+				}
 			case '{':
 				currentStateIns().isObject = true
 				// 激活待处理的字段流写入器，用于处理对象类型的值
-				bufManager.activatePendingFieldWriter()
+				frame := bufManager.activatePendingFieldWriter()
 				writeToFieldStream() // 写入开始大括号
 				pushState(state_jsonObj)
+				if frame != nil {
+					currentStateIns().fieldStreamFrame = frame
+				}
 				pushStateWithIdx(state_objectKey, index+1)
 				continue
 			case '"':
@@ -644,7 +688,8 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					} else {
 						ret.objectValueHandledString = true
 						// 激活待处理的字段流写入器
-						bufManager.activatePendingFieldWriter()
+						frame := bufManager.activatePendingFieldWriter()
+						ret.fieldStreamFrame = frame
 						writeToFieldStream() // 写入开始引号
 						pushState(state_DoubleQuoteString)
 						continue
@@ -656,13 +701,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			case '}':
 				if !currentStateIns().objectValueInArray {
 					popState()
-					currentStateName := currentState()
-					switch currentStateName {
-					case state_jsonObj:
-						popStateWithIdx(index + 1)
-						continue
-					}
-					continue
+					goto RETRY
 				}
 			case '\n':
 				popState()
@@ -685,18 +724,9 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					pushStateWithIdx(state_objectKey, index+1)
 				}
 				continue
-			default:
-				// 处理数字、布尔值、null等其他类型
-				if unicode.IsDigit(rune(ch)) || ch == '-' || ch == 't' || ch == 'f' || ch == 'n' {
-					// 激活待处理的字段流写入器，用于处理数字、布尔值、null等类型的值
-					bufManager.activatePendingFieldWriter()
-					writeToFieldStream() // 写入当前字符
-					pushState(state_primitiveValue)
-					continue
-				}
-				continue
 			case ']':
 				if currentStateIns().objectValueInArray {
+					writeToFieldStream()
 					popStateWithIdx(index)
 					currentStateName := currentState()
 					switch currentStateName {
@@ -706,13 +736,26 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					}
 					goto RETRY
 				}
+			default:
+				// 处理数字、布尔值、null等其他类型
+				if unicode.IsDigit(rune(ch)) || ch == '-' || ch == 't' || ch == 'f' || ch == 'n' {
+					// 激活待处理的字段流写入器，用于处理数字、布尔值、null等类型的值
+					frame := bufManager.activatePendingFieldWriter()
+					currentStateIns().fieldStreamFrame = frame
+					writeToFieldStream() // 写入当前字符
+					pushState(state_primitiveValue)
+					continue
+				}
+				continue
 			}
 		case state_objectKey:
 			switch ch {
 			case '"':
+				writeToFieldStream() // 写入键名起始引号
 				pushState(state_DoubleQuoteString)
 				continue
 			case ':':
+				writeToFieldStream() // 写入键值分隔符
 				popStateWithIdx(index)
 				pushStateWithIdx(state_objectValue, index+1)
 				continue
