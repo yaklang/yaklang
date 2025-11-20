@@ -108,7 +108,7 @@ func (t *AiTask) executed() bool {
 func (t *AiTask) executing() bool {
 	if len(t.Subtasks) > 0 {
 		for _, subtask := range t.Subtasks {
-			if subtask.executing() { // 子任务有执行中的时候 本任务也为执行中
+			if subtask.executing() || subtask.executed() { // 子任务有执行中或者完成的时候 本任务也为执行中
 				return true
 			}
 		}
