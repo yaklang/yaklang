@@ -145,6 +145,9 @@ type AiOutputEvent struct {
 
 	// task index
 	TaskIndex string
+
+	// task uuid
+	TaskUUID string
 	// disable markdown render
 	DisableMarkdown bool
 	CallToolID      string
@@ -334,5 +337,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
 		ContentType:     e.ContentType,
 		AIService:       e.AIService,
+		TaskUUID:        e.TaskUUID,
 	}
 }
