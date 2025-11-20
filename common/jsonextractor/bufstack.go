@@ -1,7 +1,6 @@
 package jsonextractor
 
 import (
-	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -20,8 +19,8 @@ type bufStack struct {
 	kv           func(key any, val any)
 	currentStack *vmstack.Stack
 	recorders    []*bufStackKv
-	// 字段流写入器，绑定到当前栈层级
-	fieldWriters []io.WriteCloser
+	// 字段流上下文，绑定到当前栈层级
+	fieldStreamContexts []*fieldStreamContext
 }
 
 type bufStackManager struct {
@@ -64,29 +63,31 @@ func (m *bufStackManager) PushKey(v any) {
 		m.base.PushKey(keyStr)
 		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
 		if m.callbackManager != nil {
-			writers := m.callbackManager.handleFieldStreamStart(keyStr, m)
-			m.base.fieldWriters = writers
+			contexts := m.callbackManager.handleFieldStreamStart(keyStr, m)
+			m.base.fieldStreamContexts = contexts
 		}
 	case string:
 		m.base.PushKey(ret)
 		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
 		if m.callbackManager != nil {
-			writers := m.callbackManager.handleFieldStreamStart(ret, m)
-			m.base.fieldWriters = writers
+			contexts := m.callbackManager.handleFieldStreamStart(ret, m)
+			m.base.fieldStreamContexts = contexts
 		}
 	case int:
 		m.base.PushKey(ret)
 		// 数组索引不需要字段流处理
-		m.base.fieldWriters = nil
+		m.base.fieldStreamContexts = nil
 	}
 }
 
 // activatePendingFieldWriter 激活待处理的字段写入器
-func (m *bufStackManager) activatePendingFieldWriter() {
-	if len(m.base.fieldWriters) > 0 && m.callbackManager != nil {
-		m.callbackManager.activeWriters = make([]io.WriteCloser, len(m.base.fieldWriters))
-		copy(m.callbackManager.activeWriters, m.base.fieldWriters)
+func (m *bufStackManager) activatePendingFieldWriter() *fieldStreamFrame {
+	if len(m.base.fieldStreamContexts) > 0 && m.callbackManager != nil {
+		frame := m.callbackManager.pushFieldStreamFrame(m.base.fieldStreamContexts)
+		m.base.fieldStreamContexts = nil
+		return frame
 	}
+	return nil
 }
 
 // getParentPath 从stack中获取父路径
@@ -134,8 +135,8 @@ func (m *bufStackManager) getPrefixKey() []string { // get parent path and curre
 func (m *bufStackManager) PushValue(v string) {
 	// 字符级流式写入现在在状态机中处理，这里不再写入
 	// 清理当前栈的字段写入器（如果有的话）
-	if len(m.base.fieldWriters) > 0 {
-		m.base.fieldWriters = nil
+	if len(m.base.fieldStreamContexts) > 0 {
+		m.base.fieldStreamContexts = nil
 	}
 	m.base.PushValue(v)
 }
@@ -153,7 +154,7 @@ func (m *bufStackManager) PushContainer() {
 		currentStack: vmstack.New(),
 		recorders:    []*bufStackKv{},
 		// 继承父栈的字段写入器
-		fieldWriters: m.base.fieldWriters,
+		fieldStreamContexts: m.base.fieldStreamContexts,
 	}
 	m.base = sub
 	m.stack.Push(sub)
