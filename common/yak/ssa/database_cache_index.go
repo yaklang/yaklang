@@ -87,12 +87,17 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.editorCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrSource]) {
-				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-					for _, item := range iii {
-						item.Value.Save(tx)
-					}
-					return nil
-				})
+				saveStep := func() {
+					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+						for _, item := range iii {
+							if err := tx.Save(item.Value).Error; err != nil {
+								log.Errorf("DATABASE: save ir source to database error: %v", err)
+							}
+						}
+						return nil
+					})
+				}
+				c.diagnosticsTrack("ssa.Database.SaveIrSourceBatch", saveStep)
 				return
 			},
 			asyncdb.WithSaveSize(saveSize),
@@ -103,12 +108,15 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.offsetCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrOffset]) {
-				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-					for _, item := range iii {
-						ssadb.SaveIrOffset(tx, item.Value)
-					}
-					return nil
-				})
+				saveStep := func() {
+					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+						for _, item := range iii {
+							ssadb.SaveIrOffset(tx, item.Value)
+						}
+						return nil
+					})
+				}
+				c.diagnosticsTrack("ssa.Database.SaveIrOffsetBatch", saveStep)
 				return
 			},
 			asyncdb.WithSaveSize(saveSize),
@@ -119,12 +127,15 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.indexCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrIndex]) {
-				utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
-					for _, item := range iii {
-						ssadb.SaveIrIndex(tx, item.Value)
-					}
-					return nil
-				})
+				saveStep := func() {
+					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+						for _, item := range iii {
+							ssadb.SaveIrIndex(tx, item.Value)
+						}
+						return nil
+					})
+				}
+				c.diagnosticsTrack("ssa.Database.SaveIrIndexBatch", saveStep)
 				return
 			},
 			asyncdb.WithSaveSize(saveSize),

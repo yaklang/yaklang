@@ -4,6 +4,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -249,6 +250,9 @@ type Program struct {
 
 	DatabaseKind ProgramCacheKind // for compile, whether use database
 	irProgram    *ssadb.IrProgram // from database program
+
+	// diagnostics recorder
+	diagnosticsRecorder *diagnostics.Recorder
 
 	// TODO: this four map should need????!
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]

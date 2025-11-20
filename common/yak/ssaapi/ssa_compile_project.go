@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -34,10 +33,13 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if config.DiagnosticsEnabled() {
+		defer config.LogDiagnostics("ssa.compile")
+	}
 	f1 := func() {
 		prog, err = config.parseProject()
 	}
-	diagnostics.Track(true, "ssaapi.ParseProject", f1)
+	config.DiagnosticsTrack("ssaapi.ParseProject", f1)
 	return
 }
 
