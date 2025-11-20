@@ -7,6 +7,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -59,6 +60,10 @@ type Config struct {
 	logLevel string
 
 	astSequence ssareducer.ASTSequenceType
+
+	// diagnostics configuration
+	diagnosticsEnabled  bool
+	diagnosticsRecorder *diagnostics.Recorder
 }
 
 func (c *Config) CalcHash() string {

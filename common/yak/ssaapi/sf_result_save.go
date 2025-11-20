@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/jinzhu/gorm"
@@ -196,6 +197,9 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		// database
 		OptionSaveValue_Database(database),
 		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
+	}
+	if r.program != nil && r.program.config != nil && r.program.config.DiagnosticsEnabled() {
+		opts = append(opts, OptionSaveValue_Diagnostics(r.program.config.DiagnosticsRecorder()))
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))

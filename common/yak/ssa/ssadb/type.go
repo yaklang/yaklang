@@ -4,7 +4,6 @@ import (
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 )
 
 type IrType struct {
@@ -30,11 +29,7 @@ func (t *IrType) CalcHash(ex ...string) string {
 }
 
 func (ir *IrType) Save(db *gorm.DB) error {
-	var err error
-	diagnostics.Track(true, "Database.SaveIrType", func() {
-		err = db.Save(ir).Error
-	})
-	return err
+	return db.Save(ir).Error
 }
 
 func EmptyIrType(progName string, id uint64) *IrType {

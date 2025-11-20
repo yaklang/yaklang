@@ -110,6 +110,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg := NewProgram(name, prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
+	subProg.SetDiagnosticsRecorder(prog.DiagnosticsRecorder())
 
 	subProg.Loader.AddIncludePath(prog.Loader.GetIncludeFiles()...)
 	subProg.Language = prog.Language

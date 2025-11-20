@@ -35,7 +35,8 @@ type saveValueCtx struct {
 
 	visitedNode map[*Value]*ssadb.AuditNode
 
-	isMemoryCompile bool
+	isMemoryCompile     bool
+	diagnosticsRecorder *diagnostics.Recorder
 }
 
 func newSaveValueCtx(opts ...SaveValueOption) *saveValueCtx {
@@ -80,6 +81,7 @@ func OptionSaveValue_IsMemoryCompile(bool2 bool) SaveValueOption {
 		c.isMemoryCompile = bool2
 	}
 }
+
 func OptionSaveValue_ResultVariable(variable string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultVariable = variable
@@ -232,7 +234,7 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 	}
 
 	saveEdge := func(edge *ssadb.AuditEdge) error {
-		_, err := diagnostics.TrackWithError(true, "dbgraph_create_edge", func() error {
+		_, err := g.DiagnosticsTrackWithError("dbgraph_create_edge", func() error {
 			g.database.SaveEdge(edge)
 			return nil
 		})

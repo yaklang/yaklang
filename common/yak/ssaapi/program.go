@@ -84,6 +84,13 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 	if config != nil {
 		p.config = config
 		p.enableDatabase = config.databaseKind != ssa.ProgramCacheMemory
+		if config.DiagnosticsEnabled() {
+			prog.SetDiagnosticsRecorder(config.DiagnosticsRecorder())
+		} else {
+			prog.SetDiagnosticsRecorder(nil)
+		}
+	} else {
+		prog.SetDiagnosticsRecorder(nil)
 	}
 	return p
 }
