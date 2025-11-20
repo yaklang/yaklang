@@ -170,7 +170,7 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 				return
 			}
 			// Wrap the accepted connection
-			wrapped := NewWrapperedConn(conn, false, nil)
+			wrapped := NewWrapperedConnEx(conn, false, nil, true)
 			select {
 			case incomming <- wrapped:
 			case <-ctx.Done():
@@ -278,6 +278,11 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 						session.Set("StrongHostLocalAddr", localAddr)
 					}
 				}
+
+				if wrapped.isListened {
+					session.Set(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn, true)
+				}
+
 				metaInfo := wrapped.GetMetaInfo()
 				if len(metaInfo) > 0 {
 					session.Set("ConnMetaInfo", metaInfo)
@@ -315,6 +320,11 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 							session.Set("StrongHostLocalAddr", localAddr)
 						}
 					}
+
+					if wrapped.isListened {
+						session.Set(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn, true)
+					}
+
 					metaInfo := wrapped.GetMetaInfo()
 					if len(metaInfo) > 0 {
 						session.Set("ConnMetaInfo", metaInfo)
@@ -324,13 +334,6 @@ func (p *Proxy) Serve(l net.Listener, baseCtx context.Context) error {
 					}
 				}
 				sessionBindConnectTo(proxyContext.Session(), PROTO_S5, dstHost, dstPort)
-			} else {
-				host, port, err := utils.ParseStringToHostPort(originConn.LocalAddr().String())
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				sessionBindConnectTo(proxyContext.Session(), PROTO_TUNNEL, host, port)
 			}
 			p.handleLoop(isTls, handledConnection, proxyContext)
 		}(uid, conn, wrappedConn)
@@ -356,6 +359,17 @@ func (p *Proxy) defaultTLSConfig() *tls.Config {
 		}
 	}
 	return cachedTLSConfig
+}
+
+func GetDialDetectionAddr(ctx *Context, conn net.Conn) string {
+	connectedHost := ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+	connectedPort := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+	if connectedHost == "" || connectedPort == 0 {
+		if !ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsListenedConn) {
+			return conn.RemoteAddr().String()
+		}
+	}
+	return utils.HostPort(connectedHost, connectedPort)
 }
 
 func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
@@ -387,7 +401,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 	brw := s.brw
 
 	/* TLS */
-	if isTLSConn {
+	if isTLSConn { // for extra conn and socks5 connect tls
 		s.MarkSecure()
 		s.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, true)
 		var serverUseH2 bool
@@ -399,7 +413,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 			}
 
 			// Check the cache first.
-			cacheKey := utils.HostPort(ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost), ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort))
+			cacheKey := GetDialDetectionAddr(ctx, conn)
 			if cached, ok := p.h2Cache.Load(cacheKey); ok {
 				log.Infof("use cached h2 %v", cacheKey)
 				serverUseH2 = cached.(bool)
@@ -568,20 +582,30 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 			}
 
 			// Check the cache first.
-			cacheKey := utils.HostPort(parsedConnectedToHost, parsedConnectedToPort)
+			cacheKey := GetDialDetectionAddr(ctx, conn)
 			if cached, ok := p.h2Cache.Load(cacheKey); ok {
 				log.Infof("use cached h2 %v", cacheKey)
 				serverUseH2 = cached.(bool)
 			} else {
 				// TODO: should connect every connection?
-				netConn, _ := netx.DialX(
-					cacheKey,
-					netx.DialX_WithTimeout(10*time.Second),
+				basicOptions := []netx.DialXOption{
+					netx.DialX_WithTimeout(10 * time.Second),
 					netx.DialX_WithProxy(proxyStr),
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
 					netx.DialX_WithDialer(p.dialer),
+				}
+
+				if ctx.GetSessionBoolValue("StrongHostMode") {
+					localAddrIP := ctx.GetSessionStringValue("StrongHostLocalAddr")
+					if localAddrIP != "" {
+						basicOptions = append(basicOptions, netx.DialX_WithStrongHostMode(localAddrIP))
+					}
+				}
+				netConn, _ := netx.DialX(
+					cacheKey,
+					basicOptions...,
 				)
 				if netConn != nil {
 					switch ret := netConn.(type) {

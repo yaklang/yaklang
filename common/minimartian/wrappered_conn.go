@@ -13,6 +13,7 @@ type WrapperedConn struct {
 	strongHostLocalAddr string // Local IP address for strong host mode binding
 	metaInfo            map[string]any
 	mu                  sync.RWMutex
+	isListened          bool
 }
 
 // NewWrapperedConn 创建一个新的 WrapperedConn
@@ -24,6 +25,18 @@ func NewWrapperedConn(conn net.Conn, strongHostMode bool, metaInfo map[string]an
 		Conn:           conn,
 		strongHostMode: strongHostMode,
 		metaInfo:       metaInfo,
+	}
+}
+
+func NewWrapperedConnEx(conn net.Conn, strongHostMode bool, metaInfo map[string]any, listened bool) *WrapperedConn {
+	if metaInfo == nil {
+		metaInfo = make(map[string]any)
+	}
+	return &WrapperedConn{
+		Conn:           conn,
+		strongHostMode: strongHostMode,
+		metaInfo:       metaInfo,
+		isListened:     listened,
 	}
 }
 
