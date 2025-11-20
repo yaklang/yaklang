@@ -107,7 +107,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 	})
 	newRandomName := flag + uuid.NewString()
 	newRandomDescription := uuid.NewString()
-	newRandomContent := uuid.NewString()
+	newRandomContent := "print('test')"
 	newRandomToolPath := uuid.NewString()
 	newRandomKeywords := []string{uuid.NewString()}
 	t.Run("UpdateAITool", func(t *testing.T) {
