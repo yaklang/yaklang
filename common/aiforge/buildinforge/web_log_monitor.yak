@@ -125,8 +125,12 @@ forgeHandle = func(params) {
         log.Error("%v", err)
         return err
     }
-    aidConfig = cod.GetConfig()
+    aidConfig = cod.GetAIConfig()
 
+
+    makeReader := func(format,args ...) {
+        return str.NewReader(sprintf(format,args...))
+    }
 
     var reader
     if text != "" {
@@ -135,29 +139,29 @@ forgeHandle = func(params) {
         yakit.Info("start to open file: %s", filePath)
         reader, err = file.OpenFile(filePath, file.O_RDONLY, 0x777)
         if err != nil {
-            aidConfig.EmitStream("打开文件失败",sprintf("打开文件[%s]失败: %v",filePath,err))
+            aidConfig.EmitDefaultStreamEvent("打开文件失败",makeReader("打开文件[%s]失败: %v",filePath,err),"")
             yakit.Error("open file %s failed: %v", filePath, err)
             return err
         }
-        aidConfig.EmitStream("打开文件成功",sprintf("打开文件[%s]成功",filePath))
+        aidConfig.EmitDefaultStreamEvent("打开文件成功",makeReader("打开文件[%s]成功",filePath),"")
         defer reader.Close()
     } else {
         yakit.Error("text or filePath is all empty")
-        aidConfig.EmitStream("打开文件失败", "没有提供有效的文本或文件路径")
+        aidConfig.EmitDefaultStreamEvent("打开文件失败", makeReader("没有提供有效的文本或文件路径"),"")
         return nil
     }
 
     yakit.Info("start to build web log event db")
-    aidConfig.EmitStream("开始构建web日志事件数据库", "正在创建web日志事件数据库")
+    aidConfig.EmitDefaultStreamEvent("开始构建web日志事件数据库", makeReader("正在创建web日志事件数据库"),"")
     logDb, err = NewWebLogEventDB()
     if err != nil {
-        aidConfig.EmitStream("构建web日志事件数据库失败", sprintf("创建web日志事件数据库失败: %v", err))
+        aidConfig.EmitDefaultStreamEvent("构建web日志事件数据库失败", makeReader("创建web日志事件数据库失败: %v", err),"")
         yakit.Error("web log event db build err: %v", err)
         return err
     }
 
     yakit.Info("start to build x.NewEventWatcher with trigger count: 20")
-    aidConfig.EmitStream("开始构建事件监控器", sprintf("设置触发间隔为%d秒，触发次数为%d次", triggerSec, triggerCount))
+    aidConfig.EmitDefaultStreamEvent("开始构建事件监控器", makeReader("设置触发间隔为%d秒，触发次数为%d次", triggerSec, triggerCount),"")
     ew := x.NewEventWatcher(context.Background(), time.ParseDuration(sprintf("%ds",triggerSec))~, triggerCount)
 
     update := func(attackType, entityValue) {
@@ -201,7 +205,7 @@ forgeHandle = func(params) {
             return
         }
 
-        aidConfig.EmitStream(sprintf("分析目标[%s]行为",sourceIP),eventJsonString)
+        aidConfig.EmitDefaultStreamEvent(sprintf("分析目标[%s]行为",sourceIP),makeReader(eventJsonString),"")
         shrinked := len(eventJsonString) > 100 ? sprint(string(eventJsonString[:100])) : eventJsonString
         yakit.Info("start to call event_analyzer with len:%v data: %#v", len(eventJsonString), shrinked)
         res, err := aiagent.ExecuteForge("event_analyzer", eventJsonString)
@@ -237,7 +241,7 @@ forgeHandle = func(params) {
     index := 0
 
     yakit.Info("start to build aireducer.NewReducerFromReader with reader: %v, chunkBatch: %d", reader, chunkBatch)
-    aidConfig.EmitStream("开始处理日志数据", sprintf("日志分片大小设置为%d行", chunkBatch))
+    aidConfig.EmitDefaultStreamEvent("开始处理日志数据", makeReader("日志分片大小设置为%d行", chunkBatch),"")
     reducer := aireducer.NewReducerFromReader(
         reader,
         aireducer.reducerCallback(func(config, memory, chunk) {
@@ -265,7 +269,7 @@ forgeHandle = func(params) {
                     return
                 }
 
-                aidConfig.EmitStream(sprintf("解析日志分块[%d]实体",currentIndex),sprintf("解析到实体%d条",len(res)))
+                aidConfig.EmitDefaultStreamEvent(sprintf("解析日志分块[%d]实体",currentIndex),makeReader("解析到实体%d条",len(res)),"")
                 for _, params := range res {
                     entityCountTotal += 1
                     err := SaveEntityRawSQL(logDb, entityMarshal(params))
@@ -283,7 +287,7 @@ forgeHandle = func(params) {
                     return
                 }
 
-                aidConfig.EmitStream(sprintf("解析日志分块[%d]事件",currentIndex),sprintf("解析日志事件%d条",len(res)))
+                aidConfig.EmitDefaultStreamEvent(sprintf("解析日志分块[%d]事件",currentIndex),makeReader("解析日志事件%d条",len(res)),"")
                 for _, params := range res {
                     event := eventMarshal(params)
                     err := SaveEvent(logDb, event)
@@ -293,7 +297,7 @@ forgeHandle = func(params) {
                     }
                     if event.LogType == "WEB_REQUEST" {
                         ew.Watch(event.SourceIP,analyzeLog ,func(key) {
-                            aidConfig.EmitStream("开始监控目标",sprintf("监控访问目标：[%s], 检测足够相关事件后分析目标行为",key))
+                            aidConfig.EmitDefaultStreamEvent("开始监控目标",sprintf("监控访问目标：[%s], 检测足够相关事件后分析目标行为",key))
                         })
                     }
 
@@ -309,23 +313,23 @@ forgeHandle = func(params) {
         yakit.Info("ai-reducer has some left cache buffer, start to handle it")
     }
 
-    aidConfig.EmitStream(sprintf("开始分析日志目标[%s]",filePaths),"")
+    aidConfig.EmitDefaultStreamEvent(sprintf("开始分析日志目标[%s]",filePaths),makeReader(""),"")
     err = reducer.Run()
     swg.Wait()
     if err != nil {
-        aidConfig.EmitStream("日志处理失败", sprintf("处理日志时发生错误: %v", err))
+        aidConfig.EmitDefaultStreamEvent("日志处理失败", makeReader("处理日志时发生错误: %v", err),"")
         return err
     }
-    aidConfig.EmitStream("日志处理完成", sprintf("所有日志分片已成功处理, 实体和事件已保存到数据库，总处理分片数: %d, 总处理字节数：%v，日志内解析出实体数：%v", count, byteCount, entityCountTotal))
+    aidConfig.EmitDefaultStreamEvent("日志处理完成", makeReader("所有日志分片已成功处理, 实体和事件已保存到数据库，总处理分片数: %d, 总处理字节数：%v，日志内解析出实体数：%v", count, byteCount, entityCountTotal),"")
     if len(foundRiskList) > 0 {
-        aidConfig.EmitStream("检测出日志中存在风险", sprintf("检测到%d个潜在风险IP，其中解析危险报警：%v", len(riskIP), len(foundRiskList)))
+        aidConfig.EmitDefaultStreamEvent("检测出日志中存在风险", makeReader("检测到%d个潜在风险IP，其中解析危险报警：%v", len(riskIP), len(foundRiskList)),"")
         for i in foundRiskList {
             riskIns = i
             result = json.dumps(riskIns, json.withIndent("  "))
-            aidConfig.EmitStream(sprintf("风险IP: %s", riskIns.IP), string(result))
+            aidConfig.EmitDefaultStreamEvent(sprintf("风险IP: %s", riskIns.IP), makeReader(result),"")
         }
     } else {
-        aidConfig.EmitStream("日志检测完毕-未发现明显风险", "没有检测到潜在风险IP")
+        aidConfig.EmitDefaultStreamEvent("日志检测完毕-未发现明显风险", makeReader("没有检测到潜在风险IP"),"")
     }
 
 
