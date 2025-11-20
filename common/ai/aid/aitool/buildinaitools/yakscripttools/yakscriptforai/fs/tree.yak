@@ -59,5 +59,4 @@ treeInfo := filesys.Glance(path)
 yakit.Info("Directory Tree Structure:")
 yakit.Info("========================")
 yakit.Info(treeInfo)
-
 yakit.Info("Directory tree view completed")

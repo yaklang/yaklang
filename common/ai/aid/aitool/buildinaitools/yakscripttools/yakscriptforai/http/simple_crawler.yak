@@ -68,10 +68,10 @@ for result in reqCh {
     buf.WriteString("\n")
     yakit.Output(line)
 }
-if parseInt(string(buf.String())) <= 2048 {
+if len(buf.String()) <= 30000 {
     yakit.Info(string(buf.String()))
 } else {
-    yakit.Info(string(buf.String())[:2000] + "... chunked")
+    yakit.Info(string(buf.String())[:30000] + "... (truncated)")
 }
 try {
     name := file.TempFileName(`crawler-result-*.txt`)~
