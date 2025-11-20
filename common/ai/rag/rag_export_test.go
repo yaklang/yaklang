@@ -409,3 +409,206 @@ func TestMUSTPASS_ImportRAGFile(t *testing.T) {
 	assert.Equal(t, calcUID[:], document.UID)
 	assert.Equal(t, collection.UUID, document.CollectionUUID)
 }
+
+func TestMUSTPASS_ExportWithNewUUID(t *testing.T) {
+	// 创建源数据库并准备测试数据
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	collectionName := "test_export_new_uuid_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建RAG系统
+	ragSystem, err := Get(collectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+		WithEnableKnowledgeBase(true),
+		WithEnableEntityRepository(true),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 获取实体仓库信息
+	entityRepoInfo, err := ragSystem.EntityRepository.GetInfo()
+	assert.NoError(t, err)
+
+	// 添加实体到实体仓库
+	entity1 := &schema.ERModelEntity{
+		RepositoryUUID:    entityRepoInfo.Uuid,
+		EntityName:        "测试实体1",
+		Description:       "这是第一个测试实体",
+		EntityType:        "Person",
+		EntityTypeVerbose: "人物",
+		Attributes: map[string]any{
+			"age":  30,
+			"city": "北京",
+		},
+	}
+	err = sourceDB.Create(entity1).Error
+	assert.NoError(t, err)
+
+	entity2 := &schema.ERModelEntity{
+		RepositoryUUID:    entityRepoInfo.Uuid,
+		EntityName:        "测试实体2",
+		Description:       "这是第二个测试实体",
+		EntityType:        "Company",
+		EntityTypeVerbose: "公司",
+		Attributes: map[string]any{
+			"industry": "科技",
+			"founded":  2020,
+		},
+	}
+	err = sourceDB.Create(entity2).Error
+	assert.NoError(t, err)
+
+	// 保存原始实体的UUID
+	originalEntityUUIDs := []string{entity1.Uuid, entity2.Uuid}
+	t.Logf("原始实体UUID: %v", originalEntityUUIDs)
+
+	// 添加知识库条目
+	kbInfo := ragSystem.KnowledgeBase.GetKnowledgeBaseInfo()
+	entry1 := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:    int64(kbInfo.ID),
+		RelatedEntityUUIDS: entity1.Uuid,
+		KnowledgeTitle:     "Go语言并发编程",
+		KnowledgeType:      "Programming",
+		ImportanceScore:    9,
+		Keywords:           schema.StringArray{"Go", "并发", "goroutine", "channel"},
+		KnowledgeDetails:   "Go语言的并发模型基于goroutine和channel，提供了简洁而强大的并发编程能力。",
+	}
+	err = sourceDB.Create(entry1).Error
+	assert.NoError(t, err)
+
+	entry2 := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:    int64(kbInfo.ID),
+		RelatedEntityUUIDS: entity2.Uuid,
+		KnowledgeTitle:     "Python数据分析",
+		KnowledgeType:      "Data Science",
+		ImportanceScore:    8,
+		Keywords:           schema.StringArray{"Python", "数据分析", "pandas", "numpy"},
+		KnowledgeDetails:   "Python在数据分析领域有着广泛的应用，pandas和numpy是核心库。",
+	}
+	err = sourceDB.Create(entry2).Error
+	assert.NoError(t, err)
+
+	// 保存原始知识条目的HiddenIndex
+	originalKnowledgeHiddenIndexes := []string{entry1.HiddenIndex, entry2.HiddenIndex}
+	t.Logf("原始知识条目HiddenIndex: %v", originalKnowledgeHiddenIndexes)
+
+	// 添加向量文档（关联实体）
+	ragSystem.VectorStore.AddWithOptions("entity_doc_1", entity1.ToRAGContent(),
+		vectorstore.WithDocumentRawMetadata(map[string]interface{}{
+			schema.META_Data_UUID: entity1.Uuid,
+		}),
+		vectorstore.WithDocumentEntityID(entity1.Uuid),
+	)
+	ragSystem.VectorStore.AddWithOptions("entity_doc_2", entity2.ToRAGContent(),
+		vectorstore.WithDocumentRawMetadata(map[string]interface{}{
+			schema.META_Data_UUID: entity2.Uuid,
+		}),
+		vectorstore.WithDocumentEntityID(entity2.Uuid),
+	)
+
+	// 添加向量文档（关联知识条目）
+	ragSystem.VectorStore.AddWithOptions("knowledge_doc_1", entry1.KnowledgeDetails,
+		vectorstore.WithDocumentRawMetadata(map[string]interface{}{
+			schema.META_Data_UUID: entry1.HiddenIndex,
+		}),
+	)
+	ragSystem.VectorStore.AddWithOptions("knowledge_doc_2", entry2.KnowledgeDetails,
+		vectorstore.WithDocumentRawMetadata(map[string]interface{}{
+			schema.META_Data_UUID: entry2.HiddenIndex,
+		}),
+	)
+
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_export_new_uuid_*.zip")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	err = ExportRAG(collectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的数据库用于导入
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 执行导入
+	err = ImportRAG(tempFile.Name(), WithDB(targetDB))
+	assert.NoError(t, err)
+
+	// 验证导入后的数据
+
+	// 1. 验证实体的UUID已经改变
+	var importedEntities []schema.ERModelEntity
+	err = targetDB.Find(&importedEntities).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(importedEntities), "应该导入2个实体")
+
+	for _, entity := range importedEntities {
+		t.Logf("导入后的实体UUID: %s (原名称: %s)", entity.Uuid, entity.EntityName)
+		// 验证UUID已经改变
+		assert.NotContains(t, originalEntityUUIDs, entity.Uuid, "实体UUID应该已经改变")
+		assert.NotEmpty(t, entity.Uuid, "实体UUID不应为空")
+	}
+
+	// 2. 验证知识条目的HiddenIndex已经改变
+	var importedKnowledgeEntries []schema.KnowledgeBaseEntry
+	err = targetDB.Find(&importedKnowledgeEntries).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(importedKnowledgeEntries), "应该导入2个知识条目")
+
+	for _, entry := range importedKnowledgeEntries {
+		t.Logf("导入后的知识条目HiddenIndex: %s (原标题: %s)", entry.HiddenIndex, entry.KnowledgeTitle)
+		// 验证HiddenIndex已经改变
+		assert.NotContains(t, originalKnowledgeHiddenIndexes, entry.HiddenIndex, "知识条目HiddenIndex应该已经改变")
+		assert.NotEmpty(t, entry.HiddenIndex, "知识条目HiddenIndex不应为空")
+	}
+
+	// 3. 验证向量文档中的metadata UUID也已经更新
+	var importedDocuments []schema.VectorStoreDocument
+	err = targetDB.Find(&importedDocuments).Error
+	assert.NoError(t, err)
+	assert.Greater(t, len(importedDocuments), 0, "应该有导入的向量文档")
+
+	for _, doc := range importedDocuments {
+		if metaUUID, ok := doc.Metadata.GetDataUUID(); ok {
+			t.Logf("导入后的向量文档metadata UUID: %s (DocumentID: %s)", metaUUID, doc.DocumentID)
+			// 验证metadata中的UUID不是原始的UUID
+			assert.NotContains(t, originalEntityUUIDs, metaUUID, "向量文档metadata中的实体UUID应该已经改变")
+			assert.NotContains(t, originalKnowledgeHiddenIndexes, metaUUID, "向量文档metadata中的知识条目HiddenIndex应该已经改变")
+		}
+	}
+
+	// 4. 验证实体仓库的UUID也已经改变
+	var importedRepos []schema.EntityRepository
+	err = targetDB.Find(&importedRepos).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(importedRepos), "应该有1个实体仓库")
+
+	originalReposUUID := entityRepoInfo.Uuid
+	importedReposUUID := importedRepos[0].Uuid
+	t.Logf("原始实体仓库UUID: %s, 导入后: %s", originalReposUUID, importedReposUUID)
+	assert.NotEqual(t, originalReposUUID, importedReposUUID, "实体仓库UUID应该已经改变")
+
+	// 5. 验证知识库信息的UUID关联正确
+	var importedKBInfo []schema.KnowledgeBaseInfo
+	err = targetDB.Find(&importedKBInfo).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(importedKBInfo), "应该有1个知识库")
+
+	// 验证所有知识条目都关联到新的知识库ID
+	for _, entry := range importedKnowledgeEntries {
+		assert.Equal(t, int64(importedKBInfo[0].ID), entry.KnowledgeBaseID, "知识条目应该关联到新的知识库ID")
+	}
+
+	// 6. 验证所有实体都关联到新的实体仓库UUID
+	for _, entity := range importedEntities {
+		assert.Equal(t, importedReposUUID, entity.RepositoryUUID, "实体应该关联到新的实体仓库UUID")
+	}
+
+	t.Log("所有UUID和HiddenIndex验证通过，导入后的数据已经使用新的标识符")
+}
