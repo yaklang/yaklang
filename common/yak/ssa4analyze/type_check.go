@@ -252,6 +252,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 			log.Errorf("TypeCheckCall: %s, %s", method.GetVerboseName(),
 				"gotParaLen == funcTyp.ParameterLen but no enough argument")
+			return
 		}
 		checkParamType := func(i int, got, want ssa.Type) {
 			if !ssa.TypeCompare(got, want) {
@@ -268,6 +269,10 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 		// checkFixedParams
 		var got, want ssa.Type
+		if len(gotPara) < fixedLen {
+			// Safety check: avoid index out of range
+			return
+		}
 		for i := 0; i < fixedLen; i++ {
 			got = gotPara[i]
 			want = funcTyp.Parameter[i]
