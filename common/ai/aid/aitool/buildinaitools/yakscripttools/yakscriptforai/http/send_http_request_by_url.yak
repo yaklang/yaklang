@@ -67,7 +67,7 @@ if err != nil {
 file.Save(rspFilename, string(rsp.RawPacket))
 yakit.Info("rsp packet[size:%v], save to %v, use grep or some text tool to handle it", len(rsp.RawPacket), rspFilename)
 
-if len(rsp.RawPacket) < 1024 {
+if len(rsp.RawPacket) < 30000 {
     yakit.Info("rsp packet[size:%v]: \n%v", len(rsp.RawPacket), string(rsp.RawPacket))
 }
 
