@@ -9,7 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -18,10 +18,8 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	scanStart := time.Now()
 	defer func() {
 		// 输出性能统计报告
-		enableRulePerf := m.Config != nil &&
-			m.Config.ScanTaskCallback != nil &&
-			m.Config.ScanTaskCallback.EnableRulePerformanceLog
-		ssaprofile.ShowScanPerformance(m.ruleProfileMap, enableRulePerf, time.Since(scanStart))
+		enableRulePerf := m.Config.IsEnableRulePerformanceLog()
+		diagnostics.LogScanPerformance(m.ruleProfiler, enableRulePerf, time.Since(scanStart))
 
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -93,7 +91,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	}
 
 	// 检查是否启用规则级别的详细性能监控
-	enableRulePerf := m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableRulePerformanceLog
+	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
 
 	// 将查询逻辑包装到函数中
 	f := func() {
@@ -124,10 +122,10 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	}
 
 	// 根据配置决定是否记录规则级别的详细性能
-	if enableRulePerf && m.ruleProfileMap != nil {
+	if enableRulePerf && m.ruleProfiler != nil {
 		// 构建 profile 名称：Rule[规则名].Prog[程序名]
 		profileName := fmt.Sprintf("Rule[%s].Prog[%s]", rule.RuleName, prog.GetProgramName())
-		ssaprofile.ProfileAddToMap(m.ruleProfileMap, true, profileName, f)
+		m.ruleProfiler.Track(true, profileName, f)
 	} else {
 		// 不启用性能监控时，直接执行
 		f()

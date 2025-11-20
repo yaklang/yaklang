@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -242,7 +242,7 @@ public class UmsAdminController {
 //		}
 //		return nil
 //	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-//	ssa.ShowDatabaseCacheCost()
+//	diagnostics.LogCompileSummary()
 //	log.Info("ast cost: ", astCost)
 //	log.Info("mem cost: ", memCost)
 //	log.Info(" db cost: ", dbCost)
@@ -264,7 +264,7 @@ func TestBigJavaFile2(t *testing.T) {
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-	ssa.ShowDatabaseCacheCost()
+	diagnostics.LogCompileSummary()
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)
 	log.Info(" db cost: ", dbCost)
@@ -289,7 +289,7 @@ func TestBigJavaFile3(t *testing.T) {
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-	ssa.ShowDatabaseCacheCost()
+	diagnostics.LogCompileSummary()
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)
 	log.Info(" db cost: ", dbCost)
