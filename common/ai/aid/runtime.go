@@ -3,6 +3,7 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strconv"
 	"strings"
@@ -143,6 +144,9 @@ func (r *runtime) Invoke(task *AiTask) {
 
 	invokeTask := func(current *AiTask) error {
 		r.config.EmitInfo("invoke subtask: %v", current.Name)
+		if len(current.Subtasks) == 0 {
+			current.SetStatus(aicommon.AITaskState_Processing) // 设置为执行中
+		}
 		r.config.EmitPushTask(current)
 		defer func() {
 			r.config.EmitUpdateTaskStatus(current)
