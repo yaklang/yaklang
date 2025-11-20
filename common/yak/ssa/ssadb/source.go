@@ -5,11 +5,10 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 var irSourceCache = utils.NewTTLCache[*memedit.MemEditor]()
@@ -196,7 +195,7 @@ func (irSource *IrSource) Save(db *gorm.DB) error {
 	// log.Infof("save source: %v", irSource.SourceCodeHash)
 	// check existed
 	var err error
-	ssaprofile.ProfileAdd(true, "Database.Source", func() {
+	diagnostics.Track(true, "Database.Source", func() {
 		err = db.Save(irSource).Error
 	})
 	if err != nil {

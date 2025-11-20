@@ -8,6 +8,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -216,7 +217,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	f9 := func() {
 		c.cacheCtxCancel()
 	}
-	ProfileAdd(true, "ssa.ProgramCache.SaveToDatabase",
+	diagnostics.Track(true, "ssa.ProgramCache.SaveToDatabase",
 		f1, f2, f3, f4, f5, f6, f7, f8, f9)
 }
 

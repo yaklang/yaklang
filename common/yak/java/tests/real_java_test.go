@@ -20,10 +20,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -99,17 +99,17 @@ func TestCodeCompile(t *testing.T) {
 	)
 	_ = prog
 	databaseTime := time.Since(start)
-	// ssa.ShowDatabaseCacheCost()
+	// diagnostics.LogCompileSummary()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), progName)
 	require.NoError(t, err)
 
-	databaseCost := ssaprofile.GetProfileListMap()
-	_ = databaseCost
+	databaseRecorder := diagnostics.DefaultRecorder()
+	memoryRecorder := databaseRecorder
 
 	start = time.Now()
 	if false {
 		// memory
-		ssaprofile.Refresh()
+		memoryRecorder = diagnostics.ResetDefaultRecorder()
 		_, err := ssaapi.ParseProject(
 			ssaapi.WithFileSystem(filesys.NewRelLocalFs(path)),
 			ssaapi.WithLanguage(ssaconfig.JAVA),
@@ -117,24 +117,26 @@ func TestCodeCompile(t *testing.T) {
 				log.Errorf("Mem-Process: %s, %.2f%%", msg, process*100)
 			}),
 		)
-		// ssa.ShowDatabaseCacheCost()
+		// diagnostics.LogCompileSummary()
 		require.NoError(t, err)
 	}
 	memoryTime := time.Since(start)
-	memoryCost := ssaprofile.GetProfileListMap()
+	if memoryRecorder == diagnostics.DefaultRecorder() {
+		memoryRecorder = diagnostics.DefaultRecorder()
+	}
 
 	if true {
-		ssaprofile.ShowProfileMaps("memory", memoryCost)
+		diagnostics.LogRecorder("memory", memoryRecorder)
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
-		ssaprofile.ShowProfileMaps("database", databaseCost)
+		diagnostics.LogRecorder("database", databaseRecorder)
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
-		ssaprofile.ShowDiffCacheCost(databaseCost, memoryCost)
+		diagnostics.CompareRecorderCosts(databaseRecorder, memoryRecorder)
 		// _ = prog
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
@@ -269,7 +271,7 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
-	ssaprofile.ShowCompileProfiles()
+	diagnostics.LogCompileSummary()
 }
 
 func TestA(t *testing.T) {
@@ -280,7 +282,7 @@ func TestA(t *testing.T) {
 			return
 		}
 	}()
-	// ssaprofile.DumpHeapProfileWithInterval(time.Second, ssaprofile.WithFileName("heap.prof"))
+	// diagnostics.StartHeapMonitor(time.Second, diagnostics.WithFileName("heap.prof"))
 
 	path := "/Users/wlz/Developer/Target/yakssaExample/wanwu"
 	fs := filesys.NewRelLocalFs(path)
@@ -300,7 +302,7 @@ func TestA(t *testing.T) {
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
-	ssaprofile.ProfileAdd(true, "collect file", func() {
+	diagnostics.Track(true, "collect file", func() {
 		filesys.Recursive(".",
 			filesys.WithFileSystem(fs),
 			filesys.WithFileStat(func(s string, fi os.FileInfo) error {
@@ -319,7 +321,7 @@ func TestA(t *testing.T) {
 
 	var ch <-chan *ssareducer.FileContent
 
-	ssaprofile.ProfileAdd(true, "getFileHandler", func() {
+	diagnostics.Track(true, "getFileHandler", func() {
 		ch = config.GetFileHandler(
 			fs,
 			fileList,
@@ -334,5 +336,5 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
-	ssaprofile.ShowCompileProfiles()
+	diagnostics.LogCompileSummary()
 }

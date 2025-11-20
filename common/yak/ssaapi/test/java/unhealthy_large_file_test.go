@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -33,5 +33,5 @@ func TestUnhealthyLargeFile(t *testing.T) {
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	log.SetOutput(os.Stdout)
 	fmt.Println(buf.String())
-	ssa.ShowDatabaseCacheCost()
+	diagnostics.LogCompileSummary()
 }

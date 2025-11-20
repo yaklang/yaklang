@@ -42,10 +42,10 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -234,7 +234,7 @@ var ssaCompile = &cli.Command{
 		reCompile := c.Bool("re-compile")
 		if programName != "" {
 			defer func() {
-				ssa.ShowDatabaseCacheCost()
+				diagnostics.LogCompileSummary()
 			}()
 		}
 		entry := c.String("entry")
@@ -1290,7 +1290,7 @@ var ssaCodeScan = &cli.Command{
 		ctx := context.Background()
 
 		if pprofFile := c.String("pprof"); pprofFile != "" {
-			ssaprofile.DumpHeapProfileWithInterval(30*time.Second, ssaprofile.WithFileName(pprofFile))
+			diagnostics.StartHeapMonitor(30*time.Second, diagnostics.WithFileName(pprofFile))
 		}
 
 		if logLevel := c.String("log-level"); logLevel != "" {
@@ -1389,7 +1389,7 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		ssaprofile.ShowCompileProfiles()
+		diagnostics.LogCompileSummary()
 		return nil
 	},
 }

@@ -9,8 +9,8 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 const (
@@ -232,10 +232,11 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 	}
 
 	saveEdge := func(edge *ssadb.AuditEdge) error {
-		return ssaprofile.ProfileAddWithError(true, "dbgraph_create_edge", func() error {
+		_, err := diagnostics.TrackWithError(true, "dbgraph_create_edge", func() error {
 			g.database.SaveEdge(edge)
 			return nil
 		})
+		return err
 	}
 	msg := edge.Msg
 	switch edge.Kind {
