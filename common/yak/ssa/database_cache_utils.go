@@ -90,7 +90,7 @@ func createInstructionCache(
 	ret.SetPersistence(
 		NewSerializingPersistenceStrategy[Instruction, *ssadb.IrCode](ctx,
 			marshalIrCode,
-			saveIrCode(db, saveFinish),
+			saveIrCode(prog, db, saveFinish),
 			asyncdb.WithSaveSize(saveSize),
 			asyncdb.WithSaveTimeout(saveTime),
 			asyncdb.WithName("Instruction"),
@@ -102,13 +102,14 @@ func createInstructionCache(
 func createTypeCache(
 	ctx context.Context,
 	db *gorm.DB,
+	prog *Program,
 	programName string, saveSize int,
 
 ) *Cache[Type] {
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
 	ret := NewCache[Type]()
 	ret.SetPersistence(NewSerializingPersistenceStrategy[Type, *ssadb.IrType](ctx,
-		marshalIrType(programName), saveIrType(db),
+		marshalIrType(programName), saveIrType(prog, db),
 		asyncdb.WithSaveSize(saveSize),
 		asyncdb.WithSaveTimeout(saveTime),
 		asyncdb.WithEnableSave(true), // always enable save for type cache
@@ -117,7 +118,7 @@ func createTypeCache(
 	return ret
 }
 
-func saveIrCode(db *gorm.DB, f func(int)) func(t []*ssadb.IrCode) {
+func saveIrCode(prog *Program, db *gorm.DB, f func(int)) func(t []*ssadb.IrCode) {
 	return func(t []*ssadb.IrCode) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -125,15 +126,21 @@ func saveIrCode(db *gorm.DB, f func(int)) func(t []*ssadb.IrCode) {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// log.Errorf("DATABASE: Save IR: %d", len(t))
-			for _, irCode := range t {
-				if err := irCode.Save(tx); err != nil {
-					log.Errorf("DATABASE: save irCode to database error: %v", err)
+		saveStep := func() {
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				for _, irCode := range t {
+					if err := tx.Save(irCode).Error; err != nil {
+						log.Errorf("DATABASE: save irCode to database error: %v", err)
+					}
 				}
-			}
-			return nil
-		})
+				return nil
+			})
+		}
+		if prog != nil {
+			prog.DiagnosticsTrack("ssa.Database.SaveIrCodeBatch", saveStep)
+		} else {
+			saveStep()
+		}
 		f(len(t))
 	}
 }
@@ -157,7 +164,7 @@ func marshalIrType(name string) func(s Type) (*ssadb.IrType, error) {
 	}
 }
 
-func saveIrType(db *gorm.DB) func(t []*ssadb.IrType) {
+func saveIrType(prog *Program, db *gorm.DB) func(t []*ssadb.IrType) {
 	return func(t []*ssadb.IrType) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -165,18 +172,21 @@ func saveIrType(db *gorm.DB) func(t []*ssadb.IrType) {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		// log.Errorf("DATABASE: type save to db : %d", len(t))
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			// log.Errorf("DATABASE: Save IR Types: %d", len(t))
-			for _, irType := range t {
-				_ = irType
-				if err := irType.Save(tx); err != nil {
-					log.Errorf("DATABASE: save irType to database error: %v", err)
+		saveStep := func() {
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				for _, irType := range t {
+					if err := tx.Save(irType).Error; err != nil {
+						log.Errorf("DATABASE: save irType to database error: %v", err)
+					}
 				}
-			}
-			// log.Errorf("DATABASE: Save IR Types finish : %d", len(t))
-			return nil
-		})
+				return nil
+			})
+		}
+		if prog != nil {
+			prog.DiagnosticsTrack("ssa.Database.SaveIrTypeBatch", saveStep)
+		} else {
+			saveStep()
+		}
 	}
 }
 
