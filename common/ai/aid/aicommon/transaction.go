@@ -39,12 +39,16 @@ func CallAITransaction(
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
 		finalPrompt := c.RetryPromptBuilder(prompt, postHandlerErr)
-		// 调试打印：输出完整的 prompt（仅在测试环境或调试模式下）
-		if i == 0 {
-			emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", seq, i+1, finalPrompt)
-		} else {
-			emitter.EmitInfo("[DEBUG] AI Transaction Prompt Retry (seq=%d, attempt=%d):\n%s", seq, i+1, utils.ShrinkString(finalPrompt, 512))
-		}
+
+		utils.Debug(func() {
+			// 调试打印：输出完整的 prompt（仅在测试环境或调试模式下）
+			if i == 0 {
+				emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", seq, i+1, finalPrompt)
+			} else {
+				emitter.EmitInfo("[DEBUG] AI Transaction Prompt Retry (seq=%d, attempt=%d):\n%s", seq, i+1, utils.ShrinkString(finalPrompt, 512))
+			}
+		})
+
 		rsp, err := callAi(
 			NewAIRequest(
 				finalPrompt,

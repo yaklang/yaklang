@@ -54,7 +54,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 				"memory":            entity,
 			})
 		}
-		log.Infof("saved memory entity to database: %s", entity.Id)
+		log.Infof("saved memory entity to database: %s content: %v", entity.Id, utils.ShrinkString(entity.Content, 256))
 
 		// 添加到HNSW索引
 		if r.hnswBackend != nil {
@@ -62,7 +62,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 				log.Errorf("add to HNSW index failed: %v", err)
 				return utils.Errorf("add to HNSW index failed: %v", err)
 			}
-			log.Infof("added memory entity to HNSW index: %s", entity.Id)
+			//log.Infof("added memory entity to HNSW index: %s", entity.Id)
 		}
 
 		// 索引 potential_questions 到 RAG 系统
