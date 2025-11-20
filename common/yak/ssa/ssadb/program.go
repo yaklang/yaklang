@@ -82,7 +82,7 @@ func GetApplicationProgram(name string) (*IrProgram, error) {
 
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
-	db := GetDB().Model(&IrProgram{}).Debug()
+	db := GetDB().Model(&IrProgram{})
 	if name == "" {
 		return nil, utils.Errorf("program name is empty")
 	}

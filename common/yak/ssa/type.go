@@ -547,10 +547,7 @@ func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
 	}
-
-	if !lo.Contains(b.fullTypeName, name) {
-		b.fullTypeName = append(b.fullTypeName, name)
-	}
+	fullTypeNameAdd(&b.fullTypeName, name, b)
 }
 
 func (b *BasicType) GetFullTypeNames() []string {
@@ -564,7 +561,7 @@ func (b *BasicType) SetFullTypeNames(names []string) {
 	if b == nil {
 		return
 	}
-	b.fullTypeName = clean(names)
+	fullTypeNameSet(&b.fullTypeName, names, b)
 }
 
 func (b *BasicType) IsAny() bool {
@@ -696,9 +693,7 @@ func (a *AliasType) AddFullTypeName(name string) {
 	if a == nil {
 		return
 	}
-	if !lo.Contains(a.fullTypeName, name) {
-		a.fullTypeName = append(a.fullTypeName, name)
-	}
+	fullTypeNameAdd(&a.fullTypeName, name, a)
 }
 
 func (a *AliasType) GetFullTypeNames() []string {
@@ -712,7 +707,7 @@ func (a *AliasType) SetFullTypeNames(names []string) {
 	if a == nil {
 		return
 	}
-	a.fullTypeName = clean(names)
+	fullTypeNameSet(&a.fullTypeName, names, a)
 }
 
 // func (b *AliasType) GetAllKey() []string {
@@ -821,6 +816,7 @@ func (i *InterfaceType) AddFullTypeName(name string) {
 		return
 	}
 	i.name = name
+	fullTypeNameAdd(&i.fullTypeName, name, i)
 }
 
 func (i *InterfaceType) GetFullTypeNames() []string {
@@ -834,7 +830,7 @@ func (i *InterfaceType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.fullTypeName = clean(names)
+	fullTypeNameSet(&i.fullTypeName, names, i)
 }
 
 // ====================== chan type
@@ -850,9 +846,7 @@ func (c *ChanType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	if !lo.Contains(c.fullTypeName, name) {
-		c.fullTypeName = append(c.fullTypeName, name)
-	}
+	fullTypeNameAdd(&c.fullTypeName, name, c)
 }
 
 func (c *ChanType) GetFullTypeNames() []string {
@@ -866,7 +860,7 @@ func (c *ChanType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = clean(names)
+	fullTypeNameSet(&c.fullTypeName, names, c)
 }
 
 // func (b *ChanType) GetAllKey() []string {
@@ -934,9 +928,7 @@ func (i *ObjectType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
-	if !lo.Contains(i.fullTypeName, name) {
-		i.fullTypeName = append(i.fullTypeName, name)
-	}
+	fullTypeNameAdd(&i.fullTypeName, name, i)
 }
 
 func (i *ObjectType) GetFullTypeNames() []string {
@@ -950,7 +942,7 @@ func (i *ObjectType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.fullTypeName = clean(names)
+	fullTypeNameSet(&i.fullTypeName, names, i)
 }
 
 func (i *ObjectType) SetName(name string) {
@@ -1190,9 +1182,7 @@ func (f *FunctionType) AddFullTypeName(name string) {
 	if f == nil {
 		return
 	}
-	if !lo.Contains(f.fullTypeName, name) {
-		f.fullTypeName = append(f.fullTypeName, name)
-	}
+	fullTypeNameAdd(&f.fullTypeName, name, f)
 }
 
 func (f *FunctionType) GetFullTypeNames() []string {
@@ -1206,7 +1196,7 @@ func (f *FunctionType) SetFullTypeNames(names []string) {
 	if f == nil {
 		return
 	}
-	f.fullTypeName = clean(names)
+	fullTypeNameSet(&f.fullTypeName, names, f)
 }
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
@@ -1353,9 +1343,7 @@ func (c *GenericType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	if !lo.Contains(c.fullTypeName, name) {
-		c.fullTypeName = append(c.fullTypeName, name)
-	}
+	fullTypeNameAdd(&c.fullTypeName, name, c)
 }
 
 func (c *GenericType) GetFullTypeNames() []string {
@@ -1369,7 +1357,7 @@ func (c *GenericType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = clean(names)
+	fullTypeNameSet(&c.fullTypeName, names, c)
 }
 
 func (c *GenericType) GetTypeKind() TypeKind {
@@ -1548,16 +1536,14 @@ func (c *OrType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = clean(names)
+	fullTypeNameSet(&c.fullTypeName, names, c)
 }
 
 func (c *OrType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	if !lo.Contains(c.fullTypeName, name) {
-		c.fullTypeName = append(c.fullTypeName, name)
-	}
+	fullTypeNameAdd(&c.fullTypeName, name, c)
 }
 
 func (c *OrType) GetTypeKind() TypeKind {
