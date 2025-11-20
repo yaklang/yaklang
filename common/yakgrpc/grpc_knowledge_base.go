@@ -109,13 +109,9 @@ func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowled
 func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	// 使用knowledgebase包创建知识库
-	_, err := knowledgebase.CreateKnowledgeBase(db,
-		req.GetKnowledgeBaseName(),
-		req.GetKnowledgeBaseDescription(),
-		req.GetKnowledgeBaseType())
+	_, err := rag.Get(req.GetKnowledgeBaseName(), rag.WithDB(db))
 	if err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "创建知识库失败")
 	}
 
 	return &ypb.GeneralResponse{
@@ -125,15 +121,14 @@ func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowled
 
 func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowledgeBaseV2Request) (*ypb.CreateKnowledgeBaseV2Response, error) {
 	db := consts.GetGormProfileDatabase()
-	kb, err := knowledgebase.CreateKnowledgeBase(db, req.GetName(), req.GetDescription(), req.GetType())
+	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db))
 	if err != nil {
-		return nil, utils.Errorf("创建知识库失败: %v", err)
+		return nil, utils.Wrap(err, "创建知识库失败")
 	}
 
-	var kbInfo schema.KnowledgeBaseInfo
-	err = db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", kb.GetID()).First(&kbInfo).Error
-	if err != nil {
-		return nil, utils.Errorf("获取知识库信息失败: %v", err)
+	kbInfo := ragSystem.KnowledgeBase.GetKnowledgeBaseInfo()
+	if kbInfo == nil {
+		return nil, utils.Errorf("获取知识库信息失败")
 	}
 	return &ypb.CreateKnowledgeBaseV2Response{
 		KnowledgeBase: &ypb.KnowledgeBaseInfo{

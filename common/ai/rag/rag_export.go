@@ -429,7 +429,10 @@ func writeEntityToBinary(writer io.Writer, entity *schema.ERModelEntity) error {
 	if err := pbWriteBytes(writer, []byte(entity.EntityName)); err != nil {
 		return utils.Wrap(err, "write entity name")
 	}
-	if err := pbWriteBytes(writer, []byte(entity.Uuid)); err != nil {
+	// if err := pbWriteBytes(writer, []byte(entity.Uuid)); err != nil {
+	// 	return utils.Wrap(err, "write entity uuid")
+	// }
+	if err := pbWriteBytes(writer, []byte("")); err != nil {
 		return utils.Wrap(err, "write entity uuid")
 	}
 	if err := pbWriteBytes(writer, []byte(entity.Description)); err != nil {
@@ -931,6 +934,8 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	if err != nil {
 		return utils.Wrap(err, "update knowledge base rag id")
 	}
+	knowledgeBaseInfo := knowledgeBase.GetKnowledgeBaseInfo()
+
 	entityBaseInfo := &schema.EntityRepository{
 		EntityBaseName: ragSystemConfig.Name,
 		Description:    ragSystemConfig.description,
@@ -949,6 +954,8 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 			if err != nil {
 				return utils.Wrap(err, "read knowledge entry")
 			}
+			knowledgeEntry.HiddenIndex = uuid.NewString()
+			knowledgeEntry.KnowledgeBaseID = int64(knowledgeBaseInfo.ID)
 			err = yakit.CreateKnowledgeBaseEntry(ragSystemConfig.db, knowledgeEntry)
 			if err != nil {
 				return utils.Wrap(err, "create knowledge base entry")
@@ -959,6 +966,8 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 			if err != nil {
 				return utils.Wrap(err, "read entity")
 			}
+			// 强制使用新uuid
+			entity.Uuid = uuid.NewString()
 			entity.RepositoryUUID = entityBaseInfo.Uuid
 			err = yakit.CreateEntity(ragSystemConfig.db, entity)
 			if err != nil {

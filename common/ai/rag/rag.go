@@ -8,7 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // type DocumentOption = vectorstore.DocumentOption
@@ -74,4 +76,41 @@ func DeleteRAG(db *gorm.DB, name string) error {
 		}
 	}
 	return nil
+}
+
+func ListRAGSystemNames(db *gorm.DB) []string {
+	nameSet := make(map[string]struct{})
+
+	// 获取所有向量库（collections）的名字
+	collectionNames := vectorstore.ListCollections(db)
+	for _, name := range collectionNames {
+		nameSet[name] = struct{}{}
+	}
+
+	// 获取所有知识库的名字
+	knowledgeBaseNames, err := yakit.GetKnowledgeBaseNameList(db)
+	if err == nil {
+		for _, name := range knowledgeBaseNames {
+			nameSet[name] = struct{}{}
+		}
+	}
+
+	// 获取所有实体库的名字
+	var entityRepos []*schema.EntityRepository
+	err = db.Model(&schema.EntityRepository{}).Select("entity_base_name").Find(&entityRepos).Error
+	if err == nil {
+		for _, repo := range entityRepos {
+			if repo.EntityBaseName != "" {
+				nameSet[repo.EntityBaseName] = struct{}{}
+			}
+		}
+	}
+
+	// 将 map 转换为 slice
+	result := make([]string, 0, len(nameSet))
+	for name := range nameSet {
+		result = append(result, name)
+	}
+
+	return result
 }
