@@ -41,6 +41,7 @@ func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "coordinator_id", filter.GetCoordinatorId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_index", filter.GetTaskIndex())
+	db = bizhelper.ExactQueryStringArrayOr(db, "task_uuid", filter.GetTaskUUID())
 	return db
 }
 
