@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,7 +140,7 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 
 	// 需要提权，使用 UAC（User Account Control）
 	// 创建临时批处理文件来执行命令
-	tempFileDir := os.TempDir()
+	tempFileDir := consts.GetDefaultYakitBaseTempDir()
 	token := utils.RandStringBytes(20)
 	batName := filepath.Join(tempFileDir, fmt.Sprintf("windows-uac-prompt-%v.bat", token))
 
