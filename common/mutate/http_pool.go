@@ -72,6 +72,8 @@ type httpPoolConfig struct {
 
 	// 强制使用 h2
 	ForceHttp2 bool
+	// 禁用 HTTP/2 连接复用
+	DisableHttp2Reuse bool
 
 	// 重试
 	RetryTimes           int
@@ -606,6 +608,12 @@ func _httpPool_NoReadMultiResponse(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_DisableHttp2Reuse(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.DisableHttp2Reuse = b
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -666,6 +674,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		ForceFuzz:          true,
 		SaveHTTPFlow:       consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		ForceFuzzDangerous: false,
+		DisableHttp2Reuse:  false,
 	}
 	for _, opt := range opts {
 		if opt == nil {
@@ -946,6 +955,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithRandomJA3FingerPrint(config.IsRandomJA3),
 							lowhttp.WithConnPool(config.WithConnPool),
+							lowhttp.WithDisableHttp2Reuse(config.DisableHttp2Reuse),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 							lowhttp.WithNoReadMultiResponse(config.NoReadMultiResponse),
@@ -1321,4 +1331,5 @@ var (
 	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
 	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
 	WithPoolOpt_NoReadMultiResponse        = _httpPool_NoReadMultiResponse
+	WithPoolOpt_DisableHttp2Reuse          = _httpPool_DisableHttp2Reuse
 )
