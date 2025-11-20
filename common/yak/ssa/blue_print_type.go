@@ -1,10 +1,6 @@
 package ssa
 
-import (
-	"fmt"
-
-	"github.com/samber/lo"
-)
+import "fmt"
 
 var _ Type = (*Blueprint)(nil)
 
@@ -46,9 +42,7 @@ func (c *Blueprint) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	if !lo.Contains(c.fullTypeName, name) {
-		c.fullTypeName = append(c.fullTypeName, name)
-	}
+	fullTypeNameAdd(&c.fullTypeName, name, c)
 }
 
 func (c *Blueprint) GetFullTypeNames() []string {
@@ -62,5 +56,12 @@ func (c *Blueprint) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = clean(names)
+	fullTypeNameSet(&c.fullTypeName, names, c)
+}
+
+func (c *Blueprint) addFullTypeNames(names []string) {
+	if c == nil {
+		return
+	}
+	fullTypeNameAddList(&c.fullTypeName, names, c)
 }

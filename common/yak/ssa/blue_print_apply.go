@@ -76,7 +76,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 		}
 		parent.Apply(obj)
 		_, i := lo.Difference(c.fullTypeName, parent.fullTypeName)
-		c.fullTypeName = append(c.fullTypeName, i...)
+		c.addFullTypeNames(i)
 	}
 
 	for _, bp := range c.InterfaceBlueprints {
@@ -88,7 +88,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 		}
 		bp.Apply(obj)
 		_, i := lo.Difference(c.fullTypeName, bp.fullTypeName)
-		c.fullTypeName = append(c.fullTypeName, i...)
+		c.addFullTypeNames(i)
 	}
 
 	if prog != nil || prog.Cache != nil {
@@ -144,6 +144,6 @@ func (c *Blueprint) Apply(obj Value) Type {
 		}
 	}
 
-	objTyp.fullTypeName = c.GetFullTypeNames()
+	objTyp.SetFullTypeNames(c.GetFullTypeNames())
 	return objTyp
 }

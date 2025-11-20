@@ -226,9 +226,9 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 			但数据库保存是异步，保存时fulltypename可能没有设置完毕
 			因此在这里选择直接强制保存
 		*/
-		// if typ.GetId() <= 0 {
-		saveTypeWithValue(value, typ)
-		// }
+		if typ.GetId() <= 0 {
+			saveTypeWithValue(value, typ)
+		}
 
 		if typ.GetId() <= 0 {
 			log.Errorf("[BUG] Failed to save type, ID still invalid: %d, type: %s, value: %s",
