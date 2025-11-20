@@ -175,9 +175,19 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	}
 
 	if inst.Kind == ssa.UndefinedMemberInValid {
-
-		objTyp := inst.GetObject().GetType()
+		obj := inst.GetObject()
+		if utils.IsNil(obj) {
+			return
+		}
+		objTyp := obj.GetType()
+		if utils.IsNil(objTyp) || objTyp.GetTypeKind() == ssa.AnyTypeKind {
+			return
+		}
 		key := inst.GetKey()
+		keyName := ssa.GetKeyString(key)
+		if keyName == "" {
+			return
+		}
 		if ssa.IsConstInst(key) {
 			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(objTyp), key.String())
 			if want != "" {
@@ -190,7 +200,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		}
 
 		inst.NewError(ssa.Error, TypeCheckTAG,
-			ssa.InvalidField(objTyp.String(), ssa.GetKeyString(inst.GetKey())),
+			ssa.InvalidField(objTyp.String(), keyName),
 		)
 	}
 }
