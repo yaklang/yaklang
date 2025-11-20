@@ -147,7 +147,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	// 提取响应
 	extractHTTPResponseResult, err := s.ExtractHTTPResponse(ctx, &ypb.ExtractHTTPResponseParams{
 		HTTPResponse: string(rspRaw),
-		Extractors:   req.GetExtractors(),
+		HTTPRequest: string(rspIns.RawRequest),
+		IsHTTPS:     isHttps,
+		Extractors:  req.GetExtractors(),
 	})
 	var extractResults []*ypb.KVPair
 	if err == nil && extractHTTPResponseResult != nil && extractHTTPResponseResult.GetValues() != nil {
@@ -1512,7 +1514,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 
 	params := make(map[string]interface{})
 	for _, i := range extractors {
-		p, err := i.Execute([]byte(req.GetHTTPResponse()), params)
+		p, err := i.ExecuteWithRequest([]byte(req.GetHTTPResponse()), []byte(req.GetHTTPRequest()), req.GetIsHTTPS(), params)
 		if err != nil {
 			log.Errorf("extractor %s execute failed: %s", i.Name, err)
 			continue
