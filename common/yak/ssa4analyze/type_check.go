@@ -232,8 +232,19 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			// len:  gotParaLen >=  wantParaLen-1
 			lengthError = gotParaLen < fixedLen
 		case !funcTyp.IsVariadic && c.IsEllipsis:
-			// error, con't use ellipsis in this function
-			lengthError = true
+			if len(gotPara) > 0 && fixedLen > 0 {
+				firstArgType := gotPara[0]
+				expectedType := funcTyp.Parameter[0]
+				sliceType := ssa.NewSliceType(firstArgType)
+
+				if !ssa.TypeCompare(sliceType, expectedType) {
+					c.NewError(ssa.Error, TypeCheckTAG,
+						ArgumentTypeError(1, sliceType.String(), expectedType.String(), funName),
+					)
+					return
+				}
+			}
+			lengthError = gotParaLen != fixedLen
 		case funcTyp.IsVariadic && c.IsEllipsis:
 			// lengthError = gotParaLen != wantParaLen
 			// TODO: warn
