@@ -175,6 +175,10 @@ type Coordinator struct {
 	rootTask *AiTask
 }
 
+func (c *Coordinator) GetAIConfig() *aicommon.Config {
+	return c.Config
+}
+
 func (c *Coordinator) GetContextProvider() *PromptContextProvider {
 	return c.ContextProvider
 }
