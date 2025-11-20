@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -62,6 +63,7 @@ type AIStatefulTask interface {
 
 	SetDB(db *gorm.DB)
 	GetRisks() []*schema.Risk
+	GetUUID() string
 }
 
 type AIStatefulTaskBase struct {
@@ -85,6 +87,12 @@ type AIStatefulTaskBase struct {
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
 	reActLoop         ReActLoopIF
 	db                *gorm.DB
+
+	uuid string
+}
+
+func (s *AIStatefulTaskBase) GetUUID() string {
+	return s.uuid
 }
 
 func (s *AIStatefulTaskBase) GetDB() *gorm.DB {
@@ -106,7 +114,8 @@ func (r *AIStatefulTaskBase) GetRisks() []*schema.Risk {
 		return nil
 	}
 	events, err := yakit.QueryAIEvent(r.GetDB(), &ypb.AIEventFilter{
-		TaskIndex: []string{r.GetId()},
+		TaskUUID:  []string{r.GetUUID()},
+		EventType: []string{schema.EVENT_TYPE_YAKIT_RISK},
 	})
 	if err != nil {
 		return nil
@@ -334,8 +343,15 @@ func NewStatefulTaskBase(
 		status:            AITaskState_Created,
 		createdAt:         time.Now(),
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
+		uuid:              ksuid.New().String(),
 	}
 	if base.Emitter != nil {
+		base.Emitter = base.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+			if event != nil {
+				event.TaskUUID = base.GetUUID()
+			}
+			return event
+		})
 		if len(skipEvent) > 0 && skipEvent[0] {
 
 		} else {
@@ -345,6 +361,7 @@ func NewStatefulTaskBase(
 					"react_task_status": base.status,
 					"react_user_input":  userInput,
 					"react_task_id":     taskId,
+					"react_task_uuid":   base.GetUUID(),
 				},
 			)
 		}

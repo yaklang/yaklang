@@ -389,6 +389,11 @@ LOOP:
 		t.Fatal("No risks found")
 	}
 
+	// risks 数量为 1
+	if len(risks) != 1 {
+		t.Fatalf("Expected 1 risk, got %d", len(risks))
+	}
+
 	// 验证 risk 的内容
 	found := false
 	for _, risk := range risks {
