@@ -275,6 +275,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		dnsHosts                = option.EtcHosts
 		connPool                = option.ConnPool
 		withConnPool            = option.WithConnPool
+		disableHttp2Reuse       = option.DisableHttp2Reuse
 		sni                     = option.SNI
 		payloads                = option.Payloads
 		tags                    = option.Tags
@@ -725,7 +726,8 @@ RECONNECT:
 		response.RawPacket = responsePacket
 		return response, nil
 	} else if withConnPool {
-		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
+		exclusiveH2 := disableHttp2Reuse && enableHttp2
+		conn, err = connPool.getIdleConn(cacheKey, exclusiveH2, dialopts...)
 	} else {
 		conn, err = netx.DialX(originAddr, dialopts...)
 	}
@@ -756,8 +758,9 @@ RECONNECT:
 					tried[basicProxy] = struct{}{}
 				}
 				if withConnPool {
+					exclusiveH2 := disableHttp2Reuse && enableHttp2
 					cacheKey.addr = utils.ExtractHostPort(basicProxy)
-					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
+					conn, err = connPool.getIdleConn(cacheKey, exclusiveH2, noProxyDial...)
 				} else {
 					conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
 				}

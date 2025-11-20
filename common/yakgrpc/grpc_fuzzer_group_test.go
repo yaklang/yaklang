@@ -1,6 +1,9 @@
 package yakgrpc
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"testing"
@@ -134,4 +137,57 @@ done:
 	hitLock.Lock()
 	defer hitLock.Unlock()
 	require.GreaterOrEqual(t, hit, 2)
+}
+
+func BenchmarkHTTPFuzzerGroup_Concurrent(b *testing.B) {
+	client, err := NewLocalClient()
+	if err != nil {
+		b.Fatalf("new client: %v", err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte(`ok`))
+	})
+
+	const (
+		totalRequests = 2000
+		concurrent    = 50
+	)
+
+	requests := make([]*ypb.FuzzerRequest, 0, totalRequests)
+	for i := 0; i < totalRequests; i++ {
+		packet := fmt.Sprintf("GET /bench-%d HTTP/1.1\nHost: example.com\n\n", i%5)
+		req := &ypb.FuzzerRequest{
+			FuzzerIndex:              fmt.Sprintf("bench-%d", i),
+			Request:                  string(lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Host", utils.HostPort(host, port))),
+			IsHTTPS:                  false,
+			PerRequestTimeoutSeconds: 5,
+			ForceFuzz:                true,
+		}
+		requests = append(requests, req)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		stream, err := client.HTTPFuzzerGroup(ctx, &ypb.GroupHTTPFuzzerRequest{
+			Requests:   requests,
+			Concurrent: concurrent,
+		})
+		if err != nil {
+			cancel()
+			b.Fatalf("HTTPFuzzerGroup: %v", err)
+		}
+		for {
+			if _, recvErr := stream.Recv(); recvErr != nil {
+				if recvErr != io.EOF {
+					cancel()
+					b.Fatalf("recv: %v", recvErr)
+				}
+				break
+			}
+		}
+		cancel()
+	}
 }
