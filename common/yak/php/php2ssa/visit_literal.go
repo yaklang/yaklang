@@ -209,5 +209,11 @@ func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringP
 	if i.Chain() != nil {
 		return y.VisitChain(i.Chain())
 	}
+	if i.Expression() != nil {
+		return y.VisitExpression(i.Expression())
+	}
+	if i.FunctionCall() != nil {
+		return y.VisitFunctionCall(i.FunctionCall())
+	}
 	return y.EmitConstInst(i.GetText())
 }

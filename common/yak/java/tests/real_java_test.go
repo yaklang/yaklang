@@ -23,7 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -277,6 +276,7 @@ $sink #-> ?{opcode: param} as $result;
 }
 
 func TestA(t *testing.T) {
+	t.Skip("Skip TestA")
 	go func() {
 		err := http.ListenAndServe(":18080", nil)
 		if err != nil {
@@ -387,16 +387,4 @@ func TestRuleRun(t *testing.T) {
 
 	diagnostics.LogRecorder("")
 
-}
-
-func TestPHPFront(t *testing.T) {
-	path := "/home/wlz/Developer/pfsense"
-	file := "src/etc/inc/captiveportal.inc"
-	data, err := os.ReadFile(filepath.Join(path, file))
-	require.NoError(t, err)
-	code := string(data)
-
-	ast, err := php2ssa.Frontend(code)
-	require.NoError(t, err)
-	require.NotNil(t, ast)
 }

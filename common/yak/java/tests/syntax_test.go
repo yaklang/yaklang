@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
-	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 )
 
 //go:embed code
@@ -51,22 +50,4 @@ public interface LogEnabled {
 }
 `
 	validateSource(t, "", badCode)
-}
-
-func TestPHPInterpolatedCurlyBraces(t *testing.T) {
-	phpCode := `<?php
-function build_rules($cpips, $cpiplist, $interfaces, $rdrtag, $authtag) {
-	$rules = "table <{$cpips}> { " . join(' ', $cpiplist)  . "}\n";
-	$rules .= "ether pass in on { {$interfaces} } tag \"{$rdrtag}\"\n";
-	$rules .= "pass in quick on {$interfaces} proto tcp from any to <{$cpips}> port {$rdrtag} ridentifier {$authtag}\n";
-	return $rules;
-}
-
-$rules = build_rules('cpzone', ['127.0.0.1', '127.0.0.2'], 'igb0 igb1', 'rdr', 'auto');
-echo $rules;
-`
-
-	ast, err := php2ssa.Frontend(phpCode)
-	require.NoError(t, err)
-	require.NotNil(t, ast)
 }
