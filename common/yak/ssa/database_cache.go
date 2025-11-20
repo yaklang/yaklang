@@ -8,7 +8,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -74,7 +73,7 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, cache.DB,
+		cacheCtx, cache.DB, prog,
 		programName, saveSize,
 	)
 	return cache
@@ -82,6 +81,24 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 
 func (c *ProgramCache) HaveDatabaseBackend() bool {
 	return c.DB != nil
+}
+
+func (c *ProgramCache) diagnosticsTrack(name string, steps ...func()) {
+	if len(steps) == 0 {
+		return
+	}
+	if c == nil {
+		return
+	}
+	if prog := c.program; prog != nil {
+		prog.DiagnosticsTrack(name, steps...)
+		return
+	}
+	for _, step := range steps {
+		if step != nil {
+			step()
+		}
+	}
 }
 
 // =============================================== Instruction =======================================================
@@ -217,8 +234,8 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	f9 := func() {
 		c.cacheCtxCancel()
 	}
-	diagnostics.Track(true, "ssa.ProgramCache.SaveToDatabase",
-		f1, f2, f3, f4, f5, f6, f7, f8, f9)
+	steps := []func(){f1, f2, f3, f4, f5, f6, f7, f8, f9}
+	c.diagnosticsTrack("ssa.ProgramCache.SaveToDatabase", steps...)
 }
 
 func (c *ProgramCache) CountInstruction() int {

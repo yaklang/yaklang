@@ -5,7 +5,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -124,11 +123,7 @@ func GetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 }
 
 func (ir *IrCode) Save(db *gorm.DB) error {
-	var err error
-	diagnostics.Track(true, "Database.SaveIrCode", func() {
-		err = db.Save(ir).Error
-	})
-	return err
+	return db.Save(ir).Error
 }
 
 func (r *IrCode) IsEmptySourceCodeHash() bool {
