@@ -32,7 +32,7 @@ __KEYWORDS__ = "file,head,bytes,lines,文件读取,文本处理,十六进制转�
 3. 查看文件前 100 字节：
    yak head.yak --filename test.txt --mode bytes --limit 100
 
-4. 查看文件前 8192 字节（8K）：
+4. 查看文件前 30000 字节（30K）：
    yak head.yak --filename test.txt --mode bytes
 
 5. 查看文件前 5 行（不带行号）：
@@ -43,7 +43,7 @@ __KEYWORDS__ = "file,head,bytes,lines,文件读取,文本处理,十六进制转�
 
 注意事项：
 - 默认模式为 lines 模式，读取 20 行
-- bytes 模式自动限制最大 8K (8192) 字节
+- bytes 模式自动限制最大 30K (30000) 字节
 - 按行模式支持行长度截断，避免显示过长的行
 - 十六进制转储模式会同时显示 dump() 和 sdump() 的结果
 - 行号显示会自动计算合适的宽度对齐
@@ -52,7 +52,7 @@ __KEYWORDS__ = "file,head,bytes,lines,文件读取,文本处理,十六进制转�
 
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("which file you want to check?"))
 mode = cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'bytes' for byte count, 'lines' for line count (default: lines)"))
-limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("how many bytes/lines you want to read (default: 20 for lines, 8192 for bytes)"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("how many bytes/lines you want to read (default: 20 for lines, 30000 for bytes)"))
 noLineNumber = cli.Bool("no-linenumber", cli.setHelp("disable line number display"))
 lineLength = cli.Int("line-length", cli.setDefault(190), cli.setHelp("if the line is so long, use it to limit context (only for lines mode)"))
 hexdumped = cli.Bool("hexdump", cli.setHelp("show result in hex dump (only for bytes mode)"))
@@ -63,10 +63,10 @@ showLineNumber = !noLineNumber
 
 // 设置默认值并处理模式
 if mode == "bytes" {
-    // bytes 模式限制最大 8K (8192) 字节
-    if limit <= 0 || limit > 8192 {
-        limit = 8192
-        yakit.Warn("bytes mode limit set to max 8K (8192 bytes)")
+    // bytes 模式限制最大 30K (30000) 字节
+    if limit <= 0 || limit > 30000 {
+        limit = 30000
+        yakit.Warn("bytes mode limit set to max 30K (30000 bytes)")
     }
 } else {
     // lines 模式默认 20 行

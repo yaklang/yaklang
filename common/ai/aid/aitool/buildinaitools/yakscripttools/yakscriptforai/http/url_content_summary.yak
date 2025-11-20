@@ -41,6 +41,6 @@ if str.Contains(ct, "html") {
     })
     result = str.Join(txt, " ")
     if len(result) > 0 {
-        yakit.Info("[TEXT(Size:%v)]: %v", len(result), string(result))
+        yakit.Info("[TEXT(Size:%v)]: \n%v", len(result), string(result))
     }
 }

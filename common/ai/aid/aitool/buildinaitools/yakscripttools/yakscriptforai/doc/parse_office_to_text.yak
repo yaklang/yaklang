@@ -161,6 +161,11 @@ if outputFile != "" {
     // 输出到控制台
     yakit.Info("Extracted text content:")
     yakit.Info("--- BEGIN EXTRACTED TEXT ---")
+    tmpFile, err := file.TempFileName("office-text-*.txt")
+    if err == nil {
+        file.Save(tmpFile, extractedText)
+        yakit.Info("Extracted text[size:%v] saved to %v (too large to display)", len(extractedText), tmpFile)
+    }
     yakit.Info(extractedText)
     yakit.Info("--- END EXTRACTED TEXT ---")
 }

@@ -89,7 +89,7 @@ reqfile, err := file.TempFileName("req-packet-*.txt")
 if err != nil {
     yakit.Error("save req failed: %v", err)
 } else {
-    yakit.Info("save req[size:%v] to %v", len(rsp), reqfile)
+    yakit.Info("save req[size:%v] to %v", len(req), reqfile)
     file.Save(reqfile, string(req))
 }
 
@@ -102,18 +102,50 @@ if err != nil {
 }
 
 
-if substrs != "" && regexpKeyword != "" {
+if substrs != "" || regexpKeyword != "" {
     edt := memeditor.New(string(rsp))
     if substrs != "" {
-        edt.FindStringRange(substrs, rg => { yakit.Info("match in rsp:\n%v", rg.String()) })
+        edt.FindStringRange(substrs, rg => { 
+            matchContent := rg.GetTextContextWithPrompt(contextLine)
+            if len(matchContent) > 30000 {
+                yakit.Info("match in rsp[size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+            } else {
+                yakit.Info("match in rsp:\n%v", matchContent)
+            }
+        })
     }
     if regexpKeyword != "" {
-        edt.FindRegexpRange(regexpKeyword, rg => { yakit.Info("match in rsp: \n%v", string(rg.String())) })
+        edt.FindRegexpRange(regexpKeyword, rg => { 
+            matchContent := rg.GetTextContextWithPrompt(contextLine)
+            if len(matchContent) > 30000 {
+                yakit.Info("match in rsp[size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+            } else {
+                yakit.Info("match in rsp:\n%v", matchContent)
+            }
+        })
     }
 
     if matchRequest in ["y", "yes", "true"] {
-        edt = memeditor.New(string(rsp))
-        substrs != "" ? edt.FindStringRange(substrs, rg => { yakit.Info("match in req:\n%v", rg.String()) }) : ""
-        regexpKeyword != "" ? edt.FindRegexpRange(regexpKeyword, rg => { yakit.Info("match in req: \n%v", string(rg.String())) }) : ""
+        edt = memeditor.New(string(req))
+        if substrs != "" {
+            edt.FindStringRange(substrs, rg => { 
+                matchContent := rg.GetTextContextWithPrompt(contextLine)
+                if len(matchContent) > 30000 {
+                    yakit.Info("match in req[size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+                } else {
+                    yakit.Info("match in req:\n%v", matchContent)
+                }
+            })
+        }
+        if regexpKeyword != "" {
+            edt.FindRegexpRange(regexpKeyword, rg => { 
+                matchContent := rg.GetTextContextWithPrompt(contextLine)
+                if len(matchContent) > 30000 {
+                    yakit.Info("match in req[size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+                } else {
+                    yakit.Info("match in req:\n%v", matchContent)
+                }
+            })
+        }
     }
 }
