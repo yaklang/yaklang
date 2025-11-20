@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,7 +15,7 @@ func CreateKnowledgeBase(db *gorm.DB, knowledgeBase *schema.KnowledgeBaseInfo) e
 	db = db.Model(&schema.KnowledgeBaseInfo{})
 	err := db.Create(knowledgeBase).Error
 	if err != nil {
-		return utils.Errorf("create KnowledgeBase failed: %s", err)
+		return utils.Wrap(err, "create KnowledgeBase failed")
 	}
 	return nil
 }
@@ -25,11 +27,11 @@ func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.Knowle
 	count := 0
 	db.Where("id = ?", id).Count(&count)
 	if count == 0 {
-		return utils.Errorf("knowledge base not found")
+		return utils.Wrap(errors.New("knowledge base not found"), "knowledge base not found")
 	} else {
 		err := db.Where("id = ?", id).Updates(knowledgeBase).Error
 		if err != nil {
-			return utils.Errorf("update KnowledgeBase failed: %s", err)
+			return utils.Wrap(err, "update KnowledgeBase failed")
 		}
 		return nil
 	}
@@ -41,11 +43,11 @@ func DeleteKnowledgeBase(db *gorm.DB, id int64) error {
 		tx = tx.Model(&schema.KnowledgeBaseInfo{})
 		err := tx.Where("id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error
 		if err != nil {
-			return utils.Errorf("delete KnowledgeBase failed: %s", err)
+			return utils.Wrap(err, "delete KnowledgeBase failed")
 		}
 		err = tx.Where("knowledge_base_id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error
 		if err != nil {
-			return utils.Errorf("delete KnowledgeBaseEntry failed: %s", err)
+			return utils.Wrap(err, "delete KnowledgeBaseEntry failed")
 		}
 		return nil
 	})
@@ -57,7 +59,7 @@ func GetKnowledgeBase(db *gorm.DB, id int64) (*schema.KnowledgeBaseInfo, error) 
 	var knowledgeBase schema.KnowledgeBaseInfo
 	err := db.Where("id = ?", id).First(&knowledgeBase).Error
 	if err != nil {
-		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+		return nil, utils.Wrap(err, "get KnowledgeBase failed")
 	}
 	return &knowledgeBase, nil
 }
@@ -68,7 +70,7 @@ func GetKnowledgeBaseByName(db *gorm.DB, name string) (*schema.KnowledgeBaseInfo
 	var knowledgeBase schema.KnowledgeBaseInfo
 	err := db.Where("knowledge_base_name = ?", name).First(&knowledgeBase).Error
 	if err != nil {
-		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+		return nil, utils.Wrap(err, "get KnowledgeBase failed")
 	}
 	return &knowledgeBase, nil
 }
@@ -78,7 +80,7 @@ func GetKnowledgeBaseByRAGID(db *gorm.DB, ragID string) (*schema.KnowledgeBaseIn
 	var knowledgeBase schema.KnowledgeBaseInfo
 	err := db.Where("rag_id = ?", ragID).First(&knowledgeBase).Error
 	if err != nil {
-		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+		return nil, utils.Wrap(err, "get KnowledgeBase failed")
 	}
 	return &knowledgeBase, nil
 }
@@ -89,7 +91,7 @@ func GetKnowledgeBaseNameList(db *gorm.DB) ([]string, error) {
 	var knowledgeBaseNames []string
 	err := db.Pluck("knowledge_base_name", &knowledgeBaseNames).Error
 	if err != nil {
-		return nil, utils.Errorf("get KnowledgeBaseNameList failed: %s", err)
+		return nil, utils.Wrap(err, "get KnowledgeBaseNameList failed")
 	}
 	return knowledgeBaseNames, nil
 }
@@ -103,7 +105,7 @@ func UpdateKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string, know
 	} else {
 		err := db.Where("hidden_index = ?", hiddenIndex).Updates(knowledgeBase).Error
 		if err != nil {
-			return utils.Errorf("update KnowledgeBase failed: %s", err)
+			return utils.Wrap(err, "update KnowledgeBase failed")
 		}
 		return nil
 	}

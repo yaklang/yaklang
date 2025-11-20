@@ -97,7 +97,7 @@ func GetEntityRepositoryByRAGID(db *gorm.DB, ragID string) (*schema.EntityReposi
 	db = db.Model(&schema.EntityRepository{})
 	if err := db.Where("rag_id = ?", ragID).First(&entityRepository).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			return nil, utils.Errorf("entity repository not found")
+			return nil, utils.Wrap(err, "entity repository not found")
 		}
 		return nil, err
 	}

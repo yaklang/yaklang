@@ -1,7 +1,6 @@
 package rag
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -225,19 +224,18 @@ func loadCollectionInfoByConfig(config *RAGSystemConfig) (*schema.VectorStoreCol
 		if config.ragID != "" {
 			var collection schema.VectorStoreCollection
 			err := config.db.Model(&schema.VectorStoreCollection{}).Where("rag_id = ?", config.ragID).First(&collection).Error
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get collection by rag_id %s failed", config.ragID))
+			if err == nil {
+				return &collection, nil
 			}
-			return &collection, nil
-		} else if config.Name != "" {
-			collection, err := yakit.GetRAGCollectionInfoByName(config.db, config.Name)
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get collection by name %s failed", config.Name))
+		}
+		if config.Name != "" {
+			collection, _ := yakit.GetRAGCollectionInfoByName(config.db, config.Name)
+			if collection != nil {
+				return collection, nil
 			}
-			return collection, nil
 		}
 	}
-	return nil, utils.Errorf("collection name or rag_id or vector store options are required")
+	return nil, gorm.ErrRecordNotFound
 }
 
 func loadKnowledgeBaseInfoByConfig(config *RAGSystemConfig) (*schema.KnowledgeBaseInfo, error) {
@@ -245,20 +243,19 @@ func loadKnowledgeBaseInfoByConfig(config *RAGSystemConfig) (*schema.KnowledgeBa
 		return config.knowledgeBase.GetKnowledgeBaseInfo(), nil
 	} else {
 		if config.ragID != "" {
-			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByRAGID(config.db, config.ragID)
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get knowledge base by rag_id %s failed", config.ragID))
+			knowledgeBaseInfo, _ := yakit.GetKnowledgeBaseByRAGID(config.db, config.ragID)
+			if knowledgeBaseInfo != nil {
+				return knowledgeBaseInfo, nil
 			}
-			return knowledgeBaseInfo, nil
-		} else if config.Name != "" {
-			knowledgeBaseInfo, err := yakit.GetKnowledgeBaseByName(config.db, config.Name)
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get knowledge base by name %s failed", config.Name))
+		}
+		if config.Name != "" {
+			knowledgeBaseInfo, _ := yakit.GetKnowledgeBaseByName(config.db, config.Name)
+			if knowledgeBaseInfo != nil {
+				return knowledgeBaseInfo, nil
 			}
-			return knowledgeBaseInfo, nil
 		}
 	}
-	return nil, utils.Errorf("knowledge base name or rag_id or knowledge base options are required")
+	return nil, gorm.ErrRecordNotFound
 }
 
 func loadEntityRepositoryInfoByConfig(config *RAGSystemConfig) (*schema.EntityRepository, error) {
@@ -270,18 +267,17 @@ func loadEntityRepositoryInfoByConfig(config *RAGSystemConfig) (*schema.EntityRe
 		return info, nil
 	} else {
 		if config.ragID != "" {
-			entityRepositoryInfo, err := yakit.GetEntityRepositoryByRAGID(config.db, config.ragID)
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get entity repository by rag_id %s failed", config.ragID))
+			entityRepositoryInfo, _ := yakit.GetEntityRepositoryByRAGID(config.db, config.ragID)
+			if entityRepositoryInfo != nil {
+				return entityRepositoryInfo, nil
 			}
-			return entityRepositoryInfo, nil
-		} else if config.Name != "" {
-			entityRepositoryInfo, err := yakit.GetEntityRepositoryByName(config.db, config.Name)
-			if err != nil {
-				return nil, utils.Wrap(err, fmt.Sprintf("get entity repository by name %s failed", config.Name))
+		}
+		if config.Name != "" {
+			entityRepositoryInfo, _ := yakit.GetEntityRepositoryByName(config.db, config.Name)
+			if entityRepositoryInfo != nil {
+				return entityRepositoryInfo, nil
 			}
-			return entityRepositoryInfo, nil
 		}
 	}
-	return nil, utils.Errorf("entity repository name or rag_id or entity repository options are required")
+	return nil, gorm.ErrRecordNotFound
 }

@@ -152,8 +152,7 @@ func _deleteCollection(name string) error {
 //
 // ```
 func _listRAG() []string {
-	// return rag.ListRAGSystemNames(consts.GetGormProfileDatabase())
-	return []string{}
+	return rag.ListRAGSystemNames(consts.GetGormProfileDatabase())
 }
 
 // _deleteRAG 删除指定的 RAG 系统
