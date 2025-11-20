@@ -3,9 +3,10 @@ package yaklib
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
 )
 
 type YakitFileAction struct {
@@ -31,7 +32,7 @@ func FileReadAction(offset int, length int, unit string, content []byte) *YakitF
 			"offset":  offset,
 			"length":  length,
 			"unit":    unit,
-			"content": content,
+			"content": utils.InterfaceToString(content),
 		},
 	}
 }
@@ -43,7 +44,7 @@ func FileWriteAction(length int, mode string, content []byte) *YakitFileAction {
 			"message": fmt.Sprintf("write file with length %d, mode %s", length, mode),
 			"length":  length,
 			"mode":    mode, // append | cover
-			"content": content,
+			"content": utils.InterfaceToString(content),
 		},
 	}
 }
