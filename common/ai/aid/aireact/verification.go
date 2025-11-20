@@ -76,7 +76,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					func(key string, rd io.Reader) {
 						r.Emitter.EmitDefaultStreamEvent(
 							"next_movements",
-							rd,
+							utils.JSONStringReader(rd),
 							rsp.GetTaskIndex(),
 						)
 					},
