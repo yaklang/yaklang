@@ -364,6 +364,58 @@ func TestFieldStreamHandler_StreamArrayValueKeepsStructure(t *testing.T) {
 	}
 }
 
+func normalizeJSONForAssert(s string) string {
+	replacer := strings.NewReplacer(
+		" ", "",
+		"\n", "",
+		"\t", "",
+		"\r", "",
+	)
+	return replacer.Replace(s)
+}
+
+func TestFieldStreamHandler_ComplexCompositePayload(t *testing.T) {
+	jsonData := `{"@action": "aaa", "arr": ["123123", {"arr2": [1, 2, 3, ["3333"]]}, "aaa"]}`
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	results := make(map[string]string)
+
+	expectedKeys := map[string]struct{}{
+		"@action": {},
+		"arr":     {},
+	}
+
+	wg.Add(len(expectedKeys))
+
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterMultiFieldStreamHandler([]string{"@action", "arr"}, func(key string, reader io.Reader, parents []string) {
+			if _, ok := expectedKeys[key]; !ok {
+				return
+			}
+			data, readErr := io.ReadAll(reader)
+			require.NoError(t, readErr)
+			mu.Lock()
+			results[key] = string(data)
+			mu.Unlock()
+			wg.Done()
+		}))
+
+	require.NoError(t, err)
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	require.Equal(t, len(expectedKeys), len(results))
+
+	assert.Equal(t, `"aaa"`, results["@action"])
+
+	arrNormalized := normalizeJSONForAssert(results["arr"])
+	assert.Contains(t, arrNormalized, `"123123"`)
+	assert.Contains(t, arrNormalized, `"arr2":[1,2,3,["3333"]]`)
+	assert.Contains(t, arrNormalized, `"aaa"`)
+}
+
 func TestFieldStreamHandler_NestedCompositeSameKey(t *testing.T) {
 	jsonData := `{"key": {"key": 2}}`
 	var wg sync.WaitGroup
@@ -417,6 +469,83 @@ func TestFieldStreamHandler_NestedCompositeSameKey(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timeout waiting for nested stream callbacks")
 	}
+}
+
+func TestFieldStreamHandler_BoundaryCompositeVariants(t *testing.T) {
+	jsonData := `{
+		"empty_object": {},
+		"empty_array": [],
+		"nested_object_array": {
+			"outer": [
+				{"inner": []},
+				[{"deep": "value"}]
+			]
+		},
+		"array_of_objects": [
+			{"id": 1},
+			{"id": 2}
+		],
+		"array_with_primitives": [true, false, null, 0]
+	}`
+
+	expectedKeys := map[string]struct{}{
+		"empty_object":          {},
+		"empty_array":           {},
+		"nested_object_array":   {},
+		"array_of_objects":      {},
+		"array_with_primitives": {},
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(expectedKeys))
+
+	var mu sync.Mutex
+	results := make(map[string]string, len(expectedKeys))
+
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterMultiFieldStreamHandler(
+			[]string{
+				"empty_object",
+				"empty_array",
+				"nested_object_array",
+				"array_of_objects",
+				"array_with_primitives",
+			},
+			func(key string, reader io.Reader, parents []string) {
+				if _, ok := expectedKeys[key]; !ok {
+					return
+				}
+
+				data, readErr := io.ReadAll(reader)
+				require.NoError(t, readErr)
+				mu.Lock()
+				results[key] = string(data)
+				mu.Unlock()
+				wg.Done()
+			}))
+
+	require.NoError(t, err)
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	require.Equal(t, len(expectedKeys), len(results))
+
+	normalized := make(map[string]string, len(results))
+	for k, v := range results {
+		normalized[k] = normalizeJSONForAssert(v)
+	}
+
+	assert.Equal(t, `{}`, normalized["empty_object"])
+	assert.Equal(t, `[]`, normalized["empty_array"])
+	assert.Contains(t, normalized["nested_object_array"], `"outer":[{"inner":[]},[{"deep":"value"}]]`)
+	assert.Contains(t, normalized["array_of_objects"], `"id":1`)
+	assert.Contains(t, normalized["array_of_objects"], `"id":2`)
+	assert.Contains(t, normalized["array_with_primitives"], `true`)
+	assert.Contains(t, normalized["array_with_primitives"], `false`)
+	assert.Contains(t, normalized["array_with_primitives"], `null`)
+	assert.Contains(t, normalized["array_with_primitives"], `0`)
 }
 
 func TestFieldStreamHandler_CombinedMatchers(t *testing.T) {
