@@ -97,3 +97,13 @@ func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	ssaconfig.ApplyExtraOptions(cfg, cfg.Config)
 	return cfg, nil
 }
+
+func (c *Config) IsEnableRulePerformanceLog() bool {
+	if c == nil {
+		return false
+	}
+	if c.ScanTaskCallback != nil {
+		return c.ScanTaskCallback.EnableRulePerformanceLog
+	}
+	return false
+}

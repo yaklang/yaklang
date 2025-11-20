@@ -4,11 +4,11 @@ import (
 	"errors"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -37,7 +37,7 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 	f1 := func() {
 		prog, err = config.parseProject()
 	}
-	ssaprofile.ProfileAdd(true, "ssaapi.ParseProject", f1)
+	diagnostics.Track(true, "ssaapi.ParseProject", f1)
 	return
 }
 
