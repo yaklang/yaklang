@@ -3,7 +3,6 @@ package ssadb
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -33,11 +32,7 @@ func CreateOffset(rng *memedit.Range, projectName string) *IrOffset {
 }
 func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
 	// db.Save(idx)
-	var err error
-	diagnostics.Track(true, "Database.IrOffset", func() {
-		err = db.Save(idx).Error
-	})
-	_ = err
+	_ = db.Save(idx).Error
 }
 
 func GetOffsetByVariable(name string, valueID int64) []*IrOffset {
