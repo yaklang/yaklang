@@ -6,9 +6,13 @@ import (
 
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
-func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
+func ReplaceMemberCall(old, replacement Value) map[string]Value {
+	return replaceMemberCall(old, old, replacement)
+}
+
+func replaceMemberCall(holder, target, replacement Value) map[string]Value {
 	ret := make(map[string]Value)
-	if utils.IsNil(holder) || utils.IsNil(old) || utils.IsNil(replacement) {
+	if utils.IsNil(holder) || utils.IsNil(target) || utils.IsNil(replacement) {
 		return ret
 	}
 
@@ -26,14 +30,14 @@ func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
 		if utils.IsNil(root) || utils.IsNil(targetObj) {
 			return
 		}
-		if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != old.GetId() && currentObj.GetId() != holder.GetId() {
+		if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != target.GetId() && currentObj.GetId() != holder.GetId() {
 			// already points to a valid object, no change needed
 		} else {
 			root.SetObject(targetObj)
 		}
 		if root.IsMember() {
 			currentKey := root.GetKey()
-			if utils.IsNil(currentKey) || currentKey.GetId() == old.GetId() || currentKey.GetId() == holder.GetId() {
+			if utils.IsNil(currentKey) || currentKey.GetId() == target.GetId() || currentKey.GetId() == holder.GetId() {
 				root.SetKey(pickMemberKey(root, rootKey))
 			}
 		}
@@ -69,7 +73,7 @@ func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
 			}
 		}
 
-		if key.GetId() == old.GetId() {
+		if key.GetId() == target.GetId() {
 			toKey := replacement
 			setMemberCallRelationship(container, toKey, member)
 			if utils.IsNil(toMember) {
@@ -80,7 +84,7 @@ func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
 			toMember = builder.ReadMemberCallValue(replacement, key)
 		}
 
-		if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == old.GetId() || toMember.GetObject().GetId() == holder.GetId() {
+		if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == target.GetId() || toMember.GetObject().GetId() == holder.GetId() {
 			fixBranch(toMember, replacement, key)
 		}
 
@@ -94,7 +98,7 @@ func ReplaceMemberCall(holder, old, replacement Value) map[string]Value {
 			memberT = toMember
 		}
 
-		for n, v2 := range ReplaceMemberCall(member, old, toMember) {
+		for n, v2 := range replaceMemberCall(member, target, toMember) {
 			ret[n] = v2
 		}
 		if !member.IsObject() {
