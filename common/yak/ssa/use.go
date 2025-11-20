@@ -38,9 +38,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			continue
 		}
 		user.ReplaceValue(v, to)
-		if t, ok := ToExternLib(user); ok {
-			ReplaceMemberCall(t, v, to)
-		}
 
 		to.AddUser(user)
 		deleteInst = append(deleteInst, user)

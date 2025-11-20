@@ -155,8 +155,9 @@ type ScopedVersionedTable[T versionedValue] struct {
 	//incomingPhi *omap.OrderedMap[string, VersionedIF[T]]
 
 	// for loop
-	spin           bool
-	createEmptyPhi func(string) T
+	spin              bool
+	createEmptyPhi    func(string) T
+	spinReplaceFilter func(T) bool
 
 	// relations
 	this     ScopedVersionedTableIF[T]
@@ -213,6 +214,9 @@ func NewScope[T versionedValue](
 	if parent != nil {
 		s.level = parent.GetScopeLevel() + 1
 		s.SetParent(parent.GetThis())
+		if parentScope, ok := parent.(*ScopedVersionedTable[T]); ok {
+			s.spinReplaceFilter = parentScope.spinReplaceFilter
+		}
 	} else {
 		s.level = 0
 	}
@@ -249,6 +253,7 @@ func NewRootVersionedTable[T versionedValue](
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	sub.SetForceCapture(v.GetForceCapture())
+	sub.spinReplaceFilter = v.spinReplaceFilter
 	v.ForEachCapturedSideEffect(func(s string, vi []VersionedIF[T]) {
 		sub.SetCapturedSideEffect(s, vi[0], vi[1])
 	})
@@ -258,6 +263,7 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 func (v *ScopedVersionedTable[T]) CreateShadowScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.ProgramName, v.offsetFetcher, v.newVersioned, v)
 	sub.SetForceCapture(v.GetForceCapture())
+	sub.spinReplaceFilter = v.spinReplaceFilter
 
 	v.ForEachCapturedVariable(func(s string, vi VersionedIF[T]) {
 		sub.SetCapturedVariable(s, vi)
@@ -698,4 +704,11 @@ func (s *ScopedVersionedTable[T]) GetExternInfo(key string) any {
 		return v
 	}
 	return nil
+}
+
+func (s *ScopedVersionedTable[T]) SetSpinReplaceFilter(filter func(T) bool) {
+	if s == nil {
+		return
+	}
+	s.spinReplaceFilter = filter
 }

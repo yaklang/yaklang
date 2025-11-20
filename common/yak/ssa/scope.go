@@ -16,6 +16,14 @@ type ScopeIF ssautil.ScopedVersionedTableIF[Value]
 
 var _ ssautil.ScopedVersionedTableIF[Value] = (*ScopeInstance)(nil)
 
+var spinReplaceSkipExternLib = func(v Value) bool {
+	if utils.IsNil(v) {
+		return false
+	}
+	_, ok := ToExternLib(v)
+	return ok
+}
+
 func NewScope(f *Function, progname string) *ScopeInstance {
 	s := &ScopeInstance{
 		ScopedVersionedTable: ssautil.NewRootVersionedTable(progname, NewVariable),
@@ -23,6 +31,7 @@ func NewScope(f *Function, progname string) *ScopeInstance {
 	}
 	s.SetName()
 	s.SetThis(s)
+	s.SetSpinReplaceFilter(spinReplaceSkipExternLib)
 	return s
 }
 
@@ -33,6 +42,7 @@ func (s *ScopeInstance) CreateSubScope() ssautil.ScopedVersionedTableIF[Value] {
 	}
 	scope.SetName()
 	scope.SetThis(scope)
+	scope.SetSpinReplaceFilter(spinReplaceSkipExternLib)
 	return scope
 }
 
@@ -43,6 +53,7 @@ func (s *ScopeInstance) CreateShadowScope() ssautil.ScopedVersionedTableIF[Value
 	}
 	scope.SetName()
 	scope.SetThis(scope)
+	scope.SetSpinReplaceFilter(spinReplaceSkipExternLib)
 	s.ForEachCapturedVariable(func(s string, vi ssautil.VersionedIF[Value]) {
 		scope.SetCapturedVariable(s, vi)
 	})
@@ -70,4 +81,11 @@ func GetBlockByScope(scope ssautil.ScopedVersionedTableIF[Value]) *BasicBlock {
 		log.Errorf("scope %s extern info with key[block] is not BasicBlock: %v", scope.GetScopeName(), raw)
 		return nil
 	}
+}
+
+func (s *ScopeInstance) SetSpinReplaceFilter(filter func(Value) bool) {
+	if s == nil {
+		return
+	}
+	s.ScopedVersionedTable.SetSpinReplaceFilter(filter)
 }
