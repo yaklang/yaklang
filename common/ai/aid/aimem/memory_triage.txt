@@ -21,3 +21,56 @@ You are an AI Memory Triage System. Your task is to analyze user input and gener
 5. Create potential questions this memory might help answer in future
 6. Preserve original meaning while cleaning up formatting issues
 <|Instruct_END|>
+
+<|Output_Example|>
+{
+  "@action": "memory-triage",
+  "memory_entities": [
+    {
+      "content": "回答输出要求包含结构化小标题与要点列表，重要术语使用加粗，代码示例前置简要说明。",
+      "tags": ["format", "communication"],
+      "potential_questions": [
+        "回答输出的固定小标题与列表结构规范是什么？",
+        "代码示例前的说明需要包含哪些要点与限制条件？"
+      ],
+      "t": 0.9,
+      "a": 0.9,
+      "p": 0.8,
+      "o": 0.9,
+      "e": 0.6,
+      "r": 0.8,
+      "c": 0.8
+    },
+    {
+      "content": "项目合规要求：遵循 GDPR，采用数据最小化与匿名化策略，避免收集可识别个人数据；样例数据默认脱敏；日志不记录敏感字段。",
+      "tags": ["privacy", "compliance", "security", "logging"],
+      "potential_questions": [
+        "日志与样例数据的字段级脱敏策略与实现方案是什么？",
+        "在 GDPR 下如何制定数据最小化清单与审计流程？"
+      ],
+      "t": 0.9,
+      "a": 0.9,
+      "p": 0.6,
+      "o": 0.9,
+      "e": 0.6,
+      "r": 0.9,
+      "c": 0.9
+    },
+    {
+      "content": "里程碑目标（截至 2025-12-31）：发布 MVP，核心功能为“团队知识搜索 + 对话助理”，优先优化检索准确率与响应时延指标。",
+      "tags": ["project", "milestone", "retrieval", "assistant", "metrics"],
+      "potential_questions": [
+        "截至 2025-12-31 的里程碑与验收标准清单是什么？",
+        "检索准确率与响应时延的优化路径与评测方法是什么？"
+      ],
+      "t": 0.7,
+      "a": 0.8,
+      "p": 0.5,
+      "o": 0.8,
+      "e": 0.6,
+      "r": 0.9,
+      "c": 0.8
+    }
+  ]
+}
+<|Output_Example_END|>

@@ -1636,6 +1636,7 @@ func (c *Config) restorePersistentSession() {
 	}
 
 	c.Timeline = timelineInstance
+	c.TimelineDiffer = NewTimelineDiffer(timelineInstance)
 	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",
 		c.PersistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
 }
