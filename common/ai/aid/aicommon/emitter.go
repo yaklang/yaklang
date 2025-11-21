@@ -71,7 +71,7 @@ func (i *Emitter) PopEventProcesser() *Emitter {
 
 	// copy event processer stack
 	if i.eventProcesserStack != nil && i.eventProcesserStack.Len() > 0 {
-		for j := 0; j < i.eventProcesserStack.Len(); j++ {
+		for j := i.eventProcesserStack.Len() - 1; j >= 0; j-- {
 			copyEmitter.eventProcesserStack.Push(i.eventProcesserStack.PeekN(j))
 		}
 	}
