@@ -93,6 +93,22 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	return paging, progGRPCs, nil
 }
 
+func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string, error) {
+	var names []string
+	err := ssadb.GetDB().Model(&ssadb.IrProgram{}).
+		Where("project_id = ?", projectID).
+		Order("updated_at desc").
+		Limit(1).
+		Pluck("program_name", &names).Error
+	if err != nil {
+		return "", err
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	return names[0], nil
+}
+
 func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 	ret := &ypb.SSAProgram{
 		Id: uint32(prog.ID),
@@ -137,7 +153,7 @@ func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 		ret.LowRiskNumber = result.Low
 		ret.InfoRiskNumber = result.Info
 	}
-
+	ret.SSAProjectID = prog.ProjectID
 	return ret
 }
 
@@ -150,8 +166,42 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	return db.RowsAffected, db.Error
 }
 
+func QueryHasNoProjectIDProgram(db *gorm.DB) ([]*ssadb.IrProgram, error) {
+	var programs []*ssadb.IrProgram
+	if err := db.Model(&ssadb.IrProgram{}).Where("project_id = ? OR project_id IS NULL", 0).Find(&programs).Error; err != nil {
+		return nil, utils.Errorf("query programs without project_id failed: %s", err)
+	}
+	return programs, nil
+}
+
+func UpdateIrProgramProjectID(db *gorm.DB, programID uint, projectID uint64) error {
+	if programID == 0 {
+		return utils.Errorf("program id is required")
+	}
+	if projectID == 0 {
+		return utils.Errorf("project id is required")
+	}
+
+	err := db.Model(&ssadb.IrProgram{}).
+		Where("id = ?", programID).
+		Update("project_id", projectID).Error
+	if err != nil {
+		return utils.Errorf("update program %d project_id to %d failed: %s", programID, projectID, err)
+	}
+	return nil
+}
+
 func QuerySSACompileTimesByProjectID(db *gorm.DB, projectID uint) int64 {
 	var count int64
 	db.Model(&ssadb.IrProgram{}).Where("project_id = ?", projectID).Count(&count)
 	return count
+}
+
+func GetSSAProgramByName(db *gorm.DB, name string) (*ssadb.IrProgram, error) {
+	var prog ssadb.IrProgram
+	err := db.Model(&ssadb.IrProgram{}).Where("program_name = ?", name).First(&prog).Error
+	if err != nil {
+		return nil, utils.Errorf("get ssa program by name %s failed: %s", name, err)
+	}
+	return &prog, nil
 }
