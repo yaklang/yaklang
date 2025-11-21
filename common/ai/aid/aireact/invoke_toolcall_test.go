@@ -301,9 +301,9 @@ risk.NewRisk(
 	}()
 
 	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
+	// if utils.InGithubActions() {
+	// 	du = time.Duration(5)
+	// }
 	after := time.After(du * time.Second)
 
 	var taskID string
@@ -342,6 +342,7 @@ LOOP:
 			// 检测任务完成
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				log.Infof("task status: %s", utils.InterfaceToString(result))
 				if utils.InterfaceToString(result) == "completed" {
 					taskCompleted = true
 					fmt.Println("Task completed")
