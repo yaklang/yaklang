@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"strings"
 	"sync"
 	"time"
@@ -255,37 +256,16 @@ func (m *scanManager) initByConfig() error {
 		return utils.Errorf("config is nil")
 	}
 
-	if projectId := config.GetProjectID(); projectId != 0 {
-		project, err := yakit.GetSSAProjectById(projectId)
-		if err != nil || project == nil {
-			return utils.Errorf("query ssa project by id failed: %s", err)
+	if len(config.GetProgramNames()) == 0 {
+		if config.GetProjectID() == 0 {
+			return utils.Errorf("SyntaxFlow Scan Failed:SSA Program Name is empty and Project ID is zero")
 		}
-		config, err := project.GetConfig()
-		if config == nil || err != nil {
-			return utils.Errorf("scan config error: %v", err)
+		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
+		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormDefaultSSADataBase(), config.GetProjectID())
+		if err != nil {
+			return utils.Errorf("SyntaxFlow Scan Failed: query latest SSA Program Name by Project ID failed: %s", err)
 		}
-		m.Config.Config = config
-	} else if projectName := config.GetProjectName(); projectName != "" {
-		// Aborted: disable load by project name
-		//project, err := yakit.GetSSAProjectByName(projectName)
-		//if err != nil || project == nil {
-		//	return utils.Errorf("query ssa project by id failed: %s", err)
-		//}
-		//config, err := project.GetConfig()
-		//if config == nil || err != nil {
-		//	return utils.Errorf("scan config error: %v", err)
-		//}
-		//
-		//m.Config.Config = config
-	} else {
-		// init by stream config
-		// if len(config.GetProgramName()) == 0 {
-		// 	return utils.Errorf("program name is empty")
-		// }
-		// m.programs = config.GetProgramName()
-		// m.ignoreLanguage = config.GetIgnoreLanguage()
-		// m.memory = config.GetMemory()
-		// m.concurrency = config.GetConcurrency()
+		config.Update(ssaconfig.WithProgramNames(name))
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {

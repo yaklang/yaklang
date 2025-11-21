@@ -204,10 +204,10 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 		}
 
 		// 提取扫描配置
-		c.SyntaxFlowScan.ControlMode = req.ControlMode
-		c.SyntaxFlowScan.IgnoreLanguage = req.IgnoreLanguage
-		c.SyntaxFlowScan.ResumeTaskId = req.ResumeTaskId
-		c.SyntaxFlowScan.Concurrency = req.Concurrency
+		c.SyntaxFlowScan.ControlMode = req.GetControlMode()
+		c.SyntaxFlowScan.IgnoreLanguage = req.GetIgnoreLanguage()
+		c.SyntaxFlowScan.ResumeTaskId = req.GetResumeTaskId()
+		c.SyntaxFlowScan.Concurrency = req.GetConcurrency()
 
 		// SyntaxFlow
 		if err := c.ensureSyntaxFlow("Scan Raw"); err == nil {
@@ -220,11 +220,13 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 				c.BaseInfo = defaultBaseInfo()
 			}
 			if len(req.ProgramName) > 0 {
-				c.BaseInfo.ProgramNames = req.ProgramName
+				c.BaseInfo.ProgramNames = req.GetProjectName()
 			}
 			if len(req.ProjectName) > 0 {
-				c.BaseInfo.ProjectName = req.ProjectName[0]
+				c.BaseInfo.ProjectName = req.GetProjectName()[0]
 			}
+			c.BaseInfo.ProjectID = req.GetSSAProjectId()
+			c.BaseInfo.ProgramNames = req.GetProgramName()
 		}
 
 		// 提取规则配置
@@ -233,10 +235,10 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 				c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
 			}
 			if req.Filter != nil {
-				c.SyntaxFlowRule.RuleFilter = req.Filter
+				c.SyntaxFlowRule.RuleFilter = req.GetFilter()
 			}
 			if req.RuleInput != nil {
-				c.SyntaxFlowRule.RuleInput = req.RuleInput
+				c.SyntaxFlowRule.RuleInput = req.GetRuleInput()
 			}
 		}
 

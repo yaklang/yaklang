@@ -105,7 +105,7 @@ func WithProgramNames(programName ...string) Option {
 		if err := c.ensureBase("Program Name"); err != nil {
 			return err
 		}
-		c.BaseInfo.ProgramNames = append(c.BaseInfo.ProgramNames, programName...)
+		c.BaseInfo.ProgramNames = programName
 		return nil
 	}
 }

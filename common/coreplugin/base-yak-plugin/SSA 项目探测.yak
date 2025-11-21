@@ -378,34 +378,43 @@ if err == nil && existingSSAProject != nil {
     config, err = existingSSAProject.GetConfig()
     if err != nil {
         yakit.Warn("获取已存在项目配置失败: %v，将创建新配置", err)
-        config = nil
     }
 }
 
+options = [
+   ssa.withProgramNames(params.program_name),
+   ssa.withProjectName(params.project_name),
+   ssa.withProgramDescription(params.description),
+   ssa.withProjectLanguage(params.language),
+   ssa.withCodeSourceKind(params.info.kind),
+   ssa.withCodeSourceLocalFile(params.info.local_file),
+   ssa.withCodeSourceURL(params.info.url),
+   ssa.withCodeSourceBranch(params.info.branch),
+   ssa.withCodeSourcePath(params.info.path),
+   ssa.withCompileStrictMode(strictMode),
+   ssa.withCompilePeepholeSize(peepholeSize),
+   ssa.withCompileExcludeFiles(str.Split(excludeFile, ",")),
+   ssa.withCompileReCompile(reCompile),
+   ssa.withCompileMemoryCompile(memory),
+   ssa.withCompileConcurrency(concurrency),
+]
 // 如果项目不存在或获取已有配置失败，创建新配置
 if config == nil {
     config, err = ssa.NewConfig(
     ssa.ModeAll,
-    ssa.withProgramNames(params.program_name),
-    ssa.withProjectName(params.project_name),
-    ssa.withProgramDescription(params.description),
-    ssa.withProjectLanguage(params.language),
-    ssa.withCodeSourceKind(params.info.kind),
-    ssa.withCodeSourceLocalFile(params.info.local_file),
-    ssa.withCodeSourceURL(params.info.url),
-    ssa.withCodeSourceBranch(params.info.branch),
-    ssa.withCodeSourcePath(params.info.path),
-    ssa.withCompileStrictMode(strictMode),
-    ssa.withCompilePeepholeSize(peepholeSize),
-    ssa.withCompileExcludeFiles(str.Split(excludeFile, ",")),
-    ssa.withCompileReCompile(reCompile),
-    ssa.withCompileMemoryCompile(memory),
-    ssa.withCompileConcurrency(concurrency),
-)
-if err != nil {
-    yakit.Error("创建 SSAConfig 失败: %v", err)
-    return
-}
+    options...
+    )
+    if err != nil {
+        yakit.Error("创建 SSAConfig 失败: %v", err)
+        return
+    }
+}else{
+    err := config.Update(options...)
+    if err != nil {
+        yakit.Error("更新 SSAConfig 失败: %v", err)
+        return
+    }
+    yakit.Info("更新 SSAConfig 成功")
 }
 
 // 将 SSAConfig 转换为 JSON 字符串
