@@ -2,6 +2,7 @@ package ssaconfig
 
 import (
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -41,6 +42,13 @@ type CodeSourceInfo struct {
 	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
 }
 
+func NewLocalFileCodeSourceConfig(localFile string) *CodeSourceInfo {
+	return &CodeSourceInfo{
+		Kind:      CodeSourceLocal,
+		LocalFile: localFile,
+	}
+}
+
 func (c *CodeSourceInfo) ToJSONString() string {
 	if c == nil {
 		return ""
@@ -50,6 +58,18 @@ func (c *CodeSourceInfo) ToJSONString() string {
 		return ""
 	}
 	return string(jsonRaw)
+}
+
+func (c *CodeSourceInfo) GetCodeSourceURL() string {
+	if c == nil {
+		return ""
+	}
+	switch c.Kind {
+	case CodeSourceLocal:
+		return c.LocalFile
+	default:
+		return c.URL
+	}
 }
 
 // ValidateSourceConfig 验证代码源配置的有效性
@@ -330,6 +350,16 @@ func WithCodeSourceMap(input map[string]any) Option {
 		if err := c.CodeSource.ValidateSourceConfig(); err != nil {
 			return utils.Errorf("Config: Code Source Map Validate failed: %v", err)
 		}
+		return nil
+	}
+}
+
+func WithCodeSourceInfo(info *CodeSourceInfo) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Info"); err != nil {
+			return err
+		}
+		c.CodeSource = info
 		return nil
 	}
 }
