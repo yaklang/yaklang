@@ -56,23 +56,30 @@ func (m *bufStackManager) getCurrentKey() any {
 	return nil
 }
 
+func (m *bufStackManager) prepareFieldStreamContexts(key string) {
+	if m.callbackManager == nil {
+		return
+	}
+	if len(m.base.fieldStreamContexts) > 0 {
+		return
+	}
+	contexts := m.callbackManager.handleFieldStreamStart(key, m)
+	if len(contexts) > 0 {
+		m.base.fieldStreamContexts = contexts
+	}
+}
+
 func (m *bufStackManager) PushKey(v any) {
 	switch ret := v.(type) {
 	case []byte:
 		keyStr := string(ret)
 		m.base.PushKey(keyStr)
-		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
-		if m.callbackManager != nil {
-			contexts := m.callbackManager.handleFieldStreamStart(keyStr, m)
-			m.base.fieldStreamContexts = contexts
-		}
+		// 如果尚未准备字段流上下文，则现在准备
+		m.prepareFieldStreamContexts(keyStr)
 	case string:
 		m.base.PushKey(ret)
-		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
-		if m.callbackManager != nil {
-			contexts := m.callbackManager.handleFieldStreamStart(ret, m)
-			m.base.fieldStreamContexts = contexts
-		}
+		// 如果尚未准备字段流上下文，则现在准备
+		m.prepareFieldStreamContexts(ret)
 	case int:
 		m.base.PushKey(ret)
 		// 数组索引不需要字段流处理
