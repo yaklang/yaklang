@@ -261,7 +261,7 @@ func (m *scanManager) initByConfig() error {
 			return utils.Errorf("SyntaxFlow Scan Failed:SSA Program Name is empty and Project ID is zero")
 		}
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
-		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormDefaultSSADataBase(), config.GetProjectID())
+		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
 		if err != nil {
 			return utils.Errorf("SyntaxFlow Scan Failed: query latest SSA Program Name by Project ID failed: %s", err)
 		}
