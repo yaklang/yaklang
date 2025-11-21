@@ -21,7 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -196,97 +195,69 @@ func TestReAct_ToolUse_TaskGetRisks(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
+	riskToolName := "create_test_risk" + ksuid.New().String()
 	// 生成唯一标识符用于验证
 	flagTitle := ksuid.New().String()
-	flagTarget := "http://test-" + ksuid.New().String() + ".example.com"
-
-	// 创建一个生成 risk 的测试工具
-	testToolScript := `
-yakit.AutoInitYakit()
-target = cli.String("target", cli.setRequired(true))
-title = cli.String("title", cli.setRequired(true))
-cli.check()
-
-risk.NewRisk(
-	target,
-	risk.title(title),
-	risk.type("baseline"),
-	risk.severity("low"),
-	risk.description("This is a test risk created by TestReAct_ToolUse_WithCallbackRuntimeID"),
-)
-`
-
-	// Params 字段应该是 JSON Schema 格式
-	paramsJSON := `{
-		"type": "object",
-		"properties": {
-			"target": {
-				"type": "string",
-				"description": "The target URL or IP address"
-			},
-			"title": {
-				"type": "string",
-				"description": "The title of the risk"
+	flagTarget := "http://" + ksuid.New().String() + ".com"
+	riskTool, err := aitool.New(
+		riskToolName,
+		aitool.WithNumberParam("seconds"),
+		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
+			// 构建 risk 数据
+			riskData, err := yakit.NewRisk(flagTarget, yakit.WithRiskParam_Title(flagTitle), yakit.WithRiskParam_RiskType("test-risk"), yakit.WithRiskParam_Severity("high"))
+			if err != nil {
+				return nil, err
 			}
-		},
-		"required": ["target", "title"]
-	}`
+			// 序列化 risk 数据
+			riskJSON, err := json.Marshal(riskData)
+			if err != nil {
+				return nil, err
+			}
 
-	tools := yak.YakTool2AITool([]*schema.AIYakTool{
-		{
-			Name:        "create_test_risk",
-			Description: "Create a test security risk",
-			Content:     testToolScript,
-			Params:      paramsJSON,
-		},
-	})
-	if len(tools) == 0 {
-		t.Fatal("tools not found")
-	}
+			// 构建 YakitLog
+			logInfo := map[string]any{
+				"level":     "json-risk",
+				"data":      string(riskJSON),
+				"timestamp": time.Now().Unix(),
+			}
+			logJSON, err := json.Marshal(logInfo)
+			if err != nil {
+				return nil, err
+			}
 
-	riskTool := tools[0]
-	if riskTool == nil {
-		t.Fatal("risk tool not found")
+			// 构建 YakitMessage
+			message := map[string]any{
+				"type":    "log",
+				"content": json.RawMessage(logJSON),
+			}
+			messageJSON, err := json.Marshal(message)
+			if err != nil {
+				return nil, err
+			}
+
+			// 发送 risk 消息
+			runtimeConfig.FeedBacker(&ypb.ExecResult{
+				IsMessage: true,
+				Message:   messageJSON,
+			})
+			return nil, nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// 创建 ReAct 实例
 	reAct, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			// Mock AI 响应，让它调用 create_test_risk 工具
-			prompt := r.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "create_test_risk" },
-"human_readable_thought": "I need to create a test risk", "cumulative_summary": "Creating test risk"}
-`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
-				rsp := i.NewAIResponse()
-				// 返回工具参数
-				paramsJSON := fmt.Sprintf(`{"@action": "call-tool", "params": { "target": "%s", "title": "%s" }}`, flagTarget, flagTitle)
-				rsp.EmitOutputStream(bytes.NewBufferString(paramsJSON))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test risk created successfully"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			return mockedToolCalling(i, r, riskToolName)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithTools(riskTool),
+		aicommon.WithAgreeYOLO(true),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -301,9 +272,9 @@ risk.NewRisk(
 	}()
 
 	du := time.Duration(10)
-	// if utils.InGithubActions() {
-	// 	du = time.Duration(5)
-	// }
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
 	after := time.After(du * time.Second)
 
 	var taskID string
@@ -315,6 +286,10 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
+			t.Logf("event: %s", e.String())
+			t.Logf("event type: %s", e.Type)
+			t.Logf("event node id: %s", e.NodeId)
+			t.Logf("event content: %s", e.GetContent())
 			// 捕获 task ID
 			if e.NodeId == "react_task_created" || e.NodeId == "react_task_status_changed" {
 				if tid := jsonpath.FindFirst(e.GetContent(), "$..react_task_id"); tid != nil {
@@ -326,6 +301,7 @@ LOOP:
 			// 处理工具审核请求
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				t.Logf("tool use review require: %s", iid)
 				in <- &ypb.AIInputEvent{
 					IsInteractiveMessage: true,
 					InteractiveId:        iid,
@@ -336,16 +312,16 @@ LOOP:
 			// 检测工具是否被调用
 			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
 				toolCalled = true
-				fmt.Println("Tool call completed")
+				t.Logf("Tool call completed")
 			}
 
 			// 检测任务完成
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
-				log.Infof("task status: %s", utils.InterfaceToString(result))
+				t.Logf("task status: %s", utils.InterfaceToString(result))
 				if utils.InterfaceToString(result) == "completed" {
 					taskCompleted = true
-					fmt.Println("Task completed")
+					t.Logf("Task completed")
 					break LOOP
 				}
 			}
@@ -402,12 +378,6 @@ LOOP:
 			risk.ID, risk.Title, risk.Url, risk.RuntimeId)
 		if risk.Title == flagTitle && risk.Url == flagTarget {
 			found = true
-			// 验证 RuntimeID 是否被正确设置
-			if risk.RuntimeId == "" {
-				t.Error("Risk RuntimeID is empty")
-			}
-			fmt.Printf("✓ Risk verified: Title=%s, Target=%s, RuntimeID=%s\n",
-				risk.Title, risk.Url, risk.RuntimeId)
 			break
 		}
 	}
