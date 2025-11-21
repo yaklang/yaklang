@@ -24,11 +24,20 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 	// target is the original old value, used to identify which values need to be replaced
 	target := old
+	visited := make(map[int64]struct{})
 
 	// Internal recursive function to handle nested member replacement
-	var replaceMemberCallRecursive func(holder Value, replacement Value) map[string]Value
-	replaceMemberCallRecursive = func(holder Value, replacement Value) map[string]Value {
+	var replaceMemberCallRecursive func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value
+	replaceMemberCallRecursive = func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value {
 		holderRet := make(map[string]Value)
+
+		if !utils.IsNil(holder) {
+			holderID := holder.GetId()
+			if _, alreadyVisited := visited[holderID]; alreadyVisited {
+				return holderRet
+			}
+			visited[holderID] = struct{}{}
+		}
 
 		fixBranch := func(root Value, targetObj Value, rootKey Value) {
 			if utils.IsNil(root) || utils.IsNil(targetObj) {
@@ -102,8 +111,10 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			}
 
 			// Recursively replace nested members
-			for n, v2 := range replaceMemberCallRecursive(member, toMember) {
-				holderRet[n] = v2
+			if _, ok := visited[container.GetId()]; !ok {
+				for n, v2 := range replaceMemberCallRecursive(member, toMember, visited) {
+					holderRet[n] = v2
+				}
 			}
 			if !member.IsObject() {
 				holderRet[name] = memberT
@@ -128,7 +139,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	}
 
 	// Merge results from recursive calls
-	for n, v2 := range replaceMemberCallRecursive(old, replacement) {
+	for n, v2 := range replaceMemberCallRecursive(old, replacement, visited) {
 		ret[n] = v2
 	}
 
