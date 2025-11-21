@@ -1,7 +1,9 @@
 package jsonextractor
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -694,5 +696,241 @@ func TestFieldStreamHandler_FromStream(t *testing.T) {
 		assert.Equal(t, `"streaming data 2"`, results["stream_field2"])
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timeout waiting for stream processing")
+	}
+}
+
+func TestFieldStreamHandler_StreamedReaderInput(t *testing.T) {
+	pr, pw := io.Pipe()
+	firstChunkRead := make(chan struct{})
+	handlerDone := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- ExtractStructuredJSONFromStream(pr,
+			WithRegisterFieldStreamHandler("payload", func(key string, reader io.Reader, parents []string) {
+				var notified sync.Once
+				var buf bytes.Buffer
+				tmp := make([]byte, 4)
+				for {
+					n, err := reader.Read(tmp)
+					if n > 0 {
+						buf.Write(tmp[:n])
+						notified.Do(func() {
+							close(firstChunkRead)
+						})
+					}
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+				}
+				assert.Equal(t, `"hello streaming"`, buf.String())
+				close(handlerDone)
+			}))
+	}()
+
+	_, err := pw.Write([]byte(`{"payload":"hel`))
+	require.NoError(t, err)
+
+	select {
+	case <-firstChunkRead:
+	case <-time.After(time.Second):
+		t.Fatal("field stream reader did not receive partial data in time")
+	}
+
+	_, err = pw.Write([]byte(`lo streaming"}`))
+	require.NoError(t, err)
+	require.NoError(t, pw.Close())
+
+	require.NoError(t, <-errCh)
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not finish reading stream data")
+	}
+}
+
+func TestFieldStreamHandler_StreamClosesOnInputError(t *testing.T) {
+	pr, pw := io.Pipe()
+	handlerDone := make(chan struct{})
+	errCh := make(chan error, 1)
+	closeErr := errors.New("upstream boom")
+
+	go func() {
+		errCh <- ExtractStructuredJSONFromStream(pr,
+			WithRegisterFieldStreamHandler("payload", func(key string, reader io.Reader, parents []string) {
+				data, err := io.ReadAll(reader)
+				require.NoError(t, err)
+				assert.Equal(t, `"partial`, string(data))
+				close(handlerDone)
+			}))
+	}()
+
+	_, err := pw.Write([]byte(`{"payload":"partial`))
+	require.NoError(t, err)
+	require.NoError(t, pw.CloseWithError(closeErr))
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.ErrorIs(t, err, closeErr)
+	case <-time.After(time.Second):
+		t.Fatal("extractor did not return after upstream error")
+	}
+
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("field stream reader was not closed after upstream error")
+	}
+}
+
+func TestFieldStreamHandler_StreamedCompositeValues(t *testing.T) {
+	pr, pw := io.Pipe()
+	handlerDone := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- ExtractStructuredJSONFromStream(pr,
+			WithRegisterFieldStreamHandler("config", func(key string, reader io.Reader, parents []string) {
+				var buf bytes.Buffer
+				tmp := make([]byte, 8)
+				for {
+					n, err := reader.Read(tmp)
+					if n > 0 {
+						buf.Write(tmp[:n])
+					}
+					if err == io.EOF {
+						break
+					}
+					require.NoError(t, err)
+				}
+				normalized := normalizeJSONForAssert(buf.String())
+				assert.Equal(t, `{"db":{"hosts":["10.0.0.1"],"port":5432},"features":[true,false,null]}`, normalized)
+				close(handlerDone)
+			}))
+	}()
+
+	chunks := []string{
+		`{"config":{"db":{"hosts":["10.0.`,
+		`0.1"],"port":5432},"features":[true,`,
+		`false,null]}}`,
+	}
+
+	for _, chunk := range chunks {
+		_, err := pw.Write([]byte(chunk))
+		require.NoError(t, err)
+		time.Sleep(5 * time.Millisecond)
+	}
+	require.NoError(t, pw.Close())
+
+	require.NoError(t, <-errCh)
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not finish reading composite stream data")
+	}
+}
+
+func TestFieldStreamHandler_MultipleHandlersReceiveSameStream(t *testing.T) {
+	pr, pw := io.Pipe()
+	errCh := make(chan error, 1)
+	var mu sync.Mutex
+	results := make(map[string]string)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		errCh <- ExtractStructuredJSONFromStream(pr,
+			WithRegisterFieldStreamHandler("payload", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
+				data, err := io.ReadAll(reader)
+				require.NoError(t, err)
+				mu.Lock()
+				results["exact"] = string(data)
+				mu.Unlock()
+			}),
+			WithRegisterRegexpFieldStreamHandler("^payload$", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
+				data, err := io.ReadAll(reader)
+				require.NoError(t, err)
+				mu.Lock()
+				results["regex"] = string(data)
+				mu.Unlock()
+			}),
+		)
+	}()
+
+	parts := []string{`{"payload":"mir`, `rored stream"}`}
+	for _, part := range parts {
+		_, err := pw.Write([]byte(part))
+		require.NoError(t, err)
+	}
+	require.NoError(t, pw.Close())
+
+	require.NoError(t, <-errCh)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("field stream handlers did not finish")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, `"mirrored stream"`, results["exact"])
+	assert.Equal(t, `"mirrored stream"`, results["regex"])
+}
+
+func TestFieldStreamHandler_StartCallbackFiresBeforeValue(t *testing.T) {
+	pr, pw := io.Pipe()
+	startCalled := make(chan struct{}, 1)
+	handlerDone := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- ExtractStructuredJSONFromStream(pr,
+			WithRegisterFieldStreamHandlerAndStartCallback(
+				"payload",
+				func(key string, reader io.Reader, parents []string) {
+					data, err := io.ReadAll(reader)
+					require.NoError(t, err)
+					assert.Equal(t, `"gate"`, string(data))
+					close(handlerDone)
+				},
+				func(key string, reader io.Reader, parents []string) {
+					select {
+					case startCalled <- struct{}{}:
+					default:
+					}
+				},
+			))
+	}()
+
+	_, err := pw.Write([]byte(`{"payload":`))
+	require.NoError(t, err)
+
+	select {
+	case <-startCalled:
+	case <-time.After(time.Second):
+		t.Fatal("start callback was not invoked before payload streaming")
+	}
+
+	_, err = pw.Write([]byte(`"gate"}`))
+	require.NoError(t, err)
+	require.NoError(t, pw.Close())
+
+	require.NoError(t, <-errCh)
+	select {
+	case <-handlerDone:
+	case <-time.After(time.Second):
+		t.Fatal("handler did not finish after start callback")
 	}
 }
