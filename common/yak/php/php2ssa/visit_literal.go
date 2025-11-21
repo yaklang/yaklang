@@ -26,7 +26,7 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	}
 
 	if i.Null() != nil {
-		return y.EmitConstInst(nil)
+		return y.EmitConstInstNil()
 	} else if i.LiteralConstant() != nil {
 		return y.VisitLiteralConstant(i.LiteralConstant())
 	} else if i.MagicConstant() != nil {

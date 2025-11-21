@@ -219,5 +219,5 @@ func (b *astbuilder) buildBooleanLiteral(bo string) ssa.Value {
 }
 
 func (b *astbuilder) buildNullLiteral() ssa.Value {
-	return b.EmitConstInst(nil)
+	return b.EmitConstInstNil()
 }
