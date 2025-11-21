@@ -17,7 +17,8 @@ type IrProgram struct {
 	gorm.Model
 
 	ProgramName string `json:"program_name" gorm:"unique_index"`
-	ProjectName string `json:"project_name" gorm:"index"`
+	// ProjectName string `json:"project_name" gorm:"index"`
+	ProjectID uint64 `json:"project_id" gorm:"index"`
 
 	Description string `json:"description" gorm:"type:text"`
 
@@ -82,7 +83,7 @@ func GetApplicationProgram(name string) (*IrProgram, error) {
 
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {
 	var p IrProgram
-	db := GetDB().Model(&IrProgram{}).Debug()
+	db := GetDB().Model(&IrProgram{})
 	if name == "" {
 		return nil, utils.Errorf("program name is empty")
 	}
@@ -118,4 +119,13 @@ func AllPrograms(db *gorm.DB) []*IrProgram {
 	var prorams []*IrProgram
 	db.Model(&IrProgram{}).Order("created_at DESC").Find(&prorams)
 	return prorams
+}
+
+func GetProgramByProjectID(projectID uint64) (*IrProgram, error) {
+	var p IrProgram
+	db := GetDB().Model(&IrProgram{})
+	if err := db.Where("project_id = ?", projectID).First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
 }

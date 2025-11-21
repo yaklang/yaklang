@@ -54,7 +54,7 @@ func (c *Config) parseProjectWithFS(
 	var err error
 	start := time.Now()
 
-	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().JsonString()))
+	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString()))
 	processCallback(0.0, "calculate total size of project")
 
 	folder2Save := make([][]string, 0)
@@ -154,7 +154,7 @@ func (c *Config) parseProjectWithFS(
 			}
 		}
 		prog.SetPreHandler(true)
-		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().JsonString())
+		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString())
 		start = time.Now()
 
 		ch := c.GetFileHandler(

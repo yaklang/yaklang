@@ -2,9 +2,14 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
+	"fmt"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaproject"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -19,17 +24,17 @@ func (s *Server) QuerySSAProject(ctx context.Context, req *ypb.QuerySSAProjectRe
 		Total:      int64(p.TotalRecord),
 	}
 	for _, d := range data {
-		rsp.Projects = append(rsp.Projects, d.ToGRPCModel())
+		model := SSAProjectToGRPCModel(d)
+		if model == nil {
+			continue
+		}
+		rsp.Projects = append(rsp.Projects, model)
 	}
 	return rsp, nil
 }
 
 func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProjectRequest) (*ypb.CreateSSAProjectResponse, error) {
-	if req == nil || req.Project == nil {
-		return nil, utils.Errorf("create SSA project failed: request or project is nil")
-	}
-
-	project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), req.Project)
+	project, err := yakit.CreateSSAProject(consts.GetGormProfileDatabase(), req)
 	if err != nil {
 		return &ypb.CreateSSAProjectResponse{
 			Message: &ypb.DbOperateMessage{
@@ -41,7 +46,7 @@ func (s *Server) CreateSSAProject(ctx context.Context, req *ypb.CreateSSAProject
 		}, err
 	}
 	return &ypb.CreateSSAProjectResponse{
-		Project: project.ToGRPCModel(),
+		Project: SSAProjectToGRPCModel(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationCreate,
@@ -68,7 +73,7 @@ func (s *Server) UpdateSSAProject(ctx context.Context, req *ypb.UpdateSSAProject
 		}, err
 	}
 	return &ypb.UpdateSSAProjectResponse{
-		Project: project.ToGRPCModel(),
+		Project: SSAProjectToGRPCModel(project),
 		Message: &ypb.DbOperateMessage{
 			TableName:    "ssa_projects",
 			Operation:    DbOperationUpdate,
@@ -97,4 +102,106 @@ func (s *Server) DeleteSSAProject(ctx context.Context, req *ypb.DeleteSSAProject
 			EffectRows: count,
 		},
 	}, nil
+}
+
+func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
+	if p == nil {
+		return nil
+	}
+	db := consts.GetGormSSAProjectDataBase()
+	project := p.ToGRPCModelBasic()
+	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
+	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
+	return project
+}
+
+func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb.Yak_MigrateSSAProjectServer) error {
+	ssaDB := consts.GetGormSSAProjectDataBase()
+
+	sendProgress := func(percent float64, message string) {
+		stream.Send(&ypb.MigrateSSAProjectResponse{
+			Percent: percent,
+			Message: message,
+		})
+	}
+
+	oldPrograms, err := yakit.QueryHasNoProjectIDProgram(ssaDB)
+	if err != nil {
+		return utils.Errorf("query old programs failed: %s", err)
+	}
+
+	totalCount := len(oldPrograms)
+	if totalCount == 0 {
+		sendProgress(100, "未找到旧数据，所有程序都已有 project_id")
+		return nil
+	}
+
+	sendProgress(0, fmt.Sprintf("找到 %d 个没有 项目配置 的程序，开始创建 SSA 项目...", totalCount))
+
+	count := 0
+	for i, prog := range oldPrograms {
+		count++
+		sendProgress(float64(count)*100.0/float64(totalCount), fmt.Sprintf("正在为程序 '%s' 创建 SSA 项目...", prog.ProgramName))
+		programName := prog.ProgramName
+		language := prog.Language
+		description := prog.Description
+
+		info := prog.ConfigInput
+		var codeSourceURL string
+		var codeSource *ssaconfig.CodeSourceInfo
+		if info != "" {
+			config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig([]byte(info)))
+			if err != nil {
+				return utils.Errorf("new config failed: %s", err)
+			}
+			codeSourceURL = config.GetCodeSourceLocalFileOrURL()
+			codeSource = config.GetCodeSource()
+		}
+		// 查询是否存在相同的项目（只有在有 URL 时才查询）
+		var project *ssaproject.SSAProject
+		var existingProject *ssaproject.SSAProject
+
+		existingProject, _ = ssaproject.LoadSSAProjectByNameAndURL(programName, codeSourceURL)
+		if existingProject != nil {
+			// 如果项目已存在，直接复用
+			project = existingProject
+			sendProgress(
+				float64(i)*100.0/float64(totalCount),
+				fmt.Sprintf("[%d/%d] 程序 '%s' 的 SSA 项目已存在（ID：%d），直接复用...", i+1, totalCount, programName, project.ID),
+			)
+		} else {
+			// 创建新项目
+			project, err = ssaproject.NewSSAProject(
+				ssaconfig.WithProjectName(programName),
+				ssaconfig.WithProjectLanguage(language),
+				ssaconfig.WithProgramDescription(description),
+				ssaconfig.WithCodeSourceInfo(codeSource),
+			)
+			if err != nil {
+				sendProgress(
+					float64(i+1)*100.0/float64(totalCount),
+					fmt.Sprintf("[%d/%d] 为程序 '%s' 创建 SSA 项目失败：%s", i+1, totalCount, programName, err),
+				)
+				continue
+			}
+			err = project.Save()
+			if err != nil {
+				sendProgress(
+					float64(i+1)*100.0/float64(totalCount),
+					fmt.Sprintf("[%d/%d] 保存程序 '%s' 的 SSA 项目失败：%s", i+1, totalCount, programName, err),
+				)
+				continue
+			}
+		}
+
+		if err := yakit.UpdateIrProgramProjectID(ssaDB, prog.ID, uint64(project.ID)); err != nil {
+			sendProgress(
+				float64(i+1)*100.0/float64(totalCount),
+				fmt.Sprintf("[%d/%d] 更新程序 '%s' 的 project_id 失败：%s", i+1, totalCount, programName, err),
+			)
+			continue
+		}
+	}
+	sendProgress(100, fmt.Sprintf("迁移完成！总计：%d", totalCount))
+	return nil
 }

@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"strings"
 	"sync"
 	"time"
@@ -182,7 +183,7 @@ func (m *scanManager) SaveTask() error {
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
-
+	m.taskRecorder.ProjectId = m.Config.GetProjectID()
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 		levelCounts, _ := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
@@ -255,32 +256,16 @@ func (m *scanManager) initByConfig() error {
 		return utils.Errorf("config is nil")
 	}
 
-	projectId := config.GetProjectID()
-	if projectId != 0 && len(config.GetProgramNames()) == 0 {
-		// init by project info in db
-		project, err := yakit.QuerySSAProjectById((projectId))
-		if err != nil || project == nil {
-			return utils.Errorf("query ssa project by id failed: %s", err)
+	if len(config.GetProgramNames()) == 0 {
+		if config.GetProjectID() == 0 {
+			return utils.Errorf("SyntaxFlow Scan Failed:SSA Program Name is empty and Project ID is zero")
 		}
-		config, err := project.GetConfig()
-		if config == nil || err != nil {
-			return utils.Errorf("scan config error: %v", err)
+		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
+		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
+		if err != nil {
+			return utils.Errorf("SyntaxFlow Scan Failed: query latest SSA Program Name by Project ID failed: %s", err)
 		}
-
-		// m.programs = []string{project.ProjectName}
-		m.Config.Config = config
-		// m.ignoreLanguage = scanConfig.IgnoreLanguage
-		// m.memory = scanConfig.Memory
-		// m.concurrency = scanConfig.Concurrency
-	} else {
-		// init by stream config
-		// if len(config.GetProgramName()) == 0 {
-		// 	return utils.Errorf("program name is empty")
-		// }
-		// m.programs = config.GetProgramName()
-		// m.ignoreLanguage = config.GetIgnoreLanguage()
-		// m.memory = config.GetMemory()
-		// m.concurrency = config.GetConcurrency()
+		config.Update(ssaconfig.WithProgramNames(name))
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
@@ -314,18 +299,6 @@ func (m *scanManager) initByConfig() error {
 		m.rulesCount = 1
 		m.kind = schema.SFResultKindDebug
 	} else if config.GetRuleFilter() != nil {
-		if err := setRuleChan(config.GetRuleFilter()); err != nil {
-			return err
-		}
-	} else if projectId != 0 {
-		project, err := yakit.QuerySSAProjectById(projectId)
-		if err != nil {
-			return utils.Errorf("load ssa project by id failed: %s", err)
-		}
-		config, err := project.GetConfig()
-		if err != nil {
-			return utils.Errorf("get rule filter from project config failed: %s", err)
-		}
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
 		}

@@ -34,6 +34,7 @@ const (
 	ModeSSACompile = ModeProjectBase | modeSSACompile | ModeCodeSource
 
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
+	ModeProjectCompile      = ModeProjectBase | ModeCodeSource | modeSSACompile
 	// all
 	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
 )
@@ -53,12 +54,43 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 	}
 	return cfg, nil
 }
+
 func NewSyntaxFlowScanConfig(opts ...Option) (*Config, error) {
 	return New(ModeSyntaxFlowScan, opts...)
 }
 
 func (c *Config) IsSyntaxFlowScanConfig() bool {
 	return c.Mode == ModeSyntaxFlowScan
+}
+
+func (c *Config) ToJSONRaw() ([]byte, error) {
+	if c == nil {
+		return nil, nil
+	}
+	return json.Marshal(c)
+}
+
+func (c *Config) ToJSONString() (string, error) {
+	if c == nil {
+		return "", nil
+	}
+	data, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func (c *Config) Update(options ...Option) error {
+	if c == nil {
+		return nil
+	}
+	for _, option := range options {
+		if err := option(c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // default factory functions - used by With... option helpers to create nested configs
@@ -211,6 +243,19 @@ func WithConfigJson(jsonStr string) Option {
 			return err
 		}
 		*c = temp
+		return nil
+	}
+}
+
+func WithJsonRawConfig(raw []byte) Option {
+	return func(c *Config) error {
+		if raw == nil {
+			return nil
+		}
+		err := json.Unmarshal(raw, &c)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 }

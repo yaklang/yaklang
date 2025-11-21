@@ -42,12 +42,34 @@ type CodeSourceInfo struct {
 	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
 }
 
-func (c *CodeSourceInfo) JsonString() string {
-	json, err := json.Marshal(c)
+func NewLocalFileCodeSourceConfig(localFile string) *CodeSourceInfo {
+	return &CodeSourceInfo{
+		Kind:      CodeSourceLocal,
+		LocalFile: localFile,
+	}
+}
+
+func (c *CodeSourceInfo) ToJSONString() string {
+	if c == nil {
+		return ""
+	}
+	jsonRaw, err := json.Marshal(c)
 	if err != nil {
 		return ""
 	}
-	return string(json)
+	return string(jsonRaw)
+}
+
+func (c *CodeSourceInfo) GetCodeSourceURL() string {
+	if c == nil {
+		return ""
+	}
+	switch c.Kind {
+	case CodeSourceLocal:
+		return c.LocalFile
+	default:
+		return c.URL
+	}
 }
 
 // ValidateSourceConfig 验证代码源配置的有效性
@@ -118,6 +140,17 @@ func (c *Config) GetCodeSourcePath() string {
 		return ""
 	}
 	return c.CodeSource.Path
+}
+
+func (c *Config) GetCodeSourceLocalFileOrURL() string {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return ""
+	}
+	if c.CodeSource.URL != "" {
+		return c.CodeSource.URL
+	} else {
+		return c.CodeSource.LocalFile
+	}
 }
 
 func (c *Config) GetCodeSourceAuthKind() string {
@@ -299,7 +332,9 @@ func WithCodeSourceJson(raw string) Option {
 		if err := c.ensureCodeSource("Code Source JSON"); err != nil {
 			return err
 		}
-		err := json.Unmarshal([]byte(raw), c.CodeSource)
+		codeSource := &CodeSourceInfo{}
+		err := json.Unmarshal([]byte(raw), codeSource)
+		c.CodeSource = codeSource
 		if err != nil {
 			return utils.Errorf("Config: Code Source JSON Unmarshal failed: %v", err)
 		}
@@ -326,6 +361,16 @@ func WithCodeSourceMap(input map[string]any) Option {
 		if err := c.CodeSource.ValidateSourceConfig(); err != nil {
 			return utils.Errorf("Config: Code Source Map Validate failed: %v", err)
 		}
+		return nil
+	}
+}
+
+func WithCodeSourceInfo(info *CodeSourceInfo) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Info"); err != nil {
+			return err
+		}
+		c.CodeSource = info
 		return nil
 	}
 }
