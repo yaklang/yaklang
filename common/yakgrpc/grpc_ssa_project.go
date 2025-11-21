@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -109,7 +108,7 @@ func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
 	if p == nil {
 		return nil
 	}
-	db := consts.GetGormDefaultSSADataBase()
+	db := consts.GetGormSSAProjectDataBase()
 	project := p.ToGRPCModelBasic()
 	project.CompileTimes = yakit.QuerySSACompileTimesByProjectID(db, p.ID)
 	project.RiskNumber = yakit.QuerySSARiskNumberByProjectID(db, p.ID)
@@ -117,7 +116,7 @@ func SSAProjectToGRPCModel(p *schema.SSAProject) *ypb.SSAProject {
 }
 
 func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb.Yak_MigrateSSAProjectServer) error {
-	ssaDB := consts.GetGormDefaultSSADataBase()
+	ssaDB := consts.GetGormSSAProjectDataBase()
 
 	sendProgress := func(percent float64, message string) {
 		stream.Send(&ypb.MigrateSSAProjectResponse{
@@ -147,23 +146,17 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 		language := prog.Language
 		description := prog.Description
 
-		codeSourceConfig := prog.ConfigInput
-		var codeSourceInfo *ssaconfig.CodeSourceInfo
-		if codeSourceConfig == "" {
-			codeSourceInfo = ssaconfig.NewLocalFileCodeSourceConfig(prog.ProgramName)
-		} else {
-			err = json.Unmarshal([]byte(prog.ConfigInput), &codeSourceInfo)
+		info := prog.ConfigInput
+		var codeSourceURL string
+		var codeSource *ssaconfig.CodeSourceInfo
+		if info != "" {
+			config, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithJsonRawConfig([]byte(info)))
 			if err != nil {
-				sendProgress(
-					float64(i+1)*100.0/float64(totalCount),
-					fmt.Sprintf("[%d/%d] 解析程序 '%s' 的 CodeSourceConfig 失败：%s", i+1, totalCount, programName, err),
-				)
-				continue
+				return utils.Errorf("new config failed: %s", err)
 			}
+			codeSourceURL = config.GetCodeSourceLocalFileOrURL()
+			codeSource = config.GetCodeSource()
 		}
-
-		codeSourceURL := codeSourceInfo.GetCodeSourceURL()
-
 		// 查询是否存在相同的项目（只有在有 URL 时才查询）
 		var project *ssaproject.SSAProject
 		var existingProject *ssaproject.SSAProject
@@ -182,7 +175,7 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 				ssaconfig.WithProjectName(programName),
 				ssaconfig.WithProjectLanguage(language),
 				ssaconfig.WithProgramDescription(description),
-				ssaconfig.WithCodeSourceInfo(codeSourceInfo),
+				ssaconfig.WithCodeSourceInfo(codeSource),
 			)
 			if err != nil {
 				sendProgress(

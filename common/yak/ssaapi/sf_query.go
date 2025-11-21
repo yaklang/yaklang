@@ -101,7 +101,7 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 }
 
 func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
-	c, _ := ssaconfig.New(ssaconfig.ModeSyntaxFlow)
+	c, _ := ssaconfig.New(ssaconfig.ModeProjectBase | ssaconfig.ModeSyntaxFlow)
 	config := &queryConfig{
 		Config: c,
 	}
@@ -267,6 +267,15 @@ func QueryWithTaskID(taskID string) QueryOption {
 func QueryWithRuleName(names string) QueryOption {
 	return func(c *queryConfig) {
 		c.ruleName = names
+	}
+}
+
+func QueryWithProjectId(id uint64) QueryOption {
+	return func(c *queryConfig) {
+		if c.Config == nil {
+			c.Config, _ = ssaconfig.New(ssaconfig.ModeProjectBase | ssaconfig.ModeSyntaxFlow)
+		}
+		ssaconfig.WithProjectID(id)(c.Config)
 	}
 }
 

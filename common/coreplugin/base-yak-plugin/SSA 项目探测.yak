@@ -371,7 +371,7 @@ if params.info.local_file != "" {
 }
 
 var projectExists = false
-var config = nil
+var config
 existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
 if err == nil && existingSSAProject != nil {
     projectExists = true
@@ -382,21 +382,21 @@ if err == nil && existingSSAProject != nil {
 }
 
 options = [
-   ssa.withProgramNames(params.program_name),
+   ssa.withProgramName(params.program_name),
    ssa.withProjectName(params.project_name),
-   ssa.withProgramDescription(params.description),
-   ssa.withProjectLanguage(params.language),
+   ssa.withProjectDescription(description),
+   ssa.withLanguage(params.language),
    ssa.withCodeSourceKind(params.info.kind),
    ssa.withCodeSourceLocalFile(params.info.local_file),
    ssa.withCodeSourceURL(params.info.url),
    ssa.withCodeSourceBranch(params.info.branch),
    ssa.withCodeSourcePath(params.info.path),
-   ssa.withCompileStrictMode(strictMode),
-   ssa.withCompilePeepholeSize(peepholeSize),
-   ssa.withCompileExcludeFiles(str.Split(excludeFile, ",")),
-   ssa.withCompileReCompile(reCompile),
-   ssa.withCompileMemoryCompile(memory),
-   ssa.withCompileConcurrency(concurrency),
+   ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
+   ssa.withReCompile(reCompile),
+   ssa.withConcurrency(concurrency),
+   ssa.withStrictMode(strictMode),
+   ssa.withDescription(description),
+   ssa.withEntryFile(entry...)
 ]
 // 如果项目不存在或获取已有配置失败，创建新配置
 if config == nil {
@@ -424,12 +424,14 @@ if err != nil {
     return
 }
 
-// 创建返回对象，添加额外信息
+// 创建返回对象，添加额外信息，用来给前端做后续处理提供依据
 result = json.loads(configJSON)
 result["error"] = params.error
 result["file_count"] = params.file_count
+// 前端会根据是否立即编译来决定是否调用【项目编译】脚本
 result["compile_immediately"] = params.compile_immediately
 result["kind"] = params.info.kind
+// 前端会根据项目是否存在来觉得是否调用CreateSSAProject
 result["project_exists"] = projectExists
 
 // 转换为 JSON 字符串再返回

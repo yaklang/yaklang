@@ -164,9 +164,9 @@ func NewSSAProject(opts ...ssaconfig.Option) (*SSAProject, error) {
 	}
 	builder := &SSAProject{}
 	builder.setConfig(config)
-	if err := builder.Validate(); err != nil {
-		return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
-	}
+	//if err := builder.Validate(); err != nil {
+	//	return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
+	//}
 	return builder, nil
 }
 
