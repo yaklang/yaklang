@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 	"testing"
 
 	"github.com/google/uuid"
@@ -361,4 +367,171 @@ func TestSSAProjectDifferentSourceTypes(t *testing.T) {
 			}(req.Project.ProjectName)
 		})
 	}
+}
+
+func TestMigrateSSAProject(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// 1. 准备测试数据：创建3个没有 projectId 的 IrProgram
+	testPrograms := []struct {
+		name        string
+		code        string
+		language    ssaconfig.Language
+		description string
+		configInput string
+	}{
+		{
+			name:        uuid.NewString(),
+			code:        `println("test1")`,
+			language:    ssaconfig.Yak,
+			description: "测试程序1",
+			configInput: "",
+		},
+		{
+			name:        uuid.NewString(),
+			code:        `println("test2")`,
+			language:    ssaconfig.Yak,
+			description: "测试程序2 - 带配置",
+			configInput: func() string {
+				config := &ssaconfig.CodeSourceInfo{
+					Kind:      ssaconfig.CodeSourceLocal,
+					LocalFile: "/tmp/test2",
+				}
+				data, _ := json.Marshal(config)
+				return string(data)
+			}(),
+		},
+		{
+			name:        uuid.NewString(),
+			code:        `println("test3")`,
+			language:    ssaconfig.Yak,
+			description: "测试程序3 - Git配置",
+			configInput: func() string {
+				config := &ssaconfig.CodeSourceInfo{
+					Kind:   ssaconfig.CodeSourceGit,
+					URL:    "https://github.com/test/repo.git",
+					Branch: "main",
+				}
+				data, _ := json.Marshal(config)
+				return string(data)
+			}(),
+		},
+	}
+
+	// 创建程序但不指定 projectId（模拟旧数据）
+	ssaDB := consts.GetGormDefaultSSADataBase()
+	createdProgramNames := make([]string, 0)
+
+	for _, tp := range testPrograms {
+		t.Logf("创建测试程序: %s", tp.name)
+
+		// 使用 ssaapi.Parse 创建程序，只指定 programName，不指定 projectId
+		prog, err := ssaapi.Parse(tp.code,
+			ssaapi.WithProgramName(tp.name),
+			ssaapi.WithLanguage(tp.language),
+			ssaapi.WithProgramDescription(tp.description),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+
+		// 如果有 ConfigInput，手动更新到数据库（模拟旧数据情况）
+		if tp.configInput != "" {
+			err = ssaDB.Model(&ssadb.IrProgram{}).
+				Where("program_name = ?", tp.name).
+				Update("config_input", tp.configInput).Error
+			require.NoError(t, err)
+		}
+
+		// 验证创建的程序没有 projectId
+		irProg, err := yakit.GetSSAProgramByName(ssaDB, tp.name)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0), irProg.ProjectID, "新创建的程序应该没有 project_id")
+
+		createdProgramNames = append(createdProgramNames, tp.name)
+	}
+
+	// 确保测试后清理数据
+	defer func() {
+		for _, name := range createdProgramNames {
+			ssadb.DeleteProgram(ssaDB, name)
+		}
+		// 清理创建的 SSAProject
+		profileDB := consts.GetGormProfileDatabase()
+		for _, tp := range testPrograms {
+			profileDB.Where("project_name = ?", tp.name).Unscoped().Delete(&schema.SSAProject{})
+		}
+	}()
+
+	// 2. 执行迁移操作
+	t.Log("开始执行数据迁移...")
+
+	stream, err := client.MigrateSSAProject(ctx, &ypb.MigrateSSAProjectRequest{})
+	require.NoError(t, err)
+
+	// 收集所有的流式响应
+	messages := make([]string, 0)
+	var finalPercent float64
+
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		t.Logf("进度: %.2f%% - %s", resp.Percent, resp.Message)
+		messages = append(messages, resp.Message)
+		finalPercent = resp.Percent
+	}
+
+	// 验证迁移完成
+	require.Equal(t, float64(100), finalPercent, "迁移进度应该达到100%")
+	require.Greater(t, len(messages), 3, "应该收到多条进度消息")
+
+	// 3. 验证迁移结果
+	t.Log("验证迁移结果...")
+
+	for i, tp := range testPrograms {
+		t.Run("验证程序_"+tp.name, func(t *testing.T) {
+			// 检查 IrProgram 的 projectId 是否已更新
+			irProg, err := yakit.GetSSAProgramByName(ssaDB, tp.name)
+			require.NoError(t, err)
+			if irProg.ProjectID == 0 {
+				println("a")
+			}
+			require.NotEqual(t, uint64(0), irProg.ProjectID, "迁移后程序应该有 project_id")
+
+			t.Logf("程序 %s 的 project_id: %d", tp.name, irProg.ProjectID)
+
+			// 查询对应的 SSAProject
+			queryReq := &ypb.QuerySSAProjectRequest{
+				Filter: &ypb.SSAProjectFilter{
+					IDs: []int64{int64(irProg.ProjectID)},
+				},
+			}
+			queryResp, err := client.QuerySSAProject(ctx, queryReq)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(queryResp.Projects), "应该能找到对应的 SSAProject")
+
+			project := queryResp.Projects[0]
+
+			// 验证基本信息
+			require.Equal(t, tp.name, project.ProjectName, "项目名称应该匹配")
+			require.Equal(t, string(tp.language), project.Language, "语言应该匹配")
+			require.Equal(t, tp.description, project.Description, "描述应该匹配")
+
+			// 验证 ConfigInput 是否正确迁移
+			if tp.configInput != "" {
+				require.Equal(t, tp.configInput, project.CodeSourceConfig,
+					"ConfigInput 应该正确迁移到 CodeSourceConfig")
+				t.Logf("✓ 程序 %d: ConfigInput 已成功迁移", i+1)
+			}
+
+			t.Logf("✓ 程序 %d 验证通过: ID=%d, Name=%s", i+1, project.ID, project.ProjectName)
+		})
+	}
+
 }
