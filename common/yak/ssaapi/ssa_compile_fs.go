@@ -275,7 +275,7 @@ func (c *Config) parseProjectWithFS(
 			start := time.Now()
 			prog.UpdateToDatabaseWithWG(&wg)
 			since := time.Since(start)
-			log.Errorf("program %s save to database cost: %s", prog.Name, since)
+			log.Infof("program %s save to database cost: %s", prog.Name, since)
 		}
 		return nil
 	}
