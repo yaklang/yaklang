@@ -32,13 +32,6 @@ configData = cli.Json("config_data",
           "title": "项目语言",
           "type": "string",
           "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
-        },
-        "tags": {
-          "title": "项目标签",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       },
       "required": ["project_name", "language"]
@@ -113,8 +106,7 @@ configData = cli.Json("config_data",
               "title": "代理密码",
               "type": "string"
             }
-          },
-          "required": ["url"]
+          }
         }
       }
     },

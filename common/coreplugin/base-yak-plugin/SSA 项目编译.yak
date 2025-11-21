@@ -35,7 +35,7 @@ opts = [
         yakit.Info("%s: %f", msg, process)
     }),
     ssa.withContext(context.Background()),
-    ssa.withSSAConfig(config),
+    ssa.withJsonRawConfig(configJSON),
     ssa.withProgramName(programName),
 ]
 
