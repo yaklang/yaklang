@@ -6,105 +6,151 @@ import (
 
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
-func ReplaceMemberCall(object, v, to Value) map[string]Value {
+func ReplaceMemberCall(old, replacement Value) map[string]Value {
 	ret := make(map[string]Value)
-	builder := object.GetFunc().builder
+	if utils.IsNil(old) || utils.IsNil(replacement) {
+		return ret
+	}
+
+	builder := old.GetFunc().builder
 	if utils.IsNil(builder) {
 		return ret
 	}
-	recoverScope := builder.SetCurrent(object)
+
+	recoverScope := builder.SetCurrent(old)
 	defer recoverScope()
+
 	createPhi := generatePhi(builder, nil, nil)
 
-	// replace object member-call
-	if object.IsObject() {
-		replace := func(key, member Value) {
-			if utils.IsNil(key) || utils.IsNil(member) {
-				log.Errorf("BUG: replace member is nil key[%v] member[%v]", key, member)
+	// target is the original old value, used to identify which values need to be replaced
+	target := old
+	visited := make(map[int64]struct{})
+
+	// Internal recursive function to handle nested member replacement
+	var replaceMemberCallRecursive func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value
+	replaceMemberCallRecursive = func(holder Value, replacement Value, visited map[int64]struct{}) map[string]Value {
+		holderRet := make(map[string]Value)
+
+		if !utils.IsNil(holder) {
+			holderID := holder.GetId()
+			if _, alreadyVisited := visited[holderID]; alreadyVisited {
+				return holderRet
+			}
+			visited[holderID] = struct{}{}
+		}
+
+		fixBranch := func(root Value, targetObj Value, rootKey Value) {
+			if utils.IsNil(root) || utils.IsNil(targetObj) {
 				return
 			}
-			// replace this member object to to
-			trueKey := member.GetKey()
-			// remove this member from v
-			if _, ok := object.GetMember(key); ok {
-				object.DeleteMember(key)
+			if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != target.GetId() && currentObj.GetId() != holder.GetId() {
+				// already points to a valid object, no change needed
+			} else {
+				root.SetObject(targetObj)
+			}
+			if root.IsMember() {
+				currentKey := root.GetKey()
+				if utils.IsNil(currentKey) || currentKey.GetId() == target.GetId() || currentKey.GetId() == holder.GetId() {
+					root.SetKey(pickMemberKey(root, rootKey))
+				}
+			}
+		}
+
+		replace := func(container Value, key Value, member Value) {
+			if utils.IsNil(key) || utils.IsNil(member) {
+				return
 			}
 
-			// create member of `to` value with key
-			// if fun := GetMethod(value.GetType(), key.String()); fun != nil {
-			// 	return NewClassMethod(fun, value)
-			// }
-			// re-set type
-			res := checkCanMemberCallExist(to, key)
-			trueRes := checkCanMemberCallExist(to, trueKey)
+			trueKey := member.GetKey()
+			if _, ok := container.GetMember(key); ok {
+				container.DeleteMember(key)
+			}
+
+			res := checkCanMemberCallExist(replacement, key)
+			trueRes := checkCanMemberCallExist(replacement, trueKey)
 			name, typ := res.name, res.typ
-			// toMember := builder.getOriginMember(name, typ, to, key)
 			toMember := builder.PeekValue(trueRes.name)
 
-			// then, we will replace value, `member` to `toMember`
 			if member.GetOpcode() != SSAOpcodeUndefined {
 				member.SetName(name)
 				member.SetType(typ)
-				setMemberCallRelationship(to, key, member)
-				log.Warn("ReplaceMemberCall can create phi, but we cannot find cfgEntryBlock")
+				setMemberCallRelationship(replacement, key, member)
 				if utils.IsNil(toMember) {
-					ret[name] = member
+					holderRet[name] = member
 				} else {
-					ret[name] = createPhi(name, []Value{toMember, member})
+					if res.typ != nil {
+						toMember.SetType(res.typ)
+					}
+					holderRet[name] = createPhi(name, []Value{toMember, member})
 				}
 			}
 
-			if key.GetId() == v.GetId() {
-				// No need for recursion
-				toKey := to
-				setMemberCallRelationship(object, toKey, member)
+			if key.GetId() == target.GetId() {
+				toKey := replacement
+				setMemberCallRelationship(container, toKey, member)
 				if utils.IsNil(toMember) {
 					toMember = member
 				}
 			}
 			if utils.IsNil(toMember) {
-				toMember = builder.ReadMemberCallValue(to, key)
+				toMember = builder.ReadMemberCallValue(replacement, key)
+			}
+
+			if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == target.GetId() || toMember.GetObject().GetId() == holder.GetId() {
+				fixBranch(toMember, replacement, key)
 			}
 
 			memberT := member
 			switch member.GetOpcode() {
-			// Do nothing, it will be replaced later
-			case SSAOpcodeBinOp:
-			case SSAOpcodeUnOp:
+			case SSAOpcodeBinOp, SSAOpcodeUnOp:
+				// keep original instruction for later replacement
 			default:
 				ReplaceAllValue(member, toMember)
 				DeleteInst(member)
 				memberT = toMember
 			}
-			for n, v := range ReplaceMemberCall(member, v, toMember) {
-				ret[n] = v
+
+			// Recursively replace nested members
+			if _, ok := visited[container.GetId()]; !ok {
+				for n, v2 := range replaceMemberCallRecursive(member, toMember, visited) {
+					holderRet[n] = v2
+				}
 			}
 			if !member.IsObject() {
-				ret[name] = memberT
+				holderRet[name] = memberT
 			}
-			// } else {
-			// 	log.Errorf("BUG: replace key[%v]/member[%v] is not EmptyPhi", key, member)
-			// 	return
-			// }
 		}
-		// call value需要优先替换
-		callMap := make(map[Value]Value)
-		for key, member := range object.GetAllMember() {
-			if _, ok := ToCall(member); ok {
-				callMap[key] = member
-				continue
+
+		if holder.IsObject() {
+			callMap := make(map[Value]Value)
+			for key, member := range holder.GetAllMember() {
+				if _, ok := ToCall(member); ok {
+					callMap[key] = member
+					continue
+				}
+				replace(holder, key, member)
 			}
-			replace(key, member)
+			for key, member := range callMap {
+				replace(holder, key, member)
+			}
 		}
-		for key, member := range callMap {
-			replace(key, member)
-		}
+
+		return holderRet
 	}
 
-	// TODO : this need more test, i think this code error
-	if object.IsMember() {
-		obj := object.GetObject()
-		setMemberCallRelationship(obj, object.GetKey(), object)
+	// Merge results from recursive calls
+	for n, v2 := range replaceMemberCallRecursive(old, replacement, visited) {
+		ret[n] = v2
 	}
+
 	return ret
+}
+
+func pickMemberKey(member, fallback Value) Value {
+	if !utils.IsNil(member) {
+		if k := member.GetKey(); !utils.IsNil(k) {
+			return k
+		}
+	}
+	return fallback
 }

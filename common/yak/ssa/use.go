@@ -38,9 +38,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			continue
 		}
 		user.ReplaceValue(v, to)
-		if t, ok := ToExternLib(user); ok {
-			ReplaceMemberCall(t, v, to)
-		}
 
 		to.AddUser(user)
 		deleteInst = append(deleteInst, user)
@@ -221,11 +218,6 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	lo.ForEach(c.ArgMember, func(id int64, index int) {
 		c.ArgMember[index] = to.GetId()
 	})
-
-	binding, ok := c.Binding[v.GetName()]
-	if ok && binding == v.GetId() {
-		c.Binding[v.GetName()] = to.GetId()
-	}
 }
 
 // ------------ SideEffect
