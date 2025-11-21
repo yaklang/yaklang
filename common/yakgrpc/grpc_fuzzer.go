@@ -147,9 +147,9 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	// 提取响应
 	extractHTTPResponseResult, err := s.ExtractHTTPResponse(ctx, &ypb.ExtractHTTPResponseParams{
 		HTTPResponse: string(rspRaw),
-		HTTPRequest: string(rspIns.RawRequest),
-		IsHTTPS:     isHttps,
-		Extractors:  req.GetExtractors(),
+		HTTPRequest:  string(rspIns.RawRequest),
+		IsHTTPS:      isHttps,
+		Extractors:   req.GetExtractors(),
 	})
 	var extractResults []*ypb.KVPair
 	if err == nil && extractHTTPResponseResult != nil && extractHTTPResponseResult.GetValues() != nil {
@@ -505,7 +505,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					if haveHTTPTplExtractor { // 提取器提取参数
 						params := make(map[string]any)
 						for _, extractor := range httpTplExtractor {
-							vars, err := extractor.Execute(respModel.ResponseRaw, params)
+							vars, err := extractor.ExecuteWithRequest(respModel.ResponseRaw, respModel.RequestRaw, respModel.IsHTTPS, params)
 							if err != nil {
 								log.Errorf("extractor execute failed: %s", err)
 								continue
@@ -910,7 +910,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			if haveHTTPTplExtractor {
 				params := make(map[string]any)
 				for _, extractor := range httpTplExtractor {
-					vars, err := extractor.Execute(result.ResponseRaw, params)
+					vars, err := extractor.ExecuteWithRequest(result.ResponseRaw, result.RequestRaw, req.GetIsHTTPS(), params)
 					if err != nil {
 						log.Errorf("extractor execute failed: %s", err)
 						continue
