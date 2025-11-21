@@ -142,6 +142,17 @@ func (c *Config) GetCodeSourcePath() string {
 	return c.CodeSource.Path
 }
 
+func (c *Config) GetCodeSourceLocalFileOrURL() string {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return ""
+	}
+	if c.CodeSource.URL != "" {
+		return c.CodeSource.URL
+	} else {
+		return c.CodeSource.LocalFile
+	}
+}
+
 func (c *Config) GetCodeSourceAuthKind() string {
 	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Auth == nil {
 		return ""

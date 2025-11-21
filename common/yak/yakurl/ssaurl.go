@@ -240,6 +240,7 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 			}
 			v, err := result.GetValue(variable, index)
 			if v == nil || err != nil {
+				log.Errorf("Get Value By SSA URL Faild:%v", err)
 				continue
 			}
 			codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
@@ -314,7 +315,7 @@ func (a *SyntaxFlowAction) GetResultByRiskHash(
 	if err != nil {
 		return nil, err
 	}
-	value, err := GetTmpValueByRiskHash(programName, risk)
+	value, err := GetValueByRiskHash(programName, risk)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +327,7 @@ func (a *SyntaxFlowAction) GetResultByRiskHash(
 	}, nil
 }
 
-func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Value, error) {
+func GetValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Value, error) {
 	var auditNodeID string
 
 	auditNodeIDs, err := ssadb.GetResultNodeByRiskHash(ssadb.GetDB(), risk.Hash)
@@ -342,8 +343,12 @@ func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Va
 		auditNodeID = auditNodeIDs[0]
 	}
 
-	prog := ssaapi.NewTmpProgram(programName)
-	value := prog.NewValueFromAuditNode(auditNodeID)
+	var p *ssaapi.Program
+	p, err = ssaapi.FromDatabase(programName)
+	if p == nil || err != nil {
+		p = ssaapi.NewTmpProgram(programName)
+	}
+	value := p.NewValueFromAuditNode(auditNodeID)
 	if utils.IsNil(value) {
 		return nil, utils.Errorf("value not found from audit node id: %s", auditNodeID)
 	}

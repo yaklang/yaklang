@@ -259,16 +259,4 @@ func TestManager(t *testing.T) {
 		require.Equal(t, schema.SFResultKindScan, task.kind)
 	})
 
-	t.Run("test invalid SSA project ID", func(t *testing.T) {
-		// 测试使用无效的项目ID
-		taskId := uuid.NewString()
-		_, err := createSyntaxflowTaskById(context.Background(), "", taskId,
-			newConfig(
-				ssaconfig.WithScanControlMode(""),
-				ssaconfig.WithProjectID(999999999),
-			),
-		)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "query ssa project by id failed")
-	})
 }

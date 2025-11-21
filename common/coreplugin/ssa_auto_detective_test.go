@@ -37,10 +37,13 @@ func TestSSAAutoDetective(t *testing.T) {
 	t.Run("check compile jar", func(t *testing.T) {
 		jarPath, err := ssatest.GetJarFile()
 		require.NoError(t, err)
-		info, prog, err := ParseProjectWithAutoDetective(context.Background(), jarPath, "")
+		config, err := check(t, jarPath)
 		require.NoError(t, err)
-		require.NotNil(t, prog)
-		log.Infof("info: %v", info)
+		log.Infof("config: %v", config)
+		require.Equal(t, string(config.GetLanguage()), "java")
+		require.NotNil(t, config.CodeSource)
+		require.Equal(t, string(config.GetCodeSourceKind()), "jar")
+		require.Equal(t, config.GetCodeSourceLocalFile(), jarPath)
 	})
 
 	t.Run("check jar", func(t *testing.T) {
@@ -313,7 +316,7 @@ public class ExistsTest {
 		tempDir, cleanupDir := setupTempDirWithJavaFile(t, "HelloWorld.java", javaCode)
 		defer cleanupDir()
 
-		ssaDB := consts.GetGormDefaultSSADataBase()
+		ssaDB := consts.GetGormSSAProjectDataBase()
 
 		// Step 1: 探测项目
 		log.Infof("Step 1: Starting SSA auto detective without compile...")

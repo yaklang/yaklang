@@ -111,7 +111,7 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 	if len(projects) == 0 {
 		return 0, nil
 	}
-	ssaDB := consts.GetGormDefaultSSADataBase()
+	ssaDB := consts.GetGormSSAProjectDataBase()
 	deleteMode := req.GetDeleteMode()
 	var totalDeleted int64
 	for _, project := range projects {
@@ -213,7 +213,7 @@ func NewSSAProjectByProto(proto *ypb.SSAProject) (*ssaproject.SSAProject, error)
 		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles))
 		opts = append(opts, ssaconfig.WithCompileReCompile(cc.ReCompile))
 		opts = append(opts, ssaconfig.WithCompileMemoryCompile(cc.Memory))
-		opts = append(opts, ssaconfig.WithCompileConcurrency(cc.Concurrency))
+		opts = append(opts, ssaconfig.WithCompileConcurrency(int(cc.Concurrency)))
 	}
 	if sc := proto.ScanConfig; sc != nil {
 		opts = append(opts, ssaconfig.WithScanConcurrency(sc.Concurrency))

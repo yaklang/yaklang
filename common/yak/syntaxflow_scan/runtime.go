@@ -105,6 +105,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 				m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
 			}),
 			ssaapi.QueryWithSave(m.kind),
+			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
 		if m.Config.GetSyntaxFlowMemory() {
 			option = append(option, ssaapi.QueryWithMemory())
