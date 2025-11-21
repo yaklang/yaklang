@@ -7,6 +7,11 @@ import (
 // ReplaceMemberCall replace all member or object relationship
 // and will fixup method function call
 func ReplaceMemberCall(object, v, to Value) map[string]Value {
+	return replaceMemberCallWithVisited(object, v, to, make(map[int64]struct{}))
+}
+
+// replaceMemberCallWithVisited 带有循环检测的内部实现
+func replaceMemberCallWithVisited(object, v, to Value, visited map[int64]struct{}) map[string]Value {
 	ret := make(map[string]Value)
 	builder := object.GetFunc().builder
 	if utils.IsNil(builder) {
@@ -14,6 +19,10 @@ func ReplaceMemberCall(object, v, to Value) map[string]Value {
 	}
 	recoverScope := builder.SetCurrent(object)
 	defer recoverScope()
+	// 循环检测:检查是否已经访问过这个 Value
+	if _, alreadyVisited := visited[object.GetId()]; alreadyVisited {
+		return ret
+	}
 	createPhi := generatePhi(builder, nil, nil)
 
 	// replace object member-call
@@ -76,7 +85,7 @@ func ReplaceMemberCall(object, v, to Value) map[string]Value {
 				DeleteInst(member)
 				memberT = toMember
 			}
-			for n, v := range ReplaceMemberCall(member, v, toMember) {
+			for n, v := range replaceMemberCallWithVisited(member, v, toMember, visited) {
 				ret[n] = v
 			}
 			if !member.IsObject() {
@@ -90,6 +99,7 @@ func ReplaceMemberCall(object, v, to Value) map[string]Value {
 		// call value需要优先替换
 		callMap := make(map[Value]Value)
 		for key, member := range object.GetAllMember() {
+			visited[member.GetId()] = struct{}{}
 			if _, ok := ToCall(member); ok {
 				callMap[key] = member
 				continue

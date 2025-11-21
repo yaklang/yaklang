@@ -2075,7 +2075,7 @@ println(a);`
 
 }
 
-func TestPanicWhenBuilt(t *testing.T) {
+func TestPanicOrAnomalyWhenBuilt(t *testing.T) {
 	t.Run("panic when switch built", func(t *testing.T) {
 		code := `switch (i.shape) {
                             case "circle":
@@ -2129,15 +2129,27 @@ func TestPanicWhenBuilt(t *testing.T) {
 		require.NoError(t, err)
 		_ = prog
 	})
-	//t.Run("stuck", func(t *testing.T) {
-	//	code := inf_loop_js_file
-	//	prog, err := ssaapi.Parse(code,
-	//		ssaapi.WithLanguage("ts"),
-	//	)
-	//	require.NoError(t, err)
-	//	_ = prog
-	//
-	//})
+	t.Run("stuck", func(t *testing.T) {
+		/*
+			// 假设有如下对象结构：
+			obj1.member1 = obj2
+			obj2.member2 = obj1
+
+			// 当调用 ReplaceMemberCall(obj1, v, to) 时：
+			// 1. 处理 obj1.member1 (即 obj2)
+			// 2. 递归调用 ReplaceMemberCall(obj2, v, to)
+			// 3. 处理 obj2.member2 (即 obj1)
+			// 4. 递归调用 ReplaceMemberCall(obj1, v, to)  ← 回到第1步，形成循环
+
+		*/
+		code := inf_loop_js_file
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("ts"),
+		)
+		require.NoError(t, err)
+		_ = prog
+
+	})
 	t.Run("stuck1", func(t *testing.T) {
 		prog, err := ssaapi.Parse(`
   const r = function(n) {
