@@ -177,7 +177,7 @@ DESC
 
 desc(
 	lang:java
-	alert_min: 2
+	alert_num: 2
 	"file://demo.java":<<<CODE
     /**
      * 网络套接字资源管理示例

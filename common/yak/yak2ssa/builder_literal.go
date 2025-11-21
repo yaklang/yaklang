@@ -37,7 +37,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
 		// TODO: this ok??
 		return ssa.NewParam("undefined", false, b.FunctionBuilder)
 	} else if stmt.NilLiteral() != nil {
-		return b.EmitConstInst(nil)
+		return b.EmitConstInstNil()
 	} else if stmt.CharacterLiteral() != nil {
 		lit := stmt.CharacterLiteral().GetText()
 		var s string

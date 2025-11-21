@@ -64,7 +64,7 @@ func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Val
 		}
 		res = y.EmitConstInst(boolLit)
 	} else if ret = i.NULL_LITERAL(); ret != nil {
-		res = y.EmitConstInst(nil)
+		res = y.EmitConstInstNil()
 	} else if ret = i.TEXT_BLOCK(); ret != nil {
 		text := ret.GetText()
 		val := text[3 : len(text)-3]

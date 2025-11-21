@@ -1755,7 +1755,7 @@ func (y *singleFileBuilder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRe
 
 func (y *singleFileBuilder) getDefaultValueForType(typ ssa.Type) ssa.Value {
 	if utils.IsNil(typ) {
-		return y.EmitConstInst(nil)
+		return y.EmitConstInstNil()
 	}
 
 	switch typ.GetTypeKind() {
@@ -1766,7 +1766,7 @@ func (y *singleFileBuilder) getDefaultValueForType(typ ssa.Type) ssa.Value {
 	case ssa.BooleanTypeKind:
 		return y.EmitConstInst(false)
 	default:
-		return y.EmitConstInst(nil)
+		return y.EmitConstInstNil()
 	}
 }
 

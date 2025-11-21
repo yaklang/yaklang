@@ -234,7 +234,7 @@ func (c *Call) handlerGeneric() {
 
 	c.Method = newMethod.GetId()
 	if c.Method <= 0 {
-		log.Infof("ab")
+		log.Errorf("method id is %d, target: %s", c.Method, newMethod.String())
 	}
 }
 func (c *Call) handlerObjectMethod() {
@@ -253,10 +253,10 @@ func (c *Call) handlerObjectMethod() {
 		this.AddUser(c)
 	}
 	if target == nil {
-		log.Infof("b")
+		log.Errorf("target is nil")
 	}
 	if target.GetType() == nil {
-		log.Infof("aa")
+		log.Errorf("target type is nil")
 	}
 	switch t := target.GetType().(type) {
 	case *FunctionType:
