@@ -147,7 +147,8 @@ func (y *YakExtractor) ExecuteWithRequest(rsp []byte, req []byte, isHttps bool, 
 		}
 	case "kv", "key-value", "kval":
 		var kvResult map[string]any
-		if y.Scope == "body" {
+		scope := strings.TrimSpace(strings.ToLower(y.Scope))
+		if scope == "body" || scope == "request_body" {
 			kvResult = ExtractKValFromBody(material)
 		} else {
 			kvResult = ExtractKValFromResponse([]byte(material))
