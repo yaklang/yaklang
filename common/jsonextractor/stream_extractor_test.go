@@ -191,6 +191,20 @@ func TestExtractJSONStream_TableDriven(t *testing.T) {
 	}
 }
 
+func TestExtractJSONStream_BoundaryValue(t *testing.T) {
+	raw := `{"tail":"END"}`
+	var captured string
+	err := ExtractStructuredJSON(raw, WithRawKeyValueCallback(func(key, data any) {
+		if keyStr, ok := key.(string); ok && keyStr == `"tail"` {
+			if dataStr, ok := data.(string); ok {
+				captured = dataStr
+			}
+		}
+	}))
+	require.NoError(t, err)
+	require.Equal(t, `"END"`, captured)
+}
+
 func TestStreamExtractorArray_SMOKING(t *testing.T) {
 	ExtractStructuredJSON(`{a: []}`, WithRawKeyValueCallback(func(key, data any) {
 		spew.Dump(key)

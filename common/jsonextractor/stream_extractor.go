@@ -2,7 +2,6 @@ package jsonextractor
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -405,6 +404,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	for _, option := range options {
 		option(callbackManager)
 	}
+	defer callbackManager.resetFieldStreamFrames()
 
 	var mirror = new(bytes.Buffer)
 	reader := newAutoPeekReader(io.TeeReader(jsonReader, mirror))
@@ -432,30 +432,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		arrayCurrentKeyIndex     int
 		legalArrayItem           bool
 		fieldStreamFrame         *fieldStreamFrame
-	}
-
-	peekUntil := func(checkFunc func(b byte) bool) (byte, error) { // peek until meet the conditions
-		i := 0
-		for {
-			i++
-			res, err := reader.PeekN(i)
-			if err != nil {
-				return 0, err
-			}
-			if len(res) < i {
-				return 0, fmt.Errorf("invalid peek , want %d but got %d", i, len(res))
-			}
-
-			if checkFunc(res[i-1]) {
-				return res[i-1], nil
-			}
-		}
-	}
-
-	peekUntilNoWhiteSpace := func() (byte, error) {
-		return peekUntil(func(b byte) bool {
-			return b != ' ' && b != '\t' && b != '\f' && b != '\v'
-		})
 	}
 
 	bufManager := newBufStackManager(func(key any, val any, parents []string) {
@@ -517,6 +493,13 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					raw.end = len(c) - 1
 				}
 				sliceValue := getStrSlice(raw)
+				if raw.value == state_DoubleQuoteString {
+					if parentRaw := stack.Peek(); parentRaw != nil {
+						if parentState, ok := parentRaw.(*state); ok && parentState.value == state_objectKey {
+							bufManager.prepareFieldStreamContexts(sliceValue)
+						}
+					}
+				}
 				//log.Infof("pop  state: %v, with data: %#v (start:%v end:%v), current-state: %v", raw.value, sliceValue, raw.start, raw.end, currentState())
 				switch raw.value {
 				case state_objectKey:
@@ -715,15 +698,15 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					popState()
 					goto RETRY
 				}
-				peekByte, err := peekUntilNoWhiteSpace()
-				if err != nil {
-					return err
-				}
-				if peekByte == '"' || peekByte == '\n' || peekByte == '\r' {
-					popState()
-					pushStateWithIdx(state_objectKey, index+1)
-				}
-				continue
+				// Check if we're still inside a composite value (object/array)
+				// If the previous state was jsonObj or jsonArray, we should have handled the comma there
+				// This comma is a separator between object values, don't write it to field stream
+				// Always transition to objectKey after comma in object value
+				// This handles both normal cases and error recovery (e.g., consecutive commas)
+				// The peek was removed to fix infinite loop - we always transition now
+				popState()
+				pushStateWithIdx(state_objectKey, index+1)
+				goto RETRY
 			case ']':
 				if currentStateIns().objectValueInArray {
 					writeToFieldStream()
@@ -759,6 +742,25 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				popStateWithIdx(index)
 				pushStateWithIdx(state_objectValue, index+1)
 				continue
+			case ',':
+				// Check if we're inside a composite value by looking at parent state (2nd element on stack)
+				// If parent is jsonObj/jsonArray, comma is part of the value and should be written
+				if parentRaw := stack.PeekN(2); parentRaw != nil {
+					if parentState, ok := parentRaw.(*state); ok {
+						if parentState.value == state_jsonObj || parentState.value == state_jsonArray {
+							writeToFieldStream() // 写入逗号（作为复合值的一部分）
+							continue
+						}
+					}
+				}
+				// Otherwise, this comma is a separator between key-value pairs in the outer object
+				// Pop state_objectKey, then let state_jsonObj handle the comma and push state_objectKey
+				popState()
+				// The comma will be handled by state_jsonObj in the next iteration
+				// After that, we need to push state_objectKey to handle the next key
+				// But we can't do that here because we're in state_objectKey switch
+				// So we just goto RETRY and let state_jsonObj handle it
+				goto RETRY
 			case '}':
 				writeToFieldStream() // 写入对象结束符，处理空对象
 				popStateWithIdx(index - 1)
@@ -808,7 +810,15 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				writeToFieldStream() // 写入结束大括号
 				popState()
 				continue
-			case ',', ':', ' ', '\t', '\n', '\r':
+			case ',':
+				writeToFieldStream() // 写入逗号（作为复合值的一部分）
+				// After comma in jsonObj, we need to push objectKey to handle the next key
+				// But only if we're not already in objectKey (which would mean we're at top level)
+				if currentState() != state_objectKey {
+					pushStateWithIdx(state_objectKey, index+1)
+				}
+				continue
+			case ':', ' ', '\t', '\n', '\r':
 				writeToFieldStream() // 写入分隔符和空白字符
 				continue
 			default:
@@ -828,11 +838,44 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				pushState(state_quote)
 				continue
 			case '"':
-				writeToFieldStream() // 写入结束引号
-				// 清除当前字段写入器
-				callbackManager.clearCurrentFieldWriter()
-				popStateWithIdx(index + 1)
-				continue
+				// 检查下一个字符是否是有效的JSON结构字符（表示字符串结束）
+				// 如果是逗号、冒号、右大括号、右方括号、空格、制表符、换行符等，则字符串结束
+				// 如果下一个字符是点号，再检查点号后面是否是有效结束字符
+				// 否则，这个引号可能是字符串内容的一部分（非标准JSON，但需要容错处理）
+				nextCh, peekErr := reader.Peek()
+				isValidEndChar := false
+				if peekErr == nil {
+					// 有效的结束字符：逗号、冒号、右大括号、右方括号、空格、制表符、换行符、回车符
+					if nextCh == ',' || nextCh == ':' || nextCh == '}' || nextCh == ']' ||
+						nextCh == ' ' || nextCh == '\t' || nextCh == '\n' || nextCh == '\r' {
+						isValidEndChar = true
+					} else if nextCh == '.' {
+						// 如果下一个字符是点号，检查点号后面是否是有效结束字符
+						peek2, peekErr2 := reader.PeekN(2)
+						if peekErr2 == nil && len(peek2) >= 2 {
+							afterDot := peek2[1]
+							if afterDot == ',' || afterDot == ':' || afterDot == '}' || afterDot == ']' ||
+								afterDot == ' ' || afterDot == '\t' || afterDot == '\n' || afterDot == '\r' {
+								isValidEndChar = true
+							}
+						}
+					}
+				} else if peekErr == io.EOF {
+					// 到达文件末尾，字符串结束
+					isValidEndChar = true
+				}
+
+				if isValidEndChar {
+					writeToFieldStream() // 写入结束引号
+					// 清除当前字段写入器
+					callbackManager.clearCurrentFieldWriter()
+					popStateWithIdx(index + 1)
+					continue
+				} else {
+					// 这不是字符串结束，继续作为字符串内容处理
+					writeToFieldStream() // 写入引号字符（作为字符串内容）
+					continue
+				}
 			default:
 				writeToFieldStream() // 写入普通字符
 			}
