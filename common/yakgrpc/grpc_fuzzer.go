@@ -1586,7 +1586,12 @@ func (s *Server) MatchHTTPResponse(ctx context.Context, req *ypb.MatchHTTPRespon
 		matcher.SubMatcherCondition = "and"
 	}
 
-	result, err := matcher.ExecuteRawResponse([]byte(req.GetHTTPResponse()), nil)
+	// 使用 Execute 方法支持请求相关的 matcher
+	result, err := matcher.Execute(&httptpl.RespForMatch{
+		RawPacket:     []byte(req.GetHTTPResponse()),
+		RequestPacket: []byte(req.GetHTTPRequest()),
+		IsHttps:       req.GetIsHTTPS(),
+	}, nil)
 	if err != nil {
 		return nil, err
 	}

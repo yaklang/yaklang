@@ -592,3 +592,273 @@ func TestExtractHTTPResponse_ComplexScenario(t *testing.T) {
 	assert.Contains(t, resultMap["combined_info"], "admin")
 	assert.Contains(t, resultMap["combined_info"], "/api/v1/auth/login")
 }
+
+// TestMatchHTTPResponse_RequestScope 测试 MatchHTTPResponse 支持请求相关的 matcher
+func TestMatchHTTPResponse_RequestScope(t *testing.T) {
+	s := &Server{}
+	reqRaw := "POST /api/login HTTP/1.1\r\n" +
+		"Host: api.example.com\r\n" +
+		"Authorization: Bearer test-token-123\r\n" +
+		"Content-Type: application/json\r\n\r\n" +
+		"{\"username\": \"admin\", \"password\": \"secret\"}"
+	rspRaw := "HTTP/1.1 200 OK\r\n" +
+		"Content-Type: application/json\r\n\r\n" +
+		"{\"success\": true}"
+
+	tests := []struct {
+		name        string
+		matcher     *ypb.HTTPResponseMatcher
+		shouldMatch bool
+	}{
+		{
+			name: "match_request_header",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "request_header",
+				Group:       []string{"Bearer test-token-123"},
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "match_request_body",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "request_body",
+				Group:       []string{"admin"},
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "match_request_url",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "request_url",
+				Group:       []string{"/api/login"},
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "match_request_raw",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "request_raw",
+				Group:       []string{"POST /api/login"},
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "match_response_body",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "body",
+				Group:       []string{"success"},
+			},
+			shouldMatch: true,
+		},
+		{
+			name: "not_match_request_header",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "word",
+				Scope:       "request_header",
+				Group:       []string{"not-exist-token"},
+			},
+			shouldMatch: false,
+		},
+		{
+			name: "regex_match_request",
+			matcher: &ypb.HTTPResponseMatcher{
+				MatcherType: "regex",
+				Scope:       "request_header",
+				Group:       []string{"Bearer\\s+test-token-\\d+"},
+			},
+			shouldMatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := &ypb.MatchHTTPResponseParams{
+				HTTPResponse: rspRaw,
+				HTTPRequest:  reqRaw,
+				IsHTTPS:      false,
+				Matchers:     []*ypb.HTTPResponseMatcher{tt.matcher},
+			}
+			res, err := s.MatchHTTPResponse(context.Background(), params)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.Equal(t, tt.shouldMatch, res.GetMatched(), "匹配结果应该符合预期")
+		})
+	}
+}
+
+// TestMatchHTTPResponse_NucleiDSL 测试 MatchHTTPResponse 支持 nuclei-dsl matcher
+func TestMatchHTTPResponse_NucleiDSL(t *testing.T) {
+	s := &Server{}
+	reqRaw := "POST /api/users HTTP/1.1\r\n" +
+		"Host: api.example.com\r\n" +
+		"Content-Type: application/json\r\n\r\n" +
+		"{\"role\": \"admin\"}"
+	rspRaw := "HTTP/1.1 201 Created\r\n" +
+		"Content-Type: application/json\r\n\r\n" +
+		"{\"id\": 100, \"created\": true}"
+
+	tests := []struct {
+		name        string
+		dslExpr     string
+		shouldMatch bool
+	}{
+		{
+			name:        "check_request_url",
+			dslExpr:     "contains(request_url, '/api/users')",
+			shouldMatch: true,
+		},
+		{
+			name:        "check_request_body",
+			dslExpr:     "contains(request_body, 'admin')",
+			shouldMatch: true,
+		},
+		{
+			name:        "check_response_body",
+			dslExpr:     "contains(body, 'created')",
+			shouldMatch: true,
+		},
+		{
+			name:        "combine_request_and_response",
+			dslExpr:     "contains(request_body, 'admin') && contains(body, 'created')",
+			shouldMatch: true,
+		},
+		{
+			name:        "not_match",
+			dslExpr:     "contains(request_body, 'notexist')",
+			shouldMatch: false,
+		},
+		{
+			name:        "check_status_code",
+			dslExpr:     "status_code == 201",
+			shouldMatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := &ypb.MatchHTTPResponseParams{
+				HTTPResponse: rspRaw,
+				HTTPRequest:  reqRaw,
+				IsHTTPS:      false,
+				Matchers: []*ypb.HTTPResponseMatcher{
+					{
+						MatcherType: "expr",
+						ExprType:    "nuclei-dsl",
+						Group:       []string{tt.dslExpr},
+					},
+				},
+			}
+			res, err := s.MatchHTTPResponse(context.Background(), params)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.Equal(t, tt.shouldMatch, res.GetMatched(), "匹配结果应该符合预期")
+		})
+	}
+}
+
+// TestMatchHTTPResponse_MultipleMatchers 测试多个 matcher 的 AND/OR 逻辑
+func TestMatchHTTPResponse_MultipleMatchers(t *testing.T) {
+	s := &Server{}
+	reqRaw := "POST /api/auth HTTP/1.1\r\n" +
+		"Host: api.example.com\r\n" +
+		"X-API-Key: secret123\r\n\r\n" +
+		"{\"user\": \"admin\"}"
+	rspRaw := "HTTP/1.1 200 OK\r\n\r\n{\"token\": \"abc\", \"success\": true}"
+
+	tests := []struct {
+		name        string
+		matchers    []*ypb.HTTPResponseMatcher
+		condition   string
+		shouldMatch bool
+	}{
+		{
+			name: "and_both_match",
+			matchers: []*ypb.HTTPResponseMatcher{
+				{
+					MatcherType: "word",
+					Scope:       "request_header",
+					Group:       []string{"secret123"},
+				},
+				{
+					MatcherType: "word",
+					Scope:       "body",
+					Group:       []string{"success"},
+				},
+			},
+			condition:   "and",
+			shouldMatch: true,
+		},
+		{
+			name: "and_one_not_match",
+			matchers: []*ypb.HTTPResponseMatcher{
+				{
+					MatcherType: "word",
+					Scope:       "request_header",
+					Group:       []string{"secret123"},
+				},
+				{
+					MatcherType: "word",
+					Scope:       "body",
+					Group:       []string{"notexist"},
+				},
+			},
+			condition:   "and",
+			shouldMatch: false,
+		},
+		{
+			name: "or_one_match",
+			matchers: []*ypb.HTTPResponseMatcher{
+				{
+					MatcherType: "word",
+					Scope:       "request_body",
+					Group:       []string{"admin"},
+				},
+				{
+					MatcherType: "word",
+					Scope:       "body",
+					Group:       []string{"notexist"},
+				},
+			},
+			condition:   "or",
+			shouldMatch: true,
+		},
+		{
+			name: "or_none_match",
+			matchers: []*ypb.HTTPResponseMatcher{
+				{
+					MatcherType: "word",
+					Scope:       "request_body",
+					Group:       []string{"notexist1"},
+				},
+				{
+					MatcherType: "word",
+					Scope:       "body",
+					Group:       []string{"notexist2"},
+				},
+			},
+			condition:   "or",
+			shouldMatch: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := &ypb.MatchHTTPResponseParams{
+				HTTPResponse:     rspRaw,
+				HTTPRequest:      reqRaw,
+				IsHTTPS:          false,
+				Matchers:         tt.matchers,
+				MatcherCondition: tt.condition,
+			}
+			res, err := s.MatchHTTPResponse(context.Background(), params)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			assert.Equal(t, tt.shouldMatch, res.GetMatched(), "匹配结果应该符合预期")
+		})
+	}
+}
