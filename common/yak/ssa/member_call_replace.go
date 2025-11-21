@@ -19,10 +19,14 @@ func replaceMemberCallWithVisited(object, v, to Value, visited map[int64]struct{
 	}
 	recoverScope := builder.SetCurrent(object)
 	defer recoverScope()
-	// 循环检测:检查是否已经访问过这个 Value
-	if _, alreadyVisited := visited[object.GetId()]; alreadyVisited {
-		return ret
+
+	if !utils.IsNil(to) {
+		if _, alreadyVisited := visited[object.GetId()]; alreadyVisited {
+			return ret
+		}
+		visited[to.GetId()] = struct{}{}
 	}
+
 	createPhi := generatePhi(builder, nil, nil)
 
 	// replace object member-call
@@ -99,7 +103,6 @@ func replaceMemberCallWithVisited(object, v, to Value, visited map[int64]struct{
 		// call value需要优先替换
 		callMap := make(map[Value]Value)
 		for key, member := range object.GetAllMember() {
-			visited[member.GetId()] = struct{}{}
 			if _, ok := ToCall(member); ok {
 				callMap[key] = member
 				continue
