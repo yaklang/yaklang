@@ -1,0 +1,65 @@
+// 测试 hids 模块的进程和连接监控功能
+
+// 测试获取所有进程
+procs = hids.GetAllProcesses()
+assert len(procs) > 0, "应该能获取到进程列表"
+
+// 验证进程信息结构
+proc = procs[0]
+assert proc.Pid > 0, "进程ID应该大于0"
+assert proc.Name != "", "进程名称不应为空"
+
+// 测试获取进程数量
+count = hids.GetProcessCount()
+assert count > 0, "进程数量应该大于0"
+assert count == len(procs), "GetProcessCount应该等于GetAllProcesses的长度"
+
+// 测试根据PID获取进程
+currentPid = os.Getpid()
+proc = hids.GetProcessByPid(currentPid)
+assert proc != nil, "应该能找到当前进程"
+assert proc.Pid == currentPid, "进程ID应该匹配"
+
+// 测试获取进程打开的文件（如果支持）
+if proc != nil {
+    files = hids.GetProcessOpenFiles(proc.Pid)
+    // 注意：在某些系统上可能没有权限获取文件列表，所以这里只检查函数是否正常执行
+    assert files != nil, "GetProcessOpenFiles应该返回列表（可能为空）"
+    
+    fileCount = hids.GetProcessOpenFilesCount(proc.Pid)
+    assert fileCount >= 0, "文件数量应该大于等于0"
+    assert fileCount == len(files), "文件数量应该匹配"
+}
+
+// 测试获取所有连接
+conns = hids.GetAllConnections()
+// 注意：连接列表可能为空，但函数应该正常执行
+assert conns != nil, "GetAllConnections应该返回列表（可能为空）"
+
+// 测试获取连接数量
+connCount = hids.GetConnectionCount()
+assert connCount >= 0, "连接数量应该大于等于0"
+assert connCount == len(conns), "连接数量应该匹配"
+
+// 测试根据PID获取连接
+if proc != nil && len(conns) > 0 {
+    pidConns = hids.GetConnectionsByPid(proc.Pid)
+    assert pidConns != nil, "GetConnectionsByPid应该返回列表（可能为空）"
+    
+    // 验证返回的连接都属于指定进程
+    for conn in pidConns {
+        assert conn.Pid == proc.Pid, "连接应该属于指定进程"
+        assert conn.LocalAddr != "" || conn.RemoteAddr != "", "连接应该有地址信息"
+    }
+}
+
+// 验证连接信息结构
+if len(conns) > 0 {
+    conn = conns[0]
+    assert conn.Pid > 0, "连接应该有关联的进程ID"
+    assert conn.Family != "", "连接应该有地址族信息"
+    assert conn.Type != "", "连接应该有类型信息"
+}
+
+println("所有 hids 进程和连接监控功能测试通过")
+
