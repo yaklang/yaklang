@@ -120,6 +120,7 @@ func init() {
 			registerBuildInForge("flow_report")
 			registerBuildInForge("ssa_vulnerability_analyzer")
 			registerBuildInForge("mock_forge")
+			registerBuildInForge("alert_denoising")
 			return nil
 		})
 	}, "sync-buildin-ai-forge")

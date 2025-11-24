@@ -1,0 +1,476 @@
+基于告警降噪分析结果，请按照以下JSON格式输出详细的降噪分析报告，所有信息使用中文
+
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "executive_summary", "statistics", "noise_analysis", "threat_analysis", "priority_alerts", "recommendations"],
+  "properties": {
+    "@action": {
+      "const": "alert_denoising_result"
+    },
+    "executive_summary": {
+      "type": "object",
+      "required": ["analysis_time", "log_file", "time_range", "total_alerts", "noise_count", "noise_ratio", "threat_count", "critical_threats"],
+      "properties": {
+        "analysis_time": {
+          "type": "string",
+          "description": "分析执行时间"
+        },
+        "log_file": {
+          "type": "string",
+          "description": "分析的日志文件路径"
+        },
+        "time_range": {
+          "type": "object",
+          "required": ["start", "end", "duration"],
+          "properties": {
+            "start": {
+              "type": "string",
+              "description": "告警时间范围开始"
+            },
+            "end": {
+              "type": "string",
+              "description": "告警时间范围结束"
+            },
+            "duration": {
+              "type": "string",
+              "description": "时间跨度"
+            }
+          }
+        },
+        "total_alerts": {
+          "type": "integer",
+          "description": "告警总数"
+        },
+        "noise_count": {
+          "type": "integer",
+          "description": "噪声告警数量"
+        },
+        "noise_ratio": {
+          "type": "number",
+          "description": "噪声比例（百分比）"
+        },
+        "threat_count": {
+          "type": "integer",
+          "description": "真实威胁数量"
+        },
+        "critical_threats": {
+          "type": "integer",
+          "description": "严重威胁数量"
+        },
+        "key_findings": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "关键发现摘要"
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "required": ["by_severity", "by_type", "by_source", "by_time"],
+      "properties": {
+        "by_severity": {
+          "type": "object",
+          "required": ["critical", "high", "medium", "low", "info"],
+          "properties": {
+            "critical": {
+              "type": "object",
+              "required": ["count", "percentage"],
+              "properties": {
+                "count": {"type": "integer"},
+                "percentage": {"type": "number"}
+              }
+            },
+            "high": {
+              "type": "object",
+              "required": ["count", "percentage"],
+              "properties": {
+                "count": {"type": "integer"},
+                "percentage": {"type": "number"}
+              }
+            },
+            "medium": {
+              "type": "object",
+              "required": ["count", "percentage"],
+              "properties": {
+                "count": {"type": "integer"},
+                "percentage": {"type": "number"}
+              }
+            },
+            "low": {
+              "type": "object",
+              "required": ["count", "percentage"],
+              "properties": {
+                "count": {"type": "integer"},
+                "percentage": {"type": "number"}
+              }
+            },
+            "info": {
+              "type": "object",
+              "required": ["count", "percentage"],
+              "properties": {
+                "count": {"type": "integer"},
+                "percentage": {"type": "number"}
+              }
+            }
+          }
+        },
+        "by_type": {
+          "type": "array",
+          "description": "按告警类型统计（Top 10）",
+          "items": {
+            "type": "object",
+            "required": ["type", "count", "percentage", "is_noise"],
+            "properties": {
+              "type": {"type": "string"},
+              "count": {"type": "integer"},
+              "percentage": {"type": "number"},
+              "is_noise": {"type": "boolean"}
+            }
+          }
+        },
+        "by_source": {
+          "type": "array",
+          "description": "按来源统计（Top 10）",
+          "items": {
+            "type": "object",
+            "required": ["source", "count", "threat_count", "noise_count"],
+            "properties": {
+              "source": {"type": "string"},
+              "count": {"type": "integer"},
+              "threat_count": {"type": "integer"},
+              "noise_count": {"type": "integer"}
+            }
+          }
+        },
+        "by_time": {
+          "type": "object",
+          "required": ["hourly_distribution", "peak_hours"],
+          "properties": {
+            "hourly_distribution": {
+              "type": "array",
+              "description": "每小时告警分布",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hour": {"type": "string"},
+                  "total": {"type": "integer"},
+                  "threats": {"type": "integer"},
+                  "noise": {"type": "integer"}
+                }
+              }
+            },
+            "peak_hours": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "告警高峰时段"
+            }
+          }
+        }
+      }
+    },
+    "noise_analysis": {
+      "type": "object",
+      "required": ["noise_categories", "top_noise_patterns", "noise_sources"],
+      "properties": {
+        "noise_categories": {
+          "type": "array",
+          "description": "噪声类别分析",
+          "items": {
+            "type": "object",
+            "required": ["category", "count", "percentage", "examples"],
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": ["重复性告警", "例行操作", "误报", "低优先级事件", "已知良性行为", "测试活动"],
+                "description": "噪声类别"
+              },
+              "count": {
+                "type": "integer",
+                "description": "该类别噪声数量"
+              },
+              "percentage": {
+                "type": "number",
+                "description": "占总噪声的百分比"
+              },
+              "examples": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "典型示例"
+              }
+            }
+          }
+        },
+        "top_noise_patterns": {
+          "type": "array",
+          "description": "Top噪声模式（按频率排序）",
+          "items": {
+            "type": "object",
+            "required": ["pattern", "count", "type", "recommendation"],
+            "properties": {
+              "pattern": {"type": "string"},
+              "count": {"type": "integer"},
+              "type": {"type": "string"},
+              "recommendation": {"type": "string"}
+            }
+          }
+        },
+        "noise_sources": {
+          "type": "array",
+          "description": "主要噪声来源",
+          "items": {
+            "type": "object",
+            "required": ["source", "noise_count", "main_types"],
+            "properties": {
+              "source": {"type": "string"},
+              "noise_count": {"type": "integer"},
+              "main_types": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "threat_analysis": {
+      "type": "object",
+      "required": ["threat_summary", "critical_threats", "high_threats", "attack_chains"],
+      "properties": {
+        "threat_summary": {
+          "type": "object",
+          "required": ["total_threats", "unique_sources", "unique_targets", "attack_types"],
+          "properties": {
+            "total_threats": {"type": "integer"},
+            "unique_sources": {"type": "integer"},
+            "unique_targets": {"type": "integer"},
+            "attack_types": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "critical_threats": {
+          "type": "array",
+          "description": "严重威胁详情",
+          "items": {
+            "type": "object",
+            "required": ["id", "type", "severity", "source", "target", "timestamp", "description", "impact", "risk_score"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"type": "string"},
+              "severity": {"type": "string"},
+              "source": {"type": "string"},
+              "target": {"type": "string"},
+              "timestamp": {"type": "string"},
+              "description": {"type": "string"},
+              "impact": {"type": "string"},
+              "risk_score": {"type": "number"},
+              "related_alerts": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "high_threats": {
+          "type": "array",
+          "description": "高危威胁详情",
+          "items": {
+            "type": "object",
+            "required": ["id", "type", "severity", "source", "target", "timestamp", "description", "risk_score"],
+            "properties": {
+              "id": {"type": "string"},
+              "type": {"type": "string"},
+              "severity": {"type": "string"},
+              "source": {"type": "string"},
+              "target": {"type": "string"},
+              "timestamp": {"type": "string"},
+              "description": {"type": "string"},
+              "risk_score": {"type": "number"}
+            }
+          }
+        },
+        "attack_chains": {
+          "type": "array",
+          "description": "识别的攻击链",
+          "items": {
+            "type": "object",
+            "required": ["chain_id", "source", "stages", "total_alerts", "time_span", "risk_level"],
+            "properties": {
+              "chain_id": {"type": "string"},
+              "source": {"type": "string"},
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stage": {"type": "string"},
+                    "timestamp": {"type": "string"},
+                    "alert_type": {"type": "string"}
+                  }
+                }
+              },
+              "total_alerts": {"type": "integer"},
+              "time_span": {"type": "string"},
+              "risk_level": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "priority_alerts": {
+      "type": "object",
+      "required": ["p0_immediate", "p1_high", "p2_medium"],
+      "properties": {
+        "p0_immediate": {
+          "type": "array",
+          "description": "P0-紧急（立即处理）",
+          "items": {
+            "type": "object",
+            "required": ["alert_id", "type", "source", "target", "description", "action_required"],
+            "properties": {
+              "alert_id": {"type": "string"},
+              "type": {"type": "string"},
+              "source": {"type": "string"},
+              "target": {"type": "string"},
+              "description": {"type": "string"},
+              "action_required": {"type": "string"}
+            }
+          }
+        },
+        "p1_high": {
+          "type": "array",
+          "description": "P1-高优先级（24小时内）",
+          "items": {
+            "type": "object",
+            "required": ["alert_id", "type", "source", "description", "action_required"],
+            "properties": {
+              "alert_id": {"type": "string"},
+              "type": {"type": "string"},
+              "source": {"type": "string"},
+              "description": {"type": "string"},
+              "action_required": {"type": "string"}
+            }
+          }
+        },
+        "p2_medium": {
+          "type": "array",
+          "description": "P2-中优先级（本周内）",
+          "items": {
+            "type": "object",
+            "required": ["alert_id", "type", "description", "action_required"],
+            "properties": {
+              "alert_id": {"type": "string"},
+              "type": {"type": "string"},
+              "description": {"type": "string"},
+              "action_required": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "required": ["immediate_actions", "rule_optimization", "alert_aggregation", "automation_suggestions", "monitoring_improvements"],
+      "properties": {
+        "immediate_actions": {
+          "type": "array",
+          "description": "立即执行的措施",
+          "items": {
+            "type": "object",
+            "required": ["action", "reason", "expected_impact"],
+            "properties": {
+              "action": {"type": "string"},
+              "reason": {"type": "string"},
+              "expected_impact": {"type": "string"}
+            }
+          }
+        },
+        "rule_optimization": {
+          "type": "array",
+          "description": "规则优化建议",
+          "items": {
+            "type": "object",
+            "required": ["rule_type", "current_issue", "optimization", "expected_reduction"],
+            "properties": {
+              "rule_type": {"type": "string"},
+              "current_issue": {"type": "string"},
+              "optimization": {"type": "string"},
+              "expected_reduction": {"type": "string"}
+            }
+          }
+        },
+        "alert_aggregation": {
+          "type": "array",
+          "description": "告警聚合建议",
+          "items": {
+            "type": "object",
+            "required": ["aggregation_type", "target_alerts", "method", "benefit"],
+            "properties": {
+              "aggregation_type": {"type": "string"},
+              "target_alerts": {"type": "string"},
+              "method": {"type": "string"},
+              "benefit": {"type": "string"}
+            }
+          }
+        },
+        "automation_suggestions": {
+          "type": "array",
+          "description": "自动化处理建议",
+          "items": {
+            "type": "object",
+            "required": ["automation_type", "target_scenario", "implementation", "efficiency_gain"],
+            "properties": {
+              "automation_type": {"type": "string"},
+              "target_scenario": {"type": "string"},
+              "implementation": {"type": "string"},
+              "efficiency_gain": {"type": "string"}
+            }
+          }
+        },
+        "monitoring_improvements": {
+          "type": "array",
+          "description": "监控改进建议",
+          "items": {
+            "type": "object",
+            "required": ["improvement_area", "current_gap", "recommendation", "benefit"],
+            "properties": {
+              "improvement_area": {"type": "string"},
+              "current_gap": {"type": "string"},
+              "recommendation": {"type": "string"},
+              "benefit": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "conclusion": {
+      "type": "object",
+      "required": ["overall_assessment", "key_takeaways", "next_steps"],
+      "properties": {
+        "overall_assessment": {
+          "type": "string",
+          "description": "整体评估"
+        },
+        "key_takeaways": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "关键要点"
+        },
+        "next_steps": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "后续步骤"
+        }
+      }
+    }
+  }
+}
+```
+
