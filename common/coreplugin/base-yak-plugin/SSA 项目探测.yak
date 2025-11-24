@@ -55,6 +55,7 @@ strictMode = cli.Bool(
     cli.setDefault(false),
 )
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
+enableFilePerfLog := cli.Bool("enableFilePerformanceLog", cli.setVerboseName("启用文件级别性能日志"), cli.setCliGroup("compile"), cli.setDefault(false))
 
 cli.check()
 target = target.Trim(" ", "\n", "\t")

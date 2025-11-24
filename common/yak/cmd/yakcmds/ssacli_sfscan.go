@@ -41,8 +41,9 @@ type ssaCliConfig struct {
 	// targetPath is the path of the target
 	targetPath string
 
-	language string
-	memory   bool
+	language    string
+	memory      bool
+	filePerfLog bool
 	// }}
 
 	// {{ should result
@@ -96,6 +97,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 	}
 	config.language = c.String("language")
 	config.memory = c.Bool("memory")
+	config.filePerfLog = c.Bool("file-perf-log")
 
 	// result  writer
 	// var writer io.Writer
@@ -158,7 +160,10 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 			para["memory"] = true
 			para["excludeFile"] = config.exclude
 		}
-		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, true, para)
+		if config.filePerfLog {
+			para["enableFilePerformanceLog"] = true
+		}
+		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, para)
 		return prog, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")

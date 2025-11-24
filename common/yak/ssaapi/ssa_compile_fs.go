@@ -226,6 +226,8 @@ func (c *Config) parseProjectWithFS(
 		prog.SetPreHandler(false)
 		start = time.Now()
 
+		enableFilePerf := c.GetCompileFilePerformanceLog()
+		// log.Infof("enableFilePerf %v", enableFilePerf)
 		// ssareducer.FilesHandler(
 		// 	c.ctx, filesystem, handlerFiles,
 		// 	func(path string, content []byte) {
@@ -246,18 +248,37 @@ func (c *Config) parseProjectWithFS(
 			path := fileContent.Path
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("parse [%s] error %v  ", path, r)
-						utils.PrintCurrentGoroutineRuntimeStack()
+
+			// 根据配置决定是否按文件监控 Build
+			if enableFilePerf {
+				profileName := fmt.Sprintf("Build[%s]", normalizePathForProfile(path))
+				ssaprofile.ProfileAdd(true, profileName, func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Errorf("parse [%s] error %v  ", path, r)
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
+					// build
+					if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
+						log.Errorf("parse %#v failed: %v", path, err)
+					}
+				})
+			} else {
+				// 不启用文件级别监控时，使用原有逻辑
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Errorf("parse [%s] error %v  ", path, r)
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+					}()
+					// build
+					if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
+						log.Errorf("parse %#v failed: %v", path, err)
 					}
 				}()
-				// build
-				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
-					log.Errorf("parse %#v failed: %v", path, err)
-				}
-			}()
+			}
 		}
 		fileContents = make([]*ssareducer.FileContent, 0)
 		parseTime = time.Since(start)
