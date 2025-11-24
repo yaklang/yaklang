@@ -8,11 +8,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -210,12 +208,12 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	)
 
 	if forgeName != "" {
-		var opts []any = make([]any, len(baseOpts))
+		var opts = make([]aicommon.ConfigOption, len(baseOpts))
 		for i, o := range baseOpts {
 			opts[i] = o
 		}
 		stdOut := new(bytes.Buffer)
-		opts = append(opts, yak.WithAiAgentEventHandler(func(e *schema.AiOutputEvent) {
+		eventHandler := func(e *schema.AiOutputEvent) {
 			if e.Type == schema.EVENT_TYPE_YAKIT_EXEC_RESULT && e.IsJson {
 				var execResult ypb.ExecResult
 				if err := json.Unmarshal(e.Content, &execResult); err != nil {
@@ -239,7 +237,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 				}
 			}
 			r.config.Emit(e)
-		}))
+		}
+		opts = append(opts, aicommon.WithEventHandler(eventHandler))
 
 		// Ensure user original input is preserved in forge parameters
 		// This prevents context loss when AI rewrites the query parameter
@@ -283,7 +282,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 
 		done()
-		result, err := yak.ExecuteForge(forgeName, forgeParams, opts...)
+		result, err := aicommon.ExecuteRegisteredForge(forgeName, ctx, forgeParams, opts...)
 		if err != nil {
 			log.Errorf("Failed to execute forge: %v", err)
 			return utils.Errorf("failed to execute forge %s: %v", forgeName, err)

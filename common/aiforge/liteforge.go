@@ -4,19 +4,38 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"text/template"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
-	"strings"
-	"text/template"
 )
+
+func init() {
+	utils.Debug(func() {
+		log.Info("liteforge.go is already registered aicommon.LiteForgeExecuteCallback")
+	})
+	aicommon.RegisterLiteForgeExecuteCallback(func(prompt string, opts ...any) (*aicommon.ForgeResult, error) {
+		result, err := _executeLiteForgeTemp(prompt, opts...)
+		if err != nil {
+			return nil, err
+		}
+		final := &aicommon.ForgeResult{
+			Action: result.Action,
+		}
+		final.Name = result.Forge.Name
+		return final, nil
+	})
+}
 
 type streamableField struct {
 	AINodeId string
