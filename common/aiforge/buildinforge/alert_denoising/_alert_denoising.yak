@@ -1,0 +1,566 @@
+log_file = cli.String("log-file", cli.setRequired(true), cli.setHelp("告警日志文件路径"))
+cli.check()
+
+// safeVar 安全获取嵌套对象的值
+safeVar = (val, member) => {
+    try {
+        if val == nil || val == "" {
+            return ""
+        }
+        members = str.Split(member, ".")
+        finallyVal = val
+        for i in members {
+            finallyVal = finallyVal.$i
+        }
+        return finallyVal
+    } catch e {
+        return ""
+    }
+}
+
+// generateSeverityStatsTable 生成严重程度统计表格
+func generateSeverityStatsTable(bySeverity) {
+    lines = []
+    lines = append(lines, "| 严重程度 | 数量 | 占比 |")
+    lines = append(lines, "|----------|------|------|")
+    
+    severityLevels = ["critical", "high", "medium", "low", "info"]
+    severityNames = {
+        "critical": "🔴 严重",
+        "high": "🟠 高危",
+        "medium": "🟡 中等",
+        "low": "🟢 低危",
+        "info": "🔵 信息"
+    }
+    
+    for _, level := range severityLevels {
+        levelData = bySeverity[level]
+        if levelData != nil {
+            count = safeVar(levelData, "count")
+            percentage = safeVar(levelData, "percentage")
+            name = severityNames[level]
+            lines = append(lines, sprintf("| %s | %v | %.1f%% |", name, count, percentage))
+        }
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateTypeStatsTable 生成告警类型统计表格（Top 10）
+func generateTypeStatsTable(byType) {
+    if len(byType) == 0 {
+        return "暂无数据"
+    }
+    
+    lines = []
+    lines = append(lines, "| 告警类型 | 数量 | 占比 | 是否噪声 |")
+    lines = append(lines, "|----------|------|------|----------|")
+    
+    for _, typeData := range byType {
+        typeName = safeVar(typeData, "type")
+        count = safeVar(typeData, "count")
+        percentage = safeVar(typeData, "percentage")
+        isNoise = safeVar(typeData, "is_noise")
+        
+        noiseLabel = isNoise ? "✅ 噪声" : "⚠️ 威胁"
+        lines = append(lines, sprintf("| %v | %v | %.1f%% | %s |", typeName, count, percentage, noiseLabel))
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateSourceStatsTable 生成来源统计表格（Top 10）
+func generateSourceStatsTable(bySource) {
+    if len(bySource) == 0 {
+        return "暂无数据"
+    }
+    
+    lines = []
+    lines = append(lines, "| 来源地址 | 总数 | 威胁数 | 噪声数 |")
+    lines = append(lines, "|----------|------|--------|--------|")
+    
+    for _, sourceData := range bySource {
+        source = safeVar(sourceData, "source")
+        count = safeVar(sourceData, "count")
+        threatCount = safeVar(sourceData, "threat_count")
+        noiseCount = safeVar(sourceData, "noise_count")
+        
+        lines = append(lines, sprintf("| %v | %v | %v | %v |", source, count, threatCount, noiseCount))
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateNoiseCategoriesText 生成噪声类别分析文本
+func generateNoiseCategoriesText(noiseCategories) {
+    if len(noiseCategories) == 0 {
+        return "✅ 未识别到噪声类别"
+    }
+    
+    lines = []
+    for _, category := range noiseCategories {
+        categoryName = safeVar(category, "category")
+        count = safeVar(category, "count")
+        percentage = safeVar(category, "percentage")
+        examples = category["examples"]
+        
+        lines = append(lines, sprintf("### %s", categoryName))
+        lines = append(lines, sprintf("- **数量**: %v", count))
+        lines = append(lines, sprintf("- **占比**: %.1f%%", percentage))
+        
+        if examples != nil && len(examples) > 0 {
+            lines = append(lines, "- **典型示例**:")
+            for _, example := range examples {
+                lines = append(lines, sprintf("  - %v", example))
+            }
+        }
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateNoisePatternsList 生成噪声模式列表
+func generateNoisePatternsList(topNoisePatterns) {
+    if len(topNoisePatterns) == 0 {
+        return "✅ 未发现重复噪声模式"
+    }
+    
+    lines = []
+    for idx, pattern := range topNoisePatterns {
+        patternText = safeVar(pattern, "pattern")
+        count = safeVar(pattern, "count")
+        patternType = safeVar(pattern, "type")
+        recommendation = safeVar(pattern, "recommendation")
+        
+        lines = append(lines, sprintf("#### %d. %s", idx+1, patternText))
+        lines = append(lines, sprintf("- **出现次数**: %v", count))
+        lines = append(lines, sprintf("- **类型**: %v", patternType))
+        lines = append(lines, sprintf("- **建议**: %v", recommendation))
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateThreatsList 生成威胁列表
+func generateThreatsList(threats, level) {
+    if len(threats) == 0 {
+        return sprintf("✅ 未发现%s威胁", level)
+    }
+    
+    lines = []
+    for _, threat := range threats {
+        threatId = safeVar(threat, "id")
+        threatType = safeVar(threat, "type")
+        source = safeVar(threat, "source")
+        target = safeVar(threat, "target")
+        timestamp = safeVar(threat, "timestamp")
+        description = safeVar(threat, "description")
+        impact = safeVar(threat, "impact")
+        riskScore = safeVar(threat, "risk_score")
+        
+        lines = append(lines, sprintf("#### 🚨 %s", threatType))
+        lines = append(lines, sprintf("- **ID**: %v", threatId))
+        lines = append(lines, sprintf("- **来源**: %v", source))
+        if target != "" {
+            lines = append(lines, sprintf("- **目标**: %v", target))
+        }
+        lines = append(lines, sprintf("- **时间**: %v", timestamp))
+        lines = append(lines, sprintf("- **描述**: %v", description))
+        if impact != "" {
+            lines = append(lines, sprintf("- **影响**: %v", impact))
+        }
+        lines = append(lines, sprintf("- **风险评分**: %.1f", riskScore))
+        lines = append(lines, "")
+        lines = append(lines, "---")
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateAttackChainsList 生成攻击链列表
+func generateAttackChainsList(attackChains) {
+    if len(attackChains) == 0 {
+        return "✅ 未发现关联攻击链"
+    }
+    
+    lines = []
+    for _, chain := range attackChains {
+        chainId = safeVar(chain, "chain_id")
+        source = safeVar(chain, "source")
+        stages = chain["stages"]
+        totalAlerts = safeVar(chain, "total_alerts")
+        timeSpan = safeVar(chain, "time_span")
+        riskLevel = safeVar(chain, "risk_level")
+        
+        lines = append(lines, sprintf("### 攻击链 %s", chainId))
+        lines = append(lines, sprintf("- **来源**: %v", source))
+        lines = append(lines, sprintf("- **告警数**: %v", totalAlerts))
+        lines = append(lines, sprintf("- **时间跨度**: %v", timeSpan))
+        lines = append(lines, sprintf("- **风险等级**: %v", riskLevel))
+        
+        if stages != nil && len(stages) > 0 {
+            lines = append(lines, "- **攻击阶段**:")
+            for idx, stage := range stages {
+                stageName = safeVar(stage, "stage")
+                stageTime = safeVar(stage, "timestamp")
+                alertType = safeVar(stage, "alert_type")
+                lines = append(lines, sprintf("  %d. **%s** (%s) - %s", idx+1, stageName, stageTime, alertType))
+            }
+        }
+        lines = append(lines, "")
+        lines = append(lines, "---")
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generatePriorityAlertsList 生成优先级告警列表
+func generatePriorityAlertsList(alerts, priority) {
+    if len(alerts) == 0 {
+        return sprintf("✅ 无%s优先级告警", priority)
+    }
+    
+    lines = []
+    for idx, alert := range alerts {
+        alertId = safeVar(alert, "alert_id")
+        alertType = safeVar(alert, "type")
+        source = safeVar(alert, "source")
+        target = safeVar(alert, "target")
+        description = safeVar(alert, "description")
+        actionRequired = safeVar(alert, "action_required")
+        
+        lines = append(lines, sprintf("#### %d. %s", idx+1, alertType))
+        lines = append(lines, sprintf("- **ID**: %v", alertId))
+        lines = append(lines, sprintf("- **来源**: %v", source))
+        if target != "" {
+            lines = append(lines, sprintf("- **目标**: %v", target))
+        }
+        lines = append(lines, sprintf("- **描述**: %v", description))
+        lines = append(lines, sprintf("- **处置措施**: %v", actionRequired))
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateRecommendationsList 生成建议列表
+func generateRecommendationsList(recommendations, recType) {
+    if len(recommendations) == 0 {
+        return sprintf("✅ 暂无%s建议", recType)
+    }
+    
+    lines = []
+    for idx, rec := range recommendations {
+        action = safeVar(rec, "action")
+        reason = safeVar(rec, "reason")
+        expectedImpact = safeVar(rec, "expected_impact")
+        
+        // 处理不同类型的建议字段
+        if action == "" {
+            action = safeVar(rec, "rule_type")
+        }
+        if action == "" {
+            action = safeVar(rec, "aggregation_type")
+        }
+        if action == "" {
+            action = safeVar(rec, "automation_type")
+        }
+        if action == "" {
+            action = safeVar(rec, "improvement_area")
+        }
+        
+        currentIssue = safeVar(rec, "current_issue")
+        optimization = safeVar(rec, "optimization")
+        targetAlerts = safeVar(rec, "target_alerts")
+        method = safeVar(rec, "method")
+        benefit = safeVar(rec, "benefit")
+        targetScenario = safeVar(rec, "target_scenario")
+        implementation = safeVar(rec, "implementation")
+        efficiencyGain = safeVar(rec, "efficiency_gain")
+        currentGap = safeVar(rec, "current_gap")
+        recommendation = safeVar(rec, "recommendation")
+        
+        lines = append(lines, sprintf("#### %d. %s", idx+1, action))
+        
+        if reason != "" {
+            lines = append(lines, sprintf("- **原因**: %v", reason))
+        }
+        if currentIssue != "" {
+            lines = append(lines, sprintf("- **当前问题**: %v", currentIssue))
+        }
+        if currentGap != "" {
+            lines = append(lines, sprintf("- **当前不足**: %v", currentGap))
+        }
+        if optimization != "" {
+            lines = append(lines, sprintf("- **优化方案**: %v", optimization))
+        }
+        if targetAlerts != "" {
+            lines = append(lines, sprintf("- **目标告警**: %v", targetAlerts))
+        }
+        if method != "" {
+            lines = append(lines, sprintf("- **方法**: %v", method))
+        }
+        if targetScenario != "" {
+            lines = append(lines, sprintf("- **适用场景**: %v", targetScenario))
+        }
+        if implementation != "" {
+            lines = append(lines, sprintf("- **实施方案**: %v", implementation))
+        }
+        if recommendation != "" {
+            lines = append(lines, sprintf("- **建议**: %v", recommendation))
+        }
+        if expectedImpact != "" {
+            lines = append(lines, sprintf("- **预期效果**: %v", expectedImpact))
+        }
+        if benefit != "" {
+            lines = append(lines, sprintf("- **收益**: %v", benefit))
+        }
+        if efficiencyGain != "" {
+            lines = append(lines, sprintf("- **效率提升**: %v", efficiencyGain))
+        }
+        
+        lines = append(lines, "")
+    }
+    
+    return str.Join(lines, "\n")
+}
+
+// generateSummaryMessage 生成总结信息
+func generateSummaryMessage(executiveSummary) {
+    messages = []
+    
+    criticalThreats = safeVar(executiveSummary, "critical_threats")
+    threatCount = safeVar(executiveSummary, "threat_count")
+    noiseRatio = safeVar(executiveSummary, "noise_ratio")
+    
+    if criticalThreats > 0 {
+        messages = append(messages, sprintf("🚨 **紧急关注**: 发现 %v 个严重威胁，需要立即处理", criticalThreats))
+    }
+    
+    if threatCount > 0 {
+        messages = append(messages, sprintf("⚠️ **威胁总数**: 共识别出 %v 个真实威胁", threatCount))
+    }
+    
+    if noiseRatio >= 50 {
+        messages = append(messages, sprintf("📊 **降噪效果**: 噪声比例为 %.1f%%，建议优化告警规则以减少误报", noiseRatio))
+    } else {
+        messages = append(messages, sprintf("✅ **告警质量**: 噪声比例为 %.1f%%，告警质量较好", noiseRatio))
+    }
+    
+    return str.Join(messages, "\n\n")
+}
+
+forgeHandle = func(params, opts...) {
+    result, err = __DEFAULT_FORGE_HANDLE__(params, opts...)
+    if err != nil {
+        return nil
+    }
+    
+    // 获取各个部分的数据
+    executiveSummary = result.Action.GetInvokeParams("executive_summary")
+    statistics = result.Action.GetInvokeParams("statistics")
+    noiseAnalysis = result.Action.GetInvokeParams("noise_analysis")
+    threatAnalysis = result.Action.GetInvokeParams("threat_analysis")
+    priorityAlerts = result.Action.GetInvokeParams("priority_alerts")
+    recommendations = result.Action.GetInvokeParams("recommendations")
+    conclusion = result.Action.GetInvokeParams("conclusion")
+    
+    // 生成各个部分的文本
+    severityStatsTable = generateSeverityStatsTable(statistics["by_severity"])
+    typeStatsTable = generateTypeStatsTable(statistics["by_type"])
+    sourceStatsTable = generateSourceStatsTable(statistics["by_source"])
+    
+    noiseCategoriesText = generateNoiseCategoriesText(noiseAnalysis["noise_categories"])
+    noisePatternsText = generateNoisePatternsList(noiseAnalysis["top_noise_patterns"])
+    
+    criticalThreatsText = generateThreatsList(threatAnalysis["critical_threats"], "严重")
+    highThreatsText = generateThreatsList(threatAnalysis["high_threats"], "高危")
+    attackChainsText = generateAttackChainsList(threatAnalysis["attack_chains"])
+    
+    p0AlertsText = generatePriorityAlertsList(priorityAlerts["p0_immediate"], "P0")
+    p1AlertsText = generatePriorityAlertsList(priorityAlerts["p1_high"], "P1")
+    p2AlertsText = generatePriorityAlertsList(priorityAlerts["p2_medium"], "P2")
+    
+    immediateActionsText = generateRecommendationsList(recommendations["immediate_actions"], "立即措施")
+    ruleOptimizationText = generateRecommendationsList(recommendations["rule_optimization"], "规则优化")
+    alertAggregationText = generateRecommendationsList(recommendations["alert_aggregation"], "告警聚合")
+    automationText = generateRecommendationsList(recommendations["automation_suggestions"], "自动化")
+    monitoringText = generateRecommendationsList(recommendations["monitoring_improvements"], "监控改进")
+    
+    summaryMessage = generateSummaryMessage(executiveSummary)
+    
+    // 获取关键发现
+    keyFindings = executiveSummary["key_findings"]
+    keyFindingsText = ""
+    if keyFindings != nil && len(keyFindings) > 0 {
+        keyFindingsLines = []
+        for _, finding := range keyFindings {
+            keyFindingsLines = append(keyFindingsLines, sprintf("- %v", finding))
+        }
+        keyFindingsText = str.Join(keyFindingsLines, "\n")
+    }
+    
+    // 获取结论部分
+    keyTakeaways = conclusion["key_takeaways"]
+    keyTakeawaysText = ""
+    if keyTakeaways != nil && len(keyTakeaways) > 0 {
+        keyTakeawaysLines = []
+        for _, takeaway := range keyTakeaways {
+            keyTakeawaysLines = append(keyTakeawaysLines, sprintf("- %v", takeaway))
+        }
+        keyTakeawaysText = str.Join(keyTakeawaysLines, "\n")
+    }
+    
+    nextSteps = conclusion["next_steps"]
+    nextStepsText = ""
+    if nextSteps != nil && len(nextSteps) > 0 {
+        nextStepsLines = []
+        for idx, step := range nextSteps {
+            nextStepsLines = append(nextStepsLines, sprintf("%d. %v", idx+1, step))
+        }
+        nextStepsText = str.Join(nextStepsLines, "\n")
+    }
+    
+    // 生成报告模板
+    reportTemplate = f`# 🔍 安全告警降噪分析报告
+
+## 📊 执行摘要
+
+| 项目 | 值 |
+|------|-----|
+| **分析时间** | ${safeVar(executiveSummary, "analysis_time")} |
+| **日志文件** | ${safeVar(executiveSummary, "log_file")} |
+| **时间范围** | ${safeVar(executiveSummary, "time_range.start")} 至 ${safeVar(executiveSummary, "time_range.end")} |
+| **时间跨度** | ${safeVar(executiveSummary, "time_range.duration")} |
+| **告警总数** | ${safeVar(executiveSummary, "total_alerts")} |
+| **噪声告警** | ${safeVar(executiveSummary, "noise_count")} |
+| **噪声比例** | ${safeVar(executiveSummary, "noise_ratio")}% |
+| **真实威胁** | ${safeVar(executiveSummary, "threat_count")} |
+| **严重威胁** | ${safeVar(executiveSummary, "critical_threats")} |
+
+### 🎯 关键发现
+
+${keyFindingsText}
+
+## 📈 统计分析
+
+### 按严重程度统计
+
+${severityStatsTable}
+
+### 按告警类型统计（Top 10）
+
+${typeStatsTable}
+
+### 按来源统计（Top 10）
+
+${sourceStatsTable}
+
+## 🔇 噪声分析
+
+### 噪声类别分布
+
+${noiseCategoriesText}
+
+### Top 噪声模式
+
+${noisePatternsText}
+
+## 🚨 威胁分析
+
+### 威胁概览
+
+- **威胁总数**: ${safeVar(threatAnalysis, "threat_summary.total_threats")}
+- **独立来源**: ${safeVar(threatAnalysis, "threat_summary.unique_sources")}
+- **受影响目标**: ${safeVar(threatAnalysis, "threat_summary.unique_targets")}
+
+### 🔴 严重威胁详情
+
+${criticalThreatsText}
+
+### 🟠 高危威胁详情
+
+${highThreatsText}
+
+### 🔗 攻击链分析
+
+${attackChainsText}
+
+## ⚡ 优先级告警
+
+### 🔴 P0 - 紧急（立即处理）
+
+${p0AlertsText}
+
+### 🟠 P1 - 高优先级（24小时内）
+
+${p1AlertsText}
+
+### 🟡 P2 - 中优先级（本周内）
+
+${p2AlertsText}
+
+## 💡 优化建议
+
+### 🚀 立即执行措施
+
+${immediateActionsText}
+
+### 📋 规则优化建议
+
+${ruleOptimizationText}
+
+### 🔄 告警聚合建议
+
+${alertAggregationText}
+
+### 🤖 自动化处理建议
+
+${automationText}
+
+### 📊 监控改进建议
+
+${monitoringText}
+
+## 📝 结论
+
+### 整体评估
+
+${safeVar(conclusion, "overall_assessment")}
+
+### 关键要点
+
+${keyTakeawaysText}
+
+### 后续步骤
+
+${nextStepsText}
+
+---
+
+## 📋 总结
+
+${summaryMessage}
+
+---
+
+*报告生成时间: ${safeVar(executiveSummary, "analysis_time")}*
+*分析文件: ${safeVar(executiveSummary, "log_file")}*
+`
+    
+    // 创建报告实例
+    reportIns = report.New()
+    reportIns.From("告警降噪 AIAgent")
+    reportIns.Title("安全告警降噪分析报告 %v", time.Now().Format("2006-01-02 15:04:05"))
+    reportIns.Markdown(reportTemplate)
+    
+    // 保存报告
+    reportIns.Save()
+    
+    return result
+}
+
