@@ -1,0 +1,11 @@
+{
+	"name": "alert_denoising",
+	"verbose_name": "警告降噪分析",
+	"description": "专业的安全警告降噪AI助手，能够分析包含大量噪声的安全告警日志文件，识别真实威胁与误报噪声，生成详细的降噪分析报告。通过智能分析告警模式、频率、严重程度等特征，帮助安全团队快速聚焦真正需要关注的安全事件。",
+	"cli_parameter_rule_yaklang_code": "log_file = cli.String(\"log-file\", cli.setHelp(\"告警日志文件路径\"))",
+	"tool_keywords": "告警分析,降噪处理,误报识别,威胁分析,日志分析,安全运营,SOC,告警聚合,模式识别,风险评估,事件分类,噪声过滤,优先级排序,告警关联",
+	"tools": "read_file_lines,read_file_chunk,grep,find_file,bash,head_by_lines,query_file_meta",
+	"actions": "alert_denoising_result,analysis_progress,pattern_identified,denoising_complete",
+	"tags": "告警降噪,安全运营,日志分析,威胁识别,误报过滤,SOC,SIEM,告警管理,事件响应,安全分析"
+}
+

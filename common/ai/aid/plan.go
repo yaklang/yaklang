@@ -3,13 +3,14 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"strings"
+	"sync/atomic"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"strings"
-	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -197,6 +198,23 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 		true,
 	)
 	task.AIStatefulTaskBase = taskBase
+
+	nonce := utils.RandStringBytes(4)
+	taskInput := task.GetUserInput()
+	i := utils.MustRenderTemplate(`
+<|用户原始需求_{{.nonce}}|>
+{{ .RawUserInput }}
+<|用户原始需求_END_{{.nonce}}|>
+--- 
+{{ .Origin }}
+`,
+		map[string]any{
+			"nonce":        nonce,
+			"RawUserInput": c.userInput,
+			"Origin":       taskInput,
+		})
+	task.SetUserInput(i)
+
 	return task
 }
 

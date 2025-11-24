@@ -359,6 +359,7 @@ func (c *Coordinator) Run() error {
 	// init aiTask
 	// check tools
 	root := rsp.RootTask
+	c.rootTask = root
 	c.ContextProvider.StoreRootTask(root)
 	if len(root.Subtasks) <= 0 {
 		c.EmitError("no subtasks found, this task is not a valid task")
