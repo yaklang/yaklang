@@ -365,6 +365,12 @@ func init() {
 			withPluginHelp("从实体库中构建知识条目，支持目的性的知识条目构建"),
 			withPluginEnableGenerateParam(true),
 		)
+
+		registerBuildInPlugin(
+			"yak", "证书生成",
+			withPluginHelp("通过各种选项生成所需的证书文件"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 

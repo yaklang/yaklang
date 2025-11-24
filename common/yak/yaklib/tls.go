@@ -37,8 +37,8 @@ func generateRSA4096KeyPair() ([]byte, []byte, error) {
 // ```
 // cert, key, err := tls.GenerateRootCA("yaklang.io")
 // ```
-func generateRootCA(commonName string) (ca []byte, key []byte, err error) {
-	return tlsutils.GenerateSelfSignedCertKeyWithCommonName(commonName, "", nil, nil)
+func generateRootCA(commonName string, opts ...tlsutils.CertOption) (ca []byte, key []byte, err error) {
+	return tlsutils.GenerateCA(append(opts, tlsutils.WithCommonName(commonName))...)
 }
 
 var TlsExports = map[string]interface{}{
@@ -47,7 +47,6 @@ var TlsExports = map[string]interface{}{
 	"GenerateRSA2048KeyPair":   generateRSA2048KeyPair,
 	"GenerateRSA4096KeyPair":   generateRSA4096KeyPair,
 	"GenerateSM2KeyPair":       tlsutils.SM2GenerateKeyPair,
-	"GenerateRootCA":           generateRootCA,
 	"SignX509ServerCertAndKey": tlsutils.SignServerCrtNKey,
 	"SignX509ClientCertAndKey": tlsutils.SignClientCrtNKey,
 	"SignServerCertAndKey":     tlsutils.SignServerCrtNKeyWithoutAuth,
@@ -57,4 +56,31 @@ var TlsExports = map[string]interface{}{
 	"InspectForceHttp1_1":      netx.TLSInspectForceHttp1_1,
 	"EncryptWithPkcs1v15":      tlsutils.Pkcs1v15Encrypt,
 	"DecryptWithPkcs1v15":      tlsutils.Pkcs1v15Decrypt,
+
+	/*
+		证书生成
+	*/
+	"GenerateRootCA":     generateRootCA,
+	"GenerateServerCert": tlsutils.GenerateServerCert,
+	"GenerateClientCert": tlsutils.GenerateClientCert,
+
+	// --- 主体选项 ---
+	"commonName":   tlsutils.WithCommonName,
+	"organization": tlsutils.WithOrganization,
+	"country":      tlsutils.WithCountry,
+	"locality":     tlsutils.WithLocality,
+	"province":     tlsutils.WithProvince,
+
+	// --- 替代名称选项 ---
+	"alternativeIP":  tlsutils.WithAlternativeIPStrings,
+	"alternativeDNS": tlsutils.WithAlternativeDNS,
+
+	// --- 有效期选项 ---
+	"validity":  tlsutils.WithValidity,
+	"notBefore": tlsutils.WithNotBefore,
+	"notAfter":  tlsutils.WithNotAfter,
+
+	// --- 密钥材料选项 ---
+	"privateKeyFromFile": tlsutils.WithPrivateKeyFromFile,
+	"privateKeyFromRaw":  tlsutils.WithPrivateKeyFromBytes,
 }

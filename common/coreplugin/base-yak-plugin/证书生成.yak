@@ -1,0 +1,198 @@
+yakit.AutoInitYakit()
+// --- Group: 主体部分 ---
+certTypeInfo := cli.Json("type_info", cli.setVerboseName("证书类型信息"),
+cli.setRequired(true),
+cli.setJsonSchema(<<<jsonschema
+{
+    "type": "object",
+    "properties": {
+        "kind": {
+            "title": "证书类型",
+            "type": "string",
+            "enum": [
+                "CA",
+                "Server",
+                "Client"
+            ],
+            "default": "CA"
+        }
+    },
+    "allOf": [
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "Server"
+                    }
+                }
+            },
+            "then": {}
+        },
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "Server"
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "CA_Path": {
+                        "title": "CA证书路径",
+                        "yakit_type": "file",
+                        "type": "string"
+                    },
+                    "Key_Path": {
+                        "title": "私钥路径",
+                        "yakit_type": "file",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "CA_Path",
+                    "Key_Path"
+                ]
+            }
+        },
+        {
+            "if": {
+                "properties": {
+                    "kind": {
+                        "const": "Client"
+                    }
+                }
+            },
+            "then": {
+                "properties": {
+                    "CA_Path": {
+                        "title": "CA证书路径",
+                        "yakit_type": "file",
+                        "type": "string"
+                    },
+                    "Key_Path": {
+                        "title": "私钥路径",
+                        "yakit_type": "file",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "CA_Path",
+                    "Key_Path"
+                ]
+            }
+        },
+        {
+            "required": [
+                "kind"
+            ]
+        }
+    ]
+}
+jsonschema,
+cli.setUISchema(
+    cli.uiGlobalFieldPosition(cli.uiPosHorizontal)
+)
+))
+
+commonName := cli.String("commonName", cli.setVerboseName("通用名 (CN)"), cli.setCliGroup("主体部分"), cli.setRequired(true), cli.setDefault("Yakit CA"), cli.setHelp("证书的主题通用名称，例如 'myserver.example.com' 或 'My Corp Root CA'"))
+org := cli.String("org", cli.setVerboseName("组织 (O)"), cli.setCliGroup("主体部分"), cli.setRequired(true), cli.setDefault("Yakit Corp"), cli.setHelp("证书所属的组织名称，多个值请用逗号分隔"))
+country := cli.String("country", cli.setVerboseName("国家 (C)"), cli.setCliGroup("主体部分"), cli.setHelp("国家/地区的两字母代码，多个值请用逗号分隔，例如 'CN,US'"))
+province := cli.String("province", cli.setVerboseName("省份 (ST)"), cli.setCliGroup("主体部分"), cli.setHelp("省份或州名，多个值请用逗号分隔"))
+locality := cli.String("locality", cli.setVerboseName("城市 (L)"), cli.setCliGroup("主体部分"), cli.setHelp("城市或地区名称，多个值请用逗号分隔"))
+
+
+// --- Group: 有效期 ---
+years := cli.Int("years", cli.setVerboseName("有效期 (年)"), cli.setCliGroup("有效期"), cli.setDefault(10), cli.setHelp("证书的有效年限"))
+notBefore := cli.String("notBefore", cli.setVerboseName("生效日期"), cli.setCliGroup("有效期"), cli.setHelp("证书生效日期 (RFC3339 格式, 例如 '2023-01-01T00:00:00Z')，默认为当前时间"))
+notAfter := cli.String("notAfter", cli.setVerboseName("失效日期"), cli.setCliGroup("有效期"), cli.setHelp("证书失效日期 (RFC3339 格式)，如果设置了 'years'，则此项优先"))
+
+// --- Group: 证书用途与名称 ---
+dnslist := cli.String("dns", cli.setVerboseName("DNS 名称"), cli.setCliGroup("替代名称"), cli.setHelp("主题备用名称 (SAN) 中的 DNS 名称，多个值请用逗号分隔"))
+iplist := cli.String("ip", cli.setVerboseName("IP 地址"), cli.setCliGroup("替代名称"), cli.setHelp("主题备用名称 (SAN) 中的 IP 地址，多个值请用逗号分隔"))
+
+cli.check()
+
+
+// build options
+options := [tls.commonName(commonName),tls.organization(org)]
+if country != "" {
+    options = append(options, tls.country(country))
+}
+
+if country != "" {
+    options = append(options, tls.country(country))
+}
+if province != "" {
+    options = append(options, tls.province(province))
+}
+if locality != "" {
+    options = append(options, tls.locality(locality))
+}
+
+if notBefore != "" {
+    beforeTime := time.Parse("2020-01-01T00:00:00Z", notBefore)~
+    options = append(options, tls.notBefore(beforeTime))
+}
+if notAfter != "" {
+    afterTime := time.Parse("2020-01-01T00:00:00Z", notAfter)~
+    options = append(options, tls.notAfter(afterTime))
+}
+// --- Group: 证书用途与名称 ---
+
+if dnslist != "" {
+    options = append(options, tls.alternativeDNS(str.Split(dnslist, ",")...))
+}
+if iplist != "" {
+    options = append(options, tls.alternativeIP(str.Split(iplist, ",")...))
+}
+
+
+certType := certTypeInfo["kind"]
+var ca,key
+if certType == "CA" {
+    ca,key = tls.GenerateRootCA(commonName, options...)~
+}else if certType == "Server" {
+    parentCAPath := certTypeInfo["CA_Path"]
+    parentPrivPath := certTypeInfo["Key_Path"]
+    parentCA := file.ReadFile(parentCAPath)~
+    parentPriv := file.ReadFile(parentPrivPath)~
+    ca,key = tls.GenerateServerCert(parentCA, parentPriv, append(options, tls.commonName(commonName),tls.organization(org))...)~
+}else if certType == "Client" {
+    parentCAPath := certTypeInfo["CA_Path"]
+    parentPrivPath := certTypeInfo["Key_Path"]
+    parentCA := file.ReadFile(parentCAPath)~
+    parentPriv := file.ReadFile(parentPrivPath)~
+    ca,key = tls.GenerateClientCert(parentCA, parentPriv, append(options, tls.commonName(commonName),tls.organization(org))...)~
+}else{
+    die("not support cert type")
+}
+
+tmpDir := yakit.GetHomeTempDir()
+
+randString := str.RandStr(5)
+NewCaPath := file.Join(tmpDir,sprintf("yak_%s_ca.pem", randString))
+NewPrviPath := file.Join(tmpDir,sprintf("yak_%s_key.pem", randString))
+
+file.Save(NewCaPath, ca)~
+yakit.File(NewCaPath, yakit.fileCreateAction(false, 777))
+yakit.StatusCard("CA 文件地址", NewCaPath)
+
+file.Save(NewPrviPath, key)~
+yakit.File(NewPrviPath, yakit.fileCreateAction(false, 777))
+yakit.StatusCard("私钥 文件地址", NewPrviPath)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
