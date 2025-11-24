@@ -14,6 +14,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"github.com/yaklang/yaklang/common/yak/depinjector/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
+	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 )
 
 func init() {

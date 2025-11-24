@@ -7,7 +7,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
-	"github.com/yaklang/yaklang/common/yak/depinjector"
+
+	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 )
 
 type AiToolTestCase struct {
@@ -60,18 +61,4 @@ func compare(a, b interface{}) bool {
 	aStr := fmt.Sprintf("%v", a)
 	bStr := fmt.Sprintf("%v", b)
 	return aStr == bStr
-}
-func _TestAiToolsSearch(t *testing.T) {
-	depinjector.DependencyInject()
-	for _, testCase := range []*AiToolTestCase{
-		{
-			Name:  "tools_search",
-			Input: aitool.InvokeParams{"query": "search"},
-			Data:  "[omni_search tools_search]",
-		},
-	} {
-		t.Run(testCase.Name, func(t *testing.T) {
-			CheckAiTool(t, testCase)
-		})
-	}
 }
