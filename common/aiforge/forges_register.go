@@ -2,8 +2,9 @@ package aiforge
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
@@ -85,4 +86,30 @@ func ExecuteForge(
 	} else {
 		return nil, utils.Errorf("forge %s not found", forgeName)
 	}
+}
+
+func convertForgeResultIntoCommonForgeResult(fr *ForgeResult) *aicommon.ForgeResult {
+	return &aicommon.ForgeResult{
+		Action: fr.Action,
+		Name:   fr.Forge.Name,
+	}
+}
+
+func init() {
+	aicommon.RegisterPresetForgeExecuteCallback(func(name string, ctx context.Context, params any, opts ...aicommon.ConfigOption) (*aicommon.ForgeResult, error) {
+		var finalParams []*ypb.ExecParamItem
+		switch paramIns := params.(type) {
+		case []*ypb.ExecParamItem:
+			finalParams = paramIns
+		default:
+			finalParams = []*ypb.ExecParamItem{
+				{Key: "query", Value: utils.InterfaceToString(params)},
+			}
+		}
+		result, err := ExecuteForge(name, ctx, finalParams, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return convertForgeResultIntoCommonForgeResult(result), nil
+	})
 }

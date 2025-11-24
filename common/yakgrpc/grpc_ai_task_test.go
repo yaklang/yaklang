@@ -1,15 +1,10 @@
 package yakgrpc
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -440,100 +435,4 @@ func TestAITaskWithAdjustPlan(t *testing.T) {
 		}
 	}
 	require.True(t, existMarkdownReport)
-}
-
-func TestAITaskForge(t *testing.T) {
-	if utils.InGithubActions() {
-		return
-	}
-
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	stream, err := client.StartAITask(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tempDir := t.TempDir()
-	tempFile, err := os.CreateTemp(tempDir, "*.txt")
-	require.NoError(t, err)
-	defer tempFile.Close()
-
-	dataPath := filepath.Join("common", "aiforge", "aisecretary", "long_text_summarizer_data", "我的叔叔于勒.txt")
-	data, err := os.ReadFile(dataPath)
-	require.NoError(t, err)
-
-	_, err = tempFile.Write(data)
-	require.NoError(t, err)
-	require.NoError(t, tempFile.Sync())
-
-	stream.Send(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			ForgeName: "long_text_summarizer",
-			ForgeParams: []*ypb.ExecParamItem{
-				{Key: "filePath", Value: tempFile.Name()},
-			},
-			UseDefaultAIConfig: true,
-		},
-	})
-
-	for {
-		event, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if event.IsStream {
-			continue
-		}
-		fmt.Println(event.String())
-	}
-}
-
-func TestAITaskForgeTriage(t *testing.T) {
-	if utils.InGithubActions() {
-		return
-	}
-
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	stream, err := client.StartAITask(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stream.Send(&ypb.AIInputEvent{
-		IsStart: true,
-		Params: &ypb.AIStartParams{
-			ForgeName:          "",
-			UserQuery:          "我想做渗透测试",
-			UseDefaultAIConfig: true,
-		},
-	})
-
-	for {
-		event, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if event.Type == schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE {
-			eventId := ""
-			jsonextractor.ExtractStructuredJSONFromStream(bytes.NewReader(event.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
-				if id, ok := data["id"]; ok {
-					eventId = id.(string)
-				}
-			}))
-			stream.Send(&ypb.AIInputEvent{
-				IsInteractiveMessage: true,
-				InteractiveId:        eventId,
-				InteractiveJSONInput: `{"suggestion": "xss"}`,
-			})
-		}
-	}
 }

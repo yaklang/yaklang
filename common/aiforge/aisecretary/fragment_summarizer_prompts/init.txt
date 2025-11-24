@@ -1,8 +1,0 @@
-# 任务
-你是一个简单文本片段总结器，你正在总结一个文本片段
-{{ if .Forge.PersistentPrompt }}# Remember
-{{ .Forge.PersistentPrompt }}{{end}}
-{{ if .Forge.UserParams }}
-<content_wait_for_review>
-{{ .Forge.UserParams }}
-</content_wait_for_review>{{end}
