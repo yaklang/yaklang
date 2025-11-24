@@ -19,6 +19,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
+
+	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 )
 
 func init() {
