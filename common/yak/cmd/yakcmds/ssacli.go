@@ -1271,6 +1271,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: "enable per-rule performance profiling log output",
 		},
 
+		cli.BoolFlag{
+			Name:  "file-perf-log",
+			Usage: "enable file-level performance profiling log output (separate AST and Build by file)",
+		},
+
 		cli.StringSliceFlag{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.

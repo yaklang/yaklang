@@ -5,6 +5,7 @@ programName := cli.String("programName",
     cli.setRequired(true),
     cli.setVerboseName("项目名")
 )
+enableFilePerfLog := cli.Bool("enableFilePerformanceLog", cli.setVerboseName("启用文件级别性能日志"), cli.setCliGroup("compile"), cli.setDefault(false))
 // }}
 cli.check()
 
@@ -22,6 +23,10 @@ opts = [
     }), 
     ssa.withContext(context.Background()),
 ] 
+
+if enableFilePerfLog {
+    opts = append(opts, ssa.withCompileFilePerformanceLog(true))
+}
 
 err := prog.Recompile(opts...)
 if err != nil {
