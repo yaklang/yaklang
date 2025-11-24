@@ -38,7 +38,7 @@ func generateRSA4096KeyPair() ([]byte, []byte, error) {
 // cert, key, err := tls.GenerateRootCA("yaklang.io")
 // ```
 func generateRootCA(commonName string, opts ...tlsutils.CertOption) (ca []byte, key []byte, err error) {
-	return tlsutils.GenerateCA(append(opts, tlsutils.WithCommonName(commonName))...)
+	return tlsutils.GenerateCA(append(opts, tlsutils.WithCommonName(commonName), tlsutils.WithOrganization(commonName))...)
 }
 
 var TlsExports = map[string]interface{}{
