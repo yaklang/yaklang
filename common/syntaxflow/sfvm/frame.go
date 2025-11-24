@@ -8,14 +8,16 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -256,12 +258,28 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	// clear
 	s.Flush()
 
+	start := time.Now()
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)
 			log.Infof("%+v", ret)
 		}
+		// 输出性能统计报告
+		diagnostics.LogScanPerformance(s.GetDiagnosticsRecorder(), s.config.diagnosticsEnabled, time.Since(start))
 	}()
+
+	// diagnostics: track rule execution timing
+	ruleName := "unknown-rule"
+	if s.rule != nil && s.rule.Title != "" {
+		ruleName = s.rule.Title
+	}
+
+	return s.trackWithError("rule-execution:"+ruleName, func() error {
+		return s.execRule(feedValue)
+	})
+}
+
+func (s *SFFrame) execRule(feedValue ValueOperator) error {
 	for {
 		var msg string
 		if s.idx < len(s.Codes) {
@@ -353,19 +371,11 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 				return err
 			}
 		default:
-			if err := s.execStatement(i); err != nil {
-				s.debugSubLog("execStatement error: %v", err)
-				if errors.Is(err, AbortError) {
-					return nil
-				}
-				if errors.Is(err, CriticalError) {
-					return err
-				}
-				// go to expression end
-				if result := s.errorSkipStack.Peek(); result != nil {
-					s.idx = result.end
-					continue
-				}
+			// diagnostics: track instruction execution timing
+			opcodeName := Opcode2String[i.OpCode]
+			if err := s.trackStatementWithError("instruction:"+opcodeName, func() error {
+				return s.execStatement(i)
+			}); err != nil {
 				return err
 			}
 		}
@@ -475,7 +485,18 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		result, next, err := value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
+
+		// diagnostics: track value operation timing
+		var result bool
+		var next ValueOperator
+		var err error
+		if trackErr := s.trackWithError("value-op:ExactMatch", func() error {
+			result, next, err = value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
+			return err
+		}); trackErr != nil {
+			return trackErr
+		}
+
 		if err != nil {
 			err = utils.Wrapf(err, "search exact failed")
 		}
@@ -752,7 +773,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "get users failed: stack top is empty")
 		}
 		s.debugSubLog("- call GetUser")
-		vals, err := value.GetSyntaxFlowUse()
+
+		// diagnostics: track value operation timing
+		var vals ValueOperator
+		var err error
+		if trackErr := s.trackWithError("value-op:GetSyntaxFlowUse", func() error {
+			vals, err = value.GetSyntaxFlowUse()
+			return err
+		}); trackErr != nil {
+			return trackErr
+		}
+
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
@@ -766,7 +797,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get bottom uses failed, empty stack")
 		}
 		s.debugSubLog("- call BottomUses")
-		vals, err := value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+
+		// diagnostics: track value operation timing
+		var vals ValueOperator
+		var err error
+		if trackErr := s.trackWithError("value-op:GetSyntaxFlowBottomUse", func() error {
+			vals, err = value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+			return err
+		}); trackErr != nil {
+			return trackErr
+		}
+
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
@@ -793,7 +834,17 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("- call TopDefs")
 		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
-		vals, err := value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+
+		// diagnostics: track value operation timing
+		var vals ValueOperator
+		var err error
+		if trackErr := s.trackWithError("value-op:GetSyntaxFlowTopDef", func() error {
+			vals, err = value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+			return err
+		}); trackErr != nil {
+			return trackErr
+		}
+
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}

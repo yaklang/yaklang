@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -30,6 +31,9 @@ type Config struct {
 	ctx                       context.Context
 	processCallback           func(idx int, msg string)
 	Mutex                     sync.Mutex
+
+	diagnosticsEnabled  bool
+	diagnosticsRecorder *diagnostics.Recorder
 }
 
 func (c *Config) GetContext() context.Context {
@@ -94,6 +98,17 @@ func WithResultCaptured(c ResultCapturedCallback) Option {
 	}
 }
 
+func WithDiagnostics(enabled bool, recorder ...*diagnostics.Recorder) Option {
+	return func(config *Config) {
+		config.diagnosticsEnabled = enabled
+		if len(recorder) > 0 && recorder[0] != nil {
+			config.diagnosticsRecorder = recorder[0]
+		} else if enabled && config.diagnosticsRecorder == nil {
+			config.diagnosticsRecorder = diagnostics.NewRecorder()
+		}
+	}
+}
+
 func WithConfig(other *Config) Option {
 	return func(self *Config) {
 		self.StrictMatch = other.StrictMatch
@@ -102,6 +117,8 @@ func WithConfig(other *Config) Option {
 		self.onResultCapturedCallbacks = other.onResultCapturedCallbacks
 		self.ctx = other.ctx
 		self.processCallback = other.processCallback
+		self.diagnosticsEnabled = other.diagnosticsEnabled
+		self.diagnosticsRecorder = other.diagnosticsRecorder
 	}
 }
 
@@ -114,5 +131,7 @@ func (c *Config) Copy() *Config {
 		onResultCapturedCallbacks: c.onResultCapturedCallbacks,
 		ctx:                       c.ctx,
 		processCallback:           c.processCallback,
+		diagnosticsEnabled:        c.diagnosticsEnabled,
+		diagnosticsRecorder:       c.diagnosticsRecorder,
 	}
 }
