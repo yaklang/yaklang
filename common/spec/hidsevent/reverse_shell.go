@@ -1,6 +1,6 @@
 package hidsevent
 
-import "github.com/shirou/gopsutil/v3/net"
+import "github.com/shirou/gopsutil/v4/net"
 
 type ReverseShellInfo struct {
 	Process       *ProcessMeta         `json:"process"`

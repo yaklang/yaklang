@@ -1,5 +1,4 @@
-// Reference: https://github.com/MetaCubeX/mihomo
-package process
+package sysproc
 
 import (
 	"errors"

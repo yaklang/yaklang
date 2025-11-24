@@ -695,7 +695,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 
 	// set process name
 	if p.findProcessName {
-		_, name, err := process.FindProcessNameByConn(conn)
+		_, name, err := sysproc.FindProcessNameByConn(conn)
 		if err != nil {
 			log.Errorf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
 		} else {

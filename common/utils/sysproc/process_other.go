@@ -1,6 +1,6 @@
 //go:build !darwin && !linux && !windows && (!freebsd || !amd64)
 
-package process
+package sysproc
 
 import "net/netip"
 
