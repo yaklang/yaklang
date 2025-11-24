@@ -98,6 +98,8 @@ import (
 	"github.com/yaklang/yaklang/common/omnisearch"
 
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
+
+	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag" // register search
 )
 
 var (
@@ -350,6 +352,7 @@ func initYaklangLib() {
 	yaklang.Import("aiagent", AIAgentExport)
 
 	yaklang.Import("aim", AIEngineExports)
+	//yaklang.Import("aim", aiengine.Exports)
 
 	yaklang.Import("liteforge", aiforge.LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
