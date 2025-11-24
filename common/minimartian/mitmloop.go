@@ -18,7 +18,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/process"
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
