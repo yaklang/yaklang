@@ -1076,8 +1076,8 @@
   {
     "rule_id": "4dd5053f-36a9-4f35-83a9-aeb40fc43094",
     "rule_name": "检测Java Socket资源未释放",
-    "hash": "8e3ed83f3feac7b90070f20bfcbbb428c83e452d9d72dc1ed5c6a0c0be1c2e7f",
-    "version": "20251015.0001"
+    "hash": "bd35ea2ec8a39d9faa9f981cc677970c3ce8787ee6a35d0db5462fac2621b271",
+    "version": "20251124.0001"
   },
   {
     "rule_id": "7691bedd-84dd-44bd-a403-d8c72e9d5378",
