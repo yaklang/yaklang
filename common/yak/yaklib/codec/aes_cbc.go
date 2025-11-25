@@ -105,7 +105,7 @@ func AESEncryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte,
 //
 // ```
 func AESDecryptCBCWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
-	return AESDecFactory(PKCS5UnPadding, CBC)(key, i, iv)
+	return AESDecFactory(PKCS5Padding, PKCS5UnPadding, CBC)(key, i, iv)
 }
 
 // AESCBCEncryptWithZeroPadding 使用 AES 算法，在 CBC 模式下，使用 Zero 填充来加密数据。
@@ -129,7 +129,7 @@ func AESEncryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 // codec.AESCBCDecryptWithZeroPadding("1234567890123456", ciphertext, "1234567890123456")
 // ```
 func AESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
-	return AESDecFactory(ZeroUnPadding, CBC)(key, i, iv)
+	return AESDecFactory(ZeroPadding, ZeroUnPadding, CBC)(key, i, iv)
 }
 
 func AESEncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricCryptFunc {
@@ -140,10 +140,15 @@ func AESEncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricC
 	}
 }
 
-func AESDecFactory(unpaddingFunc func([]byte) []byte, mode string) SymmetricCryptFunc {
+func AESDecFactory(paddingFunc func([]byte, int) []byte, unpaddingFunc func([]byte) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {
 		iv = FixIV(iv, key, 16)
-		res, err := AESDec(key, interfaceToBytes(i), iv, mode)
+		data := interfaceToBytes(i)
+		// Auto-pad data to blockSize (16 bytes) multiple if needed
+		// This allows decryption of data that is not a multiple of block size
+		data = paddingFunc(data, 16)
+
+		res, err := AESDec(key, data, iv, mode)
 		if err != nil {
 			return nil, err
 		}
