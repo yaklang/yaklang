@@ -312,6 +312,10 @@ func (v *KnowledgeBaseInfo) TableName() string {
 	return "rag_knowledge_base_test"
 }
 
+var (
+	KnowledgeEntryType_QuestionIndex = "question_index"
+)
+
 // KnowledgeBase 表示知识库条目
 // 用于存储各种标准、指南等知识库信息
 type KnowledgeBaseEntry struct {
