@@ -211,6 +211,11 @@ type Config struct {
 
 	// focus config
 	Focus string
+
+	// output schema
+	// worked for liteforge
+	LiteForgeActionName   string
+	LiteForgeOutputSchema string
 }
 
 // NewConfig creates a new Config with options
@@ -1433,6 +1438,36 @@ func WithFocus(focus string) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
 		c.Focus = focus
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithLiteForgeOutputSchema(i string) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.LiteForgeOutputSchema = i
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithLiteForgeOutputSchemaFromAIToolOptions(params ...aitool.ToolOption) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		defer c.m.Unlock()
+
+		t := aitool.NewWithoutCallback("output", params...)
+		c.LiteForgeOutputSchema = t.ToJSONSchemaString()
+		c.LiteForgeActionName = "call-tool"
+		return nil
+	}
+}
+
+func WithLiteForgeActionName(i string) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.LiteForgeActionName = i
 		c.m.Unlock()
 		return nil
 	}
