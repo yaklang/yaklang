@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strconv"
 	"strings"
@@ -165,6 +166,7 @@ func (r *runtime) Invoke(task *AiTask) {
 			return
 		}
 		if err := invokeTask(currentTask); err != nil {
+			r.config.EmitJSON(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION, "plan_fail", fmt.Sprintf("invoke task[%s] failed: %v", currentTask.Name, err))
 			r.config.EmitError("invoke subtask failed: %v", err)
 			log.Errorf("invoke subtask failed: %v", err)
 			return

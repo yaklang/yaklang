@@ -75,6 +75,7 @@ const (
 	EVENT_TOOL_CALL_DECISION    = "tool_call_decision"    // tool call decision event, used to emit the tool call decision information
 
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
+	EVENT_TYPE_FAIL_PLAN_AND_EXECUTION     EventType = "fail_plan_and_execution"
 	EVENT_TYPE_END_PLAN_AND_EXECUTION      EventType = "end_plan_and_execution"
 	EVENT_TYPE_PLAN                        EventType = "plan"
 	EVENT_TYPE_PERMISSION_REQUIRE          EventType = "permission_require"
