@@ -249,8 +249,10 @@ HandleExpect100Continue:
 		}
 		bodyRawBuf.Write(raw)
 	} else {
-		// by header
-		if useContentLength && useTransferEncodingChunked {
+		// HEAD, TRACE, CONNECT requests should not have response body
+		if nobodyReqMethod {
+			io.Copy(io.Discard, bodyReader)
+		} else if useContentLength && useTransferEncodingChunked {
 			// smuggle...
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
