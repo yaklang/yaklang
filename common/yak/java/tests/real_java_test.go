@@ -271,7 +271,7 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
-	diagnostics.LogCompileSummary()
+	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 }
 
 func TestA(t *testing.T) {
@@ -336,5 +336,5 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
-	diagnostics.LogCompileSummary()
+	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 }

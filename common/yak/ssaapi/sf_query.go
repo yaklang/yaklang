@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -11,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -255,6 +257,12 @@ func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 func QueryWithMemory() QueryOption {
 	return func(c *queryConfig) {
 		c.SetSyntaxFlowResultSaveMemory()
+	}
+}
+
+func QueryWithRuleDiagnosticsRecorder(recorder ...*diagnostics.Recorder) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithDiagnostics(true, recorder...))
 	}
 }
 
