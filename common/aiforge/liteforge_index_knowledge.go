@@ -145,8 +145,8 @@ func Index2KnowledgeEntity(
 		} else {
 			answerSnippet := safeGetSnippet(int(startLine), int(endLine))
 			entry := &schema.KnowledgeBaseEntry{
-				KnowledgeTitle:     utils.ShrinkString(answerSnippet, 10),
-				KnowledgeType:      "Standard",
+				KnowledgeTitle:     question,
+				KnowledgeType:      schema.KnowledgeEntryType_QuestionIndex,
 				Summary:            utils.ShrinkString(answerSnippet, 20),
 				KnowledgeDetails:   answerSnippet,
 				PotentialQuestions: []string{question},
