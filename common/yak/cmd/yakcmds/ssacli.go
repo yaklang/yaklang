@@ -234,7 +234,7 @@ var ssaCompile = &cli.Command{
 		reCompile := c.Bool("re-compile")
 		if programName != "" {
 			defer func() {
-				diagnostics.LogCompileSummary()
+				diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 			}()
 		}
 		entry := c.String("entry")
@@ -1389,7 +1389,7 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		diagnostics.LogCompileSummary()
+		diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 		return nil
 	},
 }

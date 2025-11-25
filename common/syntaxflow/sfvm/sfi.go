@@ -405,6 +405,9 @@ func (s *SFI) String() string {
 	case OpRecursiveSearchExact:
 		return fmt.Sprintf(verboseLen+" %v", "recursive$exact", s.UnaryStr)
 	case OpNativeCall:
+		if s.UnaryStr == "include" {
+			return fmt.Sprintf(verboseLen+" %v", "native$call", fmt.Sprintf("include %+v", s.Values))
+		}
 		return fmt.Sprintf(verboseLen+" %v", "native$call", s.UnaryStr)
 	case OpFileFilterReg:
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$regexp", s.UnaryStr)

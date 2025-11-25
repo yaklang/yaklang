@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -19,7 +18,8 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	defer func() {
 		// 输出性能统计报告
 		enableRulePerf := m.Config.IsEnableRulePerformanceLog()
-		diagnostics.LogScanPerformance(m.ruleProfiler, enableRulePerf, time.Since(scanStart))
+		totalDuration := time.Since(scanStart)
+		m.logScanPerformance(totalDuration, enableRulePerf)
 
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -108,6 +108,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		if m.Config.GetSyntaxFlowMemory() {
 			option = append(option, ssaapi.QueryWithMemory())
 		}
+		if enableRulePerf {
+			option = append(option, ssaapi.QueryWithRuleDiagnosticsRecorder())
+		}
 
 		// 执行规则查询
 		if res, err := prog.SyntaxFlowRule(rule, option...); err == nil {
@@ -160,7 +163,14 @@ func (m *scanManager) errorCallback(format string, a ...interface{}) {
 	log.Errorf(format, a...)
 }
 
-// showScanPerformance 显示扫描性能统计报告
-// 分为两部分：
-//  1. 整体扫描任务级别的统计（编译时间等）- 始终显示
-//  2. 规则级别的性能详情（每个规则在每个程序上的执行时间）- 需要配置启用
+// logScanPerformance 记录扫描性能统计报告
+func (m *scanManager) logScanPerformance(totalDuration time.Duration, enableRulePerf bool) {
+	log.Infof("=== Scan Total ===")
+	log.Infof("Time: %v", totalDuration)
+	log.Infof("==================")
+
+	if enableRulePerf && m.ruleProfiler != nil {
+		m.ruleProfiler.Log("Rule Performance (scan)")
+	}
+
+}
