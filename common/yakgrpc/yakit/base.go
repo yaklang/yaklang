@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -71,8 +73,32 @@ func RegisterPostInitDatabaseFunction(f func() error, notes ...string) {
 	})
 }
 
+const md5Placeholder = "f97f966eb7f8ba8fdb63e4d29109c058" // md5("CallPostInitDatabase")
+
 func CallPostInitDatabase() error {
 	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		if ctx.Err() == context.DeadlineExceeded {
+			// if the context timed out, echo a warning for frontend
+			msg := "CallPostInitDatabase is taking too long, please wait..."
+
+			// log for frontend
+			m := make(map[string]any)
+			m["warning"] = msg
+			msgBytes, _ := json.Marshal(m)
+			log.Warnf("<json-%s>%s<json-%s>\n",
+				md5Placeholder, string(msgBytes), md5Placeholder,
+			)
+
+			// log for console
+			log.Warn(msg)
+		}
+	}()
+
 	for idx, f := range __initializingDatabase {
 		if f == nil || f.Fn == nil {
 			continue
