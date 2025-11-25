@@ -212,6 +212,17 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			fun, isFunc = ssa.ToFunction(method.GetReference())
 		}
 
+		// 如果 real 不是函数，检查是否是 FreeValue Parameter
+		// TypeScript 等语言会将闭包捕获的外部函数表示为 FreeValue
+		if !isFunc {
+			if param, ok := ssa.ToParameter(real); ok && param.IsFreeValue {
+				// FreeValue 的 GetDefault() 返回实际捕获的值
+				if defaultVal := param.GetDefault(); !utils.IsNil(defaultVal) {
+					fun, isFunc = ssa.ToFunction(defaultVal)
+				}
+			}
+		}
+
 		if isFunc {
 			for index, arg := range inst.Args {
 				if index >= len(fun.Params) {
