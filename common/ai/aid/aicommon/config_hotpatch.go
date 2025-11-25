@@ -70,6 +70,7 @@ var (
 	HotPatchType_AllowRequireForUserInteract = "AllowRequireForUserInteract"
 	HotPatchType_AgreePolicy                 = "AgreePolicy"
 	HotPatchType_AIService                   = "AIService"
+	HotPatchType_RiskControlScore            = "RiskControlScore"
 )
 
 func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
@@ -89,6 +90,10 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		case "manual":
 			aiOption = append(aiOption, WithAgreeManual())
 		}
+	}
+
+	if e.HotpatchType == HotPatchType_RiskControlScore {
+		aiOption = append(aiOption, WithAgreeAIRiskCtrlScore(hotPatchParams.GetAIReviewRiskControlScore()))
 	}
 
 	if e.HotpatchType == HotPatchType_AllowRequireForUserInteract {

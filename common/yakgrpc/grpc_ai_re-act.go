@@ -36,6 +36,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithAgreePolicy(aicommon.AgreePolicyType(i.ReviewPolicy)))
 	}
 
+	if i.GetAIReviewRiskControlScore() > 0 {
+		opts = append(opts, aicommon.WithAgreeAIRiskCtrlScore(i.GetAIReviewRiskControlScore()))
+	}
+
 	if i.ReActMaxIteration > 0 {
 		opts = append(opts, aicommon.WithMaxIterationCount(int64(int(i.ReActMaxIteration))))
 	}

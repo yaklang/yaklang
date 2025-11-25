@@ -843,6 +843,23 @@ func WithAgreeAIScoreLowMid(low, mid float64) ConfigOption {
 	}
 }
 
+func WithAgreeAIRiskCtrlScore(score float64) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		low := score
+		if score > 0.2 {
+			low = score - 0.2
+		}
+		c.m.Lock()
+		c.AgreeAIScoreLow = low
+		c.AgreeAIScoreMiddle = score
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithAgreeManualCallback(cb func(context.Context, *Config) (aitool.InvokeParams, error)) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1576,6 +1593,11 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	case <-c.Ctx.Done():
 		return
 	default:
+	}
+
+	// set ai service
+	if c.AiServerName != "" {
+		e.AIService = c.AiServerName // set ai service name
 	}
 
 	if e.ShouldSave() {
