@@ -175,7 +175,7 @@ DESC
 
 desc(
 	lang: golang
-	alert_mid: 2
+	alert_min: 0
 	'file://unsafe_aes_cbc.go': <<<UNSAFE
 package main
 
