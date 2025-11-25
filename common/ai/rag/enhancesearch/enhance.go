@@ -3,8 +3,8 @@ package enhancesearch
 import (
 	"context"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -16,27 +16,18 @@ type SearchHandler interface {
 }
 
 type LiteForgeSearchHandler struct {
-	liteForge contracts.LiteForge
 }
 
 func NewDefaultSearchHandler() *LiteForgeSearchHandler {
-	return NewSearchHandler(Simpleliteforge)
+	return NewSearchHandler()
 }
 
-func NewSearchHandler(liteForge contracts.LiteForge) *LiteForgeSearchHandler {
-	return &LiteForgeSearchHandler{
-		liteForge: liteForge,
-	}
+func NewSearchHandler() *LiteForgeSearchHandler {
+	return &LiteForgeSearchHandler{}
 }
-
-// 需要调用之前注入Simpleliteforge
-var Simpleliteforge contracts.LiteForge
 
 // ExtractKeywords 从问题中提取核心关键词，用于精确的词条搜索。
 func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query string) ([]string, error) {
-	if h.liteForge == nil {
-		return nil, utils.Errorf("liteForge is not injected")
-	}
 	prompt := `# 角色
 你是一位精通各领域知识的首席信息检索专家（Chief Information Retrieval Expert）。
 # 任务
@@ -73,14 +64,15 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 		return nil, err
 	}
 	inputPrompt := prompt
-	result, err := h.liteForge.SimpleExecute(ctx,
+	result, err := aicommon.InvokeLiteForge(
 		inputPrompt,
-		[]aitool.ToolOption{
+		aicommon.WithContext(ctx),
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"search_keywords",
 				aitool.WithParam_Description("从问题中提取的核心搜索关键词列表，用于精确的词条检索"),
 			),
-		},
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -91,9 +83,6 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 
 // HypotheticalAnswer 生成详细的假设回答，有助于搜索到更多相关结果
 func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query string) (string, error) {
-	if h.liteForge == nil {
-		return "", utils.Errorf("liteForge is not injected")
-	}
 	prompt, err := utils.RenderTemplate(`
 你是一个精通信息检索的AI助手。
 # 任务
@@ -118,14 +107,15 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 	}
 
 	inputPrompt := prompt
-	result, err := h.liteForge.SimpleExecute(ctx,
+	result, err := aicommon.InvokeLiteForge(
 		inputPrompt,
-		[]aitool.ToolOption{
+		aicommon.WithContext(ctx),
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringParam(
 				"hypothetical_answer",
 				aitool.WithParam_Description("假设文档内容，搜索会使用假设文档作为 rag 搜索的查询内容"),
 			),
-		},
+		),
 	)
 	if err != nil {
 		return "", err
@@ -137,9 +127,6 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 
 // SplitQuery 将复杂问题拆分为多个子问题，有助于精确搜索多个领域的问题
 func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) ([]string, error) {
-	if h.liteForge == nil {
-		return nil, utils.Errorf("liteForge is not injected")
-	}
 	prompt := `# 角色
 你是一位顶级的首席信息分析师和搜索策略师。
 # 任务
@@ -175,14 +162,15 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 	})
 
 	inputPrompt := prompt
-	result, err := h.liteForge.SimpleExecute(ctx,
+	result, err := aicommon.InvokeLiteForge(
 		inputPrompt,
-		[]aitool.ToolOption{
+		aicommon.WithContext(ctx),
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"sub_questions",
 				aitool.WithParam_Description("拆分后的子问题列表，若无法拆分则返回原问题作为唯一子问题"),
 			),
-		},
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -194,9 +182,6 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 
 // GeneralizeQuery 把问题泛化，有助于扩大搜索范围
 func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query string) ([]string, error) {
-	if h.liteForge == nil {
-		return nil, utils.Errorf("liteForge is not injected")
-	}
 	prompt := `# 角色
 你是一位专业的知识架构师和信息检索策略师。
 # 任务
@@ -224,14 +209,15 @@ func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query stri
 		"query": query,
 	})
 	inputPrompt := prompt
-	result, err := h.liteForge.SimpleExecute(ctx,
+	result, err := aicommon.InvokeLiteForge(
 		inputPrompt,
-		[]aitool.ToolOption{
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"generalized_query",
 				aitool.WithParam_Description("泛化后的主题级问题，若无法泛化则返回原问题"),
 			),
-		},
+		),
+		aicommon.WithContext(ctx),
 	)
 	if err != nil {
 		return nil, err

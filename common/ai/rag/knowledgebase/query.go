@@ -308,15 +308,27 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				Type:    SearchResultTypeMessage,
 				Data:    nil,
 			})
-			var aiCommonOptions []aicommon.ConfigOption
 
+			var aiCommonOptions []aicommon.ConfigOption
+			aiCommonOptions = append(
+				aiCommonOptions,
+				aicommon.WithContext(config.Ctx),
+				aicommon.WithLiteForgeOutputSchema(aitool.NewObjectSchemaWithAction(
+					aitool.WithStringParam("answer"),
+				)),
+				aicommon.WithLiteForgeActionName("object"),
+			)
 			if config.AICallback != nil {
 				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(config.AICallback))
 			} else if config.AIService != "" {
 				aiCommonOptions = append(aiCommonOptions, aicommon.WithAIServiceName(config.AIService))
 			}
 
-			answer, err := Simpleliteforge.SimpleExecuteWithOptions(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")}, aiCommonOptions...)
+			//answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
+			answer, err := aicommon.InvokeLiteForge(
+				prompt,
+				aicommon.WithContext(config.Ctx),
+			)
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 					Message: err.Error(),

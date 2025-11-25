@@ -7,14 +7,14 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var Simpleliteforge contracts.LiteForge
+// var Simpleliteforge contracts.LiteForge
+// var Simpleliteforge contracts.LiteForge
 
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
 type KnowledgeBase struct {
