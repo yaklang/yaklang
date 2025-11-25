@@ -37,4 +37,15 @@ func TestHotPatchConfig(t *testing.T) {
 	})
 	time.Sleep(1 * time.Second)
 	require.Equal(t, AgreePolicyYOLO, c.AgreePolicy)
+
+	c.EventInputChan.SafeFeed(&ypb.AIInputEvent{
+		IsConfigHotpatch: true,
+		HotpatchType:     HotPatchType_RiskControlScore,
+		Params: &ypb.AIStartParams{
+			AIReviewRiskControlScore: 0.75,
+		},
+	})
+	time.Sleep(1 * time.Second)
+	require.Equal(t, 0.75, c.AgreeAIScoreMiddle)
+	require.Equal(t, 0.55, c.AgreeAIScoreLow)
 }
