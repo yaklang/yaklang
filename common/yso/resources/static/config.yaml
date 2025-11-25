@@ -380,3 +380,13 @@ ReflectChainFunction:
       - name: jndi
         name_zh: "JNDI地址"
         desc: JNDI地址
+  defining_class_loader:
+    desc: 使用org.mozilla.javascript.DefiningClassLoader加载任意类, 常用于NC利用
+    params:
+      - name: className
+        name_zh: "类名"
+        desc: 类名
+      - name: base64Class
+        name_zh: "base64编码的类"
+        desc: base64编码的字节码
+        type: bytes
