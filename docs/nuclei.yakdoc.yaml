@@ -943,6 +943,22 @@ functions:
     type_alias: ""
     description: ""
     type_str: interface {}
+- name: nuclei.vars
+  type_str: 'func (v1: map[string]interface {}) return(func ConfigOption(v1: *httptpl.Config) ) '
+  long_description: ""
+  description: 为模板注入自定义变量，可在 YAML 中通过 {{var}} 访问
+  params:
+  - name: v1
+    param_alias: ""
+    type_alias: ""
+    description: 键值对变量
+    type_str: 'map[string]interface {}'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: 'func ConfigOption(v1: *httptpl.Config) '
 - name: nuclei.timeout
   type_str: 'func (v1: float64) return(func LowhttpOpt(v1: *lowhttp.LowhttpExecConfig)
     ) '

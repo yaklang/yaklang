@@ -417,3 +417,35 @@ http:
 // 		}
 // 	}
 // }
+
+func TestNucleiScanWithCustomVars(t *testing.T) {
+	rawTpl := `
+id: custom-vars-test
+info:
+  name: custom vars
+  severity: info
+http:
+  - method: GET
+    path:
+      - /
+    matchers:
+      - type: dsl
+        dsl:
+          - custom_flag == "ALLOW"
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(rawTpl)
+	require.NoError(t, err)
+
+	config := NewConfig(WithCustomVariables(map[string]any{"custom_flag": "ALLOW"}))
+	applyCustomVariablesToTemplate(tpl, config)
+	require.NotNil(t, tpl.Variables)
+
+	runtimeVars := tpl.Variables.ToMap()
+	resp := &RespForMatch{
+		RawPacket: []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"),
+	}
+	match, err := tpl.HTTPRequestSequences[0].Matcher.Execute(resp, runtimeVars)
+	require.NoError(t, err)
+	require.True(t, match, "expected matcher to see injected variable")
+}

@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"math"
 	"math/rand"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/samber/lo"
 
@@ -531,6 +532,7 @@ var Exports = map[string]interface{}{
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
 	"exactTemplateIns":        WithExactTemplateInstance,
 	"all":                     WithAllTemplate,
+	"vars":                    withCustomVariablesFromInterface,
 	// "runtimeId":               lowhttp.WithRuntimeId,
 	"runtimeId":         WithHttpTplRuntimeId,
 	"mode":              WithMode,
