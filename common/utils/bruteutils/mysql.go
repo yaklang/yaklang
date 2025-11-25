@@ -35,13 +35,16 @@ func MYSQLAuth(target, username, password string, needAuth bool) (ok, finished b
 	}
 	_, err = db.Exec("select 1")
 	if err != nil {
+		errStr := err.Error()
 		switch true {
-		case strings.Contains(err.Error(), "is not allowed to connect to"):
+		case strings.Contains(errStr, "is not allowed to connect to"):
 			fallthrough
-		case strings.Contains(err.Error(), "connect: connection refused"): // connect: connection refused
+		case strings.Contains(errStr, "connect: connection refused"): // connect: connection refused
 			return false, true, err
-		case strings.Contains(err.Error(), "Error 1045:"):
+		case strings.Contains(errStr, "Error 1045:"):
 			return false, false, utils.Wrapf(err, "auth failed: %s/%v", username, password)
+		case strings.Contains(errStr, "Error 1044:") || strings.Contains(errStr, "1044:"):
+			return true, false, nil
 		}
 
 		return false, false, utils.Wrapf(err, "exec 'select 1' to mysql failed: %v, (%v:%v)", err, username, password)
