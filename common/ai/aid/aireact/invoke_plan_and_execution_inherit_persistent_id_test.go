@@ -560,3 +560,198 @@ LOOP:
 	log.Infof("  User query auto-appended to forge params: %v", userQueryFoundInForgeParams)
 	log.Infof("  Forge params length: %d", len(capturedForgeParams))
 }
+
+// TestReAct_ForgeExecution_Task_UserQueryContext 测试 forge execution 的任务执行提示词包含用户原始输入
+func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
+	persistentId := "persistent_id_" + utils.RandStringBytes(16)
+	userOriginalQuery := "user_original_query_" + utils.RandStringBytes(16)
+	aiGeneratedQuery := "ai_generated_query_" + utils.RandStringBytes(16)
+	finishTaskFlag := "finish_task_flag_" + utils.RandStringBytes(16)
+	var hasUserQueryFoundInTaskExec, hasAIQueryFoundInTaskExec, userQueryFoundInCallAiBlueprintPrompt bool
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	finishedCh := make(chan bool, 1)
+	defer close(finishedCh)
+	testForgeName := "test_forge_" + utils.RandStringBytes(16)
+	planFlag := "plan_flag_" + utils.RandStringBytes(16)
+	forge := &schema.AIForge{
+		ForgeName:    testForgeName,
+		ForgeType:    "yak",
+		ForgeContent: "",
+		InitPrompt: `{{ if .Forge.UserParams }}
+## 分析任务参数
+<content_wait_for_review>
+{{ .Forge.UserParams }}
+</content_wait_for_review>
+{{end}}
+**分析目标**: {{ .Forge.UserQuery }}`,
+		PlanPrompt: `{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "` + planFlag + `",
+  "main_task_goal": "通过系统化的分析方法，从海量告警中识别真实安全威胁，过滤误报和噪声，生成详细的降噪分析报告，帮助安全团队提高告警处理效率。",
+  "tasks": [
+    {
+      "subtask_name": "xxx",
+      "subtask_goal": "xxx"
+    }
+  ]
+}`,
+	}
+	yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge)
+	defer func() {
+		yakit.DeleteAIForge(consts.GetGormProfileDatabase(), &ypb.AIForgeFilter{
+			ForgeName: testForgeName,
+		})
+	}()
+	_, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+
+			// ReAct 主循环的响应 - 请求 blueprint (forge)
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
+				// 验证用户输入在 prompt 中
+				if strings.Contains(prompt, userOriginalQuery) {
+					log.Infof("✓ User query found in ReAct main loop prompt")
+				} else {
+					t.Errorf("user query NOT found in ReAct main loop prompt")
+				}
+
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
+"human_readable_thought": "requesting forge to analyze vulnerability", "cumulative_summary": "forge analysis"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Blueprint 参数生成
+			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
+				// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
+				if strings.Contains(prompt, userOriginalQuery) {
+					userQueryFoundInCallAiBlueprintPrompt = true
+					log.Infof("✓ User query found in blueprint parameter generation prompt")
+				} else {
+					log.Errorf("✗ User query NOT found in blueprint parameter generation prompt")
+				}
+
+				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
+				rsp := i.NewAIResponse()
+				//	rsp.EmitOutputStream(bytes.NewBufferString(`
+				//
+				// {"@action": "call-ai-blueprint", "params": {"target": "http://example.com", "query": "` + aiGeneratedQuery + `"},
+				// "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
+				// `))
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "call-ai-blueprint","blueprint":"` + testForgeName + `", "params": {"query": "` + aiGeneratedQuery + `"},
+"human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
+`))
+
+				rsp.Close()
+				return rsp, nil
+			}
+			if utils.MatchAllOfSubString(prompt, planFlag, "PROGRESS_TASK_") {
+				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
+				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
+				aitagNonce := nonce()
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "directly_answer"}
+<|FINAL_ANSWER_` + aitagNonce + `|>
+` + finishTaskFlag + `
+<|FINAL_ANSWER_END_` + aitagNonce + `|>
+`))
+				rsp.Close()
+				finishedCh <- true
+				return rsp, nil
+			}
+			log.Infof("unexpected prompt in TestReAct_ForgeExecution_UserQueryContext")
+			return nil, utils.Errorf("unexpected prompt: %v", utils.ShrinkString(prompt, 200))
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithPersistentSessionId(persistentId),
+		aicommon.WithAgreeYOLO(true),
+		// 注意：不使用 hijack，让代码真正执行到 forge execution 的参数处理逻辑
+		// 通过监听 START_PLAN_AND_EXECUTION 事件来验证参数
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   userOriginalQuery,
+		}
+	}()
+
+	after := time.After(500 * time.Second)
+
+	forgeStarted := false
+
+	var iid string
+	var forgeExecutedWithLogs []string
+
+LOOP:
+	for {
+		select {
+		case <-finishedCh:
+			break LOOP
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
+				forgeStarted = true
+				log.Infof("forge execution started")
+			}
+
+			// 捕获 forge 执行的日志输出
+			if e.Type == string(schema.EVENT_TYPE_YAKIT_EXEC_RESULT) && e.IsJson {
+				forgeExecutedWithLogs = append(forgeExecutedWithLogs, string(e.Content))
+			}
+
+			// 处理 blueprint review
+			if e.Type == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
+				// 自动同意执行
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				status := utils.InterfaceToString(result)
+				if status == "completed" || status == "failed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			log.Warnf("test timeout")
+			break LOOP
+		}
+	}
+	close(in)
+
+	// 验证 forge 被调用
+	if !forgeStarted {
+		t.Fatal("forge execution did not start")
+	}
+
+	if !hasUserQueryFoundInTaskExec {
+		t.Fatal("user query not found in call ai blueprint prompt")
+	}
+
+	if !userQueryFoundInCallAiBlueprintPrompt {
+		t.Fatal("user query not found in call ai blueprint prompt")
+	}
+
+	if !hasAIQueryFoundInTaskExec {
+		t.Fatal("ai query not found in call ai blueprint prompt")
+	}
+}
