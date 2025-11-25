@@ -12,7 +12,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -265,7 +264,9 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 			log.Infof("%+v", ret)
 		}
 		// 输出性能统计报告
-		diagnostics.LogScanPerformance(s.GetDiagnosticsRecorder(), s.config.diagnosticsEnabled, time.Since(start))
+		totalDuration := time.Since(start)
+		enableRulePerf := s.config.diagnosticsEnabled
+		s.logScanPerformance(totalDuration, enableRulePerf)
 	}()
 
 	// diagnostics: track rule execution timing
@@ -371,11 +372,19 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 				return err
 			}
 		default:
-			// diagnostics: track instruction execution timing
-			opcodeName := Opcode2String[i.OpCode]
-			if err := s.trackStatementWithError("instruction:"+opcodeName, func() error {
-				return s.execStatement(i)
-			}); err != nil {
+			if err := s.execStatement(i); err != nil {
+				s.debugSubLog("execStatement error: %v", err)
+				if errors.Is(err, AbortError) {
+					return nil
+				}
+				if errors.Is(err, CriticalError) {
+					return err
+				}
+				// go to expression end
+				if result := s.errorSkipStack.Peek(); result != nil {
+					s.idx = result.end
+					continue
+				}
 				return err
 			}
 		}
