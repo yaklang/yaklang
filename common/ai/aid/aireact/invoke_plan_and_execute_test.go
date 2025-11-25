@@ -105,6 +105,7 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 
 	planStart := false
 	planEnd := false
+	switchedToAsync := false
 	var iid string
 	_ = iid
 LOOP:
@@ -122,6 +123,10 @@ LOOP:
 
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
 				planEnd = true
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC) {
+				switchedToAsync = true
 			}
 
 			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) && e.NodeId == "react_task_status_changed" {
@@ -154,6 +159,10 @@ LOOP:
 
 	if !planMatchFlag {
 		t.Fatal("Expected planMatchFlag to be true")
+	}
+
+	if !switchedToAsync {
+		t.Fatal("Expected switchedToAsync to be true")
 	}
 
 	fmt.Println("--------------------------------------")

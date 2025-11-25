@@ -122,6 +122,9 @@ const (
 	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_add_context"
 	EVENT_TYPE_MEMORY_REMOVE_CONTEXT  EventType = "memory_remove_context"
 	EVENT_TYPE_MEMORY_CONTEXT         EventType = "memory_context" // memory context sync event, used to emit all memory context information
+
+	// AI Task Execution Mode Switch
+	EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC EventType = "ai_task_switched_to_async" // AI task switched to async execution event
 )
 
 type AiOutputEvent struct {

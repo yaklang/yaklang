@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
 	"time"
@@ -481,6 +482,13 @@ LOOP:
 
 		if handler.AsyncMode {
 			task.SetAsyncMode(true)
+			emitter.EmitJSON(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC, `react_task_mode_changed`, map[string]any{
+				"task_id":         task.GetId(),
+				"loop_name":       r.loopName,
+				"task_index":      task.GetIndex(),
+				"task_user_input": task.GetUserInput(),
+			})
+
 			// 异步模式不在主循环更新状态
 			// 只能在异步回调中更新状态
 			// 否则会出现状态被覆盖的问题
