@@ -1,0 +1,12 @@
+// 在只使用Decrypt的情况下应该自动填充
+data, err = codec.AESECBDecryptWithPKCS7Padding(
+    "aaaaaaaaaaaaa", 
+    "Hello Yak World!", 
+    nil, 
+)
+print(data)
+print(err)
+
+data, err = codec.AESECBEncryptWithPKCS7Padding("aaaaaaaaaaaaa", "Hello Yak World!", nil)
+print(data)
+print(err)

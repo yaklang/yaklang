@@ -2,9 +2,10 @@ package codec
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAESECBEncrypt(t *testing.T) {
@@ -278,4 +279,30 @@ func TestAESWithPassphrase(t *testing.T) {
 	plainText = PKCS7UnPadding(plainText)
 	fmt.Println(plainText)
 	require.Equal(t, rawData, plainText)
+}
+
+func TestAESECBDecryptWithPKCS7Padding(t *testing.T) {
+	key := RandBytes(16)
+
+	testCases := []struct {
+		name  string
+		plain []byte
+	}{
+		{"empty", []byte{}},
+		{"1 byte", []byte("a")},
+		{"10 bytes", []byte("1234567890")},
+		{"15 bytes", RandBytes(15)}, // Just under one block
+		{"16 bytes", RandBytes(16)}, // Exactly one block
+		{"17 bytes", RandBytes(17)}, // Just over one block
+		{"32 bytes", RandBytes(32)}, // Exactly two blocks
+		{"33 bytes", RandBytes(33)}, // Just over two blocks
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := AESDecryptECBWithPKCSPadding(key, tc.plain, nil)
+			require.NoError(t, err, "decryption should succeed for %s", tc.name)
+			_ = raw
+		})
+	}
 }

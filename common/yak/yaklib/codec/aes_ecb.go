@@ -113,7 +113,7 @@ func AESEncryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 // codec.AESECBDecryptWithPKCS7Padding("1234567890123456", "hello world", nil)
 // ```
 func AESDecryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
-	return AESDecFactory(PKCS5UnPadding, ECB)(key, i, iv)
+	return AESDecFactory(PKCS5Padding, PKCS5UnPadding, ECB)(key, i, iv)
 }
 
 // AESDecryptECBWithZeroPadding 使用 AES 算法，在 ECB 模式下对数据进行解密，使用 ZeroPadding 填充方式
@@ -125,5 +125,5 @@ func AESDecryptECBWithPKCSPadding(key []byte, i interface{}, iv []byte) ([]byte,
 // codec.AESECBDecryptWithZeroPadding("1234567890123456", "hello world", nil)
 // ```
 func AESDecryptECBWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte, error) {
-	return AESDecFactory(ZeroUnPadding, ECB)(key, i, iv)
+	return AESDecFactory(ZeroPadding, ZeroUnPadding, ECB)(key, i, iv)
 }
