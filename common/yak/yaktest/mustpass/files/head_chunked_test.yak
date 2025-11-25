@@ -1,0 +1,22 @@
+port = os.GetRandomAvailableTCPPort()
+println(f"127.0.0.1:${port}")
+go func {
+    tcp.Serve(
+        "127.0.0.1", 
+        port, 
+        tcp.serverCallback(conn => {
+            go func {
+                conn.Write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n")
+                sleep(3)
+                conn.Close()
+            }
+        }), 
+    )
+}
+
+
+os.WaitConnect(f"127.0.0.1:${port}", 3)~
+start = time.Now()
+rsp, _ = poc.HTTP(f"HEAD /a HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nUser-Agent: testcase\r\n\r\n")~
+assert time.Now().Sub(start).Seconds() <= 1
+println(rsp)
