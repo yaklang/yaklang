@@ -1,6 +1,7 @@
 package yakcmds
 
 import (
+	"bufio"
 	"context"
 	_ "embed"
 	"fmt"
@@ -68,6 +69,14 @@ var hybridScanCommand = &cli.Command{
 		cli.BoolFlag{
 			Name:  "list,l",
 			Usage: "Just List Plugin, No Scan",
+		},
+		cli.StringSliceFlag{
+			Name:  "vars",
+			Usage: "Inject template variable (KEY=VALUE). Can be specified multiple times",
+		},
+		cli.StringFlag{
+			Name:  "vars-file",
+			Usage: "Load template variables from file (each line 'Key: Value')",
 		},
 		cli.StringFlag{
 			Name: "plugin", Usage: "Exec Single Plugin by Name",
@@ -285,9 +294,39 @@ var hybridScanCommand = &cli.Command{
 		if targets.GetInput() == "" && targets.GetInputFile() == nil && targets.GetHTTPRequestTemplate() == nil {
 			log.Fatal("no target/target-file/raw-packet-file input")
 		}
+		varEntries := c.StringSlice("vars")
+		varFile := c.String("vars-file")
+		customVars, err := collectCustomVars(varEntries, varFile)
+		if err != nil {
+			return err
+		}
+
 		gen, err := yakgrpc.TargetGenerator(context.Background(), consts.GetGormProjectDatabase(), targets)
 		if err != nil {
 			return utils.Errorf("generate target failed: %s", err)
+		}
+
+		if len(customVars) > 0 {
+			origGen := gen
+			genWithVars := make(chan *yakgrpc.HybridScanTarget)
+			go func() {
+				defer close(genWithVars)
+				for target := range origGen {
+					if target.Vars == nil {
+						target.Vars = map[string]any{}
+					}
+					injected, _ := target.Vars["INJECTED_VARS"].(map[string]any)
+					if injected == nil {
+						injected = make(map[string]any, len(customVars))
+						target.Vars["INJECTED_VARS"] = injected
+					}
+					for k, v := range customVars {
+						injected[k] = v
+					}
+					genWithVars <- target
+				}
+			}()
+			gen = genWithVars
 		}
 
 		runtimeId := uuid.New().String()
@@ -334,6 +373,7 @@ var hybridScanCommand = &cli.Command{
 			return utils.Errorf("create local client failed: %s", err)
 		}
 		for target := range gen {
+			target := target
 			log.Infof("start to scan target: %v with plugins list cap: %v", target.Url, pluginList.Len())
 			for _, plugin := range pluginList.Values() {
 				log.Debugf("prepare target: %p in: %v", target, plugin.ScriptName)
@@ -388,4 +428,72 @@ func ShowHistoryHTTPFlowByRuntimeId(last int64, runtimeId string) int64 {
 		}
 	}
 	return last
+}
+
+func collectCustomVars(entries []string, varsFile string) (map[string]any, error) {
+	result := make(map[string]any)
+	if varsFile != "" {
+		fileVars, err := loadVarsFromFile(varsFile)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range fileVars {
+			result[k] = v
+		}
+	}
+	for _, entry := range entries {
+		key, value, err := parseKeyValue(entry)
+		if err != nil {
+			return nil, err
+		}
+		result[key] = value
+	}
+	if len(result) == 0 {
+		return nil, nil
+	}
+	return result, nil
+}
+
+func parseKeyValue(raw string) (string, string, error) {
+	parts := strings.SplitN(raw, "=", 2)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid vars format: %s (expected KEY=VALUE)", raw)
+	}
+	key := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+	if key == "" {
+		return "", "", fmt.Errorf("empty variable name in %s", raw)
+	}
+	return key, value, nil
+}
+
+func loadVarsFromFile(path string) (map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]string)
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid vars-file line %d: %s", lineNum, line)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key == "" {
+			return nil, fmt.Errorf("invalid vars-file line %d: empty key", lineNum)
+		}
+		res[key] = value
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
