@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 
 func init() {

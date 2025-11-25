@@ -12,10 +12,10 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/depinjector"
-	"github.com/yaklang/yaklang/common/yak/depinjector/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 
 func init() {
@@ -33,7 +33,6 @@ func init() {
 // 6. 过滤查询
 // 7. 关键词搜索
 func TestKnowledgeBaseQuery(t *testing.T) {
-	knowledgebase.Simpleliteforge = aiforge.SimpleAiForgeIns
 	db, _ := utils.CreateTempTestDatabaseInMemory()
 	if db == nil {
 		t.Fatal("Failed to get database connection")
