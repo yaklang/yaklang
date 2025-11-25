@@ -3,8 +3,9 @@ package httptpl
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -95,6 +96,8 @@ type Config struct {
 	OOBRequireCallback        func(...float64) (string, string, error)
 	OOBRequireCheckingTrigger func(string, string, ...float64) (string, []byte)
 
+	CustomVariables map[string]any
+
 	// onTempalteLoaded
 	OnTemplateLoaded  func(*YakTemplate) bool
 	BeforeSendPackage func(data []byte, isHttps bool) []byte
@@ -146,6 +149,35 @@ func WithVerbose(b bool) ConfigOption {
 	return func(config *Config) {
 		config.Verbose = b
 	}
+}
+
+func WithCustomVariables(vars map[string]any) ConfigOption {
+	return func(config *Config) {
+		if len(vars) == 0 {
+			return
+		}
+		if config.CustomVariables == nil {
+			config.CustomVariables = make(map[string]any, len(vars))
+		}
+		for k, v := range vars {
+			config.CustomVariables[k] = v
+		}
+	}
+}
+
+func withCustomVariablesFromInterface(raw interface{}) ConfigOption {
+	if raw == nil {
+		return func(*Config) {}
+	}
+	m := utils.InterfaceToMapInterface(raw)
+	if len(m) == 0 {
+		return func(*Config) {}
+	}
+	copied := make(map[string]any, len(m))
+	for k, v := range m {
+		copied[k] = v
+	}
+	return WithCustomVariables(copied)
 }
 
 func WithDebugRequest(b bool) ConfigOption {

@@ -94,6 +94,7 @@ jobs:
           - name: "Test Utils/Misc in 2min USE gRPC"
             test_configs: |
               [
+                {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
                 {"package": "./common/chunkmaker/...", "timeout": "20s"},
                 {"package": "./common/jsonextractor", "timeout": "20s"},
                 {"package": "./common/markdownextractor", "timeout": "20s"},

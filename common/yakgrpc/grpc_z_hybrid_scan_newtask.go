@@ -380,6 +380,11 @@ func ScanHybridTargetWithPlugin(
 			"CALLER_FILTER": callerFilter,
 			"PROXY":         proxy,
 		}
+		if target != nil && target.Vars != nil {
+			if injected, ok := target.Vars["INJECTED_VARS"]; ok {
+				vars["INJECTED_VARS"] = injected
+			}
+		}
 		engine.SetVars(vars)
 		return nil
 	})
@@ -438,6 +443,7 @@ type HybridScanTarget struct {
 	Request  []byte
 	Response []byte
 	Url      string
+	Vars     map[string]any
 }
 
 func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
@@ -471,6 +477,9 @@ func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridS
 				IsHttps: target.IsHttps,
 				Request: target.Request,
 				Url:     target.Url,
+				Vars: map[string]any{
+					"INJECTED_VARS": map[string]any{},
+				},
 			}:
 				continue
 			}

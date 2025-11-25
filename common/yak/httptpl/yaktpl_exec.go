@@ -197,6 +197,8 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 		config = NewConfig()
 	}
 
+	applyCustomVariablesToTemplate(y, config)
+
 	var count int64 = 0
 	if y.ReverseConnectionNeed {
 		var err error
@@ -382,6 +384,16 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	var requestIsHttps []bool   // store isHttps for each request
 	cacheRes := make(map[string]bool)
 	runtimeVars := map[string]any{}
+	if y != nil && y.Variables != nil {
+		for k, v := range y.Variables.ToMap() {
+			runtimeVars[k] = v
+		}
+	}
+	if config != nil && len(config.CustomVariables) > 0 {
+		for k, v := range config.CustomVariables {
+			runtimeVars[k] = v
+		}
+	}
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
 		var tempMatchersResult []any
 		for matcherIndex, matcher := range matchers {
@@ -557,4 +569,19 @@ func (y *YakTemplate) InjectInteractshVar(token string, runtimeID string, vars m
 		}
 		return item.Type
 	})), ",")
+}
+
+func applyCustomVariablesToTemplate(y *YakTemplate, config *Config) {
+	if y == nil || config == nil {
+		return
+	}
+	if len(config.CustomVariables) == 0 {
+		return
+	}
+	if y.Variables == nil {
+		y.Variables = NewVars()
+	}
+	for k, v := range config.CustomVariables {
+		y.Variables.AutoSet(k, v)
+	}
 }

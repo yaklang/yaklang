@@ -2,11 +2,21 @@ nucleiPoC = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN"]
 execNuclei = func(target) {
     nucleiPocName = nucleiPoC.ScriptName
 	// log.Info("start to execute: %s [%v]", nucleiPocName, target)
-	res, err = nuclei.Scan(
-        target,
-        nuclei.exactTemplateIns(nucleiPoC),
-        nuclei.timeout(10),
-    )
+    customVars = INJECTED_VARS
+    if customVars == nil {
+        res, err = nuclei.Scan(
+            target,
+            nuclei.exactTemplateIns(nucleiPoC),
+            nuclei.timeout(10),
+        )
+    } else {
+        res, err = nuclei.Scan(
+            target,
+            nuclei.exactTemplateIns(nucleiPoC),
+            nuclei.timeout(10),
+            nuclei.vars(customVars),
+        )
+    }
 	if err != nil {
 		yakit.Error("failed to scan[%v]: %s", target, err)
 		return
