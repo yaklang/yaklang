@@ -48,23 +48,33 @@ func (s *Server) GetCVE(ctx context.Context, req *ypb.GetCVERequest) (*ypb.CVEDe
 	if err != nil {
 		return nil, utils.Error("empty cve database")
 	}
-	var ref map[string]interface{}
-	err = json.Unmarshal(cve.References, &ref)
-	if err != nil {
-		log.Errorf("unmarshal references failed: %s", err)
-		return nil, err
-	}
-	// 获取每个URL字段并将其拼接为一个字符串
 	var urls []string
-	if rdArr, ok := ref["reference_data"].([]interface{}); ok {
-		for _, rd := range rdArr {
-			if rdMap, ok := rd.(map[string]interface{}); ok {
-				if url, ok := rdMap["url"].(string); ok {
-					urls = append(urls, url)
+
+	var refArray []map[string]interface{}
+	if err := json.Unmarshal(cve.References, &refArray); err == nil {
+		for _, rd := range refArray {
+			if url, ok := rd["url"].(string); ok {
+				urls = append(urls, url)
+			}
+		}
+	} else {
+		var ref map[string]interface{}
+		err = json.Unmarshal(cve.References, &ref)
+		if err != nil {
+			log.Errorf("unmarshal references failed: %s", err)
+			return nil, err
+		}
+		if rdArr, ok := ref["reference_data"].([]interface{}); ok {
+			for _, rd := range rdArr {
+				if rdMap, ok := rd.(map[string]interface{}); ok {
+					if url, ok := rdMap["url"].(string); ok {
+						urls = append(urls, url)
+					}
 				}
 			}
 		}
 	}
+
 	urlStr := strings.Join(urls, "\n")
 	cve.References = []byte(urlStr)
 	var cwes []*ypb.CWEDetail
