@@ -264,6 +264,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "通用模式",
 		En: "Lose Focus",
 	},
+	"react_task_mode_changed": {
+		Zh: "任务执行模式变更",
+		En: "Task Execution Mode Changed",
+	},
 	"react_task_status_changed": {
 		Zh: "任务状态变更",
 		En: "ReAct Task Status Changed",
