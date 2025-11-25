@@ -12,6 +12,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+
+	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 
 // TestIntegrationWithRealEmbedding 完整的集成测试，使用真实的 embedding 接口

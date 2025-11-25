@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
@@ -296,7 +297,15 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				Type:    SearchResultTypeMessage,
 				Data:    nil,
 			})
-			answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
+			//answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
+			answer, err := aicommon.InvokeLiteForge(
+				prompt,
+				aicommon.WithContext(config.Ctx),
+				aicommon.WithLiteForgeOutputSchema(aitool.NewObjectSchemaWithAction(
+					aitool.WithStringParam("answer"),
+				)),
+				aicommon.WithLiteForgeActionName("object"),
+			)
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 					Message: err.Error(),
