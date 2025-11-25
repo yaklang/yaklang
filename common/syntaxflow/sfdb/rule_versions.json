@@ -194,8 +194,8 @@
   {
     "rule_id": "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34",
     "rule_name": "检测Golang使用AES-CBC弱加密模式",
-    "hash": "612ebdab529e443f04ea0a7f2ca4c7f76ee313957efe76ede9282c6049abd95f",
-    "version": "20251024.0001"
+    "hash": "d4f7a2d3cb40cfbd9222ebaa9c0b6dbcb437dc30a80716ae48ab68d594919dd9",
+    "version": "20251125.0001"
   },
   {
     "rule_id": "dfb88d4d-1459-4045-a0f3-5a98083fee81",
