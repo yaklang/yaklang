@@ -274,10 +274,6 @@ func TrackWithError(enabled bool, name string, steps ...StepFunc) (Measurement, 
 	return DefaultRecorder().TrackWithError(enabled, name, steps...)
 }
 
-func LogCompileSummary() {
-	LogRecorder("compile", DefaultRecorder())
-}
-
 func LogRecorder(label string, recorders ...*Recorder) {
 	if len(recorders) == 0 {
 		recorders = []*Recorder{DefaultRecorder()}
@@ -285,6 +281,10 @@ func LogRecorder(label string, recorders ...*Recorder) {
 	for _, rec := range recorders {
 		logRecorder(label, rec)
 	}
+}
+
+func (r *Recorder) Log(label string) {
+	logRecorder(label, r)
 }
 
 func logRecorder(label string, rec *Recorder) {
@@ -304,44 +304,6 @@ func logRecorder(label string, rec *Recorder) {
 		log.Infof(snapshot.String())
 	}
 	log.Infof("========================================")
-}
-
-func LogScanPerformance(ruleRecorder *Recorder, enableRulePerformance bool, totalDuration time.Duration) {
-	LogCompileSummary()
-
-	totalCount := uint64(0)
-	if ruleRecorder != nil {
-		for _, measurement := range ruleRecorder.Snapshot() {
-			totalCount += measurement.Count
-		}
-	}
-	if totalCount == 0 {
-		totalCount = 1
-	}
-
-	avgDuration := totalDuration / time.Duration(totalCount)
-	log.Infof("=== Scan Total ===")
-	log.Infof("Time: %v\tCount: %d\tAvg: %v", totalDuration, totalCount, avgDuration)
-	log.Infof("==================")
-
-	if !enableRulePerformance || ruleRecorder == nil {
-		return
-	}
-
-	snapshots := ruleRecorder.Snapshot()
-	if len(snapshots) == 0 {
-		return
-	}
-
-	log.Infof("=== Rule Performance (scan) ===")
-	for _, measurement := range snapshots {
-		if measurement.Count == 0 {
-			continue
-		}
-		avg := measurement.Total / time.Duration(measurement.Count)
-		log.Infof("%s Time: %v Count: %d Avg: %v", measurement.Name, measurement.Total, measurement.Count, avg)
-	}
-	log.Infof("================================")
 }
 
 func CompareRecorderCosts(database, memory *Recorder) {
