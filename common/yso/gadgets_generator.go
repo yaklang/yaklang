@@ -1,6 +1,7 @@
 package yso
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -204,7 +205,16 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 				if !ok {
 					return nil, errors.New("missing param: " + string(p.Name))
 				}
-				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
+				if p.Type == "bytes" {
+					// 检测到bytes类型，使用 ReplaceByteArrayInJavaSerilizable替换占位符
+					new, decodeErr := base64.StdEncoding.DecodeString(val)
+					if decodeErr != nil {
+						return nil, decodeErr
+					}
+					err = ReplaceByteArrayInJavaSerilizable(obj, []byte(fmt.Sprintf("{{param%d}}", i)), new, -1)
+				} else {
+					err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
+				}
 				if err != nil {
 					return nil, err
 				}
