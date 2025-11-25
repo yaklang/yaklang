@@ -93,6 +93,9 @@ func (r *ReAct) reviewAIForge(
 		return nil, nil, false, utils.Error("ai forge execution cancelled by user")
 	case "modify_params":
 		return r.invokeBlueprintReviewModifyParams(ins, invokeParams, reviewParams, release)
+	case "input_params":
+		inputParams := reviewParams.GetObject("params")
+		return ins, inputParams, false, nil
 	case "change_blueprint":
 		return r.invokeBlueprintReviewChangeBlueprint(ins, invokeParams, release)
 	case "continue":
