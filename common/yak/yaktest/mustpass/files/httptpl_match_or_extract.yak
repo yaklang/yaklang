@@ -1,0 +1,144 @@
+reqRaw = "GET /hello HTTP/1.1\r\nHost: example.com\r\n\r\n"
+rspRaw = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nbody token=abc123"
+
+inlineTpl = `
+matchers:
+  - type: word
+    scope: body
+    words:
+      - token=abc123
+extractors:
+  - name: token
+    type: regex
+    regex:
+      - token=([a-z0-9]+)
+    group: 1
+`
+
+println("[httptpl] inline template match start")
+result, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, inlineTpl, httptpl.https(true))
+assert err == nil, sprintf("inline tpl exec failed: %v", err)
+assert result.IsMatched, "inline tpl matcher not matched"
+assert result.Extracted["token"] == "abc123", "inline tpl extractor got invalid value"
+println("[httptpl] inline template match success, token:", result.Extracted["token"])
+
+nucleiTpl = `
+id: demo-httptpl
+info:
+  name: demo
+http:
+  - method: GET
+    path:
+      - /hello
+    matchers:
+      - type: dsl
+        dsl:
+          - request_url == "https://example.com/hello"
+    extractors:
+      - name: status
+        type: dsl
+        dsl:
+          - status_code
+`
+
+println("[httptpl] nuclei template match start")
+result2, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, nucleiTpl, httptpl.https(true))
+assert err == nil, sprintf("nuclei tpl exec failed: %v", err)
+assert result2.IsMatched, "nuclei tpl matcher not matched"
+assert result2.Extracted["status"] == "200", "nuclei tpl extractor got invalid status"
+println("[httptpl] nuclei template match success, status:", result2.Extracted["status"])
+
+println("[httptpl] request raw scope match start")
+reqScopeRaw = "POST /login HTTP/1.1\r\nHost: example.com\r\nContent-Length: 21\r\n\r\nusername=admin&role=1"
+scopeTpl = `
+matchers:
+  - type: word
+    scope: request_raw
+    words:
+      - username=admin
+extractors:
+  - name: req_url
+    type: dsl
+    dsl:
+      - request_url
+  - name: req_role
+    type: regex
+    scope: request_raw
+    regex:
+      - role=(\d+)
+    group: 1
+`
+scopeResult, err = httptpl.MatchOrExtractHTTPFlow(reqScopeRaw, rspRaw, scopeTpl, httptpl.https(true))
+assert err == nil, sprintf("scope tpl exec failed: %v", err)
+assert scopeResult.IsMatched, "scope tpl matcher not matched"
+assert scopeResult.Extracted["req_url"] == "https://example.com/login", "request url extractor failed"
+assert scopeResult.Extracted["req_role"] == "1", "request raw extractor failed"
+println("[httptpl] request raw scope match success")
+
+println("[httptpl] custom vars match start")
+varsTpl = `
+matchers:
+  - type: dsl
+    dsl:
+      - custom_flag == "ALLOW"
+`
+varsResult, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, varsTpl, httptpl.vars({"custom_flag": "ALLOW"}))
+assert err == nil, sprintf("vars tpl exec failed: %v", err)
+assert varsResult.IsMatched, "vars tpl matcher not matched"
+println("[httptpl] custom vars match success")
+
+println("[httptpl] requests-style template match start")
+requestsTpl = `
+requests:
+  - raw:
+      - |
+        GET /requests HTTP/1.1
+        Host: example.com
+
+    matchers:
+      - type: word
+        scope: body
+        words:
+          - token=abc123
+    extractors:
+      - name: body_token
+        type: regex
+        scope: body
+        regex:
+          - token=([a-z0-9]+)
+        group: 1
+`
+requestsResult, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, requestsTpl, httptpl.https(true))
+assert err == nil, sprintf("requests tpl exec failed: %v", err)
+assert requestsResult.IsMatched, "requests tpl matcher not matched"
+assert requestsResult.Extracted["body_token"] == "abc123", "requests tpl extractor failed"
+println("[httptpl] requests-style template match success")
+
+println("[httptpl] extractor-only template match start")
+extractOnlyTpl = `
+extractors:
+  - name: status_text
+    type: regex
+    scope: body
+    regex:
+      - token=([a-z0-9]+)
+    group: 1
+`
+extractOnlyResult, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, extractOnlyTpl)
+assert err == nil, sprintf("extract-only tpl exec failed: %v", err)
+assert extractOnlyResult.Extracted["status_text"] == "abc123", "extract-only tpl failed"
+println("[httptpl] extractor-only template match success")
+
+println("[httptpl] invalid yaml detection start")
+invalidTpl = `
+info:
+  name: invalid
+`
+_, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, rspRaw, invalidTpl)
+assert err != nil, "invalid yaml should fail"
+println("[httptpl] invalid yaml detection success:", err)
+
+println("[httptpl] empty response detection start")
+_, err = httptpl.MatchOrExtractHTTPFlow(reqRaw, "", inlineTpl)
+assert err != nil, "empty response should fail"
+println("[httptpl] empty response detection success:", err)

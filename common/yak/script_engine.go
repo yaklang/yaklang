@@ -233,8 +233,9 @@ func initYaklangLib() {
 	// eval
 	// yaklang.Import("", GlobalEvalExporst)
 	yaklang.Import("dyn", EvalExports)
-	// nuclei
+	// nuclei / httptpl helpers
 	yaklang.Import("nuclei", httptpl.Exports)
+	yaklang.Import("httptpl", httptpl.MatchOrExtractExports)
 	yaklang.Import("nasl", antlr4nasl.Exports)
 
 	// jwt
