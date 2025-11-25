@@ -242,7 +242,7 @@ public class UmsAdminController {
 //		}
 //		return nil
 //	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-//	diagnostics.LogCompileSummary()
+//	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 //	log.Info("ast cost: ", astCost)
 //	log.Info("mem cost: ", memCost)
 //	log.Info(" db cost: ", dbCost)
@@ -264,7 +264,7 @@ func TestBigJavaFile2(t *testing.T) {
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-	diagnostics.LogCompileSummary()
+	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)
 	log.Info(" db cost: ", dbCost)
@@ -289,7 +289,7 @@ func TestBigJavaFile3(t *testing.T) {
 		}
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
-	diagnostics.LogCompileSummary()
+	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 	log.Info("ast cost: ", astCost)
 	log.Info("mem cost: ", memCost)
 	log.Info(" db cost: ", dbCost)

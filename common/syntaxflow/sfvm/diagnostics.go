@@ -1,8 +1,9 @@
 package sfvm
 
 import (
-	"errors"
+	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 )
 
@@ -23,25 +24,13 @@ func (s *SFFrame) trackWithError(name string, fn func() error) error {
 	return fn()
 }
 
-// trackStatementWithError executes a statement with diagnostics tracking and handles common errors
-func (s *SFFrame) trackStatementWithError(name string, fn func() error) error {
-	return s.trackWithError(name, func() error {
-		err := fn()
-		if err != nil {
-			s.debugSubLog("execStatement error: %v", err)
-			if errors.Is(err, AbortError) {
-				return nil
-			}
-			if errors.Is(err, CriticalError) {
-				return err
-			}
-			// go to expression end
-			if result := s.errorSkipStack.Peek(); result != nil {
-				s.idx = result.end
-				return nil
-			}
-			return err
-		}
-		return nil
-	})
+func (s *SFFrame) logScanPerformance(totalDuration time.Duration, enableRulePerf bool) {
+	ruleRecorder := s.GetDiagnosticsRecorder()
+	log.Infof("=== Scan Total ===")
+	log.Infof("SyntaxFlow VM Run Finish Time: %v", totalDuration)
+	log.Infof("==================")
+
+	if enableRulePerf && ruleRecorder != nil {
+		ruleRecorder.Log("Rule Performance (scan)")
+	}
 }

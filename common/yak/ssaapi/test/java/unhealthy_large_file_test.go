@@ -33,5 +33,5 @@ func TestUnhealthyLargeFile(t *testing.T) {
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	log.SetOutput(os.Stdout)
 	fmt.Println(buf.String())
-	diagnostics.LogCompileSummary()
+	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
 }
