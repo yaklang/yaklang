@@ -251,7 +251,25 @@ HandleExpect100Continue:
 	} else {
 		// HEAD, TRACE, CONNECT requests should not have response body
 		if nobodyReqMethod {
-			io.Copy(io.Discard, bodyReader)
+			// HEAD requests should never have a body, even if Transfer-Encoding: chunked is present
+			// Skip body reading for HEAD requests to avoid blocking when connection is closed
+			if req != nil && strings.EqualFold(req.Method, http.MethodHead) {
+				// HEAD request: skip all body reading logic
+				// This prevents blocking when server sends Transfer-Encoding: chunked but closes connection without body
+			} else {
+				// TRACE, CONNECT requests: try to discard body if present
+				if useContentLength && contentLengthInt > 0 {
+					_, err := io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+					if err != nil && !errors.Is(err, io.EOF) {
+						return nil, errors.Wrap(err, "read body error")
+					}
+				} else {
+					_, err := io.Copy(io.Discard, bodyReader)
+					if err != nil && !errors.Is(err, io.EOF) {
+						return nil, errors.Wrap(err, "read body error")
+					}
+				}
+			}
 		} else if useContentLength && useTransferEncodingChunked {
 			// smuggle...
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
