@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2334,4 +2335,675 @@ http:
 	require.NoError(t, err)
 	require.True(t, cookieCheck)
 
+}
+
+// TestHTTPTpl_Vars_In_DSL_Matcher 测试 vars 在 DSL matcher 中生效 - 端到端测试
+func TestHTTPTpl_Vars_In_DSL_Matcher(t *testing.T) {
+	// 记录实际收到的请求
+	var receivedPath string
+	var receivedHeader string
+	requestCount := 0
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestCount++
+		receivedPath = request.URL.Path
+		receivedHeader = request.Header.Get("X-Test-Var")
+		writer.WriteHeader(200)
+		writer.Write([]byte(`{"status":"success","data":"test_value","resource":"users"}`))
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-dsl-matcher-test
+info:
+  name: Test vars in DSL matcher
+  severity: info
+http:
+  - raw:
+      - |
+        GET /api/{{endpoint}}/{{resource_id}} HTTP/1.1
+        Host: {{Hostname}}
+        X-Test-Var: {{test_header}}
+        
+    matchers:
+      - type: dsl
+        dsl:
+          - test_header == "header_value"
+          - status_code == 200
+          - contains(body, "test_value")
+          - contains(body, "users")
+        condition: and
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 使用 vars 配置并执行完整流程
+	matched := false
+	config := NewConfig(
+		WithCustomVariables(map[string]any{
+			"endpoint":    "users",
+			"resource_id": "12345",
+			"test_header": "header_value",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched = result
+
+			// 验证请求确实被发送
+			require.NotEmpty(t, rsp, "should have response")
+			statusCode := lowhttp.ExtractStatusCodeFromResponse(rsp[0].RawPacket)
+			require.Equal(t, 200, statusCode, "status code should be 200")
+
+			// 验证请求内容
+			reqContent := string(rsp[0].RawRequest)
+			require.Contains(t, reqContent, "/api/users/12345", "path should contain vars")
+			require.Contains(t, reqContent, "X-Test-Var: header_value", "header should contain vars")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config)
+	require.NoError(t, err)
+
+	// 验证请求真实发出
+	require.Equal(t, 1, requestCount, "should send exactly 1 request")
+	require.Equal(t, "/api/users/12345", receivedPath, "server should receive correct path with vars")
+	require.Equal(t, "header_value", receivedHeader, "server should receive correct header with vars")
+
+	// 验证匹配成功
+	require.True(t, matched, "matcher with vars should match")
+}
+
+// TestHTTPTpl_Vars_In_DSL_Extractor 测试 vars 在 DSL extractor 中生效 - 端到端测试
+func TestHTTPTpl_Vars_In_DSL_Extractor(t *testing.T) {
+	// 记录请求详情
+	var receivedBody string
+	var receivedPath string
+	requestCount := 0
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestCount++
+		receivedPath = request.URL.Path
+		body, _ := io.ReadAll(request.Body)
+		receivedBody = string(body)
+
+		// 返回包含变量值的响应
+		writer.WriteHeader(200)
+		writer.Write([]byte(`{"prefix":"custom_prefix","suffix":"custom_suffix","combined":"custom_prefix_custom_suffix","code":200}`))
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-dsl-extractor-test
+info:
+  name: Test vars in DSL extractor
+  severity: info
+http:
+  - raw:
+      - |
+        POST /submit/{{action}} HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/json
+        
+        {"prefix":"{{var_prefix}}","suffix":"{{var_suffix}}"}
+    matchers:
+      - type: word
+        words:
+          - "custom_prefix"
+    extractors:
+      - type: dsl
+        name: combined_from_vars
+        dsl:
+          - var_prefix + "_" + var_suffix
+      - type: dsl
+        name: status_with_action
+        dsl:
+          - action + ":" + string(status_code)
+      - type: regex
+        name: extracted_combined
+        regex:
+          - '"combined":"([^"]+)"'
+        group: 1
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 使用 vars 配置并执行完整流程
+	matched := false
+	extractedData := make(map[string]interface{})
+
+	config := NewConfig(
+		WithCustomVariables(map[string]any{
+			"action":     "create",
+			"var_prefix": "custom_prefix",
+			"var_suffix": "custom_suffix",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched = result
+			extractedData = extractor
+
+			// 验证响应存在
+			require.NotEmpty(t, rsp, "should have response")
+
+			// 验证请求包含变量
+			reqContent := string(rsp[0].RawRequest)
+			require.Contains(t, reqContent, "/submit/create", "path should contain action var")
+			require.Contains(t, reqContent, `"prefix":"custom_prefix"`, "body should contain prefix var")
+			require.Contains(t, reqContent, `"suffix":"custom_suffix"`, "body should contain suffix var")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config)
+	require.NoError(t, err)
+
+	// 验证请求真实发出
+	require.Equal(t, 1, requestCount, "should send exactly 1 request")
+	require.Equal(t, "/submit/create", receivedPath, "server should receive path with vars")
+	require.Contains(t, receivedBody, `"prefix":"custom_prefix"`, "server should receive body with vars")
+	require.Contains(t, receivedBody, `"suffix":"custom_suffix"`, "server should receive body with vars")
+
+	// 验证匹配和提取
+	require.True(t, matched, "matcher should match")
+	require.NotEmpty(t, extractedData, "should have extracted data")
+
+	// 验证使用 vars 的 DSL 提取器
+	require.Equal(t, "custom_prefix_custom_suffix", ExtractResultToString(extractedData["combined_from_vars"]),
+		"DSL extractor with vars should work")
+	require.Equal(t, "create:200", ExtractResultToString(extractedData["status_with_action"]),
+		"DSL extractor combining vars with builtin should work")
+
+	// 验证 regex 提取器也正常工作
+	require.Equal(t, "custom_prefix_custom_suffix", ExtractResultToString(extractedData["extracted_combined"]),
+		"regex extractor should work")
+}
+
+// TestHTTPTpl_Vars_In_Path_Mode 测试 vars 在 Paths 模式中生效 - 端到端多路径测试
+func TestHTTPTpl_Vars_In_Path_Mode(t *testing.T) {
+	receivedPaths := []string{}
+	receivedQueries := []string{}
+	requestCount := 0
+	mu := &sync.Mutex{}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		mu.Lock()
+		requestCount++
+		receivedPaths = append(receivedPaths, request.URL.Path)
+		receivedQueries = append(receivedQueries, request.URL.RawQuery)
+		mu.Unlock()
+
+		// 根据路径返回不同响应
+		if strings.Contains(request.URL.Path, "/api/v1/users") {
+			writer.WriteHeader(200)
+			writer.Write([]byte(`{"version":"v1","type":"users","status":"success"}`))
+		} else if strings.Contains(request.URL.Path, "/api/v2/posts") {
+			writer.WriteHeader(200)
+			writer.Write([]byte(`{"version":"v2","type":"posts","status":"success"}`))
+		} else {
+			writer.WriteHeader(404)
+			writer.Write([]byte("not found"))
+		}
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-path-test
+info:
+  name: Test vars in path mode
+  severity: info
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/{{api_prefix}}/{{api_version}}/{{resource_type}}?filter={{filter_value}}&limit={{limit_value}}"
+    matchers:
+      - type: word
+        words:
+          - "success"
+    extractors:
+      - type: dsl
+        name: full_path
+        dsl:
+          - api_prefix + "/" + api_version + "/" + resource_type
+      - type: regex
+        name: response_version
+        regex:
+          - '"version":"([^"]+)"'
+        group: 1
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 测试第一组变量
+	matched1 := false
+	extractedData1 := make(map[string]interface{})
+	config1 := NewConfig(
+		WithCustomVariables(map[string]any{
+			"api_prefix":    "api",
+			"api_version":   "v1",
+			"resource_type": "users",
+			"filter_value":  "active",
+			"limit_value":   "10",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched1 = result
+			extractedData1 = extractor
+
+			require.NotEmpty(t, rsp, "should have response")
+			require.Contains(t, string(rsp[0].RawRequest), "/api/v1/users", "request should contain path with vars")
+			require.Contains(t, string(rsp[0].RawRequest), "filter=active", "request should contain query with vars")
+			require.Contains(t, string(rsp[0].RawRequest), "limit=10", "request should contain query with vars")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config1)
+	require.NoError(t, err)
+	require.True(t, matched1, "first vars set should match")
+	require.Equal(t, "api/v1/users", ExtractResultToString(extractedData1["full_path"]), "should extract path from vars")
+	require.Equal(t, "v1", ExtractResultToString(extractedData1["response_version"]), "should extract version")
+
+	// 测试第二组变量
+	matched2 := false
+	extractedData2 := make(map[string]interface{})
+	config2 := NewConfig(
+		WithCustomVariables(map[string]any{
+			"api_prefix":    "api",
+			"api_version":   "v2",
+			"resource_type": "posts",
+			"filter_value":  "published",
+			"limit_value":   "20",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched2 = result
+			extractedData2 = extractor
+
+			require.NotEmpty(t, rsp, "should have response")
+			require.Contains(t, string(rsp[0].RawRequest), "/api/v2/posts", "request should contain path with vars")
+			require.Contains(t, string(rsp[0].RawRequest), "filter=published", "request should contain query with vars")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config2)
+	require.NoError(t, err)
+	require.True(t, matched2, "second vars set should match")
+	require.Equal(t, "api/v2/posts", ExtractResultToString(extractedData2["full_path"]), "should extract path from vars")
+
+	// 验证请求真实发出且正确
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 2, requestCount, "should send exactly 2 requests")
+	require.Contains(t, receivedPaths, "/api/v1/users", "should receive first path")
+	require.Contains(t, receivedPaths, "/api/v2/posts", "should receive second path")
+	require.Contains(t, receivedQueries[0], "filter=active", "should receive first query")
+	require.Contains(t, receivedQueries[0], "limit=10", "should receive first limit")
+	require.Contains(t, receivedQueries[1], "filter=published", "should receive second query")
+	require.Contains(t, receivedQueries[1], "limit=20", "should receive second limit")
+}
+
+// TestHTTPTpl_Vars_In_Raw_Request 测试 vars 在整个数据包模式中生效 - 端到端完整测试
+func TestHTTPTpl_Vars_In_Raw_Request(t *testing.T) {
+	type ReceivedRequest struct {
+		Path        string
+		Method      string
+		Headers     map[string]string
+		Body        string
+		ContentType string
+	}
+
+	receivedRequests := []ReceivedRequest{}
+	requestCount := 0
+	mu := &sync.Mutex{}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		mu.Lock()
+		requestCount++
+
+		body, _ := io.ReadAll(request.Body)
+		req := ReceivedRequest{
+			Path:        request.URL.Path,
+			Method:      request.Method,
+			Headers:     make(map[string]string),
+			Body:        string(body),
+			ContentType: request.Header.Get("Content-Type"),
+		}
+
+		// 记录关键头部
+		for key := range request.Header {
+			if strings.HasPrefix(key, "X-") || key == "Authorization" {
+				req.Headers[key] = request.Header.Get(key)
+			}
+		}
+		receivedRequests = append(receivedRequests, req)
+		mu.Unlock()
+
+		// 根据请求内容返回不同响应
+		if strings.Contains(string(body), "user_id") {
+			writer.Header().Set("X-Response-Type", "user")
+			writer.WriteHeader(201)
+			writer.Write([]byte(`{"status":"created","resource":"user","id":"usr_12345","token":"tok_abcdef"}`))
+		} else if strings.Contains(string(body), "post_id") {
+			writer.Header().Set("X-Response-Type", "post")
+			writer.WriteHeader(200)
+			writer.Write([]byte(`{"status":"updated","resource":"post","id":"pst_67890"}`))
+		} else {
+			writer.WriteHeader(400)
+			writer.Write([]byte(`{"error":"invalid request"}`))
+		}
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-raw-request-test
+info:
+  name: Test vars in raw request mode
+  severity: info
+http:
+  - raw:
+      - |
+        {{http_method}} /{{api_path}}/{{action}} HTTP/1.1
+        Host: {{Hostname}}
+        X-Custom-Header: {{custom_header}}
+        X-Api-Key: {{api_key}}
+        Authorization: Bearer {{auth_token}}
+        Content-Type: {{content_type}}
+        
+        {{request_body}}
+    matchers:
+      - type: dsl
+        dsl:
+          - status_code >= 200 && status_code < 300
+          - contains(body, action)
+          - contains(body, resource_type)
+        condition: and
+    extractors:
+      - type: regex
+        name: resource_id
+        regex:
+          - '"id":"([^"]+)"'
+        group: 1
+      - type: regex
+        name: status_result
+        regex:
+          - '"status":"([^"]+)"'
+        group: 1
+      - type: dsl
+        name: full_api_path
+        dsl:
+          - api_path + "/" + action
+      - type: regex
+        name: token
+        regex:
+          - '"token":"([^"]+)"'
+        group: 1
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 测试场景1：创建用户
+	matched1 := false
+	extractedData1 := make(map[string]interface{})
+	config1 := NewConfig(
+		WithCustomVariables(map[string]any{
+			"http_method":   "POST",
+			"api_path":      "users",
+			"action":        "create",
+			"custom_header": "test-value-1",
+			"api_key":       "key_abc123",
+			"auth_token":    "token_xyz789",
+			"content_type":  "application/json",
+			"request_body":  `{"user_id":"usr_001","name":"test user","email":"test@example.com"}`,
+			"resource_type": "user",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched1 = result
+			extractedData1 = extractor
+
+			require.NotEmpty(t, rsp, "should have response")
+			reqContent := string(rsp[0].RawRequest)
+
+			// 验证请求各部分都包含变量
+			require.Contains(t, reqContent, "POST /users/create", "method and path should contain vars")
+			require.Contains(t, reqContent, "X-Custom-Header: test-value-1", "custom header should contain var")
+			require.Contains(t, reqContent, "X-Api-Key: key_abc123", "api key should contain var")
+			require.Contains(t, reqContent, "Authorization: Bearer token_xyz789", "auth header should contain var")
+			require.Contains(t, reqContent, "Content-Type: application/json", "content type should contain var")
+			require.Contains(t, reqContent, `"user_id":"usr_001"`, "body should contain var content")
+			require.Contains(t, reqContent, `"name":"test user"`, "body should contain var content")
+
+			// 验证响应
+			statusCode := lowhttp.ExtractStatusCodeFromResponse(rsp[0].RawPacket)
+			require.Equal(t, 201, statusCode, "status should be 201")
+			require.Contains(t, string(rsp[0].RawPacket), "created", "response should contain created")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config1)
+	require.NoError(t, err)
+	require.True(t, matched1, "first request should match")
+	require.Equal(t, "usr_12345", ExtractResultToString(extractedData1["resource_id"]), "should extract resource id")
+	require.Equal(t, "created", ExtractResultToString(extractedData1["status_result"]), "should extract status")
+	require.Equal(t, "users/create", ExtractResultToString(extractedData1["full_api_path"]), "should extract full path from vars")
+	require.Equal(t, "tok_abcdef", ExtractResultToString(extractedData1["token"]), "should extract token")
+
+	// 测试场景2：更新文章
+	matched2 := false
+	extractedData2 := make(map[string]interface{})
+	config2 := NewConfig(
+		WithCustomVariables(map[string]any{
+			"http_method":   "PUT",
+			"api_path":      "posts",
+			"action":        "update",
+			"custom_header": "test-value-2",
+			"api_key":       "key_def456",
+			"auth_token":    "token_uvw456",
+			"content_type":  "application/json",
+			"request_body":  `{"post_id":"pst_002","title":"updated title","content":"updated content"}`,
+			"resource_type": "post",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched2 = result
+			extractedData2 = extractor
+
+			require.NotEmpty(t, rsp, "should have response")
+			reqContent := string(rsp[0].RawRequest)
+
+			// 验证第二组变量生效
+			require.Contains(t, reqContent, "PUT /posts/update", "method and path should use second vars")
+			require.Contains(t, reqContent, "X-Custom-Header: test-value-2", "should use second custom header")
+			require.Contains(t, reqContent, "X-Api-Key: key_def456", "should use second api key")
+			require.Contains(t, reqContent, `"post_id":"pst_002"`, "body should use second vars")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config2)
+	require.NoError(t, err)
+	require.True(t, matched2, "second request should match")
+	require.Equal(t, "pst_67890", ExtractResultToString(extractedData2["resource_id"]), "should extract post id")
+	require.Equal(t, "updated", ExtractResultToString(extractedData2["status_result"]), "should extract updated status")
+	require.Equal(t, "posts/update", ExtractResultToString(extractedData2["full_api_path"]), "should extract second path from vars")
+
+	// 验证服务器端收到的请求
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, 2, requestCount, "should send exactly 2 requests")
+
+	// 验证第一个请求
+	require.Equal(t, "/users/create", receivedRequests[0].Path, "server should receive first path")
+	require.Equal(t, "POST", receivedRequests[0].Method, "server should receive POST method")
+	require.Equal(t, "test-value-1", receivedRequests[0].Headers["X-Custom-Header"], "server should receive first custom header")
+	require.Equal(t, "key_abc123", receivedRequests[0].Headers["X-Api-Key"], "server should receive first api key")
+	require.Contains(t, receivedRequests[0].Body, `"user_id":"usr_001"`, "server should receive first body")
+	require.Equal(t, "application/json", receivedRequests[0].ContentType, "server should receive content type")
+
+	// 验证第二个请求
+	require.Equal(t, "/posts/update", receivedRequests[1].Path, "server should receive second path")
+	require.Equal(t, "PUT", receivedRequests[1].Method, "server should receive PUT method")
+	require.Equal(t, "test-value-2", receivedRequests[1].Headers["X-Custom-Header"], "server should receive second custom header")
+	require.Equal(t, "key_def456", receivedRequests[1].Headers["X-Api-Key"], "server should receive second api key")
+	require.Contains(t, receivedRequests[1].Body, `"post_id":"pst_002"`, "server should receive second body")
+}
+
+// TestHTTPTpl_Vars_Undefined_In_Request 测试未定义变量在请求包中保持 {{varName}} 形式
+func TestHTTPTpl_Vars_Undefined_In_Request(t *testing.T) {
+	// 记录收到的请求
+	var receivedPath string
+	var receivedHeader string
+	var receivedBody string
+	requestCount := 0
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestCount++
+		receivedPath = request.URL.Path
+		receivedHeader = request.Header.Get("X-Custom-Header")
+		body, _ := io.ReadAll(request.Body)
+		receivedBody = string(body)
+
+		// 返回成功，但记录收到的原始内容
+		writer.WriteHeader(200)
+		writer.Write([]byte(`{"status":"ok"}`))
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-undefined-test
+info:
+  name: Test undefined vars in request
+  severity: info
+http:
+  - raw:
+      - |
+        POST /api/{{defined_var}}/{{undefined_var1}}/action HTTP/1.1
+        Host: {{Hostname}}
+        X-Custom-Header: {{defined_header}}-{{undefined_header}}
+        Content-Type: application/json
+        
+        {"defined":"{{defined_value}}","undefined":"{{undefined_value}}","mixed":"{{defined_var}}_{{undefined_var2}}"}
+    matchers:
+      - type: word
+        words:
+          - "ok"
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	// 只定义部分变量
+	matched := false
+	config := NewConfig(
+		WithCustomVariables(map[string]any{
+			"defined_var":    "users",
+			"defined_header": "header-value",
+			"defined_value":  "test-data",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			matched = result
+
+			require.NotEmpty(t, rsp, "should have response")
+			reqContent := string(rsp[0].RawRequest)
+
+			// 验证已定义的变量被替换
+			require.Contains(t, reqContent, "/api/users/", "defined var should be replaced")
+			require.Contains(t, reqContent, "header-value-", "defined header should be replaced")
+			require.Contains(t, reqContent, `"defined":"test-data"`, "defined value should be replaced")
+
+			// 验证未定义的变量保持 {{varName}} 形式
+			require.Contains(t, reqContent, "{{undefined_var1}}", "undefined var should keep {{varName}} format in path")
+			require.Contains(t, reqContent, "{{undefined_header}}", "undefined var should keep {{varName}} format in header")
+			require.Contains(t, reqContent, `{{undefined_value}}`, "undefined var should keep {{varName}} format in body")
+			require.Contains(t, reqContent, "{{undefined_var2}}", "undefined var should keep {{varName}} format in mixed content")
+
+			// 验证混合内容：已定义_未定义
+			require.Contains(t, reqContent, `users_{{undefined_var2}}`, "mixed defined and undefined should work")
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config)
+	require.NoError(t, err)
+	require.True(t, matched, "should match even with undefined vars")
+
+	// 验证服务器收到的内容
+	require.Equal(t, 1, requestCount, "should send exactly 1 request")
+	require.Contains(t, receivedPath, "/api/users/{{undefined_var1}}/action",
+		"server should receive path with {{varName}} for undefined vars")
+	require.Contains(t, receivedHeader, "header-value-{{undefined_header}}",
+		"server should receive header with {{varName}} for undefined vars")
+	require.Contains(t, receivedBody, `"undefined":"{{undefined_value}}"`,
+		"server should receive body with {{varName}} for undefined vars")
+	require.Contains(t, receivedBody, `"mixed":"users_{{undefined_var2}}"`,
+		"server should receive mixed content correctly")
+}
+
+// TestHTTPTpl_Vars_Complex_Scenario 测试复杂场景：vars 在 matcher, extractor 和 request 中同时使用
+func TestHTTPTpl_Vars_Complex_Scenario(t *testing.T) {
+	receivedPath := ""
+	receivedHeader := ""
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedPath = request.URL.Path
+		receivedHeader = request.Header.Get("X-Token")
+		writer.Write([]byte("user_data: admin_12345"))
+	})
+	target := utils.HostPort(host, port)
+
+	tmpl := `
+id: vars-complex-test
+info:
+  name: Test vars complex scenario
+  severity: info
+http:
+  - raw:
+      - |
+        GET /{{api_path}}/{{user_id}} HTTP/1.1
+        Host: {{Hostname}}
+        X-Token: {{auth_token}}
+        
+    matchers:
+      - type: dsl
+        dsl:
+          - auth_token == "secret_token"
+          - contains(body, "user_data")
+        condition: and
+    extractors:
+      - type: regex
+        name: user_info
+        regex:
+          - "user_data: ([a-z0-9_]+)"
+        group: 1
+      - type: dsl
+        name: combined_info
+        dsl:
+          - api_path + "/" + user_id
+`
+
+	tpl, err := CreateYakTemplateFromNucleiTemplateRaw(tmpl)
+	require.NoError(t, err)
+
+	matched := false
+	extractedUserInfo := ""
+	extractedCombined := ""
+	config := NewConfig(
+		WithCustomVariables(map[string]any{
+			"api_path":   "users",
+			"user_id":    "123",
+			"auth_token": "secret_token",
+		}),
+		WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			if result {
+				matched = true
+			}
+			if val, ok := extractor["user_info"]; ok {
+				extractedUserInfo = fmt.Sprint(val)
+			}
+			if val, ok := extractor["combined_info"]; ok {
+				extractedCombined = fmt.Sprint(val)
+			}
+		}),
+	)
+
+	_, err = tpl.ExecWithUrl(fmt.Sprintf("http://%s/", target), config)
+	require.NoError(t, err)
+	require.True(t, matched, "complex scenario should match")
+	require.Equal(t, "/users/123", receivedPath, "path should use custom vars")
+	require.Equal(t, "secret_token", receivedHeader, "header should use custom vars")
+	require.Equal(t, "admin_12345", extractedUserInfo, "should extract user info")
+	require.Equal(t, "users/123", extractedCombined, "should extract combined info using vars")
 }
