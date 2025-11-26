@@ -33,7 +33,7 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		ekm.AppendKnowledge(currentTask.GetUUID(), enhanceDatum)
+		ekm.AppendKnowledge(currentTask.GetId(), enhanceDatum)
 	}
 
 	var queryBuf bytes.Buffer
@@ -87,7 +87,7 @@ func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (s
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		ekm.AppendKnowledge(currentTask.GetUUID(), enhanceDatum)
+		ekm.AppendKnowledge(currentTask.GetId(), enhanceDatum)
 	}
 
 	var queryBuf bytes.Buffer
