@@ -71,11 +71,11 @@ var hybridScanCommand = &cli.Command{
 			Usage: "Just List Plugin, No Scan",
 		},
 		cli.StringSliceFlag{
-			Name:  "vars",
+			Name:  "vars,var",
 			Usage: "Inject template variable (KEY=VALUE). Can be specified multiple times",
 		},
 		cli.StringFlag{
-			Name:  "vars-file",
+			Name:  "vars-file,varfile,var-file",
 			Usage: "Load template variables from file (each line 'Key: Value')",
 		},
 		cli.StringFlag{

@@ -1,0 +1,119 @@
+// httptpl_nuclei_yaml_vars.yak - 测试 httptpl 的 vars 选项功能
+
+yakit.AutoInitYakit()
+
+println("[httptpl vars test] Starting vars option tests...")
+
+// 测试1: vars 在 Paths 模式中生效
+println("\n[Test 1] Testing vars in Paths mode...")
+host, port = tcp.MockServe("HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nsuccess")
+target = str.HostPort(host, port)
+
+template1 = `
+id: vars-path-test
+info:
+  name: Test vars in path mode
+  severity: info
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/{{custom_path}}/{{custom_endpoint}}"
+    matchers:
+      - type: word
+        words:
+          - "success"
+`
+
+matched1 = false
+for result in nuclei.Scan(target, nuclei.rawTemplate(template1), nuclei.vars({
+    "custom_path": "api",
+    "custom_endpoint": "v1"
+}))~ {
+    matched1 = true
+    println("[Test 1] Matched! vars work in path mode")
+}
+assert matched1, "[Test 1] Failed: vars should work in path mode"
+println("[Test 1] PASSED")
+
+// 测试2: vars 在整个数据包模式中生效
+println("\n[Test 2] Testing vars in raw request mode...")
+host2, port2 = tcp.MockServe("HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nsuccess")
+target2 = str.HostPort(host2, port2)
+
+template2 = `
+id: vars-raw-request-test
+info:
+  name: Test vars in raw request mode
+  severity: info
+http:
+  - raw:
+      - |
+        POST /{{custom_path}} HTTP/1.1
+        Host: {{Hostname}}
+        X-Custom-Header: {{custom_header}}
+        Content-Type: application/json
+        
+        {{custom_body}}
+    matchers:
+      - type: word
+        words:
+          - "success"
+`
+
+matched2 = false
+for result in nuclei.Scan(target2, nuclei.rawTemplate(template2), nuclei.vars({
+    "custom_path": "submit",
+    "custom_header": "custom_value",
+    "custom_body": "test_body"
+}))~ {
+    matched2 = true
+    println("[Test 2] Matched! vars work in raw request mode")
+}
+assert matched2, "[Test 2] Failed: vars should work in raw request mode"
+println("[Test 2] PASSED")
+
+// 测试3: 复杂场景 - vars 在 matcher, extractor 和 request 中同时使用
+println("\n[Test 3] Testing complex scenario with vars...")
+host3, port3 = tcp.MockServe("HTTP/1.1 200 OK\r\nContent-Length: 22\r\n\r\nuser_data: admin_12345")
+target3 = str.HostPort(host3, port3)
+
+template3 = `
+id: vars-complex-test
+info:
+  name: Test vars complex scenario
+  severity: info
+http:
+  - raw:
+      - |
+        GET /{{api_path}}/{{user_id}} HTTP/1.1
+        Host: {{Hostname}}
+        X-Token: {{auth_token}}
+        
+    matchers:
+      - type: dsl
+        dsl:
+          - auth_token == "secret_token"
+          - contains(body, "user_data")
+        condition: and
+    extractors:
+      - type: regex
+        name: user_info
+        regex:
+          - "user_data: ([a-z0-9_]+)"
+        group: 1
+`
+
+matched3 = false
+for result in nuclei.Scan(target3, nuclei.rawTemplate(template3), nuclei.vars({
+    "api_path": "users",
+    "user_id": "123",
+    "auth_token": "secret_token"
+}))~ {
+    matched3 = true
+    println("[Test 3] Matched! complex scenario works")
+}
+assert matched3, "[Test 3] Failed: complex scenario should work"
+println("[Test 3] PASSED")
+
+println("\n[httptpl vars test] All tests PASSED! ✓")
+
