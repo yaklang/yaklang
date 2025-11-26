@@ -1784,6 +1784,9 @@ message AIStartParams {
   // 是否启用AI搜索本地工具的功能？
   bool EnableAISearchTool = 12;
 
+  // 是否禁用AI搜索forge功能
+  bool DisableAISearchForge = 32;
+
   // 是否启用AI搜索互联网搜索引擎的功能？
   bool EnableAISearchInternet = 13;
 
