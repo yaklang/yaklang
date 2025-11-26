@@ -276,7 +276,7 @@ func (f *FuzzHTTPRequest) fuzzHTTPHeader(key interface{}, value interface{}) ([]
 		vals := m.Value()
 		key, value := vals[0], vals[1]
 
-		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketHeader(origin, key, value))
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketHeaderStrict(origin, key, value))
 		if err != nil {
 			log.Infof("parse (in FuzzHTTPHeader) request failed: %v", err)
 			continue
