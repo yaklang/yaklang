@@ -456,3 +456,82 @@ func TestAESKeyLengthValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestAESGCMDecryptErrorHandling 测试 AES GCM 模式的错误处理
+func TestAESGCMDecryptErrorHandling(t *testing.T) {
+	plaintext := []byte("Hello Yak World! This is a test message for GCM mode.")
+	key := []byte("1234567890123456")    // 16 bytes key for AES-128
+	validNonce := []byte("aabbccddaabb") // 12 bytes nonce
+
+	// 1. 正常加密解密应该成功
+	encrypted, err := AESGCMEncryptWithNonceSize12(key, plaintext, validNonce)
+	require.NoError(t, err, "encryption should succeed")
+	require.NotNil(t, encrypted, "encrypted data should not be nil")
+
+	decrypted, err := AESGCMDecryptWithNonceSize12(key, encrypted, validNonce)
+	require.NoError(t, err, "decryption should succeed with correct key and nonce")
+	require.Equal(t, plaintext, decrypted, "decrypted data should match original plaintext")
+
+	// 2. 使用错误的密钥解密应该返回错误（不是损坏的内容）
+	wrongKey := []byte("wrongkey12345678") // 16 bytes but wrong key
+	decrypted, err = AESGCMDecryptWithNonceSize12(wrongKey, encrypted, validNonce)
+	require.Error(t, err, "decryption should fail with wrong key")
+	require.Nil(t, decrypted, "decrypted data should be nil when decryption fails")
+	// 验证错误不是 padding 相关的，而是 GCM 认证失败
+	require.NotContains(t, err.Error(), "padding", "error should not be about padding")
+	require.NotContains(t, err.Error(), "PKCS", "error should not be about PKCS padding")
+	// GCM 的错误信息可能包含 "message authentication failed" 或其他认证相关的错误
+	// 关键是要确保这不是 padding 错误，而是真正的解密/认证错误
+
+	// 3. 使用错误的 nonce 解密应该返回错误
+	wrongNonce := []byte("wrongnonce12") // 12 bytes but wrong nonce
+	decrypted, err = AESGCMDecryptWithNonceSize12(key, encrypted, wrongNonce)
+	require.Error(t, err, "decryption should fail with wrong nonce")
+	require.Nil(t, decrypted, "decrypted data should be nil when decryption fails")
+	require.NotContains(t, err.Error(), "padding", "error should not be about padding")
+	require.NotContains(t, err.Error(), "PKCS", "error should not be about PKCS padding")
+	// GCM 的错误应该是认证失败，而不是 padding 问题
+
+	// 4. 修改密文后解密应该返回错误（GCM 有完整性校验）
+	modifiedCiphertext := make([]byte, len(encrypted))
+	copy(modifiedCiphertext, encrypted)
+	// 修改密文的最后一个字节
+	if len(modifiedCiphertext) > 0 {
+		modifiedCiphertext[len(modifiedCiphertext)-1] ^= 0x01
+	}
+	decrypted, err = AESGCMDecryptWithNonceSize12(key, modifiedCiphertext, validNonce)
+	require.Error(t, err, "decryption should fail with modified ciphertext")
+	require.Nil(t, decrypted, "decrypted data should be nil when decryption fails")
+	require.NotContains(t, err.Error(), "padding", "error should not be about padding")
+	require.NotContains(t, err.Error(), "PKCS", "error should not be about PKCS padding")
+	// GCM 的错误应该是认证失败，而不是 padding 问题
+
+	// 5. 使用错误的密钥长度应该返回错误（在创建 cipher 时就会失败）
+	invalidKey := []byte("short") // 5 bytes, invalid for AES
+	_, err = AESGCMEncryptWithNonceSize12(invalidKey, plaintext, validNonce)
+	require.Error(t, err, "encryption should fail with invalid key length")
+	require.Contains(t, err.Error(), "cipher", "error should mention cipher creation failure")
+
+	// 6. 使用无效的密文长度（太短，无法包含 nonce + ciphertext + tag）
+	tooShortCiphertext := []byte("short")
+	decrypted, err = AESGCMDecryptWithNonceSize12(key, tooShortCiphertext, validNonce)
+	require.Error(t, err, "decryption should fail with too short ciphertext")
+	require.Nil(t, decrypted, "decrypted data should be nil when decryption fails")
+	// 这个错误可能是关于数据长度或 nonce 的，不是 padding
+
+	// 7. 验证 GCM 模式不会像 ECB 那样返回损坏的内容
+	// 在 ECB 模式下，使用错误密钥可能会返回一些看起来像数据的内容（虽然损坏）
+	// 但在 GCM 模式下，应该直接返回错误
+	encrypted2, err := AESGCMEncryptWithNonceSize12(key, plaintext, validNonce)
+	require.NoError(t, err)
+
+	// 尝试用错误密钥解密，应该得到错误而不是损坏的数据
+	wrongKey2 := []byte("anotherwrongkey1") // 16 bytes but wrong (确保长度正确)
+	decrypted, err = AESGCMDecryptWithNonceSize12(wrongKey2, encrypted2, validNonce)
+	require.Error(t, err, "decryption with wrong key should return error, not corrupted data")
+	require.Nil(t, decrypted, "GCM should return nil on error, not corrupted data")
+	// GCM 的错误可能是 "cipher: message authentication failed" 或其他格式
+	// 但关键是不应该包含 padding 相关的错误
+	require.NotContains(t, err.Error(), "padding", "error should not be about padding")
+	require.NotContains(t, err.Error(), "PKCS", "error should not be about PKCS padding")
+}
