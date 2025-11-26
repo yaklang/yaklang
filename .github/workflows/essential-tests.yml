@@ -1,6 +1,12 @@
 name: Essential Tests
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or commit SHA to run Essential Tests"
+        required: false
+        default: ""
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -15,38 +21,69 @@ concurrency:
 
 jobs:
   check-wip:
-    # fork PR should not run this action
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     runs-on: ubuntu-22.04
     outputs:
-      should_run_tests: ${{ steps.pre_check.outputs.should_run_tests }}
+      should_run_tests: ${{ steps.finalize.outputs.should_run_tests }}
+      target_ref: ${{ steps.target.outputs.ref }}
     steps:
+      - name: Determine target revision
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF="${{ inputs.ref }}"
+            if [ -z "$REF" ]; then
+              REF="${{ github.sha }}"
+            fi
+          else
+            REF="${{ github.event.pull_request.head.sha }}"
+          fi
+          echo "ref=$REF" >> $GITHUB_OUTPUT
+
+      - name: Initialize run flag
+        run: echo "SHOULD_RUN=false" >> $GITHUB_ENV
+
+      - name: Allow manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "SHOULD_RUN=true" >> $GITHUB_ENV
+
       - name: 'Check Out'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ steps.target.outputs.ref }}
 
       - name: Run Pre-Check
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         id: pre_check
         uses: ./.github/actions/pre-check
         with:
           failed-labels: 'do-not-merge,work in progress,wip,rfc'
           cache-key-prefix: 'essential-tests'
 
+      - name: Accept Pre-Check result
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: echo "SHOULD_RUN=${{ steps.pre_check.outputs.should_run_tests }}" >> $GITHUB_ENV
+
+      - name: Finalize outputs
+        id: finalize
+        run: |
+          echo "should_run_tests=$SHOULD_RUN" >> $GITHUB_OUTPUT
+        env:
+          SHOULD_RUN: ${{ env.SHOULD_RUN }}
+
   setup:
     needs: check-wip
-    # 运行条件：
-    # 1. check-wip 正常运行且输出 should_run_tests == 'true'
-    # 2. check-wip 被跳过，但 PR 有 run-tests label（外部 PR 手动触发）
-    if: |
-      (needs.check-wip.result == 'success' && needs.check-wip.outputs.should_run_tests == 'true') ||
-      (needs.check-wip.result == 'skipped' && contains(github.event.pull_request.labels.*.name, 'run-tests'))
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Set Cache Key
         id: cache_key
         run: |
-          CACHE_SHA="${{ github.event.pull_request.head.sha }}"
+          CACHE_SHA="${{ needs.check-wip.outputs.target_ref }}"
+          if [ -z "$CACHE_SHA" ]; then
+            CACHE_SHA="${{ github.sha }}"
+          fi
           echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
           echo "Cache key will be: go-$CACHE_SHA"
 
@@ -63,7 +100,7 @@ jobs:
         if: steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -91,12 +128,7 @@ jobs:
   test:
     name: ${{ matrix.name }}
     needs: [check-wip, setup]
-    # 运行条件：
-    # 1. check-wip 正常运行且输出 should_run_tests == 'true'
-    # 2. check-wip 被跳过，但 PR 有 run-tests label（外部 PR 手动触发）
-    if: |
-      (needs.check-wip.result == 'success' && needs.check-wip.outputs.should_run_tests == 'true') ||
-      (needs.check-wip.result == 'skipped' && contains(github.event.pull_request.labels.*.name, 'run-tests'))
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     strategy:
       matrix:
@@ -318,12 +350,15 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
 
       - name: Set Cache Key
         id: cache_key
         run: |
-          CACHE_SHA="${{ github.event.pull_request.head.sha }}"
+          CACHE_SHA="${{ needs.check-wip.outputs.target_ref }}"
+          if [ -z "$CACHE_SHA" ]; then
+            CACHE_SHA="${{ github.sha }}"
+          fi
           echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
           echo "Cache key will be: go-$CACHE_SHA"
 
