@@ -2,12 +2,16 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
+	mcptool "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -108,6 +112,33 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	// 处理动态脚本
 	if len(req.GetScript()) > 0 {
 		opts = append(opts, mcp.WithDynamicScript(req.GetScript()))
+	}
+
+	if req.GetEnableYakAITool() {
+		_, yakitTools, err := yakit.SearchAIYakToolWithPagination(consts.GetGormProfileDatabase(), "", false, &ypb.Paging{
+			OrderBy: "updated_at",
+			Order:   "desc",
+			Limit:   200,
+		})
+		if err != nil {
+			log.Errorf("failed to search yakit tools: %s", err)
+		}
+
+		tools := make([]*mcptool.Tool, 0, len(yakitTools))
+		for _, aiTool := range yakitTools {
+			tool := mcptool.NewTool(aiTool.Name)
+			tool.Description = aiTool.Description
+			dataMap := map[string]any{}
+			err := json.Unmarshal([]byte(aiTool.Params), &dataMap)
+			if err != nil {
+				log.Errorf("unmarshal aiTool.Params failed: %v", err)
+				continue
+			}
+			tool.InputSchema.FromMap(dataMap)
+			tool.YakScript = aiTool.Content
+			tools = append(tools, tool)
+		}
+		opts = append(opts, mcp.WithYakScriptTools(tools...))
 	}
 
 	// 创建 MCP 服务器

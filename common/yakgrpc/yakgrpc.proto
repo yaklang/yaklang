@@ -1946,6 +1946,8 @@ message StartMcpServerRequest {
   repeated string Script = 7;
   // enable all tool sets
   bool EnableAll = 8;
+  // enable yak ai tool
+  bool EnableYakAITool = 9;
 }
 
 message StartMcpServerResponse {

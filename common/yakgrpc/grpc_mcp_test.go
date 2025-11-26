@@ -172,3 +172,123 @@ func TestGRPC_StartMcpServer_DefaultPort(t *testing.T) {
 		}
 	}
 }
+
+func TestGRPC_StartMcpServer_WithAITool(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 第一步：创建一个 AI Tool
+	toolName := "test_mcp_tool_" + utils.RandStringBytes(8)
+	toolDescription := "Test tool for MCP server validation"
+	toolContent := `
+cli.String("url", cli.setRequired(true))
+`
+
+	saveReq := &ypb.SaveAIToolRequest{
+		Name:        toolName,
+		Description: toolDescription,
+		Content:     toolContent,
+		Keywords:    []string{"test", "mcp"},
+	}
+
+	saveResp, err := client.SaveAIToolV2(context.Background(), saveReq)
+	require.NoError(t, err)
+	require.NotNil(t, saveResp)
+	require.True(t, saveResp.IsSuccess, "Tool should be created successfully")
+
+	// 清理：测试结束后删除创建的工具
+	defer func() {
+		deleteReq := &ypb.DeleteAIToolRequest{
+			ToolNames: []string{toolName},
+		}
+		_, _ = client.DeleteAITool(context.Background(), deleteReq)
+	}()
+
+	// 第二步：启动 MCP Server
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	startReq := &ypb.StartMcpServerRequest{
+		Host:      "127.0.0.1",
+		Port:      0, // 使用随机端口
+		EnableAll: true,
+	}
+
+	stream, err := client.StartMcpServer(ctx, startReq)
+	require.NoError(t, err)
+
+	var serverUrl string
+
+	// 接收状态消息，直到服务器启动
+	for i := 0; i < 5; i++ {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		if resp.ServerUrl != "" {
+			serverUrl = resp.ServerUrl
+		}
+
+		log.Infof("MCP Server Status: %s, Message: %s", resp.Status, resp.Message)
+
+		if resp.Status == "running" {
+			break
+		}
+	}
+
+	require.NotEmpty(t, serverUrl, "Server URL should be provided")
+
+	// 第三步：连接 MCP 客户端并验证工具是否存在
+	mcpClient, err := mcpclient.NewSSEMCPClient(serverUrl)
+	require.NoError(t, err)
+	defer mcpClient.Close()
+
+	// 启动客户端连接
+	clientCtx, clientCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer clientCancel()
+
+	err = mcpClient.Start(clientCtx)
+	require.NoError(t, err)
+
+	// 初始化客户端
+	initRequest := rawmcp.InitializeRequest{}
+	initRequest.Params.ProtocolVersion = rawmcp.LATEST_PROTOCOL_VERSION
+	initRequest.Params.ClientInfo = rawmcp.Implementation{
+		Name:    "test-mcp-aitool-client",
+		Version: "1.0.0",
+	}
+
+	initResult, err := mcpClient.Initialize(clientCtx, initRequest)
+	require.NoError(t, err)
+	require.NotNil(t, initResult)
+	log.Infof("MCP Client initialized with server: %s %s",
+		initResult.ServerInfo.Name,
+		initResult.ServerInfo.Version)
+
+	// 第四步：列出所有工具并验证我们创建的工具是否存在
+	toolsRequest := rawmcp.ListToolsRequest{}
+	toolsResult, err := mcpClient.ListTools(clientCtx, toolsRequest)
+	require.NoError(t, err)
+	require.NotNil(t, toolsResult)
+	require.Greater(t, len(toolsResult.Tools), 0, "Should have at least one tool")
+
+	log.Infof("Total tools available: %d", len(toolsResult.Tools))
+
+	// 查找我们创建的工具
+	toolFound := false
+	for _, tool := range toolsResult.Tools {
+		log.Infof("Available tool: %s - %s", tool.Name, tool.Description)
+		if tool.Name == toolName {
+			toolFound = true
+			assert.Equal(t, toolDescription, tool.Description, "Tool description should match")
+			log.Infof("Found our test tool: %s", toolName)
+			break
+		}
+	}
+
+	// 验证工具必须存在
+	require.True(t, toolFound, "Created AI tool '%s' should be available in MCP server", toolName)
+}
