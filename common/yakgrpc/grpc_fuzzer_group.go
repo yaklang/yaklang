@@ -91,11 +91,11 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 	}
 
 	ctx := stream.Context()
-	limit := req.GetConcurrent()
-	if limit <= 0 {
-		limit = int64(len(requests))
+	groupConcurrent := req.GetConcurrent()
+	if groupConcurrent <= 0 {
+		groupConcurrent = int64(len(requests))
 	}
-	swg := utils.NewSizedWaitGroup(int(limit), ctx)
+	swg := utils.NewSizedWaitGroup(int(groupConcurrent), ctx)
 
 	var (
 		wg          sync.WaitGroup
@@ -126,6 +126,9 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 		}
 		if req.GetOverrides() != nil {
 			applyGroupOverrides(req.GetOverrides(), request)
+		}
+		if groupConcurrent > 0 {
+			request.Concurrent = groupConcurrent
 		}
 		request.FuzzerSequenceIndex = uuid.NewString()
 

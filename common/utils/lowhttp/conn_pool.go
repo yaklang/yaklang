@@ -121,13 +121,21 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, exclusive bool, opts ...n
 		return nil, utils.Error("lowhttp: context done")
 	}
 
+	if exclusive {
+		pConn, err := newPersistConn(key, l, true, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return pConn, nil
+	}
+
 	// 尝试获取复用连接
 	if oldPc, ok := l.getFromConn(key, exclusive); ok {
 		//addGetIdleConnFinishedCounter()
 		return oldPc, nil
 	}
 	// 没有复用连接则新建一个连接
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(key, l, false, opts...)
 	if err != nil {
 		// try get idle conn
 		if oldPc, ok := l.getFromConn(key, exclusive); ok {
@@ -411,7 +419,7 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+func newPersistConn(key *connectKey, pool *LowHttpConnPool, exclusive bool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
 	newConn, err := netx.DialX(key.addr, opt...)
@@ -439,6 +447,7 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		rPacket:         make([]packetInfo, 0),
 		//numExpectedResponses: 0,
 	}
+	pc.exclusive = exclusive
 
 	if key.scheme == H2 {
 		if key.https { // Negotiation fail downgrade
@@ -459,6 +468,9 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		pc.h2Conn()
 		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
+			if exclusive {
+				return pc, nil
+			}
 			err = pool.putIdleConn(pc)
 			if err != nil {
 				log.Errorf("h2 conn put idle conn failed: %v", err) // not care h2 conn put idle conn failed
