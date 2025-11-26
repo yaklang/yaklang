@@ -10,11 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func NewTestConfig(ctx context.Context) *Config {
+func NewTestConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	return NewConfig(ctx,
-		WithAICallback(func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		append(opts, WithAICallback(func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 			return &AIResponse{}, nil
-		}),
+		}))...,
 	)
 }
 
