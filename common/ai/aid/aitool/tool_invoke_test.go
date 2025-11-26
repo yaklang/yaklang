@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -571,6 +573,10 @@ func TestHandleLargeContent(t *testing.T) {
 		// 验证返回的文件名
 		require.NotEmpty(t, filename, "文件名不应为空")
 		require.Contains(t, filename, ".test.txt", "文件名应包含内容类型")
+		require.True(t, utils.FileExists(filename))
+		fileContent, err := os.ReadFile(filename)
+		require.NoError(t, err)
+		require.Equal(t, string(fileContent), testContent)
 	})
 }
 

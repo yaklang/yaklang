@@ -293,7 +293,7 @@ func handleLargeContentToFile(content string, contentType string) string {
 
 	fp.Write([]byte(content))
 	fp.Close()
-	return filename
+	return fp.Name()
 }
 
 // ValidateParams 验证参数 - 内部方法支持两种参数类型
