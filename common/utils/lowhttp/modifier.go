@@ -702,10 +702,12 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		}
 		return nil
 	}, func(line string) string {
-		if k, _ := SplitHTTPHeader(line); k == headerKey {
-			handled = true
-			header = append(header, headerKey+": "+utils.InterfaceToString(headerValue))
-			return line
+		if k, _ := SplitHTTPHeader(line); k != "" {
+			if strings.EqualFold(k, headerKey) {
+				handled = true
+				header = append(header, k+": "+utils.InterfaceToString(headerValue))
+				return line
+			}
 		}
 		header = append(header, line)
 		return line
@@ -841,7 +843,7 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 		}
 		return nil
 	}, func(line string) string {
-		if k, _ := SplitHTTPHeader(line); k == headerKey {
+		if k, _ := SplitHTTPHeader(line); k != "" && strings.EqualFold(k, headerKey) {
 			return ""
 		}
 		header = append(header, line)
@@ -1593,7 +1595,7 @@ func AppendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerVal
 		if !isChunked {
 			isChunked = IsChunkedHeaderLine(line)
 		}
-		if k, _ := SplitHTTPHeader(line); k == headerKey {
+		if k, _ := SplitHTTPHeader(line); k != "" && strings.EqualFold(k, headerKey) {
 			exist = true
 		}
 		header = append(header, line)
@@ -1863,7 +1865,7 @@ func GetHTTPPacketHeader(packet []byte, key string) (header string) {
 		if key == headerKey {
 			return value
 		}
-		if strings.ToLower(key) == strings.ToLower(headerKey) {
+		if strings.EqualFold(key, headerKey) {
 			fuzzResult[key] = value
 		}
 	}
