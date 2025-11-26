@@ -282,7 +282,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	if fs, err := c.parseFSFromInfo(); err != nil {
 		return nil, err
 	} else if fs != nil {
-		c.fs = fs
+		c.fs = getUnifiedSeparatorFs(fs)
 	}
 	switch c.databaseKind {
 	case ssa.ProgramCacheNone:
