@@ -200,6 +200,7 @@ type MixPluginCaller struct {
 
 	runtimeId string
 	proxy     []string
+	extraVars map[string]any // 额外的变量传递给插件
 
 	feedbackHandler        func(*ypb.ExecResult) error
 	ordinaryFeedback       func(i interface{}, item ...interface{})
@@ -234,6 +235,16 @@ func (m *MixPluginCaller) SetRuntimeId(s string) {
 	if m.callers != nil {
 		m.callers.runtimeId = s
 	}
+}
+
+func (m *MixPluginCaller) SetVar(key string, value any) {
+	if m == nil {
+		return
+	}
+	if m.extraVars == nil {
+		m.extraVars = make(map[string]any)
+	}
+	m.extraVars[key] = value
 }
 
 func (m *MixPluginCaller) SetProxy(s ...string) {
@@ -618,6 +629,13 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *schema.YakSc
 	)
 	for _, p := range params {
 		paramMap[p.Key] = p.Value
+	}
+
+	// 添加额外的变量
+	if m.extraVars != nil {
+		for k, v := range m.extraVars {
+			paramMap[k] = v
+		}
 	}
 
 	ctx = context.WithValue(ctx, "ctx_info", map[string]interface{}{})

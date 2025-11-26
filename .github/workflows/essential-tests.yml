@@ -261,6 +261,7 @@ jobs:
               [
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow*"},
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_Fingerprint*"},
+                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan*"},
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS*"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON*"},
                 {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
