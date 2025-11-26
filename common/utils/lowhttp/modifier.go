@@ -682,12 +682,30 @@ func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
 	})
 }
 
-// ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改请求头，如果不存在则会增加
+func headerKeyEqual(lhs, rhs string, ignoreCase bool) bool {
+	if ignoreCase {
+		return strings.EqualFold(lhs, rhs)
+	}
+	return lhs == rhs
+}
+
+// ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改请求头，如果不存在则会增加。
+// 默认情况下（ignoreCase=true）会忽略大小写匹配，若需要严格匹配可使用 ReplaceHTTPPacketHeaderStrict。
 // Example:
 // ```
-// poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改 AAA 请求头，如果不存在则新增（忽略大小写）
+// poc.ReplaceHTTPPacketHeaderStrict(poc.BasicRequest(),"AAA", "BBB") // 严格匹配 AAA 的大小写，再进行修改/新增
 // ```
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
+	return replaceHTTPPacketHeader(packet, headerKey, headerValue, true)
+}
+
+// ReplaceHTTPPacketHeaderStrict matches header keys case-sensitively.
+func ReplaceHTTPPacketHeaderStrict(packet []byte, headerKey string, headerValue any) []byte {
+	return replaceHTTPPacketHeader(packet, headerKey, headerValue, false)
+}
+
+func replaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any, ignoreCase bool) []byte {
 	var firstLine string
 	var header []string
 	var handled bool
@@ -703,7 +721,7 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 		return nil
 	}, func(line string) string {
 		if k, _ := SplitHTTPHeader(line); k != "" {
-			if strings.EqualFold(k, headerKey) {
+			if headerKeyEqual(k, headerKey, ignoreCase) {
 				handled = true
 				header = append(header, k+": "+utils.InterfaceToString(headerValue))
 				return line
@@ -789,10 +807,11 @@ func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte
 	return ReplaceHTTPPacketHeader(packet, "Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
-// AppendHTTPPacketHeader 是一个辅助函数，用于改变请求报文，添加请求头
+// AppendHTTPPacketHeader 是一个辅助函数，用于改变请求报文，添加请求头。
+// 无论 header 是否已存在都会直接附加（大小写不敏感行为与 Replace 不冲突）。
 // Example:
 // ```
-// poc.AppendHTTPPacketHeader(poc.BasicRequest(), "AAA", "BBB") // 添加AAA请求头的值为BBB
+// poc.AppendHTTPPacketHeader(poc.BasicRequest(), "AAA", "BBB") // 添加 AAA 请求头
 // ```
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
@@ -819,7 +838,8 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 	return ReplaceHTTPPacketBodyRaw(buf.Bytes(), body, true)
 }
 
-// DeleteHTTPPacketHeader 是一个辅助函数，用于改变请求报文，删除请求头
+// DeleteHTTPPacketHeader 是一个辅助函数，用于改变请求报文，删除请求头。
+// 默认情况下匹配会忽略 Header 名大小写，若需严格匹配可使用 DeleteHTTPPacketHeaderStrict。
 // Example:
 // ```
 // poc.DeleteHTTPPacketHeader(`GET /get HTTP/1.1
@@ -827,9 +847,25 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 // AAA: BBB
 // Host: pie.dev
 //
-// `, "AAA") // 删除AAA请求头
+// `, "AAA") // 删除 AAA 请求头（忽略大小写）
+//
+// poc.DeleteHTTPPacketHeaderStrict(`GET /get HTTP/1.1
+// Content-Type: application/json
+// AAA: BBB
+// Host: pie.dev
+//
+// `, "AAA") // 仅当 Header 严格等于 AAA 时才删除
 // ```
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
+	return deleteHTTPPacketHeader(packet, headerKey, true)
+}
+
+// DeleteHTTPPacketHeaderStrict removes headers using case-sensitive match.
+func DeleteHTTPPacketHeaderStrict(packet []byte, headerKey string) []byte {
+	return deleteHTTPPacketHeader(packet, headerKey, false)
+}
+
+func deleteHTTPPacketHeader(packet []byte, headerKey string, ignoreCase bool) []byte {
 	var firstLine string
 	var header []string
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
@@ -843,7 +879,7 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 		}
 		return nil
 	}, func(line string) string {
-		if k, _ := SplitHTTPHeader(line); k != "" && strings.EqualFold(k, headerKey) {
+		if k, _ := SplitHTTPHeader(line); k != "" && headerKeyEqual(k, headerKey, ignoreCase) {
 			return ""
 		}
 		header = append(header, line)
@@ -1577,6 +1613,20 @@ func GetParamsFromBody(contentType string, body []byte) (params *OrderedParams, 
 }
 
 func AppendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerValue any) []byte {
+	return appendHTTPPacketHeaderIfNotExist(packet, headerKey, headerValue, true)
+}
+
+// AppendHTTPPacketHeaderIfNotExistStrict 使用区分大小写的方式判断 Header 是否已存在。
+// Example:
+// ```
+// poc.AppendHTTPPacketHeaderIfNotExist(poc.BasicRequest(), "AAA", "BBB") // 添加 AAA 请求头的值为 BBB，如已存在则忽略（忽略大小写）
+// poc.AppendHTTPPacketHeaderIfNotExistStrict(poc.BasicRequest(), "AAA", "BBB") // 严格匹配 AAA，不存在时才添加
+// ```
+func AppendHTTPPacketHeaderIfNotExistStrict(packet []byte, headerKey string, headerValue any) []byte {
+	return appendHTTPPacketHeaderIfNotExist(packet, headerKey, headerValue, false)
+}
+
+func appendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerValue any, ignoreCase bool) []byte {
 	var firstLine string
 	var header []string
 	var exist bool
@@ -1595,7 +1645,7 @@ func AppendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerVal
 		if !isChunked {
 			isChunked = IsChunkedHeaderLine(line)
 		}
-		if k, _ := SplitHTTPHeader(line); k != "" && strings.EqualFold(k, headerKey) {
+		if k, _ := SplitHTTPHeader(line); k != "" && headerKeyEqual(k, headerKey, ignoreCase) {
 			exist = true
 		}
 		header = append(header, line)
@@ -1855,6 +1905,15 @@ func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
 // `, "Content-Type") // 获取Content-Type请求头，这里会返回"application/json"
 // ```
 func GetHTTPPacketHeader(packet []byte, key string) (header string) {
+	return getHTTPPacketHeader(packet, key, true)
+}
+
+// GetHTTPPacketHeaderStrict 获取请求头时会区分大小写。
+func GetHTTPPacketHeaderStrict(packet []byte, key string) (header string) {
+	return getHTTPPacketHeader(packet, key, false)
+}
+
+func getHTTPPacketHeader(packet []byte, key string, ignoreCase bool) (header string) {
 	ret := GetHTTPPacketHeaders(packet)
 	if ret == nil {
 		return ""
@@ -1862,11 +1921,11 @@ func GetHTTPPacketHeader(packet []byte, key string) (header string) {
 
 	fuzzResult := make(map[string]string)
 	for headerKey, value := range ret {
-		if key == headerKey {
-			return value
-		}
-		if strings.EqualFold(key, headerKey) {
+		if headerKeyEqual(key, headerKey, ignoreCase) {
 			fuzzResult[key] = value
+			if !ignoreCase || key == headerKey {
+				return value
+			}
 		}
 	}
 	if len(fuzzResult) > 0 {
