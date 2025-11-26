@@ -187,15 +187,21 @@ CCC: aaa`,
 			require.NotContains(t, string(byteResult), c.black, "AppendHTTPPacketHeaderIfNotExist failed")
 		}
 	}
+
+	// Ensure existing headers with different casing are detected
+	packet := []byte("GET / HTTP/1.1\r\nHOST: example.com\r\n\r\n")
+	result := AppendHTTPPacketHeaderIfNotExist(packet, "host", "example.com")
+	require.Equal(t, string(packet), string(result), "case-insensitive header detection failed")
 }
 
 func TestReplaceHTTPPacketHeader(t *testing.T) {
 	type testcase struct {
-		packet string
-		key    string
-		value  string
-		black  string
-		whites []string
+		packet      string
+		key         string
+		value       string
+		black       string
+		whites      []string
+		expectKeyIn string
 	}
 	testcases := []testcase{
 		{
@@ -241,12 +247,25 @@ Content-Length: 123
 			value:  "123",
 			whites: []string{"Content-Length: 3", "c: 123"},
 		},
+		{
+			packet: `GET / HTTP/1.1
+HOST: www.example.com`,
+			key:         "host",
+			value:       "new.example.com",
+			black:       "www.example.com",
+			whites:      []string{"HOST: new.example.com"},
+			expectKeyIn: "HOST",
+		},
 	}
 
 	for _, c := range testcases {
 		byteResult := ReplaceHTTPPacketHeader([]byte(c.packet), c.key, c.value)
 		spew.Dump(byteResult)
-		require.Contains(t, string(byteResult), c.key, "ReplaceHTTPPacketHeader failed")
+		checkKey := c.key
+		if c.expectKeyIn != "" {
+			checkKey = c.expectKeyIn
+		}
+		require.Contains(t, string(byteResult), checkKey, "ReplaceHTTPPacketHeader failed")
 
 		if c.black != "" {
 			require.NotContains(t, string(byteResult), c.black, "ReplaceHTTPPacketHeader failed")
@@ -307,6 +326,13 @@ DDDD: 11`,
 			key:   "CCC",
 			black: "aaa",
 			white: "DDDD: 11",
+		},
+		{
+			packet: `GET / HTTP/1.1
+HOST: www.baidu.com
+CCC: aaa`,
+			key:   "ccc",
+			black: "CCC: aaa",
 		},
 		{
 			packet: `GET / HTTP/1.1
@@ -1052,6 +1078,30 @@ func TestGetHTTPPacketHeader2(t *testing.T) {
 Host: www.baidu.com`), "host") != "www.baidu.com" {
 		t.Fatal("GetHTTPPacketHeader failed(insensitive case test)")
 	}
+}
+
+func TestHTTPPacketHeaderFunctionsCaseInsensitive(t *testing.T) {
+	raw := []byte("GET / HTTP/1.1\r\nHOST: example.com\r\nX-Test: 1\r\n\r\n")
+
+	t.Run("ReplaceHTTPPacketHeader", func(t *testing.T) {
+		result := ReplaceHTTPPacketHeader(raw, "host", "new.example.com")
+		require.Contains(t, string(result), "HOST: new.example.com")
+	})
+
+	t.Run("AppendHTTPPacketHeaderIfNotExist", func(t *testing.T) {
+		result := AppendHTTPPacketHeaderIfNotExist(raw, "HOST", "example.com")
+		require.Equal(t, string(raw), string(result))
+	})
+
+	t.Run("DeleteHTTPPacketHeader", func(t *testing.T) {
+		result := DeleteHTTPPacketHeader(raw, "host")
+		require.NotContains(t, string(result), "HOST:")
+	})
+
+	t.Run("GetHTTPPacketHeader", func(t *testing.T) {
+		value := GetHTTPPacketHeader(raw, "host")
+		require.Equal(t, "example.com", value)
+	})
 }
 
 func TestGetHTTPPacketURLFetcher(t *testing.T) {
