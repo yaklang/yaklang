@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -446,7 +447,7 @@ func collectCustomVars(entries []string, varsFile string) (map[string]any, error
 		if err != nil {
 			return nil, err
 		}
-		result[key] = value
+		result[key] = parseVarValue(value)
 	}
 	if len(result) == 0 {
 		return nil, nil
@@ -467,12 +468,12 @@ func parseKeyValue(raw string) (string, string, error) {
 	return key, value, nil
 }
 
-func loadVarsFromFile(path string) (map[string]string, error) {
+func loadVarsFromFile(path string) (map[string]any, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	res := make(map[string]string)
+	res := make(map[string]any)
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	lineNum := 0
 	for scanner.Scan() {
@@ -490,10 +491,39 @@ func loadVarsFromFile(path string) (map[string]string, error) {
 		if key == "" {
 			return nil, fmt.Errorf("invalid vars-file line %d: empty key", lineNum)
 		}
-		res[key] = value
+		res[key] = parseVarValue(value)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 	return res, nil
+}
+
+func parseVarValue(raw string) any {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	lower := strings.ToLower(trimmed)
+	switch lower {
+	case "true":
+		return true
+	case "false":
+		return false
+	case "null":
+		return nil
+	}
+	if i, err := strconv.Atoi(trimmed); err == nil {
+		return i
+	}
+	if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
+		return f
+	}
+	if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) || (strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+			return parsed
+		}
+	}
+	return trimmed
 }
