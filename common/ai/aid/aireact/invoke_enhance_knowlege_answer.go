@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -17,18 +18,22 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 	enhanceID := uuid.NewString()
 	config := r.config
 
-	if config.EnhanceKnowledgeManager == nil {
-		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
+	ekm := config.EnhanceKnowledgeManager
+
+	if ekm == nil {
+		log.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check config! use temp rag knowledge manager")
+		ekm = rag.NewRagEnhanceKnowledgeManager()
+		ekm.SetEmitter(r.Emitter)
 	}
 
-	enhanceData, err := config.EnhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
+	enhanceData, err := ekm.FetchKnowledge(ctx, userQuery)
 	if err != nil {
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		config.EnhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
+		ekm.AppendKnowledge(currentTask.GetUUID(), enhanceDatum)
 	}
 
 	var queryBuf bytes.Buffer
@@ -68,18 +73,21 @@ func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (s
 	enhanceID := uuid.NewString()
 	config := r.config
 
-	if config.EnhanceKnowledgeManager == nil {
-		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
+	ekm := config.EnhanceKnowledgeManager
+	if ekm == nil {
+		log.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check config! use temp rag knowledge manager")
+		ekm = rag.NewRagEnhanceKnowledgeManager()
+		ekm.SetEmitter(r.Emitter)
 	}
 
-	enhanceData, err := config.EnhanceKnowledgeManager.FetchKnowledge(ctx, userQuery)
+	enhanceData, err := ekm.FetchKnowledge(ctx, userQuery)
 	if err != nil {
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		config.EnhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
+		ekm.AppendKnowledge(currentTask.GetUUID(), enhanceDatum)
 	}
 
 	var queryBuf bytes.Buffer

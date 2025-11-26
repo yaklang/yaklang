@@ -1845,6 +1845,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithHotPatchOptionChan(hotPatchChan))
 	}
 
+	if i.EnhanceKnowledgeManager != nil {
+		opts = append(opts, WithEnhanceKnowledgeManager(i.EnhanceKnowledgeManager))
+	}
+
 	opts = append(opts, WithContext(i.Ctx))
 
 	return opts
