@@ -1,8 +1,14 @@
 nucleiPoC = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN"]
+customVars = "INJECTED_VARS" in MITM_PARAMS ? MITM_PARAMS["INJECTED_VARS"] : nil
+if customVars != nil {
+    log.Info("found injected vars for nuclei: %v", customVars)
+}
+
 execNuclei = func(target) {
     nucleiPocName = nucleiPoC.ScriptName
 	// log.Info("start to execute: %s [%v]", nucleiPocName, target)
-    customVars = INJECTED_VARS
+    var res
+    var err
     if customVars == nil {
         res, err = nuclei.Scan(
             target,
