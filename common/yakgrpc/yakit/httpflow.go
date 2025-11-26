@@ -898,7 +898,8 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			}
 			suffixes = append(suffixes, suffix)
 		}
-		db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", suffixes)
+		// 使用精确后缀匹配，避免 .js 匹配 .json 或 .jsp
+		db = bizhelper.FuzzQueryStringArrayOrSuffixLike(db, "path", suffixes)
 	}
 	if len(params.GetExcludeSuffix()) > 0 {
 		var suffixes []string
@@ -908,7 +909,8 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			}
 			suffixes = append(suffixes, suffix)
 		}
-		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", suffixes)
+		// 使用精确后缀匹配，避免 .js 匹配 .json 或 .jsp
+		db = bizhelper.FuzzQueryStringArrayOrSuffixLikeExclude(db, "path", suffixes)
 	}
 	if len(params.GetExcludeContentType()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.GetExcludeContentType())

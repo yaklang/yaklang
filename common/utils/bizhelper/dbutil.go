@@ -306,6 +306,50 @@ func FuzzQueryStringArrayOrLikeExclude(db *gorm.DB, field string, s []string) *g
 	return FuzzQueryArrayOrLikeExclude(db, field, raw)
 }
 
+// FuzzQueryStringArrayOrSuffixLike 精确匹配后缀（用于文件后缀过滤）
+// 使用 path LIKE '%.suffix' 模式，确保只匹配以指定后缀结尾的路径
+func FuzzQueryStringArrayOrSuffixLike(db *gorm.DB, field string, s []string) *gorm.DB {
+	s = utils.StringArrayFilterEmpty(s)
+	if len(s) <= 0 {
+		return db
+	}
+
+	var (
+		querys []string
+		items  []interface{}
+	)
+
+	for _, suffix := range s {
+		// 使用 %suffix 模式，只匹配以指定后缀结尾的路径
+		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
+		items = append(items, fmt.Sprintf("%%%s", suffix))
+	}
+
+	return db.Where(strings.Join(querys, " OR "), items...)
+}
+
+// FuzzQueryStringArrayOrSuffixLikeExclude 精确排除后缀（用于文件后缀过滤）
+// 使用 path NOT LIKE '%.suffix' 模式，确保只排除以指定后缀结尾的路径
+func FuzzQueryStringArrayOrSuffixLikeExclude(db *gorm.DB, field string, s []string) *gorm.DB {
+	s = utils.StringArrayFilterEmpty(s)
+	if len(s) <= 0 {
+		return db
+	}
+
+	var (
+		querys []string
+		items  []interface{}
+	)
+
+	for _, suffix := range s {
+		// 使用 %suffix 模式，只匹配以指定后缀结尾的路径
+		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
+		items = append(items, fmt.Sprintf("%%%s", suffix))
+	}
+
+	return db.Where(`(not (`+strings.Join(querys, " OR ")+`))`, items...)
+}
+
 func FuzzQueryStringArrayOrPrefixLike(db *gorm.DB, field string, s []string) *gorm.DB {
 	s = utils.StringArrayFilterEmpty(s)
 	if len(s) <= 0 {
