@@ -15,6 +15,11 @@ caller.SetRuntimeId(RUNTIME_ID)
 if PROXY != undefined{
     caller.SetProxy(PROXY)
 }
+
+// Pass INJECTED_VARS to nuclei plugins via SetVar
+if INJECTED_VARS != undefined {
+    caller.SetVar("INJECTED_VARS", INJECTED_VARS)
+}
 caller.LoadPluginByName(CTX,plugin.ScriptName,[])~
 
 needResponse := plugin.Type == "mitm" && RESPONSE == undefined
