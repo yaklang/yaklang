@@ -35,7 +35,12 @@ jobs:
 
   setup:
     needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    # 运行条件：
+    # 1. check-wip 正常运行且输出 should_run_tests == 'true'
+    # 2. check-wip 被跳过，但 PR 有 run-tests label（外部 PR 手动触发）
+    if: |
+      (needs.check-wip.result == 'success' && needs.check-wip.outputs.should_run_tests == 'true') ||
+      (needs.check-wip.result == 'skipped' && contains(github.event.pull_request.labels.*.name, 'run-tests'))
     runs-on: ubuntu-22.04
     steps:
       - name: Set Cache Key
@@ -86,7 +91,12 @@ jobs:
   test:
     name: ${{ matrix.name }}
     needs: [check-wip, setup]
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    # 运行条件：
+    # 1. check-wip 正常运行且输出 should_run_tests == 'true'
+    # 2. check-wip 被跳过，但 PR 有 run-tests label（外部 PR 手动触发）
+    if: |
+      (needs.check-wip.result == 'success' && needs.check-wip.outputs.should_run_tests == 'true') ||
+      (needs.check-wip.result == 'skipped' && contains(github.event.pull_request.labels.*.name, 'run-tests'))
     runs-on: ubuntu-22.04
     strategy:
       matrix:
