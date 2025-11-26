@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -15,6 +17,7 @@ import (
 
 type MCPServerConfig struct {
 	enableTools      map[string]*ToolWithHandler
+	enableAITools    map[string]*ToolWithHandler
 	disableTools     map[string]*ToolWithHandler
 	enableResources  map[string]*ResourceWithHandler
 	disableResources map[string]*ResourceWithHandler
@@ -24,6 +27,7 @@ type MCPServerConfig struct {
 func NewMCPServerConfig() *MCPServerConfig {
 	return &MCPServerConfig{
 		enableTools:      make(map[string]*ToolWithHandler),
+		enableAITools:    make(map[string]*ToolWithHandler),
 		disableTools:     make(map[string]*ToolWithHandler),
 		enableResources:  make(map[string]*ResourceWithHandler),
 		disableResources: make(map[string]*ResourceWithHandler),
@@ -31,10 +35,15 @@ func NewMCPServerConfig() *MCPServerConfig {
 }
 
 func (cfg *MCPServerConfig) ApplyConfig(s *MCPServer) {
-	tools := cfg.enableTools
+	tools := maps.Clone(globalTools)
 	if len(tools) == 0 {
 		tools = globalTools
 	}
+
+	for name, tool := range cfg.enableAITools {
+		tools[name] = tool
+	}
+
 	for name, tool := range tools {
 		if _, ok := cfg.disableTools[name]; ok {
 			continue
@@ -255,4 +264,18 @@ func WithEnableYakScriptToolSet() McpServerOption {
 
 func WithDisableYakScriptToolSet() McpServerOption {
 	return WithDisableToolSet("yak_script")
+}
+
+func WithYakScriptTools(tools ...*mcp.Tool) McpServerOption {
+	return func(cfg *MCPServerConfig) error {
+		for _, tool := range tools {
+			cfg.enableAITools[tool.Name] = &ToolWithHandler{
+				tool: tool,
+				handler: func(s *MCPServer) server.ToolHandlerFunc {
+					return s.execYakScriptWrapper(tool.Name, tool.YakScript)
+				},
+			}
+		}
+		return nil
+	}
 }

@@ -83,6 +83,9 @@ type Tool struct {
 	// DANGER: 这个值永远不应该暴露给用户，只有内部工具才有资格设置它
 	// No Need User-Review
 	NoNeedUserReview bool `json:"-"`
+
+	// 用于使用YakScript创建 MCP 工具
+	YakScript string `json:"yakScript,omitempty"`
 }
 
 type ToolInputSchema struct {
