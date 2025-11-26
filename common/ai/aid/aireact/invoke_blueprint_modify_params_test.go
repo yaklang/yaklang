@@ -332,11 +332,3 @@ LOOP:
 	}
 	fmt.Println(timeline)
 }
-
-func TestAac(t *testing.T) {
-	flag := aitool.InvokeParams(map[string]interface{}{
-		"key": ksuid.New().String(),
-	})
-
-	fmt.Printf(`{"suggestion": "input_params", "params": %s}`, utils.InterfaceToString(flag))
-}
