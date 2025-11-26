@@ -42,9 +42,10 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 		PromptEnglish: "Cancel the execution",
 	},
 	{
-		Value:         "input_params",
-		Prompt:        "直接修改参数",
-		PromptEnglish: "user directly modify the parameters",
+		Value:            "input_params",
+		Prompt:           "直接修改参数",
+		PromptEnglish:    "user directly modify the parameters",
+		AllowExtraPrompt: true,
 	},
 }
 
