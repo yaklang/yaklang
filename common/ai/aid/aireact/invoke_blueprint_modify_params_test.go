@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"strings"
 	"testing"
@@ -277,6 +278,7 @@ LOOP:
 
 			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
 				fmt.Println(string(e.GetContent()))
+				require.Contains(t, string(e.GetContent()), "input_params")
 				epid := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.id"))
 				in <- &ypb.AIInputEvent{
 					IsInteractiveMessage: true,
