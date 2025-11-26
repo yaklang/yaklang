@@ -306,3 +306,153 @@ func TestAESECBDecryptWithPKCS7Padding(t *testing.T) {
 		})
 	}
 }
+
+// TestAESECBEncryptWithPKCS7Padding_KeyLengthValidation 测试 AES 加密函数对密钥长度的验证
+// 验证：密钥长度必须是 16、24 或 32 字节，否则返回错误
+func TestAESECBEncryptWithPKCS7Padding_KeyLengthValidation(t *testing.T) {
+	plaintext := []byte("Hello Yak World!")
+
+	testCases := []struct {
+		name      string
+		key       []byte
+		shouldErr bool
+	}{
+		{"key 13 bytes (should return error)", []byte("aaaaaaaaaaaaa"), true},
+		{"key 15 bytes (should return error)", []byte("aaaaaaaaaaaaaaa"), true},
+		{"key 16 bytes (AES-128, valid)", []byte("aaaaaaaaaaaaaaaa"), false},
+		{"key 17 bytes (should return error)", []byte("aaaaaaaaaaaaaaaaa"), true},
+		{"key 23 bytes (should return error)", make([]byte, 23), true},
+		{"key 24 bytes (AES-192, valid)", make([]byte, 24), false},
+		{"key 25 bytes (should return error)", make([]byte, 25), true},
+		{"key 31 bytes (should return error)", make([]byte, 31), true},
+		{"key 32 bytes (AES-256, valid)", make([]byte, 32), false},
+		{"key 33 bytes (should return error)", make([]byte, 33), true},
+		{"key 40 bytes (should return error)", make([]byte, 40), true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 加密
+			encrypted, err := AESEncryptECBWithPKCSPadding(tc.key, plaintext, nil)
+			if tc.shouldErr {
+				require.Error(t, err, "encryption should fail for %s", tc.name)
+				require.Contains(t, err.Error(), "AES key length must be 16, 24, or 32 bytes", "error message should mention key length requirement")
+				require.Nil(t, encrypted, "encrypted data should be nil when encryption fails")
+				return
+			}
+			require.NoError(t, err, "encryption should succeed for %s", tc.name)
+			require.NotNil(t, encrypted, "encrypted data should not be nil for %s", tc.name)
+			require.Greater(t, len(encrypted), 0, "encrypted data should not be empty for %s", tc.name)
+
+			// 解密
+			decrypted, err := AESDecryptECBWithPKCSPadding(tc.key, encrypted, nil)
+			require.NoError(t, err, "decryption should succeed for %s", tc.name)
+			require.NotNil(t, decrypted, "decrypted data should not be nil for %s", tc.name)
+			require.Equal(t, plaintext, decrypted, "decrypted data should match original plaintext for %s", tc.name)
+		})
+	}
+}
+
+// TestAESECBEncryptWithPKCS7Padding_VariousPlaintextLengths 测试不同长度的明文加密
+func TestAESECBEncryptWithPKCS7Padding_VariousPlaintextLengths(t *testing.T) {
+	key := []byte("aaaaaaaaaaaaaaaa") // 16 bytes for AES-128
+
+	testCases := []struct {
+		name      string
+		plaintext []byte
+	}{
+		{"empty", []byte{}},
+		{"1 byte", []byte("a")},
+		{"10 bytes", []byte("1234567890")},
+		{"15 bytes", []byte("123456789012345")},   // Just under one block
+		{"16 bytes", []byte("1234567890123456")},  // Exactly one block
+		{"17 bytes", []byte("12345678901234567")}, // Just over one block
+		{"32 bytes", make([]byte, 32)},            // Exactly two blocks
+		{"33 bytes", make([]byte, 33)},            // Just over two blocks
+		{"100 bytes", make([]byte, 100)},          // Multiple blocks
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 加密
+			encrypted, err := AESEncryptECBWithPKCSPadding(key, tc.plaintext, nil)
+			require.NoError(t, err, "encryption should succeed for %s", tc.name)
+			require.NotNil(t, encrypted, "encrypted data should not be nil for %s", tc.name)
+			require.Greater(t, len(encrypted), 0, "encrypted data should not be empty for %s", tc.name)
+
+			// 验证加密后的数据长度是块大小的倍数
+			require.Equal(t, 0, len(encrypted)%16, "encrypted data length should be multiple of block size (16) for %s", tc.name)
+
+			// 解密
+			decrypted, err := AESDecryptECBWithPKCSPadding(key, encrypted, nil)
+			require.NoError(t, err, "decryption should succeed for %s", tc.name)
+			require.NotNil(t, decrypted, "decrypted data should not be nil for %s", tc.name)
+			require.Equal(t, tc.plaintext, decrypted, "decrypted data should match original plaintext for %s", tc.name)
+		})
+	}
+}
+
+// TestAESKeyLengthValidation 验证密钥长度验证功能
+// 这个测试验证：密钥长度必须是 16、24 或 32 字节，否则会返回错误
+func TestAESKeyLengthValidation(t *testing.T) {
+	plaintext := []byte("Hello Yak World!")
+
+	// 测试无效密钥长度（应该返回错误）
+	invalidKeyCases := []struct {
+		name string
+		key  []byte
+	}{
+		{"empty key", []byte{}},
+		{"1 byte key", []byte("a")},
+		{"13 bytes key", []byte("aaaaaaaaaaaaa")},
+		{"15 bytes key", make([]byte, 15)},
+		{"17 bytes key", make([]byte, 17)},
+		{"23 bytes key", make([]byte, 23)},
+		{"25 bytes key", make([]byte, 25)},
+		{"31 bytes key", make([]byte, 31)},
+		{"33 bytes key", make([]byte, 33)},
+		{"40 bytes key", make([]byte, 40)},
+		{"100 bytes key", make([]byte, 100)},
+	}
+
+	for _, tc := range invalidKeyCases {
+		t.Run("invalid_"+tc.name, func(t *testing.T) {
+			// 验证加密应该返回错误
+			encrypted, err := AESEncryptECBWithPKCSPadding(tc.key, plaintext, nil)
+			require.Error(t, err, "encryption should fail for invalid key length: %s", tc.name)
+			require.Contains(t, err.Error(), "AES key length must be 16, 24, or 32 bytes", "error message should mention key length requirement")
+			require.Nil(t, encrypted, "encrypted data should be nil when encryption fails")
+
+			// 验证解密也应该返回错误
+			decrypted, err := AESDecryptECBWithPKCSPadding(tc.key, []byte("dummy ciphertext"), nil)
+			require.Error(t, err, "decryption should fail for invalid key length: %s", tc.name)
+			require.Contains(t, err.Error(), "AES key length must be 16, 24, or 32 bytes", "error message should mention key length requirement")
+			require.Nil(t, decrypted, "decrypted data should be nil when decryption fails")
+		})
+	}
+
+	// 测试有效密钥长度（应该成功）
+	validKeyCases := []struct {
+		name string
+		key  []byte
+	}{
+		{"16 bytes key (AES-128)", make([]byte, 16)},
+		{"24 bytes key (AES-192)", make([]byte, 24)},
+		{"32 bytes key (AES-256)", make([]byte, 32)},
+	}
+
+	for _, tc := range validKeyCases {
+		t.Run("valid_"+tc.name, func(t *testing.T) {
+			// 验证加密应该成功
+			encrypted, err := AESEncryptECBWithPKCSPadding(tc.key, plaintext, nil)
+			require.NoError(t, err, "encryption should succeed for valid key length: %s", tc.name)
+			require.NotNil(t, encrypted, "encrypted data should not be nil for %s", tc.name)
+
+			// 验证解密也应该成功
+			decrypted, err := AESDecryptECBWithPKCSPadding(tc.key, encrypted, nil)
+			require.NoError(t, err, "decryption should succeed for valid key length: %s", tc.name)
+			require.NotNil(t, decrypted, "decrypted data should not be nil for %s", tc.name)
+			require.Equal(t, plaintext, decrypted, "decrypted data should match original plaintext for %s", tc.name)
+		})
+	}
+}

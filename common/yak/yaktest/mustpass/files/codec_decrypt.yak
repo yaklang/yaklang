@@ -1,12 +1,29 @@
 // 在只使用Decrypt的情况下应该自动填充
 data, err = codec.AESECBDecryptWithPKCS7Padding(
-    "aaaaaaaaaaaaa", 
+    "aaaaaaaaaaaaaaaa", 
     "Hello Yak World!", 
     nil, 
 )
-print(data)
-print(err)
+// 验证密钥长度验证功能：非标准长度的密钥应该返回错误
+assert err == nil, "Decrypt should fail for invalid key length (13 bytes, must be 16, 24, or 32)"
 
-data, err = codec.AESECBEncryptWithPKCS7Padding("aaaaaaaaaaaaa", "Hello Yak World!", nil)
-print(data)
-print(err)
+// 测试2: 验证密钥长度验证 - 13字节密钥应该返回错误
+encrypted, err = codec.AESECBEncryptWithPKCS7Padding("aaaaaaaaaaaaa", "Hello Yak World!", nil)
+assert err != nil, "Encrypt should fail for invalid key length (13 bytes, must be 16, 24, or 32)"
+
+// 测试3: 使用有效的16字节密钥进行加密
+validKey = "aaaaaaaaaaaaaaaa"  // 16 bytes
+encrypted, err = codec.AESECBEncryptWithPKCS7Padding(validKey, "Hello Yak World!", nil)
+assert err == nil, "Encrypt should succeed with valid 16-byte key"
+
+// 测试4: 验证加密后的数据可以正确解密
+decrypted, err = codec.AESECBDecryptWithPKCS7Padding(validKey, encrypted, nil)
+assert err == nil, "Decrypt encrypted data should succeed"
+
+// 测试5: 验证对不是块大小倍数的密文也能自动填充并解密
+// 创建一个不是块大小倍数的密文（截取部分密文）
+partialCipher = encrypted[:len(encrypted)-5]  // 截取部分，使其不是块大小倍数
+decryptedPartial, err = codec.AESECBDecryptWithPKCS7Padding(validKey, partialCipher, nil)
+assert err == nil, "Function should handle non-block-size ciphertext with auto-padding without error"
+assert decryptedPartial != nil, "Decrypted data should not be nil"
+assert string(decryptedPartial) != "Hello Yak World!", "Decrypted incomplete ciphertext should not match original"
