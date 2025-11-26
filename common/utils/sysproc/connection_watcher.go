@@ -15,8 +15,8 @@ import (
 // NewRemoteIPCallback 是发现新外联 IP 时的回调函数签名
 type NewRemoteIPCallback func(pid int32, remoteIP string, domain string)
 
-// ProcessWatcher 封装了针对单个进程的监控逻辑
-type ProcessWatcher struct {
+// ConnectionsWatcher 封装了针对单个进程的监控逻辑
+type ConnectionsWatcher struct {
 	Pid          int32
 	Proc         *process.Process
 	seenIPs      sync.Map // 已发现的 IP 地址 (key: IP string, value: bool true)
@@ -25,13 +25,13 @@ type ProcessWatcher struct {
 }
 
 // NewWatcher 创建一个新的进程监控器实例
-func NewWatcher(pid int32, cb NewRemoteIPCallback, interval time.Duration) (*ProcessWatcher, error) {
+func NewWatcher(pid int32, cb NewRemoteIPCallback, interval time.Duration) (*ConnectionsWatcher, error) {
 	proc, err := process.NewProcess(pid)
 	if err != nil {
 		return nil, fmt.Errorf("无法找到或创建进程对象 (PID %d): %v", pid, err)
 	}
 
-	return &ProcessWatcher{
+	return &ConnectionsWatcher{
 		Pid:          pid,
 		Proc:         proc,
 		callback:     cb,
@@ -40,7 +40,7 @@ func NewWatcher(pid int32, cb NewRemoteIPCallback, interval time.Duration) (*Pro
 }
 
 // Start 启动监控循环，直到 Context 被取消或进程退出
-func (w *ProcessWatcher) Start(ctx context.Context) {
+func (w *ConnectionsWatcher) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
@@ -79,7 +79,7 @@ func (w *ProcessWatcher) Start(ctx context.Context) {
 }
 
 // processConnections 检查新连接并触发回调
-func (w *ProcessWatcher) processConnections(conns []net.ConnectionStat) {
+func (w *ConnectionsWatcher) processConnections(conns []net.ConnectionStat) {
 	for _, c := range conns {
 		remoteIP := c.Raddr.IP
 
@@ -102,6 +102,6 @@ func (w *ProcessWatcher) processConnections(conns []net.ConnectionStat) {
 }
 
 // resolveIPToDomain 模拟 IP -> 域名的解析
-func (w *ProcessWatcher) resolveIPToDomain(ip string) string {
+func (w *ConnectionsWatcher) resolveIPToDomain(ip string) string {
 	return "N/A (未命中 DNS 缓存)"
 }
