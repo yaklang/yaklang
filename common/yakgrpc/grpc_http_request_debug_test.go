@@ -951,7 +951,7 @@ func TestDebugPluginRiskCount(t *testing.T) {
 		}
 		code := `
 for i in 10 {
-a = risk.NewRisk("127.0.0.1")
+	a = risk.NewRisk("127.0.0.1")
 }
 `
 		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
@@ -1080,10 +1080,14 @@ http:
 					riskMessageCount++
 				}
 			}
+			if cardCount > 0 && riskMessageCount > 0 {
+				break
+			}
 		}
 
 		riskCount, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 		require.NoError(t, err)
+		require.Greater(t, cardCount, 0, "risk count should greater than 0")
 		require.Equal(t, cardCount, riskCount, "risk count not match")
 		require.Equal(t, cardCount, riskMessageCount, "risk message count not match")
 	})
