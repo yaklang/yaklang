@@ -479,6 +479,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "Yaklang 代码",
 		En: "Yaklang Code",
 	},
+	"plan_exec_fail": {
+		Zh: "任务规划执行失败",
+		En: "plan and execute failed",
+	},
 }
 
 func NodeIdToI18n(nodeId string, isStream bool) *I18n {
