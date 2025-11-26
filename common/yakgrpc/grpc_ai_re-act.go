@@ -68,6 +68,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithKeywords(i.GetIncludeSuggestedToolKeywords()...))
 	}
 	if i.GetAIService() != "" {
+		opts = append(opts, aicommon.WithAIServiceName(i.GetAIService()))
 		chat, err := ai.LoadChater(i.GetAIService())
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
@@ -76,8 +77,9 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		}
 	}
 
-	// 默认开启 forge 搜索
-	opts = append(opts, aid.WithAiForgeSearchTool())
+	if !i.GetDisableAISearchForge() {
+		opts = append(opts, aid.WithAiForgeSearchTool())
+	}
 
 	return opts
 }
