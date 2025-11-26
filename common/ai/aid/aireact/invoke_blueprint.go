@@ -26,8 +26,8 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 	},
 	{
 		Value:            "modify_params",
-		Prompt:           "修改参数",
-		PromptEnglish:    "Modify the parameters",
+		Prompt:           "AI修改参数",
+		PromptEnglish:    "ai Modify the parameters",
 		AllowExtraPrompt: true,
 	},
 	{
@@ -40,6 +40,11 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 		Value:         "cancel",
 		Prompt:        "取消执行",
 		PromptEnglish: "Cancel the execution",
+	},
+	{
+		Value:         "input_params",
+		Prompt:        "直接修改参数",
+		PromptEnglish: "user directly modify the parameters",
 	},
 }
 
