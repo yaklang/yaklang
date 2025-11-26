@@ -3,6 +3,7 @@ package codec
 import (
 	"crypto/aes"
 	"errors"
+	"strconv"
 )
 
 //func AESCBCEncryptWithPKCS7Padding(key []byte, i interface{}, iv []byte) ([]byte, error) {
@@ -134,6 +135,11 @@ func AESDecryptCBCWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 
 func AESEncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {
+		// 验证密钥长度必须是 16、24 或 32 字节
+		keyLen := len(key)
+		if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+			return nil, errors.New("AES key length must be 16, 24, or 32 bytes, got " + strconv.Itoa(keyLen) + " bytes")
+		}
 		data := paddingFunc(interfaceToBytes(i), 16)
 		iv = FixIV(iv, key, 16)
 		return AESEnc(key, data, iv, mode)
@@ -142,11 +148,20 @@ func AESEncFactory(paddingFunc func([]byte, int) []byte, mode string) SymmetricC
 
 func AESDecFactory(paddingFunc func([]byte, int) []byte, unpaddingFunc func([]byte) []byte, mode string) SymmetricCryptFunc {
 	return func(key []byte, i interface{}, iv []byte) ([]byte, error) {
+		// 验证密钥长度必须是 16、24 或 32 字节
+		keyLen := len(key)
+		if keyLen != 16 && keyLen != 24 && keyLen != 32 {
+			return nil, errors.New("AES key length must be 16, 24, or 32 bytes, got " + strconv.Itoa(keyLen) + " bytes")
+		}
 		iv = FixIV(iv, key, 16)
 		data := interfaceToBytes(i)
 		// Auto-pad data to blockSize (16 bytes) multiple if needed
 		// This allows decryption of data that is not a multiple of block size
-		data = paddingFunc(data, 16)
+		// Only pad if data is not already a multiple of block size
+		blockSize := 16
+		if len(data)%blockSize != 0 {
+			data = paddingFunc(data, blockSize)
+		}
 
 		res, err := AESDec(key, data, iv, mode)
 		if err != nil {
