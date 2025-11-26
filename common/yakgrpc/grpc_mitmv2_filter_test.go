@@ -288,6 +288,9 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeSuffixAndContentType(t *testing.T)
 			{"/static/abc.js", 0},
 			{"/abc.ajs", 1},
 			{"/abc.json", 1},
+			{"/abc.jsp", 1},              // 测试：过滤 .js 不应该过滤 .jsp
+			{"/test.jsp", 1},             // 测试：过滤 .js 不应该过滤 .jsp
+			{"/page.jsp?param=value", 1}, // 测试：带参数的 .jsp 也不应该被过滤
 		} {
 			path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
