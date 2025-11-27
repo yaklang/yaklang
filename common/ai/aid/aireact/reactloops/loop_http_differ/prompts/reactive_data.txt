@@ -1,0 +1,48 @@
+## Current HTTP Fuzzing Context
+
+<|ORIGINAL_REQUEST_{{ .Nonce }}|>
+{{ .OriginalRequest }}
+<|ORIGINAL_REQUEST_END_{{ .Nonce }}|>
+
+{{ if .SecurityKnowledge }}
+### Security Knowledge Base Results
+<|SECURITY_KNOWLEDGE_{{ .Nonce }}|>
+{{ .SecurityKnowledge }}
+<|SECURITY_KNOWLEDGE_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .LastRequest }}
+### Last Fuzzed Request
+<|LAST_REQUEST_{{ .Nonce }}|>
+{{ .LastRequest }}
+<|LAST_REQUEST_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .LastResponse }}
+### Last Response
+<|LAST_RESPONSE_{{ .Nonce }}|>
+{{ .LastResponse }}
+<|LAST_RESPONSE_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .DiffResult }}
+### Diff Analysis Results
+<|DIFF_RESULT_{{ .Nonce }}|>
+{{ .DiffResult }}
+<|DIFF_RESULT_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .FeedbackMessages }}
+### Feedback Messages
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+{{ end }}
+
+---
+Based on the above context and security knowledge, decide your next fuzzing action. Consider:
+1. What parameters have not been tested yet?
+2. What patterns emerged from previous tests?
+3. What payloads are recommended by the security knowledge base?
+4. Should you try different payload types based on observed responses?
+
