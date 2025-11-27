@@ -142,47 +142,21 @@ func (r *Recorder) ensureEntry(name string, stepCount int) (*measurementData, er
 	return entry, nil
 }
 
-func (r *Recorder) Track(enabled bool, name string, steps ...func()) {
-	stepFuncs := make([]StepFunc, 0, len(steps))
-	for _, step := range steps {
-		if step == nil {
-			continue
-		}
-		fn := step
-		stepFuncs = append(stepFuncs, func() error {
-			fn()
-			return nil
-		})
-	}
-	if _, err := r.TrackWithError(enabled, name, stepFuncs...); err != nil {
-		log.Debugf("diagnostics: track %s error: %v", name, err)
-	}
-}
-
-func (r *Recorder) TrackWithError(enabled bool, name string, steps ...StepFunc) (Measurement, error) {
-	empty := Measurement{Name: name}
+func (r *Recorder) Track(enabled bool, name string, steps ...StepFunc) error {
 	if name == "" {
-		return empty, errors.New("diagnostics: measurement name is empty")
+		return errors.New("diagnostics: measurement name is empty")
 	}
 
 	if !enabled || r == nil {
-		for _, step := range steps {
-			if step == nil {
-				continue
-			}
-			if err := step(); err != nil {
-				return empty, err
-			}
-		}
-		return empty, nil
+		return runStepsWithoutRecording(steps)
 	}
 
 	entry, err := r.ensureEntry(name, len(steps))
 	if err != nil {
-		return empty, err
+		return err
 	}
 	if entry == nil {
-		return empty, nil
+		return nil
 	}
 
 	durations := make([]time.Duration, len(steps))
@@ -194,7 +168,7 @@ func (r *Recorder) TrackWithError(enabled bool, name string, steps ...StepFunc) 
 		start := time.Now()
 		if err := step(); err != nil {
 			entry.markError()
-			return empty, err
+			return err
 		}
 		elapsed := time.Since(start)
 		durations[i] = elapsed
@@ -202,7 +176,19 @@ func (r *Recorder) TrackWithError(enabled bool, name string, steps ...StepFunc) 
 	}
 
 	entry.record(total, durations)
-	return entry.snapshot(), nil
+	return nil
+}
+
+func runStepsWithoutRecording(steps []StepFunc) error {
+	for _, step := range steps {
+		if step == nil {
+			continue
+		}
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Recorder) Snapshot() []Measurement {
@@ -234,60 +220,16 @@ func (r *Recorder) Reset() {
 	r.entries = utils.NewSafeMap[*measurementData]()
 }
 
-var defaultRecorder struct {
-	mu       sync.RWMutex
-	recorder *Recorder
-}
-
-func init() {
-	defaultRecorder.recorder = NewRecorder()
-}
-
-func DefaultRecorder() *Recorder {
-	defaultRecorder.mu.RLock()
-	defer defaultRecorder.mu.RUnlock()
-	return defaultRecorder.recorder
-}
-
-func ReplaceDefault(rec *Recorder) *Recorder {
-	if rec == nil {
-		rec = NewRecorder()
-	}
-	defaultRecorder.mu.Lock()
-	old := defaultRecorder.recorder
-	defaultRecorder.recorder = rec
-	defaultRecorder.mu.Unlock()
-	return old
-}
-
-func ResetDefaultRecorder() *Recorder {
-	rec := NewRecorder()
-	ReplaceDefault(rec)
-	return rec
-}
-
-func Track(enabled bool, name string, steps ...func()) {
-	DefaultRecorder().Track(enabled, name, steps...)
-}
-
-func TrackWithError(enabled bool, name string, steps ...StepFunc) (Measurement, error) {
-	return DefaultRecorder().TrackWithError(enabled, name, steps...)
-}
-
 func LogRecorder(label string, recorders ...*Recorder) {
 	if len(recorders) == 0 {
 		recorders = []*Recorder{DefaultRecorder()}
 	}
 	for _, rec := range recorders {
-		logRecorder(label, rec)
+		rec.Log(label)
 	}
 }
 
-func (r *Recorder) Log(label string) {
-	logRecorder(label, r)
-}
-
-func logRecorder(label string, rec *Recorder) {
+func (rec *Recorder) Log(label string) {
 	if rec == nil {
 		log.Infof("recorder %s is nil", label)
 		return
