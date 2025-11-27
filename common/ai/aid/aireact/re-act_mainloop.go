@@ -19,6 +19,24 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// updateRuntimeTasks 更新 runtime tasks
+func (r *ReAct) updateRuntimeTasks() {
+	r.UpdateRuntimeTaskMutex.Lock()
+	defer r.UpdateRuntimeTaskMutex.Unlock()
+	newRuntimeTasks := make([]aicommon.AIStatefulTask, 0)
+
+	for _, task := range r.RuntimeTasks {
+		if task.GetStatus() == aicommon.AITaskState_Completed {
+			continue
+		}
+		if task.GetStatus() == aicommon.AITaskState_Aborted {
+			continue
+		}
+		newRuntimeTasks = append(newRuntimeTasks, task)
+	}
+	r.RuntimeTasks = newRuntimeTasks
+}
+
 // processReActFromQueue 处理队列中的下一个任务
 func (r *ReAct) processReActFromQueue() {
 	if r.taskQueue.IsEmpty() {
@@ -37,6 +55,7 @@ func (r *ReAct) processReActFromQueue() {
 		return
 	}
 
+	r.addRuntimeTask(nextTask)
 	r.setCurrentTask(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
 	if r.config.DebugEvent {
@@ -110,6 +129,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		}),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			r.wg.Add(1)
+
 			diffStr, err := r.config.TimelineDiffer.Diff()
 			if err != nil {
 				log.Warnf("timeline differ call failed: %v", err)

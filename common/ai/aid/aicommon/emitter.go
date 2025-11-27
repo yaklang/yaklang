@@ -152,6 +152,7 @@ func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, sync
 		Type:          typeName,
 		NodeId:        id,
 		IsJson:        true,
+		IsSync:        true,
 		Content:       utils.Jsonify(i),
 		Timestamp:     time.Now().Unix(),
 		SyncID:        syncID,
@@ -161,6 +162,12 @@ func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, sync
 
 func (r *Emitter) EmitSyncEvent(id string, i any, syncID string) {
 	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, id, i, syncID)
+}
+
+func (r *Emitter) EmitSyncEventError(id string, err error, syncID string) {
+	r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, id, map[string]any{
+		"error": err.Error(),
+	}, syncID)
 }
 
 func (r *Emitter) EmitYakitRisk(id uint, title string) {
