@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -181,5 +183,32 @@ LOOP:
 	}
 	if !haveTaskDequeue {
 		t.Fatal("task not dequeue")
+	}
+}
+
+func TestReAct_ContextDoneDieLock(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	basicOption := []aicommon.ConfigOption{
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return &aicommon.AIResponse{}, nil
+		}),
+	}
+
+	ctxDoneErrGet := make(chan struct{})
+	go func() {
+		_, err := BuildReActInvoker(ctx, basicOption...)
+		require.Error(t, err)
+		close(ctxDoneErrGet)
+	}()
+
+	select {
+	case <-time.After(time.Second * 2):
+		t.Fatal("timeout")
+	case <-ctxDoneErrGet:
 	}
 }
