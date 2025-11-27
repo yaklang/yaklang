@@ -1603,18 +1603,26 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 	defer recoverRange()
 	ellipsis := stmt.Ellipsis()
 	allExprs := stmt.AllExpression()
-	// v := make([]ssa.Value, 0, len(allExprs))
+	values := make([]ssa.Value, 0, len(allExprs))
 	for _, expr := range allExprs {
-		v = append(v, b.buildExpression(expr.(*yak.ExpressionContext)))
+		values = append(values, b.buildExpression(expr.(*yak.ExpressionContext)))
 	}
-	if ellipsis != nil {
+	if ellipsis != nil && len(values) > 0 {
 		// for yaklang | del: f = func(a,b,c) | call: f([1,2,3]...)
-		ellipsisValue := v[len(v)-1]
-		v = v[:len(v)-1]
-		for _, val := range ellipsisValue.GetAllMember() {
-			v = append(v, val)
+		ellipsisValue := values[len(values)-1]
+		values = values[:len(values)-1]
+		if !utils.IsNil(ellipsisValue) {
+			for _, val := range ellipsisValue.GetAllMember() {
+				values = append(values, val)
+			}
 		}
 		hasEll = true
+	}
+	for _, val := range values {
+		if utils.IsNil(val) {
+			continue
+		}
+		v = append(v, val)
 	}
 	return
 }
