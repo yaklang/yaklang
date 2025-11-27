@@ -95,6 +95,7 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 	if groupConcurrent <= 0 {
 		groupConcurrent = int64(len(requests))
 	}
+	log.Infof("[httpfuzzer-group] start: total=%d group-concurrent=%d overrides=%v", len(requests), groupConcurrent, req.GetOverrides() != nil)
 	swg := utils.NewSizedWaitGroup(int(groupConcurrent), ctx)
 
 	var (
@@ -131,6 +132,7 @@ func (s *Server) HTTPFuzzerGroup(req *ypb.GroupHTTPFuzzerRequest, stream ypb.Yak
 			request.Concurrent = groupConcurrent
 		}
 		request.FuzzerSequenceIndex = uuid.NewString()
+		log.Infof("[httpfuzzer-group] dispatch seq=%s fidx=%s disableConnPool=%v concurrent=%d", request.FuzzerSequenceIndex, request.GetFuzzerIndex(), request.GetDisableUseConnPool(), request.GetConcurrent())
 
 		wg.Add(1)
 		go func(r *ypb.FuzzerRequest) {
