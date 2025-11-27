@@ -209,9 +209,10 @@ cli.String("url", cli.setRequired(true))
 	defer cancel()
 
 	startReq := &ypb.StartMcpServerRequest{
-		Host:      "127.0.0.1",
-		Port:      0, // 使用随机端口
-		EnableAll: true,
+		Host:            "127.0.0.1",
+		Port:            0, // 使用随机端口
+		EnableAll:       true,
+		EnableYakAITool: true,
 	}
 
 	stream, err := client.StartMcpServer(ctx, startReq)
