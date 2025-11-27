@@ -13,7 +13,7 @@ import (
 )
 
 // NewRemoteIPCallback 是发现新外联 IP 时的回调函数签名
-type NewRemoteIPCallback func(pid int32, remoteIP string, domain string)
+type NewRemoteIPCallback func(pid int32, remoteIP string)
 
 // ConnectionsWatcher 封装了针对单个进程的监控逻辑
 type ConnectionsWatcher struct {
@@ -28,7 +28,7 @@ type ConnectionsWatcher struct {
 func NewWatcher(pid int32, cb NewRemoteIPCallback, interval time.Duration) (*ConnectionsWatcher, error) {
 	proc, err := process.NewProcess(pid)
 	if err != nil {
-		return nil, fmt.Errorf("无法找到或创建进程对象 (PID %d): %v", pid, err)
+		return nil, fmt.Errorf("can not found process (PID %d): %v", pid, err)
 	}
 
 	return &ConnectionsWatcher{
@@ -44,35 +44,36 @@ func (w *ConnectionsWatcher) Start(ctx context.Context) {
 	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
 
-	log.Printf("[PID %d] 监控器启动，轮询间隔: %v", w.Pid, w.pollInterval)
+	log.Printf("[PID %d] start watching, ticker duration: %v", w.Pid, w.pollInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[PID %d] 监控器因 Context 取消而退出。", w.Pid)
+			log.Printf("[PID %d] context cancel", w.Pid)
 			return
 		case <-ticker.C:
-			// 1. 检查进程是否仍然存活
-			isRunning, _ := w.Proc.IsRunning()
-			if !isRunning {
-				log.Printf("[PID %d] 进程已退出，停止监控。", w.Pid)
+
+			if w.Proc == nil {
+				log.Printf("[PID %d] process exit , stop watching", w.Pid)
 				return
 			}
 
-			// 2. 获取进程连接
+			isRunning, _ := w.Proc.IsRunning()
+			if !isRunning {
+				log.Printf("[PID %d] process exit , stop watching", w.Pid)
+				return
+			}
+
 			conns, err := w.Proc.Connections()
 			if err != nil {
-				// 权限不足或瞬时错误是常见的，继续即可
 				if strings.Contains(err.Error(), "permission denied") {
-					log.Printf("[PID %d] 权限不足，无法获取连接信息。请以管理员身份运行。", w.Pid)
+					log.Printf("[PID %d] permission denied , can not get connections information", w.Pid)
 					continue
 				}
-				// 忽略其他错误，但记录重要的
-				log.Printf("[PID %d] 获取连接失败: %v", w.Pid, err)
+				log.Printf("[PID %d] get connections information fail: %v", w.Pid, err)
 				continue
 			}
 
-			// 3. 遍历连接并去重
 			w.processConnections(conns)
 		}
 	}
@@ -83,25 +84,12 @@ func (w *ConnectionsWatcher) processConnections(conns []net.ConnectionStat) {
 	for _, c := range conns {
 		remoteIP := c.Raddr.IP
 
-		// 过滤不必要的连接 (本地回环、监听状态)
 		if remoteIP == "127.0.0.1" || remoteIP == "::1" || c.Status == "LISTEN" || remoteIP == "" {
 			continue
 		}
 
-		// 检查 IP 是否已经记录 (去重)
 		if _, loaded := w.seenIPs.LoadOrStore(remoteIP, true); !loaded {
-			// 这是一个新的远端 IP
-
-			// 尝试从 DNS 缓存中获取域名
-			domain := w.resolveIPToDomain(remoteIP)
-
-			// 触发回调
-			w.callback(w.Pid, remoteIP, domain)
+			w.callback(w.Pid, remoteIP)
 		}
 	}
-}
-
-// resolveIPToDomain 模拟 IP -> 域名的解析
-func (w *ConnectionsWatcher) resolveIPToDomain(ip string) string {
-	return "N/A (未命中 DNS 缓存)"
 }
