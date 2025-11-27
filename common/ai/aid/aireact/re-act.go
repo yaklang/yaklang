@@ -42,6 +42,7 @@ const (
 	SYNC_TYPE_MEMORY_CONTEXT            = "memory_sync"
 	SYNC_TYPE_REACT_CANCEL_CURRENT_TASK = "react_cancel_current_task"
 	SYNC_TYPE_REACT_JUMP_QUEUE          = "react_jump_queue"
+	SYNC_TYPE_REACT_CANCEL_TASK         = "react_cancel_task"
 	SYNC_TYPE_REACT_REMOVE_TASK         = "react_remove_task"
 	SYNC_TYPE_REACT_CLEAR_TASK          = "react_clear_task"
 )
@@ -79,6 +80,10 @@ type ReAct struct {
 	currentTask aicommon.AIStatefulTask // 当前正在处理的任务
 
 	lastTask aicommon.AIStatefulTask // 上一个完成的任务
+
+	// All Runtime Tasks
+	RuntimeTasks           []aicommon.AIStatefulTask
+	UpdateRuntimeTaskMutex sync.Mutex
 
 	currentPlanExecution aicommon.AIStatefulTask
 	taskQueue            *TaskQueue // 任务队列
@@ -394,6 +399,7 @@ func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 				select {
 				case <-ticker.C:
 					r.processReActFromQueue()
+					r.updateRuntimeTasks()
 				case <-ctx.Done():
 					if r.config.DebugEvent {
 						log.Infof("Task queue processor stopped for ReAct instance: %s", r.config.Id)
