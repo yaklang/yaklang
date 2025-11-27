@@ -262,12 +262,20 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
 	react.startEventLoop(cfg.Ctx, mainloopDone)
-	<-mainloopDone // Ensure the event loop has started
+	select {
+	case <-cfg.Ctx.Done():
+		return nil, utils.Errorf("context canceled before ReAct invoker started")
+	case <-mainloopDone:
+	}
 
 	// Start queue processor in background
 	done := make(chan struct{})
 	react.startQueueProcessor(cfg.Ctx, done)
-	<-done // Ensure the queue processor has started
+	select {
+	case <-cfg.Ctx.Done():
+		return nil, utils.Errorf("context canceled before queue processer started")
+	case <-done:
+	}
 
 	err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
@@ -475,7 +483,6 @@ func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 				if done != nil {
 					close(done)
 				}
-
 			})
 		})
 }

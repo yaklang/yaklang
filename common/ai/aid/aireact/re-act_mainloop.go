@@ -316,7 +316,10 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
 	invoker.startEventLoop(cfg.Ctx, mainloopDone)
-	<-mainloopDone // Ensure the event loop has started
-
+	select {
+	case <-cfg.Ctx.Done():
+		return nil, utils.Errorf("context canceled before ReAct invoker started")
+	case <-mainloopDone:
+	}
 	return invoker, nil
 }

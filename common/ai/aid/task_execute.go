@@ -115,6 +115,9 @@ func (t *AiTask) executeTaskPushTaskIndex() error {
 
 // executeTask 实际执行任务并返回结果
 func (t *AiTask) executeTask() error {
+	if t.IsCtxDone() {
+		return utils.Errorf("context is done")
+	}
 	if err := t.execute(); err != nil {
 		return err
 	}

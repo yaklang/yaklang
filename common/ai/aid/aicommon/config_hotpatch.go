@@ -35,7 +35,10 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 				}
 			}
 		}()
-		validator <- struct{}{}
+		select {
+		case validator <- struct{}{}:
+		case <-ctx.Done():
+		}
 	})
 }
 
