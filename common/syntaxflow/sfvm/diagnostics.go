@@ -15,11 +15,10 @@ func (s *SFFrame) GetDiagnosticsRecorder() *diagnostics.Recorder {
 	return nil
 }
 
-// trackWithError executes a function with diagnostics tracking if enabled
-func (s *SFFrame) trackWithError(name string, fn func() error) error {
+// track executes a function with diagnostics tracking if enabled
+func (s *SFFrame) track(name string, fn func() error) error {
 	if recorder := s.GetDiagnosticsRecorder(); recorder != nil {
-		_, err := recorder.TrackWithError(true, name, fn)
-		return err
+		return recorder.TrackTrace(name, fn)
 	}
 	return fn()
 }
@@ -31,6 +30,10 @@ func (s *SFFrame) logScanPerformance(totalDuration time.Duration, enableRulePerf
 	log.Infof("==================")
 
 	if enableRulePerf && ruleRecorder != nil {
-		ruleRecorder.Log("Rule Performance (scan)")
+		for _, item := range ruleRecorder.Snapshot() {
+			if item.Total > totalDuration/5 {
+				log.Infof("Rule Performance: %s", item.String())
+			}
+		}
 	}
 }

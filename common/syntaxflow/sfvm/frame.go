@@ -275,7 +275,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 		ruleName = s.rule.Title
 	}
 
-	return s.trackWithError("rule-execution:"+ruleName, func() error {
+	return s.track("rule-execution:"+ruleName, func() error {
 		return s.execRule(feedValue)
 	})
 }
@@ -499,7 +499,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		var result bool
 		var next ValueOperator
 		var err error
-		if trackErr := s.trackWithError("value-op:ExactMatch", func() error {
+		if trackErr := s.track("value-op:ExactMatch", func() error {
 			result, next, err = value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
 			return err
 		}); trackErr != nil {
@@ -786,7 +786,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		// diagnostics: track value operation timing
 		var vals ValueOperator
 		var err error
-		if trackErr := s.trackWithError("value-op:GetSyntaxFlowUse", func() error {
+		if trackErr := s.track("value-op:GetSyntaxFlowUse", func() error {
 			vals, err = value.GetSyntaxFlowUse()
 			return err
 		}); trackErr != nil {
@@ -810,7 +810,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		// diagnostics: track value operation timing
 		var vals ValueOperator
 		var err error
-		if trackErr := s.trackWithError("value-op:GetSyntaxFlowBottomUse", func() error {
+		if trackErr := s.track("value-op:GetSyntaxFlowBottomUse", func() error {
 			vals, err = value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
 			return err
 		}); trackErr != nil {
@@ -847,7 +847,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		// diagnostics: track value operation timing
 		var vals ValueOperator
 		var err error
-		if trackErr := s.trackWithError("value-op:GetSyntaxFlowTopDef", func() error {
+		if trackErr := s.track("value-op:GetSyntaxFlowTopDef", func() error {
 			vals, err = value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
 			return err
 		}); trackErr != nil {
