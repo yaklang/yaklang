@@ -380,7 +380,10 @@ func (c *Coordinator) Run() error {
 	c.EmitInfo("start to create runtime")
 	rt := c.createRuntime()
 	c.runtime = rt
-	rt.Invoke(root)
+	err = rt.Invoke(root)
+	if err != nil {
+		return err
+	}
 
 	/*
 		Result Handler
