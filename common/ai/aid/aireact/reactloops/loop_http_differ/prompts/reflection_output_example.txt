@@ -1,0 +1,69 @@
+## HTTP Differ Output Examples
+
+### Example 1: Fuzz GET Parameter for SQL Injection
+```json
+{
+  "@action": "fuzz_get_params",
+  "human_readable_thought": "Testing the 'id' parameter for SQL injection vulnerabilities",
+  "param_name": "id",
+  "param_values": ["1", "1'", "1\"", "1 OR 1=1", "1' OR '1'='1", "1; DROP TABLE users--"],
+  "reason": "The id parameter appears to be used in database queries, testing for SQL injection"
+}
+```
+
+### Example 2: Fuzz HTTP Header
+```json
+{
+  "@action": "fuzz_header",
+  "human_readable_thought": "Testing X-Forwarded-For header for IP spoofing",
+  "header_name": "X-Forwarded-For",
+  "header_values": ["127.0.0.1", "localhost", "192.168.1.1", "10.0.0.1"],
+  "reason": "Testing if the application trusts X-Forwarded-For header for access control"
+}
+```
+
+### Example 3: Fuzz Path for Directory Traversal
+```json
+{
+  "@action": "fuzz_path",
+  "human_readable_thought": "Testing path traversal to access sensitive files",
+  "paths": ["../etc/passwd", "....//....//etc/passwd", "/admin", "/backup"],
+  "append_mode": false,
+  "reason": "Testing for path traversal vulnerabilities to access system files"
+}
+```
+
+### Example 4: Fuzz Request Body
+```json
+{
+  "@action": "fuzz_body",
+  "human_readable_thought": "Testing JSON body parameter for template injection",
+  "body_type": "json_params",
+  "param_name": "username",
+  "param_values": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
+  "reason": "Testing for server-side template injection in JSON body"
+}
+```
+
+### Example 5: Fuzz Cookie
+```json
+{
+  "@action": "fuzz_cookie",
+  "human_readable_thought": "Testing session cookie manipulation",
+  "cookie_name": "session",
+  "cookie_values": ["admin", "root", "' OR '1'='1", "{{constructor.constructor('return this')()}}"],
+  "raw_mode": false,
+  "reason": "Testing session cookie for privilege escalation and injection"
+}
+```
+
+### Example 6: Fuzz HTTP Method
+```json
+{
+  "@action": "fuzz_method",
+  "human_readable_thought": "Testing different HTTP methods to find hidden functionality",
+  "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"],
+  "reason": "Checking if the endpoint responds differently to various HTTP methods"
+}
+```
+
