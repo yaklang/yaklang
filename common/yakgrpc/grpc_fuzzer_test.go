@@ -1645,3 +1645,69 @@ Content-Length: 10000000` + "\r\n\r\n" + strings.Repeat("a", 10*1024)))
 		require.Less(t, len(recv.ResponseRaw), 4096+100, "response raw is too large, got: "+utils.ByteSize(uint64(len(recv.ResponseRaw))))
 	}
 }
+
+func TestCancelStringFuzzer(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	flagKey := uuid.New().String()
+	flagValue := uuid.New().String()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var cancelTime time.Time
+	var cancelDuration time.Duration
+	fuzzTaskEnd := make(chan struct{})
+	go func() {
+		defer func() {
+			if !cancelTime.IsZero() {
+				cancelDuration = time.Since(cancelTime)
+			} else {
+				cancelDuration = 0
+			}
+			yakit.DelKey(consts.GetGormProfileDatabase(), flagKey)
+			close(fuzzTaskEnd)
+		}()
+		_, err := client.StringFuzzer(ctx, &ypb.StringFuzzerRequest{
+			Template: "{{yak(handle)}}",
+			Limit:    100000000,
+			HotPatchCode: `
+	handle = s => {
+		db.SetKey("` + flagKey + `", "` + flagValue + `")
+		for {
+			sleep(1)
+			println("hot patch code is running")
+		}
+	}
+	`,
+		})
+		assert.Contains(t, err.Error(), "context canceled")
+	}()
+
+	timeout := 10 * time.Second
+	after := time.After(timeout)
+
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		t.Fatal("database is nil")
+	}
+
+LOOP:
+	for {
+		select {
+		case <-after:
+			t.Fatal("timeout")
+		default:
+			value := yakit.GetKey(db, flagKey)
+			if value == flagValue {
+				cancelTime = time.Now()
+				cancel()
+				break LOOP
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	<-fuzzTaskEnd
+	log.Infof("cancel duration: %s", cancelDuration.String())
+	require.Less(t, cancelDuration, 10*time.Second)
+}
