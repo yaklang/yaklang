@@ -305,7 +305,7 @@ func (c *Config) parseProjectWithFS(
 		wg.Wait()
 		return nil
 	}
-	if _, err := c.DiagnosticsTrackWithError("ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
+	if err := c.DiagnosticsTrack("ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
 		return nil, err
 	}
 

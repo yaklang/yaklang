@@ -34,6 +34,6 @@ func ResetDefaultRecorder() *Recorder {
 	return rec
 }
 
-func Track(enabled bool, name string, steps ...StepFunc) error {
+func Track(enabled bool, name string, steps ...func() error) error {
 	return DefaultRecorder().Track(enabled, name, steps...)
 }

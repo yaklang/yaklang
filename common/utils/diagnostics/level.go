@@ -104,42 +104,42 @@ func Enabled(lvl Level) bool {
 }
 
 // API
-func (r *Recorder) TrackLevel(lvl Level, name string, steps ...StepFunc) error {
+func (r *Recorder) TrackLevel(lvl Level, name string, steps ...func() error) error {
 	return r.Track(Enabled(lvl), name, steps...)
 }
 
-func TrackLevel(lvl Level, name string, steps ...StepFunc) error {
+func TrackLevel(lvl Level, name string, steps ...func() error) error {
 	return DefaultRecorder().TrackLevel(lvl, name, steps...)
 }
 
-func (r *Recorder) TrackTrace(name string, steps ...StepFunc) error {
+func (r *Recorder) TrackTrace(name string, steps ...func() error) error {
 	return r.TrackLevel(LevelTrace, name, steps...)
 }
 
-func TrackTrace(name string, steps ...StepFunc) error {
+func TrackTrace(name string, steps ...func() error) error {
 	return DefaultRecorder().TrackTrace(name, steps...)
 }
 
-func (r *Recorder) TrackMeasure(name string, steps ...StepFunc) error {
+func (r *Recorder) TrackMeasure(name string, steps ...func() error) error {
 	return r.TrackLevel(LevelMeasure, name, steps...)
 }
 
-func TrackMeasure(name string, steps ...StepFunc) error {
+func TrackMeasure(name string, steps ...func() error) error {
 	return DefaultRecorder().TrackMeasure(name, steps...)
 }
 
-func (r *Recorder) TrackFocus(name string, steps ...StepFunc) error {
+func (r *Recorder) TrackFocus(name string, steps ...func() error) error {
 	return r.TrackLevel(LevelFocus, name, steps...)
 }
 
-func TrackFocus(name string, steps ...StepFunc) error {
+func TrackFocus(name string, steps ...func() error) error {
 	return DefaultRecorder().TrackFocus(name, steps...)
 }
 
-func (r *Recorder) TrackCritical(name string, steps ...StepFunc) error {
+func (r *Recorder) TrackCritical(name string, steps ...func() error) error {
 	return r.TrackLevel(LevelCritical, name, steps...)
 }
 
-func TrackCritical(name string, steps ...StepFunc) error {
+func TrackCritical(name string, steps ...func() error) error {
 	return DefaultRecorder().TrackCritical(name, steps...)
 }

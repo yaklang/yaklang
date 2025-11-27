@@ -234,7 +234,7 @@ var ssaCompile = &cli.Command{
 		reCompile := c.Bool("re-compile")
 		if programName != "" {
 			defer func() {
-				diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
+				diagnostics.LogRecorder("compile")
 			}()
 		}
 		entry := c.String("entry")

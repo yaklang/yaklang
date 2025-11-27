@@ -16,7 +16,7 @@ func (prog *Program) DiagnosticsRecorder() *diagnostics.Recorder {
 	return prog.diagnosticsRecorder
 }
 
-func (prog *Program) DiagnosticsTrack(name string, steps ...func()) {
+func (prog *Program) DiagnosticsTrack(name string, steps ...func() error) {
 	if len(steps) == 0 {
 		return
 	}
@@ -40,19 +40,20 @@ func (prog *Program) DiagnosticsTrack(name string, steps ...func()) {
 	}
 }
 
-func (prog *Program) DiagnosticsTrackWithError(name string, steps ...diagnostics.StepFunc) (diagnostics.Measurement, error) {
-	empty := diagnostics.Measurement{Name: name}
-	rec := prog.DiagnosticsRecorder()
-	if rec != nil {
-		return rec.TrackWithError(true, name, steps...)
+func (c *ProgramCache) diagnosticsTrack(name string, steps ...func() error) {
+	if len(steps) == 0 {
+		return
+	}
+	if c == nil {
+		return
+	}
+	if prog := c.program; prog != nil {
+		prog.DiagnosticsTrack(name, steps...)
+		return
 	}
 	for _, step := range steps {
-		if step == nil {
-			continue
-		}
-		if err := step(); err != nil {
-			return empty, err
+		if step != nil {
+			step()
 		}
 	}
-	return empty, nil
 }

@@ -83,24 +83,6 @@ func (c *ProgramCache) HaveDatabaseBackend() bool {
 	return c.DB != nil
 }
 
-func (c *ProgramCache) diagnosticsTrack(name string, steps ...func()) {
-	if len(steps) == 0 {
-		return
-	}
-	if c == nil {
-		return
-	}
-	if prog := c.program; prog != nil {
-		prog.DiagnosticsTrack(name, steps...)
-		return
-	}
-	for _, step := range steps {
-		if step != nil {
-			step()
-		}
-	}
-}
-
 // =============================================== Instruction =======================================================
 
 // SetInstruction : set instruction to cache.
@@ -204,37 +186,46 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if len(cb) > 0 {
 		c.afterSaveNotify = cb[0]
 	}
-	f1 := func() {
+	f1 := func() error {
 		c.InstructionCache.Close()
 		log.Infof("Instruction cache closed")
+		return nil
 	}
-	f2 := func() {
+	f2 := func() error {
 		c.TypeCache.Close()
 		log.Infof("Type Cache closed")
+		return nil
 	}
-	f3 := func() {
+	f3 := func() error {
+		return nil
 	}
-	f4 := func() {
+	f4 := func() error {
 		c.VariableIndex.Close()
+		return nil
 	}
-	f5 := func() {
+	f5 := func() error {
 		c.MemberIndex.Close()
+		return nil
 	}
-	f6 := func() {
+	f6 := func() error {
 		c.ClassIndex.Close()
+		return nil
 	}
-	f7 := func() {
+	f7 := func() error {
 		c.ConstCache.Close()
+		return nil
 	}
-	f8 := func() {
+	f8 := func() error {
 		c.offsetCache.Close()
 		c.editorCache.Close()
 		c.indexCache.Close()
+		return nil
 	}
-	f9 := func() {
+	f9 := func() error {
 		c.cacheCtxCancel()
+		return nil
 	}
-	steps := []func(){f1, f2, f3, f4, f5, f6, f7, f8, f9}
+	steps := []func() error{f1, f2, f3, f4, f5, f6, f7, f8, f9}
 	c.diagnosticsTrack("ssa.ProgramCache.SaveToDatabase", steps...)
 }
 
