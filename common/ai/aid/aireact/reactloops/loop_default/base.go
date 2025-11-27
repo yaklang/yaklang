@@ -30,6 +30,7 @@ func init() {
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_JAVA_DECOMPILER),
+				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_HTTP_DIFFER),
 			}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
