@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"strings"
@@ -135,7 +136,7 @@ func (r *runtime) NextStep() (*AiTask, bool) {
 	return r.TaskLink.Get(r.currentIndex)
 }
 
-func (r *runtime) Invoke(task *AiTask) {
+func (r *runtime) Invoke(task *AiTask) error {
 	if r.RootTask == nil {
 		r.RootTask = task
 	}
@@ -143,6 +144,10 @@ func (r *runtime) Invoke(task *AiTask) {
 	r.currentIndex = 0
 
 	invokeTask := func(current *AiTask) error {
+		if current.IsCtxDone() {
+			return utils.Errorf("context is done")
+		}
+
 		r.config.EmitInfo("invoke subtask: %v", current.Name)
 		if len(current.Subtasks) == 0 {
 			current.SetStatus(aicommon.AITaskState_Processing) // 设置为执行中
@@ -162,13 +167,13 @@ func (r *runtime) Invoke(task *AiTask) {
 	for {
 		currentTask, ok := r.NextStep()
 		if !ok {
-			return
+			return nil
 		}
 		if err := invokeTask(currentTask); err != nil {
 			r.config.EmitPlanExecFail("invoke task[%s] failed: %v", currentTask.Name, err)
 			r.config.EmitError("invoke subtask failed: %v", err)
 			log.Errorf("invoke subtask failed: %v", err)
-			return
+			return err
 		}
 	}
 }

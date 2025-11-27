@@ -113,7 +113,10 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 				}
 			}
 		}()
-		validator <- struct{}{}
+		select {
+		case validator <- struct{}{}:
+		case <-ctx.Done():
+		}
 	})
 	c.StartHotPatchLoop(ctx)
 }
