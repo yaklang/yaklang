@@ -61,6 +61,10 @@ var SSHCommands = []*cli.Command{
 				Name:  "upload-file",
 				Usage: "Upload a file to remote server's home directory",
 			},
+			cli.StringFlag{
+				Name:  "upload-dir",
+				Usage: "Upload directory under $HOME (e.g., 'uploads' will upload to $HOME/uploads/)",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			host := c.String("host")
@@ -77,6 +81,7 @@ var SSHCommands = []*cli.Command{
 			port := c.Int("port")
 			shellType := c.String("shell")
 			uploadFile := c.String("upload-file")
+			uploadDir := c.String("upload-dir")
 
 			// Parse host and port
 			parsedHost, parsedPort, err := utils.ParseStringToHostPort(host)
@@ -167,7 +172,7 @@ var SSHCommands = []*cli.Command{
 				// Get the filename
 				fileName := filepath.Base(uploadFile)
 
-				// Get remote home directory
+				// Get remote home directory first
 				homeCmd := client.Cmd("echo $HOME")
 				homeOutput, err := homeCmd.Output()
 				if err != nil {
@@ -175,7 +180,25 @@ var SSHCommands = []*cli.Command{
 					os.Exit(-1)
 				}
 				remoteHome := strings.TrimSpace(string(homeOutput))
-				remotePath := filepath.Join(remoteHome, fileName)
+
+				// Determine remote path
+				var remotePath string
+				if uploadDir != "" {
+					// Upload to $HOME/{uploadDir}/
+					remotePath = filepath.Join(remoteHome, uploadDir, fileName)
+					log.Infof("upload directory specified: %s (full path: %s)", uploadDir, filepath.Join(remoteHome, uploadDir))
+
+					// Create remote directory if it doesn't exist
+					targetDir := filepath.Join(remoteHome, uploadDir)
+					mkdirCmd := client.Cmd(fmt.Sprintf("mkdir -p %s", targetDir))
+					if err := mkdirCmd.Run(); err != nil {
+						log.Errorf("failed to create remote directory: %s", err)
+						os.Exit(-1)
+					}
+				} else {
+					// Upload to home directory
+					remotePath = filepath.Join(remoteHome, fileName)
+				}
 
 				log.Infof("target remote path: %s", remotePath)
 
