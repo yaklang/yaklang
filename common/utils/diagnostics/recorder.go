@@ -12,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type StepFunc func() error
-
 type Measurement struct {
 	Name       string
 	Total      time.Duration
@@ -142,7 +140,7 @@ func (r *Recorder) ensureEntry(name string, stepCount int) (*measurementData, er
 	return entry, nil
 }
 
-func (r *Recorder) Track(enabled bool, name string, steps ...StepFunc) error {
+func (r *Recorder) Track(enabled bool, name string, steps ...func() error) error {
 	if name == "" {
 		return errors.New("diagnostics: measurement name is empty")
 	}
@@ -179,7 +177,7 @@ func (r *Recorder) Track(enabled bool, name string, steps ...StepFunc) error {
 	return nil
 }
 
-func runStepsWithoutRecording(steps []StepFunc) error {
+func runStepsWithoutRecording(steps []func() error) error {
 	for _, step := range steps {
 		if step == nil {
 			continue

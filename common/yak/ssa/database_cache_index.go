@@ -87,8 +87,8 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.editorCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrSource]) {
-				saveStep := func() {
-					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				saveStep := func() error {
+					return utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 						for _, item := range iii {
 							if err := tx.Save(item.Value).Error; err != nil {
 								log.Errorf("DATABASE: save ir source to database error: %v", err)
@@ -108,8 +108,8 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.offsetCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrOffset]) {
-				saveStep := func() {
-					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				saveStep := func() error {
+					return utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 						for _, item := range iii {
 							ssadb.SaveIrOffset(tx, item.Value)
 						}
@@ -127,8 +127,8 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 	if databaseKind == ProgramCacheDBWrite {
 		c.indexCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrIndex]) {
-				saveStep := func() {
-					utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+				saveStep := func() error {
+					return utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 						for _, item := range iii {
 							ssadb.SaveIrIndex(tx, item.Value)
 						}

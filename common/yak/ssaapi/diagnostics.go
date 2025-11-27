@@ -27,56 +27,6 @@ func (c *Config) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {
 	c.diagnosticsRecorder = rec
 }
 
-func (c *Config) DiagnosticsTrack(name string, steps ...func()) {
-	if len(steps) == 0 {
-		return
-	}
-	if !c.DiagnosticsEnabled() {
-		for _, step := range steps {
-			if step != nil {
-				step()
-			}
-		}
-		return
-	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		rec.Track(true, name, steps...)
-		return
-	}
-	for _, step := range steps {
-		if step != nil {
-			step()
-		}
-	}
-}
-
-func (c *Config) DiagnosticsTrackWithError(name string, steps ...diagnostics.StepFunc) (diagnostics.Measurement, error) {
-	empty := diagnostics.Measurement{Name: name}
-	if !c.DiagnosticsEnabled() {
-		for _, step := range steps {
-			if step == nil {
-				continue
-			}
-			if err := step(); err != nil {
-				return empty, err
-			}
-		}
-		return empty, nil
-	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		return rec.TrackWithError(true, name, steps...)
-	}
-	for _, step := range steps {
-		if step == nil {
-			continue
-		}
-		if err := step(); err != nil {
-			return empty, err
-		}
-	}
-	return empty, nil
-}
-
 func (c *Config) LogDiagnostics(label string) {
 	if !c.DiagnosticsEnabled() {
 		return
@@ -88,39 +38,12 @@ func (c *Config) LogDiagnostics(label string) {
 	diagnostics.LogRecorder(label, recorder)
 }
 
-func (c *saveValueCtx) DiagnosticsRecorder() *diagnostics.Recorder {
-	return c.diagnosticsRecorder
+func (c *Config) DiagnosticsTrack(name string, steps ...func() error) error {
+	return c.DiagnosticsRecorder().TrackTrace(name, steps...)
 }
 
-func (c *saveValueCtx) DiagnosticsTrack(name string, steps ...func()) {
-	if len(steps) == 0 {
-		return
-	}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		rec.Track(true, name, steps...)
-		return
-	}
-	for _, step := range steps {
-		if step != nil {
-			step()
-		}
-	}
-}
-
-func (c *saveValueCtx) DiagnosticsTrackWithError(name string, steps ...diagnostics.StepFunc) (diagnostics.Measurement, error) {
-	empty := diagnostics.Measurement{Name: name}
-	if rec := c.DiagnosticsRecorder(); rec != nil {
-		return rec.TrackWithError(true, name, steps...)
-	}
-	for _, step := range steps {
-		if step == nil {
-			continue
-		}
-		if err := step(); err != nil {
-			return empty, err
-		}
-	}
-	return empty, nil
+func (c *saveValueCtx) DiagnosticsTrack(name string, steps ...func() error) error {
+	return c.diagnosticsRecorder.TrackTrace(name, steps...)
 }
 
 func OptionSaveValue_Diagnostics(rec *diagnostics.Recorder) SaveValueOption {

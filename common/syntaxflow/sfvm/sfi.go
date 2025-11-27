@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -406,7 +407,7 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "recursive$exact", s.UnaryStr)
 	case OpNativeCall:
 		if s.UnaryStr == "include" {
-			return fmt.Sprintf(verboseLen+" %v", "native$call", fmt.Sprintf("include %+v", s.Values))
+			return fmt.Sprintf(verboseLen+" %v", "native$call", fmt.Sprintf("include %+v", codec.AnyToString(s.SyntaxFlowConfig)))
 		}
 		return fmt.Sprintf(verboseLen+" %v", "native$call", s.UnaryStr)
 	case OpFileFilterReg:
