@@ -94,7 +94,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
 
 	// 将查询逻辑包装到函数中
-	f := func() {
+	f := func() error {
 		option := []ssaapi.QueryOption{}
 		option = append(option,
 			ssaapi.QueryWithContext(m.ctx),
@@ -122,13 +122,14 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			m.markRuleFailed()
 			m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 		}
+		return nil
 	}
 
 	// 根据配置决定是否记录规则级别的详细性能
 	if enableRulePerf && m.ruleProfiler != nil {
 		// 构建 profile 名称：Rule[规则名].Prog[程序名]
 		profileName := fmt.Sprintf("Rule[%s].Prog[%s]", rule.RuleName, prog.GetProgramName())
-		m.ruleProfiler.Track(true, profileName, f)
+		m.ruleProfiler.TrackTrace(profileName, f)
 	} else {
 		// 不启用性能监控时，直接执行
 		f()

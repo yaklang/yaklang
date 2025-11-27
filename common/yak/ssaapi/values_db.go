@@ -234,7 +234,7 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 	}
 
 	saveEdge := func(edge *ssadb.AuditEdge) error {
-		_, err := g.DiagnosticsTrackWithError("dbgraph_create_edge", func() error {
+		err := g.DiagnosticsTrack("dbgraph_create_edge", func() error {
 			g.database.SaveEdge(edge)
 			return nil
 		})

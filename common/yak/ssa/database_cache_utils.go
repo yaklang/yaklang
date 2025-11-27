@@ -126,8 +126,8 @@ func saveIrCode(prog *Program, db *gorm.DB, f func(int)) func(t []*ssadb.IrCode)
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		saveStep := func() {
-			utils.GormTransaction(db, func(tx *gorm.DB) error {
+		saveStep := func() error {
+			return utils.GormTransaction(db, func(tx *gorm.DB) error {
 				for _, irCode := range t {
 					if err := tx.Save(irCode).Error; err != nil {
 						log.Errorf("DATABASE: save irCode to database error: %v", err)
@@ -172,8 +172,8 @@ func saveIrType(prog *Program, db *gorm.DB) func(t []*ssadb.IrType) {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		saveStep := func() {
-			utils.GormTransaction(db, func(tx *gorm.DB) error {
+		saveStep := func() error {
+			return utils.GormTransaction(db, func(tx *gorm.DB) error {
 				for _, irType := range t {
 					if err := tx.Save(irType).Error; err != nil {
 						log.Errorf("DATABASE: save irType to database error: %v", err)

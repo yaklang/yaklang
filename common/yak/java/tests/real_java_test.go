@@ -271,7 +271,7 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
-	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
+	diagnostics.LogRecorder("compile")
 }
 
 func TestA(t *testing.T) {
@@ -302,7 +302,7 @@ func TestA(t *testing.T) {
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
-	diagnostics.Track(true, "collect file", func() {
+	diagnostics.Track(true, "collect file", func() error {
 		filesys.Recursive(".",
 			filesys.WithFileSystem(fs),
 			filesys.WithFileStat(func(s string, fi os.FileInfo) error {
@@ -317,16 +317,18 @@ func TestA(t *testing.T) {
 				return nil
 			}),
 		)
+		return nil
 	})
 
 	var ch <-chan *ssareducer.FileContent
 
-	diagnostics.Track(true, "getFileHandler", func() {
+	diagnostics.Track(true, "getFileHandler", func() error {
 		ch = config.GetFileHandler(
 			fs,
 			fileList,
 			fileMap,
 		)
+		return nil
 	})
 
 	for fc := range ch {
@@ -336,5 +338,5 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
-	diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
+	diagnostics.LogRecorder("compile")
 }
