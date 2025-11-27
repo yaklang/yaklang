@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeReactJumpQueueEvent(event)
 	case SYNC_TYPE_REACT_CANCEL_CURRENT_TASK:
 		return r.HandleSyncTypeReactCancelCurrentTaskEvent(event)
+	case SYNC_TYPE_REACT_CANCEL_TASK:
+		return r.HandleSyncTypeCancelTaskEvent(event)
 	case SYNC_TYPE_REACT_REMOVE_TASK:
 		return r.HandleSyncTypeReactRemoveTaskEvent(event)
 	case SYNC_TYPE_REACT_CLEAR_TASK:
@@ -38,6 +41,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK, r.HandleSyncTypeReactCancelCurrentTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK, r.HandleSyncTypeReactRemoveTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CLEAR_TASK, r.HandleSyncTypeReactClearTaskEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK, r.HandleSyncTypeCancelTaskEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -47,6 +51,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_CURRENT_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK)
 	r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(SYNC_TYPE_REACT_CLEAR_TASK)
+	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK)
 }
 
 // 单独拆分的 handler 函数
@@ -80,6 +85,68 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 		log.Error("no knowledge found")
 	}
 	r.EmitKnowledgeListAboutTask(taskID, knowledgeList, event.SyncID)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
+	sendError := func(err error) {
+		r.EmitSyncEventError(event.SyncID, err, event.SyncID)
+		log.Error(err)
+	}
+
+	var targetTaskId string
+	if event.SyncJsonInput != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+			sendError(fmt.Errorf("failed to parse jump queue parameters: %v", err))
+			return nil
+		}
+
+		if taskId, ok := params["task_id"].(string); ok && taskId != "" {
+			targetTaskId = taskId
+		} else {
+			sendError(errors.New("task_id is required for jump queue operation"))
+			return nil
+		}
+	} else {
+		sendError(errors.New("SyncJsonInput is required for jump queue operation"))
+		return nil
+	}
+
+	if targetTaskId == "" {
+		sendError(errors.New("task_id is required for cancel task operation"))
+		return nil
+	}
+	getTaskById := func(taskId string) aicommon.AIStatefulTask {
+		for _, task := range r.RuntimeTasks {
+			if task.GetId() == taskId {
+				return task
+			}
+		}
+		return nil
+	}
+	targetTask := getTaskById(targetTaskId)
+	if targetTask == nil {
+		sendError(errors.New("no task to cancel"))
+		return nil
+	}
+
+	log.Infof("cancelling task: %s", targetTaskId)
+
+	// 调用任务的 Cancel 方法，这会取消任务的 context
+	targetTask.Cancel()
+
+	// 设置任务状态为 Aborted
+	targetTask.SetStatus(aicommon.AITaskState_Aborted)
+
+	// 发送任务取消事件
+	r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
+		"task_id":      targetTask.GetId(),
+		"user_input":   targetTask.GetUserInput(),
+		"cancelled_at": time.Now(),
+	}, event.SyncID)
+
+	log.Infof("task %s has been cancelled", targetTask.GetId())
 	return nil
 }
 
