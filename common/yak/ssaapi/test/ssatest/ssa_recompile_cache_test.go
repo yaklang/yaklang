@@ -54,6 +54,7 @@ println(c)
 
 	// Simulate recompilation by deleting IR code and re-parsing
 	ssadb.DeleteProgramIrCode(ssadb.GetDB(), progName)
+	ssaapi.ProgramCache.Remove(progName)
 
 	_, err = ssaapi.Parse(code2,
 		ssaapi.WithProgramName(progName),
