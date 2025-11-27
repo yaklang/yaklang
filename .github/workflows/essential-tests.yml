@@ -3,8 +3,8 @@ name: Essential Tests
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Branch, tag, or commit SHA to run Essential Tests"
+      target:
+        description: "PR number, branch (e.g. owner:branch for fork), or commit SHA. Examples: 123, MisakaMikato:feature/branch, 4e7c85623d3bb7caa0b24ac6cabb5a3872e4a7bc"
         required: false
         default: ""
   pull_request:
@@ -26,19 +26,83 @@ jobs:
     outputs:
       should_run_tests: ${{ steps.finalize.outputs.should_run_tests }}
       target_ref: ${{ steps.target.outputs.ref }}
+      fork_repo: ${{ steps.target.outputs.fork_repo }}
     steps:
       - name: Determine target revision
         id: target
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            REF="${{ inputs.ref }}"
-            if [ -z "$REF" ]; then
-              REF="${{ github.sha }}"
+            INPUT="${{ inputs.target }}"
+            
+            if [ -z "$INPUT" ] || [ "$INPUT" = "" ]; then
+              REF="${{ github.ref_name }}"
+              echo "No input provided, using current branch: $REF"
+            elif [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+              PR_NUM="$INPUT"
+              echo "Detected PR number: #$PR_NUM"
+              echo "Fetching PR #$PR_NUM information..."
+              
+              PR_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM")
+              
+              PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // empty')
+              PR_STATE=$(echo "$PR_RESPONSE" | jq -r '.state // empty')
+              PR_TITLE=$(echo "$PR_RESPONSE" | jq -r '.title // empty')
+              PR_HEAD_REF=$(echo "$PR_RESPONSE" | jq -r '.head.ref // empty')
+              PR_HEAD_REPO=$(echo "$PR_RESPONSE" | jq -r '.head.repo.full_name // empty')
+              
+              if [ -z "$PR_HEAD_SHA" ] || [ "$PR_HEAD_SHA" = "null" ]; then
+                echo "Failed to get PR #$PR_NUM. Please check if the PR exists and is accessible."
+                exit 1
+              fi
+              
+              echo "PR #$PR_NUM: $PR_TITLE"
+              echo "PR state: $PR_STATE"
+              echo "PR head branch: $PR_HEAD_REPO:$PR_HEAD_REF"
+              echo "PR head commit (latest): $PR_HEAD_SHA"
+              
+              COMMITS_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM/commits")
+              
+              COMMIT_COUNT=$(echo "$COMMITS_RESPONSE" | jq '. | length')
+              echo "Total commits in PR: $COMMIT_COUNT"
+              
+              if [ "$COMMIT_COUNT" -gt 0 ]; then
+                echo "Commits in this PR:"
+                echo "$COMMITS_RESPONSE" | jq -r '.[] | "  - \(.sha[0:7]) \(.commit.message | split("\n")[0])"'
+              fi
+              
+              REF="$PR_HEAD_SHA"
+              echo "Using PR head commit (latest): $REF"
+            elif [[ "$INPUT" =~ ^[a-f0-9]{40}$ ]] || [[ "$INPUT" =~ ^[a-f0-9]{7,}$ ]]; then
+              REF="$INPUT"
+              echo "Detected commit SHA: $REF"
+            elif [[ "$INPUT" == *":"* ]]; then
+              FORK_OWNER=$(echo "$INPUT" | cut -d':' -f1)
+              FORK_BRANCH=$(echo "$INPUT" | cut -d':' -f2-)
+              REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+              FORK_REPO="$FORK_OWNER/$REPO_NAME"
+              
+              echo "Detected fork branch format: $INPUT"
+              echo "Fork owner: $FORK_OWNER"
+              echo "Branch: $FORK_BRANCH"
+              echo "Fork repository: $FORK_REPO"
+              
+              REF="$FORK_BRANCH"
+              FORK_REPO_FULL="$FORK_REPO"
+              echo "fork_repo=$FORK_REPO_FULL" >> $GITHUB_OUTPUT
+              echo "Using fork branch: $FORK_REPO_FULL:$FORK_BRANCH"
+            else
+              REF="$INPUT"
+              echo "Detected branch/tag: $REF"
             fi
           else
             REF="${{ github.event.pull_request.head.sha }}"
           fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
+          echo "Final target ref: $REF"
 
       - name: Initialize run flag
         run: echo "SHOULD_RUN=false" >> $GITHUB_ENV
@@ -100,7 +164,9 @@ jobs:
         if: steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
           ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -352,7 +418,9 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v3
         with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
           ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set Cache Key
         id: cache_key
