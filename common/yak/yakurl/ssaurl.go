@@ -4,7 +4,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -17,41 +16,21 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type SyntaxFlowAction struct {
-	ProgramCache  *utils.CacheWithKey[string, *ssaapi.Program]          // name - program
-	QueryCache    *utils.CacheWithKey[string, *ssaapi.SyntaxFlowResult] // hash - result
-	ResultIDCache *utils.CacheWithKey[uint, *ssaapi.SyntaxFlowResult]   // result_id - result
-}
+type SyntaxFlowAction struct{}
 
 func NewSyntaxFlowAction() *SyntaxFlowAction {
-	ttl := 5 * time.Minute
-	ret := &SyntaxFlowAction{
-		ProgramCache:  utils.NewTTLCacheWithKey[string, *ssaapi.Program](ttl),
-		QueryCache:    utils.NewTTLCacheWithKey[string, *ssaapi.SyntaxFlowResult](ttl),
-		ResultIDCache: utils.NewTTLCacheWithKey[uint, *ssaapi.SyntaxFlowResult](ttl),
-	}
-	return ret
+	return &SyntaxFlowAction{}
 }
 
 func (a *SyntaxFlowAction) getProgram(name string) (*ssaapi.Program, error) {
-	if prog, ok := a.ProgramCache.Get(name); ok {
-		return prog, nil
-	}
-
 	prog, err := ssaapi.FromDatabase(name)
 	if err != nil {
 		return nil, utils.Wrapf(err, "get program %s", name)
 	}
-	a.ProgramCache.Set(name, prog)
 	return prog, nil
 }
 
 func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlowResult, error) {
-	hash := codec.Md5(programName + code)
-	if res, ok := a.QueryCache.Get(hash); ok {
-		return res, nil
-	}
-
 	prog, err := a.getProgram(programName)
 	if err != nil {
 		return nil, err
@@ -60,24 +39,17 @@ func (a *SyntaxFlowAction) querySF(programName, code string) (*ssaapi.SyntaxFlow
 	if err != nil {
 		return nil, err
 	}
-	a.QueryCache.Set(hash, res)
 	return res, nil
 }
 
 func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*ssaapi.SyntaxFlowResult, uint, error) {
 	// get result
 	if resultID != 0 {
-		if res, ok := a.ResultIDCache.Get(resultID); ok {
-			// get result from cache
-			return res, resultID, nil
-		}
-
 		// get db result by ResultID
 		result, err := ssaapi.LoadResultByID(resultID)
 		if err != nil {
 			return nil, 0, utils.Errorf("get result by id %d failed: %v", resultID, err)
 		}
-		a.ResultIDCache.Set(resultID, result)
 		return result, resultID, nil
 	}
 
@@ -92,9 +64,6 @@ func (a *SyntaxFlowAction) getResult(programName, code string, resultID uint) (*
 	if err != nil {
 		return nil, 0, utils.Errorf("save result failed: %v", err)
 	}
-	// save result to cache
-	a.ResultIDCache.Set(resultID, result)
-
 	return result, resultID, nil
 }
 
