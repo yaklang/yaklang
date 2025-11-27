@@ -19,9 +19,9 @@ func NewEmbedResourcesMonitor(resourceID string, buildInHash string) *EmbedResou
 
 func (m *EmbedResourcesMonitor) getCurrentHash(currentHashGetter func() string) string {
 	if consts.IsDevMode() {
-		return m.buildInHash
-	} else {
 		return currentHashGetter()
+	} else {
+		return m.buildInHash
 	}
 }
 

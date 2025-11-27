@@ -73,7 +73,12 @@ runAiForgeForFile = (params,name,progress)=>{
     yakit.Markdown(reportString)
     name := str.RandStr(10) + ".md"
     path = file.Join(yakit.GetHomeTempDir(),name)
-    err = file.Save(path, str.Unquote(reportString)~)
+    reportUnquoteString,err := str.Unquote(reportString)
+    if err != nil {
+        yakit.Error("unquote report string fail :%v",err)
+        reportUnquoteString = reportString
+    }
+    err = file.Save(path, reportUnquoteString)
     if err != nil {
         yakit.Error("save file fail :%v",err)
         return err
