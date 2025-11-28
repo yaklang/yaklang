@@ -166,39 +166,39 @@ func TestQueryFilterHTTPFlow(t *testing.T) {
 func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	// 测试后缀过滤的精确性：过滤 .js 不应该过滤 .json 和 .jsp
 	token := utils.RandString(10)
-	
+
 	// 创建测试数据
 	jsFlow := &schema.HTTPFlow{
 		Url:  fmt.Sprintf("https://example.com/%s.js", token),
 		Path: fmt.Sprintf("/%s.js", token),
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsFlow)
-	
+
 	jsonFlow := &schema.HTTPFlow{
 		Url:  fmt.Sprintf("https://example.com/%s.json", token),
 		Path: fmt.Sprintf("/%s.json", token),
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsonFlow)
-	
+
 	jspFlow := &schema.HTTPFlow{
 		Url:  fmt.Sprintf("https://example.com/%s.jsp", token),
 		Path: fmt.Sprintf("/%s.jsp", token),
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jspFlow)
-	
+
 	// 清理测试数据
 	defer func() {
 		DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
 			Id: []int64{int64(jsFlow.ID), int64(jsonFlow.ID), int64(jspFlow.ID)},
 		})
 	}()
-	
+
 	// 测试：过滤 .js 后缀
 	_, flows, err := QueryHTTPFlow(consts.GetGormProjectDatabase().Debug(), &ypb.QueryHTTPFlowRequest{
 		ExcludeSuffix: []string{".js"},
 	})
 	require.NoError(t, err)
-	
+
 	// 验证结果
 	var foundJs, foundJson, foundJsp bool
 	for _, flow := range flows {
@@ -212,7 +212,7 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 			foundJsp = true
 		}
 	}
-	
+
 	// .js 应该被过滤掉（不应该找到）
 	assert.False(t, foundJs, "过滤 .js 时，.js 文件应该被过滤掉")
 	// .json 不应该被过滤（应该找到）
@@ -628,6 +628,157 @@ func TestExcludeKeywords(t *testing.T) {
 	t.Logf("query with exclude keywords cost: %v", time.Since(start))
 	require.NoError(t, err)
 	require.Len(t, httpflows, 1)
+}
+
+// TestExcludeKeywordsWithSpecialChars 测试排除关键字功能对特殊字符的处理
+func TestExcludeKeywordsWithSpecialChars(t *testing.T) {
+	baseToken := uuid.NewString()
+	ids := make([]int64, 0, 10)
+	defer func() {
+		if len(ids) > 0 {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+				Id: ids,
+			})
+		}
+	}()
+
+	// 创建包含特殊字符的测试数据
+	testCases := []struct {
+		name        string
+		url         string
+		path        string
+		request     string
+		response    string
+		excludeKey  string
+		shouldMatch bool // 是否应该被排除
+	}{
+		{
+			name:        "normal_content",
+			url:         fmt.Sprintf("https://example.com/%s/normal", baseToken),
+			path:        fmt.Sprintf("/%s/normal", baseToken),
+			request:     fmt.Sprintf("GET /%s/normal HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/normal", baseToken),
+			excludeKey:  "normal",
+			shouldMatch: true,
+		},
+		{
+			name:        "with_percent",
+			url:         fmt.Sprintf("https://example.com/%s/50%%discount", baseToken),
+			path:        fmt.Sprintf("/%s/50%%discount", baseToken),
+			request:     fmt.Sprintf("GET /%s/50%%discount HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/50%%discount", baseToken),
+			excludeKey:  "50%",
+			shouldMatch: true,
+		},
+		{
+			name:        "with_underscore",
+			url:         fmt.Sprintf("https://example.com/%s/file_name", baseToken),
+			path:        fmt.Sprintf("/%s/file_name", baseToken),
+			request:     fmt.Sprintf("GET /%s/file_name HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/file_name", baseToken),
+			excludeKey:  "file_name",
+			shouldMatch: true,
+		},
+		{
+			name:        "with_brackets",
+			url:         fmt.Sprintf("https://example.com/%s/[test]", baseToken),
+			path:        fmt.Sprintf("/%s/[test]", baseToken),
+			request:     fmt.Sprintf("GET /%s/[test] HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/[test]", baseToken),
+			excludeKey:  "[test]",
+			shouldMatch: true,
+		},
+		{
+			name:        "with_caret",
+			url:         fmt.Sprintf("https://example.com/%s/^test", baseToken),
+			path:        fmt.Sprintf("/%s/^test", baseToken),
+			request:     fmt.Sprintf("GET /%s/^test HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/^test", baseToken),
+			excludeKey:  "^test",
+			shouldMatch: true,
+		},
+		{
+			name:        "with_backslash",
+			url:         fmt.Sprintf("https://example.com/%s/\\test", baseToken),
+			path:        fmt.Sprintf("/%s/\\test", baseToken),
+			request:     fmt.Sprintf("GET /%s/\\test HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/\\test", baseToken),
+			excludeKey:  "\\test",
+			shouldMatch: true,
+		},
+		{
+			name:        "mixed_special_chars",
+			url:         fmt.Sprintf("https://example.com/%s/50%%_discount[2024]^test\\value", baseToken),
+			path:        fmt.Sprintf("/%s/50%%_discount[2024]^test\\value", baseToken),
+			request:     fmt.Sprintf("GET /%s/50%%_discount[2024]^test\\value HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/50%%_discount[2024]^test\\value", baseToken),
+			excludeKey:  "50%_discount[2024]^test\\value",
+			shouldMatch: true,
+		},
+		{
+			name:        "should_not_exclude",
+			url:         fmt.Sprintf("https://example.com/%s/other", baseToken),
+			path:        fmt.Sprintf("/%s/other", baseToken),
+			request:     fmt.Sprintf("GET /%s/other HTTP/1.1", baseToken),
+			response:    fmt.Sprintf("HTTP/1.1 200 OK\r\nContent: %s/other", baseToken),
+			excludeKey:  "normal",
+			shouldMatch: false,
+		},
+	}
+
+	// 插入测试数据
+	for _, tc := range testCases {
+		flow := &schema.HTTPFlow{
+			Url:      tc.url,
+			Path:     tc.path,
+			Request:  tc.request,
+			Response: tc.response,
+		}
+		err := InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		require.NoError(t, err)
+		ids = append(ids, int64(flow.ID))
+	}
+
+	db := consts.GetGormProjectDatabase().Debug()
+
+	// 测试每个特殊字符的排除功能
+	for _, tc := range testCases {
+		if !tc.shouldMatch {
+			continue // 跳过不应该被排除的测试用例
+		}
+
+		t.Run(fmt.Sprintf("排除关键字_%s", tc.name), func(t *testing.T) {
+			_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+				Keyword:         baseToken,
+				ExcludeKeywords: []string{tc.excludeKey},
+			})
+			require.NoError(t, err)
+
+			// 验证被排除的记录不在结果中
+			for _, flow := range httpflows {
+				require.NotContains(t, flow.Url, tc.excludeKey, "URL不应包含被排除的关键字")
+				require.NotContains(t, flow.Path, tc.excludeKey, "Path不应包含被排除的关键字")
+				require.NotContains(t, string(flow.Request), tc.excludeKey, "Request不应包含被排除的关键字")
+				require.NotContains(t, string(flow.Response), tc.excludeKey, "Response不应包含被排除的关键字")
+			}
+		})
+	}
+
+	// 测试多个排除关键字
+	t.Run("排除多个特殊字符关键字", func(t *testing.T) {
+		_, httpflows, err := QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
+			Keyword:         baseToken,
+			ExcludeKeywords: []string{"50%", "file_name", "[test]"},
+		})
+		require.NoError(t, err)
+
+		// 验证结果中不包含任何被排除的关键字
+		for _, flow := range httpflows {
+			require.NotContains(t, flow.Url, "50%")
+			require.NotContains(t, flow.Url, "file_name")
+			require.NotContains(t, flow.Url, "[test]")
+		}
+	})
 }
 
 func TestFilterHTTPFlowByDomain(t *testing.T) {
