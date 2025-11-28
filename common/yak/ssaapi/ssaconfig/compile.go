@@ -155,13 +155,14 @@ func WithProjectLanguage(language Language) Option {
 
 // SSACompileConfig 编译配置
 type SSACompileConfig struct {
-	StrictMode        bool          `json:"strict_mode"`
-	PeepholeSize      int           `json:"peephole_size"`
-	ExcludeFiles      []string      `json:"exclude_files"`
-	ReCompile         bool          `json:"re_compile"`
-	MemoryCompile     bool          `json:"memory_compile"`
-	Concurrency       int           `json:"compile_concurrency"`
-	CompileIrCacheTTL time.Duration `json:"compile_ir_cache_ttl"`
+	StrictMode               bool          `json:"strict_mode"`
+	PeepholeSize             int           `json:"peephole_size"`
+	ExcludeFiles             []string      `json:"exclude_files"`
+	ReCompile                bool          `json:"re_compile"`
+	MemoryCompile            bool          `json:"memory_compile"`
+	Concurrency              int           `json:"compile_concurrency"`
+	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
+	enableFilePerformanceLog bool          `json:"enable_file_performance_log"`
 }
 
 // --- 编译配置 Get/Set 方法 ---
@@ -272,6 +273,13 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 	c.SSACompile.Concurrency = concurrency
 }
 
+func (c *Config) GetCompileFilePerformanceLog() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.enableFilePerformanceLog
+}
+
 // --- 编译配置 Options ---
 
 // WithCompileStrictMode 设置严格模式
@@ -340,6 +348,18 @@ func WithCompileConcurrency(concurrency int) Option {
 			return err
 		}
 		c.SSACompile.Concurrency = concurrency
+		return nil
+	}
+}
+
+// WithCompileFilePerformanceLog 设置是否启用文件级别的性能日志
+// 启用后，AST 解析和 Build 会按文件为单位显示性能统计
+func WithCompileFilePerformanceLog(enable bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile File Performance Log"); err != nil {
+			return err
+		}
+		c.SSACompile.enableFilePerformanceLog = enable
 		return nil
 	}
 }

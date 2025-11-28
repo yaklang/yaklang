@@ -154,6 +154,7 @@ func ProfileAddWithErrorToMap(profileMap *utils.SafeMap[*Profile], enable bool, 
 // ShowCompileProfiles 输出编译阶段的性能统计
 func ShowCompileProfiles() {
 	ShowProfileMaps("compile", profileListMap)
+	dumpFilePerformanceProfiles(profileListMap)
 }
 
 // ShowProfileMaps 按标签输出给定 Profile map 的统计信息
@@ -194,6 +195,46 @@ func dumpProfileMap(label string, prof *utils.SafeMap[*Profile]) {
 		log.Infof(profile.String())
 	}
 	log.Infof("========================================")
+}
+
+func dumpFilePerformanceProfiles(prof *utils.SafeMap[*Profile]) {
+	if prof == nil || prof.Count() == 0 {
+		return
+	}
+	dumpProfileByPrefix := func(prefix string, title string) {
+		profiles := make([]*Profile, 0)
+		prof.ForEach(func(key string, value *Profile) bool {
+			if strings.HasPrefix(key, prefix) {
+				profiles = append(profiles, value)
+			}
+			return true
+		})
+		if len(profiles) == 0 {
+			return
+		}
+		slices.SortFunc(profiles, func(a, b *Profile) int {
+			if a.TotalTime < b.TotalTime {
+				return 1
+			} else if a.TotalTime > b.TotalTime {
+				return -1
+			}
+			return 0
+		})
+		log.Infof("----------- File Performance [%s] --------------------", title)
+		for _, profile := range profiles {
+			totalDur := time.Duration(profile.TotalTime)
+			count := profile.Count
+			var avg time.Duration
+			if count > 0 {
+				avg = totalDur / time.Duration(count)
+			}
+			log.Infof("File[%s] Time: %v Count: %d Avg: %v", profile.Name, totalDur, count, avg)
+		}
+		log.Infof("======================================================")
+	}
+
+	dumpProfileByPrefix("ParseAST[", "ParseAST")
+	dumpProfileByPrefix("Build[", "Build")
 }
 
 // ShowScanPerformance 输出代码扫描相关的性能日志

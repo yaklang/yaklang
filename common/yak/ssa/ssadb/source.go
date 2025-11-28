@@ -115,7 +115,7 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 		return nil, utils.Wrapf(err, "query source via hash: %v failed", hash)
 	}
 
-	log.Debugf("GetEditorByHash: loaded from database, hash=%s, program=%s, path=%s", hash, source.ProgramName, source.FolderPath+source.FileName)
+	// log.Debugf("GetEditorByHash: loaded from database, hash=%s, program=%s, path=%s", hash, source.ProgramName, source.FolderPath+source.FileName)
 	return irSource2Editor(&source), nil
 }
 

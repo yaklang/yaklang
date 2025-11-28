@@ -233,6 +233,8 @@ var WithMemory = ssaconfig.WithCompileMemoryCompile
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
 
+var WithPerformanceLog = ssaconfig.WithCompileFilePerformanceLog
+
 var WithDatabaseProgramCacheHitter = ssaconfig.SetOption("ssa_compile/database_program_cache_hitter", func(c *Config, h func(i any)) {
 	c.DatabaseProgramCacheHitter = h
 })

@@ -45,7 +45,9 @@ type ScanTaskCallback struct {
 	// 默认为 false，只显示任务级别的性能统计（编译时间等）
 	// 设置为 true 时，会显示每个规则在每个程序上的详细执行时间
 	EnableRulePerformanceLog bool `json:"-"`
-	ProcessWithRule          bool `json:"-"`
+	// EnableInstructionPerformanceLog 是否输出 SyntaxFlow 指令级性能信息
+	EnableInstructionPerformanceLog bool `json:"-"`
+	ProcessWithRule                 bool `json:"-"`
 }
 
 const (
@@ -82,6 +84,10 @@ var WithProcessRuleDetail = ssaconfig.SetOption("syntaxflow-scan/processRuleDeta
 
 var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerformanceLog", func(c *Config, enable bool) {
 	c.EnableRulePerformanceLog = enable
+})
+
+var WithInstructionPerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableInstructionPerformanceLog", func(c *Config, enable bool) {
+	c.EnableInstructionPerformanceLog = enable
 })
 
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {

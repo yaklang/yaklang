@@ -226,6 +226,8 @@ func (c *Config) parseProjectWithFS(
 		prog.SetPreHandler(false)
 		start = time.Now()
 
+		enableFilePerf := c.GetCompileFilePerformanceLog()
+		// log.Infof("enableFilePerf %v", enableFilePerf)
 		// ssareducer.FilesHandler(
 		// 	c.ctx, filesystem, handlerFiles,
 		// 	func(path string, content []byte) {
@@ -246,18 +248,25 @@ func (c *Config) parseProjectWithFS(
 			path := fileContent.Path
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
-			func() {
+
+			buildOne := func() {
 				defer func() {
 					if r := recover(); r != nil {
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 				}()
-				// build
 				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
 					log.Errorf("parse %#v failed: %v", path, err)
 				}
-			}()
+			}
+
+			if enableFilePerf {
+				profileName := fmt.Sprintf("Build[%s]", normalizePathForProfile(path))
+				ssaprofile.ProfileAdd(true, profileName, buildOne)
+			} else {
+				buildOne()
+			}
 		}
 		fileContents = make([]*ssareducer.FileContent, 0)
 		parseTime = time.Since(start)
