@@ -1,0 +1,15 @@
+{
+  "project_name": "dvwa",
+  "language": "php",
+  "code_source": {
+    "kind": "git",
+    "url": "https://github.com/digininja/DVWA",
+    "branch": "master"
+  },
+  "exclude_patterns": [],
+  "rule_names": [],
+  "memory": true,
+  "output_file": "dvwa-scan-result",
+  "output_format": "irify"
+}
+

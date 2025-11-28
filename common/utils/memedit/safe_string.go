@@ -105,7 +105,15 @@ func (s *SafeString) Slice(start int, end ...int) string {
 func (s *SafeString) SliceBeforeStart(end int) string {
 	if s.utf8Valid {
 		s.ensureRunes()
+		// 添加边界检查：如果请求的长度超过实际长度，使用实际长度
+		if end > len(s.runes) {
+			end = len(s.runes)
+		}
 		return string(s.runes[:end])
+	}
+	// 对于非 UTF-8，也需要边界检查
+	if end > len(s.bytes) {
+		end = len(s.bytes)
 	}
 	return string(s.bytes[:end])
 }
