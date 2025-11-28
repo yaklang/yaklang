@@ -28,6 +28,7 @@ var MitmExports = map[string]interface{}{
 	"hijackHTTPRequest":    mitmConfigHijackHTTPRequest,
 	"hijackHTTPResponse":   mitmConfigHijackHTTPResponse,
 	"hijackHTTPResponseEx": mitmConfigHijackHTTPResponseEx,
+	"mockHTTPRequest":      mitmConfigMockHTTPRequest,
 	"wscallback":           mitmConfigWSCallback,
 	"wsforcetext":          mitmConfigWSForceTextFrame,
 	"rootCA":               mitmConfigCertAndKey,
@@ -89,6 +90,7 @@ type mitmConfig struct {
 	hijackWebsocketDataFrame func(isHttps bool, urlStr string, req []byte, forward func([]byte), reject func())
 	hijackResponse           func(isHttps bool, urlStr string, rsp []byte, forward func([]byte), reject func())
 	hijackResponseEx         func(isHttps bool, urlStr string, req, rsp []byte, forward func([]byte), reject func())
+	mockHTTPRequest          func(isHttps bool, urlStr string, req []byte, mockResponse func(rsp interface{}))
 
 	// extra incoming connection channels (legacy, for backward compatibility)
 	extraIncomingConnChans []chan net.Conn
@@ -244,6 +246,25 @@ func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, mod
 func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]byte), func())) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.hijackResponseEx = h
+	}
+}
+
+// mockHTTPRequest 是一个选项函数，用于指定中间人代理服务器的请求 mock 函数
+// 当接收到请求后，会调用该回调函数，通过调用 mockResponse 函数可以直接返回自定义响应，跳过真实的网络请求
+// mockResponse 接受一个响应（字符串或字节数组），会自动修复响应格式，如果修复失败则返回 502 Bad Gateway
+// Example:
+// ```
+// mitm.Start(8080, mitm.mockHTTPRequest(func(isHttps, urlStr, req, mockResponse) {
+//
+//	if str.Contains(urlStr, "test") {
+//	    mockResponse("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nMocked Response")
+//	}
+//
+// }))
+// ```
+func mitmConfigMockHTTPRequest(h func(isHttps bool, urlStr string, req []byte, mockResponse func(rsp interface{}))) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.mockHTTPRequest = h
 	}
 }
 
@@ -642,19 +663,45 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey),
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
-			if config.hijackRequest == nil {
-				return req
-			}
-
 			if reqIns.Method == "CONNECT" {
 				return req
 			}
 
 			req = lowhttp.FixHTTPRequest(req)
 			urlStrIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
+			urlStr := ""
+			if urlStrIns != nil {
+				urlStr = urlStrIns.String()
+			}
+
+			// Handle mockHTTPRequest first
+			if config.mockHTTPRequest != nil {
+				isMocked := utils.NewBool(false)
+				config.mockHTTPRequest(isHttps, urlStr, req, func(rsp interface{}) {
+					isMocked.Set()
+					rspBytes := utils.InterfaceToBytes(rsp)
+					fixedRsp, _, _ := lowhttp.FixHTTPResponse(rspBytes)
+					if fixedRsp == nil {
+						log.Warnf("failed to fix mock response, using original bytes")
+						fixedRsp = rspBytes
+					}
+					httpctx.SetMockResponseBytes(reqIns, fixedRsp)
+					httpctx.SetShouldMockResponse(reqIns, true)
+				})
+				if isMocked.IsSet() {
+					// Return original request, the mock response will be used in doHTTPRequest
+					return req
+				}
+			}
+
+			// Handle hijackRequest
+			if config.hijackRequest == nil {
+				return req
+			}
+
 			after := req
 			isDropped := utils.NewBool(false)
-			config.hijackRequest(isHttps, urlStrIns.String(), req, func(bytes []byte) {
+			config.hijackRequest(isHttps, urlStr, req, func(bytes []byte) {
 				after = lowhttp.FixHTTPRequest(bytes)
 				httpctx.SetRequestModified(reqIns, "user")
 				httpctx.SetHijackedRequestBytes(reqIns, after)
