@@ -2,12 +2,15 @@ package aiforge
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -72,6 +75,8 @@ func RegisterForgeExecutor(i string, f ForgeExecutor) error {
 	return nil
 }
 
+var forgeNotFoundError = utils.Errorf("forge not found")
+
 func ExecuteForge(
 	forgeName string,
 	ctx context.Context,
@@ -84,8 +89,31 @@ func ExecuteForge(
 	if forge, ok := forges[forgeName]; ok {
 		return forge(ctx, params, opts...)
 	} else {
-		return nil, utils.Errorf("forge %s not found", forgeName)
+		return nil, utils.Wrapf(forgeNotFoundError, "forge %s not found", forgeName)
 	}
+}
+
+func ExecuteForgeAndAutoRegister(forgeName string, ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
+	forgeRes, err := ExecuteForge(forgeName, ctx, params, opts...)
+	if err == nil {
+		return forgeRes, nil
+	}
+
+	if !errors.Is(err, forgeNotFoundError) {
+		return nil, err
+	}
+
+	forgeIns, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), forgeName)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to get forge instance")
+	}
+	cfg := NewYakForgeBlueprintConfigFromSchemaForge(forgeIns)
+	err = RegisterYakAiForge(cfg)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to register forge")
+	}
+
+	return ExecuteForge(forgeName, ctx, params, opts...)
 }
 
 func convertForgeResultIntoCommonForgeResult(fr *ForgeResult) *aicommon.ForgeResult {
@@ -106,7 +134,7 @@ func init() {
 				{Key: "query", Value: utils.InterfaceToString(params)},
 			}
 		}
-		result, err := ExecuteForge(name, ctx, finalParams, opts...)
+		result, err := ExecuteForgeAndAutoRegister(name, ctx, finalParams, opts...)
 		if err != nil {
 			return nil, err
 		}
