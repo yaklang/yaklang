@@ -656,14 +656,10 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, planFlag, "PROGRESS_TASK_") {
 				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
 				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
-				aitagNonce := nonce()
+				// aitagNonce := nonce()
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "directly_answer"}
-<|FINAL_ANSWER_` + aitagNonce + `|>
-` + finishTaskFlag + `
-<|FINAL_ANSWER_END_` + aitagNonce + `|>
-`))
+{"@action": "directly_answer","answer_payload":"` + finishTaskFlag + `"}`))
 				rsp.Close()
 				finishedCh <- true
 				return rsp, nil
