@@ -121,6 +121,8 @@ compile_one() {
     enable_race_for_pkg=1
   fi
   
+  # 使用 build cache 加速编译
+  # GOCACHE 环境变量应该已经设置，go test 会自动使用
   if go test "${compile_args[@]}" "$pkg" 2>"$log"; then
     if [[ $enable_race_for_pkg -eq 1 ]]; then
       echo "OK  $pkg -> $(basename "$bin") [race]"
