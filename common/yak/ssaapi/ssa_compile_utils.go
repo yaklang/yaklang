@@ -30,54 +30,9 @@ func (c *Config) GetFileHandler(
 	enableFilePerf := c.GetCompileFilePerformanceLog()
 
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
-		var ast ssa.FrontAST
-		var err error
-
-		// log.Infof("enableFilePerf %v", enableFilePerf)
-		if enableFilePerf {
-			profileName := fmt.Sprintf("ParseAST[%s]", normalizePathForProfile(path))
-			ssaprofile.ProfileAdd(true, profileName, func() {
-				start := time.Now()
-				defer func() {
-					log.Infof("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
-				}()
-
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("pre-handler parse [%s] error %v  ", path, r)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-
-				if _, needBuild := handlerFilesMap[path]; !needBuild {
-					return
-				}
-
-				var cache *ssa.AntlrCache
-				raw, ok := store.Get(key)
-				if ok {
-					if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
-						cache = raw
-					}
-				}
-				if cache == nil {
-					cache = c.LanguageBuilder.GetAntlrCache()
-					log.Errorf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
-					store.Set(key, cache)
-				}
-
-				if language := c.LanguageBuilder; language != nil {
-					if language.FilterParseAST(path) {
-						ast, err = language.ParseAST(utils.UnsafeBytesToString(content), cache)
-					} else {
-						log.Debugf("skip parse ast file: %s", path)
-					}
-				} else {
-					err = utils.Errorf("not select language %s", c.GetLanguage())
-				}
-			})
-		} else {
-			// 不启用文件级别监控时，使用原有逻辑
+		parseWithLog := func() (ssa.FrontAST, error) {
+			var ast ssa.FrontAST
+			var err error
 			start := time.Now()
 			defer func() {
 				log.Infof("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
@@ -91,6 +46,7 @@ func (c *Config) GetFileHandler(
 			}()
 
 			if _, needBuild := handlerFilesMap[path]; !needBuild {
+				// don't need parse ast
 				return nil, nil
 			}
 
@@ -117,8 +73,21 @@ func (c *Config) GetFileHandler(
 			} else {
 				err = utils.Errorf("not select language %s", c.GetLanguage())
 			}
+			return ast, err
 		}
 
+		if !enableFilePerf {
+			return parseWithLog()
+		}
+
+		var (
+			ast ssa.FrontAST
+			err error
+		)
+		profileName := fmt.Sprintf("ParseAST[%s]", normalizePathForProfile(path))
+		ssaprofile.ProfileAdd(true, profileName, func() {
+			ast, err = parseWithLog()
+		})
 		return ast, err
 	}
 	initWorker := func() *utils.SafeMap[any] {

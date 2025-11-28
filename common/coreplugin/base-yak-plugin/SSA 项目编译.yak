@@ -5,6 +5,11 @@ configJSON := cli.Text("config",
     cli.setVerboseName("SSA 配置"),
     cli.setHelp("SSA 项目的配置 JSON 字符串")
 )
+enableFilePerfLog := cli.Bool("enableFilePerformanceLog",
+    cli.setVerboseName("启用文件级别性能日志"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(false),
+)
 
 cli.check()
 
@@ -38,6 +43,11 @@ opts = [
     ssa.withJsonRawConfig(configJSON),
     ssa.withProgramName(programName),
 ]
+
+if enableFilePerfLog {
+    opts = append(opts, ssa.withCompileFilePerformanceLog(true))
+    yakit.Info("已启用文件级别性能日志，将按文件输出 AST/Build 耗时")
+}
 
 progs, err = ssa.ParseProject(opts...)
 if err != nil {

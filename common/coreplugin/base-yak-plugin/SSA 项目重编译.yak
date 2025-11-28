@@ -26,6 +26,7 @@ opts = [
 
 if enableFilePerfLog {
     opts = append(opts, ssa.withCompileFilePerformanceLog(true))
+    yakit.Info("已启用文件级别性能日志，将按文件输出 AST/Build 耗时")
 }
 
 err := prog.Recompile(opts...)
