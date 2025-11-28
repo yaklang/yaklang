@@ -94,14 +94,27 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 
 	// 检查是否启用规则级别的详细性能监控
 	enableRulePerf := m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableRulePerformanceLog
+	enableInstructionPerf := m.Config != nil && m.Config.ScanTaskCallback != nil && m.Config.ScanTaskCallback.EnableInstructionPerformanceLog
 
 	// 将查询逻辑包装到函数中
 	f := func() {
+		var instrProfiler *instructionProfiler
+		if enableInstructionPerf {
+			instrProfiler = newInstructionProfiler(rule.RuleName, prog.GetProgramName())
+			defer func() {
+				instrProfiler.Finish()
+				instrProfiler.LogSummary()
+			}()
+		}
+
 		option := []ssaapi.QueryOption{}
 		option = append(option,
 			ssaapi.QueryWithContext(m.ctx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
+				if instrProfiler != nil {
+					instrProfiler.Observe(info)
+				}
 				m.processMonitor.UpdateRuleStatus(prog.GetProgramName(), rule.RuleName, f, info)
 			}),
 			ssaapi.QueryWithSave(m.kind),

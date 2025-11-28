@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
-	sfscan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
@@ -1272,6 +1271,11 @@ var ssaCodeScan = &cli.Command{
 		},
 
 		cli.BoolFlag{
+			Name:  "rule-instr-log",
+			Usage: "enable instruction-level performance profiling for syntaxflow rules",
+		},
+
+		cli.BoolFlag{
 			Name:  "file-perf-log",
 			Usage: "enable file-level performance profiling log output (separate AST and Build by file)",
 		},
@@ -1366,14 +1370,15 @@ var ssaCodeScan = &cli.Command{
 			return err
 		}
 
-		err = sfscan.StartScan(
+		err = syntaxflow_scan.StartScan(
 			ctx,
 			ssaconfig.WithProgramNames(prog.GetProgramName()),
 			ssaconfig.WithRuleFilter(ruleFilter),
 			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-			sfscan.WithReporter(reportInstance),
+			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
 			syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
+			syntaxflow_scan.WithInstructionPerformanceLog(c.Bool("rule-instr-log")),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
 				if info == nil || len(info.Rules) == 0 {
@@ -1394,7 +1399,6 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		ssaprofile.ShowCompileProfiles()
 		return nil
 	},
 }
