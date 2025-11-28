@@ -1,0 +1,89 @@
+// Test concurrent eval and beforeRequest execution
+// This test verifies that concurrent execution of eval and beforeRequest
+// does not cause race conditions or nil function errors
+
+// Initialize variables
+counter = 0
+lock = sync.NewLock()
+successCount = 0
+errorCount = 0
+
+// Initial beforeRequest function
+beforeRequest = func(pack) {
+    lock.Lock()
+    defer lock.Unlock()
+    counter = counter + 1
+    return pack + "_processed"
+}
+
+// Hot loading function code (simulating Hot_Loading_Func)
+hotLoadingCode = `
+beforeRequest = func(pack) {
+    lock.Lock()
+    defer lock.Unlock()
+    counter = counter + 1
+    return pack + "_hotloaded"
+}
+`
+
+// Simulate Hot_Loading_FuncSync lock
+hotLoadingLock = sync.NewLock()
+
+// Test concurrent execution
+concurrentCount = 30
+wg = sync.NewWaitGroup()
+
+for i in concurrentCount {
+    wg.Add(1)
+    go func(id) {
+        defer wg.Done()
+        defer func {
+            err = recover()
+            if err != nil {
+                lock.Lock()
+                errorCount = errorCount + 1
+                lock.Unlock()
+                println(f"[ERROR] Goroutine ${id} panic: ${err}")
+            }
+        }
+        
+        // Simulate user code: eval and call beforeRequest
+        hotLoadingLock.Lock()
+        defer hotLoadingLock.Unlock()
+        
+        // Execute eval to reload function
+        eval(hotLoadingCode)
+        
+        // Call beforeRequest
+        testPack = f"test_${id}"
+        result = beforeRequest(testPack)
+        
+        // Verify result
+        if result != nil && str.Contains(result, "_hotloaded") {
+            lock.Lock()
+            successCount = successCount + 1
+            lock.Unlock()
+        } else {
+            lock.Lock()
+            errorCount = errorCount + 1
+            lock.Unlock()
+            println(f"[ERROR] Goroutine ${id} got invalid result: ${result}")
+        }
+    }(i)
+}
+
+// Wait for all goroutines
+wg.Wait()
+
+// Verify results
+println(f"Success count: ${successCount}/${concurrentCount}")
+println(f"Error count: ${errorCount}")
+println(f"Total counter: ${counter}")
+
+// Assertions
+assert successCount > concurrentCount * 0.8, f"At least 80% should succeed, got ${successCount}/${concurrentCount}"
+assert errorCount == 0, f"Should have no errors, got ${errorCount}"
+assert counter >= concurrentCount, f"Counter should be at least ${concurrentCount}, got ${counter}"
+
+println("\n[TEST] ✓ Concurrent eval and beforeRequest test passed!")
+
