@@ -229,6 +229,74 @@ func ReplaceStringInJavaSerilizable(objSer yserx.JavaSerializable, old string, n
 	return err
 }
 
+// ReplaceByteArrayInJavaSerilizable 替换Java序列化对象中的字节数组
+func ReplaceByteArrayInJavaSerilizable(objSer yserx.JavaSerializable, old, new []byte, times int) error {
+	err := utils.Error("not found byte array in java object")
+	WalkJavaSerializableObject(objSer, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
+		// 检查是否是JavaArray对象
+		javaArray, ok := objSer.(*yserx.JavaArray)
+		if !ok {
+			return
+		}
+
+		// 检查是否是字节数组（类名为"[B"）
+		isByteArray := false
+		if javaArray.ClassDesc != nil {
+			switch classDesc := javaArray.ClassDesc.(type) {
+			case *yserx.JavaClassDesc:
+				if classDesc.Detail != nil && classDesc.Detail.ClassName == "[B" {
+					isByteArray = true
+				}
+			case *yserx.JavaReference:
+				// 对于引用类型，需要通过handleTable查找实际的类描述
+				// 这里简化处理，假设Bytescode为true的数组是字节数组
+				if javaArray.Bytescode {
+					isByteArray = true
+				}
+			}
+		}
+		if !isByteArray || times == 0 {
+			return
+		}
+		// 比较字节数组内容
+		if javaArray.Bytescode {
+			// 对于以字节形式存储的数组
+			if len(javaArray.Bytes) == len(old) &&
+				bytes.Equal(javaArray.Bytes, old) {
+				// 替换字节数组
+				javaArray.Bytes = new
+				javaArray.Size = len(new)
+				err = nil
+				times--
+			}
+		} else {
+			// 对于以Values形式存储的数组
+			if len(javaArray.Values) == len(old) {
+				match := true
+				for i, value := range javaArray.Values {
+					if i < len(old) && len(value.Bytes) > 0 && value.Bytes[0] != old[i] {
+						match = false
+						break
+					}
+				}
+
+				if match {
+					// 替换字节数组
+					javaArray.Values = make([]*yserx.JavaFieldValue, len(new))
+					for i, b := range new {
+						javaArray.Values[i] = yserx.NewJavaFieldByteValue(b)
+					}
+					javaArray.Size = len(new)
+					err = nil
+					times--
+				}
+			}
+		}
+	})
+
+	return err
+}
+
 // ReplaceClassNameInJavaSerilizable 这个 ClassName 指的是要探测的目标 jar 包里是否存在该 ClassName
 func ReplaceClassNameInJavaSerilizable(objSer yserx.JavaSerializable, old string, new string, times int) error {
 	err := utils.Error("not found class name in java object")
@@ -319,6 +387,10 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 		node.Type = ret.Type
 		node.TypeVerbose = ret.TypeVerbose
 		node.Value = v
+		// 如果是字节数组，使用handle处理
+		if ret.Values == nil && ret.Bytes != nil {
+			handle(nil, ret, replace)
+		}
 		for i, value := range ret.Values {
 			//if value.Object
 			v[i] = &JavaStruct{}
