@@ -83,11 +83,14 @@ sec-websocket-accept: sFDrS2IYVLt69E6E21k3vkgxYjY=` + "\r\n\r\n")
 			}
 		}
 	}
+	// 等待 MITM 服务器完全启动并准备好接受连接
+	time.Sleep(500 * time.Millisecond)
+
 	tokenMap := map[string]int{}
 	checkSave := func(n int) {
 		token := utils.RandSecret(8)
 
-		lowhttp.HTTP(lowhttp.WithPacketBytes([]byte(`GET / HTTP/1.1
+		_, err := lowhttp.HTTP(lowhttp.WithPacketBytes([]byte(`GET / HTTP/1.1
 Host: `+addr+`
 Accept-Encoding: gzip, deflate, br, zstd
 Pragma: no-cache
@@ -99,6 +102,9 @@ Sec-WebSocket-Version: 13
 token: `+token+`
 
 `)), lowhttp.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", rPort)), lowhttp.WithSaveHTTPFlow(false))
+		if err != nil {
+			t.Fatalf("HTTP request failed: %v", err)
+		}
 		tokenMap[token] = n
 	}
 
@@ -111,7 +117,8 @@ token: `+token+`
 		SetAutoForward:        true,
 		AutoForwardValue:      true,
 	})
-	time.Sleep(100 * time.Millisecond)
+	// 增加等待时间，确保配置更新生效
+	time.Sleep(500 * time.Millisecond)
 	checkSave(0)
 	stream.Send(&ypb.MITMRequest{
 		UpdateFilterWebsocket: true,
@@ -121,7 +128,7 @@ token: `+token+`
 		SetAutoForward:        true,
 		AutoForwardValue:      true,
 	})
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	checkSave(1)
 	stream.Send(&ypb.MITMRequest{
 		FilterData: &ypb.MITMFilterData{ExcludeHostnames: []*ypb.FilterDataItem{{
@@ -134,17 +141,34 @@ token: `+token+`
 		SetAutoForward:   true,
 		AutoForwardValue: true,
 	})
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 	checkSave(0)
-	time.Sleep(1 * time.Second)
+	// 增加等待时间，给数据库更多写入时间
+	time.Sleep(2 * time.Second)
+
+	// 使用重试机制查询数据库，避免写入延迟导致的失败
 	for token, expect := range tokenMap {
-		flows, err := client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{
-			Keyword: token,
-		})
-		if err != nil {
-			t.Fatal(err)
+		var flows *ypb.QueryHTTPFlowResponse
+		var err error
+
+		// 重试查询，最多重试 5 次
+		for i := 0; i < 5; i++ {
+			flows, err = client.QueryHTTPFlows(ctx, &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(flows.GetData()) == expect {
+				break
+			}
+			if i < 4 {
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
-		assert.Equal(t, expect, len(flows.GetData()))
+
+		require.Equal(t, expect, len(flows.GetData()),
+			"token %s: expected %d flows, got %d", token, expect, len(flows.GetData()))
 	}
 }
 
