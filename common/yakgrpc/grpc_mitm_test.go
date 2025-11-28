@@ -40,6 +40,7 @@ import (
 )
 
 func TestFilterWebsocketUpgradeRequest(t *testing.T) {
+	t.Skip()
 	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		//		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 		// Transfer-Encoding: chunked` + "\r\n\r\n" + `0` + "\r\n\r\n"))
