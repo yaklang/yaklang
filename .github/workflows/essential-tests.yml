@@ -172,12 +172,40 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
+          cache-dependency-path: go.sum
         id: go
+
+      - name: Restore Go Build Cache
+        uses: actions/cache@v3
+        id: cache-go-build
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ steps.cache_key.outputs.sha }}-
+            go-build-
 
       - name: Init Module
         run: |
           go mod tidy 
           echo "Modifying permissions to read-write for pcap-bpf.h"
+
+      - name: Warm up Go Build Cache
+        if: steps.cache-go-build.outputs.cache-hit != 'true'
+        run: |
+          echo "Warming up Go build cache by building core dependencies..."
+          # 编译核心依赖包，填充 build cache
+          go build ./common/utils/... || true
+          go build ./common/mutate/... || true
+          go build ./common/yak/ssaapi/... || true
+          echo "Build cache warmed up"
+
+      - name: Save Go Build Cache
+        uses: actions/cache/save@v3
+        if: steps.cache-go-build.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
 
       - name: Generate Document Data
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -191,9 +219,67 @@ jobs:
           go build -x common/yak/cmd/yak.go 
           ./yak --help
 
+  warm-build-cache:
+    needs: [check-wip, setup]
+    if: needs.check-wip.outputs.should_run_tests == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set Cache Key
+        id: cache_key
+        run: |
+          CACHE_SHA="${{ needs.check-wip.outputs.target_ref }}"
+          if [ -z "$CACHE_SHA" ]; then
+            CACHE_SHA="${{ github.sha }}"
+          fi
+          echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache-dependency-path: go.sum
+
+      - name: Restore Go Build Cache
+        uses: actions/cache@v3
+        id: cache-go-build
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ steps.cache_key.outputs.sha }}-
+            go-build-
+
+      - name: Build All Common Packages
+        if: steps.cache-go-build.outputs.cache-hit != 'true'
+        run: |
+          echo "Building all common packages to populate build cache..."
+          echo "This may take 5-10 minutes on first run..."
+          # 编译所有测试会用到的包，填充 build cache
+          # 使用 -o /dev/null 只编译不生成二进制
+          go list -f '{{.ImportPath}}' ./common/... 2>/dev/null | \
+            while read -r pkg; do
+              echo "Building $pkg..."
+              go build -o /dev/null "$pkg" 2>/dev/null || true
+            done
+          echo "Build cache populated"
+
+      - name: Save Go Build Cache
+        uses: actions/cache/save@v3
+        if: steps.cache-go-build.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+
   test:
     name: ${{ matrix.name }}
-    needs: [check-wip, setup]
+    needs: [check-wip, setup, warm-build-cache]
     if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     strategy:
@@ -445,7 +531,29 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
+          cache-dependency-path: go.sum
         id: go
+
+      - name: Restore Go Build Cache
+        uses: actions/cache@v3
+        id: cache-go-build
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ steps.cache_key.outputs.sha }}-
+            go-build-
+
+      - name: Set GOCACHE environment
+        run: |
+          echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
+          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
+          if [ -d "$HOME/.cache/go-build" ]; then
+            CACHE_SIZE=$(du -sh "$HOME/.cache/go-build" 2>/dev/null | cut -f1 || echo "0B")
+            echo "Build cache restored: $CACHE_SIZE"
+          else
+            echo "Build cache directory not found"
+          fi
 
       - name: Generate Test Config
         run: |
@@ -467,11 +575,17 @@ jobs:
           fi
 
       - name: Compile Test Binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
         run: |
           chmod +x ./scripts/ci/compile-tests.sh
           export TEST_BIN_DIR=/tmp/test_binaries
           export TEST_CONFIG="/tmp/test_config.json"
+          echo "Compiling test binaries with build cache..."
           ./scripts/ci/compile-tests.sh
+          if [ -d "$HOME/.cache/go-build" ]; then
+            echo "Build cache after compilation: $(du -sh $HOME/.cache/go-build 2>/dev/null | cut -f1 || echo '0B')"
+          fi
 
       - name: Start GRPC Server
         env: 
