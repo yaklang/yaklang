@@ -214,7 +214,11 @@ func (n *VirtualMachine) GetVarWithoutFrame(name string) (any, bool) {
 }
 
 func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
+	// 使用锁保护 VMStack 的访问，防止并发访问问题
+	vmstackLock.Lock()
 	ivm := n.VMStack.Peek()
+	vmstackLock.Unlock()
+	
 	if ivm == nil {
 		val, ok := n.rootScope.GetValueByName(name)
 		if ok {
@@ -224,7 +228,12 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 	}
 
 	// ivm 存在的时候，从 frame 中找变量
-	frame := ivm.(*Frame)
+	frame, ok := ivm.(*Frame)
+	if !ok || frame == nil {
+		// 类型断言失败或 frame 为 nil，回退到全局变量查找
+		return n.GetVarWithoutFrame(name)
+	}
+	
 	val, ok := frame.CurrentScope().GetValueByName(name)
 	if ok {
 		return val.Value, true

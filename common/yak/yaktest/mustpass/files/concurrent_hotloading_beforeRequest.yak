@@ -1,0 +1,164 @@
+// Test concurrent hot loading and beforeRequest execution
+// This test simulates the real-world scenario where multiple goroutines
+// concurrently execute eval(Hot_Loading_Func) and call beforeRequest
+
+yakit.AutoInitYakit()
+
+start = time.Now() // 记录开始时间
+
+// 定义热加载函数代码（模拟 cli.Text 的默认值）
+Hot_Loading_Func = "beforeRequest = (req) => {\n    println(\"这个是测试输出\")\n    return req + \"_processed\"\n}"
+
+info = {
+    "Include_Key_Word": [
+        {
+            "Include_Key_Word_Way": "123",
+            "Place": false,
+            "Discard_Or_Save": "1111"
+        }
+    ]
+}
+
+infoMap = make(map[string]any)
+for k, v := range info {
+    infoMap[string(k)] = v
+}
+
+/*
+    通过类型判断存在键名
+*/
+mapkeyExist = (v) => {
+    // 判断路径存在
+    if !string(type(v)) {
+        return
+    }
+    return v
+}
+
+/*
+    避免并发读写map
+    设置map读写锁
+    mapSync
+*/
+mapSync = sync.NewLock()
+Hot_Loading_FuncSync = sync.NewLock()
+
+getMap = (key) => {
+    mapSync.Lock()
+    defer mapSync.Unlock()
+    v = json.Find(infoMap, "$."+key)
+    if !(mapkeyExist(v)) {
+        // 不存在键名
+        return error("不存在键名")
+    }
+    return v
+}
+
+/*
+    通过json修改内容
+*/
+setMap = (key, value) => {
+    mapSync.Lock()
+    defer mapSync.Unlock()
+    if !(mapkeyExist(json.Find(infoMap, "$."+key))) {
+        // 不存在键名
+        return error("不存在键名")
+    }
+    infoMap = json.ReplaceAll(infoMap, "$."+key, value)
+}
+
+// 初始化计数器用于验证
+successCount = 0
+errorCount = 0
+resultLock = sync.NewLock()
+
+totalTasks = 20
+groupSize = 5
+groupCount = (totalTasks + groupSize - 1) / groupSize // 向上取整
+taskID = 1
+done = false
+
+for g = 1; g <= groupCount; g++ {
+    if done {
+        println(sprintf("❌ 取消执行第 %d 组任务\n", g))
+        break
+    }
+    
+    wg = sync.NewSizedWaitGroup(30) // 线程池限制大小为30
+    println(sprintf("🧩 开始执行第 %d 组任务\n", g))
+    
+    startTaskID = taskID
+    
+    for i = 0; i < groupSize && taskID <= totalTasks; i++ {
+        if done {
+            break
+        }
+        
+        id = taskID
+        taskID++
+        
+        wg.Add()
+        go func(i) {
+            defer wg.Done()
+            defer func {
+                err = recover()
+                if err != nil {
+                    resultLock.Lock()
+                    errorCount = errorCount + 1
+                    resultLock.Unlock()
+                    println(sprintf("❌ 任务 %d 发生错误: %v\n", i, err))
+                }
+            }
+            
+            println(sprintf("任务 %d 开始\n", i))
+            
+            // 模拟任务耗时
+            Hot_Loading_FuncSync.Lock()
+            defer Hot_Loading_FuncSync.Unlock()
+            
+            // 修复：避免并发读写
+            // 执行 beforeRequest
+            eval(Hot_Loading_Func)
+            
+            // 调用 beforeRequest 重新赋值新包
+            pack = beforeRequest("123")
+            
+            // 验证结果
+            if pack != nil && str.Contains(pack, "_processed") {
+                resultLock.Lock()
+                successCount = successCount + 1
+                resultLock.Unlock()
+            } else {
+                resultLock.Lock()
+                errorCount = errorCount + 1
+                resultLock.Unlock()
+                println(sprintf("❌ 任务 %d 结果无效: %v\n", i, pack))
+            }
+            
+            println(sprintf("任务 %d 完成\n", i))
+        }(id)
+    }
+    
+    wg.Wait()
+    println(sprintf("✅ 第 %d 组任务（%d~%d）已全部完成\n\n", g, startTaskID, taskID-1))
+}
+
+println("所有任务完成")
+
+// 验证结果
+println(sprintf("成功任务数: %d/%d", successCount, totalTasks))
+println(sprintf("失败任务数: %d", errorCount))
+
+// 断言验证
+assert successCount > totalTasks * 0.9, f"至少 90%% 的任务应该成功，实际成功: ${successCount}/${totalTasks}"
+assert errorCount == 0, f"不应该有错误，实际错误数: ${errorCount}"
+
+// 验证 map 操作
+testValue = getMap("Include_Key_Word")
+assert testValue != nil, "getMap 应该能获取到值"
+
+yakit.StatusCard("用时：", time.Since(start))
+yakit.StatusCard("成功任务数", sprintf("%d/%d", successCount, totalTasks))
+
+println("\n[TEST] ✓ Concurrent hot loading and beforeRequest test passed!")
+

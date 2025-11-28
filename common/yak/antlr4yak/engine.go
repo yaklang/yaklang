@@ -188,15 +188,32 @@ func (n *Engine) SafeCallYakFunction(ctx context.Context, funcName string, param
 }
 
 // 函数调用时如果不加锁，并发会有问题
+// 修复：添加 nil 检查和更好的错误处理，防止函数在获取和调用之间变成 nil
 func (n *Engine) CallYakFunction(ctx context.Context, funcName string, params []interface{}) (interface{}, error) {
+	// 获取函数变量
 	i, ok := n.GetVar(funcName)
 	if !ok {
 		return nil, utils.Errorf("function %s not found", funcName)
 	}
-	if f, ok := i.(*yakvm.Function); ok {
-		return n.CallYakFunctionNative(ctx, f, params...)
+	
+	// 检查是否为 nil
+	if i == nil {
+		return nil, utils.Errorf("function %s is nil", funcName)
 	}
-	return nil, utils.Errorf("cannot found yakvm.Function: %v", funcName)
+	
+	// 类型断言为 *yakvm.Function
+	f, ok := i.(*yakvm.Function)
+	if !ok {
+		return nil, utils.Errorf("cannot convert %s to yakvm.Function, got type: %T", funcName, i)
+	}
+	
+	// 再次检查 Function 对象是否为 nil（防止在类型断言后变成 nil）
+	if f == nil {
+		return nil, utils.Errorf("function %s is nil after type assertion", funcName)
+	}
+	
+	// 调用函数
+	return n.CallYakFunctionNative(ctx, f, params...)
 	//
 	//returnValueReciver := "__global_return__"
 	//paramStrList := []string{}
