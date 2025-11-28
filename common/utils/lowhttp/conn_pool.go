@@ -122,7 +122,7 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, exclusive bool, opts ...n
 	}
 
 	if exclusive {
-		log.Infof("[lowhttp-conn-pool] dialing exclusive connection scheme=%s addr=%s", key.scheme, key.addr)
+		log.Debugf("[lowhttp-conn-pool] dialing exclusive connection scheme=%s addr=%s", key.scheme, key.addr)
 		pConn, err := newPersistConn(key, l, true, opts...)
 		if err != nil {
 			return nil, err
@@ -470,9 +470,9 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, exclusive bool, opt 
 		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
 			if exclusive {
-				log.Infof("[lowhttp-conn-pool] exclusive h2 connection established addr=%s", key.addr)
+				log.Debugf("[lowhttp-conn-pool] exclusive h2 connection established addr=%s", key.addr)
 			} else {
-				log.Infof("[lowhttp-conn-pool] pooled h2 connection established addr=%s", key.addr)
+				log.Debugf("[lowhttp-conn-pool] pooled h2 connection established addr=%s", key.addr)
 			}
 			if exclusive {
 				return pc, nil
