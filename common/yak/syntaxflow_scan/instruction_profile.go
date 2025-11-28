@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -22,13 +23,16 @@ type instructionProfiler struct {
 	lastLabel string
 
 	stats map[string]*instructionStat
+
+	summary *instructionSummary
 }
 
-func newInstructionProfiler(ruleName, programName string) *instructionProfiler {
+func newInstructionProfiler(ruleName, programName string, summary *instructionSummary) *instructionProfiler {
 	return &instructionProfiler{
 		ruleName:    ruleName,
 		programName: programName,
 		stats:       make(map[string]*instructionStat),
+		summary:     summary,
 	}
 }
 
@@ -42,6 +46,9 @@ func (p *instructionProfiler) Finish() {
 	p.addDuration(time.Now())
 	p.lastLabel = ""
 	p.lastTime = time.Time{}
+	if p.summary != nil {
+		p.summary.Merge(p.stats)
+	}
 }
 
 func (p *instructionProfiler) addDuration(now time.Time) {
@@ -146,4 +153,117 @@ func classifyInstructionLabel(label string) string {
 		}
 	}
 	return "Other"
+}
+
+type instructionSummary struct {
+	mu    sync.Mutex
+	stats map[string]*instructionStat
+}
+
+func newInstructionSummary() *instructionSummary {
+	return &instructionSummary{
+		stats: make(map[string]*instructionStat),
+	}
+}
+
+func (s *instructionSummary) Merge(stats map[string]*instructionStat) {
+	if s == nil || len(stats) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stats == nil {
+		s.stats = make(map[string]*instructionStat)
+	}
+	for key, stat := range stats {
+		if stat == nil {
+			continue
+		}
+		item := s.stats[key]
+		if item == nil {
+			item = &instructionStat{name: stat.name}
+			s.stats[key] = item
+		}
+		item.total += stat.total
+		item.count += stat.count
+	}
+}
+
+func (s *instructionSummary) snapshot() []*instructionStat {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]*instructionStat, 0, len(s.stats))
+	for _, stat := range s.stats {
+		result = append(result, &instructionStat{
+			name:  stat.name,
+			total: stat.total,
+			count: stat.count,
+		})
+	}
+	return result
+}
+
+var importantInstructionLabels = []string{
+	"LoadRule",
+	"StartQuery",
+	"Iterator",
+	"GetCallArgs",
+	"GetCall",
+	"Users",
+	"Defs",
+	"NativeCall",
+	"Condition",
+	"Compare",
+	"Push",
+	"Pop",
+	"SaveResult",
+	"Alert",
+}
+
+func (s *instructionSummary) LogGlobal() {
+	entries := s.snapshot()
+	if len(entries) == 0 {
+		return
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].total > entries[j].total
+	})
+
+	log.Infof("=========== SyntaxFlow Instruction Performance (Global) ===========")
+	index := make(map[string]*instructionStat, len(entries))
+	for _, stat := range entries {
+		index[stat.name] = stat
+	}
+
+	highlighted := map[string]struct{}{}
+	for _, label := range importantInstructionLabels {
+		if stat, ok := index[label]; ok {
+			log.Infof("[关键] Instr[%s] Time: %v Count: %d Avg: %v", stat.name, stat.total, stat.count, averageDuration(stat))
+			highlighted[label] = struct{}{}
+		}
+	}
+
+	const maxTop = 15
+	topPrinted := 0
+	for _, stat := range entries {
+		if _, skip := highlighted[stat.name]; skip {
+			continue
+		}
+		log.Infof("Instr[%s] Time: %v Count: %d Avg: %v", stat.name, stat.total, stat.count, averageDuration(stat))
+		topPrinted++
+		if topPrinted >= maxTop {
+			break
+		}
+	}
+	log.Infof("===================================================================")
+}
+
+func averageDuration(stat *instructionStat) time.Duration {
+	if stat == nil || stat.count == 0 {
+		return 0
+	}
+	return stat.total / time.Duration(stat.count)
 }

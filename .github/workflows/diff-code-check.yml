@@ -187,7 +187,13 @@ jobs:
           yak sync-rule
           
           # 运行扫描并捕获输出
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go,*_test.go 2>&1) || SCAN_EXIT_CODE=$?
+          SCAN_LOG="scan_output.log"
+          rm -f "$SCAN_LOG"
+          set -o pipefail
+          if ! yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --file-perf-log --rule-perf-log --rule-instr-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go,*_test.go 2>&1 | tee "$SCAN_LOG"; then
+            SCAN_EXIT_CODE=$?
+          fi
+          SCAN_OUTPUT=$(cat "$SCAN_LOG")
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"
@@ -393,6 +399,19 @@ jobs:
           name: risk-results
           path: results/
           if-no-files-found: ignore
+
+      - name: Highlight performance logs
+        if: steps.validate.outputs.should_skip != 'true'
+        run: |
+          if [ ! -f "scan_output.log" ]; then
+            echo "::notice::scan_output.log not found, skip performance summary"
+            exit 0
+          fi
+          echo "::group::Performance logs (grep view)"
+          if ! grep -nE "Profile Summary|SyntaxFlow Instruction Performance" scan_output.log; then
+            echo "::notice::No performance logs detected in scan_output.log"
+          fi
+          echo "::endgroup::"
 
       - name: Comment PR with security findings
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && steps.generate_report.outputs.RISK_COUNT != '0'

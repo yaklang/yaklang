@@ -1377,8 +1377,8 @@ var ssaCodeScan = &cli.Command{
 			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
 			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
-			syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
-			syntaxflow_scan.WithInstructionPerformanceLog(c.Bool("rule-instr-log")),
+			syntaxflow_scan.WithRulePerformanceLog(config.rulePerfLog),
+			syntaxflow_scan.WithInstructionPerformanceLog(config.ruleInstrLog),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
 				if info == nil || len(info.Rules) == 0 {

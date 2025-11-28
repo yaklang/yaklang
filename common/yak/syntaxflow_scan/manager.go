@@ -56,6 +56,9 @@ type scanManager struct {
 
 	// 规则级别的性能统计（独立的 profile map）
 	ruleProfileMap *utils.SafeMap[*ssaprofile.Profile]
+
+	// 指令级别性能统计
+	instructionSummary *instructionSummary
 }
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
@@ -112,6 +115,7 @@ func createEmptySyntaxFlowTaskByID(
 	m.callback.Set(runningID, config.ScanTaskCallback)
 	// syntaxFlowScanManagerMap.Set(taskId, m)
 	m.Config = config
+	m.ensureInstructionSummary()
 	// 设置进度回调
 	eventWithRule := false
 	if config != nil && config.ScanTaskCallback != nil {
@@ -333,6 +337,23 @@ func (m *scanManager) IsStop() bool {
 	default:
 		return false
 	}
+}
+
+func (m *scanManager) instructionPerfEnabled() bool {
+	if m == nil || m.Config == nil || m.Config.ScanTaskCallback == nil {
+		return false
+	}
+	return m.Config.ScanTaskCallback.EnableInstructionPerformanceLog
+}
+
+func (m *scanManager) ensureInstructionSummary() *instructionSummary {
+	if !m.instructionPerfEnabled() {
+		return nil
+	}
+	if m.instructionSummary == nil {
+		m.instructionSummary = newInstructionSummary()
+	}
+	return m.instructionSummary
 }
 
 func (m *scanManager) IsPause() bool {

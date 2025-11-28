@@ -22,6 +22,9 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			m.Config.ScanTaskCallback != nil &&
 			m.Config.ScanTaskCallback.EnableRulePerformanceLog
 		ssaprofile.ShowScanPerformance(m.ruleProfileMap, enableRulePerf, time.Since(scanStart))
+		if m.instructionSummary != nil {
+			m.instructionSummary.LogGlobal()
+		}
 
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -100,7 +103,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	f := func() {
 		var instrProfiler *instructionProfiler
 		if enableInstructionPerf {
-			instrProfiler = newInstructionProfiler(rule.RuleName, prog.GetProgramName())
+			instrProfiler = newInstructionProfiler(rule.RuleName, prog.GetProgramName(), m.ensureInstructionSummary())
 			defer func() {
 				instrProfiler.Finish()
 				instrProfiler.LogSummary()
