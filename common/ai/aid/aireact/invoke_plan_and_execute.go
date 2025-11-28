@@ -149,11 +149,10 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	}
 	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, params)
 	defer func() {
-		if finalErr == nil {
-			r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, params)
-		} else {
+		if finalErr != nil {
 			r.EmitPlanExecFail(finalErr.Error())
 		}
+		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, params)
 	}()
 	r.EmitAction(fmt.Sprintf("Plan request: %s", planPayload))
 
