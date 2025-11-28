@@ -51,6 +51,7 @@ import (
 )
 
 var UtilsCommands = []*cli.Command{
+	VacuumSQLiteCommand,
 	createYakToolMetadataCommand(),
 	createBuildInForgeMetadataCommand(),
 	{
