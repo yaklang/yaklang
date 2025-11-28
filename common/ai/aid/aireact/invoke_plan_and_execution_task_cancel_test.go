@@ -3,7 +3,9 @@ package aireact
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -23,6 +24,11 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 	// mock 一个 forge ，用于测试取消 pe 任务
 	testForgeName := "test_forge_" + utils.RandStringBytes(16)
 	planFlag := "plan_flag_" + utils.RandStringBytes(16)
+
+	// 调试日志：打印测试配置
+	t.Logf("[TEST] TestReAct_PlanAndExecute_TaskCancel started")
+	t.Logf("[TEST] testForgeName: %s", testForgeName)
+	t.Logf("[TEST] planFlag: %s", planFlag)
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",
@@ -74,15 +80,26 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 	waitCancelTaskDone := make(chan struct{}, 1)
 	// mock 工具，用于取消任务
 	mockToolName := "mock_cancel_tool_" + utils.RandStringBytes(16)
+	t.Logf("[TEST] mockToolName: %s", mockToolName)
+
+	// 用于在闭包中收集日志
+	var callbackLogs []string
+	addLog := func(format string, args ...any) {
+		callbackLogs = append(callbackLogs, fmt.Sprintf(format, args...))
+	}
+
 	mockCancelTool, err := aitool.New(
 		mockToolName,
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			addLog("[MOCK_TOOL] Mock tool '%s' invoked, firstCall=%v", mockToolName, firstCall)
 			if firstCall {
+				addLog("[MOCK_TOOL] Tool called twice!")
 				callToolTwice = true
 				return "", nil
 			}
 
 			firstCall = true
+			addLog("[MOCK_TOOL] Sending cancel task event for taskID=%s", currentTaskID)
 			in <- &ypb.AIInputEvent{
 				IsSyncMessage: true,
 				SyncType:      SYNC_TYPE_REACT_CANCEL_TASK,
@@ -90,7 +107,9 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				SyncID:        syncID,
 			}
 
+			addLog("[MOCK_TOOL] Waiting for cancel task done signal...")
 			<-waitCancelTaskDone
+			addLog("[MOCK_TOOL] Cancel task done signal received")
 			cancelTaskSuccess = true
 			return "", nil
 		}),
@@ -100,14 +119,19 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 	}
 
 	reactIns, err = NewTestReAct(
-		// aicommon.WithAICallback(aiCallback),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if cancelTaskSuccess {
+				addLog("[AI_CALLBACK] AI callback invoked after task was cancelled!")
 				callAIAfterCancelTask = true
 			}
 			prompt := r.GetPrompt()
+			addLog("[AI_CALLBACK] ========== AI callback invoked ==========")
+			addLog("[AI_CALLBACK] Full prompt:\n%s", prompt)
+			addLog("[AI_CALLBACK] ========== End of prompt ==========")
+
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
+				addLog("[AI_CALLBACK] MATCHED: ReAct main loop (directly_answer, require_ai_blueprint, require_tool)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 		{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
@@ -119,7 +143,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 
 			// Blueprint 参数生成
 			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
-				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
+				addLog("[AI_CALLBACK] MATCHED: Blueprint parameter generation (Blueprint Schema, call-ai-blueprint)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 		{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "` + "abc" + `"},
@@ -129,7 +153,14 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, planFlag) && !utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
+			// 检查是否匹配 planFlag（但不包含 call-tool）
+			hasPlanFlag := strings.Contains(prompt, planFlag)
+			hasCallTool := strings.Contains(prompt, "call-tool")
+			hasToolnameYet := strings.Contains(prompt, "toolname_yet")
+			addLog("[AI_CALLBACK] Check conditions - planFlag(%s): %v, call-tool: %v, toolname_yet: %v", planFlag, hasPlanFlag, hasCallTool, hasToolnameYet)
+
+			if hasPlanFlag && !hasCallTool && !hasToolnameYet {
+				addLog("[AI_CALLBACK] MATCHED: Task requires tool (planFlag found, no call-tool)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
@@ -139,7 +170,8 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
+			if hasCallTool && hasToolnameYet {
+				addLog("[AI_CALLBACK] MATCHED: Call tool (call-tool + toolname_yet)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {
@@ -151,6 +183,8 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				rsp.Close()
 				return rsp, nil
 			}
+
+			addLog("[AI_CALLBACK] NO MATCH - unreachable code path")
 			unreachableCode = true
 			return nil, errors.New("unreachable code")
 		}),
@@ -178,47 +212,50 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
+			addLog("[EVENT] Received event: Type=%s, NodeId=%s", e.Type, e.NodeId)
 			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
-				log.Infof("plan execution started")
+				addLog("[EVENT] Plan execution started")
 			}
 
-			// if e.NodeId == "react_task_status_changed" {
-			// 	result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
-			// 	status := utils.InterfaceToString(result)
-			// 	if status == "completed" || status == "aborted" {
-			// 		break LOOP
-			// 	}
-			// }
-
 			if e.GetIsSync() && e.GetSyncID() == syncID && e.NodeId == string("react_task_cancelled") {
+				addLog("[EVENT] Task cancelled event received, sending done signal")
 				waitCancelTaskDone <- struct{}{}
 			}
 			if e.Type == string(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC) {
 				task_id := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$..task_id"))
 				currentTaskID = task_id
+				addLog("[EVENT] Task switched to async, taskID=%s", currentTaskID)
 			}
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
+				addLog("[EVENT] Plan execution ended")
 				break LOOP
 			}
-			// if e.Type == string(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION) {
-			// 	contextCanceledErr = strings.Contains(string(e.Content), "context canceled")
-			// }
 
 		case <-after:
-			log.Warnf("test timeout")
+			addLog("[EVENT] Test timeout after 30s")
 			break LOOP
 		}
 	}
 	close(in)
 
+	// 打印所有收集的日志（只有测试失败时才会显示）
+	t.Logf("[TEST] ========== Collected logs ==========")
+	for _, logLine := range callbackLogs {
+		t.Logf("%s", logLine)
+	}
+	t.Logf("[TEST] ========== End of logs ==========")
+
+	t.Logf("[TEST] Final state: firstCall=%v, callToolTwice=%v, unreachableCode=%v, cancelTaskSuccess=%v, callAIAfterCancelTask=%v, currentTaskID=%s",
+		firstCall, callToolTwice, unreachableCode, cancelTaskSuccess, callAIAfterCancelTask, currentTaskID)
+
 	if !firstCall {
-		t.Fatal("first call failed")
+		t.Fatalf("firstCall is false - mock tool '%s' was never invoked (expected planFlag=%s to trigger require_tool)", mockToolName, planFlag)
 	}
 	if callToolTwice {
 		t.Fatal("call tool twice")
 	}
 	if unreachableCode {
-		t.Fatal("unreachable code")
+		t.Fatal("unreachable code - AI callback hit unexpected branch")
 	}
 	if !cancelTaskSuccess {
 		t.Fatal("cancel task failed")
@@ -316,7 +353,7 @@ LOOP:
 		select {
 		case e := <-out:
 			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
-				log.Infof("plan execution started")
+				t.Log("plan execution started")
 			}
 
 			if e.NodeId == "react_task_status_changed" {
@@ -328,14 +365,14 @@ LOOP:
 				}
 			}
 			if e.GetIsSync() {
-				println("is sync")
+				t.Log("is sync")
 			}
 			if e.GetIsSync() && e.GetSyncID() == syncID && e.NodeId == string("react_task_cancelled") {
 				waitCancelTaskDone <- struct{}{}
 			}
 
 		case <-after:
-			log.Warnf("test timeout")
+			t.Log("test timeout")
 			break LOOP
 		}
 	}

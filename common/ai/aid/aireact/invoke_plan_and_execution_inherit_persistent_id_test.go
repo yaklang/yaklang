@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -576,6 +577,13 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 	defer close(finishedCh)
 	testForgeName := "test_forge_" + utils.RandStringBytes(16)
 	planFlag := "plan_flag_" + utils.RandStringBytes(16)
+
+	// 调试日志：打印测试配置
+	t.Logf("[TEST_DEBUG] TestReAct_ForgeExecution_Task_UserQueryContext started")
+	t.Logf("[TEST_DEBUG] testForgeName: %s", testForgeName)
+	t.Logf("[TEST_DEBUG] planFlag: %s", planFlag)
+	t.Logf("[TEST_DEBUG] userOriginalQuery: %s", userOriginalQuery)
+	t.Logf("[TEST_DEBUG] aiGeneratedQuery: %s", aiGeneratedQuery)
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",
@@ -606,17 +614,27 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			ForgeName: testForgeName,
 		})
 	}()
+	// 用于在闭包中收集日志
+	var callbackLogs []string
+	addLog := func(format string, args ...any) {
+		callbackLogs = append(callbackLogs, fmt.Sprintf(format, args...))
+	}
+
 	_, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+			addLog("[AI_CALLBACK] ========== AI callback invoked ==========")
+			addLog("[AI_CALLBACK] Full prompt:\n%s", prompt)
+			addLog("[AI_CALLBACK] ========== End of prompt ==========")
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
+				addLog("[AI_CALLBACK] MATCHED: ReAct main loop (directly_answer, require_ai_blueprint, require_tool)")
 				// 验证用户输入在 prompt 中
 				if strings.Contains(prompt, userOriginalQuery) {
-					log.Infof("✓ User query found in ReAct main loop prompt")
+					addLog("[AI_CALLBACK] ✓ User query found in ReAct main loop prompt")
 				} else {
-					t.Errorf("user query NOT found in ReAct main loop prompt")
+					addLog("[AI_CALLBACK] ✗ User query NOT found in ReAct main loop prompt")
 				}
 
 				rsp := i.NewAIResponse()
@@ -630,21 +648,17 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 
 			// Blueprint 参数生成
 			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
+				addLog("[AI_CALLBACK] MATCHED: Blueprint parameter generation (Blueprint Schema, call-ai-blueprint)")
 				// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
 				if strings.Contains(prompt, userOriginalQuery) {
 					userQueryFoundInCallAiBlueprintPrompt = true
-					log.Infof("✓ User query found in blueprint parameter generation prompt")
+					addLog("[AI_CALLBACK] ✓ User query found in blueprint parameter generation prompt")
 				} else {
-					log.Errorf("✗ User query NOT found in blueprint parameter generation prompt")
+					addLog("[AI_CALLBACK] ✗ User query NOT found in blueprint parameter generation prompt")
 				}
 
 				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
 				rsp := i.NewAIResponse()
-				//	rsp.EmitOutputStream(bytes.NewBufferString(`
-				//
-				// {"@action": "call-ai-blueprint", "params": {"target": "http://example.com", "query": "` + aiGeneratedQuery + `"},
-				// "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
-				// `))
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint":"` + testForgeName + `", "params": {"query": "` + aiGeneratedQuery + `"},
 "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
@@ -653,10 +667,18 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 				rsp.Close()
 				return rsp, nil
 			}
-			if utils.MatchAllOfSubString(prompt, planFlag, "PROGRESS_TASK_") {
+
+			// 检查是否匹配 planFlag 和 PROGRESS_TASK_
+			hasPlanFlag := strings.Contains(prompt, planFlag)
+			hasProgressTask := strings.Contains(prompt, "PROGRESS_TASK_")
+			addLog("[AI_CALLBACK] Check conditions - planFlag(%s): %v, PROGRESS_TASK_: %v", planFlag, hasPlanFlag, hasProgressTask)
+
+			if hasPlanFlag && hasProgressTask {
+				addLog("[AI_CALLBACK] MATCHED: Task execution prompt (planFlag + PROGRESS_TASK_)")
 				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
 				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
-				// aitagNonce := nonce()
+
+				addLog("[AI_CALLBACK] hasUserQueryFoundInTaskExec: %v, hasAIQueryFoundInTaskExec: %v", hasUserQueryFoundInTaskExec, hasAIQueryFoundInTaskExec)
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "directly_answer","answer_payload":"` + finishTaskFlag + `"}`))
@@ -664,7 +686,8 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 				finishedCh <- true
 				return rsp, nil
 			}
-			log.Infof("unexpected prompt in TestReAct_ForgeExecution_UserQueryContext")
+
+			addLog("[AI_CALLBACK] NO MATCH - unexpected prompt, returning error")
 			return nil, utils.Errorf("unexpected prompt: %v", utils.ShrinkString(prompt, 200))
 		}),
 		aicommon.WithEventInputChan(in),
@@ -687,7 +710,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 		}
 	}()
 
-	after := time.After(500 * time.Second)
+	after := time.After(15 * time.Second)
 
 	forgeStarted := false
 
@@ -728,11 +751,21 @@ LOOP:
 				}
 			}
 		case <-after:
-			log.Warnf("test timeout")
+			t.Logf("[TEST] test timeout after 15s")
 			break LOOP
 		}
 	}
 	close(in)
+
+	// 打印所有收集的日志（只有测试失败时才会显示）
+	t.Logf("[TEST] ========== Collected callback logs ==========")
+	for _, logLine := range callbackLogs {
+		t.Logf("%s", logLine)
+	}
+	t.Logf("[TEST] ========== End of callback logs ==========")
+
+	t.Logf("[TEST] Final state: forgeStarted=%v, hasUserQueryFoundInTaskExec=%v, hasAIQueryFoundInTaskExec=%v, userQueryFoundInCallAiBlueprintPrompt=%v",
+		forgeStarted, hasUserQueryFoundInTaskExec, hasAIQueryFoundInTaskExec, userQueryFoundInCallAiBlueprintPrompt)
 
 	// 验证 forge 被调用
 	if !forgeStarted {
@@ -740,14 +773,14 @@ LOOP:
 	}
 
 	if !hasUserQueryFoundInTaskExec {
-		t.Fatal("user query not found in call ai blueprint prompt")
+		t.Fatalf("hasUserQueryFoundInTaskExec is false - user query not found in task exec prompt (expected planFlag=%s and PROGRESS_TASK_ in prompt)", planFlag)
 	}
 
 	if !userQueryFoundInCallAiBlueprintPrompt {
-		t.Fatal("user query not found in call ai blueprint prompt")
+		t.Fatal("userQueryFoundInCallAiBlueprintPrompt is false - user query not found in call-ai-blueprint prompt")
 	}
 
 	if !hasAIQueryFoundInTaskExec {
-		t.Fatal("ai query not found in call ai blueprint prompt")
+		t.Fatalf("hasAIQueryFoundInTaskExec is false - ai generated query not found in task exec prompt (expected aiGeneratedQuery=%s)", aiGeneratedQuery)
 	}
 }
