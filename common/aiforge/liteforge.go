@@ -4,19 +4,38 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"text/template"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
-	"strings"
-	"text/template"
 )
+
+func init() {
+	utils.Debug(func() {
+		log.Info("liteforge.go is already registered aicommon.LiteForgeExecuteCallback")
+	})
+	aicommon.RegisterLiteForgeExecuteCallback(func(prompt string, opts ...any) (*aicommon.ForgeResult, error) {
+		result, err := _executeLiteForgeTemp(prompt, opts...)
+		if err != nil {
+			return nil, err
+		}
+		final := &aicommon.ForgeResult{
+			Action: result.Action,
+		}
+		final.Name = result.Forge.Name
+		return final, nil
+	})
+}
 
 type streamableField struct {
 	AINodeId string
@@ -144,13 +163,18 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 }
 
 func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
-	if l.OutputSchema == "" {
-		return nil, fmt.Errorf("liteforge output schema is required")
-	}
-
 	cod, err := aid.NewCoordinatorContext(ctx, l.Prompt, append(l.ExtendAIDOptions, opts...)...)
 	if err != nil {
 		return nil, utils.Errorf("cannot create coordinator: %v", err)
+	}
+
+	if l.OutputSchema == "" {
+		l.OutputSchema = cod.GetAIConfig().LiteForgeOutputSchema
+		l.OutputActionName = cod.GetAIConfig().LiteForgeActionName
+	}
+
+	if l.OutputSchema == "" {
+		return nil, utils.Error("liteforge output schema is required, you should set it via aiforge.WithLiteForge_OutputSchema or aicommon.WithLiteForgeOutputSchema config option")
 	}
 
 	nonce := strings.ToLower(utils.RandStringBytes(6))
@@ -243,7 +267,15 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 				}))
 			}
 
-			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), l.OutputActionName, actionOpts...)
+			actionNames := []string{}
+			if l.OutputActionName == "" {
+				actionNames = append(actionNames, "call-tool", "object")
+			} else {
+				actionNames = append(actionNames, l.OutputActionName)
+			}
+			actionOpts = append(actionOpts, aicommon.WithActionAlias(actionNames...))
+
+			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), "object", actionOpts...)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

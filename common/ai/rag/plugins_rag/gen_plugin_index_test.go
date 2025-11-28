@@ -1,8 +1,9 @@
-package plugins_rag
+package plugins_rag_test
 
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
@@ -18,8 +19,17 @@ func TestGenPluginIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	tempDir := consts.TempAIDir()
+	defer os.RemoveAll(tempDir)
+
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	manager, err := generate_index_tool.CreateIndexManager(db, "test_plugin_index", "脚本向量库", generate_index_tool.WithConcurrentWorkers(10), generate_index_tool.WithCacheDir("/Users/z3/Downloads/test_plugin_index"))
+	manager, err := generate_index_tool.CreateIndexManager(
+		db, "test_plugin_index",
+		"脚本向量库",
+		generate_index_tool.WithConcurrentWorkers(10),
+		generate_index_tool.WithCacheDir(tempDir),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

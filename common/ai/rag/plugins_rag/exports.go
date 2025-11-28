@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -86,4 +87,8 @@ func SearchPluginIds(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelpe
 		PrevPage:    int(pagination.GetPage()) - 1,
 		NextPage:    int(pagination.GetPage()) + 1,
 	}, ids, nil
+}
+
+func init() {
+	yakit.RegisterRAGSearchPluginIdsCallback(SearchPluginIds)
 }

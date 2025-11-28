@@ -19,7 +19,24 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var SearchPluginIdsFunc func(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelper.Paginator, []string, error)
+type RAGSearchPluginIdsCallback func(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelper.Paginator, []string, error)
+
+var registerMutex = new(sync.Mutex)
+var ragSearchPluginIdsFunc RAGSearchPluginIdsCallback
+
+func RegisterRAGSearchPluginIdsCallback(callback RAGSearchPluginIdsCallback) {
+	registerMutex.Lock()
+	defer registerMutex.Unlock()
+
+	ragSearchPluginIdsFunc = callback
+}
+
+func RAGSearchPluginIds(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhelper.Paginator, []string, error) {
+	if ragSearchPluginIdsFunc == nil {
+		return nil, nil, utils.Error("ragSearchPluginIdsFunc is nil, try to import plugins_rag package outter")
+	}
+	return ragSearchPluginIdsFunc(db, pagination, key)
+}
 
 var yakScriptOpLock = new(sync.Mutex)
 
@@ -471,9 +488,6 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 }
 
 func QueryYakScriptByVectorSearch(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.YakScript, error) {
-	if SearchPluginIdsFunc == nil {
-		return nil, nil, utils.Errorf("SearchPluginIdsFunc is not set")
-	}
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
 			Page:    1,
@@ -482,7 +496,7 @@ func QueryYakScriptByVectorSearch(db *gorm.DB, params *ypb.QueryYakScriptRequest
 			Order:   "desc",
 		}
 	}
-	paging, ids, err := SearchPluginIdsFunc(db, params.Pagination, params.GetVectorSearchContent())
+	paging, ids, err := RAGSearchPluginIds(db, params.Pagination, params.GetVectorSearchContent())
 	if err != nil {
 		return nil, nil, err
 	}
