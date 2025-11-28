@@ -1188,18 +1188,20 @@ func FuzzSearchNotEx(db *gorm.DB, fields []string, target string, ilike bool) *g
 		return db
 	}
 
-	target = fmt.Sprintf("%%%s%%", target)
+	// 转义 SQL LIKE 查询中的特殊字符
+	pattern := escapeRegexp.ReplaceAllString(target, `\$0`)
+	pattern = fmt.Sprintf("%%%s%%", pattern)
 
 	var conds []string
 	var items []interface{}
 
 	for _, field := range fields {
 		if ilike {
-			conds = append(conds, fmt.Sprintf("( %v NOT ILIKE ?)", field))
+			conds = append(conds, fmt.Sprintf(`( %v NOT ILIKE ? ESCAPE '\' )`, field))
 		} else {
-			conds = append(conds, fmt.Sprintf("( %v NOT LIKE ?)", field))
+			conds = append(conds, fmt.Sprintf(`( %v NOT LIKE ? ESCAPE '\' )`, field))
 		}
-		items = append(items, target)
+		items = append(items, pattern)
 	}
 
 	return db.Where(strings.Join(conds, " AND "), items...)
