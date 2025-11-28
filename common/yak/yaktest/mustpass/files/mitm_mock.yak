@@ -1,0 +1,117 @@
+// Test for mitm.mockHTTPRequest feature
+// Core test cases:
+// 1. Mock happens BEFORE reaching real server - mocked requests should NOT reach server
+// 2. Mock response is correctly returned to client
+// 3. Non-mocked requests should pass through normally to real server
+
+serverReceivedPaths = []  // Record all paths received by real server
+serverPort = os.GetRandomAvailableTCPPort()
+
+// Create a real backend server that records all received requests
+go func {
+    httpserver.Serve("127.0.0.1", serverPort, httpserver.handler(func(rw, req) {
+        path = req.URL.Path
+        serverReceivedPaths = append(serverReceivedPaths, path)
+        rw.Write([]byte("real_server_response"))
+    }))~
+}
+
+sleep(0.3)
+
+ctx, cancel = context.WithCancel(context.New())
+mitmPort = os.GetRandomAvailableTCPPort()
+proxyAddr = f"http://127.0.0.1:${mitmPort}"
+serverAddr = f"127.0.0.1:${serverPort}"
+
+// Test result flags
+test1_mockResponseCorrect = false
+test2_nonMockResponseCorrect = false
+test3_invalidMockReturns502 = false
+
+go func {
+    defer cancel()
+    sleep(0.5)
+
+    // Test 1: Request that should be MOCKED - should NOT reach real server
+    rsp, _ = poc.Get(f"http://${serverAddr}/mock_path_should_not_reach_server", poc.proxy(proxyAddr))~
+    body = string(poc.GetHTTPPacketBody(rsp.RawPacket))
+    if body == "MOCKED_BODY" {
+        test1_mockResponseCorrect = true
+    } else {
+        println(f"Test 1 failed: expected 'MOCKED_BODY', got: '${body}'")
+    }
+
+    // Test 2: Request that should NOT be mocked - should reach real server normally
+    rsp, _ = poc.Get(f"http://${serverAddr}/normal_path", poc.proxy(proxyAddr))~
+    body = string(poc.GetHTTPPacketBody(rsp.RawPacket))
+    if body == "real_server_response" {
+        test2_nonMockResponseCorrect = true
+    } else {
+        println(f"Test 2 failed: expected 'real_server_response', got: '${body}'")
+    }
+
+    // Test 3: Invalid mock response should return 502
+    rsp, _ = poc.Get(f"http://${serverAddr}/invalid_mock_path", poc.proxy(proxyAddr))~
+    _, code, _ = poc.GetHTTPPacketFirstLine(rsp.RawPacket)
+    if int(code) == 502 {
+        test3_invalidMockReturns502 = true
+    } else {
+        println(f"Test 3 failed: expected 502, got: ${code}")
+    }
+}
+
+mitm.Start(mitmPort, mitm.mockHTTPRequest((isHttps, urlStr, req, mockResponse) => {
+    // Mock requests containing "mock_path" - these should NOT reach real server
+    if str.Contains(urlStr, "mock_path_should_not_reach_server") {
+        mockResponse(`HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 11
+
+MOCKED_BODY`)
+        return
+    }
+
+    // Invalid mock response test
+    if str.Contains(urlStr, "invalid_mock_path") {
+        mockResponse("invalid http response format")
+        return
+    }
+
+    // For "/normal_path", do NOT call mockResponse - request should go to real server
+}), mitm.context(ctx))
+
+// Verify test results
+if !test1_mockResponseCorrect {
+    die("Test 1 FAILED: mock response was not correctly returned")
+}
+
+if !test2_nonMockResponseCorrect {
+    die("Test 2 FAILED: non-mocked request did not get real server response")
+}
+
+if !test3_invalidMockReturns502 {
+    die("Test 3 FAILED: invalid mock response did not return 502")
+}
+
+// CRITICAL: Verify mocked request did NOT reach real server
+mockPathReachedServer = false
+normalPathReachedServer = false
+for _, path = range serverReceivedPaths {
+    if str.Contains(path, "mock_path_should_not_reach_server") {
+        mockPathReachedServer = true
+    }
+    if str.Contains(path, "normal_path") {
+        normalPathReachedServer = true
+    }
+}
+
+if mockPathReachedServer {
+    die("CRITICAL FAILURE: Mocked request should NOT have reached real server, but it did!")
+}
+
+if !normalPathReachedServer {
+    die("CRITICAL FAILURE: Non-mocked request should have reached real server, but it didn't!")
+}
+
+println("All mitm.mockHTTPRequest tests passed!")
+println(f"Server received paths: ${serverReceivedPaths}")
