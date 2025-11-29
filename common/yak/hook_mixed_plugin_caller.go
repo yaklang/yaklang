@@ -131,6 +131,9 @@ const (
 	// func hijackHTTPRequest(isHttps, url, request, response, forward/*func(modified []byte)*/, drop /*func()*/)
 	HOOK_HijackHTTPResponseEx = "hijackHTTPResponseEx"
 
+	// func mockHTTPRequest(isHttps, url, request, mockResponse /*func(rsp interface{})*/)
+	HOOK_MockHTTPRequest = "mockHTTPRequest"
+
 	// func hijackSaveHTTPFlow(record *httpFlow, forward func(*httpFlow), drop func()) return (*httpFlow)
 	HOOK_hijackSaveHTTPFlow = "hijackSaveHTTPFlow"
 
@@ -174,6 +177,7 @@ var (
 		HOOK_HijackHTTPRequest,
 		HOOK_HijackHTTPResponse,
 		HOOK_HijackHTTPResponseEx,
+		HOOK_MockHTTPRequest,
 		HOOK_hijackSaveHTTPFlow,
 
 		// port-scan
@@ -859,6 +863,38 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 	reject, drop func() interface{},
 ) {
 	m.CallHijackResponseExWithCtx(context.Background(), isHttps, u, getRequest, getResponse, reject, drop)
+}
+
+func (m *MixPluginCaller) CallMockHTTPRequestWithCtx(
+	runtimeCtx context.Context,
+	isHttps bool, u string, getRequest func() interface{},
+	mockResponse func(rsp interface{}),
+) {
+	if !m.IsPassed(u) {
+		log.Infof("call MockHTTPRequest error: url[%v] not passed", u)
+		return
+	}
+	callers := m.callers
+	if callers.ShouldCallByName(HOOK_MockHTTPRequest) {
+		callers.Call(
+			HOOK_MockHTTPRequest,
+			WithCallConfigForceSync(true),
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItemFuncs(
+				func() any { return isHttps },
+				func() any { return u },
+				getRequest,
+				func() any { return mockResponse },
+			),
+		)
+	}
+}
+
+func (m *MixPluginCaller) CallMockHTTPRequest(
+	isHttps bool, u string, getRequest func() interface{},
+	mockResponse func(rsp interface{}),
+) {
+	m.CallMockHTTPRequestWithCtx(context.Background(), isHttps, u, getRequest, mockResponse)
 }
 
 func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
