@@ -116,6 +116,20 @@ var (
 		return url, packet, nil, nil
 	}
 
+	// https://otx.alienvault.com/api/v1/indicators/domain/%s/url_list?page=1
+	AlienVault SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
+		url := fmt.Sprintf("https://otx.alienvault.com/api/v1/indicators/domain/%s/url_list?page=1", target)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, true)
+		return url, packet, nil, nil
+	}
+
+	// http://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey
+	ArchiveOrg SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
+		url := fmt.Sprintf("http://web.archive.org/cdx/search/cdx?url=*.%s/*&output=txt&fl=original&collapse=urlkey", target)
+		packet := lowhttp.UrlToRequestPacket("GET", url, nil, false)
+		return url, packet, nil, nil
+	}
+
 	// https://crt.sh/?q=%25.%s
 	CrtSh SearchRequestBuilder = func(target string) (string, []byte, []poc.PocConfigOption, error) {
 		url := fmt.Sprintf("https://crt.sh/?q=%%25.%s", target)
@@ -240,7 +254,7 @@ var (
 
 	SearchSource = []SearchRequestBuilder{
 		HackerTarget, BaiduCe, Sublist3r, CrtSh,
-		CertsPotter, Entrust,
+		ArchiveOrg, AlienVault, CertsPotter, Entrust,
 	}
 
 	SearchActions = []SearchAction{
