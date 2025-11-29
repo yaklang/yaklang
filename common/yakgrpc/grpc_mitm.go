@@ -1230,6 +1230,24 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			setModifiedRequest("yakit.mitm.replacer", req1)
 		}
 
+		// Handle mockHTTPRequest hook
+		mitmPluginCaller.CallMockHTTPRequestWithCtx(pluginCtx, isHttps, urlStr,
+			func() interface{} {
+				if modifiedByRule {
+					return httpctx.GetHijackedRequestBytes(originReqIns)
+				}
+				return getPlainRequestBytes(originReqIns)
+			}, func(rsp interface{}) {
+				rspBytes := codec.AnyToBytes(rsp)
+				fixedRsp, _, _ := lowhttp.FixHTTPResponse(rspBytes)
+				if fixedRsp == nil {
+					log.Warnf("failed to fix mock response, using 502 Bad Gateway")
+					fixedRsp = []byte("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+				}
+				httpctx.SetMockResponseBytes(originReqIns, fixedRsp)
+				httpctx.SetShouldMockResponse(originReqIns, true)
+			})
+
 		mitmPluginCaller.CallHijackRequestWithCtx(pluginCtx, isHttps, urlStr,
 			func() interface{} {
 				if modifiedByRule {
@@ -1518,6 +1536,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		flow.Hash = flow.CalcHash()
+
+		// Check if response was mocked
+		if httpctx.GetShouldMockResponse(req) {
+			flow.AddTagToFirst("[MOCK响应]")
+			flow.Blue()
+		}
+
 		if isViewed {
 			if isModified {
 				flow.AddTagToFirst("[手动修改]")
