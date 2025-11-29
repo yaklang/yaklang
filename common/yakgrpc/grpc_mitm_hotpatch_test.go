@@ -25,6 +25,137 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestGRPCMUSTPASS_MITM_HotPatch_MockHTTPRequest(t *testing.T) {
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(10))
+	defer cancel()
+
+	mockToken := utils.RandStringBytes(16)
+	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("Real Server Response"))
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			if !strings.Contains(msg, "starting mitm server") {
+				continue
+			}
+			// load hot-patch mitm plugin with mockHTTPRequest
+			stream.Send(&ypb.MITMRequest{
+				SetYakScript: true,
+				YakScriptContent: `mockHTTPRequest = func(isHttps, url, req, mockResponse) {
+	if str.Contains(url, "/mock") {
+		mockResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n` + mockToken + `")
+	}
+}
+`,
+			})
+			stream.Send(&ypb.MITMRequest{
+				SetAutoForward:   true,
+				AutoForwardValue: true,
+			})
+		} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+			// Verify mockHTTPRequest hook is loaded
+			found := false
+			for _, hook := range data.GetHooks() {
+				if hook.HookName == "mockHTTPRequest" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatal("mockHTTPRequest hook not found in loaded hooks")
+			}
+
+			// Test 1: Request to /mock should get mocked response
+			packet1 := `GET /mock HTTP/1.1
+Host: ` + utils.HostPort(mockHost, mockPort) + `
+
+`
+			packetBytes1 := lowhttp.FixHTTPRequest([]byte(packet1))
+			_, err := yak.Execute(`
+rsp, req = poc.HTTPEx(packet, poc.proxy(mitmProxy))~
+dump(rsp.RawPacket)
+assert rsp.RawPacket.Contains(mockToken), "Mock response should contain mock token"
+assert !rsp.RawPacket.Contains("Real Server Response"), "Mock response should NOT contain real server response"
+`, map[string]any{
+				"packet":    string(packetBytes1),
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				"mockToken": mockToken,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Test 2: Request to other path should get real response
+			packet2 := `GET /normal HTTP/1.1
+Host: ` + utils.HostPort(mockHost, mockPort) + `
+
+`
+			packetBytes2 := lowhttp.FixHTTPRequest([]byte(packet2))
+			_, err = yak.Execute(`
+rsp, req = poc.HTTPEx(packet, poc.proxy(mitmProxy))~
+dump(rsp.RawPacket)
+assert rsp.RawPacket.Contains("Real Server Response"), "Normal response should contain real server response"
+assert !rsp.RawPacket.Contains(mockToken), "Normal response should NOT contain mock token"
+`, map[string]any{
+				"packet":    string(packetBytes2),
+				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
+				"mockToken": mockToken,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Test 3: Verify HTTPFlow is saved with [MOCK响应] tag
+			time.Sleep(500 * time.Millisecond) // Wait for flow to be saved
+			queryCtx, queryCancel := context.WithTimeout(ctx, 2*time.Second)
+			defer queryCancel()
+			flows, err := client.QueryHTTPFlows(queryCtx, &ypb.QueryHTTPFlowRequest{
+				Pagination: &ypb.Paging{Page: 1, Limit: 100},
+				SearchURL:  "/mock",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			foundMockTag := false
+			for _, flow := range flows.Data {
+				if strings.Contains(flow.Url, "/mock") {
+					if strings.Contains(flow.Tags, "[MOCK响应]") {
+						foundMockTag = true
+						break
+					}
+				}
+			}
+
+			if !foundMockTag {
+				t.Fatal("HTTPFlow with mock response should have [MOCK响应] tag")
+			}
+
+			cancel()
+		}
+	}
+}
+
 func TestGRPCMUSTPASS_MITM_HotPatch_Drop(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
 	defer cancel()

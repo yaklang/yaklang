@@ -311,6 +311,8 @@ const (
 	REQUEST_CONTEXT_KEY_IsStrongHostMode             = "isStrongHostMode"    // Used for transparent hijacking of tun-generated data
 	REQUEST_CONTEXT_KEY_StrongHostLocalAddr          = "strongHostLocalAddr" // Local IP address for strong host mode binding
 	REQUEST_CONTEXT_KEY_IsListenedConn               = "listenedConn"        // exrat connection object
+	REQUEST_CONTEXT_KEY_MockResponseBytes            = "mockResponseBytes"   // Mock HTTP response bytes for mockHTTPRequest
+	REQUEST_CONTEXT_KEY_ShouldMockResponse           = "shouldMockResponse"  // Flag to indicate mock response should be used
 )
 
 func SetRequestMITMTaskID(req *http.Request, id string) {
@@ -737,4 +739,25 @@ func SetIsStrongHostMode(r *http.Request, b bool) {
 // GetIsStrongHostMode gets the strong host mode flag from httpctx
 func GetIsStrongHostMode(r *http.Request) bool {
 	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsStrongHostMode)
+}
+
+// SetMockResponseBytes sets the mock HTTP response bytes in httpctx
+// This is used by mockHTTPRequest to skip real network request and return mock response
+func SetMockResponseBytes(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes, string(bytes))
+}
+
+// GetMockResponseBytes gets the mock HTTP response bytes from httpctx
+func GetMockResponseBytes(r *http.Request) []byte {
+	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes))
+}
+
+// SetShouldMockResponse sets the flag to indicate mock response should be used
+func SetShouldMockResponse(r *http.Request, b bool) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ShouldMockResponse, b)
+}
+
+// GetShouldMockResponse gets the flag indicating if mock response should be used
+func GetShouldMockResponse(r *http.Request) bool {
+	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_ShouldMockResponse)
 }

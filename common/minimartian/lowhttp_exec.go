@@ -16,6 +16,23 @@ import (
 )
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
+	// Check if mock response should be used (set by mockHTTPRequest)
+	if httpctx.GetShouldMockResponse(req) {
+		log.Debugf("mitm: using mock response")
+		mockRespBytes := httpctx.GetMockResponseBytes(req)
+		if len(mockRespBytes) > 0 {
+			mockRsp, err := utils.ReadHTTPResponseFromBytes(mockRespBytes, nil)
+			if err != nil {
+				log.Warnf("mitm: failed to parse mock response, returning 502: %v", err)
+				return proxyutil.NewResponse(502, nil, req), nil
+			}
+			mockRsp.Request = req
+			return mockRsp, nil
+		}
+		// No mock response bytes, return 502
+		log.Warnf("mitm: mock response flag set but no response bytes, returning 502")
+		return proxyutil.NewResponse(502, nil, req), nil
+	}
 	if ctx.SkippingRoundTrip() {
 		log.Debugf("mitm: skipping round trip")
 		return proxyutil.NewResponse(200, nil, req), nil
