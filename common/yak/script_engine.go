@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/netstack_exports"
-	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaproject"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/netstack_exports"
+	"github.com/yaklang/yaklang/common/tcpmitm"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
 	"github.com/yaklang/yaklang/common/aiforge"
 
@@ -409,6 +411,9 @@ func initYaklangLib() {
 
 	// netstack (TUN device and network stack VM)
 	yaklang.Import("netstack", netstack_exports.Exports)
+
+	// tcpmitm (TCP MITM framework for hijacking and inspecting TCP connections)
+	yaklang.Import("tcpmitm", tcpmitm.Exports)
 
 	// aibalance - AI traffic forwarding and load balancing
 	yaklang.Import("aibalance", aibalance.Exports)

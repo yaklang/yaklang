@@ -271,30 +271,37 @@ func (m *TCPMitm) handleWithFrameCallback(hijackedConn net.Conn, flow *Connectio
 
 	log.Debugf("tcpmitm: connected to real server %s", serverAddr)
 
-	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(m.ctx)
 	defer cancel()
 
-	// Client -> Server direction
+	// Create connection context with frame queues
+	connCtx := NewConnectionContext(ctx, flow)
+	flow.SetConnectionContext(connCtx)
+	defer connCtx.Close()
+
+	var wg sync.WaitGroup
+
+	// Client -> Server direction: reader -> queue -> callback -> writer
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer cancel()
-		m.processDirection(ctx, hijackedConn, serverConn, flow, DirectionClientToServer, callback)
+		m.processDirectionWithQueue(ctx, hijackedConn, serverConn, flow, DirectionClientToServer, connCtx, callback)
 	}()
 
-	// Server -> Client direction
+	// Server -> Client direction: reader -> queue -> callback -> writer
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer cancel()
-		m.processDirection(ctx, serverConn, hijackedConn, flow, DirectionServerToClient, callback)
+		m.processDirectionWithQueue(ctx, serverConn, hijackedConn, flow, DirectionServerToClient, connCtx, callback)
 	}()
 
 	wg.Wait()
 }
 
 // processDirection processes one direction of data flow with frame splitting.
+// This is the legacy version without queue support.
 func (m *TCPMitm) processDirection(
 	ctx context.Context,
 	reader io.Reader,
@@ -326,6 +333,70 @@ func (m *TCPMitm) processDirection(
 			}
 		}
 	}
+}
+
+// processDirectionWithQueue processes one direction of data flow with frame queuing.
+// This version supports peek functionality by buffering frames in a queue before
+// invoking the callback. Each connection's frames are processed sequentially within
+// that connection, while multiple connections are processed concurrently.
+func (m *TCPMitm) processDirectionWithQueue(
+	ctx context.Context,
+	reader io.Reader,
+	writer io.Writer,
+	flow *ConnectionFlow,
+	direction FrameDirection,
+	connCtx *ConnectionContext,
+	callback FrameHijackCallback,
+) {
+	splitter := NewStreamSplitter(reader, writer, direction, m.splitterConfig)
+	splitter.Start()
+	defer splitter.Stop()
+
+	queue := connCtx.GetQueue(direction)
+
+	// Producer goroutine: reads frames and enqueues them
+	producerDone := make(chan struct{})
+	go func() {
+		defer close(producerDone)
+		defer queue.Close()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case frame, ok := <-splitter.Frames():
+				if !ok {
+					return
+				}
+				// Assign sequence number
+				seq := connCtx.IncrementFrameCounter()
+				frame.SetSequenceNum(seq)
+				queue.Enqueue(frame)
+			}
+		}
+	}()
+
+	// Consumer: processes frames sequentially from the queue
+	for {
+		frame := queue.DequeueWait(ctx)
+		if frame == nil {
+			// Queue closed or context cancelled
+			break
+		}
+
+		// Invoke callback for inspection/modification
+		// At this point, the queue may have more frames buffered that can be peeked
+		callback(flow, frame)
+
+		// Write the frame (handles drop, inject, modify)
+		if err := splitter.WriteFrame(frame); err != nil {
+			log.Debugf("tcpmitm: write frame error: %v", err)
+			break
+		}
+	}
+
+	// Wait for producer to finish
+	<-producerDone
 }
 
 // handleTransparent performs transparent forwarding without frame processing.

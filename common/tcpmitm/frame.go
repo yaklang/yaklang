@@ -61,6 +61,12 @@ type Frame struct {
 
 	// unknown protocol flag
 	unknownProtocol bool
+
+	// Queue reference for peek functionality
+	queue *FrameQueue
+
+	// Sequence number within the connection
+	sequenceNum uint64
 }
 
 // NewFrame creates a new Frame with the given data and direction.
@@ -310,4 +316,102 @@ func (f *Frame) getFinalBytes() []byte {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.rawBytes
+}
+
+// setQueue sets the queue reference for peek functionality (internal use).
+func (f *Frame) setQueue(q *FrameQueue) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queue = q
+}
+
+// SetSequenceNum sets the sequence number for this frame.
+func (f *Frame) SetSequenceNum(seq uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sequenceNum = seq
+}
+
+// GetSequenceNum returns the sequence number of this frame within the connection.
+func (f *Frame) GetSequenceNum() uint64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.sequenceNum
+}
+
+// PeekNextFrameRawData returns the raw bytes of the next frame in the queue
+// without removing it. This allows looking ahead at data that hasn't been
+// processed by the callback yet.
+// Returns nil if no more frames are available in the buffer.
+func (f *Frame) PeekNextFrameRawData() []byte {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return nil
+	}
+	return q.PeekNextRawBytes()
+}
+
+// PeekNextFrame returns the next frame in the queue without removing it.
+// Returns nil if no more frames are available in the buffer.
+func (f *Frame) PeekNextFrame() *Frame {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return nil
+	}
+	return q.PeekNext(0)
+}
+
+// PeekNextNFrames returns up to n frames from the queue without removing them.
+func (f *Frame) PeekNextNFrames(n int) []*Frame {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return nil
+	}
+	return q.PeekNextN(n)
+}
+
+// PeekAllBufferedRawData returns all buffered raw bytes concatenated.
+// This includes all frames currently waiting in the queue.
+func (f *Frame) PeekAllBufferedRawData() []byte {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return nil
+	}
+	return q.PeekAllRawBytes()
+}
+
+// GetBufferedFrameCount returns the number of frames currently buffered in the queue.
+func (f *Frame) GetBufferedFrameCount() int {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return 0
+	}
+	return q.Size()
+}
+
+// GetBufferedBytes returns the total bytes currently buffered in the queue.
+func (f *Frame) GetBufferedBytes() int {
+	f.mu.RLock()
+	q := f.queue
+	f.mu.RUnlock()
+
+	if q == nil {
+		return 0
+	}
+	return q.BufferedBytes()
 }
