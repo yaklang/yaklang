@@ -15,6 +15,9 @@ type ConnectionFlow struct {
 
 	// raw connection for internal use
 	conn net.Conn
+
+	// Connection context with frame queues
+	connCtx *ConnectionContext
 }
 
 // NewConnectionFlow creates a new ConnectionFlow from the given connection.
@@ -64,4 +67,67 @@ func (cf *ConnectionFlow) GetClientAddr() string {
 // String returns a string representation of the connection flow.
 func (cf *ConnectionFlow) String() string {
 	return fmt.Sprintf("%s -> %s", cf.GetClientAddr(), cf.GetServerAddr())
+}
+
+// SetConnectionContext sets the connection context for this flow.
+func (cf *ConnectionFlow) SetConnectionContext(ctx *ConnectionContext) {
+	cf.connCtx = ctx
+}
+
+// GetConnectionContext returns the connection context.
+// Returns nil if no context has been set.
+func (cf *ConnectionFlow) GetConnectionContext() *ConnectionContext {
+	return cf.connCtx
+}
+
+// GetClientToServerQueue returns the C->S frame queue for this connection.
+// Returns nil if no connection context has been set.
+func (cf *ConnectionFlow) GetClientToServerQueue() *FrameQueue {
+	if cf.connCtx == nil {
+		return nil
+	}
+	return cf.connCtx.GetClientToServerQueue()
+}
+
+// GetServerToClientQueue returns the S->C frame queue for this connection.
+// Returns nil if no connection context has been set.
+func (cf *ConnectionFlow) GetServerToClientQueue() *FrameQueue {
+	if cf.connCtx == nil {
+		return nil
+	}
+	return cf.connCtx.GetServerToClientQueue()
+}
+
+// PeekNextClientToServerRawData returns the raw bytes of the next C->S frame.
+func (cf *ConnectionFlow) PeekNextClientToServerRawData() []byte {
+	q := cf.GetClientToServerQueue()
+	if q == nil {
+		return nil
+	}
+	return q.PeekNextRawBytes()
+}
+
+// PeekNextServerToClientRawData returns the raw bytes of the next S->C frame.
+func (cf *ConnectionFlow) PeekNextServerToClientRawData() []byte {
+	q := cf.GetServerToClientQueue()
+	if q == nil {
+		return nil
+	}
+	return q.PeekNextRawBytes()
+}
+
+// GetTotalBufferedBytes returns the total bytes buffered in both directions.
+func (cf *ConnectionFlow) GetTotalBufferedBytes() int {
+	if cf.connCtx == nil {
+		return 0
+	}
+	return cf.connCtx.TotalBufferedBytes()
+}
+
+// GetTotalBufferedFrames returns the total frames buffered in both directions.
+func (cf *ConnectionFlow) GetTotalBufferedFrames() int {
+	if cf.connCtx == nil {
+		return 0
+	}
+	return cf.connCtx.TotalBufferedFrames()
 }
