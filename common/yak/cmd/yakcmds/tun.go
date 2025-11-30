@@ -967,58 +967,6 @@ func GetPublicNetworkInterface() (interfaceName string, ipAddr string, err error
 	return "", "", utils.Errorf("no suitable network interface found")
 }
 
-// dialWithSourceIP 使用指定的源 IP 地址连接目标服务器
-func dialWithSourceIP(targetAddr string, sourceIP string, timeout time.Duration) (net.Conn, error) {
-	// 解析目标地址
-	targetHost, targetPort, err := net.SplitHostPort(targetAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	// 解析目标主机（可能是域名或 IP）
-	targetIPs, err := net.LookupIP(targetHost)
-	if err != nil {
-		return nil, err
-	}
-
-	var targetIP net.IP
-	for _, ip := range targetIPs {
-		if ip.To4() != nil {
-			targetIP = ip
-			break
-		}
-	}
-
-	if targetIP == nil {
-		return nil, utils.Errorf("no IPv4 address found for %s", targetHost)
-	}
-
-	// 创建本地地址（绑定源 IP，端口由系统分配）
-	localAddr := &net.TCPAddr{
-		IP: net.ParseIP(sourceIP),
-	}
-
-	// 创建远程地址
-	port, err := strconv.Atoi(targetPort)
-	if err != nil {
-		return nil, err
-	}
-
-	remoteAddr := &net.TCPAddr{
-		IP:   targetIP,
-		Port: port,
-	}
-
-	// 创建 dialer 并绑定本地地址
-	dialer := &net.Dialer{
-		LocalAddr: localAddr,
-		Timeout:   timeout,
-	}
-
-	log.Infof("dialing %s from source %s", remoteAddr.String(), localAddr.String())
-	return dialer.Dial("tcp", remoteAddr.String())
-}
-
 // authenticateConnection 服务器端认证：读取 {"secret": "..."} 并验证，然后回复 {"ok": true, "utun": "..."} 或 {"ok": false, "error": "..."}
 func authenticateConnection(conn net.Conn, expectedSecret string, tunName string) error {
 	// 1. 读取认证请求
