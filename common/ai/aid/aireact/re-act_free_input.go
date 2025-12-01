@@ -13,6 +13,9 @@ import (
 )
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
+	if r.pureInvokerMode {
+		return utils.Errorf("use in prue invoker mode, cannot handle free input")
+	}
 	userInput := event.FreeInput
 	if userInput == "" || strings.TrimSpace(userInput) == "" {
 		return utils.Errorf("user input cannot be empty")

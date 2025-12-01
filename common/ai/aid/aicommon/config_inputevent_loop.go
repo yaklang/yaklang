@@ -178,6 +178,10 @@ func NewAIInputEventProcessor() *AIInputEventProcessor {
 	}
 }
 
+func (p *AIInputEventProcessor) IsFreeInputCallbackSet() bool {
+	return p.freeInputCallback != nil
+}
+
 func (p *AIInputEventProcessor) RegisterSyncCallback(syncType string, callback func(event *ypb.AIInputEvent) error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()

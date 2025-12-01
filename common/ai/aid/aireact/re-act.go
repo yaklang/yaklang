@@ -96,6 +96,8 @@ type ReAct struct {
 
 	wg           *sync.WaitGroup
 	memoryTriage aicommon.MemoryTriage
+
+	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
@@ -467,7 +469,9 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 // startEventLoop starts the background event processing loop
 func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
 	doneOnce := new(sync.Once)
-	r.config.InputEventManager.SetFreeInputCallback(r.handleFreeValue)
+	if !r.pureInvokerMode {
+		r.config.InputEventManager.SetFreeInputCallback(r.handleFreeValue)
+	}
 	r.RegisterReActSyncEvent()
 	r.config.StartEventLoopEx(ctx,
 		func() {

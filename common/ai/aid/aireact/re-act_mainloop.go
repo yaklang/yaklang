@@ -258,6 +258,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
+		pureInvokerMode:      true,
 	}
 
 	if cfg.MemoryTriage != nil {
