@@ -64,7 +64,16 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"human_readable_result"},
 					func(key string, read io.Reader) {
-						r.Emitter.EmitThoughtStreamReader(taskID, read)
+						var out bytes.Buffer
+						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
+						r.Emitter.EmitTextMarkdownStreamEvent(
+							"human_readable_result", outputReader, taskID,
+							func() {
+								if out.Len() > 0 {
+									r.AddToTimeline("human_readable_result", out.String())
+								}
+							},
+						)
 					},
 				),
 				aicommon.WithActionFieldStreamHandler(
