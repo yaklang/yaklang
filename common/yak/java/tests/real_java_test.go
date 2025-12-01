@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -302,7 +303,7 @@ func TestA(t *testing.T) {
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
-	diagnostics.Track(true, "collect file", func() error {
+	diagnostics.Track("collect file", func() error {
 		filesys.Recursive(".",
 			filesys.WithFileSystem(fs),
 			filesys.WithFileStat(func(s string, fi os.FileInfo) error {
@@ -322,7 +323,7 @@ func TestA(t *testing.T) {
 
 	var ch <-chan *ssareducer.FileContent
 
-	diagnostics.Track(true, "getFileHandler", func() error {
+	diagnostics.Track("getFileHandler", func() error {
 		ch = config.GetFileHandler(
 			fs,
 			fileList,
@@ -339,4 +340,38 @@ func TestA(t *testing.T) {
 		}
 	}
 	diagnostics.LogRecorder("compile")
+}
+
+func TestRuleRun(t *testing.T) {
+	if utils.InGithubActions() {
+		return
+	}
+	name := "检测Java 日志伪造攻击"
+	rule, err := sfdb.GetRule(name)
+	require.NoError(t, err)
+	_ = rule
+
+	progName := "RuoYi-Cloud-Plus(2025-1125-06:20)"
+	prog, err := ssaapi.FromDatabase(progName)
+	require.NoError(t, err)
+
+	content := `
+
+
+// 声明式参数绑定(注解方式)
+*Mapping.__ref__?{opcode: function} as $start;
+$start<getFormalParams>?{opcode: param && !have: this} as $params;
+$params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
+	`
+
+	result, err := prog.SyntaxFlowWithError(content,
+		ssaapi.QueryWithProcessCallback(func(f float64, s string) {
+			log.Infof("Progress: %.2f%%, Status: %s", f*100, s)
+		}),
+		ssaapi.QueryWithEnableDebug(),
+		ssaapi.QueryWithRuleDiagnosticsRecorder(),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	result.GetValues("result").Show()
 }

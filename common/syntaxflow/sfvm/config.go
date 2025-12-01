@@ -123,7 +123,7 @@ func WithConfig(other *Config) Option {
 }
 
 func (c *Config) Copy() *Config {
-	return &Config{
+	ret := &Config{
 		debug:                     c.debug,
 		StrictMatch:               c.StrictMatch,
 		FailFast:                  c.FailFast,
@@ -132,6 +132,10 @@ func (c *Config) Copy() *Config {
 		ctx:                       c.ctx,
 		processCallback:           c.processCallback,
 		diagnosticsEnabled:        c.diagnosticsEnabled,
-		diagnosticsRecorder:       c.diagnosticsRecorder,
+		// diagnosticsRecorder:       c.diagnosticsRecorder,
 	}
+	if ret.diagnosticsEnabled {
+		ret.diagnosticsRecorder = diagnostics.NewRecorder()
+	}
+	return ret
 }

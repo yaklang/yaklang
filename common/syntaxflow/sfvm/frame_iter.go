@@ -78,7 +78,7 @@ func (s *SFFrame) IterEnd() error {
 	}
 	//results := iter.results
 	results := s.conditionStack.Peek()
-	s.debugSubLog("<< push condition results[len: %v]", results)
+	s.debugSubLog("<< push condition results[len: %v]", len(results))
 	//s.conditionStack.Push(results)
 	return nil
 }
