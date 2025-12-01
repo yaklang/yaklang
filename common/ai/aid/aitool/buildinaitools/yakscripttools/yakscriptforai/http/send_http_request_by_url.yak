@@ -14,6 +14,7 @@ keyword := cli.String("keyword", cli.setHelp("是否需要重点展示某一些�
 cli.check()
 
 opts = []
+redirectLogs = [] // 存储重定向记录
 
 try {
     yakit.Info("当前URL:%v", url)
@@ -31,6 +32,22 @@ if err != nil {
     return
 }
 opts.Push(poc.https(isHttps))
+
+// 记录重定向信息
+redirectCount = 0
+opts.Push(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
+    redirectCount++
+    redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
+    statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
+    yakit.Info("检测到重定向[%v] -> %v", statusCode, redirectUrl)
+    
+    // 记录重定向信息到数组
+    logEntry = sprintf("========== 重定向 #%d [状态码: %v] ==========\n目标URL: %v\n\n--- 请求包 ---\n%v\n\n--- 响应包 ---\n%v\n\n", 
+        redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
+    redirectLogs.Push(logEntry)
+    
+    return true // 继续跟随重定向
+}))
 
 switch str.ToLower(string(testParamType)) {
 case "query", "get":
@@ -69,6 +86,16 @@ if err != nil {
 file.Save(rspFilename, string(rsp.RawPacket))
 yakit.Info("rsp packet[size:%v], save to %v, use grep or some text tool to handle it", len(rsp.RawPacket), rspFilename)
 yakit.Info("dns cost: %v; connect time: %v; server time(firstByte arrival): %v; total: %v", rsp.TraceInfo.DNSTime.String(), rsp.TraceInfo.ConnTime.String(), rsp.TraceInfo.ServerTime.String(), rsp.TraceInfo.TotalTime.String())
+
+// 将重定向记录写入文件
+if len(redirectLogs) > 0 {
+    redirectFilename, err := file.TempFileName("do-http-redirect-logs-*.txt")
+    if err == nil {
+        redirectContent = str.Join(redirectLogs, "\n")
+        file.Save(redirectFilename, redirectContent)
+        yakit.Info("共发生 %d 次重定向，重定向记录已保存到 %v", len(redirectLogs), redirectFilename)
+    }
+}
 
 if len(rsp.RawPacket) < 30000 {
     yakit.Info("rsp packet[size:%v]: \n%v", len(rsp.RawPacket), string(rsp.RawPacket))
