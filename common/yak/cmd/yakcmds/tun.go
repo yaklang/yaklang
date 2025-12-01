@@ -30,6 +30,23 @@ import (
 
 var TunCommands = []*cli.Command{
 	{
+		Name:  "modify-route-to-socks",
+		Usage: "Create a route manager process server listen to unix socket",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "socket-path",
+				Usage: "Unix socket path for forwarding traffic",
+				Value: "/tmp/router-manager.sock",
+			},
+			cli.StringFlag{
+				Name:  "secret",
+				Usage: "Unix socket path (if set, clients must authenticate)",
+				Value: "",
+			},
+		},
+		Action: routeManagerToSocks,
+	},
+	{
 		Name:  "forward-tun-to-socks",
 		Usage: "Create a TUN device and forward traffic to unix socket",
 		Flags: []cli.Flag{

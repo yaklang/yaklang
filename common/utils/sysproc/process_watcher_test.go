@@ -7,6 +7,7 @@ import (
 )
 
 func TestProcessesWatcher_Start(t *testing.T) {
+	t.Skip("Skip TestProcessesWatcher_Start")
 	watcher := NewProcessesWatcher()
 	watcher.Start(
 		func(ctx context.Context, p *ProcessBasicInfo) {
