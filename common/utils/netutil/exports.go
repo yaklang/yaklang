@@ -110,3 +110,28 @@ var Exports = map[string]any{
 	"BatchDeleteSpecificIPRoute":            BatchDeleteSpecificIPRoute,
 	"DeleteAllRoutesForInterface":           DeleteAllRoutesForInterface,
 }
+
+var (
+	Action_Add    = "add"
+	Action_Delete = "delete"
+)
+
+type RouteModifyResult struct {
+	SuccessList []string          `json:"success_list"`
+	FailMap     map[string]string `json:"fail_map"`
+	Error       string            `json:"error,omitempty"`
+}
+
+type RouteModifyMessage struct {
+	Action  string   `json:"action"` // "add" 或 "delete"
+	IpList  []string `json:"ip_list"`
+	TunName string   `json:"tun_name"`
+}
+
+func (r *RouteModifyMessage) IsAdd() bool {
+	return r.Action == "add"
+}
+
+func (r *RouteModifyMessage) IsDelete() bool {
+	return r.Action == "delete"
+}

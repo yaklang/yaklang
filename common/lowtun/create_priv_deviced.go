@@ -123,13 +123,31 @@ func readPIDFromLockFile(lockPath string) (int, error) {
 	return pid, nil
 }
 
+const (
+	tunnelPrivilegedSocketPrefix = "lowtun"
+	routePrivilegedSocketPrefix  = "route"
+
+	tunnelPrivilegedCmd = "forward-tun-to-sock"
+	routePrivilegedCmd  = "modify-route-to-socks"
+)
+
 func CreatePrivilegedDevice(mtu int) (Device, string, error) {
+	return CreatePrivilegedDeviceEx(mtu, tunnelPrivilegedSocketPrefix, tunnelPrivilegedCmd)
+}
+
+func CreatePrivilegedRouteDevice(mtu int) (Device, string, error) {
+	return CreatePrivilegedDeviceEx(mtu, routePrivilegedSocketPrefix, routePrivilegedCmd)
+}
+
+func CreatePrivilegedDeviceEx(mtu int, socketPrefix string, cmd string) (Device, string, error) {
 	var socketName string
 	if utils.IsWindows() {
-		socketName = "lowtun.pipe"
+		socketName = ".pipe"
 	} else {
-		socketName = "lowtun.sock"
+		socketName = ".sock"
 	}
+	socketName = socketPrefix + socketName
+
 	var socketPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), socketName)
 
 	log.Infof("attempting to create privileged device with socket path: %s", socketPath)
@@ -198,8 +216,8 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 					"A privileged process is running but using a different password.\n"+
 					"Cannot determine the process PID (no PID lock file found).\n"+
 					"Please manually kill the existing process and try again.\n"+
-					"You can find the process with: ps aux | grep 'forward-tun-to-socks'\n"+
-					"Then kill it with: sudo kill -9 <PID>", socketPath, err)
+					"You can find the process with: ps aux | grep '%s'\n"+
+					"Then kill it with: sudo kill -9 <PID>", socketPath, err, cmd)
 			}
 		} else if err != nil {
 			// 其他未知错误
@@ -219,9 +237,9 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 		return nil, "", utils.Errorf("Failed to get current binary path: %v", err)
 	}
 
-	log.Infof("checking binary capability: %s forward-tun-to-socks", currentBinary)
+	log.Infof("checking binary capability: %s %s", currentBinary, cmd)
 
-	prepared := exec.Command(currentBinary, "forward-tun-to-socks", "-h")
+	prepared := exec.Command(currentBinary, cmd, "-h")
 	var out bytes.Buffer
 	prepared.Stdout = &out
 	prepared.Stderr = &out
@@ -229,8 +247,8 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 	if err != nil {
 		return nil, "", utils.Errorf("Failed to prepare privileged executor: %v, output: %s", err, out.String())
 	}
-	if !strings.Contains(out.String(), `Create a TUN device and forward traffic`) {
-		return nil, "", utils.Errorf("Failed to check `forward-tun-to-socks`, output: %s, check flag 'Create a TUN device and forward traffic'", out.String())
+	if !strings.Contains(out.String(), `Unix socket path`) {
+		return nil, "", utils.Errorf("Failed to check `%s`, output: %s, check flag 'Unix socket path'", out.String(), cmd)
 	}
 
 	log.Infof("binary capability check passed, starting privileged executor")
@@ -242,12 +260,12 @@ func CreatePrivilegedDevice(mtu int) (Device, string, error) {
 	go func() {
 		log.Infof("starting privileged executor goroutine")
 		executor := privileged.NewExecutor("CreateLowTunDevice")
-		log.Infof("executing privileged command: %s forward-tun-to-socks --socket-path %s --secret %s", currentBinary, socketPath, secret)
+		log.Infof("executing privileged command: %s %s --socket-path %s --secret %s", currentBinary, socketPath, secret, cmd)
 		_, err := executor.Execute(
 			context.Background(),
 			fmt.Sprintf(
-				"%v forward-tun-to-socks --socket-path %#v --secret %s",
-				currentBinary, socketPath, secret,
+				"%v %s --socket-path %#v --secret %s",
+				currentBinary, cmd, socketPath, secret,
 			),
 			privileged.WithSkipConfirmDialog(),
 			privileged.WithTitle("CreateHijackTUNDevice"),

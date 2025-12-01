@@ -2,6 +2,8 @@ package netstackvm
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/lowtun"
 	"net"
 	"sync"
 
@@ -20,8 +22,9 @@ type Record struct {
 // SystemRouteManager 系统路由管理器，单例模式
 // 只管理通过AddIPRoute添加的路由记录，不涉及系统默认路由的获取
 type SystemRouteManager struct {
-	records map[string]*Record // key: ip_addr, value: record
-	mux     sync.RWMutex
+	records          map[string]*Record // key: ip_addr, value: record
+	mux              sync.RWMutex
+	privilegedDevice *routePrivilegedDevice
 }
 
 // 路由管理器数据库存储的键名
@@ -44,6 +47,19 @@ func GetSystemRouteManager() *SystemRouteManager {
 		systemRouteManagerInstance.loadFromDB()
 	})
 	return systemRouteManagerInstance
+}
+
+func GetPrivilegedSystemRouteManager() (*SystemRouteManager, error) {
+	var rm = &SystemRouteManager{
+		records: make(map[string]*Record),
+	}
+	rm.loadFromDB()
+	device, _, err := lowtun.CreatePrivilegedRouteDevice(1400)
+	if err != nil {
+		return nil, utils.Errorf("failed to create privileged route device: %v", err)
+	}
+	rm.privilegedDevice = &routePrivilegedDevice{device}
+	return rm, nil
 }
 
 // AddIPRoute 添加IP路由
@@ -95,10 +111,26 @@ func (m *SystemRouteManager) AddIPRoute(ipAddrs interface{}, tunName string) err
 		return nil
 	}
 
-	// 批量添加路由
-	success, failed := netutil.BatchAddSpecificIPRouteToNetInterface(toAdd, tunName)
-	if len(failed) > 0 {
-		log.Errorf("failed to add some routes: %v", failed)
+	var success []string
+	var failData any
+
+	if m.privilegedDevice != nil {
+		// 尝试使用特权设备添加路由
+		result, privErr := m.privilegedDevice.BatchAddSpecificIPRouteToNetInterface(toAdd, tunName)
+
+		if privErr == nil && result != nil {
+			success = result.SuccessList
+			failData = result.FailMap
+		} else {
+			log.Warnf("privileged device returned nil result, falling back to netutil")
+			success, failData = netutil.BatchAddSpecificIPRouteToNetInterface(toAdd, tunName)
+		}
+	} else {
+		// 没有特权设备，直接使用原始逻辑
+		success, failData = netutil.BatchAddSpecificIPRouteToNetInterface(toAdd, tunName)
+	}
+	if funk.IsEmpty(failData) {
+		log.Errorf("failed to add some routes: %v", failData)
 	}
 
 	// 添加成功的记录到内存
@@ -162,10 +194,26 @@ func (m *SystemRouteManager) DeleteIPRoute(ipAddrs interface{}) error {
 		return nil
 	}
 
-	// 批量删除路由
-	success, failed := netutil.BatchDeleteSpecificIPRoute(toDelete)
-	if len(failed) > 0 {
-		log.Errorf("failed to delete some routes: %v", failed)
+	var success []string
+	var failData any
+
+	if m.privilegedDevice != nil {
+		// 尝试使用特权设备添加路由
+		result, privErr := m.privilegedDevice.BatchDeleteSpecificIPRoute(toDelete)
+
+		if privErr == nil && result != nil {
+			success = result.SuccessList
+			failData = result.FailMap
+		} else {
+			log.Warnf("privileged device returned nil result, falling back to netutil")
+			success, failData = netutil.BatchDeleteSpecificIPRoute(toDelete)
+		}
+	} else {
+		// 没有特权设备，直接使用原始逻辑
+		success, failData = netutil.BatchDeleteSpecificIPRoute(toDelete)
+	}
+	if funk.IsEmpty(failData) {
+		log.Errorf("failed to add some routes: %v", failData)
 	}
 
 	// 从内存记录中移除成功的
@@ -207,10 +255,26 @@ func (m *SystemRouteManager) DeleteRoutesForInterface(interfaceName string) erro
 		return nil
 	}
 
-	// 批量删除路由
-	success, failed := netutil.BatchDeleteSpecificIPRoute(toDelete)
-	if len(failed) > 0 {
-		log.Errorf("failed to delete some routes for interface %s: %v", interfaceName, failed)
+	var success []string
+	var failData any
+
+	if m.privilegedDevice != nil {
+		// 尝试使用特权设备添加路由
+		result, privErr := m.privilegedDevice.BatchDeleteSpecificIPRoute(toDelete)
+
+		if privErr == nil && result != nil {
+			success = result.SuccessList
+			failData = result.FailMap
+		} else {
+			log.Warnf("privileged device returned nil result, falling back to netutil")
+			success, failData = netutil.BatchDeleteSpecificIPRoute(toDelete)
+		}
+	} else {
+		// 没有特权设备，直接使用原始逻辑
+		success, failData = netutil.BatchDeleteSpecificIPRoute(toDelete)
+	}
+	if funk.IsEmpty(failData) {
+		log.Errorf("failed to add some routes: %v", failData)
 	}
 
 	// 从内存记录中移除成功的
@@ -282,4 +346,11 @@ func (m *SystemRouteManager) loadFromDB() {
 	}
 
 	log.Infof("loaded %d route records from database", len(records))
+}
+
+func (m *SystemRouteManager) Close() error {
+	if m.privilegedDevice != nil {
+		return m.privilegedDevice.device.Close()
+	}
+	return nil
 }

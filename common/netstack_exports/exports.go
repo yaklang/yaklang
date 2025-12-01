@@ -14,11 +14,12 @@ import (
 
 // Exports provides yaklang bindings for netstack functionality
 var Exports = map[string]interface{}{
-	"CreatePrivilegedDevice":        _createPrivilegedDevice,
-	"CreatePrivilegedDeviceWithMTU": _createPrivilegedDeviceWithMTU,
-	"NewVMFromDevice":               _newVMFromDevice,
-	"NewVMFromDeviceWithContext":    _newVMFromDeviceWithContext,
-	"GetSystemRouteManager":         netstackvm.GetSystemRouteManager,
+	"CreatePrivilegedDevice":          _createPrivilegedDevice,
+	"CreatePrivilegedDeviceWithMTU":   _createPrivilegedDeviceWithMTU,
+	"NewVMFromDevice":                 _newVMFromDevice,
+	"NewVMFromDeviceWithContext":      _newVMFromDeviceWithContext,
+	"GetSystemRouteManager":           netstackvm.GetSystemRouteManager,
+	"GetPrivilegedSystemRouteManager": netstackvm.GetPrivilegedSystemRouteManager,
 }
 
 // _createPrivilegedDevice creates a privileged TUN device with default MTU (1500)
