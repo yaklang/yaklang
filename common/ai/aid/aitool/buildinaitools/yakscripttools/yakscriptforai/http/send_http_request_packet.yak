@@ -43,6 +43,7 @@ timeoutSecond := cli.Int("timeout-seconds", cli.setDefault(10), cli.setHelp("请
 cli.check()
 
 opts = []
+redirectLogs = [] // 存储重定向记录
 
 isHttps := https in ["yes", "y", "true"]
 
@@ -52,6 +53,22 @@ if redirectTime <= 0 {
 } else {
     opts.Append(poc.noRedirect(false), poc.redirectTimes(int(redirectTime)))
 }
+
+// 记录重定向信息
+redirectCount = 0
+opts.Append(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
+    redirectCount++
+    redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
+    statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
+    yakit.Info("检测到重定向[%v] -> %v", statusCode, redirectUrl)
+    
+    // 记录重定向信息到数组
+    logEntry = sprintf("========== 重定向 #%d [状态码: %v] ==========\n目标URL: %v\n\n--- 请求包 ---\n%v\n\n--- 响应包 ---\n%v\n\n", 
+        redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
+    redirectLogs.Push(logEntry)
+    
+    return true // 继续跟随重定向
+}))
 
 
 url := poc.GetUrlFromHTTPRequest(isHttps ? "https": "http", packet /*type: []byte*/)
@@ -101,6 +118,15 @@ if err != nil {
     file.Save(rspfile, string(rsp))
 }
 
+// 将重定向记录写入文件
+if len(redirectLogs) > 0 {
+    redirectFilename, err := file.TempFileName("do-http-redirect-logs-*.txt")
+    if err == nil {
+        redirectContent = str.Join(redirectLogs, "\n")
+        file.Save(redirectFilename, redirectContent)
+        yakit.Info("共发生 %d 次重定向，重定向记录已保存到 %v", len(redirectLogs), redirectFilename)
+    }
+}
 
 if substrs != "" || regexpKeyword != "" {
     edt := memeditor.New(string(rsp))
