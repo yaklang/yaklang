@@ -162,7 +162,7 @@ func (c *Config) parseProjectWithFS(
 		)
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
 		for fileContent := range ch {
-			if !fileContent.Skip {
+			if fileContent.Skip {
 				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
 				continue
 			}
@@ -234,7 +234,7 @@ func (c *Config) parseProjectWithFS(
 				continue // skip if not in handlerFilesMap
 			}
 			handlerProcess()
-			if !fileContent.Skip {
+			if fileContent.Skip {
 				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
 				continue
 			}
