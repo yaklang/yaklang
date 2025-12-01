@@ -15,39 +15,34 @@ const envDiagnosticsLevel = "YAK_DIAGNOSTICS_LOG_LEVEL"
 type Level int
 
 const (
-	LevelTrace Level = iota
-	LevelMeasure
-	LevelFocus
-	LevelCritical
+	LevelLow    Level = iota
+	LevelNormal       // default
+	LevelHigh
 	LevelOff
 )
 
 var levelNames = map[string]Level{
-	"trace":    LevelTrace,
-	"detail":   LevelTrace,
-	"verbose":  LevelTrace,
-	"measure":  LevelMeasure,
-	"monitor":  LevelMeasure,
-	"routine":  LevelMeasure,
-	"focus":    LevelFocus,
-	"high":     LevelFocus,
-	"alert":    LevelFocus,
-	"critical": LevelCritical,
-	"signal":   LevelCritical,
+	"trace":    LevelLow,
+	"detail":   LevelLow,
+	"verbose":  LevelLow,
+	"measure":  LevelNormal,
+	"monitor":  LevelNormal,
+	"routine":  LevelNormal,
+	"critical": LevelHigh,
+	"signal":   LevelHigh,
 	"off":      LevelOff,
 }
 
 var levelStrings = map[Level]string{
-	LevelTrace:    "trace",
-	LevelMeasure:  "measure",
-	LevelFocus:    "focus",
-	LevelCritical: "critical",
-	LevelOff:      "off",
+	LevelLow:    "trace",
+	LevelNormal: "measure",
+	LevelHigh:   "critical",
+	LevelOff:    "off",
 }
 
 var (
 	levelMu sync.RWMutex
-	level   = LevelMeasure
+	level   = LevelNormal
 )
 
 func init() {
@@ -104,42 +99,30 @@ func Enabled(lvl Level) bool {
 }
 
 // API
-func (r *Recorder) TrackLevel(lvl Level, name string, steps ...func() error) error {
-	return r.Track(Enabled(lvl), name, steps...)
+func (r *Recorder) trackLevel(lvl Level, name string, steps ...func() error) error {
+	return r.track(Enabled(lvl), name, steps...)
 }
 
-func TrackLevel(lvl Level, name string, steps ...func() error) error {
-	return DefaultRecorder().TrackLevel(lvl, name, steps...)
+func (r *Recorder) TrackLow(name string, steps ...func() error) error {
+	return r.trackLevel(LevelLow, name, steps...)
 }
 
-func (r *Recorder) TrackTrace(name string, steps ...func() error) error {
-	return r.TrackLevel(LevelTrace, name, steps...)
+func TrackLow(name string, steps ...func() error) error {
+	return DefaultRecorder().TrackLow(name, steps...)
 }
 
-func TrackTrace(name string, steps ...func() error) error {
-	return DefaultRecorder().TrackTrace(name, steps...)
+func Track(name string, steps ...func() error) error {
+	return DefaultRecorder().Track(name, steps...)
 }
 
-func (r *Recorder) TrackMeasure(name string, steps ...func() error) error {
-	return r.TrackLevel(LevelMeasure, name, steps...)
+func (r *Recorder) Track(name string, steps ...func() error) error {
+	return r.trackLevel(LevelNormal, name, steps...)
 }
 
-func TrackMeasure(name string, steps ...func() error) error {
-	return DefaultRecorder().TrackMeasure(name, steps...)
+func (r *Recorder) TrackHigh(name string, steps ...func() error) error {
+	return r.trackLevel(LevelHigh, name, steps...)
 }
 
-func (r *Recorder) TrackFocus(name string, steps ...func() error) error {
-	return r.TrackLevel(LevelFocus, name, steps...)
-}
-
-func TrackFocus(name string, steps ...func() error) error {
-	return DefaultRecorder().TrackFocus(name, steps...)
-}
-
-func (r *Recorder) TrackCritical(name string, steps ...func() error) error {
-	return r.TrackLevel(LevelCritical, name, steps...)
-}
-
-func TrackCritical(name string, steps ...func() error) error {
-	return DefaultRecorder().TrackCritical(name, steps...)
+func TrackHigh(name string, steps ...func() error) error {
+	return DefaultRecorder().TrackHigh(name, steps...)
 }

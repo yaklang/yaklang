@@ -39,14 +39,16 @@ func (m Measurement) String() string {
 		m.Name, m.Total, m.Count, m.Average(),
 	))
 
-	for index, t := range m.Steps {
-		stepAvg := time.Duration(0)
-		if m.Count > 0 {
-			stepAvg = t / time.Duration(m.Count)
+	if m.Count > 1 {
+		for index, t := range m.Steps {
+			stepAvg := time.Duration(0)
+			if m.Count > 0 {
+				stepAvg = t / time.Duration(m.Count)
+			}
+			builder.WriteString(fmt.Sprintf("%s-%-4d\tTime: %v\tCount: %v\tAvg: %v\n",
+				m.Name, index+1, t, m.Count, stepAvg,
+			))
 		}
-		builder.WriteString(fmt.Sprintf("%s-%-4d\tTime: %v\tCount: %v\tAvg: %v\n",
-			m.Name, index+1, t, m.Count, stepAvg,
-		))
 	}
 	return builder.String()
 }
@@ -140,7 +142,7 @@ func (r *Recorder) ensureEntry(name string, stepCount int) (*measurementData, er
 	return entry, nil
 }
 
-func (r *Recorder) Track(enabled bool, name string, steps ...func() error) error {
+func (r *Recorder) track(enabled bool, name string, steps ...func() error) error {
 	if name == "" {
 		return errors.New("diagnostics: measurement name is empty")
 	}
@@ -227,7 +229,7 @@ func LogRecorder(label string, recorders ...*Recorder) {
 	}
 }
 
-func (rec *Recorder) Log(label string) {
+func (rec *Recorder) Log(label ...string) {
 	if rec == nil {
 		log.Infof("recorder %s is nil", label)
 		return

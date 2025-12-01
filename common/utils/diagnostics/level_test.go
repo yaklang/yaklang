@@ -8,9 +8,9 @@ func TestTraceLevelSkipsWhenDisabled(t *testing.T) {
 	defer SetLevel(origLevel)
 	defer ReplaceDefault(origRec)
 
-	SetLevel(LevelCritical)
+	SetLevel(LevelHigh)
 	run := false
-	if err := TrackTrace("trace-skip", func() error {
+	if err := Track("trace-skip", func() error {
 		run = true
 		return nil
 	}); err != nil {
@@ -30,8 +30,8 @@ func TestTraceLevelRecordsWhenAllowed(t *testing.T) {
 	defer SetLevel(origLevel)
 	defer ReplaceDefault(origRec)
 
-	SetLevel(LevelTrace)
-	if err := TrackMeasure("measure-allowed", func() error { return nil }); err != nil {
+	SetLevel(LevelLow)
+	if err := Track("measure-allowed", func() error { return nil }); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	snaps := DefaultRecorder().Snapshot()
@@ -50,11 +50,11 @@ func TestEnabledTierOrdering(t *testing.T) {
 	orig := GetLevel()
 	defer SetLevel(orig)
 
-	SetLevel(LevelMeasure)
-	if Enabled(LevelTrace) {
+	SetLevel(LevelNormal)
+	if Enabled(LevelLow) {
 		t.Fatalf("trace should be disabled when minimum tier is measure")
 	}
-	if !Enabled(LevelFocus) {
+	if !Enabled(LevelNormal) {
 		t.Fatalf("focus should be enabled when minimum tier is measure")
 	}
 }
