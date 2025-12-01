@@ -36,7 +36,7 @@ var TunCommands = []*cli.Command{
 			cli.StringFlag{
 				Name:  "socket-path",
 				Usage: "Unix socket path for forwarding traffic",
-				Value: "/tmp/router-manager.sock",
+				Value: "/tmp/route.sock",
 			},
 			cli.StringFlag{
 				Name:  "secret",
