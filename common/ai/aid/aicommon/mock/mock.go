@@ -36,8 +36,8 @@ func (m *MockedAIConfig) CallAI(request *aicommon.AIRequest) (*aicommon.AIRespon
 var _ aicommon.AICallerConfigIf = (*MockedAIConfig)(nil)
 
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
-	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) error {
-		return nil
+	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		return e, nil
 	})
 
 	config := &MockedAIConfig{
