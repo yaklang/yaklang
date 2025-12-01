@@ -4,7 +4,7 @@ __KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文�
 
 yakit.AutoInitYakit()
 
-pathName := cli.String("path", cli.setHelp("the filepath you want to check"), cli.setRequired(true))
+pathName := cli.String("path", cli.setHelp("the filepath(s) you want to check, use comma ',' to separate multiple paths"), cli.setRequired(true))
 pattern := cli.String("pattern", cli.setHelp("target text you want to grep, use comma ',' as split"), cli.setRequired(true))
 matchMode = cli.String("pattern-mode", cli.setHelp("one of [substr/regexp/isubstr] set match mode: 1. substr for CaseSensitive-SubString; 2. isubstr for CaseInsensitive-SubString; 3. regexp for Regexp match in Golang Style"))
 maxResult := cli.Int("limit", cli.setHelp("max times (limit) grep for results"),  cli.setDefault(10))
@@ -13,10 +13,27 @@ fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if th
 contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
 cli.check()
 
-if !file.IsExisted(pathName) {
-    yakit.Info("no such file or directory: %v" % pathName)
+// 解析多个路径（以逗号分隔）
+pathList := str.Split(pathName, ",")
+validPaths := []
+for p in pathList {
+    p = str.TrimSpace(p)
+    if p == "" {
+        continue
+    }
+    if !file.IsExisted(p) {
+        yakit.Info("no such file or directory: %v" % p)
+        continue
+    }
+    validPaths = append(validPaths, p)
+}
+
+if len(validPaths) == 0 {
+    yakit.Info("no valid file or directory found")
     return
 }
+
+multipleFiles := len(validPaths) > 1
 
 if pattern == "" {
     yakit.Info("grep target not right")
@@ -55,7 +72,14 @@ output = (targetFile, offset, offsetEnd) => {
         end = true
         return
     }
-    msg := "find in %v index:%v-%v" % [targetFile, offset, offsetEnd]
+    
+    // 当有多个文件时，显示文件来源
+    var msg
+    if multipleFiles {
+        msg = "[file: %v] find index:%v-%v" % [targetFile, offset, offsetEnd]
+    } else {
+        msg = "find in %v index:%v-%v" % [targetFile, offset, offsetEnd]
+    }
     println(msg)
     buf.WriteString(msg)
     buf.WriteByte('\n')
@@ -138,39 +162,51 @@ handle = (patternSubstr, targetFile, content) => {
 }
 
 
-if file.IsDir(pathName) {
-    filesys.Recursive(pathName, filesys.onFileStat((fileToCheck, info) => {
-        yakit.File(fileToCheck, yakit.fileStatusAction(info))
-        defer recover()
-        if end { return }
+// 处理单个路径的函数
+processPath = (singlePath) => {
+    if file.IsDir(singlePath) {
+        filesys.Recursive(singlePath, filesys.onFileStat((fileToCheck, info) => {
+            yakit.File(fileToCheck, yakit.fileStatusAction(info))
+            defer recover()
+            if end { return }
 
-        if fileSizeLimit > 0 && info.Size() > fileSizeLimit {
-            // overlarge
-            return
-        }
+            if fileSizeLimit > 0 && info.Size() > fileSizeLimit {
+                // overlarge
+                return
+            }
 
+            allpattern := str.Split(pattern, ",")
+            for subPatternItem in allpattern {
+                fileContent := file.ReadFile(fileToCheck)~
+                yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+                if isRegexp {
+                    handleRegexp(subPatternItem, fileToCheck, string(fileContent))
+                } else {
+                    handle(subPatternItem, fileToCheck, string(fileContent))
+                }
+            }
+        }))
+    } else {
         allpattern := str.Split(pattern, ",")
         for subPatternItem in allpattern {
-            fileContent := file.ReadFile(fileToCheck)~
-            yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+            fileContent := file.ReadFile(singlePath)~
+            yakit.File(singlePath, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
             if isRegexp {
-                handleRegexp(subPatternItem, fileToCheck, string(fileContent))
+                handleRegexp(subPatternItem, singlePath, string(fileContent))
             } else {
-                handle(subPatternItem, fileToCheck, string(fileContent))
+                handle(subPatternItem, singlePath, string(fileContent))
             }
         }
-    }))
-} else {
-    allpattern := str.Split(pattern, ",")
-    for subPatternItem in allpattern {
-        fileContent := file.ReadFile(pathName)~
-        yakit.File(pathName, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
-        if isRegexp {
-            handleRegexp(subPatternItem, pathName, string(fileContent))
-        } else {
-            handle(subPatternItem, pathName, string(fileContent))
-        }
     }
+}
+
+// 遍历所有有效路径
+for currentPath in validPaths {
+    if end { break }
+    if multipleFiles {
+        yakit.Info("processing path: %v", currentPath)
+    }
+    processPath(currentPath)
 }
 println()
 
