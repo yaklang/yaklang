@@ -7,9 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/minimartian"
-	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io"
 	"math/rand"
 	"net/http"
@@ -22,6 +19,10 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
@@ -915,6 +916,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return raw
 				}
 				if controlMessage.GetSendPacket() {
+					task.infoMessage.Payload = controlMessage.GetPayload()
 					return task.infoMessage.Payload
 				}
 			}
