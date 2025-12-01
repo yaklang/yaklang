@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type BaseEmitter func(e *schema.AiOutputEvent) error
+type BaseEmitter func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error)
 type EventProcesser func(e *schema.AiOutputEvent) *schema.AiOutputEvent
 type Emitter struct {
 	streamWG              *sync.WaitGroup
@@ -29,7 +29,7 @@ type Emitter struct {
 	interactiveEventSaver func(string, *schema.AiOutputEvent)
 }
 
-func (i *Emitter) Emit(e *schema.AiOutputEvent) error {
+func (i *Emitter) Emit(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 	return i.emit(e)
 }
 
@@ -91,7 +91,7 @@ func (i *Emitter) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOut
 	return event
 }
 
-func (i *Emitter) emit(e *schema.AiOutputEvent) (retErr error) {
+func (i *Emitter) emit(e *schema.AiOutputEvent) (finalEvent *schema.AiOutputEvent, retErr error) {
 	if err := recover(); err != nil {
 		retErr = utils.Errorf("Emitter panic: %v", err)
 		_ = retErr
@@ -100,11 +100,12 @@ func (i *Emitter) emit(e *schema.AiOutputEvent) (retErr error) {
 		e = i.callEventBeforeSave(e)
 	}
 	if i.baseEmitter != nil {
-		if err := i.baseEmitter(e); err != nil {
-			return utils.Errorf("emit event failed: %v", err)
+		var err error
+		if e, err = i.baseEmitter(e); err != nil {
+			return e, utils.Errorf("emit event failed: %v", err)
 		}
 	}
-	return nil
+	return e, nil
 }
 
 func (i *Emitter) StoreInteractiveEvent(id string, e *schema.AiOutputEvent) {

@@ -319,12 +319,12 @@ func newConfig(ctx context.Context) *Config {
 	)
 
 	// Initialize emitter
-	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) error {
+	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		if config.Guardian != nil {
 			config.Guardian.Feed(e)
 		}
 		config.emitBaseHandler(e)
-		return nil
+		return e, nil
 	})
 
 	return config

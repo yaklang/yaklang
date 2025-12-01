@@ -2,13 +2,14 @@ package aicommon
 
 import (
 	"context"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"sync"
-	"time"
 )
 
 // GuardianEmitter defines the interface for emitting events in the Guardian system.
@@ -26,9 +27,9 @@ type guardianEmitter struct {
 }
 
 func NewGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent)) *guardianEmitter {
-	baseEmitter := func(e *schema.AiOutputEvent) error {
+	baseEmitter := func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		emitter(e)
-		return nil
+		return e, nil
 	}
 	return &guardianEmitter{
 		Emitter: NewEmitter(coordinatorId, baseEmitter),
