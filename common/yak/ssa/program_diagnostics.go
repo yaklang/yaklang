@@ -30,7 +30,7 @@ func (prog *Program) DiagnosticsTrack(name string, steps ...func() error) {
 	}
 	rec := prog.DiagnosticsRecorder()
 	if rec != nil {
-		rec.Track(true, name, steps...)
+		rec.Track(name, steps...)
 		return
 	}
 	for _, step := range steps {

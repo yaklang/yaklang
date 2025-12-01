@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -109,7 +110,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			option = append(option, ssaapi.QueryWithMemory())
 		}
 		if enableRulePerf {
-			option = append(option, ssaapi.QueryWithRuleDiagnosticsRecorder())
+			recorder := diagnostics.NewRecorder()
+			option = append(option, ssaapi.QueryWithRuleDiagnosticsRecorder(recorder))
+			defer recorder.Log("RunRule: " + rule.RuleName)
 		}
 
 		// 执行规则查询
@@ -129,7 +132,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	if enableRulePerf && m.ruleProfiler != nil {
 		// 构建 profile 名称：Rule[规则名].Prog[程序名]
 		profileName := fmt.Sprintf("Rule[%s].Prog[%s]", rule.RuleName, prog.GetProgramName())
-		m.ruleProfiler.TrackTrace(profileName, f)
+		m.ruleProfiler.Track(profileName, f)
 	} else {
 		// 不启用性能监控时，直接执行
 		f()
