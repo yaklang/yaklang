@@ -2,13 +2,12 @@ package ssareducer
 
 import (
 	"context"
-	"slices"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/pipeline"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"slices"
 )
 
 type ASTSequenceType int
@@ -68,7 +67,7 @@ func FilesHandler(
 				Path:    path,
 				Content: content,
 				Err:     fileErr,
-				Skip:    utils.IsPlainText(content),
+				Skip:    false,
 			}, nil
 		},
 		concurrency,
@@ -77,7 +76,7 @@ func FilesHandler(
 
 	parseASTPipe := pipeline.NewPipeWithStore[*FileContent, *FileContent](
 		ctx, bufSize, func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
-			if fileContent.Err != nil || !fileContent.Skip {
+			if fileContent.Err != nil || fileContent.Skip {
 				return fileContent, nil
 			}
 			ast, err := handler(fileContent.Path, fileContent.Content, store)
