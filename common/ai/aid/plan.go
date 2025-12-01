@@ -129,6 +129,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		pr.rawInput,
 		pr.cod.Ctx,
 		pr.cod.Emitter,
+		true,
 	)
 	err := pr.cod.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PLAN,

@@ -101,6 +101,9 @@ LOOP:
 				}
 			}
 
+			if utils.MatchAllOfSubString(result.String(), `react_task_created`, `plan-task`) {
+				t.Fatal("should not create plan build task")
+			}
 			_ = inputChan
 		case <-time.After(time.Second * 10):
 			t.Fatal("timeout")
