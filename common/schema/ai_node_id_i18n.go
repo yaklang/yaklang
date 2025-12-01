@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"human_readable_result": {
+		Zh: "结果摘要",
+		En: "Human Readable Result",
+	},
 	"next_movements": {
 		Zh: "下一步行动",
 		En: "Next Movements",
