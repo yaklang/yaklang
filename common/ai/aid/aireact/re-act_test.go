@@ -212,3 +212,23 @@ func TestReAct_ContextDoneDieLock(t *testing.T) {
 	case <-ctxDoneErrGet:
 	}
 }
+
+func TestReAct_Invoker_FreeInputShouldNotSet(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	basicOption := []aicommon.ConfigOption{
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return &aicommon.AIResponse{}, nil
+		}),
+	}
+
+	invoker, err := BuildReActInvoker(ctx, basicOption...)
+	require.NoError(t, err)
+	reactInvoker, ok := invoker.(*ReAct)
+	require.True(t, ok)
+	require.True(t, reactInvoker.pureInvokerMode)
+	require.False(t, reactInvoker.config.InputEventManager.IsFreeInputCallbackSet())
+}
