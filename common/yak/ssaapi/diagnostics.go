@@ -39,11 +39,11 @@ func (c *Config) LogDiagnostics(label string) {
 }
 
 func (c *Config) DiagnosticsTrack(name string, steps ...func() error) error {
-	return c.DiagnosticsRecorder().TrackTrace(name, steps...)
+	return c.DiagnosticsRecorder().Track(name, steps...)
 }
 
 func (c *saveValueCtx) DiagnosticsTrack(name string, steps ...func() error) error {
-	return c.diagnosticsRecorder.TrackTrace(name, steps...)
+	return c.diagnosticsRecorder.Track(name, steps...)
 }
 
 func OptionSaveValue_Diagnostics(rec *diagnostics.Recorder) SaveValueOption {
