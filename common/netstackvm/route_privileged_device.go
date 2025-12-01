@@ -31,12 +31,12 @@ func (r *routePrivilegedDevice) modifyRoute(message *netutil.RouteModifyMessage)
 	}
 
 	rawResp := make([]byte, mtu)
-	_, err = rw.Read(rawResp)
+	n, err := rw.Read(rawResp)
 	if err != nil {
 		return nil, utils.Errorf("failed to read resp: %v", err)
 	}
+	rawResp = rawResp[:n]
 	var resp netutil.RouteModifyResult
-
 	err = json.Unmarshal(rawResp, &resp)
 	if err != nil {
 		return nil, utils.Errorf("failed to unmarshal response data: %v", err)

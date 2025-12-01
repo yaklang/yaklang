@@ -259,7 +259,7 @@ func CreatePrivilegedDeviceEx(mtu int, socketPrefix string, cmd string) (Device,
 
 	go func() {
 		log.Infof("starting privileged executor goroutine")
-		executor := privileged.NewExecutor("CreateLowTunDevice")
+		executor := privileged.NewExecutor("CreatePrivilegedDevice")
 		log.Infof("executing privileged command: %s %s --socket-path %s --secret %s", currentBinary, socketPath, secret, cmd)
 		_, err := executor.Execute(
 			context.Background(),
@@ -268,8 +268,8 @@ func CreatePrivilegedDeviceEx(mtu int, socketPrefix string, cmd string) (Device,
 				currentBinary, cmd, socketPath, secret,
 			),
 			privileged.WithSkipConfirmDialog(),
-			privileged.WithTitle("CreateHijackTUNDevice"),
-			privileged.WithDescription(fmt.Sprintf("Create a TUN device and forward traffic to unix socket: %v", socketPath)),
+			privileged.WithTitle("CreatePrivilegedDevice"),
+			privileged.WithDescription(fmt.Sprintf("Create a Privileged device and forward traffic or modify route: %v", socketPath)),
 			privileged.WithDiscardStdoutAndStderr(),
 			privileged.WithBeforePrivilegedProcessExecute(func() {
 				log.Infof("privileged process is starting, notifying main goroutine")

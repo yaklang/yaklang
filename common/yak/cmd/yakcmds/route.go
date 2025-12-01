@@ -164,6 +164,7 @@ func routeManagerToSocks(c *cli.Context) error {
 					modifyRequest, err := readRouteModifyRequest(cli.reader)
 					if err != nil {
 						log.Errorf("failed to read route modify request: %v", err)
+						return
 					}
 
 					var successList = make([]string, 0)
@@ -301,10 +302,11 @@ func readRouteData(conn net.Conn) ([]byte, error) {
 
 func readRouteModifyRequest(reader *protocolReader) (*netutil.RouteModifyMessage, error) {
 	var rawData = make([]byte, 1500)
-	_, err := reader.Read(rawData)
+	n, err := reader.Read(rawData)
 	if err != nil {
 		return nil, err
 	}
+	rawData = rawData[:n]
 	var message netutil.RouteModifyMessage
 	err = json.Unmarshal(rawData, &message)
 	if err != nil {
