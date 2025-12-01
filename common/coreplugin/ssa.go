@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -79,12 +80,6 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 		return info, nil, nil, utils.Errorf("config is nil")
 	}
 
-	// 创建 SSA 项目
-	client, err := yakgrpc.NewLocalClient()
-	if err != nil {
-		return info, nil, nil, utils.Errorf("failed to create grpc client: %s", err)
-	}
-
 	configJSON, err := config.ToJSONString()
 	if err != nil {
 		return info, nil, nil, utils.Errorf("failed to convert config to json: %s", err)
@@ -94,30 +89,31 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 		JSONStringConfig: configJSON,
 	}
 
-	createResp, err := client.CreateSSAProject(ctx, createReq)
+	profileDb := consts.GetGormProfileDatabase()
+	createResp, err := yakit.CreateSSAProject(profileDb, createReq)
 	if err != nil {
 		return info, nil, nil, utils.Errorf("failed to create ssa project: %s", err)
 	}
 
-	if createResp.Project == nil {
-		return info, nil, nil, utils.Errorf("created project is nil")
-	}
-
-	//建清理函数，用于删除创建的项目
 	cleanup := func() {
 		deleteReq := &ypb.DeleteSSAProjectRequest{
 			DeleteMode: string(yakit.SSAProjectDeleteAll),
 			Filter: &ypb.SSAProjectFilter{
-				IDs: []int64{createResp.Project.ID},
+				IDs: []int64{int64(createResp.ID)},
 			},
 		}
-		client.DeleteSSAProject(context.Background(), deleteReq)
+		yakit.DeleteSSAProject(profileDb, deleteReq)
 	}
 
 	// 调用编译脚本
+	projectConfig, err := createResp.GetConfig()
+	if err != nil {
+		return info, nil, nil, err
+	}
 	compilePluginName := "SSA 项目编译"
 	compileParam := make(map[string]string)
-	compileParam["config"] = createResp.Project.JSONStringConfig
+	jsonString, _ := projectConfig.ToJSONString()
+	compileParam["config"] = jsonString
 
 	var compiledProgramName string
 	err = yakgrpc.ExecScriptWithParam(ctx, compilePluginName, compileParam,
