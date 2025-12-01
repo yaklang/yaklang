@@ -45,7 +45,7 @@ func TestEmitThoughtStream_Truncation(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 
-			emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) error {
+			emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 				if e.Type == schema.EVENT_TYPE_STREAM && e.IsStream {
 					mu.Lock()
 					receivedContent.Write(e.StreamDelta)
@@ -54,7 +54,7 @@ func TestEmitThoughtStream_Truncation(t *testing.T) {
 				if e.Type == schema.EVENT_TYPE_STRUCTURED && e.NodeId == "stream-finished" {
 					wg.Done()
 				}
-				return nil
+				return e, nil
 			})
 
 			emitter.EmitThoughtStream("task-1", tc.content)

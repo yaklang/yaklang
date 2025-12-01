@@ -3,14 +3,15 @@ package mock
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync/atomic"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"sync/atomic"
-	"testing"
 )
 
 type mockedAI struct {
@@ -234,8 +235,8 @@ func TestCompressionBoundary(t *testing.T) {
 func TestCompressionWithContentSizeLimit(t *testing.T) {
 	memoryTimeline := aicommon.NewTimeline(&mockedAI{}, nil)
 
-	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) error {
-		return nil
+	emitter := aicommon.NewEmitter("mock-emitter", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		return e, nil
 	})
 
 	config := &MockedAIConfig{
