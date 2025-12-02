@@ -187,16 +187,19 @@ func MarshalFolder(folderPaths []string) *IrSource {
 }
 
 func (irSource *IrSource) Save(db *gorm.DB) error {
-	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
-		irSource.FolderPath = "/" + irSource.FolderPath
-	}
-
 	// log.Infof("save source: %v", irSource.SourceCodeHash)
 	// check existed
 	err := db.Save(irSource).Error
 	if err != nil {
 		log.Errorf("save ir source failed: %v", err)
 		return utils.Wrapf(err, "save ir source failed")
+	}
+	return nil
+}
+
+func (irSource *IrSource) BeforeSave(tx *gorm.DB) error {
+	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
+		irSource.FolderPath = "/" + irSource.FolderPath
 	}
 	return nil
 }
