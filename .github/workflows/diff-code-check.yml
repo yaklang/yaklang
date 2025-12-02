@@ -114,26 +114,107 @@ jobs:
         env: 
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
-          echo "::group::Downloading Yak installation script"
-          if ! curl -sS -L http://oss.yaklang.io/install-latest-yak.sh -o install-latest-yak.sh; then
-            echo "::error::Failed to download Yak installation script"
+          echo "::group::Finding latest Yak version"
+          
+          # 获取所有可用版本列表（已按从新到旧排序）
+          VERSIONS_URL="https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt"
+          echo "Fetching versions from: $VERSIONS_URL"
+          
+          if ! VERSIONS=$(curl -sS -L "$VERSIONS_URL" | grep -v '^$'); then
+            echo "::error::Failed to fetch version list"
             exit 1
           fi
+          
+          echo "Available versions (newest first):"
+          echo "$VERSIONS" | head -n 5
+          echo "..."
+          
+          # 从上到下遍历，找到第一个符合条件的版本（*-alpha*-diff-check 或 *-beta*）
+          SELECTED_VERSION=""
+          
+          while IFS= read -r version; do
+            # 检查是否为 alpha-diff-check 或 beta
+            if echo "$version" | grep -qE '.*-alpha.*-diff-check'; then
+              SELECTED_VERSION="$version"
+              echo "✅ Found alpha-diff-check version: $SELECTED_VERSION"
+              break
+            elif echo "$version" | grep -qE '.*-beta[0-9]+$'; then
+              SELECTED_VERSION="$version"
+              echo "✅ Found beta version: $SELECTED_VERSION"
+              break
+            fi
+          done <<< "$VERSIONS"
+          
+          if [ -z "$SELECTED_VERSION" ]; then
+            echo "::error::No suitable version found (alpha-diff-check or beta)"
+            exit 1
+          fi
+          
+          echo "Selected version: $SELECTED_VERSION"
+          echo "SELECTED_VERSION=$SELECTED_VERSION" >> $GITHUB_ENV
           echo "::endgroup::"
           
-          echo "::group::Installing Yak"
-          chmod +x install-latest-yak.sh
-          if ! ./install-latest-yak.sh; then
-            echo "::error::Failed to install Yak"
+          echo "::group::Downloading Yak binary"
+          
+          # 检测操作系统和架构
+          OS=""
+          ARCH=""
+          case "$(uname -s)" in
+            Linux*)   OS="linux" ;;
+            Darwin*)  OS="darwin" ;;
+            MINGW*)   OS="windows" ;;
+            *)        echo "::error::Unsupported OS: $(uname -s)"; exit 1 ;;
+          esac
+          
+          case "$(uname -m)" in
+            x86_64)   ARCH="amd64" ;;
+            aarch64)  ARCH="arm64" ;;
+            arm64)    ARCH="arm64" ;;
+            *)        echo "::error::Unsupported architecture: $(uname -m)"; exit 1 ;;
+          esac
+          
+          # Windows 需要 .exe 后缀
+          BINARY_NAME="yak_${OS}_${ARCH}"
+          if [ "$OS" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+          
+          DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/${BINARY_NAME}"
+          echo "Downloading from: $DOWNLOAD_URL"
+          
+          if ! curl -sS -L "$DOWNLOAD_URL" -o yak; then
+            echo "::error::Failed to download Yak binary"
             exit 1
           fi
+          
+          chmod +x yak
           echo "::endgroup::"
           
           echo "::group::Verifying Yak installation"
-          if ! yak version; then
+          if ! ./yak version; then
             echo "::error::Yak installation verification failed"
             exit 1
           fi
+          
+          # 将 yak 移动到 PATH
+          if command -v sudo >/dev/null 2>&1; then
+            sudo mv yak /usr/local/bin/yak || sudo mv yak /usr/bin/yak || mv yak ~/.local/bin/yak
+          else
+            mv yak /usr/local/bin/yak 2>/dev/null || mv yak /usr/bin/yak 2>/dev/null || mv yak ~/.local/bin/yak
+          fi
+          
+          # 确保 yak 在 PATH 中
+          if ! command -v yak >/dev/null 2>&1; then
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          
+          # 最终验证
+          if ! yak version; then
+            echo "::error::Yak installation verification failed after moving to PATH"
+            exit 1
+          fi
+          
+          echo "Yak installed successfully: $(yak version)"
           echo "::endgroup::"
 
       - name: Generate Prog
