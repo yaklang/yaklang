@@ -9,12 +9,13 @@ import (
 )
 
 func TestMustPassDebug(t *testing.T) {
+	// for i := 0; i < 10; i++ {
 	if utils.InGithubActions() {
 		t.Skip()
 		return
 	}
 
-	debugName := "mitm_mock.yak"
+	debugName := "hot_loading_concurrent.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
@@ -33,6 +34,7 @@ func TestMustPassDebug(t *testing.T) {
 	totalTest := t
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
+			t.Parallel()
 			_, err := yak.Execute(i[1], map[string]any{
 				"VULINBOX":      vulinboxAddr,
 				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
@@ -43,4 +45,5 @@ func TestMustPassDebug(t *testing.T) {
 			}
 		})
 	}
+	// }
 }
