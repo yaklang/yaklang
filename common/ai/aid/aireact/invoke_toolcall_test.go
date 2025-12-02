@@ -112,6 +112,7 @@ func TestReAct_ToolUse(t *testing.T) {
 	reviewed := false
 	reviewReleased := false
 	toolCallOutputEvent := false
+	materialFetched := false
 	var iid string
 LOOP:
 	for {
@@ -148,6 +149,10 @@ LOOP:
 				toolCallOutputEvent = true
 			}
 
+			if e.Type == string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
+				materialFetched = true
+			}
+
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
@@ -174,6 +179,10 @@ LOOP:
 
 	if !toolCallOutputEvent {
 		t.Fatal("Expected to have at least one output event, but got none")
+	}
+
+	if !materialFetched {
+		t.Fatal("Expected to have at least one material event, but got none")
 	}
 
 	fmt.Println("--------------------------------------")
