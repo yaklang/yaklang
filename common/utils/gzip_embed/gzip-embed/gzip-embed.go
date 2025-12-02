@@ -47,6 +47,10 @@ func main() {
 		cli.BoolFlag{
 			Name: "no-embed",
 		},
+		cli.BoolFlag{
+			Name:  "root-path,r",
+			Usage: "include root directory name in archive paths (e.g., static/a.png instead of a.png)",
+		},
 		cli.StringFlag{
 			Name:  "source,s",
 			Value: "static",
@@ -58,10 +62,11 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		sourceDir := c.String("source")
 		gzName := c.String("gz")
+		withRootPath := c.Bool("root-path")
 		if gzName == "" {
 			gzName = fmt.Sprintf("%s.tar.gz", sourceDir)
 		}
-		err := targz(sourceDir, gzName)
+		err := targz(sourceDir, gzName, withRootPath)
 		if err != nil {
 			log.Error(err)
 		}
@@ -90,7 +95,7 @@ func writeEmbedFile(cache bool, sourceDir string, gzName string) {
 	}))
 	os.WriteFile("embed.go", []byte(code), 0644)
 }
-func targz(path string, gzName string) error {
+func targz(path string, gzName string, withRootPath bool) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return err
 	}
@@ -108,13 +113,21 @@ func targz(path string, gzName string) error {
 	// 创建 tar 归档器
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
-	rootPath := path
+
+	// 如果开启 withRootPath，使用父目录作为基准，这样相对路径会包含根目录名称
+	// 例如：path="static", withRootPath=true -> relBase=filepath.Dir("static")="."
+	// 这样 static/a.png 相对于 "." 的路径就是 "static/a.png"
+	relBase := path
+	if withRootPath {
+		relBase = filepath.Dir(path)
+	}
+
 	// 递归地添加文件夹内容到 tar 归档
-	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		return addFileToTarWriter(path, info, rootPath, tarWriter)
+		return addFileToTarWriter(filePath, info, relBase, tarWriter)
 	})
 
 	if err != nil {
@@ -142,7 +155,8 @@ func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter
 	if relativePath == "." {
 		return nil
 	}
-
+	// 统一使用正斜杠作为路径分隔符（tar 标准）
+	relativePath = filepath.ToSlash(relativePath)
 	// 创建 tar 头
 	header, err := tar.FileInfoHeader(info, relativePath)
 	if err != nil {

@@ -1,13 +1,14 @@
 package yso
 
 import (
+	"path"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yso/resources"
-	"path"
-	"strconv"
-	"strings"
 )
 
 type ParamConfig struct {
@@ -47,6 +48,7 @@ type YsoConfig struct {
 var YsoConfigInstance *YsoConfig
 
 func init() {
+	resources.InitEmbedFS()
 	var err error
 	YsoConfigInstance, err = getConfig()
 	if err != nil {
@@ -59,7 +61,7 @@ func getConfig() (*YsoConfig, error) {
 		Gadgets:              map[GadgetType]*GadgetConfig{},
 		ReflectChainFunction: map[string]*ReflectChainFunctionConfig{},
 	}
-	content, err := resources.YsoResourceFS.ReadFile("config.yaml")
+	content, err := resources.YsoResourceFS.ReadFile("static/config.yaml")
 	if err != nil {
 		return nil, utils.Errorf("read config.yaml failed: %v", err)
 	}
@@ -116,7 +118,7 @@ func getConfig() (*YsoConfig, error) {
 	parseClassesTask := getMapOrEmptyTask([]string{}, configMap, "Classes", func(currentKey []string, classesInfo map[string]any) error {
 		for name, attr := range classesInfo {
 			cfg := &ClassConfig{}
-			templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("classes", name+".class"))
+			templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("static", "classes", name+".class"))
 			if err != nil {
 				return utils.Errorf("read class %s failed: %v", name, err)
 			}
@@ -203,7 +205,7 @@ func getConfig() (*YsoConfig, error) {
 			fileName := name
 			if gadgetConfig.IsTemplateImpl {
 				fileName = "template_" + name
-				templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+				templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("static", "gadgets", fileName+".ser"))
 				if err != nil {
 					return utils.Errorf("read gadget %s template failed: %v", fileName, err)
 				}
@@ -212,7 +214,7 @@ func getConfig() (*YsoConfig, error) {
 				var isTransformChain bool
 				for _, chainInfo := range config.ReflectChainFunction {
 					fileName = "transform_" + chainInfo.Name + "_" + name
-					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("static", "gadgets", fileName+".ser"))
 					if err != nil {
 						if strings.Contains(err.Error(), "file does not exist") {
 							continue
@@ -224,7 +226,7 @@ func getConfig() (*YsoConfig, error) {
 				}
 				if !isTransformChain {
 					fileName = name
-					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("static", "gadgets", fileName+".ser"))
 					if err != nil {
 						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
 					}

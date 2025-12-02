@@ -154,6 +154,7 @@ jobs:
 
       - name: Generate yakscriptforai tar.gz
         run: gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
+        run: gzip-embed -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --no-embed --root-path
 
       - name: Initialize License Machine
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
