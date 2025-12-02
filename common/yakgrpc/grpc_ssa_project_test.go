@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io"
-	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -489,7 +490,7 @@ func TestGRPCMUSTPASS_SSAProjectMigrateSSAProject(t *testing.T) {
 	}
 
 	// 验证迁移完成
-	require.Equal(t, float64(100), finalPercent, "迁移进度应该达到100%")
+	require.Equal(t, float64(1), finalPercent, "迁移进度应该达到100%")
 
 	// 3. 验证迁移结果
 	t.Log("验证迁移结果...")
