@@ -180,10 +180,9 @@ jobs:
         id: cache-go-build
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
           restore-keys: |
-            go-build-${{ steps.cache_key.outputs.sha }}-
-            go-build-
+            go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
 
       - name: Init Module
         run: |
@@ -205,7 +204,7 @@ jobs:
         if: steps.cache-go-build.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
 
       - name: Generate Document Data
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -251,10 +250,9 @@ jobs:
         id: cache-go-build
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
           restore-keys: |
-            go-build-${{ steps.cache_key.outputs.sha }}-
-            go-build-
+            go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
 
       - name: Build All Common Packages
         if: steps.cache-go-build.outputs.cache-hit != 'true'
@@ -275,7 +273,7 @@ jobs:
         if: steps.cache-go-build.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
 
   test:
     name: ${{ matrix.name }}
@@ -539,10 +537,9 @@ jobs:
         id: cache-go-build
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ steps.cache_key.outputs.sha }}-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
           restore-keys: |
-            go-build-${{ steps.cache_key.outputs.sha }}-
-            go-build-
+            go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
 
       - name: Set GOCACHE environment
         run: |
