@@ -1,21 +1,29 @@
+//go:build !gzip_embed
+
 package resources
 
 import (
 	"embed"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-//go:embed static.tar.gz
+//go:embed static
 var resourceFS embed.FS
 
-var YsoResourceFS *gzip_embed.PreprocessingEmbed
+var YsoResourceFS fi.FileSystem
 
-func init() {
-	var err error
-	YsoResourceFS, err = gzip_embed.NewPreprocessingEmbed(&resourceFS, "static.tar.gz", true)
-	if err != nil {
-		log.Errorf("init embed failed: %v", err)
-		YsoResourceFS = gzip_embed.NewEmptyPreprocessingEmbed()
-	}
+// embedFSWithHash 包装 embed.FS 并添加 GetHash 方法
+type embedFSWithHash struct {
+	fi.FileSystem
+	fs embed.FS
+}
+
+func (e *embedFSWithHash) GetHash() (string, error) {
+	return filesys.CreateEmbedFSHash(e.fs)
+}
+
+func InitEmbedFS() {
+	YsoResourceFS = filesys.NewEmbedFS(resourceFS)
 }
