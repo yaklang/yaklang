@@ -2,12 +2,13 @@ package facades
 
 import (
 	"errors"
+
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso/resources"
 )
 
 func LoadReferenceResourceForRmi() (*yserx.JavaObject, error) {
-	referenceData, err := resources.YsoResourceFS.ReadFile("gadgets/reference_for_rmi.ser")
+	referenceData, err := resources.YsoResourceFS.ReadFile("static/gadgets/reference_for_rmi.ser")
 	if err != nil {
 		return nil, err
 	}
