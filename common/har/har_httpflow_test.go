@@ -253,3 +253,117 @@ Content-Length: %d
 	require.Equal(t, sourceType, flow.SourceType)
 	require.Equal(t, randTag, flow.Tags)
 }
+
+// TestHTTPFlow2HarEntryWithFieldSelection tests HAR export field selection functionality
+// Similar to Excel export test style, tests the impact of field selection on HAR export
+func TestHTTPFlow2HarEntryWithFieldSelection(t *testing.T) {
+	requestBody := "test request body"
+	responseBody := "test response body"
+	randTag := utils.RandStringBytes(16)
+	fromPlugin := "test-plugin"
+	duration := int64(123)
+	ipAddress := "192.168.1.1"
+
+	request := fmt.Sprintf(`POST /test HTTP/1.1
+Host: example.com
+Content-Type: application/json
+
+%s`, requestBody)
+	request = strconv.Quote(request)
+
+	response := fmt.Sprintf(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: %d
+
+%s`, len(responseBody), responseBody)
+	response = strconv.Quote(response)
+
+	flow := &schema.HTTPFlow{
+		Request:           request,
+		Response:          response,
+		Method:            "POST",
+		Url:               "http://example.com/test",
+		StatusCode:        200,
+		BodyLength:        int64(len(responseBody)),
+		SourceType:        "mitm",
+		Tags:              randTag,
+		FromPlugin:        fromPlugin,
+		Duration:          duration,
+		IPAddress:         ipAddress,
+		Path:              "/test",
+		GetParamsTotal:    2,
+		PostParamsTotal:   1,
+		CookieParamsTotal: 3,
+		IsWebsocket:       false,
+		Payload:           "test-payload",
+	}
+
+	t.Run("only request packet fields", func(t *testing.T) {
+		// Similar to Excel export test, test selecting specific fields only
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"request", "method", "url"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// Should include request body
+		require.NotNil(t, entry.Request.PostData)
+		require.Equal(t, requestBody, entry.Request.PostData.Text)
+		// Should not include response body
+		require.NotNil(t, entry.Response.Content)
+		require.Equal(t, "", entry.Response.Content.Text)
+	})
+
+	t.Run("only response packet fields", func(t *testing.T) {
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"response", "status_code", "url"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// Should not include request body
+		require.Nil(t, entry.Request.PostData)
+		// Should include response body
+		require.NotNil(t, entry.Response.Content)
+		require.Equal(t, responseBody, entry.Response.Content.Text)
+	})
+
+	t.Run("only metadata fields", func(t *testing.T) {
+		// Similar to Excel export test, test selecting metadata fields only
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"tags", "from_plugin", "duration", "iP_address", "path"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// Should not include request and response body
+		require.Nil(t, entry.Request.PostData)
+		require.NotNil(t, entry.Response.Content)
+		require.Equal(t, "", entry.Response.Content.Text)
+		// Should include selected metadata fields
+		require.NotNil(t, entry.MetaData)
+		require.Equal(t, randTag, entry.MetaData.Tags)
+		require.Equal(t, fromPlugin, entry.MetaData.FromPlugin)
+		require.Equal(t, duration, entry.MetaData.Duration)
+		require.Equal(t, ipAddress, entry.MetaData.IPAddress)
+		require.Equal(t, "/test", entry.MetaData.Path)
+		// Unselected fields should be empty
+		require.Equal(t, "", entry.MetaData.SourceType)
+		require.Equal(t, "", entry.MetaData.Payload)
+	})
+
+	t.Run("include parameter statistics fields", func(t *testing.T) {
+		// Test parameter statistics field selection
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"get_params_total", "path", "url"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		require.NotNil(t, entry.MetaData)
+		// When get_params_total is selected, should include all parameter statistics
+		require.Equal(t, 2, entry.MetaData.GetParamsTotal)
+		require.Equal(t, 1, entry.MetaData.PostParamsTotal)
+		require.Equal(t, 3, entry.MetaData.CookieParamsTotal)
+	})
+}

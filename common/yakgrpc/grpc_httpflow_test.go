@@ -7,9 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bytedance/mockey"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io"
 	"net/http"
 	"os"
@@ -18,6 +15,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/bytedance/mockey"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
@@ -907,7 +908,6 @@ func generateTestHTTPFlowData(db *gorm.DB, num int, url string) (string, []int64
 func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
-	ctx := utils.TimeoutContextSeconds(10)
 
 	wantCount := 16
 	wantURL := "http://example.com/"
@@ -922,13 +922,14 @@ func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 
 	// export
 	fn := filepath.Join(t.TempDir(), "test.har")
-	stream, err := client.ExportHTTPFlowStream(ctx, &ypb.ExportHTTPFlowStreamRequest{
+	stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
 		Filter: &ypb.QueryHTTPFlowRequest{
 			Keyword: token,
 		},
 		ExportType: "har",
 		TargetPath: fn,
 	})
+	require.NoError(t, err)
 	progress := 0.0
 	for {
 		msg, err := stream.Recv()
@@ -966,7 +967,7 @@ func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 	require.NoError(t, err)
 
 	// import
-	importStream, err := client.ImportHTTPFlowStream(ctx, &ypb.ImportHTTPFlowStreamRequest{
+	importStream, err := client.ImportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ImportHTTPFlowStreamRequest{
 		InputPath: fn,
 	})
 	require.NoError(t, err)
@@ -1279,5 +1280,141 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 		assert.NotNil(t, success)
 		assert.Contains(t, success, flow1.Hash)
 		assert.Empty(t, failed)
+	})
+}
+
+// TestGRPCMUSTPASS_Export_HAR_WithFieldSelection 测试 HAR 导出的字段选择功能
+// 参考 Excel 导出测试风格，验证字段选择对 HAR 导出的影响
+func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	wantCount := 16
+	wantURL := "http://example.com/"
+	db := consts.GetGormProjectDatabase()
+	token, ids := generateTestHTTPFlowData(db, wantCount, wantURL)
+
+	t.Cleanup(func() {
+		yakit.DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{
+			Id: ids,
+		})
+	})
+
+	t.Run("only request packet fields", func(t *testing.T) {
+		fn := filepath.Join(t.TempDir(), "test_request_only.har")
+		fieldNames := []string{"request", "method", "url"}
+		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			FieldName: fieldNames,
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn,
+		})
+		require.NoError(t, err)
+		progress := 0.0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			progress = msg.Percent
+		}
+		require.Equal(t, 1.0, progress)
+
+		fh, err := os.Open(fn)
+		require.NoError(t, err)
+		defer fh.Close()
+		count := 0
+		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+			count++
+			require.NotNil(t, h.Request)
+			require.Equal(t, wantURL, h.Request.URL)
+			require.NotNil(t, h.Request.PostData) // 应该包含请求 body
+			require.Greater(t, len(h.Request.PostData.Text), 0)
+			require.NotNil(t, h.Response)
+			require.NotNil(t, h.Response.Content)
+			require.Equal(t, "", h.Response.Content.Text) // 响应 body 应该为空
+			return nil
+		})
+		require.Equal(t, wantCount, count)
+	})
+
+	t.Run("only response packet fields", func(t *testing.T) {
+		fn := filepath.Join(t.TempDir(), "test_response_only.har")
+		fieldNames := []string{"response", "status_code", "url"}
+		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			FieldName: fieldNames,
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn,
+		})
+		require.NoError(t, err)
+		progress := 0.0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			progress = msg.Percent
+		}
+		require.Equal(t, 1.0, progress)
+
+		fh, err := os.Open(fn)
+		require.NoError(t, err)
+		defer fh.Close()
+		count := 0
+		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+			count++
+			require.NotNil(t, h.Request)
+			require.Nil(t, h.Request.PostData) // 请求 body 应该为空
+			require.NotNil(t, h.Response)
+			require.NotNil(t, h.Response.Content)
+			require.Contains(t, h.Response.Content.Text, token) // 应该包含响应 body
+			return nil
+		})
+		require.Equal(t, wantCount, count)
+	})
+
+	t.Run("only metadata fields", func(t *testing.T) {
+		fn := filepath.Join(t.TempDir(), "test_metadata_only.har")
+		fieldNames := []string{"tags", "path", "url"}
+		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			FieldName: fieldNames,
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn,
+		})
+		require.NoError(t, err)
+		progress := 0.0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			progress = msg.Percent
+		}
+		require.Equal(t, 1.0, progress)
+
+		fh, err := os.Open(fn)
+		require.NoError(t, err)
+		defer fh.Close()
+		count := 0
+		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+			count++
+			require.NotNil(t, h.Request)
+			require.Nil(t, h.Request.PostData) // 请求 body 应该为空
+			require.NotNil(t, h.Response)
+			require.NotNil(t, h.Response.Content)
+			require.Equal(t, "", h.Response.Content.Text) // 响应 body 应该为空
+			require.NotNil(t, h.MetaData)                 // 应该包含元数据
+			require.Equal(t, "/", h.MetaData.Path)        // 应该包含选中的字段
+			return nil
+		})
+		require.Equal(t, wantCount, count)
 	})
 }

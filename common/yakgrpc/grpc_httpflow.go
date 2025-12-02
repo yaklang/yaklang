@@ -933,6 +933,13 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 			})
 		}
 	case "har":
+		// HAR 导出支持字段选择，如果未提供字段则包含所有字段
+		var harOptions *har.HTTPFlow2HarEntryOptions
+		if len(fieldNames) > 0 {
+			harOptions = &har.HTTPFlow2HarEntryOptions{
+				SelectedFields: fieldNames,
+			}
+		}
 		flowCh := yakit.YieldHTTPFlowsEx(queryDB, stream.Context(), totalCallback)
 		sendPercent := func() {
 			percent := 0.0
@@ -949,7 +956,7 @@ func (s *Server) ExportHTTPFlowStream(req *ypb.ExportHTTPFlowStreamRequest, stre
 		entryCh := make(chan *har.HAREntry, 8)
 		go func() {
 			for flow := range flowCh {
-				entry, err := har.HTTPFlow2HarEntry(flow)
+				entry, err := har.HTTPFlow2HarEntry(flow, harOptions)
 				if err != nil {
 					log.Errorf("HTTPFlow2HarEntry failed: %s", err)
 					stream.Send(&ypb.ExportHTTPFlowStreamResponse{

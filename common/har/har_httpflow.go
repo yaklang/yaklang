@@ -16,7 +16,35 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
+// HTTPFlow2HarEntryOptions 控制 HAR 导出的字段选择
+type HTTPFlow2HarEntryOptions struct {
+	// 选择的字段列表，如果为空则包含所有字段
+	SelectedFields []string
+}
+
+// HTTPFlow2HarEntry 将 HTTPFlow 转换为 HAREntry
+// 如果提供了 options，则根据字段选择来决定包含哪些内容
+func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptions) (*HAREntry, error) {
+	var opts *HTTPFlow2HarEntryOptions
+	if len(options) > 0 {
+		opts = options[0]
+	}
+	
+	// 检查字段是否被选中 - 支持多种字段名格式（前端可能传递不同的字段名）
+	hasField := func(fieldNames ...string) bool {
+		if opts == nil || len(opts.SelectedFields) == 0 {
+			return true // 如果没有指定字段选择，默认包含所有字段
+		}
+		for _, fieldName := range fieldNames {
+			for _, f := range opts.SelectedFields {
+				// 支持精确匹配和忽略大小写匹配
+				if strings.EqualFold(f, fieldName) {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	//---------------- build request
 	request := &HARRequest{
 		Method:      flow.Method,
@@ -83,23 +111,31 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	request.Headers = requestHeaders
 	request.HeadersSize = len(requestHeaders)
 
-	// get post data
+	// get post data - 根据字段选择决定是否包含 body
+	// 支持多种字段名：request, 请求包, Request, RequestPacket
+	includeRequestBody := hasField("request", "请求包", "Request", "RequestPacket")
 	contentType := lowhttp.GetHTTPPacketContentType(reqByte)
 	var params []*HARHTTPParam
-	if contentType == "application/x-www-form-urlencoded" {
-		for postKey, postValues := range lowhttp.GetFullHTTPRequestPostParams(reqByte) {
-			for _, value := range postValues {
-				params = append(params, &HARHTTPParam{
-					Name:  postKey,
-					Value: value,
-				})
+	var requestBodyText string
+	if includeRequestBody {
+		requestBodyText = string(lowhttp.GetHTTPPacketBody(reqByte))
+		if contentType == "application/x-www-form-urlencoded" {
+			for postKey, postValues := range lowhttp.GetFullHTTPRequestPostParams(reqByte) {
+				for _, value := range postValues {
+					params = append(params, &HARHTTPParam{
+						Name:  postKey,
+						Value: value,
+					})
+				}
 			}
 		}
 	}
-	request.PostData = &HARHTTPPostData{
-		MimeType: contentType,
-		Params:   params,
-		Text:     string(lowhttp.GetHTTPPacketBody(reqByte)),
+	if includeRequestBody {
+		request.PostData = &HARHTTPPostData{
+			MimeType: contentType,
+			Params:   params,
+			Text:     requestBodyText,
+		}
 	}
 	request.BodySize = int(flow.BodyLength)
 
@@ -162,42 +198,82 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow) (*HAREntry, error) {
 	response.Headers = responseHeaders
 	response.HeadersSize = len(responseHeaders)
 
+	// 根据字段选择决定是否包含 response body
+	// 支持多种字段名：response, 响应包, Response, ResponsePacket
+	includeResponseBody := hasField("response", "响应包", "Response", "ResponsePacket")
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+	bodySize := len(body)
 
 	// get content
-	response.Content = &HARHTTPContent{
-		Size:     len(body),
-		MimeType: ResponseContentType,
-		Text:     string(body),
+	if includeResponseBody {
+		response.Content = &HARHTTPContent{
+			Size:     bodySize,
+			MimeType: ResponseContentType,
+			Text:     string(body),
+		}
+	} else {
+		// 只包含大小和类型，不包含内容（符合 HAR 标准，但减少文件大小）
+		response.Content = &HARHTTPContent{
+			Size:     bodySize,
+			MimeType: ResponseContentType,
+			Text:     "", // 不包含 body 内容
+		}
 	}
-	response.BodySize = len(body)
+	response.BodySize = bodySize
 
-	// clear and save httpflow metadata
+	// clear and save httpflow metadata - 根据字段选择决定是否包含某些元数据
+	metadata := &HTTPFlowMetaData{
+		NoFixContentLength: flow.NoFixContentLength,
+		IsHTTPS:            flow.IsHTTPS,
+	}
+	
+	// 根据字段选择包含相应的元数据
+	// 支持多种字段名格式（前端可能传递不同的字段名）
+	if hasField("path", "Path") {
+		metadata.Path = flow.Path
+	}
+	if hasField("source_type", "SourceType", "来源") {
+		metadata.SourceType = flow.SourceType
+	}
+	if hasField("duration", "Duration", "延迟", "延迟(ms)", "DurationMs") {
+		metadata.Duration = flow.Duration
+	}
+	if hasField("get_params_total", "GetParamsTotal", "参数", "Params") {
+		metadata.GetParamsTotal = flow.GetParamsTotal
+		metadata.PostParamsTotal = flow.PostParamsTotal
+		metadata.CookieParamsTotal = flow.CookieParamsTotal
+	}
+	if hasField("ip", "IP", "IPAddress", "iP_address", "ip_address") {
+		metadata.IPAddress = flow.IPAddress
+		metadata.IPInteger = flow.IPInteger
+	}
+	if hasField("tags", "Tags") {
+		metadata.Tags = flow.Tags
+	}
+	if hasField("payload", "Payload") {
+		metadata.Payload = flow.Payload
+	}
+	if hasField("is_websocket", "IsWebsocket", "Websocket", "IsWebSocket") {
+		metadata.IsWebsocket = flow.IsWebsocket
+	}
+	if hasField("from_plugin", "FromPlugin", "相关插件") {
+		metadata.FromPlugin = flow.FromPlugin
+	}
+	if hasField("process_name", "ProcessName") {
+		metadata.ProcessName = flow.ProcessName
+	}
+	if hasField("upload_online", "UploadOnline") {
+		metadata.UploadOnline = flow.UploadOnline
+	}
+	
 	entry := &HAREntry{
 		Request:         request,
 		Response:        response,
 		ServerIPAddress: flow.RemoteAddr,
-		MetaData: &HTTPFlowMetaData{
-			NoFixContentLength: flow.NoFixContentLength,
-			IsHTTPS:            flow.IsHTTPS,
-			Path:               flow.Path,
-			SourceType:         flow.SourceType,
-			Duration:           flow.Duration,
-			GetParamsTotal:     flow.GetParamsTotal,
-			PostParamsTotal:    flow.PostParamsTotal,
-			CookieParamsTotal:  flow.CookieParamsTotal,
-			IPAddress:          flow.IPAddress,
-			IPInteger:          flow.IPInteger,
-			Tags:               flow.Tags,
-			Payload:            flow.Payload,
-			IsWebsocket:        flow.IsWebsocket,
-			FromPlugin:         flow.FromPlugin,
-			ProcessName:        flow.ProcessName,
-			UploadOnline:       flow.UploadOnline,
-		},
+		MetaData:        metadata,
 	}
 
 	return entry, nil
