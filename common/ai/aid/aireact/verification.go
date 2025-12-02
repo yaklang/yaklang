@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -66,7 +67,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					func(key string, read io.Reader) {
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
-						r.Emitter.EmitTextMarkdownStreamEvent(
+						event, err := r.Emitter.EmitTextMarkdownStreamEvent(
 							"human_readable_result", outputReader, taskID,
 							func() {
 								if out.Len() > 0 {
@@ -74,6 +75,29 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 								}
 							},
 						)
+						if err != nil {
+							log.Errorf("failed to emit human_readable_result stream event: %v", err)
+							return
+						}
+						streamEventId := jsonpath.FindFirst(event.Content, `$.event_writer_id`) // stream event id != "
+						streamId := utils.InterfaceToString(streamEventId)
+						if streamId != "" {
+							_, _ = r.EmitTextReferenceMaterial(utils.MustRenderTemplate(`<|ORIGINAL_QUERY|>
+{{ .OriginalQuery }}
+<|ORIGINAL_QUERY_END|>
+
+{{ if .IsToolCall }}<|IS_TOOL_CALL|>
+{{ .Payload }}<|IS_TOOL_CALL_END|>
+{{ else }}<|VERIFICATION_PAYLOAD|>
+{{ .Payload }}
+<|VERIFICATION_PAYLOAD_END|>
+{{ end }}
+`, map[string]any{
+								"OriginalQuery": originalQuery,
+								"IsToolCall":    isToolCall,
+								"Payload":       payload,
+							}))
+						}
 					},
 				),
 				aicommon.WithActionFieldStreamHandler(
