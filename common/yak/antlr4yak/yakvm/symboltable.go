@@ -2,9 +2,10 @@ package yakvm
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type SymbolTable struct {
@@ -307,5 +308,8 @@ func (s *SymbolTable) GetSymbolTableById(id int) *SymbolTable {
 	if err != nil {
 		panic(err)
 	}
+	// 添加锁保护，避免并发读写 idToSymbolTable map
+	symbolTableMutex.Lock()
+	defer symbolTableMutex.Unlock()
 	return root.idToSymbolTable[id]
 }

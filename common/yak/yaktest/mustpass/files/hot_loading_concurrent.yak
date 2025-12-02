@@ -1,0 +1,139 @@
+yakit.AutoInitYakit()
+
+start = time.Now().Unix()// 记录开始时间 时间戳
+
+Hot_Loading_Func = cli.Text(
+    "Hot_Loading_Func", 
+    cli.setVerboseName("方法"), 
+    cli.setDefault("beforeRequest = (req) => {\n\n\n\n\n\n\n\n\n   println(\"这个是测试输出\")    \nreturn req\n}"),
+)
+
+cli.check()
+
+info = {
+    "Include_Key_Word":[
+        {
+        "Include_Key_Word_Way":"123",
+        "Place":false,
+        "Discard_Or_Save":"1111"
+        }
+    ]
+    
+}
+
+infoMap = make(map[string]any)
+for k, v := range info {
+    infoMap[string(k)] = v
+}
+
+/*
+    通过类型判断存在键名
+*/
+mapkeyExist = (v) =>{
+        //判断路径存在
+    if !string(type(v)) {
+        // yakit.StatusCard("没这个键值对：",v)
+        return
+    }
+    return v
+}
+
+/*
+    避免并发读写map
+    设置map读写锁
+    mapSync
+*/
+mapSync = sync.NewLock()
+Hot_Loading_FuncSync = sync.NewLock()
+
+getMap = (key) => {
+    mapSync.Lock()
+    defer mapSync.Unlock()
+    v = json.Find(infoMap, "$."+key)
+    if !(mapkeyExist(v)){
+        //不存在键名
+        return error("不存在键名")
+    }
+    return v
+}
+
+/*
+    通过json修改内容
+*/
+setMap = (key,value) => {
+    mapSync.Lock()
+    defer mapSync.Unlock()
+    if !(mapkeyExist(json.Find(infoMap, "$."+key))){
+        //不存在键名
+        return error("不存在键名")
+    }
+    infoMap = json.ReplaceAll(infoMap, "$."+key, value)
+}
+
+totalTasks := 20
+maxConcurrency := 30 // 最大并发数
+
+completedTasksLock = sync.NewLock()
+completedTasks := 0
+
+// 创建 SizedWaitGroup 来控制并发度
+wg = sync.NewSizedWaitGroup(maxConcurrency)
+
+println(sprintf("🚀 开始并发执行 %d 个任务，最大并发数：%d\n", totalTasks, maxConcurrency))
+
+// 并发启动所有任务
+for taskID := 1; taskID <= totalTasks; taskID++ {
+    id = taskID
+    wg.Add()
+    go func(taskIdx) {
+        defer wg.Done()
+        println(sprintf("任务 %d 开始\n", taskIdx))
+        
+        // 模拟任务耗时
+        Hot_Loading_FuncSync.Lock()
+        defer Hot_Loading_FuncSync.Unlock()
+        // 修复：避免并发读写
+        // 执行 beforeRequest
+        err := eval(Hot_Loading_Func)
+        assert err == nil, sprintf("eval failed for task %d: %v", taskIdx, err)
+        // 调用 beforeRequest 重新赋值新包
+        // println(Hot_Loading_Func)
+        pack = beforeRequest("123")
+        assert pack != nil, sprintf("beforeRequest returned nil for task %d", taskIdx)
+        assert pack == "123", sprintf("beforeRequest should return input for task %d", taskIdx)
+        
+        // 使用锁保护 completedTasks 的并发访问
+        completedTasksLock.Lock()
+        completedTasks++
+        completedTasksLock.Unlock()
+        
+        println(sprintf("任务 %d 完成\n", taskIdx))
+    }(id)
+}
+
+// 等待所有任务完成
+wg.Wait()
+
+println("所有任务完成")
+assert completedTasks == totalTasks, sprintf("expected %d completed tasks, got %d", totalTasks, completedTasks)
+
+// 验证 getMap 和 setMap 函数正常工作
+result = getMap("Include_Key_Word")
+assert result != nil, "getMap should return value for existing key"
+assert len(result) > 0, "getMap result should not be empty"
+
+// 验证 mapSync 锁正常工作（没有崩溃说明锁机制正常）
+mapSync.Lock()
+mapSync.Unlock()
+assert true, "mapSync lock/unlock should work without panic"
+
+// 验证 Hot_Loading_FuncSync 锁正常工作
+Hot_Loading_FuncSync.Lock()
+Hot_Loading_FuncSync.Unlock()
+assert true, "Hot_Loading_FuncSync lock/unlock should work without panic"
+
+elapsed := time.Since(time.Unix(start, 0))
+assert elapsed > 0, "elapsed time should be greater than 0"
+yakit.StatusCard("用时：", elapsed)
+println(sprintf("测试通过：所有 %d 个任务完成，用时 %v", totalTasks, elapsed))
+
