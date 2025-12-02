@@ -166,12 +166,20 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	return db.RowsAffected, db.Error
 }
 
-func QueryHasNoProjectIDProgram(db *gorm.DB) ([]*ssadb.IrProgram, error) {
+func QuerySSAHasNotProjectIDProgram(db *gorm.DB) ([]*ssadb.IrProgram, error) {
 	var programs []*ssadb.IrProgram
 	if err := db.Model(&ssadb.IrProgram{}).Where("project_id = ? OR project_id IS NULL", 0).Find(&programs).Error; err != nil {
 		return nil, utils.Errorf("query programs without project_id failed: %s", err)
 	}
 	return programs, nil
+}
+
+func QueryExistSSAHasNotProjectIDProgram(db *gorm.DB) bool {
+	var count int64
+	if err := db.Model(&ssadb.IrProgram{}).Where("project_id = ? OR project_id IS NULL", 0).Count(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
 }
 
 func UpdateIrProgramProjectID(db *gorm.DB, programID uint, projectID uint64) error {

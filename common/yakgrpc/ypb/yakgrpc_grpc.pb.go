@@ -482,6 +482,7 @@ const (
 	Yak_UpdateSSAProject_FullMethodName                           = "/ypb.Yak/UpdateSSAProject"
 	Yak_DeleteSSAProject_FullMethodName                           = "/ypb.Yak/DeleteSSAProject"
 	Yak_QuerySSAProject_FullMethodName                            = "/ypb.Yak/QuerySSAProject"
+	Yak_QueryNeedMigrateSSAProject_FullMethodName                 = "/ypb.Yak/QueryNeedMigrateSSAProject"
 	Yak_MigrateSSAProject_FullMethodName                          = "/ypb.Yak/MigrateSSAProject"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
@@ -1194,6 +1195,7 @@ type YakClient interface {
 	UpdateSSAProject(ctx context.Context, in *UpdateSSAProjectRequest, opts ...grpc.CallOption) (*UpdateSSAProjectResponse, error)
 	DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error)
 	QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error)
+	QueryNeedMigrateSSAProject(ctx context.Context, in *QueryNeedMigrateSSAProjectRequest, opts ...grpc.CallOption) (*QueryNeedMigrateSSAProjectResponse, error)
 	MigrateSSAProject(ctx context.Context, in *MigrateSSAProjectRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MigrateSSAProjectResponse], error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
@@ -6655,6 +6657,16 @@ func (c *yakClient) QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequ
 	return out, nil
 }
 
+func (c *yakClient) QueryNeedMigrateSSAProject(ctx context.Context, in *QueryNeedMigrateSSAProjectRequest, opts ...grpc.CallOption) (*QueryNeedMigrateSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryNeedMigrateSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryNeedMigrateSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) MigrateSSAProject(ctx context.Context, in *MigrateSSAProjectRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MigrateSSAProjectResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_MigrateSSAProject_FullMethodName, cOpts...)
@@ -8529,6 +8541,7 @@ type YakServer interface {
 	UpdateSSAProject(context.Context, *UpdateSSAProjectRequest) (*UpdateSSAProjectResponse, error)
 	DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error)
 	QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error)
+	QueryNeedMigrateSSAProject(context.Context, *QueryNeedMigrateSSAProjectRequest) (*QueryNeedMigrateSSAProjectResponse, error)
 	MigrateSSAProject(*MigrateSSAProjectRequest, grpc.ServerStreamingServer[MigrateSSAProjectResponse]) error
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
@@ -10055,6 +10068,9 @@ func (UnimplementedYakServer) DeleteSSAProject(context.Context, *DeleteSSAProjec
 }
 func (UnimplementedYakServer) QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySSAProject not implemented")
+}
+func (UnimplementedYakServer) QueryNeedMigrateSSAProject(context.Context, *QueryNeedMigrateSSAProjectRequest) (*QueryNeedMigrateSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryNeedMigrateSSAProject not implemented")
 }
 func (UnimplementedYakServer) MigrateSSAProject(*MigrateSSAProjectRequest, grpc.ServerStreamingServer[MigrateSSAProjectResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method MigrateSSAProject not implemented")
@@ -18098,6 +18114,24 @@ func _Yak_QuerySSAProject_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryNeedMigrateSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryNeedMigrateSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryNeedMigrateSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryNeedMigrateSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryNeedMigrateSSAProject(ctx, req.(*QueryNeedMigrateSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_MigrateSSAProject_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(MigrateSSAProjectRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -21426,6 +21460,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySSAProject",
 			Handler:    _Yak_QuerySSAProject_Handler,
+		},
+		{
+			MethodName: "QueryNeedMigrateSSAProject",
+			Handler:    _Yak_QueryNeedMigrateSSAProject_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",
