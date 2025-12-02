@@ -23,7 +23,14 @@ func FilterSSAProgram(db *gorm.DB, filter *ypb.SSAProgramFilter) *gorm.DB {
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
 	// db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())
-	db = bizhelper.ExactQueryUInt64ArrayOr(db, "project_id", filter.GetProjectIds())
+
+	projectIds := filter.GetProjectIds()
+	if len(projectIds) == 1 && projectIds[0] == 0 {
+		db = db.Where("project_id = ? OR project_id IS NULL", 0)
+	} else {
+		db = bizhelper.ExactQueryUInt64ArrayOr(db, "project_id", projectIds)
+	}
+
 	if word := filter.GetKeyword(); word != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"program_name", "description"}, word, false)
 	}
@@ -166,7 +173,7 @@ func UpdateSSAProgram(DB *gorm.DB, input *ypb.SSAProgramInput) (int64, error) {
 	return db.RowsAffected, db.Error
 }
 
-func QueryHasNoProjectIDProgram(db *gorm.DB) ([]*ssadb.IrProgram, error) {
+func QuerySSAHasNotProjectIDProgram(db *gorm.DB) ([]*ssadb.IrProgram, error) {
 	var programs []*ssadb.IrProgram
 	if err := db.Model(&ssadb.IrProgram{}).Where("project_id = ? OR project_id IS NULL", 0).Find(&programs).Error; err != nil {
 		return nil, utils.Errorf("query programs without project_id failed: %s", err)
