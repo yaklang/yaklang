@@ -270,7 +270,6 @@ func (c *Config) parseProjectWithFS(
 		process = 0.9 // %90
 		prog.Finish()
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
-			log.Errorf("program %s save to database", prog.Name)
 			start := time.Now()
 			prog.UpdateToDatabaseWithWG(&wg)
 			since := time.Since(start)
