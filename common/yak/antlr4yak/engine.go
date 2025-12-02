@@ -193,10 +193,20 @@ func (n *Engine) CallYakFunction(ctx context.Context, funcName string, params []
 	if !ok {
 		return nil, utils.Errorf("function %s not found", funcName)
 	}
-	if f, ok := i.(*yakvm.Function); ok {
-		return n.CallYakFunctionNative(ctx, f, params...)
+	if i == nil {
+		return nil, utils.Errorf("function %s is nil", funcName)
 	}
-	return nil, utils.Errorf("cannot found yakvm.Function: %v", funcName)
+
+	f, ok := i.(*yakvm.Function)
+	if !ok {
+		return nil, utils.Errorf("cannot convert %s to yakvm.Function, got type: %T", funcName, i)
+	}
+
+	if f == nil {
+		return nil, utils.Errorf("function %s is nil after type assertion", funcName)
+	}
+
+	return n.CallYakFunctionNative(ctx, f, params...)
 	//
 	//returnValueReciver := "__global_return__"
 	//paramStrList := []string{}
