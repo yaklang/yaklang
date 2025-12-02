@@ -3,6 +3,8 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/jsonpath"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -164,6 +166,14 @@ type AiOutputEvent struct {
 
 	ContentType string
 	AIService   string
+}
+
+func (e *AiOutputEvent) GetContentJSONPath(p string) string {
+	var result any
+	jsonextractor.ExtractStructuredJSON(string(e.Content), jsonextractor.WithObjectCallback(func(data map[string]any) {
+		result = jsonpath.FindFirst(data, p)
+	}))
+	return utils.InterfaceToString(result)
 }
 
 func (e *AiOutputEvent) ShouldSave() bool {
