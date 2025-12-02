@@ -158,7 +158,11 @@ func (fs *irSourceFS) getProgram(path string) (string, bool) {
 		return "", false
 	}
 	dir := strings.Split(path, string(fs.GetSeparators()))
-	return dir[1], len(dir) == 2
+	if len(dir) < 2 {
+		return "", false
+	} else {
+		return dir[1], len(dir) == 2
+	}
 }
 
 func GetIrSourceFsSeparators() rune {

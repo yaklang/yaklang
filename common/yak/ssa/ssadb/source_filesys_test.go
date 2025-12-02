@@ -85,7 +85,8 @@ func TestSourceFilesysLocal(t *testing.T) {
 	file := make([]string, 0)
 	dbfs := ssadb.NewIrSourceFs()
 	t.Run("test source file system", func(t *testing.T) {
-		filesys.Recursive(
+		filesys.TreeView(dbfs)
+		err := filesys.Recursive(
 			fmt.Sprintf("/%s", programID),
 			filesys.WithFileSystem(dbfs),
 			filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
@@ -101,6 +102,7 @@ func TestSourceFilesysLocal(t *testing.T) {
 				return nil
 			}),
 		)
+		require.NoError(t, err)
 		wantDir := []string{
 			"example", "example/src", "example/src/main", "example/src/main/java",
 			"example/src/main/java/com", "example/src/main/java/com/example",
