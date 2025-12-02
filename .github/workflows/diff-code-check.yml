@@ -129,14 +129,18 @@ jobs:
           echo "$VERSIONS" | head -n 5
           echo "..."
           
-          # 从上到下遍历，找到第一个符合条件的版本（*-alpha*-diff-check 或 *-beta*）
+          # 从上到下遍历，找到第一个符合条件的版本（*-alpha*-diff-check / *-alpha*-code-scan / *-beta*）
           SELECTED_VERSION=""
           
           while IFS= read -r version; do
-            # 检查是否为 alpha-diff-check 或 beta
+            # 检查是否为 alpha-diff-check / alpha-code-scan / beta
             if echo "$version" | grep -qE '.*-alpha.*-diff-check'; then
               SELECTED_VERSION="$version"
               echo "✅ Found alpha-diff-check version: $SELECTED_VERSION"
+              break
+            elif echo "$version" | grep -qE '.*-alpha.*-code-scan'; then
+              SELECTED_VERSION="$version"
+              echo "✅ Found alpha-code-scan version: $SELECTED_VERSION"
               break
             elif echo "$version" | grep -qE '.*-beta[0-9]+$'; then
               SELECTED_VERSION="$version"
@@ -146,7 +150,7 @@ jobs:
           done <<< "$VERSIONS"
           
           if [ -z "$SELECTED_VERSION" ]; then
-            echo "::error::No suitable version found (alpha-diff-check or beta)"
+            echo "::error::No suitable version found (alpha-diff-check / alpha-code-scan / beta)"
             exit 1
           fi
           
