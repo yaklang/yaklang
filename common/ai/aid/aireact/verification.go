@@ -3,12 +3,11 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"io"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
@@ -23,7 +22,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	default:
 	}
 
-	verificationPrompt := r.generateVerificationPrompt(
+	verificationPrompt, nonce := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
 	if r.config.DebugPrompt {
@@ -37,6 +36,8 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		r.config, verificationPrompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
+
+			// stream = io.TeeReader(stream, os.Stdout)
 
 			createReasonCallback := func(prompt string) func(key string, reader io.Reader) {
 				return func(key string, reader io.Reader) {
@@ -59,9 +60,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			if r.GetCurrentTask() != nil {
 				taskID = r.GetCurrentTask().GetId()
 			}
+
 			action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
+				aicommon.WithActionNonce(nonce),
+				aicommon.WithActionTagToKey("HUMAN_READABLE_RESULT", "human_readable_result"),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"human_readable_result"},
 					func(key string, read io.Reader) {
@@ -145,13 +149,13 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction
-func (r *ReAct) generateVerificationPrompt(originalQuery string, isToolCall bool, payload string, enhanceData ...string) string {
+func (r *ReAct) generateVerificationPrompt(originalQuery string, isToolCall bool, payload string, enhanceData ...string) (string, string) {
 	// Use the prompt manager to generate the prompt
-	prompt, err := r.promptManager.GenerateVerificationPrompt(originalQuery, isToolCall, payload, enhanceData...)
+	prompt, nonce, err := r.promptManager.GenerateVerificationPrompt(originalQuery, isToolCall, payload, enhanceData...)
 	if err != nil {
 		// Fallback to basic prompt if template fails
 		log.Errorf("Failed to generate verification prompt from template: %v", err)
-		return "Verify if the tool execution satisfied the user request."
+		return "Verify if the tool execution satisfied the user request.", nonce
 	}
-	return prompt
+	return prompt, nonce
 }
