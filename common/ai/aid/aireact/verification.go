@@ -6,8 +6,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
+	"sync"
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
@@ -31,6 +33,33 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 
 	var satisfied bool
 	var reasoning string
+	var referenceOnce = new(sync.Once)
+
+	emitStreamIdReference := func(event *schema.AiOutputEvent) {
+		streamId := event.GetContentJSONPath(`$.event_writer_id`)
+		if streamId == "" {
+			log.Errorf("empty streamId provided for reference emission, origin data: %v", string(event.Content))
+			return
+		}
+		referenceOnce.Do(func() {
+			_, _ = r.EmitTextReferenceMaterial(streamId, utils.MustRenderTemplate(`<|ORIGINAL_QUERY|>
+{{ .OriginalQuery }}
+<|ORIGINAL_QUERY_END|>
+
+{{ if .IsToolCall }}<|IS_TOOL_CALL|>
+{{ .Payload }}<|IS_TOOL_CALL_END|>
+{{ else }}<|VERIFICATION_PAYLOAD|>
+{{ .Payload }}
+<|VERIFICATION_PAYLOAD_END|>
+{{ end }}
+`, map[string]any{
+				"OriginalQuery": originalQuery,
+				"IsToolCall":    isToolCall,
+				"Payload":       payload,
+			}))
+		})
+	}
+
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 	transErr := aicommon.CallAITransaction(
 		r.config, verificationPrompt, r.config.CallAI,
@@ -43,16 +72,23 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				return func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
-					r.Emitter.EmitDefaultStreamEvent(
+					var event *schema.AiOutputEvent
+					var err error
+					event, err = r.Emitter.EmitDefaultStreamEvent(
 						"re-act-verify",
 						reader,
 						rsp.GetTaskIndex(),
 						func() {
 							if out.Len() > 0 {
 								r.AddToTimeline("verify", prompt+": "+out.String())
+								emitStreamIdReference(event)
 							}
 						},
 					)
+					if err != nil {
+						log.Errorf("failed to emit %s stream event: %v", key, err)
+						return
+					}
 				}
 			}
 
@@ -71,11 +107,14 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					func(key string, read io.Reader) {
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
-						event, err := r.Emitter.EmitTextMarkdownStreamEvent(
+						var event *schema.AiOutputEvent
+						var err error
+						event, err = r.Emitter.EmitTextMarkdownStreamEvent(
 							"human_readable_result", outputReader, taskID,
 							func() {
 								if out.Len() > 0 {
 									r.AddToTimeline("human_readable_result", out.String())
+									emitStreamIdReference(event)
 								}
 							},
 						)
@@ -86,21 +125,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						streamEventId := jsonpath.FindFirst(event.Content, `$.event_writer_id`) // stream event id != "
 						streamId := utils.InterfaceToString(streamEventId)
 						if streamId != "" {
-							_, _ = r.EmitTextReferenceMaterial(utils.MustRenderTemplate(`<|ORIGINAL_QUERY|>
-{{ .OriginalQuery }}
-<|ORIGINAL_QUERY_END|>
 
-{{ if .IsToolCall }}<|IS_TOOL_CALL|>
-{{ .Payload }}<|IS_TOOL_CALL_END|>
-{{ else }}<|VERIFICATION_PAYLOAD|>
-{{ .Payload }}
-<|VERIFICATION_PAYLOAD_END|>
-{{ end }}
-`, map[string]any{
-								"OriginalQuery": originalQuery,
-								"IsToolCall":    isToolCall,
-								"Payload":       payload,
-							}))
 						}
 					},
 				),

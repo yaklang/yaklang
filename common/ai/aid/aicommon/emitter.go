@@ -723,13 +723,15 @@ func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, resul
 
 }
 
-func (e *Emitter) EmitReferenceMaterial(typeName string, content any) (*schema.AiOutputEvent, error) {
+func (e *Emitter) EmitReferenceMaterial(typeName string, eventId string, content any) (*schema.AiOutputEvent, error) {
+	log.Infof("emit reference material: [%v]-[to:%v] content: %v", typeName, eventId, utils.ShrinkTextBlock(utils.InterfaceToString(content), 256))
 	return e.EmitJSON(schema.EVENT_TYPE_REFERENCE_MATERIAL, "reference_material", map[string]any{
-		"type":    typeName, // text / file / url / other
-		"payload": utils.InterfaceToString(content),
+		"event_uuid": eventId,
+		"type":       typeName, // text / file / url / other
+		"payload":    utils.InterfaceToString(content),
 	})
 }
 
-func (e *Emitter) EmitTextReferenceMaterial(content any) (*schema.AiOutputEvent, error) {
-	return e.EmitReferenceMaterial("text", utils.InterfaceToString(content))
+func (e *Emitter) EmitTextReferenceMaterial(eventId string, content any) (*schema.AiOutputEvent, error) {
+	return e.EmitReferenceMaterial("text", eventId, utils.InterfaceToString(content))
 }
