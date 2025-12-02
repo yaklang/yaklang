@@ -247,7 +247,17 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	return action, handler, nil
 }
 
+const ReActLoadingStatusKey = "re-act-loading-status-key"
+
+func (r *ReActLoop) loadingStatus(i string) {
+	log.Infof("re-act-loop loading status updated: %v", i)
+	r.emitter.EmitStatus(ReActLoadingStatusKey, i)
+}
+
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
+	r.loadingStatus("初始化 / initializing...")
+	defer r.loadingStatus("end")
+
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")
 	}
@@ -267,12 +277,19 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 
 	r.SetCurrentTask(task)
 	if r.initHandler != nil {
+		r.loadingStatus("执行初始化函数 / execute init handler...")
 		utils.Debug(func() {
 			fmt.Println("================================================")
 			fmt.Printf("re-act loop [%v] task init handler start to execute\n", r.loopName)
 			fmt.Println("================================================")
 		})
 		initErr := r.initHandler(r, task)
+		if initErr != nil {
+			r.loadingStatus("init handler done with err: " + initErr.Error())
+		} else {
+			r.loadingStatus("init handler done")
+		}
+
 		if initErr != nil {
 			inv := r.GetInvoker()
 			inv.AddToTimeline("error", fmt.Sprintf("ReActLoop[%v] task init handler execute failed: %v", r.loopName, initErr))
@@ -373,9 +390,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}()
 
 	needSummary := utils.NewBool(false)
-	defer func() {
-
-	}()
 LOOP:
 	for {
 		iterationCount++
@@ -394,13 +408,21 @@ LOOP:
 			r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
 		}()
 
+		r.loadingStatus("记忆快速装载中 / waiting for fast memories to load...")
 		select {
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
 		case <-waitMem:
+			r.loadingStatus("记忆已装载 / memories loaded")
 		case <-time.After(200 * time.Millisecond):
+			r.loadingStatus("跳过快速记忆装载，原因：超时 / skipping wait memories due to timeout")
 		}
 
+		r.loadingStatus(fmt.Sprintf(
+			"迭代中[%v/%v] /start to enter iteration loop[%v/%v]...",
+			iterationCount, maxIterations,
+			iterationCount, maxIterations,
+		))
 		var prompt string
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
@@ -450,6 +472,8 @@ LOOP:
 			break LOOP
 		}
 		actionName := actionParams.Name()
+
+		r.loadingStatus(fmt.Sprintf("[%v]执行中 / [%v] executing action...", actionName, actionName))
 
 		// 记录当前迭代索引和 Action 信息
 		r.actionHistoryMutex.Lock()
@@ -542,6 +566,7 @@ LOOP:
 		// 执行自我反思（如果启用）
 		reflectionLevel := r.shouldTriggerReflection(handler, operator, iterationCount)
 		if reflectionLevel != ReflectionLevel_None {
+			r.loadingStatus(fmt.Sprintf("[%v]反思中 / [%v] self-reflecting...", actionName, actionName))
 			log.Infof("trigger self-reflection for action[%s] with level[%s]", actionName, reflectionLevel.String())
 			r.executeReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
 		}
@@ -573,6 +598,7 @@ LOOP:
 		}
 
 		if handler.AsyncMode {
+			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
 			// 异步模式直接退出循环
 			finalError = nil
 			utils.Debug(func() {

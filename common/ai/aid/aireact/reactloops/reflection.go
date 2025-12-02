@@ -80,8 +80,10 @@ func (r *ReActLoop) shouldTriggerReflection(
 	// 高迭代次数：采用间隔反思策略减少噪声（5 次之后才开始）
 	if iterationCount > 5 {
 		// 优先检查 SPIN 情况：如果检测到 SPIN，立即触发反思
+		r.loadingStatus("是否陷入循环（SPIN）检测中... / Checking for SPIN...")
 		if r.IsInSameActionTypeSpin() {
 			log.Infof("SPIN detected at iteration[%d], trigger immediate reflection", iterationCount)
+			r.loadingStatus("检测到 SPIN 迹象，触发反思 / SPIN detected, triggering reflection...")
 			return ReflectionLevel_Standard
 		}
 
