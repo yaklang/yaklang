@@ -91,6 +91,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			log.Errorf("send mitm response error: %v", err)
 		}
 	}
+	notifyMITMStartFailed := func(reason string) {
+		reason = strings.TrimSpace(reason)
+		if reason == "" {
+			return
+		}
+		sendLogged(&ypb.MITMV2Response{
+			HaveNotification:    true,
+			NotificationContent: []byte(fmt.Sprintf("启动 MITM 服务器 ERROR!\n%v", reason)),
+		})
+	}
 
 	execFeedback := yak.YakitCallerIf(func(result *ypb.ExecResult) error {
 		return send(&ypb.MITMV2Response{Message: result, HaveMessage: true})
@@ -146,27 +156,34 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 			proxyUrl, err2 := url.Parse(proxy)
 			if err2 != nil {
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, err))
-				//做一个兼容处理
-				continue
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, err2)
+				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err2)
+				feedbackToUser(errMsg)
+				return nil, utils.Errorf(errMsg)
 			}
 			_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
 			if err != nil {
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "parse host to host:port failed "+err.Error()))
-				continue
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "parse host to host:port failed "+err.Error())
+				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err)
+				feedbackToUser(errMsg)
+				return nil, utils.Errorf(errMsg)
 			}
 			if port <= 0 {
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "缺乏端口（Miss Port）"))
-				continue
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "缺乏端口（Miss Port）")
+				log.Errorf("代理检测失败 / proxy check failed:[%v] 缺乏端口（Miss Port）", proxy)
+				feedbackToUser(errMsg)
+				return nil, utils.Errorf(errMsg)
 			}
-			conn, err := netx.ProxyCheck(proxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
+			conn, err := netx.ProxyCheck(proxy, 5*time.Second)
 			if err != nil {
 				errInfo := "代理不通（Proxy Cannot be connected）"
 				if errors.Is(err, netx.ErrorProxyAuthFailed) {
 					errInfo = "认证失败（Proxy Auth Fail）"
 				}
-				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, errInfo)
-				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, errInfo))
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, errInfo)
+				log.Errorf("代理检测失败 / proxy check failed:[%v] %v: %v", proxy, errInfo, err)
+				feedbackToUser(errMsg)
+				return nil, utils.Errorf(errMsg)
 			}
 			if conn != nil {
 				conn.Close()
@@ -193,12 +210,24 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		pluginConcurrency           = firstReq.GetPluginConcurrency()
 	)
 
+	if firstReq.GetHost() != "" {
+		host = firstReq.GetHost()
+	}
+
+	if firstReq.GetPort() > 0 {
+		port = int(firstReq.GetPort())
+	}
+
 	if pluginConcurrency <= 0 {
 		pluginConcurrency = 20
 	}
 
+	addr := utils.HostPort(host, port)
+
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
+		notifyMITMStartFailed(err.Error())
+		log.Errorf("close mitm server for %s, reason: %v", addr, err)
 		return err
 	}
 
@@ -217,15 +246,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	if strings.Contains(proxyUsername, ":") {
 		return utils.Errorf("proxy username cannot contains ':'")
 	}
-
-	if firstReq.GetHost() != "" {
-		host = firstReq.GetHost()
-	}
-
-	if firstReq.GetPort() > 0 {
-		port = int(firstReq.GetPort())
-	}
-	addr := utils.HostPort(host, port)
 
 	streamCtx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
