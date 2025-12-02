@@ -236,13 +236,20 @@ func DialX_WithTimeout(timeout time.Duration) DialXOption {
 }
 
 func DialX_WithProxy(proxy ...string) DialXOption {
+	// 先过滤空字符串
+	originalProxy := proxy
 	proxy = utils.StringArrayFilterEmpty(proxy)
-	if len(proxy) == 0 {
-		return func(c *dialXConfig) {}
-	}
 
 	return func(c *dialXConfig) {
-		c.Proxy = proxy
+		if len(proxy) > 0 {
+			// 有有效的代理地址
+			c.Proxy = proxy
+		} else if len(originalProxy) > 0 {
+			// 用户传入了代理但全部被过滤掉了（都是无效的）
+			// 设置 ForceProxy=true 防止回退到直连
+			c.ForceProxy = true
+		}
+		// 如果 originalProxy 为空，说明用户没有传入任何代理，不做任何操作
 	}
 }
 

@@ -3,10 +3,11 @@ package netx
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // SystemProxySetting represents systemwide proxy settings.
@@ -50,6 +51,18 @@ func FixProxy(i string) string {
 		if host != "" && port > 0 {
 			return fmt.Sprintf("http://%v:%v", host, port)
 		}
+		// 如果没有端口，返回空字符串而不是无效的代理地址
+		// 这样可以防止无效代理被传递到下游
+		return ""
 	}
+
+	// 验证带协议的代理地址是否包含端口
+	if u := utils.ParseStringToUrl(i); u != nil {
+		if u.Port() == "" {
+			// 协议存在但没有端口，返回空字符串
+			return ""
+		}
+	}
+
 	return i
 }
