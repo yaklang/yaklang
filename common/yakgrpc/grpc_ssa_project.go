@@ -125,23 +125,21 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 		})
 	}
 
-	oldPrograms, err := yakit.QueryHasNoProjectIDProgram(ssaDB)
+	oldPrograms, err := yakit.QuerySSAHasNotProjectIDProgram(ssaDB)
 	if err != nil {
 		return utils.Errorf("query old programs failed: %s", err)
 	}
 
 	totalCount := len(oldPrograms)
 	if totalCount == 0 {
-		sendProgress(100, "未找到旧数据，所有程序都已有 project_id")
+		sendProgress(1, "未找到旧数据，所有程序都已有 project_id")
 		return nil
 	}
 
 	sendProgress(0, fmt.Sprintf("找到 %d 个没有 项目配置 的程序，开始创建 SSA 项目...", totalCount))
 
-	count := 0
 	for i, prog := range oldPrograms {
-		count++
-		sendProgress(float64(count)*100.0/float64(totalCount), fmt.Sprintf("正在为程序 '%s' 创建 SSA 项目...", prog.ProgramName))
+		sendProgress(float64(i+1)/float64(totalCount), fmt.Sprintf("正在为程序 '%s' 创建 SSA 项目...", prog.ProgramName))
 		programName := prog.ProgramName
 		language := prog.Language
 		description := prog.Description
@@ -166,7 +164,7 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 			// 如果项目已存在，直接复用
 			project = existingProject
 			sendProgress(
-				float64(i)*100.0/float64(totalCount),
+				float64(i+1)/float64(totalCount),
 				fmt.Sprintf("[%d/%d] 程序 '%s' 的 SSA 项目已存在（ID：%d），直接复用...", i+1, totalCount, programName, project.ID),
 			)
 		} else {
@@ -179,7 +177,7 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 			)
 			if err != nil {
 				sendProgress(
-					float64(i+1)*100.0/float64(totalCount),
+					float64(i+1)/float64(totalCount),
 					fmt.Sprintf("[%d/%d] 为程序 '%s' 创建 SSA 项目失败：%s", i+1, totalCount, programName, err),
 				)
 				continue
@@ -187,7 +185,7 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 			err = project.Save()
 			if err != nil {
 				sendProgress(
-					float64(i+1)*100.0/float64(totalCount),
+					float64(i+1)/float64(totalCount),
 					fmt.Sprintf("[%d/%d] 保存程序 '%s' 的 SSA 项目失败：%s", i+1, totalCount, programName, err),
 				)
 				continue
@@ -196,12 +194,12 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 
 		if err := yakit.UpdateIrProgramProjectID(ssaDB, prog.ID, uint64(project.ID)); err != nil {
 			sendProgress(
-				float64(i+1)*100.0/float64(totalCount),
+				float64(i+1)/float64(totalCount),
 				fmt.Sprintf("[%d/%d] 更新程序 '%s' 的 project_id 失败：%s", i+1, totalCount, programName, err),
 			)
 			continue
 		}
 	}
-	sendProgress(100, fmt.Sprintf("迁移完成！总计：%d", totalCount))
+	sendProgress(1, fmt.Sprintf("迁移完成！总计：%d", totalCount))
 	return nil
 }
