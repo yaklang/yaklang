@@ -15,10 +15,10 @@ import (
 // GuardianEmitter defines the interface for emitting events in the Guardian system.
 // it provides some restricted methods for emitting events based on an ordinary Emitter
 type GuardianEmitter interface {
-	EmitStatus(key string, value any)
-	EmitStructured(nodeId string, result any)
-	EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader)
-	EmitJson(typeName schema.EventType, nodeId string, i any)
+	EmitStatus(key string, value any) (*schema.AiOutputEvent, error)
+	EmitStructured(nodeId string, result any) (*schema.AiOutputEvent, error)
+	EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader) (*schema.AiOutputEvent, error)
+	EmitJson(typeName schema.EventType, nodeId string, i any) (*schema.AiOutputEvent, error)
 	WaitForStream()
 }
 
@@ -36,12 +36,12 @@ func NewGuardianEmitter(coordinatorId string, emitter func(*schema.AiOutputEvent
 	}
 }
 
-func (e *guardianEmitter) EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader) {
-	e.EmitSystemStreamEvent(nodeId, startTime, reader, "")
+func (e *guardianEmitter) EmitGuardianStreamEvent(nodeId string, startTime time.Time, reader io.Reader) (*schema.AiOutputEvent, error) {
+	return e.EmitSystemStreamEvent(nodeId, startTime, reader, "")
 }
 
-func (e *guardianEmitter) EmitJson(typeName schema.EventType, nodeId string, i any) {
-	e.EmitJSON(typeName, nodeId, i)
+func (e *guardianEmitter) EmitJson(typeName schema.EventType, nodeId string, i any) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(typeName, nodeId, i)
 }
 
 var _ GuardianEmitter = (*guardianEmitter)(nil)
