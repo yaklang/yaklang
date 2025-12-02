@@ -114,6 +114,7 @@ func TestReAct_ToolUse(t *testing.T) {
 	toolCallOutputEvent := false
 	materialFetched := false
 	var iid string
+	taskDone := false
 LOOP:
 	for {
 		select {
@@ -156,8 +157,12 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
-					break LOOP
+					taskDone = true
 				}
+			}
+
+			if materialFetched && taskDone {
+				break LOOP
 			}
 		case <-after:
 			break LOOP
