@@ -38,7 +38,9 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			// Check if path exists first
 			fileInfo, err := fsys.Stat(pathName)
 			if err != nil {
-				return nil, utils.Errorf("stat %s: %v", pathName, err)
+				errMsg := utils.Errorf("stat %s: %v", pathName, err)
+				stderr.Write([]byte("failed to stat path: " + pathName + "\n"))
+				return nil, errMsg
 			}
 
 			// If it's a file, return file info directly
@@ -59,13 +61,17 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 				rawJSON, _ := json.Marshal(raw)
 				buf.WriteString(string(rawJSON))
 				buf.WriteString("\n")
+
+				stdout.Write([]byte("file info retrieved: " + pathName + "\n"))
 				return buf.String(), nil
 			}
 
 			// Otherwise, handle directory as before
 			entries, err := fsys.ReadDir(pathName)
 			if err != nil {
-				return nil, utils.Errorf("read dir %s: %v", pathName, err)
+				errMsg := utils.Errorf("read dir %s: %v", pathName, err)
+				stderr.Write([]byte("failed to read directory: " + pathName + "\n"))
+				return nil, errMsg
 			}
 			var buf bytes.Buffer
 			for _, entry := range entries {
@@ -91,6 +97,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 					buf.WriteString("\n")
 				}
 			}
+			stdout.Write([]byte("listed " + utils.InterfaceToString(len(entries)) + " entries in directory: " + pathName + "\n"))
 			return buf.String(), nil
 		}),
 	)
@@ -109,7 +116,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			aitool.WithParam_Description("offset to start reading"),
 		),
 		aitool.WithIntegerParam("chunk_size",
-			aitool.WithParam_Default(2048),
+			aitool.WithParam_Default(20480),
 			aitool.WithParam_Description("chunk size to read"),
 		),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
@@ -118,6 +125,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			chunkSize := params.GetInt("chunk_size")
 			f, err := fsys.OpenFile(pathName, os.O_RDONLY, 0444)
 			if err != nil {
+				stderr.Write([]byte("failed to open file: " + pathName + "\n"))
 				return nil, err
 			}
 			defer f.Close()
@@ -128,15 +136,17 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			}); ok {
 				_, err := seeker.Seek(int64(offset), io.SeekStart)
 				if err != nil {
-					os.Stderr.WriteString("seek failed: " + err.Error())
+					stderr.Write([]byte("seek failed: " + err.Error() + "\n"))
 				} else {
 					// read chunk
 					buf := make([]byte, chunkSize)
 					raw, err := f.Read(buf)
-					if err != nil {
-						os.Stderr.WriteString("read failed: " + err.Error())
+					if err != nil && err != io.EOF {
+						stderr.Write([]byte("read failed: " + err.Error() + "\n"))
 					} else {
-						return string(buf[:raw]), nil
+						content := string(buf[:raw])
+						stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
+						return content, nil
 					}
 				}
 			}
@@ -145,14 +155,16 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			if offset > 0 {
 				_, err := io.CopyN(io.Discard, f, int64(offset))
 				if err != nil {
-					os.Stderr.WriteString("discard failed: " + err.Error())
+					stderr.Write([]byte("discard failed: " + err.Error() + "\n"))
 				} else {
 					buf := make([]byte, chunkSize)
 					raw, err := io.ReadFull(f, buf)
-					if err != nil {
-						os.Stderr.WriteString("read failed: " + err.Error())
+					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+						stderr.Write([]byte("read failed: " + err.Error() + "\n"))
 					} else {
-						return string(buf[:raw]), nil
+						content := string(buf[:raw])
+						stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
+						return content, nil
 					}
 				}
 			}
@@ -160,10 +172,12 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			// read chunk
 			buf := make([]byte, chunkSize)
 			raw, err := f.Read(buf)
-			if err != nil {
-				os.Stderr.WriteString("read failed: " + err.Error())
+			if err != nil && err != io.EOF {
+				stderr.Write([]byte("read failed: " + err.Error() + "\n"))
 			} else {
-				return string(buf[:raw]), nil
+				content := string(buf[:raw])
+				stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + "\n"))
+				return content, nil
 			}
 			return nil, nil
 		}),
@@ -183,9 +197,11 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			pathName := params.GetString("path")
 			err := fsys.Delete(pathName)
 			if err != nil {
+				stderr.Write([]byte("failed to remove file: " + pathName + "\n"))
 				return nil, err
 			}
-			return nil, nil
+			stdout.Write([]byte("successfully removed file: " + pathName + "\n"))
+			return "success", nil
 		}),
 	)
 	if err != nil {
@@ -208,9 +224,11 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			content := params.GetString("content")
 			err := fsys.WriteFile(pathName, []byte(content), 0644)
 			if err != nil {
+				stderr.Write([]byte("failed to write file: " + pathName + "\n"))
 				return nil, err
 			}
-			return nil, nil
+			stdout.Write([]byte("successfully wrote " + utils.InterfaceToString(len(content)) + " bytes to file: " + pathName + "\n"))
+			return "success", nil
 		}),
 	)
 	if err != nil {
@@ -232,31 +250,39 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			dst := params.GetString("dst")
 			r, err := fsys.OpenFile(src, os.O_RDONLY, 0444)
 			if err != nil {
+				stderr.Write([]byte("failed to open source file: " + src + "\n"))
 				return nil, err
 			}
 			defer r.Close()
 			writeFile, err := fsys.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
+				stderr.Write([]byte("failed to open destination file: " + dst + "\n"))
 				return nil, err
 			}
 			defer writeFile.Close()
 
+			var bytesCopied int64
 			if w, ok := writeFile.(io.Writer); ok {
-				_, err = io.Copy(w, r)
+				bytesCopied, err = io.Copy(w, r)
 				if err != nil {
+					stderr.Write([]byte("failed to copy file content\n"))
 					return nil, err
 				}
 			} else {
 				content, err := io.ReadAll(r)
 				if err != nil {
+					stderr.Write([]byte("failed to read source file\n"))
 					return nil, err
 				}
 				err = fsys.WriteFile(dst, content, 0644)
 				if err != nil {
+					stderr.Write([]byte("failed to write destination file\n"))
 					return nil, err
 				}
+				bytesCopied = int64(len(content))
 			}
 
+			stdout.Write([]byte("successfully copied " + utils.InterfaceToString(bytesCopied) + " bytes from " + src + " to " + dst + "\n"))
 			return "success", nil
 		}),
 	)
@@ -276,6 +302,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			offset := params.GetInt("offset")
 
 			counter := int64(0)
+			resultCount := int64(0)
 			var buf bytes.Buffer
 			err := filesys.Recursive(
 				path,
@@ -301,14 +328,17 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 						if len(rawJSON) > 0 {
 							buf.WriteString("\n")
 						}
+						resultCount++
 					}
 					counter++
 					return nil
 				}),
 			)
 			if err != nil {
+				stderr.Write([]byte("failed to traverse directory: " + path + "\n"))
 				return nil, err
 			}
+			stdout.Write([]byte("listed " + utils.InterfaceToString(resultCount) + " items recursively from: " + path + " (offset: " + utils.InterfaceToString(offset) + ", limit: " + utils.InterfaceToString(limit) + ")\n"))
 			return buf.String(), nil
 		}),
 	)

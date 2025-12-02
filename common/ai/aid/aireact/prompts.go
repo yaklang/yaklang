@@ -364,9 +364,10 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 }
 
 // GenerateVerificationPrompt generates verification prompt using template
-func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, error) {
+func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
+	nonce := nonce()
 	data := &VerificationPromptData{
-		Nonce:          nonce(),
+		Nonce:          nonce,
 		OriginalQuery:  originalQuery,
 		IsToolCall:     isToolResult,
 		Payload:        payload,
@@ -382,7 +383,8 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		data.Timeline = t.Dump()
 	}
 
-	return pm.executeTemplate("verification", verificationPromptTemplate, data)
+	promptResult, err := pm.executeTemplate("verification", verificationPromptTemplate, data)
+	return promptResult, nonce, err
 }
 
 // GenerateAIReviewPrompt generates AI tool call review prompt using template

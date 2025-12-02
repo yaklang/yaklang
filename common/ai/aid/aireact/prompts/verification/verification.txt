@@ -113,7 +113,73 @@ IMPORTANT GUIDELINES:
         - "接下来我短期需要做的事情有：1. xxx; \n2. xxx; \n3. xxx; 这些工作有如下潜在风险和状态评估可能，我接下来会使用 xxx 工具来走一步看一部，随时调整工具调用。"
         - "虽然遇到了一些问题，但是我们可以尝试新的办法，使用 xxx 工具（和之前不一样）来尝试重新解决这个问题。"
         - "之前的任务似乎走偏了，我们尝试使用新的内容或者查询一些文件内容来决定下一步怎么走"
+- 关于 'reasoning' 的设置，一定要简明扼要，并且战略性分析，我会给你一些简明扼要的风格，作为回答的参考：
+    - 工具执行失败：命令返回非零退出码，无法继续任务
+    - 任务未完成：当前结果仅确认了文件存在，仍需进行实际修改操作
+    - 目标达成：用户要求的代码修改已成功实施并验证
+    - 知识不足：检索结果不完整，需要调用外部工具获取实时信息
+    - 回答准确：基于充分知识支撑，完全满足用户的查询需求
+- 关于 'human_readable_result' 这个字段，承载的核心作用是把不一定好读的工具调用结果或材料转变为用户理解起来容易的内容，例如如下内容：
+    - 成功创建了名为 'user_service.go' 的新文件，包含基础的用户管理接口
+    - 代码编译通过，单元测试全部通过，共执行了15个测试用例
+    - 在项目根目录下发现了3个配置文件：config.yaml、settings.json和.env
+    - API接口测试失败：POST /api/users 返回500错误，需要进一步调试
+    - 数据库迁移完成，已成功创建users表和相关索引
+- 如果 'human_readable_result' 的内容很多，在 JSON 中表达有所困难，可以使用如下标签来包括你想输出的大范围的结果摘要信息
+    - 长摘要1:
+
+        <|HUMAN_READABLE_RESULT_{{ .Nonce }}|>
+        # 总结用户的回答 标题
+
+        1. foo
+        2. bar   
+        3. ...
+
+        ```code
+        println("Hello World")
+        ```
+        <|HUMAN_READABLE_RESULT_END_{{ .Nonce }}|>
+
+    - 长摘要案例2：
+
+        <|HUMAN_READABLE_RESULT_{{ .Nonce }}|>
+        - **长摘要案例示例**：
+        - 代码审查完成：发现12个潜在问题，已修复8个，仍有4个需要进一步讨论
+            - 修复项：移除了未使用的导入，修复了内存泄漏，优化了错误处理
+            - 待讨论：循环复杂度过高、缺少单元测试覆盖、API设计不一致
+        - 系统性能分析：响应时间从平均2.3秒降低到1.1秒，内存使用减少15%
+            - 优化措施：实现了数据库查询缓存，减少了不必要的对象创建
+            - 建议改进：考虑使用连接池，进一步优化热点路径
+        - 安全漏洞扫描：发现3个中危漏洞和1个高危漏洞，已提供修复方案
+            - 高危：SQL注入风险，已实施参数化查询
+            - 中危：XSS防护不完善，已添加输入验证和输出编码
+        <|HUMAN_READABLE_RESULT_END_{{ .Nonce }}|>
 
 
+## 以下是两个典型响应信息（正确）
 
-{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
+---
+{"@action": "verify-satisfaction", "user_satisfied": false, "human_readable_result": "这是一个短摘要信息，不使用任何摘要信息", "reasoning": "简明扼要分析", "next_movements": "根据之前的结果，下次需要执行xxx可能会更接近目标"}
+
+
+---
+{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "简明扼要分析", "next_movements": "根据之前的结果，下次需要执行xxx可能会更接近目标"}
+<|HUMAN_READABLE_RESULT_{{ .Nonce }}|>
+- 代码审查完成：发现12个潜在问题，已修复8个，仍有4个需要进一步讨论
+    - 修复项：移除了未使用的导入，修复了内存泄漏，优化了错误处理
+    - 待讨论：循环复杂度过高、缺少单元测试覆盖、API设计不一致
+- 系统性能分析：响应时间从平均2.3秒降低到1.1秒，内存使用减少15%
+    - 优化措施：实现了数据库查询缓存，减少了不必要的对象创建
+    - 建议改进：考虑使用连接池，进一步优化热点路径
+- 安全漏洞扫描：发现3个中危漏洞和1个高危漏洞，已提供修复方案
+    - 高危：SQL注入风险，已实施参数化查询
+    - 中危：XSS防护不完善，已添加输入验证和输出编码
+
+```code
+println("Hello World")
+```
+<|HUMAN_READABLE_RESULT_END_{{ .Nonce }}|>
+
+## 严格禁止
+
+{"@action": "verify-satisfaction", "user_satisfied": false, "human_readable_result": "<|HUMAN_READABLE_RESULT_{{ .Nonce }}|>!!!绝对禁止这样输出!!!<|HUMAN_READABLE_RESULT_END_{{ .Nonce }}|>", "reasoning": "简明扼要分析", "next_movements": "根据之前的结果，下次需要执行xxx可能会更接近目标"}
