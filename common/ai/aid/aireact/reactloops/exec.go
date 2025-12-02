@@ -250,6 +250,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 const ReActLoadingStatusKey = "re-act-loading-status-key"
 
 func (r *ReActLoop) loadingStatus(i string) {
+	if r.emitter == nil {
+		return
+	}
 	log.Infof("re-act-loop loading status updated: %v", i)
 	r.emitter.EmitStatus(ReActLoadingStatusKey, i)
 }
