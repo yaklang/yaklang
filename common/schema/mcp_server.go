@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -9,11 +11,12 @@ import (
 type MCPServer struct {
 	gorm.Model
 
-	Name    string `gorm:"index;not null" json:"name"` // 服务器名称
-	Type    string `gorm:"index;not null" json:"type"` // 服务器类型 (stdio/sse)
-	URL     string `gorm:"type:text" json:"url"`       // 服务器URL (for sse type)
-	Command string `gorm:"type:text" json:"command"`   // 启动命令 (for stdio type)
-	Enable  bool   `gorm:"default:true" json:"enable"` // 是否启用
+	Name    string       `gorm:"index;not null" json:"name"` // 服务器名称
+	Type    string       `gorm:"index;not null" json:"type"` // 服务器类型 (stdio/sse)
+	URL     string       `gorm:"type:text" json:"url"`       // 服务器URL (for sse type)
+	Command string       `gorm:"type:text" json:"command"`   // 启动命令 (for stdio type)
+	Enable  bool         `gorm:"default:true" json:"enable"` // 是否启用
+	Envs    MapStringAny `gorm:"type:text" json:"env"`       // 环境变量
 }
 
 func (m *MCPServer) TableName() string {
@@ -22,6 +25,10 @@ func (m *MCPServer) TableName() string {
 
 // ToGRPC 转换为gRPC响应格式
 func (m *MCPServer) ToGRPC() *ypb.MCPServer {
+	envs := make([]*ypb.KVPair, 0, len(m.Envs))
+	for k, v := range m.Envs {
+		envs = append(envs, &ypb.KVPair{Key: k, Value: fmt.Sprintf("%v", v)})
+	}
 	return &ypb.MCPServer{
 		ID:      int64(m.ID),
 		Name:    m.Name,
@@ -30,6 +37,7 @@ func (m *MCPServer) ToGRPC() *ypb.MCPServer {
 		Command: m.Command,
 		Enable:  m.Enable,
 		Tools:   []*ypb.MCPServerTool{}, // 工具列表将在需要时动态获取
+		Envs:    envs,
 	}
 }
 
