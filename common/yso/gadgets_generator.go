@@ -208,10 +208,7 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 					return nil, err
 				}
 				className := classObj.GetClassName()
-				params = map[string]string{
-					"base64Class": defaultParam,
-					"className":   className,
-				}
+				params["className"] = className
 				defaultParam = ""
 			}
 		}
