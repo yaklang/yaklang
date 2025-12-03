@@ -179,20 +179,41 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 			return nil, utils.Errorf("not support transform chain type: `%s`", chainType)
 		}
 		if chainType == "mozilla_defining_class_loader" {
-			bytes, err := codec.DecodeBase64(defaultParam)
-			if err != nil {
-				return nil, err
+			if defaultParam != "" {
+				bytes, err := codec.DecodeBase64(defaultParam)
+				if err != nil {
+					return nil, err
+				}
+				classObj, err := javaclassparser.Parse(bytes)
+				if err != nil {
+					return nil, err
+				}
+				className := classObj.GetClassName()
+				params = map[string]string{
+					"base64Class": defaultParam,
+					"className":   className,
+				}
+				defaultParam = ""
+			} else {
+				base64Class, ok := params["base64Class"]
+				if !ok {
+					return nil, utils.Errorf("missing param: base64Class")
+				}
+				bytes, err := codec.DecodeBase64(base64Class)
+				if err != nil {
+					return nil, err
+				}
+				classObj, err := javaclassparser.Parse(bytes)
+				if err != nil {
+					return nil, err
+				}
+				className := classObj.GetClassName()
+				params = map[string]string{
+					"base64Class": defaultParam,
+					"className":   className,
+				}
+				defaultParam = ""
 			}
-			classObj, err := javaclassparser.Parse(bytes)
-			if err != nil {
-				return nil, err
-			}
-			className := classObj.GetClassName()
-			params = map[string]string{
-				"base64Class": defaultParam,
-				"className":   className,
-			}
-			defaultParam = ""
 		}
 		funMap, ok := YsoConfigInstance.ReflectChainFunction[funName]
 		if !ok {
