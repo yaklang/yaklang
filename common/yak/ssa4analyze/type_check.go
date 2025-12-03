@@ -229,6 +229,11 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			return arg.GetType(), true
 		})
 		gotParaLen := len(c.Args)
+
+		if len(gotPara) != gotParaLen {
+			log.Errorf("TypeCheckCall: %s, gotParaLen != len(c.Args)", method.GetVerboseName())
+			return
+		}
 		funName := ""
 		if f, ok := ssa.ToFunction(method); ok {
 			funName = f.GetName()

@@ -184,167 +184,18 @@ func init() {
 		//	withPluginHelp("请求包中各种情况参数进行sql注入检测"),
 		//	withPluginAuthors("雨过天晴&伞落人离"),
 		//)
-<<<<<<< HEAD
-		registerBuildInPlugin(
-			"mitm", "基础 XSS 检测",
-			withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
-			withPluginAuthors("WaY"),
-		)
-		registerBuildInPlugin(
-			"mitm", "文件包含",
-			withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "开放 URL 重定向漏洞",
-			withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
-			withPluginAuthors("Rookie"),
-		)
-		registerBuildInPlugin(
-			"mitm", "回显命令注入",
-			withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求 Header",
-			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求 Cookie",
-			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求",
-			withPluginHelp("允许用户加载该插件修改/增加/删除请求的 Header/Cookie/GetParams/PostParams，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("WaY"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "多认证综合越权测试",
-			withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "简易意图识别",
-			withPluginHelp("使用ai对用户的意图进行简易识别"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "Tun劫持服务",
-			withPluginHelp("通过Tun设备劫持流量并转发到MITM进行处理"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表查询",
-			withPluginHelp("查询当前tun劫持的路由信息"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表增加",
-			withPluginHelp("增加tun劫持的路由"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表删除",
-			withPluginHelp("删除tun劫持的路由"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-=======
-		// registerBuildInPlugin(
-		// 	"mitm", "基础 XSS 检测",
-		// 	withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
-		// 	withPluginAuthors("WaY"),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "文件包含",
-		// 	withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
-		// 	withPluginAuthors("V1ll4n"),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "开放 URL 重定向漏洞",
-		// 	withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
-		// 	withPluginAuthors("Rookie"),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "回显命令注入",
-		// 	withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
-		// 	withPluginAuthors("V1ll4n"),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "修改 HTTP 请求 Header",
-		// 	withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
-		// 	withPluginAuthors("V1ll4n"),
-		// 	withPluginEnableGenerateParam(true),
-		// 	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "修改 HTTP 请求 Cookie",
-		// 	withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
-		// 	withPluginAuthors("V1ll4n"),
-		// 	withPluginEnableGenerateParam(true),
-		// 	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "修改 HTTP 请求",
-		// 	withPluginHelp("允许用户加载该插件修改/增加/删除请求的 Header/Cookie/GetParams/PostParams，可以设置 URL 关键字作为前提条件"),
-		// 	withPluginAuthors("WaY"),
-		// 	withPluginEnableGenerateParam(true),
-		// 	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		// )
-		// registerBuildInPlugin(
-		// 	"mitm", "多认证综合越权测试",
-		// 	withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
-		// 	withPluginAuthors("V1ll4n"),
-		// 	withPluginEnableGenerateParam(true),
-		// )
->>>>>>> 089329c7a (fix(coreplugin):nw plugin author and remove other corepluin)
-		//registerBuildInPlugin(
-		//	"mitm", "MITM 请求修改",
-		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
-		//	withPluginAuthors("WaY"),
-		//	withPluginEnableGenerateParam(true),
-		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		//)
-		//registerBuildInPlugin(
-		//	"mitm", "MITM 响应修改",
-		//	withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
-		//	withPluginAuthors("WaY"),
-		//	withPluginEnableGenerateParam(true),
-		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		//)
 		registerBuildInPlugin(
 			"yak", "核心引擎性能采样",
 			withPluginHelp("动态开启PPROF采样，用于性能调优"),
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginEnableGenerateParam(true),
 		)
 		registerBuildInPlugin(
 			"yak", "崩溃日志收集",
 			withPluginHelp("收集本地项目日志中的崩溃信息，保存成 zip 以便分析"),
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginEnableGenerateParam(true),
 		)
 		// registerBuildInPlugin(
@@ -371,43 +222,7 @@ func init() {
 			withPluginAuthors("csg"),
 			withPluginEnableGenerateParam(true),
 		)
-<<<<<<< HEAD
-		registerBuildInPlugin(
-			"yak", "SSA 项目探测",
-			withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
-			withPluginAuthors("Q16G"),
-			withPluginEnableGenerateParam(true))
-		registerBuildInPlugin(
-			"yak", "SSA 项目更新",
-			withPluginHelp("更新SSA项目信息，包括项目名称、描述、语言、配置等"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin("yak", "SyntaxFlow Searcher",
-			withPluginHelp(`代码审计项目管理中，支持文件名、函数名、变量名、常量等搜索`),
-			withPluginAuthors("Q16G"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak",
-			"SyntaxFlow 查询项目信息",
-			withPluginHelp("使用SyntaxFlow查询项目信息，如项目的过滤函数。"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"mitm",
-			"SQL注入-Path参数注入",
-			withPluginAuthors("intSheep"),
-			withPluginHelp("SQL注入检测，针对RESTful API风格设计的Path参数进行SQL注入检测"),
-		)
-		registerBuildInPlugin(
-			"mitm",
-			"SQL注入-高危Header注入",
-			withPluginAuthors("intSheep"),
-			withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
-		)
-=======
+
 		// registerBuildInPlugin(
 		// 	"yak", "SSA 项目探测",
 		// 	withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
@@ -437,35 +252,11 @@ func init() {
 		// 	withPluginAuthors("intSheep"),
 		// 	withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
 		// )
->>>>>>> 089329c7a (fix(coreplugin):nw plugin author and remove other corepluin)
 
 		registerBuildInPlugin(
-<<<<<<< HEAD
-			"yak", "构建知识库",
-			withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "检索知识",
-			withPluginHelp("从知识库中语义检索相关知识，返回相关内容"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "构建知识条目",
-			withPluginHelp("从实体库中构建知识条目，支持目的性的知识条目构建"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "证书生成",
-			withPluginHelp("通过各种选项生成所需的证书文件"),
-			withPluginEnableGenerateParam(true),
-		)
-=======
 			"mitm", "nw-未授权遍历",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权遍历"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -473,6 +264,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-未授权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权添加"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -480,6 +272,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-未授权访问",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-未授权访问"),
 			withPluginTags([]string{"逻辑漏洞检测,可能修改HTTP数据包"}),
 		)
@@ -487,6 +280,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-验证码回显",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-验证码回显"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -494,6 +288,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权查询",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权查询"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -501,6 +296,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权删除",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权删除"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -508,6 +304,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权修改",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权修改"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -515,6 +312,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-水平越权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-水平越权添加"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -522,6 +320,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权查询",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权查询"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -529,6 +328,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权删除",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权删除"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -536,6 +336,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权修改",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权修改"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -543,6 +344,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-垂直越权添加",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-垂直越权添加"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -550,6 +352,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-通用CMS未授权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-通用CMS未授权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -557,6 +360,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-敏感信息遍历",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-敏感信息遍历"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -564,6 +368,7 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-接口未授权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-接口未授权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
@@ -571,17 +376,17 @@ func init() {
 		registerBuildInPlugin(
 			"mitm", "nw-越权",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("nw-越权"),
 			withPluginTags([]string{"逻辑漏洞检测"}),
 		)
 		registerBuildInPlugin(
 			"yak", "基础爬虫",
 			withPluginAuthors("csg"),
+			withPluginEnableGenerateParam(true),
 			withPluginHelp("基础爬虫"),
 			withPluginTags([]string{"信息收集", "功能类型"}),
 		)
-
->>>>>>> 8d1994b08 (feat(coreplugin): add nw plugin)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 
