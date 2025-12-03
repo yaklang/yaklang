@@ -26,8 +26,23 @@ func (c *UnlimitedChan[T]) FeedBlock(item T) {
 }
 
 func (c *UnlimitedChan[T]) SafeFeed(i T) {
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
+
+	if c.ctx != nil {
+		select {
+		case <-c.ctx.Done():
+			return
+		default:
+		}
+	}
+
 	select {
 	case c.innerIn <- i:
+		return
 	case <-time.After(3 * time.Second):
 		log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
 			"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
@@ -35,6 +50,9 @@ func (c *UnlimitedChan[T]) SafeFeed(i T) {
 			len(c.innerOut), cap(c.innerOut),
 			c.BufLen(), c.buffer.Capacity(),
 		)
+		return
+	case <-c.ctx.Done():
+		return
 	}
 }
 
