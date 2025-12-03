@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
 )
 
@@ -175,6 +177,22 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 		template, ok := cfg.ChainTemplate[chainType]
 		if !ok {
 			return nil, utils.Errorf("not support transform chain type: `%s`", chainType)
+		}
+		if chainType == "mozilla_defining_class_loader" {
+			bytes, err := codec.DecodeBase64(defaultParam)
+			if err != nil {
+				return nil, err
+			}
+			classObj, err := javaclassparser.Parse(bytes)
+			if err != nil {
+				return nil, err
+			}
+			className := classObj.GetClassName()
+			params = map[string]string{
+				"base64Class": defaultParam,
+				"className":   className,
+			}
+			defaultParam = ""
 		}
 		funMap, ok := YsoConfigInstance.ReflectChainFunction[funName]
 		if !ok {

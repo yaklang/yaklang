@@ -2,6 +2,11 @@
 
 # 编译 java_source/classes 目录下的所有 Java 文件到 static/classes 目录
 # 这些 Java 文件属于 payload 包，编译后需要将 class 文件从 payload 子目录移动到 classes 根目录
+#
+# 用法: ./compile_classes.sh --java8 <java8_home>
+#   --java8 <path>  必须指定 Java 8 的 JAVA_HOME 路径
+#
+# 示例: ./compile_classes.sh --java8 /Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -9,6 +14,70 @@ SOURCE_DIR="$BASE_DIR/java_source/classes"
 OUTPUT_DIR="$BASE_DIR/static/classes"
 TEMP_DIR="$BASE_DIR/temp_compile"
 LIBS_DIR="$BASE_DIR/libs"
+
+# 颜色输出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+# 解析命令行参数
+JAVA_HOME_PATH=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --java8)
+            if [ -n "$2" ] && [ -d "$2" ]; then
+                JAVA_HOME_PATH="$2"
+                shift 2
+            else
+                print_error "错误: 请指定有效的 Java 8 路径"
+                exit 1
+            fi
+            ;;
+        -h|--help)
+            echo "用法: $0 --java8 <java8_home>"
+            echo ""
+            echo "参数:"
+            echo "  --java8 <path>  必须指定 Java 8 的 JAVA_HOME 路径"
+            echo ""
+            echo "示例:"
+            echo "  $0 --java8 /Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/"
+            exit 0
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+# 检查 Java 8 路径
+if [ -z "$JAVA_HOME_PATH" ]; then
+    print_error "错误: 必须指定 Java 8 路径"
+    echo ""
+    echo "用法: $0 --java8 <java8_home>"
+    echo ""
+    echo "示例:"
+    echo "  $0 --java8 /Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/"
+    exit 1
+fi
+
+# 验证 Java 8
+if [ ! -f "$JAVA_HOME_PATH/bin/java" ] || [ ! -f "$JAVA_HOME_PATH/bin/javac" ]; then
+    print_error "错误: 无效的 Java 8 路径: $JAVA_HOME_PATH"
+    exit 1
+fi
+
+# 设置 java 和 javac 命令
+JAVA_CMD="$JAVA_HOME_PATH/bin/java"
+JAVAC_CMD="$JAVA_HOME_PATH/bin/javac"
+
+JAVA8_VERSION=$("$JAVA_CMD" -version 2>&1 | head -1)
+echo "Java 8 路径: $JAVA_HOME_PATH"
+echo "Java 版本: $JAVA8_VERSION"
+echo ""
 
 # Tomcat 版本和下载地址
 TOMCAT_VERSION="9.0.83"
@@ -87,7 +156,7 @@ echo "Classpath: $CLASSPATH"
 echo ""
 
 # 检查 Java 版本
-JAVA_VERSION=$(java -version 2>&1 | head -1 | cut -d'"' -f2 | cut -d'.' -f1)
+JAVA_VERSION=$("$JAVA_CMD" -version 2>&1 | head -1 | cut -d'"' -f2 | cut -d'.' -f1)
 echo "检测到 Java 主版本: $JAVA_VERSION"
 
 # 根据 Java 版本设置编译参数
@@ -127,7 +196,7 @@ for java_file in $JAVA_FILES; do
     rm -rf "$TEMP_DIR"/*
     
     # 编译单个文件
-    javac $JAVAC_OPTS -d "$TEMP_DIR" "$java_file" 2>/dev/null
+    "$JAVAC_CMD" $JAVAC_OPTS -d "$TEMP_DIR" "$java_file" 2>/dev/null
     
     if [ $? -eq 0 ]; then
         # 编译成功，移动 class 文件
