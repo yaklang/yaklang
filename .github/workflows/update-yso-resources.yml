@@ -1,12 +1,12 @@
 name: Auto Update YSO Resources
 
 on:
-  pull_request:
-    branches: [ main ]
-    types: [ opened, synchronize, reopened ]
-    paths:
-      - 'common/yso/resources/java_source/**'
-      - 'common/yso/resources/scripts/**'
+  # pull_request:
+  #   branches: [ main ]
+  #   types: [ opened, synchronize, reopened ]
+  #   paths:
+  #     - 'common/yso/resources/java_source/**'
+  #     - 'common/yso/resources/scripts/**'
       
 jobs:
   build-yso-resources:
