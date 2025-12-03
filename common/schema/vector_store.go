@@ -305,6 +305,9 @@ type KnowledgeBaseInfo struct {
 	// 知识库类型
 	KnowledgeBaseType string `gorm:"index;not null" json:"knowledge_base_type"`
 
+	// 标签
+	Tags string `gorm:"type:text" json:"tags"`
+
 	SerialVersionUID string `gorm:"index" json:"serial_version_uid"`
 }
 

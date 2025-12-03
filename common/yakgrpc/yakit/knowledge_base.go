@@ -1,8 +1,6 @@
 package yakit
 
 import (
-	"errors"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,18 +21,18 @@ func CreateKnowledgeBase(db *gorm.DB, knowledgeBase *schema.KnowledgeBaseInfo) e
 // UpdateKnowledgeBase 更新知识库信息
 func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.KnowledgeBaseInfo) error {
 	db = db.Model(&schema.KnowledgeBaseInfo{})
-	// 先判断是否存在
-	count := 0
-	db.Where("id = ?", id).Count(&count)
-	if count == 0 {
-		return utils.Wrap(errors.New("knowledge base not found"), "knowledge base not found")
-	} else {
-		err := db.Where("id = ?", id).Updates(knowledgeBase).Error
-		if err != nil {
-			return utils.Wrap(err, "update KnowledgeBase failed")
-		}
-		return nil
+	var existingKnowledgeBase schema.KnowledgeBaseInfo
+	err := db.Where("id = ?", id).First(&existingKnowledgeBase).Error
+	if err != nil {
+		return utils.Wrap(err, "get KnowledgeBase failed")
 	}
+	knowledgeBase.ID = existingKnowledgeBase.ID
+	knowledgeBase.CreatedAt = existingKnowledgeBase.CreatedAt
+	err = db.Save(knowledgeBase).Error
+	if err != nil {
+		return utils.Wrap(err, "update KnowledgeBase failed")
+	}
+	return nil
 }
 
 // DeleteKnowledgeBase 删除知识库和知识库条目
@@ -217,4 +215,39 @@ func GetKnowledgeBaseEntryByUUID(db *gorm.DB, uuid string) (*schema.KnowledgeBas
 		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
 	}
 	return &knowledgeBase, nil
+}
+
+// FilterKnowledgeBase 过滤知识库
+func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string) *gorm.DB {
+	db = db.Model(&schema.KnowledgeBaseInfo{})
+
+	// 实现关键词和ID的二选一逻辑
+	if keyword != "" {
+		// 如果关键词不为空，忽略ID，使用关键词搜索
+		db = bizhelper.FuzzSearchEx(db, []string{"knowledge_base_name", "knowledge_base_description"}, keyword, false)
+	} else if knowledgeBaseId > 0 {
+		// 如果ID不为空，搜索指定ID
+		db = bizhelper.ExactQueryInt64(db, "id", knowledgeBaseId)
+	}
+	// 如果都为空，返回所有记录（无过滤条件）
+
+	return db
+}
+
+// QueryKnowledgeBasePaging 分页查询知识库
+func QueryKnowledgeBasePaging(db *gorm.DB, knowledgeBaseId int64, keyword string, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseInfo, error) {
+	// 1. 设置查询的数据模型
+	db = db.Model(&schema.KnowledgeBaseInfo{})
+
+	// 2. 应用过滤条件
+	db = FilterKnowledgeBase(db, knowledgeBaseId, keyword)
+
+	// 3. 执行分页查询
+	ret := make([]*schema.KnowledgeBaseInfo, 0)
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+
+	return pag, ret, nil
 }

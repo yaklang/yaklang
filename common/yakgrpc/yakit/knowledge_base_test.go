@@ -101,6 +101,36 @@ func TestMUSTPASS_GetKnowledgeBase(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestMUSTPASS_QueryKnowledgeBasePaging 测试分页查询知识库
+func TestMUSTPASS_QueryKnowledgeBasePaging(t *testing.T) {
+	// 创建临时测试数据库
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// 自动迁移数据库表结构
+	db.AutoMigrate(&schema.KnowledgeBaseInfo{})
+
+	// 创建测试知识库
+	originalKB := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "query_test_kb",
+		KnowledgeBaseDescription: "用于测试分页查询功能的知识库",
+		KnowledgeBaseType:        "test",
+	}
+	err = CreateKnowledgeBase(db, originalKB)
+	assert.NoError(t, err)
+
+	// 测试分页查询知识库
+	paging := &ypb.Paging{Page: 1, Limit: 10}
+	paginator, knowledgeBases, err := QueryKnowledgeBasePaging(db, 0, "", paging)
+	assert.NoError(t, err)
+	assert.Equal(t, int(1), paginator.TotalRecord)
+	assert.Len(t, knowledgeBases, 1)
+	assert.Equal(t, originalKB.KnowledgeBaseName, knowledgeBases[0].KnowledgeBaseName)
+	assert.Equal(t, originalKB.KnowledgeBaseDescription, knowledgeBases[0].KnowledgeBaseDescription)
+	assert.Equal(t, originalKB.KnowledgeBaseType, knowledgeBases[0].KnowledgeBaseType)
+}
+
 // TestMUSTPASS_UpdateKnowledgeBaseInfo 测试更新知识库信息
 func TestMUSTPASS_UpdateKnowledgeBaseInfo(t *testing.T) {
 	// 创建临时测试数据库
