@@ -336,7 +336,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// type
 	value.SetIsFromDB(true)
-	value.SetType(GetTypeFromDB(cache, ir.TypeID))
+	value.getAnValue().setTypeID(ir.TypeID)
 }
 
 func function2IrCode(inst Instruction, ir *ssadb.IrCode) {

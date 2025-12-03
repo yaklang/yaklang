@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/slices"
 )
 
@@ -274,7 +275,7 @@ var _ Instruction = (*anInstruction)(nil)
 type anValue struct {
 	*anInstruction
 
-	typ      Type
+	typeID   int64
 	userList []int64
 
 	object     int64
@@ -297,12 +298,64 @@ type anValue struct {
 }
 
 var defaultAnyType = CreateAnyType()
+var fallbackTypeIDGen = atomic.NewInt64(1)
+var fallbackTypeCache = utils.NewSafeMapWithKey[int64, Type]()
 
 func NewValue() *anValue {
 	return &anValue{
 		anInstruction: NewInstruction(),
-		typ:           defaultAnyType,
+		typeID:        defaultAnyType.GetId(),
 	}
+}
+
+func (n *anValue) setTypeID(id int64) {
+	if id <= 0 {
+		n.typeID = defaultAnyType.GetId()
+		return
+	}
+	n.typeID = id
+}
+
+func (n *anValue) programCache() *ProgramCache {
+	if n == nil {
+		return nil
+	}
+	prog := n.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	if prog.Cache != nil {
+		return prog.Cache
+	}
+	if prog.Application != nil {
+		return prog.Application.Cache
+	}
+	return nil
+}
+
+func (n *anValue) cacheTypeIfPossible(typ Type) {
+	if utils.IsNil(typ) {
+		return
+	}
+	if cache := n.programCache(); cache != nil {
+		cache.TypeCache.Set(typ)
+		n.setTypeID(typ.GetId())
+		return
+	}
+	n.setTypeID(storeFallbackType(typ))
+}
+
+func storeFallbackType(typ Type) int64 {
+	if utils.IsNil(typ) {
+		return defaultAnyType.GetId()
+	}
+	id := typ.GetId()
+	if id == 0 {
+		id = -fallbackTypeIDGen.Inc()
+		typ.SetId(id)
+	}
+	fallbackTypeCache.Set(id, typ)
+	return id
 }
 
 func (n *anValue) IsMember() bool {
@@ -492,36 +545,49 @@ func (n *anValue) RemoveUser(u User) {
 func (n *anValue) GetType() Type {
 	if n == nil {
 		log.Errorf("BUG in *anValue.GetType(), the *anValue is nil!")
-		return CreateAnyType()
+		return defaultAnyType
 	}
-	return n.typ
+	return n.getTypeCache()
+}
+
+func (n *anValue) getTypeCache() Type {
+	if n.typeID <= 0 {
+		if n.typeID < 0 {
+			if typ, ok := fallbackTypeCache.Get(n.typeID); ok && !utils.IsNil(typ) {
+				return typ
+			}
+		}
+		return defaultAnyType
+	}
+	// typeID > 0: 使用 TypeCacheManager 统一管理两层缓存
+	cache := n.programCache()
+	if cache != nil && cache.typeCacheManager != nil {
+		return cache.typeCacheManager.GetType(n.typeID)
+	}
+	// 如果 cache 为 nil 或没有 typeCacheManager，返回默认类型
+	return defaultAnyType
 }
 
 func (n *anValue) SetType(typ Type) {
 	if typ == nil {
 		return
 	}
-
-	if n.IsFromDB() {
-		n.typ = typ
-		return
-	}
-
 	value, ok := n.GetValueById(n.GetId())
-	if !ok {
-		n.typ = typ
+	if !ok || utils.IsNil(value) {
+		n.cacheTypeIfPossible(typ)
 		return
 	}
-	saveTypeWithValue(value, typ)
+
+	resolved := typ
 
 	switch t := typ.(type) {
 	case *Blueprint:
-		n.typ = t.Apply(value)
+		resolved = t.Apply(value)
 	case *FunctionType:
-		n.typ = typ
+		resolved = typ
 		this := value
 		if this == nil {
-			return
+			break
 		}
 		if fun := t.This; fun != nil {
 			Point(this, fun)
@@ -531,8 +597,30 @@ func (n *anValue) SetType(typ Type) {
 		}
 
 	default:
-		n.typ = typ
+		resolved = typ
 	}
+
+	if utils.IsNil(resolved) {
+		resolved = defaultAnyType
+	}
+
+	if n.IsFromDB() {
+		n.setTypeID(resolved.GetId())
+		return
+	}
+
+	saveTypeWithValue(value, resolved)
+	// Also cache in program cache if available
+	if cache := n.programCache(); cache != nil {
+		if cache.typeCacheManager != nil {
+			// 使用 TypeCacheManager 确保两层缓存一致性
+			cache.typeCacheManager.setTypeToBothCaches(resolved.GetId(), resolved)
+		} else {
+			// 降级处理：如果没有 typeCacheManager，只设置第一层缓存
+			cache.TypeCache.Set(resolved)
+		}
+	}
+	n.setTypeID(resolved.GetId())
 }
 
 func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Variable] {

@@ -2,9 +2,21 @@ package ssa
 
 import (
 	"encoding/json"
+	"fmt"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"golang.org/x/sync/singleflight"
+)
+
+var (
+	typeFromDBSingleFlight singleflight.Group
+	typeFromDBOnce         sync.Once
+	// 跟踪正在加载的类型，防止循环依赖
+	loadingTypes sync.Map // map[string]bool // key: "programName_typeID"
+	// 限制递归深度，防止栈溢出
+	maxRecursionDepth = 10
 )
 
 func saveTypeWithValue(value Value, typ Type) {
@@ -110,7 +122,13 @@ func type2IrType(typ Type, ir *ssadb.IrType) {
 	ir.String = str
 }
 
-func GetTypeFromDB(cache *ProgramCache, id int64) Type {
+// getTypeFromDBInternal 向后兼容的包装函数
+func getTypeFromDBInternal(cache *ProgramCache, id int64) Type {
+	return getTypeFromDBInternalWithDepth(cache, id, 0)
+}
+
+// getTypeFromDBInternalWithDepth 从数据库恢复类型，支持递归深度限制
+func getTypeFromDBInternalWithDepth(cache *ProgramCache, id int64, depth int) Type {
 	if id <= 0 {
 		if id == 0 {
 			log.Warnf("GetTypeFromDB: called with id=0, likely a serialization bug")
@@ -143,9 +161,12 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		return str
 	}
 
+	var typ Type
 	switch TypeKind(kind) {
 	case FunctionTypeKind:
-		typ := &FunctionType{}
+		typ = &FunctionType{
+			baseType: NewBaseType(),
+		}
 		if raw, ok := params["return_value"].(string); ok {
 			_ = raw
 			// typ.ReturnValue = lo.FilterMap(strings.Split(raw, ","), func(s string, _ int) (*Return, bool) {
@@ -160,53 +181,110 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 			// 	return r, true
 			// })
 		}
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		return typ
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
-		typ := NewObjectType()
-		typ.Name = getParamStr("name")
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		typ.Kind = TypeKind(kind)
-		return typ
+		typ = NewObjectType()
+		if objTyp, ok := ToObjectType(typ); ok {
+			objTyp.Name = getParamStr("name")
+			objTyp.Kind = TypeKind(kind)
+		}
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
-		typ := NewBasicType(TypeKind(kind), getParamStr("name"))
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		return typ
+		typ = NewBasicType(TypeKind(kind), getParamStr("name"))
+		typ.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
 	case ClassBluePrintTypeKind:
-		typ := &Blueprint{
+		typ = &Blueprint{
 			LazyBuilder: NewLazyBuilder("Blueprint:" + getParamStr("name")),
 		}
-		typ.Name = getParamStr("name")
-		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
-		parents, ok := params["parentBlueprints"].([]interface{})
-		if ok {
-			for _, typeId := range parents {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
-				if isBlueprint {
-					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
+		if blueprint, ok := ToClassBluePrintType(typ); ok {
+			blueprint.Name = getParamStr("name")
+			blueprint.SetFullTypeNames(utils.InterfaceToStringSlice(params["fullTypeName"]))
+			blueprint.Kind = ValidBlueprintKind(getParamStr("kind"))
+			parents, ok := params["parentBlueprints"].([]interface{})
+			if ok {
+				for _, typeId := range parents {
+					parentID := int64(utils.InterfaceToInt(typeId))
+					// 使用带深度参数的版本，防止递归死锁
+					parentBlueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDBWithDepth(cache, parentID, depth))
+					if isBlueprint {
+						blueprint.ParentBlueprints = append(blueprint.ParentBlueprints, parentBlueprint)
+					}
+				}
+			}
+			interfaces, ok := params["interfaceBlueprints"].([]interface{})
+			if ok {
+				for _, typeId := range interfaces {
+					interfaceID := int64(utils.InterfaceToInt(typeId))
+					// 使用带深度参数的版本，防止递归死锁
+					interfaceBlueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDBWithDepth(cache, interfaceID, depth))
+					if isBlueprint {
+						blueprint.InterfaceBlueprints = append(blueprint.InterfaceBlueprints, interfaceBlueprint)
+					}
+				}
+			}
+			containerId := utils.MapGetInt64Or(params, "container", -1)
+			if containerId != -1 {
+				if container, err := NewInstructionWithCover(cache.program, containerId, ToValue); err == nil {
+					blueprint.InitializeWithContainer(container)
 				}
 			}
 		}
-		interfaces, ok := params["interfaceBlueprints"].([]interface{})
-		if ok {
-			for _, typeId := range interfaces {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
-				if isBlueprint {
-					typ.InterfaceBlueprints = append(typ.InterfaceBlueprints, blueprint)
-				}
-			}
-		}
-		containerId := utils.MapGetInt64Or(params, "container", -1)
-		if containerId != -1 {
-			if container, err := NewInstructionWithCover(cache.program, containerId, ToValue); err == nil {
-				typ.InitializeWithContainer(container)
-			}
-		}
-		return typ
 	default:
+		return nil
+	}
+
+	// 设置类型ID为数据库中的ID，确保ID一致性
+	if !utils.IsNil(typ) {
+		typ.SetId(id)
+		return typ
 	}
 
 	return nil
+}
+
+// GetTypeFromDB 从数据库恢复类型，使用 singleflight 避免并发重复查询
+// 这是向后兼容的包装函数，内部调用带深度参数的版本
+func GetTypeFromDB(cache *ProgramCache, id int64) Type {
+	return GetTypeFromDBWithDepth(cache, id, 0)
+}
+
+// GetTypeFromDBWithDepth 从数据库恢复类型，支持递归深度限制和循环依赖检测
+func GetTypeFromDBWithDepth(cache *ProgramCache, id int64, depth int) Type {
+	if id <= 0 {
+		if id == 0 {
+			log.Warnf("GetTypeFromDB: called with id=0, likely a serialization bug")
+		}
+		return nil
+	}
+
+	// 防止递归过深
+	if depth > maxRecursionDepth {
+		log.Errorf("GetTypeFromDB: max recursion depth reached for type %d (depth: %d)", id, depth)
+		return nil
+	}
+
+	programName := cache.program.GetProgramName()
+	key := fmt.Sprintf("%s_%d", programName, id)
+
+	// 检查是否正在加载（防止循环依赖）
+	if loading, ok := loadingTypes.Load(key); ok && loading.(bool) {
+		log.Warnf("GetTypeFromDB: circular dependency detected for type %d", id)
+		return nil
+	}
+
+	// 使用 singleflight 确保同时只有一个协程查询相同的类型
+	result, _, _ := typeFromDBSingleFlight.Do(key, func() (interface{}, error) {
+		// 标记为正在加载
+		loadingTypes.Store(key, true)
+		defer loadingTypes.Delete(key)
+
+		typ := getTypeFromDBInternalWithDepth(cache, id, depth+1)
+		return typ, nil
+	})
+
+	if result == nil {
+		return nil
+	}
+	return result.(Type)
 }
