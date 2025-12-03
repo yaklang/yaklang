@@ -1,4 +1,4 @@
-__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。"
+__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。注意：当使用cmd类型时，路径中的反斜杠(\\)需要转义，例如应使用 C:\\\\Users 而不是 C:\\Users。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令"
 
