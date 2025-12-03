@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -1098,4 +1099,39 @@ println("测试特殊字符: !@#$%^&*()")
 			ToolNames: []string{toolName},
 		})
 	})
+}
+
+func TestGRPCMUSTPASS_UpdateAIToolWithZeroField(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	toolName := uuid.New().String()
+	toolContent := "cli.String('test')"
+
+	resp, err := client.SaveAIToolV2(ctx, &ypb.SaveAIToolRequest{
+		Name:    toolName,
+		Content: toolContent,
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
+			ToolNames: []string{toolName},
+		})
+		require.NoError(t, err)
+	}()
+	_, err = client.UpdateAITool(ctx, &ypb.UpdateAIToolRequest{
+		ID:      resp.AITool.ID,
+		Name:    toolName,
+		Content: "",
+	})
+	require.NoError(t, err)
+
+	tool, err := client.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+		ToolName: toolName,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, tool)
+	require.Equal(t, "", tool.Tools[0].Content)
 }

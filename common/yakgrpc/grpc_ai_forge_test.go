@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 )
 
 func queryForge(ctx context.Context, client ypb.YakClient, filter *ypb.AIForgeFilter) ([]*ypb.AIForge, error) {
@@ -119,4 +120,40 @@ func TestGetAIForgeByName(t *testing.T) {
 		ForgeName: name,
 	})
 	require.NoError(t, err)
+}
+
+func TestUpdateAIForgeWithZeroField(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	content := uuid.New().String()
+
+	forgeIns := &ypb.AIForge{
+		ForgeName:    name,
+		ForgeContent: content,
+	}
+	_, err = client.CreateAIForge(ctx, forgeIns)
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
+			ForgeName: name,
+		})
+		require.NoError(t, err)
+	}()
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		ForgeName:    name,
+		ForgeContent: "",
+	})
+	require.NoError(t, err)
+
+	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{
+		ForgeName: name,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, forge)
+	require.Equal(t, name, forge.ForgeName)
+	require.Equal(t, "", forge.ForgeContent)
 }

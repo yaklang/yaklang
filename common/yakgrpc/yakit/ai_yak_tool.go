@@ -25,8 +25,14 @@ func CreateAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 }
 
 func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
-	db = db.Model(&schema.AIYakTool{})
-	if db := db.Where("id = ?", tool.ID).Updates(tool); db.Error != nil {
+	// 先查询获取现有记录的 CreatedAt
+	var existing schema.AIYakTool
+	if err := db.Where("id = ?", tool.ID).First(&existing).Error; err != nil {
+		return 0, utils.Errorf("find AIYakTool failed: %s", err)
+	}
+	// 设置 CreatedAt 以确保执行 UPDATE 而不是 INSERT
+	tool.CreatedAt = existing.CreatedAt
+	if db := db.Save(tool); db.Error != nil {
 		return 0, utils.Errorf("update AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil

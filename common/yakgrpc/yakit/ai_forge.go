@@ -32,16 +32,30 @@ func CreateOrUpdateAIForge(db *gorm.DB, forge *schema.AIForge) error {
 }
 
 func UpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge) error {
-	db = db.Model(&schema.AIForge{})
-	if db := db.Where("forge_name = ?", name).Updates(forge); db.Error != nil {
+	// 先查询获取现有记录的 ID 和 CreatedAt
+	var existing schema.AIForge
+	if err := db.Where("forge_name = ?", name).First(&existing).Error; err != nil {
+		return utils.Errorf("find AI Forge failed: %s", err)
+	}
+	// 设置 ID 和 CreatedAt 以确保执行 UPDATE 而不是 INSERT
+	forge.ID = existing.ID
+	forge.CreatedAt = existing.CreatedAt
+	if db := db.Save(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil
 }
 
 func UpdateAIForgeByID(db *gorm.DB, id uint, forge *schema.AIForge) error {
-	db = db.Model(&schema.AIForge{})
-	if db := db.Where("id = ?", id).Updates(forge); db.Error != nil {
+	// 先查询获取现有记录的 CreatedAt
+	var existing schema.AIForge
+	if err := db.Where("id = ?", id).First(&existing).Error; err != nil {
+		return utils.Errorf("find AI Forge failed: %s", err)
+	}
+	// 设置 ID 和 CreatedAt 以确保执行 UPDATE 而不是 INSERT
+	forge.ID = id
+	forge.CreatedAt = existing.CreatedAt
+	if db := db.Save(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil
