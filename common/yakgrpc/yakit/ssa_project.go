@@ -98,11 +98,23 @@ const (
 )
 
 func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, error) {
-	if req == nil || req.Filter == nil {
+	if req == nil {
+		return 0, utils.Errorf("delete SSA project failed: request is nil")
+	}
+
+	deleteAll := req.GetDeleteAllProject()
+
+	if !deleteAll && req.Filter == nil {
 		return 0, utils.Errorf("delete SSA project failed: filter is nil")
 	}
 
-	query := FilterSSAProject(db, req.Filter)
+	var query *gorm.DB
+	if deleteAll {
+		query = db.Model(&schema.SSAProject{})
+	} else {
+		query = FilterSSAProject(db, req.Filter)
+	}
+
 	var projects []*schema.SSAProject
 	if err := query.Find(&projects).Error; err != nil {
 		return 0, utils.Errorf("query SSA projects failed: %s", err)
@@ -111,9 +123,11 @@ func DeleteSSAProject(db *gorm.DB, req *ypb.DeleteSSAProjectRequest) (int64, err
 	if len(projects) == 0 {
 		return 0, nil
 	}
+
 	ssaDB := consts.GetGormSSAProjectDataBase()
 	deleteMode := req.GetDeleteMode()
 	var totalDeleted int64
+
 	for _, project := range projects {
 		programFilter := &ypb.SSAProgramFilter{
 			ProjectIds: []uint64{uint64(project.ID)},
