@@ -214,6 +214,9 @@ type MixPluginCaller struct {
 	swg                    *utils.SizedWaitGroup
 	cache                  bool
 	pluginScanFilter       *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
+
+	// filterMutex protects all filter operations (Exist/Insert) from race conditions
+	filterMutex sync.Mutex
 }
 
 func (m *MixPluginCaller) LastErr() error {
@@ -1004,8 +1007,29 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 		websitePathHash := calcWebsitePathHash(urlObj, host, port, req)
 		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
 		targetHash := calcTargetHash(host, port)
-		if !m.targetFilter.Exist(targetHash) {
+
+		// Use mutex to protect filter operations from race conditions
+		m.filterMutex.Lock()
+		shouldScanTarget := !m.targetFilter.Exist(targetHash)
+		if shouldScanTarget {
 			m.targetFilter.Insert(targetHash)
+		}
+		shouldCallNewWebsite := !m.websiteFilter.Exist(websiteHash)
+		if shouldCallNewWebsite {
+			m.websiteFilter.Insert(websiteHash)
+		}
+		shouldCallNewWebsitePath := !m.websitePathFilter.Exist(websitePathHash)
+		if shouldCallNewWebsitePath {
+			m.websitePathFilter.Insert(websitePathHash)
+		}
+		shouldCallNewWebsitePathParams := !m.websiteParamsFilter.Exist(websitePathParamsHash)
+		if shouldCallNewWebsitePathParams {
+			m.websiteParamsFilter.Insert(websitePathParamsHash)
+		}
+		m.filterMutex.Unlock()
+
+		// Execute callbacks outside the lock to avoid blocking
+		if shouldScanTarget {
 			if callers.ShouldCallByName(HOOK_PortScanHandle) {
 				var (
 					matchResult *fp.MatchResult = &fp.MatchResult{State: fp.OPEN}
@@ -1037,8 +1061,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 				}
 			}
 		}
-		if !m.websiteFilter.Exist(websiteHash) {
-			m.websiteFilter.Insert(websiteHash)
+		if shouldCallNewWebsite {
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
 				callers.Call(HOOK_MirrorNewWebsite,
 					WithCallConfigRuntimeCtx(runtimeCtx),
@@ -1072,8 +1095,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 			}
 		}
 
-		if !m.websitePathFilter.Exist(websitePathHash) {
-			m.websitePathFilter.Insert(websitePathHash)
+		if shouldCallNewWebsitePath {
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePath) {
 				callers.Call(HOOK_MirrorNewWebsitePath,
 					WithCallConfigRuntimeCtx(runtimeCtx),
@@ -1083,8 +1105,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 			}
 		}
 
-		if !m.websiteParamsFilter.Exist(websitePathParamsHash) {
-			m.websiteParamsFilter.Insert(websitePathParamsHash)
+		if shouldCallNewWebsitePathParams {
 			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePathParams) {
 				callers.Call(HOOK_MirrorNewWebsitePathParams,
 					WithCallConfigRuntimeCtx(runtimeCtx),
