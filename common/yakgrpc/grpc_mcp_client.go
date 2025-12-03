@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/client"
@@ -51,12 +52,17 @@ func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest)
 		}, nil
 	}
 
+	envs := make(schema.MapStringAny)
+	for _, env := range req.GetEnvs() {
+		envs[env.GetKey()] = env.GetValue()
+	}
 	server := &schema.MCPServer{
 		Name:    req.GetName(),
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
 		Enable:  req.GetEnable(),
+		Envs:    envs,
 	}
 
 	err := yakit.CreateMCPServer(s.GetProfileDatabase(), server)
@@ -113,12 +119,17 @@ func (s *Server) UpdateMCPServer(ctx context.Context, req *ypb.UpdateMCPServerRe
 		}, nil
 	}
 
+	envs := make(schema.MapStringAny)
+	for _, env := range req.GetEnvs() {
+		envs[env.GetKey()] = env.GetValue()
+	}
 	server := &schema.MCPServer{
 		Name:    req.GetName(),
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
 		Enable:  req.GetEnable(),
+		Envs:    envs,
 	}
 
 	err := yakit.UpdateMCPServer(s.GetProfileDatabase(), req.GetID(), server)
@@ -184,7 +195,11 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 		}
 		command := commandParts[0]
 		args := commandParts[1:]
-		mcpClient, err = client.NewStdioMCPClient(command, []string{}, args...)
+		envs := make([]string, 0, len(server.Envs))
+		for k, v := range server.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%v", k, v))
+		}
+		mcpClient, err = client.NewStdioMCPClient(command, envs, args...)
 		if err != nil {
 			return nil, err
 		}

@@ -107,6 +107,7 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 		"url":     server.URL,
 		"command": server.Command,
 		"enable":  server.Enable,
+		"envs":    server.Envs,
 	}
 	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(updateData).Error
 }
