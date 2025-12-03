@@ -107,6 +107,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	}
 	defer func() {
 		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
 			frame = nil
 		}
@@ -137,6 +138,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 	result.rule.OpCodes = result.ToString()
 	frame = result.CreateFrame(s.vars)
 	frame.config = s.config
+
 	if len(result.verifyFsInfo) > 0 {
 		frame.VerifyFsInfo = result.verifyFsInfo
 	}

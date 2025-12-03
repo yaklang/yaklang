@@ -3,6 +3,7 @@ package sfvm
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -181,6 +182,8 @@ const (
 	OpFileFilterReg
 	OpFileFilterXpath
 	OpFileFilterJsonPath
+
+	OpConditionStart
 )
 
 var Opcode2String = map[SFVMOpCode]string{
@@ -338,6 +341,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v [%d] mul:%v", "compare string", s.Values, s.UnaryInt, s.MultiOperator)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
+	case OpConditionStart:
+		return fmt.Sprintf(verboseLen+" %v", "condition start", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
@@ -428,4 +433,97 @@ func (s *SFI) String() string {
 		panic("unhandled default case")
 	}
 	return ""
+}
+
+var (
+	DataFlowOpcode = []SFVMOpCode{
+		OpGetUsers,
+		OpGetBottomUsers,
+		OpGetDefs,
+		OpGetTopDefs,
+	}
+
+	SearchOpcode = []SFVMOpCode{
+		OpPushSearchExact,
+		OpPushSearchGlob,
+		OpPushSearchRegexp,
+		OpRecursiveSearchExact,
+		OpRecursiveSearchGlob,
+		OpRecursiveSearchRegexp,
+	}
+
+	// ConditionGeneratorOpcode 生成条件的操作码（修改 conditionStack）
+	ConditionGeneratorOpcode = []SFVMOpCode{
+		OpCompareString, // 字符串比较，生成条件
+		OpCompareOpcode, // Opcode 比较，生成条件
+		OpEq,            // 相等比较
+		OpNotEq,         // 不等比较
+		OpGt,            // 大于比较
+		OpGtEq,          // 大于等于比较
+		OpLt,            // 小于比较
+		OpLtEq,          // 小于等于比较
+		OpEmptyCompare,  // 空值比较
+		OpVersionIn,     // 版本比较
+	}
+
+	// ConditionLogicOpcode 逻辑运算操作码（修改 conditionStack）
+	ConditionLogicOpcode = []SFVMOpCode{
+		OpLogicAnd,  // 逻辑与
+		OpLogicOr,   // 逻辑或
+		OpLogicBang, // 逻辑非
+	}
+
+	// ConditionApplyOpcode 应用条件的操作码（消费 conditionStack 和 valueStack）
+	ConditionApplyOpcode = []SFVMOpCode{
+		OpCondition,  // 根据条件过滤值
+		OpCheckEmpty, // 检查空值
+	}
+
+	// FilterOpcode 所有过滤相关的操作码（向后兼容）
+	FilterOpcode = append(append(
+		ConditionGeneratorOpcode,
+		ConditionLogicOpcode...),
+		ConditionApplyOpcode...,
+	)
+
+	GetOpcode = []SFVMOpCode{
+		OpGetCall,
+		OpGetCallArgs,
+		OpFileFilterReg,
+		OpFileFilterXpath,
+		OpFileFilterJsonPath,
+		OpNativeCall,
+	}
+)
+
+func (s *SFI) IsDataFlowOpcode() bool {
+	return slices.Contains(DataFlowOpcode, s.OpCode)
+}
+
+func (s *SFI) IsSearchOpcode() bool {
+	return slices.Contains(SearchOpcode, s.OpCode)
+}
+
+func (s *SFI) IsFilterOpcode() bool {
+	return slices.Contains(FilterOpcode, s.OpCode)
+}
+
+func (s *SFI) IsConditionGenerator() bool {
+	return slices.Contains(ConditionGeneratorOpcode, s.OpCode)
+}
+
+func (s *SFI) IsConditionLogic() bool {
+	return slices.Contains(ConditionLogicOpcode, s.OpCode)
+}
+
+func (s *SFI) IsConditionApply() bool {
+	return slices.Contains(ConditionApplyOpcode, s.OpCode)
+}
+
+func (s *SFI) IsGetOpcode() bool {
+	return slices.Contains(GetOpcode, s.OpCode)
+}
+
+func (s *SFI) IsNativeCallOpcode() bool {
+	return s.OpCode == OpNativeCall
 }

@@ -29,9 +29,11 @@ type SFFrameResult struct {
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      ValueOperator
 	AlertSymbolTable *utils.SafeMap[ValueOperator]
+
+	VarFlowGraph *VarFlowGraph
 }
 
-func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
+func NewSFResult(rule *schema.SyntaxFlowRule, config *Config, m *VarFlowGraph) *SFFrameResult {
 	return &SFFrameResult{
 		config:           config,
 		rule:             rule,
@@ -39,6 +41,7 @@ func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
 		AlertSymbolTable: utils.NewSafeMap[ValueOperator](),
+		VarFlowGraph:     m,
 	}
 }
 
@@ -72,6 +75,10 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 	//}
 	s.CheckParams = append(s.CheckParams, result.CheckParams...)
 	s.Errors = append(s.Errors, result.Errors...)
+}
+
+func (s *SFFrameResult) GetVarGraph() *VarFlowGraph {
+	return s.VarFlowGraph
 }
 
 type showConfig struct {
@@ -230,7 +237,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 }
 
 func (s *SFFrameResult) Copy() *SFFrameResult {
-	ret := NewSFResult(s.rule, s.config)
+	ret := NewSFResult(s.rule, s.config, s.VarFlowGraph)
 	ret.Description = s.Description.Copy()
 	ret.CheckParams = append([]string{}, s.CheckParams...)
 	ret.Errors = append([]string{}, s.Errors...)

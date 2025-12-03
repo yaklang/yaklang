@@ -1469,7 +1469,15 @@ func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
 		o(n)
 	}
 	NativeCallDocuments[name] = n
-	sfvm.RegisterNativeCall(n.Name, n.Function)
+	sfvm.RegisterNativeCall(n.Name, n.Description, n.Function)
+}
+
+func getNativeCallDescription(name string) string {
+	doc, ok := NativeCallDocuments[name]
+	if !ok {
+		return ""
+	}
+	return doc.Description
 }
 
 func haveResult(operator sfvm.ValueOperator) bool {
