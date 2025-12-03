@@ -67,6 +67,7 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	newContent = uuid.New().String()
 	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
 		Id:           forge[0].GetId(),
+		ForgeName:    name,
 		ForgeContent: newContent,
 	})
 	require.NoError(t, err)
