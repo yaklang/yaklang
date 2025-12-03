@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "PR number, branch (e.g. owner:branch for fork), or commit SHA. Examples: 123, MisakaMikato:feature/branch, 4e7c85623d3bb7caa0b24ac6cabb5a3872e4a7bc"
+        description: "PR number, branch (e.g. owner:branch for fork), or commit SHA"
         required: false
         default: ""
   pull_request:
@@ -99,6 +99,15 @@ jobs:
               echo "Detected branch/tag: $REF"
             fi
           else
+            # For pull_request events, check if it's from a fork
+            PR_HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
+            PR_BASE_REPO="${{ github.repository }}"
+            
+            if [ "$PR_HEAD_REPO" != "$PR_BASE_REPO" ]; then
+              # This is a fork PR
+              echo "Detected fork PR from: $PR_HEAD_REPO"
+              echo "fork_repo=$PR_HEAD_REPO" >> $GITHUB_OUTPUT
+            fi
             REF="${{ github.event.pull_request.head.sha }}"
           fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
@@ -128,6 +137,10 @@ jobs:
       - name: Accept Pre-Check result
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: echo "SHOULD_RUN=${{ steps.pre_check.outputs.should_run_tests }}" >> $GITHUB_ENV
+
+      - name: Allow fork PRs (skip pre-check)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: echo "SHOULD_RUN=true" >> $GITHUB_ENV
 
       - name: Finalize outputs
         id: finalize
