@@ -176,7 +176,7 @@ func _newRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 			} else {
 				knowledgeBaseName = knowledgeBaseInfo.KnowledgeBaseName
 			}
-			knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragConfig.db, knowledgeBaseName, ragConfig.description, ragConfig.knowledgeBaseType, ragSystem.VectorStore)
+			knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragConfig.db, knowledgeBaseName, ragConfig.description, ragConfig.knowledgeBaseType, ragConfig.tags, ragSystem.VectorStore)
 			if err != nil {
 				return nil, err
 			}

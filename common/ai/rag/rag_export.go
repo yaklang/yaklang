@@ -926,7 +926,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	}
 
 	// 创建知识库
-	knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.knowledgeBaseType, nil)
+	knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.knowledgeBaseType, ragSystemConfig.tags, nil)
 	if err != nil {
 		return utils.Wrap(err, "create knowledge base")
 	}

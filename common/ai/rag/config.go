@@ -34,6 +34,7 @@ type RAGSystemConfig struct {
 
 	db                     *gorm.DB
 	description            string
+	tags                   []string
 	knowledgeBaseType      string
 	embeddingClient        aispec.EmbeddingCaller
 	enableEntityRepository bool
@@ -276,6 +277,12 @@ func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGSystemConfigOption {
 func WithDescription(description string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.description = description
+	}
+}
+
+func WithTags(tags ...string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.tags = tags
 	}
 }
 

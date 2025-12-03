@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -11,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -31,53 +31,40 @@ func (s *Server) GetKnowledgeBaseNameList(ctx context.Context, req *ypb.Empty) (
 // GetKnowledgeBase 获取知识库信息和条目列表
 func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBaseRequest) (*ypb.GetKnowledgeBaseResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	var knowledgeBases []*schema.KnowledgeBaseInfo
-	query := db.Model(&schema.KnowledgeBaseInfo{})
 
-	// 实现关键词和ID的二选一逻辑
-	if req.GetKeyword() != "" {
-		// 如果关键词不为空，忽略ID，使用关键词搜索
-		query = bizhelper.FuzzSearchEx(query, []string{"knowledge_base_name", "knowledge_base_description"}, req.GetKeyword(), false)
-	} else if req.GetKnowledgeBaseId() > 0 {
-		// 如果ID不为空，搜索指定ID
-		query = query.Where("id = ?", req.GetKnowledgeBaseId())
+	paging := req.GetPagination()
+	if paging == nil {
+		paging = &ypb.Paging{
+			Page:  1,
+			Limit: 10,
+		}
 	}
-	// 如果都为空，进行分页搜索（无过滤条件）
-
-	// 使用 bizhelper.Paging 实现分页功能
-	pagination := req.GetPagination()
-	page := 1
-	limit := 10
-	if pagination != nil {
-		page = int(pagination.GetPage())
-		limit = int(pagination.GetLimit())
-	}
-	if page <= 0 {
-		page = 1
-	}
-	if limit <= 0 {
-		limit = 10
-	}
-
-	p, db := bizhelper.Paging(query, page, limit, &knowledgeBases)
-	if db.Error != nil {
-		return nil, utils.Errorf("获取知识库列表失败: %v", db.Error)
+	p, knowledgeBases, err := yakit.QueryKnowledgeBasePaging(db, req.GetKnowledgeBaseId(), req.GetKeyword(), paging)
+	if err != nil {
+		return nil, utils.Errorf("获取知识库列表失败: %v", err)
 	}
 
 	// 转换为protobuf格式
 	pbKnowledgeBases := make([]*ypb.KnowledgeBaseInfo, len(knowledgeBases))
 	for i, kb := range knowledgeBases {
+		ragSystem, err := rag.Get(kb.KnowledgeBaseName, rag.WithDB(db))
+		if err != nil {
+			return nil, utils.Errorf("获取知识库失败: %v", err)
+		}
+		isImported := ragSystem.VectorStore.GetCollectionInfo().SerialVersionUID != ""
 		pbKnowledgeBases[i] = &ypb.KnowledgeBaseInfo{
 			ID:                       int64(kb.ID),
 			KnowledgeBaseName:        kb.KnowledgeBaseName,
+			IsImported:               isImported,
 			KnowledgeBaseDescription: kb.KnowledgeBaseDescription,
 			KnowledgeBaseType:        kb.KnowledgeBaseType,
+			Tags:                     utils.StringSplitAndStrip(kb.Tags, ","),
 		}
 	}
 
 	return &ypb.GetKnowledgeBaseResponse{
 		KnowledgeBases: pbKnowledgeBases,
-		Pagination:     pagination,
+		Pagination:     req.GetPagination(),
 		Total:          int64(p.TotalRecord),
 	}, nil
 }
@@ -121,7 +108,7 @@ func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowled
 
 func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowledgeBaseV2Request) (*ypb.CreateKnowledgeBaseV2Response, error) {
 	db := consts.GetGormProfileDatabase()
-	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db))
+	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}
@@ -136,6 +123,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 			KnowledgeBaseName:        kbInfo.KnowledgeBaseName,
 			KnowledgeBaseDescription: kbInfo.KnowledgeBaseDescription,
 			KnowledgeBaseType:        kbInfo.KnowledgeBaseType,
+			Tags:                     utils.StringSplitAndStrip(kbInfo.Tags, ","),
 		},
 		IsSuccess:   true,
 		Message:     "创建知识库成功",
@@ -150,7 +138,12 @@ func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowled
 	if err != nil {
 		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
-	err = kb.UpdateKnowledgeBaseInfo(req.GetKnowledgeBaseName(), req.GetKnowledgeBaseDescription(), req.GetKnowledgeBaseType())
+	err = yakit.UpdateKnowledgeBaseInfo(db, kb.GetID(), &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        req.GetKnowledgeBaseName(),
+		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
+		KnowledgeBaseType:        req.GetKnowledgeBaseType(),
+		Tags:                     strings.Join(req.GetTags(), ","),
+	})
 	if err != nil {
 		return nil, utils.Errorf("更新知识库信息失败: %v", err)
 	}

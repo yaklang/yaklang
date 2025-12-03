@@ -3,6 +3,7 @@ package knowledgebase
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -35,7 +36,7 @@ func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}).Error
 }
 
-func NewKnowledgeBaseWithVectorStore(db *gorm.DB, name, description, kbType string, vectorStore *vectorstore.SQLiteVectorStoreHNSW) (*KnowledgeBase, error) {
+func NewKnowledgeBaseWithVectorStore(db *gorm.DB, name, description, kbType string, kbTags []string, vectorStore *vectorstore.SQLiteVectorStoreHNSW) (*KnowledgeBase, error) {
 	if err := AutoMigrate(db); err != nil {
 		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
 	}
@@ -58,6 +59,7 @@ func NewKnowledgeBaseWithVectorStore(db *gorm.DB, name, description, kbType stri
 			KnowledgeBaseName:        name,
 			KnowledgeBaseDescription: description,
 			KnowledgeBaseType:        kbType,
+			Tags:                     strings.Join(kbTags, ","),
 		}
 		err := yakit.CreateKnowledgeBase(db, &knowledgeBaseInfo)
 		if err != nil {
@@ -108,7 +110,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...vec
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
 	}
-	return NewKnowledgeBaseWithVectorStore(db, name, description, kbType, collectionMg)
+	return NewKnowledgeBaseWithVectorStore(db, name, description, kbType, nil, collectionMg)
 }
 
 // CreateKnowledgeBase 创建全新的知识库（如果已存在会返回错误）
@@ -229,7 +231,7 @@ func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEn
 	return nil
 }
 
-func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string) error {
+func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string, tags ...string) error {
 	err := yakit.UpdateKnowledgeBaseInfo(kb.db, kb.id, &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName:        name,
 		KnowledgeBaseDescription: description,
