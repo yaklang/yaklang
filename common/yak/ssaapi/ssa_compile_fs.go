@@ -161,21 +161,23 @@ func (c *Config) parseProjectWithFS(
 		)
 		// diagnostics.DumpHeap(diagnostics.WithName("ast"))
 		for fileContent := range ch {
-			if fileContent.Skip {
-				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
+			if fileContent.Status == ssareducer.FileStatusFsError {
+				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				continue
 			}
+
+			if fileContent.Status == ssareducer.FileParseASTError {
+				log.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+				AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+				// continue
+			}
+
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
 			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
 
 			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
-
-			if fileContent.Err != nil {
-				AstErr = utils.JoinErrors(AstErr,
-					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-				)
-			}
 
 			preHandlerProcess() // notify the process
 			// handler
@@ -188,7 +190,10 @@ func (c *Config) parseProjectWithFS(
 						}
 					}()
 					language.InitHandler(builder)
-					language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+					err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+					if err != nil {
+						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+					}
 				}()
 			}
 		}
@@ -233,8 +238,9 @@ func (c *Config) parseProjectWithFS(
 				continue // skip if not in handlerFilesMap
 			}
 			handlerProcess()
-			if fileContent.Skip {
-				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
+			if fileContent.Status == ssareducer.FileStatusFsError {
+				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				continue
 			}
 			// log.Infof("visited file: ", prog.GetIncludeFiles())

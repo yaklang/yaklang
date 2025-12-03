@@ -53,7 +53,7 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 
 	err = projectBuilder.Save()
 	if err != nil {
-		return nil, utils.Errorf("create SSA project failed: %s", err)
+		return nil, utils.Errorf("save SSA project failed: %s", err)
 	}
 	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
 	if err != nil {
