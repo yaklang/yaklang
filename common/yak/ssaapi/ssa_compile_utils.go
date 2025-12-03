@@ -57,9 +57,13 @@ func (c *Config) GetFileHandler(
 
 		if language := c.LanguageBuilder; language != nil {
 			if language.FilterParseAST(path) {
-				return language.ParseAST(utils.UnsafeBytesToString(content), cache)
+				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
+				if err != nil {
+					log.Infof("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
+				}
+				return ast, err
 			} else {
-				log.Debugf("skip parse ast file: %s", path)
+				log.Debugf("skip parse ast file: %s filter by %s", path, language.GetLanguage())
 				return nil, nil
 			}
 		}
