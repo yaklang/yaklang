@@ -341,7 +341,7 @@ public class Start {
             case "bcel_with_args":
                 return "{{param0}}|{{param1}}";
             case "mozilla_defining_class_loader":
-                return "{{param0}}|{{param1}}";
+                return "{{param0}}|e3twYXJhbTF9fQ==";
             case "script_base64":
                 return "e3twYXJhbTB9fQ=="; // base64 of {{param0}}
             default:

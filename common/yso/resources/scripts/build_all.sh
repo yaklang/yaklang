@@ -103,7 +103,7 @@ echo ""
 # Step 1: 编译 classes
 print_step "Step 1/3: 编译 Java Classes"
 if [ -f "$SCRIPT_DIR/compile_classes.sh" ]; then
-    "$SCRIPT_DIR/compile_classes.sh"
+    "$SCRIPT_DIR/compile_classes.sh" --java8 "$JAVA8_HOME"
     print_success "Classes 编译完成"
 else
     print_warning "跳过: compile_classes.sh 不存在"
