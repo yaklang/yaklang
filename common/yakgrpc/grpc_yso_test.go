@@ -3,9 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak"
 	"math/rand"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -55,6 +56,9 @@ func TestGRPCMUSTPASS_GeneratePayload(t *testing.T) {
 				Class:   classOption.GetName(),
 				Options: options,
 			})
+			if err != nil {
+				t.Fatal(fmt.Sprintf("GenerateYsoBytes error: %v, gadget: %s, class: %s", err, option.GetName(), classOption.GetName()))
+			}
 			if len(rsp.Bytes) == 0 {
 				t.Fatal(fmt.Sprintf("rsp.Bytes is empty, gadget: %s, class: %s", option.GetName(), classOption.GetName()))
 			}
