@@ -362,11 +362,16 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			WithActionFieldStreamHandler(
 				[]string{"reducer_memory"},
 				func(key string, reader io.Reader) {
-					reducerMem := utils.JSONStringReader(reader)
-					m.config.GetEmitter().EmitDefaultStreamEvent( // need conceal
+					var out bytes.Buffer
+					reducerMem := io.TeeReader(utils.JSONStringReader(reader), &out)
+					m.config.GetEmitter().EmitSystemStreamEvent(
 						"memory-timeline",
+						time.Now(),
 						reducerMem,
 						response.GetTaskIndex(),
+						func() {
+							log.Infof("memory-timeline shrink result: %v", out.String())
+						},
 					)
 				}),
 		)
