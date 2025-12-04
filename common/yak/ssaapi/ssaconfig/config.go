@@ -3,17 +3,19 @@ package ssaconfig
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 type Config struct {
-	ctx            context.Context
-	Mode           Mode
-	BaseInfo       *BaseInfo
-	CodeSource     *CodeSourceInfo
-	SSACompile     *SSACompileConfig
-	SyntaxFlow     *SyntaxFlowConfig
-	SyntaxFlowScan *SyntaxFlowScanConfig
-	SyntaxFlowRule *SyntaxFlowRuleConfig
+	ctx            context.Context       `json:"-"`
+	Mode           Mode                  `json:"mode,omitempty"` // 配置模式，可以从 JSON 指定
+	BaseInfo       *BaseInfo             `json:"base_info,omitempty"`
+	CodeSource     *CodeSourceInfo       `json:"code_source,omitempty"`
+	SSACompile     *SSACompileConfig     `json:"ssa_compile,omitempty"`
+	SyntaxFlow     *SyntaxFlowConfig     `json:"syntax_flow,omitempty"`
+	SyntaxFlowScan *SyntaxFlowScanConfig `json:"syntax_flow_scan,omitempty"`
+	SyntaxFlowRule *SyntaxFlowRuleConfig `json:"syntax_flow_rule,omitempty"`
+	Output         *OutputConfig         `json:"output,omitempty"`
 
 	// 其他配置项可以在这里添加
 	ExtraInfo map[string][]any `json:"-"` // 用于存储外部传入的其他信息
@@ -30,13 +32,14 @@ const (
 	ModeSyntaxFlow            Mode = 1 << iota // - SyntaxFlow模式
 	ModeSyntaxFlowRule        Mode = 1 << iota // - 规则模式
 	ModeCodeSource            Mode = 1 << iota // - 源码配置模式
+	ModeOutput                Mode = 1 << iota // - CLI输出配置模式
 
 	ModeSSACompile = ModeProjectBase | modeSSACompile | ModeCodeSource
 
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
 	ModeProjectCompile      = ModeProjectBase | ModeCodeSource | modeSSACompile
 	// all
-	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
+	ModeAll = ModeProjectBase | modeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager | ModeOutput
 )
 
 func New(mode Mode, opts ...Option) (*Config, error) {
@@ -57,6 +60,11 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 
 func NewSyntaxFlowScanConfig(opts ...Option) (*Config, error) {
 	return New(ModeSyntaxFlowScan, opts...)
+}
+
+// NewCLIScanConfig 创建CLI扫描配置，包含编译、扫描、输出等完整功能
+func NewCLIScanConfig(opts ...Option) (*Config, error) {
+	return New(ModeAll, opts...)
 }
 
 func (c *Config) IsSyntaxFlowScanConfig() bool {
@@ -129,6 +137,12 @@ func defaultBaseInfo() *BaseInfo {
 
 func defaultSyntaxFlowRuleConfig() *SyntaxFlowRuleConfig {
 	return &SyntaxFlowRuleConfig{}
+}
+
+func defaultOutputConfig() *OutputConfig {
+	return &OutputConfig{
+		OutputFormat: "sarif", // 默认输出格式
+	}
 }
 
 // --- Context Get/Set 方法 ---
@@ -232,6 +246,9 @@ func LoadConfigFromJSON(data []byte) (*Config, error) {
 	var c Config
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, err
+	}
+	if c.Mode == 0 {
+		return nil, errors.New("mode not specified in config json file")
 	}
 	return &c, nil
 }
