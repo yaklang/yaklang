@@ -2237,28 +2237,32 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
 		return b.EmitUndefined("")
 	}
-	if !utils.IsNil(callee.GetFunc()) {
-		for len(callee.GetFunc().Params) > len(args) {
+
+	// 只有当callee本身是Function类型时，才检查参数数量并填充Undefined
+	// 注意：callee.GetFunc()返回的是callee所在的函数，而不是callee代表的函数
+	// 所以需要使用ssa.ToFunction来判断callee是否是Function类型
+	if calleeFunc, ok := ssa.ToFunction(callee); ok {
+		for len(calleeFunc.Params) > len(args) {
 			args = append(args, b.EmitUndefined(""))
 		}
-		// 创建调用
-		// TODO: 函数调用导致实参发生改变如何处理?
-		call := b.EmitCall(b.NewCall(callee, args))
+	}
 
-		// 根据被调用函数的类型设置 Call 指令的返回类型
-		// 这对于 Promise 等返回类型的正确传递非常重要
-		if funcType := callee.GetType(); funcType != nil {
-			if funcType.GetTypeKind() == ssa.FunctionTypeKind {
-				// 如果是函数类型，获取其返回类型
-				if ft, ok := funcType.(*ssa.FunctionType); ok && ft.ReturnType != nil {
-					call.SetType(ft.ReturnType)
-				}
+	// 创建调用
+	// TODO: 函数调用导致实参发生改变如何处理?
+	call := b.EmitCall(b.NewCall(callee, args))
+
+	// 根据被调用函数的类型设置 Call 指令的返回类型
+	// 这对于 Promise 等返回类型的正确传递非常重要
+	if funcType := callee.GetType(); funcType != nil {
+		if funcType.GetTypeKind() == ssa.FunctionTypeKind {
+			// 如果是函数类型，获取其返回类型
+			if ft, ok := funcType.(*ssa.FunctionType); ok && ft.ReturnType != nil {
+				call.SetType(ft.ReturnType)
 			}
 		}
-
-		return call
 	}
-	return nil
+
+	return call
 }
 
 // VisitObjectLiteralExpression 访问对象字面量表达式
