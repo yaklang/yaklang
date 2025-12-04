@@ -32,6 +32,26 @@ func (s *Server) GetKnowledgeBaseNameList(ctx context.Context, req *ypb.Empty) (
 func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBaseRequest) (*ypb.GetKnowledgeBaseResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
+	// 删除名称为空的rag
+	var emptyRagCollection schema.VectorStoreCollection
+	if err := db.Model(&schema.VectorStoreCollection{}).Where("name = ''").First(&emptyRagCollection).Error; err == nil {
+		db.Model(&schema.VectorStoreCollection{}).Where("name = ''").Unscoped().Delete(&schema.VectorStoreCollection{})
+		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", emptyRagCollection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
+	}
+
+	var emptyKnowledgeBase schema.KnowledgeBaseInfo
+	if err := db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ''").First(&emptyKnowledgeBase).Error; err == nil {
+		db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ''").Unscoped().Delete(&schema.KnowledgeBaseInfo{})
+		db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", emptyKnowledgeBase.ID).Unscoped().Delete(&schema.KnowledgeBaseEntry{})
+	}
+
+	var emptyEntityRepository schema.EntityRepository
+	if err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ''").First(&emptyEntityRepository).Error; err == nil {
+		db.Model(&schema.EntityRepository{}).Where("entity_base_name = ''").Unscoped().Delete(&schema.EntityRepository{})
+		db.Model(&schema.ERModelEntity{}).Where("repository_uuid = ?", emptyEntityRepository.Uuid).Unscoped().Delete(&schema.ERModelEntity{})
+		db.Model(&schema.ERModelRelationship{}).Where("repository_uuid = ?", emptyEntityRepository.Uuid).Unscoped().Delete(&schema.ERModelRelationship{})
+	}
+
 	paging := req.GetPagination()
 	if paging == nil {
 		paging = &ypb.Paging{
