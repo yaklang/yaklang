@@ -3,6 +3,8 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -21,6 +23,9 @@ var loginPage []byte
 
 //go:embed html/vul_user_profile.html
 var profilePage []byte
+
+//go:embed html/vul_user_container.html
+var containerPage []byte
 
 func (s *VulinServer) RegisterUserHandler(writer http.ResponseWriter, request *http.Request) {
 	if request.Method == http.MethodGet {
@@ -83,6 +88,8 @@ func (s *VulinServer) RegisterUserHandler(writer http.ResponseWriter, request *h
 		return
 	}
 }
+
+var UserContainerPool = omap.NewOrderedMap[int, string](make(map[int]string))
 
 func (s *VulinServer) registerUserRoute() {
 	var router = s.router
@@ -170,6 +177,92 @@ func (s *VulinServer) registerUserRoute() {
 			DefaultQuery: "",
 			Path:         "/user/register",
 			Handler:      s.RegisterUserHandler,
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/user/container/fetch",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				realUser, err := s.database.Authenticate(writer, request)
+				if err != nil {
+					return
+				}
+				id := realUser.ID
+				containerName, ok := UserContainerPool.Get(int(id))
+				status := ""
+				if ok {
+					status = "active"
+				}
+
+				jsonData, err := json.Marshal(map[string]interface{}{
+					"label":  containerName,
+					"status": status,
+				})
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error, cannot found user: " + realUser.Username + " \n json.Marshal failed: " + err.Error()))
+					return
+				}
+				writer.Write(jsonData)
+			},
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/user/container/activate",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				realUser, err := s.database.Authenticate(writer, request)
+				if err != nil {
+					return
+				}
+				id := realUser.ID
+				UserContainerPool.Set(int(id), uuid.NewString())
+				jsonData, err := json.Marshal(map[string]interface{}{
+					"ok": true,
+				})
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error, cannot found user: " + realUser.Username + " \n json.Marshal failed: " + err.Error()))
+					return
+				}
+				writer.Write(jsonData)
+				return
+			},
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/user/container/deactivate",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				realUser, err := s.database.Authenticate(writer, request)
+				if err != nil {
+					return
+				}
+				id := realUser.ID
+				UserContainerPool.Delete(int(id))
+				jsonData, err := json.Marshal(map[string]interface{}{
+					"ok": true,
+				})
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte("internal error, cannot found user: " + realUser.Username + " \n json.Marshal failed: " + err.Error()))
+					return
+				}
+				writer.Write(jsonData)
+				return
+
+			},
+		},
+
+		{
+			DefaultQuery: "",
+			Path:         "/user/container",
+			Title:        "用户容器页面",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				_, err := s.database.Authenticate(writer, request)
+				if err != nil {
+					return
+				}
+				writer.Header().Set("Content-Type", "text/html")
+				writer.Write(containerPage)
+			},
 		},
 		{
 			DefaultQuery: "",

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Service Panel</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 2em auto; text-align: center; }
+        .panel { padding: 2em; border: 1px solid #ccc; border-radius: 8px; margin-top: 1em; }
+        .panel h2 { margin-top: 0; }
+        button { padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1.1em; transition: background-color 0.2s; }
+        button:disabled { cursor: not-allowed; background-color: #ccc !important; }
+        .deactivate-btn { background-color: #f44336; color: white; }
+        .deactivate-btn:hover { background-color: #d32f2f; }
+        .activate-btn { background-color: #4CAF50; color: white; }
+        .activate-btn:hover { background-color: #45a049; }
+        #status { margin-top: 1.5em; font-weight: bold; color: #333; min-height: 1.2em; }
+        input[type="text"] { padding: 10px; font-size: 1em; width: 250px; margin-right: 10px; }
+        #service-active-panel p { font-size: 1.2em; color: #555; }
+        #service-active-panel strong { color: #000; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<h1>Your Cloud Service</h1>
+<div id="status">Checking service status...</div>
+
+<!-- 状态一: 服务已激活 -->
+<div id="service-active-panel" class="panel hidden">
+    <h2>Service is Active</h2>
+    <p>Your personal service is up and running.</p>
+    <p><strong>Label:</strong> <span id="service-label"></span></p>
+    <button id="deactivate-btn" class="deactivate-btn">Deactivate Service</button>
+</div>
+
+<!-- 状态二: 服务未激活 -->
+<div id="service-inactive-panel" class="panel hidden">
+    <h2>Service is Inactive</h2>
+    <p>Click the button below to activate your personal cloud service.</p>
+    <div style="margin-top: 1em;">
+        <input type="text" id="new-service-label" placeholder="Optional: give your service a label">
+        <button id="activate-btn" class="activate-btn">Activate Now</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // === 获取DOM元素 ===
+        const statusDiv = document.getElementById('status');
+        const activePanel = document.getElementById('service-active-panel');
+        const inactivePanel = document.getElementById('service-inactive-panel');
+
+        const serviceLabelSpan = document.getElementById('service-label');
+        const deactivateBtn = document.getElementById('deactivate-btn');
+
+        const labelInput = document.getElementById('new-service-label');
+        const activateBtn = document.getElementById('activate-btn');
+
+        // === 核心逻辑：页面初始化，检查用户服务状态 ===
+
+
+        async function initializePage() {
+            statusDiv.innerText = 'Checking service status...';
+            resetUI();
+
+            try {
+                const response = await fetch('/logic/user/container/fetch', {
+                });
+
+                // 404 Not Found 被清晰地定义为“服务不存在”
+                if (response.status === 404) {
+                    showInactiveService();
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const service = await response.json();
+
+                if (service && service.status === 'active') {
+                    showActiveService(service);
+                } else {
+                    showInactiveService();
+                }
+            } catch (e) {
+                statusDiv.innerText = `Error loading status: ${e.message}`;
+                // 可以在此显示一个专用的错误面板
+            }
+        }
+        initializePage()
+        // === UI状态切换函数 ===
+
+        function showActiveService(service) {
+            activePanel.classList.remove('hidden');
+            serviceLabelSpan.innerText = service.label || 'Not set'; // 如果没有标签则显示默认值
+            deactivateBtn.disabled = false;
+            deactivateBtn.innerText = "Deactivate";
+        }
+
+        function showInactiveService() {
+            inactivePanel.classList.remove('hidden');
+            statusDiv.innerText = 'Your service is ready to be activated.';
+            activateBtn.innerText = 'Activate';
+            activateBtn.disabled = false
+        }
+
+        function resetUI() {
+            activePanel.classList.add('hidden');
+            inactivePanel.classList.add('hidden');
+            statusDiv.innerText = '';
+        }
+
+
+        // === 事件处理函数 ===
+
+        async function activateService() {
+            // UI交互
+            activateBtn.disabled = true;
+            activateBtn.innerText = 'Activating...';
+            labelInput.disabled = true;
+            statusDiv.innerText = 'Sending activation request...';
+
+            try {
+                // 新API: 只需要传递一个可选的标签(label)
+                const response = await fetch('/logic/user/container/activate', {});
+
+                if (response.ok) {
+                    statusDiv.innerText = 'Service activated successfully!';
+                    await initializePage(); // 重新加载状态，UI会自动切换
+                } else {
+                    const error = await response.text();
+                    throw new Error(error || 'Failed to activate service.');
+                }
+            } catch (e) {
+                statusDiv.innerText = `Activation Error: ${e.message}`;
+                activateBtn.disabled = false;
+                activateBtn.innerText = 'Activate Now';
+                labelInput.disabled = false;
+            }
+
+        }
+
+        async function deactivateService() {
+            if (!confirm('Are you sure you want to deactivate your service? This action cannot be undone.')) {
+                return;
+            }
+            // UI交互
+            deactivateBtn.disabled = true;
+            deactivateBtn.innerText = 'Deactivating...';
+            statusDiv.innerText = 'Sending deactivation request...';
+
+            try {
+                // 新API: 无需任何ID，后端知道要删除谁的服务
+                const response = await fetch('/logic/user/container/deactivate', {
+                });
+
+                if (response.ok) {
+                    statusDiv.innerText = 'Service deactivated successfully.';
+                    labelInput.value = ''; // 清空输入框
+                    await initializePage(); // 重新加载状态，UI会自动切换
+                } else {
+                    const error = await response.text();
+                    throw new Error(error || 'Failed to deactivate service.');
+                }
+            } catch (e) {
+                statusDiv.innerText = `Deactivation Error: ${e.message}`;
+                deactivateBtn.disabled = false;
+                deactivateBtn.innerText = 'Deactivate Service';
+            }
+        }
+
+        // 绑定事件
+        activateBtn.addEventListener('click', activateService);
+        deactivateBtn.addEventListener('click', deactivateService);
+    })
+
+</script>
+</body>
+</html>
