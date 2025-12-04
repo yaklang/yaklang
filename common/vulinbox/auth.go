@@ -21,8 +21,14 @@ window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
 	auth := session.Value
 	se, err := s.GetUserBySession(auth)
 	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte("Internal error session " + err.Error()))
+		//writer.Header().Set("Location", "/logic/user/login")
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte(`
+<script>
+alert("session 异常，请重新登录");
+window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
+</script>
+`))
 		return nil, err
 	}
 
@@ -30,8 +36,14 @@ window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
 	// 假设根据用户名查询用户信息
 	users, err := s.GetUserByUsername(se.Username)
 	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte("Internal error, cannot retrieve user information"))
+		//writer.Header().Set("Location", "/logic/user/login")
+		writer.WriteHeader(http.StatusOK)
+		writer.Write([]byte(`
+<script>
+alert("用户信息异常，请重新登录");
+window.location.href = '/logic/user/login?from=` + request.URL.Path + `';
+</script>
+`))
 		return nil, err
 	}
 	user := users[0]
