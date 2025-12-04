@@ -264,7 +264,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	if cfg.MemoryTriage != nil {
 		invoker.memoryTriage = cfg.MemoryTriage
 	} else {
-		memoryTriageId := cfg.MemoryTriageId
+		memoryTriageId := cfg.PersistentSessionId
 		if memoryTriageId == "" {
 			memoryTriageId = "default"
 		}

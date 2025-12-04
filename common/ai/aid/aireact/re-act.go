@@ -216,7 +216,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if cfg.MemoryTriage != nil {
 		react.memoryTriage = cfg.MemoryTriage
 	} else {
-		memoryTriageId := cfg.MemoryTriageId
+		memoryTriageId := cfg.PersistentSessionId
 		if memoryTriageId == "" {
 			memoryTriageId = "default"
 		}
