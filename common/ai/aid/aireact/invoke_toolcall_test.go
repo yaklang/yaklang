@@ -590,3 +590,114 @@ LOOP2:
 
 	fmt.Printf("\n✓ Test completed: WithNoToolsCache allows dynamic tool loading\n")
 }
+
+func TestReAct_ToolUse_WithToolCallResult(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	toolName := "test_sleep_" + ksuid.New().String()
+
+	callToolResultFlag := utils.RandStringBytes(10)
+
+	sleepTool, err := aitool.New(
+		toolName,
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return map[string]any{"result": callToolResultFlag}, nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, toolName)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithAgreeYOLO(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 发送输入事件
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "please use " + toolName,
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+	toolCallResult := false
+	var callToolID string
+	var recivedToolCallResultFlag string
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			fmt.Println(e.String())
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				if callToolID == "" {
+					callToolID = e.CallToolID
+				} else if callToolID != e.CallToolID {
+					// 应该只有一个callToolID
+					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
+				}
+			}
+
+			if e.NodeId == string(schema.EVENT_TOOL_CALL_RESULT) {
+				if e.CallToolID != callToolID {
+					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
+				}
+				toolCallResult = true
+				result := jsonpath.FindFirst(e.GetContent(), "$..result.result")
+				recivedToolCallResultFlag = utils.InterfaceToString(result)
+				break LOOP
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+
+	if !toolCallResult {
+		t.Fatal("tool call result not found")
+	}
+
+	if recivedToolCallResultFlag != callToolResultFlag {
+		t.Fatalf("call tool result mismatch: %s != %s", recivedToolCallResultFlag, callToolResultFlag)
+	}
+
+	db := consts.GetGormProjectDatabase()
+	aiProcess, err := yakit.GetAIProcessByID(db, callToolID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if aiProcess == nil {
+		t.Fatal("ai process not found")
+	}
+
+	var hasFlag bool
+	for _, event := range aiProcess.Events {
+		if event.NodeId == schema.EVENT_TOOL_CALL_RESULT {
+			result := jsonpath.FindFirst(string(event.Content), "$..result.result")
+			if utils.InterfaceToString(result) == callToolResultFlag {
+				hasFlag = true
+				break
+			}
+		}
+	}
+
+	if !hasFlag {
+		t.Fatalf("call tool result flag not found in ai process events")
+	}
+}
