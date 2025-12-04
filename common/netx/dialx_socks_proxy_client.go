@@ -215,7 +215,9 @@ RECON:
 	if cfg.Check { // s5 just auth ok
 		return conn, nil
 	}
-
+	if targetAddr == "" {
+		targetAddr = cfg.Host
+	}
 	// detail request
 	host, port, err := splitHostPort(targetAddr)
 	if err != nil {
