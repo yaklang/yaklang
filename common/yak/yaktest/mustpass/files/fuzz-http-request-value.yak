@@ -1,0 +1,145 @@
+// 测试参数值的格式化问题
+// 确保数字类型的值能正确转换为字符串，而不是 %!s(float64=1) 这样的错误格式
+
+// 测试 1: 使用整数值进行 Fuzz
+raw1 = `GET /?value=old HTTP/1.1
+Host: www.example.com`
+
+freq1 = fuzz.MustHTTPRequest(raw1)
+
+// 使用整数值
+results1, err = freq1.FuzzGetParams("value", 123).Results()
+if err != nil {
+    die(sprintf("FuzzGetParams with int failed: %v", err))
+}
+
+for result in results1 {
+    reqBytes = http.dump(result)~
+    reqStr = string(reqBytes)
+    
+    // 确保请求中不包含错误的格式化字符串
+    if reqStr.Contains("%!s(") {
+        die(sprintf("Request contains wrong format: %s", reqStr))
+    }
+    
+    if !reqStr.Contains("value=123") {
+        die(sprintf("Request should contain 'value=123', got: %s", reqStr))
+    }
+    
+    println("✓ GET params with integer value formatted correctly")
+}
+
+// 测试 2: 使用浮点数值进行 Fuzz
+results2, err = freq1.FuzzGetParams("value", 1.5).Results()
+if err != nil {
+    die(sprintf("FuzzGetParams with float failed: %v", err))
+}
+
+for result in results2 {
+    reqBytes = http.dump(result)~
+    reqStr = string(reqBytes)
+    
+    if reqStr.Contains("%!s(") {
+        die(sprintf("Request contains wrong format: %s", reqStr))
+    }
+    
+    if !reqStr.Contains("value=1.5") {
+        die(sprintf("Request should contain 'value=1.5', got: %s", reqStr))
+    }
+    
+    println("✓ GET params with float value formatted correctly")
+}
+
+// 测试 3: 测试 POST 参数中的数字值
+raw2 = `POST / HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Host: www.example.com
+
+aaa=old`
+
+freq2 = fuzz.MustHTTPRequest(raw2)
+
+results3, err = freq2.FuzzPostParams("aaa", 1).Results()
+if err != nil {
+    die(sprintf("FuzzPostParams with int failed: %v", err))
+}
+
+for result in results3 {
+    reqBytes = http.dump(result)~
+    reqStr = string(reqBytes)
+    
+    if reqStr.Contains("%!s(") {
+        die(sprintf("Request contains wrong format: %s", reqStr))
+    }
+    
+    if !reqStr.Contains("aaa=1") {
+        die(sprintf("Request should contain 'aaa=1', got: %s", reqStr))
+    }
+    
+    println("✓ POST params with integer value formatted correctly")
+}
+
+// 测试 4: 测试 JSON 参数中的数字值
+raw3 = `POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"key": "value"}`
+
+freq3 = fuzz.MustHTTPRequest(raw3)
+params = freq3.GetCommonParams()
+
+foundKey = false
+for param in params {
+    if param.Name() == "key" {
+        foundKey = true
+        // 使用数字值进行 Fuzz
+        results4, err = param.Fuzz(999).Results()
+        if err != nil {
+            die(sprintf("Fuzz JSON param with number failed: %v", err))
+        }
+        
+        for result in results4 {
+            reqBytes = http.dump(result)~
+            reqStr = string(reqBytes)
+            
+            if reqStr.Contains("%!s(") {
+                die(sprintf("Request contains wrong format: %s", reqStr))
+            }
+            
+            if !reqStr.Contains("999") {
+                die(sprintf("Request should contain '999', got: %s", reqStr))
+            }
+            
+            println("✓ JSON params with numeric value formatted correctly")
+        }
+    }
+}
+
+if !foundKey {
+    die("Did not find 'key' parameter in JSON body")
+}
+
+// 测试 5: 测试 GetCommonParams 返回的参数值的 ValueString() 方法
+raw4 = `POST / HTTP/1.1
+Content-Type: application/json
+Host: www.example.com
+
+{"number": 1, "float": 1.5, "string": "text"}`
+
+freq4 = fuzz.MustHTTPRequest(raw4)
+params4 = freq4.GetCommonParams()
+
+for param in params4 {
+    // 测试 ValueString() 方法不会产生 %!s(...) 格式的错误
+    valueStr = param.ValueString()
+    
+    if valueStr.Contains("%!s(") {
+        die(sprintf("param.ValueString() contains wrong format: %s for param: %s", valueStr, param.Name()))
+    }
+    
+    println(sprintf("✓ param '%s' ValueString() = '%s' (no format error)", param.Name(), valueStr))
+}
+
+println("✓ All tests passed!")
+
