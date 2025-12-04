@@ -147,41 +147,23 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 }
 
 func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
-	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByExact(ctx, p.Program, mod, s),
-		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, err := p.NewValue(i); err != nil {
-				log.Errorf("ExactMatch: new value failed: %v", err)
-				return nil, false
-			} else {
-				return v, true
-			}
-		},
-	)
-	return len(values) > 0, values, nil
+	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
 }
 
 func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
-	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByGlob(ctx, p.Program, mod, g),
-		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, err := p.NewValue(i); err != nil {
-				log.Errorf("GlobMatch: new value failed: %v", err)
-				return nil, false
-			} else {
-				return v, true
-			}
-		},
-	)
-	return len(values) > 0, values, nil
+	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
 }
 
 func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
+}
+
+func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionByRegexp(ctx, p.Program, mod, re),
+		ssa.MatchInstructionsByVariable(ctx, p.Program, compareMode, mod, pattern),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {
-				log.Errorf("RegexpMatch: new value failed: %v", err)
+				log.Errorf("matchVariable: new value failed: %v", err)
 				return nil, false
 			} else {
 				return v, true
