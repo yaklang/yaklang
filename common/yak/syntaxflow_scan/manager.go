@@ -3,7 +3,6 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"strings"
 	"sync"
 	"time"
@@ -257,15 +256,25 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	if len(config.GetProgramNames()) == 0 {
-		if config.GetProjectID() == 0 {
-			return utils.Errorf("SyntaxFlow Scan Failed:SSA Program Name is empty and Project ID is zero")
+		for _, name := range config.GetProgramNames() {
+			prog, err := ssaapi.FromDatabase(name)
+			if err != nil {
+				log.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database", name)
+			}
+			config.Programs = append(config.Programs, prog)
 		}
+	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
 		if err != nil {
 			return utils.Errorf("SyntaxFlow Scan Failed: query latest SSA Program Name by Project ID failed: %s", err)
 		}
-		config.Update(ssaconfig.WithProgramNames(name))
+		prog, err := ssaapi.FromDatabase(name)
+		config.Programs = append(config.Programs, prog)
+	}
+
+	if len(config.Programs) == 0 {
+		return utils.Errorf("SyntaxFlow Scan Failed: SSA Program is empty")
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
@@ -284,15 +293,17 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	log.Errorf("config: %v", config.Config.GetRuleInput())
-	if input := config.GetRuleInput(); input != nil {
+	if input := config.GetRuleInput(); len(input) != 0 {
 		// start debug mode scan task
 		ruleCh := make(chan *schema.SyntaxFlowRule)
 		go func() {
 			defer close(ruleCh)
-			if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
-				m.errorCallback("compile rule failed: %s", err)
-			} else {
-				ruleCh <- rule
+			for _, rinput := range input {
+				if rule, err := yakit.ParseSyntaxFlowInput(rinput); err != nil {
+					m.errorCallback("compile rule failed: %s", err)
+				} else {
+					ruleCh <- rule
+				}
 			}
 		}()
 		m.ruleChan = ruleCh

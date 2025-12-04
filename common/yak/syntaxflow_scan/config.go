@@ -46,6 +46,8 @@ type ScanTaskCallback struct {
 	// 设置为 true 时，会显示每个规则在每个程序上的详细执行时间
 	EnableRulePerformanceLog bool `json:"-"`
 	ProcessWithRule          bool `json:"-"`
+
+	Programs []*ssaapi.Program `json:"-"`
 }
 
 const (
@@ -83,6 +85,14 @@ var WithProcessRuleDetail = ssaconfig.SetOption("syntaxflow-scan/processRuleDeta
 var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerformanceLog", func(c *Config, enable bool) {
 	c.EnableRulePerformanceLog = enable
 })
+
+var withPrograms = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs []*ssaapi.Program) {
+	c.ScanTaskCallback.Programs = progs
+})
+
+func WithPrograms(programs ...*ssaapi.Program) ssaconfig.Option {
+	return withPrograms(programs)
+}
 
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
 	cfg := &Config{

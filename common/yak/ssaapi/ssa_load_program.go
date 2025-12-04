@@ -4,7 +4,9 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/glob"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 var ProgramCache = utils.NewLRUCache[*Program](10)
@@ -45,4 +47,25 @@ func fromDatabase(name string) (*Program, error) {
 	ret.enableDatabase = true // enable database
 	ret.irProgram = prog.GetIrProgram()
 	return ret, nil
+}
+
+func LoadProgramGlob(match string) []*Program {
+	programs := []*Program{}
+
+	var irprogram []*ssadb.IrProgram
+	regexpStr := glob.Glob2Regex(match)
+	ssadb.GetDB().Debug().Model(&ssadb.IrProgram{}).Where("program_name REGEXP ?", regexpStr).
+		Where("program_kind = ?", "application").
+		Find(&irprogram)
+
+	for _, irp := range irprogram {
+		p, err := FromDatabase(irp.ProgramName)
+		if err != nil {
+			log.Errorf("load program %s from database fail: %v", irp.ProgramName, err)
+			continue
+		}
+		programs = append(programs, p)
+	}
+
+	return programs
 }

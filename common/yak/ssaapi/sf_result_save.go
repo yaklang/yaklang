@@ -134,7 +134,7 @@ func (r *SyntaxFlowResult) save(
 	result.Kind = kind
 	result.RuleTitle = rule.Title
 	result.RuleSeverity = string(schema.ValidSeverityType(rule.Severity))
-	result.RuleDesc = rule.Description
+	// result.RuleDesc = rule.Description
 	result.AlertDesc = rule.AlertDesc
 	result.RuleContent = rule.Content
 	// program
