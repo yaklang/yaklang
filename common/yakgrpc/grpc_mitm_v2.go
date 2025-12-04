@@ -212,21 +212,33 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if endpoint == nil {
 					continue
 				}
-				url := strings.TrimSpace(endpoint.GetUrl())
-				if url == "" {
+				url := yakit.BuildProxyEndpointURL(endpoint)
+				if strings.TrimSpace(url) == "" {
 					continue
 				}
 				endpointURLByID[endpoint.GetId()] = url
 			}
-			var rule *ypb.ProxyRoute
+			var (
+				rule         *ypb.ProxyRoute
+				ruleDisabled bool
+			)
 			for _, r := range cfg.GetRoutes() {
-				if r != nil && strings.EqualFold(r.GetId(), ruleID) {
-					rule = r
+				if r == nil || !strings.EqualFold(r.GetId(), ruleID) {
+					continue
+				}
+				if r.GetDisabled() {
+					ruleDisabled = true
 					break
 				}
+				rule = r
+				break
 			}
 			if rule == nil {
-				feedbackToUser(fmt.Sprintf("未找到代理规则 / proxy rule not found: %s", ruleID))
+				if ruleDisabled {
+					feedbackToUser(fmt.Sprintf("代理规则已禁用 / proxy rule disabled: %s", ruleID))
+				} else {
+					feedbackToUser(fmt.Sprintf("未找到代理规则 / proxy rule not found: %s", ruleID))
+				}
 			} else {
 				ruleProxies := make([]string, 0, len(rule.GetEndpointIds()))
 				for _, endpointID := range rule.GetEndpointIds() {

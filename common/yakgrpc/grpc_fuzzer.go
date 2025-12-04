@@ -53,6 +53,65 @@ func Chardet(raw []byte) string {
 	return res.Charset
 }
 
+func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
+	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
+	ruleID := strings.TrimSpace(req.GetProxyRuleId())
+	if ruleID == "" {
+		return proxies, nil
+	}
+
+	cfg, err := yakit.GetGlobalProxyRulesConfig()
+	if err != nil {
+		return nil, err
+	}
+	if cfg == nil {
+		return nil, utils.Errorf("proxy rule config not initialized")
+	}
+
+	endpointURLByID := make(map[string]string, len(cfg.GetEndpoints()))
+	for _, endpoint := range cfg.GetEndpoints() {
+		if endpoint == nil {
+			continue
+		}
+		url := yakit.BuildProxyEndpointURL(endpoint)
+		if strings.TrimSpace(url) == "" {
+			continue
+		}
+		endpointURLByID[endpoint.GetId()] = url
+	}
+
+	var rule *ypb.ProxyRoute
+	for _, route := range cfg.GetRoutes() {
+		if route == nil {
+			continue
+		}
+		if strings.EqualFold(route.GetId(), ruleID) {
+			if route.GetDisabled() {
+				return nil, utils.Errorf("proxy rule disabled: %s", ruleID)
+			}
+			rule = route
+			break
+		}
+	}
+	if rule == nil {
+		return nil, utils.Errorf("proxy rule not found: %s", ruleID)
+	}
+
+	ruleProxies := make([]string, 0, len(rule.GetEndpointIds()))
+	for _, endpointID := range rule.GetEndpointIds() {
+		if url := strings.TrimSpace(endpointURLByID[endpointID]); url != "" {
+			ruleProxies = append(ruleProxies, url)
+		}
+	}
+	if len(ruleProxies) == 0 {
+		return nil, utils.Errorf("proxy rule has no available endpoint: %s", ruleID)
+	}
+
+	proxies = append(proxies, ruleProxies...)
+	proxies = utils.StringArrayFilterEmpty(lo.Uniq(proxies))
+	return proxies, nil
+}
+
 func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.ExtractedUrl, error) {
 	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableDangerousTag(), mutate.Fuzz_WithResultLimit(1))
 	if err != nil {
@@ -590,8 +649,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	if !isRetry && len(rawRequest) <= 0 {
 		return utils.Errorf("empty request is not allowed")
 	}
-
-	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
+	log.Infof("build fuzzer proxy list: %s", req.GetProxyRuleId())
+	log.Infof("build fuzzer proxy list: %s", req.GetProxy())
+	proxies, err := buildFuzzerProxyList(req)
+	if err != nil {
+		return err
+	}
 	concurrent := req.GetConcurrent()
 	if concurrent <= 0 {
 		concurrent = 20
