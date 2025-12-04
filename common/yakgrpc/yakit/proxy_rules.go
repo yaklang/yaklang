@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -30,6 +31,31 @@ func normalizePatterns(patterns []string) []string {
 		res = append(res, pattern)
 	}
 	return lo.Uniq(res)
+}
+
+func BuildProxyEndpointURL(endpoint *ypb.ProxyEndpoint) string {
+	if endpoint == nil {
+		return ""
+	}
+	rawURL := strings.TrimSpace(endpoint.GetUrl())
+	if rawURL == "" {
+		return ""
+	}
+	username := strings.TrimSpace(endpoint.GetUserName())
+	password := endpoint.GetPassword()
+	if username == "" && password == "" {
+		return rawURL
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	if password != "" {
+		parsed.User = url.UserPassword(username, password)
+	} else {
+		parsed.User = url.User(username)
+	}
+	return parsed.String()
 }
 
 func GetGlobalProxyRulesConfig() (*ypb.GlobalProxyRulesConfig, error) {
@@ -86,9 +112,11 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 			continue
 		}
 		normalized.Endpoints = append(normalized.Endpoints, &ypb.ProxyEndpoint{
-			Id:   id,
-			Name: strings.TrimSpace(endpoint.GetName()),
-			Url:  url,
+			Id:       id,
+			Name:     strings.TrimSpace(endpoint.GetName()),
+			Url:      url,
+			UserName: strings.TrimSpace(endpoint.GetUserName()),
+			Password: endpoint.GetPassword(),
 		})
 	}
 
@@ -115,14 +143,17 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 			_, ok := validEndpointIDs[item]
 			return ok
 		})
+		filteredEndpointIDs = lo.Uniq(filteredEndpointIDs)
+		disabled := route.GetDisabled()
 		if len(filteredEndpointIDs) == 0 {
-			continue
+			disabled = true
 		}
 		normalized.Routes = append(normalized.Routes, &ypb.ProxyRoute{
 			Id:          id,
 			Name:        strings.TrimSpace(route.GetName()),
 			Patterns:    filteredPatterns,
-			EndpointIds: lo.Uniq(filteredEndpointIDs),
+			EndpointIds: filteredEndpointIDs,
+			Disabled:    disabled,
 		})
 	}
 
@@ -143,6 +174,8 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 				ExternalID: endpoint.GetId(),
 				Name:       endpoint.GetName(),
 				URL:        endpoint.GetUrl(),
+				Username:   endpoint.GetUserName(),
+				Password:   endpoint.GetPassword(),
 			}
 			if err := tx.Create(model).Error; err != nil {
 				return err
@@ -153,6 +186,7 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 			model := &schema.ProxyRoute{
 				ExternalID: route.GetId(),
 				Name:       route.GetName(),
+				Disabled:   route.GetDisabled(),
 			}
 			model.UpdatePatterns(route.GetPatterns())
 			model.UpdateEndpointIDs(route.GetEndpointIds())

@@ -12,6 +12,8 @@ type ProxyEndpoint struct {
 	ExternalID string `gorm:"column:external_id;unique_index"`
 	Name       string `gorm:"column:name"`
 	URL        string `gorm:"column:url"`
+	Username   string `gorm:"column:username"`
+	Password   string `gorm:"column:password"`
 }
 
 func (p *ProxyEndpoint) ToProto() *ypb.ProxyEndpoint {
@@ -19,9 +21,11 @@ func (p *ProxyEndpoint) ToProto() *ypb.ProxyEndpoint {
 		return nil
 	}
 	return &ypb.ProxyEndpoint{
-		Id:   p.ExternalID,
-		Name: p.Name,
-		Url:  p.URL,
+		Id:       p.ExternalID,
+		Name:     p.Name,
+		Url:      p.URL,
+		UserName: p.Username,
+		Password: p.Password,
 	}
 }
 
@@ -31,6 +35,7 @@ type ProxyRoute struct {
 	Name         string `gorm:"column:name"`
 	PatternsRaw  string `gorm:"column:patterns;type:text"`
 	EndpointsRaw string `gorm:"column:endpoint_ids;type:text"`
+	Disabled     bool   `gorm:"column:disabled"`
 }
 
 func (p *ProxyRoute) Patterns() []string {
@@ -64,6 +69,7 @@ func (p *ProxyRoute) ToProto() *ypb.ProxyRoute {
 		Name:        p.Name,
 		Patterns:    p.Patterns(),
 		EndpointIds: p.EndpointIDs(),
+		Disabled:    p.Disabled,
 	}
 }
 
