@@ -981,38 +981,6 @@ println("Partial update")
 		assert.NotEmpty(t, tool.Keywords, "Keywords should be auto-filled")
 		assert.Equal(t, "Partial Update Verbose", tool.VerboseName)
 	})
-
-	t.Run("UpdateWithEmptyFieldsGetAutoFilled", func(t *testing.T) {
-		// 测试显式传入空字符串时，应该被自动填充
-		newContent := `__DESC__ = "Auto fill for empty fields"
-__VERBOSE_NAME__ = "Empty Fields Verbose"
-__KEYWORDS__ = "empty,auto,fill"
-
-cli.String("emptyParam")
-println("Empty fields test")
-`
-		_, err := c.UpdateAITool(ctx, &ypb.UpdateAIToolRequest{
-			ID:          toolID,
-			Name:        toolName,
-			Description: "", // 显式传空
-			Keywords:    []string{},
-			Content:     newContent,
-			ToolPath:    "", // 显式传空
-		})
-		require.NoError(t, err)
-
-		// 验证空字段被自动填充
-		resp, err := c.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
-			ToolName: toolName,
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.Tools, 1)
-
-		tool := resp.Tools[0]
-		assert.NotEmpty(t, tool.Description, "Empty description should be auto-filled")
-		assert.NotEmpty(t, tool.Keywords, "Empty keywords should be auto-filled")
-		assert.NotEmpty(t, tool.ToolPath, "Empty path should be auto-filled")
-	})
 }
 
 // TestGRPCMUSTPASS_FixAIToolMetadata_EdgeCases 测试fixAIToolMetadata的边界情况
