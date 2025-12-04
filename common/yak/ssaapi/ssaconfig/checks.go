@@ -83,3 +83,16 @@ func (c *Config) ensureCodeSource(field string) error {
 	}
 	return nil
 }
+
+func (c *Config) ensureOutput(field string) error {
+	if c == nil {
+		return nil
+	}
+	if c.Mode&ModeOutput == 0 {
+		return utils.Errorf("Config: %s can only be set in Output mode", field)
+	}
+	if c.Output == nil {
+		c.Output = defaultOutputConfig()
+	}
+	return nil
+}

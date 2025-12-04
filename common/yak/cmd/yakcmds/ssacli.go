@@ -1182,6 +1182,12 @@ var ssaCodeScan = &cli.Command{
 	Name:    "code-scan",
 	Aliases: []string{"codescan,sfscan"},
 	Flags: []cli.Flag{
+		// Config file
+		cli.StringFlag{
+			Name:  "config,c",
+			Usage: "load scan configuration from JSON file",
+		},
+
 		// Input {{{
 		// program name
 		cli.StringFlag{

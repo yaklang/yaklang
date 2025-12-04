@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func SyncEmbedRule(force ...bool) {
@@ -35,15 +36,8 @@ func SyncEmbedRule(force ...bool) {
 }
 
 type ssaCliConfig struct {
-	// {{ parse program
-	// programName is the name of the program
-	programName string
-	// targetPath is the path of the target
-	targetPath string
-
-	language string
-	memory   bool
-	// }}
+	// 统一配置
+	*ssaconfig.Config
 
 	// {{ should result
 	// OutputWriter is the file to save the result
@@ -55,8 +49,6 @@ type ssaCliConfig struct {
 	// {{ defer function
 	deferFunc []func()
 	// }}
-
-	exclude string
 }
 
 func (config *ssaCliConfig) DeferFunc() {
@@ -75,36 +67,108 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 			err = utils.Errorf("parse config failed: %s", err)
 		}
 	}()
-	// Parse and validate output configuration
-	config := &ssaCliConfig{}
-	// 	OutputFile:  writer,
-	// 	Format:      format,
-	// 	programName: programName,
-	// 	targetPath:  targetPath,
-	// }
 
-	config.Format = sfreport.ReportTypeFromString(c.String("format"))
+	// 收集所有配置选项
+	var opts []ssaconfig.Option
+
+	// Check if config file is provided
+	configFilePath := c.String("config")
+	if configFilePath != "" {
+		log.Infof("Loading scan configuration from file: %s", configFilePath)
+		data, err := os.ReadFile(configFilePath)
+		if err != nil {
+			return nil, utils.Errorf("failed to read config file %s: %v", configFilePath, err)
+		}
+		// 从JSON加载配置
+		opts = append(opts, ssaconfig.WithJsonRawConfig(data))
+	}
+
+	// 命令行参数优先级高于配置文件
+
+	// Output format
+	if format := c.String("format"); format != "" {
+		opts = append(opts, ssaconfig.WithOutputFormat(format))
+	}
 
 	// Parse program configuration
-	programName := c.String("program")
-	targetPath := c.String("target")
-	if programName == "" && targetPath == "" {
-		return nil, utils.Errorf("either --program or --target must be specified")
-	} else {
-		config.programName = programName
-		config.targetPath = targetPath
+	if programName := c.String("program"); programName != "" {
+		opts = append(opts, ssaconfig.WithProgramNames(programName))
 	}
-	config.language = c.String("language")
-	config.memory = c.Bool("memory")
 
-	// result  writer
-	// var writer io.Writer
-	outputFile := c.String("output")
+	// target path -> code source
+	if targetPath := c.String("target"); targetPath != "" {
+		opts = append(opts, ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal))
+		opts = append(opts, ssaconfig.WithCodeSourceLocalFile(targetPath))
+	}
+
+	// Language
+	if language := c.String("language"); language != "" {
+		opts = append(opts, ssaconfig.WithProjectRawLanguage(language))
+	}
+
+	// Memory mode
+	if c.Bool("memory") {
+		opts = append(opts, ssaconfig.WithCompileMemoryCompile(true))
+		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(true))
+	}
+
+	// Output file
+	if outputFile := c.String("output"); outputFile != "" {
+		opts = append(opts, ssaconfig.WithOutputFile(outputFile))
+	}
+
+	// Exclude patterns
+	if excludeFiles := c.StringSlice("exclude-file"); len(excludeFiles) > 0 {
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludeFiles))
+	}
+
+	// with-file-content
+	if c.Bool("with-file-content") {
+		opts = append(opts, ssaconfig.WithOutputFileContent(true))
+	}
+
+	// with-dataflow-path
+	if c.Bool("with-dataflow-path") {
+		opts = append(opts, ssaconfig.WithOutputDataflowPath(true))
+	}
+
+	// 创建统一配置
+	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
+	if err != nil {
+		return nil, utils.Errorf("failed to create config: %v", err)
+	}
+
+	// 调试日志
+	log.Infof("Config loaded: programName=%s, language=%s, targetPath=%s, outputFile=%s, outputFormat=%s",
+		cfg.GetProgramName(), cfg.GetLanguage(), cfg.GetCodeSourceLocalFileOrURL(),
+		cfg.GetOutputFile(), cfg.GetOutputFormat())
+
+	// 验证必要配置
+	programName := cfg.GetProgramName()
+	targetPath := cfg.GetCodeSourceLocalFileOrURL()
+
+	if programName == "" && targetPath == "" {
+		return nil, utils.Errorf("either --program, --target, or --config with valid code_source must be specified")
+	}
+
+	config := &ssaCliConfig{
+		Config: cfg,
+	}
+
+	// 设置输出格式
+	outputFormat := cfg.GetOutputFormat()
+	if outputFormat == "" {
+		outputFormat = "sarif" // 默认格式
+	}
+	config.Format = sfreport.ReportTypeFromString(outputFormat)
+
+	// 处理输出文件
+	outputFile := cfg.GetOutputFile()
 	if outputFile == "" {
 		log.Infof("output file is not specified, use stdout")
-		// writer = os.Stdout
 		config.OutputWriter = os.Stdout
 	} else {
+		// Add appropriate file extension
 		if config.Format == sfreport.SarifReportType {
 			if filepath.Ext(outputFile) != ".sarif" {
 				outputFile += ".sarif"
@@ -114,6 +178,8 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 				outputFile += ".json"
 			}
 		}
+
+		// Backup existing file
 		if utils.GetFirstExistedFile(outputFile) != "" {
 			backup := outputFile + ".bak"
 			os.Rename(outputFile, backup)
@@ -130,10 +196,6 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		})
 	}
 
-	if e := c.String("exclude-file"); e != "" {
-		config.exclude = e
-	}
-
 	return config, nil
 }
 
@@ -147,19 +209,32 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	if config.programName != "" {
-		log.Infof("get program from database: %s", config.programName)
-		return ssaapi.FromDatabase(config.programName)
-	}
-	if config.targetPath != "" {
-		log.Infof("get program from target path: %s", config.targetPath)
+
+	targetPath := config.GetCodeSourceLocalFileOrURL()
+	programName := config.GetProgramName()
+	language := string(config.GetLanguage())
+	memory := config.GetCompileMemory() || config.GetSyntaxFlowMemory()
+	excludeFiles := config.GetCompileExcludeFiles()
+
+	// Priority: targetPath > programName (compile from source > database lookup)
+	if targetPath != "" {
+		log.Infof("get program from target path: %s", targetPath)
 		para := make(map[string]any)
-		if config.memory {
+		if memory {
 			para["memory"] = true
-			para["excludeFile"] = config.exclude
 		}
-		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, true, para)
+		if len(excludeFiles) > 0 {
+			para["excludeFile"] = excludeFiles
+		}
+		if programName != "" {
+			para["program_name"] = programName
+		}
+		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, targetPath, language, true, para)
 		return prog, err
+	}
+	if programName != "" {
+		log.Infof("get program from database: %s", programName)
+		return ssaapi.FromDatabase(programName)
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
 }
