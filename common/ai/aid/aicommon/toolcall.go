@@ -361,11 +361,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Success = false
 	}
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
-	toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
-	if ok {
-		t.emitter.EmitToolCallResult(tool.Name, toolExecutionResult.Result, t.task.GetIndex())
+	if toolResult.Data != nil {
+		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
+		if ok {
+			t.emitter.EmitToolCallResult(tool.Name, toolExecutionResult.Result, t.task.GetIndex())
 
+		}
 	}
+
 	return toolResult, false, nil
 }
 
