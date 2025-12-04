@@ -103,6 +103,25 @@ func MatchModeString(mode int) string {
 	return "Unknown"
 }
 
+// MatchModeStringZh 返回搜索模式的中文描述
+func MatchModeStringZh(mode int) string {
+	switch {
+	case mode == NameMatch:
+		return "名称"
+	case mode == KeyMatch:
+		return "键"
+	case mode == BothMatch:
+		return "名称+键"
+	case mode&KeyMatch != 0 && mode&NameMatch == 0:
+		return "键"
+	case mode&NameMatch != 0 && mode&KeyMatch == 0:
+		return "名称"
+	case mode&BothMatch == BothMatch:
+		return "名称+键"
+	}
+	return "名称"
+}
+
 type ValueOperator interface {
 	String() string
 	IsMap() bool

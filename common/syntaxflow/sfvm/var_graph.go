@@ -43,8 +43,8 @@ const (
 	AnalysisStepTypeNormal AnalysisStepType = iota
 	AnalysisStepTypeDataFlow
 	AnalysisStepTypeSearch
-	AnalysisStepTypeFilter
-	AnalysisStepTypeGet
+	AnalysisStepTypeConditionFilter
+	AnalysisStepTypeTransform
 )
 
 func (t AnalysisStepType) String() string {
@@ -55,12 +55,12 @@ func (t AnalysisStepType) String() string {
 		return "DataFlow"
 	case AnalysisStepTypeSearch:
 		return "Search"
-	case AnalysisStepTypeFilter:
-		return "Filter"
-	case AnalysisStepTypeGet:
-		return "Get"
+	case AnalysisStepTypeConditionFilter:
+		return "ConditionFilter"
+	case AnalysisStepTypeTransform:
+		return "Transform"
 	default:
-		return "Unknown"
+		return "Normal"
 	}
 }
 
@@ -165,7 +165,7 @@ func (g *VarFlowGraph) ExitConditionWithFilter(sfi *SFI) {
 	}
 	g.popConditionStack()
 	rootNode := g.popEvidenceNode()
-	g.CreateStep(AnalysisStepTypeFilter, sfi, WithEvidenceTree(rootNode))
+	g.CreateStep(AnalysisStepTypeConditionFilter, sfi, WithEvidenceTree(rootNode))
 }
 
 func (g *VarFlowGraph) PushFilterCondition(sfi *SFI, passed, failed ValueOperator) {

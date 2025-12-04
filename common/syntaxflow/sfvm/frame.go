@@ -605,8 +605,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Search Exact by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过名称 【%s】 精确搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeExact, i.UnaryStr, mod, false),
 			WithValues(next),
 		)
 	case OpRecursiveSearchExact:
@@ -649,8 +648,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push next")
 
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Recursive Search Exact by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过名称 【%s】 递归精确搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeExact, i.UnaryStr, BothMatch, true),
 			WithValues(results),
 		)
 	case OpRecursiveSearchGlob:
@@ -700,9 +698,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 
+		// mod|NameMatch 在上面的 GlobMatch 调用中使用
+		actualMod := mod | NameMatch
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Recursive Search Glob by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过名称 【%s】 递归搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeFuzzy, i.UnaryStr, actualMod, true),
 			WithValues(results),
 		)
 	case OpRecursiveSearchRegexp:
@@ -755,9 +754,10 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
 
+		// mod|NameMatch 在上面的 RegexpMatch 调用中使用
+		actualMod := mod | NameMatch
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Recursive Search Regexp by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过正则表达式 【%s】 递归搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeRegexp, i.UnaryStr, actualMod, true),
 			WithValues(results),
 		)
 	case OpPushSearchGlob:
@@ -802,8 +802,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Fuzzy Search by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过名称【%s】模糊匹配搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeFuzzy, i.UnaryStr, mod, false),
 			WithValues(next),
 		)
 	case OpPushSearchRegexp:
@@ -846,8 +845,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
-			WithLabel(fmt.Sprintf("Regexp Search by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("通过正则表达式【%s】搜索", i.UnaryStr)),
+			WithSearchMode(SearchTypeRegexp, i.UnaryStr, mod, false),
 			WithValues(next),
 		)
 	case OpPopDuplicate:
@@ -909,9 +907,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push len: %v", callLen)
 		s.stack.Push(results)
 
-		s.CreateAnalysisStep(AnalysisStepTypeGet, i,
-			WithLabel("Get Call"),
-			WithLabelZh("获取调用"),
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription("Get Call"),
+			WithDescriptionZh("获取调用"),
 			WithValues(results),
 		)
 	case OpGetCallArgs:
@@ -939,9 +937,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< stack grow")
 
 		s.stack.Push(results)
-		s.CreateAnalysisStep(AnalysisStepTypeGet, i,
-			WithLabel("Get Call Args"),
-			WithLabelZh("获取调用参数"),
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription("Get Call Args"),
+			WithDescriptionZh("获取调用参数"),
 			WithValues(results),
 		)
 	case OpGetUsers:
@@ -971,8 +969,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push users")
 		s.stack.Push(vals)
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithLabel("Get User"),
-			WithLabelZh("获取下一级数据流"),
+			WithDescription("Get Users"),
+			WithDescriptionZh("获取下一级数据流"),
 			WithValues(vals),
 		)
 	case OpGetBottomUsers:
@@ -1002,8 +1000,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(vals)
 
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithLabel("Get Bottom Users"),
-			WithLabelZh("进行自顶向下数据流分析"),
+			WithDescription("Get Bottom Users"),
+			WithDescriptionZh("进行自顶向下数据流分析"),
 			WithValues(vals),
 		)
 	case OpGetDefs:
@@ -1029,8 +1027,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push users %v", ValuesLen(vals))
 		s.stack.Push(vals)
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithLabel("Get Defs"),
-			WithLabelZh("获取上一级数据流"),
+			WithDescription("Get Defs"),
+			WithDescriptionZh("获取上一级数据流"),
 			WithValues(vals),
 		)
 	case OpGetTopDefs:
@@ -1061,8 +1059,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		s.stack.Push(vals)
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithLabel("Get TopDefs"),
-			WithLabelZh("进行自顶向下数据流分析"),
+			WithDescription("Get TopDefs"),
+			WithDescriptionZh("进行自顶向下数据流分析"),
 			WithValues(vals),
 		)
 	case OpNewRef:
@@ -1619,9 +1617,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)
 
-		s.CreateAnalysisStep(AnalysisStepTypeGet, i,
-			WithLabel(fmt.Sprintf("Native Call by [%s]", i.UnaryStr)),
-			WithLabelZh(fmt.Sprintf("调用NativeCall 【%s】;描述：%s", i.UnaryStr, description)),
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription(fmt.Sprintf("Native Call by [%s]", i.UnaryStr)),
+			WithDescriptionZh(fmt.Sprintf("调用NativeCall 【%s】;描述：%s", i.UnaryStr, description)),
 			WithValues(ret),
 		)
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
