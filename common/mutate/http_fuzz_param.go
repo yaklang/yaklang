@@ -2,8 +2,9 @@ package mutate
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -232,7 +233,7 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 }
 
 func (p *FuzzHTTPRequestParam) ValueString() string {
-	return fmt.Sprintf("%s", p.Value())
+	return utils.InterfaceToString(p.Value())
 }
 
 func (p *FuzzHTTPRequestParam) Repeat(i int) FuzzHTTPRequestIf {
