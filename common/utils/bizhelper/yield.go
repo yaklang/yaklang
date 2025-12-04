@@ -10,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var defaultYieldSize = 1024
+
 type YieldModelConfig struct {
 	Size          int
 	IndexField    string
@@ -20,7 +22,7 @@ type YieldModelConfig struct {
 
 func NewYieldModelConfig() *YieldModelConfig {
 	return &YieldModelConfig{
-		Size:       1024,
+		Size:       defaultYieldSize,
 		IndexField: "id",
 	}
 }

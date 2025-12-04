@@ -135,8 +135,8 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 
 func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
-		ssa.MatchInstructionByExact(
-			context.Background(), p.Program, ssadb.NameMatch, name,
+		ssa.MatchInstructionsByVariable(
+			context.Background(), p.Program, ssadb.ExactCompare, ssadb.NameMatch, name,
 		),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {

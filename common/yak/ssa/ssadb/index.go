@@ -1,6 +1,9 @@
 package ssadb
 
-import "github.com/jinzhu/gorm"
+import (
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
+)
 
 type IrIndex struct {
 	gorm.Model
@@ -36,7 +39,15 @@ func CreateIndex(progName string) *IrIndex {
 }
 
 func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
-	_ = db.Save(idx).Error
+	if idx == nil || db == nil {
+		return
+	}
+	err := diagnostics.Track("Database.SaveIRIndex", func() error {
+		return db.Save(idx).Error
+	})
+	if err != nil {
+		log.Warnf("SaveIrIndex failed: %v", err)
+	}
 }
 
 type IrVariable struct {

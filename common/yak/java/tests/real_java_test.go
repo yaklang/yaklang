@@ -351,7 +351,9 @@ func TestRuleRun(t *testing.T) {
 	require.NoError(t, err)
 	_ = rule
 
-	progName := "RuoYi-Cloud-Plus(2025-1125-06:20)"
+	diagnostics.SetLevel(diagnostics.LevelLow)
+
+	progName := "RuoYi-Cloud-Plus(2025-12-03 15:22:29)"
 	prog, err := ssaapi.FromDatabase(progName)
 	require.NoError(t, err)
 
@@ -359,9 +361,7 @@ func TestRuleRun(t *testing.T) {
 
 
 // 声明式参数绑定(注解方式)
-*Mapping.__ref__?{opcode: function} as $start;
-$start<getFormalParams>?{opcode: param && !have: this} as $params;
-$params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
+*Mapping as $a 
 	`
 
 	result, err := prog.SyntaxFlowWithError(content,
@@ -369,9 +369,12 @@ $params?{!<typeName>?{have:'javax.servlet.http'}} as $output;
 			log.Infof("Progress: %.2f%%, Status: %s", f*100, s)
 		}),
 		ssaapi.QueryWithEnableDebug(),
-		ssaapi.QueryWithRuleDiagnosticsRecorder(),
+		// ssaapi.QueryWithRuleDiagnosticsRecorder(),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	result.GetValues("result").Show()
+	require.Equal(t, 409, result.GetValues("a").Len())
+
+	diagnostics.LogRecorder("")
+
 }

@@ -42,17 +42,17 @@ func WithFastPaginator_IndexField(selectField string) FastPaginatorOpts {
 
 func FastPagination[T any](ctx context.Context, db *gorm.DB, cfg *YieldModelConfig, opts ...FastPaginatorOpts) chan T {
 	outC := make(chan T)
+	size := defaultYieldSize
+	if cfg != nil {
+		if cfg.Size > 0 {
+			size = cfg.Size
+		}
+		if cfg.IndexField != "" {
+			opts = append(opts, WithFastPaginator_IndexField(cfg.IndexField))
+		}
+	}
 	go func() {
 		defer close(outC)
-		size := 0
-		if cfg != nil {
-			if cfg.Size > 0 {
-				size = cfg.Size
-			}
-			if cfg.IndexField != "" {
-				opts = append(opts, WithFastPaginator_IndexField(cfg.IndexField))
-			}
-		}
 
 		paginator := NewFastPaginator(db, size, opts...)
 		if cfg != nil && cfg.CountCallback != nil {
