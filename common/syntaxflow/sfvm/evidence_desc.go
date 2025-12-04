@@ -188,3 +188,35 @@ func (s *SearchMode) GenerateDescZh() string {
 		return fmt.Sprintf("%s搜索【%s】%s", prefix, s.Pattern, matchModeDesc)
 	}
 }
+
+func GenerateNativeCallDesc(name string, configs []*RecursiveConfigItem) string {
+	if len(configs) == 0 {
+		return fmt.Sprintf("Native Call [%s]", name)
+	}
+	var params []string
+	for _, cfg := range configs {
+		if cfg != nil {
+			params = append(params, fmt.Sprintf("%s=%s", cfg.Key, cfg.Value))
+		}
+	}
+	if len(params) == 0 {
+		return fmt.Sprintf("Native Call [%s]", name)
+	}
+	return fmt.Sprintf("Native Call [%s] with params: %s", name, strings.Join(params, ", "))
+}
+
+func GenerateNativeCallDescZh(name string, configs []*RecursiveConfigItem, nativeCallDesc string) string {
+	if len(configs) == 0 {
+		return fmt.Sprintf("调用 NativeCall【%s】；描述：%s", name, nativeCallDesc)
+	}
+	var params []string
+	for _, cfg := range configs {
+		if cfg != nil {
+			params = append(params, fmt.Sprintf("%s=%s", cfg.Key, cfg.Value))
+		}
+	}
+	if len(params) == 0 {
+		return fmt.Sprintf("调用 NativeCall【%s】；描述：%s", name, nativeCallDesc)
+	}
+	return fmt.Sprintf("调用 NativeCall【%s】，参数：%s；描述：%s", name, strings.Join(params, ", "), nativeCallDesc)
+}

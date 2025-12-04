@@ -1618,8 +1618,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(ret)
 
 		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
-			WithDescription(fmt.Sprintf("Native Call by [%s]", i.UnaryStr)),
-			WithDescriptionZh(fmt.Sprintf("调用NativeCall 【%s】;描述：%s", i.UnaryStr, description)),
+			WithDescription(GenerateNativeCallDesc(i.UnaryStr, i.SyntaxFlowConfig)),
+			WithDescriptionZh(GenerateNativeCallDescZh(i.UnaryStr, i.SyntaxFlowConfig, description)),
 			WithValues(ret),
 		)
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
