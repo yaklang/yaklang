@@ -50,15 +50,47 @@
 }
 ```
 
+# **风格限制**
+
+- **极简原则**：压缩后的内容严格不超过 100 字符，即使有大量错误也要高度浓缩
+- **时间锚点**：重要事件必须标注时间点（如：14:23、第3步）
+- **零试错**：移除所有无意义的尝试、试错、探索过程
+- **结果导向**：只保留最终决策、关键数据、核心成果
+- **无冗余**：不要重复说明，不要过度解释
+- **错误聚合**：多个错误用统计数字表示（如：失败3次），不要逐一列举
+
 输出案例：
 
-## Good Case 1
+## Good Case 1: 单一关键事件
 
 {"@action": "timeline-reducer"}
 <|REDUCER_MEMORY_{{ .NONCE }}|>
-之前发生的事件为A，有关键指标B，这个动作需要注意C的行为和潜在风险。
+14:23 配置代理为 http://127.0.0.1:8080，超时30s，启用TLS验证
 <|REDUCER_MEMORY_END_{{ .NONCE }}|>
 
-## Good Case 2
+## Good Case 2: 多个关键决策
 
-{"@action": "timeline-reducer", "reducer_memory": "简短但是有力的回答。"}
+{"@action": "timeline-reducer"}
+<|REDUCER_MEMORY_{{ .NONCE }}|>
+步骤1: 设置并发数=50，步骤2: 过滤规则status=200且size>1KB，步骤3: 发现3个有效端点
+<|REDUCER_MEMORY_END_{{ .NONCE }}|>
+
+## Good Case 3: 简短JSON格式
+
+{"@action": "timeline-reducer", "reducer_memory": "15:40 漏洞确认：SQL注入于/api/user，payload: ' OR 1=1--"}
+
+## Good Case 4: 关键参数记录
+
+{"@action": "timeline-reducer", "reducer_memory": "fuzzer配置: mode=smart, dict=common.txt, threads=20, 成功率18%"}
+
+## Good Case 5: 里程碑事件
+
+{"@action": "timeline-reducer", "reducer_memory": "16:15 完成目标扫描，发现5个C段存活主机，已导出结果至/tmp/scan.txt"}
+
+## Good Case 6: 大量错误的压缩
+
+{"@action": "timeline-reducer", "reducer_memory": "10:30-11:45 连接失败15次(超时12次,拒绝3次)，最终成功，根因：防火墙规则"}
+
+## Good Case 7: 多次试错的浓缩
+
+{"@action": "timeline-reducer", "reducer_memory": "尝试4种payload均失败，改用编码绕过成功，最终利用点：/admin?id=1%27"}
