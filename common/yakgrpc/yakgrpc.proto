@@ -8169,6 +8169,27 @@ message GetSupportedLocalModelsResponse {
 }
 
 
+message WatchProcessStartParams {
+  int64 CheckIntervalSec = 1;
+}
+
+message WatchProcessRequest {
+  WatchProcessStartParams StartParams = 1;
+}
+
+message ProcessInfo {
+  int64 Pid = 1;
+  string Name = 2;
+  string Status = 3;
+  string Exe = 4;
+  string Cmdline = 5;
+}
+
+
+message WatchProcessResponse {
+
+}
+
 
 
 message MITMV2Request{

@@ -146,13 +146,27 @@ func (pw *ProcessesWatcher) scanAndNotify() {
 		currentPIDs[pid] = struct{}{}
 		if _, exists := pw.activeProcesses[pid]; !exists {
 			pw.activeProcesses[pid] = pInfo
-			go pw.supervisor.onProcessCreate(pw.ctx, pInfo)
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Printf("panic in onProcessCreate: %v", err)
+					}
+				}()
+				pw.supervisor.onProcessCreate(pw.ctx, pInfo)
+			}()
 		}
 	}
 	// 阶段 2: 检查已退出进程
 	for pid, pInfo := range pw.activeProcesses {
 		if _, exists := currentPIDs[pid]; !exists {
-			go pw.supervisor.onProcessExit(pw.ctx, pInfo)
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Printf("panic in onProcessCreate: %v", err)
+					}
+				}()
+				pw.supervisor.onProcessExit(pw.ctx, pInfo)
+			}()
 			delete(pw.activeProcesses, pid)
 		}
 	}

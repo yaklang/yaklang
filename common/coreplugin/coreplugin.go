@@ -268,6 +268,14 @@ func init() {
 			withPluginIgnore(true),
 		)
 
+		registerBuildInPlugin(
+			"yak", "劫持进程",
+			withPluginHelp("劫持指定进程的流量到tun设备"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
+		)
+
 		//registerBuildInPlugin(
 		//	"mitm", "MITM 请求修改",
 		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
