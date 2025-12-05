@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 	"net"
 	"os"
 	"runtime"
@@ -62,6 +63,9 @@ var SystemExports = map[string]interface{}{
 	"GetLocalAddress":      GetLocalAddress,
 	"GetLocalIPv4Address":  GetLocalIPv4Address,
 	"GetLocalIPv6Address":  GetLocalIPv6Address,
+
+	"NewConnectionsWatcher": sysproc.NewWatcher,
+	"NewProcessWatcher":     sysproc.NewProcessesWatcher,
 }
 
 // LookupHost 通过DNS服务器，根据域名查找IP

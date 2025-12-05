@@ -1,0 +1,82 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+tunName := cli.String("name", cli.setVerboseName("tun设备名"),cli.setRequired(true))
+pid := cli.Int("pid", cli.setVerboseName("劫持进程id"),cli.setCliGroup("进程信息"))
+pName := cli.String("pName", cli.setVerboseName("劫持进程名"),cli.setCliGroup("进程信息"),cli.setHelp("支持glob模式"))
+cli.check()
+
+
+
+watchingMap := {}
+watchingLock := sync.NewLock()
+
+
+addWatching := func(pId) {
+    watchingLock.Lock()
+    defer watchingLock.Unlock()
+    key := sprint(pId)
+    if watchingMap[key] != undefined {
+        return false
+    }
+    watchingMap[key] = true
+    yakit.StatusCard("监控劫持进程数", len(watchingMap))
+    return true
+}
+
+stopWatching := func(pId) {
+    watchingLock.Lock()
+    defer watchingLock.Unlock()
+    key := sprint(pId)
+    delete(watchingMap, key)
+    yakit.StatusCard("监控劫持进程数", len(watchingMap))
+}
+
+hijackNewIP := func(pid, remoteIP){
+    m,err := netstack.GetPrivilegedSystemRouteManager()
+    if err != nil {
+        m = netstack.GetSystemRouteManager()
+    }
+    err := m.AddIPRoute([remoteIP], tunName )
+    if err !=nil {
+        yakit.Error("add ip[%v] to tunnel device [%s] fail:%v",ipArray,tunName,err )
+    }
+    yakit.Info("sucess add ip route %s to tunnel %s", remoteIP, tunName)
+}
+
+
+watchProcess = func(ctx, ProcessId) {
+    if !addWatching(ProcessId) {
+        yakit.Info("process %d is watching",ProcessId)
+        return
+    }
+
+    yakit.Info("start watch process %d", ProcessId)
+    cWatcher,err := os.NewConnectionsWatcher(ProcessId, hijackNewIP , time.ParseDuration("1s")~)
+    if err != nil {
+        yakit.Error("watch process %d fail %v", ProcessId, err)
+        return
+    }
+    cWatcher.Start(ctx)
+    stopWatching(ProcessId)
+    yakit.Info("stop watch process %d", ProcessId)
+}
+
+
+baseCtx := context.Background()
+if pid > 0 {
+    yakit.StatusCard("监控进程", sprintf("Pid:%s", pid))
+    watchProcess(baseCtx,pid)
+}elif pName != ""{
+    yakit.StatusCard("监控进程", sprintf("Name:%s", pName))
+    pWatcher := os.NewProcessWatcher()
+    pWatcher.Start(baseCtx,func(ctx, pInfo){
+        if str.MatchAnyOfGlob(pInfo.Name,pName){
+            watchProcess(ctx,pInfo.Pid)
+        }
+    } , nil, time.ParseDuration("1s")~)
+    <- baseCtx.Done()
+}else {
+    yakit.Error("empty input")
+}

@@ -214,7 +214,7 @@ func StartTargetMonitor() (*AliveTargetMonitor, error) {
 			m.addAliveTarget(targetIP, key)
 		}
 
-		tcpPayload := GetTCPPayload(buffer)
+		tcpPayload := GetTransportPayload(buffer)
 		if serverName := ReadServerName(tcpPayload); serverName != "" {
 			m.addAliveDomain(serverName, key)
 		}
@@ -222,7 +222,7 @@ func StartTargetMonitor() (*AliveTargetMonitor, error) {
 	return m, nil
 }
 
-func GetTCPPayload(buffer *stack.PacketBuffer) []byte {
+func GetTransportPayload(buffer *stack.PacketBuffer) []byte {
 	allView := buffer.ToView()
 	allView.TrimFront(buffer.LinkHeader().View().Size() + buffer.NetworkHeader().View().Size() + buffer.TransportHeader().View().Size())
 	return allView.ToSlice()
