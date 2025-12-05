@@ -3,14 +3,15 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -184,6 +185,7 @@ func (s *VulinServer) registerUserRoute() {
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				realUser, err := s.database.Authenticate(writer, request)
 				if err != nil {
+					log.Infof("authenticate failed: %v", err)
 					return
 				}
 				id := realUser.ID
