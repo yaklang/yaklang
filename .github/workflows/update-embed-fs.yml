@@ -39,6 +39,18 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
+          cache: false
+
+      - name: Cache Go modules
+        if: ${{env.SKIP_CI != 'true'}}
+        uses: actions/cache@v3
+        id: cache-go-modules
+        with:
+          path: ~/go/pkg/mod
+          key: go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-modules-${{ runner.os }}-1.21-${{ hashFiles('**/go.sum') }}
+
       - name: Try Auto Merge
         if: ${{env.SKIP_CI != 'true'}}
         run: |
