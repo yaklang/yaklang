@@ -2457,6 +2457,8 @@ message ProxyEndpoint {
   string Id = 1;
   string Name = 2;
   string Url = 3;
+  string UserName = 4;
+  string Password = 5;
 }
 
 message ProxyRoute {
@@ -2464,6 +2466,7 @@ message ProxyRoute {
   string Name = 2;
   repeated string Patterns = 3;
   repeated string EndpointIds = 4;
+  bool Disabled = 5;
 }
 
 message GlobalProxyRulesConfig {
@@ -5862,6 +5865,7 @@ message FuzzerRequest {// last index 68
   string FuzzTagMode = 50; // "close"/"standard"/"legacy"
   bool FuzzTagSyncIndex = 51;
   string Proxy = 6;
+  string ProxyRuleId = 70;
   double PerRequestTimeoutSeconds = 7;
   double DialTimeoutSeconds = 61;
 
