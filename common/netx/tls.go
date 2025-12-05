@@ -233,7 +233,7 @@ func LoadCertificatesConfig(i any) error {
 			}
 			ret.GetClientCertificate = func(info *utls.CertificateRequestInfo) (*utls.Certificate, error) {
 				for _, certMap := range hostCertMappings {
-					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.UCertificate) {
+					if utils.MatchAnyOfSubString(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.UCertificate) {
 						return &certMap.UCertificate, nil
 					}
 				}
@@ -291,9 +291,12 @@ func LoadCertificatesConfig(i any) error {
 			//		return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
 			//	}
 			ret.Certificates = presetClientCertificates
+			/*
+				这里在gmtls基础设施内部对证书做了兜底机制 当通过自定义的GetClientCertificate拿不到证书也会尝试根据算法和CA去匹配证书
+			*/
 			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
 				for _, certMap := range hostCertMappings {
-					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.Certificate) {
+					if utils.MatchAnyOfSubString(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.Certificate) {
 						return &certMap.Certificate, nil
 					}
 				}
