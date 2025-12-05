@@ -10,20 +10,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func MatchInstructionByExact(ctx context.Context, prog *Program, mod int, e string) []Instruction {
-	return matchInstructionsByVariable(ctx, prog, ssadb.ExactCompare, mod, e)
-}
-
-// GetByVariableGlob means get variable name(glob).
-func MatchInstructionByGlob(ctx context.Context, prog *Program, mod int, g string) []Instruction {
-	return matchInstructionsByVariable(ctx, prog, ssadb.GlobCompare, mod, g)
-}
-
-// GetByVariableRegexp will filter Instruction via variable regexp name
-func MatchInstructionByRegexp(ctx context.Context, prog *Program, mod int, r string) []Instruction {
-	return matchInstructionsByVariable(ctx, prog, ssadb.RegexpCompare, mod, r)
-}
-
 func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
 	return matchInstructionByOpcodes(ctx, prog, opcodes...)
 }
@@ -57,7 +43,7 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 
 }
 
-func matchInstructionsByVariable(
+func MatchInstructionsByVariable(
 	ctx context.Context,
 	prog *Program,
 	compareMode, matchMode int,

@@ -161,21 +161,33 @@ func (c *Config) parseProjectWithFS(
 		)
 		// diagnostics.DumpHeap(diagnostics.WithName("ast"))
 		for fileContent := range ch {
-			if fileContent.Skip {
-				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
+			if fileContent.Status == ssareducer.FileStatusFsError {
+				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				continue
 			}
+
+			if fileContent.Status == ssareducer.FileStatusSkipped {
+				prog.ProcessInfof("skip  file: %s with empty AST", fileContent.Path)
+				continue
+			}
+
+			if fileContent.Status == ssareducer.FileStatusParseError {
+				log.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err)
+				AstErr = utils.JoinErrors(AstErr,
+					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+				)
+				if fileContent.AST == nil {
+					prog.ProcessInfof("skip file: %s with parse error", fileContent.Path)
+					continue
+				}
+			}
+
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
 			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
 
 			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
-
-			if fileContent.Err != nil {
-				AstErr = utils.JoinErrors(AstErr,
-					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-				)
-			}
 
 			preHandlerProcess() // notify the process
 			// handler
@@ -188,7 +200,10 @@ func (c *Config) parseProjectWithFS(
 						}
 					}()
 					language.InitHandler(builder)
-					language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+					err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+					if err != nil {
+						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+					}
 				}()
 			}
 		}
@@ -233,8 +248,17 @@ func (c *Config) parseProjectWithFS(
 				continue // skip if not in handlerFilesMap
 			}
 			handlerProcess()
-			if fileContent.Skip {
-				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
+			if fileContent.Status == ssareducer.FileStatusFsError {
+				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+				continue
+			}
+			if fileContent.Status == ssareducer.FileStatusSkipped {
+				prog.ProcessInfof("skip  file: %s with empty AST", fileContent.Path)
+				continue
+			}
+			if fileContent.AST == nil {
+				prog.ProcessInfof("skip  file: %s with empty AST", fileContent.Path)
 				continue
 			}
 			// log.Infof("visited file: ", prog.GetIncludeFiles())
@@ -244,7 +268,7 @@ func (c *Config) parseProjectWithFS(
 			}
 			path := fileContent.Path
 			ast := fileContent.AST
-			fileContent.AST = nil // clear AST
+			// fileContent.AST = nil // clear AST
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
