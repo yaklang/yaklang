@@ -76,16 +76,16 @@ func TestVerifiedRule(t *testing.T) {
 }
 
 func TestVerify_DEBUG(t *testing.T) {
-	// for i := 0; i < 30; i++ {
 	if utils.InGithubActions() {
 		t.SkipNow()
 		return
 	}
+	// for i := 0; i < 30; i++ {
 	yakit.InitialDatabase()
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "检测Java Socket资源未释放"
+	ruleName := "检测Golang使用AES-CBC弱加密模式"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {

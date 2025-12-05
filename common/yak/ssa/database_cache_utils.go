@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -40,6 +41,8 @@ type Cache[T asyncdb.MemoryItem] struct {
 	id *atomic.Int64
 
 	persistence PersistenceStrategy[T]
+	// 保护 ID 分配的锁
+	idLock sync.Mutex
 }
 
 func NewCache[T asyncdb.MemoryItem]() *Cache[T] {
@@ -59,10 +62,27 @@ func (c *Cache[T]) Set(item T) {
 	}
 	id := item.GetId()
 	if id <= 0 {
-		id = c.id.Inc()
-		// log.Infof("Cache: assign new id %d to item", id)
+		// 使用锁保护 ID 分配逻辑
+		c.idLock.Lock()
+		// Double-check：再次检查是否已有 ID（防止重复分配）
+		if item.GetId() <= 0 {
+			id = c.id.Inc()
+			item.SetId(id)
+		} else {
+			id = item.GetId()
+		}
+		c.idLock.Unlock()
 	}
-	item.SetId(id)
+
+	// 检查是否已存在，如果存在，记录警告
+	if existing, ok := c.SafeMapWithKey.Get(id); ok {
+		if !utils.IsNil(existing) {
+			// 使用类型断言检查是否是同一个对象（通过比较指针）
+			// 注意：对于值类型，这个检查可能不够准确，但可以防止明显的覆盖
+			log.Warnf("Cache.Set: overwriting existing item with id %d", id)
+		}
+	}
+
 	c.SafeMapWithKey.Set(id, item)
 }
 

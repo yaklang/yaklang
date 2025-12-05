@@ -206,7 +206,8 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 			if ret == nil {
 				return nil
 			}
-			itemsToCache[int64(ret.TypeId)] = ret
+			// 使用传入的 id 作为缓存 key，确保与查询参数一致
+			itemsToCache[id] = ret
 
 			// load [id-relation ... id ... id+relation]
 			for i := int64(1); i < irRelationCount; i++ {
@@ -218,6 +219,7 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
 			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "type_id", ids).Where("program_name = ?", progName)
 			for ir := range bizhelper.YieldModel[*IrType](ctx, tx, bizhelper.WithYieldModel_Fast()) {
+				// 使用查询到的 ir.TypeId 转换为 int64 作为缓存 key
 				itemsToCache[int64(ir.TypeId)] = ir
 			}
 			return nil

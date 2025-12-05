@@ -26,6 +26,9 @@ type ProgramCache struct {
 	InstructionCache *Cache[Instruction]
 	TypeCache        *Cache[Type]
 
+	// TypeCacheManager 统一管理两层缓存
+	typeCacheManager *TypeCacheManager
+
 	VariableIndex *SimpleCache[Instruction]
 	MemberIndex   *SimpleCache[Instruction]
 	ClassIndex    *SimpleCache[Instruction]
@@ -76,6 +79,8 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		cacheCtx, cache.DB, prog,
 		programName, saveSize,
 	)
+	// 初始化 TypeCacheManager
+	cache.typeCacheManager = NewTypeCacheManager(cache)
 	return cache
 }
 

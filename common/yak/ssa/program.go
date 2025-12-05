@@ -100,6 +100,7 @@ func NewTmpProgram(ProgramName string) *Program {
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory
+	prog.Cache = NewDBCache(prog, ProgramCacheMemory, 0)
 	return prog
 }
 func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {

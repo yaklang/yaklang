@@ -955,7 +955,9 @@ func (i *ObjectType) SetPkgPath(pkg string) {
 
 func (i *ObjectType) GetKeybyName(key string) Value {
 	if index, ok := i.keymap[key]; ok {
-		return i.Keys[index]
+		ret := i.Keys[index]
+		ret.SetType(i.keyTypes[index])
+		return ret
 	}
 	return nil
 }

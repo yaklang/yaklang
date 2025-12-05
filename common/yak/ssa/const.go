@@ -113,11 +113,11 @@ func newConstByMap(i any) *Const {
 }
 
 func (c *ConstInst) GetTypeKind() TypeKind {
-	return c.typ.GetTypeKind()
+	return c.GetType().GetTypeKind()
 }
 
 func (c *ConstInst) IsBoolean() bool {
-	return c.typ.GetTypeKind() == BooleanTypeKind
+	return c.GetType().GetTypeKind() == BooleanTypeKind
 }
 
 func (c *Const) Boolean() bool {
@@ -158,9 +158,9 @@ func (c *Const) Number() int64 {
 func (c *ConstInst) IsFloat() bool {
 	switch c.value.(type) {
 	case float32:
-		return c.typ.GetTypeKind() == NumberTypeKind
+		return c.GetType().GetTypeKind() == NumberTypeKind
 	case float64:
-		return c.typ.GetTypeKind() == NumberTypeKind
+		return c.GetType().GetTypeKind() == NumberTypeKind
 	}
 	return false
 }
@@ -176,7 +176,7 @@ func (c *Const) Float() float64 {
 }
 
 func (c *ConstInst) IsString() bool {
-	return c.typ.GetTypeKind() == StringTypeKind
+	return c.GetType().GetTypeKind() == StringTypeKind
 }
 
 func (c *Const) VarString() string {
