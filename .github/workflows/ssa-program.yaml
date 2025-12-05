@@ -39,7 +39,18 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
+          cache: false
         id: goz
+
+      - name: Cache Go modules
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/cache@v3
+        id: cache-go-modules
+        with:
+          path: ~/go/pkg/mod
+          key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
 
       - name: Init Module
         if: steps.cache-project.outputs.cache-hit != 'true'

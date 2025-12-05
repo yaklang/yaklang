@@ -33,6 +33,17 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.22.8
+          cache: false
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        id: cache-go-modules
+        with:
+          path: ~/go/pkg/mod
+          key: go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
+
       #      - name: Download Npcap SDK (Windows)
       #        run: |
       #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
