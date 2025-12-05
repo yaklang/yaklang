@@ -24,6 +24,7 @@ import (
 	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -51,6 +52,64 @@ func Chardet(raw []byte) string {
 		return "utf-8"
 	}
 	return res.Charset
+}
+
+func extractFuzzerRequestHost(req *ypb.FuzzerRequest) string {
+	if req == nil {
+		return ""
+	}
+	extractHost := func(value string) string {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return ""
+		}
+		if host, _, err := utils.ParseStringToHostPort(value); err == nil && host != "" {
+			return strings.ToLower(host)
+		}
+		return strings.ToLower(value)
+	}
+
+	if addr := extractHost(req.GetActualAddr()); addr != "" {
+		return addr
+	}
+
+	raw := req.GetRequestRaw()
+	if len(raw) == 0 && req.GetRequest() != "" {
+		raw = []byte(req.GetRequest())
+	}
+	if len(raw) == 0 {
+		return ""
+	}
+
+	if u, err := lowhttp.ExtractURLFromHTTPRequestRaw(raw, req.GetIsHTTPS()); err == nil && u != nil {
+		if host := strings.TrimSpace(u.Hostname()); host != "" {
+			return strings.ToLower(host)
+		}
+		if host := extractHost(u.Host); host != "" {
+			return host
+		}
+	}
+
+	if httpReq, err := lowhttp.ParseBytesToHttpRequest(raw); err == nil && httpReq != nil {
+		if host := extractHost(httpReq.Host); host != "" {
+			return host
+		}
+	}
+
+	return ""
+}
+
+func rulePatternsMatchHost(rule *ypb.ProxyRoute, host string) bool {
+	if rule == nil {
+		return false
+	}
+	patterns := rule.GetPatterns()
+	if len(patterns) == 0 || host == "" {
+		// 没有 pattern 或无法识别 host 时默认认为匹配，保持向后兼容
+		return true
+	}
+	matcher := minimartian.NewProxyHostMatcher(patterns)
+	return matcher.Match(host)
 }
 
 func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
@@ -95,6 +154,11 @@ func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 	}
 	if rule == nil {
 		return nil, utils.Errorf("proxy rule not found: %s", ruleID)
+	}
+
+	host := extractFuzzerRequestHost(req)
+	if !rulePatternsMatchHost(rule, host) {
+		return proxies, nil
 	}
 
 	ruleProxies := make([]string, 0, len(rule.GetEndpointIds()))
