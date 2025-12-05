@@ -47,29 +47,51 @@ func trimPathWithOneSlash(path string) string {
 
 func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*WebsiteNextPart {
 	db = FilterHTTPFlowByDomain(db, domainSuffix)
-	db = db.Select(
-		"DISTINCT SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) as next_part,\n" +
-			"SUBSTR(url, 0, INSTR(url, '://'))",
-	).Table("http_flows").Limit(1000) //.Debug()
+	db = db.Select("url").Table("http_flows").Limit(1000)
 	if rows, err := db.Rows(); err != nil {
 		log.Errorf("query nextPart for website tree failed: %s", err)
 		return nil
 	} else {
 		resultMap := make(map[string]*WebsiteNextPart)
 		for rows.Next() {
-			var nextPart string
-			var schema string
-			rows.Scan(&nextPart, &schema)
-			if nextPart == "" {
+			var urlStr string
+			if err := rows.Scan(&urlStr); err != nil {
+				continue
+			}
+			protocolIdx := strings.Index(urlStr, "://")
+			if protocolIdx == -1 {
+				continue
+			}
+			schema := urlStr[:protocolIdx]
+			start := protocolIdx + 3
+			pathIdx := strings.Index(urlStr[start:], "/")
+			var domain string
+			if pathIdx == -1 {
+				queryIdx := strings.Index(urlStr[start:], "?")
+				if queryIdx == -1 {
+					domain = urlStr[start:]
+				} else {
+					domain = urlStr[start : start+queryIdx]
+				}
+			} else {
+				domain = urlStr[start : start+pathIdx]
+			}
+			if domainSuffix != "" {
+				if !strings.Contains(domain, domainSuffix) {
+					continue
+				}
+			}
+			if domain == "" {
 				continue
 			}
 			haveChildren := false
-			nextPartItem, after, splited := strings.Cut(nextPart, "/")
-			if splited && after != "" {
-				haveChildren = true
+			if pathIdx != -1 {
+				remainingPath := urlStr[start+pathIdx+1:]
+				if remainingPath != "" {
+					haveChildren = true
+				}
 			}
-			// 创建一个包含schema和nextPart的唯一键
-			uniqueKey := schema + "://" + nextPartItem
+			uniqueKey := schema + "://" + domain
 			if result, ok := resultMap[uniqueKey]; ok {
 				result.Count++
 			} else {
