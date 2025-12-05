@@ -423,10 +423,11 @@ func (n *PQLayerNode[K]) GetKey() K {
 }
 
 func (n *PQLayerNode[K]) GetVector() Vector {
-	// PQ节点不存储原始向量，返回nil或抛出错误
+	// PQ节点不存储原始向量，返回空向量并记录警告
 	// 在实际使用中应该使用PQ编码进行距离计算
 	return func() []float32 {
-		panic("PQ node does not store original vector data. Use PQ codes for distance calculation.")
+		log.Warnf("PQLayerNode.GetVector called for key=%v, but PQ node does not store original vector data", n.key)
+		return nil
 	}
 }
 

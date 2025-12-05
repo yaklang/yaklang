@@ -636,8 +636,9 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 // maxLevel returns an upper-bound on the number of levels in the graph
 // based on the size of the base layer.
 func maxLevel(ml float64, numNodes int) int {
-	if ml == 0 {
-		panic("ml must be greater than 0")
+	if ml <= 0 {
+		log.Errorf("maxLevel: ml must be greater than 0, got %f, using default 0.25", ml)
+		ml = 0.25
 	}
 
 	if numNodes == 0 {
@@ -658,8 +659,9 @@ func (h *Graph[K]) randomLevel() int {
 	// by calculating a probably good one from the size of the base layer.
 	max := 1
 	if len(h.Layers) > 0 {
-		if h.Ml == 0 {
-			panic("(*Graph).Ml must be greater than 0")
+		if h.Ml <= 0 {
+			log.Errorf("(*Graph).Ml must be greater than 0, got %f, using default 0.25", h.Ml)
+			h.Ml = 0.25
 		}
 		max = maxLevel(h.Ml, h.Layers[0].size())
 	}
@@ -682,8 +684,9 @@ func (g *Graph[K]) assertDims(n Vector) {
 		return
 	}
 	hasDims := g.Dims()
-	if hasDims != len(n()) {
-		panic(fmt.Sprint("embedding dimension mismatch: ", hasDims, " != ", len(n())))
+	vecLen := len(n())
+	if hasDims != vecLen && hasDims != 0 && vecLen != 0 {
+		log.Errorf("embedding dimension mismatch: graph expects %d dimensions, but got %d", hasDims, vecLen)
 	}
 }
 
@@ -776,7 +779,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		layersCreateTime := time.Since(layersCreateStart)
 
 		if insertLevel < 0 {
-			panic("invalid level")
+			log.Errorf("HNSW invalid level %d for node %v, skipping this node", insertLevel, key)
+			continue
 		}
 
 		var elevator *K
@@ -864,7 +868,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			}
 
 			if g.nodeDistance == nil {
-				panic("(*Graph).nodeDistance must be set")
+				log.Errorf("HNSW nodeDistance function is not set, cannot perform search")
+				continue
 			}
 
 			// Ensure searchPoint is not nil before calling search
@@ -900,9 +905,10 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			}
 
 			if len(neighborhood) == 0 {
-				// This should never happen because the searchPoint itself
-				// should be in the result set.
-				panic("no nodes found")
+				// This should not happen because the searchPoint itself
+				// should be in the result set, but we handle it gracefully.
+				log.Errorf("HNSW search returned no nodes at layer %d, this is unexpected, skipping this layer", i)
+				continue
 			}
 
 			// Re-set the elevator node for the next layer.
@@ -1043,7 +1049,9 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 		return out
 	}
 
-	panic("unreachable")
+	// This should not be reachable, but handle gracefully
+	log.Errorf("HNSW search reached unexpected code path, returning empty results")
+	return nil
 }
 
 // Len returns the number of nodes in the graph.

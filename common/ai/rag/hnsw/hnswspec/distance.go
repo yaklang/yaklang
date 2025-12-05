@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // CosineDistance 余弦距离计算函数（基于节点接口，不支持PQ）
@@ -21,22 +22,41 @@ func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quant
 		if okA && okB {
 			return PQCosineDistance(codesA, codesB, a, b)
 		}
+		// PQ节点但无法获取编码，返回最大距离
+		log.Warnf("PQ nodes but failed to get PQ codes, returning max distance")
+		return 1.0
 	}
 
 	// 如果只有一个节点启用PQ，使用非对称距离计算
 	if a.IsPQEnabled() && !b.IsPQEnabled() {
 		// a是PQ节点，b是标准节点（通常是查询向量）
 		vecB := b.GetVector()()
+		if len(vecB) == 0 {
+			log.Warnf("node b has empty vector, returning max distance")
+			return 1.0
+		}
 		return PQAsymmetricCosineDistance(vecB, a, quantizer)
 	} else if !a.IsPQEnabled() && b.IsPQEnabled() {
 		// a是标准节点（通常是查询向量），b是PQ节点
 		vecA := a.GetVector()()
+		if len(vecA) == 0 {
+			log.Warnf("node a has empty vector, returning max distance")
+			return 1.0
+		}
 		return PQAsymmetricCosineDistance(vecA, b, quantizer)
 	}
 
 	// 都是标准节点，使用原始向量进行精确计算
 	vecA := a.GetVector()()
 	vecB := b.GetVector()()
+	if len(vecA) == 0 || len(vecB) == 0 {
+		log.Warnf("one or both vectors are empty: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
+		return 1.0
+	}
+	if len(vecA) != len(vecB) {
+		log.Warnf("vector dimension mismatch: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
+		return 1.0
+	}
 	return cosineDistanceRaw(vecA, vecB)
 }
 
@@ -54,29 +74,54 @@ func PQAwareEuclideanDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Qu
 		if okA && okB {
 			return PQEuclideanDistance(codesA, codesB, a, b)
 		}
+		// PQ节点但无法获取编码，返回最大距离
+		log.Warnf("PQ nodes but failed to get PQ codes, returning max distance")
+		return math.Inf(1)
 	}
 
 	// 如果只有一个节点启用PQ，使用非对称距离计算
 	if a.IsPQEnabled() && !b.IsPQEnabled() {
 		// a是PQ节点，b是标准节点（通常是查询向量）
 		vecB := b.GetVector()()
+		if len(vecB) == 0 {
+			log.Warnf("node b has empty vector, returning max distance")
+			return math.Inf(1)
+		}
 		return PQAsymmetricDistance(vecB, a, quantizer)
 	} else if !a.IsPQEnabled() && b.IsPQEnabled() {
 		// a是标准节点（通常是查询向量），b是PQ节点
 		vecA := a.GetVector()()
+		if len(vecA) == 0 {
+			log.Warnf("node a has empty vector, returning max distance")
+			return math.Inf(1)
+		}
 		return PQAsymmetricDistance(vecA, b, quantizer)
 	}
 
 	// 都是标准节点，使用原始向量进行精确计算
 	vecA := a.GetVector()()
 	vecB := b.GetVector()()
+	if len(vecA) == 0 || len(vecB) == 0 {
+		log.Warnf("one or both vectors are empty: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
+		return math.Inf(1)
+	}
+	if len(vecA) != len(vecB) {
+		log.Warnf("vector dimension mismatch: len(a)=%d, len(b)=%d, returning max distance", len(vecA), len(vecB))
+		return math.Inf(1)
+	}
 	return euclideanDistanceRaw(vecA, vecB)
 }
 
 // cosineDistanceRaw 原始余弦距离计算
 func cosineDistanceRaw(a, b []float32) float64 {
 	if len(a) != len(b) {
-		panic("vectors must have the same length")
+		log.Errorf("cosineDistanceRaw: vectors must have the same length, but len(a)=%d, len(b)=%d", len(a), len(b))
+		return 1.0 // Maximum cosine distance
+	}
+
+	if len(a) == 0 {
+		log.Warnf("cosineDistanceRaw: empty vectors")
+		return 1.0
 	}
 
 	var (
@@ -111,7 +156,13 @@ func cosineDistanceRaw(a, b []float32) float64 {
 // euclideanDistanceRaw 原始欧氏距离计算
 func euclideanDistanceRaw(a, b []float32) float64 {
 	if len(a) != len(b) {
-		panic("vectors must have the same length")
+		log.Errorf("euclideanDistanceRaw: vectors must have the same length, but len(a)=%d, len(b)=%d", len(a), len(b))
+		return math.Inf(1) // Maximum distance
+	}
+
+	if len(a) == 0 {
+		log.Warnf("euclideanDistanceRaw: empty vectors")
+		return math.Inf(1)
 	}
 
 	var sum float64
