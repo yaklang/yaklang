@@ -96,11 +96,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
-          cache: false
-          # 显式禁用自动缓存以避免以下问题：
-          # 1) 跨平台构建场景下缓存复用价值有限（不同平台产物不同）
-          # 2) windows/windows7 任务会生成相同缓存键导致冲突
-          # 3) 避免缓存保存的长时间等待和网络竞争
         id: go
 
       - name: Get Repo tags
