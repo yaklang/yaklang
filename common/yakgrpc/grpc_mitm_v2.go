@@ -198,7 +198,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			proxys = append(proxys, proxyUrl.String())
 		}
 		if len(proxys) == 0 && len(proxyErrors) > 0 {
-			return nil, utils.Errorf(strings.Join(proxyErrors, "; "))
+			return nil, nil, utils.Errorf(strings.Join(proxyErrors, "; "))
 		}
 		ruleID := strings.TrimSpace(request.GetDownstreamProxyRuleId())
 		var routeMap map[string][]string
@@ -293,7 +293,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	if pluginConcurrency <= 0 {
 		pluginConcurrency = 20
 	}
-
+	addr := fmt.Sprintf("%s:%d", host, port)
 	downstreamProxy, downstreamProxyRoutes, err := getDownstreamProxy(firstReq)
 	if err != nil {
 		notifyMITMStartFailed(err.Error())
