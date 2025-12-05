@@ -531,6 +531,7 @@ func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*schema.R
 var (
 	beforeRiskSave      []func(*schema.Risk)
 	beforeRiskSaveMutex = new(sync.Mutex)
+	riskSaveMutex       = new(sync.Mutex) // 保护 risk 保存操作，防止并发写入
 )
 
 func RegisterBeforeRiskSave(f func(*schema.Risk)) {
@@ -553,10 +554,17 @@ func _saveRisk(r *schema.Risk) error {
 	}
 
 	beforeRiskSaveMutex.Lock()
-	defer beforeRiskSaveMutex.Unlock()
-	for _, m := range beforeRiskSave {
+	callbacks := make([]func(*schema.Risk), len(beforeRiskSave))
+	copy(callbacks, beforeRiskSave)
+	beforeRiskSaveMutex.Unlock()
+
+	// 先复制回调列表，然后在锁外执行回调，避免在持有锁的情况下执行回调
+	for _, m := range callbacks {
 		m(r)
 	}
+
+	riskSaveMutex.Lock()
+	defer riskSaveMutex.Unlock()
 
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
