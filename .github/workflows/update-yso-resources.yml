@@ -61,6 +61,15 @@ jobs:
             echo "No conflicts. Continuing workflow."
           fi
           
+      - name: Download YSO dependencies
+        if: ${{ env.SKIP_CI != 'true' }}
+        run: |
+          mkdir -p common/yso/resources/libs
+          curl -L -o common/yso/resources/libs/ysoserial-for-woodpecker-0.5.2-patched.jar \
+            https://cve-db.oss-cn-beijing.aliyuncs.com/ysoserial-for-woodpecker-0.5.2-patched.jar
+          echo "Downloaded ysoserial-for-woodpecker-0.5.2-patched.jar"
+          ls -la common/yso/resources/libs/
+          
       - name: Build YSO resources
         if: ${{ env.SKIP_CI != 'true' }}
         run: |
