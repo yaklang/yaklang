@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/consts"
 )
 
@@ -45,6 +46,12 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 	cfg.AnalysisConfig = NewAnalysisConfig(otherOption...)
 	cfg.ragSystemOptions = append(cfg.ragSystemOptions, rag.WithRAGCtx(cfg.Ctx))
 	return cfg
+}
+
+func (a *RefineConfig) KHopOption() []entityrepos.KHopQueryOption {
+	config := rag.NewRAGSystemConfig(a.ragSystemOptions...)
+	options := append(a.AnalysisConfig.KHopOption(), config.ConvertToKHopOptions()...)
+	return options
 }
 
 type RefineOption func(*RefineConfig)
