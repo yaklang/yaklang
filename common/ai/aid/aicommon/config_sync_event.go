@@ -8,13 +8,15 @@ import (
 )
 
 const (
-	SYNC_TYPE_PLAN           string = "plan"
-	SYNC_TYPE_CONSUMPTION    string = "consumption"
-	SYNC_TYPE_PING           string = "ping"
-	SYNC_TYPE_UPDATE_CONFIG  string = "set_config"
-	SYNC_TYPE_PROCESS_EVENT  string = "sync_process_event"
-	SYNC_TYPE_TIMELINE              = "timeline"
-	SYNC_TYPE_MEMORY_CONTEXT        = "memory_sync"
+	SYNC_TYPE_PLAN                string = "plan"
+	SYNC_TYPE_CONSUMPTION         string = "consumption"
+	SYNC_TYPE_PING                string = "ping"
+	SYNC_TYPE_UPDATE_CONFIG       string = "set_config"
+	SYNC_TYPE_PROCESS_EVENT       string = "sync_process_event"
+	SYNC_TYPE_TIMELINE                   = "timeline"
+	SYNC_TYPE_MEMORY_CONTEXT             = "memory_sync"
+	SYNC_TYPE_SKIP_SUBTASK_IN_PLAN       = "skip_subtask_in_plan"
+	SYNC_TYPE_REDO_SUBTASK_IN_PLAN       = "redo_subtask_in_plan"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"
