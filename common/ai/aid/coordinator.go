@@ -434,10 +434,15 @@ func (c *Coordinator) registerPEModeInputEventCallback() {
 		}
 		return nil
 	})
+
+	c.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN, c.HandleSkipSubtaskInPlan)
+	c.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN, c.HandleRedoSubtaskInPlan)
 }
 
 func (c *Coordinator) unregisterPEModeInputEventCallback() {
 	c.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_PLAN)
+	c.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN)
+	c.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN)
 }
 
 func (c *Coordinator) newPlanResponse(rootTask *AiTask) *PlanResponse {
@@ -520,5 +525,164 @@ func (c *Coordinator) EnableToolManagerAISearch() error {
 	if err != nil {
 		return utils.Errorf("aiToolManager.EnableAIForgeSearch failed: %v", err)
 	}
+	return nil
+}
+
+// FindSubtaskByIndex 根据任务索引查找子任务
+// 索引格式为 "1-1", "1-2", "1-1-1" 等
+func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
+	if c.rootTask == nil {
+		return nil
+	}
+
+	// 使用 DFS 遍历查找匹配 index 的任务
+	taskLink := DFSOrderAiTask(c.rootTask)
+	for i := 0; i < taskLink.Len(); i++ {
+		task, ok := taskLink.Get(i)
+		if !ok {
+			continue
+		}
+		if task.Index == index {
+			return task
+		}
+	}
+	return nil
+}
+
+// HandleSkipSubtaskInPlan 处理跳过子任务的同步事件
+// 输入参数:
+//   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
+//   - reason: 用户跳过该任务的理由（可选）
+func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
+	// 解析参数
+	var params map[string]interface{}
+	if event.SyncJsonInput != "" {
+		if err := jsonextractor.ExtractStructuredJSON(event.SyncJsonInput, jsonextractor.WithObjectCallback(func(data map[string]any) {
+			params = data
+		})); err != nil {
+			c.EmitError("parse skip_subtask_in_plan params failed: %v", err)
+			return utils.Errorf("parse skip_subtask_in_plan params failed: %v", err)
+		}
+	}
+
+	if params == nil {
+		c.EmitError("skip_subtask_in_plan params is nil")
+		return utils.Error("skip_subtask_in_plan params is nil")
+	}
+
+	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
+	if subtaskIndex == "" {
+		c.EmitError("subtask_index is required")
+		return utils.Error("subtask_index is required for skip_subtask_in_plan")
+	}
+
+	// 获取用户理由（可选）
+	userReason := utils.InterfaceToString(params["reason"])
+
+	// 查找子任务
+	task := c.FindSubtaskByIndex(subtaskIndex)
+	if task == nil {
+		c.EmitError("subtask not found by index: %v", subtaskIndex)
+		return utils.Errorf("subtask not found by index: %v", subtaskIndex)
+	}
+
+	// 取消任务
+	task.Cancel()
+	task.SetStatus(aicommon.AITaskState_Aborted)
+
+	// 构建 timeline 消息
+	baseMessage := "用户主动跳过了当前子任务，可能是用户觉得当前任务意义不重要，或者当前信息已经足够作出决定了，请你不要质疑，直接开始执行下一个子任务"
+	timelineMessage := baseMessage
+	if userReason != "" {
+		timelineMessage = baseMessage + "。用户给出的理由: " + userReason
+	}
+
+	c.Timeline.PushText(c.AcquireId(), "[user-skip-subtask] 任务 %s (%s) 被用户主动跳过: %s", task.Index, task.Name, timelineMessage)
+
+	c.EmitInfo("subtask %s (%s) skipped by user", task.Index, task.Name)
+
+	// 发送同步响应
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
+		"success":       true,
+		"subtask_index": subtaskIndex,
+		"subtask_name":  task.Name,
+		"reason":        userReason,
+		"message":       timelineMessage,
+	}, event.SyncID)
+
+	return nil
+}
+
+// HandleRedoSubtaskInPlan 处理重做子任务的同步事件
+// 用户可以中断当前子任务，添加额外信息到 timeline，然后重新执行该任务
+// 输入参数:
+//   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
+//   - user_message: 用户提供的额外信息，用于辅助 AI 更好地执行任务（必需）
+func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
+	// 解析参数
+	var params map[string]interface{}
+	if event.SyncJsonInput != "" {
+		if err := jsonextractor.ExtractStructuredJSON(event.SyncJsonInput, jsonextractor.WithObjectCallback(func(data map[string]any) {
+			params = data
+		})); err != nil {
+			c.EmitError("parse redo_subtask_in_plan params failed: %v", err)
+			return utils.Errorf("parse redo_subtask_in_plan params failed: %v", err)
+		}
+	}
+
+	if params == nil {
+		c.EmitError("redo_subtask_in_plan params is nil")
+		return utils.Error("redo_subtask_in_plan params is nil")
+	}
+
+	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
+	if subtaskIndex == "" {
+		c.EmitError("subtask_index is required")
+		return utils.Error("subtask_index is required for redo_subtask_in_plan")
+	}
+
+	// 用户消息是必须的
+	userMessage := utils.InterfaceToString(params["user_message"])
+	if userMessage == "" {
+		c.EmitError("user_message is required for redo_subtask_in_plan")
+		return utils.Error("user_message is required for redo_subtask_in_plan")
+	}
+
+	// 查找子任务
+	task := c.FindSubtaskByIndex(subtaskIndex)
+	if task == nil {
+		c.EmitError("subtask not found by index: %v", subtaskIndex)
+		return utils.Errorf("subtask not found by index: %v", subtaskIndex)
+	}
+
+	// 构建 timeline 消息 - 包含用户的额外信息
+	timelineMessage := strings.Join([]string{
+		"用户请求重新执行当前子任务，并提供了以下额外信息来辅助任务执行:",
+		"",
+		"<用户补充信息>",
+		userMessage,
+		"</用户补充信息>",
+		"",
+		"请 AI 认真解读用户提供的信息，理解用户的真实意图，并据此调整任务执行策略，确保更好地满足用户需求。",
+	}, "\n")
+
+	// 先添加 timeline 消息
+	c.Timeline.PushText(c.AcquireId(), "[user-redo-subtask] 任务 %s (%s) 被用户请求重新执行:\n%s", task.Index, task.Name, timelineMessage)
+
+	c.EmitInfo("subtask %s (%s) will be redone with user message", task.Index, task.Name)
+
+	// 重置 context 准备重新执行（内部会取消旧 context 并创建新的）
+	// 注意：任务状态保持 Processing 不变
+	task.ResetContextWithoutStatusChanged()
+
+	// 发送同步响应
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
+		"success":       true,
+		"subtask_index": subtaskIndex,
+		"subtask_name":  task.Name,
+		"user_message":  userMessage,
+		"message":       timelineMessage,
+	}, event.SyncID)
+
 	return nil
 }
