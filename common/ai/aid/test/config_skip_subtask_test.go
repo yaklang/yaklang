@@ -234,10 +234,17 @@ LOOP:
 				continue
 			}
 
-			// 检查错误事件
-			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "subtask not found") {
-				errorReceived = true
-				break LOOP
+			// 检查错误响应（通过 success=false 返回）
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "subtask not found") {
+							errorReceived = true
+							break LOOP
+						}
+					}
+				}
 			}
 
 			// 检查完成
@@ -493,8 +500,11 @@ func TestCoordinator_RedoSubtaskInPlan(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 
-	taskStarted := false
+	taskExecCount := 0
+	userMessageFoundInPrompt := false
 	userMessage := "请注意：我需要你在执行这个任务时，特别关注安全性问题，确保所有操作都是安全的"
+
+	var coordinator *aid.Coordinator
 
 	ins, err := aid.NewCoordinator(
 		"测试重做子任务功能",
@@ -529,8 +539,15 @@ func TestCoordinator_RedoSubtaskInPlan(t *testing.T) {
 				return rsp, nil
 			}
 
+			// 任务执行请求
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-				taskStarted = true
+				taskExecCount++
+
+				// 检查 prompt 中是否包含用户消息（用于验证 redo 后 timeline 被传递）
+				if strings.Contains(prompt, userMessage) {
+					userMessageFoundInPrompt = true
+				}
+
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
 				return rsp, nil
 			}
@@ -545,6 +562,7 @@ func TestCoordinator_RedoSubtaskInPlan(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
+	coordinator = ins
 
 	go func() {
 		ins.Run()
@@ -552,7 +570,6 @@ func TestCoordinator_RedoSubtaskInPlan(t *testing.T) {
 
 	redoSent := false
 	redoSuccess := false
-	timelineContainsUserMessage := false
 	syncId := uuid.New().String()
 
 	ctx := utils.TimeoutContextSeconds(10)
@@ -561,8 +578,8 @@ LOOP:
 	for {
 		select {
 		case result := <-outputChan:
-			// 当任务执行开始后，发送 redo 请求
-			if taskStarted && !redoSent {
+			// 当第一次任务执行后，发送 redo 请求
+			if taskExecCount == 1 && !redoSent {
 				redoSent = true
 				inputChan.SafeFeed(SyncInputEventWithJSON(
 					aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN,
@@ -584,28 +601,35 @@ LOOP:
 						require.Equal(t, userMessage, data["user_message"])
 						require.Contains(t, data["message"], "用户请求重新执行当前子任务")
 						require.Contains(t, data["message"], userMessage)
-						// 验证消息格式正确
 						require.Contains(t, data["message"], "<用户补充信息>")
 						require.Contains(t, data["message"], "</用户补充信息>")
-						timelineContainsUserMessage = true
+
+						// 验证 timeline 包含用户消息
+						timeline := coordinator.Timeline.Dump()
+						require.Contains(t, timeline, userMessage, "timeline should contain user message")
+						require.Contains(t, timeline, "user-redo-subtask", "timeline should contain redo marker")
+
+						// 验证任务状态保持 Processing（未改变）
+						task := coordinator.FindSubtaskByIndex("1-1")
+						require.NotNil(t, task, "task should be found")
+						require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus(), "task status should remain Processing after redo")
 					}
 				}
 			}
 
-			// 一旦 redo 成功，结束测试
+			// redo 成功后即可结束测试（验证了核心功能）
 			if redoSuccess {
 				break LOOP
 			}
 
 		case <-ctx.Done():
-			t.Fatalf("timeout: taskStarted=%v, redoSent=%v, redoSuccess=%v, timelineContainsUserMessage=%v",
-				taskStarted, redoSent, redoSuccess, timelineContainsUserMessage)
+			t.Fatalf("timeout: taskExecCount=%v, redoSent=%v, redoSuccess=%v, userMessageFoundInPrompt=%v",
+				taskExecCount, redoSent, redoSuccess, userMessageFoundInPrompt)
 		}
 	}
 
 	require.True(t, redoSent, "redo request should be sent")
 	require.True(t, redoSuccess, "redo should succeed")
-	require.True(t, timelineContainsUserMessage, "timeline message should contain user message")
 }
 
 func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
@@ -693,10 +717,17 @@ LOOP:
 				continue
 			}
 
-			// 检查错误事件
-			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "user_message is required") {
-				errorReceived = true
-				break LOOP
+			// 检查错误响应（通过 success=false 返回）
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "user_message is required") {
+							errorReceived = true
+							break LOOP
+						}
+					}
+				}
 			}
 
 			// 检查完成
