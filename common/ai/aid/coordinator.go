@@ -553,27 +553,49 @@ func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
 // 输入参数:
 //   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
 //   - reason: 用户跳过该任务的理由（可选）
+//
+// 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
 func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
+	// 容错处理：捕获可能的 panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("HandleSkipSubtaskInPlan panic recovered: %v", r)
+			c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
+				"success": false,
+				"error":   utils.InterfaceToString(r),
+			}, event.SyncID)
+		}
+	}()
+
+	// 辅助函数：发送失败响应（不返回错误）
+	sendFailResponse := func(errMsg string) {
+		c.EmitError(errMsg)
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skip_subtask_in_plan", map[string]any{
+			"success": false,
+			"error":   errMsg,
+		}, event.SyncID)
+	}
+
 	// 解析参数
 	var params map[string]interface{}
 	if event.SyncJsonInput != "" {
 		if err := jsonextractor.ExtractStructuredJSON(event.SyncJsonInput, jsonextractor.WithObjectCallback(func(data map[string]any) {
 			params = data
 		})); err != nil {
-			c.EmitError("parse skip_subtask_in_plan params failed: %v", err)
-			return utils.Errorf("parse skip_subtask_in_plan params failed: %v", err)
+			sendFailResponse("parse skip_subtask_in_plan params failed: " + err.Error())
+			return nil
 		}
 	}
 
 	if params == nil {
-		c.EmitError("skip_subtask_in_plan params is nil")
-		return utils.Error("skip_subtask_in_plan params is nil")
+		sendFailResponse("skip_subtask_in_plan params is nil")
+		return nil
 	}
 
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
 	if subtaskIndex == "" {
-		c.EmitError("subtask_index is required")
-		return utils.Error("subtask_index is required for skip_subtask_in_plan")
+		sendFailResponse("subtask_index is required for skip_subtask_in_plan")
+		return nil
 	}
 
 	// 获取用户理由（可选）
@@ -582,8 +604,8 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	// 查找子任务
 	task := c.FindSubtaskByIndex(subtaskIndex)
 	if task == nil {
-		c.EmitError("subtask not found by index: %v", subtaskIndex)
-		return utils.Errorf("subtask not found by index: %v", subtaskIndex)
+		sendFailResponse("subtask not found by index: " + subtaskIndex)
+		return nil
 	}
 
 	// 取消任务
@@ -618,41 +640,63 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 // 输入参数:
 //   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
 //   - user_message: 用户提供的额外信息，用于辅助 AI 更好地执行任务（必需）
+//
+// 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
 func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
+	// 容错处理：捕获可能的 panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("HandleRedoSubtaskInPlan panic recovered: %v", r)
+			c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
+				"success": false,
+				"error":   utils.InterfaceToString(r),
+			}, event.SyncID)
+		}
+	}()
+
+	// 辅助函数：发送失败响应（不返回错误）
+	sendFailResponse := func(errMsg string) {
+		c.EmitError(errMsg)
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
+			"success": false,
+			"error":   errMsg,
+		}, event.SyncID)
+	}
+
 	// 解析参数
 	var params map[string]interface{}
 	if event.SyncJsonInput != "" {
 		if err := jsonextractor.ExtractStructuredJSON(event.SyncJsonInput, jsonextractor.WithObjectCallback(func(data map[string]any) {
 			params = data
 		})); err != nil {
-			c.EmitError("parse redo_subtask_in_plan params failed: %v", err)
-			return utils.Errorf("parse redo_subtask_in_plan params failed: %v", err)
+			sendFailResponse("parse redo_subtask_in_plan params failed: " + err.Error())
+			return nil
 		}
 	}
 
 	if params == nil {
-		c.EmitError("redo_subtask_in_plan params is nil")
-		return utils.Error("redo_subtask_in_plan params is nil")
+		sendFailResponse("redo_subtask_in_plan params is nil")
+		return nil
 	}
 
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
 	if subtaskIndex == "" {
-		c.EmitError("subtask_index is required")
-		return utils.Error("subtask_index is required for redo_subtask_in_plan")
+		sendFailResponse("subtask_index is required for redo_subtask_in_plan")
+		return nil
 	}
 
 	// 用户消息是必须的
 	userMessage := utils.InterfaceToString(params["user_message"])
 	if userMessage == "" {
-		c.EmitError("user_message is required for redo_subtask_in_plan")
-		return utils.Error("user_message is required for redo_subtask_in_plan")
+		sendFailResponse("user_message is required for redo_subtask_in_plan")
+		return nil
 	}
 
 	// 查找子任务
 	task := c.FindSubtaskByIndex(subtaskIndex)
 	if task == nil {
-		c.EmitError("subtask not found by index: %v", subtaskIndex)
-		return utils.Errorf("subtask not found by index: %v", subtaskIndex)
+		sendFailResponse("subtask not found by index: " + subtaskIndex)
+		return nil
 	}
 
 	// 构建 timeline 消息 - 包含用户的额外信息
