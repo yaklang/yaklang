@@ -35,7 +35,8 @@ const (
 	AITaskState_Queueing   AITaskState = "queueing"
 	AITaskState_Processing AITaskState = "processing"
 	AITaskState_Completed  AITaskState = "completed"
-	AITaskState_Aborted    AITaskState = "aborted"
+	AITaskState_Aborted    AITaskState = "aborted" // 任务执行失败或异常终止
+	AITaskState_Skipped    AITaskState = "skipped" // 用户主动跳过
 )
 
 type AIStatefulTask interface {
@@ -269,7 +270,7 @@ func (s *AIStatefulTaskBase) ResetContextWithoutStatusChanged(parentCtx context.
 
 func (s *AIStatefulTaskBase) IsFinished() bool {
 	switch s.status {
-	case AITaskState_Completed, AITaskState_Aborted:
+	case AITaskState_Completed, AITaskState_Aborted, AITaskState_Skipped:
 		return true
 	default:
 		return false

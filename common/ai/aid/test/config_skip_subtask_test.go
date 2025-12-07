@@ -632,6 +632,150 @@ LOOP:
 	require.True(t, redoSuccess, "redo should succeed")
 }
 
+// TestCoordinator_SkipSubtaskAndContinueNext 验证 skip 子任务后，下一个子任务立即开始执行
+// 这是一个关键测试，确保：
+// 1. 测试中有 1-1 和 1-2 两个任务
+// 2. 当 1-1 执行过程中接收到 skip 后，1-2 立即开始执行
+//
+// 测试策略：由于 skip 是通过 context.Cancel() 实现的，而 AI callback 可能在 context 取消前就返回了
+// 所以我们采用"预跳过"策略：在任务规划完成后、任务开始执行前，先跳过任务 1-1
+// 然后验证 runtime 能正确识别 Skipped 状态并跳过任务 1-1，直接执行任务 1-2
+func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	task11Started := false
+	task12Started := false
+	task12Completed := false
+
+	ins, err := aid.NewCoordinator(
+		"测试跳过子任务后继续执行下一个任务",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
+				// 确保创建两个子任务 1-1 和 1-2
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "plan",
+    "query": "测试跳过后继续",
+    "main_task": "测试跳过子任务后立即执行下一个任务",
+    "main_task_goal": "验证 skip 1-1 后 1-2 立即开始执行",
+    "tasks": [
+        {"subtask_name": "任务1-1", "subtask_goal": "这个任务会被跳过"},
+        {"subtask_name": "任务1-2", "subtask_goal": "这个任务应该在1-1被跳过后立即执行"}
+    ]
+}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			// 处理任务执行请求
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				// 检查是否是 1-1 任务（理论上不应该被调用，因为已被跳过）
+				if strings.Contains(prompt, "任务名称: 任务1-1") {
+					task11Started = true
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "任务1-1完成"}}`))
+					return rsp, nil
+				}
+
+				// 检查是否是 1-2 任务
+				if strings.Contains(prompt, "任务名称: 任务1-2") {
+					task12Started = true
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "任务1-2完成"}}`))
+					return rsp, nil
+				}
+
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				if strings.Contains(prompt, "任务1-2") {
+					task12Completed = true
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	skipSuccess := false
+	syncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			// 在计划审核时发送 skip 请求（任务开始执行前）
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE && !skipSent {
+				skipSent = true
+				// 先发送 skip 请求跳过任务 1-1
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					syncId,
+					map[string]any{
+						"subtask_index": "1-1",
+						"reason":        "用户决定跳过任务1-1，希望立即执行任务1-2",
+					},
+				))
+				// 然后继续执行计划
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			// 检查 skip 响应
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success {
+						skipSuccess = true
+						require.Equal(t, "1-1", data["subtask_index"])
+					}
+				}
+			}
+
+			// 检查完成（YOLO 模式下会快速完成，不会调用 verify-satisfaction）
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "coordinator run finished") {
+				break LOOP
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: skipSent=%v, skipSuccess=%v, task11Started=%v, task12Started=%v, task12Completed=%v",
+				skipSent, skipSuccess, task11Started, task12Started, task12Completed)
+		}
+	}
+
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, skipSuccess, "skip should succeed")
+	require.False(t, task11Started, "task 1-1 should NOT be started (it was skipped)")
+	require.True(t, task12Started, "task 1-2 should start after 1-1 is skipped")
+}
+
 func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
