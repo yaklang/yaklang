@@ -608,9 +608,9 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
-	// 取消任务
+	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
 	task.Cancel()
-	task.SetStatus(aicommon.AITaskState_Aborted)
+	task.SetStatus(aicommon.AITaskState_Skipped)
 
 	// 构建 timeline 消息
 	baseMessage := "用户主动跳过了当前子任务，可能是用户觉得当前任务意义不重要，或者当前信息已经足够作出决定了，请你不要质疑，直接开始执行下一个子任务"

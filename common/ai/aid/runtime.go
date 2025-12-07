@@ -144,8 +144,26 @@ func (r *runtime) Invoke(task *AiTask) error {
 	r.currentIndex = 0
 
 	invokeTask := func(current *AiTask) error {
+		// 检查任务是否已被用户主动跳过（Skipped 状态，区别于 Aborted 失败状态）
+		// 如果任务已被用户主动跳过，则直接返回 nil 继续下一个任务
+		if current.GetStatus() == aicommon.AITaskState_Skipped {
+			r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
+			return nil
+		}
+
+		// 检查全局 context 是否被取消（用户终止整个任务）
+		if r.config.IsCtxDone() {
+			return utils.Errorf("coordinator context is done")
+		}
+
+		// 检查任务自身的 context（可能被 skip/redo 重置）
 		if current.IsCtxDone() {
-			return utils.Errorf("context is done")
+			// 再次检查状态，如果是 Skipped，说明是被用户主动跳过的
+			if current.GetStatus() == aicommon.AITaskState_Skipped {
+				r.config.EmitInfo("subtask %s context cancelled (skipped), moving to next task", current.Name)
+				return nil
+			}
+			return utils.Errorf("task context is done")
 		}
 
 		r.config.EmitInfo("invoke subtask: %v", current.Name)
@@ -170,6 +188,23 @@ func (r *runtime) Invoke(task *AiTask) error {
 			return nil
 		}
 		if err := invokeTask(currentTask); err != nil {
+			// 检查是否是任务被用户主动跳过导致的错误
+			// 1. 检查任务状态是否为 Skipped（用户主动跳过）
+			// 2. 检查错误是否包含 context canceled（任务执行中被中断）
+			isSkipped := currentTask.GetStatus() == aicommon.AITaskState_Skipped
+			isContextCanceled := strings.Contains(err.Error(), "context canceled") || strings.Contains(err.Error(), "context done")
+
+			if isSkipped || (isContextCanceled && currentTask.GetStatus() == aicommon.AITaskState_Skipped) {
+				r.config.EmitInfo("task %s was skipped by user, continuing to next task", currentTask.Name)
+				continue
+			}
+
+			// 检查全局 context 是否被取消（用户终止整个任务）
+			if r.config.IsCtxDone() {
+				r.config.EmitInfo("coordinator context cancelled, stopping execution")
+				return err
+			}
+
 			r.config.EmitPlanExecFail("invoke task[%s] failed: %v", currentTask.Name, err)
 			r.config.EmitError("invoke subtask failed: %v", err)
 			log.Errorf("invoke subtask failed: %v", err)
