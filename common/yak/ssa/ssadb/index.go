@@ -42,7 +42,7 @@ func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
 	if idx == nil || db == nil {
 		return
 	}
-	err := diagnostics.Track("Database.SaveIRIndex", func() error {
+	err := diagnostics.TrackLow("Database.SaveIRIndex", func() error {
 		return db.Save(idx).Error
 	})
 	if err != nil {
