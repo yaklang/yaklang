@@ -8,14 +8,14 @@ import (
 
 type Config struct {
 	ctx            context.Context       `json:"-"`
-	Mode           Mode                  `json:"mode,omitempty"` // 配置模式，可以从 JSON 指定
-	BaseInfo       *BaseInfo             `json:"base_info,omitempty"`
-	CodeSource     *CodeSourceInfo       `json:"code_source,omitempty"`
-	SSACompile     *SSACompileConfig     `json:"ssa_compile,omitempty"`
-	SyntaxFlow     *SyntaxFlowConfig     `json:"syntax_flow,omitempty"`
-	SyntaxFlowScan *SyntaxFlowScanConfig `json:"syntax_flow_scan,omitempty"`
-	SyntaxFlowRule *SyntaxFlowRuleConfig `json:"syntax_flow_rule,omitempty"`
-	Output         *OutputConfig         `json:"output,omitempty"`
+	Mode           Mode                  `json:"Mode,omitempty"` // 配置模式，可以从 JSON 指定
+	BaseInfo       *BaseInfo             `json:"BaseInfo,omitempty"`
+	CodeSource     *CodeSourceInfo       `json:"CodeSource,omitempty"`
+	SSACompile     *SSACompileConfig     `json:"SSACompile,omitempty"`
+	SyntaxFlow     *SyntaxFlowConfig     `json:"SyntaxFlow,omitempty"`
+	SyntaxFlowScan *SyntaxFlowScanConfig `json:"SyntaxFlowScan,omitempty"`
+	SyntaxFlowRule *SyntaxFlowRuleConfig `json:"SyntaxFlowRule,omitempty"`
+	Output         *OutputConfig         `json:"Output,omitempty"`
 
 	// 其他配置项可以在这里添加
 	ExtraInfo map[string][]any `json:"-"` // 用于存储外部传入的其他信息
