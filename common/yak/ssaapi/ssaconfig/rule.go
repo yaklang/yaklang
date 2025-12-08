@@ -5,9 +5,9 @@ import (
 )
 
 type SyntaxFlowRuleConfig struct {
-	RuleNames  []string                  `json:"rule_names"`
-	RuleInput  *ypb.SyntaxFlowRuleInput  `json:"rule_input"`
-	RuleFilter *ypb.SyntaxFlowRuleFilter `json:"rule_filter"`
+	RuleNames  []string                   `json:"rule_names"`
+	RuleInput  []*ypb.SyntaxFlowRuleInput `json:"rule_input"`
+	RuleFilter *ypb.SyntaxFlowRuleFilter  `json:"rule_filter"`
 }
 
 // --- 规则配置 Get 方法 ---
@@ -54,7 +54,7 @@ func (c *Config) SetRuleNames(names []string) {
 	c.SyntaxFlowRule.RuleNames = names
 }
 
-func (c *Config) GetRuleInput() *ypb.SyntaxFlowRuleInput {
+func (c *Config) GetRuleInput() []*ypb.SyntaxFlowRuleInput {
 	if c == nil || c.Mode&ModeSyntaxFlowRule == 0 || c.SyntaxFlowRule == nil {
 		return nil
 	}
@@ -71,7 +71,7 @@ func (c *Config) SetRuleInput(input *ypb.SyntaxFlowRuleInput) {
 	if c.SyntaxFlowRule == nil {
 		c.SyntaxFlowRule = &SyntaxFlowRuleConfig{}
 	}
-	c.SyntaxFlowRule.RuleInput = input
+	c.SyntaxFlowRule.RuleInput = append(c.SyntaxFlowRule.RuleInput, input)
 }
 
 // --- 规则配置 Options ---
@@ -87,12 +87,16 @@ func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) Option {
 	}
 }
 
+func WithRuleInputRaw(raw string) Option {
+	return WithRuleInput(&ypb.SyntaxFlowRuleInput{Content: raw})
+}
+
 func WithRuleInput(input *ypb.SyntaxFlowRuleInput) Option {
 	return func(c *Config) error {
 		if err := c.ensureSyntaxFlowRule("Rule Input"); err != nil {
 			return err
 		}
-		c.SyntaxFlowRule.RuleInput = input
+		c.SyntaxFlowRule.RuleInput = append(c.SyntaxFlowRule.RuleInput, input)
 		return nil
 	}
 }

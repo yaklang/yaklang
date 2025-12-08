@@ -238,7 +238,7 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 				c.SyntaxFlowRule.RuleFilter = req.GetFilter()
 			}
 			if req.RuleInput != nil {
-				c.SyntaxFlowRule.RuleInput = req.GetRuleInput()
+				c.SyntaxFlowRule.RuleInput = append(c.SyntaxFlowRule.RuleInput,  req.GetRuleInput())
 			}
 		}
 
