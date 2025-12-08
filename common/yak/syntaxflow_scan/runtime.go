@@ -54,7 +54,7 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		for _, progName := range m.Config.GetProgramNames() {
+		for _, prog := range m.Config.Programs {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
@@ -65,17 +65,11 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			}
 
 			swg.Add()
-			go func(rule *schema.SyntaxFlowRule, progName string) {
+			go func(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 				defer m.SaveTask()
 				defer swg.Done()
-
-				prog, err := ssaapi.FromDatabase(progName)
-				if err != nil {
-					m.markRuleSkipped()
-					return
-				}
 				m.Query(rule, prog)
-			}(rule, progName)
+			}(rule, prog)
 		}
 	}
 	swg.Wait()
