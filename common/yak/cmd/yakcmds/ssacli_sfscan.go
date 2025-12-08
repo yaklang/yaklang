@@ -200,7 +200,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 }
 
 // getProgram gets the program using the provided configuration
-func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, error) {
+func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, error) {
 	log.Infof("================= get or parse program ================")
 	defer func() {
 		log.Infof("get program done")
@@ -209,14 +209,21 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-
 	targetPath := config.GetCodeSourceLocalFileOrURL()
 	programName := config.GetProgramName()
 	language := string(config.GetLanguage())
 	memory := config.GetCompileMemory() || config.GetSyntaxFlowMemory()
 	excludeFiles := config.GetCompileExcludeFiles()
 
-	// Priority: targetPath > programName (compile from source > database lookup)
+	if programName != "" {
+		log.Infof("get program from database: %s", programName)
+		ret := ssaapi.LoadProgramRegexp(programName)
+		if len(ret) == 0 {
+			return nil, utils.Errorf("program %s not found in database", programName)
+		}
+		return ret, nil
+	}
+
 	if targetPath != "" {
 		log.Infof("get program from target path: %s", targetPath)
 		para := make(map[string]any)
@@ -230,11 +237,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 			para["program_name"] = programName
 		}
 		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, targetPath, language, true, para)
-		return prog, err
-	}
-	if programName != "" {
-		log.Infof("get program from database: %s", programName)
-		return ssaapi.FromDatabase(programName)
+		return []*ssaapi.Program{prog}, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
 }

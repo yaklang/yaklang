@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 var ProgramCache = utils.NewLRUCache[*Program](10)
@@ -45,4 +46,37 @@ func fromDatabase(name string) (*Program, error) {
 	ret.enableDatabase = true // enable database
 	ret.irProgram = prog.GetIrProgram()
 	return ret, nil
+}
+
+func fromDatabaseIRProgram(irprog *ssadb.IrProgram) (*Program, error) {
+	// get program from database
+	prog := ssa.NewProgramFromDB(irprog)
+
+	// all function and instruction will be lazy
+	ret := NewProgram(prog, nil)
+	ret.comeFromDatabase = true
+	ret.enableDatabase = true // enable database
+	ret.irProgram = irprog
+	return ret, nil
+}
+
+func LoadProgramRegexp(match string) []*Program {
+	programs := []*Program{}
+
+	var irprogram []*ssadb.IrProgram
+	ssadb.GetDB().Model(&ssadb.IrProgram{}).
+		Where("program_name REGEXP ?  OR program_name = ? ", match, match).
+		Where("program_kind = ?", "application").
+		Find(&irprogram)
+
+	for _, irp := range irprogram {
+		p, err := fromDatabaseIRProgram(irp)
+		if err != nil {
+			log.Errorf("load program %s from database fail: %v", irp.ProgramName, err)
+			continue
+		}
+		programs = append(programs, p)
+	}
+
+	return programs
 }
