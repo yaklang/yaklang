@@ -82,6 +82,8 @@ const (
 
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
 	EVENT_TYPE_FAIL_PLAN_AND_EXECUTION     EventType = "fail_plan_and_execution"
+	EVENT_TYPE_FAIL_REACT                  EventType = "fail_react_task"
+	EVENT_TYPE_SUCCESS_REACT               EventType = "success_react_task"
 	EVENT_TYPE_END_PLAN_AND_EXECUTION      EventType = "end_plan_and_execution"
 	EVENT_TYPE_PLAN                        EventType = "plan"
 	EVENT_TYPE_PERMISSION_REQUIRE          EventType = "permission_require"

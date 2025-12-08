@@ -602,6 +602,13 @@ func (e Emitter) EmitPlanExecFail(fmtlog string, items ...any) (*schema.AiOutput
 	return e.EmitJSON(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION, "plan_exec_fail", fmt.Sprintf(fmtlog, items...))
 }
 
+func (e Emitter) EmitReActFail(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_FAIL_REACT, "re_act_fail", fmt.Sprintf(fmtlog, items...))
+}
+func (e Emitter) EmitReActSuccess(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_SUCCESS_REACT, "re_act_success", fmt.Sprintf(fmtlog, items...))
+}
+
 func (e *Emitter) EmitError(fmtlog string, items ...any) (*schema.AiOutputEvent, error) {
 	return e.EmitLogWithLevel("error", "system", fmtlog, items...)
 }

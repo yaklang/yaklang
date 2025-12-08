@@ -5,10 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
@@ -646,6 +647,10 @@ func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTa
 
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) {
 	if r.onPostIteration != nil {
-		r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err))
+		if err != nil {
+			r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err))
+		} else {
+			r.onPostIteration(r, current, task, true, nil)
+		}
 	}
 }

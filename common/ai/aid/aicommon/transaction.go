@@ -23,6 +23,7 @@ func CallAITransaction(
 		trcRetry = 3
 	}
 	var postHandlerErr error
+	var lastErr error // 记录最后一次重试的错误
 
 	emitter := c.GetEmitter()
 
@@ -55,6 +56,7 @@ func CallAITransaction(
 				append(requestOpts, WithAIRequest_SeqId(seq))...,
 			))
 		if err != nil {
+			lastErr = err
 			emitter.EmitError("call ai api error: %v, retry and block it", err)
 			select {
 			case <-c.GetContext().Done():
@@ -69,6 +71,7 @@ func CallAITransaction(
 		}
 		postHandlerErr = postHandler(rsp)
 		if postHandlerErr != nil {
+			lastErr = postHandlerErr
 			emitter.EmitError("ai transaction in postHandler error: %v, retry and block it, prompts: %v", postHandlerErr, utils.ShrinkString(finalPrompt, 512))
 			select {
 			case <-c.GetContext().Done():
@@ -88,6 +91,9 @@ func CallAITransaction(
 			}
 		}
 		return nil
+	}
+	if lastErr != nil {
+		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)
 	}
 	return utils.Errorf("max retry count[%v] reached in transaction", trcRetry)
 }
