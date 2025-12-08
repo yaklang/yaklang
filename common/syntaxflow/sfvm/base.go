@@ -46,6 +46,10 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeTypeCast
 	case "make":
 		return ssa.SSAOpcodeMake
+	case "binop":
+		return ssa.SSAOpcodeBinOp
+	case "unop":
+		return ssa.SSAOpcodeUnOp
 	default:
 		return -1
 	}
