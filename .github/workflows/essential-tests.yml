@@ -178,14 +178,14 @@ jobs:
           cache: false
         id: go
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        id: cache-go-modules
-        with:
-          path: ~/go/pkg/mod
-          key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      # - name: Cache Go modules
+      #   uses: actions/cache@v3
+      #   id: cache-go-modules
+      #   with:
+      #     path: ~/go/pkg/mod
+      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
 
       - name: Restore Go Build Cache
         uses: actions/cache@v3
@@ -464,14 +464,14 @@ jobs:
           cache: false
         id: go
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        id: cache-go-modules
-        with:
-          path: ~/go/pkg/mod
-          key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      # - name: Cache Go modules
+      #   uses: actions/cache@v3
+      #   id: cache-go-modules
+      #   with:
+      #     path: ~/go/pkg/mod
+      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
 
       - name: Restore Go Build Cache
         uses: actions/cache@v3

@@ -20,14 +20,14 @@ jobs:
           go-version-file: "./go.mod" # 使用 go.mod 指定的版本
           cache: false
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        id: cache-go-modules
-        with:
-          path: ~/go/pkg/mod
-          key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      # - name: Cache Go modules
+      #   uses: actions/cache@v3
+      #   id: cache-go-modules
+      #   with:
+      #     path: ~/go/pkg/mod
+      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
 
       - name: Install libpcap-dev
         run: |

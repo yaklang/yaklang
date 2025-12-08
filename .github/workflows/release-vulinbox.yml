@@ -30,19 +30,19 @@ jobs:
         run: |
           echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: 1.22.8
           cache: false
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        id: cache-go-modules
-        with:
-          path: ~/go/pkg/mod
-          key: go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
+      # - name: Cache Go modules
+      #   uses: actions/cache@v3
+      #   id: cache-go-modules
+      #   with:
+      #     path: ~/go/pkg/mod
+      #     key: go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
 
       #      - name: Download Npcap SDK (Windows)
       #        run: |
