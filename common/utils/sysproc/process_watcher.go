@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/shirou/gopsutil/v4/net"
 	"github.com/shirou/gopsutil/v4/process"
+	"github.com/yaklang/yaklang/common/utils"
 	"log"
 	"sync"
 	"time"
@@ -72,11 +73,11 @@ func NewProcessesWatcher() *ProcessesWatcher {
 // onProcessCreate: 匹配的进程出现时的回调.
 // onProcessExit: 匹配的进程消失时的回调.
 // checkInterval: 扫描进程列表的时间间隔.
-func (pw *ProcessesWatcher) Start(onProcessCreate OnProcessCreateFunc, onProcessExit OnProcessExitFunc, checkInterval time.Duration) {
+func (pw *ProcessesWatcher) Start(ctx context.Context, onProcessCreate OnProcessCreateFunc, onProcessExit OnProcessExitFunc, checkInterval time.Duration) {
 	log.Println("ProcessesWatcher starting...")
 	// 初始化 supervisor 和 context
 	// 每次调用 Start 都会重置监控循环
-	baseCtx, cancel := context.WithCancel(context.Background())
+	baseCtx, cancel := context.WithCancel(ctx)
 	pw.ctx = baseCtx
 	pw.supervisor.cancelFunc = cancel
 
@@ -218,4 +219,22 @@ func (pw *ProcessesWatcher) DetectProcessConnections(pid int32, limit int) ([]ne
 		total = limit
 	}
 	return conns[:total], nil
+}
+
+func (pw *ProcessesWatcher) DetectPublicProcessConnections(pid int32, limit int) ([]net.ConnectionStat, error) {
+	conns, err := pw.DetectProcessConnections(pid, limit)
+	if err != nil {
+		return nil, err
+	}
+	filteredConns := make([]net.ConnectionStat, 0, len(conns))
+	for _, conn := range conns {
+		if utils.IsLoopback(conn.Laddr.IP) && utils.IsLoopback(conn.Raddr.IP) {
+			continue
+		}
+		if utils.StringArrayContains([]string{conn.Laddr.IP, conn.Raddr.IP}, "*") || utils.StringArrayContains([]string{conn.Laddr.IP, conn.Raddr.IP}, "") {
+			continue
+		}
+		filteredConns = append(filteredConns, conn)
+	}
+	return filteredConns, nil
 }
