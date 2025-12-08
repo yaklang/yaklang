@@ -168,34 +168,79 @@ func (g *VarFlowGraph) ExitConditionWithFilter(sfi *SFI) {
 	g.CreateStep(AnalysisStepTypeConditionFilter, sfi, WithEvidenceTree(rootNode))
 }
 
-func (g *VarFlowGraph) PushFilterCondition(sfi *SFI, passed, failed ValueOperator) {
+func (g *VarFlowGraph) PushFilterCondition(sfi *SFI) {
 	if g == nil {
 		return
 	}
 	node := NewEvidenceLeafNode(EvidenceTypeFilterCondition, sfi)
-	node.Passed = passed
-	node.Failed = failed
 	g.pushEvidenceNode(node)
 }
 
-func (g *VarFlowGraph) PushStringCondition(sfi *SFI, passed, failed ValueOperator) {
+// AppendFilterResultToCurrentNode 将 FilterResult 附加到当前栈顶的证据节点
+// 在 OpCheckEmpty 时调用，记录每个值的过滤结果
+func (g *VarFlowGraph) AppendFilterResultToCurrentNode(result *FilterResult) {
+	if g == nil || g.evidenceStack == nil {
+		return
+	}
+	node := g.evidenceStack.Peek()
+	if node == nil {
+		return
+	}
+	node.Results = append(node.Results, result)
+}
+
+func (g *VarFlowGraph) PushStringCondition(sfi *SFI) {
 	if g == nil {
 		return
 	}
 	node := NewEvidenceLeafNode(EvidenceTypeStringCondition, sfi)
-	node.Passed = passed
-	node.Failed = failed
 	g.pushEvidenceNode(node)
 }
 
-func (g *VarFlowGraph) PushOpcodeCondition(sfi *SFI, passed, failed ValueOperator) {
+// PushStringConditionWithResults 推入字符串条件节点并附加过滤结果
+func (g *VarFlowGraph) PushStringConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	if g == nil {
+		return
+	}
+	node := NewEvidenceLeafNode(EvidenceTypeStringCondition, sfi)
+	node.Results = buildFilterResults(values, conditions)
+	g.pushEvidenceNode(node)
+}
+
+func (g *VarFlowGraph) PushOpcodeCondition(sfi *SFI) {
 	if g == nil {
 		return
 	}
 	node := NewEvidenceLeafNode(EvidenceTypeOpcodeCondition, sfi)
-	node.Passed = passed
-	node.Failed = failed
 	g.pushEvidenceNode(node)
+}
+
+// PushOpcodeConditionWithResults 推入 opcode 条件节点并附加过滤结果
+func (g *VarFlowGraph) PushOpcodeConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	if g == nil {
+		return
+	}
+	node := NewEvidenceLeafNode(EvidenceTypeOpcodeCondition, sfi)
+	node.Results = buildFilterResults(values, conditions)
+	g.pushEvidenceNode(node)
+}
+
+// buildFilterResults 根据原始值和条件数组构建 FilterResult 列表
+func buildFilterResults(values ValueOperator, conditions []bool) []*FilterResult {
+	if values == nil {
+		return nil
+	}
+	results := make([]*FilterResult, 0, len(conditions))
+	for i, passed := range conditions {
+		if v, err := values.ListIndex(i); err == nil {
+			results = append(results, &FilterResult{
+				Value:  v,
+				Passed: passed,
+				// StringCondition/OpcodeCondition 没有中间值，IntermValue 为 nil
+			})
+		}
+	}
+	return results
 }
 
 func (g *VarFlowGraph) PushLogicAnd() {

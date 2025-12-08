@@ -85,16 +85,26 @@ func (s *SFFrame) graphEnterCondition() {
 	s.getVarFlowGraph().EnterCondition()
 }
 
-func (s *SFFrame) graphPushFilterCondition(sfi *SFI, passed, failed ValueOperator) {
-	s.getVarFlowGraph().PushFilterCondition(sfi, passed, failed)
+func (s *SFFrame) graphPushFilterCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushFilterCondition(sfi)
 }
 
-func (s *SFFrame) graphPushStringCondition(sfi *SFI, passed, failed ValueOperator) {
-	s.getVarFlowGraph().PushStringCondition(sfi, passed, failed)
+func (s *SFFrame) graphPushStringCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushStringCondition(sfi)
 }
 
-func (s *SFFrame) graphPushOpcodeCondition(sfi *SFI, passed, failed ValueOperator) {
-	s.getVarFlowGraph().PushOpcodeCondition(sfi, passed, failed)
+// graphPushStringConditionWithResults 推入字符串条件节点并附加过滤结果
+func (s *SFFrame) graphPushStringConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	s.getVarFlowGraph().PushStringConditionWithResults(sfi, values, conditions)
+}
+
+func (s *SFFrame) graphPushOpcodeCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushOpcodeCondition(sfi)
+}
+
+// graphPushOpcodeConditionWithResults 推入 opcode 条件节点并附加过滤结果
+func (s *SFFrame) graphPushOpcodeConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	s.getVarFlowGraph().PushOpcodeConditionWithResults(sfi, values, conditions)
 }
 
 func (s *SFFrame) graphPushLogicAnd() {
@@ -111,6 +121,11 @@ func (s *SFFrame) graphPushLogicNot() {
 
 func (s *SFFrame) graphExitConditionWithFilter(sfi *SFI) {
 	s.getVarFlowGraph().ExitConditionWithFilter(sfi)
+}
+
+// graphAppendFilterResult 将过滤结果附加到当前证据节点
+func (s *SFFrame) graphAppendFilterResult(result *FilterResult) {
+	s.getVarFlowGraph().AppendFilterResultToCurrentNode(result)
 }
 
 // splitByCondition 根据条件数组将值分离为通过和未通过两组
@@ -861,7 +876,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		index := i.Iter.currentIndex
 		conditions := s.conditionStack.Peek()
-		//如果是null
+		// val 是过滤表达式产生的中间值
 		val := s.stack.Pop()
 		if len(conditions) == index+1 && !conditions[index] {
 			return nil
@@ -870,9 +885,22 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if len(conditions) < index+1 {
 			return utils.Errorf("check empty failed: stack top is empty")
 		}
-		conditions[index] = !val.IsEmpty()
+		passed := !val.IsEmpty()
+		conditions[index] = passed
 		s.conditionStack.Push(conditions)
 		s.popStack.Free()
+
+		// 收集过滤证据：原始值、中间值、是否通过
+		originValue := s.GetCurrentOriginValue()
+		if originValue != nil {
+			result := &FilterResult{
+				Value:       originValue, // 原始值
+				IntermValue: val,         // 中间值（过滤表达式的结果）
+				Passed:      passed,
+			}
+			s.graphAppendFilterResult(result)
+		}
+
 	case OpPop:
 		if _, err := s.opPop(true); err != nil {
 			return err
@@ -1000,8 +1028,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(vals)
 
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithDescription("Get Bottom Users"),
-			WithDescriptionZh("进行自顶向下数据流分析"),
+			WithDataFlowMode(DataFlowDirectionBottomUse, i.SyntaxFlowConfig),
 			WithValues(vals),
 		)
 	case OpGetDefs:
@@ -1059,8 +1086,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 
 		s.stack.Push(vals)
 		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
-			WithDescription("Get TopDefs"),
-			WithDescriptionZh("进行自顶向下数据流分析"),
+			WithDataFlowMode(DataFlowDirectionTopDef, i.SyntaxFlowConfig),
 			WithValues(vals),
 		)
 	case OpNewRef:
@@ -1207,8 +1233,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		})
 		s.conditionStack.Push(flag)
 
-		passed, failed := s.splitByCondition(vals, flag)
-		s.graphPushFilterCondition(i, passed, failed)
+		s.graphPushFilterCondition(i)
 	case OpCompareOpcode:
 		s.debugSubLog(">> pop")
 		values := s.stack.Pop()
@@ -1244,8 +1269,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
 
-		passed, failed := s.splitByCondition(values, condition)
-		s.graphPushOpcodeCondition(i, passed, failed)
+		// 收集 OpcodeCondition 的过滤结果
+		s.graphPushOpcodeConditionWithResults(i, values, condition)
 	case OpCompareString:
 		s.debugSubLog(">> pop")
 		//pop到原值
@@ -1280,8 +1305,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
 
-		passed, failed := s.splitByCondition(values, condition)
-		s.graphPushStringCondition(i, passed, failed)
+		// 收集 StringCondition 的过滤结果
+		s.graphPushStringConditionWithResults(i, values, condition)
 	case OpVersionIn:
 		value := s.stack.Peek()
 		if value == nil {

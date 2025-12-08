@@ -5,40 +5,49 @@ import (
 	"strings"
 )
 
-// EvidenceNode 条件过滤语句的证据
 type EvidenceNode struct {
 	Type        EvidenceNodeType
 	LogicOp     EvidenceNodeCondition
-	Description string          // 人类可读的描述
-	Filter      *EvidenceFilter // 结构化的过滤信息
+	Description string
 	Children    []*EvidenceNode
-
-	// 运行时添加的证据
-	Passed ValueOperator
-	Failed ValueOperator
+	// string compare, opcode compare的证据
+	CompareEvidence *CompareEvidence
+	// check empty 的证据
+	Results []*FilterResult
 }
 
-// FilterCondition 表示单个过滤条件
+type CompareEvidence struct {
+	FilterType string             `json:"filter_type"` // "string", "opcode", "compare", "version", "regex", "glob", "empty_check"
+	MatchMode  string             `json:"match_mode"`  // "have"(全部匹配), "any"(任意匹配) - 仅用于字符串过滤
+	Operator   string             `json:"operator"`    // "==", "!=", ">", ">=", "<", "<=" - 仅用于比较操作
+	Conditions []*FilterCondition `json:"conditions"`  // 过滤条件列表
+	Results    []*FilterResult
+}
+
+type CheckEmptyEvidence struct {
+	Results []*FilterResult
+}
+
+// FilterCondition 单个过滤条件
 type FilterCondition struct {
 	Type  string `json:"type"`  // "exact", "regexp", "glob"
 	Value string `json:"value"` // 匹配的值或模式
 }
 
-// EvidenceFilter 描述过滤器的详细信息
-type EvidenceFilter struct {
-	FilterType string             `json:"filter_type"` // "string", "opcode", "compare", "version", "regex", "glob", "empty_check"
-	MatchMode  string             `json:"match_mode"`  // "have"(全部匹配), "any"(任意匹配) - 仅用于字符串过滤
-	Operator   string             `json:"operator"`    // "==", "!=", ">", ">=", "<", "<=" - 仅用于比较操作
-	Conditions []*FilterCondition `json:"conditions"`  // 过滤条件列表
+type FilterResult struct {
+	Value       ValueOperator // 原始值 (如 sink1)
+	IntermValue ValueOperator // 中间值：过滤表达式产生的值
+	Passed      bool          // 是否通过过滤
 }
 
-// generateEvidenceFromSFI 根据 SFI 生成描述和过滤信息
-func generateEvidenceFromSFI(sfi *SFI) (string, *EvidenceFilter) {
+type FilterEvidenceItem = FilterResult
+
+func generateEvidenceFromSFI(sfi *SFI) (string, *CompareEvidence) {
 	if sfi == nil {
 		return "", nil
 	}
 
-	filter := &EvidenceFilter{}
+	filter := &CompareEvidence{}
 	var description string
 
 	switch sfi.OpCode {
@@ -183,19 +192,80 @@ func NewEvidenceLogicNode(op EvidenceNodeCondition, children ...*EvidenceNode) *
 func NewEvidenceLeafNode(typ EvidenceNodeType, sfi *SFI) *EvidenceNode {
 	description, filter := generateEvidenceFromSFI(sfi)
 	return &EvidenceNode{
-		Type:        typ,
-		LogicOp:     ConditionTypeNone,
-		Description: description,
-		Filter:      filter,
-		Children:    nil,
+		Type:            typ,
+		LogicOp:         ConditionTypeNone,
+		Description:     description,
+		CompareEvidence: filter,
+		Children:        nil,
 	}
 }
 
-// SearchMode 搜索语句的证据
 type SearchMode struct {
 	SearchType   SearchType `json:"search_type"`    // 搜索类型：exact, fuzzy, regexp
 	Pattern      string     `json:"pattern"`        // 搜索模式
 	MatchMode    int        `json:"match_mode"`     // NameMatch=1, KeyMatch=2, BothMatch=3
 	MatchModeStr string     `json:"match_mode_str"` // "name", "key", "name+key"
 	IsRecursive  bool       `json:"is_recursive"`   // 是否递归搜索
+}
+
+type DataFlowDirection string
+
+const (
+	DataFlowDirectionTopDef    DataFlowDirection = "top_def"
+	DataFlowDirectionBottomUse DataFlowDirection = "bottom_use"
+)
+
+// DataFlowMode 数据流分析语句的证据
+type DataFlowMode struct {
+	Direction DataFlowDirection   `json:"direction"`        // 数据流方向
+	Depth     int                 `json:"depth"`            // 深度限制
+	DepthMin  int                 `json:"depth_min"`        // 最小深度
+	DepthMax  int                 `json:"depth_max"`        // 最大深度
+	Config    map[string][]string `json:"config,omitempty"` // 配置规则 (include/exclude/until/hook)
+}
+
+func NewDataFlowMode(direction DataFlowDirection, configs []*RecursiveConfigItem) *DataFlowMode {
+	mode := &DataFlowMode{
+		Direction: direction,
+		Config:    make(map[string][]string),
+	}
+	for _, cfg := range configs {
+		if cfg == nil {
+			continue
+		}
+		switch RecursiveConfigKey(cfg.Key) {
+		case RecursiveConfig_Depth:
+			mode.Depth = parseIntOrZero(cfg.Value)
+		case RecursiveConfig_DepthMin:
+			mode.DepthMin = parseIntOrZero(cfg.Value)
+		case RecursiveConfig_DepthMax:
+			mode.DepthMax = parseIntOrZero(cfg.Value)
+		case RecursiveConfig_Include, RecursiveConfig_Exclude, RecursiveConfig_Until, RecursiveConfig_Hook:
+			mode.Config[cfg.Key] = append(mode.Config[cfg.Key], cfg.Value)
+		}
+	}
+	return mode
+}
+
+func (m *DataFlowMode) String() string {
+	if m == nil {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString(string(m.Direction))
+	if m.Depth > 0 || m.DepthMin > 0 || m.DepthMax > 0 {
+		sb.WriteString(fmt.Sprintf("\n  Depth: %d, Min: %d, Max: %d", m.Depth, m.DepthMin, m.DepthMax))
+	}
+	for key, values := range m.Config {
+		if len(values) > 0 {
+			sb.WriteString(fmt.Sprintf("\n  %s: %v", key, values))
+		}
+	}
+	return sb.String()
+}
+
+func parseIntOrZero(s string) int {
+	var result int
+	fmt.Sscanf(s, "%d", &result)
+	return result
 }
