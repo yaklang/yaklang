@@ -550,7 +550,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		DatabasePath:  fileName,
 		FolderID:      req.FolderId,
 		ChildFolderID: req.GetChildFolderId(),
-		Type:          "project",
+		Type:          req.GetType(),
 	}
 	err = yakit.CreateOrUpdateProject(s.GetProfileDatabase(), projectName, req.FolderId, req.ChildFolderId, req.GetType(), proj)
 	if err != nil {
