@@ -101,8 +101,8 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 		return result, nil
 	}
 
-	if hash == "" {
-		return nil, utils.Error("source code hash is empty, contact developers to fix it")
+	if hash == "" || hash == "d41d8cd98f00b204e9800998ecf8427e" {
+		return nil, utils.Error("source code hash is empty")
 	}
 
 	var source IrSource
