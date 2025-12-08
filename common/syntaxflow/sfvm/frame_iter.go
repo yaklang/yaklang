@@ -10,7 +10,6 @@ type IterContext struct {
 	results      []bool
 	counter      int
 
-	// 当前迭代的原始值（用于证据收集）
 	currentOriginValue ValueOperator
 }
 
@@ -49,7 +48,6 @@ func (s *SFFrame) IterNext() (ValueOperator, bool, error) {
 		return nil, false, nil
 	}
 	iter.counter++
-	// 保存当前迭代的原始值
 	iter.currentOriginValue = val
 	return val, true, nil
 }

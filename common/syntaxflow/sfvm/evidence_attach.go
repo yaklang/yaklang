@@ -30,9 +30,9 @@ type EvidenceAttach struct {
 	Values ValueOperator
 	// EvidenceTree是?{...}条件过滤对应的证据
 	EvidenceTree *EvidenceNode
-	// SearchMode 搜索模式信息（仅搜索步骤使用）
+	// SearchMode 搜索模式
 	SearchMode *SearchMode
-	// DataFlowMode 数据流分析模式信息（仅数据流步骤使用）
+	// DataFlowMode 数据流分析模式信息
 	DataFlowMode *DataFlowMode
 }
 
