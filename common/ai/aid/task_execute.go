@@ -127,6 +127,9 @@ func (t *AiTask) executeTask() error {
 	t.EmitInfo("start to wait for user review current task")
 
 	t.EmitRequireReviewForTask(t, ep.GetId())
+
+	log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
+
 	t.DoWaitAgree(t.Ctx, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
