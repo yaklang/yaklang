@@ -130,6 +130,12 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			r.wg.Add(1)
 
+			if isDone && reason != nil {
+				r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
+			} else {
+				r.Emitter.EmitReActSuccess("ReAct task execution success")
+			}
+
 			diffStr, err := r.config.TimelineDiffer.Diff()
 			if err != nil {
 				log.Warnf("timeline differ call failed: %v", err)

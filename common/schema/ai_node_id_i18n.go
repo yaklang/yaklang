@@ -491,6 +491,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务规划执行失败",
 		En: "plan and execute failed",
 	},
+	"re_act_fail": {
+		Zh: "ReAct 任务执行失败",
+		En: "ReAct Task Execution Failed",
+	},
+	"re_act_success": {
+		Zh: "ReAct 任务执行成功",
+		En: "ReAct Task Execution Success",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{
