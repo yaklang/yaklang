@@ -101,7 +101,8 @@ func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReA
 }
 
 func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) error {
-	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](c.Ctx, 10)
+	taskCtx := task.GetContext()
+	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](taskCtx, 10)
 	uid := uuid.NewString()
 	c.InputEventManager.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
@@ -116,7 +117,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	defer func() {
 		c.InputEventManager.UnregisterMirrorOfAIInputEvent(uid)
 	}()
-	ctx, cancel := context.WithCancel(c.Ctx)
+	ctx, cancel := context.WithCancel(taskCtx)
 	defer cancel()
 	hotpatchChan := c.Config.HotPatchBroadcaster.Subscribe()
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
