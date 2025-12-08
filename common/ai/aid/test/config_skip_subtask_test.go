@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -17,6 +20,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// extractCurrentTaskContent 从 prompt 中提取 <|CURRENT_TASK|> 和 <|CURRENT_TASK_END|> 之间的内容
+// 返回提取的内容，如果未找到则返回空字符串
+func extractCurrentTaskContent(prompt string) string {
+	re := regexp.MustCompile(`(?s)<\|CURRENT_TASK\|>(.*?)<\|CURRENT_TASK_END\|>`)
+	matches := re.FindStringSubmatch(prompt)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+	return ""
+}
+
+// isCurrentTask 判断当前执行的任务是否为指定的任务名称
+// 通过提取 <|CURRENT_TASK|> 标签内的内容，检查其中是否包含 "任务名称: taskName"
+func isCurrentTask(prompt string, taskName string) bool {
+	currentTaskContent := extractCurrentTaskContent(prompt)
+	if currentTaskContent == "" {
+		return false
+	}
+	return strings.Contains(currentTaskContent, "任务名称: "+taskName)
+}
 
 // SyncInputEventWithJSON 创建带 JSON 参数的同步事件
 func SyncInputEventWithJSON(syncType string, syncId string, params map[string]any) *ypb.AIInputEvent {
@@ -74,7 +98,8 @@ func TestCoordinator_SkipSubtaskInPlan(t *testing.T) {
 
 			// 处理任务执行请求
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-				if strings.Contains(prompt, "任务名称: 第一个任务") {
+				// 使用正则表达式提取 <|CURRENT_TASK|> 标签内容来精确判断当前执行的任务
+				if isCurrentTask(prompt, "第一个任务") {
 					task1Started = true
 				}
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
@@ -423,7 +448,8 @@ func TestCoordinator_SkipSubtaskInPlan_WithReason(t *testing.T) {
 			}
 
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-				if strings.Contains(prompt, "任务名称: 任务一") {
+				// 使用正则表达式提取 <|CURRENT_TASK|> 标签内容来精确判断当前执行的任务
+				if isCurrentTask(prompt, "任务一") {
 					task1Started = true
 				}
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
@@ -637,16 +663,29 @@ LOOP:
 // 1. 测试中有 1-1 和 1-2 两个任务
 // 2. 当 1-1 执行过程中接收到 skip 后，1-2 立即开始执行
 //
-// 测试策略：由于 skip 是通过 context.Cancel() 实现的，而 AI callback 可能在 context 取消前就返回了
-// 所以我们采用"预跳过"策略：在任务规划完成后、任务开始执行前，先跳过任务 1-1
-// 然后验证 runtime 能正确识别 Skipped 状态并跳过任务 1-1，直接执行任务 1-2
+// 测试策略：
+// 1. plan 正常 continue
+// 2. 任务 1-1 开始执行时：
+//   - 通知外部任务已开始
+//   - 使用 goroutine 异步发送响应，避免阻塞核心处理 skip 请求
+//   - 等待 skip 确认后再返回响应
+//
+// 3. 外部收到任务开始通知后发送 skip 请求
+// 4. skip 被核心处理并确认成功
+// 5. callback 收到确认后返回响应
+// 6. runtime 检测到 Skipped 状态并继续执行任务 1-2
+//
+// 关键点：AI callback 使用异步方式，不阻塞核心处理 skip 请求
 func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 
-	task11Started := false
+	// 用于协调 callback 和外部测试循环
+	task11Started := make(chan struct{}, 1) // callback 通知外部任务 1-1 开始
+	skipConfirmed := make(chan struct{}, 1) // 外部通知 callback skip 已确认成功
+	task11DidStart := false
+	task11AlreadyNotified := false // 防止重试时重复通知
 	task12Started := false
-	task12Completed := false
 
 	ins, err := aid.NewCoordinator(
 		"测试跳过子任务后继续执行下一个任务",
@@ -658,12 +697,12 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
 			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
 				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
 
 			if isPlanRequest {
+				defer rsp.Close()
 				// 确保创建两个子任务 1-1 和 1-2
 				rsp.EmitOutputStream(strings.NewReader(`{
     "@action": "plan",
@@ -679,38 +718,88 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 			}
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				defer rsp.Close()
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
 				return rsp, nil
 			}
 
 			// 处理任务执行请求
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-				// 检查是否是 1-1 任务（理论上不应该被调用，因为已被跳过）
-				if strings.Contains(prompt, "任务名称: 任务1-1") {
-					task11Started = true
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "任务1-1完成"}}`))
+				// 使用正则表达式提取 <|CURRENT_TASK|> 标签内容来精确判断当前执行的任务
+
+				// 任务 1-1：使用 pipe 异步写入，先写不完整的 JSON 让解析器等待
+				if isCurrentTask(prompt, "任务1-1") {
+					task11DidStart = true
+
+					// 如果已经通知过（可能是重试），用 pipe 卡住不返回，避免干扰
+					if task11AlreadyNotified {
+						pr, pw := io.Pipe()
+						go func() {
+							// 写入部分数据让解析器等待
+							pw.Write([]byte(`{"@a`))
+							// sleep 15s 后关闭（测试应该在这之前完成）
+							time.Sleep(15 * time.Second)
+							pw.Close()
+							rsp.Close()
+						}()
+						rsp.EmitOutputStream(pr)
+						return rsp, nil
+					}
+					task11AlreadyNotified = true
+
+					// 使用 pipe 来控制响应流
+					pr, pw := io.Pipe()
+
+					// 在 goroutine 中异步写入响应
+					go func() {
+						// 先写入不完整的 JSON，让解析器等待更多数据
+						pw.Write([]byte(`{"@a`))
+
+						// 通知外部任务已开始
+						select {
+						case task11Started <- struct{}{}:
+						default:
+						}
+
+						// 等待 skip 成功确认信号
+						<-skipConfirmed
+
+						// skip 已确认，写入完整的响应
+						pw.Write([]byte(`ction": "object", "next_action": {"type": "finish", "answer_payload": "任务1-1完成"}}`))
+
+						// 关闭 pipe，此时核心才会开始解析完整响应
+						pw.Close()
+
+						// 关闭响应
+						rsp.Close()
+					}()
+
+					// 使用 pipe reader 作为响应流
+					rsp.EmitOutputStream(pr)
+					// 不在这里调用 rsp.Close()，由 goroutine 负责关闭
 					return rsp, nil
 				}
 
-				// 检查是否是 1-2 任务
-				if strings.Contains(prompt, "任务名称: 任务1-2") {
+				// 任务 1-2：正常执行
+				if isCurrentTask(prompt, "任务1-2") {
+					defer rsp.Close()
 					task12Started = true
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "任务1-2完成"}}`))
 					return rsp, nil
 				}
 
+				defer rsp.Close()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
 				return rsp, nil
 			}
 
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-				if strings.Contains(prompt, "任务1-2") {
-					task12Completed = true
-				}
+				defer rsp.Close()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
 				return rsp, nil
 			}
 
+			defer rsp.Close()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
 			return rsp, nil
 		}),
@@ -725,16 +814,24 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 	skipSuccess := false
 	syncId := uuid.New().String()
 
-	ctx := utils.TimeoutContextSeconds(10)
+	// 计数器：验证只触发一次
+	task11StartedCount := 0
+	skipConfirmedCount := 0
+
+	ctx := utils.TimeoutContextSeconds(15)
 
 LOOP:
 	for {
 		select {
-		case result := <-outputChan:
-			// 在计划审核时发送 skip 请求（任务开始执行前）
-			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE && !skipSent {
+		case <-task11Started:
+			// 验证：task11Started 只能触发一次
+			task11StartedCount++
+			require.Equal(t, 1, task11StartedCount, "task11Started should only be triggered once, but got %d times", task11StartedCount)
+
+			// 任务 1-1 开始执行后，立即发送 skip 请求
+			// 由于 callback 是异步的，核心可以立即处理 skip 请求
+			if !skipSent {
 				skipSent = true
-				// 先发送 skip 请求跳过任务 1-1
 				inputChan.SafeFeed(SyncInputEventWithJSON(
 					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
 					syncId,
@@ -743,7 +840,11 @@ LOOP:
 						"reason":        "用户决定跳过任务1-1，希望立即执行任务1-2",
 					},
 				))
-				// 然后继续执行计划
+			}
+
+		case result := <-outputChan:
+			// plan 审核正常 continue
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
@@ -753,32 +854,53 @@ LOOP:
 				var data map[string]any
 				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
 					if success, ok := data["success"].(bool); ok && success {
+						// 验证：skipConfirmed 只能发送一次
+						skipConfirmedCount++
+						require.Equal(t, 1, skipConfirmedCount, "skipConfirmed should only be sent once, but got %d times", skipConfirmedCount)
+
 						skipSuccess = true
 						require.Equal(t, "1-1", data["subtask_index"])
+						// 通知 callback skip 已成功确认，可以返回响应了
+						select {
+						case skipConfirmed <- struct{}{}:
+						default:
+						}
 					}
 				}
 			}
 
-			// 检查完成（YOLO 模式下会快速完成，不会调用 verify-satisfaction）
+			// 检查完成
 			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "coordinator run finished") {
 				break LOOP
 			}
 
 		case <-ctx.Done():
-			t.Fatalf("timeout: skipSent=%v, skipSuccess=%v, task11Started=%v, task12Started=%v, task12Completed=%v",
-				skipSent, skipSuccess, task11Started, task12Started, task12Completed)
+			t.Fatalf("timeout: skipSent=%v, skipSuccess=%v, task11DidStart=%v, task12Started=%v",
+				skipSent, skipSuccess, task11DidStart, task12Started)
 		}
 	}
 
+	// 最终验证：确保都恰好触发了一次
+	require.Equal(t, 1, task11StartedCount, "task11Started should be triggered exactly once")
+	require.Equal(t, 1, skipConfirmedCount, "skipConfirmed should be sent exactly once")
 	require.True(t, skipSent, "skip request should be sent")
 	require.True(t, skipSuccess, "skip should succeed")
-	require.False(t, task11Started, "task 1-1 should NOT be started (it was skipped)")
+	require.True(t, task11DidStart, "task 1-1 should be started before being skipped")
 	require.True(t, task12Started, "task 1-2 should start after 1-1 is skipped")
 }
 
+// TestCoordinator_RedoSubtaskInPlan_MissingUserMessage 验证 redo 请求缺少 user_message 时返回错误
+// 测试策略：
+// 1. plan 正常 continue
+// 2. 任务开始执行时，通知外部并等待 redo 错误响应被接收的信号
+// 3. 外部在任务执行过程中发送缺少 user_message 的 redo 请求
+// 4. 验证收到错误响应后，通知 callback 继续
 func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	taskStarted := make(chan struct{}, 1)   // callback 通知外部任务开始
+	redoErrorDone := make(chan struct{}, 1) // 外部通知 callback redo 错误已处理
 
 	ins, err := aid.NewCoordinator(
 		"测试重做子任务缺少用户消息",
@@ -812,6 +934,14 @@ func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 			}
 
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				// 通知外部任务已开始
+				select {
+				case taskStarted <- struct{}{}:
+				default:
+				}
+				// 等待 redo 错误响应被处理的信号
+				<-redoErrorDone
+				// 正常返回
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
 				return rsp, nil
 			}
@@ -831,19 +961,19 @@ func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 		ins.Run()
 	}()
 
-	planReviewed := false
+	redoSent := false
 	errorReceived := false
 	syncId := uuid.New().String()
 
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx := utils.TimeoutContextSeconds(15)
 
 LOOP:
 	for {
 		select {
-		case result := <-outputChan:
-			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				planReviewed = true
-				// 发送缺少 user_message 的 redo 请求
+		case <-taskStarted:
+			// 任务开始执行后，发送缺少 user_message 的 redo 请求
+			if !redoSent {
+				redoSent = true
 				inputChan.SafeFeed(SyncInputEventWithJSON(
 					aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN,
 					syncId,
@@ -852,6 +982,11 @@ LOOP:
 						// 故意不提供 user_message
 					},
 				))
+			}
+
+		case result := <-outputChan:
+			// plan 审核正常 continue
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
@@ -868,6 +1003,11 @@ LOOP:
 					if success, ok := data["success"].(bool); ok && !success {
 						if errMsg, ok := data["error"].(string); ok && strings.Contains(errMsg, "user_message is required") {
 							errorReceived = true
+							// 通知 callback 继续
+							select {
+							case redoErrorDone <- struct{}{}:
+							default:
+							}
 							break LOOP
 						}
 					}
@@ -880,11 +1020,10 @@ LOOP:
 			}
 
 		case <-ctx.Done():
-			t.Fatalf("timeout: planReviewed=%v, errorReceived=%v", planReviewed, errorReceived)
+			t.Fatalf("timeout: redoSent=%v, errorReceived=%v", redoSent, errorReceived)
 		}
 	}
 
-	require.True(t, planReviewed, "plan should be reviewed")
+	require.True(t, redoSent, "redo request should be sent")
 	require.True(t, errorReceived, "error should be received for missing user_message")
 }
-
