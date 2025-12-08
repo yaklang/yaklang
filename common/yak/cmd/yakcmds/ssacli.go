@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
-	sfscan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
@@ -153,6 +152,60 @@ var staticCheck = &cli.Command{
 		}
 		if ruleError != nil {
 			return ruleError
+		}
+		return nil
+	},
+}
+
+type Program interface {
+	GetLanguage() ssaconfig.Language
+	GetProgramName() string
+}
+
+var ssaProgram = &cli.Command{
+	Name:    "ssa-program",
+	Aliases: []string{"ssa-prog"},
+	Usage:   "Get SSA OpCodes program info from database",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "database",
+			Usage: "",
+		},
+	},
+	Action: func(c *cli.Context) error {
+
+		if databaseRaw := c.String("database"); databaseRaw != "" {
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseRaw); err != nil {
+				return utils.Errorf("set database by info %s failed: %v", databaseRaw, err)
+			}
+		}
+
+		showProgram := func(name string, progs []*ssaapi.Program) {
+			fmt.Printf("Program match: %s\n", name)
+			if len(progs) == 0 {
+				fmt.Printf("\tno program found\n")
+				return
+			}
+			for _, p := range progs {
+				fmt.Printf("\t[%6s]:\t%s \n",
+					p.GetLanguage(),
+					p.GetProgramName(),
+				)
+			}
+		}
+
+		if len(c.Args()) == 0 {
+			// list all program names
+			fmt.Printf("All Programs in database:\n")
+			progs := ssaapi.LoadProgramRegexp(".*")
+			showProgram(".*", progs)
+		}
+
+		for _, name := range c.Args() {
+			regMatch := fmt.Sprintf("%s", name)
+			ret := ssaapi.LoadProgramRegexp(regMatch)
+			// show: name -> []{}
+			showProgram(name, ret)
 		}
 		return nil
 	},
@@ -1245,11 +1298,12 @@ var ssaCodeScan = &cli.Command{
 		cli.StringFlag{
 			Name: "format",
 			Usage: `output file format:
-	* sarif (default)
-	* irify (can config with --with-file-content and --with-dataflow-path)
-	* irify-full (with all info)
-	* irify-react-report (save database and generate react report in IRify frontend)
-		`,
+	* sarif 
+	* irify (default) (can config with --with-file-content and --with-dataflow-path)
+	`,
+			// * irify-full (with all info)
+			// * irify-react-report (save database and generate react report in IRify frontend)
+			// 	`,
 		},
 
 		cli.BoolFlag{
@@ -1281,6 +1335,11 @@ var ssaCodeScan = &cli.Command{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.
 					targets/*, vendor/*`,
+		},
+
+		cli.StringFlag{
+			Name:  "syntaxflow,sf",
+			Usage: "SyntaxFlow Rule Path/File",
 		},
 	},
 	Action: func(c *cli.Context) (e error) {
@@ -1331,7 +1390,7 @@ var ssaCodeScan = &cli.Command{
 		defer config.DeferFunc()
 
 		// compileTimeStart := time.Now()
-		prog, err := getProgram(ctx, config)
+		progs, err := getProgram(ctx, config)
 		if err != nil {
 			log.Errorf("get program failed: %s", err)
 			return err
@@ -1342,7 +1401,6 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("================= get or parse rule ================")
 		// scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
-			Language:          []string{string(prog.GetLanguage())},
 			Keyword:           c.String("rule-keyword"),
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
@@ -1366,31 +1424,72 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("create ssaconfig failed: %s", err)
 			return err
 		}
+		scanOpt := make([]ssaconfig.Option, 0)
+		if path := c.String("syntaxflow"); path != "" {
+			if utils.IsFile(path) {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					log.Errorf("failed to read file %s: %v", path, err)
+				} else {
+					scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(string(data)))
+				}
+			} else {
+				// folder
+				local := filesys.NewLocalFs()
+				entrys, err := utils.ReadDir(path)
+				if err != nil {
+					return err
+				}
+				for _, entry := range entrys {
+					if filepath.Ext(entry.Path) != ".sf" {
+						continue
+					}
+					contentRaw, _ := local.ReadFile(entry.Path)
+					if len(contentRaw) <= 0 {
+						continue
+					}
+					scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(string(contentRaw)))
+				}
+			}
 
-		err = sfscan.StartScan(
-			ctx,
-			ssaconfig.WithProgramNames(prog.GetProgramName()),
+		}
+
+		scanOpt = append(scanOpt,
+			// ssaconfig.WithProgramNames(prog.GetProgramName()),
+			syntaxflow_scan.WithPrograms(progs...),
 			ssaconfig.WithRuleFilter(ruleFilter),
 			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-			sfscan.WithReporter(reportInstance),
+			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessRuleDetail(true),
 			syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
-				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
-				if info == nil || len(info.Rules) == 0 {
+				// Minimal header always shown
+				log.Infof("[Task %s]", taskID)
+				log.Infof("\tstatus=%s progress=%.2f%%", status, progress*100.0)
+
+				if info == nil {
 					return
 				}
-				str := "\n"
-				for _, rule := range info.Rules {
-					since := time.Since(time.Unix(rule.UpdateTime, 0))
-					str += fmt.Sprintf("\t %s [progress: %.2f%%, update: %s, status: %s]\n", rule.RuleName, rule.Progress*100, since, rule.Info)
-					// str += fmt.Sprintf("\t%s (progress: %.2f%%, status: %s)\n", rule.RuleName, rule.Progress*100, rule.Info)
+				log.Infof("\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
+					info.FailedQuery, info.SkippedQuery, info.SuccessQuery,
+					info.FinishedQuery, info.TotalQuery, info.RiskCount,
+				)
+
+				if len(info.Rules) == 0 {
+					return
 				}
-
-				log.Infof("rule: %s", str)
-
+				var b bytes.Buffer
+				b.WriteString("\tRules:\n")
+				for _, rule := range info.Rules {
+					// since := time.Since(time.Unix(rule.UpdateTime, 0))
+					b.WriteString(fmt.Sprintf("  - [%6.2f%%]: [%s] [%s] status=%s\n",
+						rule.Progress*100, rule.ProgramName, rule.RuleName, rule.Info,
+					))
+				}
+				log.Info(b.String())
 			}),
 		)
+		err = syntaxflow_scan.StartScan(ctx, scanOpt...)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
 			return err
@@ -1824,6 +1923,7 @@ var SSACompilerCommands = []*cli.Command{
 	// program manage
 	ssaRemove,  // remove program from database
 	ssaCompile, // compile program
+	ssaProgram,
 
 	// rule manage
 	syntaxFlowCreate,              // create rule template

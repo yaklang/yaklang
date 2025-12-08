@@ -36,7 +36,7 @@ func ReportTypeFromString(s string) ReportType {
 		return IRifyReactReportType
 	default:
 		log.Warnf("unsupported report type: %s, use sarif as default, you can set [sarif, irify, irify-full] to set report type", s)
-		return SarifReportType
+		return IRifyReportType
 	}
 }
 
