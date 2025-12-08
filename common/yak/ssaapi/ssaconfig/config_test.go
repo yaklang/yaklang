@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -611,4 +612,84 @@ func TestWrapOption(t *testing.T) {
 		require.True(t, ok2)
 		require.Equal(t, "value2", value2)
 	})
+}
+
+func TestJsondata(t *testing.T) {
+	json := `
+
+{
+  "Mode": 63,
+  "BaseInfo": {
+    "program_names": [
+      "DVWA(2025-12-08 11:23:52)"
+    ],
+    "project_id": 0,
+    "project_name": "DVWA",
+    "project_description": "",
+    "language": "php",
+    "tags": null
+  },
+  "CodeSource": {
+    "kind": "local",
+    "local_file": "/Users/wlz/Developer/Target/yakssaExample/DVWA"
+  },
+  "SSACompile": {
+    "strict_mode": false,
+    "peephole_size": 0,
+    "exclude_files": [],
+    "re_compile": true,
+    "memory_compile": false,
+    "compile_concurrency": 10,
+    "compile_ir_cache_ttl": 0
+  },
+  "SyntaxFlow": null,
+  "SyntaxFlowScan": null,
+  "SyntaxFlowRule": null,
+  "error": {
+    "kind": "",
+    "msg": ""
+  },
+  "file_count": 301,
+  "compile_immediately": true,
+  "kind": "local",
+  "project_exists": false
+}
+	`
+	c, err := LoadConfigFromJSON([]byte(json))
+	require.NoError(t, err)
+	require.NotNil(t, c)
+
+	// Mode from JSON is 63 (bits for modes except ModeOutput)
+	require.Equal(t, Mode(63), c.Mode)
+
+	// BaseInfo checks
+	require.NotNil(t, c.BaseInfo)
+	require.Equal(t, []string{"DVWA(2025-12-08 11:23:52)"}, c.BaseInfo.ProgramNames)
+	require.Equal(t, uint64(0), c.BaseInfo.ProjectID)
+	require.Equal(t, "DVWA", c.BaseInfo.ProjectName)
+	require.Equal(t, "", c.BaseInfo.ProjectDescription)
+	require.Equal(t, PHP, c.BaseInfo.Language)
+
+	// CodeSource checks
+	require.NotNil(t, c.CodeSource)
+	require.Equal(t, CodeSourceLocal, c.CodeSource.Kind)
+	require.Equal(t, "/Users/wlz/Developer/Target/yakssaExample/DVWA", c.CodeSource.LocalFile)
+
+	// SSACompile checks
+	require.NotNil(t, c.SSACompile)
+	require.False(t, c.SSACompile.StrictMode)
+	require.Equal(t, 0, c.SSACompile.PeepholeSize)
+	require.Equal(t, []string{}, c.SSACompile.ExcludeFiles)
+	require.True(t, c.SSACompile.ReCompile)
+	require.False(t, c.SSACompile.MemoryCompile)
+	require.Equal(t, 10, c.SSACompile.Concurrency)
+
+	// SyntaxFlow-related fields were null in JSON and should remain nil
+	require.Nil(t, c.SyntaxFlow)
+	require.Nil(t, c.SyntaxFlowScan)
+	require.Nil(t, c.SyntaxFlowRule)
+
+	// Log the config for debugging if needed
+	log.Infof("%v", codec.AnyToString(c))
+
 }
