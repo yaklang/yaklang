@@ -18,7 +18,10 @@ feedbackIpDelete := func(count) {
     yakit.StatusCard("删除路由(单位:设备)", interfaceCount)
 }
 
-m := netstack.GetSystemRouteManager()
+m,err := netstack.GetPrivilegedSystemRouteManager()
+if err !=nil {
+    m = netstack.GetSystemRouteManager()
+}
 if clearRoute {
     for i in m.GetExistedManagedSystemTableRoute(){
         m.DeleteIPRoute(i.IPAddr)

@@ -51,7 +51,10 @@ ipArray := parseTarget(target)
 
 
 yakit.StatusCard("执行状态", "正在添加路由")
-m := netstack.GetSystemRouteManager()
+m,err := netstack.GetPrivilegedSystemRouteManager()
+if err !=nil {
+    m = netstack.GetSystemRouteManager()
+}
 err := m.AddIPRoute(ipArray, tunName )
 if err !=nil {
     die(err)
