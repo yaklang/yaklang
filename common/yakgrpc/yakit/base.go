@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +16,24 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// sqlTraceLogger 用于捕获最后一条 SQL 日志（gorm v1）
+type sqlTraceLogger struct {
+	mu   sync.Mutex
+	last string
+}
+
+func (l *sqlTraceLogger) Print(v ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.last = utils.ShrinkString(fmt.Sprint(v...), 512)
+}
+
+func (l *sqlTraceLogger) Last() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.last
+}
 
 type initializingCallback struct {
 	Note string
@@ -37,10 +57,27 @@ func init() {
 			select {
 			case f := <-DBSaveAsyncChannel:
 				start := time.Now()
-				err := f(consts.GetGormProjectDatabase())
+				// 为单次执行创建 tracer，记录耗时 SQL
+				tracer := &sqlTraceLogger{}
+				db := consts.GetGormProjectDatabase()
+				if db != nil {
+					// SetLogger 可能无返回值，分开调用以兼容
+					db.SetLogger(tracer)
+					db = db.LogMode(true)
+				}
+
+				err := f(db)
 				elapsed := time.Since(start)
 				if elapsed > 2*time.Second {
-					log.Warnf("SQL execution took too long: %v, function: %+v", elapsed, f)
+					// 提供更多信息帮助定位耗时的执行
+					ptr := reflect.ValueOf(f).Pointer()
+					fn := runtime.FuncForPC(ptr)
+					fnName := "<unknown>"
+					if fn != nil {
+						fnName = fn.Name()
+					}
+					log.Warnf("SQL execution took too long: %v, func_ptr:%p, func_name:%s, queue_len:%d, last_sql:%s",
+						elapsed, f, fnName, len(DBSaveAsyncChannel), tracer.Last())
 				}
 				count++
 				if count%1000 == 0 {
