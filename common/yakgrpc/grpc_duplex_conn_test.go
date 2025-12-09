@@ -149,10 +149,10 @@ func TestGRPCMUSTPASS_HTTPFlowSlowSQL(t *testing.T) {
 				require.Contains(t, item, "func_name", "item should have func_name")
 				require.Contains(t, item, "last_sql", "item should have last_sql")
 
-				// 验证 func_name 应该是 MockHTTPFlowsSQL
+				// 验证 func_name 应该是 MockHTTPFlowSlowInsertSQL
 				funcName, ok := item["func_name"].(string)
 				require.True(t, ok, "func_name should be string")
-				require.Contains(t, funcName, "MockHTTPFlowsSQL", "func_name should contain MockHTTPFlowsSQL")
+				require.Contains(t, funcName, "MockHTTPFlowSlowInsertSQL", "func_name should contain MockHTTPFlowSlowInsertSQL")
 
 				t.Logf("slow SQL data validated successfully: %+v", data)
 				return
@@ -218,12 +218,11 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 				t.Logf("received global message, triggering slow rule hook after short delay")
 				go func() {
 					time.Sleep(100 * time.Millisecond) // 确保回调已注册
-					// 测试三种 Hook 类型
-					yakit.MockMITMSlowRuleHook(500*time.Millisecond, "hook_color", 10)
-					time.Sleep(50 * time.Millisecond)
-					yakit.MockMITMSlowRuleHook(400*time.Millisecond, "hook_request", 15)
-					time.Sleep(50 * time.Millisecond)
-					yakit.MockMITMSlowRuleHook(350*time.Millisecond, "hook_response", 20)
+					// 一次触发所有规则类型，默认使用1秒（1000ms）来触发报警
+					// 这会同时触发 hook_color, hook_request, hook_response 三种类型
+					yakit.MockMITMSlowRuleHook(1*time.Second, "hook_color", 10)
+					yakit.MockMITMSlowRuleHook(1*time.Second, "hook_request", 15)
+					yakit.MockMITMSlowRuleHook(1*time.Second, "hook_response", 20)
 				}()
 			}
 
@@ -256,19 +255,19 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 					require.True(t, ok, "item should be map")
 					require.Contains(t, item, "duration_ms", "item should have duration_ms")
 					require.Contains(t, item, "duration_str", "item should have duration_str")
-					require.Contains(t, item, "hook_type", "item should have hook_type")
+					require.Contains(t, item, "type", "item should have type field")
 					require.Contains(t, item, "rule_count", "item should have rule_count")
 					require.Contains(t, item, "url", "item should have url")
 					require.Contains(t, item, "timestamp_unix", "item should have timestamp_unix")
 
-					// 验证 hook_type 是有效的类型
-					hookType, ok := item["hook_type"].(string)
-					require.True(t, ok, "hook_type should be string")
-					require.Contains(t, []string{"hook_color", "hook_request", "hook_response"}, hookType, "hook_type should be one of hook_color, hook_request, hook_response")
+					// 验证 type 字段是有效的类型
+					typeField, ok := item["type"].(string)
+					require.True(t, ok, "type should be string")
+					require.Contains(t, []string{"hook_color", "hook_request", "hook_response"}, typeField, "type should be one of hook_color, hook_request, hook_response")
 					
 					// 记录已测试的 Hook 类型
-					if hookType == "hook_color" || hookType == "hook_request" || hookType == "hook_response" {
-						testHookTypes[hookType] = true
+					if typeField == "hook_color" || typeField == "hook_request" || typeField == "hook_response" {
+						testHookTypes[typeField] = true
 					}
 
 					// 验证 duration_ms 应该大于 300
