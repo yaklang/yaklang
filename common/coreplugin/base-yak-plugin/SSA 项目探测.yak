@@ -376,8 +376,13 @@ existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, pat
 if err == nil && existingSSAProject != nil {
     projectExists = true
     config, err = existingSSAProject.GetConfig()
-    if err != nil {
-        yakit.Warn("获取已存在项目配置失败: %v，将创建新配置", err)
+    if err != nil || config == nil {
+        if err != nil {
+            yakit.Warn("获取已存在项目配置失败: %v，将创建新配置", err)
+        } else {
+            yakit.Warn("获取已存在项目配置返回 nil，将创建新配置")
+        }
+        config = nil
     }
 }
 
@@ -408,13 +413,35 @@ if config == nil {
         yakit.Error("创建 SSAConfig 失败: %v", err)
         return
     }
-}else{
-    err := config.Update(options...)
-    if err != nil {
-        yakit.Error("更新 SSAConfig 失败: %v", err)
+    if config == nil {
+        yakit.Error("创建 SSAConfig 返回 nil")
         return
     }
-    yakit.Info("更新 SSAConfig 成功")
+} else {
+    // 防御性检查：在调用 Update 前再次确认 config 不为 nil
+    // 防止在某些边缘情况下 config 为 nil 但通过了上面的检查
+    if config == nil {
+        yakit.Warn("配置对象为 nil，将创建新配置")
+        config, err = ssa.NewConfig(
+        ssa.ModeAll,
+        options...
+        )
+        if err != nil {
+            yakit.Error("创建 SSAConfig 失败: %v", err)
+            return
+        }
+        if config == nil {
+            yakit.Error("创建 SSAConfig 返回 nil")
+            return
+        }
+    } else {
+        err := config.Update(options...)
+        if err != nil {
+            yakit.Error("更新 SSAConfig 失败: %v", err)
+            return
+        }
+        yakit.Info("更新 SSAConfig 成功")
+    }
 }
 
 // 将 SSAConfig 转换为 JSON 字符串
