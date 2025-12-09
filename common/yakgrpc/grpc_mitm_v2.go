@@ -151,7 +151,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		downstreamProxys := strings.Split(downstreamProxy, ",")
 		var (
 			proxys      []string
-			proxyErrors []string
+			proxyErrors []string // 格式错误等致命错误
 		)
 		for _, proxy := range downstreamProxys {
 			if strings.TrimSpace(proxy) == "" {
@@ -186,17 +186,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				if errors.Is(err, netx.ErrorProxyAuthFailed) {
 					errInfo = "认证失败（Proxy Auth Fail）"
 				}
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, errInfo)
+				warnMsg := fmt.Sprintf("下游代理检测失败（继续使用） / downstream proxy failed (will still be used):[%v] %v", proxy, errInfo)
 				log.Errorf("代理检测失败 / proxy check failed:[%v] %v: %v", proxy, errInfo, err)
-				feedbackToUser(errMsg)
-				proxyErrors = append(proxyErrors, errMsg)
-				continue
+				feedbackToUser(warnMsg)
 			}
 			if conn != nil {
 				conn.Close()
 			}
 			proxys = append(proxys, proxyUrl.String())
 		}
+		// 如果全部是致命错误（格式等），依然报错；连通性失败只告警不阻塞
 		if len(proxys) == 0 && len(proxyErrors) > 0 {
 			return nil, nil, utils.Errorf(strings.Join(proxyErrors, "; "))
 		}
