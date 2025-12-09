@@ -128,6 +128,9 @@ func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowled
 
 func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowledgeBaseV2Request) (*ypb.CreateKnowledgeBaseV2Response, error) {
 	db := consts.GetGormProfileDatabase()
+	if req.GetName() == "" {
+		return nil, utils.Errorf("知识库名称不能为空")
+	}
 	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
@@ -154,11 +157,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
-	if err != nil {
-		return nil, utils.Errorf("获取知识库信息失败: %v", err)
-	}
-	err = yakit.UpdateKnowledgeBaseInfo(db, kb.GetID(), &schema.KnowledgeBaseInfo{
+	err := yakit.UpdateKnowledgeBaseInfo(db, req.GetKnowledgeBaseId(), &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName:        req.GetKnowledgeBaseName(),
 		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
 		KnowledgeBaseType:        req.GetKnowledgeBaseType(),

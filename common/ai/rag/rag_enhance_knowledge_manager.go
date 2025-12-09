@@ -37,3 +37,37 @@ func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
 		return result.OutputChannel(), nil
 	})
 }
+
+func NewRagEnhanceKnowledgeManagerWithOptions(opts ...RAGSystemConfigOption) *aicommon.EnhanceKnowledgeManager {
+	return aicommon.NewEnhanceKnowledgeManager(func(ctx context.Context, e *aicommon.Emitter, query string) (<-chan aicommon.EnhanceKnowledge, error) {
+		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
+		allOpts := append(
+			opts,
+			WithRAGCtx(ctx),
+			WithEveryQueryResultCallback(func(data *ScoredResult) {
+				result.SafeFeed(data)
+			}),
+			WithRAGOnQueryFinish(func(_ []*ScoredResult) {
+				result.Close()
+			}),
+			WithRAGLogReader(func(reader io.Reader) {
+				if e == nil {
+					io.Copy(io.Discard, reader)
+					return
+				}
+				e.EmitTextMarkdownStreamEvent(
+					"enhance-query",
+					reader,
+					"",
+				)
+			}),
+		)
+		_, err := QueryYakitProfile(query,
+			allOpts...,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return result.OutputChannel(), nil
+	})
+}
