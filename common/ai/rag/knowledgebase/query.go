@@ -156,7 +156,7 @@ func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*sch
 }
 
 func (kb *KnowledgeBase) Query(query string, opts ...QueryOption) (string, error) {
-	res, err := kb.SearchKnowledgeEntriesWithEnhance(query, append(opts, WithEnableAISummary(true))...)
+	res, err := kb.SearchKnowledgeEntriesWithEnhance(query, append(opts, WithEnableAISummary(true), WithCollectionName(kb.name))...)
 	if err != nil {
 		return "", utils.Errorf("搜索失败: %v", err)
 	}
@@ -245,14 +245,17 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		knowledgeBaseMsgCallback(kbResult)
 	}
 
-	kbNames, err := yakit.GetKnowledgeBaseNameList(db)
-	if err != nil {
-		return nil, utils.Errorf("get knowledge base name list failed: %v", err)
-	}
-
-	ragOpts = append(ragOpts, vectorstore.WithRAGQueryCollectionNames(kbNames...))
-
 	ragOpts = append(ragOpts, vectorstore.WithRAGMsgCallBack(ragMsgCallback))
+
+	if config.CollectionName != "" {
+		ragOpts = append(ragOpts, vectorstore.WithRAGQueryCollectionNames(config.CollectionName))
+	} else {
+		kbNames, err := yakit.GetKnowledgeBaseNameList(db)
+		if err != nil {
+			return nil, utils.Errorf("get knowledge base name list failed: %v", err)
+		}
+		ragOpts = append(ragOpts, vectorstore.WithRAGQueryCollectionNames(kbNames...))
+	}
 
 	// 调用rag.Query进行搜索
 	ragResultCh, err := vectorstore.Query(db, query, ragOpts...)

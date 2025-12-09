@@ -528,7 +528,11 @@ func (s *ScoredResult) GetScore() float64 {
 }
 
 func (s *ScoredResult) GetUUID() string {
-	return s.Document.ID
+	if s.Document == nil {
+		return ""
+	}
+	uuid, _ := s.Document.Metadata.GetDataUUID()
+	return uuid
 }
 
 func QueryYakitProfile(query string, opts ...CollectionQueryOption) (<-chan *RAGSearchResult, error) {
@@ -646,9 +650,15 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 	}
 
 	status("STATUS", "初始化RAG查询配置")
+
+	if len(config.QueryCollectionNames) == 0 {
+		collectionNames := ListCollections(db)
+		config.QueryCollectionNames = collectionNames
+	}
+
 	var cols []*SQLiteVectorStoreHNSW
 	start := time.Now()
-	for _, name := range ListCollections(db) {
+	for _, name := range config.QueryCollectionNames {
 		log.Infof("start to load collection %v", name)
 		r, err := LoadCollection(db, name, config.LoadConfig...)
 		if err != nil {

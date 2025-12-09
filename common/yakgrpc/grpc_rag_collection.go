@@ -1,8 +1,7 @@
 package yakgrpc
 
 import (
-	"sync"
-
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -16,25 +15,19 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 	options = append(options, rag.WithRAGCtx(ctx))
 	db := s.GetProfileDatabase()
 
-	wg := sync.WaitGroup{}
-
-	feedbackSearchResult := func(result *rag.ScoredResult) {
-		document := result.Document
-		if document == nil {
-			return
-		}
-		docType := document.Type
+	feedbackSearchResult := func(result aicommon.EnhanceKnowledge) {
+		docType := schema.RAGDocumentType(result.GetType())
+		uuid := result.GetUUID()
 
 		var feedMessage = &ypb.RAGCollectionSearchResponse{
-			Type:        string(docType),
-			EnhancePlan: result.QueryMethod,
-			Similarity:  float32(result.Score),
+			Type:        result.GetType(),
+			EnhancePlan: result.GetScoreMethod(),
+			Similarity:  float32(result.GetScore()),
 		}
 		switch docType {
 		case schema.RAGDocumentType_Knowledge:
-			uuid, ok := document.Metadata.GetDataUUID()
-			if !ok {
-				log.Errorf("Document missing DataUUID in metadata")
+			if uuid == "" {
+				log.Errorf("Document missing UUID")
 				return
 			}
 			knowledge, err := yakit.GetKnowledgeBaseEntryByUUID(db, uuid)
@@ -45,9 +38,8 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 
 			feedMessage.Knowledge = KnowledgeBaseEntryToGrpcModel(knowledge)
 		case schema.RAGDocumentType_Entity:
-			uuid, ok := document.Metadata.GetDataUUID()
-			if !ok {
-				log.Errorf("Document missing DataUUID in metadata")
+			if uuid == "" {
+				log.Errorf("Document missing UUID")
 				return
 			}
 			entity, err := yakit.GetEntityByIndex(db, uuid)
@@ -58,9 +50,8 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 
 			feedMessage.Entity = entity.ToGRPC()
 		case schema.RAGDocumentType_Relationship:
-			uuid, ok := document.Metadata.GetDataUUID()
-			if !ok {
-				log.Errorf("Document missing DataUUID in metadata")
+			if uuid == "" {
+				log.Errorf("Document missing UUID")
 				return
 			}
 			relationship, err := yakit.GetRelationshipByUUID(db, uuid)
@@ -71,7 +62,7 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 
 			feedMessage.Relationship = relationship.ToGRPC()
 		case schema.RAGDocumentType_KHop:
-			feedMessage.KhopPath = document.Content
+			feedMessage.KhopPath = result.GetContent()
 		default:
 			log.Errorf("Unknown document type %s", docType)
 			return
@@ -83,22 +74,15 @@ func (s *Server) RAGCollectionSearch(req *ypb.RAGCollectionSearchRequest, stream
 		}
 	}
 
-	options = append(options, rag.WithEveryQueryResultCallback(func(result *rag.ScoredResult) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			feedbackSearchResult(result)
-		}()
-	}))
+	enhanceKnowledgeManager := rag.NewRagEnhanceKnowledgeManagerWithOptions(options...)
 
-	result, err := rag.Query(s.GetProfileDatabase(), req.Query, options...)
+	resultCh, err := enhanceKnowledgeManager.FetchKnowledge(ctx, req.Query)
 	if err != nil {
 		return err
 	}
-	for r := range result {
-		log.Debugf("Query result: %v", r)
+	for result := range resultCh {
+		feedbackSearchResult(result)
 	}
-	wg.Wait()
 	return nil
 }
 
