@@ -127,7 +127,7 @@ const (
 	tunnelPrivilegedSocketPrefix = "lowtun"
 	routePrivilegedSocketPrefix  = "route"
 
-	tunnelPrivilegedCmd = "forward-tun-to-sock"
+	tunnelPrivilegedCmd = "forward-tun-to-socks"
 	routePrivilegedCmd  = "modify-route-to-socks"
 )
 
