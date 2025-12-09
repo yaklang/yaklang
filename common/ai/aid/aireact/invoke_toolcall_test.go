@@ -645,7 +645,7 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
-			fmt.Println(e.String())
+			t.Logf("event: %s", e.String())
 			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
 				if callToolID == "" {
 					callToolID = e.CallToolID
@@ -655,7 +655,7 @@ LOOP:
 				}
 			}
 
-			if e.NodeId == string(schema.EVENT_TOOL_CALL_RESULT) {
+			if e.Type == string(schema.EVENT_TOOL_CALL_RESULT) {
 				if e.CallToolID != callToolID {
 					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
 				}
@@ -688,7 +688,7 @@ LOOP:
 
 	var hasFlag bool
 	for _, event := range aiProcess.Events {
-		if event.NodeId == schema.EVENT_TOOL_CALL_RESULT {
+		if event.Type == schema.EVENT_TOOL_CALL_RESULT {
 			result := jsonpath.FindFirst(string(event.Content), "$..result.result")
 			if utils.InterfaceToString(result) == callToolResultFlag {
 				hasFlag = true

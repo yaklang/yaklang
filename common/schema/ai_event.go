@@ -354,7 +354,7 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		SyncID:          e.SyncID,
 		EventUUID:       e.EventUUID,
 		CallToolID:      e.CallToolID,
-		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
+		NodeIdVerbose:   NodeIdAndTypeToI18n(e.NodeId, e.Type, e.IsStream).I18nToYPB_I18n(),
 		ContentType:     e.ContentType,
 		AIService:       e.AIService,
 		TaskUUID:        e.TaskUUID,

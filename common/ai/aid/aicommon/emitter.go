@@ -384,6 +384,13 @@ func (r *Emitter) EmitToolCallDecision(callToolId string, action string, summary
 	})
 }
 
+func (r *Emitter) EmitToolCallResult(callToolId string, result any) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_RESULT, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"result":       result,
+	})
+}
+
 const (
 	TypeLogTool            = "log/tool"
 	TypeLogToolErrorOutput = "log/tool-error-output"
@@ -396,22 +403,6 @@ const (
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
 	_, _ = r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, TypeLogTool)
 	_, _ = r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, TypeLogToolErrorOutput)
-}
-
-func (r *Emitter) EmitToolCallResult(toolName string, result any, taskIndex string) (*schema.AiOutputEvent, error) {
-	event := &schema.AiOutputEvent{
-		CoordinatorId: r.id,
-		Type:          schema.EVENT_TYPE_STRUCTURED,
-		NodeId:        schema.EVENT_TOOL_CALL_RESULT,
-		TaskIndex:     taskIndex,
-		IsJson:        true,
-		Content: utils.Jsonify(map[string]any{
-			"tool_name": toolName,
-			"result":    result,
-		}),
-		Timestamp: time.Now().Unix(),
-	}
-	return r.emit(event)
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) (*schema.AiOutputEvent, error) {
