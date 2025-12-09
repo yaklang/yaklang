@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/coreplugin"
@@ -118,8 +119,17 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 	}
 
 	// Exclude patterns
-	if excludeFiles := c.StringSlice("exclude-file"); len(excludeFiles) > 0 {
-		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludeFiles))
+	if excludeFileStr := c.String("exclude-file"); excludeFileStr != "" {
+		excludeFiles := strings.Split(excludeFileStr, ",")
+		var validExcludeFiles []string
+		for _, s := range excludeFiles {
+			if s != "" {
+				validExcludeFiles = append(validExcludeFiles, strings.TrimSpace(s))
+			}
+		}
+		if len(validExcludeFiles) > 0 {
+			opts = append(opts, ssaconfig.WithCompileExcludeFiles(validExcludeFiles))
+		}
 	}
 
 	// with-file-content
@@ -213,7 +223,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 	programName := config.GetProgramName()
 	language := string(config.GetLanguage())
 	memory := config.GetCompileMemory() || config.GetSyntaxFlowMemory()
-	excludeFiles := config.GetCompileExcludeFiles()
+	excludeFiles := strings.Join(config.GetCompileExcludeFiles(), ",")
 
 	if programName != "" {
 		log.Infof("get program from database: %s", programName)

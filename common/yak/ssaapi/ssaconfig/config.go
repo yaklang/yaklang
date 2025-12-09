@@ -94,6 +94,9 @@ func (c *Config) Update(options ...Option) error {
 		return nil
 	}
 	for _, option := range options {
+		if option == nil {
+			continue
+		}
 		if err := option(c); err != nil {
 			return err
 		}

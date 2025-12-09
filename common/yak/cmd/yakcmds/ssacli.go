@@ -92,9 +92,19 @@ var staticCheck = &cli.Command{
 		file := c.String("file")
 		rules := c.String("rules")
 		language := c.String("language")
-		excludeFiles := c.StringSlice("exclude-file")
+		excludeFileStr := c.String("exclude-file")
+		var excludeFiles []string
+		if excludeFileStr != "" {
+			excludeFiles = strings.Split(excludeFileStr, ",")
+			for i := range excludeFiles {
+				excludeFiles[i] = strings.TrimSpace(excludeFiles[i])
+			}
+		}
 		var excludeCompile []glob.Glob
 		for _, s := range excludeFiles {
+			if s == "" {
+				continue
+			}
 			compile, err := glob.Compile(s)
 			if err != nil {
 				return err
@@ -272,7 +282,7 @@ var ssaCompile = &cli.Command{
 			Usage: `in default, you can see program that compiled by ssa-cli in Yakit Frontend.
 				you can use --no-frontend to disable this function`,
 		},
-		cli.StringSliceFlag{
+		cli.StringFlag{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.
 					targets/*, vendor/*`,
@@ -303,10 +313,20 @@ var ssaCompile = &cli.Command{
 		sfDebug := c.Bool("syntaxflow-debug")
 		showDot := c.Bool("dot")
 		withCode := c.Bool("with-code")
-		excludeFile := c.StringSlice("exclude-file")
+		excludeFileStr := c.String("exclude-file")
+		var excludeFiles []string
+		if excludeFileStr != "" {
+			excludeFiles = strings.Split(excludeFileStr, ",")
+			for i := range excludeFiles {
+				excludeFiles[i] = strings.TrimSpace(excludeFiles[i])
+			}
+		}
 
 		var excludeCompile []glob.Glob
-		for _, s := range excludeFile {
+		for _, s := range excludeFiles {
+			if s == "" {
+				continue
+			}
 			compile, err := glob.Compile(s)
 			if err != nil {
 				return err
@@ -1331,7 +1351,7 @@ var ssaCodeScan = &cli.Command{
 			Usage: "enable per-rule performance profiling log output",
 		},
 
-		cli.StringSliceFlag{
+		cli.StringFlag{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.
 					targets/*, vendor/*`,

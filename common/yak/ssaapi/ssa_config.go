@@ -81,9 +81,15 @@ func WithExcludeFunc(patterns []string) ssaconfig.Option {
 	for _, pattern := range patterns {
 		g, err := glob.Compile(pattern)
 		if err != nil {
-			return nil
+			log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, pattern)
+			continue
 		}
 		compile = append(compile, g)
+	}
+	if len(compile) == 0 {
+		return func(c *ssaconfig.Config) error {
+			return nil
+		}
 	}
 	return withExcludeFile(func(dir string, path string) bool {
 		for _, g := range compile {

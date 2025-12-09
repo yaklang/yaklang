@@ -83,3 +83,68 @@ func (c *XSSVuln1Controller) Get() {
 	str := fmt.Sprintf("%v", vf)
 	require.Equal(t, str, "VirtualFS{src/main/go/A/test1.go}")
 }
+
+func TestWithExcludeFunc_GlobPatternCompilation(t *testing.T) {
+	patterns := []string{
+		"**/vendor/**",
+		"vendor/**",
+		"**/classes/**",
+		"**/target/**",
+		"**include/**",
+		"**caches/**",
+		"**cache/**",
+		"**tmp/**",
+		"**alipay/**",
+		"**includes/**",
+		"**temp/**",
+		"**zh_cn/**",
+		"**zh_en/**",
+		"**plugins/**",
+		"**PHPExcel/**",
+		"*.pb.go",
+		"*_test.go",
+	}
+
+	var failedPatterns []string
+	var successPatterns []string
+
+	for _, pattern := range patterns {
+		_, err := glob.Compile(pattern)
+		if err != nil {
+			failedPatterns = append(failedPatterns, pattern)
+			t.Logf("Pattern '%s' failed to compile: %v", pattern, err)
+		} else {
+			successPatterns = append(successPatterns, pattern)
+		}
+	}
+
+	t.Logf("Successfully compiled patterns: %v", successPatterns)
+	t.Logf("Failed to compile patterns: %v", failedPatterns)
+
+	option := ssaapi.WithExcludeFunc(patterns)
+	require.NotNil(t, option)
+
+	config, err := ssaconfig.New(ssaconfig.ModeAll)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	err = option(config)
+	require.NoError(t, err)
+}
+
+func TestWithExcludeFunc_PartialFailure(t *testing.T) {
+	validPatterns := []string{"*.pb.go", "*_test.go"}
+	invalidPatterns := []string{"[invalid", "{unclosed"}
+
+	allPatterns := append(validPatterns, invalidPatterns...)
+
+	option := ssaapi.WithExcludeFunc(allPatterns)
+	require.NotNil(t, option)
+
+	config, err := ssaconfig.New(ssaconfig.ModeAll)
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	err = option(config)
+	require.NoError(t, err)
+}
