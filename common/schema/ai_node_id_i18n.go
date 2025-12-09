@@ -493,6 +493,13 @@ var nodeIdMapper = map[string]*I18n{
 	},
 }
 
+var eventTypeMapper = map[EventType]*I18n{
+	EVENT_TOOL_CALL_RESULT: {
+		Zh: "工具结果",
+		En: "Tool Result",
+	},
+}
+
 func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 	if val, ok := nodeIdMapper[nodeId]; ok {
 		return val
@@ -519,6 +526,16 @@ func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 		Zh: nodeId,
 		En: nodeId,
 	}
+}
+
+func NodeIdAndTypeToI18n(nodeId string, eventType EventType, isStream bool) *I18n {
+	if eventType == "" {
+		return NodeIdToI18n(nodeId, isStream)
+	}
+	if val, ok := eventTypeMapper[eventType]; ok {
+		return val
+	}
+	return NodeIdToI18n(nodeId, isStream)
 }
 
 func (i18n *I18n) I18nToYPB_I18n() *ypb.I18N {

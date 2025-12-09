@@ -364,7 +364,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	if toolResult.Data != nil {
 		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
 		if ok {
-			t.emitter.EmitToolCallResult(tool.Name, toolExecutionResult.Result, t.task.GetIndex())
+			t.emitter.EmitToolCallResult(callToolId, toolExecutionResult.Result)
 
 		}
 	}
