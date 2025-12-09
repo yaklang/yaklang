@@ -19,7 +19,7 @@ func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 	// b.Function.FreeValues = s.Function.FreeValues
 	// b.Function.ParameterMembers = s.Function.ParameterMembers
 	// b.Function.SideEffects = s.Function.SideEffects
-	b.Function.Return = s.Function.Return
+	// b.Function.Return = s.Function.Return // Fix for TestTopDef_Anonymous：这会覆盖已经添加的 Return，导致嵌套闭包返回类型丢失
 	// b.Function.Blocks = s.Function.Blocks
 
 	b.SetProgram(s.GetProgram())
