@@ -44,6 +44,7 @@ var (
 	ServerPushType_Fuzzer            = "fuzzer_server_push"
 	ServerPushType_SlowInsertSQL     = "httpflow_slow_insert_sql"
 	ServerPushType_SlowQuerySQL      = "httpflow_slow_query_sql"
+	ServerPushType_SlowRuleHook      = "mitm_slow_rule_hook"
 )
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {
