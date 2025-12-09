@@ -3,13 +3,14 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"io"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"sync"
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
@@ -34,6 +35,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	var satisfied bool
 	var reasoning string
 	var referenceOnce = new(sync.Once)
+	var nextMovementsReferenceOnce = new(sync.Once)
 
 	emitStreamIdReference := func(event *schema.AiOutputEvent) {
 		streamId := event.GetContentJSONPath(`$.event_writer_id`)
@@ -57,6 +59,17 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				"IsToolCall":    isToolCall,
 				"Payload":       payload,
 			}))
+		})
+	}
+
+	emitNextMovementsReference := func(event *schema.AiOutputEvent) {
+		streamId := event.GetContentJSONPath(`$.event_writer_id`)
+		if streamId == "" {
+			log.Errorf("empty streamId provided for next_movements reference emission, origin data: %v", string(event.Content))
+			return
+		}
+		nextMovementsReferenceOnce.Do(func() {
+			_, _ = r.EmitTextReferenceMaterial(streamId, verificationPrompt)
 		})
 	}
 
@@ -136,11 +149,24 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
 					func(key string, rd io.Reader) {
-						r.Emitter.EmitDefaultStreamEvent(
+						var out bytes.Buffer
+						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(rd)), &out)
+						var event *schema.AiOutputEvent
+						var err error
+						event, err = r.Emitter.EmitDefaultStreamEvent(
 							"next_movements",
-							utils.JSONStringReader(rd),
+							outputReader,
 							rsp.GetTaskIndex(),
+							func() {
+								if out.Len() > 0 {
+									emitNextMovementsReference(event)
+								}
+							},
 						)
+						if err != nil {
+							log.Errorf("failed to emit next_movements stream event: %v", err)
+							return
+						}
 					},
 				),
 			)
