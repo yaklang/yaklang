@@ -54,6 +54,21 @@ type LongSQLDescription struct {
 // HTTPFlowSQLCallback 慢 SQL 回调函数类型
 type HTTPFlowSQLCallback func(avgCost time.Duration, items []*LongSQLDescription)
 
+// SlowRuleHookDescription 描述慢规则 Hook 的详细信息
+type SlowRuleHookDescription struct {
+	Duration      time.Duration `json:"duration"`       // Hook 执行耗时
+	DurationMs    int64         `json:"duration_ms"`   // Hook 执行耗时（毫秒）
+	DurationStr   string        `json:"duration_str"`   // Hook 执行耗时（字符串形式）
+	HookType      string        `json:"hook_type"`      // Hook 类型：hook_color, hook_request, hook_response
+	RuleCount     int           `json:"rule_count"`     // 当前规则数量
+	URL           string        `json:"url"`            // 请求 URL（如果有）
+	Timestamp     time.Time     `json:"timestamp"`      // 时间戳
+	TimestampUnix int64         `json:"timestamp_unix"` // 时间戳（Unix 秒）
+}
+
+// MITMSlowRuleHookCallback 慢规则 Hook 回调函数类型
+type MITMSlowRuleHookCallback func(avgCost time.Duration, items []*SlowRuleHookDescription)
+
 type initializingCallback struct {
 	Note string
 	Fn   func() error
@@ -76,6 +91,13 @@ var (
 	slowQuerySQLItems              []*LongSQLDescription // 收集慢查询 SQL 信息
 	slowQuerySQLItemsMutex         sync.Mutex
 	slowQuerySQLThrottle           = utils.NewThrottle(2) // 每2秒最多触发一次
+
+	// MITMSlowRuleHookCallback 相关变量（慢规则 Hook）
+	mitmSlowRuleHookCallbackMutex sync.Mutex
+	mitmSlowRuleHookCallback     MITMSlowRuleHookCallback
+	slowRuleHookItems            []*SlowRuleHookDescription // 收集慢规则 Hook 信息
+	slowRuleHookItemsMutex       sync.Mutex
+	slowRuleHookThrottle          = utils.NewThrottle(2) // 每2秒最多触发一次
 )
 
 type DbExecFunc func(db *gorm.DB) error
@@ -300,6 +322,89 @@ func MockHTTPFlowSlowQuerySQL(duration time.Duration) {
 
 	// 使用节流机制触发回调
 	TriggerSlowQuerySQLCallbackThrottled()
+}
+
+// triggerSlowRuleHookCallback 触发慢规则 Hook 回调
+func triggerSlowRuleHookCallback() {
+	mitmSlowRuleHookCallbackMutex.Lock()
+	callback := mitmSlowRuleHookCallback
+	mitmSlowRuleHookCallbackMutex.Unlock()
+
+	if callback == nil {
+		return
+	}
+
+	// 获取并清空收集的慢规则 Hook 信息
+	slowRuleHookItemsMutex.Lock()
+	items := make([]*SlowRuleHookDescription, len(slowRuleHookItems))
+	copy(items, slowRuleHookItems)
+	slowRuleHookItems = slowRuleHookItems[:0] // 清空列表
+	slowRuleHookItemsMutex.Unlock()
+
+	if len(items) == 0 {
+		return
+	}
+
+	// 计算平均耗时
+	var totalDuration time.Duration
+	for _, item := range items {
+		totalDuration += item.Duration
+	}
+	avgCost := totalDuration / time.Duration(len(items))
+
+	// 调用回调
+	callback(avgCost, items)
+}
+
+// RegisterMITMSlowRuleHookCallback 注册 MITM 慢规则 Hook 回调
+// callback 在慢规则 Hook 出现时触发，每2秒最多触发一次
+func RegisterMITMSlowRuleHookCallback(callback MITMSlowRuleHookCallback) {
+	mitmSlowRuleHookCallbackMutex.Lock()
+	defer mitmSlowRuleHookCallbackMutex.Unlock()
+	mitmSlowRuleHookCallback = callback
+}
+
+// AddSlowRuleHookItem 添加慢规则 Hook 项（线程安全）
+func AddSlowRuleHookItem(item *SlowRuleHookDescription) {
+	slowRuleHookItemsMutex.Lock()
+	defer slowRuleHookItemsMutex.Unlock()
+	slowRuleHookItems = append(slowRuleHookItems, item)
+}
+
+// TriggerSlowRuleHookCallbackThrottled 使用节流机制触发慢规则 Hook 回调
+func TriggerSlowRuleHookCallbackThrottled() {
+	slowRuleHookThrottle(func() {
+		go triggerSlowRuleHookCallback()
+	})
+}
+
+// MockMITMSlowRuleHook 模拟一次慢规则 Hook 执行，用于测试
+// duration 指定模拟的 Hook 执行耗时
+// hookType 指定 Hook 类型：hook_color, hook_request, hook_response
+// ruleCount 指定规则数量
+func MockMITMSlowRuleHook(duration time.Duration, hookType string, ruleCount int) {
+	if duration < 300*time.Millisecond {
+		duration = 300*time.Millisecond + 100*time.Millisecond // 确保超过阈值
+	}
+
+	// 创建一个模拟的慢规则 Hook 项
+	now := time.Now()
+	slowHookItem := &SlowRuleHookDescription{
+		Duration:      duration,
+		DurationMs:    duration.Milliseconds(),
+		DurationStr:   duration.String(),
+		HookType:      hookType,
+		RuleCount:     ruleCount,
+		URL:           "http://mock.example.com/test",
+		Timestamp:     now,
+		TimestampUnix: now.Unix(),
+	}
+
+	// 添加到收集列表
+	AddSlowRuleHookItem(slowHookItem)
+
+	// 使用节流机制触发回调
+	TriggerSlowRuleHookCallbackThrottled()
 }
 
 func RegisterPostInitDatabaseFunction(f func() error, notes ...string) {

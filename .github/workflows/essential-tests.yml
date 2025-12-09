@@ -372,7 +372,9 @@ jobs:
               [
               {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
               {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_*"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITMV2_*"}
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITMV2_*"},
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
               ]
 
           - name: "Test gRPC MUSTPASS Fuzzer"

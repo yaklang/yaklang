@@ -121,6 +121,20 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		})
 	}
 
+	// MITM slow rule hook monitoring
+	{
+		yakit.RegisterMITMSlowRuleHookCallback(func(avgCost time.Duration, items []*yakit.SlowRuleHookDescription) {
+			// 广播慢规则 Hook 事件给前端
+			log.Infof("broadcast slow rule hook event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+			yakit.BroadcastData(yakit.ServerPushType_SlowRuleHook, map[string]any{
+				"avg_cost":    avgCost.String(),
+				"avg_cost_ms": avgCost.Milliseconds(),
+				"count":       len(items),
+				"items":       items,
+			})
+		})
+	}
+
 	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
 	return stream.Context().Err()
 }
