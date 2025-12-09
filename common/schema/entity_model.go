@@ -53,6 +53,7 @@ type ERModelEntity struct {
 	Description       string      // 对该实体的简要描述
 	EntityType        string      // 实体的类型或类别
 	EntityTypeVerbose string      // 实体类型的详细描述
+	QualifiedName     string      // 人类易读的全名
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
 
 	RuntimeID string
@@ -139,14 +140,15 @@ func (e *ERModelEntity) ToRAGContent() string {
 		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
 	}
 
-	result, err := utils.RenderTemplate("{{ .name }}[{{ .type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }}]"+
+	result, err := utils.RenderTemplate("{{ .name }}|{{ .qualified_name }}[{{ .type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }}]"+
 		"{{ if .desc }} DESC: {{ .desc }}{{ end }}"+
 		"{{ if .attr }} ATTR:{{ .attr }}{{ end }}", map[string]any{
-		"name":         e.EntityName,
-		"type":         e.EntityType,
-		"type_verbose": e.EntityTypeVerbose,
-		"desc":         e.Description,
-		"attr":         attrString.String(),
+		"name":           e.EntityName,
+		"qualified_name": e.QualifiedName,
+		"type":           e.EntityType,
+		"type_verbose":   e.EntityTypeVerbose,
+		"desc":           e.Description,
+		"attr":           attrString.String(),
 	})
 	if err != nil {
 		return strings.Trim(e.String(), "|")
