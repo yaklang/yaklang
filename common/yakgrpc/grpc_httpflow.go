@@ -238,7 +238,42 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	paging, data, err := yakit.QueryHTTPFlow(s.GetProjectDatabase(), req)
+
+	// 监控慢查询
+	queryStart := time.Now()
+	tracer := &yakit.SQLTraceLogger{}
+	db := s.GetProjectDatabase()
+	if db != nil {
+		db.SetLogger(tracer)
+		db = db.LogMode(true)
+	}
+
+	paging, data, err := yakit.QueryHTTPFlow(db, req)
+	queryElapsed := time.Since(queryStart)
+
+	// 如果查询超过2秒，记录慢查询
+	if queryElapsed > 2*time.Second {
+		// 收集慢查询信息
+		now := time.Now()
+		slowQueryItem := &yakit.LongSQLDescription{
+			Duration:      queryElapsed,
+			DurationMs:    queryElapsed.Milliseconds(),
+			DurationStr:   queryElapsed.String(),
+			FuncName:      "yakit.QueryHTTPFlow",
+			FuncPtr:       "grpc_httpflow.QueryHTTPFlows",
+			QueueLen:      0, // 查询操作没有队列
+			LastSQL:       tracer.Last(),
+			Timestamp:     now,
+			TimestampUnix: now.Unix(),
+		}
+
+		// 添加到收集列表（慢查询）
+		yakit.AddSlowQuerySQLItem(slowQueryItem)
+
+		// 使用节流机制触发回调（每2秒最多触发一次），异步执行
+		yakit.TriggerSlowQuerySQLCallbackThrottled()
+	}
+
 	if err != nil {
 		return nil, err
 	}

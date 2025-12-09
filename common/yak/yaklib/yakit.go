@@ -56,6 +56,22 @@ var YakitExports = map[string]interface{}{
 	"GetOnlineBaseUrl":             consts.GetOnlineBaseUrl,
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
 
+	"MockHTTPFlowSlowSQL": func(seconds ...float64) {
+		// 如果没有传入参数，默认使用3秒
+		var duration float64 = 3.0
+		if len(seconds) > 0 {
+			duration = seconds[0]
+		}
+		// 如果传入的秒数小于2秒，设置为2.1秒，确保超过慢SQL阈值
+		if duration < 2.0 {
+			duration = 2.1
+		}
+		dur := time.Duration(float64(time.Second) * duration)
+		// 同时触发慢插入和慢查询的模拟
+		yakit.MockHTTPFlowSlowInsertSQL(dur)
+		yakit.MockHTTPFlowSlowQuerySQL(dur)
+	},
+
 	// dummy
 	"Info":          emptyVirtualClient.YakitInfo,
 	"Warn":          emptyVirtualClient.YakitWarn,
