@@ -277,7 +277,17 @@ jobs:
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"
             
-            # 检查是否是编译失败错误
+            # 检查是否是严重的运行时错误（panic、nil pointer等）
+            if echo "$SCAN_OUTPUT" | grep -qiE "panic|nil pointer|invalid memory|runtime error|fatal error"; then
+              echo "::error::Critical runtime error detected in security scan"
+              echo "::error::This indicates a bug in the scanning tool or code"
+              echo "scan_result=critical_error" >> $GITHUB_OUTPUT
+              echo "risk_count=0" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
+              exit 1
+            fi
+            
+            # 检查是否是编译失败错误（非严重错误）
             if echo "$SCAN_OUTPUT" | grep -q "record not found\|have err\|get program failed\|parse project.*failed"; then
               echo "::warning::Project compilation failed, skipping security scan"
               echo "::notice::This is usually caused by empty diff or compilation errors"
@@ -287,6 +297,9 @@ jobs:
               exit 0
             else
               echo "::error::Security scan failed with unexpected error"
+              echo "scan_result=unknown_error" >> $GITHUB_OUTPUT
+              echo "risk_count=0" >> $GITHUB_OUTPUT
+              echo "::endgroup::"
               exit 1
             fi
           fi
@@ -300,16 +313,32 @@ jobs:
             exit 1
           fi
           
-          NUM=$(cat risk.json | jq .RiskNums)
-          if [ -z "$NUM" ]; then
-            echo "::error::Failed to extract risk count from risk.json"
+          if ! NUM=$(cat risk.json | jq -r '.RiskNums // empty' 2>&1); then
+            echo "::error::Failed to parse risk.json"
+            echo "::error::jq error output: $NUM"
+            echo "::error::risk.json content (first 100 lines):"
+            head -n 100 risk.json
+            exit 1
+          fi
+          
+          if [ -z "$NUM" ] || [ "$NUM" = "null" ] || [ "$NUM" = "" ]; then
+            echo "::error::RiskNums field is missing, null, or empty in risk.json"
+            echo "::error::risk.json content (first 100 lines):"
+            head -n 100 risk.json
+            exit 1
+          fi
+          
+          if ! [[ "$NUM" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid risk count value: '$NUM' (expected a number)"
+            echo "::error::risk.json content (first 100 lines):"
+            head -n 100 risk.json
             exit 1
           fi
           
           echo "Found $NUM security risks"
           echo "risk_count=$NUM" >> $GITHUB_OUTPUT
           
-          if [ $NUM == 0 ]; then
+          if [ "$NUM" -eq 0 ]; then
             echo "scan_result=success" >> $GITHUB_OUTPUT
             echo "::notice::No security risks found"
           else
