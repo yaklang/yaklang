@@ -244,5 +244,5 @@ func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) { 
 	if err != nil {
 		return nil, err
 	}
-	return credential.proxyDial(ctx, "example.com:80")
+	return credential.proxyDial(ctx, "")
 }
