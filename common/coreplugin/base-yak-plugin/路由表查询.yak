@@ -1,7 +1,10 @@
 yakit.AutoInitYakit()
 
 # Input your code!
-m = netstack.GetSystemRouteManager()
+m,err := netstack.GetPrivilegedSystemRouteManager()
+if err !=nil {
+    m = netstack.GetSystemRouteManager()
+}
 routeInfo := m.GetExistedManagedSystemTableRoute()
 yakit.StatusCard("已设置路由数", len(routeInfo))
 tableName := "已设置路由信息"
