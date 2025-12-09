@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -29,7 +31,7 @@ var a = process(
 		// 而不是之前错误的结果：11111, 1, Undefined-, Undefined-, Undefined-, 2, ...
 		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
 			"res": {"11111", "1", "2", "100"},
-		})
+		}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 
 	t.Run("chained lambda parameter call", func(t *testing.T) {
@@ -42,6 +44,24 @@ var a = process(
 var result = pipe(10, (x) => x + 5, (x) => x * 3)`
 		ssatest.CheckSyntaxFlow(t, code, `result #-> as $res`, map[string][]string{
 			"res": {"10", "5", "3"},
-		})
+		}, ssaapi.WithLanguage(ssaconfig.TS))
+	})
+}
+
+func TestTopDef_Anonymous(t *testing.T) {
+	t.Run("closure capture", func(t *testing.T) {
+		code := `let i = 333333
+let f = () => {
+	let j = 444444
+	return () => {
+		return i + j
+    }
+}
+let f1 = f()
+let a = f1()
+console.log(a)
+`
+		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
+			"res": {"333333", "444444"}}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 }
