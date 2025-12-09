@@ -215,9 +215,49 @@ func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
 		if err != nil {
 			return i.String()
 		}
+		// for "file" type logs, only print a brief summary to prevent flooding stdout
+		// yakit.File outputs JSON containing full file content which can be very large
+		if logInfo.Level == "file" {
+			return convertYakitFileLogToSummary(logInfo.Data)
+		}
 		return fmt.Sprintf("[%s] %s", logInfo.Level, logInfo.Data)
 	}
 	return i.String()
+}
+
+// convertYakitFileLogToSummary extracts a brief summary from yakit.File log data
+// to prevent flooding stdout with large file content
+func convertYakitFileLogToSummary(data string) string {
+	var fileData map[string]any
+	if err := json.Unmarshal([]byte(data), &fileData); err != nil {
+		return ""
+	}
+
+	path, _ := fileData["path"].(string)
+	action, _ := fileData["action"].(string)
+
+	if path == "" {
+		return ""
+	}
+
+	switch action {
+	case "READ":
+		return fmt.Sprintf("[file] read file: %s", path)
+	case "WRITE":
+		return fmt.Sprintf("[file] write file: %s", path)
+	case "STATUS":
+		return fmt.Sprintf("[file] stat file: %s", path)
+	case "FIND":
+		return fmt.Sprintf("[file] find in: %s", path)
+	case "CREATE":
+		return fmt.Sprintf("[file] create file: %s", path)
+	case "DELETE":
+		return fmt.Sprintf("[file] delete file: %s", path)
+	case "CHMOD":
+		return fmt.Sprintf("[file] chmod file: %s", path)
+	default:
+		return fmt.Sprintf("[file] operation on: %s", path)
+	}
 }
 
 func NewYakitLogExecResult(level string, input any, items ...interface{}) *ypb.ExecResult {

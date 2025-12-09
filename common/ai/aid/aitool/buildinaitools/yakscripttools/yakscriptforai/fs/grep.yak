@@ -40,6 +40,13 @@ if pattern == "" {
     return
 }
 
+// Print start info
+yakit.Info("=== Start Grep ===")
+yakit.Info("target path(s): %v", pathName)
+yakit.Info("pattern: %v", pattern)
+yakit.Info("pattern-mode: %v", matchMode)
+yakit.Info("limit: %v, offset: %v, context-buffer: %v", maxResult, offsetResultCount, contextBuffer)
+
 count := 0
 m := sync.NewMutex()
 
@@ -47,15 +54,12 @@ findRes := []
 
 
 defer func{
-    if count<= 0 { yakit.Info(f"not `${pattern}` find") }
-}
-
-buf = bufio.NewBuffer()
-defer func{
-    if buf.Len() <= 0 {
-        return
+    yakit.Info("=== Grep Finished ===")
+    if count <= 0 {
+        yakit.Info("pattern [%v] matched 0 results", pattern)
+    } else {
+        yakit.Info("pattern [%v] matched %v results (showed %v)", pattern, count, min(count - offsetResultCount, maxResult))
     }
-    yakit.Info(buf.String())
 }
 
 end = false
@@ -76,15 +80,12 @@ output = (targetFile, offset, offsetEnd) => {
     // 当有多个文件时，显示文件来源
     var msg
     if multipleFiles {
-        msg = "[file: %v] find index:%v-%v" % [targetFile, offset, offsetEnd]
+        msg = "[file: %v] matched at index:%v-%v" % [targetFile, offset, offsetEnd]
     } else {
-        msg = "find in %v index:%v-%v" % [targetFile, offset, offsetEnd]
+        msg = "matched in %v at index:%v-%v" % [targetFile, offset, offsetEnd]
     }
-    println(msg)
-    buf.WriteString(msg)
-    buf.WriteByte('\n')
+    yakit.Info(msg)
     if contextBuffer > 0 {
-        println("start to show result")
         seekStart = offset - contextBuffer
         if seekStart <= 0 {
             seekStart = 0
@@ -100,7 +101,7 @@ output = (targetFile, offset, offsetEnd) => {
 
         n, err = fp.Seek(seekStart, 0)
         if err != nil {
-            dump(err)
+            return
         }
         raw, err := io.ReadAll(io.LimitReader(fp, seekLen))
         if err != nil {
@@ -108,11 +109,10 @@ output = (targetFile, offset, offsetEnd) => {
         }
         yakit.File(targetFile, yakit.fileReadAction(offset, seekLen, "byte", raw))
         if len(raw) > 0 {
-            msg := "    dump: %#v" % string(raw)
-            println(msg)
-            buf.Write(msg)
-            buf.WriteByte('\n')
-            findRes = append(findRes, string(raw))
+            // format and print the context content
+            contentStr := string(raw)
+            yakit.Info("  context: %#v", contentStr)
+            findRes = append(findRes, contentStr)
         }
     }
 }
@@ -126,16 +126,18 @@ handleRegexp = (subpattern, targetFile, content) => {
     if len(loc) < 2 {
         return
     }
-    start, end = loc[0], loc[1]
-    output(targetFile, start, end)
+    start, endPos = loc[0], loc[1]
+    output(targetFile, start, endPos)
     for {
-        newLoc := subpatternRe.FindStringIndex(string(content[start+1:]))
+        if end { return } // check global end flag
+        base := start + 1
+        newLoc := subpatternRe.FindStringIndex(string(content[base:]))
         if len(newLoc) < 2 {
             return
         }
-        base = start+1
-        start, end = newLoc[0], newLoc[1]
-        output(targetFile, start, end)
+        // add base offset to get absolute position in original content
+        start, endPos = base + newLoc[0], base + newLoc[1]
+        output(targetFile, start, endPos)
     }
 }
 
@@ -208,7 +210,15 @@ for currentPath in validPaths {
     }
     processPath(currentPath)
 }
-println()
 
+// print findRes to stdout for AI to consume
+if len(findRes) > 0 {
+    yakit.Info("=== Grep Results Summary ===")
+    for i := 0; i < len(findRes); i++ {
+        res := findRes[i]
+        yakit.Info("[match %d] %s", i+1, res)
+    }
+    yakit.Info("=== End of Grep Results ===")
+}
 
 yakit.File(pathName, yakit.fileFindAction("content", sprintf("patternMode:[%s] | pattern:[%s]",matchMode,pattern), findRes...))
