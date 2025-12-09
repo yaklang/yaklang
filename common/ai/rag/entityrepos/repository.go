@@ -951,13 +951,6 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 		collectionMg:  collectionMg,
 		runtimeConfig: NewRuntimeConfig(opts...),
 	}
-	if !repos.runtimeConfig.disableBulkProcess {
-		err = repos.StartBulkProcessor()
-		if err != nil {
-			return nil, err
-
-		}
-	}
 	return repos, nil
 }
 
@@ -987,13 +980,6 @@ func GetEntityRepositoryWithVectorStore(db *gorm.DB, name, description string, v
 		runtimeConfig: runtimeConfig,
 	}
 
-	if !repos.runtimeConfig.disableBulkProcess {
-		err = repos.StartBulkProcessor()
-		if err != nil {
-			return nil, err
-
-		}
-	}
 	return repos, nil
 }
 

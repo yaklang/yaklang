@@ -359,7 +359,7 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 	refineConfig := NewRefineConfig(option...)
 	refineConfig.AnalyzeLog("start build knowledge from entity repository use default qc")
 
-	er, err := entityrepos.GetEntityRepositoryByName(refineConfig.Database, name, option)
+	er, err := entityrepos.GetEntityRepositoryByName(refineConfig.Database, name, option...)
 	if err != nil {
 		return nil, utils.Errorf("failed to load entity repository: %v", err)
 	}

@@ -299,6 +299,7 @@ func normalizeEntityName(inputStr string) string {
 func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEntity {
 	entity := &schema.ERModelEntity{
 		EntityName:        normalizeEntityName(entityParams.GetString("identifier")),
+		QualifiedName:     entityParams.GetString("qualified_name"),
 		EntityType:        entityParams.GetString("entity_type"),
 		EntityTypeVerbose: entityParams.GetString("entity_type_verbose"),
 		Description:       entityParams.GetString("description"),
@@ -360,7 +361,7 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithContext(refineConfig.Ctx))
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithContext(refineConfig.Ctx), entityrepos.WithDisableBulkProcess())
 	if err != nil {
 		return nil, err
 	}
