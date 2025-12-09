@@ -926,6 +926,9 @@ func TestGRPCMUSTPASS_Export_And_ImportHAR(t *testing.T) {
 		Filter: &ypb.QueryHTTPFlowRequest{
 			Keyword: token,
 		},
+		FieldName: []string{
+			"request", "response",
+		},
 		ExportType: "har",
 		TargetPath: fn,
 	})
@@ -1332,9 +1335,7 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 			require.Equal(t, wantURL, h.Request.URL)
 			require.NotNil(t, h.Request.PostData) // 应该包含请求 body
 			require.Greater(t, len(h.Request.PostData.Text), 0)
-			require.NotNil(t, h.Response)
-			require.NotNil(t, h.Response.Content)
-			require.Equal(t, "", h.Response.Content.Text) // 响应 body 应该为空
+			require.Nil(t, h.Response) // 没有选择 response 相关字段，应该为 nil
 			return nil
 		})
 		require.Equal(t, wantCount, count)
@@ -1342,7 +1343,7 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 
 	t.Run("only response packet fields", func(t *testing.T) {
 		fn := filepath.Join(t.TempDir(), "test_response_only.har")
-		fieldNames := []string{"response", "status_code", "url"}
+		fieldNames := []string{"response", "status_code"}
 		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
 			FieldName: fieldNames,
 			Filter: &ypb.QueryHTTPFlowRequest{
@@ -1368,8 +1369,7 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 		count := 0
 		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
 			count++
-			require.NotNil(t, h.Request)
-			require.Nil(t, h.Request.PostData) // 请求 body 应该为空
+			require.Nil(t, h.Request) // 没有选择 request 相关字段，应该为 nil
 			require.NotNil(t, h.Response)
 			require.NotNil(t, h.Response.Content)
 			require.Contains(t, h.Response.Content.Text, token) // 应该包含响应 body
@@ -1380,7 +1380,7 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 
 	t.Run("only metadata fields", func(t *testing.T) {
 		fn := filepath.Join(t.TempDir(), "test_metadata_only.har")
-		fieldNames := []string{"tags", "path", "url"}
+		fieldNames := []string{"tags", "path"}
 		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
 			FieldName: fieldNames,
 			Filter: &ypb.QueryHTTPFlowRequest{
@@ -1406,15 +1406,198 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 		count := 0
 		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
 			count++
-			require.NotNil(t, h.Request)
-			require.Nil(t, h.Request.PostData) // 请求 body 应该为空
-			require.NotNil(t, h.Response)
-			require.NotNil(t, h.Response.Content)
-			require.Equal(t, "", h.Response.Content.Text) // 响应 body 应该为空
-			require.NotNil(t, h.MetaData)                 // 应该包含元数据
-			require.Equal(t, "/", h.MetaData.Path)        // 应该包含选中的字段
+			require.Nil(t, h.Request)              // 没有选择 request 相关字段，应该为 nil
+			require.Nil(t, h.Response)             // 没有选择 response 相关字段，应该为 nil
+			require.NotNil(t, h.MetaData)          // 应该包含元数据
+			require.Equal(t, "/", h.MetaData.Path) // 应该包含选中的字段
 			return nil
 		})
 		require.Equal(t, wantCount, count)
+	})
+
+	t.Run("test wrong field names - missing request and response", func(t *testing.T) {
+		// 测试1：不传递FieldName（应该不包含任何字段，因为 hasField 返回 false）
+		fn1 := filepath.Join(t.TempDir(), "test_no_fieldname.har")
+		stream1, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			// 不传递FieldName
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn1,
+		})
+		require.NoError(t, err)
+		progress1 := 0.0
+		for {
+			msg, err := stream1.Recv()
+			if err != nil {
+				break
+			}
+			progress1 = msg.Percent
+		}
+		require.Equal(t, 1.0, progress1)
+
+		// 测试2：传递错误的字段名（缺少request和response，但包含method和url会触发创建Request对象）
+		fn2 := filepath.Join(t.TempDir(), "test_wrong_fieldname.har")
+		wrongFieldNames := []string{"id", "method", "status_code", "url", "path", "from_plugin", "tags"}
+		stream2, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			FieldName: wrongFieldNames, // ⚠️ 缺少"request"和"response"
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn2,
+		})
+		require.NoError(t, err)
+		progress2 := 0.0
+		for {
+			msg, err := stream2.Recv()
+			if err != nil {
+				break
+			}
+			progress2 = msg.Percent
+		}
+		require.Equal(t, 1.0, progress2)
+
+		// 验证两个文件的内容
+		fh1, err := os.Open(fn1)
+		require.NoError(t, err)
+		defer fh1.Close()
+
+		fh2, err := os.Open(fn2)
+		require.NoError(t, err)
+		defer fh2.Close()
+
+		// 读取第一个文件（不传递FieldName，应该不包含任何字段）
+		hasRequest1 := false
+		hasResponse1 := false
+		hasRequestBody1 := false
+		hasResponseBody1 := false
+		count1 := 0
+		har.ImportHTTPArchiveStream(fh1, func(h *har.HAREntry) error {
+			count1++
+			if h.Request != nil {
+				hasRequest1 = true
+				if h.Request.PostData != nil && len(h.Request.PostData.Text) > 0 {
+					hasRequestBody1 = true
+				}
+			}
+			if h.Response != nil {
+				hasResponse1 = true
+				if h.Response.Content != nil && len(h.Response.Content.Text) > 0 {
+					hasResponseBody1 = true
+				}
+			}
+			return nil
+		})
+
+		// 读取第二个文件（传递错误字段名，应该不包含request和response对象）
+		hasRequest2 := false
+		hasResponse2 := false
+		hasRequestBody2 := false
+		hasResponseBody2 := false
+		hasMetadata2 := false
+		count2 := 0
+		har.ImportHTTPArchiveStream(fh2, func(h *har.HAREntry) error {
+			count2++
+			if h.Request != nil {
+				hasRequest2 = true
+				if h.Request.PostData != nil && len(h.Request.PostData.Text) > 0 {
+					hasRequestBody2 = true
+				}
+			}
+			if h.Response != nil {
+				hasResponse2 = true
+				if h.Response.Content != nil && len(h.Response.Content.Text) > 0 {
+					hasResponseBody2 = true
+				}
+			}
+			if h.MetaData != nil {
+				hasMetadata2 = true
+			}
+			return nil
+		})
+
+		require.Equal(t, wantCount, count1)
+		require.Equal(t, wantCount, count2)
+
+		// 分析结果
+		t.Logf("=== HAR导出字段选择分析 ===")
+		t.Logf("测试1（不传递FieldName）:")
+		t.Logf("  - 包含Request对象: %v", hasRequest1)
+		t.Logf("  - 包含Response对象: %v", hasResponse1)
+		t.Logf("  - 包含请求体: %v", hasRequestBody1)
+		t.Logf("  - 包含响应体: %v", hasResponseBody1)
+		t.Logf("测试2（传递错误字段名: %v）:", wrongFieldNames)
+		t.Logf("  - 包含Request对象: %v", hasRequest2)
+		t.Logf("  - 包含Response对象: %v", hasResponse2)
+		t.Logf("  - 包含请求体: %v", hasRequestBody2)
+		t.Logf("  - 包含响应体: %v", hasResponseBody2)
+		t.Logf("  - 包含MetaData对象: %v", hasMetadata2)
+		t.Logf("问题分析:")
+		t.Logf("  - 不传递FieldName时，hasField返回false，应该不包含任何字段")
+		t.Logf("  - 传递了'method'和'url'字段 → Request对象会被创建（但只有URL字段有值）")
+		t.Logf("  - 传递了'status_code'字段 → Response对象会被创建（但只有StatusCode和StatusText字段有值）")
+		t.Logf("  - 传递了'path'字段 → MetaData对象应该存在")
+
+		// 验证：测试1不应该包含任何字段，测试2不应该包含response对象
+		// 注意：测试2传递了method和url字段，这些字段会触发创建Request对象（但只有URL字段有值）
+		// 注意：测试2传递了status_code字段，这个字段会触发创建Response对象（但只有StatusCode和StatusText字段有值）
+		require.False(t, hasRequest1, "不传递FieldName时不应该包含Request对象")
+		require.False(t, hasResponse1, "不传递FieldName时不应该包含Response对象")
+		require.True(t, hasRequest2, "传递了method和url字段时会创建Request对象（但只有URL字段有值）")
+		require.True(t, hasResponse2, "传递了status_code字段时会创建Response对象（但只有StatusCode和StatusText字段有值）")
+		require.True(t, hasMetadata2, "传递'path'字段时应该包含MetaData对象")
+	})
+
+	t.Run("test correct field names with request and response", func(t *testing.T) {
+		// 这个测试验证传递正确的字段名时，应该包含body内容
+		fn := filepath.Join(t.TempDir(), "test_correct_fieldname.har")
+		correctFieldNames := []string{"request", "response", "path", "from_plugin", "tags"}
+		stream, err := client.ExportHTTPFlowStream(utils.TimeoutContextSeconds(10), &ypb.ExportHTTPFlowStreamRequest{
+			FieldName: correctFieldNames, // ✅ 包含"request"和"response"
+			Filter: &ypb.QueryHTTPFlowRequest{
+				Keyword: token,
+			},
+			ExportType: "har",
+			TargetPath: fn,
+		})
+		require.NoError(t, err)
+		progress := 0.0
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			progress = msg.Percent
+		}
+		require.Equal(t, 1.0, progress)
+
+		fh, err := os.Open(fn)
+		require.NoError(t, err)
+		defer fh.Close()
+
+		hasRequestBody := false
+		hasResponseBody := false
+		hasMetadata := false
+		count := 0
+		har.ImportHTTPArchiveStream(fh, func(h *har.HAREntry) error {
+			count++
+			if h.Request != nil && h.Request.PostData != nil && len(h.Request.PostData.Text) > 0 {
+				hasRequestBody = true
+			}
+			if h.Response != nil && h.Response.Content != nil && len(h.Response.Content.Text) > 0 {
+				hasResponseBody = true
+			}
+			if h.MetaData != nil && h.MetaData.Path != "" {
+				hasMetadata = true
+			}
+			return nil
+		})
+
+		require.Equal(t, wantCount, count)
+		require.True(t, hasRequestBody, "传递'request'字段时应该包含请求体")
+		require.True(t, hasResponseBody, "传递'response'字段时应该包含响应体")
+		require.True(t, hasMetadata, "传递'path'字段时应该包含metadata")
 	})
 }

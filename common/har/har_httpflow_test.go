@@ -298,58 +298,179 @@ Content-Length: %d
 		Payload:           "test-payload",
 	}
 
-	t.Run("only request packet fields", func(t *testing.T) {
-		// Similar to Excel export test, test selecting specific fields only
+	t.Run("only request packet fields - with parent field", func(t *testing.T) {
+		// 测试传递了父级字段"request"时，应该包含所有request子字段
 		options := &HTTPFlow2HarEntryOptions{
-			SelectedFields: []string{"request", "method", "url"},
+			SelectedFields: []string{"request"},
 		}
 		entry, err := HTTPFlow2HarEntry(flow, options)
 		require.NoError(t, err)
 		require.NotNil(t, entry)
-		// Should include request body
-		require.NotNil(t, entry.Request.PostData)
-		require.Equal(t, requestBody, entry.Request.PostData.Text)
-		// Should not include response body
-		require.NotNil(t, entry.Response.Content)
-		require.Equal(t, "", entry.Response.Content.Text)
+		// 传递了"request"父级字段，应该包含所有request子字段
+		// 没有传递response相关字段，response应该为nil
+		// 没有传递metadata相关字段，metadata应该为nil
+		require.Equal(t, entry, &HAREntry{
+			Request: &HARRequest{
+				Method:      "POST",
+				URL:         "http://example.com/test",
+				HTTPVersion: "HTTP/1.1",
+				QueryString: nil,
+				Headers: []*HARKVPair{
+					{
+						Name:  "Host",
+						Value: "example.com",
+					},
+					{
+						Name:  "Content-Type",
+						Value: "application/json",
+					},
+				},
+				HeadersSize: 2,
+				BodySize:    18,
+				PostData: &HARHTTPPostData{
+					Text:     requestBody,
+					Params:   nil,
+					MimeType: "application/json",
+				},
+				Timings: nil,
+			},
+			Response: nil,
+			MetaData: nil,
+		})
 	})
 
-	t.Run("only response packet fields", func(t *testing.T) {
+	t.Run("only request sub-field - method only", func(t *testing.T) {
+		// 测试只传递了子字段"method"时，应该只设置method字段
 		options := &HTTPFlow2HarEntryOptions{
-			SelectedFields: []string{"response", "status_code", "url"},
+			SelectedFields: []string{"method"},
 		}
 		entry, err := HTTPFlow2HarEntry(flow, options)
 		require.NoError(t, err)
 		require.NotNil(t, entry)
-		// Should not include request body
-		require.Nil(t, entry.Request.PostData)
-		// Should include response body
-		require.NotNil(t, entry.Response.Content)
-		require.Equal(t, responseBody, entry.Response.Content.Text)
+		// 只传递了"method"，应该只设置method字段
+		// 没有传递response相关字段，response应该为nil
+		// 没有传递metadata相关字段，metadata应该为nil
+		require.Equal(t, entry, &HAREntry{
+			Request: &HARRequest{
+				Method: "POST",
+			},
+			Response: nil,
+			MetaData: nil,
+		})
+	})
+
+	t.Run("only request sub-fields - method and body_size", func(t *testing.T) {
+		// 测试只传递了"method"和"body_size"时，应该只设置这两个字段
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"method", "body_size"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// 只传递了"method"和"body_size"，应该只设置这两个字段
+		// 没有传递response相关字段，response应该为nil
+		// 没有传递metadata相关字段，metadata应该为nil
+		require.Equal(t, entry, &HAREntry{
+			Request: &HARRequest{
+				Method:   "POST",
+				BodySize: int(flow.BodyLength),
+			},
+			Response: &HARResponse{
+				BodySize: int(flow.BodyLength),
+			},
+			MetaData: nil,
+		})
+	})
+
+	t.Run("only response packet fields - with parent field", func(t *testing.T) {
+		// 测试传递了父级字段"response"时，应该包含所有response子字段
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"response"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// 没有传递request相关字段，request应该为nil
+		// 传递了"response"父级字段，应该包含所有response子字段
+		// 没有传递metadata相关字段，metadata应该为nil
+		require.Equal(t, entry, &HAREntry{
+			Request: nil,
+			Response: &HARResponse{
+				StatusCode:  200,
+				StatusText:  "OK",
+				HTTPVersion: "HTTP/1.1",
+				Headers: []*HARKVPair{
+					{
+						Name:  "Content-Type",
+						Value: "text/html",
+					},
+					{
+						Name:  "Content-Length",
+						Value: "18",
+					},
+				},
+				Cookies: nil,
+				Content: &HARHTTPContent{
+					Size:     18,
+					MimeType: "text/html",
+					Text:     responseBody,
+					Encoding: "",
+				},
+				HeadersSize: 2,
+				BodySize:    18,
+			},
+			ServerIPAddress: "",
+			MetaData:        nil,
+		})
+	})
+
+	t.Run("only response sub-field - status_code only", func(t *testing.T) {
+		// 测试只传递了子字段"status_code"时，应该只设置status_code字段
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{"status_code"},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// 没有传递request相关字段，request应该为nil
+		// 只传递了"status_code"，应该只设置status_code字段（StatusText和HTTPVersion会自动设置，因为需要解析response）
+		// 没有传递metadata相关字段，metadata应该为nil
+		require.Equal(t, entry, &HAREntry{
+			Request: nil,
+			Response: &HARResponse{
+				StatusCode:  200,
+				StatusText:  "OK",
+				HTTPVersion: "HTTP/1.1",
+			},
+			MetaData: nil,
+		})
+		// 验证其他字段不应该存在
+		require.Nil(t, entry.Response.Headers)
+		require.Nil(t, entry.Response.Content)
+		require.Equal(t, 0, entry.Response.BodySize)
 	})
 
 	t.Run("only metadata fields", func(t *testing.T) {
 		// Similar to Excel export test, test selecting metadata fields only
 		options := &HTTPFlow2HarEntryOptions{
-			SelectedFields: []string{"tags", "from_plugin", "duration", "iP_address", "path"},
+			SelectedFields: []string{"tags", "from_plugin", "duration", "ip_address", "path"},
 		}
 		entry, err := HTTPFlow2HarEntry(flow, options)
 		require.NoError(t, err)
 		require.NotNil(t, entry)
-		// Should not include request and response body
-		require.Nil(t, entry.Request.PostData)
-		require.NotNil(t, entry.Response.Content)
-		require.Equal(t, "", entry.Response.Content.Text)
+		// Should not include request and response fields
 		// Should include selected metadata fields
-		require.NotNil(t, entry.MetaData)
-		require.Equal(t, randTag, entry.MetaData.Tags)
-		require.Equal(t, fromPlugin, entry.MetaData.FromPlugin)
-		require.Equal(t, duration, entry.MetaData.Duration)
-		require.Equal(t, ipAddress, entry.MetaData.IPAddress)
-		require.Equal(t, "/test", entry.MetaData.Path)
-		// Unselected fields should be empty
-		require.Equal(t, "", entry.MetaData.SourceType)
-		require.Equal(t, "", entry.MetaData.Payload)
+		require.Equal(t, entry, &HAREntry{
+			Request:  nil,
+			Response: nil,
+			MetaData: &HTTPFlowMetaData{
+				Tags:       randTag,
+				FromPlugin: fromPlugin,
+				Duration:   duration,
+				IPAddress:  ipAddress,
+				Path:       "/test",
+			},
+		})
 	})
 
 	t.Run("include parameter statistics fields", func(t *testing.T) {
@@ -365,5 +486,36 @@ Content-Length: %d
 		require.Equal(t, 2, entry.MetaData.GetParamsTotal)
 		require.Equal(t, 1, entry.MetaData.PostParamsTotal)
 		require.Equal(t, 3, entry.MetaData.CookieParamsTotal)
+	})
+
+	t.Run("no field name - should include nothing", func(t *testing.T) {
+		// 测试不传递FieldName时，应该不包含任何字段
+		entry, err := HTTPFlow2HarEntry(flow)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// request和response应该为nil，因为没有任何字段被选中
+		// MetaData应该为nil，因为没有任何metadata字段被选中
+		require.Equal(t, entry, &HAREntry{
+			Request:  nil,
+			Response: nil,
+			MetaData: nil,
+		})
+	})
+
+	t.Run("empty field name - should include nothing", func(t *testing.T) {
+		// 测试传递空FieldName数组时，应该不包含任何字段
+		options := &HTTPFlow2HarEntryOptions{
+			SelectedFields: []string{},
+		}
+		entry, err := HTTPFlow2HarEntry(flow, options)
+		require.NoError(t, err)
+		require.NotNil(t, entry)
+		// request和response应该为nil，因为没有任何字段被选中
+		// MetaData应该为nil，因为没有任何metadata字段被选中
+		require.Equal(t, entry, &HAREntry{
+			Request:  nil,
+			Response: nil,
+			MetaData: nil,
+		})
 	})
 }
