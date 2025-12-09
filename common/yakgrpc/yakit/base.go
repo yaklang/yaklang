@@ -59,7 +59,7 @@ type SlowRuleHookDescription struct {
 	Duration      time.Duration `json:"duration"`       // Hook 执行耗时
 	DurationMs    int64         `json:"duration_ms"`   // Hook 执行耗时（毫秒）
 	DurationStr   string        `json:"duration_str"`   // Hook 执行耗时（字符串形式）
-	HookType      string        `json:"hook_type"`      // Hook 类型：hook_color, hook_request, hook_response
+	Type          string        `json:"type"`           // Hook 类型：hook_color, hook_request, hook_response
 	RuleCount     int           `json:"rule_count"`     // 当前规则数量
 	URL           string        `json:"url"`            // 请求 URL（如果有）
 	Timestamp     time.Time     `json:"timestamp"`      // 时间戳
@@ -393,7 +393,7 @@ func MockMITMSlowRuleHook(duration time.Duration, hookType string, ruleCount int
 		Duration:      duration,
 		DurationMs:    duration.Milliseconds(),
 		DurationStr:   duration.String(),
-		HookType:      hookType,
+		Type:          hookType,
 		RuleCount:     ruleCount,
 		URL:           "http://mock.example.com/test",
 		Timestamp:     now,

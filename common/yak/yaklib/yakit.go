@@ -72,6 +72,27 @@ var YakitExports = map[string]interface{}{
 		yakit.MockHTTPFlowSlowQuerySQL(dur)
 	},
 
+	"MockMITMSlowRuleHook": func(seconds ...float64) {
+		// 如果没有传入参数，默认使用1秒（1000ms），确保超过300ms阈值
+		var duration float64 = 1.0
+		if len(seconds) > 0 {
+			duration = seconds[0]
+		}
+		// 如果传入的秒数小于0.3秒，设置为0.4秒，确保超过300ms阈值
+		if duration < 0.3 {
+			duration = 0.4
+		}
+		dur := time.Duration(float64(time.Second) * duration)
+		ruleCount := 10 // 默认规则数量
+		if len(seconds) > 1 {
+			ruleCount = int(seconds[1])
+		}
+		// 一次触发所有三种规则类型
+		yakit.MockMITMSlowRuleHook(dur, "hook_color", ruleCount)
+		yakit.MockMITMSlowRuleHook(dur, "hook_request", ruleCount)
+		yakit.MockMITMSlowRuleHook(dur, "hook_response", ruleCount)
+	},
+
 	// dummy
 	"Info":          emptyVirtualClient.YakitInfo,
 	"Warn":          emptyVirtualClient.YakitWarn,
