@@ -119,25 +119,14 @@ output = (targetFile, offset, offsetEnd) => {
 
 isRegexp = str.ToLower(matchMode) in ["regexp", "re", "regex"]
 
+// Use FindAllStringIndex to avoid slow string slicing ([]rune conversion)
 handleRegexp = (subpattern, targetFile, content) => {
     defer recover()
     subpatternRe := re.Compile(subpattern)~
-    loc := subpatternRe.FindStringIndex(string(content))
-    if len(loc) < 2 {
-        return
-    }
-    start, endPos = loc[0], loc[1]
-    output(targetFile, start, endPos)
-    for {
-        if end { return } // check global end flag
-        base := start + 1
-        newLoc := subpatternRe.FindStringIndex(string(content[base:]))
-        if len(newLoc) < 2 {
-            return
-        }
-        // add base offset to get absolute position in original content
-        start, endPos = base + newLoc[0], base + newLoc[1]
-        output(targetFile, start, endPos)
+    allMatches := subpatternRe.FindAllStringIndex(string(content), maxResult + offsetResultCount + 1)
+    for _, match = range allMatches {
+        if end { return }
+        output(targetFile, match[0], match[1])
     }
 }
 
@@ -148,18 +137,14 @@ handle = (patternSubstr, targetFile, content) => {
         patternSubstr = str.ToLower(patternSubstr)
     }
 
-    offset := str.Index(content, patternSubstr)
-    if offset < 0 {
-        return
-    }
-
-    output(targetFile, offset, offset+len(patternSubstr))
-    for {
-        newOffset := str.Index(content[offset+1:], patternSubstr)
-        if newOffset < 0 { return }
-        newOffset += 1 + offset
-        output(targetFile, newOffset, newOffset + len(patternSubstr))
-        offset = newOffset
+    // Use regex FindAllStringIndex for much better performance
+    // (str.Index + substring triggers slow []rune conversion in yak VM)
+    defer recover()
+    patternRe := re.Compile(re.QuoteMeta(patternSubstr))~
+    allMatches := patternRe.FindAllStringIndex(string(content), maxResult + offsetResultCount + 1)
+    for _, match = range allMatches {
+        if end { return }
+        output(targetFile, match[0], match[1])
     }
 }
 
