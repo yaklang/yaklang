@@ -197,7 +197,7 @@ func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb
 	return NewYakitLogExecResult(level, data)
 }
 
-func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
+func ConvertExecResultIntoAIToolCallStdoutLog(i *ypb.ExecResult) string {
 	if utils.IsNil(i) {
 		return ""
 	}
@@ -209,16 +209,21 @@ func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
 	if err != nil {
 		return i.String()
 	}
+	// progress/status-card should not be printed to AI stdout
+	switch yakitMsg.Type {
+	case "progress", "status-card":
+		return ""
+	}
 	if yakitMsg.Type == "log" {
 		var logInfo YakitLog
 		err := json.Unmarshal(yakitMsg.Content, &logInfo)
 		if err != nil {
 			return i.String()
 		}
-		// for "file" type logs, only print a brief summary to prevent flooding stdout
-		// yakit.File outputs JSON containing full file content which can be very large
-		if logInfo.Level == "file" {
-			return convertYakitFileLogToSummary(logInfo.Data)
+		// do NOT show noisy / UI-only logs to AI stdout
+		switch logInfo.Level {
+		case "file", "debug", "progress":
+			return ""
 		}
 		return fmt.Sprintf("[%s] %s", logInfo.Level, logInfo.Data)
 	}

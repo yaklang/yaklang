@@ -54,8 +54,8 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				}
 
 				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
-					if result.IsMessage {
-						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(result)))
+					if ret := yaklib.ConvertExecResultIntoAIToolCallStdoutLog(result); ret != "" {
+						stdout.Write([]byte(ret))
 						stdout.Write([]byte("\n"))
 					}
 					if runtimeFeedBacker != nil {
