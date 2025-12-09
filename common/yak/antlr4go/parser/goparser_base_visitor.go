@@ -119,6 +119,14 @@ func (v *BaseGoParserVisitor) VisitSimpleStmt(ctx *SimpleStmtContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseGoParserVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitAssign_op(ctx *Assign_opContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseGoParserVisitor) VisitExpressionStmt(ctx *ExpressionStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -128,14 +136,6 @@ func (v *BaseGoParserVisitor) VisitSendStmt(ctx *SendStmtContext) interface{} {
 }
 
 func (v *BaseGoParserVisitor) VisitIncDecStmt(ctx *IncDecStmtContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitAssignment(ctx *AssignmentContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitAssign_op(ctx *Assign_opContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

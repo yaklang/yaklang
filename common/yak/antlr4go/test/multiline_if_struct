@@ -1,0 +1,18 @@
+package main
+
+type Response struct {
+	HaveNotification   bool
+	NotificationContent []byte
+}
+
+func mitmSendRespLogged(resp *Response) {
+}
+
+func main() {
+	if len([]string{"a", "b"}) > 200 && false {
+		mitmSendRespLogged(&Response{HaveNotification: true, NotificationContent: []byte(
+			"批量加载插件受限，最多一次性加载200个插件",
+		)})
+	}
+}
+

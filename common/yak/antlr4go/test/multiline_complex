@@ -1,0 +1,22 @@
+package main
+
+type MITMResponse struct {
+	HaveNotification   bool
+	NotificationContent []byte
+}
+
+func mitmSendRespLogged(resp *MITMResponse) {
+}
+
+func main() {
+	var plugins []string
+	if len(plugins) > 200 && false {
+		plugins = plugins[:200]
+		mitmSendRespLogged(&MITMResponse{HaveNotification: true, NotificationContent: []byte(
+			"批量加载插件受限，最多一次性加载200个插件",
+		)})
+	} else {
+		plugins = plugins
+	}
+}
+

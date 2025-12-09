@@ -188,8 +188,17 @@ statement
 simpleStmt
     : sendStmt
     | incDecStmt
+    | assignment
     | expressionStmt
     | shortVarDecl
+    ;
+
+assignment
+    : expressionList assign_op expressionList
+    ;
+
+assign_op
+    : (PLUS | MINUS | OR | CARET | STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR)? ASSIGN
     ;
 
 expressionStmt
@@ -237,7 +246,7 @@ deferStmt
     ;
 
 ifStmt
-    : IF (expression | eos expression | simpleStmt eos expression) block (ELSE (ifStmt | block))?
+    : IF eos* (expression | simpleStmt eos* expression) eos* block (ELSE eos* (ifStmt | block))?
     ;
 
 switchStmt
@@ -259,7 +268,7 @@ exprSwitchCase
     ;
 
 typeSwitchStmt
-    : SWITCH (typeSwitchGuard | eos* typeSwitchGuard | simpleStmt eos* typeSwitchGuard) L_CURLY eos* typeCaseClause* eos* R_CURLY
+    : SWITCH eos* (typeSwitchGuard | simpleStmt eos* typeSwitchGuard) eos* L_CURLY eos* typeCaseClause* eos* R_CURLY
     ;
 
 typeSwitchGuard
@@ -297,7 +306,7 @@ recvStmt
     ;
 
 forStmt
-    : FOR (expression? | forClause | rangeClause?) block
+    : FOR eos* (expression? | forClause | rangeClause?) eos* block
     ;
 
 forClause
@@ -422,7 +431,7 @@ primaryExpr
     ;
 
 conversion
-    : type_ L_PAREN expression COMMA? R_PAREN
+    : type_ L_PAREN eos* expression eos* COMMA? eos* R_PAREN
     ;
 
 operand

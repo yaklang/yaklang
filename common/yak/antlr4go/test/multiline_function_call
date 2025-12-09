@@ -1,0 +1,16 @@
+package main
+
+type MITMResponse struct {
+	HaveNotification   bool
+	NotificationContent []byte
+}
+
+func mitmSendRespLogged(resp *MITMResponse) {
+}
+
+func main() {
+	mitmSendRespLogged(&MITMResponse{HaveNotification: true, NotificationContent: []byte(
+		"批量加载插件受限，最多一次性加载200个插件",
+	)})
+}
+
