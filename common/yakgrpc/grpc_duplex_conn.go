@@ -93,6 +93,34 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		}()
 	}
 
+	// HTTPFlow slow insert SQL monitoring
+	{
+		yakit.RegisterHTTPFlowSlowInsertCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
+			// 广播慢插入 SQL 事件给前端
+			log.Infof("broadcast slow insert SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+			yakit.BroadcastData(yakit.ServerPushType_SlowInsertSQL, map[string]any{
+				"avg_cost":    avgCost.String(),
+				"avg_cost_ms": avgCost.Milliseconds(),
+				"count":       len(items),
+				"items":       items,
+			})
+		})
+	}
+
+	// HTTPFlow slow query SQL monitoring
+	{
+		yakit.RegisterHTTPFlowSlowQueryCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
+			// 广播慢查询 SQL 事件给前端
+			log.Infof("broadcast slow query SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+			yakit.BroadcastData(yakit.ServerPushType_SlowQuerySQL, map[string]any{
+				"avg_cost":    avgCost.String(),
+				"avg_cost_ms": avgCost.Milliseconds(),
+				"count":       len(items),
+				"items":       items,
+			})
+		})
+	}
+
 	yakit.YakitDuplexConnectionServer.Server(stream.Context(), stream)
 	return stream.Context().Err()
 }
