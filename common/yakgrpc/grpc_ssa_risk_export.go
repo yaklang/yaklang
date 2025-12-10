@@ -1,10 +1,8 @@
 package yakgrpc
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -17,18 +15,16 @@ func (s *Server) ExportSSARisk(req *ypb.ExportSSARiskRequest, stream ypb.Yak_Exp
 	if req == nil {
 		return utils.Error("ExportSSARisk Failed:ExportSSARiskRequest is nil")
 	}
-	targetDir := req.GetTargetPath()
-	if targetDir == "" {
+	filePath := req.GetTargetPath()
+	if filePath == "" {
 		return utils.Error("ExportSSARisk Failed:TargetPath is empty")
 	}
 
+	// 创建文件所在的目录
+	targetDir := filepath.Dir(filePath)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return utils.Wrapf(err, "ExportSSARisk Failed:MkdirAll error")
 	}
-
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("ssa_risk_export_%s.json", timestamp)
-	filePath := filepath.Join(targetDir, filename)
 
 	fp, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o666)
 	if err != nil {
