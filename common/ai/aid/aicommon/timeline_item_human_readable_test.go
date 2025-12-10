@@ -338,3 +338,13 @@ func TestParseTextTimelineItem_MultilineContent(t *testing.T) {
 	require.Equal(t, "t1", result.TaskID)
 	require.Equal(t, "Line 1\nLine 2\nLine 3", result.Content)
 }
+
+func TestParseTextTimelineItem_WithSpecialEntryType(t *testing.T) {
+	text := "[current task user input]:\n  Special entry type"
+	result := &TimelineItemHumanReadable{}
+	parseTextTimelineItem(result, text)
+
+	require.Equal(t, "current task user input", result.EntryType)
+	require.Equal(t, "Special entry type", result.Content)
+	require.Equal(t, "user_input", result.Type)
+}
