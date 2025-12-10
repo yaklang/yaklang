@@ -45,6 +45,7 @@ type Document struct {
 	Metadata        schema.MetadataMap     `json:"metadata"` // 文档元数据
 	Embedding       []float32              `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
 	RuntimeID       string                 `json:"runtimeID"`
+	UID             []byte                 `json:"-"` // 文档全表唯一标识符
 }
 
 // SearchResult 表示检索结果

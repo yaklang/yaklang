@@ -531,7 +531,7 @@ func (s *ScoredResult) GetUUID() string {
 	if s.Document == nil {
 		return ""
 	}
-	uuid, _ := s.Document.Metadata.GetDataUUID()
+	uuid := fmt.Sprintf("%x", s.Document.UID)
 	return uuid
 }
 
@@ -550,7 +550,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 	config := NewRAGQueryConfig(opts...)
 	ctx := config.Ctx
 	resultCh := chanx.NewUnlimitedChan[*RAGSearchResult](ctx, 10)
-
+	outputCh := resultCh.OutputChannel()
 	sendRaw := func(msg *RAGSearchResult) {
 		if config.MsgCallBack != nil {
 			config.MsgCallBack(msg)
@@ -1026,7 +1026,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 		}
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
 	}()
-	return resultCh.OutputChannel(), nil
+	return outputCh, nil
 }
 
 // SimpleQuery 简化的RAG查询接口，直接返回结果
