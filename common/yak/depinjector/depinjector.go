@@ -1,9 +1,6 @@
 package depinjector
 
 import (
-	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
-	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
-	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/mcp"
@@ -12,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/depinjector/aiforge"
 
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func DependencyInject() {
@@ -27,9 +23,6 @@ func DependencyInject() {
 		}
 		return v, nil
 	})
-	yakit.SearchPluginIdsFunc = plugins_rag.SearchPluginIds
-	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
-	knowledgebase.Simpleliteforge = aiforge.SimpleAiForgeIns
 	rag_search_tool.SimpleLiteForge = aiforge.SimpleAiForgeIns
 	yak.AIEngineExports = aiengine.Exports
 }
