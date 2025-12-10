@@ -76,11 +76,18 @@ func (f *Function) GetCurrentBlueprint() *Blueprint {
 	return f.currentBlueprint
 }
 func (f *Function) GetType() Type {
-	if f != nil && f.Type != nil {
-		return f.Type
-	} else {
+	if f == nil {
 		return defaultAnyType
 	}
+	// If Type is nil, try to build the function first (trigger lazy builder)
+	// This ensures FunctionType is properly set before accessing
+	if f.Type == nil {
+		f.Build()
+	}
+	if f.Type != nil {
+		return f.Type
+	}
+	return defaultAnyType
 }
 
 func (f *Function) AddThrow(vs ...Value) {

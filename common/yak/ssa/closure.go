@@ -622,3 +622,150 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *
 	}
 	return se
 }
+
+// isParameterCalledInFunction checks if a parameter at the given index is called
+// (used as Method in a Call instruction) inside the function.
+// This is used to determine if a function argument will actually be invoked.
+//
+// For example:
+//
+//	execute = (fn) => { fn() }  // parameter fn IS called, returns true
+//	store = (fn) => { arr.push(fn) }  // parameter fn is NOT called, returns false
+func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
+	if calleeFunc == nil {
+		return false
+	}
+
+	// Get the parameter at the given index
+	if paramIndex >= len(calleeFunc.Params) {
+		return false
+	}
+
+	paramId := calleeFunc.Params[paramIndex]
+	param, ok := calleeFunc.GetValueById(paramId)
+	if !ok || utils.IsNil(param) {
+		return false
+	}
+
+	// Check if any user of this parameter is a Call instruction
+	// where this parameter is the Method (i.e., the parameter is being called)
+	for _, user := range param.GetUsers() {
+		if call, isCall := ToCall(user); isCall {
+			// Check if this parameter is the Method of the call
+			if call.Method == paramId {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// handleArgumentFunctionSideEffect handles side effects from function arguments.
+// When a function with side effects is passed as an argument and that parameter
+// is actually called inside the callee function, the side effects should be
+// propagated to the call site.
+//
+// Example:
+//
+//	var x = 111111
+//	var modifier = () => { x = 222222 }  // modifier has side-effect on x
+//	var execute = (fn) => { fn() }        // fn is called inside execute
+//	execute(modifier)                      // side-effect should be propagated here
+//	var a = x                              // a should track to 222222
+//
+// This function checks:
+// 1. If an argument is a function with side effects
+// 2. If the corresponding parameter is actually called inside the callee
+// 3. If both conditions are met, create SideEffect instructions at the call site
+func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
+	if calleeFuncTyp == nil {
+		return
+	}
+
+	function := c.GetFunc()
+	if function == nil {
+		return
+	}
+	builder := function.builder
+	if builder == nil {
+		return
+	}
+
+	currentScope := c.GetBlock().ScopeTable
+	if currentScope == nil {
+		return
+	}
+
+	// Get the callee function (not just its type) to analyze parameter usage
+	method, ok := c.GetValueById(c.Method)
+	if !ok || utils.IsNil(method) {
+		return
+	}
+	calleeFunc, isCalleeFunc := ToFunction(method)
+	if !isCalleeFunc {
+		// Cannot analyze parameter usage without function implementation
+		return
+	}
+
+	// Check each argument to see if it's a function with side effects
+	for i, argId := range c.Args {
+		argValue, ok := c.GetValueById(argId)
+		if !ok || utils.IsNil(argValue) {
+			continue
+		}
+
+		// Check if the argument is a function
+		argFunc, isFunc := ToFunction(argValue)
+		if !isFunc {
+			continue
+		}
+
+		// Get the function type of the argument function
+		argFuncTyp := argFunc.Type
+		if argFuncTyp == nil || len(argFuncTyp.SideEffects) == 0 {
+			continue
+		}
+
+		// CRITICAL: Check if the parameter is actually called inside the callee function
+		// Only propagate side effects if the parameter function is invoked
+		if !isParameterCalledInFunction(calleeFunc, i) {
+			// The parameter function is not called inside the callee,
+			// so its side effects should not be propagated
+			continue
+		}
+
+		// Parameter is called, propagate side effects from the argument function
+		recoverBuilder := builder.SetCurrent(c)
+		for _, se := range argFuncTyp.SideEffects {
+			if se.Kind != NormalSideEffect {
+				continue
+			}
+
+			modify, ok := c.GetValueById(se.Modify)
+			if !ok || utils.IsNil(modify) {
+				// Try to get modify value from the argument function's context
+				modify, ok = argFunc.GetValueById(se.Modify)
+				if !ok || utils.IsNil(modify) {
+					continue
+				}
+			}
+
+			// Create side effect at call site
+			variable := builder.CreateVariableForce(se.Name)
+			if variable == nil {
+				continue
+			}
+
+			if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
+				if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
+					variable.SetCaptured(v)
+				}
+				builder.AssignVariable(variable, sideEffect)
+				sideEffect.SetVerboseName(se.VerboseName)
+				c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+			}
+		}
+		recoverBuilder()
+	}
+}

@@ -283,7 +283,21 @@ func (c *Call) handlerReturnType() {
 	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
-		return
+		// For FreeValue Parameter, try to get FunctionType from its Default value
+		// This handles cases like mutual recursion where the method is a captured variable
+		// Note: Due to circular dependencies in mutual recursion, the Default function
+		// may still be building and its Type may not be set yet.
+		if param, ok := ToParameter(method); ok && param.IsFreeValue {
+			if defVal := param.GetDefault(); defVal != nil {
+				if defFunc, isFunc := ToFunction(defVal); isFunc && defFunc.Type != nil {
+					funcTyp = defFunc.Type
+					ok = true
+				}
+			}
+		}
+		if !ok {
+			return
+		}
 	}
 	if utils.IsNil(funcTyp.ReturnType) {
 		log.Warnf("[ssa.Call.handlerReturnType] skip setting type for call %s: return type is nil", method.GetName())
@@ -342,10 +356,48 @@ func (c *Call) handleCalleeFunction() {
 			caller := param.GetFunc()
 			callee := caller.anValue.GetFunc()
 			caller.SideEffects = append(caller.SideEffects, callee.SideEffects...)
+		}
 
+		// Handle case where method is a Call instruction (e.g., f1() where f1 = f())
+		// Try to get the FunctionType from the call's return value
+		if callMethod, ok := ToCall(method); ok {
+			// Get the callee of the inner call (e.g., f in f())
+			innerCallee, ok := c.GetValueById(callMethod.Method)
+			if ok && !utils.IsNil(innerCallee) {
+				if innerFunc, ok := ToFunction(innerCallee); ok {
+					// Try to get return type from innerFunc.Type first
+					if innerFunc.Type != nil {
+						if retFuncTyp, ok := ToFunctionType(innerFunc.Type.ReturnType); ok {
+							funcTyp = retFuncTyp
+							goto handleSideEffects
+						}
+					}
+					// If Type is nil, check the Return statements directly
+					// This handles cases where the function type hasn't been fully resolved
+					for _, retId := range innerFunc.Return {
+						if retInst, ok := innerFunc.GetValueById(retId); ok {
+							if ret, ok := ToReturn(retInst); ok {
+								for _, resId := range ret.Results {
+									if res, ok := innerFunc.GetValueById(resId); ok {
+										// Check if the return value is a function with side effects
+										if retFuncTyp, ok := ToFunctionType(res.GetType()); ok {
+											if len(retFuncTyp.SideEffects) > 0 {
+												funcTyp = retFuncTyp
+												goto handleSideEffects
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 		return
 	}
+
+handleSideEffects:
 
 	{
 		recoverBuilder := builder.SetCurrent(c)
@@ -427,6 +479,11 @@ func (c *Call) handleCalleeFunction() {
 		handleSideEffect(c, funcTyp, false)
 	}
 	handleSideEffect(c, funcTyp, true)
+
+	// Handle side effects from function arguments
+	// When a function with side effects is passed as an argument and will be called
+	// inside the callee, we need to propagate its side effects to the call site
+	handleArgumentFunctionSideEffect(c, funcTyp)
 
 	// only handler in method call
 	if !funcTyp.IsMethod {
