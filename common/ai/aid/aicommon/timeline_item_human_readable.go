@@ -7,6 +7,11 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
+// TimelineItemType 是 TimelineItem EntryType 的类型
+const (
+	TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT = "current task user input"
+)
+
 // TimelineItemHumanReadable 是 TimelineItem 的人类可读版本
 // 它解析 TimelineItem 中的 value 字段，提取出有意义的信息
 type TimelineItemHumanReadable struct {
@@ -38,6 +43,10 @@ var (
 	// 匹配没有 task 的格式: [entryType]:
 	withoutTaskRegex = regexp.MustCompile(`^\[(.+?)\]:`)
 )
+
+var EntryTypeToTimelineItemType = map[string]string{
+	TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT: "user_input",
+}
 
 // ParseTimelineItemHumanReadable 解析 TimelineItem 对象生成 TimelineItemHumanReadable 对象
 func ParseTimelineItemHumanReadable(item *TimelineItem) *TimelineItemHumanReadable {
@@ -120,6 +129,10 @@ func parseTextTimelineItem(result *TimelineItemHumanReadable, text string) {
 			// 都没有找到，整个文本就是内容
 			result.Content = text
 		}
+	}
+
+	if itemType, ok := EntryTypeToTimelineItemType[result.EntryType]; ok {
+		result.Type = itemType
 	}
 }
 
