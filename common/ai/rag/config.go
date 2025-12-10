@@ -948,3 +948,9 @@ func WithKHopRuntimeBuildOnly(isRuntime bool) RAGSystemConfigOption {
 		config.kHopIsRuntimeBuild = isRuntime
 	}
 }
+
+func WithTryRebuildHNSWIndex(tryRebuildHNSWIndex bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.tryRebuildHNSWIndex = tryRebuildHNSWIndex
+	}
+}

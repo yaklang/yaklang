@@ -67,7 +67,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 	// 转换为protobuf格式
 	pbKnowledgeBases := make([]*ypb.KnowledgeBaseInfo, len(knowledgeBases))
 	for i, kb := range knowledgeBases {
-		ragSystem, err := rag.Get(kb.KnowledgeBaseName, rag.WithDB(db))
+		ragSystem, err := rag.Get(kb.KnowledgeBaseName, rag.WithDB(db), rag.WithTryRebuildHNSWIndex(true))
 		if err != nil {
 			return nil, utils.Errorf("获取知识库失败: %v", err)
 		}
@@ -116,7 +116,7 @@ func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowled
 func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	_, err := rag.Get(req.GetKnowledgeBaseName(), rag.WithDB(db))
+	_, err := rag.Get(req.GetKnowledgeBaseName(), rag.WithDB(db), rag.WithTryRebuildHNSWIndex(true))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}
@@ -131,7 +131,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 	if req.GetName() == "" {
 		return nil, utils.Errorf("知识库名称不能为空")
 	}
-	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...))
+	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...), rag.WithTryRebuildHNSWIndex(true))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}
