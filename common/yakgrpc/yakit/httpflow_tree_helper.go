@@ -47,47 +47,57 @@ func trimPathWithOneSlash(path string) string {
 
 func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*WebsiteNextPart {
 	db = FilterHTTPFlowByDomain(db, domainSuffix)
-	db = db.Select(
-		"DISTINCT SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) as next_part,\n" +
-			"SUBSTR(url, 0, INSTR(url, '://'))",
-	).Table("http_flows").Limit(1000) //.Debug()
-	if rows, err := db.Rows(); err != nil {
+	// 简化 SQL，避免深度嵌套表达式树：只取 url，在 Go 中解析
+	db = db.Select("DISTINCT url").Table("http_flows").Limit(1000) //.Debug()
+
+	rows, err := db.Rows()
+	if err != nil {
 		log.Errorf("query nextPart for website tree failed: %s", err)
 		return nil
-	} else {
-		resultMap := make(map[string]*WebsiteNextPart)
-		for rows.Next() {
-			var nextPart string
-			var schema string
-			rows.Scan(&nextPart, &schema)
-			if nextPart == "" {
-				continue
-			}
-			haveChildren := false
-			nextPartItem, after, splited := strings.Cut(nextPart, "/")
-			if splited && after != "" {
-				haveChildren = true
-			}
-			// 创建一个包含schema和nextPart的唯一键
-			uniqueKey := schema + "://" + nextPartItem
-			if result, ok := resultMap[uniqueKey]; ok {
-				result.Count++
-			} else {
-				resultMap[uniqueKey] = &WebsiteNextPart{
-					NextPart: uniqueKey, HaveChildren: haveChildren, Count: 1,
-					Schema: schema,
-				}
-			}
-		}
-		var data []*WebsiteNextPart
-		for _, r := range resultMap {
-			data = append(data, r)
-		}
-		sort.SliceStable(data, func(i, j int) bool {
-			return data[i].NextPart > data[j].NextPart
-		})
-		return data
 	}
+	defer rows.Close()
+
+	resultMap := make(map[string]*WebsiteNextPart)
+	for rows.Next() {
+		var rawURL string
+		if err := rows.Scan(&rawURL); err != nil {
+			continue
+		}
+
+		u, err := url.Parse(rawURL)
+		if err != nil || u == nil || u.Scheme == "" || u.Host == "" {
+			continue
+		}
+
+		// 唯一键：schema://host（包含端口）
+		uniqueKey := u.Scheme + "://" + u.Host
+
+		// 判断是否有子路径
+		haveChildren := false
+		if p := strings.Trim(u.Path, "/"); p != "" && strings.Contains(p, "/") {
+			haveChildren = true
+		}
+
+		if result, ok := resultMap[uniqueKey]; ok {
+			result.Count++
+		} else {
+			resultMap[uniqueKey] = &WebsiteNextPart{
+				NextPart:     uniqueKey,
+				HaveChildren: haveChildren,
+				Count:        1,
+				Schema:       u.Scheme,
+			}
+		}
+	}
+
+	var data []*WebsiteNextPart
+	for _, r := range resultMap {
+		data = append(data, r)
+	}
+	sort.SliceStable(data, func(i, j int) bool {
+		return data[i].NextPart > data[j].NextPart
+	})
+	return data
 }
 
 func matchURL(u string, searchPath string) bool {
