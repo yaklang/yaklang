@@ -424,6 +424,7 @@ func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) *Doc
 		EntityUUID:      doc.EntityID,
 		RelatedEntities: utils.PrettifyListFromStringSplitEx(doc.RelatedEntities, ",", "|"),
 		RuntimeID:       doc.RuntimeID,
+		UID:             doc.UID,
 	}
 }
 
