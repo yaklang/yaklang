@@ -243,6 +243,11 @@ func (c *Config) parseProjectWithFS(
 				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				continue
 			}
+			if fileContent.Status == ssareducer.FileParseASTError || fileContent.AST == nil {
+				log.Errorf("skip file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
+				prog.ProcessInfof("skip  file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
+				continue
+			}
 			// log.Infof("visited file: ", prog.GetIncludeFiles())
 			if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
 				log.Infof("parse file %s done skip in main build", fileContent.Path)
