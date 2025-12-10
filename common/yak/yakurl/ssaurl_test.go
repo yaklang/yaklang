@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -1024,12 +1025,13 @@ public interface UserMapper {
 	t.Logf("Risks in database: %d", len(risks))
 
 	targetDir := t.TempDir()
+	exportedFile := filepath.Join(targetDir, "ssa_risk_export_test.json")
 
 	exportStream, err := local.ExportSSARisk(ctx, &ypb.ExportSSARiskRequest{
 		Filter: &ypb.SSARisksFilter{
 			ProgramName: []string{progID},
 		},
-		TargetPath:       targetDir,
+		TargetPath:       exportedFile,
 		WithDataFlowPath: true,
 		WithFileContent:  true,
 	})
@@ -1043,10 +1045,9 @@ public interface UserMapper {
 		t.Logf("Export progress: %.2f", msg.Process)
 	}
 
-	files, err := filepath.Glob(filepath.Join(targetDir, "ssa_risk_export_*.json"))
-	require.NoError(t, err)
-	require.Len(t, files, 1, "Expected one export file")
-	exportedFile := files[0]
+	// 验证导出的文件是否存在
+	_, err = os.Stat(exportedFile)
+	require.NoError(t, err, "Export file does not exist")
 	t.Logf("Exported to: %s", exportedFile)
 	clean()
 

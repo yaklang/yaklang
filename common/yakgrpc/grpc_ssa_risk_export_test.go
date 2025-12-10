@@ -114,12 +114,15 @@ public interface UserMapper {
 
 	// ================ 测试导出 ========================
 	t.Run("export risks with dataflow and file content", func(t *testing.T) {
+		// 指定完整的导出文件路径
+		exportedFile = filepath.Join(targetDir, "ssa_risk_export_test.json")
+
 		// 导出风险
 		exportStream, err := client.ExportSSARisk(ctx, &ypb.ExportSSARiskRequest{
 			Filter: &ypb.SSARisksFilter{
 				ProgramName: []string{program},
 			},
-			TargetPath:       targetDir,
+			TargetPath:       exportedFile,
 			WithDataFlowPath: true,
 			WithFileContent:  true,
 		})
@@ -139,11 +142,9 @@ public interface UserMapper {
 		}
 		require.Equal(t, 1.0, exportProgress, "Export did not complete")
 
-		// 验证导出的报告
-		files, err := filepath.Glob(filepath.Join(targetDir, "ssa_risk_export_*.json"))
-		require.NoError(t, err)
-		require.Len(t, files, 1, "Expected one export file")
-		exportedFile = files[0]
+		// 验证导出的报告文件是否存在
+		_, err = os.Stat(exportedFile)
+		require.NoError(t, err, "Export file does not exist")
 
 		exportData, err := os.ReadFile(exportedFile)
 		require.NoError(t, err)
