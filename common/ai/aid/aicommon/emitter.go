@@ -787,3 +787,16 @@ func (e *Emitter) EmitReferenceMaterialWithFile(typeName string, eventId string,
 func (e *Emitter) EmitTextReferenceMaterialWithFile(eventId string, content any, workdir string, taskIndex string, refIndex int) (*schema.AiOutputEvent, string, error) {
 	return e.EmitReferenceMaterialWithFile("text", eventId, content, workdir, taskIndex, refIndex)
 }
+
+func (e *Emitter) EmitTimelineItem(item *TimelineItem) (*schema.AiOutputEvent, error) {
+	if item == nil {
+		log.Warnf("emit timeline item but item is nil")
+		return nil, nil
+	}
+	humanReadable := ParseTimelineItemHumanReadable(item)
+	if humanReadable == nil {
+		log.Warnf("emit timeline item but human readable is nil")
+		return nil, nil
+	}
+	return e.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline_item", humanReadable)
+}
