@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
@@ -23,10 +24,18 @@ type QueryConfig struct {
 	EnableAISummary      bool
 	Filter               func(key string, docGetter func() *vectorstore.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool
 	EnhancePlan          string
+	AIService            string
+	AICallback           aicommon.AICallbackType
 	MsgCallBack          func(*SearchKnowledgebaseResult)
 }
 
 type QueryOption func(*QueryConfig)
+
+func WithAIService(aiService string) QueryOption {
+	return func(config *QueryConfig) {
+		config.AIService = aiService
+	}
+}
 
 func WithLimit(limit int) QueryOption {
 	return func(config *QueryConfig) {
@@ -299,7 +308,15 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				Type:    SearchResultTypeMessage,
 				Data:    nil,
 			})
-			answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
+			var aiCommonOptions []aicommon.ConfigOption
+
+			if config.AICallback != nil {
+				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(config.AICallback))
+			} else if config.AIService != "" {
+				aiCommonOptions = append(aiCommonOptions, aicommon.WithAIServiceName(config.AIService))
+			}
+
+			answer, err := Simpleliteforge.SimpleExecuteWithOptions(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")}, aiCommonOptions...)
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 					Message: err.Error(),

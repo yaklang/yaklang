@@ -359,7 +359,7 @@ func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, 
 		if err != nil {
 			return err
 		}
-		res, err := kb.SearchKnowledgeEntriesWithEnhance(req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true))
+		res, err := kb.SearchKnowledgeEntriesWithEnhance(req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true), knowledgebase.WithAIService(req.GetAIService()))
 		if err != nil {
 			return err
 		}
@@ -378,7 +378,7 @@ func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, 
 		return nil
 	}
 
-	res, err := knowledgebase.Query(db, req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true))
+	res, err := knowledgebase.Query(db, req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true), knowledgebase.WithAIService(req.GetAIService()))
 	if err != nil {
 		return err
 	}
