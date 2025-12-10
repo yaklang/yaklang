@@ -715,7 +715,6 @@ func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceK
 	})
 }
 
-
 func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge, syncId string) (*schema.AiOutputEvent, error) {
 	knowledgeList := make([]map[string]any, 0, len(results))
 	for _, result := range results {
@@ -787,4 +786,17 @@ func (e *Emitter) EmitReferenceMaterialWithFile(typeName string, eventId string,
 // EmitTextReferenceMaterialWithFile emits a text reference material event and saves to file
 func (e *Emitter) EmitTextReferenceMaterialWithFile(eventId string, content any, workdir string, taskIndex string, refIndex int) (*schema.AiOutputEvent, string, error) {
 	return e.EmitReferenceMaterialWithFile("text", eventId, content, workdir, taskIndex, refIndex)
+}
+
+func (e *Emitter) EmitTimelineItem(item *TimelineItem) (*schema.AiOutputEvent, error) {
+	if item == nil {
+		log.Warnf("emit timeline item but item is nil")
+		return nil, nil
+	}
+	humanReadable := ParseTimelineItemHumanReadable(item)
+	if humanReadable == nil {
+		log.Warnf("emit timeline item but human readable is nil")
+		return nil, nil
+	}
+	return e.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline_item", humanReadable)
 }
