@@ -82,16 +82,44 @@ func addToBlocks(block *BasicBlock) {
 }
 
 func (b *BasicBlock) SetScope(s ScopeIF) {
+	// If block already has a scope, check if we need to create a new sub scope
 	if b.ScopeTable != nil {
-		log.Errorf("block %v already has a scope", b.GetName())
-	}
-	b.ScopeTable = s
-	{
-		if block := GetBlockByScope(s); block != nil {
-			log.Errorf("block %v set scope %v, but this scope already has block %v", b.GetName(), s.GetScopeName(), block.GetName())
+		// If the scope is already associated with another block, create a new sub scope
+		if existingBlock := GetBlockByScope(s); existingBlock != nil && existingBlock != b {
+			log.Warnf("block %v already has scope %v, but trying to set scope %v which is associated with block %v, creating new sub scope",
+				b.GetName(), b.ScopeTable.GetScopeName(), s.GetScopeName(), existingBlock.GetName())
+			// Create a new sub scope to avoid conflict
+			s = s.CreateSubScope()
+			// Update the block's scope
+			b.ScopeTable = s
+			s.SetExternInfo("block", b)
+			{
+				if block := GetBlockByScope(s.GetParent()); block != nil {
+					b.Parent = block.GetId()
+					block.Child = append(block.Child, b.GetId())
+				}
+			}
+			return
 		}
-		s.SetExternInfo("block", b)
+		// If the scope is the same or already associated with this block, just return
+		if existingBlock := GetBlockByScope(s); existingBlock == b {
+			return
+		}
+		// Otherwise, log error and return
+		log.Errorf("block %v already has a scope %v, cannot set scope %v", b.GetName(), b.ScopeTable.GetScopeName(), s.GetScopeName())
+		return
 	}
+
+	// If the scope is already associated with another block, create a new sub scope
+	if existingBlock := GetBlockByScope(s); existingBlock != nil && existingBlock != b {
+		log.Warnf("block %v set scope %v, but this scope already has block %v, creating new sub scope", b.GetName(), s.GetScopeName(), existingBlock.GetName())
+		// Create a new sub scope to avoid conflict
+		s = s.CreateSubScope()
+	}
+
+	b.ScopeTable = s
+	s.SetExternInfo("block", b)
+
 	{
 		if block := GetBlockByScope(s.GetParent()); block != nil {
 			b.Parent = block.GetId()

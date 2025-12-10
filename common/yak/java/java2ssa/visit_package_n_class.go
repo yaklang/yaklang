@@ -736,10 +736,12 @@ func (y *singleFileBuilder) VisitFormalParameter(raw javaparser.IFormalParameter
 	}
 
 	if len(typeCallbacks) > 0 || len(insCallbacks) > 0 {
-		if typ != nil {
-			for _, callback := range typeCallbacks {
-				_ = callback
-				log.Warn("TBD: treat type callback plz")
+		if typ != nil && len(typeCallbacks) > 0 {
+			typeValue := y.EmitTypeValue(typ)
+			if typeValue != nil {
+				for _, callback := range typeCallbacks {
+					callback(typeValue)
+				}
 			}
 		}
 		for _, callback := range insCallbacks {
