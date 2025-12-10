@@ -243,6 +243,27 @@ func (c *Config) parseProjectWithFS(
 				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				continue
 			}
+			// Check if this file needs to be compiled (is in handlerFiles)
+			// If not, it's an extra file (like XML) that should be kept in filesystem but not compiled
+			needsCompile := false
+			for _, hf := range handlerFiles {
+				if hf == fileContent.Path {
+					needsCompile = true
+					break
+				}
+			}
+			// If file doesn't need compilation (extra file), ensure it's added to FileList
+			// and skip the build step but keep it in filesystem
+			if !needsCompile {
+				// Ensure extra files (like XML) are added to FileList even if they don't need compilation
+				if fileContent.Editor != nil {
+					prog.PushEditor(fileContent.Editor)
+					prog.PopEditor(true)
+				}
+				continue
+			}
+			// Only skip if AST is nil AND the file needs to be compiled
+			// Extra files (like XML) may have nil AST but should still be kept in filesystem
 			if fileContent.Status == ssareducer.FileParseASTError || fileContent.AST == nil {
 				log.Errorf("skip file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
 				prog.ProcessInfof("skip  file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)

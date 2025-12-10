@@ -1,5 +1,7 @@
 package ssautil
 
+import "github.com/yaklang/yaklang/common/utils"
+
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
@@ -28,7 +30,7 @@ func ForEachCapturedSideEffect[T versionedValue](
 }
 
 func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
-	if scope == nil {
+	if utils.IsNil(scope) {
 		log.Errorf("cover scope is nil")
 		return
 	}
@@ -76,10 +78,11 @@ func (base *ScopedVersionedTable[T]) Merge(
 
 		var Check func(scope ScopedVersionedTableIF[T])
 		Check = func(scope ScopedVersionedTableIF[T]) {
-			if scope == nil {
+			if utils.IsNil(scope) {
+				log.Errorf("cover scope is nil")
 				return
 			}
-			if find := scope.ReadVariable(name); find != nil {
+			if find := scope.ReadVariable(name); !utils.IsNil(find) {
 				if sub.IsSameOrSubScope(find.GetScope()) {
 					variable = find
 				}
@@ -104,7 +107,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		var v VersionedIF[T]
 		name := ver.GetName()
 		variable := base.ReadVariable(name)
-		if variable == nil {
+		if utils.IsNil(variable) {
 			return
 		}
 		origin := variable.GetValue()
@@ -168,7 +171,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		}
 		for v, ret := range tmpPhiCapture {
 			err := v.Assign(ret)
-			if err != nil {
+			if !utils.IsNil(err) {
 				log.Warnf("BUG: variable.Assign error: %v", err)
 				return
 			}
@@ -202,9 +205,12 @@ func (condition *ScopedVersionedTable[T]) Spin(
 	for name, ver := range condition.linkIncomingPhi {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
+		if utils.IsNil(last) || utils.IsNil(origin) {
+			continue
+		}
 		res := handler(name, ver.GetValue(), origin, last)
 		for name, value := range res {
-			if condition.spinReplaceFilter != nil && condition.spinReplaceFilter(value) {
+			if !utils.IsNil(condition.spinReplaceFilter) && condition.spinReplaceFilter(value) {
 				continue
 			}
 			v := condition.CreateVariable(name, ver.GetLocal())
