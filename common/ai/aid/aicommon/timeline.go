@@ -229,7 +229,9 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
-	m.config.GetEmitter().EmitTimelineItem(item)
+	if m.config != nil && m.config.GetEmitter() != nil {
+		m.config.GetEmitter().EmitTimelineItem(item)
+	}
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(id, item)
 	m.dumpSizeCheck()
