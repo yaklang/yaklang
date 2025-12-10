@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -28,18 +27,45 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+var VectorStoreHNSWMgr = NewVectorStoreHNSWManager()
+
+type VectorStoreHNSWManager struct {
+	cache map[string]*SQLiteVectorStoreHNSW
+	lock  sync.RWMutex
+}
+
+func NewVectorStoreHNSWManager() *VectorStoreHNSWManager {
+	return &VectorStoreHNSWManager{
+		make(map[string]*SQLiteVectorStoreHNSW),
+		sync.RWMutex{},
+	}
+}
+
+func (m *VectorStoreHNSWManager) LoadVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	if store, ok := m.cache[collectionName]; ok {
+		return store, nil
+	}
+	store, err := LoadSQLiteVectorStoreHNSWFromDb(db, collectionName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	m.cache[collectionName] = store
+	return store, nil
+}
+
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
 type SQLiteVectorStoreHNSW struct {
-	db         *gorm.DB
-	embedder   EmbeddingClient
+	db       *gorm.DB
+	embedder EmbeddingClient
+
 	mu         sync.RWMutex // 用于并发安全的互斥锁
 	collection *schema.VectorStoreCollection
 	// 是否自动更新 graph_infos
-	hnsw *hnsw.Graph[string]
+	hnsw *GraphWrapper[string]
 
 	EnableAutoUpdateGraphInfos bool
-	ctx                        context.Context
-	wg                         sync.WaitGroup
 	UIDType                    string
 
 	cacheSize    int
@@ -50,11 +76,14 @@ type SQLiteVectorStoreHNSW struct {
 
 const (
 	Policy_UseDBCanche = "DB_Cache"
-	Policy_UseFilter   = "Filter"
 	Policy_None        = "None"
 )
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+	return VectorStoreHNSWMgr.LoadVectorStoreHNSW(db, collectionName, opts...)
+}
+
+func LoadSQLiteVectorStoreHNSWFromDb(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
 		return nil, utils.Wrap(err, fmt.Sprintf("query rag collection [%#v]", collectionName))
@@ -74,7 +103,6 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 		db:                         db,
 		EnableAutoUpdateGraphInfos: collectionConfig.EnableAutoUpdateGraphInfos,
 		collection:                 collection,
-		ctx:                        context.Background(),
 		embedder:                   collectionConfig.EmbeddingClient,
 		cacheSize:                  collectionConfig.CacheSize,
 		preCacheSize:               collectionConfig.PreCacheSize,
@@ -88,15 +116,6 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
 	switch collectionConfig.buildGraphPolicy {
-	case Policy_UseFilter: // 选择性加载子图
-		collectionConfig.buildGraphFilter.CollectionUUID = collection.UUID
-		log.Info("build graph with filter policy, load existed vectors from db with filter")
-		for document := range yakit.YieldVectorDocument(vectorStore.ctx, db, collectionConfig.buildGraphFilter) {
-			hnswGraph.Add(hnsw.InputNode[string]{
-				Key:   document.DocumentID,
-				Value: document.Embedding,
-			})
-		}
 	case Policy_None:
 		log.Info("build graph with no policy, skip load existed vectors")
 	case Policy_UseDBCanche:
@@ -163,12 +182,16 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 		}
 	}
 
-	vectorStore.hnsw = hnswGraph
-	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
+	vectorStore.hnsw = NewGraphWrapper(hnswGraph)
+	vectorStore.hnsw.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
-			vectorStore.UpdateAutoUpdateGraphInfos()
+			err := updateDatabaseGraphInfoInLock(db, collection.ID, vectorStore.hnsw)
+			if err != nil {
+				log.Errorf("update database graph info in lock err: %v", err)
+			}
 		}
-	}
+	})
+
 	docCount, err := vectorStore.Count()
 	if err != nil {
 		return nil, utils.Wrap(err, "count documents")
@@ -213,10 +236,7 @@ func (s *SQLiteVectorStoreHNSW) GetEmbedder() EmbeddingClient {
 }
 
 func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
-	var nodeNum int
-	if len(s.hnsw.Layers) > 0 && len(s.hnsw.Layers[0].Nodes) > 0 {
-		nodeNum = len(s.hnsw.Layers[0].Nodes)
-	}
+	nodeNum := s.hnsw.GetSize()
 	k := 256
 	if nodeNum < k {
 		k = nodeNum
@@ -236,7 +256,6 @@ func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
 	if err != nil {
 		return utils.Wrap(err, "save collection")
 	}
-	s.UpdateAutoUpdateGraphInfos()
 	return nil
 }
 
@@ -257,7 +276,7 @@ func (s *SQLiteVectorStoreHNSW) fixCollectionEmbeddingData() error {
 	if !s.collection.EnablePQMode {
 		return utils.Errorf("collection %s is not in pq mode", s.collection.Name)
 	}
-	pqQuantizer := s.hnsw.GetPQQuantizer()
+	pqQuantizer := s.hnsw.GetQuantizer()
 	docNum, err := s.Count()
 	if err != nil {
 		return utils.Wrap(err, "fix collection embedding data")
@@ -284,43 +303,6 @@ func (s *SQLiteVectorStoreHNSW) fixCollectionEmbeddingData() error {
 		err = s.db.Model(&schema.VectorStoreDocument{}).Where("document_id = ?", doc.DocumentID).Update("embedding", doc.Embedding).Error
 		if err != nil {
 			return utils.Wrap(err, "fix collection embedding data")
-		}
-	}
-	return nil
-}
-
-func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
-	var graphInfosBytes []byte
-	graphInfos, err := ExportHNSWGraphToBinary(s.hnsw)
-	if err != nil {
-		if errors.Is(err, graphNodesIsEmpty) {
-			// HNSW graph is empty, set graph_binary to empty bytes
-			graphInfosBytes = []byte{}
-		} else {
-			return utils.Wrap(err, "export hnsw graph to binary")
-		}
-	} else {
-		graphInfosBytes, err = io.ReadAll(graphInfos)
-		if err != nil {
-			return utils.Wrap(err, "read graph infos")
-		}
-	}
-	err = s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("graph_binary", graphInfosBytes).Error
-	if err != nil {
-		return utils.Wrap(err, "update graph binary")
-	}
-	if s.collection.EnablePQMode {
-		codebook, err := hnsw.ExportCodebook(s.hnsw.GetCodebook())
-		if err != nil {
-			return utils.Wrap(err, "export codebook")
-		}
-		codebookBytes, err := io.ReadAll(codebook)
-		if err != nil {
-			return utils.Wrap(err, "read codebook")
-		}
-		err = s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("code_book_binary", codebookBytes).Error
-		if err != nil {
-			return utils.Wrap(err, "update codebook")
 		}
 	}
 	return nil
@@ -365,21 +347,30 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
 	hnswGraph := NewHNSWGraph(collection.Name)
+	gw := NewGraphWrapper(hnswGraph)
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   cfg.EmbeddingClient,
 		collection:                 collection,
-		hnsw:                       hnswGraph,
+		hnsw:                       gw,
 		cacheSize:                  10000,
 		config:                     cfg,
 	}
 
-	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
+	vectorStore.hnsw.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
-			vectorStore.UpdateAutoUpdateGraphInfos()
+			err := updateDatabaseGraphInfoInLock(db, collection.ID, vectorStore.hnsw)
+			if err != nil {
+				log.Errorf("update database graph info in lock err: %v", err)
+			}
 		}
-	}
+	})
+
+	VectorStoreHNSWMgr.lock.Lock()
+	VectorStoreHNSWMgr.cache[name] = vectorStore
+	VectorStoreHNSWMgr.lock.Unlock()
+
 	return vectorStore, nil
 }
 
@@ -445,13 +436,7 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc *Document) *schema.VectorSt
 }
 
 func (s *SQLiteVectorStoreHNSW) Has(docId string) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if len(s.hnsw.Layers) == 0 {
-		return false
-	}
-	_, ok := s.hnsw.Layers[0].Nodes[docId]
-	return ok
+	return s.hnsw.Has(docId)
 }
 
 func (s *SQLiteVectorStoreHNSW) requireWriteCollection() error {
@@ -674,7 +659,6 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		avgCreateTime = totalDocCreateTime / time.Duration(docCreateCount)
 	}
 
-	helper.SetStatus("analyzing performance")
 	// 性能警告条件 - 包含事务持续时间检查
 	shouldWarn := totalTime > 5*time.Second ||
 		totalDbQueryTime > time.Second ||
@@ -860,9 +844,7 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, id := range ids {
-		s.hnsw.Delete(id)
-	}
+	s.hnsw.Delete(ids...)
 
 	utils.GormTransactionReturnDb(s.db, func(tx *gorm.DB) {
 		for _, id := range ids {
@@ -969,13 +951,8 @@ func (s *SQLiteVectorStoreHNSW) _performanceDiagnosticsNeedLock() map[string]int
 
 	// HNSW图状态
 	if s.hnsw != nil {
-		diagnostics["hnsw_layers_count"] = len(s.hnsw.Layers)
+		diagnostics["hnsw_layers_count"] = s.hnsw.GetLayerLength()
 		totalNodes := 0
-		for i, layer := range s.hnsw.Layers {
-			nodesInLayer := len(layer.Nodes)
-			diagnostics[fmt.Sprintf("layer_%d_nodes", i)] = nodesInLayer
-			totalNodes += nodesInLayer
-		}
 		diagnostics["hnsw_total_nodes"] = totalNodes
 
 		// 计算理论复杂度

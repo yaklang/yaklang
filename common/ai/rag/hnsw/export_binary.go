@@ -153,6 +153,8 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 				pbWriteBytes(buf, []byte(ret))
 			case uint64:
 				pbWriteVarint(buf, ret)
+			case Vector:
+				pbWriteBytes(buf, utils.InterfaceToBytes(node.Key))
 			default:
 				return nil, utils.Errorf("unsupported node code type: %T", node.Code)
 			}

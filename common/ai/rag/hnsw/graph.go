@@ -415,6 +415,15 @@ func (g *Graph[K]) GetPQQuantizer() *pq.Quantizer {
 	return g.pqQuantizer
 }
 
+func (g *Graph[K]) Has(docId K) bool {
+	if len(g.Layers) == 0 {
+		return false
+	}
+
+	_, exists := g.Layers[0].Nodes[docId]
+	return exists
+}
+
 // GraphConfig defines the configuration parameters for creating an HNSW graph
 type GraphConfig[K cmp.Ordered] struct {
 	// M is the maximum number of neighbors each node maintains
@@ -1009,7 +1018,7 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 
 		// Descending hierarchies
 		if layer > 0 {
-			nodes := search(searchPoint, 1, efSearch, near, h.nodeDistance, nil)
+			nodes := search(searchPoint, 1, efSearch, near, h.nodeDistance, filter)
 			if len(nodes) == 0 {
 				log.Warnf("search returned no nodes at layer %d, this should not happen, continue to next layer directly", layer)
 				continue
