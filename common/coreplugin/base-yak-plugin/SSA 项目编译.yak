@@ -1,10 +1,6 @@
 yakit.AutoInitYakit()
 
-configJSON := cli.Text("config",
-    cli.setRequired(true),
-    cli.setVerboseName("SSA 配置"),
-    cli.setHelp("SSA 项目的配置 JSON 字符串")
-)
+configJSON := cli.Text("config", cli.setRequired(true), cli.setVerboseName("SSA 配置"), cli.setHelp("SSA 项目的配置 JSON 字符串"))
 
 cli.check()
 
@@ -16,10 +12,12 @@ if err != nil {
     return
 }
 
+
 if config == nil {
     yakit.Error("配置为空")
     return
 }
+
 
 projectName = config.GetProjectName()
 yakit.Info("项目名称: %s", projectName)
@@ -29,15 +27,10 @@ currentTime = time.Now().Format("2006-01-02 15:04:05")
 programName = sprintf("%s(%s)", projectName, currentTime)
 yakit.Info("程序名称: %s", programName)
 
-opts = [
-    ssa.withProcess((msg, process) => {
-        yakit.SetProgressEx("compile", process)
-        yakit.Info("%s: %f", msg, process)
-    }),
-    ssa.withContext(context.Background()),
-    ssa.withJsonRawConfig(configJSON),
-    ssa.withProgramName(programName),
-]
+opts = [ssa.withProcess((msg, process) => {
+    yakit.SetProgressEx("compile", process)
+    yakit.Info("%s: %f", msg, process)
+}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withProgramName(programName)]
 
 progs, err = ssa.ParseProject(opts...)
 if err != nil {
@@ -49,4 +42,3 @@ if err != nil {
 yakit.Info("编译完成")
 
 yakit.Code(json.dumps({"program_name": programName}))
-

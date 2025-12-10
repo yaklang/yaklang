@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gobwas/glob"
@@ -78,30 +79,44 @@ var withExcludeFile = ssaconfig.SetOption("ssa_compile/exclude_file", func(c *Co
 
 func WithExcludeFunc(patterns []string) ssaconfig.Option {
 	var compile []glob.Glob
+	var validPatterns []string
+
 	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
 		g, err := glob.Compile(pattern)
 		if err != nil {
 			log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, pattern)
 			continue
 		}
 		compile = append(compile, g)
+		validPatterns = append(validPatterns, pattern)
 	}
+
 	if len(compile) == 0 {
 		return func(c *ssaconfig.Config) error {
-			return nil
+			return ssaconfig.WithCompileExcludeFiles([]string{})(c)
 		}
 	}
-	return withExcludeFile(func(dir string, path string) bool {
-		for _, g := range compile {
-			if match := g.Match(dir); match {
-				return true
-			}
-			if match := g.Match(path); match {
-				return true
-			}
+
+	return func(c *ssaconfig.Config) error {
+		if err := ssaconfig.WithCompileExcludeFiles(validPatterns)(c); err != nil {
+			return err
 		}
-		return false
-	})
+		return withExcludeFile(func(dir string, path string) bool {
+			for _, g := range compile {
+				if match := g.Match(dir); match {
+					return true
+				}
+				if match := g.Match(path); match {
+					return true
+				}
+			}
+			return false
+		})(c)
+	}
 }
 
 func (c *Config) Processf(process float64, format string, arg ...any) {
@@ -288,6 +303,13 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		astSequence: ssareducer.OutOfOrder,
 		Config:      sc,
 	}
+	if !utils.IsNil(sc.SSACompile) {
+		if efs := sc.SSACompile.ExcludeFiles; efs != nil {
+			fn := WithExcludeFunc(efs)
+			fn(sc)
+		}
+	}
+
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
 	if fs, err := c.parseFSFromInfo(); err != nil {
