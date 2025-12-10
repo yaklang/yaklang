@@ -215,6 +215,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if !isFunc && calleeInst.GetReference() != nil {
 			fun, isFunc = ssa.ToFunction(calleeInst.GetReference())
 		}
+		// For FreeValue Parameter, check GetDefault() which may contain the actual function
+		if !isFunc {
+			if param, ok := ssa.ToParameter(calleeInst); ok && param.IsFreeValue {
+				if defVal := param.GetDefault(); defVal != nil {
+					fun, isFunc = ssa.ToFunction(defVal)
+				}
+			}
+		}
 
 		switch {
 		case isFunc && !fun.IsExtern():
