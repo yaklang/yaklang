@@ -153,6 +153,29 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				return rsp, nil
 			}
 
+			// 处理 plan prompt - 任务规划
+			// Plan prompt 的关键标识: 包含 "任务规划使命" 或 "任务设计输出要求" 或 "OUTPUT_EXAMPLE_END"
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "OUTPUT_EXAMPLE_END"))
+			if isPlanRequest {
+				addLog("[AI_CALLBACK] MATCHED: Plan prompt (任务规划)")
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "` + planFlag + `",
+  "main_task_goal": "执行测试任务",
+  "tasks": [
+    {
+      "subtask_name": "执行子任务",
+      "subtask_goal": "完成测试"
+    }
+  ]
+}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// 检查是否匹配 planFlag（但不包含 call-tool）
 			hasPlanFlag := strings.Contains(prompt, planFlag)
 			hasCallTool := strings.Contains(prompt, "call-tool")

@@ -46,6 +46,11 @@ func (m *MockMemoryTriageForBuildMemory) AddRawText(text string) ([]*aicommon.Me
 	// 3. 调用 InvokeLiteForge 与 AI 交互
 	// 4. 解析返回的 memory entities
 
+	// 首先记录输入文本，确保 memoryTriageRequest 一定被设置
+	if text != "" {
+		m.memoryTriageRequest = text
+	}
+
 	// 我们在这里模拟整个流程，验证 memory triage 系统工作
 	if m.invoker != nil {
 		// 获取 basic prompt info 来模拟真实流程
@@ -57,9 +62,9 @@ func (m *MockMemoryTriageForBuildMemory) AddRawText(text string) ([]*aicommon.Me
 		}
 	}
 
-	// 记录输入文本用于后续验证
+	// 如果 text 为空但 memoryTriageRequest 也为空，设置一个默认值
 	if m.memoryTriageRequest == "" {
-		m.memoryTriageRequest = text
+		m.memoryTriageRequest = "empty_text_memory_triage_request"
 	}
 
 	entity := &aicommon.MemoryEntity{
