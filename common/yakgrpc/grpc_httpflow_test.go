@@ -433,6 +433,295 @@ Host: %s
 	}
 }
 
+// TestExportHTTPFlows_RequestLength 测试 request_length 字段导出
+func TestExportHTTPFlows_RequestLength(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 创建测试数据，设置 RequestLength
+	reqRaw := lowhttp.FixHTTPRequest([]byte(`POST /test HTTP/1.1
+Host: www.example.com
+Content-Length: 10
+
+test body`))
+	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Length: 5
+
+hello`))
+
+	flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, reqRaw, rsp, "test", "https://www.example.com/test", "")
+	require.NoError(t, err)
+
+	// 设置明确的 RequestLength 值用于测试
+	expectedRequestLength := int64(1234)
+	flow.RequestLength = expectedRequestLength
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
+	t.Cleanup(func() {
+		consts.GetGormProjectDatabase().Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
+	})
+
+	// 测试 ExportHTTPFlows 包含 request_length 字段
+	// 注意：必须包含 id 字段，否则无法正确匹配和转换
+	response, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
+		ExportWhere: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+			Full: true,
+		},
+		Ids:       []int64{int64(flow.ID)},
+		FieldName: []string{"id", "request_length", "url", "method"},
+	})
+	require.NoError(t, err, "export httpFlows error")
+	require.NotEmpty(t, response.Data, "response data should not be empty")
+
+	// 验证 request_length 字段存在且值正确
+	found := false
+	testFlowID := uint64(flow.ID)
+	for _, exportedFlow := range response.Data {
+		if exportedFlow.GetId() == testFlowID {
+			found = true
+			require.Equal(t, expectedRequestLength, exportedFlow.RequestLength, "request_length should match")
+			break
+		}
+	}
+	require.True(t, found, "test flow should be found in export result")
+}
+
+// TestExportHTTPFlowStream_CSV_RequestLength 测试 CSV 导出中的 request_length 字段
+func TestExportHTTPFlowStream_CSV_RequestLength(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 创建测试数据
+	reqRaw := lowhttp.FixHTTPRequest([]byte(`POST /test HTTP/1.1
+Host: www.example.com
+Content-Length: 15
+
+request body 123`))
+	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Length: 5
+
+hello`))
+
+	flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, reqRaw, rsp, "test", "https://www.example.com/test", "")
+	require.NoError(t, err)
+
+	// 设置明确的 RequestLength 值用于测试
+	expectedRequestLength := int64(5678)
+	flow.RequestLength = expectedRequestLength
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
+	t.Cleanup(func() {
+		consts.GetGormProjectDatabase().Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
+	})
+
+	// 测试 CSV 导出
+	tmpFile := filepath.Join(t.TempDir(), "test_request_length.csv")
+	stream, err := client.ExportHTTPFlowStream(context.Background(), &ypb.ExportHTTPFlowStreamRequest{
+		Filter: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+		},
+		FieldName:  []string{"id", "request_length", "url", "method"},
+		ExportType: "csv",
+		TargetPath: tmpFile,
+	})
+	require.NoError(t, err)
+
+	// 等待导出完成
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		if resp.Percent >= 1.0 {
+			break
+		}
+	}
+
+	// 验证 CSV 文件存在
+	require.FileExists(t, tmpFile)
+
+	// 读取并解析 CSV
+	data, err := os.ReadFile(tmpFile)
+	require.NoError(t, err)
+
+	reader := csv.NewReader(strings.NewReader(string(data)))
+	records, err := reader.ReadAll()
+	require.NoError(t, err)
+	require.Greater(t, len(records), 1, "CSV should have header and at least one data row")
+
+	// 验证表头包含 request_length
+	headers := records[0]
+	requestLengthIdx := -1
+	for i, header := range headers {
+		if header == "request_length" {
+			requestLengthIdx = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, requestLengthIdx, "request_length column should be found in CSV header")
+
+	// 验证数据行包含正确的值
+	found := false
+	for i := 1; i < len(records); i++ {
+		row := records[i]
+		if len(row) > requestLengthIdx {
+			// 检查 ID 是否匹配（如果 ID 列存在）
+			idIdx := -1
+			for j, h := range headers {
+				if h == "id" {
+					idIdx = j
+					break
+				}
+			}
+			if idIdx >= 0 && len(row) > idIdx {
+				idStr := row[idIdx]
+				if idStr == strconv.FormatUint(uint64(flow.ID), 10) {
+					found = true
+					require.Equal(t, strconv.FormatInt(expectedRequestLength, 10), row[requestLengthIdx], "request_length value should match")
+					break
+				}
+			}
+		}
+	}
+	require.True(t, found, "test flow should be found in CSV export")
+}
+
+// TestExportHTTPFlows_FieldMapping 测试字段映射（request_length 字段名映射）
+func TestExportHTTPFlows_FieldMapping(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 创建测试数据
+	reqRaw := lowhttp.FixHTTPRequest([]byte(`GET /test HTTP/1.1
+Host: www.example.com
+`))
+	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Length: 5
+
+hello`))
+
+	flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, reqRaw, rsp, "test", "https://www.example.com/test", "")
+	require.NoError(t, err)
+
+	expectedRequestLength := int64(9999)
+	flow.RequestLength = expectedRequestLength
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
+	t.Cleanup(func() {
+		consts.GetGormProjectDatabase().Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
+	})
+
+	// 测试字段名映射：前端传递 "request_length"，后端应该能正确查询数据库的 request_length 列
+	// 注意：必须包含 id 字段，否则无法正确匹配和转换
+	response, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
+		ExportWhere: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+			Full: false, // 测试非 Full 模式下的字段映射
+		},
+		Ids:       []int64{int64(flow.ID)},
+		FieldName: []string{"id", "request_length", "body_length", "url"}, // 测试多个字段，包含 id 用于匹配
+	})
+	require.NoError(t, err, "export httpFlows error")
+	require.NotEmpty(t, response.Data, "response data should not be empty")
+
+	// 验证字段映射正确
+	found := false
+	for _, exportedFlow := range response.Data {
+		if exportedFlow.GetId() == uint64(flow.ID) {
+			found = true
+			// 验证 request_length 字段正确映射
+			require.Equal(t, expectedRequestLength, exportedFlow.RequestLength, "request_length field mapping should be correct")
+			// 验证其他字段也存在
+			require.NotEmpty(t, exportedFlow.Url, "url field should be present")
+			require.Greater(t, exportedFlow.BodyLength, int64(0), "body_length field should be present")
+			break
+		}
+	}
+	require.True(t, found, "test flow should be found in export result")
+}
+
+// TestExportHTTPFlows_FixedFieldList 测试固定字段列表是否包含 request_length
+func TestExportHTTPFlows_FixedFieldList(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 创建测试数据
+	reqRaw := lowhttp.FixHTTPRequest([]byte(`GET /test HTTP/1.1
+Host: www.example.com
+`))
+	rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Length: 5
+
+hello`))
+
+	flow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(true, reqRaw, rsp, "test", "https://www.example.com/test", "")
+	require.NoError(t, err)
+
+	expectedRequestLength := int64(8888)
+	flow.RequestLength = expectedRequestLength
+	flow.CalcHash()
+	consts.GetGormProjectDatabase().Save(flow)
+
+	t.Cleanup(func() {
+		consts.GetGormProjectDatabase().Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
+	})
+
+	// 测试在非 Full 模式下，固定字段列表应该包含 request_length
+	// 注意：在非 Full 模式下，BuildHTTPFlowQuery 会先设置固定字段列表（包含 request_length）
+	// 然后 Select(params.FieldName) 会覆盖它，所以我们需要包含 id 字段用于匹配
+	// 这个测试验证：即使只选择了 request_length，由于它在固定字段列表中，也能被正确查询
+	response, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
+		ExportWhere: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+			Full: false, // 非 Full 模式，使用固定字段列表
+		},
+		Ids:       []int64{int64(flow.ID)},
+		FieldName: []string{"id", "request_length", "url"}, // 包含 id 用于匹配，request_length 用于验证，url 用于验证其他字段
+	})
+	require.NoError(t, err, "export httpFlows error")
+	require.NotEmpty(t, response.Data, "response data should not be empty")
+
+	// 验证 request_length 字段能够正确查询（说明它在固定字段列表中或能被正确选择）
+	found := false
+	testFlowID := uint64(flow.ID)
+	for _, exportedFlow := range response.Data {
+		if exportedFlow.GetId() == testFlowID {
+			found = true
+			// 验证 request_length 字段值正确（说明它在固定字段列表中，能被正确查询）
+			require.Equal(t, expectedRequestLength, exportedFlow.RequestLength, "request_length should be available in fixed field list")
+			// 验证其他字段也存在
+			require.NotEmpty(t, exportedFlow.Url, "url field should be present")
+			break
+		}
+	}
+	if !found {
+		// 如果没找到，打印一些调试信息
+		t.Logf("Expected flow ID: %d", testFlowID)
+		t.Logf("Found %d flows in response", len(response.Data))
+		for i, f := range response.Data {
+			t.Logf("Flow %d: ID=%d, RequestLength=%d, Url=%s", i, f.GetId(), f.RequestLength, f.Url)
+		}
+	}
+	require.True(t, found, "test flow should be found in export result")
+}
+
 func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)

@@ -995,6 +995,7 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 		// max response size is 500K -> 500 * 1024 -> 512000
 		db = db.Select(fmt.Sprintf(`id,created_at,updated_at,hidden_index,%s -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
+request_length, -- request body length
 
 -- metainfo
 is_http_s, -- legacy

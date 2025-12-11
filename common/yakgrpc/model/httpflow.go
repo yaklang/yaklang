@@ -198,10 +198,13 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 		}
 	}
 
-	if flow.RequestLength == 0 {
+	// 只有在 RequestLength 为 0 且能获取到 request 内容时才重新计算
+	// 如果只选择了 request_length 字段而没有选择 request 字段，应该使用数据库中的值
+	if flow.RequestLength == 0 && unquotedRequest != "" {
 		flow.RequestLength = int64(len(unquotedRequest))
 	}
-	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(len(unquotedRequest))))
+	// RequestSizeVerbose 使用 RequestLength 计算，与 BodySizeVerbose 风格统一
+	flow.RequestSizeVerbose = utf8safe(utils.ByteSize(uint64(flow.RequestLength)))
 
 	requireRequest := full || !f.IsRequestOversize
 	requireResponse := full || !f.IsResponseOversize
