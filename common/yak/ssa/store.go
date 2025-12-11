@@ -15,7 +15,13 @@ func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 	b.parentBuilder = s.parentBuilder
 	b.MarkedThisClassBlueprint = s.MarkedThisClassBlueprint
 
-	b.Function.Type = s.Function.Type
+	// Only overwrite Type if the stored Type is not nil.
+	// This prevents lazy-built functions (like TypeScript arrow functions)
+	// from having their Type overwritten to nil when SwitchFunctionBuilder
+	// restores the saved state after the lazy builder has set the Type.
+	if s.Function.Type != nil {
+		b.Function.Type = s.Function.Type
+	}
 	// b.Function.FreeValues = s.Function.FreeValues
 	// b.Function.ParameterMembers = s.Function.ParameterMembers
 	// b.Function.SideEffects = s.Function.SideEffects

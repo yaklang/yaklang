@@ -216,10 +216,25 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			fun, isFunc = ssa.ToFunction(calleeInst.GetReference())
 		}
 		// For FreeValue Parameter, check GetDefault() which may contain the actual function
+		// This handles cases like mutual recursion where the method is a captured variable
+		// But skip this for self-recursion (same function calling itself via FreeValue)
+		// because we want to track the arguments, not just the return values
 		if !isFunc {
 			if param, ok := ssa.ToParameter(calleeInst); ok && param.IsFreeValue {
 				if defVal := param.GetDefault(); defVal != nil {
-					fun, isFunc = ssa.ToFunction(defVal)
+					if defFunc, ok := ssa.ToFunction(defVal); ok {
+						// Check if this is self-recursion by comparing the function
+						// where this call is made with the function being called
+						currentFunc := inst.GetFunc()
+						if currentFunc != nil && currentFunc.GetId() == defFunc.GetId() {
+							// Self-recursion: don't enter the function, let default branch handle it
+							// This ensures we track arguments like Undefined-a
+						} else {
+							// Mutual recursion or other cases: enter the function
+							fun = defFunc
+							isFunc = true
+						}
+					}
 				}
 			}
 		}

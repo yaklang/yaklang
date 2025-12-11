@@ -12,6 +12,12 @@ func (r *Return) calcType() Type {
 			log.Errorf("Return[%s: %s] value is nil", r.String(), r.GetRange())
 			return CreateNullType()
 		}
+		// For lazy-built functions (like TypeScript arrow functions),
+		// we need to build them first to ensure their Type is set
+		// before we try to get the return type
+		if fun, ok := ToFunction(v); ok && fun.Type == nil {
+			fun.Build()
+		}
 		t := v.GetType()
 		if objTyp, ok := ToObjectType(t); ok {
 			t = ParseClassBluePrint(v, objTyp)
