@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
 
@@ -120,6 +121,7 @@ func (a *ToolCaller) invoke(
 
 	stdoutWriter.Write([]byte(fmt.Sprintf("invoking tool[%v] ...\n", tool.Name))) // 确保触发执行卡片，优化体验
 
+	log.Infof("start to invoke tool[%s] with params: %v", tool.Name, params)
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),

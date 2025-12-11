@@ -131,6 +131,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	}
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
+	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -422,11 +423,7 @@ LOOP:
 			r.loadingStatus("跳过快速记忆装载，原因：超时 / skipping wait memories due to timeout")
 		}
 
-		r.loadingStatus(fmt.Sprintf(
-			"迭代中[%v/%v] /start to enter iteration loop[%v/%v]...",
-			iterationCount, maxIterations,
-			iterationCount, maxIterations,
-		))
+		r.loadingStatus("执行中... / executing...")
 		var prompt string
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,

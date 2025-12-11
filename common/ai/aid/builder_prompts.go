@@ -11,9 +11,6 @@ import (
 //go:embed prompts/plan/deepthink-plan.txt
 var __prompt_DeepthinkTaskListPrompt string
 
-//go:embed prompts/task/task-execute.txt
-var __prompt_ExecuteTaskPromptTemplate string
-
 //go:embed prompts/tool/tool-result-to-decision.txt
 var __prompt_ToolResultToDecisionPromptTemplate string
 
@@ -49,9 +46,6 @@ var __prompt_toolReSelect string
 
 //go:embed prompts/tool/tool-param-regenerate.txt
 var __prompt_ParamsReGenerate string
-
-//go:embed prompts/task/task-direct-answer.txt
-var __prompt_DirectAnswer string
 
 //go:embed prompts/search/aitool-keyword-search.txt
 var __prompt_KeywordSearchPrompt string
