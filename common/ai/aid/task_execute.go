@@ -90,12 +90,11 @@ func (t *AiTask) execute() error {
 			return reactiveData, nil
 		}),
 	)
-
 	if err != nil {
+		if t.GetStatus() == aicommon.AITaskState_Skipped {
+			return nil
+		}
 		return err
-	}
-	if t.IsCtxDone() {
-		return utils.Errorf("context is done")
 	}
 	return nil
 }

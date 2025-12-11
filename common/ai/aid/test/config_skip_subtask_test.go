@@ -160,9 +160,10 @@ LOOP:
 				}
 			}
 
-			// 一旦跳过成功，就可以结束测试
-			if skipSuccess {
-				break LOOP
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && utils.StringContainsAllOfSubString(string(result.Content), []string{"push_task", "1-3"}) {
+				if skipSuccess { // 检查跳过 task 2 有没有正常 来到 task3
+					break LOOP
+				}
 			}
 
 		case <-ctx.Done():
@@ -520,142 +521,6 @@ LOOP:
 
 	require.True(t, skipSent, "skip request should be sent")
 	require.True(t, skipSuccess, "skip with reason should succeed")
-}
-
-func TestCoordinator_RedoSubtaskInPlan(t *testing.T) {
-	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
-	outputChan := make(chan *schema.AiOutputEvent, 100)
-
-	taskExecCount := 0
-	userMessageFoundInPrompt := false
-	userMessage := "请注意：我需要你在执行这个任务时，特别关注安全性问题，确保所有操作都是安全的"
-
-	var coordinator *aid.Coordinator
-
-	ins, err := aid.NewCoordinator(
-		"测试重做子任务功能",
-		aicommon.WithAgreeYOLO(),
-		aicommon.WithEventInputChanx(inputChan),
-		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-			outputChan <- event
-		}),
-		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
-
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试重做子任务",
-    "main_task": "测试重做子任务功能",
-    "main_task_goal": "验证 redo_subtask_in_plan 功能正常工作",
-    "tasks": [
-        {"subtask_name": "需要重做的任务", "subtask_goal": "这个任务需要被重做"}
-    ]
-}`))
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
-				return rsp, nil
-			}
-
-			// 任务执行请求
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
-				taskExecCount++
-
-				// 检查 prompt 中是否包含用户消息（用于验证 redo 后 timeline 被传递）
-				if strings.Contains(prompt, userMessage) {
-					userMessageFoundInPrompt = true
-				}
-
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
-				return rsp, nil
-			}
-
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
-			return rsp, nil
-		}),
-	)
-	require.NoError(t, err)
-	coordinator = ins
-
-	go func() {
-		ins.Run()
-	}()
-
-	redoSent := false
-	redoSuccess := false
-	syncId := uuid.New().String()
-
-	ctx := utils.TimeoutContextSeconds(10)
-
-LOOP:
-	for {
-		select {
-		case result := <-outputChan:
-			// 当第一次任务执行后，发送 redo 请求
-			if taskExecCount == 1 && !redoSent {
-				redoSent = true
-				inputChan.SafeFeed(SyncInputEventWithJSON(
-					aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN,
-					syncId,
-					map[string]any{
-						"subtask_index": "1-1",
-						"user_message":  userMessage,
-					},
-				))
-			}
-
-			// 检查 redo 响应
-			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
-				var data map[string]any
-				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
-					if success, ok := data["success"].(bool); ok && success {
-						redoSuccess = true
-						require.Equal(t, "1-1", data["subtask_index"])
-						require.Equal(t, userMessage, data["user_message"])
-						require.Contains(t, data["message"], "用户请求重新执行当前子任务")
-						require.Contains(t, data["message"], userMessage)
-						require.Contains(t, data["message"], "<用户补充信息>")
-						require.Contains(t, data["message"], "</用户补充信息>")
-
-						// 验证 timeline 包含用户消息
-						timeline := coordinator.Timeline.Dump()
-						require.Contains(t, timeline, userMessage, "timeline should contain user message")
-						require.Contains(t, timeline, "user-redo-subtask", "timeline should contain redo marker")
-
-						// 验证任务状态保持 Processing（未改变）
-						task := coordinator.FindSubtaskByIndex("1-1")
-						require.NotNil(t, task, "task should be found")
-						require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus(), "task status should remain Processing after redo")
-					}
-				}
-			}
-
-			// redo 成功后即可结束测试（验证了核心功能）
-			if redoSuccess {
-				break LOOP
-			}
-
-		case <-ctx.Done():
-			t.Fatalf("timeout: taskExecCount=%v, redoSent=%v, redoSuccess=%v, userMessageFoundInPrompt=%v",
-				taskExecCount, redoSent, redoSuccess, userMessageFoundInPrompt)
-		}
-	}
-
-	require.True(t, redoSent, "redo request should be sent")
-	require.True(t, redoSuccess, "redo should succeed")
 }
 
 // TestCoordinator_SkipSubtaskAndContinueNext 验证 skip 子任务后，下一个子任务立即开始执行

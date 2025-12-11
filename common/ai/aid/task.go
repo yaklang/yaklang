@@ -156,14 +156,6 @@ func (t *AiTask) SetID(id string) {
 	}
 }
 
-// ResetContextWithoutStatusChanged 重置任务的 context，但不改变执行状态
-// 用于 redo 场景：中断当前执行并重新开始，但保持 Processing 状态不变
-func (t *AiTask) ResetContextWithoutStatusChanged() {
-	if t.AIStatefulTaskBase != nil {
-		t.AIStatefulTaskBase.ResetContextWithoutStatusChanged(t.Ctx)
-	}
-}
-
 func (t *AiTask) GetSummary() string {
 	if t.TaskSummary != "" {
 		return t.TaskSummary
