@@ -179,6 +179,104 @@ func SplitDocumentsByMetadata(docs []Document, metadataKey string) map[any][]Doc
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
+func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig, graphBinaryReader io.Reader) (*hnsw.Graph[string], error) {
+	cacheMinSize := collectionConfig.CacheSize
+	collectionName := collection.Name
+	collectionID := collection.ID
+	pqmode := collection.EnablePQMode
+
+	cacheMaxSize := cacheMinSize + 2000
+	cache := &sync.Map{}
+	var cacheCount int64
+	var cacheMutex sync.Mutex
+
+	clearCache := func() {
+		cacheMutex.Lock()
+		defer cacheMutex.Unlock()
+
+		currentCount := atomic.LoadInt64(&cacheCount)
+		if int(currentCount) > cacheMaxSize {
+			clearNum := int(currentCount) - cacheMinSize
+			clearKeys := []hnswspec.LazyNodeID{}
+			cache.Range(func(key, value interface{}) bool {
+				if clearNum <= 0 {
+					return false
+				}
+				clearKeys = append(clearKeys, key.(hnswspec.LazyNodeID))
+				clearNum--
+				return true
+			})
+			for _, key := range clearKeys {
+				cache.Delete(key)
+				atomic.AddInt64(&cacheCount, -1)
+			}
+		}
+	}
+
+	// cols, err := yakit.GetRAGDocumentsByCollectionNameAnd(db.Limit(cacheMinSize), collectionName)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// for _, col := range cols {
+	// 	uidStr := fmt.Sprint(col.UID)
+	// 	cache[uidStr] = []float32(col.Embedding)
+	// }
+
+	allOpts := getDefaultHNSWGraphOptions(collectionName)
+	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key string, uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+		var data any = uid
+		if collectionConfig.KeyAsUID {
+			data = key
+		}
+		uidStr := fmt.Sprint(data)
+
+		doc, err := getVectorDocumentByLazyNodeID(db.Where("collection_id = ?", collectionID).Select("document_id"), data)
+		if err != nil {
+			return nil, err
+		}
+		docId := doc.DocumentID
+		var newNode hnswspec.LayerNode[string]
+		if pqmode {
+			newNode = hnswspec.NewLazyRawPQLayerNode(docId, func() ([]byte, error) {
+				if node, ok := cache.Load(uidStr); ok {
+					return node.([]byte), nil
+				}
+
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("pq_code"), data)
+				if err != nil {
+					return nil, err
+				}
+				clearCache()
+				cache.Store(uidStr, doc.PQCode)
+				atomic.AddInt64(&cacheCount, 1)
+				return doc.PQCode, nil
+			})
+		} else {
+			newNode = hnswspec.NewStandardLayerNode(docId, func() []float32 {
+				if node, ok := cache.Load(uidStr); ok {
+					return node.([]float32)
+				}
+
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("embedding"), data)
+				if err != nil {
+					log.Errorf("get vector document by lazy node id err: %v", err)
+					return nil
+				}
+				clearCache()
+				cache.Store(uidStr, []float32(doc.Embedding))
+				atomic.AddInt64(&cacheCount, 1)
+				return doc.Embedding
+			})
+		}
+
+		return newNode, nil
+	}, allOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return hnswGraph, nil
+}
+
 func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Reader) (*hnsw.Graph[string], error) {
 	cacheMinSize := s.cacheSize
 	db := s.db
