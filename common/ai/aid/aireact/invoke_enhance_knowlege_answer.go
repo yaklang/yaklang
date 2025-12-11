@@ -85,6 +85,8 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 	}
 
 	finalResult, err := r.DirectlyAnswer(ctx, queryBuf.String(), nil, opts...)
+	// Note: DirectlyAnswer already emits the result via stream
+	// EmitTextArtifact only saves to file for reference, doesn't show duplicate UI
 	if finalResult != "" {
 		r.EmitTextArtifact("enhance_directly_answer", finalResult)
 	}

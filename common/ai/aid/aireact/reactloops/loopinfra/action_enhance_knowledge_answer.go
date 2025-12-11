@@ -69,8 +69,9 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		loop.PushSatisfactionRecord(satisfied, reason)
 
 		if satisfied {
-			invoker.EmitResult(`** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)
-			invoker.EmitResultAfterStream(enhancedAnswer)
+			// Only emit result once - EnhanceKnowledgeAnswer has already handled the stream output
+			// Just add a status message to timeline instead of duplicate emit
+			invoker.AddToTimeline("knowledge_enhance_satisfied", `** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)
 			op.Exit()
 			return
 		}
