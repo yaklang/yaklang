@@ -382,7 +382,7 @@ func (r *testRuntime) AskForClarification(ctx context.Context, question string, 
 	return ""
 }
 
-func (r *testRuntime) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+func (r *testRuntime) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
 	return "", nil
 }
 

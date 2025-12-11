@@ -503,7 +503,7 @@ func (m *mockInvokerForMemoryTest) AskForClarification(ctx context.Context, ques
 	return ""
 }
 
-func (m *mockInvokerForMemoryTest) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+func (m *mockInvokerForMemoryTest) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
 	return "", nil
 }
 
