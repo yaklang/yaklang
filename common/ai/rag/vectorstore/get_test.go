@@ -28,6 +28,7 @@ func TestMUSTPASS_LoadCollectionWithInvalidGraphBinary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to update collection graph binary: %v", err)
 	}
+	GraphWrapperManager.ClearCache()
 
 	// 验证集合已经存在
 	assert.True(t, HasCollection(testDB, collectionName), "collection should exist")

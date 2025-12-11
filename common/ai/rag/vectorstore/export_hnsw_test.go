@@ -51,6 +51,9 @@ func TestMUSTPASS_ExportHNSW(t *testing.T) {
 	err = db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Update("graph_binary", binary).Error
 	assert.NoError(t, err)
 
+	// 清理缓存
+	GraphWrapperManager.ClearCache()
+
 	// 验证使用错误的 code 导入
 	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithEmbeddingClient(embedding))
 	assert.Contains(t, err.Error(), "record not found")
