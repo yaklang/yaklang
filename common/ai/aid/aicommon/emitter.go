@@ -715,63 +715,6 @@ func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceK
 	})
 }
 
-// EmitKnowledgeWithReferenceFile emits a knowledge event and saves detailed reference material to file
-func (e *Emitter) EmitKnowledgeWithReferenceFile(nodeId string, enhanceID string, result EnhanceKnowledge, workdir string, taskIndex string, knowledgeIdx int) (*schema.AiOutputEvent, string, error) {
-	// First emit the knowledge event
-	event, err := e.EmitKnowledge(nodeId, enhanceID, result)
-	if err != nil {
-		return event, "", err
-	}
-
-	// Build detailed reference content
-	refContent := fmt.Sprintf(`=== 知识增强结果 #%d ===
-标题: %s
-类型: %s
-来源: %s
-相关度评分: %.4f
-评分方法: %s
-
---- 详细内容 ---
-%s
---- 内容结束 ---
-`, knowledgeIdx,
-		result.GetTitle(),
-		result.GetType(),
-		result.GetSource(),
-		result.GetScore(),
-		result.GetScoreMethod(),
-		result.GetContent(),
-	)
-
-	// Use temp dir if workdir is not provided
-	if workdir == "" {
-		workdir = os.TempDir()
-	}
-
-	// Generate file path
-	filename := fmt.Sprintf("knowledge-reference-%s_%d.txt", taskIndex, knowledgeIdx)
-	filePath := filepath.Join(workdir, filename)
-
-	// Save to file
-	if err := os.MkdirAll(workdir, 0755); err != nil {
-		log.Errorf("failed to create workdir for knowledge reference: %v", err)
-	} else {
-		if err := os.WriteFile(filePath, []byte(refContent), 0644); err != nil {
-			log.Errorf("failed to save knowledge reference to file: %v", err)
-		} else {
-			e.EmitPinFilename(filePath)
-			log.Infof("saved knowledge reference to file: %s", filePath)
-		}
-	}
-
-	// Also emit reference material event linked to the knowledge event
-	// Use enhanceID directly instead of extracting from event (avoids JSON path parsing issues)
-	if enhanceID != "" {
-		e.EmitReferenceMaterial("knowledge", enhanceID, refContent)
-	}
-
-	return event, filePath, nil
-}
 
 func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge, syncId string) (*schema.AiOutputEvent, error) {
 	knowledgeList := make([]map[string]any, 0, len(results))
