@@ -16,8 +16,9 @@ import (
 type DirectlyAnswerOption func(*directlyAnswerConfig)
 
 type directlyAnswerConfig struct {
-	referenceMaterial    string
-	referenceMaterialIdx int
+	referenceMaterial       string
+	referenceMaterialIdx    int
+	skipEmitResultAfterDone bool // If true, skip emitting result after stream is done
 }
 
 // WithReferenceMaterial sets reference material to emit with the stream output
@@ -25,6 +26,14 @@ func WithReferenceMaterial(material string, idx int) DirectlyAnswerOption {
 	return func(c *directlyAnswerConfig) {
 		c.referenceMaterial = material
 		c.referenceMaterialIdx = idx
+	}
+}
+
+// WithSkipEmitResult skips emitting result after stream is done
+// Use this when the caller will emit the result themselves
+func WithSkipEmitResult() DirectlyAnswerOption {
+	return func(c *directlyAnswerConfig) {
+		c.skipEmitResultAfterDone = true
 	}
 }
 
@@ -97,25 +106,28 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				aicommon.WithActionNonce(nonceStr),
 				aicommon.WithActionTagToKey("FINAL_ANSWER", "answer_payload"),
 				aicommon.WithActionAlias("directly_answer"),
-				aicommon.WithActionFieldStreamHandler(
-					[]string{"answer_payload"},
-					func(key string, reader io.Reader) {
-						var out bytes.Buffer
-						reader = utils.JSONStringReader(reader)
-						reader = io.TeeReader(reader, &out)
-						var event *schema.AiOutputEvent
-						event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
-							"re-act-loop-answer-payload",
-							reader,
-							rsp.GetTaskIndex(),
-							func() {
+			aicommon.WithActionFieldStreamHandler(
+				[]string{"answer_payload"},
+				func(key string, reader io.Reader) {
+					var out bytes.Buffer
+					reader = utils.JSONStringReader(reader)
+					reader = io.TeeReader(reader, &out)
+					var event *schema.AiOutputEvent
+					event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
+						"re-act-loop-answer-payload",
+						reader,
+						rsp.GetTaskIndex(),
+						func() {
+							// Only emit result if not skipped (caller will handle it)
+							if !config.skipEmitResultAfterDone {
 								r.EmitResultAfterStream(out.String())
-								if event != nil {
-									emitReferenceMaterial(event)
-								}
-							},
-						)
-					}),
+							}
+							if event != nil {
+								emitReferenceMaterial(event)
+							}
+						},
+					)
+				}),
 			)
 			if err != nil {
 				return err

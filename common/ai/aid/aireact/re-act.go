@@ -70,6 +70,7 @@ type ReAct struct {
 
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
+	knowledgeEmitCounter        int   // Counter for knowledge emit events
 
 	config        *aicommon.Config
 	promptManager *PromptManager

@@ -60,8 +60,15 @@ func (r *ReAct) EmitResultAfterStream(result interface{}) {
 }
 
 // EmitKnowledge emits a knowledge event using the embedded Emitter
+// Also saves reference material to file for better traceability
 func (r *ReAct) EmitKnowledge(enhanceID string, knowledge aicommon.EnhanceKnowledge) {
-	r.Emitter.EmitKnowledge("knowledge", enhanceID, knowledge)
+	r.knowledgeEmitCounter++
+	workdir := r.config.Workdir
+	taskIndex := ""
+	if r.GetCurrentTask() != nil {
+		taskIndex = r.GetCurrentTask().GetIndex()
+	}
+	r.Emitter.EmitKnowledgeWithReferenceFile("knowledge", enhanceID, knowledge, workdir, taskIndex, r.knowledgeEmitCounter)
 }
 
 // EmitKnowledgeListAboutTask emits a list of knowledge items related to a specific task using the embedded Emitter, for sync
