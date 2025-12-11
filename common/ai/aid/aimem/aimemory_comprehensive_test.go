@@ -2,12 +2,11 @@ package aimem
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/rag"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -254,6 +253,9 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 		}
 	})
 
+}
+
+func TestAIMemoryTriage_GetHNSWStats(t *testing.T) {
 	embeddingCheckCreate := func(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		db, err := getTestDatabase()
 		if err != nil {
@@ -264,10 +266,12 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 			WithInvoker(NewAdvancedMockInvoker(context.Background())),
 		}
 		allOpts := append(defaultOpts, opts...)
-		return NewAIMemory(sessionID, allOpts...)
+		return NewAIMemory(sessionId, allOpts...)
 	}
 
 	t.Run("embedding-check", func(t *testing.T) {
+		sessionID := "new-memory-test-" + uuid.New().String()
+		defer cleanupComprehensiveTestData(t, sessionID)
 		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithEmbeddingClient(&EmptyEmbedding{})))
 		require.NoError(t, err)
 		require.NotNil(t, m)
@@ -280,13 +284,14 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 	})
 
 	t.Run("embedding-check-ng", func(t *testing.T) {
+		sessionID := "new-memory-test-" + uuid.New().String()
+		defer cleanupComprehensiveTestData(t, sessionID)
 		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithModelName(utils.RandStringBytes(10)))) // use
 		require.NoError(t, err)
 		require.NotNil(t, m)
 		require.Equal(t, false, m.embeddingAvailable)
 		require.Nil(t, m.rag)
 	})
-
 }
 
 // TestAIMemoryTriage_AddRawText 测试原始文本处理
