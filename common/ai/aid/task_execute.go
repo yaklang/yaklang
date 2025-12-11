@@ -87,12 +87,11 @@ func (t *AiTask) execute() error {
 			return reactiveData, nil
 		}),
 	)
-
 	if err != nil {
+		if t.GetStatus() == aicommon.AITaskState_Skipped {
+			return nil
+		}
 		return err
-	}
-	if t.IsCtxDone() {
-		return utils.Errorf("context is done")
 	}
 	return nil
 }
@@ -127,6 +126,9 @@ func (t *AiTask) executeTask() error {
 	t.EmitInfo("start to wait for user review current task")
 
 	t.EmitRequireReviewForTask(t, ep.GetId())
+
+	log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
+
 	t.DoWaitAgree(t.Ctx, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
