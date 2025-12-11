@@ -225,15 +225,6 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 	memory := config.GetCompileMemory() || config.GetSyntaxFlowMemory()
 	excludeFiles := strings.Join(config.GetCompileExcludeFiles(), ",")
 
-	if programName != "" {
-		log.Infof("get program from database: %s", programName)
-		ret := ssaapi.LoadProgramRegexp(programName)
-		if len(ret) == 0 {
-			return nil, utils.Errorf("program %s not found in database", programName)
-		}
-		return ret, nil
-	}
-
 	if targetPath != "" {
 		log.Infof("get program from target path: %s", targetPath)
 		para := make(map[string]any)
@@ -249,5 +240,15 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, targetPath, language, true, para)
 		return []*ssaapi.Program{prog}, err
 	}
+
+	if programName != "" {
+		log.Infof("get program from database: %s", programName)
+		ret := ssaapi.LoadProgramRegexp(programName)
+		if len(ret) == 0 {
+			return nil, utils.Errorf("program %s not found in database", programName)
+		}
+		return ret, nil
+	}
+
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
 }
