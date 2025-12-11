@@ -15,11 +15,11 @@ import (
 type SSAProject struct {
 	gorm.Model
 	// 项目基础信息
-	ProjectName string             `json:"project_name" gorm:"index;not null;comment:项目名称"`
-	Description string             `json:"description,omitempty" gorm:"comment:项目描述"`
-	Tags        string             `json:"tags,omitempty" gorm:"comment:项目标签"`
-	Language    ssaconfig.Language `json:"language" gorm:"index;comment:项目语言"`
-	URL         string             `json:"url,omitempty" gorm:"index;comment:项目源码地址"`
+	ProjectName string             `json:"project_name" gorm:"index;not null"`
+	Description string             `json:"description,omitempty"`
+	Tags        string             `json:"tags,omitempty" `
+	Language    ssaconfig.Language `json:"language" gorm:"index"`
+	URL         string             `json:"url,omitempty" gorm:"index"`
 	// 配置选项
 	Config []byte `json:"config"`
 	Hash   string `json:"hash" gorm:"unique_index"`
