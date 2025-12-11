@@ -923,9 +923,11 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp(fmt.Sprintf("Unknown host: %s", req.Host))), req)
 		} else {
 			log.Debugf("mitm: failed to round trip: %v", err)
-			res = proxyutil.NewResponse(502, nil, req)
+			friendlyErr := friendlyProxyError(err)
+			body := proxyutil.GetPrettyErrorRsp(fmt.Sprintf("Proxy Error: %s", friendlyErr.Error()))
+			res = proxyutil.NewResponse(502, strings.NewReader(body), req)
 			res.Status = "502 Proxy Error"
-			proxyutil.Warning(res.Header, friendlyProxyError(err))
+			proxyutil.Warning(res.Header, friendlyErr)
 		}
 	}
 	defer func() {
