@@ -304,15 +304,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	invoker.promptManager = NewPromptManager(invoker, workdir)
 
 	// Register pending context providers
-	for _, entry := range cfg.PendingContextProviders {
-		if entry.Traced {
-			invoker.promptManager.cpm.RegisterTracedContent(entry.Name, entry.Provider)
-		} else {
-			invoker.promptManager.cpm.Register(entry.Name, entry.Provider)
-		}
-	}
-	// Clear pending list after registration
-	cfg.PendingContextProviders = nil
+	invoker.promptManager.cpm = cfg.ContextProviderManager
 
 	wd, err := invoker.artifacts.Getwd()
 	if err != nil {

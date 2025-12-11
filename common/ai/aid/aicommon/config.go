@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -109,9 +108,9 @@ type Config struct {
 	/*
 		Prompt Manager
 	*/
-	TopToolsCount           int // Number of top tools to display in prompt
-	AiForgeManager          AIForgeFactory
-	PendingContextProviders []ContextProviderEntry
+	TopToolsCount          int // Number of top tools to display in prompt
+	AiForgeManager         AIForgeFactory
+	ContextProviderManager *ContextProviderManager
 
 	/*
 		AI Tool
@@ -297,6 +296,7 @@ func newConfig(ctx context.Context) *Config {
 		MaxIterationCount:                  100,
 		Language:                           "zh", // Default to Chinese
 		TopToolsCount:                      100,
+		ContextProviderManager:             NewContextProviderManager(),
 		InputConsumption:                   new(int64),
 		OutputConsumption:                  new(int64),
 		AiAutoRetry:                        5,
@@ -623,11 +623,7 @@ func WithAIBlueprintManager(factory AIForgeFactory) ConfigOption {
 func WithDynamicContextProvider(name string, provider ContextProvider) ConfigOption {
 	return func(c *Config) error {
 		if name != "" {
-			c.PendingContextProviders = append(c.PendingContextProviders, ContextProviderEntry{
-				Traced:   false,
-				Name:     name,
-				Provider: provider,
-			})
+			c.ContextProviderManager.Register(name, provider)
 		}
 		return nil
 	}
@@ -638,11 +634,7 @@ func WithDynamicContextProvider(name string, provider ContextProvider) ConfigOpt
 func WithTracedDynamicContextProvider(name string, provider ContextProvider) ConfigOption {
 	return func(c *Config) error {
 		if name != "" {
-			c.PendingContextProviders = append(c.PendingContextProviders, ContextProviderEntry{
-				Traced:   true,
-				Name:     name,
-				Provider: provider,
-			})
+			c.ContextProviderManager.RegisterTracedContent(name, provider)
 		}
 		return nil
 	}
@@ -652,20 +644,8 @@ func WithTracedDynamicContextProvider(name string, provider ContextProvider) Con
 func WithTracedFileContext(name string, filePath string) ConfigOption {
 	return func(c *Config) error {
 		if name != "" && filePath != "" {
-			provider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-				contentBytes, err := os.ReadFile(filePath)
-				if err != nil {
-					return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
-				}
-				content := string(contentBytes)
-				return fmt.Sprintf("File: %s\nContent:\n%s", filePath, content), nil
-			}
-
-			c.PendingContextProviders = append(c.PendingContextProviders, ContextProviderEntry{
-				Traced:   true,
-				Name:     name,
-				Provider: provider,
-			})
+			provider := FileContextProvider(filePath)
+			c.ContextProviderManager.RegisterTracedContent(name, provider)
 		}
 		return nil
 	}
@@ -1053,6 +1033,18 @@ func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.DisableEnhanceDirectlyAnswer = disable
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithContextProvider(cpm *ContextProviderManager) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.ContextProviderManager = cpm
 		c.m.Unlock()
 		return nil
 	}
@@ -1847,6 +1839,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.EnhanceKnowledgeManager != nil {
 		opts = append(opts, WithEnhanceKnowledgeManager(i.EnhanceKnowledgeManager))
+	}
+
+	if i.ContextProviderManager != nil {
+		opts = append(opts, WithContextProvider(i.ContextProviderManager))
 	}
 
 	opts = append(opts, WithContext(i.Ctx))

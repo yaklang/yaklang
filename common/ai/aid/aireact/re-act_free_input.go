@@ -20,6 +20,9 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if userInput == "" || strings.TrimSpace(userInput) == "" {
 		return utils.Errorf("user input cannot be empty")
 	}
+	for _, path := range event.AttachedFilePath {
+		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
+	}
 	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)
 	}
