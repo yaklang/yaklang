@@ -28,16 +28,14 @@ func (s *Server) CheckProxyAlive(ctx context.Context, req *ypb.CheckProxyAliveRe
 	proxy := strings.TrimSpace(req.GetProxy())
 	if proxy == "" {
 		id := strings.TrimSpace(req.GetEndpointId())
-		if id == "" {
-			resp.Reason = "endpointId 或 proxy 不能为空"
-			return resp, nil
+		if id != "" {
+			endpoint, err := resolveProxyEndpoint(id)
+			if err != nil {
+				resp.Reason = err.Error()
+				return resp, nil
+			}
+			proxy = yakit.BuildProxyEndpointURL(endpoint)
 		}
-		endpoint, err := resolveProxyEndpoint(id)
-		if err != nil {
-			resp.Reason = err.Error()
-			return resp, nil
-		}
-		proxy = yakit.BuildProxyEndpointURL(endpoint)
 	}
 	proxy = strings.Trim(proxy, `":`)
 	resp.Proxy = proxy
@@ -58,12 +56,15 @@ func (s *Server) CheckProxyAlive(ctx context.Context, req *ypb.CheckProxyAliveRe
 		)
 	}
 
-	rsp, err := lowhttp.HTTPWithoutRedirect(
+	httpOpts := []lowhttp.LowhttpOpt{
 		lowhttp.WithRequest(packet),
-		lowhttp.WithProxy(proxy),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithTimeout(timeout),
-	)
+	}
+	if proxy != "" {
+		httpOpts = append(httpOpts, lowhttp.WithProxy(proxy))
+	}
+	rsp, err := lowhttp.HTTPWithoutRedirect(httpOpts...)
 	if err != nil {
 		if errors.Is(err, netx.ErrorProxyAuthFailed) {
 			resp.Reason = "代理认证失败"
