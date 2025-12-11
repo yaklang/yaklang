@@ -14,6 +14,7 @@ type ProxyEndpoint struct {
 	URL        string `gorm:"column:url"`
 	Username   string `gorm:"column:username"`
 	Password   string `gorm:"column:password"`
+	Disabled   bool   `gorm:"column:disabled"`
 }
 
 func (p *ProxyEndpoint) ToProto() *ypb.ProxyEndpoint {
@@ -26,6 +27,7 @@ func (p *ProxyEndpoint) ToProto() *ypb.ProxyEndpoint {
 		Url:      p.URL,
 		UserName: p.Username,
 		Password: p.Password,
+		Disabled: p.Disabled,
 	}
 }
 

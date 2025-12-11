@@ -924,7 +924,8 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		} else {
 			log.Debugf("mitm: failed to round trip: %v", err)
 			res = proxyutil.NewResponse(502, nil, req)
-			proxyutil.Warning(res.Header, err)
+			res.Status = "502 Proxy Error"
+			proxyutil.Warning(res.Header, friendlyProxyError(err))
 		}
 	}
 	defer func() {
@@ -1034,4 +1035,23 @@ func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 boo
 		}
 	}
 	return newConn, useH2, nil
+}
+
+func friendlyProxyError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "i/o timeout"):
+		return fmt.Errorf("proxy timeout: %s", msg)
+	case strings.Contains(msg, "proxyconnect tcp"), strings.Contains(msg, "proxy connect"):
+		return fmt.Errorf("proxy connect failed: %s", msg)
+	case strings.Contains(msg, "connection refused"):
+		return fmt.Errorf("proxy refused connection: %s", msg)
+	case strings.Contains(msg, "no such host"), strings.Contains(msg, "lookup"):
+		return fmt.Errorf("proxy DNS lookup failed: %s", msg)
+	default:
+		return fmt.Errorf("proxy request failed: %s", msg)
+	}
 }
