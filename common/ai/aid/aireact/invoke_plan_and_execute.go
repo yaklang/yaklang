@@ -180,7 +180,11 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](r.config.Ctx, 10)
 	r.config.InputEventManager.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
-			log.Infof("Received AI input event: %v", event)
+			switch event.SyncType {
+			case SYNC_TYPE_QUEUE_INFO:
+			default:
+				log.Infof("InvokePlanAndExecute: Received AI input event: %v", event)
+			}
 			inputChannel.SafeFeed(event)
 		}()
 	})

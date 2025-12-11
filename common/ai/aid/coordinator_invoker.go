@@ -105,7 +105,11 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	uid := uuid.NewString()
 	c.InputEventManager.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
-			log.Infof("Received AI input event: %v", event)
+			switch event.SyncType {
+			case "queue_info":
+			default:
+				log.Infof("Coordinator: Received AI input event: %v", event)
+			}
 			inputChannel.SafeFeed(event)
 		}()
 	})

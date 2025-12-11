@@ -15,57 +15,6 @@ import (
 	_ "embed"
 )
 
-// generate task prompt just can direct answer.
-func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
-	templateData := map[string]interface{}{
-		"ContextProvider": t.ContextProvider,
-	}
-
-	// 解析prompt模板
-	tmpl, err := template.New("execute-aiTask").Parse(__prompt_DirectAnswer)
-	if err != nil {
-		return "", fmt.Errorf("error parsing aiTask prompt template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing aiTask prompt template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
-}
-
-// generateTaskPrompt 生成执行任务的prompt
-func (t *AiTask) generateTaskPrompt() (string, error) {
-	// 创建模板数据
-	alltools, err := t.AiToolManager.GetEnableTools()
-	if err != nil {
-		return "", fmt.Errorf("error getting all tools: %w", err)
-	}
-	templateData := map[string]interface{}{
-		"Tools":           alltools,
-		"ContextProvider": t.ContextProvider,
-	}
-
-	// 解析prompt模板
-	tmpl, err := template.New("execute-aiTask").Parse(__prompt_ExecuteTaskPromptTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error parsing aiTask prompt template: %w", err)
-	}
-
-	// 渲染模板
-	var promptBuilder strings.Builder
-	err = tmpl.Execute(&promptBuilder, templateData)
-	if err != nil {
-		return "", fmt.Errorf("error executing aiTask prompt template: %w", err)
-	}
-
-	return promptBuilder.String(), nil
-}
-
-// generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
 func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
 		"ContextProvider": t.ContextProvider,
