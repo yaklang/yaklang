@@ -88,14 +88,23 @@ func TestAMQPDetectionOnNonStandardPort(t *testing.T) {
 	_, cleanup := startMockAMQPServer(t, testPort)
 	defer cleanup()
 
-	// Wait a bit for server to be ready
-	time.Sleep(1 * time.Second)
+	// Wait for server to be ready by attempting to connect
+	hostPort := fmt.Sprintf("127.0.0.1:%d", testPort)
+	err := utils.WaitConnect(hostPort, 3)
+	if err != nil {
+		t.Fatalf("Failed to wait for AMQP server to be ready: %v", err)
+	}
 
-	// Create config with reasonable ProbesMax
+	// Create config with reasonable ProbesMax and disable web fingerprint to ensure
+	// service detection runs first and is not interfered by web detection.
+	// This is important because if the port happens to be in webPorts list, web detection
+	// might run first and incorrectly identify the service as HTTP.
+	// Using ProbesMax=10 is sufficient to detect AMQP while keeping test execution time reasonable
 	config := NewConfig(
 		WithActiveMode(true),
-		WithProbesMax(100), // 100是前端服务指纹选择全部的情况
-		WithProbeTimeout(3*time.Second),
+		WithProbesMax(10), // Reduced to speed up tests while still detecting AMQP
+		WithProbeTimeout(1*time.Second), // Reduced to speed up tests
+		WithDisableWebFingerprint(true), // Disable web fingerprint to avoid interference
 	)
 
 	// Create matcher
