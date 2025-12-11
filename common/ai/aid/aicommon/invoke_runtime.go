@@ -13,7 +13,7 @@ type AIInvokeRuntime interface {
 	ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error)
 	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error)
 	AskForClarification(ctx context.Context, question string, payloads []string) string
-	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error)
+	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
 	EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error)
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error)

@@ -1,10 +1,16 @@
 package aicommon
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -344,10 +350,18 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrReader, stderrWriter := utils.NewPipe()
 	defer stderrWriter.Close()
 
+	// Create buffers to capture stdout and stderr for file saving
+	stdoutBuffer := &bytes.Buffer{}
+	stderrBuffer := &bytes.Buffer{}
+
+	// Use MultiWriter to write to both the pipe (for streaming) and the buffer (for file saving)
+	stdoutMultiWriter := io.MultiWriter(stdoutWriter, stdoutBuffer)
+	stderrMultiWriter := io.MultiWriter(stderrWriter, stderrBuffer)
+
 	t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 
-	toolResult, err = t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutWriter, stderrWriter)
+	toolResult, err = t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutMultiWriter, stderrMultiWriter)
 	if err != nil {
 		if toolResult == nil {
 			toolResult = &aitool.ToolResult{
@@ -360,6 +374,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
 		toolResult.Success = false
 	}
+
+	// Save tool call files (params, stdout, stderr, result)
+	t.saveToolCallFiles(tool, callToolId, invokeParams, stdoutBuffer, stderrBuffer, toolResult)
+
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	if toolResult.Data != nil {
 		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
@@ -370,6 +388,171 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 
 	return toolResult, false, nil
+}
+
+func (t *ToolCaller) saveToolCallFiles(
+	tool *aitool.Tool,
+	callToolId string,
+	params aitool.InvokeParams,
+	stdoutBuffer *bytes.Buffer,
+	stderrBuffer *bytes.Buffer,
+	toolResult *aitool.ToolResult,
+) {
+	// Get workdir - try to get from config if it's a Config type
+	workdir := ""
+	if cfg, ok := t.config.(*Config); ok {
+		workdir = cfg.Workdir
+	}
+	if workdir == "" {
+		workdir = consts.TempAIDir(t.config.GetRuntimeId())
+	}
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+
+	// Ensure workdir exists
+	if err := os.MkdirAll(workdir, 0755); err != nil {
+		log.Errorf("failed to create workdir %s: %v", workdir, err)
+		return
+	}
+
+	// Get task index for file naming
+	taskIndex := ""
+	if t.task != nil {
+		taskIndex = t.task.GetIndex()
+	}
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+
+	// Get tool call count for this task (number of previous tool calls + 1)
+	toolCallNumber := 1
+	if t.task != nil {
+		// Get count of existing tool call results, then add 1 for current call
+		existingResults := t.task.GetAllToolCallResults()
+		toolCallNumber = len(existingResults) + 1
+	}
+
+	// Generate file index in format: taskIndex_number
+	fileIndex := fmt.Sprintf("%s_%d", taskIndex, toolCallNumber)
+
+	// Generate tool identifier (sanitize tool name for filename)
+	toolIdentifier := sanitizeFilename(tool.Name)
+	if toolIdentifier == "" {
+		toolIdentifier = "unknown-tool"
+	}
+	// For stderr and result, use original tool name (sanitized)
+	toolName := sanitizeFilename(tool.Name)
+	if toolName == "" {
+		toolName = "unknown-tool"
+	}
+
+	// Generate file names
+	// params and stdout use identifier, stderr and result use toolname
+	paramsFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-params-%s.txt", toolIdentifier, fileIndex))
+	stdoutFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-stdout-%s.txt", toolIdentifier, fileIndex))
+	stderrFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-stderr-%s.txt", toolName, fileIndex))
+	resultFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-result-%s.txt", toolName, fileIndex))
+
+	// Save params file
+	paramsJSON := utils.Jsonify(params)
+	if err := os.WriteFile(paramsFilename, []byte(paramsJSON), 0644); err != nil {
+		log.Errorf("failed to save tool call params file: %v", err)
+	} else {
+		t.emitter.EmitPinFilename(paramsFilename)
+		log.Infof("saved tool call params to file: %s", paramsFilename)
+	}
+
+	// Save stdout file
+	// Filter out framework message "invoking tool[xxx] ...\n" - only save tool callback's actual output
+	stdoutContent := stdoutBuffer.Bytes()
+	frameworkMsgPrefix := fmt.Sprintf("invoking tool[%s] ...\n", tool.Name)
+	if bytes.HasPrefix(stdoutContent, []byte(frameworkMsgPrefix)) {
+		stdoutContent = stdoutContent[len(frameworkMsgPrefix):]
+	}
+	if len(stdoutContent) > 0 {
+		if err := os.WriteFile(stdoutFilename, stdoutContent, 0644); err != nil {
+			log.Errorf("failed to save tool call stdout file: %v", err)
+		} else {
+			t.emitter.EmitPinFilename(stdoutFilename)
+			log.Infof("saved tool call stdout to file: %s", stdoutFilename)
+		}
+	}
+
+	// Save stderr file
+	if stderrBuffer.Len() > 0 {
+		if err := os.WriteFile(stderrFilename, stderrBuffer.Bytes(), 0644); err != nil {
+			log.Errorf("failed to save tool call stderr file: %v", err)
+		} else {
+			t.emitter.EmitPinFilename(stderrFilename)
+			log.Infof("saved tool call stderr to file: %s", stderrFilename)
+		}
+	}
+
+	// Save result file
+	// Always save the full result to file, even if it's large
+	var resultContent []byte
+	if toolResult != nil {
+		// Try to get the original result from ToolExecutionResult
+		if toolResult.Data != nil {
+			toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
+			if ok && toolExecutionResult.Result != nil {
+				// Get the original result before it was truncated
+				// If result was saved to a file in tool_invoke.go, we need to read it
+				resultStr := utils.InterfaceToString(toolExecutionResult.Result)
+				// Check if result contains a file path (from handleLargeContent)
+				filePathRegex := regexp.MustCompile(`saved in file\[([^\]]+)\]`)
+				matches := filePathRegex.FindStringSubmatch(resultStr)
+				if len(matches) > 1 {
+					// Extract file path and read it
+					filePath := matches[1]
+					if fileContent, err := os.ReadFile(filePath); err == nil {
+						resultContent = fileContent
+						// Also emit the original file
+						t.emitter.EmitPinFilename(filePath)
+						log.Infof("found large result file from tool_invoke.go: %s, also emitting it", filePath)
+					} else {
+						// Fallback to JSON
+						resultContent = []byte(utils.Jsonify(toolExecutionResult.Result))
+						log.Warnf("failed to read large result file %s: %v, using JSON fallback", filePath, err)
+					}
+				} else {
+					// Result is not truncated, save as JSON
+					resultContent = []byte(utils.Jsonify(toolExecutionResult.Result))
+				}
+			} else {
+				// Fallback to full tool result
+				resultContent = []byte(utils.Jsonify(toolResult))
+			}
+		} else {
+			// Save full tool result
+			resultContent = []byte(utils.Jsonify(toolResult))
+		}
+	}
+
+	// Always save result file, even if empty
+	if err := os.WriteFile(resultFilename, resultContent, 0644); err != nil {
+		log.Errorf("failed to save tool call result file: %v", err)
+	} else {
+		t.emitter.EmitPinFilename(resultFilename)
+		log.Infof("saved tool call result to file: %s", resultFilename)
+	}
+}
+
+func sanitizeFilename(name string) string {
+	// Replace invalid filename characters with underscores
+	result := ""
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			result += string(r)
+		} else {
+			result += "_"
+		}
+	}
+	if result == "" {
+		return "unknown"
+	}
+	return result
 }
 
 func SummaryRank(task AITask, callResult *aitool.ToolResult) string {

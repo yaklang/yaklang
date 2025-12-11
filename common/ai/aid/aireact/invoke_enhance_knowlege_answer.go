@@ -31,9 +31,11 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
+	knowledgeCount := 0
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
 		ekm.AppendKnowledge(currentTask.GetId(), enhanceDatum)
+		knowledgeCount++
 	}
 
 	var queryBuf bytes.Buffer
@@ -57,7 +59,32 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 		}
 	}
 
-	finalResult, err := r.DirectlyAnswer(ctx, queryBuf.String(), nil)
+	// Build reference material content with original query and knowledge data
+	referenceMaterial := ""
+	if enhance != "" {
+		referenceMaterial, _ = utils.RenderTemplate(`<|ORIGINAL_QUERY|>
+{{ .OriginalQuery }}
+<|ORIGINAL_QUERY_END|>
+
+<|KNOWLEDGE_ENHANCED_DATA|>
+{{ .EnhanceData }}
+<|KNOWLEDGE_ENHANCED_DATA_END|>
+
+知识条目数量: {{ .KnowledgeCount }}
+`, map[string]any{
+			"OriginalQuery":  userQuery,
+			"EnhanceData":    enhance,
+			"KnowledgeCount": knowledgeCount,
+		})
+	}
+
+	// Pass reference material to DirectlyAnswer for emission with stream
+	var opts []any
+	if referenceMaterial != "" {
+		opts = append(opts, WithReferenceMaterial(referenceMaterial, 1))
+	}
+
+	finalResult, err := r.DirectlyAnswer(ctx, queryBuf.String(), nil, opts...)
 	if finalResult != "" {
 		r.EmitTextArtifact("enhance_directly_answer", finalResult)
 	}

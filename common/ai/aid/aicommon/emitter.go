@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -748,4 +750,40 @@ func (e *Emitter) EmitReferenceMaterial(typeName string, eventId string, content
 
 func (e *Emitter) EmitTextReferenceMaterial(eventId string, content any) (*schema.AiOutputEvent, error) {
 	return e.EmitReferenceMaterial("text", eventId, utils.InterfaceToString(content))
+}
+
+// EmitReferenceMaterialWithFile emits a reference material event and saves the content to a file
+// Returns the event and the file path
+func (e *Emitter) EmitReferenceMaterialWithFile(typeName string, eventId string, content any, workdir string, taskIndex string, refIndex int) (*schema.AiOutputEvent, string, error) {
+	contentStr := utils.InterfaceToString(content)
+
+	// Use temp dir if workdir is not provided
+	if workdir == "" {
+		workdir = os.TempDir()
+	}
+
+	// Generate file path
+	filename := fmt.Sprintf("reference-material-%s-%s_%d.txt", typeName, taskIndex, refIndex)
+	filePath := filepath.Join(workdir, filename)
+
+	// Save to file
+	if err := os.MkdirAll(workdir, 0755); err != nil {
+		log.Errorf("failed to create workdir for reference material: %v", err)
+	} else {
+		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
+			log.Errorf("failed to save reference material to file: %v", err)
+		} else {
+			e.EmitPinFilename(filePath)
+			log.Infof("saved reference material to file: %s", filePath)
+		}
+	}
+
+	// Emit the reference material event
+	event, err := e.EmitReferenceMaterial(typeName, eventId, content)
+	return event, filePath, err
+}
+
+// EmitTextReferenceMaterialWithFile emits a text reference material event and saves to file
+func (e *Emitter) EmitTextReferenceMaterialWithFile(eventId string, content any, workdir string, taskIndex string, refIndex int) (*schema.AiOutputEvent, string, error) {
+	return e.EmitReferenceMaterialWithFile("text", eventId, content, workdir, taskIndex, refIndex)
 }

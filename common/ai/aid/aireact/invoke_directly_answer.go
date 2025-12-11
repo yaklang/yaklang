@@ -3,16 +3,42 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
 )
 
-func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+// DirectlyAnswerOption configures DirectlyAnswer behavior
+type DirectlyAnswerOption func(*directlyAnswerConfig)
+
+type directlyAnswerConfig struct {
+	referenceMaterial    string
+	referenceMaterialIdx int
+}
+
+// WithReferenceMaterial sets reference material to emit with the stream output
+func WithReferenceMaterial(material string, idx int) DirectlyAnswerOption {
+	return func(c *directlyAnswerConfig) {
+		c.referenceMaterial = material
+		c.referenceMaterialIdx = idx
+	}
+}
+
+func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
+	}
+
+	// Apply options
+	config := &directlyAnswerConfig{}
+	for _, opt := range opts {
+		if fn, ok := opt.(DirectlyAnswerOption); ok {
+			fn(config)
+		}
 	}
 
 	// Check context cancellation early
@@ -30,6 +56,35 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 	}
 
 	var finalResult string
+	var referenceOnce = new(sync.Once)
+
+	// Helper to emit reference material when stream event is emitted
+	emitReferenceMaterial := func(event *schema.AiOutputEvent) {
+		if config.referenceMaterial == "" {
+			return
+		}
+		streamId := event.GetContentJSONPath(`$.event_writer_id`)
+		if streamId == "" {
+			return
+		}
+		referenceOnce.Do(func() {
+			taskIndex := ""
+			if r.GetCurrentTask() != nil {
+				taskIndex = r.GetCurrentTask().GetIndex()
+			}
+			// Get workdir from config
+			workdir := r.config.Workdir
+			// Emit reference material with file
+			r.Emitter.EmitTextReferenceMaterialWithFile(
+				streamId,
+				config.referenceMaterial,
+				workdir,
+				taskIndex,
+				config.referenceMaterialIdx,
+			)
+		})
+	}
+
 	err = aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -48,12 +103,16 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 						var out bytes.Buffer
 						reader = utils.JSONStringReader(reader)
 						reader = io.TeeReader(reader, &out)
-						r.Emitter.EmitTextMarkdownStreamEvent(
+						var event *schema.AiOutputEvent
+						event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
 							"re-act-loop-answer-payload",
 							reader,
 							rsp.GetTaskIndex(),
 							func() {
 								r.EmitResultAfterStream(out.String())
+								if event != nil {
+									emitReferenceMaterial(event)
+								}
 							},
 						)
 					}),

@@ -204,7 +204,7 @@ func (m *MockInvoker) AskForClarification(ctx context.Context, question string, 
 	return ""
 }
 
-func (m *MockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+func (m *MockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error) {
 	return "", nil
 }
 

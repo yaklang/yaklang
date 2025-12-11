@@ -155,7 +155,7 @@ func (m *AdvancedMockInvoker) AskForClarification(ctx context.Context, question 
 	return ""
 }
 
-func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool) (string, error) {
+func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, r ...any) (string, error) {
 	return "", nil
 }
 
