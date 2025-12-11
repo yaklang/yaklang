@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
+	"os"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -11,13 +12,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-type ContextProviderEntry struct{
+type ContextProviderEntry struct {
 	Name     string
 	Provider ContextProvider
 	Traced   bool
 }
 
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
+
+func FileContextProvider(filePath string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		contentBytes, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+		}
+		content := string(contentBytes)
+		content = utils.ShrinkString(content, 200)
+		return fmt.Sprintf("User Prompt: %s File: %s\nContent:\n%s", userPrompt, filePath, content), nil
+	}
+}
 
 type ContextProviderManager struct {
 	maxBytes int

@@ -251,16 +251,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	react.promptManager = NewPromptManager(react, workdir)
 
 	// Register pending context providers
-	for _, entry := range cfg.PendingContextProviders {
-		if entry.Traced {
-			react.promptManager.cpm.RegisterTracedContent(entry.Name, entry.Provider)
-		} else {
-			react.promptManager.cpm.Register(entry.Name, entry.Provider)
-		}
-	}
-	// Clear pending list after registration
-	cfg.PendingContextProviders = nil
-
+	react.promptManager.cpm = cfg.ContextProviderManager
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
 	react.startEventLoop(cfg.Ctx, mainloopDone)
