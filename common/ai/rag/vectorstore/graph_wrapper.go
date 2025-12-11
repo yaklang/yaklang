@@ -1,6 +1,7 @@
 package vectorstore
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -15,6 +16,123 @@ import (
 	"io"
 	"sync"
 )
+
+var GraphWrapperManager = NewGraphHNSWManager()
+
+type GraphHNSWManager struct {
+	cache map[string]*GraphWrapper[string]
+	lock  sync.Mutex
+}
+
+func NewGraphHNSWManager() *GraphHNSWManager {
+	return &GraphHNSWManager{
+		make(map[string]*GraphWrapper[string]),
+		sync.Mutex{},
+	}
+}
+
+func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
+	gm.lock.Lock()
+	defer gm.lock.Unlock()
+	wrapper, ok := gm.cache[collection.UUID]
+	if ok {
+		return wrapper, nil
+
+	}
+	wrapper, err := getGraphWrapperFromDB(db, collection, collectionConfig)
+	if err != nil {
+		return nil, utils.Wrap(err, "get graph wrapper from db")
+	}
+	gm.cache[collection.UUID] = wrapper
+	return wrapper, nil
+}
+
+func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
+	collectionName := collection.Name
+	hnswGraph := NewHNSWGraph(collectionName,
+		hnsw.WithHNSWParameters[string](collectionConfig.MaxNeighbors, collectionConfig.LayerGenerationFactor, collectionConfig.EfSearch),
+		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
+	)
+
+	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
+	switch collectionConfig.buildGraphPolicy {
+	case Policy_None:
+		log.Info("build graph with no policy, skip load existed vectors")
+	case Policy_UseDBCanche:
+		fallthrough
+	default:
+		var err error
+		var isEmpty bool
+		if len(collection.GraphBinary) == 0 {
+			// 检测是否存在向量
+			var count int64
+			db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count)
+			if count == 0 {
+				isEmpty = true
+			} else {
+				// 检测到旧版向量库，开始迁移 HNSW Graph
+				log.Warnf("detect old version vector store, start to migrate to new version")
+				err := MigrateHNSWGraph(db, collection)
+				if err != nil {
+					if errors.Is(err, graphNodesIsEmpty) {
+						isEmpty = true
+					} else {
+						return nil, utils.Errorf("migrate hnsw graph err: %v", err)
+					}
+				}
+			}
+
+		}
+		if isEmpty {
+			config := collection
+			hnswGraph = NewHNSWGraph(collectionName,
+				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
+				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
+			)
+		} else {
+			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
+			hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
+			if err != nil {
+				if collectionConfig.TryRebuildHNSWIndex {
+					log.Warnf("load hnsw graph from binary error: %v, try to rebuild hnsw graph, migrate hnsw graph from db", err)
+					err := MigrateHNSWGraph(db, collection)
+					if err != nil {
+						return nil, utils.Wrap(err, "migrate hnsw graph")
+					}
+					graphBinaryReader := bytes.NewReader(collection.GraphBinary)
+					hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
+					if err != nil {
+						return nil, utils.Wrap(err, "parse hnsw graph from binary")
+					}
+				} else {
+					return nil, utils.Wrap(err, "parse hnsw graph from binary")
+				}
+			}
+		}
+
+		if collection.EnablePQMode {
+			if len(collection.CodeBookBinary) != 0 {
+				codeBook, err := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
+				if err != nil {
+					return nil, utils.Errorf("import codebook from binary err: %v", err)
+				}
+				hnswGraph.SetPQCodebook(codeBook)
+				hnswGraph.SetPQQuantizer(pq.NewQuantizer(codeBook))
+			}
+		}
+	}
+	wrapper := NewGraphWrapper(hnswGraph)
+
+	if collectionConfig.EnableAutoUpdateGraphInfos {
+		wrapper.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
+			err := updateDatabaseGraphInfoInLock(db, collection.UUID, wrapper)
+			if err != nil {
+				log.Errorf("update database graph info in lock err: %v", err)
+			}
+		})
+	}
+	return wrapper, nil
+}
 
 var (
 	opTypeRead  = "read"
@@ -189,7 +307,7 @@ func (gw *GraphWrapper[K]) setOnLayerChange(handler func(Layers []*hnsw.Layer[K]
 	gw.graph.OnLayersChange = handler
 }
 
-func updateDatabaseGraphInfoInLock(db *gorm.DB, id uint, wrapper *GraphWrapper[string]) error {
+func updateDatabaseGraphInfoInLock(db *gorm.DB, uuid string, wrapper *GraphWrapper[string]) error {
 	var graphInfosBytes []byte
 	graphInfos, err := wrapper.exportHNSWGraphToBinaryInLock()
 	if err != nil {
@@ -205,7 +323,7 @@ func updateDatabaseGraphInfoInLock(db *gorm.DB, id uint, wrapper *GraphWrapper[s
 			return utils.Wrap(err, "read graph infos")
 		}
 	}
-	err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", id).Update("graph_binary", graphInfosBytes).Error
+	err = db.Model(&schema.VectorStoreCollection{}).Where("uuid = ?", uuid).Update("graph_binary", graphInfosBytes).Error
 	if err != nil {
 		return utils.Wrap(err, "update graph binary")
 	}
@@ -218,7 +336,7 @@ func updateDatabaseGraphInfoInLock(db *gorm.DB, id uint, wrapper *GraphWrapper[s
 		if err != nil {
 			return utils.Wrap(err, "read codebook")
 		}
-		err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", id).Update("code_book_binary", codebookBytes).Error
+		err = db.Model(&schema.VectorStoreCollection{}).Where("uuid = ?", uuid).Update("code_book_binary", codebookBytes).Error
 		if err != nil {
 			return utils.Wrap(err, "update codebook")
 		}

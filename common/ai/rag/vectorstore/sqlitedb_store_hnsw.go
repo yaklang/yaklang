@@ -1,7 +1,6 @@
 package vectorstore
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,39 +20,10 @@ import (
 	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
-	"github.com/yaklang/yaklang/common/ai/rag/pq"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
-
-var VectorStoreHNSWMgr = NewVectorStoreHNSWManager()
-
-type VectorStoreHNSWManager struct {
-	cache map[string]*SQLiteVectorStoreHNSW
-	lock  sync.RWMutex
-}
-
-func NewVectorStoreHNSWManager() *VectorStoreHNSWManager {
-	return &VectorStoreHNSWManager{
-		make(map[string]*SQLiteVectorStoreHNSW),
-		sync.RWMutex{},
-	}
-}
-
-func (m *VectorStoreHNSWManager) LoadVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	if store, ok := m.cache[collectionName]; ok {
-		return store, nil
-	}
-	store, err := LoadSQLiteVectorStoreHNSWFromDb(db, collectionName, opts...)
-	if err != nil {
-		return nil, err
-	}
-	m.cache[collectionName] = store
-	return store, nil
-}
 
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
 type SQLiteVectorStoreHNSW struct {
@@ -80,10 +50,6 @@ const (
 )
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
-	return VectorStoreHNSWMgr.LoadVectorStoreHNSW(db, collectionName, opts...)
-}
-
-func LoadSQLiteVectorStoreHNSWFromDb(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
 		return nil, utils.Wrap(err, fmt.Sprintf("query rag collection [%#v]", collectionName))
@@ -109,95 +75,19 @@ func LoadSQLiteVectorStoreHNSWFromDb(db *gorm.DB, collectionName string, opts ..
 		config:                     collectionConfig,
 	}
 
-	hnswGraph := NewHNSWGraph(collectionName,
-		hnsw.WithHNSWParameters[string](collectionConfig.MaxNeighbors, collectionConfig.LayerGenerationFactor, collectionConfig.EfSearch),
-		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
-	)
-
-	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
-	switch collectionConfig.buildGraphPolicy {
-	case Policy_None:
-		log.Info("build graph with no policy, skip load existed vectors")
-	case Policy_UseDBCanche:
-		fallthrough
-	default:
-		var err error
-		var isEmpty bool
-		if len(collection.GraphBinary) == 0 {
-			// 检测是否存在向量
-			var count int64
-			db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count)
-			if count == 0 {
-				isEmpty = true
-			} else {
-				// 检测到旧版向量库，开始迁移 HNSW Graph
-				log.Warnf("detect old version vector store, start to migrate to new version")
-				err := MigrateHNSWGraph(db, collection)
-				if err != nil {
-					if errors.Is(err, graphNodesIsEmpty) {
-						isEmpty = true
-					} else {
-						return nil, utils.Errorf("migrate hnsw graph err: %v", err)
-					}
-				}
-			}
-
-		}
-		if isEmpty {
-			config := collection
-			hnswGraph = NewHNSWGraph(collectionName,
-				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
-				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
-			)
-		} else {
-			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = vectorStore.parseHNSWGraphFromBinary(graphBinaryReader)
-			if err != nil {
-				if collectionConfig.TryRebuildHNSWIndex {
-					log.Warnf("load hnsw graph from binary error: %v, try to rebuild hnsw graph, migrate hnsw graph from db", err)
-					err := MigrateHNSWGraph(db, collection)
-					if err != nil {
-						return nil, utils.Wrap(err, "migrate hnsw graph")
-					}
-					graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-					hnswGraph, err = vectorStore.parseHNSWGraphFromBinary(graphBinaryReader)
-					if err != nil {
-						return nil, utils.Wrap(err, "parse hnsw graph from binary")
-					}
-				} else {
-					return nil, utils.Wrap(err, "parse hnsw graph from binary")
-				}
-			}
-		}
-
-		if collection.EnablePQMode {
-			if len(collection.CodeBookBinary) != 0 {
-				codeBook, err := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
-				if err != nil {
-					return nil, utils.Errorf("import codebook from binary err: %v", err)
-				}
-				hnswGraph.SetPQCodebook(codeBook)
-				hnswGraph.SetPQQuantizer(pq.NewQuantizer(codeBook))
-			}
-		}
+	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, collectionConfig)
+	if err != nil {
+		log.Errorf("get graph wrapper err: %v", err)
+		return nil, utils.Errorf("get graph wrapper err: %v", err)
 	}
-
-	vectorStore.hnsw = NewGraphWrapper(hnswGraph)
-	vectorStore.hnsw.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
-		if vectorStore.EnableAutoUpdateGraphInfos {
-			err := updateDatabaseGraphInfoInLock(db, collection.ID, vectorStore.hnsw)
-			if err != nil {
-				log.Errorf("update database graph info in lock err: %v", err)
-			}
-		}
-	})
+	vectorStore.hnsw = graphWrapper
 
 	docCount, err := vectorStore.Count()
 	if err != nil {
 		return nil, utils.Wrap(err, "count documents")
 	}
 	if docCount > 0 {
-		dims := hnswGraph.Dims()
+		dims := graphWrapper.graph.Dims()
 		if dims != collectionConfig.Dimension {
 			return nil, utils.Errorf("dimension mismatch: %d != %d, collection name: %s", dims, collectionConfig.Dimension, collectionName)
 		}
@@ -346,31 +236,21 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 	if err := cfg.FixEmbeddingClient(); err != nil {
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
-	hnswGraph := NewHNSWGraph(collection.Name)
-	gw := NewGraphWrapper(hnswGraph)
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   cfg.EmbeddingClient,
 		collection:                 collection,
-		hnsw:                       gw,
 		cacheSize:                  10000,
 		config:                     cfg,
 	}
 
-	vectorStore.hnsw.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
-		if vectorStore.EnableAutoUpdateGraphInfos {
-			err := updateDatabaseGraphInfoInLock(db, collection.ID, vectorStore.hnsw)
-			if err != nil {
-				log.Errorf("update database graph info in lock err: %v", err)
-			}
-		}
-	})
-
-	VectorStoreHNSWMgr.lock.Lock()
-	VectorStoreHNSWMgr.cache[name] = vectorStore
-	VectorStoreHNSWMgr.lock.Unlock()
-
+	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, cfg)
+	if err != nil {
+		log.Errorf("get graph wrapper err: %v", err)
+		return nil, err
+	}
+	vectorStore.hnsw = graphWrapper
 	return vectorStore, nil
 }
 

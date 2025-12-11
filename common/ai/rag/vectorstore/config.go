@@ -50,6 +50,8 @@ type CollectionConfig struct {
 	KeyAsUID bool
 
 	TryRebuildHNSWIndex bool
+
+	Name string
 }
 
 func NewCollectionConfig(options ...CollectionConfigFunc) *CollectionConfig {
@@ -96,6 +98,7 @@ func LoadConfigFromCollectionInfo(collection *schema.VectorStoreCollection, opti
 		CacheSize:                  10000,
 		PreCacheSize:               0,
 		KeyAsUID:                   false,
+		Name:                       collection.Name,
 	}
 	for _, option := range options {
 		option(loadBasicConfig)
