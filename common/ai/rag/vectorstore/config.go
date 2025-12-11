@@ -128,7 +128,7 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 				log.Warnf("collection model '%s' is not compatible with AIBalance free model '%s', falling back to local service",
 					c.ModelName, aibalanceEmbedder.GetModelName())
 			} else {
-				log.Infof("using AIBalance free embedding service (normalized model: %s, dimension: %d)",
+				log.OnceInfoLog("using AIBalance free embedding service (normalized model: %s, dimension: %d)",
 					aibalanceEmbedder.GetModelName(), aibalanceEmbedder.GetModelDimension())
 				c.EmbeddingClient = aibalanceEmbedder
 				// 更新模型名称为归一化名称（如果为空或兼容）

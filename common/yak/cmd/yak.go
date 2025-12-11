@@ -446,7 +446,7 @@ var startGRPCServerCommand = cli.Command{
 			}
 
 			log.Info("starting grpc server in local-password mode")
-			log.Infof("local-password mode: port=9011, tls=false, password=***")
+			log.Infof("local-password mode: port=%d, tls=false, password=***", localRandomPasswordPort)
 		}
 
 		if c.String("home") != "" {
@@ -642,7 +642,7 @@ var startGRPCServerCommand = cli.Command{
 		log.Infof("start to startup grpc server...")
 		if host == "127.0.0.1" {
 			if localPassword != "" {
-				log.Info("the current yak grpc running in local-password mode on '127.0.0.1:9011'")
+				log.Infof("the current yak grpc running in local-password mode on '127.0.0.1:%d'", port)
 			} else {
 				log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
 					"    yak grpc --host 0.0.0.0")
@@ -891,7 +891,12 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 		defer grpcTrans.Stop()
 
 		// 等待服务器启动
-		time.Sleep(time.Second)
+		if err := utils.WaitConnect(addr, 5); err != nil {
+			log.Errorf("failed to connect to server, start local port listener failed: %s", err)
+			finalError = utils.Wrap(err, "waiting grpc listener failed")
+			reason = "waiting grpc listener failed"
+			return
+		}
 
 		// 创建带超时的 context（10 秒）
 		dialCtx, dialCancel := context.WithTimeout(context.Background(), 10*time.Second)
