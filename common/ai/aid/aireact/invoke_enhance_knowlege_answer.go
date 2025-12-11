@@ -3,7 +3,9 @@ package aireact
 import (
 	"bytes"
 	"context"
+
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,11 +33,18 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
-	knowledgeCount := 0
+	// Collect all knowledge items for summary artifact
+	var knowledgeList []aicommon.EnhanceKnowledge
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
 		ekm.AppendKnowledge(currentTask.GetId(), enhanceDatum)
-		knowledgeCount++
+		knowledgeList = append(knowledgeList, enhanceDatum)
+	}
+	knowledgeCount := len(knowledgeList)
+
+	// Save all knowledge to a single artifact file
+	if knowledgeCount > 0 {
+		r.EmitKnowledgeReferenceArtifact(knowledgeList, userQuery)
 	}
 
 	var queryBuf bytes.Buffer

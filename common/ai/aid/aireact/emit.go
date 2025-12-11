@@ -60,15 +60,38 @@ func (r *ReAct) EmitResultAfterStream(result interface{}) {
 }
 
 // EmitKnowledge emits a knowledge event using the embedded Emitter
-// Also saves reference material to file for better traceability
 func (r *ReAct) EmitKnowledge(enhanceID string, knowledge aicommon.EnhanceKnowledge) {
 	r.knowledgeEmitCounter++
-	workdir := r.config.Workdir
-	taskIndex := ""
-	if r.GetCurrentTask() != nil {
-		taskIndex = r.GetCurrentTask().GetIndex()
+	r.Emitter.EmitKnowledge("knowledge", enhanceID, knowledge)
+}
+
+// EmitKnowledgeReferenceArtifact saves all knowledge items to a single artifact file
+// Call this after all knowledge items have been collected
+func (r *ReAct) EmitKnowledgeReferenceArtifact(knowledgeList []aicommon.EnhanceKnowledge, query string) string {
+	if len(knowledgeList) == 0 {
+		return ""
 	}
-	r.Emitter.EmitKnowledgeWithReferenceFile("knowledge", enhanceID, knowledge, workdir, taskIndex, r.knowledgeEmitCounter)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("# 知识增强查询结果\n\n"))
+	sb.WriteString(fmt.Sprintf("**查询内容**: %s\n", query))
+	sb.WriteString(fmt.Sprintf("**结果数量**: %d\n\n", len(knowledgeList)))
+	sb.WriteString("---\n\n")
+
+	for i, k := range knowledgeList {
+		sb.WriteString(fmt.Sprintf("## 知识条目 #%d\n\n", i+1))
+		sb.WriteString(fmt.Sprintf("- **标题**: %s\n", k.GetTitle()))
+		sb.WriteString(fmt.Sprintf("- **类型**: %s\n", k.GetType()))
+		sb.WriteString(fmt.Sprintf("- **来源**: %s\n", k.GetSource()))
+		sb.WriteString(fmt.Sprintf("- **相关度评分**: %.4f\n", k.GetScore()))
+		sb.WriteString(fmt.Sprintf("- **评分方法**: %s\n\n", k.GetScoreMethod()))
+		sb.WriteString("### 详细内容\n\n")
+		sb.WriteString(k.GetContent())
+		sb.WriteString("\n\n---\n\n")
+	}
+
+	// Save to artifacts directory using the existing method
+	return r.EmitFileArtifactWithExt("knowledge_reference", ".md", sb.String())
 }
 
 // EmitKnowledgeListAboutTask emits a list of knowledge items related to a specific task using the embedded Emitter, for sync
