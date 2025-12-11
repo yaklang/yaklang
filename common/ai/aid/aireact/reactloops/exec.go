@@ -329,8 +329,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		done.Do(func() {
 			if task.GetStatus() == aicommon.AITaskState_Skipped {
 				log.Infof("re-act loop [%v] task[%v] skipped", r.loopName, r.currentTask.GetId())
+			} else {
+				task.SetStatus(aicommon.AITaskState_Completed)
 			}
-			task.SetStatus(aicommon.AITaskState_Completed)
 		})
 	}
 
