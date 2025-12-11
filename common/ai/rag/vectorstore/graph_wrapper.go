@@ -31,6 +31,18 @@ func NewGraphHNSWManager() *GraphHNSWManager {
 	}
 }
 
+func (gm *GraphHNSWManager) ClearCache() {
+	gm.lock.Lock()
+	defer gm.lock.Unlock()
+	gm.cache = make(map[string]*GraphWrapper[string])
+}
+
+func (gm *GraphHNSWManager) RemoveFromCache(collectionUUID string) {
+	gm.lock.Lock()
+	defer gm.lock.Unlock()
+	delete(gm.cache, collectionUUID)
+}
+
 func (gm *GraphHNSWManager) GetGraphWrapper(db *gorm.DB, collection *schema.VectorStoreCollection, collectionConfig *CollectionConfig) (*GraphWrapper[string], error) {
 	gm.lock.Lock()
 	defer gm.lock.Unlock()
