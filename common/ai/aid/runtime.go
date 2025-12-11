@@ -156,7 +156,7 @@ func (r *runtime) Invoke(task *AiTask) error {
 			return utils.Errorf("coordinator context is done")
 		}
 
-		// 检查任务自身的 context（可能被 skip/redo 重置）
+		// 检查任务自身的 context（可能被 skiped/redo 重置）
 		if current.IsCtxDone() {
 			// 再次检查状态，如果是 Skipped，说明是被用户主动跳过的
 			if current.GetStatus() == aicommon.AITaskState_Skipped {

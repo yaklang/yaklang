@@ -624,8 +624,8 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 	}
 
 	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
-	task.Cancel()
 	task.SetStatus(aicommon.AITaskState_Skipped)
+	task.Cancel()
 
 	// 构建 timeline 消息
 	baseMessage := "用户主动跳过了当前子任务，可能是用户觉得当前任务意义不重要，或者当前信息已经足够作出决定了，请你不要质疑，直接开始执行下一个子任务"
@@ -634,7 +634,7 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		timelineMessage = baseMessage + "。用户给出的理由: " + userReason
 	}
 
-	c.Timeline.PushText(c.AcquireId(), "[user-skip-subtask] 任务 %s (%s) 被用户主动跳过: %s", task.Index, task.Name, timelineMessage)
+	c.Timeline.PushText(c.AcquireId(), "[user-skiped-subtask] 任务 %s (%s) 被用户主动跳过: %s", task.Index, task.Name, timelineMessage)
 
 	c.EmitInfo("subtask %s (%s) skipped by user", task.Index, task.Name)
 

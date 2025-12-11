@@ -150,6 +150,10 @@ func (t *AiTask) executing() bool {
 	return t.GetStatus() == aicommon.AITaskState_Processing
 }
 
+func (t *AiTask) skiped() bool {
+	return t.GetStatus() == aicommon.AITaskState_Skipped
+}
+
 func (t *AiTask) SetID(id string) {
 	if t.AIStatefulTaskBase != nil {
 		t.AIStatefulTaskBase.SetID(id)
@@ -208,6 +212,8 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		progress = string(aicommon.AITaskState_Completed)
 	} else if t.executing() {
 		progress = string(aicommon.AITaskState_Processing)
+	} else if t.skiped() {
+		progress = string(aicommon.AITaskState_Skipped)
 	}
 
 	// 创建一个不包含AICallback的结构体
