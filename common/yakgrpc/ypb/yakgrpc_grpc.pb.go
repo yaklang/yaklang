@@ -399,6 +399,7 @@ const (
 	Yak_ResetGlobalNetworkConfig_FullMethodName                   = "/ypb.Yak/ResetGlobalNetworkConfig"
 	Yak_GetGlobalProxyRulesConfig_FullMethodName                  = "/ypb.Yak/GetGlobalProxyRulesConfig"
 	Yak_SetGlobalProxyRulesConfig_FullMethodName                  = "/ypb.Yak/SetGlobalProxyRulesConfig"
+	Yak_CheckProxyAlive_FullMethodName                            = "/ypb.Yak/CheckProxyAlive"
 	Yak_ValidP12PassWord_FullMethodName                           = "/ypb.Yak/ValidP12PassWord"
 	Yak_RequestYakURL_FullMethodName                              = "/ypb.Yak/RequestYakURL"
 	Yak_ReadFile_FullMethodName                                   = "/ypb.Yak/ReadFile"
@@ -1090,6 +1091,7 @@ type YakClient interface {
 	// Global Proxy Rules Config
 	GetGlobalProxyRulesConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalProxyRulesConfig, error)
 	SetGlobalProxyRulesConfig(ctx context.Context, in *SetGlobalProxyRulesConfigRequest, opts ...grpc.CallOption) (*Empty, error)
+	CheckProxyAlive(ctx context.Context, in *CheckProxyAliveRequest, opts ...grpc.CallOption) (*CheckProxyAliveResponse, error)
 	ValidP12PassWord(ctx context.Context, in *ValidP12PassWordRequest, opts ...grpc.CallOption) (*ValidP12PassWordResponse, error)
 	// YAKURL
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
@@ -5728,6 +5730,16 @@ func (c *yakClient) SetGlobalProxyRulesConfig(ctx context.Context, in *SetGlobal
 	return out, nil
 }
 
+func (c *yakClient) CheckProxyAlive(ctx context.Context, in *CheckProxyAliveRequest, opts ...grpc.CallOption) (*CheckProxyAliveResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckProxyAliveResponse)
+	err := c.cc.Invoke(ctx, Yak_CheckProxyAlive_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) ValidP12PassWord(ctx context.Context, in *ValidP12PassWordRequest, opts ...grpc.CallOption) (*ValidP12PassWordResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ValidP12PassWordResponse)
@@ -8448,6 +8460,7 @@ type YakServer interface {
 	// Global Proxy Rules Config
 	GetGlobalProxyRulesConfig(context.Context, *Empty) (*GlobalProxyRulesConfig, error)
 	SetGlobalProxyRulesConfig(context.Context, *SetGlobalProxyRulesConfigRequest) (*Empty, error)
+	CheckProxyAlive(context.Context, *CheckProxyAliveRequest) (*CheckProxyAliveResponse, error)
 	ValidP12PassWord(context.Context, *ValidP12PassWordRequest) (*ValidP12PassWordResponse, error)
 	// YAKURL
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
@@ -9834,6 +9847,9 @@ func (UnimplementedYakServer) GetGlobalProxyRulesConfig(context.Context, *Empty)
 }
 func (UnimplementedYakServer) SetGlobalProxyRulesConfig(context.Context, *SetGlobalProxyRulesConfigRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetGlobalProxyRulesConfig not implemented")
+}
+func (UnimplementedYakServer) CheckProxyAlive(context.Context, *CheckProxyAliveRequest) (*CheckProxyAliveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckProxyAlive not implemented")
 }
 func (UnimplementedYakServer) ValidP12PassWord(context.Context, *ValidP12PassWordRequest) (*ValidP12PassWordResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidP12PassWord not implemented")
@@ -16752,6 +16768,24 @@ func _Yak_SetGlobalProxyRulesConfig_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CheckProxyAlive_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckProxyAliveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CheckProxyAlive(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CheckProxyAlive_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CheckProxyAlive(ctx, req.(*CheckProxyAliveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_ValidP12PassWord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ValidP12PassWordRequest)
 	if err := dec(in); err != nil {
@@ -21220,6 +21254,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetGlobalProxyRulesConfig",
 			Handler:    _Yak_SetGlobalProxyRulesConfig_Handler,
+		},
+		{
+			MethodName: "CheckProxyAlive",
+			Handler:    _Yak_CheckProxyAlive_Handler,
 		},
 		{
 			MethodName: "ValidP12PassWord",

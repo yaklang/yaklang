@@ -37,6 +37,9 @@ func BuildProxyEndpointURL(endpoint *ypb.ProxyEndpoint) string {
 	if endpoint == nil {
 		return ""
 	}
+	if endpoint.GetDisabled() {
+		return ""
+	}
 	rawURL := strings.TrimSpace(endpoint.GetUrl())
 	if rawURL == "" {
 		return ""
@@ -117,11 +120,15 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 			Url:      url,
 			UserName: strings.TrimSpace(endpoint.GetUserName()),
 			Password: endpoint.GetPassword(),
+			Disabled: endpoint.GetDisabled(),
 		})
 	}
 
 	validEndpointIDs := make(map[string]struct{}, len(normalized.Endpoints))
 	for _, endpoint := range normalized.Endpoints {
+		if endpoint.GetDisabled() {
+			continue
+		}
 		validEndpointIDs[endpoint.GetId()] = struct{}{}
 	}
 
@@ -176,6 +183,7 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 				URL:        endpoint.GetUrl(),
 				Username:   endpoint.GetUserName(),
 				Password:   endpoint.GetPassword(),
+				Disabled:   endpoint.GetDisabled(),
 			}
 			if err := tx.Create(model).Error; err != nil {
 				return err

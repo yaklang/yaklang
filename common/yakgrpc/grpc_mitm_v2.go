@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -31,7 +30,6 @@ import (
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -179,19 +177,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				feedbackToUser(errMsg)
 				proxyErrors = append(proxyErrors, errMsg)
 				continue
-			}
-			conn, err := netx.ProxyCheck(proxy, 5*time.Second)
-			if err != nil {
-				errInfo := "代理不通（Proxy Cannot be connected）"
-				if errors.Is(err, netx.ErrorProxyAuthFailed) {
-					errInfo = "认证失败（Proxy Auth Fail）"
-				}
-				warnMsg := fmt.Sprintf("下游代理检测失败（继续使用） / downstream proxy failed (will still be used):[%v] %v", proxy, errInfo)
-				log.Errorf("代理检测失败 / proxy check failed:[%v] %v: %v", proxy, errInfo, err)
-				feedbackToUser(warnMsg)
-			}
-			if conn != nil {
-				conn.Close()
 			}
 			proxys = append(proxys, proxyUrl.String())
 		}
@@ -856,7 +841,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			urlStr := httpctx.GetRequestURL(req)
 			rules, rspHooked, dropped := replacer.Hook(false, true, urlStr, rsp)
 			hookDuration := time.Since(hookStart)
-			
+
 			// 监控慢规则 Hook（超过 300ms）
 			if hookDuration > 300*time.Millisecond {
 				now := time.Now()
@@ -874,7 +859,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				yakit.TriggerSlowRuleHookCallbackThrottled()
 				log.Warnf("MITM HookResponse took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 			}
-			
+
 			if dropped {
 				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 				log.Warn("response should be dropped(VIA replacer.hook)")
@@ -1144,7 +1129,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		urlStr = httpctx.GetRequestURL(originReqIns)
 		rules, req1, shouldBeDropped := replacer.Hook(true, false, urlStr, req, isHttps)
 		hookDuration := time.Since(hookStart)
-		
+
 		// 监控慢规则 Hook（超过 300ms）
 		if hookDuration > 300*time.Millisecond {
 			now := time.Now()
@@ -1162,7 +1147,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			yakit.TriggerSlowRuleHookCallbackThrottled()
 			log.Warnf("MITM HookRequest took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 		}
-		
+
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1507,7 +1492,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				hookDuration := time.Since(hookStart)
 				close(colorCh)
-				
+
 				// 监控慢规则 Hook（超过 300ms）
 				if hookDuration > 300*time.Millisecond {
 					now := time.Now()
@@ -1525,7 +1510,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					yakit.TriggerSlowRuleHookCallbackThrottled()
 					log.Warnf("MITM HookColor took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 				}
-				
+
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
 					if err != nil {
