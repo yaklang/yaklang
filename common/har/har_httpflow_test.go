@@ -326,7 +326,7 @@ Content-Length: %d
 					},
 				},
 				HeadersSize: 2,
-				BodySize:    18,
+				BodySize:    17,
 				PostData: &HARHTTPPostData{
 					Text:     requestBody,
 					Params:   nil,
@@ -359,21 +359,20 @@ Content-Length: %d
 		})
 	})
 
-	t.Run("only request sub-fields - method and body_size", func(t *testing.T) {
-		// 测试只传递了"method"和"body_size"时，应该只设置这两个字段
+	t.Run("only request sub-fields - method and body_length", func(t *testing.T) {
+		// 测试只传递了"method"和"body_length"时，应该只设置这两个字段
 		options := &HTTPFlow2HarEntryOptions{
-			SelectedFields: []string{"method", "body_size"},
+			SelectedFields: []string{"method", "body_length"},
 		}
 		entry, err := HTTPFlow2HarEntry(flow, options)
 		require.NoError(t, err)
 		require.NotNil(t, entry)
-		// 只传递了"method"和"body_size"，应该只设置这两个字段
+		// 只传递了"method"和"body_length"，应该只设置这两个字段
 		// 没有传递response相关字段，response应该为nil
 		// 没有传递metadata相关字段，metadata应该为nil
 		require.Equal(t, entry, &HAREntry{
 			Request: &HARRequest{
-				Method:   "POST",
-				BodySize: int(flow.BodyLength),
+				Method: "POST",
 			},
 			Response: &HARResponse{
 				BodySize: int(flow.BodyLength),
