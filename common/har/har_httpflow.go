@@ -57,7 +57,8 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 	// 检查是否传递了父级字段"request"（如果传递了，包含所有request子字段）
 	hasRequestParent := hasParentField("request")
 	// 检查是否传递了request相关的子字段
-	hasRequestFields := hasField("method", "url", "request", "headers", "body_size")
+	// body_length 是响应大小，不应该在这里处理
+	hasRequestFields := hasField("method", "url", "request", "headers", "request_length", "host")
 
 	// 总是创建request对象（HAR格式要求），但只包含用户勾选的字段
 	// 不设置任何默认值，只包含用户勾选的字段
@@ -178,10 +179,17 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 				}
 			}
 		}
-		// 只有勾选了body_size或父级字段request时才设置BodySize
-		includeBodySize := hasRequestParent || hasField("body_size")
-		if includeBodySize {
-			request.BodySize = int(flow.BodyLength)
+
+		// 只有勾选了request_length或父级字段request时才设置请求BodySize
+		// body_length 是响应大小，不应该在这里处理
+		includeRequestBodySize := hasRequestParent || hasField("request_length")
+		if includeRequestBodySize {
+			// 如果已经解析了请求体，使用实际解析的长度；否则使用 flow.RequestLength
+			if includeBody && request.PostData != nil {
+				request.BodySize = len(request.PostData.Text)
+			} else {
+				request.BodySize = int(flow.RequestLength)
+			}
 		}
 	}
 
@@ -190,11 +198,13 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 	// 检查是否传递了父级字段"response"（如果传递了，包含所有response子字段）
 	hasResponseParent := hasParentField("response")
 	// 检查是否传递了response相关的子字段
-	hasResponseFields := hasField("status_code", "response", "headers", "body_size")
+	hasResponseFields := hasField("status_code", "response", "headers", "body_length", "content_type")
 
 	// 总是创建response对象（HAR格式要求），但只包含用户勾选的字段
 	// 不设置任何默认值，只包含用户勾选的字段
 	var response *HARResponse
+	// 用于存储从响应header提取的content-type，供metadata使用
+	var ResponseContentType string
 
 	// 如果传递了response相关字段，解析和填充数据
 	if hasResponseFields {
@@ -238,7 +248,6 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		}
 
 		// 获取content-type（在解析body之前）
-		ResponseContentType := ""
 		if ct := resp.Header.Get("Content-Type"); ct != "" {
 			ResponseContentType = ct
 		}
@@ -271,8 +280,9 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 			}
 		}
 
-		// 检查是否勾选了body_size字段
-		includeBodySize := hasResponseParent || hasField("body_size")
+		// 检查是否勾选了body_length字段（响应大小）
+		// request_length 是请求大小，不应该在这里处理
+		includeBodySize := hasResponseParent || hasField("body_length")
 
 		// 如果勾选了response字段或父级字段response，就解析并包含 body
 		if includeBody {
@@ -301,14 +311,18 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 			response.BodySize = bodySize
 			// 不创建Content对象，因为只勾选了bodySize
 		}
+	} else if hasField("body_length") {
+		// 如果只勾选了body_length但没有勾选其他response字段，使用flow.BodyLength
+		response = &HARResponse{}
+		response.BodySize = int(flow.BodyLength)
 	}
 	// 如果没有勾选response相关字段，不创建任何response子对象（保持为空）
 
 	// clear and save httpflow metadata - 根据字段选择决定是否包含某些元数据
 	// 检查是否有任何metadata字段被勾选
-	hasMetadataFields := hasField("path", "source_type", "duration",
-		"get_params_total", "ip", "ip_address", "tags", "payload",
-		"is_websocket", "from_plugin", "process_name", "upload_online")
+	hasMetadataFields := hasField("id", "path", "host", "source_type", "duration",
+		"get_params_total", "ip", "ip_address", "iP_address", "tags", "payload", "payloads",
+		"content_type", "is_websocket", "from_plugin", "process_name", "upload_online", "updated_at")
 
 	var metadata *HTTPFlowMetaData
 	if hasMetadataFields {
@@ -318,8 +332,14 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		}
 
 		// 根据字段选择包含相应的元数据
+		if hasField("id") {
+			metadata.ID = flow.ID
+		}
 		if hasField("path") {
 			metadata.Path = flow.Path
+		}
+		if hasField("host") {
+			metadata.Host = flow.Host
 		}
 		if hasField("source_type") {
 			metadata.SourceType = flow.SourceType
@@ -332,15 +352,23 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 			metadata.PostParamsTotal = flow.PostParamsTotal
 			metadata.CookieParamsTotal = flow.CookieParamsTotal
 		}
-		if hasField("ip", "ip_address") {
+		if hasField("ip", "ip_address", "iP_address") {
 			metadata.IPAddress = flow.IPAddress
 			metadata.IPInteger = flow.IPInteger
 		}
 		if hasField("tags") {
 			metadata.Tags = flow.Tags
 		}
-		if hasField("payload") {
+		if hasField("payload", "payloads") {
 			metadata.Payload = flow.Payload
+		}
+		if hasField("content_type") {
+			// 优先使用从响应header提取的content-type，如果没有则使用flow.ContentType
+			if ResponseContentType != "" {
+				metadata.ContentType = ResponseContentType
+			} else {
+				metadata.ContentType = flow.ContentType
+			}
 		}
 		if hasField("is_websocket") {
 			metadata.IsWebsocket = flow.IsWebsocket
@@ -353,6 +381,9 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		}
 		if hasField("upload_online") {
 			metadata.UploadOnline = flow.UploadOnline
+		}
+		if hasField("updated_at") {
+			metadata.UpdatedAt = flow.UpdatedAt
 		}
 	}
 

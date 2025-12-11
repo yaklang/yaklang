@@ -119,9 +119,11 @@ type Timings struct {
 }
 
 type HTTPFlowMetaData struct {
+	ID                 uint           `json:"id,omitempty"`
 	NoFixContentLength bool           `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
 	IsHTTPS            bool           `json:"is_https,omitempty"`
 	Path               string         `json:"path,omitempty"`
+	Host               string         `json:"host,omitempty"`
 	SourceType         string         `json:"source_type,omitempty"`
 	Duration           int64          `json:"duration,omitempty"`
 	GetParamsTotal     int            `json:"get_params_total,omitempty"`
@@ -131,8 +133,10 @@ type HTTPFlowMetaData struct {
 	IPInteger          int            `json:"ip_integer,omitempty"`
 	Tags               string         `json:"tags,omitempty"` // 用来打标！
 	Payload            string         `json:"payload,omitempty"`
+	ContentType        string         `json:"content_type,omitempty"`
 	IsWebsocket        bool           `json:"is_websocket,omitempty"`
 	FromPlugin         string         `json:"from_plugin,omitempty"`
 	ProcessName        sql.NullString `json:"process_name,omitempty"`
 	UploadOnline       bool           `json:"upload_online,omitempty"`
+	UpdatedAt          time.Time      `json:"updated_at,omitempty"`
 }
