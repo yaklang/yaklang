@@ -253,21 +253,6 @@ func (s *AIStatefulTaskBase) Cancel() {
 	s.cancel()
 }
 
-// ResetContextWithoutStatusChanged 重置 context，但不改变任务状态
-// 用于需要中断当前执行并重新开始，但保持任务状态（如 Processing）不变的场景
-func (s *AIStatefulTaskBase) ResetContextWithoutStatusChanged(parentCtx context.Context) {
-	// 先取消旧的 context
-	if s.cancel != nil {
-		s.cancel()
-	}
-	// 创建新的 context
-	if parentCtx == nil {
-		parentCtx = context.Background()
-	}
-	s.ctx, s.cancel = context.WithCancel(parentCtx)
-	// 状态保持不变
-}
-
 func (s *AIStatefulTaskBase) IsFinished() bool {
 	switch s.status {
 	case AITaskState_Completed, AITaskState_Aborted, AITaskState_Skipped:

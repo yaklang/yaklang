@@ -549,6 +549,21 @@ func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
 	return nil
 }
 
+func (c *Coordinator) AppendTask(t *AiTask) {
+	defer func() {
+		t.GenerateIndex()
+	}()
+	r := c.runtime
+	task, ok := r.TaskLink.Get(r.currentIndex)
+	if !ok {
+		log.Warnf("coordinator: append task failed, current task not found")
+		return
+	}
+	if parent := task.ParentTask; parent != nil {
+		parent.Subtasks = append(parent.Subtasks, t)
+	}
+}
+
 // HandleSkipSubtaskInPlan 处理跳过子任务的同步事件
 // 输入参数:
 //   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
@@ -699,6 +714,17 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
+	if task.GetStatus() != aicommon.AITaskState_Completed {
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
+			"success":       false,
+			"subtask_index": subtaskIndex,
+			"subtask_name":  task.Name,
+			"user_message":  userMessage,
+			"message":       "only completed subtasks can be redone",
+		}, event.SyncID)
+		return nil
+	}
+
 	// 构建 timeline 消息 - 包含用户的额外信息
 	timelineMessage := strings.Join([]string{
 		"用户请求重新执行当前子任务，并提供了以下额外信息来辅助任务执行:",
@@ -715,9 +741,8 @@ func (c *Coordinator) HandleRedoSubtaskInPlan(event *ypb.AIInputEvent) error {
 
 	c.EmitInfo("subtask %s (%s) will be redone with user message", task.Index, task.Name)
 
-	// 重置 context 准备重新执行（内部会取消旧 context 并创建新的）
-	// 注意：任务状态保持 Processing 不变
-	task.ResetContextWithoutStatusChanged()
+	task.SetContext(c.GetContext())
+	c.AppendTask(task)
 
 	// 发送同步响应
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "redo_subtask_in_plan", map[string]any{
