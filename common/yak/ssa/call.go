@@ -281,6 +281,11 @@ func (c *Call) handlerReturnType() {
 	if !ok || method == nil {
 		return
 	}
+	// For lazy-built functions (like TypeScript arrow functions), we need to build them first
+	// to ensure their Type is set before we try to get the return type
+	if fun, isFunc := ToFunction(method); isFunc && fun.Type == nil {
+		fun.Build()
+	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
 		// For FreeValue Parameter, try to get FunctionType from its Default value
@@ -365,6 +370,10 @@ func (c *Call) handleCalleeFunction() {
 			innerCallee, ok := c.GetValueById(callMethod.Method)
 			if ok && !utils.IsNil(innerCallee) {
 				if innerFunc, ok := ToFunction(innerCallee); ok {
+					// If Type is nil, try to build the function first (for lazy-built functions like TypeScript arrow functions)
+					if innerFunc.Type == nil {
+						innerFunc.Build()
+					}
 					// Try to get return type from innerFunc.Type first
 					if innerFunc.Type != nil {
 						if retFuncTyp, ok := ToFunctionType(innerFunc.Type.ReturnType); ok {
@@ -372,7 +381,7 @@ func (c *Call) handleCalleeFunction() {
 							goto handleSideEffects
 						}
 					}
-					// If Type is nil, check the Return statements directly
+					// If Type is still nil, check the Return statements directly
 					// This handles cases where the function type hasn't been fully resolved
 					for _, retId := range innerFunc.Return {
 						if retInst, ok := innerFunc.GetValueById(retId); ok {

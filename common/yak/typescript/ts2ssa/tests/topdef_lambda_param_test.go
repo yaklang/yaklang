@@ -116,8 +116,10 @@ var a = x
 		// 这是一个更复杂的场景：函数返回一个闭包，然后调用这个闭包
 		// f 返回一个修改 i 的闭包，f1 = f() 获取这个闭包，然后 f1() 调用它
 		//
-		// 通过在 Function.GetType() 中触发 lazy builder，现在可以正确获取
-		// 返回函数的 FunctionType 和 side-effect 信息
+		// 现在 side-effect 能够正确识别：
+		// 1. f 的返回类型被正确推断为函数类型（带有 side-effect）
+		// 2. f1() 调用时能够正确处理 side-effect
+		// 3. 因此 a 的值能够追踪到 444444（f1() 执行后 i 被修改为 j 的值）
 		code := `
 var i = 333333
 var f = () => {
@@ -131,7 +133,7 @@ f1()
 var a = i
 `
 		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
-			"res": {"444444"}, // 正确追踪到 side-effect 修改后的值
+			"res": {"444444"}, // f1() 执行后，i 被修改为 j 的值 444444
 		}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
 
