@@ -85,6 +85,13 @@ func (m *SystemRouteManager) AddIPRoute(ipAddrs interface{}, tunName string) err
 		return utils.Error("no IP addresses provided")
 	}
 
+	for _, s := range ipList {
+		disAllow, reason := IsHijackBlacklisted(s)
+		if disAllow {
+			return utils.Errorf("blacklisted IP address %s : reason : %s", s, reason)
+		}
+	}
+
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
@@ -174,6 +181,13 @@ func (m *SystemRouteManager) DeleteIPRoute(ipAddrs interface{}) error {
 
 	if len(ipList) == 0 {
 		return utils.Error("no IP addresses provided")
+	}
+
+	for _, s := range ipList {
+		disAllow, reason := IsHijackBlacklisted(s)
+		if disAllow {
+			return utils.Errorf("blacklisted IP address %s : reason : %s", s, reason)
+		}
 	}
 
 	m.mux.Lock()
