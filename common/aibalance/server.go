@@ -1173,14 +1173,18 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 
 		// HTTP/1.1 defaults to keep-alive, only close if explicitly requested
 		shouldClose := false
-		if connectionHeader := request.Header.Get("Connection"); connectionHeader != "" {
-			if strings.EqualFold(connectionHeader, "close") {
+		connectionHeader := request.Header.Get("Connection")
+
+		if request.ProtoMajor == 1 && request.ProtoMinor == 0 {
+			// HTTP/1.0 defaults to close unless keep-alive is specified
+			if connectionHeader == "" || !strings.EqualFold(connectionHeader, "keep-alive") {
 				shouldClose = true
 			}
-		}
-		// HTTP/1.0 defaults to close unless keep-alive is specified
-		if request.ProtoMajor == 1 && request.ProtoMinor == 0 {
-			if connectionHeader := request.Header.Get("Connection"); connectionHeader == "" || !strings.EqualFold(connectionHeader, "keep-alive") {
+		} else {
+			// HTTP/1.1 defaults to keep-alive
+			// Only close if explicitly set to "close"
+			// Note: "upgrade" should NOT close the connection
+			if strings.EqualFold(connectionHeader, "close") {
 				shouldClose = true
 			}
 		}
