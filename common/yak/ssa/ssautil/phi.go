@@ -79,7 +79,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		var Check func(scope ScopedVersionedTableIF[T])
 		Check = func(scope ScopedVersionedTableIF[T]) {
 			if utils.IsNil(scope) {
-				log.Errorf("cover scope is nil")
+				// log.Errorf("cover scope is nil")
 				return
 			}
 			if find := scope.ReadVariable(name); !utils.IsNil(find) {
