@@ -251,6 +251,12 @@ func (v *SyntaxFlowVisitor) EmitCondition() {
 	})
 }
 
+func (v *SyntaxFlowVisitor) EmitConditionStart() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpConditionStart,
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:

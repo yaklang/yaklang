@@ -9,6 +9,8 @@ type IterContext struct {
 	originValues chan ValueOperator
 	results      []bool
 	counter      int
+
+	currentOriginValue ValueOperator
 }
 
 // start iter
@@ -46,7 +48,17 @@ func (s *SFFrame) IterNext() (ValueOperator, bool, error) {
 		return nil, false, nil
 	}
 	iter.counter++
+	iter.currentOriginValue = val
 	return val, true, nil
+}
+
+// GetCurrentOriginValue 获取当前迭代的原始值
+func (s *SFFrame) GetCurrentOriginValue() ValueOperator {
+	iter := s.iterStack.Peek()
+	if iter == nil {
+		return nil
+	}
+	return iter.currentOriginValue
 }
 
 // check value, and set result

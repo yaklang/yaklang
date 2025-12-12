@@ -266,7 +266,7 @@ func TestAuditResult(t *testing.T) {
 	require.NoError(t, err)
 
 	// save memResult
-	memResult := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
+	memResult := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{}, nil)
 	memResult.SymbolTable.Set("print", value)
 	result := ssaapi.CreateResultWithProg(prog, memResult)
 	result.Show()

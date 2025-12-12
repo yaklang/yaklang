@@ -96,6 +96,10 @@ func CreateResultFromQuery(res *sfvm.SFFrameResult, config *ssaconfig.Config) *S
 	return ret
 }
 
+func (r *SyntaxFlowResult) GetSFFrameResult() *sfvm.SFFrameResult {
+	return r.memResult
+}
+
 func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.program = prog

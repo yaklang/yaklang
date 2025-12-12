@@ -72,6 +72,7 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			y.VisitNameFilter(true, member.NameFilter())
 		}
 	case *sf.OptionalFilterContext:
+		y.EmitConditionStart()
 		y.VisitConditionExpression(filter.ConditionExpression())
 		y.EmitCondition()
 	case *sf.NextFilterContext:

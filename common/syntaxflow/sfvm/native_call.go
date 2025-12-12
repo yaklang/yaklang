@@ -64,15 +64,30 @@ func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 
 type NativeCallFunc func(v ValueOperator, frame *SFFrame, params *NativeCallActualParams) (bool, ValueOperator, error)
 
-var nativeCallTable = map[string]NativeCallFunc{}
-
-func RegisterNativeCall(name string, f NativeCallFunc) {
-	nativeCallTable[name] = f
+type NativeCall struct {
+	Name        string
+	Description string
+	Function    NativeCallFunc
 }
 
-func GetNativeCall(name string) (NativeCallFunc, error) {
-	if f, ok := nativeCallTable[name]; ok {
-		return f, nil
+func NewNativeCall(name string, description string, function NativeCallFunc) *NativeCall {
+	return &NativeCall{
+		Name:        name,
+		Description: description,
+		Function:    function,
 	}
-	return nil, utils.Wrap(CriticalError, "native call not found: "+name)
+}
+
+var nativeCallTable = map[string]*NativeCall{}
+
+func RegisterNativeCall(name string, description string, function NativeCallFunc) {
+	nativeCallTable[name] = NewNativeCall(name, description, function)
+}
+
+func GetNativeCall(name string) (NativeCallFunc, string, error) {
+	call, ok := nativeCallTable[name]
+	if !ok {
+		return nil, "", utils.Errorf("native call not found: %s", name)
+	}
+	return call.Function, call.Description, nil
 }

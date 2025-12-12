@@ -56,6 +56,96 @@ type SFFrame struct {
 	toLeft bool
 
 	predCounter int
+
+	varFlowGraph *VarFlowGraph
+}
+
+func (s *SFFrame) getVarFlowGraph() *VarFlowGraph {
+	if s.varFlowGraph == nil {
+		s.varFlowGraph = NewVarFlowGraph()
+	}
+	return s.varFlowGraph
+}
+
+func (s *SFFrame) graphStartFlow(varName string) {
+	s.getVarFlowGraph().StartFlow(varName)
+}
+
+func (s *SFFrame) graphCommitFlow(varName string) {
+	if err := s.getVarFlowGraph().CommitFlow(varName); err != nil {
+		log.Debugf("commit flow failed: %v", err)
+	}
+}
+
+func (s *SFFrame) CreateAnalysisStep(stepType AnalysisStepType, sfi *SFI, opts ...EvidenceAttachOption) {
+	s.getVarFlowGraph().CreateStep(stepType, sfi, opts...)
+}
+
+func (s *SFFrame) graphEnterCondition() {
+	s.getVarFlowGraph().EnterCondition()
+}
+
+func (s *SFFrame) graphPushFilterCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushFilterCondition(sfi)
+}
+
+func (s *SFFrame) graphPushStringCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushStringCondition(sfi)
+}
+
+// graphPushStringConditionWithResults 推入字符串条件节点并附加过滤结果
+func (s *SFFrame) graphPushStringConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	s.getVarFlowGraph().PushStringConditionWithResults(sfi, values, conditions)
+}
+
+func (s *SFFrame) graphPushOpcodeCondition(sfi *SFI) {
+	s.getVarFlowGraph().PushOpcodeCondition(sfi)
+}
+
+// graphPushOpcodeConditionWithResults 推入 opcode 条件节点并附加过滤结果
+func (s *SFFrame) graphPushOpcodeConditionWithResults(sfi *SFI, values ValueOperator, conditions []bool) {
+	s.getVarFlowGraph().PushOpcodeConditionWithResults(sfi, values, conditions)
+}
+
+func (s *SFFrame) graphPushLogicAnd() {
+	s.getVarFlowGraph().PushLogicAnd()
+}
+
+func (s *SFFrame) graphPushLogicOr() {
+	s.getVarFlowGraph().PushLogicOr()
+}
+
+func (s *SFFrame) graphPushLogicNot() {
+	s.getVarFlowGraph().PushLogicNot()
+}
+
+func (s *SFFrame) graphExitConditionWithFilter(sfi *SFI) {
+	s.getVarFlowGraph().ExitConditionWithFilter(sfi)
+}
+
+// graphAppendFilterResult 将过滤结果附加到当前证据节点
+func (s *SFFrame) graphAppendFilterResult(result *FilterResult) {
+	s.getVarFlowGraph().AppendFilterResultToCurrentNode(result)
+}
+
+// splitByCondition 根据条件数组将值分离为通过和未通过两组
+func (s *SFFrame) splitByCondition(values ValueOperator, condition []bool) (passed, failed ValueOperator) {
+	passedList := make([]ValueOperator, 0)
+	failedList := make([]ValueOperator, 0)
+	for idx, cond := range condition {
+		if v, err := values.ListIndex(idx); err == nil {
+			if cond {
+				passedList = append(passedList, v)
+			} else {
+				failedList = append(failedList, v)
+			}
+		}
+	}
+	return NewValues(passedList), NewValues(failedList)
+}
+
+func (s *SFFrame) AttachValuesToVarFlowNode(values ValueOperator) {
+	s.getVarFlowGraph().AttachEvidenceToCurrentStep(WithValues(values))
 }
 
 type VerifyFileSystem struct {
@@ -106,6 +196,9 @@ func (s *SFFrame) GetRule() *schema.SyntaxFlowRule {
 	return s.rule
 }
 
+func (s *SFFrame) GetVarGraph() *VarFlowGraph {
+	return s.varFlowGraph
+}
 func (s *SFFrame) GetContext() context.Context {
 	if s == nil || s.config == nil {
 		return context.Background()
@@ -202,7 +295,8 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 }
 
 func (s *SFFrame) Flush() {
-	s.result = NewSFResult(s.rule, s.config)
+	s.varFlowGraph = NewVarFlowGraph()
+	s.result = NewSFResult(s.rule, s.config, s.varFlowGraph)
 	s.stack = utils.NewStack[ValueOperator]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
@@ -313,6 +407,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 				}
 				s.stack.PopN(s.stack.Len() - checkLen)
 			}
+
 			continue
 		}
 
@@ -523,6 +618,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("error: %v", err)
 			return err
 		}
+
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeExact, i.UnaryStr, mod, false),
+			WithValues(next),
+		)
 	case OpRecursiveSearchExact:
 		s.debugSubLog(">> pop recursive search exactly: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -561,6 +661,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
+
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeExact, i.UnaryStr, BothMatch, true),
+			WithValues(results),
+		)
 	case OpRecursiveSearchGlob:
 		s.debugSubLog(">> pop recursive search glob: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -607,6 +712,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
+
+		// mod|NameMatch 在上面的 GlobMatch 调用中使用
+		actualMod := mod | NameMatch
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeFuzzy, i.UnaryStr, actualMod, true),
+			WithValues(results),
+		)
 	case OpRecursiveSearchRegexp:
 		s.debugSubLog(">> pop recursive search regexp: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -656,6 +768,13 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.stack.Push(results)
 		s.debugSubLog("<< push next")
+
+		// mod|NameMatch 在上面的 RegexpMatch 调用中使用
+		actualMod := mod | NameMatch
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeRegexp, i.UnaryStr, actualMod, true),
+			WithValues(results),
+		)
 	case OpPushSearchGlob:
 		s.debugSubLog(">> pop search glob: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -696,6 +815,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("error: %v", err)
 			return err
 		}
+
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeFuzzy, i.UnaryStr, mod, false),
+			WithValues(next),
+		)
 	case OpPushSearchRegexp:
 		s.debugSubLog(">> pop search regexp: %v", i.UnaryStr)
 		value := s.stack.Pop()
@@ -734,6 +858,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog("error: %v", err)
 			return err
 		}
+
+		s.CreateAnalysisStep(AnalysisStepTypeSearch, i,
+			WithSearchMode(SearchTypeRegexp, i.UnaryStr, mod, false),
+			WithValues(next),
+		)
 	case OpPopDuplicate:
 		val := s.popStack.Peek()
 		if val == nil {
@@ -747,7 +876,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		index := i.Iter.currentIndex
 		conditions := s.conditionStack.Peek()
-		//如果是null
+		// val 是过滤表达式产生的中间值
 		val := s.stack.Pop()
 		if len(conditions) == index+1 && !conditions[index] {
 			return nil
@@ -756,9 +885,22 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if len(conditions) < index+1 {
 			return utils.Errorf("check empty failed: stack top is empty")
 		}
-		conditions[index] = !val.IsEmpty()
+		passed := !val.IsEmpty()
+		conditions[index] = passed
 		s.conditionStack.Push(conditions)
 		s.popStack.Free()
+
+		// 收集过滤证据：原始值、中间值、是否通过
+		originValue := s.GetCurrentOriginValue()
+		if originValue != nil {
+			result := &FilterResult{
+				Value:       originValue, // 原始值
+				IntermValue: val,         // 中间值（过滤表达式的结果）
+				Passed:      passed,
+			}
+			s.graphAppendFilterResult(result)
+		}
+
 	case OpPop:
 		if _, err := s.opPop(true); err != nil {
 			return err
@@ -793,6 +935,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< push len: %v", callLen)
 		s.stack.Push(results)
 
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription("Get Call"),
+			WithDescriptionZh("获取调用"),
+			WithValues(results),
+		)
 	case OpGetCallArgs:
 		s.debugSubLog("-- getCallArgs pop call args")
 		//in iterStack
@@ -818,7 +965,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		s.debugSubLog("<< stack grow")
 
 		s.stack.Push(results)
-
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription("Get Call Args"),
+			WithDescriptionZh("获取调用参数"),
+			WithValues(results),
+		)
 	case OpGetUsers:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
@@ -845,6 +996,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		vals.AppendPredecessor(value, s.WithPredecessorContext("getUser"))
 		s.debugSubLog("<< push users")
 		s.stack.Push(vals)
+		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
+			WithDescription("Get Users"),
+			WithDescriptionZh("获取下一级数据流"),
+			WithValues(vals),
+		)
 	case OpGetBottomUsers:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
@@ -870,6 +1026,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("<< push bottom uses %v", ValuesLen(vals))
 		s.stack.Push(vals)
+
+		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
+			WithDataFlowMode(DataFlowDirectionBottomUse, i.SyntaxFlowConfig),
+			WithValues(vals),
+		)
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
@@ -892,6 +1053,11 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("<< push users %v", ValuesLen(vals))
 		s.stack.Push(vals)
+		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
+			WithDescription("Get Defs"),
+			WithDescriptionZh("获取上一级数据流"),
+			WithValues(vals),
+		)
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
 		value := s.stack.Pop()
@@ -917,12 +1083,18 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push top defs %v", ValuesLen(vals))
+
 		s.stack.Push(vals)
+		s.CreateAnalysisStep(AnalysisStepTypeDataFlow, i,
+			WithDataFlowMode(DataFlowDirectionTopDef, i.SyntaxFlowConfig),
+			WithValues(vals),
+		)
 	case OpNewRef:
 		if i.UnaryStr == "" {
 			s.debugSubLog("-")
 			return utils.Errorf("new ref failed: empty name")
 		}
+		s.graphStartFlow(i.UnaryStr)
 		s.debugSubLog(">> from ref: %v ", i.UnaryStr)
 		vs, ok := s.GetSymbol(i)
 		if ok {
@@ -941,6 +1113,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			_ = operator0
 			s.debugSubLog(">> get value: %v ", vs)
 			s.stack.Push(vs)
+			s.AttachValuesToVarFlowNode(vs)
 		} else {
 			values := NewEmptyValues()
 			s.result.SymbolTable.Set(i.UnaryStr, values)
@@ -962,6 +1135,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if value == nil {
 			return utils.Error("BUG: get top defs failed, empty stack")
 		}
+
+		s.graphCommitFlow(i.UnaryStr)
+		s.AttachValuesToVarFlowNode(value)
 		err = s.output(i.UnaryStr, value)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
@@ -1056,6 +1232,8 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		})
 		s.conditionStack.Push(flag)
+
+		s.graphPushFilterCondition(i)
 	case OpCompareOpcode:
 		s.debugSubLog(">> pop")
 		values := s.stack.Pop()
@@ -1090,6 +1268,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
+
+		// 收集 OpcodeCondition 的过滤结果
+		s.graphPushOpcodeConditionWithResults(i, values, condition)
 	case OpCompareString:
 		s.debugSubLog(">> pop")
 		//pop到原值
@@ -1123,12 +1304,16 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.stack.Push(newVal)
 		s.conditionStack.Push(condition)
+
+		// 收集 StringCondition 的过滤结果
+		s.graphPushStringConditionWithResults(i, values, condition)
 	case OpVersionIn:
 		value := s.stack.Peek()
 		if value == nil {
 			return utils.Wrap(CriticalError, "compare version failed: stack top is empty")
 		}
-		call, err := GetNativeCall("versionIn")
+		call, description, err := GetNativeCall("versionIn")
+		_ = description
 		if err != nil {
 			s.debugSubLog("Err: %v", err)
 			log.Errorf("native call failed, not an existed native call-versionIn")
@@ -1299,6 +1484,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			conds[i] = !conds[i]
 		}
 		s.conditionStack.Push(conds)
+		s.graphPushLogicNot()
 	case OpLogicAnd:
 		conds1 := s.conditionStack.Pop()
 		conds2 := s.conditionStack.Pop()
@@ -1310,6 +1496,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			res = append(res, conds1[i] && conds2[i])
 		}
 		s.conditionStack.Push(res)
+		s.graphPushLogicAnd()
 	case OpLogicOr:
 		conds1 := s.conditionStack.Pop()
 		conds2 := s.conditionStack.Pop()
@@ -1321,6 +1508,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			res = append(res, conds1[i] || conds2[i])
 		}
 		s.conditionStack.Push(res)
+		s.graphPushLogicOr()
 	case OpCondition:
 		s.debugSubLog(">> pop")
 		vs := s.stack.Pop()
@@ -1341,6 +1529,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 		}
 		s.stack.Push(NewValues(res))
+		s.graphExitConditionWithFilter(i)
 	case OpMergeRef:
 		s.debugSubLog("fetch: %v", i.UnaryStr)
 		vs, ok := s.GetSymbol(i)
@@ -1433,7 +1622,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 
 		s.debugSubLog("native call: [%v]", i.UnaryStr)
-		call, err := GetNativeCall(i.UnaryStr)
+		call, description, err := GetNativeCall(i.UnaryStr)
 		if err != nil {
 			s.debugSubLog("Err: %v", err)
 			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
@@ -1452,6 +1641,12 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		}
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)
+
+		s.CreateAnalysisStep(AnalysisStepTypeTransform, i,
+			WithDescription(GenerateNativeCallDesc(i.UnaryStr, i.SyntaxFlowConfig)),
+			WithDescriptionZh(GenerateNativeCallDescZh(i.UnaryStr, i.SyntaxFlowConfig, description)),
+			WithValues(ret),
+		)
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
 		opcode2strMap := map[SFVMOpCode]string{
 			OpFileFilterJsonPath: "jsonpath",
@@ -1542,6 +1737,9 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			s.debugSubLog(">> push: %v", ValuesLen(val))
 			s.stack.Push(val)
 		}
+	case OpConditionStart:
+		s.graphEnterCondition()
+		return nil
 	default:
 		msg := fmt.Sprintf("unhandled default case, undefined opcode %v", i.String())
 		return utils.Wrap(CriticalError, msg)

@@ -181,6 +181,8 @@ const (
 	OpFileFilterReg
 	OpFileFilterXpath
 	OpFileFilterJsonPath
+
+	OpConditionStart
 )
 
 var Opcode2String = map[SFVMOpCode]string{
@@ -338,6 +340,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v [%d] mul:%v", "compare string", s.Values, s.UnaryInt, s.MultiOperator)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
+	case OpConditionStart:
+		return fmt.Sprintf(verboseLen+" %v", "condition start", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
