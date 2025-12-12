@@ -120,7 +120,7 @@ type Timings struct {
 
 type HTTPFlowMetaData struct {
 	ID                 uint           `json:"id,omitempty"`
-	NoFixContentLength bool           `json:"no_fix_content_length" json:"no_fix_content_length,omitempty"`
+	NoFixContentLength bool           `json:"no_fix_content_length,omitempty"`
 	IsHTTPS            bool           `json:"is_https,omitempty"`
 	Path               string         `json:"path,omitempty"`
 	Host               string         `json:"host,omitempty"`
