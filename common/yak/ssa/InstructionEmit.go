@@ -485,6 +485,7 @@ func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
 	}
+	ci.SetType(CreateStringType())
 	saveTypeWithValue(ci, ci.GetType())
 	return ci
 }
