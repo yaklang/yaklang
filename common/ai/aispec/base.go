@@ -28,6 +28,7 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 	opts = append(
 		opts, poc.WithTimeout(600), poc.WithConnectTimeout(8), poc.WithRetryTimes(3),
 		poc.WithSave(false),
+		poc.WithConnPool(true), // enable connection pool for better performance
 	)
 
 	if strings.HasSuffix(url, "/") {
@@ -311,6 +312,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))
 	opts = append(opts, poc.WithSave(false))
+	opts = append(opts, poc.WithConnPool(true)) // enable connection pool for better performance
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc

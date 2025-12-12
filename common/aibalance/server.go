@@ -1154,13 +1154,48 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	//c.logInfo("Received new connection request, source: %s", conn.RemoteAddr())
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
-	request, err := utils.ReadHTTPRequestFromBufioReader(reader)
-	if err != nil {
-		c.logError("Failed to read HTTP request: %v", err)
-		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
-		return
-	}
 
+	// Support HTTP/1.1 Keep-Alive (enabled by default)
+	// Handle multiple requests on the same connection
+	for {
+		// Set read deadline to avoid hanging connections
+		conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+
+		request, err := utils.ReadHTTPRequestFromBufioReader(reader)
+		if err != nil {
+			// Connection closed or timeout, this is normal for keep-alive
+			if err == io.EOF {
+				return
+			}
+			c.logError("Failed to read HTTP request: %v", err)
+			return
+		}
+
+		// HTTP/1.1 defaults to keep-alive, only close if explicitly requested
+		shouldClose := false
+		if connectionHeader := request.Header.Get("Connection"); connectionHeader != "" {
+			if strings.EqualFold(connectionHeader, "close") {
+				shouldClose = true
+			}
+		}
+		// HTTP/1.0 defaults to close unless keep-alive is specified
+		if request.ProtoMajor == 1 && request.ProtoMinor == 0 {
+			if connectionHeader := request.Header.Get("Connection"); connectionHeader == "" || !strings.EqualFold(connectionHeader, "keep-alive") {
+				shouldClose = true
+			}
+		}
+
+		// Process the request
+		c.serveRequest(conn, request, shouldClose)
+
+		// If client requested connection close, break the loop
+		if shouldClose {
+			return
+		}
+	}
+}
+
+func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, shouldClose bool) {
 	keys := make([]string, 0, len(request.Header))
 	for k := range request.Header {
 		keys = append(keys, k)
@@ -1179,7 +1214,7 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	uriIns, err := url.ParseRequestURI(request.RequestURI)
 	if err != nil {
 		c.logError("Failed to parse request URI: %v", err)
-		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		c.writeResponse(conn, "HTTP/1.1 400 Bad Request\r\n\r\n", shouldClose)
 		return
 	}
 
@@ -1187,7 +1222,7 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 	requestRaw, err := utils.DumpHTTPRequest(request, true)
 	if err != nil {
 		c.logError("Failed to serialize HTTP request: %v", err)
-		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		c.writeResponse(conn, "HTTP/1.1 400 Bad Request\r\n\r\n", shouldClose)
 		return
 	}
 
@@ -1225,7 +1260,32 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		fallthrough
 	default:
 		c.logError("Unknown request path: %s", uriIns.Path)
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		c.writeResponse(conn, "HTTP/1.1 404 Not Found\r\n\r\n", shouldClose)
 		return
 	}
+}
+
+// writeResponse writes a response with appropriate Connection header for keep-alive support
+func (c *ServerConfig) writeResponse(conn net.Conn, response string, shouldClose bool) {
+	if shouldClose {
+		// Add Connection: close header if not already present
+		if !strings.Contains(response, "Connection:") {
+			lines := strings.Split(response, "\r\n")
+			if len(lines) > 0 {
+				var builder strings.Builder
+				builder.WriteString(lines[0])
+				builder.WriteString("\r\n")
+				builder.WriteString("Connection: close\r\n")
+				for i := 1; i < len(lines); i++ {
+					builder.WriteString(lines[i])
+					if i < len(lines)-1 {
+						builder.WriteString("\r\n")
+					}
+				}
+				conn.Write([]byte(builder.String()))
+				return
+			}
+		}
+	}
+	conn.Write([]byte(response))
 }
