@@ -48,6 +48,9 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		return false
 	}
 
+	// 用于存储从请求头提取的 host，供 metadata 使用
+	var requestHostFromHeader string
+
 	// 检查是否传递了父级字段（如"request"或"response"）
 	hasParentField := func(parentFieldNames ...string) bool {
 		return hasField(parentFieldNames...)
@@ -58,7 +61,7 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 	hasRequestParent := hasParentField("request")
 	// 检查是否传递了request相关的子字段
 	// body_length 是响应大小，不应该在这里处理
-	hasRequestFields := hasField("method", "url", "request", "headers", "request_length", "host")
+	hasRequestFields := hasField("method", "url", "request", "headers", "request_length")
 
 	// 总是创建request对象（HAR格式要求），但只包含用户勾选的字段
 	// 不设置任何默认值，只包含用户勾选的字段
@@ -85,7 +88,9 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 		}
 
 		// 只有当需要解析headers、queryString或body时，才解析reqByte
-		needParseRequestPacket := includeHeaders || includeBody || (includeURL && hasRequestParent)
+		// 如果勾选了 host 字段，也需要解析请求包以从请求头中提取 host
+		includeHost := hasRequestParent || hasField("host")
+		needParseRequestPacket := includeHeaders || includeBody || (includeURL && hasRequestParent) || includeHost
 		var reqByte []byte
 		if needParseRequestPacket {
 			reqRaw, err := strconv.Unquote(flow.Request)
@@ -112,6 +117,15 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 						}
 					}
 					request.QueryString = requestQueryString
+				}
+
+				// 如果勾选了 host 字段，从请求头中提取 host
+				if includeHost {
+					if isRequestHTTP2 {
+						requestHostFromHeader = lowhttp.GetHTTPPacketHeader(reqByte, ":authority")
+					} else {
+						requestHostFromHeader = lowhttp.GetHTTPPacketHeader(reqByte, "Host")
+					}
 				}
 
 				// get headers - 如果勾选了headers或父级字段request
@@ -339,7 +353,15 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 			metadata.Path = flow.Path
 		}
 		if hasField("host") {
-			metadata.Host = flow.Host
+			// 优先使用 flow.Host，如果为空则从请求头中提取，最后从 URL 中提取
+			if flow.Host != "" {
+				metadata.Host = flow.Host
+			} else if requestHostFromHeader != "" {
+				metadata.Host = requestHostFromHeader
+			} else if flow.Url != "" {
+				host, _, _ := utils.ParseStringToHostPort(flow.Url)
+				metadata.Host = host
+			}
 		}
 		if hasField("source_type") {
 			metadata.SourceType = flow.SourceType
@@ -398,93 +420,179 @@ func HTTPFlow2HarEntry(flow *schema.HTTPFlow, options ...*HTTPFlow2HarEntryOptio
 }
 
 func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
+	if entry == nil {
+		return nil, utils.Error("HAREntry is nil")
+	}
+
+	metadata := entry.MetaData
+
 	//---------------- build request
-	req := entry.Request
-	urlIns, err := url.Parse(req.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	reqPacket := lowhttp.BasicRequest()
-	isRequestHTTP2 := strings.Contains(strings.ToLower(req.HTTPVersion), "http/2")
-
-	// build request first line
-	reqPacket = lowhttp.ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s %s %s", req.Method, urlIns.RequestURI(), strings.ToUpper(req.HTTPVersion)))
-
-	// build request headers
-	ReqHeaders := make(map[string]string)
-	lo.ForEach(req.Headers, func(kv *HARKVPair, _ int) {
-		name, value := kv.Name, kv.Value
-		if isRequestHTTP2 {
-			if strings.HasPrefix(kv.Name, ":") {
-				if strings.ToLower(kv.Name) == ":authority" {
-					ReqHeaders["Host"] = kv.Value
-				}
-				return
+	var reqPacket []byte
+	var method, requestURL string
+	if entry.Request != nil {
+		req := entry.Request
+		var urlIns *url.URL
+		var err error
+		if req.URL != "" {
+			urlIns, err = url.Parse(req.URL)
+			if err != nil {
+				return nil, utils.Wrapf(err, "parse request URL failed: %s", req.URL)
 			}
-			name = http.CanonicalHeaderKey(name)
+			requestURL = req.URL
+		} else if metadata != nil && metadata.Host != "" {
+			// 如果 URL 为空但 metadata 中有 Host，尝试构建 URL
+			requestURL = fmt.Sprintf("http://%s/", metadata.Host)
+			urlIns, err = url.Parse(requestURL)
+			if err != nil {
+				requestURL = ""
+			}
 		}
-		ReqHeaders[name] = value
-	})
-	reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, ReqHeaders)
 
-	// build request query string
-	params := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
-	for _, kv := range req.QueryString {
-		params.Add(kv.Name, kv.Value)
-	}
-	reqPacket = lowhttp.ReplaceHTTPPacketQueryParamRaw(reqPacket, params.Encode())
+		reqPacket = lowhttp.BasicRequest()
+		httpVersion := req.HTTPVersion
+		if httpVersion == "" {
+			httpVersion = "HTTP/1.1"
+		}
+		isRequestHTTP2 := strings.Contains(strings.ToLower(httpVersion), "http/2")
 
-	// build request post data
-	postData := req.PostData
-	if postData != nil {
-		if postData.Text != "" {
-			reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
-		} else if len(postData.Params) > 0 {
-			postParams := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
-			for _, kv := range postData.Params {
-				postParams.Add(kv.Name, kv.Value)
+		method = req.Method
+		if method == "" {
+			method = "GET"
+		}
+
+		// build request first line
+		if urlIns != nil {
+			reqPacket = lowhttp.ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s %s %s", method, urlIns.RequestURI(), strings.ToUpper(httpVersion)))
+		} else {
+			reqPacket = lowhttp.ReplaceHTTPPacketFirstLine(reqPacket, fmt.Sprintf("%s / %s", method, strings.ToUpper(httpVersion)))
+		}
+
+		// build request headers
+		ReqHeaders := make(map[string]string)
+		if req.Headers != nil {
+			lo.ForEach(req.Headers, func(kv *HARKVPair, _ int) {
+				name, value := kv.Name, kv.Value
+				if isRequestHTTP2 {
+					if strings.HasPrefix(kv.Name, ":") {
+						if strings.ToLower(kv.Name) == ":authority" {
+							ReqHeaders["Host"] = kv.Value
+						}
+						return
+					}
+					name = http.CanonicalHeaderKey(name)
+				}
+				ReqHeaders[name] = value
+			})
+		}
+		// 如果 metadata 中有 Host，添加到请求头
+		if metadata != nil && metadata.Host != "" {
+			if _, exists := ReqHeaders["Host"]; !exists {
+				ReqHeaders["Host"] = metadata.Host
 			}
-			reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
+		}
+		reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, ReqHeaders)
+
+		// build request query string
+		if len(req.QueryString) > 0 {
+			params := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
+			for _, kv := range req.QueryString {
+				params.Add(kv.Name, kv.Value)
+			}
+			reqPacket = lowhttp.ReplaceHTTPPacketQueryParamRaw(reqPacket, params.Encode())
+		}
+
+		// build request post data
+		if req.PostData != nil {
+			postData := req.PostData
+			if postData.Text != "" {
+				reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postData.Text), false)
+			} else if len(postData.Params) > 0 {
+				postParams := lowhttp.NewQueryParams(lowhttp.WithDisableAutoEncode(true))
+				for _, kv := range postData.Params {
+					postParams.Add(kv.Name, kv.Value)
+				}
+				reqPacket = lowhttp.ReplaceHTTPPacketBody(reqPacket, []byte(postParams.Encode()), false)
+			}
+		}
+	} else {
+		// Request 为 nil，创建空的请求包
+		reqPacket = lowhttp.BasicRequest()
+		method = "GET"
+		if metadata != nil && metadata.Host != "" {
+			requestURL = fmt.Sprintf("http://%s/", metadata.Host)
+		}
+		// 如果 metadata 中有 Host，添加到请求头
+		if metadata != nil && metadata.Host != "" {
+			ReqHeaders := make(map[string]string)
+			ReqHeaders["Host"] = metadata.Host
+			reqPacket = lowhttp.ReplaceAllHTTPPacketHeaders(reqPacket, ReqHeaders)
 		}
 	}
 
 	//---------------- build response
-	resp := entry.Response
+	var respPacket []byte
+	var statusCode int64
+	if entry.Response != nil {
+		resp := entry.Response
 
-	respPacket := lowhttp.BasicResponse()
+		respPacket = lowhttp.BasicResponse()
 
-	// build response first line
-	respPacket = lowhttp.ReplaceHTTPPacketFirstLine(respPacket, fmt.Sprintf("%s %d %s", strings.ToUpper(resp.HTTPVersion), resp.StatusCode, resp.StatusText))
-	isResponseHTTP2 := strings.Contains(strings.ToLower(resp.HTTPVersion), "http/2")
-
-	// build response headers
-	RespHeaders := make(map[string]string)
-	lo.ForEach(resp.Headers, func(kv *HARKVPair, _ int) {
-		name, value := kv.Name, kv.Value
-		if isResponseHTTP2 {
-			name = http.CanonicalHeaderKey(name)
+		httpVersion := resp.HTTPVersion
+		if httpVersion == "" {
+			httpVersion = "HTTP/1.1"
 		}
-		RespHeaders[name] = value
-	})
-	respPacket = lowhttp.ReplaceAllHTTPPacketHeaders(respPacket, RespHeaders)
+		statusCode = int64(resp.StatusCode)
+		if statusCode == 0 {
+			statusCode = 200
+		}
+		statusText := resp.StatusText
+		if statusText == "" {
+			statusText = "OK"
+		}
+		isResponseHTTP2 := strings.Contains(strings.ToLower(httpVersion), "http/2")
 
-	// build response content
-	if resp.Content != nil && resp.Content.Text != "" {
-		respPacket = lowhttp.ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
+		// build response first line
+		respPacket = lowhttp.ReplaceHTTPPacketFirstLine(respPacket, fmt.Sprintf("%s %d %s", strings.ToUpper(httpVersion), statusCode, statusText))
+
+		// build response headers
+		RespHeaders := make(map[string]string)
+		if resp.Headers != nil {
+			lo.ForEach(resp.Headers, func(kv *HARKVPair, _ int) {
+				name, value := kv.Name, kv.Value
+				if isResponseHTTP2 {
+					name = http.CanonicalHeaderKey(name)
+				}
+				RespHeaders[name] = value
+			})
+		}
+		respPacket = lowhttp.ReplaceAllHTTPPacketHeaders(respPacket, RespHeaders)
+
+		// build response content
+		if resp.Content != nil && resp.Content.Text != "" {
+			respPacket = lowhttp.ReplaceHTTPPacketBody(respPacket, []byte(resp.Content.Text), false)
+		}
+	} else {
+		// Response 为 nil，创建空的响应包
+		respPacket = lowhttp.BasicResponse()
+		statusCode = 200
+		respPacket = lowhttp.ReplaceHTTPPacketFirstLine(respPacket, "HTTP/1.1 200 OK")
 	}
 
-	metadata := entry.MetaData
 	flow := &schema.HTTPFlow{
-		Method:      req.Method,
-		Url:         req.URL,
-		StatusCode:  int64(resp.StatusCode),
-		Request:     strconv.Quote(string(reqPacket)),
-		Response:    strconv.Quote(string(respPacket)),
-		RemoteAddr:  entry.ServerIPAddress,
-		BodyLength:  int64(resp.Content.Size),
-		ContentType: resp.Content.MimeType,
+		Method:     method,
+		Url:        requestURL,
+		StatusCode: statusCode,
+		Request:    strconv.Quote(string(reqPacket)),
+		Response:   strconv.Quote(string(respPacket)),
+		RemoteAddr: entry.ServerIPAddress,
 	}
+
+	// 安全地获取 Content 信息
+	if entry.Response != nil && entry.Response.Content != nil {
+		flow.BodyLength = int64(entry.Response.Content.Size)
+		flow.ContentType = entry.Response.Content.MimeType
+	}
+
 	if metadata != nil {
 		flow.NoFixContentLength = metadata.NoFixContentLength
 		flow.IsHTTPS = metadata.IsHTTPS
@@ -502,6 +610,18 @@ func HarEntry2HTTPFlow(entry *HAREntry) (*schema.HTTPFlow, error) {
 		flow.FromPlugin = metadata.FromPlugin
 		flow.ProcessName = metadata.ProcessName
 		flow.UploadOnline = metadata.UploadOnline
+		// 如果 metadata 中有 ContentType，优先使用（因为它是从响应 header 提取的）
+		if metadata.ContentType != "" {
+			flow.ContentType = metadata.ContentType
+		}
+		// 如果 metadata 中有 Host，使用它
+		if metadata.Host != "" {
+			flow.Host = metadata.Host
+		}
+		// 如果 metadata 中有 UpdatedAt，使用它
+		if !metadata.UpdatedAt.IsZero() {
+			flow.UpdatedAt = metadata.UpdatedAt
+		}
 	}
 	return flow, nil
 }

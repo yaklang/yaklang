@@ -5,6 +5,7 @@ package har
 import (
 	sql "database/sql"
 	json "encoding/json"
+
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -504,12 +505,16 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar4(in *jlexer.Lexer, o
 			continue
 		}
 		switch key {
+		case "id":
+			out.ID = uint(in.Uint64())
 		case "no_fix_content_length":
 			out.NoFixContentLength = bool(in.Bool())
 		case "is_https":
 			out.IsHTTPS = bool(in.Bool())
 		case "path":
 			out.Path = string(in.String())
+		case "host":
+			out.Host = string(in.String())
 		case "source_type":
 			out.SourceType = string(in.String())
 		case "duration":
@@ -528,6 +533,8 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar4(in *jlexer.Lexer, o
 			out.Tags = string(in.String())
 		case "payload":
 			out.Payload = string(in.String())
+		case "content_type":
+			out.ContentType = string(in.String())
 		case "is_websocket":
 			out.IsWebsocket = bool(in.Bool())
 		case "from_plugin":
@@ -536,6 +543,10 @@ func easyjson46e2e00bDecodeGithubComYaklangYaklangCommonHar4(in *jlexer.Lexer, o
 			easyjson46e2e00bDecodeDatabaseSql(in, &out.ProcessName)
 		case "upload_online":
 			out.UploadOnline = bool(in.Bool())
+		case "updated_at":
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.UpdatedAt).UnmarshalJSON(data))
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -550,9 +561,24 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 	out.RawByte('{')
 	first := true
 	_ = first
+	if in.ID != 0 {
+		const prefix string = ",\"id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Uint64(uint64(in.ID))
+	}
 	{
 		const prefix string = ",\"no_fix_content_length\":"
-		out.RawString(prefix[1:])
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
 		out.Bool(bool(in.NoFixContentLength))
 	}
 	if in.IsHTTPS {
@@ -564,6 +590,11 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 		const prefix string = ",\"path\":"
 		out.RawString(prefix)
 		out.String(string(in.Path))
+	}
+	if in.Host != "" {
+		const prefix string = ",\"host\":"
+		out.RawString(prefix)
+		out.String(string(in.Host))
 	}
 	if in.SourceType != "" {
 		const prefix string = ",\"source_type\":"
@@ -610,6 +641,11 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 		out.RawString(prefix)
 		out.String(string(in.Payload))
 	}
+	if in.ContentType != "" {
+		const prefix string = ",\"content_type\":"
+		out.RawString(prefix)
+		out.String(string(in.ContentType))
+	}
 	if in.IsWebsocket {
 		const prefix string = ",\"is_websocket\":"
 		out.RawString(prefix)
@@ -629,6 +665,11 @@ func easyjson46e2e00bEncodeGithubComYaklangYaklangCommonHar4(out *jwriter.Writer
 		const prefix string = ",\"upload_online\":"
 		out.RawString(prefix)
 		out.Bool(bool(in.UploadOnline))
+	}
+	if !in.UpdatedAt.IsZero() {
+		const prefix string = ",\"updated_at\":"
+		out.RawString(prefix)
+		out.Raw((in.UpdatedAt).MarshalJSON())
 	}
 	out.RawByte('}')
 }
