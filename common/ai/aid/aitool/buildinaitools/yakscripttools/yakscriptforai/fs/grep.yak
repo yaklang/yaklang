@@ -168,26 +168,34 @@ processPath = (singlePath) => {
                 return
             }
 
+            // Read file once and cache the content
+            fileContent := file.ReadFile(fileToCheck)~
+            yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+            fileContentStr := string(fileContent)
+
             allpattern := str.Split(pattern, ",")
             for subPatternItem in allpattern {
-                fileContent := file.ReadFile(fileToCheck)~
-                yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+                if end { return } // Check end before each pattern
                 if isRegexp {
-                    handleRegexp(subPatternItem, fileToCheck, string(fileContent))
+                    handleRegexp(subPatternItem, fileToCheck, fileContentStr)
                 } else {
-                    handle(subPatternItem, fileToCheck, string(fileContent))
+                    handle(subPatternItem, fileToCheck, fileContentStr)
                 }
             }
         }))
     } else {
+        // Read file once and cache the content
+        fileContent := file.ReadFile(singlePath)~
+        yakit.File(singlePath, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+        fileContentStr := string(fileContent)
+
         allpattern := str.Split(pattern, ",")
         for subPatternItem in allpattern {
-            fileContent := file.ReadFile(singlePath)~
-            yakit.File(singlePath, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
+            if end { return } // Check end before each pattern
             if isRegexp {
-                handleRegexp(subPatternItem, singlePath, string(fileContent))
+                handleRegexp(subPatternItem, singlePath, fileContentStr)
             } else {
-                handle(subPatternItem, singlePath, string(fileContent))
+                handle(subPatternItem, singlePath, fileContentStr)
             }
         }
     }

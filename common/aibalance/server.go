@@ -1183,9 +1183,19 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		} else {
 			// HTTP/1.1 defaults to keep-alive
 			// Only close if explicitly set to "close"
-			// Note: "upgrade" should NOT close the connection
 			if strings.EqualFold(connectionHeader, "close") {
 				shouldClose = true
+			}
+			// Handle "Connection: upgrade" from nginx proxy
+			// If Connection is "upgrade" but no Upgrade header is present,
+			// this is not a real WebSocket upgrade request, so close the connection
+			// to avoid pending issues with nginx proxy
+			if strings.EqualFold(connectionHeader, "upgrade") {
+				upgradeHeader := request.Header.Get("Upgrade")
+				if upgradeHeader == "" {
+					// Not a real upgrade request, close connection after response
+					shouldClose = true
+				}
 			}
 		}
 
