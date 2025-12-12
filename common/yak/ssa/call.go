@@ -357,6 +357,7 @@ func (c *Call) handleCalleeFunction() {
 	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok { // for Test_SideEffect_Double_more
+		// Handle Parameter side effects
 		if param, ok := ToParameter(method); ok {
 			caller := param.GetFunc()
 			callee := caller.anValue.GetFunc()
@@ -365,121 +366,83 @@ func (c *Call) handleCalleeFunction() {
 
 		// Handle case where method is a Call instruction (e.g., f1() where f1 = f())
 		// Try to get the FunctionType from the call's return value
-		if callMethod, ok := ToCall(method); ok {
-			// Get the callee of the inner call (e.g., f in f())
-			innerCallee, ok := c.GetValueById(callMethod.Method)
-			if ok && !utils.IsNil(innerCallee) {
-				if innerFunc, ok := ToFunction(innerCallee); ok {
-					// If Type is nil, try to build the function first (for lazy-built functions like TypeScript arrow functions)
-					if innerFunc.Type == nil {
-						innerFunc.Build()
-					}
-					// Try to get return type from innerFunc.Type first
-					if innerFunc.Type != nil {
-						if retFuncTyp, ok := ToFunctionType(innerFunc.Type.ReturnType); ok {
-							funcTyp = retFuncTyp
-							goto handleSideEffects
-						}
-					}
-					// If Type is still nil, check the Return statements directly
-					// This handles cases where the function type hasn't been fully resolved
-					for _, retId := range innerFunc.Return {
-						if retInst, ok := innerFunc.GetValueById(retId); ok {
-							if ret, ok := ToReturn(retInst); ok {
-								for _, resId := range ret.Results {
-									if res, ok := innerFunc.GetValueById(resId); ok {
-										// Check if the return value is a function with side effects
-										if retFuncTyp, ok := ToFunctionType(res.GetType()); ok {
-											if len(retFuncTyp.SideEffects) > 0 {
-												funcTyp = retFuncTyp
-												goto handleSideEffects
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+		funcTyp = c.tryGetFunctionTypeFromCallReturn(method)
+		if funcTyp == nil {
+			return
 		}
-		return
 	}
 
-handleSideEffects:
+	// Handle side effects
+	recoverBuilder := builder.SetCurrent(c)
+	defer func() {
+		recoverBuilder()
+	}()
 
-	{
-		recoverBuilder := builder.SetCurrent(c)
-		defer func() {
-			recoverBuilder()
-		}()
+	for true {
+		if len(c.ArgMember) == len(funcTyp.ParameterMember) {
+			break
+		}
+		for _, p := range funcTyp.ParameterMember {
 
-		for true {
-			if len(c.ArgMember) == len(funcTyp.ParameterMember) {
-				break
+			objectName := p.ObjectName
+			key, ok := p.GetValueById(p.MemberCallKey)
+			if !ok || utils.IsNil(key) {
+				continue
 			}
-			for _, p := range funcTyp.ParameterMember {
+			object, ok := p.GetActualParam(c)
+			if !ok {
+				continue
+			}
+			if utils.IsNil(object) {
+				continue
+			}
 
-				objectName := p.ObjectName
-				key, ok := p.GetValueById(p.MemberCallKey)
-				if !ok || utils.IsNil(key) {
-					continue
-				}
-				object, ok := p.GetActualParam(c)
-				if !ok {
-					continue
-				}
-				if utils.IsNil(object) {
-					continue
-				}
+			if res := checkCanMemberCallExist(object, key); !res.exist {
+				builder.NewErrorWithPos(Error, SSATAG,
+					p.GetRange(),
+					ValueNotMember(
+						object.GetOpcode(),
+						objectName,
+						key.String(),
+						c.GetRange(),
+					),
+				)
+				c.NewError(Error, SSATAG,
+					ValueNotMemberInCall(
+						objectName,
+						key.String(),
+					),
+				)
+				continue
+			}
 
-				if res := checkCanMemberCallExist(object, key); !res.exist {
-					builder.NewErrorWithPos(Error, SSATAG,
-						p.GetRange(),
-						ValueNotMember(
-							object.GetOpcode(),
-							objectName,
-							key.String(),
-							c.GetRange(),
-						),
-					)
-					c.NewError(Error, SSATAG,
-						ValueNotMemberInCall(
-							objectName,
-							key.String(),
-						),
-					)
-					continue
-				}
-
-				var val Value
-				if val = builder.ReadMemberCallValueByName(object, key.String()); val == nil {
-					if o, ok := object.GetType().(*ObjectType); ok {
-						for n, a := range o.AnonymousField {
-							if k := a.GetKeybyName(key.String()); k != nil {
-								objectt := builder.ReadMemberCallValueByName(object, n)
-								if objectt == nil {
-									log.Warnf("anonymous object %v not find", n)
-									continue
-								}
-								val = builder.ReadMemberCallValueByName(objectt, k.String())
+			var val Value
+			if val = builder.ReadMemberCallValueByName(object, key.String()); val == nil {
+				if o, ok := object.GetType().(*ObjectType); ok {
+					for n, a := range o.AnonymousField {
+						if k := a.GetKeybyName(key.String()); k != nil {
+							objectt := builder.ReadMemberCallValueByName(object, n)
+							if objectt == nil {
+								log.Warnf("anonymous object %v not find", n)
+								continue
 							}
+							val = builder.ReadMemberCallValueByName(objectt, k.String())
 						}
 					}
 				}
-
-				if _, ok := ToExternLib(object); ok {
-					continue
-				}
-
-				if utils.IsNil(val) {
-					val = builder.ReadMemberCallValue(object, key)
-				}
-				val.AddUser(c)
-				c.ArgMember = append(c.ArgMember, val.GetId())
 			}
-			break
+
+			if _, ok := ToExternLib(object); ok {
+				continue
+			}
+
+			if utils.IsNil(val) {
+				val = builder.ReadMemberCallValue(object, key)
+			}
+			val.AddUser(c)
+			c.ArgMember = append(c.ArgMember, val.GetId())
 		}
+		break
 	}
 
 	if builder.isBindLanguage() {
@@ -572,4 +535,75 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			handleError()
 		}
 	}
+}
+
+// tryGetFunctionTypeFromCallReturn attempts to extract FunctionType from a Call instruction's return value.
+// This handles cases like: f1() where f1 = f(), and f() returns a function.
+func (c *Call) tryGetFunctionTypeFromCallReturn(method Value) *FunctionType {
+	// Check if method is a Call instruction
+	callMethod, ok := ToCall(method)
+	if !ok || utils.IsNil(callMethod) {
+		return nil
+	}
+
+	// Get the inner callee (e.g., f in f())
+	innerCallee, ok := c.GetValueById(callMethod.Method)
+	if !ok || utils.IsNil(innerCallee) {
+		return nil
+	}
+
+	innerFunc, ok := ToFunction(innerCallee)
+	if !ok || utils.IsNil(innerFunc) {
+		return nil
+	}
+
+	// Build the function if not yet built (for lazy-built functions like TypeScript arrow functions)
+	if innerFunc.Type == nil {
+		innerFunc.Build()
+	}
+
+	// Try to get return type from innerFunc.Type first
+	if innerFunc.Type != nil {
+		if retFuncTyp, ok := ToFunctionType(innerFunc.Type.ReturnType); ok {
+			return retFuncTyp
+		}
+	}
+
+	// Fallback: check the Return statements directly
+	// This handles cases where the function type hasn't been fully resolved like a function return is a closure function
+	return c.extractFunctionTypeFromReturns(innerFunc)
+}
+
+// extractFunctionTypeFromReturns extracts FunctionType from a function's return statements.
+// It looks for return values that are functions with side effects.
+func (c *Call) extractFunctionTypeFromReturns(fn *Function) *FunctionType {
+	for _, retId := range fn.Return {
+		retInst, ok := fn.GetValueById(retId)
+		if !ok || utils.IsNil(retInst) {
+			continue
+		}
+
+		ret, ok := ToReturn(retInst)
+		if !ok {
+			continue
+		}
+
+		for _, resId := range ret.Results {
+			res, ok := fn.GetValueById(resId)
+			if !ok || utils.IsNil(res) {
+				continue
+			}
+
+			// Check if the return value is a function with side effects
+			retFuncTyp, ok := ToFunctionType(res.GetType())
+			if !ok || utils.IsNil(retFuncTyp) {
+				continue
+			}
+
+			if len(retFuncTyp.SideEffects) > 0 {
+				return retFuncTyp
+			}
+		}
+	}
+	return nil
 }
