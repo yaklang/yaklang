@@ -13,6 +13,12 @@ fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if th
 contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
 cli.check()
 
+// Fallback: if fileSizeLimit is 0 or negative (e.g., due to scientific notation parsing issue), set to 2GB
+if fileSizeLimit <= 0 {
+    fileSizeLimit = 1000 * 1000 * 1000 * 2 // 2GB
+    yakit.Info("file-size-max was invalid (%v), reset to default 2GB", fileSizeLimit)
+}
+
 // 解析多个路径（以逗号分隔）
 pathList := str.Split(pathName, ",")
 validPaths := []

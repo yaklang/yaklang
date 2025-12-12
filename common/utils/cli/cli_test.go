@@ -1,11 +1,12 @@
 package cli
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -276,4 +277,45 @@ func TestCliFileAllowNoFile(t *testing.T) {
 			t.Fatal("allow no pass cli.File, but param invalid")
 		}
 	})
+}
+
+// TestParseIntScientificNotation tests that parseInt can handle scientific notation
+// This is important because large numbers from Yak scripts may be formatted as "2e+09"
+func TestParseIntScientificNotation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+	}{
+		{"normal int", "123", 123},
+		{"large int", "2000000000", 2000000000},
+		{"scientific notation positive", "2e+09", 2000000000},
+		{"scientific notation", "2e9", 2000000000},
+		{"scientific notation with decimal", "1.5e+09", 1500000000},
+		{"negative scientific notation", "-2e+09", -2000000000},
+		{"zero", "0", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseInt(tt.input)
+			if result != tt.expected {
+				t.Errorf("parseInt(%q) = %d, want %d", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestCliIntWithLargeDefault tests that cli.Int works with large default values
+// that may be formatted as scientific notation
+func TestCliIntWithLargeDefault(t *testing.T) {
+	test := assert.New(t)
+	app := NewCliApp()
+	app.SetArgs([]string{}) // No args, use default
+
+	// Test with large default value (2GB = 2e+09)
+	largeDefault := 1000 * 1000 * 1000 * 2
+	result := app.Int("file-size-max", app.SetDefault(largeDefault))
+
+	test.Equal(largeDefault, result, "Large default value should be parsed correctly")
 }
