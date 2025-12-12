@@ -99,6 +99,7 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 // Invoke 执行规划请求，调用AI生成任务列表并返回解析后的Task
 func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	if pr.cod.PlanMocker != nil {
+		pr.cod.EmitThoughtStream("mock task", "使用模版预设任务")
 		planRes := pr.cod.PlanMocker(pr.cod)
 		if utils.IsNil(planRes) {
 			return nil, utils.Error("planMocker returns nil, unknown error")
