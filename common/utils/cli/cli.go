@@ -165,6 +165,11 @@ var defaultUIParams = func() {}
 func parseInt(s string) int {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
+		// Try to parse scientific notation (e.g., 2e+09)
+		f, floatErr := strconv.ParseFloat(s, 64)
+		if floatErr == nil {
+			return int(f)
+		}
 		log.Errorf("parse int[%s] failed: %s", s, err)
 		return 0
 	}
