@@ -138,7 +138,7 @@ func TestExtractPostParams(t *testing.T) {
 			},
 			want: map[string]string{
 				"a": "1",
-				"b": "hello world",
+				"b": "hello+world",
 			},
 		},
 		{
