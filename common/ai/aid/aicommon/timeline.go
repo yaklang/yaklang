@@ -229,12 +229,15 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
-	if m.config != nil && m.config.GetEmitter() != nil {
-		m.config.GetEmitter().EmitTimelineItem(item)
-	}
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(id, item)
 	m.dumpSizeCheck()
+
+	// Emit timeline item asynchronously to avoid blocking when EventHandler
+	// writes to an unbuffered channel that hasn't been consumed yet
+	if m.config != nil && m.config.GetEmitter() != nil {
+		go m.config.GetEmitter().EmitTimelineItem(item)
+	}
 }
 
 func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {

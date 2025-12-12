@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -15,9 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
@@ -59,14 +60,13 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(500 * time.Second): // 优化：从30秒减少到5秒
+		case <-time.After(10 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 400 {
 				break LOOP
 			}
-			fmt.Println("result:" + result.String())
 
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
@@ -74,8 +74,6 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
-				// 不要立即清空toolCallID，因为 stdout 和 stderr 是流事件，是异步的
-				// toolCallID = ""
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -98,11 +96,9 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
 				break LOOP
 			}
-
-			fmt.Println("review task result:" + result.String())
 		}
 	}
 	require.Contains(t, outBuffer.String(), outputToken, " output should match expected token")
@@ -169,14 +165,13 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 LOOP:
 	for {
 		select {
-		case <-time.After(500 * time.Second): // 优化：从30秒减少到5秒
+		case <-time.After(10 * time.Second):
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 500 {
 				break LOOP
 			}
-			fmt.Println("result:" + result.String())
 
 			if result.Type == schema.EVENT_TOOL_CALL_START {
 				toolCallID = result.CallToolID
@@ -184,8 +179,6 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
-				// 不要立即清空toolCallID，因为 stdout 和 stderr 是流事件，是异步的
-				// toolCallID = ""
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -208,11 +201,9 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") {
+			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool") {
 				break LOOP
 			}
-
-			fmt.Println("review task result:" + result.String())
 		}
 	}
 	require.Contains(t, outBuffer.String(), outputToken, " output should match expected token")
