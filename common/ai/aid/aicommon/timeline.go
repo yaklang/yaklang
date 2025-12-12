@@ -5,14 +5,15 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -224,9 +225,19 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 		m.shrink(item)
 	}
 
+	m.pushTimelineItem(ts, toolResult.GetID(), item)
+}
+
+func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
 	m.tsToTimelineItem.Set(ts, item)
-	m.idToTimelineItem.Set(toolResult.GetID(), item)
+	m.idToTimelineItem.Set(id, item)
 	m.dumpSizeCheck()
+
+	// Emit timeline item asynchronously to avoid blocking when EventHandler
+	// writes to an unbuffered channel that hasn't been consumed yet
+	if m.config != nil && m.config.GetEmitter() != nil {
+		go m.config.GetEmitter().EmitTimelineItem(item)
+	}
 }
 
 func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, systemPrompt string, userExtraPrompt string) {
@@ -253,9 +264,7 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 		m.shrink(item)
 	}
 
-	m.tsToTimelineItem.Set(ts, item)
-	m.idToTimelineItem.Set(id, item)
-	m.dumpSizeCheck()
+	m.pushTimelineItem(ts, id, item)
 }
 
 // findCompressCountForTargetSize 使用二分法找到需要压缩的项目数量，使得剩余项目数约为 targetSize
@@ -799,9 +808,7 @@ func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
 		m.shrink(item)
 	}
 
-	m.tsToTimelineItem.Set(ts, item)
-	m.idToTimelineItem.Set(id, item)
-	m.dumpSizeCheck()
+	m.pushTimelineItem(ts, id, item)
 }
 
 // TimelineEntry 时间线条目
