@@ -605,7 +605,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				chatCompleted <- err
 				return
 			}
-			c.logInfo("AI chat interface call completed, final: %v", utils.ShrinkString(finalMsg, 100))
+			c.logInfo("AI chat interface call completed, final: %v.", utils.ShrinkString(finalMsg, 100))
 			chatCompleted <- nil
 		}()
 
