@@ -877,6 +877,11 @@ RECONNECT:
 			rawBytes = re.respBytes
 			response.MultiResponse = false
 			traceInfo.ServerTime = re.info.ServerTime
+			// Mark BodyStreamReaderHandler as handled in conn pool mode
+			// to prevent the defer from calling it again
+			if option != nil && option.BodyStreamReaderHandler != nil {
+				bodyStreamReaderHandled.Set()
+			}
 		case <-pc.ctx.Done(): // if persistConn closed before read response , check error can retry or not
 			if pc.closed == nil {
 				return nil, utils.Error("BUG: closeCh but closed is nil")
@@ -935,7 +940,8 @@ RECONNECT:
 
 		var mirrorWriter io.Writer = &responseRaw
 
-		// BodyStreamReaderHandler is only effect non-pool connection
+		// BodyStreamReaderHandler for non-pool connection
+		// Note: connection pool mode also supports BodyStreamReaderHandler (see conn_pool.go readLoop)
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {

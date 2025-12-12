@@ -561,11 +561,70 @@ func (pc *persistConn) readLoop() {
 		// for long time chunked supported
 
 		var respBuffer bytes.Buffer
-		httpResponseReader := io.TeeReader(pc.br, &respBuffer)
+		var mirrorWriter io.Writer = &respBuffer
+
+		// Support BodyStreamReaderHandler in connection pool mode
+		var streamHandlerWg sync.WaitGroup
+		var streamWriter io.WriteCloser
+		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
+			streamReader, sw := utils.NewBufPipe(nil)
+			streamWriter = sw
+
+			streamHandlerWg.Add(1)
+			go func(reader io.Reader, handler func([]byte, io.ReadCloser)) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("BodyStreamReaderHandler panic in conn pool: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+					streamHandlerWg.Done()
+				}()
+
+				// Parse header and body from stream
+				packetReader := bufio.NewReader(reader)
+				responseHeader := bytes.NewBufferString("")
+
+				for {
+					line, err := utils.BufioReadLine(packetReader)
+					if err != nil {
+						if err != io.EOF {
+							log.Errorf("BodyStreamReaderHandler read response failed in conn pool: %s", err)
+						}
+						break
+					}
+					responseHeader.Write(line)
+					responseHeader.Write([]byte("\r\n"))
+					if len(line) == 0 {
+						// Header finished, now handle body
+						bodyReader, bodyWriter := utils.NewBufPipe(nil)
+						go func() {
+							io.Copy(bodyWriter, packetReader)
+							bodyWriter.Close()
+						}()
+						handler(responseHeader.Bytes(), bodyReader)
+						break
+					}
+				}
+			}(streamReader, rc.option.BodyStreamReaderHandler)
+
+			// Use MultiWriter to write to both respBuffer and streamWriter
+			if rc.option.NoBodyBuffer {
+				mirrorWriter = streamWriter
+			} else {
+				mirrorWriter = io.MultiWriter(&respBuffer, streamWriter)
+			}
+		}
+
+		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
 		_ = pc.conn.SetReadDeadline(time.Time{})
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
+		}
+
+		// Close streamWriter after reading response to signal EOF to the handler
+		if streamWriter != nil {
+			streamWriter.Close()
 		}
 
 		if firstAuth && resp != nil && resp.StatusCode == http.StatusUnauthorized {
@@ -581,6 +640,8 @@ func (pc *persistConn) readLoop() {
 						}
 					}
 					firstAuth = false
+					// Wait for stream handler to complete before continuing
+					streamHandlerWg.Wait()
 					continue
 				}
 			}
@@ -617,6 +678,9 @@ func (pc *persistConn) readLoop() {
 				}
 			}
 		}
+
+		// Wait for stream handler to complete before sending response
+		streamHandlerWg.Wait()
 
 		//pc.mu.Lock()
 		////pc.numExpectedResponses-- // 减少预期响应数量

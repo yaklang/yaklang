@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
@@ -117,6 +118,15 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 				currentCoordinatorId = e.CoordinatorId
 			})
 		}
+
+		utils.Debug(func() {
+			if res := e.ToGRPC(); res != nil {
+				if res.IsStream {
+					fmt.Println(string(res.GetStreamDelta()))
+				}
+			}
+		})
+
 		err := stream.Send(e.ToGRPC())
 		if err != nil {
 			log.Errorf("send re-act event to stream failed: %v", err)
