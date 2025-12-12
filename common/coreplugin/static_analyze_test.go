@@ -26,15 +26,18 @@ func staticCheck(code, pluginType string, t *testing.T) {
 }
 
 func TestAnalyzeMustPASSCorePlugin(t *testing.T) {
+	// for i := 0; i < 20; i++ {
 	yakit.CallPostInitDatabase()
 	for _, plugin := range buildInPlugin {
 		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
 			staticCheck(plugin.Content, plugin.Type, t)
 		})
 	}
+	// }
 }
 
 func TestAnalyzeMustPASSCorePlugin_Debug(t *testing.T) {
+	// for i := 0; i < 20; i++ {
 	if utils.InGithubActions() {
 		t.Skip("Skip in Github Actions")
 	}
@@ -48,4 +51,5 @@ func TestAnalyzeMustPASSCorePlugin_Debug(t *testing.T) {
 			staticCheck(plugin.Content, plugin.Type, t)
 		})
 	}
+	// }
 }
