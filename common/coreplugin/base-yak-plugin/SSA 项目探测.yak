@@ -2,57 +2,57 @@ yakit.AutoInitYakit()
 
 target = cli.String("target", cli.setRequired(true))
 languages = cli.StringSlice(
-    "language",
-    cli.setMultipleSelect(false),
-    cli.setSelectOption("Java", "java"),
-    cli.setSelectOption("PHP", "php"),
-    cli.setSelectOption("Yaklang", "yak"),
-    cli.setSelectOption("JavaScript", "js"),
-    cli.setSelectOption("TypeScript", "ts"),
-    cli.setSelectOption("Golang", "go"),
-    cli.setSelectOption("C", "c"),
+    "language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    cli.setSelectOption("JavaScript", "js"), 
+    cli.setSelectOption("TypeScript", "ts"), 
+    cli.setSelectOption("Golang", "go"), 
+    cli.setSelectOption("C", "c"), 
 )
 
-
-compile_immediately := cli.Bool("compile-immediately",
-    cli.setDefault(false),
-    cli.setVerboseName("是否立即编译"),
-    cli.setHelp("探测完成后是否立即编译项目"),
-    cli.setCliGroup("compile"),
+compile_immediately := cli.Bool(
+    "compile-immediately", 
+    cli.setDefault(false), 
+    cli.setVerboseName("是否立即编译"), 
+    cli.setHelp("探测完成后是否立即编译项目"), 
+    cli.setCliGroup("compile"), 
 )
 
-concurrency := cli.Int("concurrency",
-    cli.setVerboseName("并发数"),
-    cli.setCliGroup("compile"),
-    cli.setDefault(10),
-    cli.setHelp("编译时，同时进行编译的文件数量"),
-)
+concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量"))
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
 peepholeSizes := cli.StringSlice(
-    "peephole",
-    cli.setHelp("将项目切分为多个小项目，以提高编译速度。精度随数字增高。"),
-    cli.setVerboseName("项目分片"),
-    cli.setSelectOption("关闭，精度IV", "0"),
-    cli.setSelectOption("慢速，精度III", "40"),
-    cli.setSelectOption("中速，精度II", "10"),
-    cli.setSelectOption("快速，精度I", "1"),
+    "peephole", 
+    cli.setHelp("将项目切分为多个小项目，以提高编译速度。精度随数字增高。"), 
+    cli.setVerboseName("项目分片"), 
+    cli.setSelectOption("关闭，精度IV", "0"), 
+    cli.setSelectOption("慢速，精度III", "40"), 
+    cli.setSelectOption("中速，精度II", "10"), 
+    cli.setSelectOption("快速，精度I", "1"), 
 )
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
+excludeFile := cli.String(
+    "excludeFile", 
+    cli.setVerboseName("排除文件/文件夹"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"), 
+)
 
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
 strictMode = cli.Bool(
-    "StrictMode",
-    cli.setVerboseName("严格模式"),
-    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"),
-    cli.setCliGroup("compile"),
-    cli.setDefault(false),
+    "StrictMode", 
+    cli.setVerboseName("严格模式"), 
+    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault(false), 
 )
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
 
@@ -60,37 +60,20 @@ cli.check()
 target = target.Trim(" ", "\n", "\t")
 origin = target
 proxy = str.TrimSpace(proxy.Lower())
- javaDir = []
+javaDir = []
 // jsDir = ["node_modules"]
 // jsFiles = ["package-lock.json","package.json","yarn.lock"]
 phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
 javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"]
 var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0}
 
-params = {
-    "program_name": "",
-    "project_name":"",
-    "language": "",
-    "info": {
-        "kind": "",
-        "local_file": "",
-        "url": "",
-        "proxy": {"proxy": false, "url": ""},
-        "branch": "",
-        "path": ""  //针对git仓库的相对路径
-    },
-    "description": "",
-    "file_count": 0,
-    "error": {
-        "kind": "",
-        "msg": ""
-    },
-    "compile_immediately": false
-}
+params = {"program_name": "", "project_name": "", "language": "", "info": {"kind": "", "local_file": "", "url": "", "proxy": {"proxy": false, "url": ""}, "branch": "", "path": ""}, "description": "", "file_count": 0, "error": {"kind": "", "msg": ""}, "compile_immediately": false}
 func setLanguage(language) {
-    if params.language == ""{
+    if params.language == "" {
         params.language = language
     }
+    
+
     return
 }
 
@@ -101,9 +84,11 @@ if proxy != "" {
     params.info.proxy.url = proxy
 }
 
+
 if len(languages) > 0 {
     setLanguage(languages[0])
 }
+
 
 peepholeSize = 0
 if len(peepholeSizes) > 0 {
@@ -135,9 +120,11 @@ func newFileNotFoundExcption(err) {
     params.error.msg = err
 }
 func newLanguageNeedSelectException(err) {
-    if  params.error.kind!= "" {
+    if params.error.kind != "" {
         return
     }
+    
+
     params.error.kind = "languageNeedSelectException"
     params.error.msg = err
 }
@@ -146,10 +133,11 @@ func generateFileName(kind, filename) {
     if params.program_name != "" {
         return
     }
-    //转换为合格的file格式
+
+//转换为合格的file格式
     filename2 = str.Split(filename, "/")[-1]
     filename2 = str.Split(filename2, "\\")[-1]
-    name := sprintf("%s(%s)",  filename2, time.Now().Format("2006-01-02 15:04:05"))
+    name := sprintf("%s(%s)", filename2, time.Now().Format("2006-01-02 15:04:05"))
     params.program_name = name
     params.project_name = filename2
 }
@@ -161,6 +149,7 @@ func AutoParseLanguage() {
             maxinfo.value = value
         }
     }
+    
 
     if maxinfo.value != 0 {
         setLanguage(maxinfo.key)
@@ -179,18 +168,22 @@ func getZipinfo(basePath) {
     if params.language != "" {
         return
     }
+    
+
     zip.Recursive(
-        basePath,
+        basePath, 
         (dir, path, info) => {
             if !info.IsDir() {
                 params.file_count++
             }
+            
 
             ext = file.GetExt(path).Lower().TrimLeft(".")
             countinfo = countMap[ext]
             if countinfo != nil {
                 countMap[ext] = countinfo + 1
             }
+            
 
             if params.language == "" {
                 if info.IsDir() {
@@ -201,23 +194,27 @@ func getZipinfo(basePath) {
                     if info.Name().Lower() in javaFiles {
                         setLanguage(ssa.Java)
                     }
+                    
+
                     if info.Name().Lower() in phpFiles {
                         setLanguage(ssa.PHP)
                     }
                 }
             }
-        },
+        }, 
     )
 }
 
 func getLocalInfo(localFile) {
     if !file.IsExisted(localFile) {
         newFileNotFoundExcption(sprintf(
-            "not found this file in local,check path: %s",
-            localFile,
+            "not found this file in local,check path: %s", 
+            localFile, 
         ))
         return
     }
+    
+
     ext := file.GetExt(localFile).Lower()
     switch ext {
     case ".jar", ".war":
@@ -236,9 +233,11 @@ func getLocalInfo(localFile) {
             newFileTypeException(sprint("文件存在，但仅支持jar、war、zip压缩格式。"))
             return
         }
+        
+
         params.info.local_file = localFile
         filesys.Recursive(
-            localFile,
+            localFile, 
             filesys.onDirStat(func(path, info) {
                 if params.language == "" {
                     switch  {
@@ -246,14 +245,16 @@ func getLocalInfo(localFile) {
                         setLanguage(ssa.Java)
                     }
                 }
-            }),
+            }), 
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 ext = file.GetExt(path).Lower().TrimLeft(".")
-                if ext in countMap{
+                if ext in countMap {
                     countinfo = countMap[ext]
                     countMap[ext] = countinfo + 1
                 }
+                
+
                 if params.language == "" {
                     switch  {
                     case info.Name().Lower() in javaFiles:
@@ -262,28 +263,33 @@ func getLocalInfo(localFile) {
                         setLanguage(ssa.PHP)
                     }
                 }
-            }),
+            }), 
         )
         generateFileName("local", file.Abs(localFile))
     }
 }
 
-
 //尝试获取git仓库的根路径
-func tryGetRepoRootPath(target){
+func tryGetRepoRootPath(target) {
     treeIndex = str.Index(target, "tree")
-    if treeIndex==-1{
+    if treeIndex == -1 {
         return target
     }
-    if len(target) <= treeIndex+5{
+    
+
+    if len(target) <= treeIndex + 5 {
         return target[:treeIndex]
     }
-    branchUri = target[treeIndex+5:]
+    
+
+    branchUri = target[treeIndex + 5:]
     branchIndex = str.Index(branchUri, "/")
-    if branchIndex == -1{
+    if branchIndex == -1 {
         return target
     }
-    params.info.branch =  branchUri[:branchIndex]
+    
+
+    params.info.branch = branchUri[:branchIndex]
     params.info.path = str.PathJoin(branchUri[branchIndex:])
     return target[:treeIndex]
 }
@@ -294,9 +300,12 @@ func getHttpInfo(target) {
     } else {
         httpUrl = target[8:]
     }
+    
+
     if !target.HasSuffix("/") {
         target += "/"
     }
+    
 
     gitUrl = target + "info/refs?service=git-upload-pack"
     rsp, req, err = poc.Get(gitUrl, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
@@ -305,23 +314,30 @@ func getHttpInfo(target) {
         params.info.url = tryGetRepoRootPath(target)
         generateFileName("git", httpUrl)
     }
+    
+
     rsp, req, err = poc.Get(tryGetRepoRootPath(target), poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
-    if err == nil && rsp.GetStatusCode()==200{
+    if err == nil && rsp.GetStatusCode() == 200 {
         params.info.kind = "git"
         params.info.url = tryGetRepoRootPath(target)
         generateFileName("git", httpUrl)
     }
+    
+
     if err != nil || rsp.GetStatusCode() != 200 {
         res, req, err2 = poc.Get(origin, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
         if err2 != nil || res.GetStatusCode() != 200 {
             generateFileName("http", target)
             if err2 == nil {
                 newConnectException(sprintf("连接URL: %s 失败，状态码:%d", target, res.GetStatusCode()))
-            }else{
+            } else {
                 newConnectException(sprintf("连接URL: %s 失败:%s", target, err2.Error()))
             }
+            
+
             return
         }
+        
 
         if str.MatchAllOfSubString(res.GetContentType(), "jar") {
             params.info.kind = "jar"
@@ -352,13 +368,16 @@ if target.HasPrefix("git://") {
     getLocalInfo(target)
 }
 
+
 if params.program_name == "" {
     generateFileName(params.info.kind, target)
 }
 
+
 if params.language == "" {
     AutoParseLanguage()
 }
+
 
 params.compile_immediately = compile_immediately
 generateDesc()
@@ -370,8 +389,9 @@ if params.info.local_file != "" {
     path = params.info.url
 }
 
+
 var projectExists = false
-var config
+var config = nil
 existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
 if err == nil && existingSSAProject != nil {
     projectExists = true
@@ -382,66 +402,39 @@ if err == nil && existingSSAProject != nil {
         } else {
             yakit.Warn("获取已存在项目配置返回 nil，将创建新配置")
         }
+        
+
         config = nil
     }
 }
 
-options = [
-   ssa.withProgramName(params.program_name),
-   ssa.withProjectName(params.project_name),
-   ssa.withProjectDescription(description),
-   ssa.withLanguage(params.language),
-   ssa.withCodeSourceKind(params.info.kind),
-   ssa.withCodeSourceLocalFile(params.info.local_file),
-   ssa.withCodeSourceURL(params.info.url),
-   ssa.withCodeSourceBranch(params.info.branch),
-   ssa.withCodeSourcePath(params.info.path),
-   ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
-   ssa.withReCompile(reCompile),
-   ssa.withConcurrency(concurrency),
-   ssa.withStrictMode(strictMode),
-   ssa.withDescription(description),
-   ssa.withEntryFile(entry...)
-]
-// 如果项目不存在或获取已有配置失败，创建新配置
+
+options = [ssa.withProgramName(params.program_name), ssa.withProjectName(params.project_name), ssa.withProjectDescription(description), ssa.withLanguage(params.language), ssa.withCodeSourceKind(params.info.kind), ssa.withCodeSourceLocalFile(params.info.local_file), ssa.withCodeSourceURL(params.info.url), ssa.withCodeSourceBranch(params.info.branch), ssa.withCodeSourcePath(params.info.path), ssa.withDefaultExcludeFunc(str.Split(
+    excludeFile, 
+    ",", 
+)), ssa.withReCompile(reCompile), ssa.withConcurrency(concurrency), ssa.withStrictMode(strictMode), ssa.withDescription(description), ssa.withEntryFile(entry...)]
+// 如果项目不存在或获取已有配置失败，创建新配置；否则更新已有配置
 if config == nil {
-    config, err = ssa.NewConfig(
-    ssa.ModeAll,
-    options...
-    )
+    config, err = ssa.NewConfig(ssa.ModeAll, options...)
     if err != nil {
         yakit.Error("创建 SSAConfig 失败: %v", err)
         return
     }
-    if config == nil {
-        yakit.Error("创建 SSAConfig 返回 nil")
+} else {
+    err := config.Update(options...)
+    if err != nil {
+        yakit.Error("更新 SSAConfig 失败: %v", err)
         return
     }
-} else {
-    // 防御性检查：在调用 Update 前再次确认 config 不为 nil
-    // 防止在某些边缘情况下 config 为 nil 但通过了上面的检查
-    if config == nil {
-        yakit.Warn("配置对象为 nil，将创建新配置")
-        config, err = ssa.NewConfig(
-        ssa.ModeAll,
-        options...
-        )
-        if err != nil {
-            yakit.Error("创建 SSAConfig 失败: %v", err)
-            return
-        }
-        if config == nil {
-            yakit.Error("创建 SSAConfig 返回 nil")
-            return
-        }
-    } else {
-        err := config.Update(options...)
-        if err != nil {
-            yakit.Error("更新 SSAConfig 失败: %v", err)
-            return
-        }
-        yakit.Info("更新 SSAConfig 成功")
-    }
+    
+
+    yakit.Info("更新 SSAConfig 成功")
+}
+
+// 确保 config 不为 nil（防御性检查，帮助静态分析器识别）
+if config == nil {
+    yakit.Error("配置对象为 nil，无法继续")
+    return
 }
 
 // 将 SSAConfig 转换为 JSON 字符串
@@ -467,5 +460,4 @@ yakit.Code(resultJSON)
 if params.error.kind != "" {
     return
 }
-
 yakit.Info("项目探测完成。")
