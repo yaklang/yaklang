@@ -1388,8 +1388,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 
 		if iterableValueType.Kind() == reflect.String {
-			if v, ok := iterableValue.Value.(string); ok {
-				iterableValueRF = reflect.ValueOf([]rune(v))
+			if runes := cacheRunes(iterableValue); runes != nil {
+				iterableValueRF = reflect.ValueOf(runes)
 			} else {
 				panic("cannot convert string to []byte/rune")
 			}
@@ -2087,12 +2087,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 		if arrayRaw.IsString() {
-			d := []rune(arrayRaw.String())
-			for _, r := range d {
-				v.push(NewValue("char", r, fmt.Sprintf("%c", r)))
+			if runes := cacheRunes(arrayRaw); runes != nil {
+				for _, r := range runes {
+					v.push(NewValue("char", r, fmt.Sprintf("%c", r)))
+				}
+				code.Unary = c.Unary + len(runes) - 1
+				return
 			}
-			code.Unary = c.Unary + len(d) - 1
-			return
 		}
 		if reflect.TypeOf(arrayRaw.Value).Kind() == reflect.Slice {
 			refV := reflect.ValueOf(arrayRaw.Value)

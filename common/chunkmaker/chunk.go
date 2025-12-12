@@ -103,7 +103,7 @@ func NewBufferChunkEx(buffer []byte, mimeType *mimetype.MIME, verbose string) *B
 		mimeType: mimeType,
 	}
 	if bc.isUTF8 {
-		bc.runesize = int64(len([]rune(string(buffer))))
+		bc.runesize = int64(utf8.RuneCount(buffer))
 	} else {
 		bc.runesize = bc.bytesize
 	}
@@ -174,7 +174,7 @@ func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chun
 		c.buffer.Reset()
 		if len(remainingData) > 0 {
 			c.buffer.Write(remainingData)
-			c.runesize = int64(len([]rune(string(remainingData))))
+			c.runesize = int64(utf8.RuneCount(remainingData))
 			c.bytesize = int64(len(remainingData))
 		} else {
 			c.runesize = 0
@@ -258,9 +258,9 @@ func (c *BufferChunk) Write(i []byte) {
 
 	c.bytesize += int64(len(i))
 	if c.isUTF8 {
-		c.runesize += int64(len([]rune(string(i))))
+		c.runesize += int64(utf8.RuneCount(i))
 	} else {
-		c.runesize += int64(len([]rune(c.buffer.String())))
+		c.runesize += int64(utf8.RuneCount(c.buffer.Bytes()))
 	}
 }
 

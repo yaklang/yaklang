@@ -5,6 +5,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -363,7 +364,7 @@ func Len(a interface{}) int {
 	}
 
 	if v, ok := a.(string); ok {
-		return len([]rune(v))
+		return utf8.RuneCountInString(v)
 	}
 
 	return reflect.ValueOf(a).Len()
