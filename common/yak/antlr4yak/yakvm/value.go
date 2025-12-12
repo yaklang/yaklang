@@ -32,6 +32,8 @@ type Value struct {
 	ExtraInfo map[string]interface{}
 }
 
+const cachedRunesKey = "yakvm_cached_runes"
+
 func (v *Value) GetLiteral() string {
 	if v.Literal == "" {
 		switch ret := v.Value.(type) {
@@ -106,22 +108,57 @@ func ChannelValueListToValue(op *Value) *Value {
 	return op
 }
 
+func cacheRunes(val *Value) []rune {
+	if val == nil {
+		return nil
+	}
+	if cached := val.GetExtraInfo(cachedRunesKey); cached != nil {
+		if runes, ok := cached.([]rune); ok {
+			return runes
+		}
+	}
+	s, ok := val.Value.(string)
+	if !ok {
+		return nil
+	}
+	runes := []rune(s)
+	val.AddExtraInfo(cachedRunesKey, runes)
+	return runes
+}
+
 func (v *Frame) getValueForLeftIterableCall(args []*Value) *Value {
 	iterableValue := args[0]
 	args = args[1:]
 
 	argsLength := len(args)
 	iterableValueType := reflect.TypeOf(iterableValue.Value)
-	var iterableValueRF reflect.Value
 	if iterableValueType.Kind() == reflect.String {
-		if v, ok := iterableValue.Value.(string); ok {
-			iterableValueRF = reflect.ValueOf([]rune(v))
+		if _, ok := iterableValue.Value.(string); ok {
+			runes := cacheRunes(iterableValue)
+			if argsLength != 1 {
+				panic("left slice call args must be 1")
+			}
+			for _, arg := range args {
+				if !arg.IsInt() {
+					panic("slice call args must be int")
+				}
+			}
+			start := args[0].Int()
+			if start < 0 {
+				start = len(runes) + start
+			}
+			if start < 0 || start >= len(runes) {
+				panic("slice call error, start out of range")
+			}
+
+			r := runes[start]
+			return NewValue("char", r, string(r))
 		} else {
 			panic("cannot convert string to []byte")
 		}
-	} else {
-		iterableValueRF = reflect.ValueOf(iterableValue.Value)
 	}
+
+	iterableValueRF := reflect.ValueOf(iterableValue.Value)
 	if iterableValueRF.Type().Kind() == reflect.Ptr {
 		iterableValueRF = iterableValueRF.Elem()
 	}
