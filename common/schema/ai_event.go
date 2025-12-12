@@ -140,7 +140,7 @@ const (
 
 type AiOutputEvent struct {
 	gorm.Model
-	CoordinatorId string
+	CoordinatorId string `gorm:"index"`
 	Type          EventType
 
 	NodeId      string
@@ -153,18 +153,18 @@ type AiOutputEvent struct {
 	Content     []byte
 
 	SyncID    string
-	EventUUID string
+	EventUUID string `gorm:"index"` // SaveStreamAIEvent uses this for query
 
 	Timestamp int64
 
 	// task index
-	TaskIndex string
+	TaskIndex string `gorm:"index"`
 
 	// task uuid
-	TaskUUID string
+	TaskUUID string `gorm:"index"`
 	// disable markdown render
 	DisableMarkdown bool
-	CallToolID      string
+	CallToolID      string `gorm:"index"`
 
 	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
 

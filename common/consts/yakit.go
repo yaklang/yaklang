@@ -160,6 +160,7 @@ func initYakitDatabase() error {
 func init() {
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_YAKIT_DATABASE, doHTTPFlowPatch)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_YAKIT_DATABASE, doDBRiskPatch)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_YAKIT_DATABASE, doAIEventPatch)
 }
 
 func doHTTPFlowPatch(db *gorm.DB) {
@@ -205,5 +206,42 @@ func doDBRiskPatch(db *gorm.DB) {
 	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_ip ON risks(ip);`).Error
 	if err != nil {
 		log.Warnf("failed to add index on risks.ip: %v", err)
+	}
+}
+
+func doAIEventPatch(db *gorm.DB) {
+	// add indexes for ai_output_events table to improve save/query performance
+	if db.HasTable("ai_output_events") {
+		indexQueries := []struct {
+			name  string
+			query string
+		}{
+			{"idx_ai_output_events_coordinator_id", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_coordinator_id" ON "ai_output_events" ("coordinator_id");`},
+			{"idx_ai_output_events_event_uuid", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_event_uuid" ON "ai_output_events" ("event_uuid");`},
+			{"idx_ai_output_events_task_index", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_task_index" ON "ai_output_events" ("task_index");`},
+			{"idx_ai_output_events_task_uuid", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_task_uuid" ON "ai_output_events" ("task_uuid");`},
+			{"idx_ai_output_events_call_tool_id", `CREATE INDEX IF NOT EXISTS "idx_ai_output_events_call_tool_id" ON "ai_output_events" ("call_tool_id");`},
+		}
+		for _, idx := range indexQueries {
+			if err := db.Exec(idx.query).Error; err != nil {
+				log.Warnf("failed to add index %s on ai_output_events: %v", idx.name, err)
+			}
+		}
+	}
+
+	// add indexes for ai_processes table
+	if db.HasTable("ai_processes") {
+		indexQueries := []struct {
+			name  string
+			query string
+		}{
+			{"idx_ai_processes_process_type", `CREATE INDEX IF NOT EXISTS "idx_ai_processes_process_type" ON "ai_processes" ("process_type");`},
+			{"idx_ai_processes_process_id", `CREATE INDEX IF NOT EXISTS "idx_ai_processes_process_id" ON "ai_processes" ("process_id");`},
+		}
+		for _, idx := range indexQueries {
+			if err := db.Exec(idx.query).Error; err != nil {
+				log.Warnf("failed to add index %s on ai_processes: %v", idx.name, err)
+			}
+		}
 	}
 }

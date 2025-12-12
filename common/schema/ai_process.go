@@ -9,7 +9,7 @@ const (
 
 type AiProcess struct {
 	gorm.Model
-	ProcessType string           `json:"process_type"`
-	ProcessId   string           `json:"process_id" `
+	ProcessType string           `json:"process_type" gorm:"index"`
+	ProcessId   string           `json:"process_id" gorm:"index"`
 	Events      []*AiOutputEvent `gorm:"many2many:ai_processes_and_events;"`
 }
