@@ -109,12 +109,22 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 					log.Warnf("load hnsw graph from binary error: %v, try to rebuild hnsw graph, migrate hnsw graph from db", err)
 					err := MigrateHNSWGraph(db, collection)
 					if err != nil {
-						return nil, utils.Wrap(err, "migrate hnsw graph")
-					}
-					graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-					hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
-					if err != nil {
-						return nil, utils.Wrap(err, "parse hnsw graph from binary")
+						if errors.Is(err, graphNodesIsEmpty) {
+							// 知识库没有文档，创建空的 HNSW 图
+							hnswGraph = NewHNSWGraph(
+								collection.Name,
+								hnsw.WithHNSWParameters[string](collection.M, collection.Ml, collection.EfSearch),
+								hnsw.WithDistance[string](hnsw.GetDistanceFunc(collection.DistanceFuncType)),
+							)
+						} else {
+							return nil, utils.Wrap(err, "migrate hnsw graph")
+						}
+					} else {
+						graphBinaryReader := bytes.NewReader(collection.GraphBinary)
+						hnswGraph, err = parseHNSWGraphFromBinary(db, collection, collectionConfig, graphBinaryReader)
+						if err != nil {
+							return nil, utils.Wrap(err, "parse hnsw graph from binary")
+						}
 					}
 				} else {
 					return nil, utils.Wrap(err, "parse hnsw graph from binary")

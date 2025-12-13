@@ -198,12 +198,37 @@ func (s *SQLiteVectorStoreHNSW) fixCollectionEmbeddingData() error {
 	return nil
 }
 
+// collectionCreateLock 用于保护集合创建操作的并发安全
+var collectionCreateLock sync.Mutex
+
 func CreateCollectionRecord(db *gorm.DB, name string, description string, opts ...CollectionConfigFunc) (*schema.VectorStoreCollection, error) {
 	cfg := NewCollectionConfig(opts...)
 
 	if cfg.Description != "" {
 		description = cfg.Description
 	}
+
+	// 使用锁保护创建操作，避免并发时的唯一性约束冲突
+	collectionCreateLock.Lock()
+	defer collectionCreateLock.Unlock()
+
+	// 先尝试查询是否已存在（使用 Unscoped 包含软删除的记录，避免唯一索引冲突）
+	var existingCollection schema.VectorStoreCollection
+	err := db.Unscoped().Model(&schema.VectorStoreCollection{}).Where("name = ?", name).First(&existingCollection).Error
+	if err == nil {
+		// 记录已存在
+		if existingCollection.DeletedAt != nil {
+			// 如果是软删除的记录，恢复它
+			if updateErr := db.Unscoped().Model(&existingCollection).Update("deleted_at", nil).Error; updateErr != nil {
+				return nil, utils.Errorf("恢复已删除的集合失败: %v", updateErr)
+			}
+		}
+		return &existingCollection, nil
+	}
+	if !gorm.IsRecordNotFoundError(err) {
+		return nil, utils.Errorf("查询集合失败: %v", err)
+	}
+
 	// 创建集合配置
 	collection := schema.VectorStoreCollection{
 		Name:             name,
