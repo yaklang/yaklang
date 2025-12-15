@@ -534,9 +534,10 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// 逐个记录 response 中的内容
 	response.Url = urlStr
 
-	// 获取cookiejar
-	cookiejar := GetCookiejar(session)
+	// 获取 cookiejar（仅在 session != nil 时启用自动 cookie 管理）
+	var cookiejar http.CookieJar
 	if session != nil {
+		cookiejar = GetCookiejar(session)
 		cookies := cookiejar.Cookies(urlIns)
 		if cookies != nil {
 			var needAppendCookie []*http.Cookie
@@ -1145,7 +1146,7 @@ RECONNECT:
 		httpctx.SetBareResponseBytes(reqIns, rawBytes)
 	}
 
-	// 更新cookiejar中的cookie
+	// 更新 cookiejar 中的 cookie
 	if session != nil && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
