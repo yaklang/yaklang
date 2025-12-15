@@ -145,7 +145,8 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 
 	switch TypeKind(kind) {
 	case FunctionTypeKind:
-		typ := &FunctionType{}
+		typ := NewFunctionType("", nil, nil, false)
+		typ.SetId(int64(irType.TypeId))
 		if raw, ok := params["return_value"].(string); ok {
 			_ = raw
 			// typ.ReturnValue = lo.FilterMap(strings.Split(raw, ","), func(s string, _ int) (*Return, bool) {
@@ -167,11 +168,13 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = TypeKind(kind)
+		typ.SetId(int64(irType.TypeId))
 		return typ
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		typ := NewBasicType(TypeKind(kind), getParamStr("name"))
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
+		typ.SetId(int64(irType.TypeId))
 		return typ
 	case ClassBluePrintTypeKind:
 		typ := &Blueprint{
@@ -180,6 +183,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
+		typ.SetId(int64(irType.TypeId))
 		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range parents {

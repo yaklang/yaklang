@@ -485,6 +485,7 @@ func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
 	}
+	ci.SetType(CreateStringType())
 	saveTypeWithValue(ci, ci.GetType())
 	return ci
 }
@@ -504,7 +505,6 @@ func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
 	}
 	t := NewTypeValue(typ)
 	f.emit(t)
-	t.SetType(typ)
 	return t
 }
 
