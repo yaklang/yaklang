@@ -1593,7 +1593,7 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	}
 
 	if e.ShouldSave() {
-		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
+		err := yakit.CreateOrUpdateAIOutputEvent(consts.GetGormProjectDatabase(), e)
 		if err != nil {
 			log.Errorf("create AI event failed: %v", err)
 		}

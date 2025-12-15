@@ -166,7 +166,7 @@ type AiOutputEvent struct {
 	DisableMarkdown bool
 	CallToolID      string `gorm:"index"`
 
-	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
+	ProcessesId []string `gorm:"-"`
 
 	ContentType string
 	AIService   string

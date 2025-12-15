@@ -44,7 +44,7 @@ func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 		if newProcess.ProcessType == schema.AI_Call_Tool {
 			event.CallToolID = newProcess.ProcessId
 		}
-		event.Processes = append(event.Processes, newProcess)
+		event.ProcessesId = append(event.ProcessesId, newProcess.ProcessId)
 		return event
 	}
 
@@ -714,7 +714,6 @@ func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceK
 		"timestamp": time.Now().Unix(),
 	})
 }
-
 
 func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge, syncId string) (*schema.AiOutputEvent, error) {
 	knowledgeList := make([]map[string]any, 0, len(results))
