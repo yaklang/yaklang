@@ -3,6 +3,7 @@ package sfreport
 import (
 	"encoding/json"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -10,8 +11,9 @@ import (
 )
 
 type Report struct {
-	config Config    `json:"-"`
-	writer io.Writer `json:"-"`
+	mu     sync.RWMutex `json:"-"`
+	config Config       `json:"-"`
+	writer io.Writer    `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -109,6 +111,9 @@ func (r *Report) GetRule(ruleName string) *Rule {
 }
 
 func (r *Report) AddRisks(risk ...*Risk) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.Risks == nil {
 		r.Risks = make(map[string]*Risk)
 	}
@@ -124,6 +129,8 @@ func (r *Report) AddRisks(risk ...*Risk) {
 }
 
 func (r *Report) GetRisk(hash string) *Risk {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.Risks[hash]
 }
 
