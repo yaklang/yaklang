@@ -274,7 +274,7 @@ var _ Instruction = (*anInstruction)(nil)
 type anValue struct {
 	*anInstruction
 
-	typ      Type
+	typId    int64
 	userList []int64
 
 	object     int64
@@ -301,7 +301,7 @@ var defaultAnyType = CreateAnyType()
 func NewValue() *anValue {
 	return &anValue{
 		anInstruction: NewInstruction(),
-		typ:           defaultAnyType,
+		typId:         defaultAnyType.GetId(),
 	}
 }
 
@@ -412,6 +412,7 @@ func (n *anValue) SetStringMember(key string, v Value) {
 	if memberMap == nil {
 		return
 	}
+	var lastMatch Value
 	for _, id := range memberMap.Keys() {
 		i, ok := n.GetValueById(id)
 		if !ok {
@@ -422,8 +423,11 @@ func (n *anValue) SetStringMember(key string, v Value) {
 			continue
 		}
 		if lit.value == key {
-			n.AddMember(i, v)
+			lastMatch = i
 		}
+	}
+	if lastMatch != nil {
+		n.AddMember(lastMatch, v)
 	}
 }
 
@@ -494,7 +498,14 @@ func (n *anValue) GetType() Type {
 		log.Errorf("BUG in *anValue.GetType(), the *anValue is nil!")
 		return CreateAnyType()
 	}
-	return n.typ
+	if n.typId <= 0 {
+		n.typId = defaultAnyType.GetId()
+		return defaultAnyType
+	}
+	if typ := n.lookupTypeById(n.typId); !utils.IsNil(typ) {
+		return typ
+	}
+	return defaultAnyType
 }
 
 func (n *anValue) SetType(typ Type) {
@@ -503,22 +514,22 @@ func (n *anValue) SetType(typ Type) {
 	}
 
 	if n.IsFromDB() {
-		n.typ = typ
+		n.typId = n.cacheType(typ)
 		return
 	}
 
 	value, ok := n.GetValueById(n.GetId())
 	if !ok {
-		n.typ = typ
+		n.typId = n.cacheType(typ)
 		return
 	}
 	saveTypeWithValue(value, typ)
 
 	switch t := typ.(type) {
 	case *Blueprint:
-		n.typ = t.Apply(value)
+		typ = t.Apply(value)
 	case *FunctionType:
-		n.typ = typ
+		// keep typ
 		this := value
 		if this == nil {
 			return
@@ -531,8 +542,44 @@ func (n *anValue) SetType(typ Type) {
 		}
 
 	default:
-		n.typ = typ
 	}
+	n.typId = n.cacheType(typ)
+}
+
+func (n *anValue) cacheType(typ Type) int64 {
+	if typ == nil {
+		return 0
+	}
+	if cache := n.getProgramCache(); cache != nil && cache.TypeCache != nil {
+		cache.TypeCache.Set(typ)
+	}
+	return typ.GetId()
+}
+
+func (n *anValue) lookupTypeById(id int64) Type {
+	cache := n.getProgramCache()
+	if cache != nil && cache.TypeCache != nil {
+		if typ, ok := cache.TypeCache.Get(id); ok && !utils.IsNil(typ) {
+			return typ
+		}
+		if cache.HaveDatabaseBackend() {
+			if typ := GetTypeFromDB(cache, id); !utils.IsNil(typ) {
+				cache.TypeCache.Set(typ)
+				return typ
+			}
+		}
+	}
+	return nil
+}
+
+func (n *anValue) getProgramCache() *ProgramCache {
+	if n == nil {
+		return nil
+	}
+	if prog := n.GetProgram(); prog != nil {
+		return prog.Cache
+	}
+	return nil
 }
 
 func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Variable] {

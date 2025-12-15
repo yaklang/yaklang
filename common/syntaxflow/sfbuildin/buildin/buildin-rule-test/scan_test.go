@@ -38,10 +38,6 @@ func TestVerifiedRule(t *testing.T) {
 		capture.Stop()
 	})
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
-		// Todo: 需要把 value.typ 转化为 id 之后再注释掉这里
-		if rule.RuleName == "检测Golang使用AES-CBC弱加密模式" {
-			continue
-		}
 		caseName := strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/")
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
@@ -85,7 +81,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "检测Java Socket资源未释放"
+	ruleName := "检测Golang XXE恶意文档引用"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
@@ -98,6 +94,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	}
 	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
+			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false, sfvm.WithEnableDebug(true))
 			if err != nil {
