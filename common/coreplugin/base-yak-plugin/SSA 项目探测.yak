@@ -391,7 +391,7 @@ if params.info.local_file != "" {
 
 
 var projectExists = false
-var config = nil
+var config
 existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
 if err == nil && existingSSAProject != nil {
     projectExists = true
@@ -402,16 +402,13 @@ if err == nil && existingSSAProject != nil {
         } else {
             yakit.Warn("获取已存在项目配置返回 nil，将创建新配置")
         }
-        
-
-        config = nil
     }
 }
 
 
 options = [ssa.withProgramName(params.program_name), ssa.withProjectName(params.project_name), ssa.withProjectDescription(description), ssa.withLanguage(params.language), ssa.withCodeSourceKind(params.info.kind), ssa.withCodeSourceLocalFile(params.info.local_file), ssa.withCodeSourceURL(params.info.url), ssa.withCodeSourceBranch(params.info.branch), ssa.withCodeSourcePath(params.info.path), ssa.withDefaultExcludeFunc(str.Split(
-    excludeFile, 
-    ",", 
+    excludeFile,
+    ",",
 )), ssa.withReCompile(reCompile), ssa.withConcurrency(concurrency), ssa.withStrictMode(strictMode), ssa.withDescription(description), ssa.withEntryFile(entry...)]
 // 如果项目不存在或获取已有配置失败，创建新配置；否则更新已有配置
 if config == nil {
@@ -426,8 +423,6 @@ if config == nil {
         yakit.Error("更新 SSAConfig 失败: %v", err)
         return
     }
-    
-
     yakit.Info("更新 SSAConfig 成功")
 }
 
