@@ -32010,13 +32010,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -41565,8 +41565,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -62123,6 +62123,8 @@ type MITMV2Request struct {
 	DnsServers      []string       `protobuf:"bytes,13,rep,name=DnsServers,proto3" json:"DnsServers,omitempty"`
 	Hosts           []*KVPair      `protobuf:"bytes,14,rep,name=hosts,proto3" json:"hosts,omitempty"`
 	HostsMapping    []*KVPair      `protobuf:"bytes,46,rep,name=HostsMapping,proto3" json:"HostsMapping,omitempty"`
+	// 不启用系统代理（环境变量 http_proxy/https_proxy 等）
+	DisableSystemProxy bool `protobuf:"varint,49,opt,name=DisableSystemProxy,proto3" json:"DisableSystemProxy,omitempty"`
 	// max content-length
 	MaxContentLength int64 `protobuf:"varint,15,opt,name=MaxContentLength,proto3" json:"MaxContentLength,omitempty"`
 	MaxReadWaitTime  int64 `protobuf:"varint,16,opt,name=MaxReadWaitTime,proto3" json:"MaxReadWaitTime,omitempty"`
@@ -62307,6 +62309,13 @@ func (x *MITMV2Request) GetHostsMapping() []*KVPair {
 		return x.HostsMapping
 	}
 	return nil
+}
+
+func (x *MITMV2Request) GetDisableSystemProxy() bool {
+	if x != nil {
+		return x.DisableSystemProxy
+	}
+	return false
 }
 
 func (x *MITMV2Request) GetMaxContentLength() int64 {
@@ -69787,7 +69796,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xf7\x10\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xa7\x11\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -69806,7 +69815,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"DnsServers\x18\r \x03(\tR\n" +
 	"DnsServers\x12!\n" +
 	"\x05hosts\x18\x0e \x03(\v2\v.ypb.KVPairR\x05hosts\x12/\n" +
-	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12*\n" +
+	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12.\n" +
+	"\x12DisableSystemProxy\x181 \x01(\bR\x12DisableSystemProxy\x12*\n" +
 	"\x10MaxContentLength\x18\x0f \x01(\x03R\x10MaxContentLength\x12(\n" +
 	"\x0fMaxReadWaitTime\x18\x10 \x01(\x03R\x0fMaxReadWaitTime\x12(\n" +
 	"\x0fFilterWebsocket\x18\x11 \x01(\bR\x0fFilterWebsocket\x124\n" +

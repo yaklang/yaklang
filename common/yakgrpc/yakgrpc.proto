@@ -8223,6 +8223,8 @@ message MITMV2Request{
   repeated string DnsServers = 13;
   repeated KVPair hosts = 14;
   repeated KVPair HostsMapping = 46;
+  // 不启用系统代理（环境变量 http_proxy/https_proxy 等）
+  bool DisableSystemProxy = 49;
 
   // max content-length
   int64 MaxContentLength = 15;

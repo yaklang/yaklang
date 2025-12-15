@@ -258,6 +258,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		proxyUsername               = firstReq.GetProxyUsername()
 		proxyPassword               = firstReq.GetProxyPassword()
 		dnsServers                  = firstReq.GetDnsServers()
+		disableSystemProxy          = firstReq.GetDisableSystemProxy()
 		forceDisableKeepAlive       = firstReq.GetForceDisableKeepAlive()
 		disableCACertPage           = firstReq.GetDisableCACertPage()
 		disableWebsocketCompression = firstReq.GetDisableWebsocketCompression()
@@ -1594,6 +1595,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
 		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
+		crep.MITM_SetDisableSystemProxy(disableSystemProxy),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		crep.MITM_SetDownstreamProxyRoutes(downstreamProxyRoutes),
