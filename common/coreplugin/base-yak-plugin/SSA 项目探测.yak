@@ -391,7 +391,7 @@ if params.info.local_file != "" {
 
 
 var projectExists = false
-var config = nil
+var config
 existingSSAProject, err = ssa.GetSSAProjectByNameAndURL(params.project_name, path)
 if err == nil && existingSSAProject != nil {
     projectExists = true
@@ -438,11 +438,11 @@ if config == nil {
 }
 
 // 将 SSAConfig 转换为 JSON 字符串
-configJSON, err = config.ToJSONString()
-if err != nil {
-    yakit.Error("转换 JSON 失败: %v", err)
-    return
-}
+configJSON, _ = config.ToJSONString()
+// if err != nil {
+//  yakit.Error("转换 JSON 失败: %v", err)
+//  return
+// }
 
 // 创建返回对象，添加额外信息，用来给前端做后续处理提供依据
 result = json.loads(configJSON)
