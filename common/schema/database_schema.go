@@ -129,6 +129,7 @@ var ProjectTables = []interface{}{
 	&AiCheckpoint{},
 	&AiOutputEvent{},
 	&AiProcess{},
+	&AiProcessAndAiEvent{},
 	&AIMemoryEntity{},
 	&AIMemoryCollection{},
 
