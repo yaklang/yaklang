@@ -189,7 +189,7 @@ type AIMemoryEntity struct {
 }
 
 func (a *AIMemoryEntity) TableName() string {
-	return "ai_memory_entities"
+	return "ai_memory_entities_v1"
 }
 
 func (a *AIMemoryEntity) BeforeSave() error {

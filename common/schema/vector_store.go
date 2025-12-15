@@ -184,7 +184,7 @@ func (v *VectorStoreCollection) BeforeSave() error {
 }
 
 func (v *VectorStoreCollection) TableName() string {
-	return "rag_vector_collection_test"
+	return "rag_vector_collection_v1"
 }
 
 // VectorStoreDocument 表示向量存储中的文档
@@ -231,7 +231,7 @@ func (v *VectorStoreDocument) BeforeSave() error {
 }
 
 func (v *VectorStoreDocument) TableName() string {
-	return "rag_vector_document_test_v1"
+	return "rag_vector_document_v1"
 }
 
 const VectorStoreDocumentBroadcastType = "vector_store_document"
@@ -312,7 +312,7 @@ type KnowledgeBaseInfo struct {
 }
 
 func (v *KnowledgeBaseInfo) TableName() string {
-	return "rag_knowledge_base_test"
+	return "rag_knowledge_base_v1"
 }
 
 var (
@@ -378,7 +378,7 @@ func (e *KnowledgeBaseEntry) AfterDelete(tx *gorm.DB) (err error) {
 }
 
 func (e *KnowledgeBaseEntry) TableName() string {
-	return "rag_knowledge_entry_test"
+	return "rag_knowledge_entry_v1"
 }
 
 func (e *KnowledgeBaseEntry) BeforeSave() error {

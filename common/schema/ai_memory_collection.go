@@ -25,7 +25,7 @@ type AIMemoryCollection struct {
 }
 
 func (a *AIMemoryCollection) TableName() string {
-	return "ai_memory_collections"
+	return "ai_memory_collections_v1"
 }
 
 func (a *AIMemoryCollection) BeforeSave() error {
