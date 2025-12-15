@@ -331,6 +331,13 @@ func MITM_SetFindProcessName(b bool) MITMConfig {
 	}
 }
 
+func MITM_SetDisableSystemProxy(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.disableSystemProxy = b
+		return nil
+	}
+}
+
 func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 	return func(server *MITMServer) error {
 		for _, c := range b {

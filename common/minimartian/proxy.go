@@ -95,6 +95,7 @@ type Proxy struct {
 	h2Cache sync.Map
 
 	forceDisableKeepAlive bool
+	disableSystemProxy    bool
 
 	// connection pool for remote server connections
 	connPool           *lowhttp.LowHttpConnPool
@@ -378,6 +379,10 @@ func (p *Proxy) selectProxiesForHost(host string) []string {
 
 func (p *Proxy) SetFindProcessName(b bool) {
 	p.findProcessName = b
+}
+
+func (p *Proxy) SetDisableSystemProxy(b bool) {
+	p.disableSystemProxy = b
 }
 
 // SetConnPool sets the connection pool for remote server connections

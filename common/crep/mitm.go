@@ -321,6 +321,7 @@ type MITMServer struct {
 	forceDisableKeepAlive bool
 	findProcessName       bool
 	dialer                func(timeout time.Duration, addr string) (net.Conn, error)
+	disableSystemProxy    bool
 
 	clientCerts []*ClientCertificationPair
 
@@ -431,6 +432,7 @@ func (m *MITMServer) initConfig() error {
 	}
 	// m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
+	m.proxy.SetDisableSystemProxy(m.disableSystemProxy)
 	if m.proxyAuth != nil {
 		m.proxy.SetAuth(m.proxyAuth.Username, m.proxyAuth.Password)
 	}
@@ -450,6 +452,10 @@ func (m *MITMServer) initConfig() error {
 		}
 		return proxys
 	}))
+
+	if m.disableSystemProxy {
+		config = append(config, lowhttp.WithEnableSystemProxyFromEnv(false))
+	}
 
 	if len(m.DNSServers) > 0 {
 		config = append(config, lowhttp.WithDNSServers(m.DNSServers))
