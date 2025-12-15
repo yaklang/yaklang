@@ -31,7 +31,7 @@ func (e *EntityRepository) BeforeSave() error {
 }
 
 func (e *EntityRepository) TableName() string {
-	return "rag_entity_repository_test"
+	return "rag_entity_repository_v1"
 }
 
 func (e *EntityRepository) ToGRPC() *ypb.EntityRepository {
@@ -77,7 +77,7 @@ func (a *ERModelEntity) AfterDelete(tx *gorm.DB) (err error) {
 }
 
 func (e *ERModelEntity) TableName() string {
-	return "rag_entity_test"
+	return "rag_entity_v1"
 }
 
 func (e *ERModelEntity) BeforeSave() error {
@@ -235,7 +235,7 @@ func (r *ERModelRelationship) AfterDelete(tx *gorm.DB) (err error) {
 }
 
 func (r *ERModelRelationship) TableName() string {
-	return "rag_entity_relationship_test"
+	return "rag_entity_relationship_v1"
 }
 
 func (r *ERModelRelationship) ToRAGContent(src string, dst string) string {
