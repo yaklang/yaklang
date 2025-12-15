@@ -22,6 +22,9 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 	if p == nil {
 		return
 	}
+	if v, ok := ToValue(i); ok {
+		v.LazySaveType()
+	}
 	p.Cache.SetInstruction(i)
 	i.RefreshString()
 }

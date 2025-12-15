@@ -158,6 +158,8 @@ type Value interface {
 	RemoveUser(User)
 
 	getAnValue() *anValue
+
+	LazySaveType()
 }
 
 type Occultation interface {

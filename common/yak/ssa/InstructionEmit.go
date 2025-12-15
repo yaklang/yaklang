@@ -472,7 +472,9 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstInstPlaceholder(i any) *ConstInst {
-	return f.emitConstInst(i, true)
+	ret := f.emitConstInst(i, true)
+	// ret.SetType(CreateStringType())
+	return ret
 }
 
 func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
@@ -485,7 +487,6 @@ func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
 	}
-	ci.SetType(CreateStringType())
 	saveTypeWithValue(ci, ci.GetType())
 	return ci
 }
