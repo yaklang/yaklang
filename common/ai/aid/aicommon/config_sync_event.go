@@ -2,21 +2,22 @@ package aicommon
 
 import (
 	"encoding/json"
+	"time"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"time"
 )
 
 const (
-	SYNC_TYPE_PLAN                string = "plan"
-	SYNC_TYPE_CONSUMPTION         string = "consumption"
-	SYNC_TYPE_PING                string = "ping"
-	SYNC_TYPE_UPDATE_CONFIG       string = "set_config"
-	SYNC_TYPE_PROCESS_EVENT       string = "sync_process_event"
-	SYNC_TYPE_TIMELINE                   = "timeline"
-	SYNC_TYPE_MEMORY_CONTEXT             = "memory_sync"
-	SYNC_TYPE_SKIP_SUBTASK_IN_PLAN       = "skip_subtask_in_plan"
-	SYNC_TYPE_REDO_SUBTASK_IN_PLAN       = "redo_subtask_in_plan"
+	SYNC_TYPE_PLAN                 string = "plan"
+	SYNC_TYPE_CONSUMPTION          string = "consumption"
+	SYNC_TYPE_PING                 string = "ping"
+	SYNC_TYPE_UPDATE_CONFIG        string = "set_config"
+	SYNC_TYPE_PROCESS_EVENT        string = "sync_process_event"
+	SYNC_TYPE_TIMELINE                    = "timeline"
+	SYNC_TYPE_MEMORY_CONTEXT              = "memory_sync"
+	SYNC_TYPE_SKIP_SUBTASK_IN_PLAN        = "skip_subtask_in_plan"
+	SYNC_TYPE_REDO_SUBTASK_IN_PLAN        = "redo_subtask_in_plan"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"
@@ -105,14 +106,67 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 		memorySessionID = c.MemoryTriage.GetSessionID()
 	}
 
-	// 收集 memoryPool 中的所有 MemoryEntity
-	var memoryInfos []*MemoryEntity
+	// 收集 memoryPool 中的所有 MemoryEntity，并统计超过 0.7 分的各维度数量
+	var memoryInfos []map[string]interface{}
 	var totalSize int
+
+	// score_overview 统计超过 0.7 分的各维度数量
+	scoreOverview := map[string]int{
+		"C_total": 0,
+		"O_total": 0,
+		"R_total": 0,
+		"E_total": 0,
+		"P_total": 0,
+		"A_total": 0,
+		"T_total": 0,
+	}
+	const scoreThreshold = 0.7
+
 	if c.MemoryPool != nil {
 		for _, memoryEntity := range c.MemoryPool.Values() {
 			if memoryEntity != nil {
-				memoryInfos = append(memoryInfos, memoryEntity)
+				// 构建带有 created_at_timestamp 的 memory 信息
+				memoryInfo := map[string]interface{}{
+					"id":                   memoryEntity.Id,
+					"created_at":           memoryEntity.CreatedAt,
+					"created_at_timestamp": memoryEntity.CreatedAt.Unix(),
+					"content":              memoryEntity.Content,
+					"tags":                 memoryEntity.Tags,
+					"c_score":              memoryEntity.C_Score,
+					"o_score":              memoryEntity.O_Score,
+					"r_score":              memoryEntity.R_Score,
+					"e_score":              memoryEntity.E_Score,
+					"p_score":              memoryEntity.P_Score,
+					"a_score":              memoryEntity.A_Score,
+					"t_score":              memoryEntity.T_Score,
+					"core_pact_vector":     memoryEntity.CorePactVector,
+					"potential_questions":  memoryEntity.PotentialQuestions,
+				}
+				memoryInfos = append(memoryInfos, memoryInfo)
 				totalSize += len(memoryEntity.Content)
+
+				// 统计超过 0.7 分的各维度
+				if memoryEntity.C_Score > scoreThreshold {
+					scoreOverview["C_total"]++
+				}
+				if memoryEntity.O_Score > scoreThreshold {
+					scoreOverview["O_total"]++
+				}
+				if memoryEntity.R_Score > scoreThreshold {
+					scoreOverview["R_total"]++
+				}
+				if memoryEntity.E_Score > scoreThreshold {
+					scoreOverview["E_total"]++
+				}
+				if memoryEntity.P_Score > scoreThreshold {
+					scoreOverview["P_total"]++
+				}
+				if memoryEntity.A_Score > scoreThreshold {
+					scoreOverview["A_total"]++
+				}
+				if memoryEntity.T_Score > scoreThreshold {
+					scoreOverview["T_total"]++
+				}
 			}
 		}
 	}
@@ -123,6 +177,7 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 		"total_memories":    len(memoryInfos),
 		"total_size":        totalSize,
 		"memory_pool_limit": c.MemoryPoolSize,
+		"score_overview":    scoreOverview,
 		"memories":          memoryInfos,
 	}
 
