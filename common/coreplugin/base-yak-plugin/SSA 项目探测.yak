@@ -26,6 +26,89 @@ concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCl
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
+// Git/SVN 认证配置（JSON Schema 形式，支持条件渲染）
+authConfig = cli.Json(
+    "auth-config",
+    cli.setVerboseName("认证配置"),
+    cli.setCliGroup("auth"),
+    cli.setDefault("{}"),
+    cli.setHelp("Git/SVN 仓库认证配置，支持密码和SSH密钥两种方式。不填则无需认证。"),
+    cli.setJsonSchema(<<<JSON
+{
+  "type": "object",
+  "properties": {
+    "source_type": {
+      "title": "代码源类型",
+      "type": "string",
+      "enum": ["git", "svn"],
+      "description": "选择代码源类型",
+      "default": "git"
+    },
+    "auth_kind": {
+      "title": "凭证类型",
+      "type": "string",
+      "enum": ["", "password", "ssh_key"],
+      "enumNames": ["无需认证", "用户名密码", "SSH密钥"],
+      "description": "选择认证凭证类型",
+      "default": ""
+    }
+  },
+  "dependencies": {
+    "auth_kind": {
+      "oneOf": [
+        {
+          "properties": {
+            "auth_kind": {
+              "enum": ["password"]
+            },
+            "username": {
+              "title": "用户名",
+              "type": "string",
+              "description": "Git/SVN 认证用户名"
+            },
+            "password": {
+              "title": "密码/Token",
+              "type": "string",
+              "description": "密码或访问令牌（如GitHub Token）"
+            }
+          },
+          "required": ["username", "password"]
+        },
+        {
+          "properties": {
+            "auth_kind": {
+              "enum": ["ssh_key"]
+            },
+            "username": {
+              "title": "用户名",
+              "type": "string",
+              "description": "Git/SVN 认证用户名（通常为git）",
+              "default": "git"
+            },
+            "ssh_key_path": {
+              "title": "SSH私钥路径",
+              "type": "string",
+              "yakit_type": "upload",
+              "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
+            }
+          },
+          "required": ["username", "ssh_key_path"]
+        },
+        {
+          "properties": {
+            "auth_kind": {
+              "enum": [""]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+JSON
+    ),
+)
+
 peepholeSizes := cli.StringSlice(
     "peephole", 
     cli.setHelp("将项目切分为多个小项目，以提高编译速度。精度随数字增高。"), 
@@ -306,26 +389,49 @@ func getHttpInfo(target) {
         target += "/"
     }
     
+    // 构建探测请求选项（包含代理和认证）
+    pocOpts = [poc.connectTimeout(timeout), poc.timeout(timeout)]
+    if proxy != "" {
+        pocOpts = append(pocOpts, poc.proxy(proxy))
+    }
+    
+    // 如果配置了密码认证，添加 HTTP Basic Auth 用于探测
+    // 注意：SSH 密钥认证无法用于 HTTP 探测，但不影响后续 clone
+    if authConfig != nil && authConfig != undefined {
+        authKind = authConfig["auth_kind"]
+        if authKind == "password" {
+            username = authConfig["username"]
+            password = authConfig["password"]
+            if username != nil && username != "" && password != nil && password != "" {
+                pocOpts = append(pocOpts, poc.replaceBasicAuth(username, password))
+                yakit.Info("探测时使用密码认证: %s", username)
+            }
+        } else if authKind == "ssh_key" {
+            yakit.Warn("探测阶段无法使用 SSH 密钥认证，如果是私有仓库可能探测失败，但不影响后续 clone")
+        }
+    }
 
     gitUrl = target + "info/refs?service=git-upload-pack"
-    rsp, req, err = poc.Get(gitUrl, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
+    rsp, req, err = poc.Get(gitUrl, pocOpts...)
     if err == nil && rsp.GetStatusCode() == 200 {
         params.info.kind = "git"
         params.info.url = tryGetRepoRootPath(target)
         generateFileName("git", httpUrl)
+        return
     }
     
 
-    rsp, req, err = poc.Get(tryGetRepoRootPath(target), poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
+    rsp, req, err = poc.Get(tryGetRepoRootPath(target), pocOpts...)
     if err == nil && rsp.GetStatusCode() == 200 {
         params.info.kind = "git"
         params.info.url = tryGetRepoRootPath(target)
         generateFileName("git", httpUrl)
+        return
     }
     
 
     if err != nil || rsp.GetStatusCode() != 200 {
-        res, req, err2 = poc.Get(origin, poc.connectTimeout(timeout), poc.timeout(timeout), poc.proxy(proxy))
+        res, req, err2 = poc.Get(origin, pocOpts...)
         if err2 != nil || res.GetStatusCode() != 200 {
             generateFileName("http", target)
             if err2 == nil {
@@ -406,10 +512,54 @@ if err == nil && existingSSAProject != nil {
 }
 
 
-options = [ssa.withProgramName(params.program_name), ssa.withProjectName(params.project_name), ssa.withProjectDescription(description), ssa.withLanguage(params.language), ssa.withCodeSourceKind(params.info.kind), ssa.withCodeSourceLocalFile(params.info.local_file), ssa.withCodeSourceURL(params.info.url), ssa.withCodeSourceBranch(params.info.branch), ssa.withCodeSourcePath(params.info.path), ssa.withDefaultExcludeFunc(str.Split(
-    excludeFile,
-    ",",
-)), ssa.withReCompile(reCompile), ssa.withConcurrency(concurrency), ssa.withStrictMode(strictMode), ssa.withDescription(description), ssa.withEntryFile(entry...)]
+options = [
+    ssa.withProgramName(params.program_name),
+    ssa.withProjectName(params.project_name),
+    ssa.withProjectDescription(description),
+    ssa.withLanguage(params.language),
+    ssa.withCodeSourceKind(params.info.kind),
+    ssa.withCodeSourceLocalFile(params.info.local_file),
+    ssa.withCodeSourceURL(params.info.url),
+    ssa.withCodeSourceBranch(params.info.branch),
+    ssa.withCodeSourcePath(params.info.path),
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
+    ssa.withReCompile(reCompile),
+    ssa.withConcurrency(concurrency),
+    ssa.withStrictMode(strictMode),
+    ssa.withDescription(description),
+    ssa.withEntryFile(entry...),
+]
+
+// 添加认证配置（从 JSON Schema 配置中提取）
+if authConfig != nil && authConfig != undefined {
+    authKind = authConfig["auth_kind"]
+    
+    if authKind != nil && authKind != "" {
+        options = append(options, ssa.withCodeSourceAuthKind(authKind))
+        
+        username = authConfig["username"]
+        if username != nil && username != "" {
+            options = append(options, ssa.withCodeSourceAuthUserName(username))
+        }
+        
+        password = authConfig["password"]
+        if password != nil && password != "" {
+            options = append(options, ssa.withCodeSourceAuthPassword(password))
+        }
+        
+        sshKeyPath = authConfig["ssh_key_path"]
+        if sshKeyPath != nil && sshKeyPath != "" {
+            options = append(options, ssa.withCodeSourceAuthKeyPath(sshKeyPath))
+        }
+        
+        sourceType = authConfig["source_type"]
+        if sourceType != nil && sourceType != "" {
+            yakit.Info("已配置 %s 认证: 凭证类型=%s, 用户名=%s", sourceType, authKind, username)
+        } else {
+            yakit.Info("已配置认证: 凭证类型=%s, 用户名=%s", authKind, username)
+        }
+    }
+}
 // 如果项目不存在或获取已有配置失败，创建新配置；否则更新已有配置
 if config == nil {
     config, err = ssa.NewConfig(ssa.ModeAll, options...)
