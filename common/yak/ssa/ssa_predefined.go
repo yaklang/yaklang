@@ -294,6 +294,8 @@ type anValue struct {
 	reference int64   // the value is pointed by this value
 
 	occultation []int64
+
+	lazySaveType func()
 }
 
 var defaultAnyType = CreateAnyType()
@@ -508,6 +510,16 @@ func (n *anValue) GetType() Type {
 	return defaultAnyType
 }
 
+func (n *anValue) SetLazySaveType(lazySaveType func()) {
+	n.lazySaveType = lazySaveType
+}
+
+func (n *anValue) LazySaveType() {
+	if n.lazySaveType != nil {
+		n.lazySaveType()
+	}
+}
+
 func (n *anValue) SetType(typ Type) {
 	if typ == nil {
 		return
@@ -552,6 +564,11 @@ func (n *anValue) cacheType(typ Type) int64 {
 	}
 	if cache := n.getProgramCache(); cache != nil && cache.TypeCache != nil {
 		cache.TypeCache.Set(typ)
+	} else {
+		n.SetLazySaveType(func() {
+			n.getProgramCache().TypeCache.Set(typ)
+			n.typId = typ.GetId()
+		})
 	}
 	return typ.GetId()
 }

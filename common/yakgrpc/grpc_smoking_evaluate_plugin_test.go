@@ -23,7 +23,8 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 		codeTyp   string
 		zeroScore bool // is score == 0 ?
 	}
-	TestSmokingEvaluatePlugin := func(tc testCase) {
+	TestSmokingEvaluatePlugin := func(t *testing.T, tc testCase) {
+		t.Helper()
 		name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(tc.codeTyp, tc.code)
 		require.NoError(t, err)
 		defer clearFunc()
@@ -59,7 +60,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 	}
 
 	t.Run("test negative alarm", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 handle = result => {
@@ -73,7 +74,7 @@ handle = result => {
 	})
 
 	t.Run("test undefine variable", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 handle = result => {
@@ -87,7 +88,7 @@ handle = result => {
 	})
 
 	t.Run("test just warning", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 handle = result => {
@@ -99,7 +100,7 @@ handle = result => {
 	})
 
 	t.Run("test yak ", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 
@@ -113,7 +114,7 @@ yakit.AutoInitYakit()
 	})
 
 	t.Run("test nuclei false positive", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `id: CVE-2024-32030
 
 info:
@@ -137,7 +138,7 @@ requests:
 	})
 
 	t.Run("test nuclei positive", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `id: WebFuzzer-Template-idZEfBnT
 info:
   name: WebFuzzer Template idZEfBnT
@@ -180,7 +181,7 @@ http:
 	})
 
 	t.Run("test localhost bypass", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -196,7 +197,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("test loose conditions", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -208,7 +209,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			codeTyp:   "mitm",
 			zeroScore: false,
 		})
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -221,7 +222,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			zeroScore: false,
 		})
 
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -237,7 +238,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("test httpflow check", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -250,7 +251,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("test http flow count", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: fmt.Sprintf(`
 yakit.AutoInitYakit()
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
@@ -269,7 +270,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("test cli mitm plugin", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 url = cli.String("url",cli.setRequired(true))
 cli.check()
@@ -283,7 +284,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("test static analyze rule", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 handle = result => {
@@ -297,7 +298,7 @@ handle = result => {
 	})
 
 	t.Run("test static analyze score rule", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 yakit.AutoInitYakit()
 handle = result => {
@@ -311,7 +312,7 @@ handle = result => {
 	})
 
 	t.Run("has send http request check", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
 	println("1")
@@ -323,7 +324,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 		})
 	})
 	t.Run("bad syntax prog should not panic backend", func(t *testing.T) {
-		TestSmokingEvaluatePlugin(testCase{
+		TestSmokingEvaluatePlugin(t, testCase{
 			code: `
     select {
     case resp = <-doneChan:
