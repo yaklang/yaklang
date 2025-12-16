@@ -117,6 +117,8 @@ var HooksExports = map[string]interface{}{
 	"LoadYakitPluginContext":       loadScriptCtx,
 	"LoadYakitPlugin":              loadScript,
 	"LoadYakitPluginByName":        loadScriptByName,
+	"LoadYakitPluginByID":          loadScriptByID,
+	"LoadYakitPluginByIDContext":   loadScriptByIDCtx,
 	"CallYakitPluginFunc":          CallYakitPluginFunc,
 }
 
@@ -1117,6 +1119,18 @@ func (y *YakToCallerManager) LoadPluginContext(ctx context.Context, t string, ho
 	return loadScriptCtx(y, ctx, t, hooks...)
 }
 
+// LoadPluginByID loads a plugin by its database ID or UUID
+// If id is int/int64, it will be treated as database ID
+// If id is string, it will be treated as UUID
+func (y *YakToCallerManager) LoadPluginByID(id interface{}, hooks ...string) error {
+	return loadScriptByID(y, id, hooks...)
+}
+
+// LoadPluginByIDContext loads a plugin by its database ID or UUID with context
+func (y *YakToCallerManager) LoadPluginByIDContext(ctx context.Context, id interface{}, hooks ...string) error {
+	return loadScriptByIDCtx(y, ctx, id, hooks...)
+}
+
 // EnableExecutionTracing 启用插件执行跟踪
 func (y *YakToCallerManager) EnableExecutionTracing(enable bool) {
 	if !enable && y.enableTracing {
@@ -2013,6 +2027,45 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 		return utils.Error("no script loading")
 	}
 	return nil
+}
+
+// loadScriptByID loads a plugin by its database ID or UUID
+// If id is int64, it will be treated as database ID
+// If id is string, it will be treated as UUID
+func loadScriptByID(mng *YakToCallerManager, id interface{}, hookNames ...string) error {
+	return loadScriptByIDCtx(mng, context.Background(), id, hookNames...)
+}
+
+func loadScriptByIDCtx(mng *YakToCallerManager, ctx context.Context, id interface{}, hookNames ...string) error {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return utils.Error("database connection is nil")
+	}
+
+	var script *schema.YakScript
+	var err error
+
+	switch v := id.(type) {
+	case int:
+		script, err = yakit.GetYakScript(db, int64(v))
+	case int64:
+		script, err = yakit.GetYakScript(db, v)
+	case string:
+		script, err = yakit.GetYakScriptByUUID(db, v)
+	default:
+		return utils.Errorf("unsupported id type: %T, expected int64 (database ID) or string (UUID)", id)
+	}
+
+	if err != nil {
+		return utils.Errorf("failed to get script by id: %v", err)
+	}
+
+	if script == nil {
+		return utils.Error("script not found")
+	}
+
+	// use script name to load the plugin
+	return loadScriptByNameCtx(mng, ctx, script.ScriptName, hookNames...)
 }
 
 func NewFetchFuncFromSrcCodeConfig() *fetchFuncFromSrcCodeConfig {

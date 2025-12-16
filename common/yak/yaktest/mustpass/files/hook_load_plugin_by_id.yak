@@ -1,0 +1,113 @@
+// Test manager.LoadPluginByID with database ID and UUID
+token = str.RandStr(16)
+testResult = f"hook_load_test_${token}"
+
+// Create a temporary test plugin with a clear function
+name = db.CreateTemporaryYakScript("yak", f`
+clear = func() {
+    db.SetKey("${testResult}", "success")
+}
+`)~
+defer db.DeleteYakScriptByName(name)
+
+// Get the plugin info to retrieve ID and UUID
+plugin = db.GetYakitPluginByName(name)~
+assert plugin != nil, "failed to get plugin info"
+
+pluginID = plugin.ID
+pluginUUID = plugin.Uuid
+
+println(f"Testing with plugin: ${name}")
+println(f"Plugin ID: ${pluginID}")
+println(f"Plugin UUID: ${pluginUUID}")
+
+// Test 1: Load plugin by database ID (int64) using manager.LoadPluginByID
+{
+    manager = hook.NewManager()
+    err = manager.LoadPluginByID(int64(pluginID), "clear")
+    assert err == nil, f"manager.LoadPluginByID by ID failed: ${err}"
+    
+    // Clear previous test result
+    db.DelKey(testResult)
+    
+    // Call the hook
+    manager.CallByName("clear")
+    
+    result = db.GetKey(testResult)
+    assert result == "success", f"manager.LoadPluginByID by ID: expected 'success', got '${result}'"
+    println("Test 1 PASSED: manager.LoadPluginByID with database ID (int64)")
+}
+
+// Test 2: Load plugin by database ID (int) using manager.LoadPluginByID
+{
+    manager = hook.NewManager()
+    err = manager.LoadPluginByID(int(pluginID), "clear")
+    assert err == nil, f"manager.LoadPluginByID by int ID failed: ${err}"
+    
+    // Clear previous test result
+    db.DelKey(testResult)
+    
+    // Call the hook
+    manager.CallByName("clear")
+    
+    result = db.GetKey(testResult)
+    assert result == "success", f"manager.LoadPluginByID by int ID: expected 'success', got '${result}'"
+    println("Test 2 PASSED: manager.LoadPluginByID with database ID (int)")
+}
+
+// Test 3: Load plugin by UUID (string) using manager.LoadPluginByID
+if pluginUUID != "" {
+    manager = hook.NewManager()
+    err = manager.LoadPluginByID(pluginUUID, "clear")
+    assert err == nil, f"manager.LoadPluginByID by UUID failed: ${err}"
+    
+    // Clear previous test result
+    db.DelKey(testResult)
+    
+    // Call the hook
+    manager.CallByName("clear")
+    
+    result = db.GetKey(testResult)
+    assert result == "success", f"manager.LoadPluginByID by UUID: expected 'success', got '${result}'"
+    println("Test 3 PASSED: manager.LoadPluginByID with UUID (string)")
+} else {
+    println("Test 3 SKIPPED: Plugin UUID is empty")
+}
+
+// Test 4: Load with invalid ID should fail
+{
+    manager = hook.NewManager()
+    err = manager.LoadPluginByID(int64(-99999), "clear")
+    assert err != nil, "manager.LoadPluginByID with invalid ID should fail"
+    println("Test 4 PASSED: manager.LoadPluginByID with invalid ID correctly returns error")
+}
+
+// Test 5: Load with invalid UUID should fail
+{
+    manager = hook.NewManager()
+    err = manager.LoadPluginByID("invalid-uuid-not-exist", "clear")
+    assert err != nil, "manager.LoadPluginByID with invalid UUID should fail"
+    println("Test 5 PASSED: manager.LoadPluginByID with invalid UUID correctly returns error")
+}
+
+// Test 6: Also verify hook.LoadYakitPluginByID still works (backwards compatibility)
+{
+    manager = hook.NewManager()
+    err = hook.LoadYakitPluginByID(manager, int64(pluginID), "clear")
+    assert err == nil, f"hook.LoadYakitPluginByID by ID failed: ${err}"
+    
+    // Clear previous test result
+    db.DelKey(testResult)
+    
+    // Call the hook
+    manager.CallByName("clear")
+    
+    result = db.GetKey(testResult)
+    assert result == "success", f"hook.LoadYakitPluginByID by ID: expected 'success', got '${result}'"
+    println("Test 6 PASSED: hook.LoadYakitPluginByID backwards compatibility")
+}
+
+// Clean up
+db.DelKey(testResult)
+
+println("All tests passed!")
