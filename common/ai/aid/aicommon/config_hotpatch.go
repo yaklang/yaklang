@@ -104,12 +104,18 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	}
 
 	if e.HotpatchType == HotPatchType_AIService {
-		chat, err := ai.LoadChater(hotPatchParams.GetAIService())
+		serviceName := hotPatchParams.GetAIService()
+		aiConfig, err := ai.LoadAiGatewayConfig(serviceName)
 		if err != nil {
-			log.Errorf("load ai service failed: %v", err)
+			log.Errorf("ai service %s not found", serviceName)
 		} else {
-			aiOption = append(aiOption, WithAICallback(AIChatToAICallbackType(chat)))
-			aiOption = append(aiOption, WithAIServiceName(hotPatchParams.GetAIService()))
+			chat, err := ai.LoadChater(hotPatchParams.GetAIService())
+			if err != nil {
+				log.Errorf("load ai service failed: %v", err)
+			} else {
+				aiOption = append(aiOption, WithAICallback(AIChatToAICallbackType(chat)))
+				aiOption = append(aiOption, WithAIChatInfo(hotPatchParams.GetAIService(), aiConfig.Model))
+			}
 		}
 	}
 	return aiOption

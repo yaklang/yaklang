@@ -313,7 +313,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 			if config.AICallback != nil {
 				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(config.AICallback))
 			} else if config.AIService != "" {
-				aiCommonOptions = append(aiCommonOptions, aicommon.WithAIServiceName(config.AIService))
+				aiCommonOptions = append(aiCommonOptions, aicommon.WithAIChatInfo(config.AIService, ""))
 			}
 
 			answer, err := Simpleliteforge.SimpleExecuteWithOptions(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")}, aiCommonOptions...)
