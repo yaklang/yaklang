@@ -41,7 +41,7 @@ YAK 是一个具有极大规模网络安全技术栈，以领域限定语言为�
 
 ![yaklang-architecture](imgs/yaklang-ecosystem.png)
 
-## CDSL-Yakang
+## CDSL-Yaklang
 
 CDSL：Cybersecurity Domain Specific Language，全称网络安全领域编程语言。
 
@@ -53,7 +53,7 @@ Yaklang 的运行时环境只依赖于 YakVM，可以实现“一次编写，处
 
 Yaklang 在 2023 年完全开源，在电子科技大学网络空间安全学院学术指导下，由 Yaklang.io 研发团队进行长达多年的迭代，覆盖大量信息安全领域基础能力，支持各类主流操作系统：macOS，Linux，Windows 可做到开箱即用。
 
-### CDSL-Yakang 的优势
+### CDSL-Yaklang 的优势
 
 基于CDSL概念构建的网络安全领域编程语言 Yaklang 被设计为针对安全能力研发领域的专用编程语言，实现了常见的大多数安全能力，可以让各种各样的安全能力彼此之间“互补，融合，进化”；提高安全从业人员的生产力。
 
@@ -73,7 +73,7 @@ Yaklang 的基础设施围绕“通用能力 + 安全能力”两大核心构建
 
 # YAK 用户生态与 Yakit
 
-YAK 生态中重要的一个软件是 Yakit，它不只是一个图形化入口，更是 Yaklang 的原生 IDE：让基础设施中的通用与安全能力，通过可视化、插件化与编排化的方式，快速转换为可交付的开发与安全生产力。 用户可以再 https://github.com/yaklang/yakit 查看该项目以及下载使用。
+YAK 生态中重要的一个软件是 Yakit，它不只是一个图形化入口，更是 Yaklang 的原生 IDE：让基础设施中的通用与安全能力，通过可视化、插件化与编排化的方式，快速转换为可交付的开发与安全生产力。 用户可以在 https://github.com/yaklang/yakit 查看该项目以及下载使用。
 
 * 角色覆盖：安全研究员、开发者、系统管理员、企业用户、渗透测试员等多角色，通过统一的交互层进入 Yaklang 能力体系。
 * 交互层组件：
@@ -106,7 +106,7 @@ YAK 也可以通过命令行来使用，这对专业用户和开发者来说非�
 
 通过命令行来安装使用 Yaklang 请遵循：**https://www.yaklang.com/** 或 **https://www.yaklang.io/** 的指引，或直接执行
 
-#### MacOS / Linux
+#### macOS / Linux
 
 ```bash
 bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)
@@ -170,7 +170,7 @@ powershell (new-object System.Net.WebClient).DownloadFile('https://yaklang.oss-c
 
 1. Alonzo Church, "A set of postulates for the foundation of logic", Annals of Mathematics, 33(2), 346-366, 1932.
 2. Dana Scott, Christopher Strachey, "Toward a mathematical semantics for computer languages", Proceedings of the Symposium on Computers and Automata, Microwave Research Institute Symposia Series Vol. 21, New York, 1971.
-3. Henk Barendregt, Wil Dekkers, Richard Statman, lambda Calculus with Types, Perspectives in Logic. Cambridge University Press, 2013.
+3. Henk Barendregt, Wil Dekkers, Richard Statman, Lambda Calculus with Types, Perspectives in Logic. Cambridge University Press, 2013.
 4. Braun, M., Buchwald, S., Hack, S., Leißa, R., Mallon, C., Zwinkau, A. (2013). Simple and Efficient Construction of Static Single Assignment Form. In: Jhala, R., De Bosschere, K. (eds) Compiler Construction. CC 2013. Lecture Notes in Computer Science, vol 7791. Springer, Berlin, Heidelberg.
 
 ### 工程技术
@@ -178,6 +178,6 @@ powershell (new-object System.Net.WebClient).DownloadFile('https://yaklang.oss-c
 1. Terence Parr, "The Definitive ANTLR 4 Reference", Pragmatic Bookshelf, 2013.
 2. Terence Parr, "Simplifying Complex Networks Using Temporal Pattern Mining: The Case of AT&T's Observed Data Network", Dissertation, 1995.
 3. Terence Parr, Russell Quong, "ANTLR: A Predicated-LL(k) Parser Generator", Journal of Software Practice and Experience, July 1995.
-4. Google Ins, "Protocol Buffers", https://developers.google.com/protocol-buffers, 2020.
-5. Google Ins, "gRPC", https://grpc.io/, 2020.
-6. Microsoft Ins, "Monaco Editor", https://microsoft.github.io/monaco-editor/, 2020.
+4. Google Inc., "Protocol Buffers", https://developers.google.com/protocol-buffers, 2020.
+5. Google Inc., "gRPC", https://grpc.io/, 2020.
+6. Microsoft Inc., "Monaco Editor", https://microsoft.github.io/monaco-editor/, 2020.
