@@ -69,23 +69,61 @@ configData = cli.Json("config_data",
             "kind": {
               "title": "认证方式",
               "type": "string",
-              "enum": ["password", "ssh_key", "token"],
-              "description": "认证方式: password=密码认证, ssh_key=SSH密钥认证, token=Token认证"
-            },
-            "user_name": {
-              "title": "用户名",
-              "type": "string"
-            },
-            "password": {
-              "title": "密码/Token",
-              "type": "string",
-              "description": "密码或Token值"
-            },
-            "key_path": {
-              "title": "SSH密钥路径",
-              "type": "string",
-              "yakit_type": "upload",
-              "description": "SSH私钥文件路径"
+              "enum": ["", "password", "ssh_key"],
+              "enumNames": ["无需认证", "用户名密码", "SSH密钥"],
+              "description": "认证方式: password=密码认证, ssh_key=SSH密钥认证",
+              "default": ""
+            }
+          },
+          "dependencies": {
+            "kind": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "kind": {
+                      "enum": ["password"]
+                    },
+                    "user_name": {
+                      "title": "用户名",
+                      "type": "string",
+                      "description": "Git/SVN 认证用户名"
+                    },
+                    "password": {
+                      "title": "密码/Token",
+                      "type": "string",
+                      "description": "密码或访问令牌（如GitHub Token）"
+                    }
+                  },
+                  "required": ["user_name", "password"]
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "enum": ["ssh_key"]
+                    },
+                    "user_name": {
+                      "title": "用户名",
+                      "type": "string",
+                      "description": "Git/SVN 认证用户名（通常为git）",
+                      "default": "git"
+                    },
+                    "key_path": {
+                      "title": "SSH私钥路径",
+                      "type": "string",
+                      "yakit_type": "upload",
+                      "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
+                    }
+                  },
+                  "required": ["user_name", "key_path"]
+                },
+                {
+                  "properties": {
+                    "kind": {
+                      "enum": [""]
+                    }
+                  }
+                }
+              ]
             }
           }
         },
