@@ -55,4 +55,9 @@ var Exports = map[string]any{
 	"threads":           WithThreads,
 	"useLocalGitBinary": WithUseLocalGitBinary,
 	"httpOpts":          WithHTTPOptions,
+
+	// SSH 选项
+	"withPrivateKey":            WithPrivateKey,
+	"withPrivateKeyContent":     WithPrivateKeyContent,
+	"withInsecureIgnoreHostKey": WithInsecureIgnoreHostKey,
 }

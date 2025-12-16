@@ -71,7 +71,6 @@ configData = cli.Json("config_data",
               "type": "string",
               "enum": ["", "password", "ssh_key"],
               "enumNames": ["无需认证", "用户名密码", "SSH密钥"],
-              "description": "认证方式: password=密码认证, ssh_key=SSH密钥认证",
               "default": ""
             }
           },
@@ -79,6 +78,7 @@ configData = cli.Json("config_data",
             "kind": {
               "oneOf": [
                 {
+                  "title": "用户名密码认证",
                   "properties": {
                     "kind": {
                       "enum": ["password"]
@@ -97,6 +97,7 @@ configData = cli.Json("config_data",
                   "required": ["user_name", "password"]
                 },
                 {
+                  "title": "SSH密钥认证",
                   "properties": {
                     "kind": {
                       "enum": ["ssh_key"]
@@ -106,15 +107,35 @@ configData = cli.Json("config_data",
                       "type": "string",
                       "description": "Git/SVN 认证用户名（通常为git）",
                       "default": "git"
-                    },
-                    "key_path": {
-                      "title": "SSH私钥路径",
-                      "type": "string",
-                      "yakit_type": "upload",
-                      "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
                     }
                   },
-                  "required": ["user_name", "key_path"]
+                  "required": ["user_name"],
+                  "oneOf": [
+                    {
+                      "title": "使用本地私钥文件",
+                      "properties": {
+                        "key_path": {
+                          "title": "SSH私钥路径",
+                          "type": "string",
+                          "yakit_type": "file",
+                          "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
+                        }
+                      },
+                      "required": ["key_path"]
+                    },
+                    {
+                      "title": "直接输入私钥内容",
+                      "properties": {
+                        "key_content": {
+                          "title": "SSH私钥内容",
+                          "type": "string",
+                          "format": "textarea",
+                          "description": "直接粘贴SSH私钥内容（PEM格式，包含 BEGIN/END 标记和换行）"
+                        }
+                      },
+                      "required": ["key_content"]
+                    }
+                  ]
                 },
                 {
                   "properties": {

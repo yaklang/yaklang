@@ -57,6 +57,7 @@ authConfig = cli.Json(
     "auth_kind": {
       "oneOf": [
         {
+          "title": "用户名密码认证",
           "properties": {
             "auth_kind": {
               "enum": ["password"]
@@ -75,6 +76,7 @@ authConfig = cli.Json(
           "required": ["username", "password"]
         },
         {
+          "title": "SSH密钥认证",
           "properties": {
             "auth_kind": {
               "enum": ["ssh_key"]
@@ -84,15 +86,35 @@ authConfig = cli.Json(
               "type": "string",
               "description": "Git/SVN 认证用户名（通常为git）",
               "default": "git"
-            },
-            "ssh_key_path": {
-              "title": "SSH私钥路径",
-              "type": "string",
-              "yakit_type": "upload",
-              "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
             }
           },
-          "required": ["username", "ssh_key_path"]
+          "required": ["username"],
+          "oneOf": [
+            {
+              "title": "使用本地私钥文件",
+              "properties": {
+                "ssh_key_path": {
+                  "title": "SSH私钥路径",
+                  "type": "string",
+                  "yakit_type": "file",
+                  "description": "SSH私钥文件路径，例如: ~/.ssh/id_rsa"
+                }
+              },
+              "required": ["ssh_key_path"]
+            },
+            {
+              "title": "直接输入私钥内容",
+              "properties": {
+                "key_content": {
+                  "title": "SSH私钥内容",
+                  "type": "string",
+                  "format": "textarea",
+                  "description": "直接粘贴SSH私钥内容（PEM格式，包含 BEGIN/END 标记和换行）"
+                }
+              },
+              "required": ["key_content"]
+            }
+          ]
         },
         {
           "properties": {
@@ -461,6 +483,7 @@ func getHttpInfo(target) {
 }
 
 if target.HasPrefix("git://") {
+    // git:// 协议（较少使用）
     gitUrl = target[6:]
     params.info.kind = "git"
     params.info.url = target
@@ -468,9 +491,27 @@ if target.HasPrefix("git://") {
     if params.language == "" {
         newLanguageNeedSelectException("git 无法自动检测项目的语言，请手动指定语言。")
     }
+} else if target.HasPrefix("ssh://") {
+    // ssh:// 协议: ssh://git@github.com/user/repo.git
+    params.info.kind = "git"
+    params.info.url = target
+    generateFileName("git", target[6:])
+    if params.language == "" {
+        newLanguageNeedSelectException("git 无法自动检测项目的语言，请手动指定语言。")
+    }
 } else if target.HasPrefix("http://") || target.HasPrefix("https://") {
+    // HTTP(S) 协议，可能是 Git 仓库或普通 HTTP 资源
     getHttpInfo(target)
+} else if target.HasPrefix("git@") && target.Contains(":") {
+    // SSH 格式的 Git URL: git@github.com:user/repo.git
+    params.info.kind = "git"
+    params.info.url = target
+    generateFileName("git", target)
+    if params.language == "" {
+        newLanguageNeedSelectException("git 无法自动检测项目的语言，请手动指定语言。")
+    }
 } else {
+    // 本地文件或文件夹
     getLocalInfo(target)
 }
 
@@ -550,6 +591,11 @@ if authConfig != nil && authConfig != undefined {
         sshKeyPath = authConfig["ssh_key_path"]
         if sshKeyPath != nil && sshKeyPath != "" {
             options = append(options, ssa.withCodeSourceAuthKeyPath(sshKeyPath))
+        }
+        
+        keyContent = authConfig["key_content"]
+        if keyContent != nil && keyContent != "" {
+            options = append(options, ssa.withCodeSourceAuthKeyContent(keyContent))
         }
         
         sourceType = authConfig["source_type"]

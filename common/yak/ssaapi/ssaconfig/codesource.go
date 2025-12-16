@@ -19,10 +19,11 @@ const (
 )
 
 type AuthConfigInfo struct {
-	Kind     string `json:"kind"`                // 认证方式: password/ssh_key/token
-	UserName string `json:"user_name,omitempty"` // 用户名
-	Password string `json:"password,omitempty"`  // 密码或token
-	KeyPath  string `json:"key_path,omitempty"`  // SSH私钥路径
+	Kind       string `json:"kind"`                  // 认证方式: password/ssh_key/token
+	UserName   string `json:"user_name,omitempty"`   // 用户名
+	Password   string `json:"password,omitempty"`    // 密码或token
+	KeyPath    string `json:"key_path,omitempty"`    // SSH私钥路径（本地文件场景）
+	KeyContent string `json:"key_content,omitempty"` // SSH私钥内容
 }
 
 type ProxyConfigInfo struct {
@@ -296,6 +297,20 @@ func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
 			c.CodeSource.Auth = &AuthConfigInfo{}
 		}
 		c.CodeSource.Auth.KeyPath = keyPath
+		return nil
+	}
+}
+
+// WithCodeSourceAuthKeyContent 设置SSH私钥内容（PEM格式，适用于分布式场景）
+func WithCodeSourceAuthKeyContent(keyContent string) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Auth Key Content"); err != nil {
+			return err
+		}
+		if c.CodeSource.Auth == nil {
+			c.CodeSource.Auth = &AuthConfigInfo{}
+		}
+		c.CodeSource.Auth.KeyContent = keyContent
 		return nil
 	}
 }

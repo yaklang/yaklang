@@ -96,9 +96,8 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 		proxyUser, proxyPassword := codeSource.GetCodeSourceProxyAuth()
 		opts = append(opts, yakgit.WithProxy(proxyURL, proxyUser, proxyPassword))
 	}
-	if opt := parseAuth(codeSource.GetCodeSourceAuth()); opt != nil {
-		opts = append(opts, opt)
-	}
+	authOpts := parseAuth(codeSource.GetCodeSourceAuth())
+	opts = append(opts, authOpts...)
 	opts = append(opts, yakgit.WithHTTPOptions(poc.WithRetryTimes(10)))
 	if err := yakgit.Clone(codeSource.GetCodeSourceURL(), local, opts...); err != nil {
 		return nil, err
@@ -113,17 +112,26 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	return filesys.NewRelLocalFs(targetPath), nil
 }
 
-func parseAuth(auth *ssaconfig.AuthConfigInfo) yakgit.Option {
+func parseAuth(auth *ssaconfig.AuthConfigInfo) []yakgit.Option {
 	if auth == nil {
 		return nil
 	}
+
+	var opts []yakgit.Option
+
 	switch auth.Kind {
 	case "password":
-		return yakgit.WithUsernamePassword(auth.UserName, auth.Password)
+		opts = append(opts, yakgit.WithUsernamePassword(auth.UserName, auth.Password))
 	case "ssh_key":
-		return yakgit.WithPrivateKey(auth.UserName, auth.KeyPath, auth.Password)
+		if auth.KeyContent != "" {
+			opts = append(opts, yakgit.WithPrivateKeyContent(auth.UserName, auth.KeyContent, auth.Password))
+		} else if auth.KeyPath != "" {
+			opts = append(opts, yakgit.WithPrivateKey(auth.UserName, auth.KeyPath, auth.Password))
+		}
+		opts = append(opts, yakgit.WithInsecureIgnoreHostKey())
 	}
-	return nil
+
+	return opts
 }
 
 func svnFs(codeSource *Config) (fi.FileSystem, error) {
