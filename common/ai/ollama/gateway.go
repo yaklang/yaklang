@@ -38,7 +38,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 }
 
 func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler, g.config.Images...)
 }
 
 func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {

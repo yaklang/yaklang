@@ -135,5 +135,5 @@ func (g *GLMClient) Chat(s string, f ...any) (string, error) {
 }
 
 func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler, g.config.Images...)
 }

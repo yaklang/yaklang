@@ -1,0 +1,147 @@
+yakit.AutoInitYakit()
+
+// Knowledge Base Availability Diagnostic Script
+// Test AI image recognition and embedding service (local + online)
+
+imageBase64 := `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`
+
+status = msg => {
+    yakit.StatusCard("status", f`${msg}`)
+}
+
+defer fn {
+    err := recover()
+    if err != nil {
+        status(f`ERR: ${err}`)
+    }
+}
+
+status("starting")
+yakit.SetProgress(0.1)
+sleep(0.5)
+
+// Step 1: Check AI image recognition capability using ai.FunctionCall + ai.imageBase64
+yakit.SetProgress(0.2)
+status("checking AI image recognition")
+
+results = nil
+try {
+    results, _ = ai.FunctionCall("根据图片，识别图片中的文字", {
+        "ai_ocr_data": "把图片中的内容的文字识别在这里,类型为string"
+    }, ai.imageBase64(imageBase64))
+} catch err {
+    status(f`ERR: AI image processing failed - ${err}`)
+    return
+}
+
+yakit.SetProgress(0.4)
+
+if results == nil {
+    status("ERR: AI returned empty result")
+    return
+}
+
+result = results["ai_ocr_data"]
+if result == nil || result == "" {
+    status("ERR: AI model cannot recognize text in image, please check AI config")
+    return
+}
+
+// Check OCR result - expected to contain "数据库"
+resultStr := sprintf("%v", result)
+if !str.Contains(resultStr, "数据库") {
+    status(f`ERR: OCR result does not contain expected text. Got: ${str.TrimSpace(resultStr)}`)
+    return
+}
+
+yakit.SetProgress(0.5)
+status("AI image recognition OK")
+
+// Step 2: Check Online Embedding service (always test)
+yakit.SetProgress(0.55)
+status("checking online embedding service")
+
+onlineOK := false
+onlineErr := ""
+onlineDim := 0
+try {
+    onlineResult, err := rag.OnlineEmbedding("你好")
+    if err == nil && onlineResult != nil && len(onlineResult) > 0 {
+        onlineOK = true
+        onlineDim = len(onlineResult)
+    } else if err != nil {
+        onlineErr = sprintf("%v", err)
+    } else {
+        onlineErr = "empty result"
+    }
+} catch err {
+    onlineErr = sprintf("%v", err)
+}
+
+if onlineOK {
+    status(f`online embedding OK (dim: ${onlineDim})`)
+} else {
+    status(f`online embedding failed: ${onlineErr}`)
+}
+
+// Step 3: Check Local Embedding service with retry
+yakit.SetProgress(0.7)
+status("checking local embedding service")
+
+localOK := false
+localErr := ""
+localDim := 0
+maxRetry := 5
+
+for i := 0; i < maxRetry; i++ {
+    try {
+        localResult, err := rag.LocalEmbedding("你好")
+        if err == nil && localResult != nil && len(localResult) > 0 {
+            localOK = true
+            localDim = len(localResult)
+            break
+        } else if err != nil {
+            localErr = sprintf("%v", err)
+        } else {
+            localErr = "empty result"
+        }
+    } catch err {
+        localErr = sprintf("%v", err)
+    }
+    
+    if i < maxRetry - 1 {
+        status(f`local embedding loading, retry ${i+1}/${maxRetry}...`)
+        sleep(3)
+    }
+}
+
+if localOK {
+    status(f`local embedding OK (dim: ${localDim})`)
+} else {
+    status(f`local embedding failed: ${localErr}`)
+}
+
+// Step 4: Check results and report
+yakit.SetProgress(0.9)
+
+// Validate dimensions if available
+if onlineOK && onlineDim != 1024 {
+    status(f`WARN: online embedding dimension incorrect, expected 1024, got ${onlineDim}`)
+}
+if localOK && localDim != 1024 {
+    status(f`WARN: local embedding dimension incorrect, expected 1024, got ${localDim}`)
+}
+
+// Final status
+sleep(0.5)
+yakit.SetProgress(1.0)
+
+if onlineOK && localOK {
+    status("ready")
+} else if onlineOK {
+    status("ready (online only, local unavailable)")
+} else if localOK {
+    status("ready (local only, online unavailable)")
+} else {
+    status("ERR: both online and local embedding services unavailable")
+}

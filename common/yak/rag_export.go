@@ -23,11 +23,13 @@ var RagExports = map[string]interface{}{
 
 	"embeddingHandle": _embeddingHandle,
 
-	"DeleteCollection":  _deleteCollection,
-	"DeleteRAG":         _deleteRAG,
-	"ListCollection":    _listCollection,
-	"ListRAG":           _listRAG,
-	"GetCollectionInfo": _getCollectionInfo,
+	"DeleteCollection":       _deleteCollection,
+	"DeleteRAG":              _deleteRAG,
+	"DeleteKnowledgeBase":    _deleteKnowledgeBase,
+	"DeleteAllKnowledgeBase": _deleteAllKnowledgeBase,
+	"ListCollection":         _listCollection,
+	"ListRAG":                _listRAG,
+	"GetCollectionInfo":      _getCollectionInfo,
 
 	"HasCollection": _hasCollection,
 
@@ -99,6 +101,10 @@ var RagExports = map[string]interface{}{
 	"noEntityRepository": _noEntityRepository,
 	"noKnowledgeBase":    _noKnowledgeBase,
 	"ragImportFile":      rag.WithImportFile,
+
+	"Embedding":       _embedding,
+	"LocalEmbedding":  _localEmbedding,
+	"OnlineEmbedding": _onlineEmbedding,
 }
 
 func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {
@@ -164,6 +170,30 @@ func _listRAG() []string {
 // ```
 func _deleteRAG(name string) error {
 	return rag.DeleteRAG(consts.GetGormProfileDatabase(), name)
+}
+
+// _deleteKnowledgeBase 删除指定的知识库及其关联的 RAG 内容
+// 包括: RAG 向量库、RAG 集合综述库、知识库条目库、知识库集合、问题索引库等
+// Example:
+// ```
+//
+//	err = rag.DeleteKnowledgeBase("my_knowledge_base")
+//
+// ```
+func _deleteKnowledgeBase(name string) error {
+	return rag.DeleteRAG(consts.GetGormProfileDatabase(), name)
+}
+
+// _deleteAllKnowledgeBase 删除所有知识库及其关联的 RAG 内容
+// 清空所有: RAG 向量库、RAG 集合综述库、知识库条目库、知识库集合、问题索引库等
+// Example:
+// ```
+//
+//	err = rag.DeleteAllKnowledgeBase()
+//
+// ```
+func _deleteAllKnowledgeBase() error {
+	return rag.DeleteAllRAG(consts.GetGormProfileDatabase())
 }
 
 // _embeddingHandle 创建自定义嵌入处理器
@@ -277,4 +307,56 @@ func _newTempRagDatabase() (*gorm.DB, error) {
 // ```
 func _enableMockMode() {
 	vectorstore.IsMockMode = true
+}
+
+// _embedding 生成文本的嵌入向量
+// 使用默认的嵌入服务生成文本的向量表示（优先使用在线服务，回退到本地服务）
+// Example:
+// ```
+//
+//	result, err = rag.Embedding("你好")
+//	if err != nil {
+//	    // handle error
+//	}
+//	// result is []float32
+//
+// ```
+func _embedding(text string) ([]float32, error) {
+	return vectorstore.Embedding(text)
+}
+
+// _localEmbedding 使用本地嵌入服务生成文本的向量表示
+// 本地服务需要安装本地模型（如 Qwen3-Embedding-0.6B-Q4_K_M）
+// Example:
+// ```
+//
+//	result, err = rag.LocalEmbedding("你好")
+//	if err != nil {
+//	    // handle error - 本地服务不可用
+//	}
+//	// result is []float32, dimension: 1024
+//
+// ```
+func _localEmbedding(text string) ([]float32, error) {
+	service, err := vectorstore.GetLocalEmbeddingService()
+	if err != nil {
+		return nil, err
+	}
+	return service.Embedding(text)
+}
+
+// _onlineEmbedding 使用在线嵌入服务生成文本的向量表示
+// 使用 AIBalance 免费在线服务，无需安装本地模型
+// Example:
+// ```
+//
+//	result, err = rag.OnlineEmbedding("你好")
+//	if err != nil {
+//	    // handle error - 在线服务不可用
+//	}
+//	// result is []float32, dimension: 1024
+//
+// ```
+func _onlineEmbedding(text string) ([]float32, error) {
+	return vectorstore.AIBalanceFreeEmbeddingFunc(text)
 }

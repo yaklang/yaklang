@@ -114,3 +114,16 @@ func ListRAGSystemNames(db *gorm.DB) []string {
 
 	return result
 }
+
+// DeleteAllRAG deletes all RAG systems, including collections, knowledge bases, and entity repositories
+func DeleteAllRAG(db *gorm.DB) error {
+	names := ListRAGSystemNames(db)
+	var lastErr error
+	for _, name := range names {
+		if err := DeleteRAG(db, name); err != nil {
+			log.Errorf("failed to delete RAG system: %v, error: %v", name, err)
+			lastErr = err
+		}
+	}
+	return lastErr
+}

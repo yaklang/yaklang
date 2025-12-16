@@ -1,0 +1,25 @@
+yakit.AutoInitYakit()
+
+# Reset Knowledge Base - Delete all knowledge bases and associated RAG content
+
+confirmReset := cli.Bool("confirm", cli.setVerboseName("确认重置"), cli.setDefault(false), cli.setRequired(true), cli.setHelp("确认删除所有知识库，此操作不可撤销"))
+cli.check()
+
+if !confirmReset {
+    yakit.Error("请确认重置操作，此操作将删除所有知识库且不可撤销")
+    return
+}
+
+yakit.Info("Starting to reset all knowledge bases...")
+yakit.StatusCard("Status", "Resetting...")
+
+err := rag.DeleteAllKnowledgeBase()
+if err != nil {
+    yakit.Error("Failed to reset knowledge bases: %v", err)
+    yakit.StatusCard("Status", "Failed")
+    return
+}
+
+yakit.Info("All knowledge bases have been successfully reset")
+yakit.StatusCard("Status", "Completed")
+

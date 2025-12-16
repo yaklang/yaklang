@@ -385,6 +385,22 @@ func init() {
 			withPluginHelp("通过各种选项生成所需的证书文件"),
 			withPluginEnableGenerateParam(true),
 		)
+
+		registerBuildInPlugin(
+			"yak", "重置知识库",
+			withPluginHelp("删除所有知识库及其关联的RAG内容，包括向量库、集合综述库、知识库条目库等"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
+		)
+
+		registerBuildInPlugin(
+			"yak", "知识库可用性诊断",
+			withPluginHelp("检测AI图像识别能力和向量化服务是否正常工作，用于知识库功能的可用性诊断"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
+		)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 

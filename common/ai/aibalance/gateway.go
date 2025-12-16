@@ -55,6 +55,7 @@ func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]a
 		g.targetUrl,
 		g.config.Model, msg, fields,
 		g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler,
+		g.config.Images...,
 	)
 }
 
