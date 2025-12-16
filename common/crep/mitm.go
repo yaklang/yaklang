@@ -369,7 +369,9 @@ type MITMServer struct {
 	randomJA3 bool
 
 	// connection pool for remote server connections
-	connPool       *lowhttp.LowHttpConnPool
+	connPool           *lowhttp.LowHttpConnPool
+	strongHostConnPool *lowhttp.LowHttpConnPool
+
 	connPoolCtx    context.Context
 	connPoolCancel context.CancelFunc
 
@@ -526,7 +528,9 @@ func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error
 	// Create connection pool with cancellable context
 	m.connPoolCtx, m.connPoolCancel = context.WithCancel(ctx)
 	m.connPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 100, 2)
+	m.strongHostConnPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 100, 2)
 	m.proxy.SetConnPool(m.connPool)
+	m.proxy.SetStrongHostConnPool(m.strongHostConnPool)
 
 	// Clean up connection pool when done
 	defer func() {
@@ -537,6 +541,10 @@ func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error
 		if m.connPool != nil {
 			log.Infof("mitm: clearing connection pool in ServerListener")
 			m.connPool.Clear()
+		}
+		if m.strongHostConnPool != nil {
+			log.Infof("mitm: clearing strong host connection pool in ServerListener")
+			m.strongHostConnPool.Clear()
 		}
 	}()
 

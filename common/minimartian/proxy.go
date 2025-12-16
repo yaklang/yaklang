@@ -97,7 +97,8 @@ type Proxy struct {
 	forceDisableKeepAlive bool
 
 	// connection pool for remote server connections
-	connPool *lowhttp.LowHttpConnPool
+	connPool           *lowhttp.LowHttpConnPool
+	strongHostConnPool *lowhttp.LowHttpConnPool
 
 	extraIncomingConnCh chan *WrapperedConn
 }
@@ -189,14 +190,14 @@ func (p *Proxy) deleteCache(req *http.Request) {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	proxy := &Proxy{
-		timeout:          5 * time.Minute,
-		closing:          make(chan bool),
-		reqmod:           noop,
-		resmod:           noop,
-		ctxCacheInitOnce: new(sync.Once),
-		ctxCacheLock:     new(sync.Mutex),
-		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
-		proxyExactRoutes: make(map[string][]string),
+		timeout:             5 * time.Minute,
+		closing:             make(chan bool),
+		reqmod:              noop,
+		resmod:              noop,
+		ctxCacheInitOnce:    new(sync.Once),
+		ctxCacheLock:        new(sync.Mutex),
+		ctxCache:            utils.NewTTLCache[*Context](5 * time.Minute),
+		proxyExactRoutes:    make(map[string][]string),
 		extraIncomingConnCh: make(chan *WrapperedConn),
 	}
 	return proxy
@@ -384,6 +385,10 @@ func (p *Proxy) SetConnPool(pool *lowhttp.LowHttpConnPool) {
 	p.connPool = pool
 }
 
+func (p *Proxy) SetStrongHostConnPool(pool *lowhttp.LowHttpConnPool) {
+	p.strongHostConnPool = pool
+}
+
 // Close sets the proxy to the closing state so it stops receiving new connections,
 // finishes processing any inflight requests, and closes existing connections without
 // reading anymore requests from them.
@@ -403,6 +408,12 @@ func (p *Proxy) Close() {
 		log.Infof("mitm: clearing connection pool")
 		p.connPool.Clear()
 		log.Infof("mitm: connection pool cleared")
+	}
+
+	if p.strongHostConnPool != nil {
+		log.Infof("mitm: clearing strong host connection pool")
+		p.strongHostConnPool.Clear()
+		log.Infof("mitm: strong host connection pool cleared")
 	}
 }
 

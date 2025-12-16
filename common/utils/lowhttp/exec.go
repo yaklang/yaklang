@@ -694,6 +694,10 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
 	}
 
+	if option.StrongHost != "" {
+		dialopts = append(dialopts, netx.DialX_WithStrongHostMode(option.StrongHost))
+	}
+
 	if len(option.ExtendDialOption) > 0 {
 		dialopts = append(dialopts, option.ExtendDialOption...)
 	}
@@ -709,6 +713,11 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if sni != nil {
 		cacheKey.sni = *sni
 	}
+
+	if option.StrongHost != "" {
+		cacheKey.strongHost = option.StrongHost
+	}
+
 	haveNativeHTTPRequestInstance := reqIns != nil
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(reqIns, https)

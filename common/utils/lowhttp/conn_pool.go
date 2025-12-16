@@ -856,10 +856,11 @@ type connectKey struct {
 	gmTls           bool
 	clientHelloSpec *utls.ClientHelloSpec
 	sni             string
+	strongHost      string
 }
 
 func (c *connectKey) hash() string {
-	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni)
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls, c.clientHelloSpec, c.sni, c.strongHost)
 }
 
 type connLRU struct {
