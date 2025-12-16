@@ -106,6 +106,8 @@ type LowhttpExecConfig struct {
 	BeforeCount *int64
 	AfterCount  *int64
 
+	StrongHost string
+
 	Dialer func(duration time.Duration, addr string) (net.Conn, error)
 
 	ExtendDialOption []netx.DialXOption // for test
@@ -792,6 +794,12 @@ func WithClientHelloSpec(spec *utls.ClientHelloSpec) LowhttpOpt {
 func WithDialer(dialer func(duration time.Duration, addr string) (net.Conn, error)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Dialer = dialer
+	}
+}
+
+func WithStrongHostMode(localAddrIP string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.StrongHost = localAddrIP
 	}
 }
 

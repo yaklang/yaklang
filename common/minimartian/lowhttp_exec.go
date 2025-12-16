@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -93,7 +92,6 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	// In strong host mode, disable connection pool
 	// Strong host connections must not be reused from pool
-	useConnPool := !isStrongHostMode
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
@@ -102,7 +100,6 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithGmTLSOnly(p.gmTLSOnly),
 		lowhttp.WithGmTLSPrefer(p.gmPrefer),
-		lowhttp.WithConnPool(useConnPool),
 		lowhttp.WithSaveHTTPFlow(false),
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithMaxContentLength(MaxContentLength),
@@ -110,8 +107,11 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	// Use custom connection pool if available and not in strong host mode
 	// In strong host mode, connections must not be reused from pool
-	if p.connPool != nil && !isStrongHostMode {
-		opts = append(opts, lowhttp.ConnPool(p.connPool))
+
+	if isStrongHostMode && p.strongHostConnPool != nil {
+		opts = append(opts, lowhttp.WithConnPool(true), lowhttp.ConnPool(p.strongHostConnPool))
+	} else if p.connPool != nil {
+		opts = append(opts, lowhttp.WithConnPool(true), lowhttp.ConnPool(p.connPool))
 	}
 
 	if p.dialer != nil {
@@ -165,7 +165,7 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 			if ip != nil {
 				// Pass strong host mode with localAddr IP to netx dial layer
 				// DialX_WithStrongHostMode expects the local IP address to bind to
-				opts = append(opts, lowhttp.WithExtendDialXOption(netx.DialX_WithStrongHostMode(localAddrIP)))
+				opts = append(opts, lowhttp.WithStrongHostMode(localAddrIP))
 			}
 		}
 	}
