@@ -93,6 +93,7 @@ type Config struct {
 
 	//aiServiceName
 	AiServerName string
+	AiModelName  string
 
 	// ai call config
 	AiCallTokenLimit       int64
@@ -1026,6 +1027,31 @@ func WithAIServiceName(name string) ConfigOption {
 	}
 }
 
+func WithAIModelName(name string) ConfigOption {
+	return func(cfg *Config) error {
+		if cfg.m == nil {
+			cfg.m = &sync.Mutex{}
+		}
+		cfg.m.Lock()
+		defer cfg.m.Unlock()
+		cfg.AiModelName = name
+		return nil
+	}
+}
+
+func WithAIChatInfo(serviceName string, modelName string) ConfigOption {
+	return func(cfg *Config) error {
+		if cfg.m == nil {
+			cfg.m = &sync.Mutex{}
+		}
+		cfg.m.Lock()
+		defer cfg.m.Unlock()
+		cfg.AiServerName = serviceName
+		cfg.AiModelName = modelName
+		return nil
+	}
+}
+
 func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -1589,7 +1615,8 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 
 	// set ai service
 	if c.AiServerName != "" {
-		e.AIService = c.AiServerName // set ai service name
+		e.AIService = c.AiServerName  // set ai service name
+		e.AIModelName = c.AiModelName // set ai model name
 	}
 
 	if e.ShouldSave() {
@@ -1752,7 +1779,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	// aiCallback
 	if i.AiServerName != "" {
-		opts = append(opts, WithAIServiceName(i.AiServerName))
+		opts = append(opts, WithAIChatInfo(i.AiServerName, i.AiModelName))
 	}
 
 	// Keywords
@@ -1851,6 +1878,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 }
 
 func (c *Config) LoadAIServiceByName(name string) error {
+	aiConfig, err := ai.LoadAiGatewayConfig(name)
+	if err != nil {
+		return fmt.Errorf("%s not found", name)
+	}
 	chat, err := ai.LoadChater(name)
 	if err != nil {
 		return err
@@ -1858,9 +1889,10 @@ func (c *Config) LoadAIServiceByName(name string) error {
 	// update react config
 	c.SetAICallback(AIChatToAICallbackType(chat))
 	c.AiServerName = name
+	c.AiModelName = aiConfig.Model
 
 	// submit hotpatch options
-	c.HotPatchBroadcaster.Submit(WithAIServiceName(c.AiServerName))
+	c.HotPatchBroadcaster.Submit(WithAIChatInfo(c.AiServerName, c.AiModelName))
 	c.HotPatchBroadcaster.Submit(WithAICallback(c.OriginalAICallback))
 	return nil
 }

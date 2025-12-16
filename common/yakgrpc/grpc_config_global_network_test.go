@@ -35,50 +35,54 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type GetawayClient struct {
+type GatewayClient struct {
 	valid              bool
 	functionCallHandle func(msg string) (map[string]any, error)
 }
 
-func (g *GetawayClient) SupportedStructuredStream() bool {
+func (g *GatewayClient) GetConfig() *aispec.AIConfig {
+	return nil
+}
+
+func (g *GatewayClient) SupportedStructuredStream() bool {
 	return false
 }
 
-func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }
 
-func (g *GetawayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
+func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (g *GetawayClient) CheckValid() error {
+func (g *GatewayClient) CheckValid() error {
 	if g.valid {
 		return nil
 	}
 	return errors.New("invalid")
 }
 
-func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
+func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	if g.valid {
 		return "ok", nil
 	}
 	return "", errors.New("invalid")
 }
 
-func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
+func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return g.functionCallHandle(msg)
 }
 
-func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
+func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	return nil, nil
 }
 
-func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
+func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 }
 
-func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	return nil, nil
 }
 
@@ -101,11 +105,11 @@ func TestAiApiPriority(t *testing.T) {
 	})
 	aispec.Register("test1", func() aispec.AIClient {
 		test1 = true
-		return &GetawayClient{valid: false}
+		return &GatewayClient{valid: false}
 	})
 	aispec.Register("test2", func() aispec.AIClient {
 		test2 = true
-		return &GetawayClient{valid: true}
+		return &GatewayClient{valid: true}
 	})
 	client.SetGlobalNetworkConfig(context.Background(), config)
 
@@ -128,7 +132,7 @@ func TestAiApiPriority(t *testing.T) {
 
 	// is set ai type, but not registered, use default config ai type
 	aispec.Register("ai", func() aispec.AIClient {
-		return &GetawayClient{valid: false}
+		return &GatewayClient{valid: false}
 	})
 	ok = false
 	ai.Chat("test", aispec.WithType("ai"))
@@ -141,7 +145,7 @@ func TestAiApiPriority(t *testing.T) {
 	var ok1 bool
 	aispec.Register("ai", func() aispec.AIClient {
 		ok1 = true
-		return &GetawayClient{valid: true}
+		return &GatewayClient{valid: true}
 	})
 	ai.Chat("test", aispec.WithType("ai"))
 	if !(ok1 && !ok) {
@@ -152,7 +156,7 @@ func TestAiApiPriority(t *testing.T) {
 	ok = false
 	aispec.Register("ai", func() aispec.AIClient {
 		ok1 = true
-		return &GetawayClient{valid: false}
+		return &GatewayClient{valid: false}
 	})
 	ai.Chat("test", aispec.WithType("ai"))
 	if !(ok1 && ok) {
@@ -163,7 +167,7 @@ func TestAiApiPriority(t *testing.T) {
 	times := 0
 	aispec.Register("functionCall", func() aispec.AIClient {
 		functionCallOk = true
-		return &GetawayClient{valid: true, functionCallHandle: func(msg string) (map[string]any, error) {
+		return &GatewayClient{valid: true, functionCallHandle: func(msg string) (map[string]any, error) {
 			defer func() {
 				times++
 			}()

@@ -15,6 +15,10 @@ type GLMClient struct {
 	targetUrl string
 }
 
+func (g *GLMClient) GetConfig() *aispec.AIConfig {
+	return g.config
+}
+
 func (g *GLMClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
 }

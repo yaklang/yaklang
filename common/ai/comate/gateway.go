@@ -21,6 +21,10 @@ type Client struct {
 	config *aispec.AIConfig
 }
 
+func (c *Client) GetConfig() *aispec.AIConfig {
+	return c.config
+}
+
 func (c *Client) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }

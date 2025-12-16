@@ -21,6 +21,7 @@ type Configurable interface {
 	LoadOption(opt ...AIConfigOption)
 	BuildHTTPOptions() ([]poc.PocConfigOption, error)
 	CheckValid() error
+	GetConfig() *AIConfig
 }
 
 type StructuredData struct {

@@ -188,7 +188,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 
 type TestAIClient struct {
 	rsp string
-	openai.GetawayClient
+	openai.GatewayClient
 }
 
 func (g *TestAIClient) CheckValid() error {

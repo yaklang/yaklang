@@ -8,21 +8,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
-type GetawayClient struct {
+type GatewayClient struct {
 	config *aispec.AIConfig
 
 	targetUrl string
 }
 
-func (g *GetawayClient) SupportedStructuredStream() bool {
+func (g *GatewayClient) GetConfig() *aispec.AIConfig {
+	return g.config
+}
+
+func (g *GatewayClient) SupportedStructuredStream() bool {
 	return true
 }
 
-func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
+func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return aispec.ListChatModels(g.targetUrl, g.BuildHTTPOptions)
 }
 
-func (g *GetawayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
+func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
 	return aispec.StructuredStreamBase(
 		g.targetUrl,
 		g.config.Model,
@@ -34,9 +38,9 @@ func (g *GetawayClient) StructuredStream(s string, function ...any) (chan *aispe
 	)
 }
 
-var _ aispec.AIClient = (*GetawayClient)(nil)
+var _ aispec.AIClient = (*GatewayClient)(nil)
 
-func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
+func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	return aispec.ChatBase(g.targetUrl, g.config.Model,
 		s,
 		aispec.WithChatBase_Function(function),
@@ -48,15 +52,15 @@ func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
 	)
 }
 
-func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
+func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler, g.config.Images...)
 }
 
-func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
+func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
 }
 
-func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
+func (g *GatewayClient) newLoadOption(opt ...aispec.AIConfigOption) {
 	config := aispec.NewDefaultAIConfig(opt...)
 	g.config = config
 
@@ -67,7 +71,7 @@ func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
 	g.targetUrl = aispec.GetBaseURLFromConfig(g.config, "https://openrouter.ai", "/api/v1/chat/completions")
 }
 
-func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
+func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	if aispec.EnableNewLoadOption {
 		g.newLoadOption(opt...)
 		return
@@ -92,14 +96,14 @@ func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {
 	}
 }
 
-func (g *GetawayClient) CheckValid() error {
+func (g *GatewayClient) CheckValid() error {
 	if g.config.APIKey == "" {
 		return errors.New("APIKey is required")
 	}
 	return nil
 }
 
-func (g *GetawayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{
 			"Content-Type":  "application/json; charset=UTF-8",

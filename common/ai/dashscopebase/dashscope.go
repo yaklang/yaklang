@@ -31,6 +31,10 @@ type DashScopeGateway struct {
 	endpointUrl string
 }
 
+func (d *DashScopeGateway) GetConfig() *aispec.AIConfig {
+	return d.config
+}
+
 func (d *DashScopeGateway) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }
