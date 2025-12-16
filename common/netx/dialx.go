@@ -180,6 +180,11 @@ RETRY:
 			if config.Debug {
 				log.Errorf("dial %s failed: %v", target, err)
 			}
+
+			if config.StrongHostMode && config.StrongLocalAddrIP != "" {
+				log.Infof("strong host mode dial failed target [%s] |strong host [%s] |failed reason [%s]", target, localAddr, err.Error())
+			}
+
 			lastError = err
 			var opError *net.OpError
 			switch {
