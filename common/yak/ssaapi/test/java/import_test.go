@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestImport(t *testing.T) {
+func TestImportJava(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a.java", `
 package com.sun.lang.javaCC;

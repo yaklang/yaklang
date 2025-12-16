@@ -664,7 +664,7 @@ class B{
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
-func TestImport1(t *testing.T) {
+func TestImportJava(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a.java", `package com.simp.sso.service.imp;
 

@@ -984,6 +984,7 @@ func (b *FunctionBuilder) HandlerReturnPhi(s ssautil.ScopedVersionedTableIF[Valu
 		leftv := b.CreateVariable(name)
 		und := b.EmitUndefined(name)
 		und.Kind = UndefinedValueReturn
+		und.SetType(value.GetType())
 		b.AssignVariable(leftv, und)
 	}
 

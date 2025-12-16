@@ -6,7 +6,7 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
-func TestImport(t *testing.T) {
+func TestImportGolang(t *testing.T) {
 	t.Run("function", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 

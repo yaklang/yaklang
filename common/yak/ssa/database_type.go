@@ -27,6 +27,7 @@ func saveTypeWithValue(value Value, typ Type) {
 	if cache := application.Cache; cache != nil {
 		cache.TypeCache.Set(typ)
 		saveType(typ)
+		value.getAnValue().SetLazySaveType(nil)
 	} else {
 		log.Error("cache is nil ")
 	}

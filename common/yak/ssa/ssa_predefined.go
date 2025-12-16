@@ -301,10 +301,12 @@ type anValue struct {
 var defaultAnyType = CreateAnyType()
 
 func NewValue() *anValue {
-	return &anValue{
+	ret := &anValue{
 		anInstruction: NewInstruction(),
-		typId:         defaultAnyType.GetId(),
+		typId:         -1,
 	}
+	ret.SetType(defaultAnyType)
+	return ret
 }
 
 func (n *anValue) IsMember() bool {
