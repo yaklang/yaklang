@@ -2,14 +2,26 @@ package yakdocument
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sort"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func ReflectFuncToFunctionDoc(libName string, ret reflect.Type) (ExportsFunctionDoc, error) {
+	return ReflectFuncToFunctionDocWithCache(libName, ret, nil)
+}
+
+// ReflectFuncToFunctionDocWithCache converts reflect.Type to ExportsFunctionDoc with shared cache
+// This avoids repeated struct parsing when processing multiple functions
+func ReflectFuncToFunctionDocWithCache(libName string, ret reflect.Type, cache *sync.Map) (ExportsFunctionDoc, error) {
 	if ret.Kind() != reflect.Func {
 		return ExportsFunctionDoc{}, utils.Errorf("no a valid func: %v", ret.Kind())
+	}
+
+	if cache == nil {
+		cache = new(sync.Map)
 	}
 
 	var params []*FieldDoc
@@ -29,7 +41,7 @@ func ReflectFuncToFunctionDoc(libName string, ret reflect.Type) (ExportsFunction
 		structInfo, _ := Dir(i)
 		if structInfo != nil {
 			rStructName = StructName(libName, structInfo.PkgPath, structInfo.Name)
-			structDocs = append(structDocs, StructHelperToDoc(structInfo)...)
+			structDocs = append(structDocs, StructHelperToDocWithCache(structInfo, cache)...)
 		}
 
 		params = append(params, &FieldDoc{
@@ -53,7 +65,7 @@ func ReflectFuncToFunctionDoc(libName string, ret reflect.Type) (ExportsFunction
 		structInfo, _ := Dir(i)
 		if structInfo != nil {
 			rStructName = StructName(libName, structInfo.PkgPath, structInfo.Name)
-			structDocs = append(structDocs, StructHelperToDoc(structInfo)...)
+			structDocs = append(structDocs, StructHelperToDocWithCache(structInfo, cache)...)
 		}
 		returnTypes = append(returnTypes, &FieldDoc{
 			Name:               fmt.Sprintf("r%v", _index),

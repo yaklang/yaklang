@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -618,6 +619,9 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 		Name: fmt.Sprintf("%v", "__global__"),
 	}
 
+	// Use shared cache for all struct document generation to avoid repeated parsing
+	var sharedCache = new(sync.Map)
+
 	fnTable := engine.GetFntable()
 	for libName, item := range fnTable {
 		iTy := reflect.TypeOf(item)
@@ -637,7 +641,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 			for elementName, value := range res {
 				switch methodType := reflect.TypeOf(value); methodType.Kind() {
 				case reflect.Func:
-					fDoc, err := yakdocument.ReflectFuncToFunctionDoc(libName, methodType)
+					fDoc, err := yakdocument.ReflectFuncToFunctionDocWithCache(libName, methodType, sharedCache)
 					if err != nil {
 						continue
 					}
@@ -651,7 +655,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 					var structDoc []*yakdocument.StructDoc
 					s, _ := yakdocument.Dir(value)
 					if s != nil {
-						structDoc = yakdocument.StructHelperToDoc(s)
+						structDoc = yakdocument.StructHelperToDocWithCache(s, sharedCache)
 					}
 					varDoc := &yakdocument.VariableDoc{
 						Name:           fmt.Sprintf("%v.%v", libName, elementName),
@@ -686,7 +690,7 @@ func EngineToLibDocuments(engine *antlr4yak.Engine) []yakdocument.LibDoc {
 			}
 			switch iTy.Kind() {
 			case reflect.Func:
-				fDoc, err := yakdocument.ReflectFuncToFunctionDoc(libName, iTy)
+				fDoc, err := yakdocument.ReflectFuncToFunctionDocWithCache(libName, iTy, sharedCache)
 				if err != nil {
 					continue
 				}

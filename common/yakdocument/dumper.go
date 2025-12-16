@@ -2,12 +2,13 @@ package yakdocument
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func DumpReturnTypes(types []reflect.Type) string {
@@ -205,6 +206,14 @@ func MethodToDoc(m reflect.Method, ptr bool, structName string) *MethodDoc {
 	return convertMethodToDoc(m, ptr, structName, new(sync.Map))
 }
 
+// MethodToDocWithCache converts reflect.Method to MethodDoc with shared cache
+func MethodToDocWithCache(m reflect.Method, ptr bool, structName string, cache *sync.Map) *MethodDoc {
+	if cache == nil {
+		cache = new(sync.Map)
+	}
+	return convertMethodToDoc(m, ptr, structName, cache)
+}
+
 func convertMethodToDoc(m reflect.Method, ptr bool, structName string, cache *sync.Map) *MethodDoc {
 	isMethod := structName != "" && structName != "."
 	doc, err := convertFuncToDoc(m.Func.Type(), ptr, cache, isMethod)
@@ -232,6 +241,14 @@ func convertMethodToDoc(m reflect.Method, ptr bool, structName string, cache *sy
 func StructHelperToDoc(h *StructHelper) []*StructDoc {
 	var cached = new(sync.Map)
 	return convertStructHelperToDoc(h, cached)
+}
+
+// StructHelperToDocWithCache converts StructHelper to StructDoc with shared cache to avoid repeated parsing
+func StructHelperToDocWithCache(h *StructHelper, cache *sync.Map) []*StructDoc {
+	if cache == nil {
+		cache = new(sync.Map)
+	}
+	return convertStructHelperToDoc(h, cache)
 }
 
 func convertStructHelperToDoc(h *StructHelper, cache *sync.Map) []*StructDoc {
