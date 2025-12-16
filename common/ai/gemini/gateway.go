@@ -165,6 +165,10 @@ type Client struct {
 	// apiKey and model removed, will be accessed via config
 }
 
+func (c *Client) GetConfig() *aispec.AIConfig {
+	return c.config
+}
+
 // Ensure Client implements AIClient interface (will add methods incrementally)
 // var _ aispec.AIClient = (*Client)(nil) // Commented out temporarily
 

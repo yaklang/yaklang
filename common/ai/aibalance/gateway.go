@@ -14,6 +14,10 @@ type GatewayClient struct {
 	targetUrl string
 }
 
+func (g *GatewayClient) GetConfig() *aispec.AIConfig {
+	return g.config
+}
+
 func (g *GatewayClient) SupportedStructuredStream() bool {
 	return true
 }

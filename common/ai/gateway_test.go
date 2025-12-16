@@ -145,6 +145,10 @@ type TestGateway struct {
 	config *aispec.AIConfig
 }
 
+func (t *TestGateway) GetConfig() *aispec.AIConfig {
+	return t.config
+}
+
 func (t *TestGateway) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }

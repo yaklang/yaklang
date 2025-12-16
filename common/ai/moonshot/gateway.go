@@ -14,6 +14,10 @@ type GatewayClient struct {
 	targetUrl string
 }
 
+func (g *GatewayClient) GetConfig() *aispec.AIConfig {
+	return g.config
+}
+
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
 func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {

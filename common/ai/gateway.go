@@ -30,7 +30,7 @@ import (
 
 func init() {
 	aispec.Register("openai", func() aispec.AIClient {
-		return &openai.GetawayClient{}
+		return &openai.GatewayClient{}
 	})
 	aispec.Register("chatglm", func() aispec.AIClient {
 		return &chatglm.GLMClient{}
@@ -39,10 +39,10 @@ func init() {
 		return &moonshot.GatewayClient{}
 	})
 	aispec.Register("tongyi", func() aispec.AIClient {
-		return &tongyi.GetawayClient{}
+		return &tongyi.GatewayClient{}
 	})
 	aispec.Register("volcengine", func() aispec.AIClient {
-		return &volcengine.GetawayClient{
+		return &volcengine.GatewayClient{
 			ExtraOptions: []aispec.AIConfigOption{
 				aispec.WithEnableThinkingEx("thinking", map[string]any{
 					"type": "disabled",
@@ -54,16 +54,16 @@ func init() {
 		return &comate.Client{}
 	})
 	aispec.Register("deepseek", func() aispec.AIClient {
-		return &deepseek.GetawayClient{}
+		return &deepseek.GatewayClient{}
 	})
 	aispec.Register("siliconflow", func() aispec.AIClient {
-		return &siliconflow.GetawayClient{}
+		return &siliconflow.GatewayClient{}
 	})
 	aispec.Register("ollama", func() aispec.AIClient {
 		return &ollama.GatewayClient{}
 	})
 	aispec.Register("openrouter", func() aispec.AIClient {
-		return &openrouter.GetawayClient{}
+		return &openrouter.GatewayClient{}
 	})
 	aispec.Register("gemini", func() aispec.AIClient {
 		return &gemini.Client{}
@@ -382,6 +382,15 @@ func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.Gener
 		}
 		return gateway.Chat(msg)
 	}, nil
+}
+
+func LoadAiGatewayConfig(name string) (*aispec.AIConfig, error) {
+	gateway, ok := aispec.Lookup(name)
+	if !ok {
+		return nil, errors.New("not found valid ai gateway type: " + name)
+	}
+	gateway.LoadOption(aispec.WithType(name))
+	return gateway.GetConfig(), nil
 }
 
 var Exports = map[string]any{
