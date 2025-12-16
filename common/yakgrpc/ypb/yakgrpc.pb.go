@@ -7546,6 +7546,7 @@ type AIOutputEvent struct {
 	ContentType     string                 `protobuf:"bytes,18,opt,name=ContentType,proto3" json:"ContentType,omitempty"`     // markdown / yaklang_code / plain_code
 	CallToolID      string                 `protobuf:"bytes,19,opt,name=CallToolID,proto3" json:"CallToolID,omitempty"`       // 如果是调用工具相关的事件，那么这里是调用的ID
 	AIService       string                 `protobuf:"bytes,20,opt,name=AIService,proto3" json:"AIService,omitempty"`         // 如果是 AI 服务相关的事件，那么这里是 AI 服务的名称
+	AIModelName     string                 `protobuf:"bytes,22,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`     // AI 模型名称
 	TaskUUID        string                 `protobuf:"bytes,21,opt,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`           // 任务的唯一ID
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -7717,6 +7718,13 @@ func (x *AIOutputEvent) GetCallToolID() string {
 func (x *AIOutputEvent) GetAIService() string {
 	if x != nil {
 		return x.AIService
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetAIModelName() string {
+	if x != nil {
+		return x.AIModelName
 	}
 	return ""
 }
@@ -65054,7 +65062,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\x86\x05\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xa8\x05\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -65078,7 +65086,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"CallToolID\x18\x13 \x01(\tR\n" +
 	"CallToolID\x12\x1c\n" +
-	"\tAIService\x18\x14 \x01(\tR\tAIService\x12\x1a\n" +
+	"\tAIService\x18\x14 \x01(\tR\tAIService\x12 \n" +
+	"\vAIModelName\x18\x16 \x01(\tR\vAIModelName\x12\x1a\n" +
 	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +

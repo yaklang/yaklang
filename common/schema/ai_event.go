@@ -170,6 +170,7 @@ type AiOutputEvent struct {
 
 	ContentType string
 	AIService   string
+	AIModelName string
 }
 
 func (e *AiOutputEvent) GetContentJSONPath(p string) string {
@@ -360,5 +361,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		ContentType:     e.ContentType,
 		AIService:       e.AIService,
 		TaskUUID:        e.TaskUUID,
+		AIModelName:     e.AIModelName,
 	}
 }

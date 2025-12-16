@@ -16,12 +16,17 @@ func TestConfig_Smoking(t *testing.T) {
 
 func TestConfig_AIServiceName(t *testing.T) {
 	token := uuid.NewString()
+	token2 := uuid.NewString()
 	serviceNameOk := false
+	serviceModelOk := false
 	config := NewTestConfig(context.Background(),
-		WithAIServiceName(token),
+		WithAIChatInfo(token, token2),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			if e.AIService == token {
 				serviceNameOk = true
+			}
+			if e.AIModelName == token2 {
+				serviceModelOk = true
 			}
 		}),
 	)
@@ -29,5 +34,9 @@ func TestConfig_AIServiceName(t *testing.T) {
 
 	if serviceNameOk == false {
 		t.Fatalf("AIServiceName not set correctly")
+	}
+
+	if serviceModelOk == false {
+		t.Fatalf("AIModelName not set correctly")
 	}
 }
