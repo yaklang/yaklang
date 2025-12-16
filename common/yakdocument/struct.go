@@ -3,11 +3,12 @@ package yakdocument
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"sync"
+
 	"github.com/dave/jennifer/jen"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
-	"sync"
 )
 
 type StructHelper struct {
@@ -143,6 +144,14 @@ func (s *StructHelper) ShowAddDocHelper() {
 
 func FuncToDoc(ret reflect.Type, ptr bool, isMethod bool) (*MethodDoc, error) {
 	return convertFuncToDoc(ret, ptr, new(sync.Map), isMethod)
+}
+
+// FuncToDocWithCache converts reflect.Type to MethodDoc with shared cache
+func FuncToDocWithCache(ret reflect.Type, ptr bool, isMethod bool, cache *sync.Map) (*MethodDoc, error) {
+	if cache == nil {
+		cache = new(sync.Map)
+	}
+	return convertFuncToDoc(ret, ptr, cache, isMethod)
 }
 
 func convertFuncToDoc(ret reflect.Type, ptr bool, cache *sync.Map, isMethod bool) (*MethodDoc, error) {
