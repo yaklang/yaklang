@@ -10,41 +10,72 @@ on:
       - '.github/workflows/exp-cross-build.yml'
 
 jobs:
-  check_commit_msg:
-    runs-on: ubuntu-22.04
+  # 预热 job：生成所有预编译资源，避免在 matrix 中重复执行
+  warmup:
+    runs-on: macos-14
+    outputs:
+      YAK_TAG: ${{ steps.get_tag.outputs.YAK_TAG }}
     steps:
-      - name: Check Commit Message
-        run: |
-          git clone https://github.com/yaklang/yaklang && cd yaklang
-          git fetch --all
-          
-          if [[ -n "$GITHUB_HEAD_REF" ]]; then
-            REF=$GITHUB_HEAD_REF
-          else
-            REF=${GITHUB_REF#refs/*/}
-          fi
-          git checkout $REF
-          echo "Switched to $REF"
-
-          git checkout $REF
-          echo "generate commit messages ... "
-          ./scripts/generate-commit.sh
-          echo "-------------"
-          # 检查 /tmp/raw_commit_message.txt 文件是否存在
-          if [ ! -f /tmp/raw_commit_message.txt ]; then
-            echo "Error: /tmp/raw_commit_message.txt does not exist."
-            exit 1
-          fi
-          echo "/tmp/raw_commit_message.txt is existed continue..."
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: raw_commit_message.txt
-          path: /tmp/raw_commit_message.txt
+          fetch-depth: 1  # 只获取当前 commit，加速 clone
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+        id: go
+
+      - name: Get Repo tags
+        id: get_tag
+        run: |
+          go run common/yak/cmd/yak.go repos-tag -o tags.txt
+          echo "$(cat tags.txt)"
+          echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
+          echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Document
+        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
+
+      - name: Codec Methods Document
+        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
+
+      - name: Sync Embed FS Hash to Code
+        run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
+
+      - name: Install gzip-embed tool
+        run: go install ./common/utils/gzip_embed/gzip-embed
+
+      - name: Generate tar.gz resources
+        run: |
+          gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
+          gzip-embed -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --no-embed --root-path
+
+      - name: Initialize License Machine
+        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
+
+      # 打包所有预热产物
+      - name: Create Warmup Bundle
+        run: |
+          tar -cvf warmup-bundle.tar \
+            common/yak/yakdoc/doc/doc.gob.gzip \
+            common/yak/yaklib/codec/codegrpc/codec.gob.gzip \
+            common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz \
+            common/yso/resources/static.tar.gz \
+            common/xlic/certs/pri.gzip \
+            common/xlic/certs/pub.gzip \
+            common/consts/hash.go
+
+      - name: Upload Warmup Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: warmup-bundle
+          path: warmup-bundle.tar
+          retention-days: 1
 
   build_and_upload_to_oss:
-    needs: check_commit_msg
-    outputs:
-      YAK_TAG: ${{ steps.get_tag.outputs.YAK_TAG}}
+    needs: warmup
     strategy:
       matrix:
         os:
@@ -89,8 +120,9 @@ jobs:
             CC: aarch64-linux-gnu-gcc
     runs-on: ${{ contains(matrix.os, 'windows') && 'windows-latest' || 'macos-14' }}
     steps:
-      # build
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # 只获取当前 commit，加速 clone
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -99,22 +131,26 @@ jobs:
           cache: false
         id: go
 
-      # - name: Cache Go modules
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      # 下载并解压预热产物
+      - name: Download Warmup Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: warmup-bundle
+
+      - name: Extract Warmup Bundle (Unix)
+        if: runner.os != 'Windows'
+        run: tar -xvf warmup-bundle.tar
+
+      - name: Extract Warmup Bundle (Windows)
+        if: runner.os == 'Windows'
+        run: tar -xvf warmup-bundle.tar
 
       - name: Get Repo tags
         id: get_tag
         run: |
           go run common/yak/cmd/yak.go repos-tag -o tags.txt
           echo "$(cat tags.txt)"
-          echo "YAK_TAG=$(cat tags.txt)" >> ${{ matrix.env }} 
-          echo "YAK_TAG=$(cat tags.txt)" >> "$GITHUB_OUTPUT"
+          echo "YAK_TAG=$(cat tags.txt)" >> ${{ matrix.env }}
 
       - name: Go Patch for Win7
         if: matrix.os == 'windows7'
@@ -145,30 +181,10 @@ jobs:
           brew install aarch64-unknown-linux-gnu
           aarch64-linux-gnu-gcc -v
 
-      - name: Generate Document
-        run: go run -gcflags=all="-N -l" common/yak/yakdoc/generate_doc/generate_doc.go common/yak/yakdoc/doc/doc.gob.gzip
-
-      - name: Codec Methods Document
-        run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
-
-      - name: Sync Embed FS Hash to Code
-        run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
-
-      - name: Install gzip-embed tool
-        run: go install ./common/utils/gzip_embed/gzip-embed
-
-      - name: Generate tar.gz resources
-        run: |
-          gzip-embed -cache --source ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai --gz ./common/ai/aid/aitool/buildinaitools/yakscripttools/yakscriptforai.tar.gz --no-embed
-          gzip-embed -cache --source ./common/yso/resources/static --gz ./common/yso/resources/static.tar.gz --no-embed --root-path
-
-      - name: Initialize License Machine
-        run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
-
       - name: Build
         run: |
-          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
-      # release
+          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ needs.warmup.outputs.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
+
       - name: Generate Checksums
         run: |
           go run common/yak/cmd/yak.go sha256 -f ${{ matrix.binary }}
@@ -177,8 +193,8 @@ jobs:
       - name: debug info
         run: |
           echo "env.YAK_TAG PRODUCT_BINARY=${{ matrix.binary }}"
-          echo "env.YAK_TAG YAK_TAG=${{ env.YAK_TAG }}"
-          echo "env.YAK_TAG SHA256=${{ env.SHA256 }}"
+          echo "env.YAK_TAG YAK_TAG=${{ needs.warmup.outputs.YAK_TAG }}"
+          echo "env.SHA256 SHA256=${{ env.SHA256 }}"
 
       - name: Show Current Dir
         run: ls
@@ -186,9 +202,8 @@ jobs:
 
       - name: Upload Binaries To aliyun-oss
         run: |
-          go run common/yak/cmd/yak.go upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f '${{ matrix.binary }}:/yak/${{ env.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/${{ env.YAK_TAG }}/${{ env.SHA256 }}'
+          go run common/yak/cmd/yak.go upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f '${{ matrix.binary }}:/yak/${{ needs.warmup.outputs.YAK_TAG }}/${{ matrix.binary }};${{ env.SHA256 }}:/yak/${{ needs.warmup.outputs.YAK_TAG }}/${{ env.SHA256 }}'
 
-      # upload assets
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -203,11 +218,12 @@ jobs:
 
   check_version_and_github_release:
     runs-on: ubuntu-22.04
-    needs: build_and_upload_to_oss
+    needs: [warmup, build_and_upload_to_oss]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # 只获取当前 commit，加速 clone
 
-      # download assets
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -217,38 +233,11 @@ jobs:
       - name: Get Repo tags
         run: |
           pwd && ls -lh && chmod +x ./yak_linux_amd64
-          ./yak_linux_amd64 repos-tag -o tags.txt
-          echo "YAK_TAG=$(cat tags.txt)" >> $GITHUB_ENV
+          echo "YAK_TAG=${{ needs.warmup.outputs.YAK_TAG }}" >> $GITHUB_ENV
 
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
 
-      - name: Publish Release INFO
-        continue-on-error: true
-        run: |
-          # 定义文件路径
-          raw_commit_file="./raw_commit_message.txt"
-          
-          # 检查文件行数
-          line_count=$(wc -l < "$raw_commit_file")
-          
-          # 如果行数超过3行，输出111
-          if [ "$line_count" -gt 3 ]; then
-            ./yak_linux_amd64 ./scripts/output_release_info.yak --ai-type chatglm --apikey ${{ secrets.CHATGLM_APIKEY }} --filename ./raw_commit_message.txt --ai-model glm-4-long
-            ls | grep release
-          fi
-          
-          if [[ -f release_note.en.txt ]]; then
-            echo "Uploading release_note.en.txt to oss"
-            cat release_note.en.txt | head -n 100
-            ./yak_linux_amd64 upload-oss -f 'release_note.en.txt:/yak/${{ env.YAK_TAG }}/release_note.en.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
-          fi
-
-          if [[ -f release_note.txt ]]; then
-            echo "Uploading release_note.txt to oss"
-            cat release_note.txt | head -n 100
-            ./yak_linux_amd64 upload-oss -f 'release_note.txt:/yak/${{ env.YAK_TAG }}/release_note.txt' -ak ${{ secrets.OSS_KEY_ID }} -sk ${{ secrets.OSS_KEY_SECRET }} -t 5
-          fi
       - name: Push Version Info to OSS
         run: |
           echo "start to handle versions"
@@ -276,14 +265,14 @@ jobs:
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
-        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags') && !contains(env.YAK_TAG, 'alpha') }}
+        if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags') && !contains(needs.warmup.outputs.YAK_TAG, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          name: ${{ env.YAK_TAG }}
-          tag_name: ${{ env.YAK_TAG }}
+          name: ${{ needs.warmup.outputs.YAK_TAG }}
+          tag_name: ${{ needs.warmup.outputs.YAK_TAG }}
           body: |
-            Release ${{ env.YAK_TAG }}
+            Release ${{ needs.warmup.outputs.YAK_TAG }}
           draft: false
           prerelease: false
           files: |
@@ -326,9 +315,9 @@ jobs:
           fi
 
   update_syntaxflow_meta:
-    needs: build_and_upload_to_oss
+    needs: [warmup, build_and_upload_to_oss]
     uses: ./.github/workflows/update-syntaxflow-meta.yml
     with:
-      update_version: ${{ needs.build_and_upload_to_oss.outputs.YAK_TAG }}
+      update_version: ${{ needs.warmup.outputs.YAK_TAG }}
       update_last: true
     secrets: inherit
