@@ -1,4 +1,4 @@
-//go:build !without_exlanguage
+//go:build !irify_exclude
 
 package ssaapi
 
