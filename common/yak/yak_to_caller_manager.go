@@ -2030,42 +2030,49 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 }
 
 // loadScriptByID loads a plugin by its database ID or UUID
-// If id is int64, it will be treated as database ID
-// If id is string, it will be treated as UUID
+// Supports various numeric types as database ID, or string as UUID
 func loadScriptByID(mng *YakToCallerManager, id interface{}, hookNames ...string) error {
 	return loadScriptByIDCtx(mng, context.Background(), id, hookNames...)
 }
 
 func loadScriptByIDCtx(mng *YakToCallerManager, ctx context.Context, id interface{}, hookNames ...string) error {
+	script, err := getYakScriptByID(id)
+	if err != nil {
+		return err
+	}
+	// use script name to load the plugin
+	return loadScriptByNameCtx(mng, ctx, script.ScriptName, hookNames...)
+}
+
+// getYakScriptByID retrieves a YakScript by its database ID or UUID
+// If id is a string, it will be treated as UUID
+// Otherwise, it will be converted to int64 as database ID
+func getYakScriptByID(id interface{}) (*schema.YakScript, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
-		return utils.Error("database connection is nil")
+		return nil, utils.Error("database connection is nil")
 	}
 
 	var script *schema.YakScript
 	var err error
 
-	switch v := id.(type) {
-	case int:
-		script, err = yakit.GetYakScript(db, int64(v))
-	case int64:
-		script, err = yakit.GetYakScript(db, v)
-	case string:
-		script, err = yakit.GetYakScriptByUUID(db, v)
-	default:
-		return utils.Errorf("unsupported id type: %T, expected int64 (database ID) or string (UUID)", id)
+	// If it's a string, treat it as UUID
+	if uuid, ok := id.(string); ok {
+		script, err = yakit.GetYakScriptByUUID(db, uuid)
+	} else {
+		// Otherwise, convert to int64 as database ID
+		script, err = yakit.GetYakScript(db, int64(utils.InterfaceToInt(id)))
 	}
 
 	if err != nil {
-		return utils.Errorf("failed to get script by id: %v", err)
+		return nil, utils.Errorf("failed to get script by id: %v", err)
 	}
 
 	if script == nil {
-		return utils.Error("script not found")
+		return nil, utils.Error("script not found")
 	}
 
-	// use script name to load the plugin
-	return loadScriptByNameCtx(mng, ctx, script.ScriptName, hookNames...)
+	return script, nil
 }
 
 func NewFetchFuncFromSrcCodeConfig() *fetchFuncFromSrcCodeConfig {

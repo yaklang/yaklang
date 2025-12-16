@@ -578,6 +578,25 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 	return m.LoadPluginByName(m.ctx, scriptName, params)
 }
 
+// LoadPluginByID loads a plugin by its database ID or UUID
+// Supports various integer types (int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64)
+// as database ID, or string as UUID
+func (m *MixPluginCaller) LoadPluginByID(id interface{}, params ...*ypb.ExecParamItem) error {
+	if m.ctx == nil {
+		m.ctx = context.Background()
+	}
+	return m.LoadPluginByIDContext(m.ctx, id, params...)
+}
+
+// LoadPluginByIDContext loads a plugin by its database ID or UUID with context
+func (m *MixPluginCaller) LoadPluginByIDContext(ctx context.Context, id interface{}, params ...*ypb.ExecParamItem) error {
+	script, err := getYakScriptByID(id)
+	if err != nil {
+		return err
+	}
+	return m.LoadPluginEx(ctx, script, params...)
+}
+
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
 	var (

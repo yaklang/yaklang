@@ -1,113 +1,176 @@
-// Test manager.LoadPluginByID with database ID and UUID
+// Test LoadPluginByID with database ID and UUID for both YakToCallerManager and MixPluginCaller
+// Note: LoadPluginByID supports various types without manual conversion:
+//   - All integer types (int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64)
+//   - Float types (float32, float64)
+//   - String (for UUID)
+
 token = str.RandStr(16)
 testResult = f"hook_load_test_${token}"
 
-// Create a temporary test plugin with a clear function
-name = db.CreateTemporaryYakScript("yak", f`
+// ========================================
+// Part 1: Test with YakToCallerManager (hook.NewManager)
+// ========================================
+println("===== Part 1: Testing YakToCallerManager (hook.NewManager) =====")
+
+// Create a temporary test plugin with a clear function (yak type for Manager)
+managerPluginName = db.CreateTemporaryYakScript("yak", f`
 clear = func() {
-    db.SetKey("${testResult}", "success")
+    db.SetKey("${testResult}", "manager_success")
 }
 `)~
-defer db.DeleteYakScriptByName(name)
+defer db.DeleteYakScriptByName(managerPluginName)
 
 // Get the plugin info to retrieve ID and UUID
-plugin = db.GetYakitPluginByName(name)~
-assert plugin != nil, "failed to get plugin info"
+managerPlugin = db.GetYakitPluginByName(managerPluginName)~
+assert managerPlugin != nil, "failed to get manager plugin info"
 
-pluginID = plugin.ID
-pluginUUID = plugin.Uuid
+// No type conversion needed - use the ID directly
+managerPluginID = managerPlugin.ID
+managerPluginUUID = managerPlugin.Uuid
 
-println(f"Testing with plugin: ${name}")
-println(f"Plugin ID: ${pluginID}")
-println(f"Plugin UUID: ${pluginUUID}")
+println(f"Manager Plugin: ${managerPluginName}")
+println(f"Manager Plugin ID: ${managerPluginID}")
+println(f"Manager Plugin UUID: ${managerPluginUUID}")
 
-// Test 1: Load plugin by database ID (int64) using manager.LoadPluginByID
+// Test 1.1: Load plugin by database ID directly (no type conversion needed)
 {
     manager = hook.NewManager()
-    err = manager.LoadPluginByID(int64(pluginID), "clear")
+    err = manager.LoadPluginByID(managerPluginID, "clear")
     assert err == nil, f"manager.LoadPluginByID by ID failed: ${err}"
     
-    // Clear previous test result
     db.DelKey(testResult)
-    
-    // Call the hook
     manager.CallByName("clear")
     
     result = db.GetKey(testResult)
-    assert result == "success", f"manager.LoadPluginByID by ID: expected 'success', got '${result}'"
-    println("Test 1 PASSED: manager.LoadPluginByID with database ID (int64)")
+    assert result == "manager_success", f"manager.LoadPluginByID by ID: expected 'manager_success', got '${result}'"
+    println("Test 1.1 PASSED: manager.LoadPluginByID with database ID (direct use, no conversion)")
 }
 
-// Test 2: Load plugin by database ID (int) using manager.LoadPluginByID
-{
+// Test 1.2: Load plugin by UUID (string) using manager.LoadPluginByID
+if managerPluginUUID != "" {
     manager = hook.NewManager()
-    err = manager.LoadPluginByID(int(pluginID), "clear")
-    assert err == nil, f"manager.LoadPluginByID by int ID failed: ${err}"
-    
-    // Clear previous test result
-    db.DelKey(testResult)
-    
-    // Call the hook
-    manager.CallByName("clear")
-    
-    result = db.GetKey(testResult)
-    assert result == "success", f"manager.LoadPluginByID by int ID: expected 'success', got '${result}'"
-    println("Test 2 PASSED: manager.LoadPluginByID with database ID (int)")
-}
-
-// Test 3: Load plugin by UUID (string) using manager.LoadPluginByID
-if pluginUUID != "" {
-    manager = hook.NewManager()
-    err = manager.LoadPluginByID(pluginUUID, "clear")
+    err = manager.LoadPluginByID(managerPluginUUID, "clear")
     assert err == nil, f"manager.LoadPluginByID by UUID failed: ${err}"
     
-    // Clear previous test result
     db.DelKey(testResult)
-    
-    // Call the hook
     manager.CallByName("clear")
     
     result = db.GetKey(testResult)
-    assert result == "success", f"manager.LoadPluginByID by UUID: expected 'success', got '${result}'"
-    println("Test 3 PASSED: manager.LoadPluginByID with UUID (string)")
+    assert result == "manager_success", f"manager.LoadPluginByID by UUID: expected 'manager_success', got '${result}'"
+    println("Test 1.2 PASSED: manager.LoadPluginByID with UUID (string)")
 } else {
-    println("Test 3 SKIPPED: Plugin UUID is empty")
+    println("Test 1.2 SKIPPED: Manager Plugin UUID is empty")
 }
 
-// Test 4: Load with invalid ID should fail
+// Test 1.3: Load with invalid ID should fail
 {
     manager = hook.NewManager()
-    err = manager.LoadPluginByID(int64(-99999), "clear")
+    err = manager.LoadPluginByID(-99999, "clear")
     assert err != nil, "manager.LoadPluginByID with invalid ID should fail"
-    println("Test 4 PASSED: manager.LoadPluginByID with invalid ID correctly returns error")
+    println("Test 1.3 PASSED: manager.LoadPluginByID with invalid ID correctly returns error")
 }
 
-// Test 5: Load with invalid UUID should fail
+// Test 1.4: Load with invalid UUID should fail
 {
     manager = hook.NewManager()
     err = manager.LoadPluginByID("invalid-uuid-not-exist", "clear")
     assert err != nil, "manager.LoadPluginByID with invalid UUID should fail"
-    println("Test 5 PASSED: manager.LoadPluginByID with invalid UUID correctly returns error")
+    println("Test 1.4 PASSED: manager.LoadPluginByID with invalid UUID correctly returns error")
 }
 
-// Test 6: Also verify hook.LoadYakitPluginByID still works (backwards compatibility)
+// Test 1.5: Also verify hook.LoadYakitPluginByID still works (backwards compatibility)
 {
     manager = hook.NewManager()
-    err = hook.LoadYakitPluginByID(manager, int64(pluginID), "clear")
+    err = hook.LoadYakitPluginByID(manager, managerPluginID, "clear")
     assert err == nil, f"hook.LoadYakitPluginByID by ID failed: ${err}"
     
-    // Clear previous test result
     db.DelKey(testResult)
-    
-    // Call the hook
     manager.CallByName("clear")
     
     result = db.GetKey(testResult)
-    assert result == "success", f"hook.LoadYakitPluginByID by ID: expected 'success', got '${result}'"
-    println("Test 6 PASSED: hook.LoadYakitPluginByID backwards compatibility")
+    assert result == "manager_success", f"hook.LoadYakitPluginByID by ID: expected 'manager_success', got '${result}'"
+    println("Test 1.5 PASSED: hook.LoadYakitPluginByID backwards compatibility")
+}
+
+// ========================================
+// Part 2: Test with MixPluginCaller (hook.NewMixPluginCaller)
+// ========================================
+println("")
+println("===== Part 2: Testing MixPluginCaller (hook.NewMixPluginCaller) =====")
+
+// Create a temporary test plugin with mirrorHTTPFlow function (mitm type for MixPluginCaller)
+mixPluginName = db.CreateTemporaryYakScript("mitm", f`
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+    db.SetKey("${testResult}", "mix_success")
+}
+`)~
+defer db.DeleteYakScriptByName(mixPluginName)
+
+// Get the plugin info to retrieve ID and UUID
+mixPlugin = db.GetYakitPluginByName(mixPluginName)~
+assert mixPlugin != nil, "failed to get mix plugin info"
+
+// No type conversion needed
+mixPluginID = mixPlugin.ID
+mixPluginUUID = mixPlugin.Uuid
+
+println(f"Mix Plugin: ${mixPluginName}")
+println(f"Mix Plugin ID: ${mixPluginID}")
+println(f"Mix Plugin UUID: ${mixPluginUUID}")
+
+// Test 2.1: Load plugin by database ID directly (no type conversion needed)
+{
+    mixCaller = hook.NewMixPluginCaller()~
+    err = mixCaller.LoadPluginByID(mixPluginID)
+    assert err == nil, f"mixCaller.LoadPluginByID by ID failed: ${err}"
+    
+    db.DelKey(testResult)
+    // Trigger the mirrorHTTPFlow hook
+    mixCaller.MirrorHTTPFlowEx(false, false, "http://example.com", []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\n\r\n"), []byte(""))
+    mixCaller.Wait()
+    
+    result = db.GetKey(testResult)
+    assert result == "mix_success", f"mixCaller.LoadPluginByID by ID: expected 'mix_success', got '${result}'"
+    println("Test 2.1 PASSED: mixCaller.LoadPluginByID with database ID (direct use, no conversion)")
+}
+
+// Test 2.2: Load plugin by UUID (string) using mixCaller.LoadPluginByID
+if mixPluginUUID != "" {
+    mixCaller = hook.NewMixPluginCaller()~
+    err = mixCaller.LoadPluginByID(mixPluginUUID)
+    assert err == nil, f"mixCaller.LoadPluginByID by UUID failed: ${err}"
+    
+    db.DelKey(testResult)
+    mixCaller.MirrorHTTPFlowEx(false, false, "http://example.com", []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\n\r\n"), []byte(""))
+    mixCaller.Wait()
+    
+    result = db.GetKey(testResult)
+    assert result == "mix_success", f"mixCaller.LoadPluginByID by UUID: expected 'mix_success', got '${result}'"
+    println("Test 2.2 PASSED: mixCaller.LoadPluginByID with UUID (string)")
+} else {
+    println("Test 2.2 SKIPPED: Mix Plugin UUID is empty")
+}
+
+// Test 2.3: Load with invalid ID should fail
+{
+    mixCaller = hook.NewMixPluginCaller()~
+    err = mixCaller.LoadPluginByID(-99999)
+    assert err != nil, "mixCaller.LoadPluginByID with invalid ID should fail"
+    println("Test 2.3 PASSED: mixCaller.LoadPluginByID with invalid ID correctly returns error")
+}
+
+// Test 2.4: Load with invalid UUID should fail
+{
+    mixCaller = hook.NewMixPluginCaller()~
+    err = mixCaller.LoadPluginByID("invalid-uuid-not-exist")
+    assert err != nil, "mixCaller.LoadPluginByID with invalid UUID should fail"
+    println("Test 2.4 PASSED: mixCaller.LoadPluginByID with invalid UUID correctly returns error")
 }
 
 // Clean up
 db.DelKey(testResult)
 
+println("")
+println("========================================")
 println("All tests passed!")
+println("========================================")
