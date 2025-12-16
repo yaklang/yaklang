@@ -117,7 +117,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 }
 
 func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
+	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler, g.Config.Images...)
 }
 
 func (g *Gateway) ChatStream(s string) (io.Reader, error) {
@@ -409,4 +409,6 @@ var Exports = map[string]any{
 	"debugStream":        aispec.WithDebugStream,
 	"type":               aispec.WithType,
 	"imageFile":          aispec.WithImageFile,
+	"imageBase64":        aispec.WithImageBase64,
+	"imageRaw":           aispec.WithImageRaw,
 }

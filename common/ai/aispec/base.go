@@ -474,6 +474,7 @@ func ChatBasedExtractData(
 	streamHandler func(io.Reader),
 	reasonHandler func(io.Reader),
 	httpErrorHandler func(error),
+	images ...*ImageDescription,
 ) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
@@ -489,7 +490,8 @@ func ChatBasedExtractData(
 		WithChatBase_PoCOptions(opt),
 		WithChatBase_StreamHandler(streamHandler),
 		WithChatBase_ReasonStreamHandler(reasonHandler),
-		WithChatBase_ErrHandler(httpErrorHandler))
+		WithChatBase_ErrHandler(httpErrorHandler),
+		WithChatBase_ImageRawInstance(images...))
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err

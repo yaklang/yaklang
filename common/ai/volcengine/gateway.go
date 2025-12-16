@@ -61,7 +61,7 @@ func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
 }
 
 func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, data, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, data, fields, g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler, g.config.Images...)
 }
 
 func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
