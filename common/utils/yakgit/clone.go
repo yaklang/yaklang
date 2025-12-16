@@ -8,9 +8,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 func init() {
@@ -44,6 +46,12 @@ func Clone(u string, localPath string, opt ...Option) error {
 	}
 	if c.Context == nil {
 		c.Context, c.Cancel = context.WithCancel(context.Background())
+	}
+
+	if c.InsecureIgnoreHostKey && c.Auth != nil {
+		if sshAuth, ok := c.Auth.(*ssh.PublicKeys); ok {
+			sshAuth.HostKeyCallback = gossh.InsecureIgnoreHostKey()
+		}
 	}
 
 	respos, err := git.PlainCloneContext(c.Context, localPath, false, &git.CloneOptions{

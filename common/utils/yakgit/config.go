@@ -21,6 +21,9 @@ type config struct {
 	Depth              int
 	RecursiveSubmodule bool
 
+	// SSH 配置
+	InsecureIgnoreHostKey bool // 是否跳过 SSH 主机密钥验证
+
 	// remote operation
 	Remote string
 	Branch string
@@ -288,12 +291,55 @@ func WithUsernamePassword(username, password string) Option {
 
 func WithPrivateKey(userName, keyPath, password string) Option {
 	return func(c *config) error {
-		if auth, err := ssh.NewPublicKeysFromFile(userName, keyPath, password); err == nil {
-			c.Auth = auth
-			return nil
-		} else {
+		auth, err := ssh.NewPublicKeysFromFile(userName, keyPath, password)
+		if err != nil {
 			return err
 		}
+		c.Auth = auth
+		return nil
+	}
+}
+
+// WithPrivateKeyContent 使用私钥内容进行认证
+// Example:
+// ```
+// keyContent := `-----BEGIN OPENSSH PRIVATE KEY-----
+// b3BlbnNzaC1rZXktdjEAAAAABG5vbmU...
+// -----END OPENSSH PRIVATE KEY-----`
+// git.Clone("git@github.com:user/repo.git", "/tmp/repo",
+//
+//	git.WithPrivateKeyContent("git", keyContent, ""),
+//	git.WithInsecureIgnoreHostKey(),  // 跳过主机密钥验证
+//
+// )
+// ```
+func WithPrivateKeyContent(userName, keyContent, password string) Option {
+	return func(c *config) error {
+		auth, err := ssh.NewPublicKeys(userName, []byte(keyContent), password)
+		if err != nil {
+			return err
+		}
+		c.Auth = auth
+		return nil
+	}
+}
+
+// WithInsecureIgnoreHostKey 跳过 SSH 主机密钥验证
+// 适用于自动化工具、测试环境或信任的内网环境
+// 警告：跳过主机密钥验证会降低安全性，可能遭受中间人攻击
+// Example:
+// ```
+// git.Clone("git@github.com:user/repo.git", "/tmp/repo",
+//
+//	git.WithPrivateKeyContent("git", keyContent, ""),
+//	git.WithInsecureIgnoreHostKey(),  // 跳过主机密钥验证
+//
+// )
+// ```
+func WithInsecureIgnoreHostKey() Option {
+	return func(c *config) error {
+		c.InsecureIgnoreHostKey = true
+		return nil
 	}
 }
 

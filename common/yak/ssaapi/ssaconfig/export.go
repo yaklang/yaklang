@@ -16,8 +16,9 @@ var Exports = map[string]interface{}{
 	"withCodeSourceBranch":    WithCodeSourceBranch,
 	"withCodeSourcePath":      WithCodeSourcePath,
 	// Git/SVN 认证配置选项
-	"withCodeSourceAuthKind":     WithCodeSourceAuthKind,
-	"withCodeSourceAuthUserName": WithCodeSourceAuthUserName,
-	"withCodeSourceAuthPassword": WithCodeSourceAuthPassword,
-	"withCodeSourceAuthKeyPath":  WithSSAProjectCodeSourceAuthKeyPath,
+	"withCodeSourceAuthKind":       WithCodeSourceAuthKind,
+	"withCodeSourceAuthUserName":   WithCodeSourceAuthUserName,
+	"withCodeSourceAuthPassword":   WithCodeSourceAuthPassword,
+	"withCodeSourceAuthKeyPath":    WithSSAProjectCodeSourceAuthKeyPath,
+	"withCodeSourceAuthKeyContent": WithCodeSourceAuthKeyContent,
 }
