@@ -70,6 +70,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 	if i.GetAIService() != "" {
 		serviceName := i.GetAIService()
+		modelName := ""
 		aiConfig, err := ai.LoadAiGatewayConfig(serviceName)
 		if err != nil {
 			log.Errorf("ai service %s not found", serviceName)
@@ -79,9 +80,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 				log.Errorf("load ai service failed: %v", err)
 			} else {
 				opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
-				opts = append(opts, aicommon.WithAIChatInfo(serviceName, aiConfig.Model))
+				modelName = aiConfig.Model
 			}
 		}
+		opts = append(opts, aicommon.WithAIChatInfo(serviceName, modelName))
 	}
 
 	if !i.GetDisableAISearchForge() {
