@@ -40,7 +40,7 @@ YAK is a large-scale cybersecurity technology stack built around a domain-specif
 
 ![yaklang-architecture](imgs/yaklang-ecosystem.png)
 
-## CDSL-Yakang
+## CDSL-Yaklang
 
 CDSL stands for Cybersecurity Domain Specific Language.
 
@@ -52,7 +52,7 @@ Its runtime depends only on YakVM, delivering "write once, run anywhere" executi
 
 Yaklang became fully open source in 2023 under the academic guidance of the School of Cyberspace Security at the University of Electronic Science and Technology of China. The Yaklang.io R&D team iterated on it for years, covering extensive foundational security capabilities and supporting macOS, Linux, and Windows out of the box.
 
-### Advantages of CDSL-Yakang
+### Advantages of CDSL-Yaklang
 
 - Simplicity: CDSL-based security products naturally separate business intent from capability layers, keeping solutions intuitive.
 - Usability: Non-specialists can build security products with CDSL and avoid the information gap common in engineering-heavy tooling.

@@ -28,7 +28,7 @@
 </p>
 
 ---
-# CDSL-Yakang Introduction
+# CDSL-Yaklang Introduction
 
 CDSL: Cybersecurity Domain Specific Language, a programming language specifically designed for the field of cybersecurity.
 
@@ -91,7 +91,7 @@ You can visit the [official documentation](https://yaklang.io/products/intro/) o
 
 Install and use Yaklang via the command line, please follow: **https://www.yaklang.com/** or **https://www.yaklang.io/**, or directly execute
 
-#### MacOS / Linux
+#### macOS / Linux
 
 ```bash
 bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)
@@ -157,7 +157,7 @@ This project is supervised by Professor Xiaosong Zhang from the University of El
 
 1. Alonzo Church, "A set of postulates for the foundation of logic", Annals of Mathematics, 33(2), 346-366, 1932.
 2. Dana Scott, Christopher Strachey, "Toward a mathematical semantics for computer languages", Proceedings of the Symposium on Computers and Automata, Microwave Research Institute Symposia Series Vol. 21, New York, 1971.
-3. Henk Barendregt, Wil Dekkers, Richard Statman, lambda Calculus with Types, Perspectives in Logic. Cambridge University Press, 2013.
+3. Henk Barendregt, Wil Dekkers, Richard Statman, Lambda Calculus with Types, Perspectives in Logic. Cambridge University Press, 2013.
 4. Braun, M., Buchwald, S., Hack, S., Leißa, R., Mallon, C., Zwinkau, A. (2013). Simple and Efficient Construction of Static Single Assignment Form. In: Jhala, R., De Bosschere, K. (eds) Compiler Construction. CC 2013. Lecture Notes in Computer Science, vol 7791. Springer, Berlin, Heidelberg.
 
 ### Engineering Technology
@@ -165,9 +165,9 @@ This project is supervised by Professor Xiaosong Zhang from the University of El
 1. Terence Parr, "The Definitive ANTLR 4 Reference", Pragmatic Bookshelf, 2013.
 2. Terence Parr, "Simplifying Complex Networks Using Temporal Pattern Mining: The Case of AT&T's Observed Data Network", Dissertation, 1995.
 3. Terence Parr, Russell Quong, "ANTLR: A Predicated-LL(k) Parser Generator", Journal of Software Practice and Experience, July 1995.
-4. Google Ins, "Protocol Buffers", https://developers.google.com/protocol-buffers, 2020.
-5. Google Ins, "gRPC", https://grpc.io/, 2020.
-6. Microsoft Ins, "Monaco Editor", https://microsoft.github.io/monaco-editor/, 2020.
+4. Google Inc., "Protocol Buffers", https://developers.google.com/protocol-buffers, 2020.
+5. Google Inc., "gRPC", https://grpc.io/, 2020.
+6. Microsoft Inc., "Monaco Editor", https://microsoft.github.io/monaco-editor/, 2020.
 
 
 ## Star History
