@@ -75,3 +75,10 @@ aaaacccc`))
 		t.Fatal("rand2a should be rand2")
 	}
 }
+
+func TestHTTPChunkedRejectHugeChunkSize(t *testing.T) {
+	// Similar to fuzz-tag newline injection:
+	// 3\n a=:\n FFFFFFFFFFFF\n ... (attempt to allocate an enormous chunk)
+	_, _, _, err := ReadHTTPChunkedDataWithFixedError([]byte("3\na=:\nFFFFFFFFFFFF\n0\n\n"))
+	require.Error(t, err)
+}

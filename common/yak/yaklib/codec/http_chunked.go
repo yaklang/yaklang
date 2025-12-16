@@ -15,6 +15,18 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+var (
+	// MaxHTTPChunkedHeaderLineBytes limits a single chunk-size line (including extensions) to avoid memory DoS.
+	// RFC 9112 doesn't mandate an exact limit, but in practice chunk-size lines should be short.
+	MaxHTTPChunkedHeaderLineBytes = 8 * 1024
+
+	// MaxHTTPChunkedChunkSize limits a single decoded chunk size to avoid huge allocations (OOM/DoS).
+	MaxHTTPChunkedChunkSize int64 = 32 * 1024 * 1024
+
+	// MaxHTTPChunkedBodyBytes limits total decoded body size for in-memory decoders to avoid unbounded growth.
+	MaxHTTPChunkedBodyBytes int64 = 128 * 1024 * 1024
+)
+
 func readLineEx(reader io.Reader) (string, int64, error) {
 	var count int64 = 0
 	buf := make([]byte, 1)
@@ -27,6 +39,9 @@ func readLineEx(reader io.Reader) (string, int64, error) {
 		count += int64(n)
 		if buf[0] == '\n' {
 			return strings.TrimRightFunc(res.String(), unicode.IsSpace), count, nil
+		}
+		if MaxHTTPChunkedHeaderLineBytes > 0 && res.Len() >= MaxHTTPChunkedHeaderLineBytes {
+			return strings.TrimRightFunc(res.String(), unicode.IsSpace), count, fmt.Errorf("chunked line too long (>%d bytes)", MaxHTTPChunkedHeaderLineBytes)
 		}
 		res.WriteByte(buf[0])
 	}
@@ -44,6 +59,9 @@ func bufioReadLine(reader *bufio.Reader) ([]byte, []byte, error) {
 			return nil, nil, err
 		}
 		lineBuffer.WriteByte(b)
+		if MaxHTTPChunkedHeaderLineBytes > 0 && lineBuffer.Len() > MaxHTTPChunkedHeaderLineBytes {
+			return nil, nil, fmt.Errorf("chunked line too long (>%d bytes)", MaxHTTPChunkedHeaderLineBytes)
+		}
 		if b == '\n' {
 			break
 		}
@@ -139,6 +157,7 @@ func readChunkedDataFromReaderEx(r io.Reader, onError func(error)) (io.Reader, i
 		}
 
 		handler := func() (io.Reader, io.Reader, io.Reader, error) {
+			var totalDecoded int64
 			for {
 				fmt.Println("---------------------------------------------------------------")
 				waitForParseInt, n, err := readLineEx(r)
@@ -175,6 +194,16 @@ func readChunkedDataFromReaderEx(r io.Reader, onError func(error)) (io.Reader, i
 					return nil, nil, getRestReader(), err
 				}
 
+				if size < 0 {
+					return nil, nil, getRestReader(), fmt.Errorf("invalid negative chunk size: %d", size)
+				}
+				if MaxHTTPChunkedChunkSize > 0 && size > MaxHTTPChunkedChunkSize {
+					return nil, nil, getRestReader(), fmt.Errorf("chunk size too large: %d (max %d)", size, MaxHTTPChunkedChunkSize)
+				}
+				if MaxHTTPChunkedBodyBytes > 0 && totalDecoded+size > MaxHTTPChunkedBodyBytes {
+					return nil, nil, getRestReader(), fmt.Errorf("chunked body too large: %d (max %d)", totalDecoded+size, MaxHTTPChunkedBodyBytes)
+				}
+
 				if size == 0 {
 					lastLine, _, err := readLineEx(r)
 					haveRead.WriteString(lastLine)
@@ -194,6 +223,7 @@ func readChunkedDataFromReaderEx(r io.Reader, onError func(error)) (io.Reader, i
 					return resultReader, fixedReader, r, nil
 				}
 
+				totalDecoded += size
 				buf := make([]byte, size)
 				blockN, err := io.ReadFull(r, buf)
 				fmt.Printf("%#v\n", string(buf[:blockN]))
@@ -268,6 +298,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 
 	var results bytes.Buffer
 	var fixedResults bytes.Buffer
+	var totalDecoded int64
 	for {
 		lineBytes, delim, err := bufioReadLine(reader)
 		haveRead.Write(lineBytes)
@@ -284,6 +315,16 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 		size, err := strconv.ParseInt(string(handledLineBytes), 16, 64)
 		if err != nil && len(handledLineBytes) > 0 {
 			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
+		}
+
+		if size < 0 {
+			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("invalid negative chunk size: %d", size)
+		}
+		if MaxHTTPChunkedChunkSize > 0 && size > MaxHTTPChunkedChunkSize {
+			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("chunk size too large: %d (max %d)", size, MaxHTTPChunkedChunkSize)
+		}
+		if MaxHTTPChunkedBodyBytes > 0 && totalDecoded+size > MaxHTTPChunkedBodyBytes {
+			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("chunked body too large: %d (max %d)", totalDecoded+size, MaxHTTPChunkedBodyBytes)
 		}
 
 		if size == 0 {
@@ -305,6 +346,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 			return results.Bytes(), fixedResults.Bytes(), reader, nil
 		}
 
+		totalDecoded += size
 		buf := make([]byte, size)
 		blockN, err := io.ReadFull(reader, buf)
 		results.Write(buf[:blockN])
