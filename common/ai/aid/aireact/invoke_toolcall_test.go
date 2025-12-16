@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io"
 	"strings"
 	"testing"
@@ -678,16 +679,22 @@ LOOP:
 	}
 
 	db := consts.GetGormProjectDatabase()
-	aiProcess, err := yakit.GetAIProcessByID(db, callToolID)
+	eventIDs, err := yakit.QueryAIEventIDByProcessID(db, callToolID)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if aiProcess == nil {
-		t.Fatal("ai process not found")
+		return
 	}
 
+	if len(eventIDs) == 0 {
+		t.Fatal("no event ids found")
+	}
+
+	event, err := yakit.QueryAIEvent(db, &ypb.AIEventFilter{
+		EventUUIDS: eventIDs,
+	})
+	require.NoError(t, err)
+
 	var hasFlag bool
-	for _, event := range aiProcess.Events {
+	for _, event := range event {
 		if event.Type == schema.EVENT_TOOL_CALL_RESULT {
 			result := jsonpath.FindFirst(string(event.Content), "$..result.result")
 			if utils.InterfaceToString(result) == callToolResultFlag {
