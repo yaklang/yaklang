@@ -107,13 +107,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		if slices.Contains(lo.Keys(vs), "_") {
 			return
 		}
-		// Sort variable names to ensure deterministic iteration order
-		// This fixes non-deterministic error reporting when iterating over map
-		varNames := lo.Keys(vs)
-		slices.Sort(varNames)
-		for _, varName := range varNames {
-			variable := vs[varName]
-			// if is `_` variable
+		for _, variable := range vs {
 			if variable.GetName() == "_" {
 				break
 			}
@@ -275,12 +269,7 @@ func (t *TypeCheck) narrowPhiType(phi *ssa.Phi, excludeType ssa.Type) {
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	tmp := make(map[ssa.Value]struct{})
 	err := func(i ssa.Value) bool {
-		vs := i.GetAllVariables()
-		// Sort variable names to ensure deterministic iteration order
-		varNames := lo.Keys(vs)
-		slices.Sort(varNames)
-		for _, varName := range varNames {
-			variable := vs[varName]
+		for _, variable := range i.GetAllVariables() {
 			variable.NewError(ssa.Error, TypeCheckTAG, ssa.ValueUndefined(inst.GetName()))
 		}
 		return true
@@ -491,11 +480,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 				if hasError {
 					vs := c.GetAllVariables()
-					// Sort variable names to ensure deterministic iteration order
-					varNames := lo.Keys(vs)
-					slices.Sort(varNames)
-					for _, varName := range varNames {
-						variable := vs[varName]
+					for _, variable := range vs {
 						variable.NewError(ssa.Error, TypeCheckTAG,
 							ErrorUnhandledWithType(c.GetType().String()),
 						)
