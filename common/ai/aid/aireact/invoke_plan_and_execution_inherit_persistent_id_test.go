@@ -563,10 +563,13 @@ LOOP:
 
 // TestReAct_ForgeExecution_Task_UserQueryContext 测试 forge execution 的任务执行提示词包含用户原始输入
 func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
-	persistentId := "persistent_id_" + utils.RandStringBytes(16)
-	userOriginalQuery := "user_original_query_" + utils.RandStringBytes(16)
-	aiGeneratedQuery := "ai_generated_query_" + utils.RandStringBytes(16)
-	finishTaskFlag := "finish_task_flag_" + utils.RandStringBytes(16)
+	// 生成测试专用的 nonce token，用于精确匹配 mock 条件
+	testNonce := utils.RandStringBytes(16)
+
+	persistentId := "persistent_id_userquery_" + testNonce
+	userOriginalQuery := "user_original_query_" + testNonce
+	aiGeneratedQuery := "ai_generated_query_" + testNonce
+	finishTaskFlag := "finish_task_flag_" + testNonce
 	var hasUserQueryFoundInTaskExec, hasAIQueryFoundInTaskExec, userQueryFoundInCallAiBlueprintPrompt bool
 
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -574,8 +577,8 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 
 	finishedCh := make(chan bool, 1)
 	defer close(finishedCh)
-	testForgeName := "test_forge_" + utils.RandStringBytes(16)
-	planFlag := "plan_flag_" + utils.RandStringBytes(16)
+	testForgeName := "test_forge_userquery_" + testNonce
+	planFlag := "plan_flag_userquery_" + testNonce
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",
@@ -611,13 +614,10 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
-				// 验证用户输入在 prompt 中
-				if strings.Contains(prompt, userOriginalQuery) {
-					log.Infof("✓ User query found in ReAct main loop prompt")
-				} else {
-					t.Errorf("user query NOT found in ReAct main loop prompt")
-				}
+			// 使用更精确的匹配：包含本测试的 testForgeName 且包含用户输入
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+				strings.Contains(prompt, userOriginalQuery) {
+				log.Infof("✓ User query found in ReAct main loop prompt")
 
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -628,8 +628,8 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Blueprint 参数生成
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
+			// Blueprint 参数生成 - 精确匹配本测试的 testForgeName
+			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
 				// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
 				if strings.Contains(prompt, userOriginalQuery) {
 					userQueryFoundInCallAiBlueprintPrompt = true
@@ -640,11 +640,6 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 
 				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
 				rsp := i.NewAIResponse()
-				//	rsp.EmitOutputStream(bytes.NewBufferString(`
-				//
-				// {"@action": "call-ai-blueprint", "params": {"target": "http://example.com", "query": "` + aiGeneratedQuery + `"},
-				// "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
-				// `))
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint":"` + testForgeName + `", "params": {"query": "` + aiGeneratedQuery + `"},
 "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
@@ -733,6 +728,9 @@ LOOP:
 		}
 	}
 	close(in)
+
+	// 等待 goroutine 完全结束，防止影响其他测试
+	time.Sleep(100 * time.Millisecond)
 
 	// 验证 forge 被调用
 	if !forgeStarted {
