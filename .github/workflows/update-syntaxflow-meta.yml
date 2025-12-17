@@ -53,6 +53,14 @@ jobs:
 
       - name: Checkout Tags Version
         run: echo ${{ env.YAK_TAG }}
+
+      - name: Initialize Builtin SyntaxFlow Rules
+        run: |
+          echo "::group::Initialize Builtin SyntaxFlow Rules"
+          echo "Syncing embedded rules to database..."
+          ./yak_linux_amd64 sync-rule
+          echo "Builtin rules initialized successfully"
+          echo "::endgroup::"
           
       - name: Generate SyntaxFlow Meta Info
         run: |
