@@ -309,7 +309,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				Data:    nil,
 			})
 
-			var aiCommonOptions []aicommon.ConfigOption
+			var aiCommonOptions []any
 			aiCommonOptions = append(
 				aiCommonOptions,
 				aicommon.WithContext(config.Ctx),
@@ -325,10 +325,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 			}
 
 			//answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
-			answer, err := aicommon.InvokeLiteForge(
-				prompt,
-				aicommon.WithContext(config.Ctx),
-			)
+			answer, err := aicommon.InvokeLiteForge(prompt, aiCommonOptions...)
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 					Message: err.Error(),
