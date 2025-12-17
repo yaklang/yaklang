@@ -107,7 +107,12 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		if slices.Contains(lo.Keys(vs), "_") {
 			return
 		}
-		for _, variable := range vs {
+		// Sort variable names to ensure deterministic iteration order
+		// This fixes non-deterministic error reporting when iterating over map
+		varNames := lo.Keys(vs)
+		slices.Sort(varNames)
+		for _, varName := range varNames {
+			variable := vs[varName]
 			// if is `_` variable
 			if variable.GetName() == "_" {
 				break
@@ -123,9 +128,9 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		case ssa.ErrorTypeKind:
 			checkError(v)
 		case ssa.NullTypeKind:
-			if len(v.GetAllVariables()) != 0 {
-				inst.NewError(ssa.Warn, TypeCheckTAG, ssa.ValueIsNull())
-			}
+			// if len(v.GetAllVariables()) != 0 {
+			// 	inst.NewError(ssa.Warn, TypeCheckTAG, ssa.ValueIsNull())
+			// }
 		default:
 		}
 	}
@@ -133,6 +138,8 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	switch inst := inst.(type) {
 	// case *ssa.ConstInst:
 	// case *ssa.BinOp:
+	case *ssa.Phi:
+		t.TypeCheckPhi(inst)
 	case *ssa.Call:
 		t.TypeCheckCall(inst)
 	case *ssa.Undefined:
@@ -140,10 +147,140 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	}
 }
 
+func (t *TypeCheck) TypeCheckPhi(phi *ssa.Phi) {
+	// Type narrowing: if a phi edge comes from a block that returns or is unreachable,
+	// we can exclude that edge's type from the phi's type in subsequent blocks.
+	// This handles cases like "if config == nil { return }" where config cannot be null after the check.
+
+	phiBlock := phi.GetBlock()
+	if phiBlock == nil {
+		return
+	}
+
+	// Check if any edge comes from a block that returns or is unreachable
+	// If so, we can narrow the type by excluding null types from those edges
+	orType, ok := ssa.ToOrType(phi.GetType())
+	if !ok {
+		// Not an OrType, no narrowing needed
+		return
+	}
+
+	// Get all types in the OrType
+	allTypes := orType.GetTypes()
+	nullType := ssa.CreateNullType()
+	hasNullType := false
+	for _, typ := range allTypes {
+		if typ.GetTypeKind() == ssa.NullTypeKind {
+			hasNullType = true
+			break
+		}
+	}
+
+	if !hasNullType {
+		// No null type to narrow, nothing to do
+		return
+	}
+
+	// Check each edge to see if it comes from a block that returns or is unreachable
+	// If a null-typed edge comes from such a block, we can exclude null from the phi's type
+	for i, edgeID := range phi.Edge {
+		edgeValue, ok := phi.GetValueById(edgeID)
+		if !ok || edgeValue == nil {
+			continue
+		}
+
+		// Check if this edge has null type
+		if edgeValue.GetType().GetTypeKind() != ssa.NullTypeKind {
+			continue
+		}
+
+		// Get the predecessor block for this edge
+		if i >= len(phiBlock.Preds) {
+			continue
+		}
+		predBlockID := phiBlock.Preds[i]
+		predBlock, ok := phiBlock.GetBasicBlockByID(predBlockID)
+		if !ok || predBlock == nil {
+			continue
+		}
+
+		// Check if the predecessor block has a return statement or is unreachable
+		if t.blockHasReturnOrUnreachable(predBlock) {
+			// This edge comes from a block that returns, so null cannot flow to subsequent blocks
+			// Narrow the phi's type by removing null
+			t.narrowPhiType(phi, nullType)
+			return
+		}
+	}
+}
+
+func (t *TypeCheck) blockHasReturnOrUnreachable(block *ssa.BasicBlock) bool {
+	if block == nil {
+		return false
+	}
+
+	// Check if block is unreachable
+	if block.Reachable() == ssa.BasicBlockUnReachable {
+		return true
+	}
+
+	// Check if block has a return statement
+	// A block has return if it has no successors (finish) or if it contains a Return instruction
+	if len(block.Succs) == 0 {
+		return true
+	}
+
+	// Check if block contains a Return instruction
+	for _, instID := range block.Insts {
+		inst, ok := block.GetInstructionById(instID)
+		if !ok {
+			continue
+		}
+		if _, ok := ssa.ToReturn(inst); ok {
+			// Found return statement
+			return true
+		}
+	}
+
+	return false
+}
+
+func (t *TypeCheck) narrowPhiType(phi *ssa.Phi, excludeType ssa.Type) {
+	orType, ok := ssa.ToOrType(phi.GetType())
+	if !ok {
+		return
+	}
+
+	allTypes := orType.GetTypes()
+	var newTypes []ssa.Type
+	for _, typ := range allTypes {
+		if typ.GetTypeKind() != excludeType.GetTypeKind() {
+			newTypes = append(newTypes, typ)
+		}
+	}
+
+	if len(newTypes) == 0 {
+		// Should not happen, but fallback to any type
+		phi.SetType(ssa.CreateAnyType())
+		return
+	}
+
+	if len(newTypes) == 1 {
+		phi.SetType(newTypes[0])
+	} else {
+		phi.SetType(ssa.NewOrType(newTypes...))
+	}
+}
+
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	tmp := make(map[ssa.Value]struct{})
 	err := func(i ssa.Value) bool {
-		for _, variable := range i.GetAllVariables() {
+		vs := i.GetAllVariables()
+		// Sort variable names to ensure deterministic iteration order
+		varNames := lo.Keys(vs)
+		slices.Sort(varNames)
+		for _, varName := range varNames {
+			variable := vs[varName]
 			variable.NewError(ssa.Error, TypeCheckTAG, ssa.ValueUndefined(inst.GetName()))
 		}
 		return true
@@ -354,7 +491,11 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 				if hasError {
 					vs := c.GetAllVariables()
-					for _, variable := range vs {
+					// Sort variable names to ensure deterministic iteration order
+					varNames := lo.Keys(vs)
+					slices.Sort(varNames)
+					for _, varName := range varNames {
+						variable := vs[varName]
 						variable.NewError(ssa.Error, TypeCheckTAG,
 							ErrorUnhandledWithType(c.GetType().String()),
 						)

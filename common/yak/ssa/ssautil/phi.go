@@ -154,7 +154,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 			// 在当前scope中尝试修改外部的某个variable
 			tmpPhiCapture[v] = ret
 		}
-		if variable.GetCaptured().GetScope().Compare(ver.GetScope()) {
+		if variable.GetCaptured().GetScope().Compare(ver.GetCaptured().GetScope()) {
 			tmpPhiScope[v] = ret
 		}
 	}
