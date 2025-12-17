@@ -855,7 +855,39 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 
 	if len(params.GetColor()) > 0 {
-		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, params.GetColor(), false)
+		const yakitColorNone = "YAKIT_COLOR_NONE"
+
+		var wantNone bool
+		var colors []string
+		for _, c := range params.GetColor() {
+			c = strings.TrimSpace(c)
+			if c == "" {
+				continue
+			}
+			if strings.EqualFold(c, yakitColorNone) {
+				wantNone = true
+				continue
+			}
+			colors = append(colors, c)
+		}
+
+		var conds []string
+		var items []any
+		if len(colors) > 0 {
+			var colorConds []string
+			for _, c := range colors {
+				colorConds = append(colorConds, "( tags LIKE ? )")
+				items = append(items, "%"+c+"%")
+			}
+			conds = append(conds, "("+strings.Join(colorConds, " OR ")+")")
+		}
+		if wantNone {
+			conds = append(conds, "( tags = '' OR tags IS NULL OR lower(tags) NOT LIKE ? )")
+			items = append(items, "%yakit_color_%")
+		}
+		if len(conds) > 0 {
+			db = db.Where(strings.Join(conds, " OR "), items...)
+		}
 	}
 
 	// 搜索 Content-Type

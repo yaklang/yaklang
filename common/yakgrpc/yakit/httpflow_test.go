@@ -583,18 +583,66 @@ func TestQueryHTTPFlowsProcessNames(t *testing.T) {
 func TestColorFilter(t *testing.T) {
 	token := ksuid.New().String()
 	colorToken := ksuid.New().String()
+	ids := make([]int64, 0, 8)
+	defer func() {
+		if len(ids) > 0 {
+			DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{Id: ids})
+		}
+	}()
+
 	jsFlow := &schema.HTTPFlow{
 		Url:  fmt.Sprintf("https://example.com/%s.js", token),
 		Path: fmt.Sprintf("https://example.com/%s.js", token),
 		Tags: fmt.Sprintf("SQL注入测试点|%s|SQL注入测试点", colorToken),
 	}
-	InsertHTTPFlow(consts.GetGormProjectDatabase(), jsFlow)
+	require.NoError(t, InsertHTTPFlow(consts.GetGormProjectDatabase(), jsFlow))
+	ids = append(ids, int64(jsFlow.ID))
 	db := FilterHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
-		Color: []string{colorToken},
+		Keyword: token,
+		Color:   []string{colorToken},
 	})
 	res := []*schema.HTTPFlow{}
 	db.Find(&res)
 	assert.Len(t, res, 1)
+
+	noneToken := ksuid.New().String()
+	noneFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s-none", noneToken),
+		Path: fmt.Sprintf("/%s-none", noneToken),
+		Tags: "tag1|tag2",
+	}
+	require.NoError(t, InsertHTTPFlow(consts.GetGormProjectDatabase(), noneFlow))
+	ids = append(ids, int64(noneFlow.ID))
+
+	emptyTagFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s-empty", noneToken),
+		Path: fmt.Sprintf("/%s-empty", noneToken),
+		Tags: "",
+	}
+	require.NoError(t, InsertHTTPFlow(consts.GetGormProjectDatabase(), emptyTagFlow))
+	ids = append(ids, int64(emptyTagFlow.ID))
+
+	redFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s-red", noneToken),
+		Path: fmt.Sprintf("/%s-red", noneToken),
+		Tags: "tag1|YAKIT_COLOR_RED|tag2",
+	}
+	require.NoError(t, InsertHTTPFlow(consts.GetGormProjectDatabase(), redFlow))
+	ids = append(ids, int64(redFlow.ID))
+
+	var noneRes []*schema.HTTPFlow
+	FilterHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+		Keyword: noneToken,
+		Color:   []string{"YAKIT_COLOR_NONE"},
+	}).Find(&noneRes)
+	assert.Len(t, noneRes, 2)
+
+	var mixedRes []*schema.HTTPFlow
+	FilterHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+		Keyword: noneToken,
+		Color:   []string{"YAKIT_COLOR_RED", "YAKIT_COLOR_NONE"},
+	}).Find(&mixedRes)
+	assert.Len(t, mixedRes, 3)
 }
 
 func TestExcludeKeywords(t *testing.T) {
