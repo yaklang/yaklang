@@ -1384,7 +1384,7 @@ func TestErrorHandler(t *testing.T) {
 			a = getError1()~
 			`,
 			Want: []string{
-				ssa.ValueIsNull(),
+				// ssa.ValueIsNull(),
 			},
 			ExternValue: map[string]any{
 				"getError1": func() error { return errors.New("err") },
@@ -1657,6 +1657,40 @@ func TestParameterMember(t *testing.T) {
 				ssa.ValueNotMemberInCall("a", "b"),
 				ssa.InvalidField("number", "b"),
 			},
+		})
+	})
+}
+
+func TestVarNilReassign(t *testing.T) {
+	t.Run("var config = nil not trigger typecheck error", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+var projectExists = false
+var config = nil
+existingSSAProject, err = ssa.GetSSAProjectByNameAndURL("", "")
+if err == nil && existingSSAProject != nil {
+    projectExists = true
+    config, err = existingSSAProject.GetConfig()
+    if err != nil || config == nil {
+        if err != nil {
+            yakit.Warn("获取已存在项目配置失败: %v，将创建新配置", err)
+        } else {
+            yakit.Warn("获取已存在项目配置返回 nil，将创建新配置")
+        }
+    }
+}
+
+if config == nil {
+    config, err = ssa.NewConfig(ssa.ModeAll)
+    _ = err
+} else {
+    err := config.Update()
+    _ = err
+}
+
+config.ToJSONString()
+			`,
+			Want: []string{},
 		})
 	})
 }

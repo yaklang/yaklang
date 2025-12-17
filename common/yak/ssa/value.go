@@ -115,7 +115,7 @@ func (b *FunctionBuilder) readValueEx(
 	local := GetFristLocalVariableFromScopeAndParent(scope, name)
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
-		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetGlobalIndex() {
+		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
 			ret = local
 		}
 		if b.CurrentRange != nil {

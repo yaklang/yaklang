@@ -209,6 +209,25 @@ int main() {
     if (a > 1) {
         a = 5;
         goto end;
+    }else{
+        println(a); // 1
+end:
+        println(a); // phi(a)[1,5]
+    }
+}
+		`, []string{
+			"1", "phi(a)[1,5]",
+		}, t)
+	})
+
+	t.Run("goto down in if ex", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+int main() {
+    int a = 1;
+    if (a > 1) {
+        a = 5;
+        goto end;
     } else {
         println(a);
     }
@@ -217,7 +236,7 @@ end:
     return 0;
 }
 		`, []string{
-			"1", "phi(a)[5,1]",
+			"1", "phi(a)[phi(a)[5,1],5]",
 		}, t)
 	})
 
