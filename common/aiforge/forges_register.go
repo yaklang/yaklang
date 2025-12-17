@@ -83,10 +83,13 @@ func ExecuteForge(
 	params []*ypb.ExecParamItem,
 	opts ...aicommon.ConfigOption,
 ) (*ForgeResult, error) {
+	// 只在查找 forge 时持有读锁，找到后立即释放
+	// 这样可以避免在 forge 执行期间（可能很长时间）阻塞其他 forge 的注册
 	forgeMutex.RLock()
-	defer forgeMutex.RUnlock()
+	forge, ok := forges[forgeName]
+	forgeMutex.RUnlock()
 
-	if forge, ok := forges[forgeName]; ok {
+	if ok {
 		return forge(ctx, params, opts...)
 	} else {
 		return nil, utils.Wrapf(forgeNotFoundError, "forge %s not found", forgeName)
