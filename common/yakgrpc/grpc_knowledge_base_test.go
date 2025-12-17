@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -80,6 +82,7 @@ func TestMUSTPASS_TestImportedFlag(t *testing.T) {
 	ctx := context.Background()
 	originalKBName := "test_imported_flag_original"
 	importedKBName := "test_imported_flag_imported"
+	db := consts.GetGormProfileDatabase()
 
 	// 清理函数，确保测试结束后删除知识库和临时文件
 	defer func() {
@@ -165,6 +168,16 @@ func TestMUSTPASS_TestImportedFlag(t *testing.T) {
 	require.Len(t, importedKBResponse.KnowledgeBases, 1)
 	assert.True(t, importedKBResponse.KnowledgeBases[0].IsImported, "导入的知识库的 IsImported 应该为 true")
 	assert.Equal(t, importedKBName, importedKBResponse.KnowledgeBases[0].KnowledgeBaseName)
+
+	// 6.1 清空 collection 的 serial_version_uid，验证 IsImported 仍然为 true（依赖知识库表的 serial_version_uid）
+	err = db.Model(&schema.VectorStoreCollection{}).Where("name = ?", importedKBName).Update("serial_version_uid", "").Error
+	require.NoError(t, err)
+	importedKBResponse2, err := client.GetKnowledgeBase(ctx, &ypb.GetKnowledgeBaseRequest{
+		Keyword: importedKBName,
+	})
+	require.NoError(t, err)
+	require.Len(t, importedKBResponse2.KnowledgeBases, 1)
+	assert.True(t, importedKBResponse2.KnowledgeBases[0].IsImported, "清空 collection serial_version_uid 后，导入的知识库仍应为 true")
 
 	// 7. 删除导入的知识库
 	deleteResponse, err := client.DeleteKnowledgeBase(ctx, &ypb.DeleteKnowledgeBaseRequest{

@@ -236,6 +236,7 @@ func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType strin
 		KnowledgeBaseName:        name,
 		KnowledgeBaseDescription: description,
 		KnowledgeBaseType:        kbType,
+		Tags:                     strings.Join(tags, ","),
 	})
 	if err != nil {
 		return utils.Errorf("更新知识库信息失败: %v", err)
