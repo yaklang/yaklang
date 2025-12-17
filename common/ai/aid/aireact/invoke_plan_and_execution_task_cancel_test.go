@@ -20,9 +20,12 @@ import (
 )
 
 func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
+	// 生成测试专用的 nonce token，用于精确匹配 mock 条件
+	testNonce := utils.RandStringBytes(16)
+
 	// mock 一个 forge ，用于测试取消 pe 任务
-	testForgeName := "test_forge_" + utils.RandStringBytes(16)
-	planFlag := "plan_flag_" + utils.RandStringBytes(16)
+	testForgeName := "test_forge_cancel_" + testNonce
+	planFlag := "plan_flag_cancel_" + testNonce
 	forge := &schema.AIForge{
 		ForgeName:    testForgeName,
 		ForgeType:    "yak",
@@ -106,40 +109,9 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				callAIAfterCancelTask = true
 			}
 			prompt := r.GetPrompt()
-			// ReAct 主循环的响应 - 请求 blueprint (forge)
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-		{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
-		"human_readable_thought": "requesting forge to analyze vulnerability", "cumulative_summary": "forge analysis"}
-		`))
-				rsp.Close()
-				return rsp, nil
-			}
 
-			// Blueprint 参数生成
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
-				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-		{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "` + "abc" + `"},
-		"human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
-		`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, planFlag) && !utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
-"human_readable_thought": "为了取消当前任务，我需要使用` + mockToolName + `工具。当前任务明确要求使用该工具，无需其他参数，直接执行即可取消当前任务。"}
-		`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "call-tool", "toolname_yet") {
+			// 工具参数生成 - 最先匹配，避免被其他条件误匹配
+			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", mockToolName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {
@@ -151,6 +123,43 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 				rsp.Close()
 				return rsp, nil
 			}
+
+			// Blueprint 参数生成 - 精确匹配本测试的 testForgeName
+			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+		{"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"target": "http://example.com", "query": "` + "abc" + `"},
+		"human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
+		`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// PE 子任务执行 - 匹配包含 PROGRESS_TASK_ 和 planFlag 的 prompt
+			if utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_", planFlag) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "require_tool", "tool_require_payload": "` + mockToolName + `", 
+"human_readable_thought": "为了取消当前任务，我需要使用` + mockToolName + `工具。当前任务明确要求使用该工具，无需其他参数，直接执行即可取消当前任务。"}
+		`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// ReAct 主循环的响应 - 请求 blueprint (forge)
+			// 使用更严格的匹配：包含本测试的 testForgeName 且不能包含 PROGRESS_TASK_
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+		{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + testForgeName + `" },
+		"human_readable_thought": "requesting forge to analyze vulnerability", "cumulative_summary": "forge analysis"}
+		`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			unreachableCode = true
 			return nil, errors.New("unreachable code")
 		}),
