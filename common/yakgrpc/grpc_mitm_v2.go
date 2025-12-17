@@ -614,6 +614,24 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				continue
 			}
 
+			// 运行时更新系统代理开关
+			if reqInstance.GetSetDisableSystemProxy() {
+				if mServer != nil {
+					err := mServer.Configure(crep.MITM_SetDisableSystemProxy(reqInstance.GetDisableSystemProxy()))
+					if err != nil {
+						feedbackToUser(fmt.Sprintf("设置系统代理开关失败 / set disable system proxy failed: %v", err))
+						log.Errorf("set disable system proxy failed: %s", err)
+					} else {
+						if reqInstance.GetDisableSystemProxy() {
+							feedbackToUser("已禁用系统代理 / system proxy disabled")
+						} else {
+							feedbackToUser("已启用系统代理 / system proxy enabled")
+						}
+					}
+				}
+				continue
+			}
+
 			if reqInstance.GetSetAutoForward() {
 				autoForwardValue := reqInstance.GetAutoForwardValue()
 				hijackManger.setCanRegister(!autoForwardValue)

@@ -62131,8 +62131,6 @@ type MITMV2Request struct {
 	DnsServers      []string       `protobuf:"bytes,13,rep,name=DnsServers,proto3" json:"DnsServers,omitempty"`
 	Hosts           []*KVPair      `protobuf:"bytes,14,rep,name=hosts,proto3" json:"hosts,omitempty"`
 	HostsMapping    []*KVPair      `protobuf:"bytes,46,rep,name=HostsMapping,proto3" json:"HostsMapping,omitempty"`
-	// 不启用系统代理（环境变量 http_proxy/https_proxy 等）
-	DisableSystemProxy bool `protobuf:"varint,49,opt,name=DisableSystemProxy,proto3" json:"DisableSystemProxy,omitempty"`
 	// max content-length
 	MaxContentLength int64 `protobuf:"varint,15,opt,name=MaxContentLength,proto3" json:"MaxContentLength,omitempty"`
 	MaxReadWaitTime  int64 `protobuf:"varint,16,opt,name=MaxReadWaitTime,proto3" json:"MaxReadWaitTime,omitempty"`
@@ -62180,6 +62178,10 @@ type MITMV2Request struct {
 	RecoverContext        bool                              `protobuf:"varint,45,opt,name=RecoverContext,proto3" json:"RecoverContext,omitempty"`       // recover mitm context plugin config...
 	PluginConcurrency     int64                             `protobuf:"varint,47,opt,name=PluginConcurrency,proto3" json:"PluginConcurrency,omitempty"` // 设置插件并发数，默认30
 	DownstreamProxyRuleId string                            `protobuf:"bytes,48,opt,name=DownstreamProxyRuleId,proto3" json:"DownstreamProxyRuleId,omitempty"`
+	// 不启用系统代理（环境变量 http_proxy/https_proxy 等）
+	DisableSystemProxy bool `protobuf:"varint,49,opt,name=DisableSystemProxy,proto3" json:"DisableSystemProxy,omitempty"`
+	// runtime change system proxy enable/disable
+	SetDisableSystemProxy bool `protobuf:"varint,50,opt,name=SetDisableSystemProxy,proto3" json:"SetDisableSystemProxy,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -62317,13 +62319,6 @@ func (x *MITMV2Request) GetHostsMapping() []*KVPair {
 		return x.HostsMapping
 	}
 	return nil
-}
-
-func (x *MITMV2Request) GetDisableSystemProxy() bool {
-	if x != nil {
-		return x.DisableSystemProxy
-	}
-	return false
 }
 
 func (x *MITMV2Request) GetMaxContentLength() int64 {
@@ -62555,6 +62550,20 @@ func (x *MITMV2Request) GetDownstreamProxyRuleId() string {
 		return x.DownstreamProxyRuleId
 	}
 	return ""
+}
+
+func (x *MITMV2Request) GetDisableSystemProxy() bool {
+	if x != nil {
+		return x.DisableSystemProxy
+	}
+	return false
+}
+
+func (x *MITMV2Request) GetSetDisableSystemProxy() bool {
+	if x != nil {
+		return x.SetDisableSystemProxy
+	}
+	return false
 }
 
 type MITMV2Response struct {
@@ -69805,7 +69814,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xa7\x11\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xdd\x11\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -69824,8 +69833,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"DnsServers\x18\r \x03(\tR\n" +
 	"DnsServers\x12!\n" +
 	"\x05hosts\x18\x0e \x03(\v2\v.ypb.KVPairR\x05hosts\x12/\n" +
-	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12.\n" +
-	"\x12DisableSystemProxy\x181 \x01(\bR\x12DisableSystemProxy\x12*\n" +
+	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12*\n" +
 	"\x10MaxContentLength\x18\x0f \x01(\x03R\x10MaxContentLength\x12(\n" +
 	"\x0fMaxReadWaitTime\x18\x10 \x01(\x03R\x0fMaxReadWaitTime\x12(\n" +
 	"\x0fFilterWebsocket\x18\x11 \x01(\bR\x0fFilterWebsocket\x124\n" +
@@ -69862,7 +69870,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13ManualHijackMessage\x18, \x01(\v2%.ypb.SingleManualHijackControlMessageR\x13ManualHijackMessage\x12&\n" +
 	"\x0eRecoverContext\x18- \x01(\bR\x0eRecoverContext\x12,\n" +
 	"\x11PluginConcurrency\x18/ \x01(\x03R\x11PluginConcurrency\x124\n" +
-	"\x15DownstreamProxyRuleId\x180 \x01(\tR\x15DownstreamProxyRuleId\"\xa5\x05\n" +
+	"\x15DownstreamProxyRuleId\x180 \x01(\tR\x15DownstreamProxyRuleId\x12.\n" +
+	"\x12DisableSystemProxy\x181 \x01(\bR\x12DisableSystemProxy\x124\n" +
+	"\x15SetDisableSystemProxy\x182 \x01(\bR\x15SetDisableSystemProxy\"\xa5\x05\n" +
 	"\x0eMITMV2Response\x12\x1e\n" +
 	"\n" +
 	"JustFilter\x18\x01 \x01(\bR\n" +
