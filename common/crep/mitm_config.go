@@ -334,6 +334,12 @@ func MITM_SetFindProcessName(b bool) MITMConfig {
 func MITM_SetDisableSystemProxy(b bool) MITMConfig {
 	return func(server *MITMServer) error {
 		server.disableSystemProxy = b
+		if server.proxy != nil {
+			server.proxy.SetDisableSystemProxy(b)
+		}
+		if server.mitmConfig != nil {
+			return server.initConfig()
+		}
 		return nil
 	}
 }
