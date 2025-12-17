@@ -3,13 +3,14 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -155,6 +156,8 @@ var DatabaseExports = map[string]interface{}{
 	},
 
 	"GetYakitPluginByName": queryYakitPluginByName,
+	"GetYakitPluginByID":   getYakitPluginByID,
+	"GetYakitPluginByUUID": getYakitPluginByUUID,
 
 	// 脚本中导入特定格式菜单栏
 	"SaveYakitMenuItemByBatchExecuteConfig": saveYakitMenuItemByBatchExecuteConfig,
@@ -286,6 +289,44 @@ func queryYakitPluginByName(name string) (*schema.YakScript, error) {
 		return scripts[0], nil
 	}
 	return nil, utils.Errorf("yakit plugin(YakScript) cannot found by name: %v", name)
+}
+
+func getYakitPluginByID(i any) (*schema.YakScript, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Error("no database found")
+	}
+
+	id := int64(utils.InterfaceToInt(i))
+	if id <= 0 {
+		return nil, utils.Errorf("invalid plugin id: %v", i)
+	}
+
+	script, err := yakit.GetYakScript(db, id)
+	if err != nil {
+		return nil, utils.Errorf("query yakit plugin(YakScript) by id[%v] failed: %v", id, err)
+	}
+	log.Infof("query yakit plugin by id[%d] success: %s", id, script.ScriptName)
+	return script, nil
+}
+
+func getYakitPluginByUUID(i any) (*schema.YakScript, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Error("no database found")
+	}
+
+	uuid := utils.InterfaceToString(i)
+	if uuid == "" {
+		return nil, utils.Errorf("invalid plugin uuid: %v", i)
+	}
+
+	script, err := yakit.GetYakScriptByUUID(db, uuid)
+	if err != nil {
+		return nil, utils.Errorf("query yakit plugin(YakScript) by uuid[%v] failed: %v", uuid, err)
+	}
+	log.Infof("query yakit plugin by uuid[%s] success: %s", uuid, script.ScriptName)
+	return script, nil
 }
 
 func YakitNewAliveHost(target string, opts ...yakit.AliveHostParamsOpt) {

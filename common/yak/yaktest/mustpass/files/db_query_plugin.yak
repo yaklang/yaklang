@@ -1,0 +1,156 @@
+// Test GetYakitPluginByID and GetYakitPluginByUUID
+// These interfaces accept any type (i any) and automatically convert to appropriate types
+// - GetYakitPluginByID: accepts int/int64/float/string, converts via utils.InterfaceToInt64
+// - GetYakitPluginByUUID: accepts any type, converts via utils.InterfaceToString
+
+token = str.RandStr(16)
+testPluginName = f"db_query_test_${token}"
+
+println("===== Testing db.GetYakitPluginByID and db.GetYakitPluginByUUID =====")
+
+// Create a temporary test plugin
+pluginContent = f`
+# Test Plugin ${token}
+# This is a test plugin for db query functions
+`
+
+tempPluginName = db.CreateTemporaryYakScript("yak", pluginContent)~
+defer db.DeleteYakScriptByName(tempPluginName)
+
+println(f"Created temporary plugin: ${tempPluginName}")
+
+// Get the plugin info to retrieve ID and UUID for testing
+originalPlugin = db.GetYakitPluginByName(tempPluginName)~
+assert originalPlugin != nil, "failed to get original plugin info"
+
+pluginID = originalPlugin.ID
+pluginUUID = originalPlugin.Uuid
+
+println(f"Plugin Name: ${tempPluginName}")
+println(f"Plugin ID: ${pluginID}")
+println(f"Plugin UUID: ${pluginUUID}")
+
+// ========================================
+// Part 1: Test GetYakitPluginByID
+// ========================================
+println("\n===== Part 1: Testing db.GetYakitPluginByID =====")
+
+// Test 1.1: Query by integer ID directly
+{
+    plugin = db.GetYakitPluginByID(pluginID)~
+    assert plugin != nil, "GetYakitPluginByID with int ID returned nil"
+    assert plugin.ScriptName == tempPluginName, f"GetYakitPluginByID: expected '${tempPluginName}', got '${plugin.ScriptName}'"
+    assert plugin.ID == pluginID, f"GetYakitPluginByID: expected ID ${pluginID}, got ${plugin.ID}"
+    println("Test 1.1 PASSED: db.GetYakitPluginByID with integer ID")
+}
+
+// Test 1.2: Query by string ID (automatic conversion)
+{
+    pluginIDStr = f"${pluginID}"
+    plugin = db.GetYakitPluginByID(pluginIDStr)~
+    assert plugin != nil, "GetYakitPluginByID with string ID returned nil"
+    assert plugin.ScriptName == tempPluginName, f"GetYakitPluginByID: expected '${tempPluginName}', got '${plugin.ScriptName}'"
+    assert plugin.ID == pluginID, f"GetYakitPluginByID: expected ID ${pluginID}, got ${plugin.ID}"
+    println("Test 1.2 PASSED: db.GetYakitPluginByID with string ID (auto conversion)")
+}
+
+// Test 1.3: Query by float ID (automatic conversion)
+{
+    pluginIDFloat = 1.0 * pluginID
+    plugin = db.GetYakitPluginByID(pluginIDFloat)~
+    assert plugin != nil, "GetYakitPluginByID with float ID returned nil"
+    assert plugin.ScriptName == tempPluginName, f"GetYakitPluginByID: expected '${tempPluginName}', got '${plugin.ScriptName}'"
+    assert plugin.ID == pluginID, f"GetYakitPluginByID: expected ID ${pluginID}, got ${plugin.ID}"
+    println("Test 1.3 PASSED: db.GetYakitPluginByID with float ID (auto conversion)")
+}
+
+// Test 1.4: Query with invalid ID should fail
+{
+    plugin, err = db.GetYakitPluginByID(0)
+    assert err != nil, "GetYakitPluginByID should fail with invalid ID 0"
+    println("Test 1.4 PASSED: db.GetYakitPluginByID correctly rejects invalid ID")
+}
+
+// Test 1.5: Query with non-existent ID should fail
+{
+    nonExistentID = 999999999
+    plugin, err = db.GetYakitPluginByID(nonExistentID)
+    assert err != nil, f"GetYakitPluginByID should fail with non-existent ID ${nonExistentID}"
+    println("Test 1.5 PASSED: db.GetYakitPluginByID correctly handles non-existent ID")
+}
+
+// ========================================
+// Part 2: Test GetYakitPluginByUUID
+// ========================================
+println("\n===== Part 2: Testing db.GetYakitPluginByUUID =====")
+
+// Only test if UUID is not empty
+if pluginUUID != "" {
+    // Test 2.1: Query by UUID string directly
+    {
+        plugin = db.GetYakitPluginByUUID(pluginUUID)~
+        assert plugin != nil, "GetYakitPluginByUUID with string UUID returned nil"
+        assert plugin.ScriptName == tempPluginName, f"GetYakitPluginByUUID: expected '${tempPluginName}', got '${plugin.ScriptName}'"
+        assert plugin.Uuid == pluginUUID, f"GetYakitPluginByUUID: expected UUID '${pluginUUID}', got '${plugin.Uuid}'"
+        println("Test 2.1 PASSED: db.GetYakitPluginByUUID with string UUID")
+    }
+
+    // Test 2.2: Query by UUID from bytes (automatic conversion)
+    {
+        uuidBytes = []byte(pluginUUID)
+        plugin = db.GetYakitPluginByUUID(uuidBytes)~
+        assert plugin != nil, "GetYakitPluginByUUID with bytes UUID returned nil"
+        assert plugin.ScriptName == tempPluginName, f"GetYakitPluginByUUID: expected '${tempPluginName}', got '${plugin.ScriptName}'"
+        assert plugin.Uuid == pluginUUID, f"GetYakitPluginByUUID: expected UUID '${pluginUUID}', got '${plugin.Uuid}'"
+        println("Test 2.2 PASSED: db.GetYakitPluginByUUID with bytes UUID (auto conversion)")
+    }
+
+    // Test 2.3: Query with empty UUID should fail
+    {
+        plugin, err = db.GetYakitPluginByUUID("")
+        assert err != nil, "GetYakitPluginByUUID should fail with empty UUID"
+        println("Test 2.3 PASSED: db.GetYakitPluginByUUID correctly rejects empty UUID")
+    }
+
+    // Test 2.4: Query with non-existent UUID should fail
+    {
+        nonExistentUUID = "non-existent-uuid-" + str.RandStr(10)
+        plugin, err = db.GetYakitPluginByUUID(nonExistentUUID)
+        assert err != nil, f"GetYakitPluginByUUID should fail with non-existent UUID ${nonExistentUUID}"
+        println("Test 2.4 PASSED: db.GetYakitPluginByUUID correctly handles non-existent UUID")
+    }
+} else {
+    println("WARNING: Plugin UUID is empty, skipping Part 2 tests")
+}
+
+// ========================================
+// Part 3: Verify returned plugin data integrity
+// ========================================
+println("\n===== Part 3: Verifying plugin data integrity =====")
+
+{
+    pluginByID = db.GetYakitPluginByID(pluginID)~
+    
+    // Verify basic fields
+    assert pluginByID.ScriptName == tempPluginName, "Plugin name mismatch"
+    assert pluginByID.ID == pluginID, "Plugin ID mismatch"
+    assert pluginByID.Type == "yak", f"Plugin type should be 'yak', got '${pluginByID.Type}'"
+    assert pluginByID.Content != "", "Plugin content should not be empty"
+    
+    println("Test 3.1 PASSED: Plugin data integrity verified via ID")
+}
+
+if pluginUUID != "" {
+    pluginByUUID = db.GetYakitPluginByUUID(pluginUUID)~
+    
+    // Verify both methods return the same plugin
+    pluginByID2 = db.GetYakitPluginByID(pluginID)~
+    assert pluginByUUID.ID == pluginByID2.ID, "Plugins queried by UUID and ID should be the same"
+    assert pluginByUUID.ScriptName == pluginByID2.ScriptName, "Plugin names should match"
+    assert pluginByUUID.Uuid == pluginByID2.Uuid, "Plugin UUIDs should match"
+    
+    println("Test 3.2 PASSED: Plugin data integrity verified via UUID, both methods return same plugin")
+}
+
+println("\n===== All tests PASSED! =====")
+
