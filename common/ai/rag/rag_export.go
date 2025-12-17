@@ -916,6 +916,11 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 
 	// 创建集合
 	ragID := uuid.NewString()
+	// 兼容旧版本导出文件（无 SerialVersionUID），导入时仍标记为“已导入”
+	if ragData.Collection.SerialVersionUID == "" {
+		ragData.Collection.SerialVersionUID = uuid.NewString()
+	}
+	ragData.Collection.RAGID = ragID
 	collection, err := vectorstore.CreateCollectionRecord(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.ConvertToVectorStoreOptions()...)
 	if err != nil {
 		return utils.Wrap(err, "create collection record")
@@ -930,7 +935,10 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	if err != nil {
 		return utils.Wrap(err, "create knowledge base")
 	}
-	err = ragSystemConfig.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", knowledgeBase.GetID()).Update("rag_id", ragID).Error
+	err = ragSystemConfig.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", knowledgeBase.GetID()).Updates(map[string]interface{}{
+		"rag_id":             ragID,
+		"serial_version_uid": ragData.Collection.SerialVersionUID,
+	}).Error
 	if err != nil {
 		return utils.Wrap(err, "update knowledge base rag id")
 	}
@@ -987,7 +995,6 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		return utils.Wrap(err, "read hnsw index")
 	}
 	ragData.Collection.GraphBinary = hnswIndex
-	ragData.Collection.RAGID = ragSystemConfig.ragID
 	ragData.Documents = documents
 
 	// 执行导入

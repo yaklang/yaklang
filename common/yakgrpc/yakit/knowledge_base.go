@@ -26,6 +26,15 @@ func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.Knowle
 	if err != nil {
 		return utils.Wrap(err, "get KnowledgeBase failed")
 	}
+
+	// 保留系统字段，避免更新元信息时意外清空 rag_id / serial_version_uid 等字段
+	if knowledgeBase.RAGID == "" {
+		knowledgeBase.RAGID = existingKnowledgeBase.RAGID
+	}
+	if knowledgeBase.SerialVersionUID == "" {
+		knowledgeBase.SerialVersionUID = existingKnowledgeBase.SerialVersionUID
+	}
+
 	knowledgeBase.ID = existingKnowledgeBase.ID
 	knowledgeBase.CreatedAt = existingKnowledgeBase.CreatedAt
 	err = db.Save(knowledgeBase).Error

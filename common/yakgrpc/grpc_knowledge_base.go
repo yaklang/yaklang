@@ -67,11 +67,11 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 	// 转换为protobuf格式
 	pbKnowledgeBases := make([]*ypb.KnowledgeBaseInfo, len(knowledgeBases))
 	for i, kb := range knowledgeBases {
-		ragSystem, err := rag.Get(kb.KnowledgeBaseName, rag.WithDB(db), rag.WithTryRebuildHNSWIndex(true))
-		if err != nil {
-			return nil, utils.Errorf("获取知识库失败: %v", err)
+		isImported := kb.SerialVersionUID != ""
+		if !isImported {
+			collectionInfo, _ := yakit.GetRAGCollectionInfoByName(db, kb.KnowledgeBaseName)
+			isImported = collectionInfo != nil && collectionInfo.SerialVersionUID != ""
 		}
-		isImported := ragSystem.VectorStore.GetCollectionInfo().SerialVersionUID != ""
 		pbKnowledgeBases[i] = &ypb.KnowledgeBaseInfo{
 			ID:                       int64(kb.ID),
 			KnowledgeBaseName:        kb.KnowledgeBaseName,
@@ -136,8 +136,18 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 		return nil, utils.Wrap(err, "创建知识库失败")
 	}
 
-	kbInfo := ragSystem.KnowledgeBase.GetKnowledgeBaseInfo()
-	if kbInfo == nil {
+	if ragSystem.KnowledgeBase == nil {
+		return nil, utils.Errorf("获取知识库信息失败")
+	}
+
+	// CreateKnowledgeBaseV2 在实践中经常被当做“创建/更新元信息”的入口；
+	// 这里做一次显式同步，确保 tags/description/type 写入 DB 后列表可查到。
+	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetTags()...); err != nil {
+		return nil, utils.Wrap(err, "更新知识库信息失败")
+	}
+
+	kbInfo, err := ragSystem.KnowledgeBase.GetInfo()
+	if err != nil || kbInfo == nil {
 		return nil, utils.Errorf("获取知识库信息失败")
 	}
 	return &ypb.CreateKnowledgeBaseV2Response{
