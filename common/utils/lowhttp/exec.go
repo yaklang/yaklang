@@ -302,7 +302,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		return nil
 	}
 
-	connectTimeout = 2 * time.Second
+	if connectTimeout <= 0 {
+		connectTimeout = 2 * time.Second
+	}
 	if reqIns == nil {
 		// create new request instance for httpctx
 		reqIns, _ = utils.ReadHTTPRequestFromBytes(requestPacket)

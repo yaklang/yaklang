@@ -117,15 +117,17 @@ func rulePatternsMatchHost(rule *ypb.ProxyRoute, host string) bool {
 func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
 	ruleID := strings.TrimSpace(req.GetProxyRuleId())
-	if ruleID == "" {
-		return proxies, nil
-	}
-
 	cfg, err := yakit.GetGlobalProxyRulesConfig()
 	if err != nil {
+		if ruleID == "" {
+			return proxies, nil
+		}
 		return nil, err
 	}
 	if cfg == nil {
+		if ruleID == "" {
+			return proxies, nil
+		}
 		return nil, utils.Errorf("proxy rule config not initialized")
 	}
 
@@ -139,6 +141,39 @@ func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 			continue
 		}
 		endpointURLByID[endpoint.GetId()] = url
+	}
+
+	// 兼容一下前端把 proxy 当作 id 的错误传参行为
+	if ruleID == "" && len(proxies) > 0 {
+		if len(proxies) == 1 {
+			candidate := strings.TrimSpace(proxies[0])
+			for _, route := range cfg.GetRoutes() {
+				if route == nil {
+					continue
+				}
+				if strings.EqualFold(route.GetId(), candidate) {
+					ruleID = candidate
+					proxies = nil
+					break
+				}
+			}
+		}
+		if ruleID == "" {
+			expanded := make([]string, 0, len(proxies))
+			for _, p := range proxies {
+				if url := strings.TrimSpace(endpointURLByID[strings.TrimSpace(p)]); url != "" {
+					expanded = append(expanded, url)
+					continue
+				}
+				expanded = append(expanded, p)
+			}
+			proxies = utils.StringArrayFilterEmpty(lo.Uniq(expanded))
+			return proxies, nil
+		}
+	}
+
+	if ruleID == "" {
+		return proxies, nil
 	}
 
 	var rule *ypb.ProxyRoute
@@ -971,12 +1006,45 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 		nowTime := time.Now()
 		count := 0
-		for result := range res {
+	for result := range res {
 			count++
 			if count > 2 && time.Now().Sub(nowTime).Seconds() > 1 {
 				log.Error("HELP! handle result cost too much time, can someone investigate it?")
 			}
 			nowTime = time.Now()
+
+			if result != nil && result.ExtraInfo != nil {
+				if result.ExtraInfo["__yak_sse_final"] == "1" {
+					continue
+				}
+				if result.ExtraInfo["__yak_sse_update"] == "1" {
+					method, _, _ := lowhttp.GetHTTPPacketFirstLine(result.RequestRaw)
+					host := lowhttp.GetHTTPPacketHeader(result.RequestRaw, "Host")
+					respHeaders, respBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+					statusLine := strings.SplitN(respHeaders, "\r\n", 2)[0]
+					_, statusCode, _, _ := utils.ParseHTTPResponseLine(statusLine)
+
+					rsp := &ypb.FuzzerResponse{
+						Ok:          true,
+						Url:         utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
+						Method:      utils.EscapeInvalidUTF8Byte([]byte(method)),
+						Host:        utils.EscapeInvalidUTF8Byte([]byte(host)),
+						StatusCode:  int32(statusCode),
+						ContentType: utils.EscapeInvalidUTF8Byte([]byte(lowhttp.GetHTTPPacketHeader(result.ResponseRaw, "Content-Type"))),
+						ResponseRaw: result.ResponseRaw,
+						RequestRaw:  result.RequestRaw,
+						UUID:        uuid.NewString(),
+						Timestamp:   result.Timestamp,
+						TaskId:      int64(taskID),
+						Payloads:    result.Payloads,
+						RuntimeID:   runtimeID,
+						BodyLength:  int64(len(respBody)),
+						DurationMs:  result.DurationMs,
+					}
+					_ = feedbackResponse(rsp, true)
+					continue
+				}
+			}
 
 			// 2M
 			if len(result.RequestRaw) > 2*1024*1024 {
