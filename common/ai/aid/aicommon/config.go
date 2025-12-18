@@ -348,6 +348,10 @@ func WithID(id string) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.Id = id
+		// Also update Emitter's id to keep them in sync
+		if c.Emitter != nil {
+			c.Emitter.SetId(id)
+		}
 		return nil
 	}
 }

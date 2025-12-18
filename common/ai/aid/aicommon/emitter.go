@@ -35,6 +35,11 @@ func (i *Emitter) Emit(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 	return i.emit(e)
 }
 
+// SetId sets the emitter's id
+func (i *Emitter) SetId(id string) {
+	i.id = id
+}
+
 func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)
 	if err != nil {
