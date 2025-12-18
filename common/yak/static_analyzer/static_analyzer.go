@@ -2,9 +2,11 @@ package static_analyzer
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -52,12 +54,28 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 		}
 	}
 
+	// 创建性能记录器
+	perfRecorder := diagnostics.NewRecorder()
+	defer func() {
+		// 输出性能表格
+		snapshots := perfRecorder.Snapshot()
+		if len(snapshots) > 0 {
+			table := diagnostics.FormatPerformanceTable("Static Analysis Performance", snapshots)
+			fmt.Println(table)
+		}
+	}()
+
 	// compiler
 	switch codeTyp {
 	case "yak", "mitm", "port-scan", "codec":
+		// Yaklang 编译
+		yaklangStart := time.Now()
 		newEngine := yaklang.New()
 		newEngine.SetStrictMode(false)
 		_, err := newEngine.Compile(code)
+		yaklangDuration := time.Since(yaklangStart)
+		perfRecorder.RecordDuration("Yaklang StaticAnalyze", yaklangDuration)
+
 		if err != nil {
 			switch ret := err.(type) {
 			case antlr4util.SourceCodeErrors:
@@ -67,12 +85,23 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 			}
 		}
 
+		// SSA 编译
+		ssaStart := time.Now()
 		prog, err := SSAParse(code, codeTyp)
+		ssaDuration := time.Since(ssaStart)
+		perfRecorder.RecordDuration("SSA Compile", ssaDuration)
+
 		if err != nil {
 			log.Error("SSA 解析失败：", err)
 			return results
 		}
+
+		// 规则检查
+		ruleStart := time.Now()
 		results = append(results, checkRules(codeTyp, prog, kind).Get()...)
+		ruleDuration := time.Since(ruleStart)
+		perfRecorder.RecordDuration("Rule Check", ruleDuration)
+
 		errs := prog.GetErrors()
 		for _, err := range errs {
 			severity := result.Hint
@@ -93,8 +122,12 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 			})
 		}
 	case "syntaxflow":
+		sfStart := time.Now()
 		vm := sfvm.NewSyntaxFlowVirtualMachine()
 		vm.Compile(code)
+		sfDuration := time.Since(sfStart)
+		perfRecorder.RecordDuration("SyntaxFlow Compile", sfDuration)
+
 		errs := vm.GetErrors()
 		if errs != nil {
 			addSourceCodeError(errs)
