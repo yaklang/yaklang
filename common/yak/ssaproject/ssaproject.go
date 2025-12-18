@@ -44,7 +44,32 @@ func (s *SSAProject) toSchemaData() (*schema.SSAProject, error) {
 	return &result, nil
 }
 
-func (s *SSAProject) Save(options ...ssaconfig.Option) (err error) {
+func (s *SSAProject) UpdateConfig(options ...ssaconfig.Option) (err error) {
+	if s == nil {
+		return utils.Errorf("update SSA project config failed: ssa project builder is nil")
+	}
+	config, err := s.GetConfig()
+	if err != nil {
+		return err
+	}
+	for _, opt := range options {
+		err := opt(config)
+		if err != nil {
+			return err
+		}
+	}
+	s.setConfig(config)
+	return nil
+}
+
+func (s *SSAProject) SaveToDB(dbs ...*gorm.DB) (err error) {
+	var db *gorm.DB
+	if len(dbs) > 0 {
+		db = dbs[0]
+	} else {
+		db = consts.GetGormProfileDatabase()
+	}
+
 	var schemaProject *schema.SSAProject
 	defer func() {
 		if err != nil {
@@ -62,15 +87,6 @@ func (s *SSAProject) Save(options ...ssaconfig.Option) (err error) {
 		return utils.Errorf("save SSA project failed: ssa project builder is nil")
 	}
 
-	db := consts.GetGormProfileDatabase()
-	config := s.Config
-	for _, opt := range options {
-		err := opt(config)
-		if err != nil {
-			return err
-		}
-	}
-	s.setConfig(config)
 	schemaProject, err = s.toSchemaData()
 	if err != nil {
 		return err

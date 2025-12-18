@@ -182,7 +182,7 @@ func (s *Server) MigrateSSAProject(req *ypb.MigrateSSAProjectRequest, stream ypb
 				)
 				continue
 			}
-			err = project.Save()
+			err = project.SaveToDB()
 			if err != nil {
 				sendProgress(
 					float64(i+1)/float64(totalCount),

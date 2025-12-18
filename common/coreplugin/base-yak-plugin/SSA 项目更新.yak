@@ -236,13 +236,16 @@ if err != nil {
     return
 }
 
-err = project.Save(ssa.withJsonRawConfig(configBytes))
+err = project.UpdateConfig(ssa.withJsonRawConfig(configBytes))
+if err != nil {
+    yakit.Error("更新SSA项目配置失败: %v", err)
+    return
+}
+err = project.SaveToDB()
 if err != nil {
     yakit.Error("保存SSA项目失败: %v", err)
     return
 }
-
-
 yakit.Info("SSA项目更新成功!")
 // 这里返回数据，前端收到会进行前端更新
 yakit.Output({
