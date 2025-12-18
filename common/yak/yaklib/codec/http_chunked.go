@@ -16,15 +16,17 @@ import (
 )
 
 var (
-	// MaxHTTPChunkedHeaderLineBytes limits a single chunk-size line (including extensions) to avoid memory DoS.
-	// RFC 9112 doesn't mandate an exact limit, but in practice chunk-size lines should be short.
+	// MaxHTTPChunkedHeaderLineBytes 限制单行 chunk-size（含 chunk-extension）的最大长度，用于避免超长行导致的内存/CPU DoS。
+	// RFC 9112 并没有规定必须的上限，但实际场景中 chunk-size 行通常很短。
 	MaxHTTPChunkedHeaderLineBytes = 8 * 1024
 
-	// MaxHTTPChunkedChunkSize limits a single decoded chunk size to avoid huge allocations (OOM/DoS).
-	MaxHTTPChunkedChunkSize int64 = 32 * 1024 * 1024
-
-	// MaxHTTPChunkedBodyBytes limits total decoded body size for in-memory decoders to avoid unbounded growth.
+	// MaxHTTPChunkedBodyBytes 限制一次解码得到的总 body 大小（内存聚合模式），避免无限制增长导致 OOM/DoS。
 	MaxHTTPChunkedBodyBytes int64 = 128 * 1024 * 1024
+
+	// MaxHTTPChunkedChunkSize 限制单个 chunk 的大小，避免按 chunk-size 直接分配超大切片触发 OOM/DoS。
+	// 注意：主要的 DoS 防护由 MaxHTTPChunkedBodyBytes 提供；这里建议保持 >= MaxHTTPChunkedBodyBytes，
+	// 以免误伤“单次大 write -> 单 chunk”的正常大响应场景。
+	MaxHTTPChunkedChunkSize int64 = 128 * 1024 * 1024
 )
 
 func readLineEx(reader io.Reader) (string, int64, error) {
