@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -141,7 +142,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 400 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
