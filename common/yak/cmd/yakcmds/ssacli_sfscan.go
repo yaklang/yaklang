@@ -142,6 +142,11 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithOutputDataflowPath(true))
 	}
 
+	// file-perf-log: 启用文件级别性能日志
+	if c.Bool("file-perf-log") {
+		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	}
+
 	// 创建统一配置
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
 	if err != nil {
@@ -236,6 +241,10 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		}
 		if programName != "" {
 			para["program_name"] = programName
+		}
+		// 传递文件性能日志配置
+		if config.GetCompileFilePerformanceLog() {
+			para["filePerformanceLog"] = true
 		}
 		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, targetPath, language, true, para)
 		return []*ssaapi.Program{prog}, err

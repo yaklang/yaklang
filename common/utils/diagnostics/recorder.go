@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -220,12 +221,28 @@ func (r *Recorder) Reset() {
 	r.entries = utils.NewSafeMap[*measurementData]()
 }
 
+// RecordDuration 记录已经测量的时间（用于外部已经测量好的时间）
+func (r *Recorder) RecordDuration(name string, duration time.Duration) {
+	if r == nil || name == "" {
+		return
+	}
+	entry, err := r.ensureEntry(name, 1)
+	if err != nil || entry == nil {
+		return
+	}
+	entry.record(duration, []time.Duration{duration})
+}
+
 func LogRecorder(label string, recorders ...*Recorder) {
 	if len(recorders) == 0 {
 		recorders = []*Recorder{DefaultRecorder()}
 	}
 	for _, rec := range recorders {
-		rec.Log(label)
+		if rec != nil {
+			rec.Log(label)
+		} else {
+			log.Warnf("recorder is nil for label: %s", label)
+		}
 	}
 }
 
@@ -239,13 +256,18 @@ func (rec *Recorder) Log(label ...string) {
 		log.Infof("recorder %s is empty", label)
 		return
 	}
-	log.Infof("========================================")
-	log.Infof("Measurement Summary [%s]", label)
-	log.Infof("========================================")
-	for _, snapshot := range snapshots {
-		log.Infof(snapshot.String())
+	// 使用 log.Info 而不是 log.Infof，确保性能日志总是输出
+	log.Info("========================================")
+	if len(label) > 0 {
+		log.Infof("Measurement Summary [%s]", label[0])
+	} else {
+		log.Info("Measurement Summary")
 	}
-	log.Infof("========================================")
+	log.Info("========================================")
+	for _, snapshot := range snapshots {
+		log.Info(snapshot.String())
+	}
+	log.Info("========================================")
 }
 
 func CompareRecorderCosts(database, memory *Recorder) {
@@ -310,4 +332,140 @@ func CompareRecorderCosts(database, memory *Recorder) {
 			}
 		}
 	}
+}
+
+// FormatPerformanceTable 格式化性能数据为表格
+func FormatPerformanceTable(title string, measurements []Measurement) string {
+	if len(measurements) == 0 {
+		return fmt.Sprintf("No performance data for: %s", title)
+	}
+
+	// 计算列宽
+	maxNameLen := len("Name")
+	maxTimeLen := len("Duration")
+
+	for _, m := range measurements {
+		nameLen := len(m.Name)
+		// 限制名称最大宽度为 80 字符
+		if nameLen > 80 {
+			nameLen = 80
+		}
+		if nameLen > maxNameLen {
+			maxNameLen = nameLen
+		}
+		if len(m.Total.String()) > maxTimeLen {
+			maxTimeLen = len(m.Total.String())
+		}
+	}
+
+	// 确保最小宽度
+	if maxNameLen < 30 {
+		maxNameLen = 30
+	}
+	if maxTimeLen < 10 {
+		maxTimeLen = 10
+	}
+
+	// 构建表格
+	var builder strings.Builder
+
+	// 标题边框
+	titleBorder := strings.Repeat("=", maxNameLen+maxTimeLen+7)
+	builder.WriteString(titleBorder + "\n")
+	builder.WriteString(fmt.Sprintf(" %s\n", title))
+	builder.WriteString(titleBorder + "\n")
+
+	// 表头
+	headerBorder := fmt.Sprintf("+-%s-+-%s-+\n",
+		strings.Repeat("-", maxNameLen),
+		strings.Repeat("-", maxTimeLen),
+	)
+	builder.WriteString(headerBorder)
+	builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+		maxNameLen, "Name",
+		maxTimeLen, "Duration",
+	))
+	builder.WriteString(headerBorder)
+
+	// 数据行
+	for _, m := range measurements {
+		// 截断过长的名称
+		displayName := m.Name
+		if len(displayName) > 80 {
+			displayName = displayName[:77] + "..."
+		}
+		builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+			maxNameLen, displayName,
+			maxTimeLen, m.Total.String(),
+		))
+	}
+
+	builder.WriteString(headerBorder)
+	return builder.String()
+}
+
+// FormatSimpleTable 格式化简单的两列表格
+func FormatSimpleTable(title string, data map[string]string) string {
+	if len(data) == 0 {
+		return fmt.Sprintf("No data for: %s", title)
+	}
+
+	// 计算列宽
+	maxKeyLen := len("Key")
+	maxValueLen := len("Value")
+
+	for k, v := range data {
+		if len(k) > maxKeyLen {
+			maxKeyLen = len(k)
+		}
+		if len(v) > maxValueLen {
+			maxValueLen = len(v)
+		}
+	}
+
+	// 确保最小宽度
+	if maxKeyLen < 20 {
+		maxKeyLen = 20
+	}
+	if maxValueLen < 20 {
+		maxValueLen = 20
+	}
+
+	// 构建表格
+	var builder strings.Builder
+
+	// 标题边框
+	titleBorder := strings.Repeat("=", maxKeyLen+maxValueLen+7)
+	builder.WriteString(titleBorder + "\n")
+	builder.WriteString(fmt.Sprintf(" %s\n", title))
+	builder.WriteString(titleBorder + "\n")
+
+	// 表头
+	headerBorder := fmt.Sprintf("+-%s-+-%s-+\n",
+		strings.Repeat("-", maxKeyLen),
+		strings.Repeat("-", maxValueLen),
+	)
+	builder.WriteString(headerBorder)
+	builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+		maxKeyLen, "项目",
+		maxValueLen, "数值",
+	))
+	builder.WriteString(headerBorder)
+
+	// 数据行（按key排序）
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+			maxKeyLen, k,
+			maxValueLen, data[k],
+		))
+	}
+
+	builder.WriteString(headerBorder)
+	return builder.String()
 }

@@ -1351,6 +1351,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: "enable per-rule performance profiling log output",
 		},
 
+		cli.BoolFlag{
+			Name:  "file-perf-log",
+			Usage: "enable file-level performance profiling log output (separate AST and Build by file)",
+		},
+
 		cli.StringFlag{
 			Name: "exclude-file",
 			Usage: `exclude default file,only support glob mode. eg.
@@ -1514,7 +1519,28 @@ var ssaCodeScan = &cli.Command{
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		diagnostics.LogRecorder("compile", diagnostics.DefaultRecorder())
+		// 输出编译性能汇总表格
+		compileRecorder := diagnostics.DefaultRecorder()
+		if compileRecorder != nil {
+			snapshots := compileRecorder.Snapshot()
+			if len(snapshots) > 0 {
+				table := diagnostics.FormatPerformanceTable("Compilation Performance Summary", snapshots)
+				log.Info("\n" + table)
+			}
+		}
+		// 输出文件性能汇总表格
+		if len(progs) > 0 && progs[0] != nil {
+			if progConfig := progs[0].GetConfig(); progConfig != nil {
+				filePerfRecorder := progConfig.GetFilePerformanceRecorder()
+				if filePerfRecorder != nil {
+					snapshots := filePerfRecorder.Snapshot()
+					if len(snapshots) > 0 {
+						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+						log.Info("\n" + table)
+					}
+				}
+			}
+		}
 		return nil
 	},
 }

@@ -51,3 +51,11 @@ func OptionSaveValue_Diagnostics(rec *diagnostics.Recorder) SaveValueOption {
 		c.diagnosticsRecorder = rec
 	}
 }
+
+// GetFilePerformanceRecorder 获取文件性能 recorder
+func (c *Config) GetFilePerformanceRecorder() *diagnostics.Recorder {
+	if c == nil {
+		return nil
+	}
+	return c.filePerformanceRecorder
+}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -142,6 +143,12 @@ func (c *Config) parseProjectWithFS(
 
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
+	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
+	// 创建文件性能 recorder
+	if enableFilePerfLog && c.filePerformanceRecorder == nil {
+		c.filePerformanceRecorder = diagnostics.NewRecorder()
+	}
+	filePerfRecorder := c.filePerformanceRecorder
 	// pre handler  0-40%
 	f1 := func() error {
 		preHandlerNum := 0
@@ -161,6 +168,7 @@ func (c *Config) parseProjectWithFS(
 		)
 		// diagnostics.DumpHeap(diagnostics.WithName("ast"))
 		for fileContent := range ch {
+			fileASTStart := time.Now()
 			if fileContent.Status == ssareducer.FileStatusFsError {
 				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
 				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
@@ -195,6 +203,17 @@ func (c *Config) parseProjectWithFS(
 						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
 					}
 				}()
+			}
+			// 记录文件级别的 AST 解析时间
+			if enableFilePerfLog {
+				fileASTTime := time.Since(fileASTStart)
+				// 收集到 recorder（记录所有文件，不设阈值）
+				if filePerfRecorder != nil {
+					filePerfRecorder.RecordDuration(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime)
+					if fileASTTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
+						log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
+					}
+				}
 			}
 		}
 		preHandlerTime = time.Since(start)
@@ -278,10 +297,22 @@ func (c *Config) parseProjectWithFS(
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
 			func() {
+				fileBuildStart := time.Now()
 				defer func() {
 					if r := recover(); r != nil {
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+					// 记录文件级别的 Build 时间
+					if enableFilePerfLog {
+						fileBuildTime := time.Since(fileBuildStart)
+						// 收集到 recorder（记录所有文件，不设阈值）
+						if filePerfRecorder != nil {
+							filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
+							if fileBuildTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
+								log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
+							}
+						}
 					}
 				}()
 				// build
@@ -338,6 +369,17 @@ func (c *Config) parseProjectWithFS(
 	}
 	if err := c.DiagnosticsTrack("ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
 		return nil, err
+	}
+
+	// 输出文件性能汇总表格
+	if enableFilePerfLog && filePerfRecorder != nil {
+		snapshots := filePerfRecorder.Snapshot()
+		if len(snapshots) > 0 {
+			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+			fmt.Println(table)
+		} else {
+			fmt.Println("File Performance: no data recorded")
+		}
 	}
 
 	return NewProgram(prog, c), nil
