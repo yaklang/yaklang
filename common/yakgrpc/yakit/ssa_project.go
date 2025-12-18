@@ -51,7 +51,7 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 		return nil, utils.Errorf("create SSA project failed: project builder is nil")
 	}
 
-	err = projectBuilder.Save()
+	err = projectBuilder.SaveToDB(db)
 	if err != nil {
 		return nil, utils.Errorf("save SSA project failed: %s", err)
 	}
@@ -79,7 +79,7 @@ func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject,
 		return nil, utils.Errorf("update SSA project failed: project builder is nil")
 	}
 
-	err = projectBuilder.Save()
+	err = projectBuilder.SaveToDB(db)
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}

@@ -86,7 +86,7 @@ func TestSSAProjectUpdate(t *testing.T) {
 		// 3. 准备更新配置数据
 		updateConfig, err := ssaconfig.New(
 			ssaconfig.ModeAll,
-			// BaseInfo
+			ssaconfig.WithProjectID(uint64(schemaProject.ID)),
 			ssaconfig.WithProjectName(projectName),
 			ssaconfig.WithProgramDescription("更新后的描述"),
 			ssaconfig.WithProjectLanguage(ssaconfig.JAVA),
@@ -104,6 +104,8 @@ func TestSSAProjectUpdate(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		log.Infof("Prepared update config with ProjectID=%d", updateConfig.GetProjectID())
+
 		configDataJSON, err := updateConfig.ToJSONString()
 		require.NoError(t, err)
 
@@ -115,48 +117,64 @@ func TestSSAProjectUpdate(t *testing.T) {
 		param["project_id"] = strconv.Itoa(int(schemaProject.ID))
 		param["config_data"] = configDataJSON
 
+		log.Infof("Calling SSA update script with project_id=%d", schemaProject.ID)
+		var scriptOutput []string
 		err = yakgrpc.ExecScriptWithParam(context.Background(), pluginName, param,
 			"", func(exec *ypb.ExecResult) error {
+				if exec.IsMessage {
+					log.Infof("[Script] %s", string(exec.Message))
+					scriptOutput = append(scriptOutput, string(exec.Message))
+				}
 				return nil
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, err, "Script execution should succeed")
+
+		log.Infof("Script execution completed, output lines: %d", len(scriptOutput))
 
 		// 5. 验证更新结果
+		log.Infof("Verifying updated project...")
 		var updatedProject schema.SSAProject
 		err = db.First(&updatedProject, schemaProject.ID).Error
-		require.NoError(t, err)
+		require.NoError(t, err, "Should find updated project in database")
+
+		log.Infof("Found updated project:")
+		log.Infof("  ProjectName: %s", updatedProject.ProjectName)
+		log.Infof("  Description: %s", updatedProject.Description)
+		log.Infof("  Language: %s", updatedProject.Language)
+		log.Infof("  Tags: %s", updatedProject.Tags)
 
 		// 验证基础字段
-		require.Equal(t, projectName, updatedProject.ProjectName)
-		require.Equal(t, "更新后的描述", updatedProject.Description)
-		require.Equal(t, ssaconfig.JAVA, updatedProject.Language)
+		require.Equal(t, projectName, updatedProject.ProjectName, "ProjectName should match")
+		require.Equal(t, "更新后的描述", updatedProject.Description, "Description should be updated")
+		require.Equal(t, ssaconfig.JAVA, updatedProject.Language, "Language should remain java")
 
 		// 验证配置
 		updatedConfig, err := updatedProject.GetConfig()
-		require.NoError(t, err)
-		require.NotNil(t, updatedConfig)
+		require.NoError(t, err, "Should get config from updated project")
+		require.NotNil(t, updatedConfig, "Config should not be nil")
 
-		// 验证编译配置
-		require.True(t, updatedConfig.GetCompileStrictMode())
-		require.Equal(t, 10, updatedConfig.GetCompilePeepholeSize())
-		require.Equal(t, uint32(5), updatedConfig.GetCompileConcurrency())
-		require.Contains(t, updatedConfig.GetCompileExcludeFiles(), "**/test/**")
-
-		// 验证BaseInfo同步
-		require.Equal(t, projectName, updatedConfig.BaseInfo.ProjectName)
-		require.Equal(t, "更新后的描述", updatedConfig.BaseInfo.ProjectDescription)
-		require.Equal(t, ssaconfig.JAVA, updatedConfig.BaseInfo.Language)
-		require.Equal(t, []string{"tag1", "tag2", "tag3"}, updatedConfig.BaseInfo.Tags)
-
-		require.Equal(t, strings.Join([]string{"tag1", "tag2", "tag3"}, ","), updatedProject.Tags)
-
-		log.Infof("SSA project updated successfully!")
-		log.Infof("  ProjectName: %s", updatedProject.ProjectName)
-		log.Infof("  Description: %s", updatedProject.Description)
-		log.Infof("  Tags: %v", updatedProject.Tags)
+		log.Infof("Updated config values:")
 		log.Infof("  StrictMode: %v", updatedConfig.GetCompileStrictMode())
 		log.Infof("  PeepholeSize: %d", updatedConfig.GetCompilePeepholeSize())
 		log.Infof("  Concurrency: %d", updatedConfig.GetCompileConcurrency())
+		log.Infof("  ExcludeFiles: %v", updatedConfig.GetCompileExcludeFiles())
+
+		// 验证编译配置
+		require.True(t, updatedConfig.GetCompileStrictMode(), "StrictMode should be true")
+		require.Equal(t, 10, updatedConfig.GetCompilePeepholeSize(), "PeepholeSize should be 10")
+		require.Equal(t, 5, updatedConfig.GetCompileConcurrency(), "Concurrency should be 5")
+		require.Contains(t, updatedConfig.GetCompileExcludeFiles(), "**/test/**", "Should contain exclude pattern")
+
+		// 验证BaseInfo同步
+		require.NotNil(t, updatedConfig.BaseInfo, "BaseInfo should not be nil")
+		require.Equal(t, projectName, updatedConfig.BaseInfo.ProjectName, "BaseInfo.ProjectName should match")
+		require.Equal(t, "更新后的描述", updatedConfig.BaseInfo.ProjectDescription, "BaseInfo.ProjectDescription should match")
+		require.Equal(t, ssaconfig.JAVA, updatedConfig.BaseInfo.Language, "BaseInfo.Language should match")
+		require.Equal(t, []string{"tag1", "tag2", "tag3"}, updatedConfig.BaseInfo.Tags, "BaseInfo.Tags should match")
+
+		require.Equal(t, strings.Join([]string{"tag1", "tag2", "tag3"}, ","), updatedProject.Tags, "Schema.Tags should match")
+
+		log.Infof("✅ SSA project update test passed successfully!")
 	})
 }
