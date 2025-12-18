@@ -528,9 +528,12 @@ func (pc *persistConn) readLoop() {
 		if firstAuth {
 			select {
 			case rc = <-pc.reqCh:
-			case <-time.After(time.Second * 5):
-				closeErr = utils.Error("lowhttp: readLoop reqCh timeout, met abnormal event: got response before request arrived")
-				log.Error(closeErr)
+			case <-pc.ctx.Done():
+				if pc.closed != nil {
+					closeErr = pc.closed
+				} else {
+					closeErr = pc.ctx.Err()
+				}
 				return
 			}
 		}
