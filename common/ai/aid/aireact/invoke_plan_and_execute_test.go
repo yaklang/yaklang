@@ -106,8 +106,10 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 	planStart := false
 	planEnd := false
 	switchedToAsync := false
-	var iid string
-	_ = iid
+	var oldCoordinatorId string
+	var newCoordinatorId string
+	// Track all unique CoordinatorIds to verify only two exist
+	allCoordinatorIds := make(map[string]bool)
 LOOP:
 	for {
 		select {
@@ -117,8 +119,23 @@ LOOP:
 				t.Fatal("Did not expect any tool use review event")
 			}
 
+			// Track all unique CoordinatorIds from events
+			if e.CoordinatorId != "" {
+				allCoordinatorIds[e.CoordinatorId] = true
+			}
+
+			// Capture the old CoordinatorId from the first event we receive
+			if oldCoordinatorId == "" && e.CoordinatorId != "" {
+				oldCoordinatorId = e.CoordinatorId
+			}
+
 			if e.Type == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
 				planStart = true
+				// Extract the new coordinator_id from the event content
+				result := utils.InterfaceToString(jsonpath.FindFirst(e.Content, `$..coordinator_id`))
+				if result != "" {
+					newCoordinatorId = result
+				}
 			}
 
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
@@ -163,6 +180,35 @@ LOOP:
 
 	if !switchedToAsync {
 		t.Fatal("Expected switchedToAsync to be true")
+	}
+
+	// Verify that the new CoordinatorId from plan execution is different from the old one
+	if oldCoordinatorId == "" {
+		t.Fatal("Expected to capture old CoordinatorId")
+	}
+	if newCoordinatorId == "" {
+		t.Fatal("Expected to capture new CoordinatorId from plan execution event")
+	}
+	if oldCoordinatorId == newCoordinatorId {
+		t.Fatalf("Expected new CoordinatorId (%s) to be different from old CoordinatorId (%s)", newCoordinatorId, oldCoordinatorId)
+	}
+	fmt.Printf("CoordinatorId verification passed: old=%s, new=%s\n", oldCoordinatorId, newCoordinatorId)
+
+	// Since HijackPERequest is used, the actual Coordinator is not created,
+	// so events will only have the ReAct's CoordinatorId.
+	// The newCoordinatorId only appears in the event content JSON.
+	// Verify that only ONE unique CoordinatorId exists in event headers (ReAct's)
+	fmt.Printf("All unique CoordinatorIds found in event headers: %v (count: %d)\n", allCoordinatorIds, len(allCoordinatorIds))
+	if len(allCoordinatorIds) != 1 {
+		var ids []string
+		for id := range allCoordinatorIds {
+			ids = append(ids, id)
+		}
+		t.Fatalf("Expected exactly 1 unique CoordinatorId in event headers (ReAct's ID only when using HijackPERequest), but found %d: %v", len(allCoordinatorIds), ids)
+	}
+	// Verify the new coordinator_id in event content is different and not appearing in event headers
+	if allCoordinatorIds[newCoordinatorId] {
+		t.Fatalf("New CoordinatorId (%s) should NOT appear in event headers when using HijackPERequest", newCoordinatorId)
 	}
 
 	fmt.Println("--------------------------------------")
