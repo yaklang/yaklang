@@ -505,6 +505,26 @@ func (pc *persistConn) h2Conn() {
 	pc.alt = newH2Conn
 }
 
+type deadlineExtendingReader struct {
+	conn    net.Conn
+	r       io.Reader
+	timeout time.Duration
+}
+
+func (d *deadlineExtendingReader) Read(p []byte) (int, error) {
+	if d == nil || d.r == nil {
+		return 0, io.EOF
+	}
+	if d.conn != nil && d.timeout > 0 {
+		_ = d.conn.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	n, err := d.r.Read(p)
+	if n > 0 && d.conn != nil && d.timeout > 0 {
+		_ = d.conn.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	return n, err
+}
+
 func (pc *persistConn) readLoop() {
 	var closeErr error
 	defer func() {
@@ -621,6 +641,11 @@ func (pc *persistConn) readLoop() {
 		}
 
 		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
+		httpResponseReader = &deadlineExtendingReader{
+			conn:    pc.conn,
+			r:       httpResponseReader,
+			timeout: timeout,
+		}
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
