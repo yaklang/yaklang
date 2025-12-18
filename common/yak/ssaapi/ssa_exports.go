@@ -138,6 +138,7 @@ var Exports = map[string]any{
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": WithExcludeFunc,
 	"withMemory":             WithMemory,
+	"withFilePerformanceLog": WithFilePerformanceLog,
 
 	// language:
 	"Javascript": ssaconfig.JS,

@@ -75,6 +75,14 @@ func (p *Program) Hash() (string, bool) {
 	}
 }
 
+// GetConfig 获取编译配置（用于访问文件性能 recorder 等）
+func (p *Program) GetConfig() *Config {
+	if p == nil {
+		return nil
+	}
+	return p.config
+}
+
 func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
 		Program:           prog,

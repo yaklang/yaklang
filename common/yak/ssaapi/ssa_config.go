@@ -65,6 +65,8 @@ type Config struct {
 	// diagnostics configuration
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
+	// file performance recorder
+	filePerformanceRecorder *diagnostics.Recorder
 }
 
 func (c *Config) CalcHash() string {
@@ -258,6 +260,8 @@ var WithProgramName = ssaconfig.WithProgramNames
 var WithMemory = ssaconfig.WithCompileMemoryCompile
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
+
+var WithFilePerformanceLog = ssaconfig.WithCompileFilePerformanceLog
 
 var WithDatabaseProgramCacheHitter = ssaconfig.SetOption("ssa_compile/database_program_cache_hitter", func(c *Config, h func(i any)) {
 	c.DatabaseProgramCacheHitter = h
