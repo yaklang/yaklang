@@ -74,6 +74,46 @@ aa`
 	}
 }
 
+func TestLowhttp_ConnectTimeoutRespected_WithDialer(t *testing.T) {
+	var got time.Duration
+	dialer := func(duration time.Duration, addr string) (net.Conn, error) {
+		got = duration
+		return nil, errors.New("dial failed")
+	}
+
+	_, err := HTTPWithoutRedirect(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")),
+		WithHost("127.0.0.1"),
+		WithPort(80),
+		WithConnectTimeout(123*time.Millisecond),
+		WithTimeout(1*time.Second),
+		WithDialer(dialer),
+	)
+	require.Error(t, err)
+	require.Equal(t, 123*time.Millisecond, got)
+}
+
+func TestLowhttp_ConnPool_ResponseTimeoutRespected(t *testing.T) {
+	ctx := utils.TimeoutContext(5 * time.Second)
+	host, port := utils.DebugMockTCPHandlerFuncContext(ctx, func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		defer conn.Close()
+		_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		buf := make([]byte, 4096)
+		_, _ = conn.Read(buf) // best-effort: consume request bytes
+		time.Sleep(500 * time.Millisecond)
+		_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na"))
+	})
+
+	start := time.Now()
+	_, err := HTTPWithoutRedirect(
+		WithConnPool(true),
+		WithPacketBytes([]byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", utils.HostPort(host, port)))),
+		WithTimeout(100*time.Millisecond),
+	)
+	require.Error(t, err)
+	require.Less(t, time.Since(start), 450*time.Millisecond)
+}
+
 func TestLowhttp_Pipeline_AutoFix2(t *testing.T) {
 	count := 0
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
