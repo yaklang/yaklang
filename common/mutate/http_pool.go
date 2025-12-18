@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +30,111 @@ import (
 var poolingList sync.Map
 
 type RandomChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
+
+const (
+	httpPoolExtraInfoSSEUpdate   = "__yak_sse_update"
+	httpPoolExtraInfoSSEFinal    = "__yak_sse_final"
+	httpPoolExtraInfoSSESeq      = "__yak_sse_seq"
+	httpPoolExtraInfoSSEStreamID = "__yak_sse_stream_id"
+)
+
+func httpPoolIsSSERequest(reqRaw []byte) bool {
+	accept := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(reqRaw, "Accept")))
+	return strings.Contains(accept, "text/event-stream")
+}
+
+func httpPoolIsSSEResponseHeader(respHeaderRaw []byte) (isSSE bool, isChunked bool) {
+	headerLower := strings.ToLower(string(respHeaderRaw))
+	isSSE = strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream")
+	isChunked = strings.Contains(headerLower, "transfer-encoding:") && strings.Contains(headerLower, "chunked")
+	return
+}
+
+func httpPoolBuildSyntheticResponseHeader(respHeaderRaw []byte, bodyLen int) []byte {
+	raw := strings.TrimRight(string(respHeaderRaw), "\r\n")
+	if raw == "" {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n", bodyLen))
+	}
+	lines := strings.Split(raw, "\r\n")
+	out := make([]string, 0, len(lines)+1)
+	out = append(out, lines[0])
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "transfer-encoding:") || strings.HasPrefix(lower, "content-length:") {
+			continue
+		}
+		out = append(out, line)
+	}
+	out = append(out, fmt.Sprintf("Content-Length: %d", bodyLen))
+	return []byte(strings.Join(out, "\r\n") + "\r\n\r\n")
+}
+
+func httpPoolChunkedStreamDecode(ctx context.Context, r io.Reader, onData func([]byte)) error {
+	br := bufio.NewReader(r)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		line, err := br.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			continue
+		}
+		sizeHex, _, _ := strings.Cut(line, ";")
+		size, err := strconv.ParseInt(strings.TrimSpace(sizeHex), 16, 64)
+		if err != nil {
+			return err
+		}
+		if size == 0 {
+			for {
+				trailerLine, err := br.ReadString('\n')
+				if err != nil {
+					return err
+				}
+				if strings.TrimRight(trailerLine, "\r\n") == "" {
+					return nil
+				}
+			}
+		}
+
+		buf := make([]byte, int(size))
+		_, err = io.ReadFull(br, buf)
+		if err != nil {
+			return err
+		}
+		onData(buf)
+
+		crlf := make([]byte, 2)
+		_, err = io.ReadFull(br, crlf)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func httpPoolRawStreamRead(ctx context.Context, r io.Reader, onData func([]byte)) error {
+	buf := make([]byte, 32*1024)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		n, err := r.Read(buf)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
+			onData(chunk)
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
 type httpPoolConfig struct {
 	Size                         int
 	SizedWaitGroupInstance       *utils.SizedWaitGroup
@@ -807,7 +915,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				// log.Infof("debug counter: %v, %v", prompt, atomic.LoadInt64(debugCounter))
 			}
 
-			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {
+				execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {
 				if maxSubmit > 0 && atomic.LoadInt64(requestCounter) >= int64(maxSubmit) {
 					return
 				}
@@ -904,6 +1012,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							return
 						}
 
+						needSSEStream := httpPoolIsSSERequest(targetRequest)
+						sseStreamID := ""
+						var sseSeq atomic.Int64
+						if needSSEStream {
+							sseStreamID = uuid.NewString()
+						}
+
 						// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
 						var host string
 						var port int
@@ -925,6 +1040,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if config.NoFollowRedirect {
 							redictTimes = 0
 						}
+						requestStart := time.Now()
 						lowhttpOptions := []lowhttp.LowhttpOpt{
 							lowhttp.WithHttps(https),
 							lowhttp.WithRuntimeId(config.RuntimeId),
@@ -952,6 +1068,109 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 							lowhttp.WithNoReadMultiResponse(config.NoReadMultiResponse),
+						}
+
+						if needSSEStream {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithNoBodyBuffer(true))
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithBodyStreamReaderHandler(func(respHeaderRaw []byte, bodyReader io.ReadCloser) {
+								defer bodyReader.Close()
+
+								isSSE, isChunked := httpPoolIsSSEResponseHeader(respHeaderRaw)
+								if !isSSE {
+									_, _ = io.Copy(io.Discard, bodyReader)
+									return
+								}
+
+								window := 250 * time.Millisecond
+								ticker := time.NewTicker(window)
+								defer ticker.Stop()
+
+								dataCh := make(chan []byte, 64)
+								doneCh := make(chan struct{})
+
+								go func() {
+									defer close(doneCh)
+									onData := func(b []byte) {
+										select {
+										case <-config.Ctx.Done():
+											return
+										case dataCh <- b:
+										default:
+										}
+									}
+									var err error
+									if isChunked {
+										err = httpPoolChunkedStreamDecode(config.Ctx, bodyReader, onData)
+									} else {
+										err = httpPoolRawStreamRead(config.Ctx, bodyReader, onData)
+									}
+									_ = err
+									close(dataCh)
+								}()
+
+								emitUpdate := func(body []byte) {
+									if len(body) == 0 {
+										return
+									}
+									seq := sseSeq.Add(1)
+									headerRaw := httpPoolBuildSyntheticResponseHeader(respHeaderRaw, len(body))
+									rspRaw := make([]byte, 0, len(headerRaw)+len(body))
+									rspRaw = append(rspRaw, headerRaw...)
+									rspRaw = append(rspRaw, body...)
+
+									cache.SafeFeed(&HttpResult{
+										Url:         urlStr,
+										Request:     reqIns,
+										RequestRaw:  targetRequest,
+										ResponseRaw: rspRaw,
+										Timestamp:   time.Now().Unix(),
+										DurationMs:  time.Since(requestStart).Milliseconds(),
+										Payloads:    payloads,
+										Source:      config.Source,
+										ExtraInfo: map[string]string{
+											httpPoolExtraInfoSSEUpdate:   "1",
+											httpPoolExtraInfoSSEStreamID: sseStreamID,
+											httpPoolExtraInfoSSESeq:      strconv.FormatInt(seq, 10),
+										},
+									})
+									requestFeedbackCounterAdd()
+								}
+
+								var buf bytes.Buffer
+								const maxBuffered = 256 * 1024
+								flush := func() {
+									if buf.Len() == 0 {
+										return
+									}
+									data := make([]byte, buf.Len())
+									copy(data, buf.Bytes())
+									buf.Reset()
+									emitUpdate(data)
+								}
+
+								for {
+									select {
+									case <-config.Ctx.Done():
+										return
+									case <-doneCh:
+										flush()
+										return
+									case b, ok := <-dataCh:
+										if !ok {
+											continue
+										}
+										if len(b) == 0 {
+											continue
+										}
+										if buf.Len()+len(b) > maxBuffered {
+											flush()
+										}
+										buf.Write(b)
+									case <-ticker.C:
+										flush()
+									}
+								}
+							}))
 						}
 
 						if config.RetryHandler != nil {
@@ -1094,6 +1313,24 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 						if err != nil {
 							log.Errorf("exec packet raw failed: %s", err)
+							if needSSEStream && sseSeq.Load() > 0 && utils.MatchAnyOfSubString(strings.ToLower(err.Error()), "timeout", "i/o timeout", "context deadline exceeded") {
+								finalResult = &HttpResult{
+									Url:         urlStr,
+									Request:     reqIns,
+									Error:       nil,
+									RequestRaw:  targetRequest,
+									ResponseRaw: rsp,
+									Timestamp:   time.Now().Unix(),
+									DurationMs:  time.Since(requestStart).Milliseconds(),
+									Payloads:    payloads,
+									Source:      config.Source,
+									ExtraInfo: map[string]string{
+										httpPoolExtraInfoSSEFinal:    "1",
+										httpPoolExtraInfoSSEStreamID: sseStreamID,
+									},
+								}
+								return
+							}
 							finalResult = &HttpResult{
 								Url:         urlStr,
 								Request:     reqIns,
@@ -1107,6 +1344,24 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								LowhttpResponse:   rspInstance,
 								ExtraInfo:         extra,
 								RandomChunkedData: chunkedData,
+							}
+							return
+						}
+						if needSSEStream && sseSeq.Load() > 0 {
+							finalResult = &HttpResult{
+								Url:         urlStr,
+								Request:     reqIns,
+								Error:       nil,
+								RequestRaw:  targetRequest,
+								ResponseRaw: rsp,
+								Timestamp:   time.Now().Unix(),
+								DurationMs:  time.Since(requestStart).Milliseconds(),
+								Payloads:    payloads,
+								Source:      config.Source,
+								ExtraInfo: map[string]string{
+									httpPoolExtraInfoSSEFinal:    "1",
+									httpPoolExtraInfoSSEStreamID: sseStreamID,
+								},
 							}
 							return
 						}

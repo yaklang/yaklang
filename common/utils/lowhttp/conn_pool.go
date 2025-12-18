@@ -525,22 +525,6 @@ func (pc *persistConn) readLoop() {
 	alive := true
 	firstAuth := true
 	for alive {
-		// if failed, handle it (re-conn / or abandoned)
-		_ = pc.conn.SetReadDeadline(time.Time{})
-		_, err := pc.br.Peek(1)
-
-		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				pc.sawEOF = true
-				closeErr = errServerClosedIdle
-			} else {
-				closeErr = connPoolReadFromServerError{err}
-			} // read error just return and close
-			return
-		}
-		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
-
 		if firstAuth {
 			select {
 			case rc = <-pc.reqCh:
@@ -550,6 +534,24 @@ func (pc *persistConn) readLoop() {
 				return
 			}
 		}
+
+		timeout := 10 * time.Second
+		if rc.option != nil && rc.option.Timeout > 0 {
+			timeout = rc.option.Timeout
+		}
+		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
+		_, err := pc.br.Peek(1)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				pc.sawEOF = true
+				closeErr = errServerClosedIdle
+			} else {
+				closeErr = connPoolReadFromServerError{err}
+			}
+			return
+		}
+
+		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
 		var resp *http.Response
 
@@ -616,7 +618,6 @@ func (pc *persistConn) readLoop() {
 		}
 
 		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
-		_ = pc.conn.SetReadDeadline(time.Time{})
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
