@@ -123,19 +123,12 @@ func buildAIToolIndex(c *cli.Context) error {
 		generate_index_tool.WithCacheDir(cacheDir + "/aitool"),
 		generate_index_tool.WithConcurrentWorkers(workers),
 		generate_index_tool.WithForceBypassCache(force),
-		generate_index_tool.WithSimpleProcessor(),
+		generate_index_tool.WithDefaultAIProcessor(), // 使用默认 AI 处理器，通过 aicommon.InvokeLiteForge 调用
 		generate_index_tool.WithProgressCallback(func(current, total int, message string) {
 			fmt.Printf("进度: %d/%d - %s\n", current, total, message)
 		}),
 	}
-
-	// 如果SimpleLiteForge已初始化，使用AI处理器
-	if rag_search_tool.SimpleLiteForge != nil {
-		opts = append(opts, generate_index_tool.WithAIProcessor(rag_search_tool.SimpleLiteForge))
-		fmt.Println("使用AI处理器")
-	} else {
-		fmt.Println("警告: SimpleLiteForge未初始化，使用简单处理器")
-	}
+	fmt.Println("使用默认AI处理器")
 
 	manager, err := generate_index_tool.CreateIndexManager(
 		db,
@@ -212,19 +205,12 @@ func buildForgeIndex(c *cli.Context) error {
 		generate_index_tool.WithCacheDir(cacheDir + "/forge"),
 		generate_index_tool.WithConcurrentWorkers(workers),
 		generate_index_tool.WithForceBypassCache(force),
-		generate_index_tool.WithSimpleProcessor(),
+		generate_index_tool.WithDefaultAIProcessor(), // 使用默认 AI 处理器，通过 aicommon.InvokeLiteForge 调用
 		generate_index_tool.WithProgressCallback(func(current, total int, message string) {
 			fmt.Printf("进度: %d/%d - %s\n", current, total, message)
 		}),
 	}
-
-	// 如果SimpleLiteForge已初始化，使用AI处理器
-	if rag_search_tool.SimpleLiteForge != nil {
-		opts = append(opts, generate_index_tool.WithAIProcessor(rag_search_tool.SimpleLiteForge))
-		fmt.Println("使用AI处理器")
-	} else {
-		fmt.Println("警告: SimpleLiteForge未初始化，使用简单处理器")
-	}
+	fmt.Println("使用默认AI处理器")
 
 	manager, err := generate_index_tool.CreateIndexManager(
 		db,

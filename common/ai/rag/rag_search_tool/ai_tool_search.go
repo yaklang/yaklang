@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
-	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,8 +20,6 @@ import (
 
 const AIToolVectorIndexName = "AI_TOOL_VECTOR_INDEX"
 const ForgeVectorIndexName = "FORGE_VECTOR_INDEX"
-
-var SimpleLiteForge contracts.LiteForge
 
 func NewRAGSearcher[T searchtools.AISearchable](name string) (searchtools.AISearcher[T], error) {
 	db := consts.GetGormProfileDatabase()
@@ -111,10 +108,8 @@ func NewComprehensiveSearcher[T searchtools.AISearchable](name string, chatToAiF
 // BuildVectorIndexForSearcher 构建向量索引
 func BuildVectorIndexForSearcher[T searchtools.AISearchable](db *gorm.DB, collectionName string, tools []T) (*rag.RAGSystem, error) {
 	// TODO: 差量更新索引
-	if SimpleLiteForge == nil {
-		return nil, utils.Errorf("SimpleLiteForge is not initialized")
-	}
-	manager, err := generate_index_tool.CreateIndexManager(db, AIToolVectorIndexName, "AITool index", generate_index_tool.WithConcurrentWorkers(1), generate_index_tool.WithAIProcessor(SimpleLiteForge))
+	// 使用默认 AI 处理器，通过 aicommon.InvokeLiteForge 调用，不再依赖外部注入
+	manager, err := generate_index_tool.CreateIndexManager(db, AIToolVectorIndexName, "AITool index", generate_index_tool.WithConcurrentWorkers(1), generate_index_tool.WithDefaultAIProcessor())
 	if err != nil {
 		return nil, utils.Errorf("create index manager failed: %v", err)
 	}
