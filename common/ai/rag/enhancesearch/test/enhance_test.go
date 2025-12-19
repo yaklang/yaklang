@@ -6,13 +6,14 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
-	"github.com/yaklang/yaklang/common/yak/depinjector/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
+	// import aiforge to register liteforge callback via init()
+	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 
 func TestRewriteQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
-	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()
 
@@ -25,7 +26,6 @@ func TestRewriteQuerySearch(t *testing.T) {
 
 func TestSplitQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
-	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()
 	enhance, err := handler.SplitQuery(context.Background(), query)
@@ -37,7 +37,6 @@ func TestSplitQuerySearch(t *testing.T) {
 
 func TestGeneralizeQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
-	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
 	handler := enhancesearch.NewDefaultSearchHandler()
 	enhance, err := handler.GeneralizeQuery(context.Background(), query)
