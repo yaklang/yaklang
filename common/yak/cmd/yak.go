@@ -25,8 +25,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/grpc_recovery"
 
 	"github.com/yaklang/yaklang/common/crep"
-	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+
+	// 直接导入以触发 init 函数，替代原来的 depinjector
+	// aiengine 现在通过 script_engine.go 中的直接导入来注册
+	// yakgrpc 已经在下方导入，会自动注册 mcp.NewLocalClient
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
@@ -172,7 +175,9 @@ func init() {
 		}
 	}
 	yaklib.SetEngineInterface(yak.NewScriptEngine(1000))
-	depinjector.DependencyInject()
+	// depinjector 已移除，相关 init 注册通过直接导入包来触发
+	// - aiengine: 通过 yak/script_engine.go 导入 aiengine 包时注册
+	// - yakgrpc: 在本文件已导入，会自动注册 mcp.NewLocalClient
 	yak.InitYaklangLib()
 }
 

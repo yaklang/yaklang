@@ -20,7 +20,7 @@ func TestHelloWorld(t *testing.T) {
 	aiCallBack := aidmock.HelloWorldScenario.GetAICallbackType()
 
 	aiRsp := ""
-	engine := newTestAIEngine(t, aiCallBack, aiengine.WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
+	engine := newTestAIEngine(t, aiCallBack, aiengine.WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
 		if NodeId == "re-act-loop-answer-payload" {
 			aiRsp += string(data)
 		}

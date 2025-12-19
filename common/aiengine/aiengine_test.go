@@ -183,7 +183,7 @@ func TestAIEngineEventHandling(t *testing.T) {
 		},
 		WithMaxIteration(1),
 		WithYOLOMode(),
-		WithOnEvent(func(react aicommon.ReActIF, event *schema.AiOutputEvent) {
+		WithOnEvent(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
 			t.Logf("Received event: type=%s, isStream=%v", event.Type, event.IsStream)
 		}),
 	)
@@ -201,13 +201,13 @@ func TestAIEngineEventHandling(t *testing.T) {
 		},
 		WithMaxIteration(1),
 		WithYOLOMode(),
-		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Stream received: %d bytes", len(data))
 		}),
-		WithOnData(func(react aicommon.ReActIF, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		WithOnData(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Data received: %d bytes", len(data))
 		}),
-		WithOnFinished(func(react aicommon.ReActIF) {
+		WithOnFinished(func(react aicommon.AIEngineOperator) {
 			t.Logf("Finished")
 		}),
 	)
@@ -430,14 +430,14 @@ func TestAIEngine_MockDirectAnswer(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			t.Logf("Stream: NodeId=%s, data=%s", NodeId, string(data))
 			if NodeId == "re-act-loop-answer-payload" {
 				streamBuffer.Write(data)
 				answerReceived = true
 			}
 		}),
-		WithOnFinished(func(react aicommon.ReActIF) {
+		WithOnFinished(func(react aicommon.AIEngineOperator) {
 			finishReceived = true
 			t.Logf("Finished")
 		}),
@@ -484,7 +484,7 @@ func TestAIEngine_MockMultipleTasks(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.ReActIF) {
+		WithOnFinished(func(react aicommon.AIEngineOperator) {
 			taskMutex.Lock()
 			taskCount++
 			taskMutex.Unlock()
@@ -527,7 +527,7 @@ func TestAIEngine_MockWithTimeout(t *testing.T) {
 		WithContext(ctx),
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.ReActIF) {
+		WithOnFinished(func(react aicommon.AIEngineOperator) {
 			finishReceived = true
 		}),
 	)
@@ -564,7 +564,7 @@ func TestAIEngine_MockErrorHandling(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.ReActIF) {
+		WithOnFinished(func(react aicommon.AIEngineOperator) {
 			t.Logf("Finished")
 		}),
 	)
@@ -609,7 +609,7 @@ func TestAIEngine_MockStreamData(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			if len(data) > 0 {
 				streamMutex.Lock()
 				streamChunks = append(streamChunks, string(data))

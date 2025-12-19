@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/depinjector"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -20,12 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
 
+	// 直接导入以触发 init 函数，替代原来的 depinjector
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
+	_ "github.com/yaklang/yaklang/common/yakgrpc"
 )
-
-func init() {
-	depinjector.DependencyInject()
-}
 
 var planJson = `{
   "@action": "plan",

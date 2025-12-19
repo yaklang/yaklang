@@ -5,8 +5,9 @@ import (
 )
 
 func init() {
-	// Register NewReAct factory function
-	aicommon.RegisterNewReAct(func(opts ...aicommon.ConfigOption) (aicommon.ReActIF, error) {
+	// Register NewReAct as ReAct-based AIEngineOperator factory function
+	// ReAct implements aicommon.AIEngineOperator interface
+	aicommon.RegisterReActAIEngineOperator(func(opts ...aicommon.ConfigOption) (aicommon.AIEngineOperator, error) {
 		return NewReAct(opts...)
 	})
 

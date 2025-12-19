@@ -19,8 +19,8 @@ import (
 // AIEngine AI 引擎封装
 // 提供简化的 API 来使用 ReAct 和其他 AI 功能
 type AIEngine struct {
-	config     *AIEngineConfig
-	react      aicommon.ReActIF
+	config   *AIEngineConfig
+	operator aicommon.AIEngineOperator // 可以是 ReAct 或其他 AI 引擎操作器
 	outputChan chan *schema.AiOutputEvent
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -48,19 +48,19 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	// 构建 ReAct 配置选项
 	reactOptions := buildReActOptions(ctx, config, outputChan)
 
-	// 创建 ReAct 实例 (using registered factory via aicommon)
-	react, err := aicommon.NewReAct(reactOptions...)
+	// 创建 ReAct-based AIEngineOperator 实例 (using registered factory via aicommon)
+	operator, err := aicommon.NewReActAIEngineOperator(reactOptions...)
 	if err != nil {
 		cancel()
-		return nil, utils.Errorf("failed to create ReAct instance: %v", err)
+		return nil, utils.Errorf("failed to create ReAct AIEngineOperator instance: %v", err)
 	}
 
 	// 创建 endpoint manager 用于任务同步
 	epm := aicommon.NewEndpointManagerContext(ctx)
 
 	engine := &AIEngine{
-		config:           config,
-		react:            react,
+		config:   config,
+		operator: operator,
 		outputChan:       outputChan,
 		ctx:              ctx,
 		cancel:           cancel,
@@ -81,8 +81,9 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	return engine, nil
 }
 
-func (e *AIEngine) GetReAct() aicommon.ReActIF {
-	return e.react
+// GetOperator 返回底层的 AIEngineOperator 实例
+func (e *AIEngine) GetOperator() aicommon.AIEngineOperator {
+	return e.operator
 }
 
 // sendInitConfig 发送初始化配置
@@ -91,7 +92,7 @@ func (e *AIEngine) sendInitConfig() error {
 		IsStart: true,
 		Params:  e.config.ConvertToYPBAIStartParams(),
 	}
-	return e.react.SendInputEvent(event)
+	return e.operator.SendInputEvent(event)
 }
 
 // sendMsgAndGetTaskName 发送消息并等待获取任务名称
@@ -118,7 +119,7 @@ func (e *AIEngine) sendMsgAndGetTaskName(input string) (string, error) {
 		FreeInput:   input,
 	}
 
-	if err := e.react.SendInputEvent(event); err != nil {
+	if err := e.operator.SendInputEvent(event); err != nil {
 		return "", utils.Errorf("failed to send input event: %v", err)
 	}
 
@@ -151,7 +152,7 @@ func (e *AIEngine) SendMsg(input string) error {
 
 	// 调用完成回调
 	if e.config.OnFinished != nil {
-		e.config.OnFinished(e.react)
+		e.config.OnFinished(e.operator)
 	}
 
 	return nil
@@ -245,17 +246,17 @@ func (e *AIEngine) SendInteractiveResponse(response string) error {
 		InteractiveJSONInput: response,
 	}
 
-	return e.react.SendInputEvent(event)
+	return e.operator.SendInputEvent(event)
 }
 
 // Wait 等待所有任务完成
 func (e *AIEngine) Wait() {
-	e.react.Wait()
+	e.operator.Wait()
 }
 
 // IsFinished 检查任务是否完成
 func (e *AIEngine) IsFinished() bool {
-	return e.react.IsFinished()
+	return e.operator.IsFinished()
 }
 
 // Close 关闭 AI 引擎，释放资源
@@ -288,7 +289,7 @@ func (e *AIEngine) handleOutputEvents() {
 
 			// 调用用户的事件回调
 			if e.config.OnEvent != nil {
-				e.config.OnEvent(e.react, event)
+				e.config.OnEvent(e.operator, event)
 			}
 
 		case <-e.ctx.Done():
@@ -363,13 +364,13 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 
 	if event.IsInteractive() {
 		if e.config.OnInputRequired != nil {
-			response := e.config.OnInputRequired(e.react, string(event.Content))
+			response := e.config.OnInputRequired(e.operator, string(event.Content))
 			if response != "" {
 				_ = e.SendInteractiveResponse(response)
 			}
 		}
 		if e.config.OnInputRequiredRaw != nil {
-			response := e.config.OnInputRequiredRaw(e.react, event, string(event.Content))
+			response := e.config.OnInputRequiredRaw(e.operator, event, string(event.Content))
 			if response != "" {
 				_ = e.SendInteractiveResponse(response)
 			}
@@ -378,7 +379,7 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 	}
 	switch event.Type {
 	case schema.EVENT_TYPE_STREAM:
-		e.config.OnStream(e.react, event, event.NodeId, event.StreamDelta)
+		e.config.OnStream(e.operator, event, event.NodeId, event.StreamDelta)
 	default:
 		// 记录其他事件类型
 		if event.Type == "error" {

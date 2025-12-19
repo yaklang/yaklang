@@ -4,64 +4,50 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// ReActIF defines the interface for ReAct instances
-// This abstraction allows aiengine to use ReAct without directly importing aireact package
-type ReActIF interface {
-	// SendInputEvent sends an input event to the ReAct instance
-	SendInputEvent(event *ypb.AIInputEvent) error
-
-	// Wait waits for all tasks to complete
-	Wait()
-
-	// IsFinished checks if all tasks are finished
-	IsFinished() bool
-}
-
-// NewReActFunc is the function type for creating a new ReAct instance
-type NewReActFunc func(opts ...ConfigOption) (ReActIF, error)
+// NewAIEngineOperatorFunc is the function type for creating a new AIEngineOperator instance
+type NewAIEngineOperatorFunc func(opts ...ConfigOption) (AIEngineOperator, error)
 
 var (
-	reactMu         sync.RWMutex
-	newReActFunc    NewReActFunc
-	builtinToolsOpt ConfigOption
+	operatorMu                      sync.RWMutex
+	newReActAIEngineOperatorFunc    NewAIEngineOperatorFunc
+	builtinToolsOpt                 ConfigOption
 )
 
-// RegisterNewReAct registers a function to create new ReAct instances
+// RegisterReActAIEngineOperator registers a function to create ReAct-based AIEngineOperator instances
 // This should be called by aireact package's init function
-func RegisterNewReAct(f NewReActFunc) {
-	reactMu.Lock()
-	defer reactMu.Unlock()
-	newReActFunc = f
+func RegisterReActAIEngineOperator(f NewAIEngineOperatorFunc) {
+	operatorMu.Lock()
+	defer operatorMu.Unlock()
+	newReActAIEngineOperatorFunc = f
 }
 
 // RegisterBuiltinToolsOption registers the WithBuiltinTools option
 // This allows aiengine to use builtin tools without importing aireact
 func RegisterBuiltinToolsOption(opt ConfigOption) {
-	reactMu.Lock()
-	defer reactMu.Unlock()
+	operatorMu.Lock()
+	defer operatorMu.Unlock()
 	builtinToolsOpt = opt
 }
 
-// NewReAct creates a new ReAct instance using the registered factory function
+// NewReActAIEngineOperator creates a new ReAct-based AIEngineOperator instance
 // Returns error if no factory function is registered
-func NewReAct(opts ...ConfigOption) (ReActIF, error) {
-	reactMu.RLock()
-	f := newReActFunc
-	reactMu.RUnlock()
+func NewReActAIEngineOperator(opts ...ConfigOption) (AIEngineOperator, error) {
+	operatorMu.RLock()
+	f := newReActAIEngineOperatorFunc
+	operatorMu.RUnlock()
 
 	if f == nil {
-		return nil, utils.Error("ReAct factory not registered, please import 'github.com/yaklang/yaklang/common/ai/aid/aireact'")
+		return nil, utils.Error("ReAct AIEngineOperator factory not registered, please import 'github.com/yaklang/yaklang/common/ai/aid/aireact'")
 	}
 	return f(opts...)
 }
 
 // GetBuiltinToolsOption returns the registered WithBuiltinTools option
 func GetBuiltinToolsOption() ConfigOption {
-	reactMu.RLock()
-	defer reactMu.RUnlock()
+	operatorMu.RLock()
+	defer operatorMu.RUnlock()
 	return builtinToolsOpt
 }
 
