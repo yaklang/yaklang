@@ -49,13 +49,13 @@ type AIEngineConfig struct {
 	DebugMode bool // 调试模式
 
 	// 事件处理回调
-	OnEvent            func(react aicommon.ReActIF, event *schema.AiOutputEvent)                             // 事件回调
-	OnStream           func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) // 流式输出回调
-	OnStreamEnd        func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string)              // 流式输出结束
-	OnData             func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) // 数据回调
-	OnFinished         func(react aicommon.ReActIF)                                                          // 完成回调, 不返回结果
-	OnInputRequiredRaw func(react aicommon.ReActIF, event *schema.AiOutputEvent, question string) string     // 需要用户输入回调
-	OnInputRequired    func(react aicommon.ReActIF, question string) string                                  // 需要用户输入回调
+	OnEvent            func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent)                             // 事件回调
+	OnStream           func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) // 流式输出回调
+	OnStreamEnd        func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string)              // 流式输出结束
+	OnData             func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) // 数据回调
+	OnFinished         func(react aicommon.AIEngineOperator)                                                          // 完成回调, 不返回结果
+	OnInputRequiredRaw func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string     // 需要用户输入回调
+	OnInputRequired    func(react aicommon.AIEngineOperator, question string) string                                  // 需要用户输入回调
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
@@ -77,12 +77,12 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		AllowUserInteract:     true,
 		ReviewPolicy:          "yolo",
 		EnableForgeSearchTool: true,
-		OnEvent:               func(aicommon.ReActIF, *schema.AiOutputEvent) {},
-		OnStream:              func(aicommon.ReActIF, *schema.AiOutputEvent, string, []byte) {},
-		OnData:                func(aicommon.ReActIF, *schema.AiOutputEvent, string, []byte) {},
-		OnFinished:            func(aicommon.ReActIF) {},
-		OnInputRequiredRaw:    func(aicommon.ReActIF, *schema.AiOutputEvent, string) string { return "" },
-		OnInputRequired:       func(aicommon.ReActIF, string) string { return "" },
+		OnEvent:               func(aicommon.AIEngineOperator, *schema.AiOutputEvent) {},
+		OnStream:              func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
+		OnData:                func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
+		OnFinished:            func(aicommon.AIEngineOperator) {},
+		OnInputRequiredRaw:    func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string) string { return "" },
+		OnInputRequired:       func(aicommon.AIEngineOperator, string) string { return "" },
 	}
 
 	// 应用选项
@@ -253,49 +253,49 @@ func WithDebugMode(debug bool) AIEngineConfigOption {
 // ========== 事件处理回调选项 ==========
 
 // WithOnEvent 设置事件回调
-func WithOnEvent(callback func(aicommon.ReActIF, *schema.AiOutputEvent)) AIEngineConfigOption {
+func WithOnEvent(callback func(aicommon.AIEngineOperator, *schema.AiOutputEvent)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnEvent = callback
 	}
 }
 
 // WithOnStream 设置流式输出回调
-func WithOnStream(callback func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
+func WithOnStream(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnStream = callback
 	}
 }
 
 // WithOnStreamEnd 设置流式输出结束回调
-func WithOnStreamEnd(callback func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string)) AIEngineConfigOption {
+func WithOnStreamEnd(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnStreamEnd = callback
 	}
 }
 
 // WithOnData 设置数据回调
-func WithOnData(callback func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
+func WithOnData(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnData = callback
 	}
 }
 
 // WithOnFinished 设置完成回调
-func WithOnFinished(callback func(react aicommon.ReActIF)) AIEngineConfigOption {
+func WithOnFinished(callback func(react aicommon.AIEngineOperator)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnFinished = callback
 	}
 }
 
 // WithOnInputRequiredRaw 设置需要用户输入回调
-func WithOnInputRequiredRaw(callback func(react aicommon.ReActIF, event *schema.AiOutputEvent, question string) string) AIEngineConfigOption {
+func WithOnInputRequiredRaw(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnInputRequiredRaw = callback
 	}
 }
 
 // WithOnInputRequired 设置需要用户输入回调
-func WithOnInputRequired(callback func(react aicommon.ReActIF, question string) string) AIEngineConfigOption {
+func WithOnInputRequired(callback func(react aicommon.AIEngineOperator, question string) string) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnInputRequired = callback
 	}

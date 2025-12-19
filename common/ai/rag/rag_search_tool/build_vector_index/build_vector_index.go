@@ -16,15 +16,15 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yak/depinjector"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
+	// 直接导入以触发 init 函数，替代原来的 depinjector
 	_ "github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	_ "github.com/yaklang/yaklang/common/aiforge"
+	_ "github.com/yaklang/yaklang/common/yakgrpc"
 )
 
 func init() {
-	depinjector.DependencyInject()
 	yakit.LoadGlobalNetworkConfig()
 }
 func main() {
