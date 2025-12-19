@@ -102,6 +102,7 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 		return nil, err
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	configureAndOptimizeDB(dialect, db)
 	return db, nil
 }
