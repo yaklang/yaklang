@@ -137,7 +137,48 @@ func product(sli, curr) {
     return ret
 }
 
+func _jsonKind(v) {
+    s = ""
+    try {
+        s = string(json.dumps(v))
+        if s == "" {
+            return ""
+        }
+        
+        if str.HasPrefix(s, "[") {
+            return "array"
+        }
+        
+        if str.HasPrefix(s, "{") {
+            return "object"
+        }
+        
+        if str.HasPrefix(s, "\"") {
+            return "string"
+        }
+        return "other"
+    } catch {
+        return "other"
+    }
+}
+
+func _normalizeProductInput(sli) {
+    if _jsonKind(sli) != "array" {
+        return []
+    }
+    normalized = make([]any, 0, len(sli))
+    for _, row = range sli {
+        if _jsonKind(row) == "array" {
+            normalized = append(normalized, row)
+        } else {
+            normalized = append(normalized, [row])
+        }
+    }
+    return normalized
+}
+
 func Product(sli) {
+    sli = _normalizeProductInput(sli)
     if len(sli) == 0 {
         return sli
     }
@@ -274,7 +315,8 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
         }
         if len(replacedTmp) == 0 {
             replacedTmp.Append({"key": "", "kind": "", "value": ""})
-            emptyResults.Append({"key": "", "kind": "", "value": ""})
+            replaceResults.Append(replacedTmp)
+            emptyResults.Append([{"key": "", "kind": "", "value": ""}])
         } else {
             replaceResults.Append(replacedTmp)
             emptyResults.Append(emptyTmp)
