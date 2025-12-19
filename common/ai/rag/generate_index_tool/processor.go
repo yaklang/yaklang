@@ -6,6 +6,7 @@ import (
 
 	_ "embed"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
 )
@@ -72,4 +73,50 @@ func NewSimpleContentProcessor() *SimpleContentProcessor {
 // ProcessContent 简单处理内容（直接返回原内容）
 func (p *SimpleContentProcessor) ProcessContent(ctx context.Context, rawContent string) (string, error) {
 	return rawContent, nil
+}
+
+// DefaultAIContentProcessor 默认AI内容处理器，使用 aicommon.InvokeLiteForge，不依赖外部注入
+type DefaultAIContentProcessor struct {
+	prompt string
+}
+
+// NewDefaultAIContentProcessor 创建默认AI内容处理器
+func NewDefaultAIContentProcessor(customPrompt ...string) *DefaultAIContentProcessor {
+	prompt := defaultProcessPrompt
+	if len(customPrompt) > 0 && customPrompt[0] != "" {
+		prompt = customPrompt[0]
+	}
+
+	return &DefaultAIContentProcessor{
+		prompt: prompt,
+	}
+}
+
+// ProcessContent 处理原始内容，返回清洗后的内容
+func (p *DefaultAIContentProcessor) ProcessContent(ctx context.Context, rawContent string) (string, error) {
+	// 构建输入 prompt
+	inputPrompt := fmt.Sprintf("%s\n\n内容: %s", p.prompt, rawContent)
+
+	// 使用 aicommon.InvokeLiteForge 执行，参考 enhancesearch/enhance.go 的用法
+	result, err := aicommon.InvokeLiteForge(
+		inputPrompt,
+		aicommon.WithContext(ctx),
+		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
+			aitool.WithStringParam("language", aitool.WithParam_Required(true), aitool.WithParam_Description("语言，固定为chinese")),
+			aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("内容功能描述")),
+			aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
+		),
+	)
+	if err != nil {
+		return "", fmt.Errorf("invoke liteforge failed: %w", err)
+	}
+
+	// 提取结果
+	description := result.GetString("description")
+	keywords := result.GetStringSlice("keywords")
+
+	// 组合描述和关键词作为处理后的内容
+	processedContent := fmt.Sprintf("描述: %s\n关键词: %v", description, keywords)
+
+	return processedContent, nil
 }

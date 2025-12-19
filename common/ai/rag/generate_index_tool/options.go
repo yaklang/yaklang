@@ -83,6 +83,13 @@ func WithAIProcessor(liteForge contracts.LiteForge, customPrompt ...string) Opti
 	}
 }
 
+// WithDefaultAIProcessor 使用默认AI处理器（不需要外部依赖注入）
+func WithDefaultAIProcessor(customPrompt ...string) OptionFunc {
+	return func(opts *IndexOptions) {
+		opts.ContentProcessor = NewDefaultAIContentProcessor(customPrompt...)
+	}
+}
+
 // WithTempCacheDir 使用临时目录作为缓存目录
 func WithTempCacheDir() OptionFunc {
 	return func(opts *IndexOptions) {
