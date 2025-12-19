@@ -11,8 +11,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/schema"
+
+	// import aireact to register NewReAct factory
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 )
 
 // TestNewAIEngine 测试创建 AI 引擎的基本功能
@@ -181,7 +183,7 @@ func TestAIEngineEventHandling(t *testing.T) {
 		},
 		WithMaxIteration(1),
 		WithYOLOMode(),
-		WithOnEvent(func(react *aireact.ReAct, event *schema.AiOutputEvent) {
+		WithOnEvent(func(react aicommon.ReActIF, event *schema.AiOutputEvent) {
 			t.Logf("Received event: type=%s, isStream=%v", event.Type, event.IsStream)
 		}),
 	)
@@ -199,13 +201,13 @@ func TestAIEngineEventHandling(t *testing.T) {
 		},
 		WithMaxIteration(1),
 		WithYOLOMode(),
-		WithOnStream(func(react *aireact.ReAct, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Stream received: %d bytes", len(data))
 		}),
-		WithOnData(func(react *aireact.ReAct, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		WithOnData(func(react aicommon.ReActIF, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Data received: %d bytes", len(data))
 		}),
-		WithOnFinished(func(react *aireact.ReAct) {
+		WithOnFinished(func(react aicommon.ReActIF) {
 			t.Logf("Finished")
 		}),
 	)
@@ -428,14 +430,14 @@ func TestAIEngine_MockDirectAnswer(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnStream(func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			t.Logf("Stream: NodeId=%s, data=%s", NodeId, string(data))
 			if NodeId == "re-act-loop-answer-payload" {
 				streamBuffer.Write(data)
 				answerReceived = true
 			}
 		}),
-		WithOnFinished(func(react *aireact.ReAct) {
+		WithOnFinished(func(react aicommon.ReActIF) {
 			finishReceived = true
 			t.Logf("Finished")
 		}),
@@ -482,7 +484,7 @@ func TestAIEngine_MockMultipleTasks(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react *aireact.ReAct) {
+		WithOnFinished(func(react aicommon.ReActIF) {
 			taskMutex.Lock()
 			taskCount++
 			taskMutex.Unlock()
@@ -525,7 +527,7 @@ func TestAIEngine_MockWithTimeout(t *testing.T) {
 		WithContext(ctx),
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react *aireact.ReAct) {
+		WithOnFinished(func(react aicommon.ReActIF) {
 			finishReceived = true
 		}),
 	)
@@ -562,7 +564,7 @@ func TestAIEngine_MockErrorHandling(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnFinished(func(react *aireact.ReAct) {
+		WithOnFinished(func(react aicommon.ReActIF) {
 			t.Logf("Finished")
 		}),
 	)
@@ -607,7 +609,7 @@ func TestAIEngine_MockStreamData(t *testing.T) {
 		},
 		WithMaxIteration(5),
 		WithYOLOMode(),
-		WithOnStream(func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			if len(data) > 0 {
 				streamMutex.Lock()
 				streamChunks = append(streamChunks, string(data))

@@ -117,8 +117,6 @@ func InitYaklangLib() {
 	})
 }
 
-var AIEngineExports map[string]interface{}
-
 type LibFuncWithFrameType func(*yakvm.Frame) interface{}
 
 func initYaklangLib() {
@@ -352,7 +350,6 @@ func initYaklangLib() {
 	yaklang.Import("aiagent", AIAgentExport)
 
 	yaklang.Import("aim", AIEngineExports)
-	//yaklang.Import("aim", aiengine.Exports)
 
 	yaklang.Import("liteforge", aiforge.LiteForgeExport)
 	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)

@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -21,7 +20,7 @@ import (
 // 提供简化的 API 来使用 ReAct 和其他 AI 功能
 type AIEngine struct {
 	config     *AIEngineConfig
-	react      *aireact.ReAct
+	react      aicommon.ReActIF
 	outputChan chan *schema.AiOutputEvent
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -49,8 +48,8 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	// 构建 ReAct 配置选项
 	reactOptions := buildReActOptions(ctx, config, outputChan)
 
-	// 创建 ReAct 实例
-	react, err := aireact.NewReAct(reactOptions...)
+	// 创建 ReAct 实例 (using registered factory via aicommon)
+	react, err := aicommon.NewReAct(reactOptions...)
 	if err != nil {
 		cancel()
 		return nil, utils.Errorf("failed to create ReAct instance: %v", err)
@@ -82,7 +81,7 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	return engine, nil
 }
 
-func (e *AIEngine) GetReAct() *aireact.ReAct {
+func (e *AIEngine) GetReAct() aicommon.ReActIF {
 	return e.react
 }
 
@@ -393,7 +392,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	options := []aicommon.ConfigOption{
 		// 基础配置
 		aicommon.WithContext(ctx),
-		aireact.WithBuiltinTools(),
+		aicommon.WithBuiltinTools(),
 
 		// AI 服务配置
 		aicommon.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),

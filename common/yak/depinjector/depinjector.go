@@ -1,13 +1,17 @@
 package depinjector
 
 import (
-	"github.com/yaklang/yaklang/common/aiengine"
-	"github.com/yaklang/yaklang/common/yak"
+	// import aiengine to register yak.AIEngineExports via init()
+	_ "github.com/yaklang/yaklang/common/aiengine"
 
 	// import yakgrpc to register mcp.NewLocalClient via init()
 	_ "github.com/yaklang/yaklang/common/yakgrpc"
 )
 
+// DependencyInject is kept for backward compatibility
+// All registrations are now done via init() functions in the respective packages:
+// - aiengine: registers yak.AIEngineExports
+// - yakgrpc: registers mcp.NewLocalClient
 func DependencyInject() {
-	yak.AIEngineExports = aiengine.Exports
+	// All registrations are now automatic via init()
 }
