@@ -6,11 +6,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/aiengine"
 	aidmock "github.com/yaklang/yaklang/common/aiengine/tests/aid_mock"
 	"github.com/yaklang/yaklang/common/schema"
 	"gotest.tools/v3/assert"
+
+	// import aireact to register NewReAct factory
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 )
 
 // hello world test
@@ -18,7 +20,7 @@ func TestHelloWorld(t *testing.T) {
 	aiCallBack := aidmock.HelloWorldScenario.GetAICallbackType()
 
 	aiRsp := ""
-	engine := newTestAIEngine(t, aiCallBack, aiengine.WithOnStream(func(react *aireact.ReAct, event *schema.AiOutputEvent, NodeId string, data []byte) {
+	engine := newTestAIEngine(t, aiCallBack, aiengine.WithOnStream(func(react aicommon.ReActIF, event *schema.AiOutputEvent, NodeId string, data []byte) {
 		if NodeId == "re-act-loop-answer-payload" {
 			aiRsp += string(data)
 		}
