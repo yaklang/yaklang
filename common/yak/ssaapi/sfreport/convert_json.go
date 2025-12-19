@@ -200,10 +200,36 @@ func (r *Report) FirstOrCreateFileByHash(irSourceHash string) (*File, bool) {
 type ImportSSARiskOption func(*ImportSSARiskManager)
 
 type ImportSSARiskManager struct {
-	programName string
-	db          *gorm.DB
-	ctx         context.Context
-	callback    func(string, float64)
+	programName  string
+	db           *gorm.DB
+	ctx          context.Context
+	callback     func(string, float64)
+	saveDataFlow bool
+	saveFile     bool
+
+	saveRiskToCustomDb func(db *gorm.DB, risk *Risk, programName string) (riskHash string, err error)
+}
+
+func WithSaveDataFlow(saveDataFlow bool) ImportSSARiskOption {
+	return func(importManager *ImportSSARiskManager) {
+		importManager.saveDataFlow = saveDataFlow
+	}
+}
+
+func WithSaveFile(saveFile bool) ImportSSARiskOption {
+	return func(importManager *ImportSSARiskManager) {
+		importManager.saveFile = saveFile
+	}
+}
+
+func WithSaveRiskToCustomDb(saveRiskToCustomDb func(
+	db *gorm.DB,
+	risk *Risk,
+	programName string,
+) (riskHash string, err error)) ImportSSARiskOption {
+	return func(importManager *ImportSSARiskManager) {
+		importManager.saveRiskToCustomDb = saveRiskToCustomDb
+	}
 }
 
 func WithDB(db *gorm.DB) ImportSSARiskOption {
@@ -262,26 +288,32 @@ func ImportSSARiskFromJSON(
 	jsonData []byte,
 	callBacks ...func(string, float64),
 ) error {
-	var report *Report
-	if err := json.Unmarshal(jsonData, &report); err != nil {
-		return utils.Wrapf(err, "failed to parse JSON data")
-	}
-
 	opts := []ImportSSARiskOption{
 		WithDB(db),
 		WithContext(ctx),
-		WithProgramName(report.ProgramName),
+		WithSaveFile(true),
+		WithSaveDataFlow(true),
 	}
 	if len(callBacks) > 0 {
 		opts = append(opts, WithCallback(callBacks[0]))
 	}
-
 	manager := NewImportSSARiskManager(opts...)
+	return manager.SaveToDB(jsonData)
+	return nil
+}
 
-	if err := manager.importRisksFromReport(report, manager.subProgressCallback(0, 0.5)); err != nil {
+func (m *ImportSSARiskManager) SaveToDB(jsonData []byte) error {
+	var report *Report
+	if err := json.Unmarshal(jsonData, &report); err != nil {
+		return utils.Wrapf(err, "failed to parse JSON data")
+	}
+	if m.programName == "" {
+		m.programName = report.ProgramName
+	}
+	if err := m.importRisksFromReport(report, m.subProgressCallback(0, 0.5)); err != nil {
 		return err
 	}
-	if err := manager.importFilesFromReport(report, manager.subProgressCallback(0.5, 1)); err != nil {
+	if err := m.importFilesFromReport(report, m.subProgressCallback(0.5, 1)); err != nil {
 		return err
 	}
 	return nil
@@ -303,11 +335,34 @@ func (m *ImportSSARiskManager) importRisksFromReport(report *Report, cb func(str
 		default:
 		}
 		count++
-		if err := risk.SaveToDB(m.db); err != nil {
+		progress := float64(count) / float64(total)
+
+		var (
+			riskHash string
+			err      error
+		)
+
+		if m.saveRiskToCustomDb != nil {
+			riskHash, err = m.saveRiskToCustomDb(m.db, risk, m.programName)
+		} else {
+			riskHash, err = risk.SaveToDB(m.db)
+		}
+
+		if err != nil {
 			log.Errorf("Import SSARisk from JSON failed: %v", err)
+			if cb != nil {
+				cb(fmt.Sprintf("Import SSARisk from JSON failed: risk ID :%d ", risk.ID), progress)
+			}
+			continue
+		}
+		// save dataflow
+		if m.saveDataFlow {
+			saver := newSaveDataFlowCtx(m.db, riskHash)
+			for _, dataFlowPath := range risk.DataFlowPaths {
+				saver.SaveDataFlow(dataFlowPath)
+			}
 		}
 		if cb != nil {
-			progress := float64(count) / float64(total)
 			cb(fmt.Sprintf("Importing risk %d/%d", count, total), progress)
 		}
 	}
@@ -315,7 +370,7 @@ func (m *ImportSSARiskManager) importRisksFromReport(report *Report, cb func(str
 }
 
 func (m *ImportSSARiskManager) importFilesFromReport(report *Report, cb func(string, float64)) error {
-	if len(report.File) == 0 {
+	if len(report.File) == 0 || !m.saveFile {
 		if cb != nil {
 			cb("No files to import", 1)
 		}
