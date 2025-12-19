@@ -3,7 +3,7 @@
     "verbose_name": "根据SSA Risk智能生成POC",
 	"description": "通过接收一个SSA RiskID，智能分析风险信息、评估POC生成可行性、获取适当模板，最终生成可执行的Python POC代码，用于验证和演示安全漏洞",
 	"tool_keywords": "SSA风险分析,POC生成,漏洞利用,概念验证,安全测试,漏洞验证,攻击向量分析,Python POC,代码生成",
-	"tools": "poc_template_searcher,ssa-risk,call_yak_plugin,bash,grep,find_file,read_file_chunk,read_file_lines",
+	"tools": "poc_template_searcher,ssa-risk,ssa-project-info,ssa-list-files,ssa-read-file,ssa-grep,call_yak_plugin,write_file",
 	"actions": "ssa_poc_result,poc_generation_result",
 	"tags": "SSA分析,POC生成,漏洞利用,概念验证,安全测试,Python,代码生成,攻击向量"
 }

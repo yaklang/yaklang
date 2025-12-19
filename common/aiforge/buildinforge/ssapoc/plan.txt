@@ -6,23 +6,35 @@
   "tasks": [
     {
       "subtask_name": "SSA风险信息获取与分析",
-      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，查询和获取详细的SSA风险信息，包括漏洞类型、影响组件、漏洞描述、代码位置、数据流路径等关键信息，为后续POC生成提供基础数据。*不需要获取完整问题代码*"
+      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，查询和获取详细的SSA风险信息，包括漏洞类型、影响组件、漏洞描述、代码位置、数据流路径等关键信息，为后续POC生成提供基础数据。尤其需要注意获取`program_name`字段，`program_name`字段表示risk关联的程序意思是这个risk源自对这个程序的扫描 *不需要获取完整问题代码*"
+    },
+    {
+      "subtask_name": "检查项目源码可用性",
+      "subtask_goal": "使用ssa-project-info工具检查Risk关联的项目(通过上一步获取的`program_name`)是否有源码可访问。如果is_memory_mode为true或has_source_code为false，说明项目是内存模式编译的，源码不可访问，需要在后续步骤中仅依赖Risk中的CodeFragment信息。"
     },
     {
       "subtask_name": "获取SSA风险信息关联项目源码上下文信息",
       "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，获取Risk关联的风险代码上下文为后续POC生成中潜在的API路由信息（例如Java Spring风格的注解）或者POC生成所需信息做准备。重点关注代码上下文、API注解、函数签名等POC生成所需的技术细节。*需要获取完整问题代码*"
     },
     {
+      "subtask_name": "探索项目结构获取更多上下文（可选）",
+      "subtask_goal": "如果项目源码可访问(非内存模式)且需要更多上下文信息，使用ssa-list-files列出项目文件结构，使用ssa-grep搜索相关代码（如路由定义、配置文件、相关类等），使用ssa-read-file读取关键文件内容。这一步可以帮助理解完整的数据流和API结构。"
+    },
+    {
       "subtask_name": "漏洞类型分类与攻击向量分析",
-      "subtask_goal": "基于可行性评估结果，对确认可以生成POC的风险进行详细分类，识别具体的漏洞类型（如SQL注入、XSS、RCE、反序列化、文件包含、SSRF等），分析漏洞的利用原理、攻击向量、所需参数和条件。结合SSA分析结果中的数据流路径，确定POC的实现思路和技术路线。"
+      "subtask_goal": "基于可行性评估结果，对确认可以生成POC的风险进行详细分类，识别具体的漏洞类型（如SQL注入、XSS、RCE、反序列化、文件包含、SSRF等），分析漏洞的利用原理、攻击向量、所需参数和条件。结合SSA分析结果中的数据流路径，确定POC的实现思路和技术路线。这一步不要生成 Markdown 报告"
     },
     {
       "subtask_name": "Python POC模板搜索与获取",
       "subtask_goal": "使用poc_template_searcher工具根据识别的漏洞类型和攻击向量，搜索和获取相应的Python POC模板。模板包括请求构造、参数处理、响应解析、结果判断等通用代码结构，为POC生成提供代码框架参考。优先选择与目标编程语言和漏洞类型最匹配的模板。 - 不要主动输出文件， 最终的POC会嵌入到生成文档中"
     },
     {
-      "subtask_name": "目标环境与API信息分析",
-      "subtask_goal": "基于SSA风险分析结果中的代码上下文，提取目标应用的关键信息，包括：1）API端点和路由信息（从注解如@RequestMapping、@GetMapping等提取）；2）函数参数和数据类型；3）认证和授权机制；4）框架类型（如Spring、JAX-RS等）。这些信息将用于生成更精确和可执行的POC代码。- 不要主动输出文件， 最终的POC会嵌入到生成文档中"
+      "subtask_name": "目标API端点URL和参数信息分析",
+      "subtask_goal": "通过已有信息或是通过ssa相关工具你能获取项目的结构，读取漏洞所在位置的上下文代码目录结构等信息。你应该提取目标应用的关键信息，包括：1）API端点和路由信息（从注解如@RequestMapping、@GetMapping等提取），但对于某些简单的项目场景也可能是通过目录结构和文件位置直接访问，例如PHP项目没有实现路由框架的情况下直接请求对应php脚本文件即可；2）POC请求中的参数和数据类型；3）认证和授权机制，端点是否存在访问控制需要Cookie；4）框架类型（如Spring、JAX-RS等）。这些信息将用于生成更精确和可执行的POC代码。- 不要主动输出文件， 最终的POC会嵌入到生成文档中"
+    }
+    {
+      "subtask_name": "根据已有信息输出包含Python POC的MarkDown报告",
+      "subtask_goal": "基于已有信息生成包含Python POC的MarkDown报告， 这个报告无论如何都需要生成。MarkDown报告应该以文件的形式被写入到用户指定的save_path中，你应该调用工具来写文件。当生成 MarkDown 文件内容时：不要对换行符进行转义，不要使用 `\n` 形式，必须使用真实的多行文本，content 字段必须是原始 Markdown。 报告使用简体中文，对于某些专业术语可以使用对应英文单词"
     }
   ]
 }

@@ -7,19 +7,9 @@ cli.check()
 
 
 forgeHandle = func(params, opts...) {
-    yakit.StatusCard("执行进度", "正在分析生成md报告")
-    # 首先通过默认forge处理获取AI生成的结果
     res, err = __DEFAULT_FORGE_HANDLE__(params, opts...)
     if err != nil {
         return nil
     }
-    yakit.StatusCard("执行进度", "生成md报告成功")
-    dump(res)
-    result = res.Action.GetString("result")
-    unquoteRes,_ = str.Unquote(string(result))
-    fileName = "ssa-report-%s.md" % str.RandStr(8)
-    savePath = file.Join(save_path,fileName)
-    file.Save(savePath, unquoteRes != "" ? unquoteRes : str.ReplaceAll(result, `\n`, "\n"))
-    yakit.StatusCard("md报告保存路径", savePath)
-    return unquoteRes
+    return res
 }

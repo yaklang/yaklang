@@ -15,6 +15,72 @@
 - **性能问题**: 算法复杂度、数据库查询优化等
 - **维护性**: 代码重复、命名规范、注释缺失等
 
+## SSA项目源码访问工具
+
+### 数据源优先级
+这些工具会按以下优先级尝试获取源码：
+1. **数据库 (irSourceFS)**: 优先从 SSA 数据库读取已保存的源码
+2. **本地文件系统 (fallback)**: 如果数据库无源码，尝试从项目编译时的本地路径读取
+
+### 工具说明
+
+1. **ssa-risk**: 根据 SSA Risk ID 获取风险详细信息和数据流分析
+   - 参数: risk_id(必需, int), get_full_code(必需, bool)
+   - 返回字段:
+     - id, hash: 风险标识
+     - title, title_verbose, description, solution: 风险描述信息
+     - severity, risk_type, cve, cwe: 风险分类
+     - program_name: 关联的 SSA 项目名称
+     - code_source_url: 源码文件路径，格式为 `/{ProgramName}/{相对路径}`
+     - code_fragment: 问题代码片段
+     - code_range: 代码范围
+     - line: 行号
+     - function_name: 所在函数名
+     - language: 编程语言
+     - data_flow_paths: 数据流路径分析（包含从 source 到 sink 的完整路径）
+   - **注意**: get_full_code=true 时会获取完整的问题代码上下文，否则只返回代码片段
+
+2. **ssa-project-info**: 获取项目元数据，判断源码访问方式
+   - 参数: program_name(必需), show_files, max_files
+   - 返回: 项目信息、source_type(database/local_fs/none)、文件数量等
+   - **重要**: 检查 source_type 和 has_source_code 字段判断源码是否可访问
+
+3. **ssa-list-files**: 列出项目中的所有源代码文件
+   - 参数: program_name(必需), path_prefix, offset, limit
+   - 返回: 文件列表（路径、大小）、source_type
+
+4. **ssa-read-file**: 读取项目中的指定文件
+   - 参数: program_name(必需), file_path(必需), start_line, line_count
+   - 返回: 文件内容（带行号）、source_type
+
+5. **ssa-grep**: 在项目源码中搜索文本
+   - 参数: program_name(必需), pattern(必需), pattern_mode, file_pattern, context_lines, max_results
+   - 返回: 匹配结果（文件、行号、上下文）、source_type
+
+### source_type 字段说明
+- **database**: 源码从 SSA 数据库读取（最可靠）
+- **local_fs**: 源码从本地文件系统读取（依赖原始编译路径仍然存在）
+- **none**: 源码不可访问
+
+### 路径格式说明
+**重要**: ssa-risk 返回的 `code_source_url` 字段格式为 `/{ProgramName}/{相对路径}`
+
+例如：
+- code_source_url: `/DVWA(2025-12-16 11:27:47)/vulnerabilities/brute/source/low.php`
+- ProgramName: `DVWA(2025-12-16 11:27:47)`
+- 实际文件路径: `vulnerabilities/brute/source/low.php`
+
+在使用 ssa-read-file、ssa-list-files 等工具时，**file_path 和 path_prefix 参数应使用相对路径**（不包含 ProgramName 前缀）：
+- ✅ 正确: `file_path: "vulnerabilities/brute/source/low.php"`
+- ❌ 错误: `file_path: "/DVWA(2025-12-16 11:27:47)/vulnerabilities/brute/source/low.php"`
+
+### 使用流程
+1. 首先使用 ssa-risk 获取 Risk 信息，从中获取 ProgramName 和 code_source_url
+2. 从 code_source_url 中提取相对路径（移除 `/{ProgramName}/` 前缀）
+3. 使用 ssa-project-info 检查项目源码访问方式和可用性
+4. 如果 has_source_code=true，根据需要使用 ssa-list-files、ssa-read-file、ssa-grep 获取更多上下文
+5. 如果 has_source_code=false，仅依赖 Risk 中的 CodeFragment 信息
+
 ## POC生成要求
 1. **基于实际代码**: 分析API注解、路由信息(问题代码片段的路由注解等信息)、函数签名等，生成精确的POC
 2. **完整可执行**: 包含必要的导入、参数处理、错误处理等
@@ -29,8 +95,16 @@
 - **框架特征**: 识别Spring、JAX-RS等框架的特定模式
 
 ## 输出规范
-- 不要主动输出文件， 最终的POC会嵌入到生成文档中
-- 使用结构化JSON格式输出结果
+- 中间任务执行过程中你不应该输出MarkDown回答，中间任务是为最后的MarkDown生成收集必要信息
+- 任务的最终目标是输出一个MarkDown文件并将最终的POC嵌入到生成文档中
 - 成功时包含完整的POC代码、使用指南、免责声明
-- 失败时提供详细的原因分析说明给定的Risk类型无法生成实际POC
 - 强调合法合规使用
+- 当生成 MarkDown 文件内容时：
+  - 不要对换行符进行转义
+  - 不要使用 \n 形式
+  - 必须使用真实的多行文本
+  - content 字段必须是原始 Markdown
+
+## 文档输出规范
+
+只有任务明确需要生成MarkDown报告的时候才生成，其他任务一律不要生成报告
