@@ -97,9 +97,9 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk,
 	return risk, irSourceHashes
 }
 
-func (r *Risk) SaveToDB(db *gorm.DB) error {
+func (r *Risk) SaveToDB(db *gorm.DB) (string, error) {
 	if db == nil {
-		return utils.Error("Save Risk to DB failed: db is nil")
+		return "", utils.Error("Save Risk to DB failed: db is nil")
 	}
 
 	ssaRisk := &schema.SSARisk{
@@ -137,17 +137,13 @@ func (r *Risk) SaveToDB(db *gorm.DB) error {
 	}
 
 	// CreateSSARisk会在BeforeCreate修正Hash
+	// Todo:Hash是否应该被修正呢？因为Risk计算hash有ResultID，但是导出后ResultId就没有了
 	err := yakit.CreateSSARisk(db, ssaRisk)
 	if err != nil {
-		return utils.Wrapf(err, "Save Risk to DB failed")
+		return "", utils.Wrapf(err, "Save Risk to DB failed")
 	}
 
-	// save data flow paths
-	saver := newSaveDataFlowCtx(db, ssaRisk.Hash)
-	for _, dataFlowPath := range r.DataFlowPaths {
-		saver.SaveDataFlow(dataFlowPath)
-	}
-	return nil
+	return ssaRisk.Hash, nil
 }
 
 func (r *Risk) GetHash() string {
