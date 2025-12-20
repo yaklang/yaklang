@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -24,7 +25,9 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...a
 	}
 	extraOpts = append(extraOpts, aicommon.WithForgeParams(params))
 	extraOpts = append(extraOpts, opts...)
-	finalOpts := []aicommon.ConfigOption{aicommon.WithForgeName(t.Name)}
+	finalOpts := []aicommon.ConfigOption{
+		aicommon.WithForgeName(t.Name),
+	}
 	finalOpts = append(finalOpts, extraOpts...)
 	return aid.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
 }

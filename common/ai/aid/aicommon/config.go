@@ -1365,8 +1365,8 @@ func WithAppendOtherOption(opts any) ConfigOption {
 	}
 }
 
-// WithAppendPersistentMemory appends keys to PersistentMemory.
-func WithAppendPersistentMemory(keys ...string) ConfigOption {
+// WithAppendPersistentContext appends keys to PersistentMemory.
+func WithAppendPersistentContext(keys ...string) ConfigOption {
 	return func(c *Config) error {
 		if len(keys) == 0 {
 			return nil
@@ -1444,7 +1444,7 @@ func WithForgeParams(i any) ConfigOption {
 		buf.WriteString("<user_input_" + nonce + ">\n")
 		buf.WriteString(aispec.ShrinkAndSafeToFile(i))
 		buf.WriteString("\n</user_input_" + nonce + ">\n")
-		return WithAppendPersistentMemory(buf.String())(c)
+		return WithAppendPersistentContext(buf.String())(c)
 	}
 }
 

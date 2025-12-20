@@ -174,7 +174,7 @@ var AIAgentExport = map[string]any{
 	"omniSearchTool":               aicommon.WithOmniSearchTool,
 	"debugPrompt":                  aicommon.WithDebugPrompt,
 	"debug":                        aicommon.WithDebug,
-	"appendPersistentMemory":       aicommon.WithAppendPersistentMemory,
+	"appendPersistentMemory":       aicommon.WithAppendPersistentContext,
 	"timelineContentLimit":         aicommon.WithTimelineContentLimit,
 	"disableToolUse":               aicommon.WithDisableToolUse,
 	"aiAutoRetry":                  aicommon.WithAIAutoRetry,

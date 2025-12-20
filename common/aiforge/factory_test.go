@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
