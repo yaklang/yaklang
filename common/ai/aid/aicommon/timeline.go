@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"fmt"
 	"io"
@@ -244,11 +243,6 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 		value:     toolResult,
 	}
 
-	// if item dump string > perDumpContentLimit should shrink this item
-	if m.perDumpContentLimit > 0 && int64(len(item.String())) > m.perDumpContentLimit {
-		m.shrink(item)
-	}
-
 	m.pushTimelineItem(ts, toolResult.GetID(), item)
 }
 
@@ -282,10 +276,6 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 			UserExtraPrompt: userExtraPrompt,
 			Stage:           stage,
 		},
-	}
-
-	if m.perDumpContentLimit > 0 && int64(len(item.String())) > m.perDumpContentLimit {
-		m.shrink(item)
 	}
 
 	m.pushTimelineItem(ts, id, item)
@@ -726,51 +716,6 @@ func (m *Timeline) compressForSizeLimit() {
 	}()
 }
 
-func (m *Timeline) shrink(currentItem *TimelineItem) {
-	if m.ai == nil {
-		log.Error("ai is nil, memory cannot emit memory shrink")
-		return
-	}
-
-	response, err := m.ai.CallAI(NewAIRequest(m.renderSummaryPrompt(currentItem)))
-	if err != nil {
-		log.Errorf("shrink call ai failed: %v", err)
-		return
-	}
-	var r io.Reader
-	ctx := context.Background()
-	if m.config == nil {
-		r = response.GetUnboundStreamReader(false)
-	} else {
-		r = response.GetOutputStreamReader("memory-timeline", true, m.config.GetEmitter())
-		ctx = m.config.GetContext()
-	}
-	action, err := ExtractValidActionFromStream(ctx, r, "timeline-shrink")
-	if err != nil {
-		log.Errorf("extract timeline action failed: %v", err)
-		return
-	}
-	pers := action.GetString("persistent")
-	if pers == "" {
-		s, ok := m.summary.Get(currentItem.GetID())
-		if ok {
-			pers = s.Value().GetShrinkResult()
-			if pers == "" {
-				pers = s.Value().GetShrinkSimilarResult()
-			}
-		}
-	}
-	newItem := *currentItem //  copy struct
-	newItem.deleted = action.GetBool("should_drop", currentItem.deleted)
-	//newItem.ShrinkResult = pers
-	newItem.SetShrinkResult(pers)
-	if lt, ok := m.summary.Get(currentItem.GetID()); ok {
-		lt.Push(&newItem)
-	} else {
-		m.summary.Set(currentItem.GetID(), linktable.NewUnlimitedLinkTable(&newItem))
-	}
-}
-
 // MaxBatchCompressPromptSize is the maximum size (80KB) for batch compress prompt
 // This leaves room for the template overhead while keeping under 100KB total
 const MaxBatchCompressPromptSize = 80 * 1024
@@ -1041,10 +986,6 @@ func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
 			ID:   id,
 			Text: result,
 		},
-	}
-
-	if m.perDumpContentLimit > 0 && int64(len(fmtText)) > m.perDumpContentLimit {
-		m.shrink(item)
 	}
 
 	m.pushTimelineItem(ts, id, item)

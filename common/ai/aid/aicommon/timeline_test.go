@@ -182,29 +182,6 @@ func TestTimelineCompressionMethods(t *testing.T) {
 	copied := memoryTimeline.CopyReducibleTimelineWithMemory()
 	require.NotNil(t, copied)
 	require.IsType(t, &Timeline{}, copied)
-
-	// Test renderSummaryPrompt (this is called internally by shrink)
-	// We can test this indirectly by checking if shrink works
-	items := []*TimelineItem{
-		{
-			value: &aitool.ToolResult{
-				ID:          100,
-				Name:        "test",
-				Description: "test",
-				Param:       map[string]any{"test": "test"},
-				Success:     true,
-				Data:        "test",
-				Error:       "test",
-			},
-		},
-	}
-
-	// Test shrink method indirectly by setting perDumpContentLimit
-	memoryTimeline.perDumpContentLimit = 10 // Very small limit to trigger shrink
-	memoryTimeline.shrink(items[0])
-
-	// The shrink result should be set
-	require.NotEmpty(t, items[0].GetShrinkResult())
 }
 
 // TestTimelineConfigurationMethods 测试Timeline配置相关方法
@@ -225,43 +202,6 @@ func TestTimelineConfigurationMethods(t *testing.T) {
 	timelineNilMeta := NewTimeline(&mockedAI{}, nil)
 	metaInfoNil := timelineNilMeta.ExtraMetaInfo()
 	require.Equal(t, "", metaInfoNil)
-}
-
-// TestTimelineShrinkMethod 测试Timeline的shrink方法
-func TestTimelineShrinkMethod(t *testing.T) {
-	memoryTimeline := NewTimeline(&mockedAI{}, nil)
-
-	// Add an item that will be shrunk
-	memoryTimeline.PushToolResult(&aitool.ToolResult{
-		ID:          100,
-		Name:        "test",
-		Description: "test",
-		Param:       map[string]any{"test": "test"},
-		Success:     true,
-		Data:        "test",
-		Error:       "test",
-	})
-
-	// Set perDumpContentLimit to trigger shrink
-	memoryTimeline.perDumpContentLimit = 10 // Very small limit
-
-	// Call shrink (this is normally called internally)
-	items := []*TimelineItem{
-		{
-			value: &aitool.ToolResult{
-				ID:          100,
-				Name:        "test",
-				Description: "test",
-				Param:       map[string]any{"test": "test"},
-				Success:     true,
-				Data:        "test",
-				Error:       "test",
-			},
-		},
-	}
-
-	memoryTimeline.shrink(items[0])
-	require.NotEmpty(t, items[0].GetShrinkResult())
 }
 
 // TestTimelineRenderSummaryPrompt 测试renderSummaryPrompt方法
