@@ -33,8 +33,8 @@ func NewIndexManager(db *gorm.DB, ragSystem *rag.RAGSystem, collectionName strin
 		options.CacheManager = NewFileCacheManager(options.CacheDir)
 	}
 	if options.ContentProcessor == nil {
-		// 默认使用简单处理器，不使用AI
-		options.ContentProcessor = NewSimpleContentProcessor()
+		log.Warn("No ContentProcessor provided, using DummyContentProcessor")
+		options.ContentProcessor = NewDummyContentProcessor()
 	}
 	if options.BatchSize <= 0 {
 		options.BatchSize = 50

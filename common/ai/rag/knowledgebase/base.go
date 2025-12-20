@@ -13,9 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// var Simpleliteforge contracts.LiteForge
-// var Simpleliteforge contracts.LiteForge
-
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
 type KnowledgeBase struct {
 	db          *gorm.DB
