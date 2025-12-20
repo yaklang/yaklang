@@ -2,8 +2,6 @@ package generate_index_tool
 
 import (
 	"os"
-
-	"github.com/yaklang/yaklang/common/aiforge/contracts"
 )
 
 // OptionFunc 选项函数类型
@@ -66,20 +64,6 @@ func WithContentProcessor(processor ContentProcessor) OptionFunc {
 func WithCacheManager(manager CacheManager) OptionFunc {
 	return func(opts *IndexOptions) {
 		opts.CacheManager = manager
-	}
-}
-
-// WithSimpleProcessor 使用简单处理器（不使用AI）
-func WithSimpleProcessor() OptionFunc {
-	return func(opts *IndexOptions) {
-		opts.ContentProcessor = NewSimpleContentProcessor()
-	}
-}
-
-// WithAIProcessor 使用AI处理器（需要提供 LiteForge 实现）
-func WithAIProcessor(liteForge contracts.LiteForge, customPrompt ...string) OptionFunc {
-	return func(opts *IndexOptions) {
-		opts.ContentProcessor = NewAIContentProcessor(liteForge, customPrompt...)
 	}
 }
 

@@ -5,6 +5,9 @@ import (
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
+
+	_ "github.com/yaklang/yaklang/common/ai/aid"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 )
 
 // indexCommand index 命令处理函数
@@ -49,12 +52,7 @@ func indexCommand(c *cli.Context) error {
 	)
 
 	if useAI {
-		// TODO: 需要注入 LiteForge 实现
-		// opts = append(opts, generate_index_tool.WithAIProcessor(liteForgeInstance))
-		fmt.Println("警告: AI处理器需要 LiteForge 实现，当前使用简单处理器")
-		opts = append(opts, generate_index_tool.WithSimpleProcessor())
-	} else {
-		opts = append(opts, generate_index_tool.WithSimpleProcessor())
+		opts = append(opts, generate_index_tool.WithDefaultAIProcessor())
 	}
 
 	// 执行索引
