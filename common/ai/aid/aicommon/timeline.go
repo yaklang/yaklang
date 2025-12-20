@@ -42,16 +42,40 @@ type Timeline struct {
 	compressing *utils.Once
 }
 
+// MaxTimelineSaveSize is the maximum size (100KB) for timeline data when saving to database
+const MaxTimelineSaveSize = 100 * 1024
+
 func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 	if utils.IsNil(m) {
 		log.Warnf("try to save nil timeline for persistentId: %v", persistentId)
 		return
 	}
+
+	// Check and emergency compress if timeline is too large before saving
 	tlstr, err := MarshalTimeline(m)
 	if err != nil {
 		log.Warnf("save(/marshal) timeline failed: %v", err)
 		return
 	}
+
+	// If timeline is too large, perform emergency compression
+	if len(tlstr) > MaxTimelineSaveSize {
+		log.Warnf("timeline size %d exceeds max save size %d, performing emergency compression before save", len(tlstr), MaxTimelineSaveSize)
+		m.emergencyCompress(MaxTimelineSaveSize)
+
+		// Re-marshal after emergency compression
+		tlstr, err = MarshalTimeline(m)
+		if err != nil {
+			log.Warnf("save(/marshal) timeline after emergency compress failed: %v", err)
+			return
+		}
+
+		// If still too large after emergency compression, truncate and log warning
+		if len(tlstr) > MaxTimelineSaveSize {
+			log.Warnf("timeline still too large (%d) after emergency compression, will save truncated version", len(tlstr))
+		}
+	}
+
 	result := strconv.Quote(tlstr)
 	if err := yakit.UpdateAIAgentRuntimeTimelineWithPersistentId(db, persistentId, result); err != nil {
 		log.Errorf("ReAct: save timeline to db failed: %v", err)
@@ -302,13 +326,33 @@ func (m *Timeline) findCompressCountForTargetSize(targetSize int) int {
 }
 
 func (m *Timeline) batchCompressByTargetSize(targetSize int) {
-	if targetSize <= 0 || m.ai == nil {
+	if targetSize <= 0 {
+		return
+	}
+
+	// If AI is nil, use emergency compress instead
+	if m.ai == nil {
+		log.Warnf("batch compress: AI is nil, using emergency compress")
+		m.emergencyCompress(MaxTimelineSaveSize)
 		return
 	}
 
 	total := int64(m.idToTimelineItem.Len())
 	if total <= 1 {
 		return
+	}
+
+	// Check if current timeline is already too large for AI processing
+	// If so, do emergency compress first to bring it to a manageable size
+	tlstr, err := MarshalTimeline(m)
+	if err == nil && len(tlstr) > MaxTimelineSaveSize*2 {
+		log.Warnf("batch compress: timeline too large (%d), performing emergency compress first", len(tlstr))
+		m.emergencyCompress(MaxTimelineSaveSize)
+		// Recalculate total after emergency compress
+		total = int64(m.idToTimelineItem.Len())
+		if total <= 1 {
+			return
+		}
 	}
 
 	// 使用二分法找到需要压缩的项目数量，使得压缩后大小约为 targetSize
@@ -342,18 +386,21 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	nonceStr := utils.RandStringBytes(4)
 	prompt := m.renderBatchCompressPrompt(itemsToCompress, nonceStr)
 	if prompt == "" {
+		// If prompt is empty, fall back to emergency compress
+		log.Warnf("batch compress: prompt is empty, falling back to emergency compress")
+		m.emergencyCompress(MaxTimelineSaveSize)
 		return
 	}
 
 	// 调用 AI 进行批量压缩
 	var action *Action
 	var cumulativeSummary string
-	err := CallAITransaction(m.config, prompt, m.ai.CallAI, func(response *AIResponse) error {
-		var err error
-		response, err = m.ai.CallAI(NewAIRequest(prompt))
-		if err != nil {
-			log.Errorf("batch compress call ai failed: %v", err)
-			return utils.Errorf("context-shrink call ai failed: %v", err)
+	err = CallAITransaction(m.config, prompt, m.ai.CallAI, func(response *AIResponse) error {
+		var callErr error
+		response, callErr = m.ai.CallAI(NewAIRequest(prompt))
+		if callErr != nil {
+			log.Errorf("batch compress call ai failed: %v", callErr)
+			return utils.Errorf("context-shrink call ai failed: %v", callErr)
 		}
 
 		var r io.Reader
@@ -363,7 +410,8 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
 		}
 
-		action, err = ExtractActionFromStream(
+		var extractErr error
+		action, extractErr = ExtractActionFromStream(
 			m.config.GetContext(),
 			r, "timeline-reducer",
 			WithActionTagToKey("REDUCER_MEMORY", "reducer_memory"),
@@ -384,9 +432,9 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 					)
 				}),
 		)
-		if err != nil {
-			log.Errorf("extract timeline batch compress action failed: %v", err)
-			return utils.Errorf("extract timeline reducer_memory action failed: %v", err)
+		if extractErr != nil {
+			log.Errorf("extract timeline batch compress action failed: %v", extractErr)
+			return utils.Errorf("extract timeline reducer_memory action failed: %v", extractErr)
 		}
 		result := action.GetString("reducer_memory")
 		if result == "" && cumulativeSummary == "" {
@@ -497,6 +545,135 @@ func (m *Timeline) dumpSizeCheck() {
 	m.compressForSizeLimit()
 }
 
+// EmergencyCompress performs non-AI compression by removing oldest items
+// This is the public API that can be called from outside
+// Use this when timeline is too large and needs to be compressed without AI assistance
+func (m *Timeline) EmergencyCompress() {
+	m.emergencyCompress(MaxTimelineSaveSize)
+}
+
+// emergencyCompress performs non-AI compression by removing oldest items
+// This is used when timeline is too large and needs to be compressed without AI assistance
+func (m *Timeline) emergencyCompress(targetSize int) {
+	if m == nil {
+		return
+	}
+
+	// Calculate current size
+	tlstr, err := MarshalTimeline(m)
+	if err != nil {
+		log.Errorf("emergency compress: failed to marshal timeline: %v", err)
+		return
+	}
+	currentSize := len(tlstr)
+	if currentSize <= targetSize {
+		return // Already small enough
+	}
+
+	log.Warnf("emergency compress: current size %d, target size %d", currentSize, targetSize)
+
+	// Get all item IDs ordered by timestamp (oldest first)
+	var itemIDs []int64
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		itemIDs = append(itemIDs, id)
+		return true
+	})
+
+	if len(itemIDs) <= 1 {
+		log.Warnf("emergency compress: only %d items left, cannot compress further", len(itemIDs))
+		return
+	}
+
+	// Keep removing oldest items until we're under target size
+	// We need to keep at least 1 item
+	removedCount := 0
+	for len(itemIDs) > 1 && currentSize > targetSize {
+		// Remove the oldest item (first in the list)
+		oldestID := itemIDs[0]
+		itemIDs = itemIDs[1:]
+
+		// Get the item for summary before removing
+		item, ok := m.idToTimelineItem.Get(oldestID)
+		if !ok {
+			continue
+		}
+
+		// Create a brief summary of what was removed (without AI)
+		briefSummary := m.createEmergencySummary(item, oldestID)
+
+		// Remove from all maps
+		if ts, ok := m.idToTs.Get(oldestID); ok {
+			m.tsToTimelineItem.Delete(ts)
+			m.idToTs.Delete(oldestID)
+		}
+		m.idToTimelineItem.Delete(oldestID)
+		m.summary.Delete(oldestID)
+
+		// Store the emergency summary in reducers
+		if briefSummary != "" {
+			if lt, ok := m.reducers.Get(oldestID); ok {
+				lt.Push(briefSummary)
+			} else {
+				m.reducers.Set(oldestID, linktable.NewUnlimitedStringLinkTable(briefSummary))
+			}
+		}
+
+		removedCount++
+
+		// Recalculate size periodically (every 10 items for performance)
+		if removedCount%10 == 0 {
+			tlstr, err = MarshalTimeline(m)
+			if err != nil {
+				continue
+			}
+			currentSize = len(tlstr)
+		}
+	}
+
+	// Final size check
+	tlstr, _ = MarshalTimeline(m)
+	log.Infof("emergency compress completed: removed %d items, final size: %d (target: %d)", removedCount, len(tlstr), targetSize)
+}
+
+// createEmergencySummary creates a brief summary of an item without AI assistance
+func (m *Timeline) createEmergencySummary(item *TimelineItem, id int64) string {
+	if item == nil {
+		return ""
+	}
+
+	// Get timestamp
+	ts, ok := m.idToTs.Get(id)
+	if !ok {
+		return ""
+	}
+	t := time.Unix(0, ts*int64(time.Millisecond))
+	timeStr := t.Format(utils.DefaultTimeFormat3)
+
+	// Create a very brief summary based on item type
+	var summary string
+	switch v := item.value.(type) {
+	case *aitool.ToolResult:
+		if v.Success {
+			summary = fmt.Sprintf("[%s] tool:%s success", timeStr, v.Name)
+		} else {
+			summary = fmt.Sprintf("[%s] tool:%s failed", timeStr, v.Name)
+		}
+	case *UserInteraction:
+		summary = fmt.Sprintf("[%s] user-interaction stage:%v", timeStr, v.Stage)
+	case *TextTimelineItem:
+		// Truncate text to 50 chars
+		text := v.Text
+		if len(text) > 50 {
+			text = text[:47] + "..."
+		}
+		summary = fmt.Sprintf("[%s] text:%s", timeStr, text)
+	default:
+		summary = fmt.Sprintf("[%s] item removed (emergency compress)", timeStr)
+	}
+
+	return summary
+}
+
 func (m *Timeline) compressForSizeLimit() {
 	if m.ai == nil || m.totalDumpContentLimit <= 0 {
 		return
@@ -594,6 +771,10 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 	}
 }
 
+// MaxBatchCompressPromptSize is the maximum size (80KB) for batch compress prompt
+// This leaves room for the template overhead while keeping under 100KB total
+const MaxBatchCompressPromptSize = 80 * 1024
+
 //go:embed prompts/timeline/batch_compress.txt
 var timelineBatchCompress string
 
@@ -614,19 +795,51 @@ func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem, nonceStr str
 		nonce = utils.RandStringBytes(6)
 	}
 
-	// 构建要压缩的 items 字符串
+	// 构建要压缩的 items 字符串，限制总大小
 	var itemsStr strings.Builder
+	totalSize := 0
+	actualItemCount := 0
+
 	for i, item := range items {
+		itemContent := fmt.Sprintf("[%d] %s", i+1, item.String())
+
+		// Check if adding this item would exceed the limit
+		if totalSize+len(itemContent)+1 > MaxBatchCompressPromptSize {
+			log.Warnf("batch compress: truncating items at %d/%d due to size limit (%d > %d)",
+				i, len(items), totalSize+len(itemContent), MaxBatchCompressPromptSize)
+
+			// Add a notice that items were truncated
+			truncateNotice := fmt.Sprintf("\n... [%d more items truncated due to size limit] ...", len(items)-i)
+			if totalSize+len(truncateNotice) < MaxBatchCompressPromptSize {
+				itemsStr.WriteString(truncateNotice)
+			}
+			break
+		}
+
 		if i > 0 {
 			itemsStr.WriteString("\n")
+			totalSize++
 		}
-		itemsStr.WriteString(fmt.Sprintf("[%d] %s", i+1, item.String()))
+		itemsStr.WriteString(itemContent)
+		totalSize += len(itemContent)
+		actualItemCount++
+	}
+
+	if actualItemCount == 0 {
+		log.Warnf("batch compress: no items could fit within size limit, using truncated first item")
+		// Force include at least a truncated version of the first item
+		firstItem := items[0].String()
+		if len(firstItem) > MaxBatchCompressPromptSize-100 {
+			firstItem = firstItem[:MaxBatchCompressPromptSize-100] + "... [truncated]"
+		}
+		itemsStr.WriteString(fmt.Sprintf("[1] %s", firstItem))
+		actualItemCount = 1
 	}
 
 	err = ins.Execute(&buf, map[string]any{
 		"ExtraMetaInfo":   m.ExtraMetaInfo(),
 		"ItemsToCompress": itemsStr.String(),
-		"ItemCount":       len(items),
+		"ItemCount":       actualItemCount,
 		"NONCE":           nonce,
 	})
 	if err != nil {
@@ -635,6 +848,13 @@ func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem, nonceStr str
 	}
 	return buf.String()
 }
+
+// MaxSummaryPromptTimelineSize is the maximum size (60KB) for timeline content in summary prompt
+// This leaves room for Input, ExtraMetaInfo, and template overhead
+const MaxSummaryPromptTimelineSize = 60 * 1024
+
+// MaxSummaryPromptInputSize is the maximum size (30KB) for input content in summary prompt
+const MaxSummaryPromptInputSize = 30 * 1024
 
 //go:embed prompts/timeline/shrink_tool_result.txt
 var timelineSummary string
@@ -647,10 +867,29 @@ func (m *Timeline) renderSummaryPrompt(result *TimelineItem) string {
 	}
 	var buf bytes.Buffer
 	var nonce = strings.ToLower(utils.RandStringBytes(6))
+
+	// Get timeline dump and truncate if too large
+	timelineDump := m.Dump()
+	if len(timelineDump) > MaxSummaryPromptTimelineSize {
+		log.Warnf("summary prompt: timeline dump too large (%d > %d), truncating",
+			len(timelineDump), MaxSummaryPromptTimelineSize)
+		// Keep the end of timeline (more recent items are more important)
+		timelineDump = "... [earlier timeline truncated due to size] ...\n" +
+			timelineDump[len(timelineDump)-MaxSummaryPromptTimelineSize+50:]
+	}
+
+	// Get input and truncate if too large
+	inputStr := result.String()
+	if len(inputStr) > MaxSummaryPromptInputSize {
+		log.Warnf("summary prompt: input too large (%d > %d), truncating",
+			len(inputStr), MaxSummaryPromptInputSize)
+		inputStr = inputStr[:MaxSummaryPromptInputSize-50] + "\n... [content truncated due to size] ..."
+	}
+
 	err = ins.Execute(&buf, map[string]any{
 		"ExtraMetaInfo": m.ExtraMetaInfo(),
-		"Timeline":      m.Dump(),
-		"Input":         result.String(),
+		"Timeline":      timelineDump,
+		"Input":         inputStr,
 		"NONCE":         nonce,
 	})
 	if err != nil {
