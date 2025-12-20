@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand/v2"
@@ -17,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -166,6 +164,10 @@ type Config struct {
 	// Plan manager
 	AllowPlanUserInteract    bool
 	PlanUserInteractMaxCount int64
+
+	// PlanPrompt: Additional context that will be injected into the Plan phase only.
+	// This content appears once during plan initialization and does not affect subsequent task execution.
+	PlanPrompt string
 
 	// result processer
 	GenerateReport  bool
@@ -891,6 +893,24 @@ func WithAllowPlanUserInteract(v bool) ConfigOption {
 	}
 }
 
+// WithPlanPrompt sets additional context that will be injected into the Plan phase only.
+// This content appears once during plan initialization and does not affect subsequent task execution.
+// It is useful for providing planning-specific instructions or constraints.
+// The prompt is also stored in KeyValueConfig with key "plan_prompt" for loop_plan to access.
+func WithPlanPrompt(prompt string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.PlanPrompt = prompt
+		c.m.Unlock()
+		// Also set to KeyValueConfig so loop_plan can access via GetConfigString
+		c.SetConfig("plan_prompt", prompt)
+		return nil
+	}
+}
+
 func WithDisableToolsName(toolsName ...string) ConfigOption {
 	return func(c *Config) error {
 		return WithAiToolManagerOptions(buildinaitools.WithDisableTools(toolsName))(c)
@@ -1437,17 +1457,6 @@ func WithTimelineContentLimit(limit int) ConfigOption {
 	return WithTimelineLimit(limit)
 }
 
-func WithForgeParams(i any) ConfigOption {
-	return func(c *Config) error {
-		var buf bytes.Buffer
-		nonce := utils.RandStringBytes(8)
-		buf.WriteString("<user_input_" + nonce + ">\n")
-		buf.WriteString(aispec.ShrinkAndSafeToFile(i))
-		buf.WriteString("\n</user_input_" + nonce + ">\n")
-		return WithAppendPersistentContext(buf.String())(c)
-	}
-}
-
 func WithEventInputChan(ch chan *ypb.AIInputEvent) ConfigOption {
 	return func(c *Config) error {
 		if ch != nil {
@@ -1909,6 +1918,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.ContextProviderManager != nil {
 		opts = append(opts, WithContextProvider(i.ContextProviderManager))
+	}
+
+	// PlanPrompt - additional context for plan phase only
+	if i.PlanPrompt != "" {
+		opts = append(opts, WithPlanPrompt(i.PlanPrompt))
 	}
 
 	opts = append(opts, WithContext(i.Ctx))

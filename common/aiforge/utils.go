@@ -206,3 +206,36 @@ func Any2ExecParams(i any) []*ypb.ExecParamItem {
 	}
 	return params
 }
+
+func ExecParams2PromptString(params []*ypb.ExecParamItem) string {
+	var buf = new(bytes.Buffer)
+
+	var queryParams = make([]string, 0, len(params))
+	var extraParawms = make([]*ypb.ExecParamItem, 0, len(params))
+	for _, i := range params {
+		if i.Key == "query" {
+			queryParams = append(queryParams, i.Value)
+			continue
+		}
+		extraParawms = append(extraParawms, i)
+	}
+
+	for _, i := range queryParams {
+		buf.WriteString(utils.InterfaceToString(i))
+		buf.WriteString("\n")
+	}
+
+	for _, i := range extraParawms {
+		if i.Key == "" && i.Value == "" {
+			continue
+		}
+		result := utils.MustRenderTemplate(`<|PARAM_{{ .Key }}_|>
+{{.Value}}
+<|PARAM_END_{{ .Key }}_|>
+`, map[string]interface{}{"Key": i.Key, "Value": utils.InterfaceToString(i.Value)})
+		if result != "" {
+			buf.WriteString(result)
+		}
+	}
+	return buf.String()
+}
