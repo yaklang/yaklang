@@ -172,7 +172,7 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	var opts []aicommon.ConfigOption
 	_ = persistentPrompt
 	if persistentPrompt != "" {
-		opts = append(opts, aicommon.WithAppendPersistentMemory(persistentPrompt))
+		opts = append(opts, aicommon.WithAppendPersistentContext(persistentPrompt))
 	}
 
 	if len(f.Tools) > 0 {

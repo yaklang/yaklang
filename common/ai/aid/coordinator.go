@@ -43,7 +43,7 @@ func WithPromptContextProvider(provider *PromptContextProvider) aicommon.ConfigO
 			return err
 		}
 
-		if err := aicommon.WithAppendPersistentMemory(provider.PersistentMemory())(config); err != nil {
+		if err := aicommon.WithAppendPersistentContext(provider.PersistentMemory())(config); err != nil {
 			return err
 		}
 		return nil

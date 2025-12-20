@@ -203,8 +203,10 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 <|用户原始需求_{{.nonce}}|>
 {{ .UserOriginalInput }}
 <|用户原始需求_END_{{.nonce}}|>
---- 
+{{ if .AIGeneratedQuery }}---
+<|AI重写/优化后_{{.nonce}}|>
 {{ .AIGeneratedQuery }}
+<|AI重写/优化后_END_{{.nonce}}|>{{end}}
 `,
 						map[string]any{
 							"nonce":             nonce,
