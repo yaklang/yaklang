@@ -22,5 +22,10 @@
 <|USER_REQUIRE_{{ .Nonce }}|>
 {{ .UserInput }}
 <|USER_REQUIRE_END_{{ .Nonce }}|>
-
+{{ if .PlanPrompt }}
+# 规划补充说明
+<|PLAN_CONTEXT_{{ .Nonce }}|>
+{{ .PlanPrompt }}
+<|PLAN_CONTEXT_END_{{ .Nonce }}|>
+{{ end }}
 仔细分析用户需求，根据后面的 Timeline 内容或已有内容，设计合理的任务列表，确保每个任务都清晰具体，可衡量且可实现。任务之间需要有逻辑衔接，确保整体任务规划能够有效地引导后续的执行步骤。

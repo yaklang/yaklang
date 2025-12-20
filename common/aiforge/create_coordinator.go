@@ -23,11 +23,14 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...a
 	if err != nil {
 		return nil, err
 	}
-	extraOpts = append(extraOpts, aicommon.WithForgeParams(params))
-	extraOpts = append(extraOpts, opts...)
+
+	rawInput := ExecParams2PromptString(params)
 	finalOpts := []aicommon.ConfigOption{
 		aicommon.WithForgeName(t.Name),
+		aicommon.WithPlanPrompt(firstQuery),
 	}
 	finalOpts = append(finalOpts, extraOpts...)
-	return aid.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
+	finalOpts = append(finalOpts, opts...)
+
+	return aid.NewCoordinatorContext(ctx, rawInput, finalOpts...)
 }

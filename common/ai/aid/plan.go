@@ -132,6 +132,13 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		pr.cod.Emitter,
 		true,
 	)
+
+	// Set PlanPrompt to KeyValueConfig for Plan Loop to use
+	// This content appears only during plan initialization
+	if pr.cod.Config.PlanPrompt != "" {
+		pr.cod.Config.SetConfig(loop_plan.PLAN_PROMPT_KEY, pr.cod.Config.PlanPrompt)
+	}
+
 	err := pr.cod.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PLAN,
 		planTask,

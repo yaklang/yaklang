@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/consts"
@@ -15,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -474,4 +476,138 @@ LOOP:
 	}
 
 	log.Infof("✓ Test passed: Persistent content verified to not be duplicated")
+}
+
+// TestCoordinator_PlanPrompt_OnlyInPlanPhase tests that:
+// 1. PlanPrompt is added to the Config and passed to the Plan Loop
+// 2. PlanPrompt content appears only before EVENT_TYPE_PLAN_REVIEW_REQUIRE (Plan phase)
+// 3. PlanPrompt should NOT appear after plan is accepted (Task execution phase)
+func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
+	testNonce := utils.RandStringBytes(16)
+	planPromptMarker := "PLAN_PROMPT_UNIQUE_MARKER_" + testNonce
+	userQuery := "Test query for plan prompt " + testNonce
+
+	// Use atomic to track phase state (shared between goroutines)
+	var planReviewReceived utils.AtomicBool
+
+	// Track occurrences
+	planPromptFoundBeforePlanReview := false
+	planPromptFoundAfterPlanReview := false
+	beforePlanReviewPromptCount := 0
+	afterPlanReviewPromptCount := 0
+
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	coordinator, err := aid.NewCoordinator(
+		userQuery,
+		aicommon.WithAgreeYOLO(true),
+		aicommon.WithPlanPrompt(planPromptMarker), // Set the PlanPrompt
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			hasPlanPromptMarker := strings.Contains(prompt, planPromptMarker)
+
+			// Determine phase by checking if PLAN_REVIEW has been received
+			if !planReviewReceived.IsSet() {
+				// Before plan review - this is Plan phase
+				beforePlanReviewPromptCount++
+				if hasPlanPromptMarker {
+					planPromptFoundBeforePlanReview = true
+					log.Infof("✓ PlanPrompt marker found BEFORE plan review (prompt #%d)", beforePlanReviewPromptCount)
+				}
+			} else {
+				// After plan review - this is Task execution phase
+				afterPlanReviewPromptCount++
+				if hasPlanPromptMarker {
+					planPromptFoundAfterPlanReview = true
+					log.Warnf("✗ PlanPrompt marker found AFTER plan review (prompt #%d) - should NOT happen",
+						afterPlanReviewPromptCount)
+				}
+			}
+
+			// Check if this is Plan phase (by prompt content)
+			isPlanPhase := strings.Contains(prompt, "任务规划使命")
+
+			// Handle Plan phase - return a simple plan
+			if isPlanPhase {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(strings.NewReader(`{
+  "@action": "plan",
+  "query": "Test plan",
+  "main_task": "Test Main Task",
+  "main_task_goal": "Complete the test",
+  "tasks": [
+    {"subtask_name": "Test Step", "subtask_goal": "Execute test step"}
+  ]
+}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Default response for task execution
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Task completed"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err, "Failed to create coordinator")
+
+	go coordinator.Run()
+
+	// Wait for completion and track events
+	timeout := time.After(30 * time.Second)
+
+LOOP:
+	for {
+		select {
+		case result := <-outputChan:
+			// Track when PLAN_REVIEW_REQUIRE is received
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				log.Infof("✓ EVENT_TYPE_PLAN_REVIEW_REQUIRE received - Plan phase ends here")
+				planReviewReceived.Set()
+			}
+
+			// Check for task completion
+			if result.NodeId == "react_task_status_changed" {
+				taskResult := jsonpath.FindFirst(string(result.Content), "$..react_task_now_status")
+				status := utils.InterfaceToString(taskResult)
+				if status == "completed" || status == "failed" {
+					log.Infof("Task status: %s", status)
+					break LOOP
+				}
+			}
+			// Also check for coordinator finish
+			if strings.Contains(string(result.Content), "coordinator run finished") {
+				break LOOP
+			}
+		case <-timeout:
+			log.Warnf("Test timeout")
+			break LOOP
+		}
+	}
+
+	inputChan.Close()
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify results
+	log.Infof("Test Results:")
+	log.Infof("  Prompts before PLAN_REVIEW: %d", beforePlanReviewPromptCount)
+	log.Infof("  Prompts after PLAN_REVIEW: %d", afterPlanReviewPromptCount)
+	log.Infof("  PlanPrompt found before PLAN_REVIEW: %v", planPromptFoundBeforePlanReview)
+	log.Infof("  PlanPrompt found after PLAN_REVIEW: %v", planPromptFoundAfterPlanReview)
+
+	// Core verification: PlanPrompt should appear before PLAN_REVIEW (Plan phase)
+	require.True(t, planPromptFoundBeforePlanReview,
+		"PlanPrompt marker was NOT found before PLAN_REVIEW - the feature may not be working correctly")
+
+	// Core verification: PlanPrompt should NOT appear after PLAN_REVIEW (Task execution phase)
+	require.False(t, planPromptFoundAfterPlanReview,
+		"PlanPrompt marker was found after PLAN_REVIEW - it should only appear during Plan phase, not Task execution")
+
+	log.Infof("✓ Test passed: PlanPrompt only appears before PLAN_REVIEW (Plan phase), not after (Task execution)")
 }

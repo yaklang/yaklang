@@ -15,6 +15,7 @@ var PLAN_DATA_KEY = "plan_data"
 var PLAN_HELP_KEY = "plan_help"
 var PLAN_ENHANCE_KEY = "plan_enhance"
 var PLAN_ENHANCE_COUNT = "plan_enhance_count"
+var PLAN_PROMPT_KEY = "plan_prompt" // Additional context for plan phase only
 
 //go:embed prompts/output_example.txt
 var outputExample string
@@ -30,6 +31,7 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_PLAN,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			help := r.GetConfig().GetConfigString(PLAN_HELP_KEY)
+			planPrompt := r.GetConfig().GetConfigString(PLAN_PROMPT_KEY)
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(false),
@@ -39,8 +41,9 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(persistentInstruction, map[string]any{
-						"Nonce":     nonce,
-						"UserInput": loop.GetCurrentTask().GetUserInput(),
+						"Nonce":      nonce,
+						"UserInput":  loop.GetCurrentTask().GetUserInput(),
+						"PlanPrompt": planPrompt,
 					})
 				}),
 				reactloops.WithReflectionOutputExample(outputExample),
