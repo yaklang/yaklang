@@ -132,6 +132,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
+	var promptRefOnce sync.Once
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -187,13 +188,24 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							defaultNodeId = fieldIns.AINodeId
 						}
 
-						emitter.EmitStreamEvent(
+						event, _ := emitter.EmitStreamEvent(
 							defaultNodeId,
 							time.Now(),
 							pr,
 							resp.GetTaskIndex(),
-							func() { done() },
+							func() {
+								done()
+							},
 						)
+						// Emit prompt as reference material (only once per transaction)
+						if event != nil && prompt != "" {
+							promptRefOnce.Do(func() {
+								streamId := event.GetContentJSONPath(`$.event_writer_id`)
+								if streamId != "" {
+									emitter.EmitTextReferenceMaterial(streamId, prompt)
+								}
+							})
+						}
 					}),
 			)
 
