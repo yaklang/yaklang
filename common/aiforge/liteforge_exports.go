@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
