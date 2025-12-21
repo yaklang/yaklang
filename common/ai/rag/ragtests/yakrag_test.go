@@ -18,6 +18,11 @@ import (
 var demo string
 
 func TestRAGFromYaklang(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip github action")
+		return
+	}
+
 	yakit.LoadGlobalNetworkConfig()
 
 	filename := consts.TempFileFast(demo)
