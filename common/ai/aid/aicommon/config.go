@@ -320,6 +320,7 @@ func newConfig(ctx context.Context) *Config {
 		MaxTaskContinue:                    3,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
+		m:                                  new(sync.Mutex),
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),

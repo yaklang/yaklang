@@ -56,6 +56,7 @@ type RAGSystemConfig struct {
 	similarityThreshold      float64
 	msgCallback              func(*RAGSearchResult)
 	logReader                func(reader io.Reader)
+	logReaderWithInfo        func(reader io.Reader, info *vectorstore.SubQueryLogInfo, referenceMaterialCallback func(content string))
 	everyQueryResultCallback func(result *vectorstore.ScoredResult)
 	onQueryFinish            func([]*vectorstore.ScoredResult)
 	concurrent               int
@@ -556,7 +557,9 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 	if config.msgCallback != nil {
 		options = append(options, vectorstore.WithRAGMsgCallBack(config.msgCallback))
 	}
-	if config.logReader != nil {
+	if config.logReaderWithInfo != nil {
+		options = append(options, vectorstore.WithRAGLogReaderWithInfo(config.logReaderWithInfo))
+	} else if config.logReader != nil {
 		options = append(options, vectorstore.WithRAGLogReader(config.logReader))
 	}
 	if config.everyQueryResultCallback != nil {
@@ -712,6 +715,17 @@ func WithRAGMsgCallBack(msgCallBack func(*RAGSearchResult)) RAGSystemConfigOptio
 func WithRAGLogReader(logReader func(reader io.Reader)) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.logReader = logReader
+	}
+}
+
+// WithRAGLogReaderWithInfo sets the log reader callback with additional sub-query info.
+// The callback receives:
+// - reader: the log reader for the current sub-query
+// - info: information about the current sub-query including method, query, and results
+// - referenceMaterialCallback: call this with the reference material content after the reader is consumed
+func WithRAGLogReaderWithInfo(f func(reader io.Reader, info *vectorstore.SubQueryLogInfo, referenceMaterialCallback func(content string))) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.logReaderWithInfo = f
 	}
 }
 
