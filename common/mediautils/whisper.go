@@ -107,9 +107,13 @@ func ConvertMediaToSRT(path string) (string, error) {
 	}
 	audioPath := path
 	if isVideo {
+		// Try to extract audio from video directly
+		// If extraction fails (no audio stream, codec issues, etc.), the error will be returned
+		// and caller can decide whether to use fallback strategy
 		ffmpegRes, err := _extractAudioFromVideo(path)
 		if err != nil {
-			return "", err
+			log.Warnf("Failed to extract audio from video '%s': %v", path, err)
+			return "", utils.Errorf("extract audio from video failed: %v", err)
 		}
 		audioPath = ffmpegRes.FilePath
 	}

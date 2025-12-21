@@ -2,13 +2,13 @@ package ffmpegutils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
