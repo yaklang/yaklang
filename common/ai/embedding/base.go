@@ -168,7 +168,9 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 	if statusCode >= 400 {
 		log.Warnf("Embedding response error body: %s", utils.ShrinkString(string(body), 500))
 	} else {
-		log.Infof("Embedding response status: %d, body length: %d", statusCode, len(body))
+		if statusCode != 200 {
+			log.Infof("Embedding response status: %d, body length: %d", statusCode, len(body))
+		}
 	}
 
 	// 策略1: 首先尝试解析标准格式（一维向量 []float32）

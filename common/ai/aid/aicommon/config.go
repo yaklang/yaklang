@@ -413,6 +413,12 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+
+		// if callback is nil, use default ai.Chat
+		if cb == nil {
+			cb = AIChatToAICallbackType(ai.Chat)
+		}
+
 		oCb := cb
 		cb = c.wrapper(cb)
 		c.m.Lock()
@@ -429,6 +435,12 @@ func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+
+		// if callback is nil, use default ai.Chat with wrapper
+		if cb == nil {
+			cb = c.wrapper(AIChatToAICallbackType(ai.Chat))
+		}
+
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.QualityPriorityAICallback = cb
@@ -1764,6 +1776,12 @@ func (c *Config) SetAICallback(callback AICallbackType) {
 	if c.m == nil {
 		c.m = &sync.Mutex{}
 	}
+
+	// if callback is nil, use default ai.Chat
+	if callback == nil {
+		callback = AIChatToAICallbackType(ai.Chat)
+	}
+
 	wCb := c.wrapper(callback)
 	c.m.Lock()
 	defer c.m.Unlock()

@@ -5,6 +5,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -112,7 +113,8 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) erro
 	if err != nil {
 		return err
 	}
-	for range entries {
+	for entry := range entries {
+		log.Infof("indexed knowledge entry: %s", entry.KnowledgeTitle)
 	}
 	return nil
 }
@@ -169,6 +171,7 @@ func _listRAG() []string {
 //
 // ```
 func _deleteRAG(name string) error {
+	log.Infof("start to delete RAG system: %s", name)
 	return rag.DeleteRAG(consts.GetGormProfileDatabase(), name)
 }
 

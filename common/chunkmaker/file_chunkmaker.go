@@ -2,18 +2,26 @@ package chunkmaker
 
 import (
 	"fmt"
+	"io/fs"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"io/fs"
-	"os"
 )
 
 func NewChunkMakerFromFile(targetFile string, opts ...Option) (ChunkMaker, error) {
-	if ok, err := filesys.NewLocalFs().Exists(targetFile); err != nil {
+	localFS := filesys.NewLocalFs()
+	if ok, err := localFS.Exists(targetFile); err != nil {
 		return nil, utils.Errorf("failed to check if file[%v] exists", err)
 	} else if !ok {
 		return nil, utils.Errorf("file [%s] does not exist", targetFile)
+	}
+
+	if info, err := localFS.Stat(targetFile); err == nil && !utils.IsNil(info) {
+		if info.Size() <= 0 {
+			log.Warnf("file [%s] is empty, cannot create chunkmaker for this", targetFile)
+			return nil, utils.Errorf("file [%s] is empty", targetFile)
+		}
 	}
 
 	isText, err := utils.IsGenericTextFile(targetFile)
@@ -23,7 +31,7 @@ func NewChunkMakerFromFile(targetFile string, opts ...Option) (ChunkMaker, error
 	}
 	cfg := NewConfig(opts...)
 	if isText {
-		fp, err := os.Open(targetFile)
+		fp, err := localFS.Open(targetFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open file %s: %w", targetFile, err)
 		}
