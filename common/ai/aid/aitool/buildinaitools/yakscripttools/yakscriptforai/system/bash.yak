@@ -1,13 +1,13 @@
-__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。注意：当使用cmd类型时，路径中的反斜杠(\\)需要转义，例如应使用 C:\\\\Users 而不是 C:\\Users。"
+__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。注意：当使用cmd类型时，路径中的反斜杠(\\)需要转义，例如应使用 C:\\\\Users 而不是 C:\\Users。【重要提示】为避免命令卡住，请确保生成的命令能在合理时间内完成，对于可能长时间运行的命令（如 tail -f、watch、ping 无限循环等），请使用 timeout 命令包装或添加适当的限制参数（如 ping -c 5）。默认超时时间为60秒。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
-__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令"
+__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制"
 
 yakit.AutoInitYakit()
 
 // 解析命令行参数：超时时间、shell类型和要执行的命令
-timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the shell command, default 10, timeout cannot be zero and below"), cli.setDefault(10))
+timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the shell command, default 60. Commands exceeding this timeout will be killed. Set a reasonable value to avoid hanging. IMPORTANT: Avoid indefinite commands like 'tail -f', 'ping' without -c, 'watch', etc."), cli.setDefault(60))
 shellType := cli.String("shell", cli.setRequired(false), cli.setHelp("shell type: bash, cmd, powershell. Auto-detect if not specified (linux/mac: bash, windows: cmd)"), cli.setDefault(""))
-command := cli.String("command", cli.setRequired(true), cli.setHelp("the shell command you want to execute"))
+command := cli.String("command", cli.setRequired(true), cli.setHelp("the shell command you want to execute. IMPORTANT: Avoid commands that run indefinitely (e.g., tail -f, ping without -c, watch). For potentially long-running commands, use timeout wrapper or add limits."))
 
 cli.check()
 
@@ -31,15 +31,17 @@ if shellType == "" {
     yakit.Info("Using specified shell: %v", shellType)
 }
 
-yakit.Info("Executing %v command: %#v", shellType, command)
+yakit.Info("Executing %v command with %d seconds timeout: %#v", shellType, timeoutSeconds, command)
 
 // 验证超时参数，确保不为零或负数
 if timeoutSeconds <= 0 {
-    timeoutSeconds = 10
+    timeoutSeconds = 60
+    yakit.Info("Invalid timeout value, using default 60 seconds")
 }
 
 // 创建带超时的上下文，保护系统资源
 ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
+defer cancel()
 
 // 根据shell类型构建相应的命令执行器
 var cmd
@@ -69,8 +71,17 @@ cmd.Stderr = stderrbuf
 
 // 执行命令并处理结果
 err = cmd.Run()
+isTimeout = false
 if err != nil {
-    yakit.Error("%v command execution failed: %v", shellType, err)
+    errStr = sprint(err)
+    // 检查是否是超时导致的错误（通过错误信息判断）
+    if str.Contains(errStr, "killed") || str.Contains(errStr, "signal: killed") || str.Contains(errStr, "context deadline exceeded") {
+        isTimeout = true
+        yakit.Info("⚠️ COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
+        yakit.Info("💡 SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
+    } else {
+        yakit.Error("%v command execution failed: %v", shellType, err)
+    }
 }
 
 toUtf8 = (s)=>{
@@ -92,5 +103,9 @@ if stderrbuf.Len() > 0 {
     yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
 }
 if count <= 0 {
-    yakit.Info("No output found, %v command execution failed or output is empty", shellType)
+    if isTimeout {
+        yakit.Info("No output captured before timeout")
+    } else {
+        yakit.Info("No output found, %v command execution failed or output is empty", shellType)
+    }
 }
