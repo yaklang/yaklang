@@ -3,6 +3,9 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"os"
-	"strings"
 )
 
 //go:embed liteforge_schema/liteforge_audio.schema.json
@@ -82,6 +83,9 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)
 	srtPath, err := mediautils.ConvertMediaToSRT(audio)
 	if err != nil {
+		// Log detailed info about the failure - could be no audio stream, codec issues, etc.
+		analyzeConfig.AnalyzeLog("Cannot extract audio from file: %v", err)
+		analyzeConfig.AnalyzeLog("Possible reasons: no audio stream, unsupported codec, corrupted file, or ffmpeg/whisper configuration issues")
 		return nil, err
 	}
 	analyzeConfig.AnalyzeLog("srt file generated: %s", srtPath)
