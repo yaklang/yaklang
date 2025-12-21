@@ -30,11 +30,19 @@ func commandContext(ctx context.Context, s string) (*exec.Cmd, error) {
 		return nil, utils.Errorf("error system cmd: %v", s)
 	}
 
+	var cmd *exec.Cmd
 	if len(cmds) > 1 {
-		return exec.CommandContext(ctx, cmds[0], cmds[1:]...), nil
+		cmd = exec.CommandContext(ctx, cmds[0], cmds[1:]...)
 	} else {
-		return exec.CommandContext(ctx, cmds[0]), nil
+		cmd = exec.CommandContext(ctx, cmds[0])
 	}
+
+	// Set up process group for proper cleanup when context is cancelled.
+	// This ensures the entire process tree is killed on timeout.
+	// Implementation is platform-specific (see exec_unix.go and exec_windows.go).
+	setupProcessGroup(cmd)
+
+	return cmd, nil
 }
 
 // Command 创建一个命令结构体
