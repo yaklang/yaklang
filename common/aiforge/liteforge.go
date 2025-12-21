@@ -32,7 +32,11 @@ func init() {
 		final := &aicommon.ForgeResult{
 			Action: result.Action,
 		}
-		final.Name = result.Forge.Name
+		if !utils.IsNil(result.Forge) {
+			final.Name = result.Forge.Name
+		} else {
+			final.Name = "liteforge"
+		}
 		return final, nil
 	})
 }

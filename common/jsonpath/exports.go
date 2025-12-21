@@ -28,7 +28,7 @@ func Find(j interface{}, jpath string) interface{} {
 	var i interface{}
 	err := json.Unmarshal(raw, &i)
 	if err != nil {
-		log.Errorf("unmarshal json failed: %s", err)
+		log.Errorf("unmarshal json failed: %s, raw: %v", err, utils.ShrinkTextBlock(j, 256))
 		return nil
 	}
 	result, err := Read(i, jpath)

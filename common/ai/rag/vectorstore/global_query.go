@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -262,6 +263,16 @@ func (e *SimpleERMAnalysisResult) GenerateDotGraphWithDirection(direction string
 	return G
 }
 
+// SubQueryLogInfo contains information about a sub-query log for reference material
+type SubQueryLogInfo struct {
+	Method       string           // Query method (e.g., basic, hypothetical_answer, split_query)
+	Query        string           // The query string
+	ResultCount  int64            // Number of results found
+	Results      []*ScoredResult  // Results for this specific sub-query
+	ReaderDone   chan struct{}    // Signal when reader is fully consumed
+	ResultBuffer *strings.Builder // Buffer to collect result content for reference material
+}
+
 // CollectionQueryConfig RAG查询配置
 type CollectionQueryConfig struct {
 	Ctx                  context.Context
@@ -280,6 +291,11 @@ type CollectionQueryConfig struct {
 
 	// On Stream Reader
 	OnLogReader func(reader io.Reader)
+
+	// OnLogReaderWithInfo is an enhanced version of OnLogReader that provides additional context
+	// The callback receives the log reader and info about the current sub-query
+	// After the reader is consumed, it should call the referenceMaterialCallback with the reference material content
+	OnLogReaderWithInfo func(reader io.Reader, info *SubQueryLogInfo, referenceMaterialCallback func(content string))
 
 	RAGSimilarityThreshold   float64 // RAG相似度限制
 	EveryQueryResultCallback func(result *ScoredResult)
@@ -402,6 +418,17 @@ func WithRAGFilter(filter func(key string, getDoc func() *Document) bool) Collec
 func WithRAGLogReader(f func(reader io.Reader)) CollectionQueryOption {
 	return func(config *CollectionQueryConfig) {
 		config.OnLogReader = f
+	}
+}
+
+// WithRAGLogReaderWithInfo sets the log reader callback with additional sub-query info.
+// The callback receives:
+// - reader: the log reader for the current sub-query
+// - info: information about the current sub-query including method, query, and results
+// - referenceMaterialCallback: call this with the reference material content after the reader is consumed
+func WithRAGLogReaderWithInfo(f func(reader io.Reader, info *SubQueryLogInfo, referenceMaterialCallback func(content string))) CollectionQueryOption {
+	return func(config *CollectionQueryConfig) {
+		config.OnLogReaderWithInfo = f
 	}
 }
 
@@ -877,19 +904,45 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 			enhanceSubQuery++
 			status("强化查询", fmt.Sprint(enhanceSubQuery))
 
+			// Prepare sub-query info for reference material
+			subQueryInfo := &SubQueryLogInfo{
+				Method:       subquery.Method,
+				Query:        subquery.Query,
+				ResultBuffer: &strings.Builder{},
+				ReaderDone:   make(chan struct{}),
+			}
+			var subQueryResults []*ScoredResult
+			var subQueryResultsMutex sync.Mutex
+
 			logReader, logWriter := utils.NewPipe()
-			if config.OnLogReader != nil {
+
+			if config.OnLogReaderWithInfo != nil {
+				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Warnf("[OnLogReaderWithInfo] panic: %v", err)
+						}
+						close(subQueryInfo.ReaderDone)
+					}()
+					config.OnLogReaderWithInfo(logReader, subQueryInfo, func(content string) {
+						// This callback can be used by the caller to emit reference material
+						log.Debugf("Reference material content generated for method: %s", subquery.Method)
+					})
+				}()
+			} else if config.OnLogReader != nil {
 				go func() {
 					defer func() {
 						if err := recover(); err != nil {
 							log.Warnf("[OnLogReader] panic: %v", err)
 						}
+						close(subQueryInfo.ReaderDone)
 					}()
 					config.OnLogReader(logReader)
 				}()
 			} else {
 				go func() {
 					io.Copy(io.Discard, logReader)
+					close(subQueryInfo.ReaderDone)
 				}()
 			}
 
@@ -958,6 +1011,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 							if exist {
 								continue
 							}
+							// Collect results for this sub-query
+							subQueryResultsMutex.Lock()
+							subQueryResults = append(subQueryResults, &ScoredResult{
+								Index:       idx,
+								QueryMethod: subquery.Method,
+								QueryOrigin: subquery.Query,
+								Document:    result.Document,
+								Score:       result.Score,
+								Source:      collectionMg.GetName(),
+							})
+							subQueryResultsMutex.Unlock()
 							sendMidResult(idx, subquery.Method, subquery.Query, result.Document, result.Score, collectionMg.GetName())
 						}
 					}
@@ -965,8 +1029,40 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 				}()
 			}
 			queryWg.Wait()
+
+			// Update sub-query info with results
+			subQueryInfo.ResultCount = currentSearchCount
+			subQueryInfo.Results = subQueryResults
+
+			// Build reference material content from results
+			if len(subQueryResults) > 0 {
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("## 增强方案: %s\n\n", MethodVerboseName(subquery.Method)))
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**查询内容**: %s\n\n", subquery.Query))
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**结果数量**: %d\n\n", currentSearchCount))
+				subQueryInfo.ResultBuffer.WriteString("### 搜索结果详情:\n\n")
+				for i, result := range subQueryResults {
+					if i >= 5 { // Limit to first 5 results for reference material
+						subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("\n... 还有 %d 条结果未显示\n", len(subQueryResults)-5))
+						break
+					}
+					title := result.GetTitle()
+					if title == "" {
+						title = utils.ShrinkString(result.GetContent(), 50)
+					}
+					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f)\n", i+1, title, result.Source, result.Score))
+					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   内容摘要: %s\n\n", utils.ShrinkString(result.GetContent(), 200)))
+				}
+			}
+
 			logWriter.WriteString("\n\n查询完成，结果数：" + fmt.Sprint(currentSearchCount) + "\n")
 			logWriter.Close()
+
+			// Wait for reader to finish before proceeding (to ensure reference material callback can be used)
+			select {
+			case <-subQueryInfo.ReaderDone:
+			case <-ctx.Done():
+			}
+
 			if currentSearchCount > 0 {
 				status(subquery.Method+"结果数", fmt.Sprint(currentSearchCount))
 			}

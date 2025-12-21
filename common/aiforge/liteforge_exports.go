@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -224,11 +225,26 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		cfg.ctx = context.Background()
 	}
 
-	if ret := utils.InterfaceToString(jsonpath.FindFirst(cfg.output, "$..properties..const")); ret != cfg.action {
-		return nil, utils.Errorf("jsonschema output must have '@action' - const value '%s', lite: ..."+`.."@action": {"const": "`+cfg.action+`"}`+"..., found: %v, expect: %v", cfg.action, ret, cfg.action)
+	// When cfg.output is set via LiteForgeExecOption, validate the schema here.
+	// When schema is passed via aicommon.ConfigOption (in cfg.aidOptions), skip validation here
+	// and let ExecuteEx handle it - it will extract schema from coordinator's config.
+	if cfg.output != "" {
+		if ret := utils.InterfaceToString(jsonpath.FindFirst(cfg.output, "$..properties..const")); ret != cfg.action {
+			return nil, utils.Errorf("jsonschema output must have '@action' - const value '%s', lite: ..."+`.."@action": {"const": "`+cfg.action+`"}`+"..., found: %v, expect: %v", cfg.action, ret, cfg.action)
+		}
 	}
 
-	liteforgeIns, err := NewLiteForge(cfg.id, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output), WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
+	fmt.Println("===========================================")
+	fmt.Println("action: ", cfg.action)
+	fmt.Println("output: ", cfg.output)
+	fmt.Println("===========================================")
+
+	var liteForgeOpts []LiteForgeOption
+	liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
+	if cfg.output != "" {
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output))
+	}
+	liteforgeIns, err := NewLiteForge(cfg.id, liteForgeOpts...)
 	if err != nil {
 		return nil, utils.Errorf("new liteforge failed: %s", err)
 	}
