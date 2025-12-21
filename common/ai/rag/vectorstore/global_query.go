@@ -971,6 +971,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 							if exist {
 								continue
 							}
+							// Collect results for exact search as well
+							subQueryResultsMutex.Lock()
+							subQueryResults = append(subQueryResults, &ScoredResult{
+								Index:       idx,
+								QueryMethod: subquery.Method,
+								QueryOrigin: subquery.Query,
+								Document:    result.Document,
+								Score:       result.Score,
+								Source:      collectionMg.GetName(),
+							})
+							subQueryResultsMutex.Unlock()
 							sendMidResult(idx, subquery.Method, subquery.Query, result.Document, result.Score, collectionMg.GetName())
 						}
 					} else {
@@ -1031,20 +1042,19 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 			queryWg.Wait()
 
 			// Update sub-query info with results
-			subQueryInfo.ResultCount = currentSearchCount
 			subQueryInfo.Results = subQueryResults
 
 			// Build reference material content from results
-			if len(subQueryResults) > 0 {
+			// Use actual collected results count instead of currentSearchCount (which includes all atomic counts)
+			actualResultCount := len(subQueryResults)
+			subQueryInfo.ResultCount = int64(actualResultCount)
+
+			if actualResultCount > 0 {
 				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("## 增强方案: %s\n\n", MethodVerboseName(subquery.Method)))
 				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**查询内容**: %s\n\n", subquery.Query))
-				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**结果数量**: %d\n\n", currentSearchCount))
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**结果数量**: %d\n\n", actualResultCount))
 				subQueryInfo.ResultBuffer.WriteString("### 搜索结果详情:\n\n")
 				for i, result := range subQueryResults {
-					if i >= 5 { // Limit to first 5 results for reference material
-						subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("\n... 还有 %d 条结果未显示\n", len(subQueryResults)-5))
-						break
-					}
 					title := result.GetTitle()
 					if title == "" {
 						title = utils.ShrinkString(result.GetContent(), 50)
@@ -1052,9 +1062,15 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f)\n", i+1, title, result.Source, result.Score))
 					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   内容摘要: %s\n\n", utils.ShrinkString(result.GetContent(), 200)))
 				}
+			} else {
+				// No results found for this enhance method
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("## 增强方案: %s\n\n", MethodVerboseName(subquery.Method)))
+				subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**查询内容**: %s\n\n", subquery.Query))
+				subQueryInfo.ResultBuffer.WriteString("**结果数量**: 0\n\n")
+				subQueryInfo.ResultBuffer.WriteString("*语义搜索无法覆盖该查询内容*\n")
 			}
 
-			logWriter.WriteString("\n\n查询完成，结果数：" + fmt.Sprint(currentSearchCount) + "\n")
+			logWriter.WriteString("\n\n查询完成，结果数：" + fmt.Sprint(actualResultCount) + "\n")
 			logWriter.Close()
 
 			// Wait for reader to finish before proceeding (to ensure reference material callback can be used)
@@ -1063,8 +1079,8 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 			case <-ctx.Done():
 			}
 
-			if currentSearchCount > 0 {
-				status(subquery.Method+"结果数", fmt.Sprint(currentSearchCount))
+			if actualResultCount > 0 {
+				status(subquery.Method+"结果数", fmt.Sprint(actualResultCount))
 			}
 		}
 

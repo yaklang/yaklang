@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
@@ -26,33 +27,42 @@ func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
 					io.Copy(io.Discard, reader)
 					return
 				}
-				event, err := e.EmitTextMarkdownStreamEvent(
+
+				// Declare event pointer to capture in closure
+				var event *schema.AiOutputEvent
+				var err error
+
+				// Use finishCallback to emit reference material after stream is fully consumed
+				// At that point, ResultBuffer will be filled (before logWriter.Close())
+				event, err = e.EmitDefaultStreamEvent(
 					"enhance-query",
 					reader,
 					"",
+					func() {
+						// This callback is called after reader EOF (after logWriter.Close())
+						// At this point, ResultBuffer should be filled
+						if info.ResultBuffer != nil && info.ResultBuffer.Len() > 0 {
+							streamId := ""
+							if event != nil {
+								streamId = event.GetContentJSONPath(`$.event_writer_id`)
+							}
+							if streamId != "" {
+								_, emitErr := e.EmitTextReferenceMaterial(streamId, info.ResultBuffer.String())
+								if emitErr != nil {
+									log.Warnf("failed to emit reference material: %v", emitErr)
+								}
+							} else {
+								log.Warnf("failed to get stream id for reference material, method: %s", info.Method)
+							}
+						} else {
+							log.Debugf("no result buffer content for method: %s", info.Method)
+						}
+					},
 				)
 				if err != nil {
 					log.Warnf("failed to emit enhance-query stream event: %v", err)
 					return
 				}
-
-				// After stream is consumed, emit reference material with search results
-				go func() {
-					// Wait for reader to be fully consumed
-					<-info.ReaderDone
-					if info.ResultBuffer != nil && info.ResultBuffer.Len() > 0 {
-						streamId := ""
-						if event != nil {
-							streamId = event.GetContentJSONPath(`$.event_writer_id`)
-						}
-						if streamId != "" {
-							_, err := e.EmitTextReferenceMaterial(streamId, info.ResultBuffer.String())
-							if err != nil {
-								log.Warnf("failed to emit reference material: %v", err)
-							}
-						}
-					}
-				}()
 			}),
 		)
 		if err != nil {
@@ -79,33 +89,42 @@ func NewRagEnhanceKnowledgeManagerWithOptions(opts ...RAGSystemConfigOption) *ai
 					io.Copy(io.Discard, reader)
 					return
 				}
-				event, err := e.EmitTextMarkdownStreamEvent(
+
+				// Declare event pointer to capture in closure
+				var event *schema.AiOutputEvent
+				var err error
+
+				// Use finishCallback to emit reference material after stream is fully consumed
+				// At that point, ResultBuffer will be filled (before logWriter.Close())
+				event, err = e.EmitDefaultStreamEvent(
 					"enhance-query",
 					reader,
 					"",
+					func() {
+						// This callback is called after reader EOF (after logWriter.Close())
+						// At this point, ResultBuffer should be filled
+						if info.ResultBuffer != nil && info.ResultBuffer.Len() > 0 {
+							streamId := ""
+							if event != nil {
+								streamId = event.GetContentJSONPath(`$.event_writer_id`)
+							}
+							if streamId != "" {
+								_, emitErr := e.EmitTextReferenceMaterial(streamId, info.ResultBuffer.String())
+								if emitErr != nil {
+									log.Warnf("failed to emit reference material: %v", emitErr)
+								}
+							} else {
+								log.Warnf("failed to get stream id for reference material, method: %s", info.Method)
+							}
+						} else {
+							log.Debugf("no result buffer content for method: %s", info.Method)
+						}
+					},
 				)
 				if err != nil {
 					log.Warnf("failed to emit enhance-query stream event: %v", err)
 					return
 				}
-
-				// After stream is consumed, emit reference material with search results
-				go func() {
-					// Wait for reader to be fully consumed
-					<-info.ReaderDone
-					if info.ResultBuffer != nil && info.ResultBuffer.Len() > 0 {
-						streamId := ""
-						if event != nil {
-							streamId = event.GetContentJSONPath(`$.event_writer_id`)
-						}
-						if streamId != "" {
-							_, err := e.EmitTextReferenceMaterial(streamId, info.ResultBuffer.String())
-							if err != nil {
-								log.Warnf("failed to emit reference material: %v", err)
-							}
-						}
-					}
-				}()
 			}),
 		)
 		_, err := QueryYakitProfile(query,
