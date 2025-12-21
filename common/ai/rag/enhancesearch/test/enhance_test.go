@@ -9,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	// import aiforge to register liteforge callback via init()
+	_ "github.com/yaklang/yaklang/common/ai/aid"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact"
 	_ "github.com/yaklang/yaklang/common/aiforge"
 )
 

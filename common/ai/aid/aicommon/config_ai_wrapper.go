@@ -2,19 +2,25 @@ package aicommon
 
 import (
 	"bytes"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io"
-	"strings"
-	"time"
 )
 
 func (c *Config) wrapper(i AICallbackType) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
+		// check if callback is nil before calling
+		if i == nil {
+			return nil, utils.Error("AI callback is not set, please configure AI service first")
+		}
+
 		defer func() {
 			// set rsp start time
 			if rsp != nil && !utils.IsNil(rsp) {
@@ -101,7 +107,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				reason, _ := io.ReadAll(reasonReader)
 				output, _ := io.ReadAll(outputReader)
 				if !request.HaveSaveCheckpointCallback() {
-					
+
 					err := c.SubmitCheckpointResponse(cp, &AIResponseSimple{
 						Reason: string(reason),
 						Output: string(output),

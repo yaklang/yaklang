@@ -234,11 +234,6 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		}
 	}
 
-	fmt.Println("===========================================")
-	fmt.Println("action: ", cfg.action)
-	fmt.Println("output: ", cfg.output)
-	fmt.Println("===========================================")
-
 	var liteForgeOpts []LiteForgeOption
 	liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
 	if cfg.output != "" {
