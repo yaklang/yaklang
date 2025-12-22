@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiengine"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/totpproxy"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/netstack_exports"
@@ -366,6 +368,9 @@ func initYaklangLib() {
 	// twofa
 	yaklang.Import("twofa", twofa.Exports)
 	yaklang.Import("mfa", twofa.Exports)
+
+	// totp reverse proxy
+	yaklang.Import("totpproxy", totpproxy.Exports)
 
 	// set
 	yaklang.Import("container", container.ContainerExports)
