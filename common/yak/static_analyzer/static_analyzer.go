@@ -1,6 +1,7 @@
 package static_analyzer
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -29,7 +30,11 @@ const (
 )
 
 func YaklangScriptChecking(code, pluginType string) []*result.StaticAnalyzeResult {
-	return StaticAnalyze(code, pluginType, Analyze)
+	return StaticAnalyzeWithContext(context.Background(), code, pluginType, Analyze)
+}
+
+func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
+	return StaticAnalyzeWithContext(context.Background(), code, codeTyp, kind)
 }
 
 func init() {
@@ -38,7 +43,7 @@ func init() {
 
 // plugin type : "yak" "mitm" "port-scan" "codec" "syntaxflow"
 
-func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
+func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	var results []*result.StaticAnalyzeResult
 	addSourceCodeError := func(errs antlr4util.SourceCodeErrors) {
 		for _, e := range errs {
@@ -54,10 +59,15 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 		}
 	}
 
-	// 创建性能记录器
+	select {
+	case <-ctx.Done():
+		log.Info("Static analysis cancelled before start")
+		return results
+	default:
+	}
+
 	perfRecorder := diagnostics.NewRecorder()
 	defer func() {
-		// 输出性能表格
 		snapshots := perfRecorder.Snapshot()
 		if len(snapshots) > 0 {
 			table := diagnostics.FormatPerformanceTable("Static Analysis Performance", snapshots)
@@ -76,6 +86,13 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 		yaklangDuration := time.Since(yaklangStart)
 		perfRecorder.RecordDuration("Yaklang StaticAnalyze", yaklangDuration)
 
+		select {
+		case <-ctx.Done():
+			log.Info("Static analysis cancelled after Yaklang compile")
+			return results
+		default:
+		}
+
 		if err != nil {
 			switch ret := err.(type) {
 			case antlr4util.SourceCodeErrors:
@@ -85,22 +102,31 @@ func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.Stati
 			}
 		}
 
-		// SSA 编译
-		ssaStart := time.Now()
-		prog, err := SSAParse(code, codeTyp)
-		ssaDuration := time.Since(ssaStart)
-		perfRecorder.RecordDuration("SSA Compile", ssaDuration)
+		prog, err := SSAParseWithPerf(code, codeTyp, perfRecorder)
+
+		select {
+		case <-ctx.Done():
+			log.Info("Static analysis cancelled after SSA compile")
+			return results
+		default:
+		}
 
 		if err != nil {
 			log.Error("SSA 解析失败：", err)
 			return results
 		}
 
-		// 规则检查
 		ruleStart := time.Now()
 		results = append(results, checkRules(codeTyp, prog, kind).Get()...)
 		ruleDuration := time.Since(ruleStart)
 		perfRecorder.RecordDuration("Rule Check", ruleDuration)
+
+		select {
+		case <-ctx.Done():
+			log.Info("Static analysis cancelled after rule check")
+			return results
+		default:
+		}
 
 		errs := prog.GetErrors()
 		for _, err := range errs {
@@ -170,7 +196,27 @@ func checkRules(plugin string, prog *ssaapi.Program, kind StaticAnalyzeKind) *re
 
 func SSAParse(code, scriptType string, o ...ssaconfig.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
-	opt = append(opt, ssaapi.WithEnableCache())
+	opt = append(opt, ssaapi.WithEnableCache(true))
 	opt = append(opt, o...)
+	return ssaapi.Parse(code, opt...)
+}
+
+// SSAParseWithPerf 带性能记录的 SSA 解析
+func SSAParseWithPerf(code, scriptType string, perfRecorder *diagnostics.Recorder, o ...ssaconfig.Option) (*ssaapi.Program, error) {
+	opt := GetPluginSSAOpt(scriptType)
+	opt = append(opt, ssaapi.WithEnableCache(true))
+	opt = append(opt, o...)
+
+	// 如果提供了性能记录器，启用 diagnostics 并设置记录器
+	if perfRecorder != nil {
+		opt = append(opt, ssaapi.WithDiagnostics(true))
+		// 创建一个选项来设置性能记录器，使用 ssaconfig.SetOption 创建接收 *Config 的选项
+		setPerfRecorderOpt := ssaconfig.SetOption("ssa_compile/perf_recorder", func(c *ssaapi.Config, rec *diagnostics.Recorder) {
+			c.SetDiagnosticsRecorder(rec)
+		})
+		opt = append(opt, setPerfRecorderOpt(perfRecorder))
+	}
+
+	// 使用公开的 Parse 方法
 	return ssaapi.Parse(code, opt...)
 }

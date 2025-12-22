@@ -1,6 +1,8 @@
 package yak
 
 import (
+	"context"
+
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
@@ -8,12 +10,14 @@ import (
 type StaticAnalyzeConfig struct {
 	kind       static_analyzer.StaticAnalyzeKind
 	pluginType string
+	ctx        context.Context
 }
 
 func NewStaticAnalyzeConfig() *StaticAnalyzeConfig {
 	return &StaticAnalyzeConfig{
 		kind:       static_analyzer.Analyze,
 		pluginType: "yak",
+		ctx:        context.Background(),
 	}
 }
 
@@ -37,10 +41,16 @@ func WithStaticAnalyzePluginType(typ string) StaticAnalyzeOption {
 	}
 }
 
+func WithStaticAnalyzeContext(ctx context.Context) StaticAnalyzeOption {
+	return func(c *StaticAnalyzeConfig) {
+		c.ctx = ctx
+	}
+}
+
 func StaticAnalyze(code string, opts ...StaticAnalyzeOption) []*result.StaticAnalyzeResult {
 	config := NewStaticAnalyzeConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-	return static_analyzer.StaticAnalyze(code, config.pluginType, config.kind)
+	return static_analyzer.StaticAnalyzeWithContext(config.ctx, code, config.pluginType, config.kind)
 }
