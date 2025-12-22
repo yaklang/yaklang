@@ -174,8 +174,26 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 	}
 
 	// directDeclarator: '(' declarator ')'
+	// 注意：这里直接处理内部的 declarator，避免通过 buildDeclarator 的完整流程
+	// 因为 buildDeclarator 会调用 buildDirectDeclarator，形成循环
 	if d := ast.Declarator(); d != nil {
-		return b.buildDeclarator(d.(*cparser.DeclaratorContext))
+		declCtx := d.(*cparser.DeclaratorContext)
+		// 先处理内部的 directDeclarator
+		var variable *ssa.Variable
+		var value ssa.Value
+		var types ssa.Types
+		if innerDirect := declCtx.DirectDeclarator(); innerDirect != nil {
+			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kinds...)
+		}
+		// 然后应用指针修饰符（如果有）
+		if p := declCtx.Pointer(); p != nil {
+			b.applyPointerModifiers(p.(*cparser.PointerContext), value)
+		}
+		// 处理 gccDeclaratorExtension
+		for _, g := range declCtx.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		return variable, value, types
 	}
 
 	// directDeclarator: directDeclarator '[' ... ']'
@@ -186,8 +204,8 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		// 3. directDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
 		// 4. directDeclarator '[' typeQualifierList? '*' ']'
 
-		if a := ast.AssignmentExpression(); a != nil {
-			base = b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+		if a := ast.Expression(); a != nil {
+			base, _ = b.buildExpression(a.(*cparser.ExpressionContext), false)
 		}
 		variable, index, _ := b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
 		if c1, ok := ssa.ToConstInst(index); ok {
@@ -244,30 +262,96 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 	}
 
 	// directDeclarator: '(' vcSpecificModifer declarator ')'
+	// 注意：这里直接处理内部的 declarator，避免通过 buildDeclarator 的完整流程
 	if vcm := ast.VcSpecificModifer(); vcm != nil && ast.Declarator() != nil {
 		b.buildVcSpecificModifer(vcm.(*cparser.VcSpecificModiferContext))
-		return b.buildDeclarator(ast.Declarator().(*cparser.DeclaratorContext))
+		declCtx := ast.Declarator().(*cparser.DeclaratorContext)
+		// 先处理内部的 directDeclarator
+		var variable *ssa.Variable
+		var value ssa.Value
+		var types ssa.Types
+		if innerDirect := declCtx.DirectDeclarator(); innerDirect != nil {
+			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kinds...)
+		}
+		// 然后应用指针修饰符（如果有）
+		if p := declCtx.Pointer(); p != nil {
+			b.applyPointerModifiers(p.(*cparser.PointerContext), value)
+		}
+		// 处理 gccDeclaratorExtension
+		for _, g := range declCtx.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		return variable, value, types
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
 	return b.CreateVariable(""), b.EmitConstInst(0), nil
 }
 
+// applyPointerModifiers 应用指针修饰符到类型上
+func (b *astbuilder) applyPointerModifiers(pointer *cparser.PointerContext, value ssa.Value) {
+	if pointer == nil || value == nil {
+		return
+	}
+
+	pointerParts := pointer.AllPointerPart()
+	// 对每个 pointerPart，应用指针类型
+	for _, part := range pointerParts {
+		// 处理类型限定符（如果需要）
+		if tql := part.(*cparser.PointerPartContext).TypeQualifierList(); tql != nil {
+			b.buildTypeQualifierList(tql.(*cparser.TypeQualifierListContext))
+		}
+		// 应用指针类型到 value 的类型上
+		currentType := value.GetType()
+		if currentType != nil {
+			pointerType := ssa.NewPointerType()
+			// 如果当前类型已经是指针，创建多级指针
+			if currentType.GetTypeKind() == ssa.PointerKind {
+				// 多级指针：保持为指针类型
+				value.SetType(pointerType)
+			} else {
+				// 单级指针：将基础类型包装为指针
+				pointerType.FieldType = currentType
+				value.SetType(pointerType)
+			}
+		} else {
+			// 如果没有类型，创建指针类型
+			value.SetType(ssa.NewPointerType())
+		}
+	}
+}
+
+// buildDeclaratorCore 处理声明符的核心逻辑（不含指针修饰和扩展）
+func (b *astbuilder) buildDeclaratorCore(directDeclarator *cparser.DirectDeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
+	if directDeclarator == nil {
+		return nil, nil, nil
+	}
+	return b.buildDirectDeclarator(directDeclarator, kinds...)
+}
+
+// buildDeclarator 处理完整的声明符：pointer? directDeclarator gccDeclaratorExtension*
 func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	// 先处理 directDeclarator（核心逻辑）
+	var variable *ssa.Variable
+	var value ssa.Value
+	var types ssa.Types
+
 	if d := ast.DirectDeclarator(); d != nil {
-		return b.buildDirectDeclarator(d.(*cparser.DirectDeclaratorContext), kinds...)
+		variable, value, types = b.buildDeclaratorCore(d.(*cparser.DirectDeclaratorContext), kinds...)
 	}
 
 	if p := ast.Pointer(); p != nil {
-		_ = p
+		b.applyPointerModifiers(p.(*cparser.PointerContext), value)
 	}
+
 	for _, g := range ast.AllGccDeclaratorExtension() {
 		b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
 	}
-	return b.CreateVariable(""), b.EmitConstInst(0), nil
+
+	return variable, value, types
 }
 
 func (b *astbuilder) buildVcSpecificModifer(ast *cparser.VcSpecificModiferContext) ssa.Value {
@@ -316,27 +400,120 @@ func (b *astbuilder) buildParameterDeclaration(ast *cparser.ParameterDeclaration
 	defer recoverRange()
 
 	if d := ast.DeclarationSpecifier(); d != nil {
+		var param ssa.Value
 		ssatyp := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
 		if d := ast.Declarator(); d != nil {
-			_, param, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), PARAM_KIND)
-			if ssatyp != nil && param != nil {
-				param.SetType(ssatyp)
-			}
-			return param, ssatyp
+			_, param, _ = b.buildDeclarator(d.(*cparser.DeclaratorContext), PARAM_KIND)
+			// if ssatyp != nil && param != nil {
+			// 	param.SetType(ssatyp)
+			// }
 		} else if a := ast.AbstractDeclarator(); a != nil {
-			b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext))
+			ssatyp = b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext), ssatyp)
 		}
-
+		return param, ssatyp
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
 	return b.EmitConstInst(0), ssa.CreateAnyType()
 }
 
-func (b *astbuilder) buildAbstractDeclarator(ast *cparser.AbstractDeclaratorContext) {
-	// TODO
+// buildAbstractDeclarator 应用抽象声明符到基础类型上
+// abstractDeclarator 用于描述类型而不包含变量名（如 int *, int (*)(), int [10] 等）
+func (b *astbuilder) buildAbstractDeclarator(ast *cparser.AbstractDeclaratorContext, baseType ssa.Type) ssa.Type {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
+
+	if utils.IsNil(baseType) {
+		baseType = ssa.CreateAnyType()
+	}
+
+	resultType := baseType
+
+	if p := ast.Pointer(); p != nil {
+		pointerParts := p.(*cparser.PointerContext).AllPointerPart()
+		for _, part := range pointerParts {
+			if tql := part.(*cparser.PointerPartContext).TypeQualifierList(); tql != nil {
+				b.buildTypeQualifierList(tql.(*cparser.TypeQualifierListContext))
+			}
+			pointerType := ssa.NewPointerType()
+			pointerType.FieldType = resultType
+			resultType = pointerType
+		}
+	}
+
+	// 处理 directAbstractDeclarator（数组、函数等修饰）
+	if d := ast.DirectAbstractDeclarator(); d != nil {
+		resultType = b.buildDirectAbstractDeclarator(d.(*cparser.DirectAbstractDeclaratorContext), resultType)
+	}
+
+	// 处理 gccDeclaratorExtension
+	for _, g := range ast.AllGccDeclaratorExtension() {
+		b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+	}
+
+	return resultType
+}
+
+// buildDirectAbstractDeclarator 处理直接抽象声明符（数组、函数等）
+func (b *astbuilder) buildDirectAbstractDeclarator(ast *cparser.DirectAbstractDeclaratorContext, baseType ssa.Type) ssa.Type {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	resultType := baseType
+
+	// 1. '(' abstractDeclarator ')' - 括号中的抽象声明符
+	if ast.LeftParen() != nil && ast.RightParen() != nil {
+		if a := ast.AbstractDeclarator(); a != nil {
+			resultType = b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext), resultType)
+		}
+	}
+
+	// 2. '[' ... ']' - 数组维度
+	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
+		var arraySize int64 = -1 // -1 表示未指定大小或可变长度数组
+
+		// 处理数组大小表达式
+		if a := ast.AssignmentExpression(); a != nil {
+			expr := b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+			if c, ok := ssa.ToConstInst(expr); ok {
+				if size, err := strconv.ParseInt(c.String(), 10, 64); err == nil {
+					arraySize = size
+				}
+			}
+		} else if ast.Star() != nil {
+			// '[' '*' ']' - 可变长度数组
+			arraySize = -1
+		}
+
+		// 创建数组类型（在 SSA 中，数组通常表示为 SliceType）
+		if arraySize >= 0 {
+			sliceType := ssa.NewSliceType(resultType)
+			sliceType.Len = int(arraySize)
+			resultType = sliceType
+		} else {
+			sliceType := ssa.NewSliceType(resultType)
+			resultType = sliceType
+		}
+	}
+
+	// 3. '(' parameterTypeList? ')' - 函数类型
+	if ast.LeftParen() != nil && ast.RightParen() != nil && ast.ParameterTypeList() != nil {
+		_, paramTypes := b.buildParameterTypeList(ast.ParameterTypeList().(*cparser.ParameterTypeListContext))
+		funcType := ssa.NewFunctionType("", paramTypes, resultType, false)
+		resultType = funcType
+	}
+
+	// 递归处理 directAbstractDeclarator（支持多维数组、函数指针等）
+	if d := ast.DirectAbstractDeclarator(); d != nil {
+		resultType = b.buildDirectAbstractDeclarator(d.(*cparser.DirectAbstractDeclaratorContext), resultType)
+	}
+
+	// 处理 gccDeclaratorExtension
+	for _, g := range ast.AllGccDeclaratorExtension() {
+		b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+	}
+
+	return resultType
 }
 
 func (b *astbuilder) buildGccDeclaratorExtension(ast *cparser.GccDeclaratorExtensionContext) {
@@ -431,24 +608,75 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 	defer recoverRange()
 	var ret ssa.Type
 
-	if s := ast.StorageClassSpecifier(0); s != nil {
-		// TODO
-		// ret = b.buildStorageClassSpecifier(s.(*cparser.StorageClassSpecifierContext))
-	}
-	if t := ast.TypeQualifier(0); t != nil {
-		// TODO
-		// ret = b.buildTypeQualifier(t.(*cparser.TypeQualifierContext))
-	}
-	if f := ast.FunctionSpecifier(0); f != nil {
-		// TODO
-		// ret = b.buildFunctionSpecifier(f.(*cparser.FunctionSpecifierContext))
+	// log.Infof("exp = %s\n", ast.GetText())
+
+	// 处理 alignmentSpecifier (优先级最高，如果存在则直接返回)
+	if a := ast.AlignmentSpecifier(); a != nil {
+		return b.buildAlignmentSpecifier(a.(*cparser.AlignmentSpecifierContext))
 	}
 
+	// 处理 storageClassSpecifier (存储类说明符，如 static, extern 等)
+	for _, s := range ast.AllStorageClassSpecifier() {
+		_ = b.buildStorageClassSpecifier(s.(*cparser.StorageClassSpecifierContext))
+		// 存储类说明符不影响类型，只影响存储方式
+	}
+
+	// 处理 typeQualifier (类型限定符，如 const, volatile 等)
+	for _, tq := range ast.AllTypeQualifier() {
+		_ = b.buildTypeQualifier(tq.(*cparser.TypeQualifierContext))
+		// 类型限定符不影响基础类型，只影响类型属性
+	}
+
+	// 处理 functionSpecifier (函数说明符，如 inline 等)
+	for _, f := range ast.AllFunctionSpecifier() {
+		_ = b.buildFunctionSpecifier(f.(*cparser.FunctionSpecifierContext))
+		// 函数说明符不影响类型
+	}
+
+	// 处理 structOrUnion (可选的 struct 或 union 关键字)
+	if so := ast.StructOrUnion(); so != nil {
+		// structOrUnion 通常与 typeSpecifier 一起使用，这里只记录
+		_ = so
+	}
+
+	// 处理 typeSpecifier 或 Identifier
 	if ts := ast.TypeSpecifier(); ts != nil {
 		ret = b.buildTypeSpecifier(ts.(*cparser.TypeSpecifierContext))
-		// if tq := ast.TypeQualifier(); tq != nil {
-		// 	ret = b.buildTypeQualifier(tq.(*cparser.TypeQualifierContext))
-		// }
+	} else if id := ast.Identifier(); id != nil {
+		// Identifier 可能是 typedef 定义的类型名
+		name := id.GetText()
+		if bp := b.GetBluePrint(name); bp != nil {
+			container := bp.Container()
+			ret = container.GetType()
+		} else {
+			// 如果找不到 typedef，尝试从特殊类型中查找
+			if ssatyp := ssa.GetTypeByStr(name); ssatyp != nil {
+				ret = ssatyp
+			} else {
+				ret = ssa.CreateAnyType()
+			}
+		}
+	}
+
+	// 处理多个 '*' (指针)
+	// 根据语法: '*'* 表示可以有多个星号
+	starCount := len(ast.AllStar())
+	for i := 0; i < starCount; i++ {
+		if ret == nil {
+			ret = ssa.CreateAnyType()
+		}
+		// 应用指针类型
+		pointerType := ssa.NewPointerType()
+		// 如果当前类型已经是指针，创建多级指针
+		if ret.GetTypeKind() == ssa.PointerKind {
+			// 多级指针：保持为指针类型
+			pointerType.FieldType = ret
+			ret = pointerType
+		} else {
+			// 单级指针：将基础类型包装为指针
+			pointerType.FieldType = ret
+			ret = pointerType
+		}
 	}
 
 	if ret == nil {
@@ -467,6 +695,21 @@ func (b *astbuilder) buildAlignmentSpecifier(ast *cparser.AlignmentSpecifierCont
 	return ssa.CreateAnyType()
 }
 
+func (b *astbuilder) buildTypeNameByValue(ast *cparser.TypeNameContext) ssa.Value {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var value ssa.Value
+	if t := ast.TypeName(); t != nil {
+		value = b.buildTypeNameByValue(t.(*cparser.TypeNameContext))
+	} else {
+		text := ast.GetText()
+		value = b.PeekValue(text)
+	}
+
+	return value
+}
+
 func (b *astbuilder) buildTypeName(ast *cparser.TypeNameContext) ssa.Type {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
@@ -474,10 +717,14 @@ func (b *astbuilder) buildTypeName(ast *cparser.TypeNameContext) ssa.Type {
 	if s := ast.SpecifierQualifierList(); s != nil {
 		ssatype := b.buildSpecifierQualifierList(s.(*cparser.SpecifierQualifierListContext))
 		if a := ast.AbstractDeclarator(); a != nil {
-			_ = a
+			// 应用抽象声明符到基础类型（如 int * -> 指针类型）
+			ssatype = b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext), ssatype)
 		}
 		return ssatype
 	}
+
+	// if t := ast.TypeName(); t != nil {
+	// }
 
 	return ssa.CreateAnyType()
 }
@@ -541,9 +788,41 @@ func (b *astbuilder) buildEnumSpecifier(ast *cparser.EnumSpecifierContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	// TODO
+	// 处理枚举标识符（如果有）
+	var enumName string
+	if id := ast.Identifier(); id != nil {
+		enumName = id.GetText()
+	}
+
+	// 处理枚举列表
 	if e := ast.EnumeratorList(); e != nil {
+		// 创建枚举类型（在 C 中，枚举类型通常被视为 int 类型）
+		enumType := ssa.CreateNumberType()
+
+		// 如果有枚举名称，创建类型蓝图并注册
+		if enumName != "" {
+			bp := b.CreateBlueprintAndSetConstruct(enumName)
+			c := bp.Container()
+			c.SetType(enumType)
+			// 注册到导出类型
+			b.GetProgram().SetExportType(enumName, enumType)
+		}
+
+		// 构建枚举列表，跟踪当前值以便自动递增
 		b.buildEnumeratorList(e.(*cparser.EnumeratorListContext))
+	} else if enumName != "" {
+		// 情况 2: 'enum' Identifier - 引用已存在的枚举类型
+		if bp := b.GetBluePrint(enumName); bp != nil {
+			container := bp.Container()
+			_ = container.GetType()
+		} else {
+			// 如果找不到，创建一个新的枚举类型
+			enumType := ssa.CreateNumberType()
+			bp := b.CreateBlueprintAndSetConstruct(enumName)
+			c := bp.Container()
+			c.SetType(enumType)
+			b.GetProgram().SetExportType(enumName, enumType)
+		}
 	}
 }
 
@@ -551,21 +830,59 @@ func (b *astbuilder) buildEnumeratorList(ast *cparser.EnumeratorListContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	// 跟踪当前枚举值，用于自动递增
+	currentValue := int64(0)
+
 	for _, e := range ast.AllEnumerator() {
-		b.buildEnumerator(e.(*cparser.EnumeratorContext))
+		value := b.buildEnumerator(e.(*cparser.EnumeratorContext), currentValue)
+		// 更新当前值：如果有显式值，使用该值；否则使用当前值
+		if value != nil {
+			if c, ok := ssa.ToConstInst(value); ok {
+				if intVal, err := strconv.ParseInt(c.String(), 10, 64); err == nil {
+					currentValue = intVal + 1
+				} else {
+					currentValue++
+				}
+			} else {
+				currentValue++
+			}
+		} else {
+			currentValue++
+		}
 	}
 }
 
-func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext) {
+func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext, defaultValue int64) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if id := ast.Identifier(); id != nil {
+		enumName := id.GetText()
+		var enumValue ssa.Value
+
+		// 处理显式值或使用默认值
 		if e := ast.Expression(); e != nil {
-			right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
-			b.addSpecialValue(id.GetText(), right)
+			// 有显式值
+			enumValue, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
+			if enumValue == nil {
+				enumValue = b.EmitConstInst(defaultValue)
+			}
+		} else {
+			// 没有显式值，使用默认值（自动递增）
+			enumValue = b.EmitConstInst(defaultValue)
 		}
+
+		// 确保值是整数类型
+		if enumValue != nil {
+			enumValue.SetType(ssa.CreateNumberType())
+			// 将枚举常量添加到特殊值中，使其可以作为常量使用
+			b.addSpecialValue(enumName, enumValue)
+		}
+
+		return enumValue
 	}
+
+	return nil
 }
 
 func (b *astbuilder) buildStructOrUnionSpecifier(ast *cparser.StructOrUnionSpecifierContext) ssa.Type {

@@ -27,6 +27,10 @@ func (v *BaseCParserVisitor) VisitPostfixExpression(ctx *PostfixExpressionContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitPostfixExpressionLvalue(ctx *PostfixExpressionLvalueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitArgumentExpressionList(ctx *ArgumentExpressionListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -52,6 +56,10 @@ func (v *BaseCParserVisitor) VisitExpressionList(ctx *ExpressionListContext) int
 }
 
 func (v *BaseCParserVisitor) VisitStatementsExpression(ctx *StatementsExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitLeftExpression(ctx *LeftExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -176,6 +184,10 @@ func (v *BaseCParserVisitor) VisitGccAttribute(ctx *GccAttributeContext) interfa
 }
 
 func (v *BaseCParserVisitor) VisitPointer(ctx *PointerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitPointerPart(ctx *PointerPartContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

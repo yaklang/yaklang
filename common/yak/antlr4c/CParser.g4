@@ -1,43 +1,53 @@
 /*
- [The "BSD licence"]
- Copyright (c) 2013 Sam Harwell
- All rights reserved.
+ [The "BSD licence"] Copyright (c) 2013 Sam Harwell All rights reserved.
  
- Redistribution and
- use
- in source and binary forms, with or without
- modification, are permitted provided that the
- following conditions
- are met:
- 1. Redistributions of source code must retain the above copyright
- notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form
- must reproduce the above copyright
- notice, this list of conditions and the following disclaimer
+ Redistribution and use
+ in source and binary forms, with or without modification, are permitted
+ provided that the
+ following conditions are met: 1. Redistributions of source code must retain the
+ above copyright
+ notice, this list of conditions and the following disclaimer. 2. Redistributions in
+ binary form
+ must reproduce the above copyright notice, this list of conditions and the following
+ disclaimer
  in
- the
- documentation and/or other materials provided with the distribution.
- 3. The name of the
- author may not be used to endorse or promote products
- derived from this software without specific
- prior written permission.
+ the documentation and/or other materials provided with the distribution. 3. The name
+ of the
+ author
+ may not be used to endorse or promote products derived from this software without
+ specific
+ prior
+ written permission.
  
- THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- OF MERCHANTABILITY AND
- FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- DIRECT, INDIRECT,
- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR
- BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY
+ EXPRESS OR
+ IMPLIED
+ WARRANTIES, INCLUDING,
+ BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND
+ FITNESS
+ FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED. IN NO EVENT SHALL THE
+ AUTHOR BE LIABLE FOR ANY
+ DIRECT,
+ INDIRECT, INCIDENTAL,
+ SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT
+ LIMITED TO,
+ PROCUREMENT OF
+ SUBSTITUTE GOODS OR SERVICES; LOSS OF
+ USE, DATA, OR PROFITS; OR
+ BUSINESS
+ INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY,
+ WHETHER IN CONTRACT,
+ STRICT
+ LIABILITY, OR TORT (INCLUDING
+ NEGLIGENCE OR OTHERWISE) ARISING IN
+ ANY WAY OUT OF THE USE
+ OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE
+ POSSIBILITY OF SUCH DAMAGE.
  */
 
 /** C 2011 grammar built from the C11 Spec */
@@ -83,16 +93,25 @@ postfixExpression
     | postfixExpression '[' expression ']'
     | postfixExpression '(' argumentExpressionList? ')'
     | postfixExpression ('.' | '->') Identifier
-    | postfixExpression '++'
-    | postfixExpression '--'
+    | leftExpression '++'
+    | leftExpression '--'
+    ;
+
+// Postfix expression that can be used as lvalue (excluding function calls)
+postfixExpressionLvalue
+    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}')
+    | postfixExpressionLvalue '[' expression ']'
+    | postfixExpressionLvalue ('.' | '->') Identifier
     ;
 
 argumentExpressionList
-    : expression (','? expression)*
+    : expression (',' expression)*
     ;
 
 unaryExpression
-    : ('++' | '--' | '*') unaryExpression
+    : ('++' | '--') leftExpression
+    | '*' unaryExpression
+    | '&' leftExpression
     | ('sizeof' | '_Alignof') '(' '*'* typeName ')'
     | '&&' unaryExpression
     | postfixExpression
@@ -106,7 +125,8 @@ castExpression
 
 // --- Binary Expressions ---
 assignmentExpression
-    : castExpression (assignmentOperator initializer)?
+    : leftExpression assignmentOperator expression
+    | castExpression
     | DigitSequence
     ;
 
@@ -130,6 +150,13 @@ expressionList
 
 statementsExpression
     : '(' '{' statement* expression? ';'? '}' ')'
+    ;
+
+// --- Left Value Expressions ---
+leftExpression
+    : '*' unaryExpression
+    | postfixExpressionLvalue
+    | '(' leftExpression ')'
     ;
 
 expression
@@ -192,8 +219,10 @@ typeSpecifier
     | 'short'
     | 'int'
     | 'long'
+    | 'long long'
     | 'float'
     | 'double'
+    | 'long double'
     | '_Bool'
     | '_Complex'
     | '__m128'
@@ -249,7 +278,8 @@ enumeratorList
     ;
 
 enumerator
-    : Identifier ('=' expression)?
+    : Identifier gccAttributeSpecifier ('=' expression)?
+    | Identifier ('=' expression)?
     ;
 
 atomicTypeSpecifier
@@ -285,9 +315,9 @@ declarator
 directDeclarator
     : Identifier
     | '(' declarator ')'
-    | directDeclarator '[' typeQualifierList? assignmentExpression? ']'
-    | directDeclarator '[' 'static' typeQualifierList? assignmentExpression ']'
-    | directDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
+    | directDeclarator '[' typeQualifierList? expression? ']'
+    | directDeclarator '[' 'static' typeQualifierList? expression ']'
+    | directDeclarator '[' typeQualifierList 'static' expression ']'
     | directDeclarator '[' typeQualifierList? '*' ']'
     | directDeclarator '(' parameterTypeList ')'
     | directDeclarator '(' identifierList? ')'
@@ -312,19 +342,24 @@ gccDeclaratorExtension
     ;
 
 gccAttributeSpecifier
-    : '__attribute__' '(' '(' gccAttributeList ')' ')'
+    : Attribute__ '(' '(' gccAttributeList? ')' ')'
     ;
 
 gccAttributeList
-    : gccAttribute? (',' gccAttribute?)*
+    : gccAttribute (',' gccAttribute)*
     ;
 
 gccAttribute
     : ~(',' | '(' | ')') ('(' argumentExpressionList? ')')?
+    | Identifier ('(' argumentExpressionList? ')')?
     ;
 
 pointer
-    : (('*' | '^') typeQualifierList?)+
+    : pointerPart+
+    ;
+
+pointerPart
+    : ('*' | '^') typeQualifierList?
     ;
 
 typeQualifierList
@@ -350,6 +385,7 @@ identifierList
 
 typeName
     : specifierQualifierList abstractDeclarator?
+    | typeName ('.' | '->') Identifier
     ;
 
 abstractDeclarator
