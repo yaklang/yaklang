@@ -571,6 +571,7 @@ options = [
     ssa.withStrictMode(strictMode),
     ssa.withDescription(description),
     ssa.withEntryFile(entry...),
+    ssa.withFilePerformanceLog(filePerformanceLog),
 ]
 
 // 添加认证配置（从 JSON Schema 配置中提取）

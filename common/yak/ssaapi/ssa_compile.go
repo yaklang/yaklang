@@ -1,7 +1,10 @@
 package ssaapi
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/ts2ssa"
@@ -96,6 +99,8 @@ func (c *Config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 }
 
 func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
+	// 确保 diagnostics 包被识别为已使用
+	var _ *diagnostics.Recorder
 	defer func() {
 		if r := recover(); r != nil {
 			ret = nil
@@ -117,19 +122,32 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if err != nil {
 		return nil, err
 	}
+
+	// AST 解析阶段
+	astStart := time.Now()
 	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode(), nil)
+	astDuration := time.Since(astStart)
+	if c.diagnosticsRecorder != nil {
+		c.diagnosticsRecorder.RecordDuration("SSA AST Parse", astDuration)
+	}
 	defer c.LanguageBuilder.Clearup()
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
-	// parse code
+
+	// Build 阶段
 	prog.SetPreHandler(false)
+	buildStart := time.Now()
 	if err := prog.Build(ast, r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
+	buildDuration := time.Since(buildStart)
+	if c.diagnosticsRecorder != nil {
+		c.diagnosticsRecorder.RecordDuration("SSA Build", buildDuration)
+	}
 	return prog, nil
 }
 

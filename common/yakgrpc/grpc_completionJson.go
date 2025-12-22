@@ -2,10 +2,13 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yakdocument"
+	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yakdocument"
+
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -20,6 +23,68 @@ var (
 	completionJsonCd  = utils.NewCoolDown(5 * time.Second)
 	completionJsonRaw []byte
 )
+
+// sessionRequest 表示某个会话的请求信息
+type sessionRequest struct {
+	requestID  uint64
+	cancelFunc context.CancelFunc
+}
+
+// staticAnalyzeManager 管理静态分析请求，按 SessionID 分组
+type staticAnalyzeManager struct {
+	mu              sync.Mutex
+	globalRequestID uint64                     // 全局请求ID计数器
+	sessions        map[string]*sessionRequest // SessionID -> 当前请求
+}
+
+var analyzeManager = &staticAnalyzeManager{
+	globalRequestID: 0,
+	sessions:        make(map[string]*sessionRequest),
+}
+
+// registerRequest 为指定 SessionID 注册新请求，取消该 Session 的旧请求
+func (m *staticAnalyzeManager) registerRequest(sessionID string, cancel context.CancelFunc) uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.globalRequestID++
+	requestID := m.globalRequestID
+
+	if oldReq, exists := m.sessions[sessionID]; exists {
+		log.Infof("[StaticAnalyze] Session '%s': Cancelling old request (ID: %d)", sessionID, oldReq.requestID)
+		oldReq.cancelFunc()
+	}
+
+	m.sessions[sessionID] = &sessionRequest{
+		requestID:  requestID,
+		cancelFunc: cancel,
+	}
+
+	log.Infof("[StaticAnalyze] Session '%s': Registered new request (ID: %d), total sessions: %d",
+		sessionID, requestID, len(m.sessions))
+	return requestID
+}
+
+// unregisterRequest 注销指定 Session 的请求
+func (m *staticAnalyzeManager) unregisterRequest(sessionID string, requestID uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	req, exists := m.sessions[sessionID]
+	if !exists {
+		log.Infof("[StaticAnalyze] Session '%s': Request %d already unregistered", sessionID, requestID)
+		return
+	}
+
+	if req.requestID == requestID {
+		delete(m.sessions, sessionID)
+		log.Infof("[StaticAnalyze] Session '%s': Unregistered request (ID: %d), remaining sessions: %d",
+			sessionID, requestID, len(m.sessions))
+	} else {
+		log.Infof("[StaticAnalyze] Session '%s': Skipped unregister for old request (ID: %d, current: %d)",
+			sessionID, requestID, req.requestID)
+	}
+}
 
 func (s *Server) GetYakVMBuildInMethodCompletion(
 	ctx context.Context,
@@ -130,7 +195,45 @@ func (s *Server) GetYakitCompletionRaw(ctx context.Context, _ *ypb.Empty) (*ypb.
 }
 
 func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErrorRequest) (*ypb.StaticAnalyzeErrorResponse, error) {
-	tmpRes := yak.StaticAnalyze(string(r.GetCode()), yak.WithStaticAnalyzePluginType(r.GetPluginType()))
+	code := string(r.GetCode())
+	pluginType := r.GetPluginType()
+	sessionID := r.GetSessionID()
+
+	if sessionID == "" {
+		sessionID = "default"
+		log.Warnf("[StaticAnalyze] No SessionID provided, using default session")
+	}
+
+	analyzeCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	requestID := analyzeManager.registerRequest(sessionID, cancel)
+	defer analyzeManager.unregisterRequest(sessionID, requestID)
+
+	log.Infof("[StaticAnalyze] Session '%s', Request %d started (code length: %d, type: %s)",
+		sessionID, requestID, len(code), pluginType)
+
+	select {
+	case <-analyzeCtx.Done():
+		log.Infof("[StaticAnalyze] Session '%s', Request %d cancelled before start", sessionID, requestID)
+		return &ypb.StaticAnalyzeErrorResponse{Result: nil}, nil
+	default:
+	}
+
+	startTime := time.Now()
+	tmpRes := yak.StaticAnalyze(code, yak.WithStaticAnalyzePluginType(pluginType), yak.WithStaticAnalyzeContext(analyzeCtx))
+	duration := time.Since(startTime)
+
+	select {
+	case <-analyzeCtx.Done():
+		log.Infof("[StaticAnalyze] Session '%s', Request %d cancelled after %v", sessionID, requestID, duration)
+		return &ypb.StaticAnalyzeErrorResponse{Result: nil}, nil
+	default:
+	}
+
+	log.Infof("[StaticAnalyze] Session '%s', Request %d completed successfully in %v, found %d issues",
+		sessionID, requestID, duration, len(tmpRes))
+
 	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),

@@ -21537,6 +21537,7 @@ type StaticAnalyzeErrorRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          []byte                 `protobuf:"bytes,1,opt,name=Code,proto3" json:"Code,omitempty"`
 	PluginType    string                 `protobuf:"bytes,2,opt,name=PluginType,proto3" json:"PluginType,omitempty"` // "yak" "mitm" "port-scan" "codec" "syntaxflow"
+	SessionID     string                 `protobuf:"bytes,3,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -21581,6 +21582,13 @@ func (x *StaticAnalyzeErrorRequest) GetCode() []byte {
 func (x *StaticAnalyzeErrorRequest) GetPluginType() string {
 	if x != nil {
 		return x.PluginType
+	}
+	return ""
+}
+
+func (x *StaticAnalyzeErrorRequest) GetSessionID() string {
+	if x != nil {
+		return x.SessionID
 	}
 	return ""
 }
@@ -66323,12 +66331,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"$YaklangGetCliCodeFromDatabaseRequest\x12\x1e\n" +
 	"\n" +
 	"ScriptName\x18\x01 \x01(\tR\n" +
-	"ScriptName\"O\n" +
+	"ScriptName\"m\n" +
 	"\x19StaticAnalyzeErrorRequest\x12\x12\n" +
 	"\x04Code\x18\x01 \x01(\fR\x04Code\x12\x1e\n" +
 	"\n" +
 	"PluginType\x18\x02 \x01(\tR\n" +
-	"PluginType\"4\n" +
+	"PluginType\x12\x1c\n" +
+	"\tSessionID\x18\x03 \x01(\tR\tSessionID\"4\n" +
 	"\x1eYaklangCompileAndFormatRequest\x12\x12\n" +
 	"\x04Code\x18\x01 \x01(\tR\x04Code\"l\n" +
 	"\x1fYaklangCompileAndFormatResponse\x12\x12\n" +
