@@ -1844,41 +1844,119 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 	require.NotContains(t, flow.Tags, "[手动修改]")
 }
 
-func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
+type MITMTestClient struct {
+	t                 *testing.T
+	client            ypb.YakClient
+	ctx               context.Context
+	cancel            context.CancelFunc
+	stream            ypb.Yak_MITMClient
+	host              string
+	port              uint32
+	OnMessageReceived func(msg *ypb.MITMResponse)
+	wg                sync.WaitGroup
+}
+
+func NewMITMTestClient(t *testing.T) *MITMTestClient {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	m := &MITMTestClient{
+		t:      t,
+		client: client,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+	return m
+}
+
+func (m *MITMTestClient) Start() {
+	m.host = "127.0.0.1"
+	m.port = uint32(utils.GetRandomAvailableTCPPort())
+	stream, err := m.client.MITM(m.ctx)
+	if err != nil {
+		m.t.Fatal(err)
+	}
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		for {
+			msg, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if m.OnMessageReceived != nil {
+				m.OnMessageReceived(msg)
+			}
+		}
+	}()
+	m.stream = stream
+	stream.Send(&ypb.MITMRequest{
+		Host: m.host,
+		Port: m.port,
+	})
+}
+
+func (m *MITMTestClient) WaitServerStarted(f func()) error {
+	err := utils.WaitConnect(utils.HostPort(m.host, m.port), 3)
+	if err != nil {
+		return err
+	}
+	if f != nil {
+		f()
+	}
+	return nil
+}
+
+func (m *MITMTestClient) SendOptions(req *ypb.MITMRequest) error {
+	return m.stream.Send(req)
+}
+
+func (m *MITMTestClient) Wait() {
+	m.wg.Wait()
+}
+
+func (m *MITMTestClient) Address() string {
+	return utils.HostPort(m.host, m.port)
+}
+
+func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
+
 	token, token2 := utils.RandStringBytes(20), utils.RandStringBytes(20)
-	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
-	proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
 	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
 		"Content-Length: %d\r\n\r\n%s", len(token), token)))
 	replacedHost := "www.example.com"
 
-	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
-		stream.Send(&ypb.MITMRequest{
-			Host: mitmHost,
-			Port: uint32(mitmPort),
-		})
-		stream.Send(&ypb.MITMRequest{
+	var receivedRequest bool
+
+	m := NewMITMTestClient(t)
+	m.Start()
+	m.WaitServerStarted(func() {
+		m.SendOptions(&ypb.MITMRequest{
 			SetAutoForward:   true,
 			AutoForwardValue: false,
 		})
-	}, func(stream ypb.Yak_MITMClient) {
-		defer cancel()
-		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))
-		require.NoError(t, err)
-	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
-		if request := msg.GetRequest(); len(request) > 0 {
+		// 等待配置生效
+		time.Sleep(time.Millisecond * 500)
+	})
+
+	// 收到请求后修改请求host
+	m.OnMessageReceived = func(msg *ypb.MITMResponse) {
+		if msg.GetRequest() != nil {
+			request := msg.GetRequest()
 			request = lowhttp.ReplaceHTTPPacketHost(request, replacedHost)
-			stream.Send(&ypb.MITMRequest{
+			m.SendOptions(&ypb.MITMRequest{
 				Id:      msg.GetId(),
 				Request: request,
 			})
+			receivedRequest = true
 		}
-	})
+	}
 
-	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+	// 发送请求，验证请求是否被修改
+	_, _, err := poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(fmt.Sprintf("http://%s", m.Address())), poc.WithTimeout(3))
+	require.NoError(t, err)
+
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), m.client, &ypb.QueryHTTPFlowRequest{
 		Keyword: token2,
 		Pagination: &ypb.Paging{
 			Page:  1,
@@ -1887,6 +1965,7 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 	}, 1)
 	require.NoError(t, err)
 	flow := flows.Data[0]
+	require.True(t, receivedRequest)
 	require.Equal(t, replacedHost, lowhttp.GetHTTPPacketHeader(flow.Request, "Host"))
 	require.Equal(t, token, string(lowhttp.GetHTTPPacketBody(flow.Response)))
 }
