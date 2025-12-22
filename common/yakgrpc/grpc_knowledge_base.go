@@ -59,7 +59,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 			Limit: 10,
 		}
 	}
-	p, knowledgeBases, err := yakit.QueryKnowledgeBasePaging(db, req.GetKnowledgeBaseId(), req.GetKeyword(), paging)
+	p, knowledgeBases, err := yakit.QueryKnowledgeBasePaging(db, req.GetKnowledgeBaseId(), req.GetKeyword(), req.GetOnlyCreatedFromUI(), paging)
 	if err != nil {
 		return nil, utils.Errorf("获取知识库列表失败: %v", err)
 	}
@@ -79,6 +79,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 			KnowledgeBaseDescription: kb.KnowledgeBaseDescription,
 			KnowledgeBaseType:        kb.KnowledgeBaseType,
 			Tags:                     utils.StringSplitAndStrip(kb.Tags, ","),
+			CreatedFromUI:            kb.CreatedFromUI,
 		}
 	}
 
@@ -140,7 +141,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 		return nil, utils.Errorf("获取知识库信息失败")
 	}
 
-	// CreateKnowledgeBaseV2 在实践中经常被当做“创建/更新元信息”的入口；
+	// CreateKnowledgeBaseV2 在实践中经常被当做"创建/更新元信息"的入口；
 	// 这里做一次显式同步，确保 tags/description/type 写入 DB 后列表可查到。
 	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetTags()...); err != nil {
 		return nil, utils.Wrap(err, "更新知识库信息失败")
@@ -150,6 +151,15 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 	if err != nil || kbInfo == nil {
 		return nil, utils.Errorf("获取知识库信息失败")
 	}
+
+	// Update CreatedFromUI field if the request indicates it was created from UI
+	if req.GetCreatedFromUI() {
+		if err := db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", kbInfo.ID).Update("created_from_ui", true).Error; err != nil {
+			log.Warnf("failed to update created_from_ui field: %v", err)
+		}
+		kbInfo.CreatedFromUI = true
+	}
+
 	return &ypb.CreateKnowledgeBaseV2Response{
 		KnowledgeBase: &ypb.KnowledgeBaseInfo{
 			ID:                       int64(kbInfo.ID),
@@ -157,6 +167,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 			KnowledgeBaseDescription: kbInfo.KnowledgeBaseDescription,
 			KnowledgeBaseType:        kbInfo.KnowledgeBaseType,
 			Tags:                     utils.StringSplitAndStrip(kbInfo.Tags, ","),
+			CreatedFromUI:            kbInfo.CreatedFromUI,
 		},
 		IsSuccess:   true,
 		Message:     "创建知识库成功",

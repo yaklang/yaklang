@@ -122,7 +122,7 @@ func TestMUSTPASS_QueryKnowledgeBasePaging(t *testing.T) {
 
 	// 测试分页查询知识库
 	paging := &ypb.Paging{Page: 1, Limit: 10}
-	paginator, knowledgeBases, err := QueryKnowledgeBasePaging(db, 0, "", paging)
+	paginator, knowledgeBases, err := QueryKnowledgeBasePaging(db, 0, "", false, paging)
 	assert.NoError(t, err)
 	assert.Equal(t, int(1), paginator.TotalRecord)
 	assert.Len(t, knowledgeBases, 1)
@@ -728,6 +728,133 @@ func TestMUSTPASS_GetKnowledgeBaseEntryByFilter(t *testing.T) {
 	for _, entry := range entriesAfterKeyword {
 		assert.Greater(t, entry.ID, firstEntryID)
 	}
+}
+
+// TestMUSTPASS_QueryKnowledgeBaseByCreatedFromUI 测试 OnlyCreatedFromUI 过滤条件查询知识库列表
+func TestMUSTPASS_QueryKnowledgeBaseByCreatedFromUI(t *testing.T) {
+	// 创建临时测试数据库
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// 自动迁移数据库表结构
+	db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{})
+
+	// 创建两个知识库：一个 CreatedFromUI=true，一个 CreatedFromUI=false
+	kbFromUI := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "kb_from_ui_" + utils.RandStringBytes(8),
+		KnowledgeBaseDescription: "由UI创建的知识库",
+		KnowledgeBaseType:        "test",
+		CreatedFromUI:            true,
+	}
+	err = CreateKnowledgeBase(db, kbFromUI)
+	assert.NoError(t, err)
+	assert.True(t, kbFromUI.CreatedFromUI, "knowledge base should have CreatedFromUI=true")
+
+	kbFromUI2 := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "kb_from_ui_2_" + utils.RandStringBytes(8),
+		KnowledgeBaseDescription: "由UI创建的知识库2",
+		KnowledgeBaseType:        "test",
+		CreatedFromUI:            true,
+	}
+	err = CreateKnowledgeBase(db, kbFromUI2)
+	assert.NoError(t, err)
+	assert.True(t, kbFromUI2.CreatedFromUI, "knowledge base should have CreatedFromUI=true")
+
+	kbFromSystem := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "kb_from_system_" + utils.RandStringBytes(8),
+		KnowledgeBaseDescription: "系统创建的知识库",
+		KnowledgeBaseType:        "test",
+		CreatedFromUI:            false,
+	}
+	err = CreateKnowledgeBase(db, kbFromSystem)
+	assert.NoError(t, err)
+	assert.False(t, kbFromSystem.CreatedFromUI, "knowledge base should have CreatedFromUI=false")
+
+	kbFromSystem2 := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "kb_from_system_2_" + utils.RandStringBytes(8),
+		KnowledgeBaseDescription: "系统创建的知识库2",
+		KnowledgeBaseType:        "test",
+		CreatedFromUI:            false,
+	}
+	err = CreateKnowledgeBase(db, kbFromSystem2)
+	assert.NoError(t, err)
+	assert.False(t, kbFromSystem2.CreatedFromUI, "knowledge base should have CreatedFromUI=false")
+
+	kbFromSystem3 := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "kb_from_system_3_" + utils.RandStringBytes(8),
+		KnowledgeBaseDescription: "系统创建的知识库3",
+		KnowledgeBaseType:        "test",
+		CreatedFromUI:            false,
+	}
+	err = CreateKnowledgeBase(db, kbFromSystem3)
+	assert.NoError(t, err)
+
+	paging := &ypb.Paging{Page: 1, Limit: 100}
+
+	// 测试1: 设置 OnlyCreatedFromUI=true，只查出 CreatedFromUI=true 的知识库
+	paginator1, uiKnowledgeBases, err := QueryKnowledgeBasePaging(db, 0, "", true, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, paginator1.TotalRecord, "should return 2 knowledge bases created from UI")
+	assert.Len(t, uiKnowledgeBases, 2)
+
+	// 验证所有返回的知识库都是 CreatedFromUI=true
+	for _, kb := range uiKnowledgeBases {
+		assert.True(t, kb.CreatedFromUI, "knowledge base should have CreatedFromUI=true")
+	}
+
+	// 测试2: 不设置 OnlyCreatedFromUI（false），应返回所有知识库
+	paginator2, allKnowledgeBases, err := QueryKnowledgeBasePaging(db, 0, "", false, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 5, paginator2.TotalRecord, "should return all 5 knowledge bases")
+	assert.Len(t, allKnowledgeBases, 5)
+
+	// 测试3: 结合 OnlyCreatedFromUI 和关键词过滤
+	paginator3, keywordUIKBs, err := QueryKnowledgeBasePaging(db, 0, "由UI创建", true, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, paginator3.TotalRecord, "should return 2 UI knowledge bases matching keyword")
+	for _, kb := range keywordUIKBs {
+		assert.True(t, kb.CreatedFromUI)
+		assert.Contains(t, kb.KnowledgeBaseDescription, "由UI创建")
+	}
+
+	// 测试4: 关键词只能匹配系统知识库，但设置了OnlyCreatedFromUI=true，应返回空
+	paginator4, emptyResult, err := QueryKnowledgeBasePaging(db, 0, "系统创建的知识库", true, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, paginator4.TotalRecord, "should return 0 when keyword only matches system kb but OnlyCreatedFromUI=true")
+	assert.Len(t, emptyResult, 0)
+
+	// 测试5: 通过ID查询，结合 OnlyCreatedFromUI
+	// 查询 UI 创建的知识库 ID，设置 OnlyCreatedFromUI=true
+	paginator5, uiKBByID, err := QueryKnowledgeBasePaging(db, int64(kbFromUI.ID), "", true, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, paginator5.TotalRecord, "should return 1 when querying UI kb by ID with OnlyCreatedFromUI=true")
+	assert.Len(t, uiKBByID, 1)
+	assert.True(t, uiKBByID[0].CreatedFromUI)
+
+	// 测试6: 通过系统创建的知识库ID查询，设置 OnlyCreatedFromUI=true，应返回空
+	paginator6, systemKBWithUIFilter, err := QueryKnowledgeBasePaging(db, int64(kbFromSystem.ID), "", true, paging)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, paginator6.TotalRecord, "should return 0 when querying system kb by ID with OnlyCreatedFromUI=true")
+	assert.Len(t, systemKBWithUIFilter, 0)
+
+	// 清理测试数据
+	err = DeleteKnowledgeBase(db, int64(kbFromUI.ID))
+	assert.NoError(t, err)
+	err = DeleteKnowledgeBase(db, int64(kbFromUI2.ID))
+	assert.NoError(t, err)
+	err = DeleteKnowledgeBase(db, int64(kbFromSystem.ID))
+	assert.NoError(t, err)
+	err = DeleteKnowledgeBase(db, int64(kbFromSystem2.ID))
+	assert.NoError(t, err)
+	err = DeleteKnowledgeBase(db, int64(kbFromSystem3.ID))
+	assert.NoError(t, err)
+
+	// 验证清理成功
+	_, err = GetKnowledgeBase(db, int64(kbFromUI.ID))
+	assert.Error(t, err)
+	_, err = GetKnowledgeBase(db, int64(kbFromSystem.ID))
+	assert.Error(t, err)
 }
 
 // TestMUSTPASS_KnowledgeBaseCompleteWorkflow 测试知识库完整工作流程

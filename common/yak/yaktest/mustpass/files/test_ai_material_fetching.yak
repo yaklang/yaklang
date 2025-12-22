@@ -1,0 +1,99 @@
+// Test db.YieldAllAITools, db.YieldAllAIForges, and db.YieldAllMCPServers
+// These functions yield all AI materials from the database
+
+println("===== Testing db.YieldAllAITools, db.YieldAllAIForges, db.YieldAllMCPServers =====")
+
+// ========================================
+// Part 1: Test YieldAllAITools
+// ========================================
+println("\n===== Part 1: Testing db.YieldAllAITools =====")
+
+{
+    ch = db.YieldAllAITools()
+    assert ch != nil, "YieldAllAITools should not return nil channel"
+    
+    count = 0
+    for tool := range ch {
+        // verify that tool has required fields
+        assert tool.Name != undefined, "AIYakTool should have Name field"
+        count++
+    }
+    
+    println(f"YieldAllAITools: fetched ${count} AI tools from database")
+    println("Test 1 PASSED: db.YieldAllAITools works correctly")
+}
+
+// ========================================
+// Part 2: Test YieldAllAIForges
+// ========================================
+println("\n===== Part 2: Testing db.YieldAllAIForges =====")
+
+{
+    ch = db.YieldAllAIForges()
+    assert ch != nil, "YieldAllAIForges should not return nil channel"
+    
+    count = 0
+    for forge := range ch {
+        // verify that forge has required fields
+        assert forge.ForgeName != undefined, "AIForge should have ForgeName field"
+        count++
+    }
+    
+    println(f"YieldAllAIForges: fetched ${count} AI forges from database")
+    println("Test 2 PASSED: db.YieldAllAIForges works correctly")
+}
+
+// ========================================
+// Part 3: Test YieldAllMCPServers
+// ========================================
+println("\n===== Part 3: Testing db.YieldAllMCPServers =====")
+
+{
+    ch = db.YieldAllMCPServers()
+    assert ch != nil, "YieldAllMCPServers should not return nil channel"
+    
+    count = 0
+    for server := range ch {
+        // verify that server has required fields
+        assert server.Name != undefined, "MCPServer should have Name field"
+        count++
+    }
+    
+    println(f"YieldAllMCPServers: fetched ${count} MCP servers from database")
+    println("Test 3 PASSED: db.YieldAllMCPServers works correctly")
+}
+
+// ========================================
+// Part 4: Test with channel consumption patterns
+// ========================================
+println("\n===== Part 4: Testing channel consumption patterns =====")
+
+// Test that channels can be consumed multiple times by calling the function again
+{
+    ch1 = db.YieldAllAITools()
+    ch2 = db.YieldAllAITools()
+    
+    // Both should be independent channels
+    assert ch1 != nil, "First YieldAllAITools channel should not be nil"
+    assert ch2 != nil, "Second YieldAllAITools channel should not be nil"
+    
+    // Consume both channels
+    count1 = 0
+    for _ := range ch1 {
+        count1++
+    }
+    
+    count2 = 0
+    for _ := range ch2 {
+        count2++
+    }
+    
+    // Both should yield the same count
+    assert count1 == count2, f"Both channels should yield same count, got ${count1} and ${count2}"
+    
+    println(f"Channel pattern test: both calls yielded ${count1} items")
+    println("Test 4 PASSED: Multiple channel calls work independently")
+}
+
+println("\n===== All AI Material Fetching Tests PASSED! =====")
+

@@ -191,6 +191,29 @@ var DatabaseExports = map[string]interface{}{
 		_, err := yakit.SaveAIYakTool(db, tool)
 		return err
 	},
+
+	// Yield AI materials
+	"YieldAllAITools": func() chan *schema.AIYakTool {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		return yakit.YieldAllAITools(context.Background(), db)
+	},
+	"YieldAllAIForges": func() chan *schema.AIForge {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		return yakit.YieldAllAIForges(context.Background(), db)
+	},
+	"YieldAllMCPServers": func() chan *schema.MCPServer {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		return yakit.YieldAllMCPServers(context.Background(), db)
+	},
 }
 
 func OpenDatabase(dialect string, source string) (*gorm.DB, error) {
