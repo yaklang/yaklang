@@ -91,6 +91,10 @@ Double
     : 'double'
     ;
 
+Longdouble
+    : 'long double'
+    ;
+
 Else
     : 'else'
     ;
@@ -129,6 +133,10 @@ Int
 
 Long
     : 'long'
+    ;
+
+Longlong
+    : 'long long'
     ;
 
 Register
@@ -421,6 +429,10 @@ Asm
     : ('__asm' | '__asm__')
     ;
 
+Attribute__
+    : '__attribute__'
+    ;
+
 // --- Identifiers ---
 Identifier
     : IdentifierNondigit (IdentifierNondigit | Digit)*
@@ -692,10 +704,6 @@ Thiscall
 
 Vectorcall
     : '__vectorcall'
-    ;
-
-Attribute__
-    : '__attribute__'
     ;
 
 Volatile__

@@ -10,163 +10,163 @@ func Test_Pointer_normal(t *testing.T) {
 	t.Run("basic pointer", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-int main() {        
-	int a = 1;
-	int *p = &a;
-	
-	*p = 2;
-	println(a);
-	println(*p);
-}
-		`, []string{"2", "2"}, t)
+	int main() {
+		int a = 1;
+		int *p = &a;
+
+		*p = 2;
+		println(a);
+		println(*p);
+	}
+			`, []string{"2", "2"}, t)
 	})
 
 	t.Run("basic pointer overwrite", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-int main() {     
-	int a = 1;
-	int b = 2;
-	int* p;
+	int main() {
+		int a = 1;
+		int b = 2;
+		int* p;
 
-	p = &a;
-	*p = 3;
-	p = &b;
-	*p = 4;
-	p = &a;
+		p = &a;
+		*p = 3;
+		p = &b;
+		*p = 4;
+		p = &a;
 
-	println(a);	// 3
-	println(b);	// 4
-	println(*p); // 3
-}
-		`, []string{"3", "4", "3"}, t)
+		println(a);	// 3
+		println(b);	// 4
+		println(*p); // 3
+	}
+			`, []string{"3", "4", "3"}, t)
 	})
 
 	t.Run("object pointer overwrite", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-struct T {
-	int* n; 
-};
+	struct T {
+		int* n;
+	};
 
-int main(){
-	int a = 1;
-	int b = 2;
+	int main(){
+		int a = 1;
+		int b = 2;
 
-	struct T o1 = { .n = &a };
-	struct T o2 = { .n = &a };
+		struct T o1 = { .n = &a };
+		struct T o2 = { .n = &a };
 
-	*o1.n = 3;
-	println(*o1.n);  // 3
-	println(*o2.n);	// 3
+		*o1.n = 3;
+		println(*o1.n);  // 3
+		println(*o2.n);	// 3
 
-	o2.n = &b;
-	*o2.n = 4;
-	println(*o1.n); // 3
-	println(*o2.n); // 4
-}	
-		`, []string{"3", "3", "3", "4"}, t)
+		o2.n = &b;
+		*o2.n = 4;
+		println(*o1.n); // 3
+		println(*o2.n); // 4
+	}
+			`, []string{"3", "3", "3", "4"}, t)
 	})
 
 	t.Run("struct pointer", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-struct T {
-	int* n;
-};
+	struct T {
+		int* n;
+	};
 
-int main(){
-	int a = 1;
-	int b = 2;
+	int main(){
+		int a = 1;
+		int b = 2;
 
-	struct T s = { .n = &a };
-	struct T* sp = &(struct T){ .n = &a };
+		struct T s = { .n = &a };
+		struct T* sp = &(struct T){ .n = &a };
 
-	*s.n = 3;
-	println(*s.n);  // 3
-	println(*sp->n);	// 3
+		*s.n = 3;
+		println(*s.n);  // 3
+		println(*sp->n);	// 3
 
-	sp->n = &b;
-	*sp->n = 4;
-	println(*s.n); // 3
-	println(*sp->n); // 4
-}
-			
-		`, []string{"3", "3", "3", "4"}, t)
+		sp->n = &b;
+		*sp->n = 4;
+		println(*s.n); // 3
+		println(*sp->n); // 4
+	}
+
+			`, []string{"3", "3", "3", "4"}, t)
 	})
 
 	t.Run("struct pointer overwrite", func(t *testing.T) {
 
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-struct T {
-	int* n;
-};
+	struct T {
+		int* n;
+	};
 
-int main(){
-	int a = 1;
-	int b = 2;
+	int main(){
+		int a = 1;
+		int b = 2;
 
-	struct T s1 = { .n = &a };
-	struct T s2 = { .n = &a };
-	struct T* sp = &s1;
+		struct T s1 = { .n = &a };
+		struct T s2 = { .n = &a };
+		struct T* sp = &s1;
 
-	*sp->n = 3;
-	println(*s1.n); // 3
-	println(*s2.n); // 3
+		*sp->n = 3;
+		println(*s1.n); // 3
+		println(*s2.n); // 3
 
-	sp->n = &b;
-	*sp->n = 4;
-	println(*s1.n); // 4
-	println(*s2.n); // 3
+		sp->n = &b;
+		*sp->n = 4;
+		println(*s1.n); // 4
+		println(*s2.n); // 3
 
-	println(a); // 3
-	println(b); // 4
-}
-			
-		`, []string{"3", "3", "4", "3", "3", "4"}, t)
+		println(a); // 3
+		println(b); // 4
+	}
+
+			`, []string{"3", "3", "4", "3", "3", "4"}, t)
 	})
 
 	t.Run("same const reused by multiple variableMemories", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-struct A {
-	int a; 
-};
+	struct A {
+		int a;
+	};
 
-int main() {
-	int n1 = 1;
-	struct A str = { .a = n1 };
+	int main() {
+		int n1 = 1;
+		struct A str = { .a = n1 };
 
-	int* p = &n1;
-	*p = 2;
+		int* p = &n1;
+		*p = 2;
 
-	println(str.a);	// 1
-	println(n1);		// 2
-}
+		println(str.a);	// 1
+		println(n1);		// 2
+	}
 
-		`, []string{"1", "2"}, t)
+			`, []string{"1", "2"}, t)
 
 		test.CheckPrintlnValue(`#include <stdio.h>
 
-struct A {
-	int* a; 
-};
+	struct A {
+		int* a;
+	};
 
-int main() {
-	int n1 = 1;
-	struct A str = { .a = &n1 };
+	int main() {
+		int n1 = 1;
+		struct A str = { .a = &n1 };
 
-	int* p = &n1;
-	*p = 2;
+		int* p = &n1;
+		*p = 2;
 
-	println(*str.a);	// 2
-	println(n1);		// 2
-}
+		println(*str.a);	// 2
+		println(n1);		// 2
+	}
 
-		`, []string{"2", "2"}, t)
+			`, []string{"2", "2"}, t)
 	})
 
 	t.Run("alias pointer", func(t *testing.T) {

@@ -22,6 +22,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#postfixExpression.
 	VisitPostfixExpression(ctx *PostfixExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#postfixExpressionLvalue.
+	VisitPostfixExpressionLvalue(ctx *PostfixExpressionLvalueContext) interface{}
+
 	// Visit a parse tree produced by CParser#argumentExpressionList.
 	VisitArgumentExpressionList(ctx *ArgumentExpressionListContext) interface{}
 
@@ -42,6 +45,9 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#statementsExpression.
 	VisitStatementsExpression(ctx *StatementsExpressionContext) interface{}
+
+	// Visit a parse tree produced by CParser#leftExpression.
+	VisitLeftExpression(ctx *LeftExpressionContext) interface{}
 
 	// Visit a parse tree produced by CParser#expression.
 	VisitExpression(ctx *ExpressionContext) interface{}
@@ -135,6 +141,9 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#pointer.
 	VisitPointer(ctx *PointerContext) interface{}
+
+	// Visit a parse tree produced by CParser#pointerPart.
+	VisitPointerPart(ctx *PointerPartContext) interface{}
 
 	// Visit a parse tree produced by CParser#typeQualifierList.
 	VisitTypeQualifierList(ctx *TypeQualifierListContext) interface{}
