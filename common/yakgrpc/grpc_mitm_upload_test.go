@@ -117,6 +117,8 @@ func TestMITM_InvalidUTF8Request(t *testing.T) {
 			AutoForwardValue: false,
 		})
 	}, func(stream ypb.Yak_MITMClient) {
+		// Wait for SetAutoForward configuration to take effect before sending request
+		time.Sleep(200 * time.Millisecond)
 		b, _ := codec.Utf8ToGB18030([]byte(`你好`))
 		poc.DoPOST(target, poc.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), poc.WithBody(b))
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
@@ -163,6 +165,8 @@ func TestGRPCMUSTPASS_MITMV2_InvalidUTF8Request(t *testing.T) {
 			AutoForwardValue: false,
 		})
 	}, func(stream ypb.Yak_MITMV2Client) {
+		// Wait for SetAutoForward configuration to take effect before sending request
+		time.Sleep(200 * time.Millisecond)
 		b, _ := codec.Utf8ToGB18030([]byte(`你好`))
 		poc.DoPOST(target, poc.WithProxy(fmt.Sprintf("http://127.0.0.1:%d", mitmPort)), poc.WithBody(b))
 	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {

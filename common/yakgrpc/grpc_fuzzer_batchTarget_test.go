@@ -126,6 +126,8 @@ func TestGRPCMUSTPASS_HTTPFUZZER_BatchTarget_FixBUG(t *testing.T) {
 			})
 		},
 		func(stream ypb.Yak_MITMClient) {
+			// Wait for SetAutoForward configuration to take effect before sending request
+			time.Sleep(200 * time.Millisecond)
 			fuzzerStream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 				Request:         "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
 				BatchTargetFile: false,
