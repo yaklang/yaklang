@@ -685,10 +685,17 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				writer.Write([]byte("HELLO GMTLS"))
 			})}
 
+			// Use a channel to ensure server is ready before returning
+			ready := make(chan struct{})
 			go func() {
 				log.Infof("START TO SERVE GMTLS HTTP SERVER at %s", srv.Addr)
+				close(ready)
 				srv.Serve(lis)
 			}()
+			// Wait for server goroutine to start
+			<-ready
+			// Additional time for server to fully initialize
+			time.Sleep(50 * time.Millisecond)
 			return
 		}
 

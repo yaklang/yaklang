@@ -838,6 +838,8 @@ func TestGRPCMUSTTPASS_MITMV2_HijackTags(t *testing.T) {
 		})
 	}, func(stream ypb.Yak_MITMV2Client) {
 		defer cancel()
+		// Wait for SetAutoForward configuration to take effect before sending request
+		time.Sleep(200 * time.Millisecond)
 		_, _, err := poc.DoGET(fmt.Sprintf("http://%s?a=modified", utils.HostPort(host, port)), poc.WithProxy(proxy))
 		require.NoError(t, err)
 		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))

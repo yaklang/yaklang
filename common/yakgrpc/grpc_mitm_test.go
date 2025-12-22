@@ -1795,6 +1795,8 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 		defer cancel()
+		// Wait for SetAutoForward configuration to take effect before sending request
+		time.Sleep(200 * time.Millisecond)
 		_, _, err := poc.DoGET(fmt.Sprintf("http://%s?a=modified", utils.HostPort(host, port)), poc.WithProxy(proxy))
 		require.NoError(t, err)
 		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))
@@ -1866,6 +1868,9 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 		})
 	}, func(stream ypb.Yak_MITMClient) {
 		defer cancel()
+		// Wait for SetAutoForward configuration to take effect before sending request
+		// This prevents race condition where request is auto-forwarded before manual hijack mode is enabled
+		time.Sleep(200 * time.Millisecond)
 		_, _, err = poc.DoGET(fmt.Sprintf("http://%s?a=%s", utils.HostPort(host, port), token2), poc.WithProxy(proxy))
 		require.NoError(t, err)
 	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
