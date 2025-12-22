@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -142,4 +144,10 @@ func GetAllAIForge(db *gorm.DB) ([]*schema.AIForge, error) {
 		return nil, db.Error
 	}
 	return forges, nil
+}
+
+// YieldAllAIForges yields all AI forges from the database
+func YieldAllAIForges(ctx context.Context, db *gorm.DB) chan *schema.AIForge {
+	db = db.Model(&schema.AIForge{})
+	return bizhelper.YieldModel[*schema.AIForge](ctx, db)
 }

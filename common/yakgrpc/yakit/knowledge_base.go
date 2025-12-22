@@ -227,7 +227,7 @@ func GetKnowledgeBaseEntryByUUID(db *gorm.DB, uuid string) (*schema.KnowledgeBas
 }
 
 // FilterKnowledgeBase 过滤知识库
-func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string) *gorm.DB {
+func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string, onlyCreatedFromUI bool) *gorm.DB {
 	db = db.Model(&schema.KnowledgeBaseInfo{})
 
 	// 实现关键词和ID的二选一逻辑
@@ -240,16 +240,21 @@ func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string) *go
 	}
 	// 如果都为空，返回所有记录（无过滤条件）
 
+	// Filter by CreatedFromUI if specified
+	if onlyCreatedFromUI {
+		db = db.Where("created_from_ui = ?", true)
+	}
+
 	return db
 }
 
 // QueryKnowledgeBasePaging 分页查询知识库
-func QueryKnowledgeBasePaging(db *gorm.DB, knowledgeBaseId int64, keyword string, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseInfo, error) {
+func QueryKnowledgeBasePaging(db *gorm.DB, knowledgeBaseId int64, keyword string, onlyCreatedFromUI bool, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseInfo, error) {
 	// 1. 设置查询的数据模型
 	db = db.Model(&schema.KnowledgeBaseInfo{})
 
 	// 2. 应用过滤条件
-	db = FilterKnowledgeBase(db, knowledgeBaseId, keyword)
+	db = FilterKnowledgeBase(db, knowledgeBaseId, keyword, onlyCreatedFromUI)
 
 	// 3. 执行分页查询
 	ret := make([]*schema.KnowledgeBaseInfo, 0)

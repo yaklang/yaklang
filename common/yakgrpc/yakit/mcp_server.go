@@ -208,3 +208,9 @@ func YieldEnabledMCPServers(ctx context.Context, db *gorm.DB) chan *schema.MCPSe
 	db = db.Model(&schema.MCPServer{}).Where("enable = ?", true)
 	return bizhelper.YieldModel[*schema.MCPServer](ctx, db)
 }
+
+// YieldAllMCPServers yields all MCP servers from the database
+func YieldAllMCPServers(ctx context.Context, db *gorm.DB) chan *schema.MCPServer {
+	db = db.Model(&schema.MCPServer{})
+	return bizhelper.YieldModel[*schema.MCPServer](ctx, db)
+}

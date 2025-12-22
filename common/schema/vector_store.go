@@ -309,6 +309,10 @@ type KnowledgeBaseInfo struct {
 	Tags string `gorm:"type:text" json:"tags"`
 
 	SerialVersionUID string `gorm:"index" json:"serial_version_uid"`
+
+	// CreatedFromUI 标记该知识库是否由用户通过 UI 直接创建
+	// 用于区分系统知识库和用户条件的知识库
+	CreatedFromUI bool `gorm:"index" json:"created_from_ui"`
 }
 
 func (v *KnowledgeBaseInfo) TableName() string {

@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -168,4 +170,10 @@ func ToggleAIYakToolFavoriteByID(db *gorm.DB, toolID uint) (bool, error) {
 	}
 
 	return tool.IsFavorite, nil
+}
+
+// YieldAllAITools yields all AI tools from the database
+func YieldAllAITools(ctx context.Context, db *gorm.DB) chan *schema.AIYakTool {
+	db = db.Model(&schema.AIYakTool{})
+	return bizhelper.YieldModel[*schema.AIYakTool](ctx, db)
 }

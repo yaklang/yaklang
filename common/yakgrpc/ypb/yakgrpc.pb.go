@@ -1000,6 +1000,7 @@ type CreateKnowledgeBaseV2Request struct {
 	Description   string                 `protobuf:"bytes,2,opt,name=Description,proto3" json:"Description,omitempty"`
 	Type          string                 `protobuf:"bytes,3,opt,name=Type,proto3" json:"Type,omitempty"`
 	Tags          []string               `protobuf:"bytes,4,rep,name=Tags,proto3" json:"Tags,omitempty"`
+	CreatedFromUI bool                   `protobuf:"varint,5,opt,name=CreatedFromUI,proto3" json:"CreatedFromUI,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1060,6 +1061,13 @@ func (x *CreateKnowledgeBaseV2Request) GetTags() []string {
 		return x.Tags
 	}
 	return nil
+}
+
+func (x *CreateKnowledgeBaseV2Request) GetCreatedFromUI() bool {
+	if x != nil {
+		return x.CreatedFromUI
+	}
+	return false
 }
 
 type CreateKnowledgeBaseV2Response struct {
@@ -4512,12 +4520,13 @@ func (x *GetKnowledgeBaseTypeListResponse) GetKnowledgeBaseTypes() []*KnowledgeB
 }
 
 type GetKnowledgeBaseRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	KnowledgeBaseId int64                  `protobuf:"varint,1,opt,name=KnowledgeBaseId,proto3" json:"KnowledgeBaseId,omitempty"`
-	Keyword         string                 `protobuf:"bytes,2,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
-	Pagination      *Paging                `protobuf:"bytes,3,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	KnowledgeBaseId   int64                  `protobuf:"varint,1,opt,name=KnowledgeBaseId,proto3" json:"KnowledgeBaseId,omitempty"`
+	Keyword           string                 `protobuf:"bytes,2,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
+	Pagination        *Paging                `protobuf:"bytes,3,opt,name=Pagination,proto3" json:"Pagination,omitempty"`
+	OnlyCreatedFromUI bool                   `protobuf:"varint,4,opt,name=OnlyCreatedFromUI,proto3" json:"OnlyCreatedFromUI,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetKnowledgeBaseRequest) Reset() {
@@ -4571,6 +4580,13 @@ func (x *GetKnowledgeBaseRequest) GetPagination() *Paging {
 	return nil
 }
 
+func (x *GetKnowledgeBaseRequest) GetOnlyCreatedFromUI() bool {
+	if x != nil {
+		return x.OnlyCreatedFromUI
+	}
+	return false
+}
+
 type KnowledgeBaseInfo struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	ID                       int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
@@ -4579,6 +4595,7 @@ type KnowledgeBaseInfo struct {
 	KnowledgeBaseType        string                 `protobuf:"bytes,4,opt,name=KnowledgeBaseType,proto3" json:"KnowledgeBaseType,omitempty"`
 	Tags                     []string               `protobuf:"bytes,5,rep,name=Tags,proto3" json:"Tags,omitempty"`
 	IsImported               bool                   `protobuf:"varint,6,opt,name=IsImported,proto3" json:"IsImported,omitempty"`
+	CreatedFromUI            bool                   `protobuf:"varint,7,opt,name=CreatedFromUI,proto3" json:"CreatedFromUI,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -4651,6 +4668,13 @@ func (x *KnowledgeBaseInfo) GetTags() []string {
 func (x *KnowledgeBaseInfo) GetIsImported() bool {
 	if x != nil {
 		return x.IsImported
+	}
+	return false
+}
+
+func (x *KnowledgeBaseInfo) GetCreatedFromUI() bool {
+	if x != nil {
+		return x.CreatedFromUI
 	}
 	return false
 }
@@ -64537,12 +64561,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bOnlineID\x18\x02 \x01(\x03R\bOnlineID\"O\n" +
 	"\x1fVerifySystemCertificateResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
-	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"|\n" +
+	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"\xa2\x01\n" +
 	"\x1cCreateKnowledgeBaseV2Request\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x12\n" +
 	"\x04Type\x18\x03 \x01(\tR\x04Type\x12\x12\n" +
-	"\x04Tags\x18\x04 \x03(\tR\x04Tags\"\xb7\x01\n" +
+	"\x04Tags\x18\x04 \x03(\tR\x04Tags\x12$\n" +
+	"\rCreatedFromUI\x18\x05 \x01(\bR\rCreatedFromUI\"\xb7\x01\n" +
 	"\x1dCreateKnowledgeBaseV2Response\x12<\n" +
 	"\rKnowledgeBase\x18\x01 \x01(\v2\x16.ypb.KnowledgeBaseInfoR\rKnowledgeBase\x12\x1c\n" +
 	"\tIsSuccess\x18\x02 \x01(\bR\tIsSuccess\x12\x18\n" +
@@ -64825,13 +64850,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x14\n" +
 	"\x05Value\x18\x03 \x01(\tR\x05Value\"j\n" +
 	" GetKnowledgeBaseTypeListResponse\x12F\n" +
-	"\x12KnowledgeBaseTypes\x18\x01 \x03(\v2\x16.ypb.KnowledgeBaseTypeR\x12KnowledgeBaseTypes\"\x8a\x01\n" +
+	"\x12KnowledgeBaseTypes\x18\x01 \x03(\v2\x16.ypb.KnowledgeBaseTypeR\x12KnowledgeBaseTypes\"\xb8\x01\n" +
 	"\x17GetKnowledgeBaseRequest\x12(\n" +
 	"\x0fKnowledgeBaseId\x18\x01 \x01(\x03R\x0fKnowledgeBaseId\x12\x18\n" +
 	"\aKeyword\x18\x02 \x01(\tR\aKeyword\x12+\n" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
-	"Pagination\"\xef\x01\n" +
+	"Pagination\x12,\n" +
+	"\x11OnlyCreatedFromUI\x18\x04 \x01(\bR\x11OnlyCreatedFromUI\"\x95\x02\n" +
 	"\x11KnowledgeBaseInfo\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12,\n" +
 	"\x11KnowledgeBaseName\x18\x02 \x01(\tR\x11KnowledgeBaseName\x12:\n" +
@@ -64840,7 +64866,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Tags\x18\x05 \x03(\tR\x04Tags\x12\x1e\n" +
 	"\n" +
 	"IsImported\x18\x06 \x01(\bR\n" +
-	"IsImported\"\x9d\x01\n" +
+	"IsImported\x12$\n" +
+	"\rCreatedFromUI\x18\a \x01(\bR\rCreatedFromUI\"\x9d\x01\n" +
 	"\x18GetKnowledgeBaseResponse\x12>\n" +
 	"\x0eKnowledgeBases\x18\x01 \x03(\v2\x16.ypb.KnowledgeBaseInfoR\x0eKnowledgeBases\x12+\n" +
 	"\n" +
