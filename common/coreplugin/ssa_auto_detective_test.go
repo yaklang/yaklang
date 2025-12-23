@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -25,13 +27,13 @@ func TestSSAAutoDetective(t *testing.T) {
 	})
 
 	check := func(t *testing.T, input string) (*ssaconfig.Config, error) {
-		info, prog, cleanup, err := ParseProjectWithAutoDetective(context.Background(), input, "", false)
-		_ = prog
-		_ = cleanup
-		if info == nil {
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target: input,
+		})
+		if res == nil || res.Info == nil {
 			return nil, err
 		}
-		return info.Config, err
+		return res.Info.Config, err
 	}
 
 	t.Run("check compile jar", func(t *testing.T) {
@@ -172,14 +174,14 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		defer cleanupDir()
 
 		// 使用 SSA 探测获取 config
-		info, prog, cleanup, err := ParseProjectWithAutoDetective(
-			context.Background(),
-			tempDir,
-			"",
-			false,
-		)
-		_ = cleanup // compileImmediately=false 时不需要清理
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target: tempDir,
+		})
 		require.NoError(t, err)
+		info := res.Info
+		prog := res.Program
+		cleanup := res.Cleanup
+		_ = cleanup // compileImmediately=false 时不需要清理
 		require.Nil(t, prog)
 
 		// 使用辅助函数创建 SSA 项目
@@ -204,13 +206,15 @@ func TestSSAProjectComprehensive(t *testing.T) {
 
 		// 使用 compile_immediately=true 探测项目
 		log.Infof("Starting SSA auto detective with compile_immediately=true...")
-		info, prog, cleanup, err := ParseProjectWithAutoDetective(
-			context.Background(),
-			tempDir,
-			"java",
-			true, // compile_immediately - 应该自动编译
-		)
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:             tempDir,
+			Language:           "java",
+			CompileImmediately: true,
+		})
 		require.NoError(t, err)
+		info := res.Info
+		prog := res.Program
+		cleanup := res.Cleanup
 		require.NotNil(t, cleanup, "cleanup function should be returned")
 		defer cleanup() // 使用返回的清理函数
 
@@ -269,8 +273,12 @@ public class ExistsTest {
 
 		// 第一次探测，项目不应该存在
 		log.Infof("First detection - project should not exist")
-		info1, _, _, err := ParseProjectWithAutoDetective(context.Background(), tempDir, "java", false)
+		res1, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:   tempDir,
+			Language: "java",
+		})
 		require.NoError(t, err)
+		info1 := res1.Info
 		require.NotNil(t, info1)
 		require.False(t, info1.ProjectExists, "First detection: project should not exist")
 
@@ -288,8 +296,12 @@ public class ExistsTest {
 
 		// 第二次探测，项目应该存在，并使用已有配置
 		log.Infof("Second detection - project should exist and use existing config")
-		info2, _, _, err := ParseProjectWithAutoDetective(context.Background(), tempDir, "java", false)
+		res2, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:   tempDir,
+			Language: "java",
+		})
 		require.NoError(t, err)
+		info2 := res2.Info
 		require.NotNil(t, info2)
 		require.True(t, info2.ProjectExists, "Second detection: project should exist")
 
@@ -320,14 +332,15 @@ public class ExistsTest {
 
 		// Step 1: 探测项目
 		log.Infof("Step 1: Starting SSA auto detective without compile...")
-		info, prog, cleanup, err := ParseProjectWithAutoDetective(
-			context.Background(),
-			tempDir,
-			"java",
-			false,
-		)
-		_ = cleanup
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:   tempDir,
+			Language: "java",
+		})
 		require.NoError(t, err)
+		info := res.Info
+		prog := res.Program
+		cleanup := res.Cleanup
+		_ = cleanup
 		require.Nil(t, prog, "Program should not be compiled yet")
 		require.NotEmpty(t, info.GetProgramName(), "Program name should not be empty")
 
