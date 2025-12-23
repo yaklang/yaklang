@@ -154,7 +154,9 @@ IMPORTANT GUIDELINES:
             - 高危：SQL注入风险，已实施参数化查询
             - 中危：XSS防护不完善，已添加输入验证和输出编码
         <|HUMAN_READABLE_RESULT_END_{{ .Nonce }}|>
-
+- 针对 `completed_task_index` 字段：
+    - 如果你认为 '1-1' 任务应该标注为结束，请返回 `..."completed_task_index": "1-1"...`
+    - 如果你在做之前的事情的时候，已经已经完成了未来的任务，例如完成了 1-2 和 2-2，请你标注 `1-2,2-2`
 
 ## 以下是两个典型响应信息（正确）
 
