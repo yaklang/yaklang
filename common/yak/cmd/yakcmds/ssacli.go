@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
-	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -93,24 +92,7 @@ var staticCheck = &cli.Command{
 		rules := c.String("rules")
 		language := c.String("language")
 		excludeFileStr := c.String("exclude-file")
-		var excludeFiles []string
-		if excludeFileStr != "" {
-			excludeFiles = strings.Split(excludeFileStr, ",")
-			for i := range excludeFiles {
-				excludeFiles[i] = strings.TrimSpace(excludeFiles[i])
-			}
-		}
-		var excludeCompile []glob.Glob
-		for _, s := range excludeFiles {
-			if s == "" {
-				continue
-			}
-			compile, err := glob.Compile(s)
-			if err != nil {
-				return err
-			}
-			excludeCompile = append(excludeCompile, compile)
-		}
+
 		zipfs, err2 := filesys.NewZipFSFromLocal(file)
 		if err2 != nil {
 			return err2
@@ -133,14 +115,10 @@ var staticCheck = &cli.Command{
 			sfrules = append(sfrules, sfrule)
 			return nil
 		}))
-		programs, err := ssaapi.ParseProjectWithFS(zipfs, ssaapi.WithRawLanguage(language), ssaapi.WithExcludeFile(func(path, filename string) bool {
-			for _, g := range excludeCompile {
-				if g.Match(file) {
-					return true
-				}
-			}
-			return false
-		}))
+		programs, err := ssaapi.ParseProjectWithFS(zipfs,
+			ssaapi.WithRawLanguage(language),
+			ssaapi.WithExcludeFunc(excludeFileStr),
+		)
 		if err != nil {
 			return err
 		}
@@ -242,9 +220,6 @@ var ssaCompile = &cli.Command{
 			Name:  "entry",
 			Usage: "Program Entry",
 		},
-		cli.BoolFlag{
-			Name: "memory",
-		},
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
 			Usage: "syntax flow query language",
@@ -302,7 +277,6 @@ var ssaCompile = &cli.Command{
 		}
 		entry := c.String("entry")
 		input_language := c.String("language")
-		inMemory := c.Bool("memory")
 		rawFile := c.String("target")
 		target := utils.GetFirstExistedPath(rawFile)
 		databaseFileRaw := c.String("database")
@@ -314,25 +288,6 @@ var ssaCompile = &cli.Command{
 		showDot := c.Bool("dot")
 		withCode := c.Bool("with-code")
 		excludeFileStr := c.String("exclude-file")
-		var excludeFiles []string
-		if excludeFileStr != "" {
-			excludeFiles = strings.Split(excludeFileStr, ",")
-			for i := range excludeFiles {
-				excludeFiles[i] = strings.TrimSpace(excludeFiles[i])
-			}
-		}
-
-		var excludeCompile []glob.Glob
-		for _, s := range excludeFiles {
-			if s == "" {
-				continue
-			}
-			compile, err := glob.Compile(s)
-			if err != nil {
-				return err
-			}
-			excludeCompile = append(excludeCompile, compile)
-		}
 		// check program name duplicate
 		if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
 			if !reCompile {
@@ -383,30 +338,18 @@ var ssaCompile = &cli.Command{
 		log.Infof("start to compile file: %v ", target)
 		opt = append(opt, ssaapi.WithRawLanguage(input_language))
 		opt = append(opt, ssaapi.WithReCompile(reCompile))
-		opt = append(opt, ssaapi.WithExcludeFile(func(path, filename string) bool {
-			for _, g := range excludeCompile {
-				if g.Match(filename) {
-					return true
-				}
-			}
-			return false
-		}))
+		opt = append(opt, ssaapi.WithExcludeFunc(excludeFileStr))
 
 		if entry != "" {
 			log.Infof("start to use entry file: %v", entry)
 			opt = append(opt, ssaapi.WithFileSystemEntry(entry))
 		}
 
-		if inMemory {
-			//纯内存模式，cache将只会保留一个小时
-			log.Infof("compile in memory mode, program-name will be ignored")
-		} else {
-			if programName == "" {
-				programName = "default-" + ksuid.New().String()
-			}
-			log.Infof("compile save to database with program name: %v", programName)
-			opt = append(opt, ssaapi.WithProgramName(programName))
+		if programName == "" {
+			programName = "default-" + ksuid.New().String()
 		}
+		log.Infof("compile save to database with program name: %v", programName)
+		opt = append(opt, ssaapi.WithProgramName(programName))
 
 		if !noOverride {
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)

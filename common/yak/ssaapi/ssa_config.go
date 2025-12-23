@@ -17,6 +17,7 @@ import (
 )
 
 type ProcessFunc func(msg string, process float64)
+type ExcludeFunc func(path, filename string) bool
 
 type Config struct {
 	*ssaconfig.Config // config
@@ -56,7 +57,7 @@ type Config struct {
 	// process ctx
 	ctx context.Context
 
-	excludeFile func(path, filename string) bool
+	excludeFile ExcludeFunc
 
 	logLevel string
 
@@ -75,49 +76,42 @@ func (c *Config) CalcHash() string {
 
 var WithConfigInfo = ssaconfig.WithCodeSourceMap
 
-var withExcludeFile = ssaconfig.SetOption("ssa_compile/exclude_file", func(c *Config, v func(path, filename string) bool) {
-	c.excludeFile = v
-})
-
-func WithExcludeFunc(patterns []string) ssaconfig.Option {
+func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
 	var compile []glob.Glob
 	var validPatterns []string
 
-	for _, pattern := range patterns {
+	addPattern := func(pattern string) {
 		pattern = strings.TrimSpace(pattern)
 		if pattern == "" {
-			continue
+			return
 		}
 		g, err := glob.Compile(pattern)
 		if err != nil {
 			log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, pattern)
-			continue
+			return
 		}
 		compile = append(compile, g)
 		validPatterns = append(validPatterns, pattern)
 	}
 
-	if len(compile) == 0 {
-		return func(c *ssaconfig.Config) error {
-			return ssaconfig.WithCompileExcludeFiles([]string{})(c)
+	for _, pattern := range patterns {
+		addPattern(pattern)
+
+		// 普通化分隔符（处理不同系统）
+		relPattern := strings.TrimPrefix(pattern, basePath)
+		relPattern = strings.TrimLeft(relPattern, "/")
+		if relPattern != pattern {
+			addPattern(relPattern)
 		}
 	}
 
-	return func(c *ssaconfig.Config) error {
-		if err := ssaconfig.WithCompileExcludeFiles(validPatterns)(c); err != nil {
-			return err
-		}
-		return withExcludeFile(func(dir string, path string) bool {
-			for _, g := range compile {
-				if match := g.Match(dir); match {
-					return true
-				}
-				if match := g.Match(path); match {
-					return true
-				}
+	return func(path, filename string) bool {
+		for _, g := range compile {
+			if match := g.Match(path); match {
+				return true
 			}
-			return false
-		})(c)
+		}
+		return false
 	}
 }
 
@@ -143,9 +137,7 @@ var WithCacheTTL = ssaconfig.SetOption("ssa_compile/cache_ttl", func(c *Config, 
 	c.cacheTTL = append(c.cacheTTL, v)
 })
 
-var WithExcludeFile = ssaconfig.SetOption("ssa_compile/exclude_file", func(c *Config, v func(path, filename string) bool) {
-	c.excludeFile = v
-})
+var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 
 var WithProcess = ssaconfig.SetOption("ssa_compile/process", func(c *Config, v ProcessFunc) {
 	c.process = v
@@ -308,9 +300,8 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		Config:      sc,
 	}
 	if !utils.IsNil(sc.SSACompile) {
-		if efs := sc.SSACompile.ExcludeFiles; efs != nil {
-			fn := WithExcludeFunc(efs)
-			fn(sc)
+		if exclude := sc.SSACompile.ExcludeFiles; exclude != nil {
+			c.excludeFile = newExcludeFunc(exclude, sc.GetCodeSourceLocalFile())
 		}
 	}
 

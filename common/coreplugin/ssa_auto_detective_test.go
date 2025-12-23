@@ -405,3 +405,106 @@ public class ExistsTest {
 		log.Infof("✅ Test passed: SSA project compiled successfully 3 times with CompileTimes = 3")
 	})
 }
+
+func TestExcludeFile(t *testing.T) {
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
+
+	setup := func() string {
+		// virtual project structure:
+		tempDir := path.Join(os.TempDir(), uuid.NewString())
+		require.NoError(t, os.MkdirAll(path.Join(tempDir, "a"), 0o755))
+		require.NoError(t, os.MkdirAll(path.Join(tempDir, "b"), 0o755))
+
+		writeFile := func(relPath, content string) {
+			fullPath := path.Join(tempDir, relPath)
+			require.NoError(t, os.WriteFile(fullPath, []byte(content), 0o644))
+		}
+
+		writeFile("a.java", "public class A{}")
+		writeFile("a/a.java", "public class A1 {}")
+		writeFile("a/b.java", "public class B1 {}")
+		writeFile("b/a.java", "public class A2 {}")
+		return tempDir
+	}
+
+	t.Run("exclude file", func(t *testing.T) {
+		tempDir := setup()
+		defer os.RemoveAll(tempDir)
+		// exclude all files named a.java, expect pattern to be kept in config
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:   tempDir,
+			Language: "java",
+			Params: map[string]any{
+				"excludeFile": "a.java",
+			},
+			CompileImmediately: true,
+		})
+		require.NoError(t, err)
+		info := res.Info
+		require.NotNil(t, info)
+		require.NotNil(t, info.Config)
+
+		excludes := info.Config.GetCompileExcludeFiles()
+		require.Contains(t, excludes, "a.java")
+
+		prog := res.Program
+		defer ssadb.DeleteProgram(ssadb.GetDB(), prog.GetProgramName())
+		require.NotNil(t, prog)
+
+		fileList := make([]string, 0, len(prog.Program.FileList))
+		prog.Show().ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+			s = strings.TrimPrefix(s, "/"+prog.GetProgramName())
+			fileList = append(fileList, s)
+			return true
+		})
+
+		log.Infof("FileList: %#v", fileList)
+
+		require.Contains(t, fileList, "/a/a.java")
+		require.Contains(t, fileList, "/a/b.java")
+		require.Contains(t, fileList, "/b/a.java")
+		require.NotContains(t, fileList, "/a.java")
+	})
+
+	t.Run("exclude folder", func(t *testing.T) {
+		tempDir := setup()
+		defer os.RemoveAll(tempDir)
+		// exclude folder `a` with both `a` and `a/` style patterns,
+		// ensure they are correctly propagated into config.
+		res, err := ParseProjectWithAutoDetective(context.Background(), &SSADetectConfig{
+			Target:   tempDir,
+			Language: "java",
+			Params: map[string]any{
+				"excludeFile": "a,a/",
+			},
+			CompileImmediately: true,
+		})
+		require.NoError(t, err)
+		info := res.Info
+		require.NotNil(t, info)
+		require.NotNil(t, info.Config)
+
+		excludes := info.Config.GetCompileExcludeFiles()
+		require.Contains(t, excludes, "a")
+		require.Contains(t, excludes, "a/")
+
+		prog := res.Program
+		defer ssadb.DeleteProgram(ssadb.GetDB(), prog.GetProgramName())
+		require.NotNil(t, prog)
+
+		fileList := make([]string, 0, len(prog.Program.FileList))
+		prog.Show().ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+			s = strings.TrimPrefix(s, "/"+prog.GetProgramName())
+			fileList = append(fileList, s)
+			return true
+		})
+		log.Infof("FileList: %#v", fileList)
+
+		require.Contains(t, fileList, "/b/a.java")
+		require.Contains(t, fileList, "/a.java")
+		require.NotContains(t, fileList, "/a/a.java")
+		require.NotContains(t, fileList, "/a/b.java")
+	})
+}

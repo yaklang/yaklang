@@ -33,7 +33,7 @@ func TestConfigWithOptions(t *testing.T) {
 		WithProjectLanguage(GO),
 		WithCompileStrictMode(true),
 		WithCompilePeepholeSize(42),
-		WithCompileExcludeFiles([]string{"*.tmp"}),
+		WithCompileExcludeFiles("*.tmp"),
 		WithCompileReCompile(true),
 		WithCompileMemoryCompile(true),
 		WithCompileConcurrency(17),

@@ -1,7 +1,6 @@
 package php
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,13 +23,7 @@ println(2);
 	result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
 	require.NoError(t, err)
 	require.True(t, result.GetValues("param").Len() != 0)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithExcludeFile(func(path, filename string) bool {
-		dir, _ := filepath.Split(path)
-		if dir == "var/www/exclude/" {
-			return true
-		}
-		return false
-	}), ssaapi.WithLanguage(ssaconfig.PHP))
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithExcludeFunc("**/vendor/**", "vendor/**"))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -56,7 +49,7 @@ println(2);
 	values := result.GetValues("param")
 	require.True(t, values.Len() != 0)
 
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithExcludeFunc([]string{"**/vendor/**", "vendor/**"}))
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.PHP), ssaapi.WithExcludeFunc("**/vendor/**", "vendor/**"))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
@@ -112,7 +105,7 @@ func CMD1(c *gin.Context) {
 	values := result.GetValues("param")
 	require.True(t, values.Len() != 0)
 
-	filterFunc := ssaapi.WithExcludeFunc([]string{"**temp**"})
+	filterFunc := ssaapi.WithExcludeFunc("**temp**")
 	require.NoError(t, err)
 	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)
@@ -122,7 +115,7 @@ func CMD1(c *gin.Context) {
 	values = result.GetValues("param")
 	require.True(t, values.Len() == 0)
 
-	filterFunc = ssaapi.WithExcludeFunc([]string{"**temp/**"})
+	filterFunc = ssaapi.WithExcludeFunc("**temp/**")
 	require.NoError(t, err)
 	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), filterFunc)
 	require.NoError(t, err)

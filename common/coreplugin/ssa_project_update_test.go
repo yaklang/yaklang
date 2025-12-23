@@ -97,7 +97,7 @@ func TestSSAProjectUpdate(t *testing.T) {
 			// SSACompile
 			ssaconfig.WithCompileStrictMode(true),
 			ssaconfig.WithCompilePeepholeSize(10),
-			ssaconfig.WithCompileExcludeFiles([]string{"**/test/**"}),
+			ssaconfig.WithCompileExcludeFiles("**/test/**"),
 			ssaconfig.WithCompileReCompile(true),
 			ssaconfig.WithCompileMemoryCompile(false),
 			ssaconfig.WithCompileConcurrency(5),
