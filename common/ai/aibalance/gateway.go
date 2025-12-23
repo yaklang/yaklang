@@ -21,10 +21,11 @@ const (
 	AIBALANCE_TOTP_SECRET_KEY = "AIBALANCE_CLIENT_TOTP_SECRET"
 )
 
-// TOTP 密钥内存缓存
+// TOTP 密钥内存缓存和初始化控制
 var (
 	totpSecretCache     string
 	totpSecretCacheLock sync.RWMutex
+	totpInitOnce        sync.Once // 控制初始化只执行一次
 )
 
 // ErrMemfitTOTPAuthFailed is the error type for TOTP authentication failures
@@ -49,6 +50,19 @@ func (g *GatewayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispec.StructuredData, error) {
+	// 用于捕获 TOTP 错误的标志
+	var totpErrorDetected bool
+
+	// 包装的错误处理器
+	wrappedErrorHandler := func(err error) {
+		if err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err) {
+			totpErrorDetected = true
+		}
+		if g.config.HTTPErrorHandler != nil {
+			g.config.HTTPErrorHandler(err)
+		}
+	}
+
 	ch, err := aispec.StructuredStreamBase(
 		g.targetUrl,
 		g.config.Model,
@@ -56,12 +70,17 @@ func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispe
 		g.BuildHTTPOptions,
 		g.config.StreamHandler,
 		g.config.ReasonStreamHandler,
-		g.config.HTTPErrorHandler,
+		wrappedErrorHandler,
 	)
-	if err != nil && g.isMemfitTOTPError(err) {
-		// TOTP 认证失败，刷新密钥并重试
-		log.Infof("TOTP authentication failed in StructuredStream, refreshing secret and retrying...")
+
+	// 检查是否是 TOTP 认证失败
+	shouldRetry := (err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err)) || totpErrorDetected
+
+	if shouldRetry {
+		log.Warnf("TOTP authentication failed in StructuredStream, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
+		totpErrorDetected = false
+
 		return aispec.StructuredStreamBase(
 			g.targetUrl,
 			g.config.Model,
@@ -69,7 +88,7 @@ func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispe
 			g.BuildHTTPOptions,
 			g.config.StreamHandler,
 			g.config.ReasonStreamHandler,
-			g.config.HTTPErrorHandler,
+			wrappedErrorHandler,
 		)
 	}
 	return ch, err
@@ -78,6 +97,51 @@ func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispe
 var _ aispec.AIClient = (*GatewayClient)(nil)
 
 func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
+	// 用于捕获 TOTP 错误的标志
+	var totpErrorDetected bool
+
+	// 包装的错误处理器，用于检测 TOTP 错误
+	wrappedErrorHandler := func(err error) {
+		if err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err) {
+			totpErrorDetected = true
+		}
+		if g.config.HTTPErrorHandler != nil {
+			g.config.HTTPErrorHandler(err)
+		}
+	}
+
+	// 检测 TOTP 错误并刷新
+	shouldRefreshAndRetry := func(result string, err error) bool {
+		// 只有 memfit 模型才需要检测 TOTP 错误
+		if !g.isMemfitModel() {
+			return false
+		}
+
+		// 检查标志（由错误处理器设置）
+		if totpErrorDetected {
+			return true
+		}
+
+		// 检查错误中是否包含 TOTP 错误
+		if err != nil && g.isMemfitTOTPError(err) {
+			return true
+		}
+
+		// 检查结果中是否包含 TOTP 错误（流式请求可能没有正确返回错误）
+		if isMemfitTOTPErrorInResponse(result) {
+			return true
+		}
+
+		// memfit 模型返回空结果时，尝试刷新 TOTP（可能是认证失败导致）
+		// 注意：这是一个保守策略，只对 memfit 模型生效
+		if result == "" && err == nil {
+			log.Warnf("Empty result for memfit model, may be TOTP auth failure, will try refresh")
+			return true
+		}
+
+		return false
+	}
+
 	result, err := aispec.ChatBase(
 		g.targetUrl,
 		g.config.Model,
@@ -86,15 +150,17 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
-		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
+		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 	)
 
-	// 检查是否是 TOTP 认证失败
-	if err != nil && g.isMemfitTOTPError(err) {
-		// TOTP 认证失败，刷新密钥并重试
-		log.Infof("TOTP authentication failed, refreshing secret and retrying...")
+	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
+	if shouldRefreshAndRetry(result, err) {
+		log.Warnf("TOTP authentication failed for memfit model, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
+
+		// 重置标志
+		totpErrorDetected = false
 
 		// 重试请求
 		return aispec.ChatBase(
@@ -105,7 +171,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 			aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 			aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
-			aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
+			aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 		)
 	}
@@ -114,22 +180,58 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 }
 
 func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
+	// 用于捕获 TOTP 错误的标志
+	var totpErrorDetected bool
+
+	// 包装的错误处理器
+	wrappedErrorHandler := func(err error) {
+		if err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err) {
+			totpErrorDetected = true
+		}
+		if g.config.HTTPErrorHandler != nil {
+			g.config.HTTPErrorHandler(err)
+		}
+	}
+
+	// 检测 TOTP 错误并刷新
+	shouldRefreshAndRetry := func(result map[string]any, err error) bool {
+		// 只有 memfit 模型才需要检测 TOTP 错误
+		if !g.isMemfitModel() {
+			return false
+		}
+
+		// 检查标志
+		if totpErrorDetected {
+			return true
+		}
+
+		// 检查错误中是否包含 TOTP 错误
+		if err != nil && g.isMemfitTOTPError(err) {
+			return true
+		}
+
+		return false
+	}
+
 	result, err := aispec.ChatBasedExtractData(
 		g.targetUrl,
 		g.config.Model, msg, fields,
-		g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler,
+		g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, wrappedErrorHandler,
 		g.config.Images...,
 	)
 
 	// 检查是否是 TOTP 认证失败
-	if err != nil && g.isMemfitTOTPError(err) {
-		log.Infof("TOTP authentication failed in ExtractData, refreshing secret and retrying...")
+	if shouldRefreshAndRetry(result, err) {
+		log.Warnf("TOTP authentication failed in ExtractData, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
+
+		// 重置标志
+		totpErrorDetected = false
 
 		return aispec.ChatBasedExtractData(
 			g.targetUrl,
 			g.config.Model, msg, fields,
-			g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, g.config.HTTPErrorHandler,
+			g.BuildHTTPOptions, g.config.StreamHandler, g.config.ReasonStreamHandler, wrappedErrorHandler,
 			g.config.Images...,
 		)
 	}
@@ -138,18 +240,34 @@ func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]a
 }
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
+	// 用于捕获 TOTP 错误的标志
+	var totpErrorDetected bool
+
+	// 包装的错误处理器
+	wrappedErrorHandler := func(err error) {
+		if err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err) {
+			totpErrorDetected = true
+		}
+		if g.config.HTTPErrorHandler != nil {
+			g.config.HTTPErrorHandler(err)
+		}
+	}
+
 	reader, err := aispec.ChatWithStream(
-		g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.ReasonStreamHandler,
+		g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 		g.BuildHTTPOptions,
 	)
 
 	// 检查是否是 TOTP 认证失败
-	if err != nil && g.isMemfitTOTPError(err) {
-		log.Infof("TOTP authentication failed in ChatStream, refreshing secret and retrying...")
+	shouldRetry := (err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err)) || totpErrorDetected
+
+	if shouldRetry {
+		log.Warnf("TOTP authentication failed in ChatStream, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
+		totpErrorDetected = false
 
 		return aispec.ChatWithStream(
-			g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.ReasonStreamHandler,
+			g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 			g.BuildHTTPOptions,
 		)
 	}
@@ -167,6 +285,12 @@ func (g *GatewayClient) isMemfitTOTPError(err error) bool {
 	return strings.Contains(errStr, "memfit_totp_auth_failed") ||
 		strings.Contains(errStr, "Memfit TOTP authentication failed") ||
 		strings.Contains(errStr, "memfit_totp_auth_required")
+}
+
+// isMemfitTOTPErrorInResponse checks if the response content contains TOTP error
+func isMemfitTOTPErrorInResponse(content string) bool {
+	return strings.Contains(content, "memfit_totp_auth_failed") ||
+		strings.Contains(content, "Memfit TOTP authentication failed")
 }
 
 func (g *GatewayClient) newLoadOption(opt ...aispec.AIConfigOption) {
@@ -217,41 +341,58 @@ func (g *GatewayClient) isMemfitModel() bool {
 	return strings.HasPrefix(strings.ToLower(g.config.Model), "memfit-")
 }
 
+// initTOTPSecretOnce initializes TOTP secret only once per process
+// Priority: Memory cache -> Database -> Server
+func (g *GatewayClient) initTOTPSecretOnce() {
+	totpInitOnce.Do(func() {
+		log.Infof("Initializing TOTP secret for aibalance client...")
+
+		// 1. Check memory cache first
+		totpSecretCacheLock.RLock()
+		if totpSecretCache != "" {
+			totpSecretCacheLock.RUnlock()
+			log.Infof("TOTP secret already in memory cache")
+			return
+		}
+		totpSecretCacheLock.RUnlock()
+
+		// 2. Try to load from database
+		db := consts.GetGormProfileDatabase()
+		if db != nil {
+			secret := yakit.GetKey(db, AIBALANCE_TOTP_SECRET_KEY)
+			if secret != "" {
+				log.Infof("Loaded TOTP secret from database during initialization")
+				totpSecretCacheLock.Lock()
+				totpSecretCache = secret
+				totpSecretCacheLock.Unlock()
+				return
+			}
+		}
+
+		// 3. Fetch from server and save to database
+		secret := g.fetchTOTPSecretFromServer()
+		if secret != "" {
+			g.saveTOTPSecretToDatabase(secret)
+			totpSecretCacheLock.Lock()
+			totpSecretCache = secret
+			totpSecretCacheLock.Unlock()
+			log.Infof("TOTP secret initialized from server")
+		}
+	})
+}
+
 // getTOTPSecret gets TOTP secret with priority:
 // 1. Memory cache
 // 2. Database
 // 3. Fetch from server (and save to database)
 func (g *GatewayClient) getTOTPSecret() string {
-	// 1. Check memory cache first
+	// Ensure initialization happened
+	g.initTOTPSecretOnce()
+
+	// Return from cache
 	totpSecretCacheLock.RLock()
-	if totpSecretCache != "" {
-		defer totpSecretCacheLock.RUnlock()
-		return totpSecretCache
-	}
-	totpSecretCacheLock.RUnlock()
-
-	// 2. Try to load from database
-	db := consts.GetGormProfileDatabase()
-	if db != nil {
-		secret := yakit.GetKey(db, AIBALANCE_TOTP_SECRET_KEY)
-		if secret != "" {
-			log.Infof("Loaded TOTP secret from database")
-			totpSecretCacheLock.Lock()
-			totpSecretCache = secret
-			totpSecretCacheLock.Unlock()
-			return secret
-		}
-	}
-
-	// 3. Fetch from server and save to database
-	secret := g.fetchTOTPSecretFromServer()
-	if secret != "" {
-		g.saveTOTPSecretToDatabase(secret)
-		totpSecretCacheLock.Lock()
-		totpSecretCache = secret
-		totpSecretCacheLock.Unlock()
-	}
-	return secret
+	defer totpSecretCacheLock.RUnlock()
+	return totpSecretCache
 }
 
 // saveTOTPSecretToDatabase saves the TOTP secret to database
@@ -323,11 +464,13 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 }
 
 // refreshTOTPSecretAndSave clears the cache, fetches new secret from server, and saves to database
+// This function is called when TOTP authentication fails
 func (g *GatewayClient) refreshTOTPSecretAndSave() {
-	log.Infof("Refreshing TOTP secret due to authentication failure...")
+	log.Warnf("Refreshing TOTP secret due to authentication failure...")
 
-	// Clear memory cache
+	// Clear memory cache first
 	totpSecretCacheLock.Lock()
+	oldSecret := totpSecretCache
 	totpSecretCache = ""
 	totpSecretCacheLock.Unlock()
 
@@ -342,10 +485,28 @@ func (g *GatewayClient) refreshTOTPSecretAndSave() {
 		totpSecretCache = secret
 		totpSecretCacheLock.Unlock()
 
-		log.Infof("TOTP secret refreshed and saved successfully")
+		if oldSecret != secret {
+			log.Infof("TOTP secret refreshed: old=%s... new=%s...", safeSecretPrefix(oldSecret), safeSecretPrefix(secret))
+		} else {
+			log.Warnf("TOTP secret unchanged after refresh, server may have same secret")
+		}
 	} else {
 		log.Errorf("Failed to refresh TOTP secret from server")
+		// Restore old secret if refresh failed
+		if oldSecret != "" {
+			totpSecretCacheLock.Lock()
+			totpSecretCache = oldSecret
+			totpSecretCacheLock.Unlock()
+		}
 	}
+}
+
+// safeSecretPrefix returns first 8 characters of secret for logging
+func safeSecretPrefix(secret string) string {
+	if len(secret) <= 8 {
+		return secret
+	}
+	return secret[:8]
 }
 
 // generateTOTPCode generates TOTP code using the secret
