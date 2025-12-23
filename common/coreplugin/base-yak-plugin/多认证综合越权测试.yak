@@ -101,6 +101,14 @@ enableResponseKeywordRegexp = cli.Bool(
     cli.setVerboseName("响应内容标志值开启正则"), 
     cli.setCliGroup("高级（可选参数）"), 
 )
+
+enableNotifyRisk = cli.Bool(
+    "enable-notify-risk",
+    cli.setRequired(false),
+    cli.setVerboseName("是否通知漏洞"),
+    cli.setCliGroup("高级（可选参数）"),
+)
+
 cli.check()
 
 yakit.AutoInitYakit()
@@ -139,15 +147,15 @@ func _jsonKind(v) {
         if s == "" {
             return ""
         }
-        
+
         if str.HasPrefix(s, "[") {
             return "array"
         }
-        
+
         if str.HasPrefix(s, "{") {
             return "object"
         }
-        
+
         if str.HasPrefix(s, "\"") {
             return "string"
         }
@@ -187,13 +195,16 @@ func Product(sli) {
     return ret
 }
 
-handleReq = (https, reqBytes, baseResponse, handleTag) => {
+handleReq = (https, url, reqBytes, baseResponse, handleTag) => {
     // yakit.Code(reqBytes)
     poc.HTTP(
-        reqBytes, 
-        poc.https(https), 
+        reqBytes,
+        poc.https(https),
         poc.saveHandler(response => {
             tag = ""
+            notifyTitle = ""
+            notifyDesc = ""
+            notifyDetail = {"handle_tag": handleTag}
             if len(enableResponseKeywordList) > 0 {
                 if respMatch(response.RawPacket, enableResponseKeywordList...) {
                     tag = "响应内容标志值匹配"
@@ -201,6 +212,8 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
                 } else {
                     tag = "响应内容标志值消失"
                     response.Green()
+                    notifyTitle = "响应内容标志值消失"
+                    notifyDesc = "原响应包含标志值，但替换/移除认证信息后响应不再匹配标志值，疑似存在越权/鉴权绕过（也可能是误报）。"
                 }
             } else {
                 sim := str.CalcSimilarity(baseResponse, response.RawPacket)
@@ -208,16 +221,58 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
                     response.Red()
                 } elif sim <= 0.4 {
                     response.Green()
+                    notifyTitle = sprintf("响应相似度较低：%.2f%%", sim*100.0)
+                    notifyDesc = "与原始响应相似度较低，疑似存在越权/鉴权绕过（也可能是误报）。"
                 } else {
                     response.Grey()
                 }
 
                 showSim = "%.2f" % (sim * 100.0)
                 tag = f"相似：${showSim}% "
+                notifyDetail["similarity"] = showSim
             }
             response.AddTag(tag)
             response.AddTag(handleTag)
-        }), 
+
+            if enableNotifyRisk && notifyTitle != "" {
+                notifyDetail["tag"] = tag
+                risk.NewRisk(
+                    url,
+                    risk.title(sprintf("(Maybe) 越权/鉴权绕过: %v", url)),
+                    risk.titleVerbose("疑似越权/鉴权绕过"),
+                    risk.type("access-control"), risk.typeVerbose("越权/鉴权绕过"),
+                    risk.severity("high"),
+                    risk.description(`
+本条记录由“多认证综合越权测试”插件生成：插件会基于你配置的多组认证信息（Header/Cookie），对同一条 HTTP 流量进行“替换认证值 / 移除认证值”的组合测试，并将测试响应与原始响应进行对比（相似度或响应内容标志值）。
+
+触发原因通常包括：
+
+移除/替换认证信息后，响应内容标志值不再出现（或出现/消失发生变化）
+响应与原始响应相似度显著降低（可能进入了不同的权限页面、未授权页面或跳转页面）
+注意：该结果并不等价于“已确认越权”，可能存在误报（例如缓存、随机字段、时间戳、AB 测试、跳转链、验证码、限流/封禁、响应内容不稳定等）。
+
+建议人工复核：
+
+复现该条记录对应的请求（保留同路径/参数），对比“原始认证”与“替换/移除认证”的响应差异
+关注是否能在未授权状态下访问到原本需要更高权限的数据/接口（IDOR/水平越权/垂直越权/鉴权缺失）
+若使用了“响应内容标志值”，请确认标志值确实代表“已授权/成功”语义
+`),
+                    risk.solution(`
+修复建议（按优先级）：
+
+服务端对每个敏感接口强制鉴权：不要仅依赖前端控制或仅校验“是否登录”，需校验“是否拥有该资源/该操作权限”
+对资源访问做对象级授权校验（IDOR）：基于用户身份/租户/角色校验资源归属与权限（而不是只信任参数中的 userId/roleId 等）
+统一鉴权入口：在网关/中间件/拦截器层对所有接口默认拒绝，按白名单放行
+避免可被绕过的认证实现：Cookie/Header 的解析与覆盖逻辑要一致，禁止多来源身份混用、禁止弱校验/仅校验某一字段
+对敏感操作增加审计与告警：记录用户、资源、来源 IP、UA、失败原因，便于定位越权路径与影响范围
+`),
+                    risk.description(sprintf("%v\n\n%v\n\nTag: %v", notifyTitle, notifyDesc, handleTag)),
+                    risk.request(reqBytes),
+                    risk.response(response.RawPacket),
+                    risk.details(notifyDetail),
+                )
+            }
+        }),
     )
 }
 
@@ -242,7 +297,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
                 rules = disableDomain.Split(",").Map(i => i.Trim())
                 skipped = str.MatchAnyOfGlob(host, rules...)
             }
-            
+
 
             if !skipped && disablePath != "" {
                 skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
@@ -252,7 +307,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             if !skipped && enableDomain {
                 skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
             }
-            
+
 
             if !skipped && enablePath {
                 skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
@@ -270,13 +325,13 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
                 enableResponseKeywordList = enableResponseKeyword.Split("\n")
                 skipped = !respMatch(rsp, enableResponseKeywordList...)
             }
-            
+
 
             if skipped {
                 return
             }
 
-            
+
             if !force {
                 if kind == "Cookie" {
                     if poc.GetHTTPPacketCookie(req, key) == "" {
@@ -320,7 +375,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             tags = append(tags, f"${kind}[${key}: ${value}]")
         }
         tag = f"值 ${str.Join(tags, ", ")}"
-        handleReq(https, replaceReq, rsp, tag)
+        handleReq(https, url, replaceReq, rsp, tag)
     }
 
     for seq in Product(emptyResults) {
@@ -340,6 +395,6 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             tags = append(tags, f"${kind}[${key}]")
         }
         tag = f"移除 ${str.Join(tags, ", ")}"
-        handleReq(https, emptyReq, rsp, tag)
+        handleReq(https, url, emptyReq, rsp, tag)
     }
 }
