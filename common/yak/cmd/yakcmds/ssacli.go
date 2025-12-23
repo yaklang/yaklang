@@ -1521,6 +1521,23 @@ var ssaCodeScan = &cli.Command{
 	},
 }
 
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0.00ns"
+	}
+	units := []time.Duration{time.Hour, time.Minute, time.Second, time.Millisecond, time.Microsecond, time.Nanosecond}
+	names := []string{"h", "m", "s", "ms", "us", "ns"}
+
+	for i, u := range units {
+		if d >= u {
+			val := float64(d) / float64(u)
+			return fmt.Sprintf("%4.2f%s", val, names[i])
+		}
+	}
+	// fallback (shouldn't normally be reached)
+	return fmt.Sprintf("%.2fns", float64(d)/float64(time.Nanosecond))
+}
+
 var syntaxFlowEvaluate = &cli.Command{
 	Name:    "syntaxflow-evaluate",
 	Aliases: []string{"sf-evaluate"},
