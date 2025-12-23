@@ -3,12 +3,14 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/linktable"
@@ -183,6 +185,13 @@ func (r *runtime) Invoke(task *AiTask) error {
 	}
 
 	for {
+		// 每次开始任务之前，先 emit 任务树，更新任务树进度
+		if r.RootTask != nil {
+			r.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+				"root_task": r.RootTask,
+			})
+		}
+
 		currentTask, ok := r.NextStep()
 		if !ok {
 			return nil
