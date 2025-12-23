@@ -2,12 +2,13 @@ package yakgrpc
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func TestAcc(t *testing.T) {
@@ -21,7 +22,7 @@ func TestAcc(t *testing.T) {
 		r.Emitter,
 	)
 
-	task, err := r.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_PLAN, currentTask, reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+	task, err := r.ExecuteLoopTask(schema.AI_REACT_LOOP_NAME_PLAN, currentTask, reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 		if isDone {
 			fmt.Println(loop.Get("plan_data"))
 		}
