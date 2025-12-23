@@ -1449,9 +1449,9 @@ var ssaCodeScan = &cli.Command{
 				var b bytes.Buffer
 				b.WriteString("\tRules:\n")
 				for _, rule := range info.Rules {
-					// since := time.Since(time.Unix(rule.UpdateTime, 0))
-					b.WriteString(fmt.Sprintf("  - [%6.2f%%]: [%s] [%s] status=%s\n",
-						rule.Progress*100, rule.ProgramName, rule.RuleName, rule.Info,
+					since := time.Since(time.Unix(rule.UpdateTime, 0))
+					b.WriteString(fmt.Sprintf("  - [%6.2f%%]: [%s] [%s] [%s] status=%s\n",
+						rule.Progress*100, formatDuration(since), rule.ProgramName, rule.RuleName, rule.Info,
 					))
 				}
 				log.Info(b.String())
@@ -1486,6 +1486,23 @@ var ssaCodeScan = &cli.Command{
 		}
 		return nil
 	},
+}
+
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0.00ns"
+	}
+	units := []time.Duration{time.Hour, time.Minute, time.Second, time.Millisecond, time.Microsecond, time.Nanosecond}
+	names := []string{"h", "m", "s", "ms", "us", "ns"}
+
+	for i, u := range units {
+		if d >= u {
+			val := float64(d) / float64(u)
+			return fmt.Sprintf("%4.2f%s", val, names[i])
+		}
+	}
+	// fallback (shouldn't normally be reached)
+	return fmt.Sprintf("%.2fns", float64(d)/float64(time.Nanosecond))
 }
 
 var syntaxFlowEvaluate = &cli.Command{
