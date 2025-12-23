@@ -3,6 +3,7 @@ package coreplugin
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,25 +15,55 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func ParseProjectWithAutoDetective(ctx context.Context, path, language string, compileImmediately bool, inputs ...map[string]any) (*autoDetectInfo, *ssaapi.Program, func(), error) {
+type SSADetectConfig struct {
+	Target             string
+	Language           string
+	CompileImmediately bool
+	Params             map[string]any
+}
+
+type SSADetectResult struct {
+	Info    *AutoDetectInfo
+	Program *ssaapi.Program
+	Cleanup func()
+}
+
+func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (*SSADetectResult, error) {
+	info, err := detectProject(ctx, conf)
+	if err != nil {
+		return nil, err
+	}
+
+	if !conf.CompileImmediately {
+		return &SSADetectResult{Info: info}, nil
+	}
+
+	prog, cleanup, err := compileProject(ctx, info)
+	if err != nil {
+		return &SSADetectResult{Info: info}, err
+	}
+
+	return &SSADetectResult{
+		Info:    info,
+		Program: prog,
+		Cleanup: cleanup,
+	}, nil
+}
+
+func detectProject(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo, error) {
 	pluginName := "SSA 项目探测"
 	param := make(map[string]string)
-	param["target"] = path
-	param["language"] = language
-	if compileImmediately {
+	param["target"] = conf.Target
+	param["language"] = conf.Language
+	if conf.CompileImmediately {
 		param["compile-immediately"] = "true"
 	}
-	for _, input := range inputs {
-		for key, value := range input {
-			param[key] = codec.AnyToString(value)
-		}
+	for key, value := range conf.Params {
+		param[key] = codec.AnyToString(value)
 	}
 
-	var info *autoDetectInfo
-	var err error
-
-	// Step 1: 执行项目探测
-	err = yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
+	var info *AutoDetectInfo
+	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil
@@ -41,8 +72,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 			var msg msg
 			json.Unmarshal(rawMsg, &msg)
 			if msg.Type == "log" && msg.Content.Level == "code" {
-				// Parse detective result
-				err = json.Unmarshal([]byte(msg.Content.Data), &info)
+				err := json.Unmarshal([]byte(msg.Content.Data), &info)
 				if err != nil {
 					return err
 				}
@@ -51,38 +81,34 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 		},
 	)
 	if err != nil {
-		return info, nil, nil, err
+		return nil, err
 	}
 	if info == nil {
-		return nil, nil, nil, utils.Errorf("auto detective info is nil")
+		return nil, utils.Errorf("auto detective info is nil")
 	}
 
-	// Check for errors
 	switch info.Error.Kind {
 	case "languageNeedSelectException":
-		return info, nil, nil, utils.Errorf("language need select")
+		return info, utils.Errorf("language need select")
 	case "fileNotFoundException":
-		return info, nil, nil, utils.Errorf("file not found")
+		return info, utils.Errorf("file not found")
 	case "fileTypeException":
-		return info, nil, nil, utils.Errorf("input file type")
+		return info, utils.Errorf("input file type")
 	case "connectFailException":
-		return info, nil, nil, utils.Errorf("connect fail")
+		return info, utils.Errorf("connect fail")
 	}
+	return info, nil
+}
 
-	// Step 2: 如果不需要立即编译，直接返回探测结果
-	if !compileImmediately {
-		return info, nil, nil, nil
-	}
-
-	// Step 3: 需要立即编译，创建项目并调用编译脚本
+func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program, func(), error) {
 	config := info.Config
 	if config == nil {
-		return info, nil, nil, utils.Errorf("config is nil")
+		return nil, nil, utils.Errorf("config is nil")
 	}
 
 	configJSON, err := config.ToJSONString()
 	if err != nil {
-		return info, nil, nil, utils.Errorf("failed to convert config to json: %s", err)
+		return nil, nil, utils.Errorf("failed to convert config to json: %s", err)
 	}
 
 	createReq := &ypb.CreateSSAProjectRequest{
@@ -92,7 +118,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 	profileDb := consts.GetGormProfileDatabase()
 	createResp, err := yakit.CreateSSAProject(profileDb, createReq)
 	if err != nil {
-		return info, nil, nil, utils.Errorf("failed to create ssa project: %s", err)
+		return nil, nil, utils.Errorf("failed to create ssa project: %s", err)
 	}
 
 	cleanup := func() {
@@ -105,10 +131,9 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 		yakit.DeleteSSAProject(profileDb, deleteReq)
 	}
 
-	// 调用编译脚本
 	projectConfig, err := createResp.GetConfig()
 	if err != nil {
-		return info, nil, nil, err
+		return nil, cleanup, err
 	}
 	compilePluginName := "SSA 项目编译"
 	compileParam := make(map[string]string)
@@ -137,19 +162,19 @@ func ParseProjectWithAutoDetective(ctx context.Context, path, language string, c
 		},
 	)
 	if err != nil {
-		return info, nil, cleanup, utils.Errorf("failed to compile project: %s", err)
+		return nil, cleanup, utils.Errorf("failed to compile project: %s", err)
 	}
 
 	if compiledProgramName == "" {
-		return info, nil, cleanup, utils.Errorf("compiled program name is empty")
+		return nil, cleanup, utils.Errorf("compiled program name is empty")
 	}
 
 	prog, err := ssaapi.FromDatabase(compiledProgramName)
 	if err != nil {
-		return info, nil, cleanup, utils.Errorf("failed to load program: %s", err)
+		return nil, cleanup, utils.Errorf("failed to load program: %s", err)
 	}
 
-	return info, prog, cleanup, nil
+	return prog, cleanup, nil
 }
 
 type msg struct {
@@ -162,7 +187,7 @@ type msg struct {
 	}
 }
 
-type autoDetectInfo struct {
+type AutoDetectInfo struct {
 	*ssaconfig.Config
 	FileCount          int  `json:"file_Count"`
 	CompileImmediately bool `json:"compile_immediately"`
