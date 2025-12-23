@@ -200,9 +200,10 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 		log.Infof("large stderr content saved to file: %s", filename)
 	})
 
-	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 10*1024 {
+	// 阈值设置为50KB，与handleLargeContent保持一致
+	if jsonResultRaw := utils.Jsonify(execResult.Result); len(jsonResultRaw) > 50*1024 {
 		originJsonResult := string(jsonResultRaw)
-		jsonResult := utils.ShrinkString(originJsonResult, 2000)
+		jsonResult := utils.ShrinkString(originJsonResult, 8000)
 		filename := handleLargeContentToFile(originJsonResult, "json")
 		execResult.Result = fmt.Sprintf("%s (total: %v, saved in file[%v]) see file use some other filesystem tool",
 			jsonResult, len(originJsonResult), filename)
@@ -261,13 +262,14 @@ func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opt
 // content: 要处理的内容指针
 // contentType: 内容类型(stdout/stderr/json)
 // logCallback: 可选的日志回调函数
+// Note: 阈值设置为50KB，避免AI工具调用时因内容被截断而反复重试
 func handleLargeContent(content *string, contentType string, logCallback func(string)) {
-	if len(*content) <= 10*1024 {
+	if len(*content) <= 50*1024 {
 		return
 	}
 
 	origContent := *content
-	newData := utils.ShrinkString(origContent, 1024)
+	newData := utils.ShrinkString(origContent, 4096)
 	filename := handleLargeContentToFile(origContent, contentType)
 
 	newData += fmt.Sprintf(

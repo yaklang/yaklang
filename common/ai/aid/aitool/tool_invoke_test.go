@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/stretchr/testify/require"
 )
@@ -520,34 +521,34 @@ func TestNewToolFromJSON(t *testing.T) {
 // TestHandleLargeContent 测试大文本内容处理功能
 func TestHandleLargeContent(t *testing.T) {
 	t.Run("处理小文本内容", func(t *testing.T) {
-		// 创建一个小于10KB的文本
-		smallContent := strings.Repeat("a", 1024*5) // 5KB
+		// 创建一个小于50KB的文本
+		smallContent := strings.Repeat("a", 1024*30) // 30KB
 		originalContent := smallContent
 
 		// 调用处理函数
 		handleLargeContent(&smallContent, "test", nil)
 
 		// 验证内容没有被修改
-		require.Equal(t, originalContent, smallContent, "小于10KB的内容不应被修改")
+		require.Equal(t, originalContent, smallContent, "小于50KB的内容不应被修改")
 	})
 
 	t.Run("处理大文本内容", func(t *testing.T) {
-		// 创建一个大于10KB的文本
-		largeContent := strings.Repeat("b", 1024*15) // 15KB
+		// 创建一个大于50KB的文本
+		largeContent := strings.Repeat("b", 1024*60) // 60KB
 		originalContent := largeContent
 
 		// 调用处理函数
 		handleLargeContent(&largeContent, "test", nil)
 
 		// 验证内容已被截断
-		require.NotEqual(t, originalContent, largeContent, "大于10KB的内容应被修改")
+		require.NotEqual(t, originalContent, largeContent, "大于50KB的内容应被修改")
 		require.Contains(t, largeContent, "saved in file", "应包含文件保存信息")
 		require.True(t, len(largeContent) < len(originalContent), "内容应被截断")
 	})
 
 	t.Run("测试回调函数", func(t *testing.T) {
-		// 创建一个大于10KB的文本
-		largeContent := strings.Repeat("c", 1024*15) // 15KB
+		// 创建一个大于50KB的文本
+		largeContent := strings.Repeat("c", 1024*60) // 60KB
 
 		// 回调函数验证
 		callbackCalled := false
@@ -584,17 +585,17 @@ func TestHandleLargeContent(t *testing.T) {
 func TestInvokeWithParamsLargeContent(t *testing.T) {
 	// 创建一个会生成大内容的回调函数
 	largeContentCallback := func(params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
-		// 向标准输出写入大于10KB的内容
-		largeStdout := strings.Repeat("A", 12*1024)
+		// 向标准输出写入大于50KB的内容
+		largeStdout := strings.Repeat("A", 60*1024)
 		fmt.Fprint(stdout, largeStdout)
 
-		// 向标准错误写入大于10KB的内容
-		largeStderr := strings.Repeat("B", 11*1024)
+		// 向标准错误写入大于50KB的内容
+		largeStderr := strings.Repeat("B", 55*1024)
 		fmt.Fprint(stderr, largeStderr)
 
 		// 返回大JSON结果
 		return map[string]interface{}{
-			"largeResult": strings.Repeat("C", 13*1024),
+			"largeResult": strings.Repeat("C", 60*1024),
 		}, nil
 	}
 
