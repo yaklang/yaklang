@@ -413,6 +413,35 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		c.logInfo("Request is for a free model, skipping key verification.")
 	}
 
+	// Check if this is a memfit model that requires TOTP authentication
+	if IsMemfitModel(modelName) {
+		c.logInfo("Memfit model detected, checking TOTP authentication...")
+		totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
+		if totpHeader == "" {
+			c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
+			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+				"error": map[string]string{
+					"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
+					"type":    "memfit_totp_auth_required",
+				},
+			})
+			return
+		}
+
+		verified, err := VerifyMemfitTOTP(totpHeader)
+		if err != nil || !verified {
+			c.logError("Memfit TOTP authentication failed: %v", err)
+			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+				"error": map[string]string{
+					"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
+					"type":    "memfit_totp_auth_failed",
+				},
+			})
+			return
+		}
+		c.logInfo("Memfit TOTP authentication successful for model: %s", modelName)
+	}
+
 	var key *Key
 	var apiKeyForStat string
 
@@ -818,6 +847,35 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 		c.logInfo("Request is for a free embedding model, skipping key verification.")
 	}
 
+	// Check if this is a memfit model that requires TOTP authentication
+	if IsMemfitModel(modelName) {
+		c.logInfo("Memfit embedding model detected, checking TOTP authentication...")
+		totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
+		if totpHeader == "" {
+			c.logError("Memfit model requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
+			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+				"error": map[string]string{
+					"message": "Memfit TOTP authentication required. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
+					"type":    "memfit_totp_auth_required",
+				},
+			})
+			return
+		}
+
+		verified, err := VerifyMemfitTOTP(totpHeader)
+		if err != nil || !verified {
+			c.logError("Memfit TOTP authentication failed: %v", err)
+			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+				"error": map[string]string{
+					"message": "Memfit TOTP authentication failed. Please refresh your TOTP secret and try again.",
+					"type":    "memfit_totp_auth_failed",
+				},
+			})
+			return
+		}
+		c.logInfo("Memfit TOTP authentication successful for embedding model: %s", modelName)
+	}
+
 	var key *Key
 
 	if !isFreeModel {
@@ -1088,6 +1146,164 @@ func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 	c.logInfo("Models list response sent, %d bytes, models: %v", len(responseJSON), modelNames)
 }
 
+// serveModelMeta serves model metadata
+func (c *ServerConfig) serveModelMeta(conn net.Conn, rawPacket []byte) {
+	c.logInfo("Serving model metadata")
+
+	// Parse query params to see if specific model is requested
+	// But standard lowhttp parsing in serveRequest only gives requestRaw
+	// We can use helper to parse URL
+
+	// Just return all for now or check URL path
+	// The caller might use /v1/model/meta?model=xxx
+
+	// We can reuse split packet logic if needed, but here simple response is enough
+	// Note: Authentication is NOT required for this endpoint as per requirements
+
+	allMetas, err := GetAllModelMetas()
+	if err != nil {
+		c.logError("Failed to get model metas: %v", err)
+		c.writeResponse(conn, "HTTP/1.1 500 Internal Server Error\r\n\r\n", true)
+		return
+	}
+
+	// Format response
+	type MetaResponse struct {
+		ModelName   string `json:"model_name"`
+		Description string `json:"description"`
+		Tags        string `json:"tags"`
+	}
+
+	var response []MetaResponse
+	for _, meta := range allMetas {
+		response = append(response, MetaResponse{
+			ModelName:   meta.ModelName,
+			Description: meta.Description,
+			Tags:        meta.Tags,
+		})
+	}
+
+	// Marshal response
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		c.logError("Failed to marshal meta response: %v", err)
+		c.writeResponse(conn, "HTTP/1.1 500 Internal Server Error\r\n\r\n", true)
+		return
+	}
+
+	// Send response
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: application/json; charset=utf-8\r\n"+
+		"Access-Control-Allow-Origin: *\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n", len(responseJSON))
+
+	conn.Write([]byte(header))
+	conn.Write(responseJSON)
+	c.logInfo("Model metadata response sent, %d bytes", len(responseJSON))
+}
+
+// serveMemfitTOTPUUID serves the TOTP UUID for Memfit model authentication
+// This endpoint is publicly accessible without authentication
+// Returns the TOTP UUID wrapped with MEMFIT-AI prefix/suffix
+func (c *ServerConfig) serveMemfitTOTPUUID(conn net.Conn) {
+	c.logInfo("Serving Memfit TOTP UUID request")
+
+	// Get the wrapped UUID
+	wrappedUUID := GetWrappedTOTPUUID()
+	if wrappedUUID == "" {
+		c.logError("TOTP secret not initialized")
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "TOTP secret not initialized",
+		})
+		return
+	}
+
+	// Return the wrapped UUID
+	response := map[string]interface{}{
+		"uuid":   wrappedUUID,
+		"format": "MEMFIT-AI<uuid>MEMFIT-AI",
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, response)
+	c.logInfo("Memfit TOTP UUID response sent")
+}
+
+// serveQueryModelMetaInfo serves detailed model meta info with description and tags
+// This is a new endpoint that returns all model metadata with descriptions and tags
+// The caller might use /v1/query-model-meta-info or /v1/query-model-meta-info?model=xxx
+func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) {
+	c.logInfo("Serving query model meta info")
+
+	// Get all model metadata
+	allMetas, err := GetAllModelMetas()
+	if err != nil {
+		c.logError("Failed to get model metas: %v", err)
+		c.writeResponse(conn, "HTTP/1.1 500 Internal Server Error\r\n\r\n", true)
+		return
+	}
+
+	// Get all providers to aggregate by model
+	providers, err := GetAllAiProviders()
+	if err != nil {
+		c.logError("Failed to get providers for query model meta: %v", err)
+		c.writeResponse(conn, "HTTP/1.1 500 Internal Server Error\r\n\r\n", true)
+		return
+	}
+
+	// Aggregate models
+	type ModelMetaInfo struct {
+		ModelName     string `json:"model_name"`
+		Description   string `json:"description"`
+		Tags          string `json:"tags"`
+		ProviderCount int    `json:"provider_count"`
+	}
+
+	modelCounts := make(map[string]int)
+	for _, p := range providers {
+		name := p.WrapperName
+		if name == "" {
+			name = p.ModelName
+		}
+		if name != "" {
+			modelCounts[name]++
+		}
+	}
+
+	// Build response
+	var response []ModelMetaInfo
+	for name, count := range modelCounts {
+		info := ModelMetaInfo{
+			ModelName:     name,
+			ProviderCount: count,
+		}
+		if meta, ok := allMetas[name]; ok {
+			info.Description = meta.Description
+			info.Tags = meta.Tags
+		}
+		response = append(response, info)
+	}
+
+	// Marshal response
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		c.logError("Failed to marshal query model meta info response: %v", err)
+		c.writeResponse(conn, "HTTP/1.1 500 Internal Server Error\r\n\r\n", true)
+		return
+	}
+
+	// Send response
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: application/json; charset=utf-8\r\n"+
+		"Access-Control-Allow-Origin: *\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n", len(responseJSON))
+
+	conn.Write([]byte(header))
+	conn.Write(responseJSON)
+	c.logInfo("Query model meta info response sent, %d bytes", len(responseJSON))
+}
+
 // serveIndexPage serves a simple HTML index page.
 func (c *ServerConfig) serveIndexPage(conn net.Conn) {
 	c.logInfo("Serving index page")
@@ -1257,6 +1473,16 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 		c.logInfo("Processing models list request")
 		key := c.getKeyFromRawRequest(requestRaw)
 		c.serveModels(key, conn)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/query-model-meta-info"):
+		c.serveQueryModelMetaInfo(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/model/meta"):
+		c.serveModelMeta(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/memfit-totp-uuid"):
+		c.logInfo("Processing Memfit TOTP UUID request")
+		c.serveMemfitTOTPUUID(conn)
 		return
 	case strings.HasPrefix(uriIns.Path, "/portal"):
 		c.HandlePortalRequest(conn, request, uriIns)

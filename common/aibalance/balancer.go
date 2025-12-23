@@ -141,7 +141,17 @@ func fixHistoricalProviderHealthState() error {
 func LoadProvidersFromDatabase(config *ServerConfig) error {
 	log.Infof("Starting to load AI providers and API keys from database")
 
+	// 0. Initialize Memfit TOTP system
+	if err := InitMemfitTOTP(); err != nil {
+		log.Warnf("Failed to initialize Memfit TOTP: %v", err)
+	}
+
 	// 1. Load AI providers
+	// Ensure metadata table exists
+	if err := EnsureModelMetaTable(); err != nil {
+		log.Warnf("Failed to ensure AiModelMeta table exists: %v", err)
+	}
+
 	// Get all providers from the database
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {

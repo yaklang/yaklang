@@ -1564,6 +1564,8 @@
                 <div class="tab active" data-tab="all">全部供应商</div>
                 <div class="tab" data-tab="add">添加接口</div>
                 <div class="tab" data-tab="api">API管理</div>
+                <div class="tab" data-tab="models">模型信息</div>
+                <div class="tab" data-tab="totp">TOTP认证</div>
             </div>
         </div>
         
@@ -1820,6 +1822,120 @@
                 </div>
             </div>
         </div>
+
+        <div id="models" class="tab-content">
+            <div class="card">
+                <h3>模型信息管理</h3>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0">
+                        <thead>
+                            <tr>
+                                <th class="column-name">模型名 (WrapperName)</th>
+                                <th class="column-name text-center">供应商数量</th>
+                                <th class="column-name">描述</th>
+                                <th class="column-name">标签</th>
+                                <th class="column-name text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .ModelMetas}}
+                            <tr>
+                                <td class="copyable" data-full-text="{{.Name}}">{{.Name}}</td>
+                                <td class="text-center">{{.ProviderCount}}</td>
+                                <td class="copyable" data-full-text="{{.Description}}">{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
+                                <td class="copyable" data-full-text="{{.Tags}}">{{if .Tags}}{{.Tags}}{{else}}-{{end}}</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm" onclick="openEditModelModal('{{.Name}}', '{{.Description}}', '{{.Tags}}')">
+                                        编辑
+                                    </button>
+                                </td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="totp" class="tab-content">
+            <div class="card">
+                <h3>🔐 Memfit TOTP 认证设置</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    以 <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">memfit-</code> 开头的模型需要 TOTP 认证才能访问。
+                </p>
+                
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: #2c3e50;">📋 当前配置</h4>
+                    <div style="display: grid; gap: 15px;">
+                        <div>
+                            <label style="color: #666; font-size: 14px;">TOTP 密钥 (UUID)</label>
+                            <div style="background: #fff; padding: 10px 15px; border-radius: 4px; border: 1px solid #e0e0e0; font-family: monospace; color: #c62828; word-break: break-all;" id="totp-secret">
+                                {{.TOTPSecret}}
+                            </div>
+                        </div>
+                        <div>
+                            <label style="color: #666; font-size: 14px;">包装后的 UUID (客户端使用)</label>
+                            <div style="background: #fff; padding: 10px 15px; border-radius: 4px; border: 1px solid #e0e0e0; font-family: monospace; word-break: break-all;" id="totp-wrapped">
+                                {{.TOTPWrapped}}
+                            </div>
+                        </div>
+                        <div>
+                            <label style="color: #666; font-size: 14px;">当前 TOTP 验证码 (每30秒更新)</label>
+                            <div style="background: #e8f5e9; padding: 10px 15px; border-radius: 4px; border: 1px solid #c8e6c9; font-family: monospace; font-size: 24px; letter-spacing: 4px; color: #2e7d32; text-align: center;" id="totp-code">
+                                {{.TOTPCode}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <strong style="color: #e65100;">⚠️ 警告</strong>
+                    <p style="margin: 10px 0 0 0; color: #bf360c;">
+                        刷新 TOTP 密钥将使所有使用 memfit- 模型的客户端需要重新获取密钥。请谨慎操作。
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <button class="btn btn-danger" onclick="refreshTOTPSecret()">🔄 刷新 TOTP 密钥</button>
+                    <button class="btn" onclick="refreshTOTPCode()">🔃 刷新验证码</button>
+                    <button class="btn" onclick="copyTOTPSecret()">📋 复制密钥</button>
+                </div>
+
+                <div style="background: #e3f2fd; border-radius: 8px; padding: 20px;">
+                    <h4 style="margin-top: 0; color: #1565c0;">📖 使用说明</h4>
+                    <ol style="margin: 0; padding-left: 20px; color: #333; line-height: 2;">
+                        <li>客户端通过 <code style="background: #fff; padding: 2px 6px; border-radius: 4px;">/v1/memfit-totp-uuid</code> 获取包装后的 UUID</li>
+                        <li>使用该 UUID 作为密钥，通过 TOTP 算法生成 6 位验证码</li>
+                        <li>访问 memfit- 模型时，在请求头中添加 <code style="background: #fff; padding: 2px 6px; border-radius: 4px;">X-Memfit-OTP-Auth: {base64编码的验证码}</code></li>
+                        <li>验证码有效期为 30 秒，允许 60 秒的时间误差</li>
+                        <li>如果认证失败，客户端应重新获取 TOTP 密钥</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditModelModal()">&times;</span>
+            <h4>编辑模型信息</h4>
+            <div class="form-group">
+                <label>模型名:</label>
+                <input type="text" id="editModelName" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>描述:</label>
+                <textarea id="editModelDescription" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>标签 (逗号分隔):</label>
+                <input type="text" id="editModelTags" class="form-control">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeEditModelModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveModelMeta()">保存</button>
+            </div>
+        </div>
     </div>
 
     <div id="context-menu" class="context-menu">
@@ -1860,6 +1976,30 @@
             <div class="modal-actions">
                 <button class="btn" onclick="copyGeneratedApiKey()">复制密钥</button>
                 <button class="btn btn-primary" onclick="closeApiKeyModal(true)">关闭并刷新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Model Meta Modal -->
+    <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditModelModal()">&times;</span>
+            <h4>编辑模型信息</h4>
+            <div class="form-group">
+                <label>模型名:</label>
+                <input type="text" id="editModelName" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>描述:</label>
+                <textarea id="editModelDescription" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>标签 (逗号分隔):</label>
+                <input type="text" id="editModelTags" class="form-control">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeEditModelModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveModelMeta()">保存</button>
             </div>
         </div>
     </div>
@@ -4183,6 +4323,126 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 showToast('复制失败，请手动选择并复制', 'error');
             }
         }
+        // Model Metadata Edit Logic
+        function openEditModelModal(name, description, tags) {
+            document.getElementById('editModelName').value = name;
+            document.getElementById('editModelDescription').value = description;
+            document.getElementById('editModelTags').value = tags;
+            document.getElementById('editModelMetaModal').style.display = 'block';
+        }
+
+        function closeEditModelModal() {
+            document.getElementById('editModelMetaModal').style.display = 'none';
+        }
+
+        function saveModelMeta() {
+            const name = document.getElementById('editModelName').value;
+            const description = document.getElementById('editModelDescription').value;
+            const tags = document.getElementById('editModelTags').value;
+
+            fetch('/portal/update-model-meta', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model_name: name,
+                    description: description,
+                    tags: tags
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('保存成功', 'success');
+                    closeEditModelModal();
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast('保存失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('保存失败', 'error');
+            });
+        }
+
+        // TOTP 相关函数
+        function refreshTOTPSecret() {
+            if (!confirm('确定要刷新 TOTP 密钥吗？这将使所有客户端需要重新获取密钥。')) {
+                return;
+            }
+            
+            fetch('/portal/refresh-totp', {
+                method: 'POST',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('TOTP 密钥刷新成功', 'success');
+                    document.getElementById('totp-secret').textContent = data.new_secret;
+                    document.getElementById('totp-wrapped').textContent = data.wrapped;
+                    refreshTOTPCode();
+                } else {
+                    showToast('刷新失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('刷新失败', 'error');
+            });
+        }
+
+        function refreshTOTPCode() {
+            fetch('/portal/get-totp-code', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('totp-code').textContent = data.code;
+                    showToast('验证码已刷新', 'success');
+                } else {
+                    showToast('刷新失败: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('刷新失败', 'error');
+            });
+        }
+
+        function copyTOTPSecret() {
+            const secret = document.getElementById('totp-secret').textContent.trim();
+            navigator.clipboard.writeText(secret).then(() => {
+                showToast('密钥已复制到剪贴板', 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                showToast('复制失败', 'error');
+            });
+        }
+
+        // 自动刷新 TOTP 验证码（每30秒）
+        setInterval(function() {
+            const totpTab = document.getElementById('totp');
+            if (totpTab && totpTab.classList.contains('active')) {
+                fetch('/portal/get-totp-code', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('totp-code').textContent = data.code;
+                    }
+                })
+                .catch(error => {
+                    console.error('Auto refresh error:', error);
+                });
+            }
+        }, 30000);
     </script>
 </body>
 </html>
