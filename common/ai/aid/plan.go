@@ -142,7 +142,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	err := pr.cod.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PLAN,
 		planTask,
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
 			if isDone {
 				planData := loop.Get(loop_plan.PLAN_DATA_KEY)
 				action, err := aicommon.ExtractAction(planData, "plan", "plan")

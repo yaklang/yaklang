@@ -2,11 +2,12 @@ package aimem
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -165,8 +166,8 @@ func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQu
 	return "", nil
 }
 
-func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error) {
-	return true, "", nil
+func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
+	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
 }
 
 func (m *AdvancedMockInvoker) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {

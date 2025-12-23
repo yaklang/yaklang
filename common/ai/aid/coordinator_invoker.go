@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
 	c.Add(1)
 	diffStr, err := c.TimelineDiffer.Diff()
 	if err != nil {

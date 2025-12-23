@@ -121,3 +121,38 @@ func (l *LoopActionHandlerOperator) SetReflectionData(key string, value interfac
 func (l *LoopActionHandlerOperator) GetReflectionData() map[string]interface{} {
 	return l.customReflectionData
 }
+
+// OnPostIterationOperator allows post-iteration callbacks to control loop behavior
+// This enables the callback to signal that the loop should end, providing a mechanism
+// for external control of the ReAct loop lifecycle.
+type OnPostIterationOperator struct {
+	shouldEndIteration bool
+	endReason          any
+}
+
+// newOnPostIterationOperator creates a new OnPostIterationOperator
+func newOnPostIterationOperator() *OnPostIterationOperator {
+	return &OnPostIterationOperator{
+		shouldEndIteration: false,
+		endReason:          nil,
+	}
+}
+
+// EndIteration signals that the loop should terminate after this iteration
+// Optional reason can be provided for logging/debugging purposes
+func (o *OnPostIterationOperator) EndIteration(reason ...any) {
+	o.shouldEndIteration = true
+	if len(reason) > 0 {
+		o.endReason = reason[0]
+	}
+}
+
+// ShouldEndIteration returns whether the loop should end
+func (o *OnPostIterationOperator) ShouldEndIteration() bool {
+	return o.shouldEndIteration
+}
+
+// GetEndReason returns the reason for ending the iteration
+func (o *OnPostIterationOperator) GetEndReason() any {
+	return o.endReason
+}

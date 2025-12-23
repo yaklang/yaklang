@@ -3,10 +3,11 @@ package aid
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"io"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -31,15 +32,48 @@ func (t *AiTask) execute() error {
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
-			if isDone {
+
+			// Log current task status for debugging - similar to prompt context format
+			log.Infof("=== Post Iteration Task Status ===")
+			log.Infof("Current Task Index: %s", t.Index)
+			log.Infof("Current Task Name: %s", t.Name)
+			log.Infof("Current Task Goal: %s", t.GetUserInput())
+			log.Infof("Current Task Status: %s", t.GetStatus())
+			if t.rootTask != nil {
+				log.Infof("Root Task Progress:\n%s", t.rootTask.Progress())
+			}
+			log.Infof("=== End Task Status ===")
+
+			// Check if completed_task_index indicates this task should be marked as done
+			// This provides an additional mechanism to end tasks beyond just isDone
+			_, summary, completedTaskIndex := loop.GetLastSatisfactionRecordWithCompletedTaskIndex()
+
+			// Check if current task index is in the completed_task_index list
+			shouldComplete := isDone
+			if !shouldComplete && completedTaskIndex != "" {
+				// completed_task_index can be a single index like "1-1" or multiple like "1-1,1-2"
+				completedIndexes := strings.Split(completedTaskIndex, ",")
+				for _, idx := range completedIndexes {
+					trimmedIdx := strings.TrimSpace(idx)
+					if trimmedIdx == t.Index {
+						log.Infof("task %s marked as completed via completed_task_index: %s", t.Name, completedTaskIndex)
+						t.EmitInfo("Task %s completed via completed_task_index mechanism", t.Name)
+						shouldComplete = true
+						break
+					}
+				}
+			}
+
+			if shouldComplete {
 				err := t.generateTaskSummary()
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
 				}
+				// Signal the loop to end - this ensures the loop terminates after this iteration
+				operator.EndIteration("task completed via completed_task_index or isDone")
 			} else {
-				_, summary := loop.GetLastSatisfactionRecord()
 				if summary != "" {
 					t.StatusSummary = summary
 				}

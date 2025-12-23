@@ -635,7 +635,13 @@ LOOP:
 				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
-			r.doneCurrentIteration(iterationCount, task)
+			postOp := r.doneCurrentIteration(iterationCount, task)
+			// Check if post-iteration callback requested to end the loop
+			if postOp.ShouldEndIteration() {
+				log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
+				needSummary.SetTo(true)
+				break LOOP
+			}
 			continue
 		}
 
@@ -646,24 +652,34 @@ LOOP:
 			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 		})
-		r.doneCurrentIteration(iterationCount, task)
+		postOp := r.doneCurrentIteration(iterationCount, task)
+		// Check if post-iteration callback requested to end the loop
+		if postOp.ShouldEndIteration() {
+			log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
+			needSummary.SetTo(true)
+			break LOOP
+		}
 		continue
 	}
 	return nil
 }
 
-func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) {
+func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) *OnPostIterationOperator {
+	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
-		r.onPostIteration(r, current, task, false, nil)
+		r.onPostIteration(r, current, task, false, nil, operator)
 	}
+	return operator
 }
 
-func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) {
+func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
+	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
 		if err != nil {
-			r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err))
+			r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err), operator)
 		} else {
-			r.onPostIteration(r, current, task, true, nil)
+			r.onPostIteration(r, current, task, true, nil, operator)
 		}
 	}
+	return operator
 }

@@ -25,8 +25,9 @@ type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
 type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
 
 type satisfactionRecord struct {
-	satisfactory bool
-	reason       string
+	satisfactory       bool
+	reason             string
+	completedTaskIndex string // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -81,7 +82,7 @@ type ReActLoop struct {
 	onTaskCreated       func(task aicommon.AIStatefulTask)
 	onAsyncTaskFinished func(task aicommon.AIStatefulTask)
 	onAsyncTaskTrigger  func(ins *LoopAction, task aicommon.AIStatefulTask)
-	onPostIteration     func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any)
+	onPostIteration     func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)
 
 	// 启动这个 loop 的时候马上要执行的事情
 	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error
@@ -109,12 +110,30 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 	})
 }
 
+// PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string) {
+	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &satisfactionRecord{
+		satisfactory:       satisfactory,
+		reason:             reason,
+		completedTaskIndex: completedTaskIndex,
+	})
+}
+
 func (r *ReActLoop) GetLastSatisfactionRecord() (bool, string) {
 	if len(r.historySatisfactionReasons) == 0 {
 		return false, ""
 	}
 	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
 	return lastRecord.satisfactory, lastRecord.reason
+}
+
+// GetLastSatisfactionRecordWithCompletedTaskIndex 获取最后一次满意度记录，包括已完成的任务索引
+func (r *ReActLoop) GetLastSatisfactionRecordWithCompletedTaskIndex() (bool, string, string) {
+	if len(r.historySatisfactionReasons) == 0 {
+		return false, "", ""
+	}
+	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
+	return lastRecord.satisfactory, lastRecord.reason, lastRecord.completedTaskIndex
 }
 
 func (r *ReActLoop) GetMaxIterations() int {

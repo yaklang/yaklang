@@ -181,14 +181,14 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			// Verify user satisfaction
 			task := loop.GetCurrentTask()
 			if task != nil {
-				satisfied, reason, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, tool.GetName())
+				verifyResult, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, tool.GetName())
 				if err != nil {
 					operator.Fail(err)
 					return
 				}
-				loop.PushSatisfactionRecord(satisfied, reason)
+				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex)
 
-				if satisfied {
+				if verifyResult.Satisfied {
 					operator.Exit()
 					return
 				}

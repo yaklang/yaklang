@@ -127,7 +127,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
 			r.wg.Add(1)
 
 			if isDone && reason != nil {

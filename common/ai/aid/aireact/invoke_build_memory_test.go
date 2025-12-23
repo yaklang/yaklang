@@ -515,8 +515,8 @@ func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetter(ctx context.Context, u
 	return "", nil
 }
 
-func (m *mockInvokerForMemoryTest) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (bool, string, error) {
-	return true, "", nil
+func (m *mockInvokerForMemoryTest) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
+	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
 }
 
 func (m *mockInvokerForMemoryTest) RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error)) {
