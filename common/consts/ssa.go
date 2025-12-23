@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/jinzhu/gorm"
@@ -103,6 +104,7 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 	configureAndOptimizeDB(dialect, db)
+	doSSAPatch(db)
 	return db, nil
 }
 
@@ -122,4 +124,43 @@ func GetGormSSAProjectDataBase() *gorm.DB {
 		initYakitDatabase()
 	}
 	return ssaDatabase
+}
+
+// doSSAPatch 添加数据库索引以优化查询性能
+func doSSAPatch(db *gorm.DB) {
+	if !db.HasTable("ir_codes") {
+		return
+	}
+
+	// 为 ir_codes 表添加复合索引 (program_name, code_id)
+	// 这是最常见的查询模式: WHERE program_name = ? AND code_id IN (...)
+	indexQueries := []struct {
+		name  string
+		query string
+	}{
+		{
+			"idx_ir_codes_program_code",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "ir_codes" ("program_name", "code_id");`,
+		},
+		// 为 ir_types 表添加复合索引
+		{
+			"idx_ir_types_program_type",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "ir_types" ("program_name", "type_id");`,
+		},
+		// 为 ir_indices 表添加复合索引以优化常见查询
+		{
+			"idx_ir_indices_program_value",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "ir_indices" ("program_name", "value_id");`,
+		},
+		{
+			"idx_ir_indices_program_field",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_field" ON "ir_indices" ("program_name", "field_name");`,
+		},
+	}
+
+	for _, idx := range indexQueries {
+		if err := db.Exec(idx.query).Error; err != nil {
+			log.Warnf("failed to add index %s: %v", idx.name, err)
+		}
+	}
 }
