@@ -173,7 +173,7 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 		return ir
 	}
 
-	// 使用singleflight确保同时只有一个协程查询相同的key
+	// 使用 singleflight 确保并发场景下同一个 type 只查询一次
 	key := dbKey(progName, id)
 	result, _, _ := irTypeSingleFlight.Do(key, func() (interface{}, error) {
 		// 再次检查缓存，防止在等待期间其他协程已经加载了数据
@@ -181,53 +181,13 @@ func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 			return ir, nil
 		}
 
-		ctx := context.Background()
-		itemsToCache := make(map[int64]*IrType)
-		var ret *IrType
-
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			idsToLoad := make(map[int64]struct{})
-			addID := func(id int64) {
-				// check
-				if id < 0 {
-					return
-				}
-				if _, ok := cache.Get(id); ok {
-					return
-				}
-				if _, ok := idsToLoad[id]; ok {
-					return
-				}
-				idsToLoad[id] = struct{}{}
-			}
-
-			// load self
-			ret = GetIrTypeItemById(tx, progName, id)
-			if ret == nil {
-				return nil
-			}
-			itemsToCache[int64(ret.TypeId)] = ret
-
-			// load [id-relation ... id ... id+relation]
-			for i := int64(1); i < irRelationCount; i++ {
-				addID(id + i)
-				addID(id - i)
-			}
-
-			// update cache
-			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
-			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "type_id", ids).Where("program_name = ?", progName)
-			for ir := range bizhelper.YieldModel[*IrType](ctx, tx, bizhelper.WithYieldModel_Fast()) {
-				itemsToCache[int64(ir.TypeId)] = ir
-			}
-			return nil
-		})
-
-		// 更新缓存
-		for id, item := range itemsToCache {
-			cache.Set(id, item)
+		// 只加载当前这个 type，而不再预取邻居，减少数据库压力
+		ret := GetIrTypeItemById(db, progName, id)
+		if ret == nil {
+			return nil, nil
 		}
 
+		cache.Set(id, ret)
 		return ret, nil
 	})
 
