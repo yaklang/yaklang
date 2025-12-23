@@ -233,9 +233,9 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 
 	// if lazy, get the real inst
 	checkInst := inst
-	if inst.IsLazy() {
-		checkInst = inst.Self()
-	}
+	// if inst.IsLazy() {
+	// checkInst = inst.Self()
+	// }
 	if n, ok := checkInst.(ssa.Value); ok {
 		v.innerValue = n
 	}

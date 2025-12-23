@@ -5,10 +5,11 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/glob"
 )
 
-func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode {
+func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
 	var ids []int64
 	if err := DB.Model(&IrCode{}).Where("program_name = ?", progName).Pluck("code_id", &ids).Error; err != nil {
 		log.Errorf("failed to get ids: %v", err)
@@ -17,7 +18,7 @@ func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode {
+func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
 	var ids []int64
 	if err := DB.Model(&IrIndex{}).Where("program_name = ?", progName).Pluck("DISTINCT value_id", &ids).Error; err != nil {
 		log.Errorf("failed to get ids from index: %v", err)
@@ -26,16 +27,16 @@ func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) chan *I
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-func yieldIrCodes(ctx context.Context, progName string, ids []int64) chan *IrCode {
-	outC := make(chan *IrCode)
+func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
+	outC := chanx.NewUnlimitedChan[*IrCode](ctx, len(ids))
 	go func() {
-		defer close(outC)
+		defer outC.Close()
 		idsToLoad := make([]int64, 0, len(ids))
 		cache := GetIrCodeCache(progName)
 		// 先从缓存加载
 		for _, id := range ids {
 			if ir, ok := cache.Get(id); ok {
-				outC <- ir
+				outC.SafeFeed(ir)
 			} else {
 				idsToLoad = append(idsToLoad, id)
 			}
@@ -51,11 +52,11 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) chan *IrCod
 		)
 		for ir := range ch {
 			cache.Set(ir.CodeID, ir)
-			outC <- ir
+			outC.SafeFeed(ir)
 		}
 	}()
 
-	return outC
+	return outC.OutputChannel()
 }
 
 // type MatchMode int
@@ -73,7 +74,7 @@ const (
 	OpcodeCompare
 )
 
-func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string) chan *IrCode {
+func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string) <-chan *IrCode {
 	// 1. Handle Glob -> Regexp
 	if compareMode == GlobCompare {
 		value = glob.Glob2Regex(value)
@@ -130,7 +131,7 @@ func applyMatchCondition(db *gorm.DB, mod int, compareMode int, value string) *g
 	}
 }
 
-func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) chan *IrCode {
+func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) <-chan *IrCode {
 	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
 	return YieldIrCode(db, ctx, progName)
 }
