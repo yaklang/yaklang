@@ -5,56 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIBalancer Login</title>
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 500px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f9f9f9;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
         .login-card {
             background: white;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            padding: 30px;
-            margin-top: 50px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
         }
         h1 {
             text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
+            color: #1a1a1a;
+            margin-bottom: 24px;
+            font-size: 24px;
+            font-weight: 600;
         }
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         label {
             display: block;
             margin-bottom: 8px;
-            font-weight: bold;
+            color: #4a4a4a;
+            font-weight: 500;
+            font-size: 14px;
         }
         input[type="password"] {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
+            padding: 10px 12px;
+            border: 1px solid #d9d9d9;
             border-radius: 4px;
             font-size: 16px;
+            transition: all 0.3s;
+            outline: none;
+        }
+        input[type="password"]:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
         }
         .btn {
-            display: inline-block;
+            display: block;
             width: 100%;
-            padding: 12px;
+            padding: 10px 16px;
             background-color: #4285f4;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
+            font-weight: 500;
             text-align: center;
+            transition: background-color 0.3s;
         }
         .btn:hover {
             background-color: #3367d6;
+        }
+        .btn:active {
+            background-color: #2850a7;
         }
     </style>
 </head>
@@ -64,10 +84,10 @@
         <form action="/portal/login" method="post">
             <div class="form-group">
                 <label for="password">Admin Secret</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required placeholder="请输入密钥">
             </div>
             <button type="submit" class="btn">Login</button>
         </form>
     </div>
 </body>
-</html> 
+</html>

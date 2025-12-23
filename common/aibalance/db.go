@@ -259,3 +259,66 @@ func UpdateAiApiKeyAllowedModels(id uint, allowedModels string) error {
 
 	return nil
 }
+
+// AiModelMeta stores metadata for a model (WrapperName)
+type AiModelMeta struct {
+	gorm.Model
+	ModelName   string `gorm:"uniqueIndex;not null"` // The platform model name (WrapperName)
+	Description string `gorm:"type:text"`
+	Tags        string `gorm:"type:text"` // Comma-separated tags or JSON
+}
+
+// EnsureModelMetaTable ensures the AiModelMeta table exists
+func EnsureModelMetaTable() error {
+	return GetDB().AutoMigrate(&AiModelMeta{}).Error
+}
+
+// SaveModelMeta saves or updates model metadata
+func SaveModelMeta(modelName, description, tags string) error {
+	var meta AiModelMeta
+	err := GetDB().Where("model_name = ?", modelName).First(&meta).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			// Create new
+			meta = AiModelMeta{
+				ModelName:   modelName,
+				Description: description,
+				Tags:        tags,
+			}
+			return GetDB().Create(&meta).Error
+		}
+		return err
+	}
+
+	// Update existing
+	meta.Description = description
+	meta.Tags = tags
+	return GetDB().Save(&meta).Error
+}
+
+// GetModelMeta retrieves metadata for a specific model
+func GetModelMeta(modelName string) (*AiModelMeta, error) {
+	var meta AiModelMeta
+	err := GetDB().Where("model_name = ?", modelName).First(&meta).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, nil // Return nil if not found, not error
+		}
+		return nil, err
+	}
+	return &meta, nil
+}
+
+// GetAllModelMetas retrieves all model metadata
+func GetAllModelMetas() (map[string]*AiModelMeta, error) {
+	var metas []AiModelMeta
+	if err := GetDB().Find(&metas).Error; err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*AiModelMeta)
+	for i := range metas {
+		result[metas[i].ModelName] = &metas[i]
+	}
+	return result, nil
+}
