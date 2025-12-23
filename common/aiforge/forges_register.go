@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -132,6 +133,10 @@ func init() {
 		switch paramIns := params.(type) {
 		case []*ypb.ExecParamItem:
 			finalParams = paramIns
+		case aitool.InvokeParams:
+			for k, v := range paramIns {
+				finalParams = append(finalParams, &ypb.ExecParamItem{Key: k, Value: utils.InterfaceToString(v)})
+			}
 		default:
 			finalParams = []*ypb.ExecParamItem{
 				{Key: "query", Value: utils.InterfaceToString(params)},
