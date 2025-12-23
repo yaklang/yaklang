@@ -42,6 +42,7 @@ var SSAProjectTables = []any{
 func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
 }
 
 // patchIrSourceQuotedCode patches the QuotedCode column type based on database dialect
@@ -75,6 +76,46 @@ func patchIrSourceQuotedCode(db *gorm.DB) {
 		log.Debugf("Database dialect %s: using default TEXT type for ir_sources.quoted_code", dialect)
 	}
 }
+
+// doSSAPatch 添加数据库索引以优化查询性能
+func patchIrCodeIndex(db *gorm.DB) {
+	if !db.HasTable("ir_codes") {
+		return
+	}
+
+	// 为 ir_codes 表添加复合索引 (program_name, code_id)
+	// 这是最常见的查询模式: WHERE program_name = ? AND code_id IN (...)
+	indexQueries := []struct {
+		name  string
+		query string
+	}{
+		{
+			"idx_ir_codes_program_code",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "ir_codes" ("program_name", "code_id");`,
+		},
+		// 为 ir_types 表添加复合索引
+		{
+			"idx_ir_types_program_type",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "ir_types" ("program_name", "type_id");`,
+		},
+		// 为 ir_indices 表添加复合索引以优化常见查询
+		{
+			"idx_ir_indices_program_value",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "ir_indices" ("program_name", "value_id");`,
+		},
+		{
+			"idx_ir_indices_program_field",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_field" ON "ir_indices" ("program_name", "field_name");`,
+		},
+	}
+
+	for _, idx := range indexQueries {
+		if err := db.Exec(idx.query).Error; err != nil {
+			log.Warnf("failed to add index %s: %v", idx.name, err)
+		}
+	}
+}
+
 func GetDB() *gorm.DB {
 	return consts.GetGormSSAProjectDataBase()
 }
