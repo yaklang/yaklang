@@ -120,16 +120,7 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// Exclude patterns
 	if excludeFileStr := c.String("exclude-file"); excludeFileStr != "" {
-		excludeFiles := strings.Split(excludeFileStr, ",")
-		var validExcludeFiles []string
-		for _, s := range excludeFiles {
-			if s != "" {
-				validExcludeFiles = append(validExcludeFiles, strings.TrimSpace(s))
-			}
-		}
-		if len(validExcludeFiles) > 0 {
-			opts = append(opts, ssaconfig.WithCompileExcludeFiles(validExcludeFiles))
-		}
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludeFileStr))
 	}
 
 	// with-file-content
@@ -246,8 +237,16 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		if config.GetCompileFilePerformanceLog() {
 			para["filePerformanceLog"] = true
 		}
-		_, prog, _, err := coreplugin.ParseProjectWithAutoDetective(ctx, targetPath, language, true, para)
-		return []*ssaapi.Program{prog}, err
+		res, err := coreplugin.ParseProjectWithAutoDetective(ctx, &coreplugin.SSADetectConfig{
+			Target:             targetPath,
+			Language:           language,
+			CompileImmediately: true,
+			Params:             para,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return []*ssaapi.Program{res.Program}, nil
 	}
 
 	if programName != "" {

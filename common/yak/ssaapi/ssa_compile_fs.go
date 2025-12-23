@@ -73,6 +73,9 @@ func (c *Config) parseProjectWithFS(
 			if folderName == "test" || folderName == ".git" {
 				return filesys.SkipDir
 			}
+			if c.excludeFile(fullPath, fi.Name()) {
+				return filesys.SkipDir
+			}
 
 			folders := []string{programName}
 			folders = append(folders,

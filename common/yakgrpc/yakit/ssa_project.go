@@ -224,7 +224,7 @@ func NewSSAProjectByProto(proto *ypb.SSAProject) (*ssaproject.SSAProject, error)
 	if cc := proto.CompileConfig; cc != nil {
 		opts = append(opts, ssaconfig.WithCompileStrictMode(cc.StrictMode))
 		opts = append(opts, ssaconfig.WithCompilePeepholeSize(int(cc.PeepholeSize)))
-		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles))
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles...))
 		opts = append(opts, ssaconfig.WithCompileReCompile(cc.ReCompile))
 		opts = append(opts, ssaconfig.WithCompileMemoryCompile(cc.Memory))
 		opts = append(opts, ssaconfig.WithCompileConcurrency(int(cc.Concurrency)))

@@ -183,7 +183,7 @@ func (s *RuleChecker) run() error {
 			defaultExclude = strings.Split("**/classes/**,**/target/**", ",")
 		}
 	}
-	opts = append(opts, ssaapi.WithExcludeFunc(defaultExclude))
+	opts = append(opts, ssaapi.WithExcludeFunc(defaultExclude...))
 	_, err = ssaapi.ParseProject(opts...)
 	if err != nil {
 		return err

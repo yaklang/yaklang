@@ -135,8 +135,8 @@ var Exports = map[string]any{
 	"withStrictMode":         WithStrictMode,
 	"withContext":            WithContext,
 	"withPeepholeSize":       WithPeepholeSize,
-	"withExcludeFile":        WithExcludeFile,
-	"withDefaultExcludeFunc": WithExcludeFunc,
+	"withExcludeFile":        WithExcludeFunc,
+	"withDefaultExcludeFunc": WithExcludeFunc, // deprecated, use withExcludeFile instead
 	"withMemory":             WithMemory,
 	"withFilePerformanceLog": WithFilePerformanceLog,
 

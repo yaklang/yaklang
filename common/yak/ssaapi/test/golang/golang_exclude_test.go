@@ -41,13 +41,7 @@ func main(){
 	require.NoError(t, err)
 	prog.Show()
 	check(prog, 3)
-	gb, err := glob.Compile(`*.pb.go`)
-	require.NoError(t, err)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), ssaapi.WithExcludeFile(func(path, filename string) bool {
-		a := filename
-		_ = a
-		return gb.Match(filename)
-	}))
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaconfig.GO), ssaapi.WithExcludeFunc("*.pb.go"))
 	require.NoError(t, err)
 	prog.Show()
 	check(prog, 1)
@@ -121,7 +115,7 @@ func TestWithExcludeFunc_GlobPatternCompilation(t *testing.T) {
 	t.Logf("Successfully compiled patterns: %v", successPatterns)
 	t.Logf("Failed to compile patterns: %v", failedPatterns)
 
-	option := ssaapi.WithExcludeFunc(patterns)
+	option := ssaapi.WithExcludeFunc(patterns...)
 	require.NotNil(t, option)
 
 	config, err := ssaconfig.New(ssaconfig.ModeAll)
@@ -138,7 +132,7 @@ func TestWithExcludeFunc_PartialFailure(t *testing.T) {
 
 	allPatterns := append(validPatterns, invalidPatterns...)
 
-	option := ssaapi.WithExcludeFunc(allPatterns)
+	option := ssaapi.WithExcludeFunc(allPatterns...)
 	require.NotNil(t, option)
 
 	config, err := ssaconfig.New(ssaconfig.ModeAll)

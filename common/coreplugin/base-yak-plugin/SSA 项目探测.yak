@@ -146,6 +146,7 @@ description := cli.Text("description", cli.setVerboseName("项目描述"), cli.s
 excludeFile := cli.String(
     "excludeFile", 
     cli.setVerboseName("排除文件/文件夹"), 
+    cli.setHelp("使用相对路径 可用Glob匹配 逗号分割"),
     cli.setCliGroup("compile"), 
     cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"), 
 )
@@ -164,6 +165,7 @@ strictMode = cli.Bool(
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
 
 cli.check()
+excludeFile = "**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,"+excludeFile 
 target = target.Trim(" ", "\n", "\t")
 origin = target
 proxy = str.TrimSpace(proxy.Lower())
@@ -565,7 +567,7 @@ options = [
     ssa.withCodeSourceURL(params.info.url),
     ssa.withCodeSourceBranch(params.info.branch),
     ssa.withCodeSourcePath(params.info.path),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ",")),
+    ssa.withExcludeFile(excludeFile),
     ssa.withReCompile(reCompile),
     ssa.withConcurrency(concurrency),
     ssa.withStrictMode(strictMode),

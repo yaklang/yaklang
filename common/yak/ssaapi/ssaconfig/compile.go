@@ -327,12 +327,16 @@ func WithCompilePeepholeSize(peepholeSize int) Option {
 }
 
 // WithCompileExcludeFiles 设置排除文件
-func WithCompileExcludeFiles(excludeFiles []string) Option {
+func WithCompileExcludeFiles(excludeFiles ...string) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Exclude Files"); err != nil {
 			return err
 		}
-		c.SSACompile.ExcludeFiles = excludeFiles
+		// 支持逗号分隔多个文件模式
+		allFiles := lo.FlatMap(excludeFiles, func(item string, index int) []string {
+			return strings.Split(item, ",")
+		})
+		c.SSACompile.ExcludeFiles = append(c.SSACompile.ExcludeFiles, allFiles...)
 		return nil
 	}
 }
