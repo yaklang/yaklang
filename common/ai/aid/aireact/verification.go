@@ -14,14 +14,14 @@ import (
 )
 
 // VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
-func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (bool, string, error) {
+func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
 	// Check context cancellation early
 	select {
 	case <-ctx.Done():
-		return false, "", ctx.Err()
+		return nil, ctx.Err()
 	default:
 	}
 
@@ -32,8 +32,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		log.Infof("Verification prompt: %s", verificationPrompt)
 	}
 
-	var satisfied bool
-	var reasoning string
+	result := &aicommon.VerifySatisfactionResult{}
 	var referenceOnce = new(sync.Once)
 	var nextMovementsReferenceOnce = new(sync.Once)
 
@@ -174,8 +173,9 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				return utils.Errorf("failed to extract verification action: %v, need ...\"@action\":\"verify-satisfaction\" ", err)
 			}
 			// If we found a proper @action structure, extract data from it
-			satisfied = action.GetBool("user_satisfied")
-			reasoning = action.GetString("reasoning")
+			result.Satisfied = action.GetBool("user_satisfied")
+			result.Reasoning = action.GetString("reasoning")
+			result.CompletedTaskIndex = action.GetString("completed_task_index")
 
 			nextMovements := action.GetString("next_movements") // currently not used
 			if nextMovements != "" {
@@ -193,10 +193,10 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)
-		return false, "", transErr
+		return nil, transErr
 	}
 
-	return satisfied, reasoning, nil
+	return result, nil
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction

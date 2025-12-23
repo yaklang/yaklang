@@ -1,4 +1,20 @@
-__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。注意：当使用cmd类型时，路径中的反斜杠(\\)需要转义，例如应使用 C:\\\\Users 而不是 C:\\Users。【重要提示】为避免命令卡住，请确保生成的命令能在合理时间内完成，对于可能长时间运行的命令（如 tail -f、watch、ping 无限循环等），请使用 timeout 命令包装或添加适当的限制参数（如 ping -c 5）。默认超时时间为60秒。"
+__DESC__ = `一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。
+
+【超时控制】为避免命令卡住，请确保生成的命令能在合理时间内完成。对于可能长时间运行的命令（如 tail -f、watch、ping 无限循环等），请使用 timeout 上下文控制或添加适当的限制参数（如 ping -c 5）。默认超时时间为60秒。
+
+【权限与安全警告 - 非常重要】
+1. 【避免敏感目录扫描】不要对根目录 / 或系统目录执行递归操作（如 find / -xxx、ls -R /）。这会触发操作系统安全警告，且在非root权限下大量报错。
+2. 【禁止访问敏感文件】非root用户禁止尝试访问：/etc/shadow、/root/.ssh/*、/etc/sudoers 等敏感配置文件。
+3. 【限制搜索范围】使用 find 命令时，必须指定具体目录（如 find /home/user -name xxx），禁止使用 find / 全盘搜索。可添加 -maxdepth 限制深度。
+4. 【避免权限升级尝试】不要执行 sudo、su、chmod 777 等可能被视为恶意的操作。
+5. 【安全的替代方案】
+   - 查看系统信息: uname -a, hostnamectl, cat /etc/os-release
+   - 检查磁盘: df -h（当前用户可读的分区）
+   - 检查进程: ps aux, top -l 1（macOS）, top -bn1（Linux）
+   - 检查网络: netstat -tuln, ss -tuln, lsof -i（限制端口）
+   - 检查端口: lsof -i:端口号
+
+【Windows注意】当使用cmd类型时，路径中的反斜杠(\)需要转义，例如应使用 C:\\Users 而不是 C:\Users。`
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制"
 

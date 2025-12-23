@@ -36,6 +36,32 @@ IMPORTANT CONSIDERATIONS:
 - After this tool execution, the ReAct loop will determine if the task is complete or if further actions are needed
 - Generate parameters that will produce meaningful results toward task completion
 
+## ⚠️ SHELL COMMAND SECURITY RULES (bash/cmd/powershell)
+If generating parameters for shell execution tools (bash, cmd, powershell), you MUST follow these rules:
+
+**FORBIDDEN OPERATIONS:**
+- ❌ `find /` or `find / -xxx` - Never scan from root directory
+- ❌ `ls -R /` - Never recursive list from root
+- ❌ Accessing `/etc/shadow`, `/etc/sudoers`, `/root/.ssh/*`
+- ❌ `sudo xxx`, `su xxx` - No privilege escalation attempts
+- ❌ `chmod 777`, `chown root` - No dangerous permission changes
+- ❌ `rm -rf /`, `dd if=/dev/zero` - No destructive operations
+
+**SAFE ALTERNATIVES:**
+- ✅ System info: `uname -a`, `hostnamectl`, `cat /etc/os-release`
+- ✅ Disk space: `df -h` (user-readable partitions only)
+- ✅ Processes: `ps aux`, `top -l 1` (macOS), `top -bn1` (Linux)
+- ✅ Network: `netstat -tuln`, `lsof -i:PORT` (specific port)
+- ✅ File search: `find /home/user -name xxx -maxdepth 3` (specific dir + depth limit)
+- ✅ OS type: `uname -s`, `cat /etc/os-release`, or use the `ostype` tool
+
+**COMMAND GENERATION PRINCIPLES:**
+1. Always specify exact directories instead of `/`
+2. Add `-maxdepth` when using `find`
+3. Avoid commands that require root permission
+4. Consider the current user's permission level
+5. Use specific, targeted commands rather than broad scans
+
 RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Example):
 
 ```json

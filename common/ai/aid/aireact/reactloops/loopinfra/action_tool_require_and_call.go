@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -69,14 +70,14 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 
 		task := loop.GetCurrentTask()
-		satisfied, reason, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
+		verifyResult, err := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
 		if err != nil {
 			operator.Fail(err)
 			return
 		}
-		loop.PushSatisfactionRecord(satisfied, reason)
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex)
 
-		if satisfied {
+		if verifyResult.Satisfied {
 			operator.Exit()
 			return
 		}
