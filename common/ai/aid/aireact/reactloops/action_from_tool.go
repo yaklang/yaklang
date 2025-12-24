@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -136,9 +138,13 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 			// Execute the tool without requiring parameter generation
 			result, directly, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, tool.GetName(), invokeParams)
 			if err != nil {
-				errMsg := utils.Errorf("tool '%s' execution failed: %v", tool.GetName(), err)
-				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg.Error())
-				operator.Fail(errMsg)
+				// FIX: Instead of terminating the loop, record error and allow AI to retry
+				errMsg := fmt.Sprintf("Tool '%s' execution failed: %v. Please try a different approach or tool.", tool.GetName(), err)
+				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+				operator.SetReflectionLevel(ReflectionLevel_Critical)
+				operator.SetReflectionData("tool_error", err.Error())
+				operator.SetReflectionData("tool_name", tool.GetName())
+				operator.Continue()
 				return
 			}
 
@@ -162,14 +168,16 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 				return
 			}
 
-			// Log error in result if present
+			// Log error in result if present - but don't terminate the loop
 			if result.Error != "" {
-				invoker.AddToTimeline(
-					"[TOOL_EXECUTION_ERROR]",
-					utils.Errorf("tool '%s' returned error: %s", tool.GetName(), result.Error).Error(),
-				)
-				operator.Fail(utils.Errorf("tool execution returned error: %s", result.Error))
-				return
+				// FIX: Instead of terminating the loop, record error and allow AI to retry
+				errMsg := fmt.Sprintf("Tool '%s' returned error: %s. Please try a different approach or tool.", tool.GetName(), result.Error)
+				invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+				operator.SetReflectionLevel(ReflectionLevel_Critical)
+				operator.SetReflectionData("tool_error", result.Error)
+				operator.SetReflectionData("tool_name", tool.GetName())
+				// Continue to allow AI to try another approach
+				// Note: We still proceed to verify user satisfaction to give AI context
 			}
 
 			// Log success
