@@ -193,3 +193,100 @@ func TestMUSTPASS_TestImportedFlag(t *testing.T) {
 	require.NoError(t, err, "删除原始知识库失败")
 	assert.True(t, deleteResponse.Ok)
 }
+
+func TestMUSTPASS_TestIsDefaultFlag(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err, "创建本地客户端失败")
+
+	ctx := context.Background()
+	defaultKBName := "test_is_default_true_" + utils.RandStringBytes(6)
+	normalKBName := "test_is_default_false_" + utils.RandStringBytes(6)
+
+	// 清理函数，确保测试结束后删除知识库
+	defer func() {
+		client.DeleteKnowledgeBase(ctx, &ypb.DeleteKnowledgeBaseRequest{Name: defaultKBName})
+		client.DeleteKnowledgeBase(ctx, &ypb.DeleteKnowledgeBaseRequest{Name: normalKBName})
+	}()
+
+	// 1. 创建一个默认知识库 (IsDefault = true)
+	createDefaultResponse, err := client.CreateKnowledgeBaseV2(ctx, &ypb.CreateKnowledgeBaseV2Request{
+		Name:        defaultKBName,
+		Description: "default knowledge base for testing",
+		Tags:        []string{"test", "default"},
+		IsDefault:   true,
+	})
+	require.NoError(t, err, "创建默认知识库失败")
+	require.True(t, createDefaultResponse.IsSuccess)
+	require.NotZero(t, createDefaultResponse.KnowledgeBase.ID)
+	defaultKBId := createDefaultResponse.KnowledgeBase.ID
+
+	// 2. 验证创建的知识库 IsDefault 为 true
+	assert.True(t, createDefaultResponse.KnowledgeBase.IsDefault, "创建时设置 IsDefault=true，返回应为 true")
+
+	// 3. 查询默认知识库，验证 IsDefault 为 true
+	getDefaultResponse, err := client.GetKnowledgeBase(ctx, &ypb.GetKnowledgeBaseRequest{
+		KnowledgeBaseId: defaultKBId,
+	})
+	require.NoError(t, err, "获取默认知识库失败")
+	require.Len(t, getDefaultResponse.KnowledgeBases, 1)
+	assert.True(t, getDefaultResponse.KnowledgeBases[0].IsDefault, "查询默认知识库的 IsDefault 应为 true")
+
+	// 4. 创建一个普通知识库 (IsDefault = false，默认值)
+	createNormalResponse, err := client.CreateKnowledgeBaseV2(ctx, &ypb.CreateKnowledgeBaseV2Request{
+		Name:        normalKBName,
+		Description: "normal knowledge base for testing",
+		Tags:        []string{"test", "normal"},
+		IsDefault:   false,
+	})
+	require.NoError(t, err, "创建普通知识库失败")
+	require.True(t, createNormalResponse.IsSuccess)
+	require.NotZero(t, createNormalResponse.KnowledgeBase.ID)
+	normalKBId := createNormalResponse.KnowledgeBase.ID
+
+	// 5. 验证创建的普通知识库 IsDefault 为 false
+	assert.False(t, createNormalResponse.KnowledgeBase.IsDefault, "创建时未设置 IsDefault，返回应为 false")
+
+	// 6. 查询普通知识库，验证 IsDefault 为 false
+	getNormalResponse, err := client.GetKnowledgeBase(ctx, &ypb.GetKnowledgeBaseRequest{
+		KnowledgeBaseId: normalKBId,
+	})
+	require.NoError(t, err, "获取普通知识库失败")
+	require.Len(t, getNormalResponse.KnowledgeBases, 1)
+	assert.False(t, getNormalResponse.KnowledgeBases[0].IsDefault, "查询普通知识库的 IsDefault 应为 false")
+
+	// 7. 通过 UpdateKnowledgeBase 将普通知识库设置为默认
+	_, err = client.UpdateKnowledgeBase(ctx, &ypb.UpdateKnowledgeBaseRequest{
+		KnowledgeBaseId:          normalKBId,
+		KnowledgeBaseName:        normalKBName,
+		KnowledgeBaseDescription: "normal knowledge base updated to default",
+		Tags:                     []string{"test", "updated"},
+		IsDefault:                true,
+	})
+	require.NoError(t, err, "更新知识库 IsDefault 失败")
+
+	// 8. 验证更新后的知识库 IsDefault 为 true
+	getUpdatedResponse, err := client.GetKnowledgeBase(ctx, &ypb.GetKnowledgeBaseRequest{
+		KnowledgeBaseId: normalKBId,
+	})
+	require.NoError(t, err, "获取更新后的知识库失败")
+	require.Len(t, getUpdatedResponse.KnowledgeBases, 1)
+	assert.True(t, getUpdatedResponse.KnowledgeBases[0].IsDefault, "更新后的知识库 IsDefault 应为 true")
+
+	// 9. 将默认知识库取消默认设置
+	_, err = client.UpdateKnowledgeBase(ctx, &ypb.UpdateKnowledgeBaseRequest{
+		KnowledgeBaseId:          defaultKBId,
+		KnowledgeBaseName:        defaultKBName,
+		KnowledgeBaseDescription: "default knowledge base updated to normal",
+		Tags:                     []string{"test", "updated"},
+		IsDefault:                false,
+	})
+	require.NoError(t, err, "取消默认知识库设置失败")
+
+	// 10. 验证取消默认后的知识库 IsDefault 为 false
+	getCancelledResponse, err := client.GetKnowledgeBase(ctx, &ypb.GetKnowledgeBaseRequest{
+		KnowledgeBaseId: defaultKBId,
+	})
+	require.NoError(t, err, "获取取消默认后的知识库失败")
+	require.Len(t, getCancelledResponse.KnowledgeBases, 1)
+	assert.False(t, getCancelledResponse.KnowledgeBases[0].IsDefault, "取消默认后的知识库 IsDefault 应为 false")
+}
