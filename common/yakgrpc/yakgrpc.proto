@@ -1380,6 +1380,7 @@ message GetKnowledgeBaseRequest {
   string Keyword = 2;
   Paging Pagination = 3;
   bool OnlyCreatedFromUI = 4;
+  bool OnlyIsDefault = 5;
 }
 
 message KnowledgeBaseInfo {

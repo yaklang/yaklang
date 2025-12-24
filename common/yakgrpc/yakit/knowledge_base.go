@@ -18,6 +18,37 @@ func CreateKnowledgeBase(db *gorm.DB, knowledgeBase *schema.KnowledgeBaseInfo) e
 	return nil
 }
 
+// GetDefaultKnowledgeBase 获取默认知识库
+func GetDefaultKnowledgeBase(db *gorm.DB) (*schema.KnowledgeBaseInfo, error) {
+	db = db.Model(&schema.KnowledgeBaseInfo{})
+	var knowledgeBase schema.KnowledgeBaseInfo
+	err := db.Where("is_default = ?", true).First(&knowledgeBase).Error
+	if err != nil {
+		return nil, utils.Wrap(err, "get default KnowledgeBase failed")
+	}
+	return &knowledgeBase, nil
+}
+
+// SetDefaultKnowledgeBase 设置默认知识库
+func SetDefaultKnowledgeBase(db *gorm.DB, id int64) error {
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// 1. 将所有知识库的 is_default 设置为 false
+		if err := tx.Model(&schema.KnowledgeBaseInfo{}).Where("is_default = ?", true).Update("is_default", false).Error; err != nil {
+			return utils.Wrap(err, "reset all default KnowledgeBase failed")
+		}
+
+		// 2. 设置指定知识库为默认知识库
+		if err := tx.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", id).Update("is_default", true).Error; err != nil {
+			return utils.Wrap(err, "set default KnowledgeBase failed")
+		}
+		return nil
+	})
+	if err != nil {
+		return utils.Wrap(err, "set default KnowledgeBase failed")
+	}
+	return nil
+}
+
 // UpdateKnowledgeBase 更新知识库信息
 func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.KnowledgeBaseInfo) error {
 	db = db.Model(&schema.KnowledgeBaseInfo{})
@@ -227,7 +258,7 @@ func GetKnowledgeBaseEntryByUUID(db *gorm.DB, uuid string) (*schema.KnowledgeBas
 }
 
 // FilterKnowledgeBase 过滤知识库
-func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string, onlyCreatedFromUI bool) *gorm.DB {
+func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string, onlyCreatedFromUI bool, onlyIsDefault bool) *gorm.DB {
 	db = db.Model(&schema.KnowledgeBaseInfo{})
 
 	// 实现关键词和ID的二选一逻辑
@@ -245,6 +276,10 @@ func FilterKnowledgeBase(db *gorm.DB, knowledgeBaseId int64, keyword string, onl
 		db = db.Where("created_from_ui = ?", true)
 	}
 
+	if onlyIsDefault {
+		db = db.Where("is_default = ?", true)
+	}
+
 	return db
 }
 
@@ -254,7 +289,25 @@ func QueryKnowledgeBasePaging(db *gorm.DB, knowledgeBaseId int64, keyword string
 	db = db.Model(&schema.KnowledgeBaseInfo{})
 
 	// 2. 应用过滤条件
-	db = FilterKnowledgeBase(db, knowledgeBaseId, keyword, onlyCreatedFromUI)
+	db = FilterKnowledgeBase(db, knowledgeBaseId, keyword, onlyCreatedFromUI, false)
+
+	// 3. 执行分页查询
+	ret := make([]*schema.KnowledgeBaseInfo, 0)
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+
+	return pag, ret, nil
+}
+
+// QueryKnowledgeBasePagingByFilter 分页查询知识库
+func QueryKnowledgeBasePagingByFilter(db *gorm.DB, req *ypb.GetKnowledgeBaseRequest, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseInfo, error) {
+	// 1. 设置查询的数据模型
+	db = db.Model(&schema.KnowledgeBaseInfo{})
+
+	// 2. 应用过滤条件
+	db = FilterKnowledgeBase(db, req.GetKnowledgeBaseId(), req.GetKeyword(), req.GetOnlyCreatedFromUI(), req.GetOnlyIsDefault())
 
 	// 3. 执行分页查询
 	ret := make([]*schema.KnowledgeBaseInfo, 0)
