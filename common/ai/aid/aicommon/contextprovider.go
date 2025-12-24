@@ -56,9 +56,10 @@ func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string
 		infoBuffer.WriteString(fmt.Sprintf("Tags: %s\n", knowledgeBase.Tags))
 		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
 		infoBuffer.WriteString("【重要提示】用户已附加此知识库作为问题的参考资源。\n")
-		infoBuffer.WriteString("请优先使用此知识库中的内容来回答用户的问题。\n")
-		infoBuffer.WriteString("如需查询知识库内容，请使用相关的知识库查询工具并指定此知识库名称。\n")
-		infoBuffer.WriteString("在回答时，请明确引用知识库中的相关信息，确保答案准确且有据可依。\n")
+		infoBuffer.WriteString("当用户问及与此知识库相关的内容时，请务必使用 `knowledge_enhance_answer` action 或相关知识库查询工具来检索知识库内容。\n")
+		infoBuffer.WriteString(fmt.Sprintf("查询时请指定知识库名称为: %s\n", knowledgeBaseName))
+		infoBuffer.WriteString("请基于知识库查询结果来回答用户的问题，确保答案准确且有据可依。\n")
+		infoBuffer.WriteString("在回答时，请明确引用知识库中的相关信息。\n")
 		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
 	}
 }
