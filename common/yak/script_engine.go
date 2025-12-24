@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiengine"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,12 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/aiengine"
+
 	"github.com/yaklang/yaklang/common/netstack_exports"
 	"github.com/yaklang/yaklang/common/tcpmitm"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
 	"github.com/yaklang/yaklang/common/aiforge"
 
@@ -39,7 +37,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/amap"
-	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/twofa"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -84,7 +81,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -330,14 +326,9 @@ func initYaklangLib() {
 	// binx
 	yaklang.Import("bin", binx.Exports)
 
-	// ssa
-	ssaExports := []map[string]any{
-		ssaapi.Exports,
-		ssaproject.Exports,
-		ssaconfig.Exports,
-	}
-	yaklang.Import("ssa", lo.Assign(ssaExports...))
-	yaklang.Import("syntaxflow", syntaxflow.Exports)
+	// ssa and syntaxflow (Irify features)
+	// Use build tag to control: !irify_exclude -> full implementation, irify_exclude -> stub for frontend hints
+	initIrifyLibs()
 
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)
