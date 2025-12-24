@@ -1990,7 +1990,7 @@ message ExportAILogsRequest {
 }
 
 message ExportAILogsResponse {
-  string FilePath = 1;  
+  string FilePath = 1;
 }
 
 message StartMcpServerRequest {
@@ -6689,6 +6689,9 @@ message MITMRequest {
   // disable websocket compression
   bool DisableWebsocketCompression = 64;
 
+  // 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+  bool AllowChunkStaticJS = 68;
+
   // hijack filter
   MITMFilterData HijackFilterData = 65;
   bool updateHijackFilter = 66;
@@ -8350,7 +8353,10 @@ message MITMV2Request{
   bool DisableSystemProxy = 49;
   // runtime change system proxy enable/disable
   bool SetDisableSystemProxy = 50;
-  
+
+  // 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+  bool AllowChunkStaticJS = 53;
+
   // SNI (Server Name Indication) configuration
   // 使用两个字段精确控制 SNI 行为：
   // 1. 自动模式（默认）：OverwriteSNI=false，根据 Host 自动推断
