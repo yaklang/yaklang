@@ -44,7 +44,16 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 		result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 		if err != nil {
-			operator.Fail(utils.Errorf("ExecuteToolRequiredAndCall error: %v", err))
+			// FIX: Instead of terminating the loop with operator.Fail(), we record the error
+			// in timeline and allow AI to retry with a different tool or approach
+			errMsg := fmt.Sprintf("Tool '%s' execution failed: %v. Please try a different tool or approach.", toolPayload, err)
+			invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+			// Set reflection level to help AI understand the failure
+			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+			operator.SetReflectionData("tool_error", err.Error())
+			operator.SetReflectionData("tool_name", toolPayload)
+			// Continue the loop to give AI a chance to retry
+			operator.Continue()
 			return
 		}
 		if directly {
