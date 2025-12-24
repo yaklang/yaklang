@@ -74,14 +74,21 @@ func (ve *MemEditor) SetUrl(url string) {
 	ve.fileUrl = url
 }
 
+// GetUrl 返回文件的完整URL路径，格式为 /programName/folderPath/fileName
 func (ve *MemEditor) GetUrl() string {
 	return path.Join("/", ve.GetProgramName(), ve.GetFolderPath(), ve.GetFilename())
+}
+
+// GetFilePath 返回文件的路径，格式为 /folderPath/fileName
+func (v *MemEditor) GetFilePath() string {
+	return path.Join("/", v.GetFolderPath(), v.GetFilename())
 }
 
 func (ve *MemEditor) SetProgramName(programName string) {
 	ve.programName = programName
 }
 
+// GetProgramName 返回程序名称
 func (ve *MemEditor) GetProgramName() string {
 	return ve.programName
 }
@@ -90,6 +97,7 @@ func (ve *MemEditor) SetFolderPath(folderPath string) {
 	ve.folderPath = folderPath
 }
 
+// GetFolderPath 返回文件夹路径
 func (ve *MemEditor) GetFolderPath() string {
 	if ve.folderPath == "" && ve.fileUrl != "" {
 		// split from ve.GetUrl
@@ -102,19 +110,20 @@ func (ve *MemEditor) SetFileName(fileName string) {
 	ve.fileName = fileName
 }
 
-// GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
-func (ve *MemEditor) GetIrSourceHash() string {
-	data := ve.GetProgramName() + ve.GetFolderPath() + ve.GetFilename() + ve.GetSourceCode()
-	hash := codec.Md5(data)
-	return hash
-}
-
+// GetFilename 返回文件名
 func (ve *MemEditor) GetFilename() string {
 	if ve.fileName == "" {
 		// split from ve.GetUrl
 		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
 	}
 	return ve.fileName
+}
+
+// GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
+func (ve *MemEditor) GetIrSourceHash() string {
+	data := ve.GetProgramName() + ve.GetFolderPath() + ve.GetFilename() + ve.GetSourceCode()
+	hash := codec.Md5(data)
+	return hash
 }
 
 func (ve *MemEditor) GetLength() int {

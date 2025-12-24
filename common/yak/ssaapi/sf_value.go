@@ -31,7 +31,7 @@ func (v *Value) IsEmpty() bool {
 }
 
 func (v *Value) GetOpcode() string {
-	return ssa.SSAOpcode2Name[v.getOpcode()]
+	return v.getOpcode().String()
 }
 
 func (v *Value) GetBinaryOperator() string {

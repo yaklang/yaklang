@@ -1,16 +1,18 @@
 package sfvm
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func validSSAOpcode(raw string) ssa.Opcode {
-	text := yakunquote.TryUnquote(raw)
+	text := strings.ToLower(yakunquote.TryUnquote(raw))
 	switch text {
 	case "und", "undefined":
 		return ssa.SSAOpcodeUndefined
-	case "free", "freeValue":
+	case "free", "freevalue":
 		return ssa.SSAOpcodeFreeValue
 	case "externlib", "extern_lib", "lib":
 		return ssa.SSAOpcodeExternLib
@@ -18,11 +20,11 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeCall
 	case "phi":
 		return ssa.SSAOpcodePhi
-	case "const", "constant":
+	case "const", "constant", "constinst":
 		return ssa.SSAOpcodeConstInst
-	case "param", "formal_param":
+	case "param", "formal_param", "parameter":
 		return ssa.SSAOpcodeParameter
-	case "param_member", "parammember":
+	case "param_member", "parammember", "parametermember":
 		return ssa.SSAOpcodeParameterMember
 	case "return":
 		return ssa.SSAOpcodeReturn
@@ -32,9 +34,9 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeBasicBlock
 	case "if":
 		return ssa.SSAOpcodeIf
-	case "try": // "error_handler"
+	case "try", "errorhandler": // "error_handler"
 		return ssa.SSAOpcodeErrorHandler
-	case "catch":
+	case "catch", "errorcatch":
 		return ssa.SSAOpcodeErrorCatch
 	case "throw", "panic":
 		return ssa.SSAOpcodePanic
@@ -50,6 +52,20 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeBinOp
 	case "unop":
 		return ssa.SSAOpcodeUnOp
+	case "assert":
+		return ssa.SSAOpcodeAssert
+	case "jump":
+		return ssa.SSAOpcodeJump
+	case "next":
+		return ssa.SSAOpcodeNext
+	case "recover":
+		return ssa.SSAOpcodeRecover
+	case "sideeffect":
+		return ssa.SSAOpcodeSideEffect
+	case "typevalue":
+		return ssa.SSAOpcodeTypeValue
+	case "unknow":
+		return ssa.SSAOpcodeUnKnow
 	default:
 		return -1
 	}

@@ -16,6 +16,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+type SyntaxFlowQueryInstance interface {
+	SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error)
+}
+
+var _ SyntaxFlowQueryInstance = (*Program)(nil)
+var _ SyntaxFlowQueryInstance = (*ProgramOverLay)(nil)
+var _ SyntaxFlowQueryInstance = (Programs)(nil)
+
 var DefaultInputVar = "input"
 
 type queryConfig struct {
@@ -438,5 +446,10 @@ func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOptio
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
+	return QuerySyntaxflow(opts...)
+}
+
+func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts, QueryWithValue(p), QueryWithRuleContent(i))
 	return QuerySyntaxflow(opts...)
 }
