@@ -22,6 +22,7 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 }
 
 var ttlSSAParseCache = createCache(30 * time.Minute)
+var parseSingleFlightCache = utils.NewSingleFlightCache(ttlSSAParseCache.CacheExWithKey)
 
 type programResult struct {
 	prog *Program
@@ -60,19 +61,17 @@ func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error
 
 	if config.EnableCache {
 		hash := config.CalcHash()
-		// Use single-flight behavior to ensure only one parsing operation per hash
-		result, err := ttlSSAParseCache.GetOrLoad(hash, func() (*programResult, error) {
+		result, err := parseSingleFlightCache.Do(hash, func() (*programResult, error) {
 			ret, err := config.parseFile()
 			return &programResult{
 				prog: ret,
 				err:  err,
-			}, nil
+			}, err
 		})
 		if err != nil {
 			return nil, err
 		}
 		return result.prog, result.err
-	} else {
 	}
 
 	ret, err := config.parseFile()
