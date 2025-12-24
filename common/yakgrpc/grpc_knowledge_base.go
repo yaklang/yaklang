@@ -80,6 +80,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 			KnowledgeBaseType:        kb.KnowledgeBaseType,
 			Tags:                     utils.StringSplitAndStrip(kb.Tags, ","),
 			CreatedFromUI:            kb.CreatedFromUI,
+			IsDefault:                kb.IsDefault,
 		}
 	}
 
@@ -143,7 +144,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 
 	// CreateKnowledgeBaseV2 在实践中经常被当做"创建/更新元信息"的入口；
 	// 这里做一次显式同步，确保 tags/description/type 写入 DB 后列表可查到。
-	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetTags()...); err != nil {
+	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetIsDefault(), req.GetTags()...); err != nil {
 		return nil, utils.Wrap(err, "更新知识库信息失败")
 	}
 
@@ -166,6 +167,7 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 			KnowledgeBaseName:        kbInfo.KnowledgeBaseName,
 			KnowledgeBaseDescription: kbInfo.KnowledgeBaseDescription,
 			KnowledgeBaseType:        kbInfo.KnowledgeBaseType,
+			IsDefault:                kbInfo.IsDefault,
 			Tags:                     utils.StringSplitAndStrip(kbInfo.Tags, ","),
 			CreatedFromUI:            kbInfo.CreatedFromUI,
 		},
@@ -183,6 +185,7 @@ func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowled
 		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
 		KnowledgeBaseType:        req.GetKnowledgeBaseType(),
 		Tags:                     strings.Join(req.GetTags(), ","),
+		IsDefault:                req.GetIsDefault(),
 	})
 	if err != nil {
 		return nil, utils.Errorf("更新知识库信息失败: %v", err)

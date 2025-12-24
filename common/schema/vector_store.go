@@ -305,6 +305,9 @@ type KnowledgeBaseInfo struct {
 	// 知识库类型
 	KnowledgeBaseType string `gorm:"index;not null" json:"knowledge_base_type"`
 
+	// 是否默认知识库
+	IsDefault bool `gorm:"default:false" json:"is_default"`
+
 	// 标签
 	Tags string `gorm:"type:text" json:"tags"`
 
