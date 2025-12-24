@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,6 +38,7 @@ type AICallerConfigIf interface {
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
+	GetAiToolManager() *buildinaitools.AiToolManager
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {
