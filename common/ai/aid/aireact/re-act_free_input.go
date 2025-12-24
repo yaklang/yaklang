@@ -23,6 +23,10 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	for _, path := range event.AttachedFilePath {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
+	for _, resource := range event.AttachedResourceInfo {
+		r.config.ContextProviderManager.RegisterTracedContent(resource.GetKey(), aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), userInput))
+	}
+
 	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)
 	}
