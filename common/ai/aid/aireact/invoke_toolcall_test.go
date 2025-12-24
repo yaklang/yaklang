@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -443,14 +444,66 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
+	// Track tool execution status for mock responses
+	toolExecutionSucceeded := utils.NewAtomicBool()
+
+	// Custom mock function for this test that responds based on tool execution status
+	mockedToolCallingWithToolStatus := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		prompt := req.GetPrompt()
+		if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			rsp := i.NewAIResponse()
+			// Return satisfied only if tool execution succeeded
+			if toolExecutionSucceeded.IsSet() {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully", "human_readable_result": "mocked thought for verification"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry", "human_readable_result": "tool not found"}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// Handle self-reflection prompts
+		if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		fmt.Println("Unexpected prompt:", prompt)
+
+		return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	}
+
 	_, err := NewTestReAct(
 		aicommon.WithAiToolManagerOptions(buildinaitools.WithNoToolsCache(), buildinaitools.WithEnableAllTools()),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCalling(i, r, toolName)
+			return mockedToolCallingWithToolStatus(i, r)
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			// Track tool execution success
+			if e.Type == schema.EVENT_TOOL_CALL_DONE {
+				toolExecutionSucceeded.Set()
+			}
 			out <- e.ToGRPC()
 		}),
 	)
@@ -467,6 +520,9 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	}
 
 	// 第一次尝试：工具不存在，应该失败
+	// Note: After recent code changes, tool execution failure no longer aborts the task.
+	// Instead, it records the error and allows AI to retry.
+	// We detect tool execution error events to verify the tool was not found.
 	fmt.Printf("Phase 1: Attempting to call non-existent tool '%s'\n", toolName)
 	in <- &ypb.AIInputEvent{
 		IsFreeInput: true,
@@ -474,8 +530,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	}
 
 	after := time.After(du * time.Second)
-	firstTaskFailed := false
-	firstTaskCompleted := false
+	toolExecutionErrorDetected := false
 
 LOOP1:
 	for {
@@ -483,11 +538,15 @@ LOOP1:
 		case e := <-out:
 			fmt.Println(e.String())
 
-			if e.NodeId == "react_task_status_changed" {
-				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
-				// 任务执行失败标志
-				if utils.InterfaceToString(result) == "aborted" {
-					firstTaskFailed = true
+			// Detect tool execution error (tool not found)
+			if e.NodeId == "timeline_item" {
+				content := string(e.GetContent())
+				if strings.Contains(content, "TOOL_EXECUTION_ERROR") && strings.Contains(content, toolName) {
+					toolExecutionErrorDetected = true
+					fmt.Printf("✓ Detected tool execution error for '%s'\n", toolName)
+					// Once we detect the error, we can break out of the loop
+					// The AI will keep retrying since verification returns false
+					break LOOP1
 				}
 			}
 
@@ -495,7 +554,6 @@ LOOP1:
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				// 任务执行完成标志
 				if utils.InterfaceToString(result) == "completed" {
-					firstTaskCompleted = true
 					break LOOP1
 				}
 			}
@@ -504,9 +562,11 @@ LOOP1:
 		}
 	}
 
-	if !(firstTaskCompleted && firstTaskFailed) {
-		t.Fatal("first task call failed")
+	// Verify that tool execution error was detected
+	if !toolExecutionErrorDetected {
+		t.Fatal("Phase 1 failed: expected tool execution error for non-existent tool, but none was detected")
 	}
+	fmt.Println("✓ Phase 1 completed: Tool execution error detected as expected")
 
 	// 创建工具
 	fmt.Printf("\nPhase 2: Creating tool '%s'\n", toolName)
