@@ -175,6 +175,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return utils.Errorf("recv first req failed: %s", err)
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
+
+	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	allowChunkStaticJS := firstReq.GetAllowChunkStaticJS()
 	hostMapping := make(map[string]string)
 	getDownstreamProxy := func(request *ypb.MITMRequest) ([]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
@@ -889,7 +892,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				urlStr := httpctx.GetRequestURL(req)
 				rules, rspHooked, dropped := replacer.Hook(false, true, urlStr, rsp)
 				hookDuration := time.Since(hookStart)
-				
+
 				// 监控慢规则 Hook（超过 300ms）
 				if hookDuration > 300*time.Millisecond {
 					now := time.Now()
@@ -907,7 +910,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					yakit.TriggerSlowRuleHookCallbackThrottled()
 					log.Warnf("MITM HookResponse took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 				}
-				
+
 				if dropped {
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 					log.Warn("response should be dropped(VIA replacer.hook)")
@@ -929,7 +932,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		urlStr = httpctx.GetRequestURL(req)
 		rules, rsp1, shouldBeDropped := replacer.Hook(false, true, urlStr, rsp)
 		hookDuration := time.Since(hookStart)
-		
+
 		// 监控慢规则 Hook（超过 300ms）
 		if hookDuration > 300*time.Millisecond {
 			now := time.Now()
@@ -947,7 +950,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			yakit.TriggerSlowRuleHookCallbackThrottled()
 			log.Warnf("MITM HookResponse took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 		}
-		
+
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
@@ -1218,8 +1221,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetRequestURL(originReqIns, reqURL)
 		}
 
+		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
+			// 默认过滤 chunk/static JS：路径命中静态 JS 或响应确认为 JS 即可过滤。
+			if !allowChunkStaticJS && (isChunkStaticJSRequest(urlPath) || isJavaScriptMIME(t)) {
+				ret = true
+			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
 			return ret
 		})
@@ -1263,6 +1271,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		if urlRaw != nil {
 			urlStr = utils.Url2UnEscapeString(urlRaw)
+			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
 			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
 				extName = ret
@@ -1297,7 +1306,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		urlStr = httpctx.GetRequestURL(originReqIns)
 		rules, req1, shouldBeDropped := replacer.Hook(true, false, urlStr, req, isHttps)
 		hookDuration := time.Since(hookStart)
-		
+
 		// 监控慢规则 Hook（超过 300ms）
 		if hookDuration > 300*time.Millisecond {
 			now := time.Now()
@@ -1315,7 +1324,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			yakit.TriggerSlowRuleHookCallbackThrottled()
 			log.Warnf("MITM HookRequest took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 		}
-		
+
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1704,7 +1713,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				hookDuration := time.Since(hookStart)
 				close(colorCh)
-				
+
 				// 监控慢规则 Hook（超过 300ms）
 				if hookDuration > 300*time.Millisecond {
 					now := time.Now()
@@ -1722,7 +1731,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					yakit.TriggerSlowRuleHookCallbackThrottled()
 					log.Warnf("MITM HookColor took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 				}
-				
+
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
 					if err != nil {
