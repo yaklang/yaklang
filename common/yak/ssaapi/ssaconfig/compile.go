@@ -69,6 +69,17 @@ func (c *Config) GetTags() []string {
 	return c.BaseInfo.Tags
 }
 
+// SetProgramName 设置程序名（单个程序名）
+func (c *Config) SetProgramName(name string) {
+	if c == nil {
+		return
+	}
+	if c.BaseInfo == nil {
+		c.BaseInfo = defaultBaseInfo()
+	}
+	c.BaseInfo.ProgramNames = []string{name}
+}
+
 // --- 基础信息配置 Options ---
 
 func WithProjectID(projectId uint64) Option {
