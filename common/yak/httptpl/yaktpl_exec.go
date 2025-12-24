@@ -231,6 +231,32 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					if config.BeforeSendPackage != nil {
 						raw = config.BeforeSendPackage(raw, req.IsHttps)
 					}
+
+					urlStrIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(raw, req.IsHttps)
+					urlStr := ""
+					if urlStrIns != nil {
+						urlStr = urlStrIns.String()
+					}
+					if config.mockHTTPRequest != nil {
+						var mockResponseRaw []byte
+						mocked := utils.NewBool(false)
+						config.mockHTTPRequest(req.IsHttps, urlStr, raw, func(rsp interface{}) {
+							rspBytes := utils.InterfaceToBytes(rsp)
+							fixedRsp, _, _ := lowhttp.FixHTTPResponse(rspBytes)
+							if fixedRsp == nil {
+								log.Warnf("failed to fix mock response, using original bytes")
+								fixedRsp = rspBytes
+							}
+							mockResponseRaw = fixedRsp
+							mocked.Set()
+						})
+						if mocked.IsSet() {
+							return &lowhttp.LowhttpResponse{
+								RawPacket: mockResponseRaw,
+							}, nil
+						}
+					}
+
 					packetOpt := opts
 					redictTimes := 0
 					if ret.RequestConfig.EnableRedirect {

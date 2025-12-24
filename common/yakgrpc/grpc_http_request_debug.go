@@ -313,17 +313,18 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
-		"REQUESTS":     reqs,
-		"CTX":          streamCtx,
-		"PLUGIN":       scriptInstance,
-		"PLUGIN_CODE":  scriptCode,
-		"PLUGIN_NAME":  scriptName,
-		"YAK_FILENAME": scriptName,
-		"PLUGIN_TYPE":  strings.ToLower(scriptType),
-		"IS_SMOKING":   isSmoking,
-		"IS_STRICT":    isStrict,
-		"RUNTIME_ID":   runtimeId,
-		"CLI_PARAMS":   KVPairToParamItem(execParams),
+		"REQUESTS":             reqs,
+		"NUCLEI_MOCK_RESPONSE": baseBuilderParams.MockHTTPResponse,
+		"CTX":                  streamCtx,
+		"PLUGIN":               scriptInstance,
+		"PLUGIN_CODE":          scriptCode,
+		"PLUGIN_NAME":          scriptName,
+		"YAK_FILENAME":         scriptName,
+		"PLUGIN_TYPE":          strings.ToLower(scriptType),
+		"IS_SMOKING":           isSmoking,
+		"IS_STRICT":            isStrict,
+		"RUNTIME_ID":           runtimeId,
+		"CLI_PARAMS":           KVPairToParamItem(execParams),
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)

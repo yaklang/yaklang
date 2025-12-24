@@ -616,7 +616,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				_, _, getMirrorHTTPFlowParams, _, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+				_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 					var extractorResults []*ypb.KVPair
 					respModel, err := resp.ToGRPCModel()
@@ -909,8 +909,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if !req.GetDisableHotPatch() {
-			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker))
+			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
 		}
 
 		if req.GetOverwriteSNI() {

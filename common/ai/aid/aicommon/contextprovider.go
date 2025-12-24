@@ -54,6 +54,11 @@ func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", knowledgeBase.KnowledgeBaseDescription))
 		infoBuffer.WriteString(fmt.Sprintf("Type: %s\n", knowledgeBase.KnowledgeBaseType))
 		infoBuffer.WriteString(fmt.Sprintf("Tags: %s\n", knowledgeBase.Tags))
+		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
+		infoBuffer.WriteString("【重要提示】用户已附加此知识库作为问题的参考资源。\n")
+		infoBuffer.WriteString("请优先使用此知识库中的内容来回答用户的问题。\n")
+		infoBuffer.WriteString("如需查询知识库内容，请使用相关的知识库查询工具并指定此知识库名称。\n")
+		infoBuffer.WriteString("在回答时，请明确引用知识库中的相关信息，确保答案准确且有据可依。\n")
 		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
 	}
 }
@@ -65,11 +70,15 @@ func AIToolContextProvider(aitoolName string, userPrompt ...string) ContextProvi
 			return "", utils.Errorf("failed to get aitool %s: %w", aitoolName, err)
 		}
 		var infoBuffer bytes.Buffer
-		// AITool Info
 		infoBuffer.WriteString("============== AITool Info ==============\n")
 		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aitool.Name))
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aitool.Description))
 		infoBuffer.WriteString(fmt.Sprintf("Schema: %s\n", aitool.ToJSONSchemaString()))
+		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
+		infoBuffer.WriteString("【重要提示】用户已指定使用此工具来完成任务。\n")
+		infoBuffer.WriteString(fmt.Sprintf("请优先调用工具 '%s' 来解决用户的问题。\n", aitool.Name))
+		infoBuffer.WriteString("在执行任务时，请根据上述工具的Schema正确传入参数。\n")
+		infoBuffer.WriteString("如果此工具无法完全满足需求，可以结合其他工具辅助完成，但应以此工具为主。\n")
 		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
 	}
 }
@@ -85,6 +94,12 @@ func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextPro
 		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aiforge.ForgeName))
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aiforge.Description))
 		infoBuffer.WriteString(fmt.Sprintf("Params: %s\n", aiforge.Params))
+		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
+		infoBuffer.WriteString("【重要提示】用户已指定使用此AI蓝图(Forge)来完成任务。\n")
+		infoBuffer.WriteString(fmt.Sprintf("请优先调用AI蓝图 '%s' 来解决用户的问题。\n", aiforge.ForgeName))
+		infoBuffer.WriteString("此蓝图专门设计用于处理特定类型的任务，能够提供更专业和高效的解决方案。\n")
+		infoBuffer.WriteString("在执行时，请根据上述参数Schema正确配置蓝图参数，确保任务顺利完成。\n")
+		infoBuffer.WriteString("如果蓝图执行过程中遇到问题，请及时向用户反馈并寻求进一步指导。\n")
 		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
 	}
 }

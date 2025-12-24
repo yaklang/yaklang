@@ -65,6 +65,7 @@ type httpPoolConfig struct {
 	MirrorHTTPFlow       func([]byte, []byte, map[string]string) map[string]string
 	RetryHandler         func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
 	CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
+	MockHTTPRequest      func(https bool, url string, req []byte, mockResponse func(rsp interface{}))
 	MutateHook           func([]byte) [][]byte
 
 	// 请求来源
@@ -216,6 +217,7 @@ func _hoopPool_SetHookCaller(
 	extractor func([]byte, []byte, map[string]string) map[string]string,
 	retryHandler func(bool, int, []byte, []byte, func(...[]byte)),
 	customFailureChecker func(bool, []byte, []byte, func(string)),
+	mockHTTPRequest func(bool, string, []byte, func(interface{})),
 ) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
@@ -223,6 +225,7 @@ func _hoopPool_SetHookCaller(
 		config.MirrorHTTPFlow = extractor
 		config.RetryHandler = retryHandler
 		config.CustomFailureChecker = customFailureChecker
+		config.MockHTTPRequest = mockHTTPRequest
 	}
 }
 
@@ -1023,7 +1026,31 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							}))
 						}
 
-						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
+						// 处理 MockHTTPRequest：如果定义了 mock 响应，则使用 mock 而不是真正发送请求
+						var mockRspRaw []byte
+						mockedRsp := utils.NewBool(false)
+						if config.MockHTTPRequest != nil {
+							config.MockHTTPRequest(https, urlStr, targetRequest, func(rsp interface{}) {
+								mockRspRaw = utils.InterfaceToBytes(rsp)
+								if fixed, _, fixErr := lowhttp.FixHTTPResponse(mockRspRaw); fixErr == nil {
+									mockRspRaw = fixed
+								}
+								mockedRsp.Set()
+							})
+						}
+
+						var rspInstance *lowhttp.LowhttpResponse
+						if mockedRsp.IsSet() {
+							reqInstance, _ := lowhttp.ParseBytesToHttpRequest(targetRequest)
+							rspInstance = &lowhttp.LowhttpResponse{
+								RawPacket:       mockRspRaw,
+								BareResponse:    mockRspRaw,
+								RequestInstance: reqInstance,
+								TraceInfo:       &lowhttp.LowhttpTraceInfo{},
+							}
+						} else {
+							rspInstance, err = lowhttp.HTTP(lowhttpOptions...)
+						}
 						requestDebugCounterAdd("after lowhttp.HTTP")
 
 						var rsp []byte
