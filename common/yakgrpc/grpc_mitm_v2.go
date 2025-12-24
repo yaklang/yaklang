@@ -141,6 +141,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
+	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	allowChunkStaticJS := firstReq.GetAllowChunkStaticJS()
+
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
@@ -1075,8 +1078,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			httpctx.SetRequestURL(originReqIns, reqURL)
 		}
 
+		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
+			// 默认过滤 chunk/static JS：路径命中静态 JS 或响应确认为 JS 即可过滤。
+			if !allowChunkStaticJS && (isChunkStaticJSRequest(urlPath) || isJavaScriptMIME(t)) {
+				ret = true
+			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
 			return ret
 		})
@@ -1118,6 +1126,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		if urlRaw != nil {
 			urlStr = urlRaw.String()
+			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
 			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
 				extName = ret
