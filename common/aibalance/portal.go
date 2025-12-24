@@ -81,6 +81,8 @@ type PortalData struct {
 	HealthyProviders int
 	TotalRequests    int64
 	SuccessRate      float64
+	TotalTraffic     int64  // 总流量（输入+输出字节数）
+	TotalTrafficStr  string // 格式化的总流量字符串
 	Providers        []ProviderData
 	AllowedModels    map[string]string
 	APIKeys          []APIKeyData
@@ -449,6 +451,7 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 
 	// 获取API密钥数据
 	dbApiKeys, err := GetAllAiApiKeys()
+	var totalTraffic int64 = 0
 	if err == nil {
 		for _, apiKey := range dbApiKeys {
 			// 创建部分隐藏的API密钥显示
@@ -460,6 +463,9 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			// 格式化流量数据，使其更具可读性
 			inputBytesFormatted := formatBytes(apiKey.InputBytes)
 			outputBytesFormatted := formatBytes(apiKey.OutputBytes)
+
+			// 累加流量统计
+			totalTraffic += apiKey.InputBytes + apiKey.OutputBytes
 
 			// 创建APIKeyData结构
 			keyData := APIKeyData{
@@ -486,6 +492,10 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			data.APIKeys = append(data.APIKeys, keyData)
 		}
 	}
+
+	// 设置流量统计
+	data.TotalTraffic = totalTraffic
+	data.TotalTrafficStr = formatBytes(totalTraffic)
 
 	// 填充 TOTP 数据
 	data.TOTPSecret = GetTOTPSecret()

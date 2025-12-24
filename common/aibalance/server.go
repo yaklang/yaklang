@@ -752,10 +752,20 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}()
 
 		// Update API Key statistics using actual success
-		if !isFreeModel {
+		inputBytes := int64(prompt.Len())
+		outputBytes := total
+		if isFreeModel {
+			// 免费模型使用特殊的 free-user 统计
 			go func() {
-				inputBytes := int64(prompt.Len())
-				outputBytes := total
+				if err := UpdateFreeUserStats(inputBytes, outputBytes, requestSucceeded); err != nil {
+					c.logError("Failed to update free user statistics: %v", err)
+				} else {
+					c.logInfo("Free user statistics updated: input=%d bytes, output=%d bytes, success=%v",
+						inputBytes, outputBytes, requestSucceeded)
+				}
+			}()
+		} else {
+			go func() {
 				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
 				} else {
@@ -992,15 +1002,25 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 		}()
 
 		// Update API Key statistics
-		if !isFreeModel {
+		inputBytesEmbed := int64(len(inputText))
+		outputBytesEmbed := int64(len(vectors) * 4) // float32 = 4 bytes
+		if isFreeModel {
+			// 免费模型使用特殊的 free-user 统计
 			go func() {
-				inputBytes := int64(len(inputText))
-				outputBytes := int64(len(vectors) * 4) // float32 = 4 bytes
-				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, true); err != nil {
+				if err := UpdateFreeUserStats(inputBytesEmbed, outputBytesEmbed, true); err != nil {
+					c.logError("Failed to update free user statistics: %v", err)
+				} else {
+					c.logInfo("Free user statistics updated: input=%d bytes, output=%d bytes",
+						inputBytesEmbed, outputBytesEmbed)
+				}
+			}()
+		} else {
+			go func() {
+				if err := UpdateAiApiKeyStats(key.Key, inputBytesEmbed, outputBytesEmbed, true); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
 				} else {
 					c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes",
-						utils.ShrinkString(key.Key, 8), inputBytes, outputBytes)
+						utils.ShrinkString(key.Key, 8), inputBytesEmbed, outputBytesEmbed)
 				}
 			}()
 		}
@@ -1231,9 +1251,26 @@ func (c *ServerConfig) serveMemfitTOTPUUID(conn net.Conn) {
 
 // serveQueryModelMetaInfo serves detailed model meta info with description and tags
 // This is a new endpoint that returns all model metadata with descriptions and tags
-// The caller might use /v1/query-model-meta-info or /v1/query-model-meta-info?model=xxx
+// The caller might use /v1/query-model-meta-info or /v1/query-model-meta-info?name=xxx
+// The name parameter supports prefix matching (e.g., name=memfit- will match all models starting with "memfit-")
 func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) {
 	c.logInfo("Serving query model meta info")
+
+	// Parse request to get query parameters
+	var nameFilter string
+	_, _ = lowhttp.SplitHTTPPacket(rawPacket, func(method string, requestUri string, proto string) error {
+		// Parse query parameters from URI
+		if idx := strings.Index(requestUri, "?"); idx != -1 {
+			queryStr := requestUri[idx+1:]
+			params, _ := url.ParseQuery(queryStr)
+			nameFilter = params.Get("name")
+		}
+		return nil
+	}, nil, nil)
+
+	if nameFilter != "" {
+		c.logInfo("Filtering model meta info by name prefix: %s", nameFilter)
+	}
 
 	// Get all model metadata
 	allMetas, err := GetAllModelMetas()
@@ -1270,9 +1307,14 @@ func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) 
 		}
 	}
 
-	// Build response
+	// Build response with optional filtering
 	var response []ModelMetaInfo
 	for name, count := range modelCounts {
+		// Apply name filter if provided (prefix matching)
+		if nameFilter != "" && !strings.HasPrefix(name, nameFilter) {
+			continue
+		}
+
 		info := ModelMetaInfo{
 			ModelName:     name,
 			ProviderCount: count,
@@ -1381,6 +1423,11 @@ func (c *ServerConfig) Serve(conn net.Conn) {
 		if err != nil {
 			// Connection closed or timeout, this is normal for keep-alive
 			if err == io.EOF {
+				return
+			}
+			// EOF in error message is also normal (connection closed by client)
+			if strings.Contains(err.Error(), "EOF") {
+				c.logDebug("Connection closed by client: %v", err)
 				return
 			}
 			c.logError("Failed to read HTTP request: %v", err)

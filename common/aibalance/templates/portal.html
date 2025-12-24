@@ -1556,6 +1556,10 @@
             <h3>成功率</h3>
             <div class="value">{{printf "%.2f" .SuccessRate}}%</div>
         </div>
+        <div class="stat-card">
+            <h3>流量计数</h3>
+            <div class="value">{{.TotalTrafficStr}}</div>
+        </div>
     </div>
 
     <div class="card">
@@ -1845,8 +1849,11 @@
                                 <td class="copyable" data-full-text="{{.Description}}">{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
                                 <td class="copyable" data-full-text="{{.Tags}}">{{if .Tags}}{{.Tags}}{{else}}-{{end}}</td>
                                 <td class="text-center">
-                                    <button class="btn btn-sm" onclick="openEditModelModal('{{.Name}}', '{{.Description}}', '{{.Tags}}')">
+                                    <button class="btn btn-sm" onclick="openEditModelModal('{{.Name}}', '{{.Description}}', '{{.Tags}}')" title="编辑模型信息">
                                         编辑
+                                    </button>
+                                    <button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand('{{.Name}}')" title="查看 curl 命令">
+                                        curl
                                     </button>
                                 </td>
                             </tr>
@@ -4323,6 +4330,117 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 showToast('复制失败，请手动选择并复制', 'error');
             }
         }
+        // Show Curl Command Modal
+        function showCurlCommand(modelName) {
+            // 获取当前页面的域名和协议
+            const baseUrl = window.location.origin;
+            const chatApiUrl = baseUrl + '/v1/chat/completions';
+            const metaApiUrl = baseUrl + '/v1/query-model-meta-info';
+            
+            // 构建调用模型的 curl 命令
+            const curlChatCommand = `curl -X POST '${chatApiUrl}' \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer YOUR_API_KEY' \\
+  -d '{
+    "model": "${modelName}",
+    "messages": [
+        {"role": "user", "content": "Hello, how are you?"}
+    ],
+    "stream": false
+}'`;
+
+            // 构建查看模型元信息的 curl 命令（公开接口，无需认证）
+            // 支持 name 参数进行前缀过滤
+            const curlMetaCommand = `# 查询所有模型信息
+curl '${metaApiUrl}'
+
+# 查询指定模型（精确匹配前缀）
+curl '${metaApiUrl}?name=${modelName}'`;
+
+            // 创建并显示模态框
+            let modal = document.getElementById('curlCommandModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'curlCommandModal';
+                modal.className = 'delete-confirmation-modal';
+                modal.innerHTML = `
+                    <div class="modal-content" style="width: 750px; max-width: 90%; max-height: 85vh; overflow-y: auto;">
+                        <span class="close-modal" onclick="closeCurlModal()">&times;</span>
+                        <h3 style="margin-top: 0; color: #2c3e50;">🔗 API 调用示例</h3>
+                        
+                        <!-- 模型元信息查询 -->
+                        <div style="margin-bottom: 20px;">
+                            <h4 style="color: #1565c0; margin-bottom: 8px;">📋 查看模型元信息（公开接口）</h4>
+                            <p style="color: #666; margin-bottom: 8px; font-size: 13px;">验证模型信息是否正确对外开放：</p>
+                            <pre id="curlMetaCommandText" style="background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 5px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; word-break: break-all;"></pre>
+                            <button class="btn btn-sm" onclick="copyCurlMetaCommand()" style="background-color: #4caf50; margin-top: 8px;">
+                                📋 复制
+                            </button>
+                        </div>
+                        
+                        <!-- 调用模型接口 -->
+                        <div style="margin-bottom: 15px;">
+                            <h4 style="color: #1565c0; margin-bottom: 8px;">💬 调用模型接口</h4>
+                            <p style="color: #666; margin-bottom: 8px; font-size: 13px;">使用以下 curl 命令调用 <strong id="curlModelName"></strong> 模型：</p>
+                            <pre id="curlCommandText" style="background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 5px; overflow-x: auto; font-size: 13px; white-space: pre-wrap; word-break: break-all;"></pre>
+                            <button class="btn btn-sm" onclick="copyCurlCommand()" style="background-color: #4caf50; margin-top: 8px;">
+                                📋 复制
+                            </button>
+                        </div>
+                        
+                        <div style="padding: 12px; background: #e3f2fd; border-radius: 5px; border-left: 4px solid #2196f3;">
+                            <strong style="color: #1565c0;">💡 提示：</strong>
+                            <ul style="margin: 5px 0 0 0; padding-left: 20px; color: #444; font-size: 13px;">
+                                <li>模型元信息接口是<strong>公开</strong>的，无需 API 密钥</li>
+                                <li><code style="background: #fff3e0; padding: 2px 4px; border-radius: 2px;">name</code> 参数支持前缀匹配，如 <code>name=memfit-</code> 可查询所有 memfit- 开头的模型</li>
+                                <li>调用模型时请将 <code style="background: #fff3e0; padding: 2px 4px; border-radius: 2px;">YOUR_API_KEY</code> 替换为您的实际 API 密钥</li>
+                                <li>设置 <code style="background: #fff3e0; padding: 2px 4px; border-radius: 2px;">"stream": true</code> 可启用流式响应</li>
+                                <li>对于免费模型（以 <code>-free</code> 结尾），可省略 Authorization 头</li>
+                            </ul>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn" onclick="closeCurlModal()" style="background-color: #9e9e9e;">
+                                关闭
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            
+            document.getElementById('curlModelName').textContent = modelName;
+            document.getElementById('curlCommandText').textContent = curlChatCommand;
+            document.getElementById('curlMetaCommandText').textContent = curlMetaCommand;
+            modal.style.display = 'block';
+        }
+
+        function closeCurlModal() {
+            const modal = document.getElementById('curlCommandModal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        function copyCurlCommand() {
+            const curlText = document.getElementById('curlCommandText').textContent;
+            navigator.clipboard.writeText(curlText).then(() => {
+                showToast('模型调用命令已复制到剪贴板', 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动选择并复制', 'error');
+            });
+        }
+
+        function copyCurlMetaCommand() {
+            const curlText = document.getElementById('curlMetaCommandText').textContent;
+            navigator.clipboard.writeText(curlText).then(() => {
+                showToast('元信息查询命令已复制到剪贴板', 'success');
+            }).catch(err => {
+                console.error('复制失败:', err);
+                showToast('复制失败，请手动选择并复制', 'error');
+            });
+        }
+
         // Model Metadata Edit Logic
         function openEditModelModal(name, description, tags) {
             document.getElementById('editModelName').value = name;

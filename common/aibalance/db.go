@@ -209,6 +209,57 @@ func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success b
 	return GetDB().Save(&key).Error
 }
 
+// UpdateFreeUserStats 更新免费用户的使用统计信息
+// 如果 free-user 记录不存在，会自动创建
+// inputBytes：本次请求的输入字节数
+// outputBytes：本次请求的输出字节数
+// success：请求是否成功
+func UpdateFreeUserStats(inputBytes, outputBytes int64, success bool) error {
+	const freeUserKey = "free-user"
+
+	// 尝试获取 free-user 记录
+	var key schema.AiApiKeys
+	err := GetDB().Where("api_key = ?", freeUserKey).First(&key).Error
+
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			// 创建 free-user 记录
+			key = schema.AiApiKeys{
+				APIKey:        freeUserKey,
+				AllowedModels: "*-free", // 允许所有免费模型
+				InputBytes:    0,
+				OutputBytes:   0,
+				UsageCount:    0,
+				SuccessCount:  0,
+				FailureCount:  0,
+				LastUsedTime:  time.Now(),
+				Active:        true,
+			}
+			if createErr := GetDB().Create(&key).Error; createErr != nil {
+				return fmt.Errorf("failed to create free-user key: %v", createErr)
+			}
+			log.Infof("Created free-user API key record for statistics tracking")
+		} else {
+			return fmt.Errorf("failed to find free-user key: %v", err)
+		}
+	}
+
+	// 更新统计信息
+	key.UsageCount++
+	key.InputBytes += inputBytes
+	key.OutputBytes += outputBytes
+	key.LastUsedTime = time.Now()
+
+	if success {
+		key.SuccessCount++
+	} else {
+		key.FailureCount++
+	}
+
+	// 保存到数据库
+	return GetDB().Save(&key).Error
+}
+
 // UpdateAiApiKeyStatus 更新单个 API Key 的激活状态
 func UpdateAiApiKeyStatus(id uint, active bool) error {
 	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("active", active)
