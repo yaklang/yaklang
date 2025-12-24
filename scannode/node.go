@@ -13,17 +13,18 @@ import (
 )
 
 type ScanNode struct {
-	node     *node.NodeBase
-	helper   *scanrpc.SCANServerHelper
-	manager  *TaskManager
-	serverIp string
+	node           *node.NodeBase
+	helper         *scanrpc.SCANServerHelper
+	manager        *TaskManager
+	serverIp       string
+	enableRuleSync bool
 }
 
 type WebServerConfig struct {
 	WebServerPort string `json:"web_server_port"`
 }
 
-func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp string) (*ScanNode, error) {
+func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp string, enableRuleSync bool) (*ScanNode, error) {
 	base, err := node.NewNodeBase(
 		spec.NodeType_Scanner,
 		spec.CommonRPCExchange,
@@ -34,11 +35,11 @@ func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp stri
 		return nil, err
 	}
 
-	node := &ScanNode{node: base, serverIp: serverIp}
-	agent := node
+	n := &ScanNode{node: base, serverIp: serverIp, enableRuleSync: enableRuleSync}
+	agent := n
 	agent.node.HookAfterRegisteringFinished(
 		func() {
-			node.GetIpecho(serverIp, serverPort)
+			n.GetIpecho(serverIp, serverPort)
 		},
 	)
 	// 回传日志信息
@@ -61,22 +62,24 @@ func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp stri
 		},
 	)
 	// 注册完成后初始化规则同步（Token已通过注册获得）
-	agent.node.HookAfterRegisteringFinished(
-		func() {
-			// 获取注册时返回的Token
-			token := agent.node.GetToken()
-			if token != "" {
-				// 使用Token初始化规则同步客户端
-				agent.initRuleSyncWithToken(token)
-			}
-		},
-	)
-	node.initScanRPC()
-	return node, nil
+	if enableRuleSync {
+		agent.node.HookAfterRegisteringFinished(
+			func() {
+				// 获取注册时返回的Token
+				token := agent.node.GetToken()
+				if token != "" {
+					// 使用Token初始化规则同步客户端
+					agent.initRuleSyncWithToken(token)
+				}
+			},
+		)
+	}
+	n.initScanRPC()
+	return n, nil
 }
 
-func NewScanNode(id, serverPort string, amqpConfig *spec.AMQPConfig) (*ScanNode, error) {
-	return NewScanNodeWithAMQPUrl(id, serverPort, amqpConfig.GetAMQPUrl(), amqpConfig.Host)
+func NewScanNode(id, serverPort string, amqpConfig *spec.AMQPConfig, enableRuleSync bool) (*ScanNode, error) {
+	return NewScanNodeWithAMQPUrl(id, serverPort, amqpConfig.GetAMQPUrl(), amqpConfig.Host, enableRuleSync)
 }
 
 func (s *ScanNode) Run() {

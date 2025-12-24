@@ -776,7 +776,7 @@ var DistributionCommands = []*cli.Command{
 		After:  nil,
 		Action: func(c *cli.Context) error {
 			config := spec.LoadAMQPConfigFromCliContext(c)
-			node, err := scannode.NewScanNode(c.String("id"), c.String("server-port"), config)
+			node, err := scannode.NewScanNode(c.String("id"), c.String("server-port"), config, c.Bool("enable-sfrule-sync"))
 			if err != nil {
 				return err
 			}
