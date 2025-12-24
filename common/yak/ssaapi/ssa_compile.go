@@ -67,6 +67,12 @@ func (c *Config) parseFile() (ret *Program, err error) {
 		}
 	}()
 
+	if c.SSACompile != nil && c.SSACompile.StopOnCliCheck && c.originEditor != nil {
+		if err := c.truncateCodeBeforeCliCheck(); err != nil {
+			log.Warnf("failed to truncate code before cli.check(): %v", err)
+		}
+	}
+
 	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
@@ -85,6 +91,33 @@ func (c *Config) parseFile() (ret *Program, err error) {
 	p := NewProgram(prog, c)
 	SaveConfig(c, p)
 	return p, nil
+}
+
+// truncateCodeBeforeCliCheck 查找第一个 cli.check() 并截取到该位置之前的代码
+func (c *Config) truncateCodeBeforeCliCheck() error {
+	if c.originEditor == nil {
+		return nil
+	}
+
+	var cliCheckOffset int = -1
+	_, found := c.originEditor.FindStringRangeIndexFirst(0, "cli.check", func(r *memedit.Range) {
+		cliCheckOffset = r.GetStartOffset()
+	})
+
+	if !found || cliCheckOffset == -1 {
+		return nil
+	}
+
+	codeBeforeCliCheck := c.originEditor.GetSourceCode(0, cliCheckOffset)
+
+	newEditor := memedit.NewMemEditor(codeBeforeCliCheck)
+	newEditor.SetProgramName(c.originEditor.GetProgramName())
+	newEditor.SetUrl(c.originEditor.GetUrl())
+	newEditor.SetFolderPath(c.originEditor.GetFolderPath())
+
+	c.originEditor = newEditor
+
+	return nil
 }
 
 func (c *Config) feed(prog *ssa.Program, code *memedit.MemEditor) error {

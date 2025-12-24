@@ -1234,3 +1234,100 @@ func TestGRPCMUSTPASS_LANGUAGE_YakCode_StringLiteral_Have_CRLF(t *testing.T) {
 		require.NoError(t, err, "LF version should parse JSON successfully")
 	})
 }
+
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_StopOnCliCheck(t *testing.T) {
+	local, err := NewLocalClient()
+	require.NoError(t, err)
+
+	t.Run("test WithStopOnCliCheck with cli.check()", func(t *testing.T) {
+		code := `
+entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
+strictMode = cli.Bool(
+    "StrictMode", 
+    cli.setVerboseName("严格模式"), 
+    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault(false), 
+)
+reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
+cli.check()
+// 这行代码在 cli.check() 之后，如果 StopOnCliCheck 正常工作，这部分代码不应该被解析
+someComplexCode = "this should not be parsed"
+for i in range(1000000) {
+    // 大量代码，用于验证性能优化
+    result = complexCalculation(i)
+}
+`
+
+		rsp := yaklangInspectInformationSend(local, "yak", code, nil)
+		require.NotNil(t, rsp, "response should not be nil")
+
+		params := rsp.GetCliParameter()
+		require.Len(t, params, 3, "should extract 3 CLI parameters")
+
+		// 验证参数是否正确提取
+		paramMap := make(map[string]*ypb.YakScriptParam)
+		for _, p := range params {
+			paramMap[p.Field] = p
+		}
+
+		// 验证 entry 参数
+		entry, ok := paramMap["entry"]
+		require.True(t, ok, "entry parameter should be found")
+		require.Equal(t, "multiple-file-path", entry.TypeVerbose)
+		require.Equal(t, "file_names", entry.MethodType)
+		require.Equal(t, "项目入口文件", entry.FieldVerbose)
+		require.Equal(t, "compile", entry.Group)
+
+		// 验证 StrictMode 参数
+		strictMode, ok := paramMap["StrictMode"]
+		require.True(t, ok, "StrictMode parameter should be found")
+		require.Equal(t, "boolean", strictMode.TypeVerbose)
+		require.Equal(t, "严格模式", strictMode.FieldVerbose)
+		require.Equal(t, "false", strictMode.DefaultValue)
+		require.Equal(t, "compile", strictMode.Group)
+
+		// 验证 re-compile 参数
+		reCompile, ok := paramMap["re-compile"]
+		require.True(t, ok, "re-compile parameter should be found")
+		require.Equal(t, "boolean", reCompile.TypeVerbose)
+		require.Equal(t, "是否重新编译", reCompile.FieldVerbose)
+		require.Equal(t, "true", reCompile.DefaultValue)
+		require.Equal(t, "compile", reCompile.Group)
+	})
+
+	t.Run("test WithStopOnCliCheck without cli.check()", func(t *testing.T) {
+		code := `
+entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
+strictMode = cli.Bool("StrictMode", cli.setVerboseName("严格模式"), cli.setCliGroup("compile"), cli.setDefault(false))
+reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
+// 没有 cli.check()，代码应该完整解析
+someCode = "this should be parsed"
+`
+
+		rsp := yaklangInspectInformationSend(local, "yak", code, nil)
+		require.NotNil(t, rsp, "response should not be nil")
+
+		params := rsp.GetCliParameter()
+		require.Len(t, params, 3, "should extract 3 CLI parameters even without cli.check()")
+	})
+
+	t.Run("test WithStopOnCliCheck with multiple cli.check()", func(t *testing.T) {
+		code := `
+entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"))
+cli.check()
+// 第一个 cli.check() 之后的内容
+anotherCheck = cli.String("another")
+cli.check()
+// 第二个 cli.check() 之后的内容
+`
+
+		rsp := yaklangInspectInformationSend(local, "yak", code, nil)
+		require.NotNil(t, rsp, "response should not be nil")
+
+		params := rsp.GetCliParameter()
+		// 应该只提取第一个 cli.check() 之前的参数
+		require.Len(t, params, 1, "should only extract parameters before first cli.check()")
+		require.Equal(t, "entry", params[0].Field)
+	})
+}

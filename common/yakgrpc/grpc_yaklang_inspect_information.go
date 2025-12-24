@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -22,7 +23,8 @@ import (
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
-	prog, err := static_analyzer.SSAParse(req.YakScriptCode, req.YakScriptType)
+	// 使用 WithStopOnCliCheck 选项以在检测到 cli.check() 时快速停止构建
+	prog, err := static_analyzer.SSAParse(req.YakScriptCode, req.YakScriptType, ssaconfig.WithStopOnCliCheck(true))
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
