@@ -174,7 +174,8 @@ type SSACompileConfig struct {
 	MemoryCompile      bool          `json:"memory_compile"`
 	Concurrency        int           `json:"compile_concurrency"`
 	CompileIrCacheTTL  time.Duration `json:"compile_ir_cache_ttl"`
-	FilePerformanceLog bool          `json:"file_performance_log"` // 启用文件级别性能日志（分别记录 AST 和 Build 时间）
+	FilePerformanceLog bool          `json:"file_performance_log"`
+	StopOnCliCheck     bool          `json:"stop_on_cli_check"`
 }
 
 // --- 编译配置 Get/Set 方法 ---
@@ -385,6 +386,17 @@ func WithCompileFilePerformanceLog(enable bool) Option {
 			return err
 		}
 		c.SSACompile.FilePerformanceLog = enable
+		return nil
+	}
+}
+
+// WithStopOnCliCheck 设置当检测到 cli.check() 时快速停止构建
+func WithStopOnCliCheck(stopOnCliCheck bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Stop On Cli Check"); err != nil {
+			return err
+		}
+		c.SSACompile.StopOnCliCheck = stopOnCliCheck
 		return nil
 	}
 }
