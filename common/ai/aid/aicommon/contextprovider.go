@@ -3,13 +3,23 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"os"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+)
+
+const (
+	CONTEXT_PROVIDER_TYPE_FILE           = "file"
+	CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE = "knowledge_base"
+	CONTEXT_PROVIDER_TYPE_AITOOL         = "aitool"
+	CONTEXT_PROVIDER_TYPE_AIFORGE        = "aiforge"
 )
 
 type ContextProviderEntry struct {
@@ -29,6 +39,69 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 		content := string(contentBytes)
 		content = utils.ShrinkString(content, 200)
 		return fmt.Sprintf("User Prompt: %s File: %s\nContent:\n%s", userPrompt, filePath, content), nil
+	}
+}
+
+func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		knowledgeBase, err := yakit.GetKnowledgeBaseByName(consts.GetGormProfileDatabase(), knowledgeBaseName)
+		if err != nil {
+			return "", utils.Errorf("failed to get knowledge base %s: %w", knowledgeBaseName, err)
+		}
+		var infoBuffer bytes.Buffer
+		infoBuffer.WriteString("============== Knowledge Base Info ==============\n")
+		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", knowledgeBaseName))
+		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", knowledgeBase.KnowledgeBaseDescription))
+		infoBuffer.WriteString(fmt.Sprintf("Type: %s\n", knowledgeBase.KnowledgeBaseType))
+		infoBuffer.WriteString(fmt.Sprintf("Tags: %s\n", knowledgeBase.Tags))
+		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+	}
+}
+
+func AIToolContextProvider(aitoolName string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		aitool, err := config.GetAiToolManager().GetToolByName(aitoolName)
+		if err != nil {
+			return "", utils.Errorf("failed to get aitool %s: %w", aitoolName, err)
+		}
+		var infoBuffer bytes.Buffer
+		// AITool Info
+		infoBuffer.WriteString("============== AITool Info ==============\n")
+		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aitool.Name))
+		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aitool.Description))
+		infoBuffer.WriteString(fmt.Sprintf("Schema: %s\n", aitool.ToJSONSchemaString()))
+		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+	}
+}
+
+func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		aiforge, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), aiforgeName)
+		if err != nil {
+			return "", utils.Errorf("failed to get aiforge %s: %w", aiforgeName, err)
+		}
+		var infoBuffer bytes.Buffer
+		infoBuffer.WriteString("============== AIForge Info ==============\n")
+		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aiforge.ForgeName))
+		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aiforge.Description))
+		infoBuffer.WriteString(fmt.Sprintf("Params: %s\n", aiforge.Params))
+		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+	}
+}
+
+func NewContextProvider(typ string, data string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		switch typ {
+		case CONTEXT_PROVIDER_TYPE_FILE:
+			return FileContextProvider(data, userPrompt...)(config, emitter, key)
+		case CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
+			return KnowledgeBaseContextProvider(data, userPrompt...)(config, emitter, key)
+		case CONTEXT_PROVIDER_TYPE_AITOOL:
+			return AIToolContextProvider(data, userPrompt...)(config, emitter, key)
+		case CONTEXT_PROVIDER_TYPE_AIFORGE:
+			return AIForgeContextProvider(data, userPrompt...)(config, emitter, key)
+		}
+		return "", utils.Errorf("unknown context provider type: %s", typ)
 	}
 }
 

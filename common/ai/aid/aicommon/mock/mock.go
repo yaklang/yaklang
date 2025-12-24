@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -61,6 +62,10 @@ func (m *MockedAIConfig) AcquireId() int64 {
 
 func (m *MockedAIConfig) GetRuntimeId() string {
 	return m.RuntimeId
+}
+
+func (m *MockedAIConfig) GetAiToolManager() *buildinaitools.AiToolManager {
+	return nil
 }
 
 func (m *MockedAIConfig) IsCtxDone() bool {
