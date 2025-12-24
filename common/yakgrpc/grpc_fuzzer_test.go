@@ -1711,3 +1711,92 @@ LOOP:
 	log.Infof("cancel duration: %s", cancelDuration.String())
 	require.Less(t, cancelDuration, 10*time.Second)
 }
+
+func TestWebFuzzerMockResponse(t *testing.T) {
+	// 设置一个标记来检测是否真正访问了服务器
+	visitedServer := false
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		visitedServer = true
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("real server response"))
+	})
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// 构造请求到 /mockRsp 路径，应该被 mock 拦截
+	mockResponseContent := uuid.New().String()
+	hotPatchCode := fmt.Sprintf(`
+mockHTTPRequest = func(isHttps, url, req, mockResponse) { 
+    if str.Contains(url, "/mockRsp"){
+        forbiddenResponse = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n%s"
+        mockResponse(forbiddenResponse)
+    }
+}
+`, mockResponseContent)
+
+	reqRaw := fmt.Sprintf(`GET /mockRsp HTTP/1.1
+Host: %s:%d
+User-Agent: test
+Connection: close
+
+`, host, port)
+
+	fuzzer, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RequestRaw:   []byte(reqRaw),
+		HotPatchCode: hotPatchCode,
+		ForceFuzz:    true,
+	})
+	require.NoError(t, err)
+
+	gotMockResponse := false
+	for {
+		recv, err := fuzzer.Recv()
+		if err != nil {
+			break
+		}
+		// 检查响应是否包含 mock 内容
+		if len(recv.GetResponseRaw()) > 0 {
+			if strings.Contains(string(recv.GetResponseRaw()), mockResponseContent) {
+				gotMockResponse = true
+			}
+		}
+	}
+
+	// 验证：应该收到 mock 响应，且不应该真正访问服务器
+	require.True(t, gotMockResponse, "should receive mock response")
+	require.False(t, visitedServer, "should not visit real server when mock is active")
+
+	// 测试不匹配的 URL 应该真正发送请求
+	visitedServer = false
+	reqRawNormal := fmt.Sprintf(`GET /normalPath HTTP/1.1
+Host: %s:%d
+User-Agent: test
+Connection: close
+
+`, host, port)
+
+	fuzzer2, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RequestRaw:   []byte(reqRawNormal),
+		HotPatchCode: hotPatchCode,
+		ForceFuzz:    true,
+	})
+	require.NoError(t, err)
+
+	gotRealResponse := false
+	for {
+		recv, err := fuzzer2.Recv()
+		if err != nil {
+			break
+		}
+		if len(recv.GetResponseRaw()) > 0 {
+			if strings.Contains(string(recv.GetResponseRaw()), "real server response") {
+				gotRealResponse = true
+			}
+		}
+	}
+
+	// 验证：不匹配 mock 条件时应该真正访问服务器
+	require.True(t, visitedServer, "should visit real server when mock condition not matched")
+	require.True(t, gotRealResponse, "should receive real server response")
+}

@@ -3,15 +3,16 @@ package yak
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"reflect"
-	"regexp"
-	"strings"
-	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -28,6 +29,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	func([]byte, []byte, map[string]string) map[string]string,
 	func(bool, int, []byte, []byte, func(...[]byte)),
 	func(bool, []byte, []byte, func(string)),
+	func(https bool, url string, req []byte, mockResponse func(rsp interface{})),
 ) {
 	// 发送数据包之前的 hook
 	scriptEngine := NewScriptEngine(2)
@@ -71,7 +73,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	engine, err = scriptEngine.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")
@@ -110,6 +112,13 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	if ret, ok := customFailureCheckerInstance.(*yakvm.Function); ok {
 		customFailureCheckerInstanceNumIn = ret.GetNumIn()
 	}
+
+	mockHTTPRequestInstance, mockHTTPRequestOk := engine.GetVar("mockHTTPRequest")
+	mockHTTPRequestInstanceNumIn := 4
+	if ret, ok := mockHTTPRequestInstance.(*yakvm.Function); ok {
+		mockHTTPRequestInstanceNumIn = ret.GetNumIn()
+	}
+
 	hookLock := new(sync.Mutex)
 
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
@@ -117,6 +126,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
 	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) = nil
 	var customFailureChecker func(https bool, req []byte, rsp []byte, fail func(string)) = nil
+	var mockHTTPRequest func(https bool, url string, req []byte, mockResponse func(rsp interface{})) = nil
 
 	if beforeRequestOk {
 		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
@@ -271,7 +281,34 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 			}
 		}
 	}
-	return hookBefore, hookAfter, mirrorFlow, retryHandler, customFailureChecker
+
+	if mockHTTPRequestOk {
+		mockHTTPRequest = func(https bool, url string, req []byte, mockResponse func(rsp interface{})) {
+			hookLock.Lock()
+			defer hookLock.Unlock()
+
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("mockHTTPRequest(https, url, request, mockResponse) data panic: %s", err)
+				}
+			}()
+
+			if engine != nil {
+				params := []any{https, url, req, mockResponse}
+				if mockHTTPRequestInstanceNumIn == 3 {
+					params = []any{url, req, mockResponse}
+				} else if mockHTTPRequestInstanceNumIn == 2 {
+					params = []any{req, mockResponse}
+				}
+				_, err := engine.CallYakFunction(context.Background(), "mockHTTPRequest", params)
+				if err != nil {
+					log.Infof("eval mockHTTPRequest hook failed: %s", err)
+				}
+			}
+		}
+	}
+
+	return hookBefore, hookAfter, mirrorFlow, retryHandler, customFailureChecker, mockHTTPRequest
 }
 
 func MutateWithParamsGetter(raw string) func() *mutate.RegexpMutateCondition {

@@ -531,6 +531,7 @@ var Exports = map[string]interface{}{
 	"rawTemplate":             WithTemplateRaw,
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
 	"exactTemplateIns":        WithExactTemplateInstance,
+	"mockHTTPRequest":         WithMockHTTPRequest,
 	"all":                     WithAllTemplate,
 	"vars":                    withCustomVariablesFromInterface,
 	// "runtimeId":               lowhttp.WithRuntimeId,

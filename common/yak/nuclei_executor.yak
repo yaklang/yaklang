@@ -1,4 +1,5 @@
 nucleiPoC = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN"]
+mock_response = MITM_PARAMS["NUCLEI_MOCK_RESPONSE"]
 customVars = "INJECTED_VARS" in MITM_PARAMS ? MITM_PARAMS["INJECTED_VARS"] : nil
 if customVars != nil {
     log.Info("found injected vars for nuclei: %v", customVars)
@@ -9,20 +10,19 @@ execNuclei = func(target) {
 	// log.Info("start to execute: %s [%v]", nucleiPocName, target)
     var res
     var err
-    if customVars == nil {
-        res, err = nuclei.Scan(
-            target,
-            nuclei.exactTemplateIns(nucleiPoC),
-            nuclei.timeout(10),
-        )
-    } else {
-        res, err = nuclei.Scan(
-            target,
-            nuclei.exactTemplateIns(nucleiPoC),
-            nuclei.timeout(10),
-            nuclei.vars(customVars),
-        )
+    opts = [
+        nuclei.exactTemplateIns(nucleiPoC),
+        nuclei.timeout(10),
+    ]
+    if customVars != nil {
+        opts.Append(nuclei.vars(customVars))
     }
+    if mock_response != nil{
+        opts.Append(nuclei.mockHTTPRequest((https,url,req,mockResponse)=>{
+            mockResponse(mock_response)
+        }))
+    }
+    res, err = nuclei.Scan(target, opts...)
 	if err != nil {
 		yakit.Error("failed to scan[%v]: %s", target, err)
 		return
