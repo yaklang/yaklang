@@ -12,8 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func init() {
+	// Suppress verbose log output during tests
+	log.SetLevel(log.ErrorLevel)
+}
 
 // TestReActLoop_ToolNotFound_ShouldContinue tests that when a tool is not found,
 // the loop should NOT terminate entirely. Instead, it should:
