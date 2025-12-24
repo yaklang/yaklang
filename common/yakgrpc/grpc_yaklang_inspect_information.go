@@ -22,6 +22,7 @@ import (
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
+
 	prog, err := static_analyzer.SSAParse(req.YakScriptCode, req.YakScriptType)
 	if err != nil {
 		return nil, errors.New("ssa parse error")

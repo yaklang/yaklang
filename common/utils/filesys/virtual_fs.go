@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -145,6 +146,7 @@ func (f *VirtualFS) AddFile(name, content string) {
 
 func (f *VirtualFS) addFileByVirtualFile(vf *VirtualFile) {
 	if _, ok := f.files.Get(vf.name); ok {
+		log.Warnf("VirtualFilesystem: add file to exist file, skiped!")
 		return
 	}
 	f.files.Set(vf.name, vf)

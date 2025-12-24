@@ -347,6 +347,12 @@ func QueryWithEnableDebug(b ...bool) QueryOption {
 	}
 }
 
+func QueryWithMultipleLayer(b ...bool) QueryOption {
+	return func(c *queryConfig) {
+		c.opts = append(c.opts, sfvm.WithMultipleLayer(b...))
+	}
+}
+
 func QueryWithStrictMatch(b ...bool) QueryOption {
 	return func(c *queryConfig) {
 		c.opts = append(c.opts, sfvm.WithStrictMatch(b...))

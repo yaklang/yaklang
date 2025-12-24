@@ -378,3 +378,129 @@ func TestRuleRun(t *testing.T) {
 	diagnostics.LogRecorder("")
 
 }
+
+var progBaseUUID = "TestMultipleLayer_BaseProgram"
+var progExtendUUID = "TestMultipleLayer_ExtendProgram"
+
+func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Program) {
+
+	vf1 := filesys.NewVirtualFs()
+	var err error
+	if progBase, err = ssaapi.FromDatabase(progBaseUUID); err == nil && progBase != nil {
+	} else {
+		vf1.AddFile("A.java", `
+		public class A {
+			public String getValue() {
+				return "Value from A";
+			}
+		}`)
+
+		vf1.AddFile("Main.java", `
+		public class static main{
+			public static void main(String[] args) {
+				A a = new A();
+				System.out.println(a.getValue());
+			}
+		}
+		`)
+
+		p, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf1),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(progBaseUUID),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, p)
+
+		progBase, err = ssaapi.FromDatabase(progBaseUUID)
+		require.NoError(t, err)
+		require.NotNil(t, progBase)
+	}
+
+	if progExtend, err = ssaapi.FromDatabase(progExtendUUID); err == nil && progExtend != nil {
+	} else {
+		vf1 := filesys.NewVirtualFs()
+		vf1.AddFile("A.java", `
+		public class A {
+			public String getValue() {
+				return "Value from Extended A";
+			}	
+		}`)
+
+		p, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf1),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(progExtendUUID),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, p)
+
+		progExtend, err = ssaapi.FromDatabase(progExtendUUID)
+		require.NoError(t, err)
+		require.NotNil(t, progExtend)
+	}
+	return
+}
+
+func TestMultipleLayer(t *testing.T) {
+
+	base, extend := InitProgram(t)
+	_ = base
+	_ = extend
+
+	rule := `
+	println as $print; 
+	$print(* as $value)
+	$value #-> as $data; 
+	`
+
+	checkPrograms := func(p ssaapi.Programs, data map[string][]string, opt ...ssaapi.QueryOption) {
+		opt = append(opt, ssaapi.QueryWithEnableDebug())
+		result, err := p.SyntaxFlowWithError(rule, opt...)
+		require.NoError(t, err)
+		ssatest.CompareResult(t, true, result, data)
+	}
+	check := func(p *ssaapi.Program, data map[string][]string, opt ...ssaapi.QueryOption) {
+		checkPrograms(ssaapi.Programs{p}, data, opt...)
+	}
+
+	t.Run("base program run print", func(t *testing.T) {
+		check(base, map[string][]string{
+			"print": {"Undefined-System.out.println"},
+			"data": {
+				"Value from A",
+			},
+		})
+	})
+
+	t.Run("extend not print", func(t *testing.T) {
+		check(extend, map[string][]string{
+			"print": {},
+		})
+	})
+
+	t.Run("extend+base run print", func(t *testing.T) {
+		checkPrograms(
+			ssaapi.Programs{base, extend},
+			map[string][]string{
+				"data": {
+					"Value from A",
+					"Value from Extended A",
+				},
+			},
+		)
+	})
+
+	t.Run("multiple ", func(t *testing.T) {
+		checkPrograms(
+			ssaapi.Programs{base, extend},
+			map[string][]string{
+				"data": {
+					"Value from Extended A",
+				},
+			},
+			ssaapi.QueryWithMultipleLayer(),
+		)
+	})
+
+}

@@ -32,6 +32,9 @@ type Config struct {
 	processCallback           func(idx int, msg string)
 	Mutex                     sync.Mutex
 
+	//  support multiple program and merge multiple layer program
+	multipleLayer bool
+
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
 }
@@ -51,6 +54,16 @@ func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 func WithProcessCallback(p func(int, string)) Option {
 	return func(config *Config) {
 		config.processCallback = p
+	}
+}
+
+func WithMultipleLayer(b ...bool) Option {
+	return func(config *Config) {
+		enable := true // default true
+		if len(b) > 0 {
+			enable = b[0]
+		}
+		config.multipleLayer = enable
 	}
 }
 
