@@ -826,6 +826,70 @@ http:
 	}
 }
 
+func TestGRPCMUSTPASS_DebugPlugin_Nuclei_MockResponse(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	visitedWebServer := false
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		visitedWebServer = true
+		return []byte("HTTP/1.1 200 OK\nContent-Length: 5\n\nHello")
+	})
+
+	rspFlag := utils.RandStringBytes(10)
+
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`id: basic-example
+info:
+    name: Test HTTP Template
+http:
+  - method: GET
+    path:
+        - "{{BaseURL}}"
+    matchers:
+        - type: word
+          part: body
+          words:
+          - "` + rspFlag + `"
+          condition: and
+`),
+		PluginType: "nuclei",
+		ExecParams: []*ypb.KVPair{},
+		Input:      utils.HostPort(host, port),
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			MockHTTPResponse: []byte(`HTTP/1.1 200 OK
+
+` + rspFlag),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hasRiskInfo := false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Errorf("recv Error: %v", err)
+		}
+		if rsp.GetIsMessage() {
+			if strings.Contains(string(rsp.GetMessage()), rspFlag) {
+				hasRiskInfo = true
+			}
+		}
+	}
+	if visitedWebServer {
+		t.Fatal("expected not visited web server")
+	}
+	if !hasRiskInfo {
+		t.Fatal("expected get risk info by mock response")
+	}
+}
+
 func TestDebug_Plugin_Cancel_Check_ForChan(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {

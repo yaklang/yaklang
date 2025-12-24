@@ -102,6 +102,14 @@ type Config struct {
 	OnTemplateLoaded  func(*YakTemplate) bool
 	BeforeSendPackage func(data []byte, isHttps bool) []byte
 	defaultFilter     filter.Filterable
+
+	mockHTTPRequest func(isHttps bool, urlStr string, req []byte, mockResponse func(rsp interface{}))
+}
+
+func WithMockHTTPRequest(f func(isHttps bool, urlStr string, req []byte, mockResponse func(rsp interface{}))) ConfigOption {
+	return func(config *Config) {
+		config.mockHTTPRequest = f
+	}
 }
 
 func WithCustomVulnFilter(f filter.Filterable) ConfigOption {

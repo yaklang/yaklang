@@ -36,6 +36,7 @@ yakit.Info("RuntimeID: %v", runtimeId)
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
 caller.SetRuntimeId(runtimeId)
+caller.SetVar("NUCLEI_MOCK_RESPONSE",getParams("NUCLEI_MOCK_RESPONSE"))
 err = caller.LoadPluginEx(ctx, plugin,cliParams...)
 if err != nil { die(err) }
 caller.SetCache(false)

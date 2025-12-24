@@ -2682,6 +2682,9 @@ message HTTPRequestBuilderParams {
 
   bool IsHttpFlowId = 14;
   repeated int64 HTTPFlowId = 15;
+
+  // 模拟 HTTP 响应包
+  bytes MockHTTPResponse = 16;
 }
 
 message ScreenRecorder {
