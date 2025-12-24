@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -32,6 +33,10 @@ func (s *Server) GetKnowledgeBaseNameList(ctx context.Context, req *ypb.Empty) (
 func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBaseRequest) (*ypb.GetKnowledgeBaseResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
+	err := initDefaultKnowledgeBase(db)
+	if err != nil {
+		log.Errorf("init default knowledge base failed: %v", err)
+	}
 	// 删除名称为空的rag
 	var emptyRagCollection schema.VectorStoreCollection
 	if err := db.Model(&schema.VectorStoreCollection{}).Where("name = ''").First(&emptyRagCollection).Error; err == nil {
@@ -59,7 +64,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 			Limit: 10,
 		}
 	}
-	p, knowledgeBases, err := yakit.QueryKnowledgeBasePaging(db, req.GetKnowledgeBaseId(), req.GetKeyword(), req.GetOnlyCreatedFromUI(), paging)
+	p, knowledgeBases, err := yakit.QueryKnowledgeBasePagingByFilter(db, req, paging)
 	if err != nil {
 		return nil, utils.Errorf("获取知识库列表失败: %v", err)
 	}
@@ -144,8 +149,15 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 
 	// CreateKnowledgeBaseV2 在实践中经常被当做"创建/更新元信息"的入口；
 	// 这里做一次显式同步，确保 tags/description/type 写入 DB 后列表可查到。
-	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetIsDefault(), req.GetTags()...); err != nil {
+	if err := ragSystem.KnowledgeBase.UpdateKnowledgeBaseInfo(req.GetName(), req.GetDescription(), req.GetType(), req.GetTags()...); err != nil {
 		return nil, utils.Wrap(err, "更新知识库信息失败")
+	}
+
+	if req.GetIsDefault() {
+		err = yakit.SetDefaultKnowledgeBase(db, ragSystem.KnowledgeBase.GetID())
+		if err != nil {
+			return nil, utils.Errorf("设置默认知识库失败: %v", err)
+		}
 	}
 
 	kbInfo, err := ragSystem.KnowledgeBase.GetInfo()
@@ -185,10 +197,16 @@ func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowled
 		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
 		KnowledgeBaseType:        req.GetKnowledgeBaseType(),
 		Tags:                     strings.Join(req.GetTags(), ","),
-		IsDefault:                req.GetIsDefault(),
 	})
 	if err != nil {
 		return nil, utils.Errorf("更新知识库信息失败: %v", err)
+	}
+
+	if req.GetIsDefault() {
+		err = yakit.SetDefaultKnowledgeBase(db, req.GetKnowledgeBaseId())
+		if err != nil {
+			return nil, utils.Errorf("设置默认知识库失败: %v", err)
+		}
 	}
 
 	return &ypb.GeneralResponse{
@@ -442,4 +460,19 @@ func (s *Server) GetKnowledgeBaseTypeList(ctx context.Context, req *ypb.Empty) (
 	return &ypb.GetKnowledgeBaseTypeListResponse{
 		KnowledgeBaseTypes: types,
 	}, nil
+}
+
+func initDefaultKnowledgeBase(db *gorm.DB) error {
+	kb, _ := yakit.GetDefaultKnowledgeBase(db)
+	// 如果默认知识库不存在，则获取第一个知识库并设置为默认知识库
+	if kb == nil {
+		_, kbs, err := yakit.QueryKnowledgeBasePaging(db, 0, "", false, &ypb.Paging{Page: 1, Limit: 1})
+		if err != nil {
+			return utils.Errorf("获取默认知识库失败: %v", err)
+		}
+		if len(kbs) > 0 && kbs[0] != nil {
+			yakit.SetDefaultKnowledgeBase(db, int64(kbs[0].ID))
+		}
+	}
+	return nil
 }

@@ -228,12 +228,11 @@ func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEn
 	return nil
 }
 
-func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string, isDefault bool, tags ...string) error {
+func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string, tags ...string) error {
 	err := yakit.UpdateKnowledgeBaseInfo(kb.db, kb.id, &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName:        name,
 		KnowledgeBaseDescription: description,
 		KnowledgeBaseType:        kbType,
-		IsDefault:                isDefault,
 		Tags:                     strings.Join(tags, ","),
 	})
 	if err != nil {
