@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -274,6 +275,13 @@ func (m *scanManager) initByConfig() error {
 			return utils.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database", name)
 		}
 		config.Programs = append(config.Programs, prog)
+		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
+		if config.Config != nil {
+			if config.Config.BaseInfo == nil {
+				config.Config.BaseInfo = &ssaconfig.BaseInfo{}
+			}
+			config.Config.BaseInfo.ProgramNames = []string{name}
+		}
 	}
 
 	if len(config.Programs) == 0 {
