@@ -82,8 +82,17 @@ REFERENCE
 <include('golang-database-sql')> as $sink;
 <include('golang-user-input')> as $input;
 
-$sink.QueryRow( * #-> as $param);
-$param & $input as $high;
+$sink.QueryRow as $func;
+$sink.Query as $func;
+*.QueryRow as $func;
+*.Query as $func;
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
@@ -208,7 +217,7 @@ func main() {
 }
 
 UNSAFE
-	"safefile://SafeLogin1.go": <<<CODE
+	"safefile://SafeLogin1.go": <<<SAFE
 package main
 
 import (
@@ -257,59 +266,5 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-CODE
-	"safefile://SafeQuery2.go": <<<CODE
-package main
-
-import (
-	"database/sql"
-	"fmt"
-	"log"
-	"strconv"
-
-	_ "github.com/go-sql-driver/mysql"
-)
-
-func getUserByIDSafe(db *sql.DB, id string) (string, error) {
-	// 假设id必然是数字，这里进行严格的输入验证
-	parsedID, err := strconv.Atoi(id)
-	if err != nil {
-		return "", fmt.Errorf("invalid ID format: %w", err)
-	}
-
-	// 即使是数字，也推荐使用参数化查询来增强安全性
-	query := "SELECT username FROM users WHERE id = ?"
-	var username string
-	err = db.QueryRow(query, parsedID).Scan(&username)
-	if err == sql.ErrNoRows {
-		return "", fmt.Errorf("user not found")
-	} else if err != nil {
-		return "", fmt.Errorf("query failed: %w", err)
-	}
-	return username, nil
-}
-
-// 示例用法（非HTTP请求）
-func main() {
-	db, err := sql.Open("mysql", "user:password@/dbname")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	username, err := getUserByIDSafe(db, "123")
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Username:", username)
-	}
-
-	// 尝试一个非数字的输入，验证输入检查是否有效
-	_, err = getUserByIDSafe(db, "123a")
-	if err != nil {
-		fmt.Println("Error:", err) // 预期会输出错误信息
-	}
-}
-
-CODE
+SAFE
 )

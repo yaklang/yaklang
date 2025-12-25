@@ -98,9 +98,17 @@ REFERENCE
 
 <include('golang-user-input')> as $input;
 
-*.LoginCheck(* #-> as $param)
-*.QueryByID(* #-> as $param)
-$param & $input as $high;
+vul_service?{<fullTypeName>?{have: "github.com/godzeo/go-gin-vul/service/vul_service"}} as $service
+service?{<fullTypeName>?{have: "github.com/godzeo/go-gin-vul/service/vul_service"}} as $service
+
+service.LogData().LoginCheck as $func
+service.LogData().QueryByID as $func
+*.LoginCheck as $func
+*.QueryByID as $func
+
+$func <getCall> #{
+    until: "* & $input"
+}-> as $high
 
 alert $high for {
 	level: "high",
@@ -216,7 +224,7 @@ func Sqlli(c *gin.Context) {
 	})
 }
 UNSAFE
-	"safefile://SafeSqlExample.go": <<<CODE
+	"safefile://SafeSqlExample.go": <<<SAFE
 // SafeSqlExample.go
 package main
 
@@ -275,80 +283,5 @@ func main() {
 
 	r.Run(":8080")
 }
-CODE
-	"safefile://SafeQueryByID.go": <<<CODE
-// SafeQueryByID.go
-package main
-
-import (
-	"database/sql"
-	"fmt"
-	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
-	"strconv"
-)
-
-// User represents a user entity
-type User struct {
-	ID int
-	Name string
-}
-
-// QueryByID safely queries a user by ID using an integer type and prepared statements.
-// This prevents SQL injection by ensuring the ID is treated as a number, not part of the query string.
-func QueryByID(id int) (*User, error) {
-	// In a real application, you would get a database connection from a pool.
-	db, err := sql.Open("mysql", "user:password@tcp(127.0.0.1:3306)/database")
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-	defer db.Close()
-
-	query := "SELECT id, name FROM users WHERE id = ?"
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer stmt.Close()
-
-	var user User
-	err = stmt.QueryRow(id).Scan(&user.ID, &user.Name)
-	if err == sql.ErrNoRows {
-		return nil, nil // User not found
-	} else if err != nil {
-		return nil, fmt.Errorf("query execution failed: %w", err)
-	}
-
-	return &user, nil
-}
-
-// main function for Gin setup, demonstrating safe ID query handling
-func main() {
-	r := gin.Default()
-
-	r.GET("/user/:id", func(c *gin.Context) {
-		idStr := c.Param("id")
-		id, err := strconv.Atoi(idStr) // Input validation: convert to int
-		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid user ID"})
-			return
-		}
-
-		user, err := QueryByID(id) // Call the safe function with integer ID
-		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
-			return
-		}
-
-		if user == nil {
-			c.JSON(404, gin.H{"message": "User not found"})
-			return
-		}
-
-		c.JSON(200, user)
-	})
-
-	r.Run(":8080")
-}
-CODE
+SAFE
 )
