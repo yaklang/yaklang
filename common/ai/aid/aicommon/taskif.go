@@ -50,6 +50,8 @@ type AIStatefulTask interface {
 	IsFinished() bool
 	GetUserInput() string
 	SetUserInput(string)
+	SetAttachedDatas([]*AttachedResource)
+	GetAttachedDatas() []*AttachedResource
 	GetStatus() AITaskState
 	SetStatus(state AITaskState)
 	AppendErrorToResult(i error)
@@ -89,7 +91,8 @@ type AIStatefulTaskBase struct {
 	reActLoop         ReActLoopIF
 	db                *gorm.DB
 
-	uuid string
+	uuid          string
+	attachedDatas []*AttachedResource
 }
 
 func (s *AIStatefulTaskBase) GetUUID() string {
@@ -318,6 +321,14 @@ func (s *AIStatefulTaskBase) GetReActLoop() ReActLoopIF {
 
 func (s *AIStatefulTaskBase) SetReActLoop(loop ReActLoopIF) {
 	s.reActLoop = loop
+}
+
+func (s *AIStatefulTaskBase) GetAttachedDatas() []*AttachedResource {
+	return s.attachedDatas
+}
+
+func (s *AIStatefulTaskBase) SetAttachedDatas(attachedDatas []*AttachedResource) {
+	s.attachedDatas = attachedDatas
 }
 
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)
