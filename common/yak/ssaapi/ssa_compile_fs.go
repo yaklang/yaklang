@@ -2,14 +2,11 @@ package ssaapi
 
 import (
 	"fmt"
-	"io/fs"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -64,46 +61,26 @@ func (c *Config) parseProjectWithFS(
 
 	filesystem = c.swapLanguageFs(filesystem)
 	// get total size
-	err = filesys.Recursive(programPath,
-		filesys.WithFileSystem(filesystem),
-		filesys.WithContext(c.ctx),
-		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
-			// check folder folderName
-			_, folderName := filesystem.PathSplit(fullPath)
-			if folderName == "test" || folderName == ".git" {
-				return filesys.SkipDir
-			}
-			if c.excludeFile(fullPath, fi.Name()) {
-				return filesys.SkipDir
-			}
+	// scan project files
+	scanResult, err := ScanProjectFiles(ScanConfig{
+		ProgramName:     programName,
+		ProgramPath:     programPath,
+		FileSystem:      filesystem,
+		ExcludeFunc:     c.excludeFile,
+		CheckLanguage:   c.checkLanguage,
+		CheckPreHandler: c.checkLanguagePreHandler,
+		Context:         c.ctx,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-			folders := []string{programName}
-			folders = append(folders,
-				strings.Split(fullPath, string(c.fs.GetSeparators()))...,
-			)
-			folder2Save = append(folder2Save, folders)
-			return nil
-		}),
-		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
-			// log.Infof("calc total: %s", path)
-			if fi.Size() == 0 {
-				return nil
-			}
-			if c.excludeFile(path, fi.Name()) {
-				return nil
-			}
-			if c.checkLanguage(path) == nil {
-				handlerTotal++
-				handlerFiles = append(handlerFiles, path)
-			}
-			if c.checkLanguagePreHandler(path) == nil {
-				preHandlerTotal++
-				preHandlerFiles = append(preHandlerFiles, path)
-				handlerFilesMap[path] = struct{}{}
-			}
-			return nil
-		}),
-	)
+	folder2Save = append(folder2Save, scanResult.Folders...)
+	handlerTotal = scanResult.HandlerTotal
+	handlerFiles = scanResult.HandlerFiles
+	preHandlerTotal = scanResult.PreHandlerTotal
+	preHandlerFiles = scanResult.PreHandlerFiles
+	handlerFilesMap = scanResult.HandlerFilesMap
 	calculateTime = time.Since(start)
 	if err != nil {
 		return nil, err

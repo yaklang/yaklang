@@ -23,7 +23,7 @@ println(2);
 	result, err := prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())
 	require.NoError(t, err)
 	require.True(t, result.GetValues("param").Len() != 0)
-	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithExcludeFunc("**/vendor/**", "vendor/**"))
+	prog, err = ssaapi.ParseProjectWithFS(fs, ssaapi.WithExcludeFunc("/var/www/exclude"))
 	require.NoError(t, err)
 	prog.Show()
 	result, err = prog.SyntaxFlowWithError(`println(* #-> * as $param)`, ssaapi.QueryWithEnableDebug())

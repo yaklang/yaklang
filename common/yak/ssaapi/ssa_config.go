@@ -17,7 +17,7 @@ import (
 )
 
 type ProcessFunc func(msg string, process float64)
-type ExcludeFunc func(path, filename string) bool
+type ExcludeFunc func(path string) bool
 
 type Config struct {
 	*ssaconfig.Config // config
@@ -94,18 +94,33 @@ func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
 		validPatterns = append(validPatterns, pattern)
 	}
 
+	// normalizePattern handles folder patterns:
+	// "vendor/" -> ["vendor", "vendor/**"] to match folder and all contents
+	normalizePattern := func(pattern string) []string {
+		if strings.HasSuffix(pattern, "/") {
+			base := strings.TrimSuffix(pattern, "/")
+			return []string{base, base + "/**"}
+		}
+		return []string{pattern}
+	}
+
 	for _, pattern := range patterns {
-		addPattern(pattern)
+		// Apply normalization for folder patterns
+		for _, p := range normalizePattern(pattern) {
+			addPattern(p)
+		}
 
 		// 普通化分隔符（处理不同系统）
 		relPattern := strings.TrimPrefix(pattern, basePath)
 		relPattern = strings.TrimLeft(relPattern, "/")
 		if relPattern != pattern {
-			addPattern(relPattern)
+			for _, p := range normalizePattern(relPattern) {
+				addPattern(p)
+			}
 		}
 	}
 
-	return func(path, filename string) bool {
+	return func(path string) bool {
 		for _, g := range compile {
 			if match := g.Match(path); match {
 				return true
@@ -292,7 +307,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		defineFunc:                 make(map[string]any),
 		DatabaseProgramCacheHitter: func(any) {},
 		ctx:                        sc.GetContext(),
-		excludeFile: func(path, filename string) bool {
+		excludeFile: func(path string) bool {
 			return false
 		},
 		logLevel:    "error",
