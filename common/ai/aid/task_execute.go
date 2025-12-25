@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -228,11 +229,22 @@ func (t *AiTask) generateTaskSummary() error {
 	var referenceEmittedOnce sync.Once
 
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
+	extractStart := time.Now()
 	err = t.CallAiTransaction(summaryPromptWellFormed, t.CallOriginalAI, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
 			aicommon.WithActionFieldStreamHandler(
 				[]string{"status_summary", "task_short_summary", "task_long_summary"},
 				func(key string, r io.Reader) {
+					// Recover from any panic in stream handler
+					defer func() {
+						if rec := recover(); rec != nil {
+							log.Errorf("summary stream handler for field [%s] panic recovered: %v", key, rec)
+						}
+					}()
+
+					log.Debugf("summary stream handler started for field [%s]", key)
+					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 处理 %s / Task [%s] Processing %s", t.Index, key, t.Index, key))
+
 					// get the corresponding nodeId for this key
 					nodeId := summaryNodeIdMapper[key]
 					if nodeId == "" {
@@ -245,16 +257,21 @@ func (t *AiTask) generateTaskSummary() error {
 
 					var event *schema.AiOutputEvent
 					var emitErr error
+					streamStart := time.Now()
 					// Emit stream event with callback for reference material
 					event, emitErr = t.EmitDefaultStreamEvent(nodeId, teeReader, t.GetIndex(),
 						func() {
 							// This callback is called after stream finishes
+							log.Debugf("summary stream callback for field [%s] triggered, buffer size: %d, took: %v", key, contentBuffer.Len(), time.Since(streamStart))
 							// Emit reference material here (once per transaction)
 							if event != nil && summaryPromptWellFormed != "" && contentBuffer.Len() > 0 {
 								referenceEmittedOnce.Do(func() {
 									streamId := event.GetContentJSONPath(`$.event_writer_id`)
 									if streamId != "" {
-										_, _ = t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+										_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+										if refErr != nil {
+											log.Warnf("emit reference material for summary field [%s] failed: %v", key, refErr)
+										}
 									}
 								})
 							}
@@ -264,8 +281,10 @@ func (t *AiTask) generateTaskSummary() error {
 						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
 						return
 					}
+					log.Debugf("summary stream handler for field [%s] emit completed", key)
 				},
 			))
+		log.Infof("ExtractValidActionFromStream for summary completed, took %v", time.Since(extractStart))
 		if err != nil {
 			return fmt.Errorf("error reading summary: %w", err)
 		}

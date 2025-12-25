@@ -163,24 +163,46 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 						doneOnce := utils.NewOnce()
 						done := func() {
 							doneOnce.Do(func() {
+								log.Debugf("stream handler for field [%s] done, streamWg.Done() called", key)
 								streamWg.Done()
 							})
 						}
 
+						// Ensure done is always called even if something goes wrong
+						defer func() {
+							if rec := recover(); rec != nil {
+								log.Errorf("stream handler for field [%s] panic recovered: %v", key, rec)
+								done()
+							}
+						}()
+
+						log.Debugf("stream handler started for field [%s]", key)
+						r.loadingStatus(fmt.Sprintf("处理流字段 [%s] / Processing Stream Field [%s]", key, key))
+
 						reader = utils.JSONStringReader(reader)
 						fieldIns, ok := streamFields.Get(key)
 						if !ok {
+							log.Warnf("stream field [%s] not found in streamFields, skipping", key)
 							done()
 							return
 						}
 
 						pr, pw := utils.NewPipe()
+						copyStartTime := time.Now()
 						go func(field *LoopStreamField) {
-							defer pw.Close()
+							defer func() {
+								pw.Close()
+								log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
+							}()
 							if field.Prefix != "" {
 								pw.WriteString(field.Prefix + ": ")
 							}
-							io.Copy(pw, reader)
+							n, copyErr := io.Copy(pw, reader)
+							if copyErr != nil {
+								log.Warnf("stream copy for field [%s] error: %v (copied %d bytes)", key, copyErr, n)
+							} else {
+								log.Debugf("stream copy for field [%s] success, copied %d bytes", key, n)
+							}
 						}(fieldIns)
 
 						defaultNodeId := "re-act-loop-thought"
@@ -188,15 +210,22 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							defaultNodeId = fieldIns.AINodeId
 						}
 
-						event, _ := emitter.EmitStreamEvent(
+						event, emitErr := emitter.EmitStreamEvent(
 							defaultNodeId,
 							time.Now(),
 							pr,
 							resp.GetTaskIndex(),
 							func() {
+								log.Debugf("stream emit callback for field [%s] triggered", key)
 								done()
 							},
 						)
+						if emitErr != nil {
+							log.Errorf("EmitStreamEvent for field [%s] failed: %v", key, emitErr)
+							done() // Ensure done is called even on error
+							return
+						}
+
 						// Emit prompt as reference material (only once per transaction)
 						if event != nil && prompt != "" {
 							promptRefOnce.Do(func() {
@@ -209,20 +238,29 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 					}),
 			)
 
+			r.loadingStatus("解析 AI 响应中 / Parsing AI Response...")
+			extractStart := time.Now()
 			action, actionErr = aicommon.ExtractActionFromStream(
 				r.currentTask.GetContext(),
 				stream,
 				"object",
 				options...,
 			)
+			log.Infof("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
 
 			if actionErr != nil {
+				r.loadingStatus("解析响应失败 / Parse Response Failed")
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
 			actionType := getNextActionType(action)
 			if actionType == "" {
+				r.loadingStatus("动作类型为空 / Action Type Empty")
 				return utils.Error("action type is empty")
 			}
+
+			r.loadingStatus(fmt.Sprintf("处理动作 [%s] / Processing Action [%s]", actionType, actionType))
+			log.Infof("action type extracted: %s", actionType)
+
 			verifier, err := r.GetActionHandler(actionType)
 			if err != nil {
 				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionType, err))
@@ -232,22 +270,31 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				return utils.Errorf("action[%s] verifier is nil", actionType)
 			}
 			if verifier.ActionVerifier == nil {
+				r.loadingStatus(fmt.Sprintf("动作 [%s] 验证跳过 / Action [%s] Verify Skipped", actionType, actionType))
 				return nil
 			}
+
+			r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
 			return verifier.ActionVerifier(r, action)
 		},
 	)
 	if transactionErr != nil {
+		r.loadingStatus(fmt.Sprintf("AI 事务失败 / AI Transaction Failed: %v", transactionErr))
+		log.Errorf("AI transaction failed: %v", transactionErr)
 		return nil, nil, transactionErr
 	}
 
 	if ctxCanceled.IsSet() {
+		r.loadingStatus("任务上下文已取消 / Task Context Cancelled")
 		return nil, nil, utils.Error("task context canceled before execute ReActLoop")
 	}
 
 	if utils.IsNil(action) {
+		r.loadingStatus("动作解析为空 / Action is Nil")
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
+
+	r.loadingStatus(fmt.Sprintf("动作解析完成 [%s] / Action Parsed [%s]", action.Name(), action.Name()))
 
 	handler, err := r.GetActionHandler(getNextActionType(action))
 	if err != nil {
@@ -256,7 +303,32 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if utils.IsNil(handler) {
 		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
 	}
-	action.WaitStream(r.GetCurrentTask().GetContext()) // sync
+
+	// Wait for all streams to complete with timeout (max 3 seconds)
+	// Don't block forever if streams are stuck
+	r.loadingStatus("等待流处理完成 / Waiting Streams to Complete...")
+	log.Infof("action.WaitStream starting for action [%s] with 3s timeout", action.Name())
+	waitStart := time.Now()
+
+	// Create a timeout context for stream waiting
+	streamWaitCtx, streamWaitCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer streamWaitCancel()
+
+	// Wait with timeout
+	waitDone := make(chan struct{})
+	go func() {
+		defer close(waitDone)
+		action.WaitStream(r.GetCurrentTask().GetContext())
+	}()
+
+	select {
+	case <-waitDone:
+		log.Infof("action.WaitStream completed normally for action [%s], took %v", action.Name(), time.Since(waitStart))
+		r.loadingStatus("流处理完成 / Streams Completed")
+	case <-streamWaitCtx.Done():
+		log.Warnf("action.WaitStream timeout (3s) for action [%s], continuing execution", action.Name())
+		r.loadingStatus("流处理超时,继续执行 / Stream Wait Timeout, Continuing...")
+	}
 
 	return action, handler, nil
 }
