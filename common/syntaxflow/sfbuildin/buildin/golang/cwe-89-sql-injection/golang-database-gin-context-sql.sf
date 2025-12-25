@@ -73,12 +73,20 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-http-sink')> as $sink;
-<include('golang-database-sink')> as $db;
-$sink.QueryRow(* #-> as $param)
-$sink.Query(* #-> as $param)
+<include('golang-database-sql')> as $sink;
+<include('golang-user-input')> as $input;
 
-$param & $sink as $high;
+$sink.QueryRow as $func;
+$sink.Query as $func;
+*.QueryRow as $func;
+*.Query as $func;
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	desc: <<<DESC

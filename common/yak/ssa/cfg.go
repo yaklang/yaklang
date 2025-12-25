@@ -801,16 +801,19 @@ func (t *GotoBuilder) Finish() func() {
 					LoopStmt ->
 						LabelStmt ->
 		*/
+		find := false
 		for ; target.tail != nil; target = target.tail {
 			if l, ok := target.tail.LabelTarget.(*ssautil.LabelStmt[Value]); ok {
 				if l.GetName() == t.name {
+					find = true
 					break
 				}
 			}
 		}
-		_break = target._break
+		if !find {
+			target = builder.target
+		}
 		builder.EmitJump(_break)
-
 		return func() { /* 在某些情况下，_break.ScopeTable可能要等loop循环执行完毕后才加载，这里暂时返回一个回调函数 */
 			gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](_break.ScopeTable))
 			builder.CurrentBlock.SetScope(gotoBuilder.Build(generatePhi(builder, _break, t.enter)))

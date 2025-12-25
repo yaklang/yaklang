@@ -84,12 +84,22 @@ SOLUTION
 REFERENCE
 )
 
+<include('golang-database-pop')> as $sink;
 <include('golang-user-input')> as $input;
-models?{<fullTypeName>?{have:'github.com/seaung/vhub/pkg/models'}} as $entry
-$entry.DB.Exec(* #-> as $param) 
-$entry.DB.Raw(* #-> as $param) 
 
-$param & $input as $high;
+models?{<fullTypeName>?{have:'github.com/seaung/vhub/pkg/models'}} as $entry;
+
+$entry.DB.Exec as $func;
+$entry.DB.Raw as $func;
+*.DB.Exec as $func;
+*.Raw as $func;
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	type: "vuln",
