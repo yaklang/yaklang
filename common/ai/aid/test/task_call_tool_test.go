@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +48,12 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 	var errBuffer = bytes.NewBuffer(nil)
 	var toolCallID string
 
+	// Helper to check if test conditions are met
+	testConditionsMet := func() bool {
+		return strings.Contains(outBuffer.String(), outputToken) &&
+			strings.Contains(errBuffer.String(), errToken)
+	}
+
 LOOP:
 	for {
 		select {
@@ -67,6 +74,10 @@ LOOP:
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
 				// 不要立即清空toolCallID，因为 stdout 和 stderr 是流事件，是异步的
 				// toolCallID = ""
+				// Check if we can exit early after tool call completes
+				if testConditionsMet() {
+					break LOOP
+				}
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
@@ -79,6 +90,10 @@ LOOP:
 					require.Equal(t, toolCallID, result.CallToolID)
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
+				}
+				// Check if test conditions are met after stream event
+				if testConditionsMet() {
+					break LOOP
 				}
 			}
 			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") {
