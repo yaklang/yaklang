@@ -296,20 +296,20 @@
   {
     "rule_id": "023f453d-7d0c-4ef8-a105-a53188c9a31e",
     "rule_name": "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞",
-    "hash": "4ec4eae8db097b69352fbacc185e65abfa917c43e8b63d9301d86dc355561439",
-    "version": "20251024.0002"
+    "hash": "b872db89133bc63827b615d80ac66fd4819547026b0ec61f626c0db09768144b",
+    "version": "20251225.0001"
   },
   {
     "rule_id": "f8fd1761-df87-496b-9aef-9a78b1566642",
-    "rule_name": "检测Golang模板引擎中的反射型XSS漏洞",
-    "hash": "5da712d992c93cb324272f7d638a7d55cde091c44a2ac18e80a45c47a10f8c91",
-    "version": "20251024.0002"
+    "rule_name": "检测到Golang模板引擎中的反射型XSS漏洞",
+    "hash": "ed36e0207a97e6ee55c94abb19d25706fe7a2e0b18498a4972e859a223d50b5d",
+    "version": "20251225.0001"
   },
   {
     "rule_id": "155bfb0e-379f-485a-a10c-cfec1109de1e",
-    "rule_name": "检测Golang反射型XSS漏洞",
-    "hash": "671d671c9eebd4e563ddddf1bf5492c19ca6a520dc157a75ce89c34763402ade",
-    "version": "20251024.0002"
+    "rule_name": "检测到Golang反射型XSS漏洞",
+    "hash": "9b6b887323696d8f885c3fdd453c4c91134836c0d240a213d8a5e8bb625b8840",
+    "version": "20251225.0001"
   },
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
