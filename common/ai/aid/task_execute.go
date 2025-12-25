@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -29,11 +30,18 @@ func (t *AiTask) execute() error {
 		fmt.Println(taskUserInput)
 		fmt.Println("-----------------------------------------------------------------------")
 	})
+
+	// Emit task execution start status
+	t.planLoadingStatus(fmt.Sprintf("执行子任务 [%s] / Executing Subtask [%s]: %s", t.Index, t.Index, t.Name))
+
 	err := t.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		t,
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			t.EmitInfo("ReAct Loop iteration %d completed for task: %s, isDone: %v, reason: %v", iteration, t.Name, isDone, reason)
+
+			// Emit iteration status
+			t.planLoadingStatus(fmt.Sprintf("任务 [%s] 迭代 %d 完成 / Task [%s] Iteration %d Completed", t.Index, iteration, t.Index, iteration))
 
 			// Log current task status for debugging - similar to prompt context format
 			log.Infof("=== Post Iteration Task Status ===")
@@ -67,13 +75,23 @@ func (t *AiTask) execute() error {
 			}
 
 			if shouldComplete {
+				// Emit task completing status
+				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
+
 				err := t.generateTaskSummary()
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
+					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
+				} else {
+					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", t.Index, t.Index))
 				}
+
 				// Signal the loop to end - this ensures the loop terminates after this iteration
 				operator.EndIteration("task completed via completed_task_index or isDone")
 			} else {
+				// Emit continuing status
+				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
+
 				if summary != "" {
 					t.StatusSummary = summary
 				}
@@ -152,12 +170,18 @@ func (t *AiTask) executeTaskPushTaskIndex() error {
 // executeTask 实际执行任务并返回结果
 func (t *AiTask) executeTask() error {
 	if t.IsCtxDone() {
+		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 上下文已取消 / Task [%s] Context Cancelled", t.Index, t.Index))
 		return utils.Errorf("context is done")
 	}
+
+	// Execute the task
 	if err := t.execute(); err != nil {
+		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 执行出错 / Task [%s] Execution Error", t.Index, t.Index))
 		return err
 	}
-	// start to wait for user review
+
+	// Start to wait for user review
+	t.planLoadingStatus(fmt.Sprintf("等待用户审查任务 [%s] / Waiting User Review for Task [%s]", t.Index, t.Index))
 	ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 	t.EmitInfo("start to wait for user review current task")
@@ -167,7 +191,9 @@ func (t *AiTask) executeTask() error {
 	log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
 
 	t.DoWaitAgree(t.Ctx, ep)
-	// user review finished, find params
+
+	// User review finished
+	t.planLoadingStatus(fmt.Sprintf("处理任务 [%s] 审查结果 / Processing Review for Task [%s]", t.Index, t.Index))
 	reviewResult := ep.GetParams()
 	t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
 	t.EmitInfo("start to handle review task event: %v", ep.GetId())
@@ -181,6 +207,8 @@ func (t *AiTask) executeTask() error {
 }
 
 func (t *AiTask) generateTaskSummary() error {
+	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
+
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 	if err != nil {
 		t.EmitError("error generating summary prompt: %v", err)
@@ -189,12 +217,53 @@ func (t *AiTask) generateTaskSummary() error {
 
 	var shortSummary, statusSummary, taskSummary, longSummary string
 
+	// nodeId mapper for different summary keys
+	summaryNodeIdMapper := map[string]string{
+		"status_summary":     "summary-status",
+		"task_short_summary": "summary-short",
+		"task_long_summary":  "summary-long",
+	}
+
+	// reference material emission tracking (once per transaction, not per key)
+	var referenceEmittedOnce sync.Once
+
+	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
 	err = t.CallAiTransaction(summaryPromptWellFormed, t.CallOriginalAI, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
 			aicommon.WithActionFieldStreamHandler(
 				[]string{"status_summary", "task_short_summary", "task_long_summary"},
 				func(key string, r io.Reader) {
-					t.EmitDefaultStreamEvent("summary", utils.UTF8Reader(r), t.GetIndex())
+					// get the corresponding nodeId for this key
+					nodeId := summaryNodeIdMapper[key]
+					if nodeId == "" {
+						nodeId = "summary" // fallback
+					}
+
+					// Use TeeReader to capture content while streaming
+					var contentBuffer bytes.Buffer
+					teeReader := io.TeeReader(utils.UTF8Reader(r), &contentBuffer)
+
+					var event *schema.AiOutputEvent
+					var emitErr error
+					// Emit stream event with callback for reference material
+					event, emitErr = t.EmitDefaultStreamEvent(nodeId, teeReader, t.GetIndex(),
+						func() {
+							// This callback is called after stream finishes
+							// Emit reference material here (once per transaction)
+							if event != nil && summaryPromptWellFormed != "" && contentBuffer.Len() > 0 {
+								referenceEmittedOnce.Do(func() {
+									streamId := event.GetContentJSONPath(`$.event_writer_id`)
+									if streamId != "" {
+										_, _ = t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+									}
+								})
+							}
+						},
+					)
+					if emitErr != nil {
+						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
+						return
+					}
 				},
 			))
 		if err != nil {
@@ -230,6 +299,8 @@ func (t *AiTask) generateTaskSummary() error {
 	if longSummary != "" {
 		t.LongSummary = longSummary
 	}
+
+	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
 	return nil
 }
 

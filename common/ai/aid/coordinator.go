@@ -22,6 +22,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// PlanExecutingLoadingStatusKey is the key used to emit loading status events for plan execution
+// Similar to ReActLoadingStatusKey in reactloops, this allows UI to show current execution phase
+const PlanExecutingLoadingStatusKey = "plan-executing-loading-status-key"
+
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
 
@@ -179,6 +183,16 @@ func (c *Coordinator) GetAIConfig() *aicommon.Config {
 	return c.Config
 }
 
+// planLoadingStatus emits the current loading status for plan execution
+// This allows UI to display the current phase of plan execution
+func (c *Coordinator) planLoadingStatus(status string) {
+	if c.Emitter == nil {
+		return
+	}
+	log.Infof("plan-executing loading status updated: %v", status)
+	c.EmitStatus(PlanExecutingLoadingStatusKey, status)
+}
+
 func (c *Coordinator) GetContextProvider() *PromptContextProvider {
 	return c.ContextProvider
 }
@@ -317,23 +331,34 @@ func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response
 }
 
 func (c *Coordinator) Run() error {
+	c.planLoadingStatus("初始化 / Initializing...")
+	defer c.planLoadingStatus("end")
+
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
+
+	// Phase 1: Creating plan
+	c.planLoadingStatus("创建任务计划 / Creating Plan...")
 	c.EmitInfo("start to create plan request")
 	planReq, err := c.createPlanRequest(c.userInput)
 	if err != nil {
+		c.planLoadingStatus("计划创建失败 / Plan Creation Failed")
 		c.EmitError("create planRequest failed: %v", err)
 		return utils.Errorf("coordinator: create planRequest failed: %v", err)
 	}
 
+	// Phase 2: Invoking plan (AI generating plan)
+	c.planLoadingStatus("等待 AI 生成计划 / Waiting AI to Generate Plan...")
 	c.EmitInfo("start to invoke plan request")
 	rsp, err := planReq.Invoke()
 	if err != nil {
+		c.planLoadingStatus("计划生成失败 / Plan Generation Failed")
 		c.EmitError("invoke planRequest failed(first): %v", err)
 		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 	}
 
-	// 审查
+	// Phase 3: Waiting for user review
+	c.planLoadingStatus("等待用户审查计划 / Waiting User to Review Plan...")
 	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
@@ -342,26 +367,34 @@ func (c *Coordinator) Run() error {
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {
+		c.planLoadingStatus("用户审查失败 / User Review Failed")
 		c.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")
 	}
+
+	// Phase 4: Processing user review
+	c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
 	c.EmitInfo("start to handle review plan response")
 	rsp, err = planReq.handleReviewPlanResponse(rsp, params)
 	if err != nil {
+		c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
 		c.EmitError("handle review plan response failed: %v", err)
 		return utils.Errorf("coordinator: handle review plan response failed: %v", err)
 	}
 
 	if rsp.RootTask == nil {
+		c.planLoadingStatus("任务计划无效 / Invalid Task Plan")
 		c.EmitError("root aiTask is nil, plan failed")
 		return utils.Errorf("coordinator: root aiTask is nil")
 	}
-	// init aiTask
-	// check tools
+
+	// Phase 5: Initializing tasks
+	c.planLoadingStatus("初始化任务队列 / Initializing Task Queue...")
 	root := rsp.RootTask
 	c.rootTask = root
 	c.ContextProvider.StoreRootTask(root)
 	if len(root.Subtasks) <= 0 {
+		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
 		c.EmitError("no subtasks found, this task is not a valid task")
 		return utils.Errorf("coordinator: no subtasks found")
 	}
@@ -377,14 +410,19 @@ func (c *Coordinator) Run() error {
 		log.Warnf("coordinator: no tools enable")
 	}
 
+	// Phase 6: Executing tasks
+	c.planLoadingStatus("执行任务中 / Executing Tasks...")
 	c.EmitInfo("start to create runtime")
 	rt := c.createRuntime()
 	c.runtime = rt
 	err = rt.Invoke(root)
 	if err != nil {
+		c.planLoadingStatus("任务执行失败 / Task Execution Failed")
 		return err
 	}
 
+	// Phase 7: Generating result/report
+	c.planLoadingStatus("生成执行结果 / Generating Results...")
 	/*
 		Result Handler
 		Result Handler 是用户自定义的回调函数，用于处理 AI 的输出结果。
@@ -393,19 +431,23 @@ func (c *Coordinator) Run() error {
 	if c.ResultHandler != nil {
 		c.ResultHandler(c)
 	} else if c.GenerateReport {
+		c.planLoadingStatus("生成报告中 / Generating Report...")
 		c.EmitInfo("start to generate report or result")
 		prompt, err := c.generateReport()
 		if err != nil {
+			c.planLoadingStatus("报告生成失败 / Report Generation Failed")
 			c.EmitError("generate report failed: %v", err)
 			return utils.Error("coordinator: generate report failed")
 		}
 		aiRsp, err := c.CallAI(aicommon.NewAIRequest(prompt))
 		if err != nil {
+			c.planLoadingStatus("AI 响应失败 / AI Response Failed")
 			c.EmitError("AICallback failed: %v", err)
 			return utils.Errorf("coordinator: AICallback failed: %v", err)
 		}
 		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.GetEmitter()))
 		if err != nil {
+			c.planLoadingStatus("读取结果失败 / Reading Result Failed")
 			c.EmitError("read AICallback response failed: %v", err)
 			return utils.Errorf("coordinator: read AICallback response failed: %v", err)
 		}
@@ -413,7 +455,9 @@ func (c *Coordinator) Run() error {
 			"data": string(output),
 		})
 	}
-	// maybe need special type to tell user run finished,just wait db insert?
+
+	// Phase 8: Completed
+	c.planLoadingStatus("执行完成 / Execution Completed")
 	c.EmitInfo("coordinator run finished")
 	c.Wait()
 	return nil
