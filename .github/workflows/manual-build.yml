@@ -2,6 +2,11 @@ name: ManualBuild
 
 on:
   workflow_dispatch:
+    inputs:
+      sign:
+        type: boolean
+        description: whether to sign windows executable
+        default: true
 
 jobs:
   build:
@@ -18,5 +23,5 @@ jobs:
     with:
       os: ${{ matrix.os }}
       ee: false
-      sign: true
+      sign: ${{ inputs.sign }}
     secrets: inherit 
