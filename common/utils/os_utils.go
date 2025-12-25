@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"html/template"
 	"io"
 	"math/rand"
 	"net"
@@ -679,7 +680,8 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				fmt.Println(string(r))
 				if handle != nil {
 					raw := handle(r)
-					writer.Write(raw)
+					escapedOutput := template.HTMLEscapeString(string(raw))
+					writer.Write([]byte(escapedOutput))
 					return
 				}
 				writer.Write([]byte("HELLO GMTLS"))

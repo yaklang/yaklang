@@ -86,7 +86,7 @@ $target.Query as $mid
 
 alert $mid for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
-	title_zh: "检测到Golang反射型XSS漏洞",
+	title_zh: "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞",
 	level: "mid",
 	risk: "XSS",
 	type: "vuln",

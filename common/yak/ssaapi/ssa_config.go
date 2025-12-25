@@ -70,7 +70,12 @@ type Config struct {
 }
 
 func (c *Config) CalcHash() string {
-	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.GetLanguage(), c.ignoreSyntaxErr, c.externInfo)
+	// YaklangInspectInformation不能和StaticAnalyzeError共用缓存，否则会导致cli.check()之后的代码无法静态分析
+	stopOnCliCheck := false
+	if c.Config != nil && c.Config.SSACompile != nil {
+		stopOnCliCheck = c.Config.SSACompile.StopOnCliCheck
+	}
+	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.GetLanguage(), c.ignoreSyntaxErr, c.externInfo, stopOnCliCheck)
 }
 
 var WithConfigInfo = ssaconfig.WithCodeSourceMap
