@@ -17,6 +17,10 @@ on:
         type: boolean
         description: whether to build ee version
         default: false
+      sign:
+        type: boolean
+        description: whether to sign windows executable
+        default: true
 
 jobs:
   build:
@@ -24,5 +28,5 @@ jobs:
     with:
       os: ${{ inputs.os }}
       ee: ${{ inputs.ee }}
-      sign: true
+      sign: ${{ inputs.sign }}
     secrets: inherit
