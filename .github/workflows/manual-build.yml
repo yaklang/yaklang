@@ -5,7 +5,7 @@ on:
     inputs:
       sign:
         type: boolean
-        description: whether to sign windows executable
+        description: whether to sign windows executable (windows/windows7 only)
         default: true
 
 jobs:
@@ -15,7 +15,7 @@ jobs:
         os:
           - windows
           - windows7
-          - darwin-amd64 
+          - darwin-amd64
           - darwin-arm64
           - linux-amd64
           - linux-arm64
@@ -23,5 +23,5 @@ jobs:
     with:
       os: ${{ matrix.os }}
       ee: false
-      sign: ${{ inputs.sign }}
+      sign: ${{ inputs.sign && contains(matrix.os, 'windows') }}
     secrets: inherit 

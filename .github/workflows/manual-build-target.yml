@@ -28,5 +28,5 @@ jobs:
     with:
       os: ${{ inputs.os }}
       ee: ${{ inputs.ee }}
-      sign: ${{ inputs.sign }}
+      sign: ${{ inputs.sign && contains(inputs.os, 'windows') }}
     secrets: inherit
