@@ -3,13 +3,14 @@ package test
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/schema"
@@ -196,7 +197,7 @@ func TestTaskCancel(t *testing.T) {
 				break LOOP
 			case result := <-outputChan:
 				count++
-				if count > 100 {
+				if count > 500 {
 					break LOOP
 				}
 

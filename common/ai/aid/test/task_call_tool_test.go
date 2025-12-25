@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
@@ -53,7 +54,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 500 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())

@@ -64,7 +64,7 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 400 {
+			if count > 500 {
 				break LOOP
 			}
 
