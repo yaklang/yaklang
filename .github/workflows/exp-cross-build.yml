@@ -168,6 +168,56 @@ jobs:
       - name: Build
         run: |
           ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
+
+      - name: Validate signing secrets
+        if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          $missing = @()
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_URI }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_URI" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL" }
+          if ($missing.Count -gt 0) {
+            throw ("Missing required secrets for signing: " + ($missing -join ", "))
+          }
+
+      - name: Set up .NET (for AzureSignTool)
+        if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install AzureSignTool
+        if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          dotnet tool install --global AzureSignTool
+          "$env:USERPROFILE\\.dotnet\\tools" >> $env:GITHUB_PATH
+          AzureSignTool --version
+
+      - name: Sign Windows executable (Azure Key Vault)
+        if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          AzureSignTool sign `
+            -kvu "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_URI }}" `
+            -kvi "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID }}" `
+            -kvt "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID }}" `
+            -kvs "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET }}" `
+            -kvc "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME }}" `
+            -tr "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL }}" `
+            -td sha256 `
+            -v `
+            ".\\${{ matrix.binary }}"
+
+      - name: Verify signature
+        if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          Get-AuthenticodeSignature ".\\${{ matrix.binary }}" | Format-List
       # release
       - name: Generate Checksums
         run: |

@@ -18,4 +18,5 @@ jobs:
     with:
       os: ${{ matrix.os }}
       ee: false
+      sign: true
     secrets: inherit 
