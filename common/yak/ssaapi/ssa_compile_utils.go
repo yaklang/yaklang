@@ -1,13 +1,16 @@
 package ssaapi
 
 import (
+	"context"
 	"errors"
+	"io/fs"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -106,4 +109,80 @@ func Size(size int) string {
 	}
 	sizeGB := sizeMB / 1024.0
 	return strconv.FormatFloat(sizeGB, 'f', 2, 64) + "GB"
+}
+
+type ScanResult struct {
+	HandlerFiles    []string
+	PreHandlerFiles []string
+	HandlerFilesMap map[string]struct{}
+	Folders         [][]string
+	HandlerTotal    int
+	PreHandlerTotal int
+}
+
+type ScanConfig struct {
+	ProgramName     string
+	ProgramPath     string
+	FileSystem      filesys_interface.FileSystem
+	ExcludeFunc     func(string) bool
+	CheckLanguage   func(string) error
+	CheckPreHandler func(string) error
+	Context         context.Context
+}
+
+// ScanProjectFiles scans the project directory and returns the files to be processed
+func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
+	result := &ScanResult{
+		HandlerFiles:    make([]string, 0),
+		PreHandlerFiles: make([]string, 0),
+		HandlerFilesMap: make(map[string]struct{}),
+		Folders:         make([][]string, 0),
+	}
+
+	err := filesys.Recursive(cfg.ProgramPath,
+		filesys.WithFileSystem(cfg.FileSystem),
+		filesys.WithContext(cfg.Context),
+		filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
+			// check folder folderName
+			_, folderName := cfg.FileSystem.PathSplit(fullPath)
+			if folderName == "test" || folderName == ".git" {
+				return filesys.SkipDir
+			}
+			if cfg.ExcludeFunc != nil && cfg.ExcludeFunc(fullPath) {
+				return filesys.SkipDir
+			}
+
+			folders := []string{cfg.ProgramName}
+			// Use the filesystem's separator to split the path
+			// Note: In the original code, this used c.fs.GetSeparators().
+			// We should use cfg.FileSystem.GetSeparators() if it matches, or pass it in.
+			// Assuming cfg.FileSystem is the one to use.
+			sep := string(cfg.FileSystem.GetSeparators())
+			folders = append(folders,
+				strings.Split(fullPath, sep)...,
+			)
+			result.Folders = append(result.Folders, folders)
+			return nil
+		}),
+		filesys.WithFileStat(func(path string, fi fs.FileInfo) error {
+			if fi.Size() == 0 {
+				return nil
+			}
+			if cfg.ExcludeFunc != nil && cfg.ExcludeFunc(path) {
+				return nil
+			}
+			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
+				result.HandlerTotal++
+				result.HandlerFiles = append(result.HandlerFiles, path)
+			}
+			if cfg.CheckPreHandler != nil && cfg.CheckPreHandler(path) == nil {
+				result.PreHandlerTotal++
+				result.PreHandlerFiles = append(result.PreHandlerFiles, path)
+				result.HandlerFilesMap[path] = struct{}{}
+			}
+			return nil
+		}),
+	)
+
+	return result, err
 }

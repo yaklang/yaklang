@@ -684,3 +684,27 @@ func (m *mockWindowsFS) ExtraInfo(path string) map[string]any {
 }
 
 var _ fi.FileSystem = (*mockWindowsFS)(nil)
+
+func TestExcludeFunction(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		exclude := newExcludeFunc([]string{"vendor"}, "")
+		require.True(t, exclude("vendor"))
+	})
+
+	t.Run("absolute", func(t *testing.T) {
+		exclude := newExcludeFunc([]string{"/tmp/vendor/a"}, "/tmp/vendor")
+		require.True(t, exclude("a"))
+		require.False(t, exclude("a.php"))
+	})
+
+	t.Run("glob", func(t *testing.T) {
+		exclude := newExcludeFunc([]string{"vendor/*"}, "")
+		require.True(t, exclude("vendor/a.php"))
+		require.True(t, exclude("vendor/a"))
+	})
+
+	t.Run("folder", func(t *testing.T) {
+		exclude := newExcludeFunc([]string{"vendor/"}, "")
+		require.True(t, exclude("vendor/a.php"))
+	})
+}
