@@ -24,4 +24,5 @@ jobs:
     with:
       os: ${{ inputs.os }}
       ee: ${{ inputs.ee }}
+      sign: true
     secrets: inherit
