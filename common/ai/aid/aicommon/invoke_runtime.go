@@ -38,6 +38,7 @@ type AIInvokeRuntime interface {
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 
+	ExecuteLoopTaskIF(taskTypeName string, task AIStatefulTask, options ...any) (bool, error)
 	// timeline operator
 	AddToTimeline(entry, content string)
 

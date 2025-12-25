@@ -115,6 +115,17 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	return r.ExecuteLoopTask(defaultFocus, currentTask)
 }
 
+func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
+	var loopOptions []reactloops.ReActLoopOption
+	for _, option := range options {
+		opt, ok := option.(reactloops.ReActLoopOption)
+		if ok {
+			loopOptions = append(loopOptions, opt)
+		}
+	}
+	return r.ExecuteLoopTask(taskTypeName, task, loopOptions...)
+}
+
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
 	defaultOptions := []reactloops.ReActLoopOption{
 		reactloops.WithMemoryTriage(r.memoryTriage),
