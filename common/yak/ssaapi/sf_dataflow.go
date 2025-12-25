@@ -41,6 +41,12 @@ func DataFlowWithSFConfig(
 	untilCheck := CreateCheck(sfResult, config)
 	hookRunner := CreateCheck(sfResult, config)
 
+	for _, opt := range config.RuntimeOptions {
+		if item, ok := opt.(OperationOption); ok {
+			options = append(options, item)
+		}
+	}
+
 	for _, item := range opts {
 		switch item.Key {
 		case sf.RecursiveConfig_DepthMin:

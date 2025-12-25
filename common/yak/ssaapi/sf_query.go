@@ -294,12 +294,16 @@ func QueryWithProjectId(id uint64) QueryOption {
 		ssaconfig.WithProjectID(id)(c.Config)
 	}
 }
-
-func QueryWithSFConfig(config *sfvm.Config) QueryOption {
+func QueryWithSFOption(opt sfvm.Option) QueryOption {
 	return func(c *queryConfig) {
-		c.opts = append(c.opts, sfvm.WithConfig(config))
+		c.opts = append(c.opts, opt)
 	}
 }
+
+func QueryWithSFConfig(config *sfvm.Config) QueryOption {
+	return QueryWithSFOption(sfvm.WithConfig(config))
+}
+
 func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
 	return func(c *queryConfig) {
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
@@ -450,6 +454,11 @@ func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOpti
 }
 
 func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
-	opts = append(opts, QueryWithValue(p), QueryWithRuleContent(i))
+	opts = append(opts,
+		QueryWithValue(p), QueryWithRuleContent(i),
+		QueryWithSFOption(
+			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
+		),
+	)
 	return QuerySyntaxflow(opts...)
 }
