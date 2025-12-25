@@ -1,5 +1,13 @@
 package sfvm
 
+// frame_iter.go
+// This file contains iterator and condition stack management functions for SyntaxFlow Virtual Machine.
+// It provides helper functions to manage iteration contexts and condition evaluations:
+// - IterStart: Initialize iteration over values
+// - IterNext: Get next value in iteration
+// - IterLatch: Latch current iteration result
+// - IterEnd: Finalize iteration and push results to condition stack
+
 import (
 	"github.com/yaklang/yaklang/common/utils"
 )
