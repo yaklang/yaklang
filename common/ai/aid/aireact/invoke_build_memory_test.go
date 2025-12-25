@@ -36,7 +36,6 @@ func (m *MockMemoryTriageForBuildMemory) SetInvoker(invoker aicommon.AIInvokeRun
 }
 
 func (m *MockMemoryTriageForBuildMemory) AddRawText(text string) ([]*aicommon.MemoryEntity, error) {
-	m.memoryBuilt = true
 	m.memoryBuildCount++
 	log.Infof("AddRawText called with: %s", utils.ShrinkString(text, 100))
 
@@ -58,9 +57,14 @@ func (m *MockMemoryTriageForBuildMemory) AddRawText(text string) ([]*aicommon.Me
 	}
 
 	// 记录输入文本用于后续验证
+	// 注意：必须在设置 memoryBuilt = true 之前设置，避免竞态条件
 	if m.memoryTriageRequest == "" {
 		m.memoryTriageRequest = text
 	}
+
+	// 最后设置 memoryBuilt，确保其他字段已经设置完毕
+	// 这样当主循环检测到 memoryBuilt == true 时，所有数据都已就绪
+	m.memoryBuilt = true
 
 	entity := &aicommon.MemoryEntity{
 		Id:                 uuid.New().String(),
