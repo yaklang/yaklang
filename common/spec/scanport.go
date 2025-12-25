@@ -3,11 +3,12 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
-	"net/http"
 )
 
 type ScanPortTask struct {
@@ -39,6 +40,9 @@ const (
 
 	//扫描任务进度
 	ScanResult_Process ScanResultType = "process"
+
+	// SSA 风险数据（sfreport 格式 JSON）
+	ScanResult_SSARisk ScanResultType = "ssa-risk"
 )
 
 type ScanResult struct {
