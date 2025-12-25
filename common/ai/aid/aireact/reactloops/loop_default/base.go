@@ -24,6 +24,7 @@ func init() {
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(true),
 				reactloops.WithAllowPlanAndExec(true),
+				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),

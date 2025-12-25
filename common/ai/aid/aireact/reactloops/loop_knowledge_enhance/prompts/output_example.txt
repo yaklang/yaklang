@@ -1,0 +1,70 @@
+## 输出示例
+
+### 1. 首次搜索知识库
+根据用户问题推测多个搜索查询和关键词：
+
+```json
+{
+  "@action": "search_knowledge",
+  "search_queries": ["什么是知识库增强", "RAG系统的工作原理", "检索增强生成技术"],
+  "keywords": ["知识库", "RAG", "检索增强"],
+  "limit": 5,
+  "human_readable_thought": "用户询问了知识库增强相关问题，我需要从多个角度搜索知识库获取相关信息"
+}
+```
+
+### 2. 搜索无结果后重试
+使用不同角度的查询语句和关键词：
+
+```json
+{
+  "@action": "search_knowledge",
+  "search_queries": ["向量数据库的应用", "语义搜索技术", "AI上下文增强"],
+  "keywords": ["向量搜索", "语义匹配", "Embedding"],
+  "limit": 5,
+  "human_readable_thought": "之前的搜索没有找到足够相关的内容，尝试使用不同的查询角度"
+}
+```
+
+### 3. 针对特定概念搜索
+当用户询问特定概念时：
+
+```json
+{
+  "@action": "search_knowledge",
+  "search_queries": ["Yaklang是什么", "Yaklang的主要功能", "Yaklang编程语言介绍"],
+  "keywords": ["Yaklang", "yak", "安全编程"],
+  "limit": 5,
+  "human_readable_thought": "用户想了解Yaklang，我需要搜索相关的基础介绍和功能说明"
+}
+```
+
+### 4. 搜索结果足够后的思考
+当搜索结果足够回答问题时，在下一轮直接基于结果回答：
+
+```json
+{
+  "@action": "object",
+  "next_action": {
+    "type": "directly_answer",
+    "answer_payload": "根据知识库内容，[详细回答内容]..."
+  },
+  "human_readable_thought": "搜索结果包含了用户需要的信息，可以直接回答",
+  "cumulative_summary": "已从知识库检索到相关信息并生成回答"
+}
+```
+
+### 5. 知识库无相关内容
+多次搜索仍未找到相关信息时：
+
+```json
+{
+  "@action": "object",
+  "next_action": {
+    "type": "directly_answer",
+    "answer_payload": "抱歉，在知识库中未找到与您问题直接相关的信息。建议您：\n1. 尝试用不同的方式描述您的问题\n2. 咨询相关领域的专家\n3. 查阅其他资料来源"
+  },
+  "human_readable_thought": "多次搜索后仍未找到相关内容，需要诚实告知用户",
+  "cumulative_summary": "知识库中没有找到相关信息"
+}
+```
