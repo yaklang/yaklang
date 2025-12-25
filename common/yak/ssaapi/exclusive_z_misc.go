@@ -184,3 +184,11 @@ func MergeValues(allVs ...Values) Values {
 	values := append(tmp.Values(), templateValue...)
 	return values
 }
+
+func (actx *AnalyzeContext) CovertShadowValue(v *Value) *Value {
+	progOverLay := actx.config.programOverLay
+	if progOverLay == nil {
+		return v
+	}
+	return progOverLay.Relocate(v)
+}

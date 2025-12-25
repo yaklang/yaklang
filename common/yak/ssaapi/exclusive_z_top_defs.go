@@ -118,6 +118,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.getTopDefs(actx, opt...)
 	}
+
+	// if not shadow value return i self
+	i = actx.CovertShadowValue(i)
+
 	var shouldExit bool
 	var recoverStack func()
 	shouldExit, recoverStack = actx.check(i)

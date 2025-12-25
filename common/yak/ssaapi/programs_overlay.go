@@ -164,7 +164,7 @@ func (p *ProgramOverLay) generateRelocateRule(v *Value) string {
 		if name == "" {
 			return true
 		}
-		banList := `.*=.*`
+		banList := `.*(=|-).*`
 		if match, err := regexp.Match(banList, []byte(name)); err == nil && match {
 			return true
 		}

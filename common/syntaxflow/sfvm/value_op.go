@@ -53,9 +53,9 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 }
 
 type RecursiveConfigItem struct {
-	Key            string
-	Value          string
-	SyntaxFlowRule bool
+	Key            string `json:"key"`
+	Value          string `json:"value"`
+	SyntaxFlowRule bool   `json:"syntax_flow_rule"`
 }
 
 type AnalysisContext struct {

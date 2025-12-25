@@ -176,5 +176,48 @@ func TestOverlay_Easy(t *testing.T) {
 		require.NotNil(t, relocatedValue)
 		require.Equalf(t, relocatedValue.GetProgramName(), progNameExtendUUID, "Relocated value should come from extend program")
 	})
+}
 
+func TestOverlay_CrossLayer_Flow(t *testing.T) {
+	progBase, progExtend := InitProgram(t)
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), progNameBaseUUID)
+		ssadb.DeleteProgram(ssadb.GetDB(), progNameExtendUUID)
+	}()
+
+	overProg := ssaapi.NewProgramOverLay(progExtend, progBase)
+	require.NotNil(t, overProg)
+
+	rule := "println(, * as $arg); $arg #->  as $data"
+	check := func(p ssaapi.SyntaxFlowQueryInstance, expectData string) {
+		res, err := p.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		res.Show()
+		values := res.GetValues("data")
+		require.NotEmpty(t, values, "Should find values for rule: %s", rule)
+		require.Len(t, values, 1, "Should find exactly one value for rule: %s", rule)
+		v := values[0]
+		require.Containsf(t, v.String(), expectData, "Value %s data should contain %s", v.String(), expectData)
+	}
+
+	t.Run("test Cross-Layer Call Graph linking - baseline", func(t *testing.T) {
+		// 在 Base 中，调用 A.getValue() 应该返回 "Value from A"
+		check(progBase, "Value from A")
+	})
+
+	t.Run("test extend ", func(t *testing.T) {
+		res, err := progExtend.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		res.Show()
+		values := res.GetAllValuesChain()
+		require.Empty(t, values, "Should not find values in extend program alone")
+	})
+
+	t.Run("test Normal-Program Call Graph linking", func(t *testing.T) {
+		check(ssaapi.Programs{progBase, progExtend}, "Value from A")
+	})
+
+	t.Run("test Cross-Layer Call Graph linking - overlay", func(t *testing.T) {
+		check(overProg, "Value from Extended A")
+	})
 }

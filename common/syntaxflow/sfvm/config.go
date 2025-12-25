@@ -32,6 +32,8 @@ type Config struct {
 	processCallback           func(idx int, msg string)
 	Mutex                     sync.Mutex
 
+	RuntimeOptions []any
+
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
 }
@@ -45,6 +47,12 @@ type Option func(*Config)
 func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
 	return func(config *Config) {
 		config.initialContextVars = o
+	}
+}
+
+func WithRuntimeOption(opt any) Option {
+	return func(config *Config) {
+		config.RuntimeOptions = append(config.RuntimeOptions, opt)
 	}
 }
 

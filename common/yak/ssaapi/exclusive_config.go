@@ -16,6 +16,8 @@ type OperationConfig struct {
 
 	//用来记录上一次的值
 	lastValue *Value
+
+	programOverLay *ProgramOverLay // for program overlay analysis
 }
 
 type OperationOption func(*OperationConfig)
@@ -23,6 +25,12 @@ type OperationOption func(*OperationConfig)
 func WithMaxDepth(maxDepth int) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.MaxDepth = maxDepth
+	}
+}
+
+func WithProgramOverlay(programOverLay *ProgramOverLay) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		operationConfig.programOverLay = programOverLay
 	}
 }
 
