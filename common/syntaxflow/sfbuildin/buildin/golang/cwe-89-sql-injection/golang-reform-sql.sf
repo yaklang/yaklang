@@ -115,13 +115,20 @@ REFERENCE
 )
 
 <include('golang-database-reform')> as $sink;
-$sink.Select(*<slice(index=2)> as $param)
-$sink.Where(*<slice(index=2)> #-> as $param);
+<include('golang-user-input')> as $input;
+
+$sink.Select as $func
+$sink.Where as $func
+*.Select<self()> as $func
+*.Where<self()> as $func
+
+$func(*<slice(index=2)> as $param);
+$func(*<slice(index=3)> as $param);
 $param #{
-    include: <<<CODE
-<self>?{have: 'Parameter'}
-CODE
-}-> as $high
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 
 
 alert $high for {
 	solution: <<<SOLUTION
@@ -295,52 +302,112 @@ UNSAFE
 package main
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
-	"net/http"
+    "database/sql"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
 
-	"github.com/hedonist/reform"
-	_ "github.com/lib/pq" // 使用 PostgreSQL 驱动
+    "github.com/hedonist/reform"
+    _ "github.com/lib/pq"
 )
 
 type User struct {
-	ID   uint
-	Name string
-	Age  int
+    ID   uint   `reform:"id"`
+    Name string `reform:"name"`
+    Age  int    `reform:"age"`
+}
+
+// 全局数据库连接
+var reformDB *reform.DB
+
+func initDB() error {
+    // 从环境变量获取配置
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        dsn = "user=youruser dbname=yourdb sslmode=disable host=localhost"
+    }
+    
+    db, err := sql.Open("postgres", dsn)
+    if err != nil {
+        return err
+    }
+    
+    // 测试连接
+    if err := db.Ping(); err != nil {
+        return err
+    }
+    
+    reformDB = reform.NewDB(db, reform.Postgres)
+    return nil
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
-	username := "username"
-	password := "password"
-
-	// 连接到数据库
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// 创建 Reform 实例
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	// 不安全的查询
-	var users []User
-	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-	_, err = reformDB.Select(&users, query)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// 打印结果
-	for _, user := range users {
-		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
-	}
+    // 1. 验证HTTP方法
+    if r.Method != "POST" {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    
+    // 2. 解析表单
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+    
+    // 3. 获取并验证输入
+    username := r.FormValue("username")
+    password := r.FormValue("password")
+    
+    if username == "" || password == "" {
+        http.Error(w, "Username and password are required", http.StatusBadRequest)
+        return
+    }
+    
+    // 4. 输入清理和验证
+    if len(username) > 50 || len(password) > 100 {
+        http.Error(w, "Invalid input length", http.StatusBadRequest)
+        return
+    }
+    
+    // 5. ✅ 安全查询：使用Reform的参数化查询
+    var users []User
+    query := "SELECT * FROM users WHERE name = $1"
+    err := reformDB.Select(&users, query, username)
+    
+    if err != nil {
+        log.Printf("Database error: %v", err)
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+    
+    // 6. 处理结果
+    if len(users) == 0 {
+        // 防止用户枚举，返回通用信息
+        http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+        return
+    }
+    
+    user := users[0]
+    
+    // 7. 验证密码（假设密码已哈希存储）
+    // 实际应用中应使用 bcrypt 等哈希算法
+    // if !checkPasswordHash(password, user.PasswordHash) { ... }
+    
+    w.Header().Set("Content-Type", "application/json")
+    fmt.Fprintf(w, `{"status": "success", "user": {"id": %d, "name": "%s"}}`, 
+        user.ID, user.Name)
 }
 
 func main() {
-	http.HandleFunc("/login", login)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+    // 初始化数据库
+    if err := initDB(); err != nil {
+        log.Fatal("Database initialization failed:", err)
+    }
+    
+    http.HandleFunc("/login", login)
+    log.Println("Server starting on :8080")
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }
 SAFE
 )

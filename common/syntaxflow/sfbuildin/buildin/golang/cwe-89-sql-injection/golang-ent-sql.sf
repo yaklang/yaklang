@@ -89,8 +89,14 @@ REFERENCE
 
 ent?{<fullTypeName>?{have: 'entgo.io/ent'}} as $entry;
 $entry.Open() <getMembers> as $client;
-$client.User.Query().Where(* #-> as $param);
-$param.FormValue as $high;
+*.Open() <getMembers> as $client;
+
+$client.User.Query().Where(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "*.FormValue"}-> } as $high;
 
 alert $high for {
 	title: "Golang SQL Injection Vulnerability Was Detected",

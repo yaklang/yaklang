@@ -80,9 +80,18 @@ REFERENCE
 <include('golang-database-sqlx')> as $sink;
 <include('golang-user-input')> as $input;
 
-$sink.Select(*<slice(index=2)> #-> as $param);
-$sink.Where(*<slice(index=2)> #-> as $param);
-$param & $input as $high;
+$sink.Select as $func
+$sink.Where as $func
+*.Select<self()> as $func
+*.Where<self()> as $func
+
+$func(*<slice(index=2)> as $param);
+$func(*<slice(index=3)> as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 
 
 alert $high for {
 	solution: <<<SOLUTION
@@ -210,105 +219,186 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 UNSAFE
-	"safefile://SafeSqlxSelectNamedParam.go": <<<CODE
-// SafeSqlxSelectNamedParam.go
+	"safefile://SafeSqlxSelectPositionalParam.go": <<<SAFE
 package main
 
 import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	ID   uint
-	Name string
-	Age  int
+	ID       uint   `db:"id"`
+	Name     string `db:"name"`
+	Age      int    `db:"age"`
+	Password string `db:"password"` // 假设存储的是哈希后的密码
 }
 
-func getUserByNameNamedParam(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
+var db *sqlx.DB
 
-	dsn := "user:password@tcp(localhost:3306)/dbname"
-	db, err := sqlx.Connect("mysql", dsn)
-	if err != nil {
-		log.Fatal(err)
+// 初始化数据库连接池
+func initDB() error {
+	// 从环境变量读取配置
+	cfg := mysql.Config{
+		User:                 os.Getenv("DB_USER"),
+		Passwd:               os.Getenv("DB_PASSWORD"),
+		Net:                  "tcp",
+		Addr:                 os.Getenv("DB_HOST") + ":" + os.Getenv("DB_PORT"),
+		DBName:               os.Getenv("DB_NAME"),
+		ParseTime:            true,
+		AllowNativePasswords: true,
+		Params: map[string]string{
+			"charset":   "utf8mb4",
+			"collation": "utf8mb4_unicode_ci",
+		},
 	}
-	defer db.Close()
 
-	var users []User
-	// 使用命名参数安全地进行查询
-	query := "SELECT * FROM users WHERE name = :username"
-	nargs := map[string]interface{}{"username": username}
-	err = db.Select(&users, query, nargs)
-
+	var err error
+	db, err = sqlx.Open("mysql", cfg.FormatDSN())
 	if err != nil {
-		log.Printf("Error querying database: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return err
+	}
+
+	// 配置连接池
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
+
+	// 测试连接
+	return db.Ping()
+}
+
+// 安全的登录处理
+func login(w http.ResponseWriter, r *http.Request) {
+	// 1. 验证HTTP方法
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// 2. 解析表单
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	// 3. 获取输入
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 4. 基本验证
+	if username == "" || password == "" {
+		http.Error(w, "Username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	// 5. ✅ 安全的参数化查询
+	var users []User
+	query := `
+		SELECT id, name, age, password 
+		FROM users 
+		WHERE name = ?
+		LIMIT 1
+	`
+
+	// 使用 sqlx.Select 的安全方式
+	err := db.Select(&users, query, username)
+	if err != nil {
+		log.Printf("Database error: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// 6. 检查用户是否存在
+	if len(users) == 0 {
+		// 防止用户枚举，返回相同的信息
+		time.Sleep(100 * time.Millisecond) // 防止时间攻击
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	user := users[0]
+
+	// 7. 验证密码
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// 8. 登录成功 - 移除敏感信息
+	user.Password = ""
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"status": "success", "user": {"id": %d, "name": "%s", "age": %d}}`,
+		user.ID, user.Name, user.Age)
+}
+
+// 使用命名参数的复杂查询示例
+func searchUsers(w http.ResponseWriter, r *http.Request) {
+	// 获取查询参数
+	name := r.URL.Query().Get("name")
+	minAge := r.URL.Query().Get("minAge")
+	maxAge := r.URL.Query().Get("maxAge")
+
+	var users []User
+	var err error
+
+	// ✅ 安全的动态查询构建
+	if name != "" && minAge != "" {
+		query := `
+			SELECT id, name, age 
+			FROM users 
+			WHERE name LIKE :name AND age >= :minAge AND age <= :maxAge
+		`
+		err = db.Select(&users, query, map[string]interface{}{
+			"name":   "%" + name + "%",
+			"minAge": minAge,
+			"maxAge": maxAge,
+		})
+	} else if name != "" {
+		query := "SELECT id, name, age FROM users WHERE name LIKE :name"
+		err = db.Select(&users, query, map[string]interface{}{
+			"name": "%" + name + "%",
+		})
+	} else {
+		// 默认查询
+		err = db.Select(&users, "SELECT id, name, age FROM users LIMIT 100")
+	}
+
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// 返回结果
 	for _, user := range users {
 		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
 	}
 }
 
 func main() {
-	http.HandleFunc("/getUserByNameNamedParam", getUserByNameNamedParam)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-CODE
-	"safefile://SafeSqlxSelectPositionalParam.go": <<<CODE
-// SafeSqlxSelectPositionalParam.go
-package main
-
-import (
-	"fmt"
-	"log"
-	"net/http"
-
-	"github.com/jmoiron/sqlx"
-)
-
-type User struct {
-	ID   uint
-	Name string
-	Age  int
-}
-
-func getUserByNamePositionalParam(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	dsn := "user:password@tcp(localhost:3306)/dbname"
-	db, err := sqlx.Connect("mysql", dsn)
-	if err != nil {
-		log.Fatal(err)
+	// 初始化数据库
+	if err := initDB(); err != nil {
+		log.Fatal("Failed to connect to database:", err)
 	}
 	defer db.Close()
 
-	var users []User
-	// 使用位置占位符参数化查询，防止SQL注入
-	query := "SELECT * FROM users WHERE name = ?"
-	err = db.Select(&users, query, username)
+	// 设置路由
+	http.HandleFunc("/login", login)
+	http.HandleFunc("/users/search", searchUsers)
 
-	if err != nil {
-		log.Printf("Error querying database: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	for _, user := range users {
-		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
-	}
-}
-
-func main() {
-	http.HandleFunc("/getUserByNamePositionalParam", getUserByNamePositionalParam)
+	// 启动服务器
+	log.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-CODE
+SAFE
 )
