@@ -176,21 +176,21 @@ func (e *EdgeInfo) ToAuditEdge(m map[string]string) *ssadb.AuditEdge {
 	}
 }
 
-type saveDataFlowCtx struct {
+type SaveDataFlowCtx struct {
 	db       *gorm.DB
 	nodeMap  map[string]string // nodeId -> nodeid
 	riskHash string
 }
 
-func newSaveDataFlowCtx(db *gorm.DB, riskHash string) *saveDataFlowCtx {
-	return &saveDataFlowCtx{
+func NewSaveDataFlowCtx(db *gorm.DB, riskHash string) *SaveDataFlowCtx {
+	return &SaveDataFlowCtx{
 		db:       db,
 		nodeMap:  make(map[string]string),
 		riskHash: riskHash,
 	}
 }
 
-func (sc *saveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
+func (sc *SaveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
 	if sc == nil || dp == nil || len(dp.Nodes) == 0 {
 		return
 	}
@@ -198,7 +198,7 @@ func (sc *saveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
 	sc.saveAuditEdges(dp.Edges)
 }
 
-func (sc *saveDataFlowCtx) saveAuditNodes(nodes []*NodeInfo) {
+func (sc *SaveDataFlowCtx) saveAuditNodes(nodes []*NodeInfo) {
 	if len(nodes) == 0 {
 		return
 	}
@@ -215,7 +215,7 @@ func (sc *saveDataFlowCtx) saveAuditNodes(nodes []*NodeInfo) {
 	}
 }
 
-func (sc *saveDataFlowCtx) saveAuditEdges(edges []*EdgeInfo) {
+func (sc *SaveDataFlowCtx) saveAuditEdges(edges []*EdgeInfo) {
 	if len(edges) == 0 {
 		return
 	}

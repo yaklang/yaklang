@@ -357,7 +357,7 @@ func (m *ImportSSARiskManager) importRisksFromReport(report *Report, cb func(str
 		}
 		// save dataflow
 		if m.saveDataFlow {
-			saver := newSaveDataFlowCtx(m.db, riskHash)
+			saver := NewSaveDataFlowCtx(m.db, riskHash)
 			for _, dataFlowPath := range risk.DataFlowPaths {
 				saver.SaveDataFlow(dataFlowPath)
 			}

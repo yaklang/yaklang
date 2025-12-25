@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/aiengine"
 
 	"github.com/yaklang/yaklang/common/netstack_exports"
 	"github.com/yaklang/yaklang/common/tcpmitm"
@@ -333,6 +334,15 @@ func initYaklangLib() {
 	// ssa and syntaxflow (Irify features)
 	// Use build tag to control: !irify_exclude -> full implementation, irify_exclude -> stub for frontend hints
 	initIrifyLibs()
+	// ssa
+	ssaExports := []map[string]any{
+		ssaapi.Exports,
+		ssaproject.Exports,
+		ssaconfig.Exports,
+	}
+	yaklang.Import("ssa", lo.Assign(ssaExports...))
+	yaklang.Import("syntaxflow", syntaxflow.Exports)
+	yaklang.Import("sfreport", sfreport.Exports)
 
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)
