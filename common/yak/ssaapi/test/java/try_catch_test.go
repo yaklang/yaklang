@@ -14,7 +14,8 @@ func TestErrorHandler_CatchBlock(t *testing.T) {
 
 	rule := `
 *?{opcode:try} as $try 
-$try.catch.body as $catch_body
+$try.catch as $catch
+$catch.body as $catch_body
 $catch_body<scanInstruction> as $inst 
 $catch_body?{!<scanInstruction>} as $no_code_catch
 	`

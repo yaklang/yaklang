@@ -22,6 +22,36 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 		return newValue
 	}
 
+	items := []*userNodeItems{}
+	addItems := func(names []string, value ...int64) {
+		items = append(items, &userNodeItems{
+			names:  names,
+			values: inst.GetValuesByIDs(value),
+		})
+	}
+
+	var searchInstructionCFG func(ssa.Instruction)
+	searchInstructionCFG = func(inst ssa.Instruction) {
+		switch inst := inst.(type) {
+		case *ssa.Function:
+			addItems([]string{"throws"}, inst.Throws...)
+		case *ssa.ErrorHandler:
+			addItems([]string{"catch"}, inst.Catch...)
+			addItems([]string{"finally"}, inst.Final)
+			addItems([]string{"try"}, inst.Try)
+			addItems([]string{"final"}, inst.Final)
+		case *ssa.ErrorCatch:
+			addItems([]string{"body"}, inst.CatchBody)
+			addItems([]string{"exception"}, inst.Exception)
+		case *ssa.LazyInstruction:
+			searchInstructionCFG(inst.Self())
+		default:
+			// log.Errorf("instruction type: %T", inst)
+
+		}
+	}
+	searchInstructionCFG(inst)
+
 	add := func(vvs ...ssa.Value) {
 		for _, vv := range vvs {
 			if utils.IsNil(vv) {
@@ -32,29 +62,6 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 			newValue = append(newValue, v)
 		}
 	}
-
-	items := []*userNodeItems{}
-
-	addItems := func(names []string, value ...int64) {
-		items = append(items, &userNodeItems{
-			names:  names,
-			values: inst.GetValuesByIDs(value),
-		})
-	}
-
-	switch inst := inst.(type) {
-	case *ssa.Function:
-		addItems([]string{"throws"}, inst.Throws...)
-	case *ssa.ErrorHandler:
-		addItems([]string{"catch"}, inst.Catch...)
-		addItems([]string{"finally"}, inst.Final)
-		addItems([]string{"try"}, inst.Try)
-		addItems([]string{"final"}, inst.Final)
-	case *ssa.ErrorCatch:
-		addItems([]string{"body"}, inst.CatchBody)
-		addItems([]string{"exception"}, inst.Exception)
-	}
-
 	for _, item := range items {
 		for _, name := range item.names {
 			if compare(name) {
@@ -62,7 +69,6 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 			}
 		}
 	}
-
 	return newValue
 
 }
