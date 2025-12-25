@@ -130,6 +130,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "总结",
 		En: "Summary",
 	},
+	"summary-status": {
+		Zh: "状态总结",
+		En: "Status Summary",
+	},
+	"summary-short": {
+		Zh: "简短总结",
+		En: "Short Summary",
+	},
+	"summary-long": {
+		Zh: "详细总结",
+		En: "Long Summary",
+	},
 	"create-subtasks": {
 		Zh: "创建子任务",
 		En: "Create Subtasks",
@@ -203,6 +215,10 @@ var nodeIdMapper = map[string]*I18n{
 	"status": {
 		Zh: "状态",
 		En: "Status",
+	},
+	"plan-executing-loading-status-key": {
+		Zh: "计划执行状态",
+		En: "Plan Execution Status",
 	},
 	"permission": {
 		Zh: "权限",
