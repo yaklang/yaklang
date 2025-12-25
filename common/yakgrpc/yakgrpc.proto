@@ -1748,6 +1748,7 @@ message AIInputEvent {
 message AttachedResourceInfo {
   string Key = 1;
   string Type = 2;
+  string Value = 3;
 }
 
 message AITriageInputEvent {

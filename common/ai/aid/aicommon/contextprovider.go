@@ -3,7 +3,10 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
+	"mime"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -20,6 +23,10 @@ const (
 	CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE = "knowledge_base"
 	CONTEXT_PROVIDER_TYPE_AITOOL         = "aitool"
 	CONTEXT_PROVIDER_TYPE_AIFORGE        = "aiforge"
+
+	CONTEXT_PROVIDER_KEY_FILE_PATH    = "file_path"
+	CONTEXT_PROVIDER_KEY_FILE_CONTENT = "file_content"
+	CONTEXT_PROVIDER_KEY_NAME         = "name"
 )
 
 type ContextProviderEntry struct {
@@ -30,15 +37,172 @@ type ContextProviderEntry struct {
 
 type ContextProvider func(config AICallerConfigIf, emitter *Emitter, key string) (string, error)
 
+// isTextMimeType 判断是否为文本类型的 MIME
+func isTextMimeType(mimeType string) bool {
+	// 移除 charset 等参数，只保留主类型
+	if idx := strings.Index(mimeType, ";"); idx != -1 {
+		mimeType = strings.TrimSpace(mimeType[:idx])
+	}
+
+	// text/* 类型都是文本
+	if strings.HasPrefix(mimeType, "text/") {
+		return true
+	}
+
+	// 常见的文本类型 MIME
+	textMimeTypes := map[string]bool{
+		"application/json":                  true,
+		"application/xml":                   true,
+		"application/javascript":            true,
+		"application/x-javascript":          true,
+		"application/typescript":            true,
+		"application/x-yaml":                true,
+		"application/yaml":                  true,
+		"application/x-sh":                  true,
+		"application/x-shellscript":         true,
+		"application/x-python":              true,
+		"application/x-ruby":                true,
+		"application/x-perl":                true,
+		"application/x-php":                 true,
+		"application/sql":                   true,
+		"application/graphql":               true,
+		"application/ld+json":               true,
+		"application/x-httpd-php":           true,
+		"application/xhtml+xml":             true,
+		"application/atom+xml":              true,
+		"application/rss+xml":               true,
+		"application/x-www-form-urlencoded": true,
+	}
+
+	return textMimeTypes[mimeType]
+}
+
+// isTextFileExtension 根据扩展名判断是否为文本文件
+func isTextFileExtension(ext string) bool {
+	ext = strings.ToLower(ext)
+	textExtensions := map[string]bool{
+		// 纯文本
+		".txt": true, ".text": true, ".log": true,
+		// Markdown 和文档
+		".md": true, ".markdown": true, ".rst": true, ".adoc": true,
+		// 配置文件
+		".json": true, ".yaml": true, ".yml": true, ".toml": true, ".xml": true,
+		".ini": true, ".conf": true, ".cfg": true, ".config": true, ".properties": true,
+		".env": true, ".env.local": true, ".env.development": true, ".env.production": true,
+		// 数据文件
+		".csv": true, ".tsv": true,
+		// 编程语言
+		".go": true, ".py": true, ".js": true, ".ts": true, ".jsx": true, ".tsx": true,
+		".java": true, ".c": true, ".cpp": true, ".cc": true, ".cxx": true, ".h": true, ".hpp": true,
+		".cs": true, ".rs": true, ".rb": true, ".php": true, ".swift": true, ".kt": true, ".kts": true,
+		".scala": true, ".groovy": true, ".lua": true, ".pl": true, ".pm": true, ".r": true,
+		".sql": true, ".graphql": true, ".gql": true,
+		// Shell 脚本
+		".sh": true, ".bash": true, ".zsh": true, ".fish": true, ".ps1": true, ".bat": true, ".cmd": true,
+		// Web 相关
+		".html": true, ".htm": true, ".css": true, ".scss": true, ".sass": true, ".less": true,
+		".vue": true, ".svelte": true,
+		// 其他
+		".proto": true, ".thrift": true, ".avro": true,
+		".makefile": true, ".dockerfile": true, ".gitignore": true, ".gitattributes": true,
+		".editorconfig": true, ".prettierrc": true, ".eslintrc": true, ".babelrc": true,
+	}
+
+	return textExtensions[ext]
+}
+
+// MaxFileContentSize 文件内容最大读取大小（1KB）
+const MaxFileContentSize = 1024
+
 func FileContextProvider(filePath string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
-		contentBytes, err := os.ReadFile(filePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+		if !utils.FileExists(filePath) {
+			return "", utils.Errorf("file %s does not exist", filePath)
 		}
-		content := string(contentBytes)
-		content = utils.ShrinkString(content, 200)
-		return fmt.Sprintf("User Prompt: %s File: %s\nContent:\n%s", userPrompt, filePath, content), nil
+
+		ext := filepath.Ext(filePath)
+		fileName := filepath.Base(filePath)
+
+		// 1. 先使用 mime.TypeByExtension 获取 MIME 类型
+		mimeType := mime.TypeByExtension(ext)
+
+		// 2. 判断是否为文本类型
+		isText := false
+		if mimeType != "" {
+			isText = isTextMimeType(mimeType)
+		}
+		// 如果 MIME 类型未知，回退到扩展名判断
+		if !isText {
+			isText = isTextFileExtension(ext)
+		}
+		// 特殊处理：没有扩展名的文件（如 Makefile, Dockerfile）
+		if ext == "" {
+			lowerName := strings.ToLower(fileName)
+			if lowerName == "makefile" || lowerName == "dockerfile" || lowerName == "vagrantfile" ||
+				lowerName == "gemfile" || lowerName == "rakefile" || lowerName == "procfile" {
+				isText = true
+			}
+		}
+
+		// 3. 非文本类型，返回未实现错误
+		if !isText {
+			return "", utils.Errorf("file type '%s' (MIME: %s) is not supported yet, only text files are supported", ext, mimeType)
+		}
+
+		// 4. 读取文本文件内容
+		file, err := os.Open(filePath)
+		if err != nil {
+			return "", utils.Errorf("failed to open file %s: %w", filePath, err)
+		}
+		defer file.Close()
+
+		// 获取文件大小
+		fileInfo, err := file.Stat()
+		if err != nil {
+			return "", utils.Errorf("failed to stat file %s: %w", filePath, err)
+		}
+		fileSize := fileInfo.Size()
+
+		// 读取内容，限制为最大 1KB
+		var content string
+		var truncated bool
+		if fileSize > MaxFileContentSize {
+			// 文件过大，只读取前 1KB
+			buffer := make([]byte, MaxFileContentSize)
+			n, err := file.Read(buffer)
+			if err != nil {
+				return "", utils.Errorf("failed to read file %s: %w", filePath, err)
+			}
+			content = string(buffer[:n])
+			truncated = true
+		} else {
+			// 文件较小，全部读取
+			contentBytes, err := os.ReadFile(filePath)
+			if err != nil {
+				return "", utils.Errorf("failed to read file %s: %w", filePath, err)
+			}
+			content = string(contentBytes)
+		}
+
+		// 5. 构建提示词
+		var result bytes.Buffer
+		result.WriteString(fmt.Sprintf("User Prompt: %s\n", strings.Join(userPrompt, " ")))
+		result.WriteString(fmt.Sprintf("File: %s\n", filePath))
+		if mimeType != "" {
+			result.WriteString(fmt.Sprintf("MIME Type: %s\n", mimeType))
+		}
+		result.WriteString(fmt.Sprintf("File Size: %d bytes\n", fileSize))
+		if truncated {
+			result.WriteString(fmt.Sprintf("Note: File content truncated to first %d bytes (original size: %d bytes)\n", MaxFileContentSize, fileSize))
+		}
+		result.WriteString("\n--- File Content ---\n")
+		result.WriteString(content)
+		if truncated {
+			result.WriteString("\n... (content truncated) ...")
+		}
+		result.WriteString("\n--- End of File Content ---\n")
+
+		return result.String(), nil
 	}
 }
 
@@ -105,17 +269,42 @@ func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextPro
 	}
 }
 
-func NewContextProvider(typ string, data string, userPrompt ...string) ContextProvider {
+func NewContextProvider(typ string, key string, value string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 		switch typ {
 		case CONTEXT_PROVIDER_TYPE_FILE:
-			return FileContextProvider(data, userPrompt...)(config, emitter, key)
+			switch key {
+			case CONTEXT_PROVIDER_KEY_FILE_PATH:
+				return FileContextProvider(value, userPrompt...)(config, emitter, key)
+			case CONTEXT_PROVIDER_KEY_FILE_CONTENT:
+				// TODO: 将文件存到 AI 工作目录
+				// 先暂时存到临时文件
+				tempFile := consts.TempAIFileFast("file-*.txt", value)
+				return FileContextProvider(tempFile, userPrompt...)(config, emitter, key)
+			default:
+				return "", utils.Errorf("unknown file context provider key: %s", key)
+			}
 		case CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
-			return KnowledgeBaseContextProvider(data, userPrompt...)(config, emitter, key)
+			switch key {
+			case CONTEXT_PROVIDER_KEY_NAME:
+				return KnowledgeBaseContextProvider(value, userPrompt...)(config, emitter, key)
+			default:
+				return "", utils.Errorf("unknown knowledge base context provider key: %s", key)
+			}
 		case CONTEXT_PROVIDER_TYPE_AITOOL:
-			return AIToolContextProvider(data, userPrompt...)(config, emitter, key)
+			switch key {
+			case CONTEXT_PROVIDER_KEY_NAME:
+				return AIToolContextProvider(value, userPrompt...)(config, emitter, key)
+			default:
+				return "", utils.Errorf("unknown aitool context provider key: %s", key)
+			}
 		case CONTEXT_PROVIDER_TYPE_AIFORGE:
-			return AIForgeContextProvider(data, userPrompt...)(config, emitter, key)
+			switch key {
+			case CONTEXT_PROVIDER_KEY_NAME:
+				return AIForgeContextProvider(value, userPrompt...)(config, emitter, key)
+			default:
+				return "", utils.Errorf("unknown aiforge context provider key: %s", key)
+			}
 		}
 		return "", utils.Errorf("unknown context provider type: %s", typ)
 	}
