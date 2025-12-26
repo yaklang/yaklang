@@ -358,14 +358,17 @@ func (a *Action) registerClassRoutes() {
 		if err != nil {
 			return nil, utils.Error("class parameter is required")
 		}
-		jarParser, err := jar.NewJarParser(jarPath)
+
+		jarFs, actualJarPath, classPath, err := a.getNestedJarFs(jarPath, className)
 		if err != nil {
 			return nil, err
 		}
-		outerClassData, err := jarParser.DecompileClass(className)
+
+		outerClassData, err := jarFs.ReadFile(classPath)
 		if err != nil {
-			return nil, err
+			return nil, utils.Wrapf(err, "failed to read class: %s from jar: %s", classPath, jarPath)
 		}
+
 		// Get inner classes from the query parameters
 		innerClassesParam, _ := getParam("innerClasses")
 		innerClassesMap := make(map[string][]byte)
@@ -374,13 +377,19 @@ func (a *Action) registerClassRoutes() {
 			// Use explicitly provided inner classes
 			innerClassPaths := strings.Split(innerClassesParam, ",")
 			for _, innerClassPath := range innerClassPaths {
-				innerClassData, err := jarParser.GetJarFS().ReadFile(innerClassPath)
+				// Parse nested JAR path for inner class if needed
+				innerJarFs, _, innerClassPathParsed, err := a.getNestedJarFs(jarPath, innerClassPath)
+				if err != nil {
+					log.Warnf("Failed to parse inner class path: %s from jar: %s: %v", innerClassPath, jarPath, err)
+					continue
+				}
+				innerClassData, err := innerJarFs.ReadFile(innerClassPathParsed)
 				if err != nil {
 					log.Warnf("Failed to read inner class: %s from jar: %s: %v", innerClassPath, jarPath, err)
 					continue
 				}
 
-				_, innerClassName := filepath.Split(innerClassPath)
+				_, innerClassName := filepath.Split(innerClassPathParsed)
 				innerClassesMap[innerClassName] = innerClassData
 			}
 		}
@@ -396,12 +405,12 @@ func (a *Action) registerClassRoutes() {
 			Schema: "javaDec",
 			Path:   "/class-aifix",
 			Query: []*ypb.KVPair{
-				{Key: "jar", Value: jarPath},
+				{Key: "jar", Value: actualJarPath},
 				{Key: "class", Value: className},
 			},
 		}
 
-		fileInfo, err := jarParser.GetJarFS().Stat(className)
+		fileInfo, err := jarFs.Stat(classPath)
 		if err != nil {
 			return nil, err
 		}
