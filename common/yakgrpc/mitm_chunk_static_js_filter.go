@@ -99,20 +99,29 @@ func shouldFilterBundledJavaScript(urlPath string, contentType string, cacheCont
 		return false
 	}
 
+	filename := path.Base(p)
+	hasHash := hasHashedJSFilename(filename)
+	cacheStrong := isCacheControlStrong(cacheControl)
+
+	// 对不在 static/assets 的 JS 也提供“非常保守”的兜底：
+	// - hash + 强缓存：基本可以认为是构建产物（常见于根路径的 framework-xxxx.js）
+	// - 超大 + 强缓存 + min.js：多为第三方库（如 babel.min.js），通常对抓包分析意义不大
+	if !isBundledJavaScriptWeakPath(p) && !isBundledJavaScriptStrongPath(p) {
+		if hasHash && cacheStrong {
+			return true
+		}
+		if cacheStrong && contentLength >= 512*1024 && strings.Contains(filename, ".min.") {
+			return true
+		}
+		return false
+	}
+
 	// 强路径：框架/脚手架固定产物目录，基本都属于编译产物
 	if isBundledJavaScriptStrongPath(p) {
 		return true
 	}
 
 	// 弱路径：static/assets 目录可能包含手写 JS，需要额外信号
-	if !isBundledJavaScriptWeakPath(p) {
-		// 非静态目录的 JS 不动，避免误伤（比如 API 返回的 JS）
-		return false
-	}
-
-	hasHash := hasHashedJSFilename(path.Base(p))
-	cacheStrong := isCacheControlStrong(cacheControl)
-
 	// 只要 hash 或强缓存其一成立，就可以认为是编译产物
 	if hasHash || cacheStrong {
 		return true

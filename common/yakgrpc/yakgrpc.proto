@@ -6690,7 +6690,8 @@ message MITMRequest {
   bool DisableWebsocketCompression = 64;
 
   // 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
-  bool AllowChunkStaticJS = 68;
+  // 使用 optional 以区分“未设置”和“显式设置为 false”，便于运行时更新开关且不误伤其他控制消息。
+  optional bool AllowChunkStaticJS = 68;
 
   // hijack filter
   MITMFilterData HijackFilterData = 65;
