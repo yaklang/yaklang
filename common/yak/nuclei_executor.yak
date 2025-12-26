@@ -17,7 +17,7 @@ execNuclei = func(target) {
     if customVars != nil {
         opts.Append(nuclei.vars(customVars))
     }
-    if mock_response != nil{
+    if mock_response != nil && len(mock_response) > 0 {
         opts.Append(nuclei.mockHTTPRequest((https,url,req,mockResponse)=>{
             mockResponse(mock_response)
         }))
