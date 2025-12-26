@@ -42,6 +42,12 @@
 ```
 请根据Schema描述构造有效JSON对象来调用此工具，系统会执行工具内容。
 
-一般来说，你应该生成数据类似于：`{"@action": "call-tool", "tool": ..., "params": ... }`。
+一般来说，你应该生成数据类似于：`{"@action": "call-tool", "tool": ..., "identifier": ..., "params": ... }`。
+
+**重要：`identifier` 字段是必需的**
+- `identifier` 应该是一个简短的、小写的、下划线分隔的字符串，描述这个工具调用的目的/意图
+- 例如：`query_large_file`, `find_process`, `list_directory`, `search_log_error`, `check_disk_usage`
+- 格式：只使用小写字母和下划线（snake_case），长度控制在30个字符以内
+- 这个标识符将用于文件路径，帮助用户快速理解这个工具调用的目的
 
 注意观察历史记录中已有的参数，不要重复使用相似参数执行工具，已经执行过的结果不要重复执行

@@ -344,6 +344,7 @@ type ToolParamsPromptResult struct {
 	Prompt     string
 	Nonce      string
 	ParamNames []string
+	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
 }
 
 // GenerateToolParamsPrompt generates tool parameter generation prompt using template

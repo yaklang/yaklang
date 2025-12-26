@@ -35,8 +35,10 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 		*callCount++
 		message := fmt.Sprintf("call %d", *callCount)
+		identifier := fmt.Sprintf("call_%d_test", *callCount)
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "params": { "message" : "%s", "output_lines": 2 }}`, message)))
+		// Include identifier field for new directory structure
+		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "identifier": "%s", "params": { "message" : "%s", "output_lines": 2 }}`, identifier, message)))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -138,30 +140,29 @@ LOOP:
 				filePath := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
 				if filePath != "" {
 					filename := filepath.Base(filePath)
-					// 解析文件名获取调用次数
-					// 文件名格式: tool-call-{toolname}-{type}-{taskIndex_number}.txt
-					parts := strings.Split(filename, "-")
-					if len(parts) >= 4 {
-						indexPart := strings.TrimSuffix(parts[len(parts)-1], ".txt")
-						indexParts := strings.Split(indexPart, "_")
-						if len(indexParts) == 2 {
-							callNumber := utils.InterfaceToInt(indexParts[1])
-							if callNumber > 0 {
-								if emittedFilesByCall[callNumber] == nil {
-									emittedFilesByCall[callNumber] = make(map[string]string)
-								}
-								// 根据文件名判断类型
-								if strings.Contains(filename, "params") {
-									emittedFilesByCall[callNumber]["params"] = filePath
-								} else if strings.Contains(filename, "stdout") {
-									emittedFilesByCall[callNumber]["stdout"] = filePath
-								} else if strings.Contains(filename, "stderr") {
-									emittedFilesByCall[callNumber]["stderr"] = filePath
-								} else if strings.Contains(filename, "result") {
-									emittedFilesByCall[callNumber]["result"] = filePath
-								}
-								log.Infof("Emitted file for call %d: %s", callNumber, filename)
+					// 新目录结构: task_{task_index}/tool_calls/{number}_{tool}_{identifier}/params.txt
+					// 从目录名中提取调用次数
+					dirName := filepath.Base(filepath.Dir(filePath))
+					parts := strings.Split(dirName, "_")
+					if len(parts) >= 2 {
+						// 第一部分是调用次数
+						callNumber := utils.InterfaceToInt(parts[0])
+						if callNumber > 0 {
+							if emittedFilesByCall[callNumber] == nil {
+								emittedFilesByCall[callNumber] = make(map[string]string)
 							}
+							// 新格式: 文件名是简单的 params.txt, stdout.txt, stderr.txt, result.txt
+							switch filename {
+							case "params.txt":
+								emittedFilesByCall[callNumber]["params"] = filePath
+							case "stdout.txt":
+								emittedFilesByCall[callNumber]["stdout"] = filePath
+							case "stderr.txt":
+								emittedFilesByCall[callNumber]["stderr"] = filePath
+							case "result.txt":
+								emittedFilesByCall[callNumber]["result"] = filePath
+							}
+							log.Infof("Emitted file for call %d: %s (dir: %s)", callNumber, filename, dirName)
 						}
 					}
 				}
@@ -218,12 +219,17 @@ LOOP:
 				if !utils.FileExists(filePath) {
 					t.Errorf("File %s for call %d does not exist: %s", fileType, callNumber, filePath)
 				} else {
-					// 验证文件名格式
-					filename := filepath.Base(filePath)
-					if !strings.Contains(filename, fmt.Sprintf("_%d", callNumber)) {
-						t.Errorf("File %s for call %d should contain '_%d' in filename, got: %s", fileType, callNumber, callNumber, filename)
+					// 验证新的目录结构
+					// 目录名格式: {number}_{tool}_{identifier}
+					dirName := filepath.Base(filepath.Dir(filePath))
+					if !strings.HasPrefix(dirName, fmt.Sprintf("%d_", callNumber)) {
+						t.Errorf("Directory for call %d should start with '%d_', got: %s", callNumber, callNumber, dirName)
 					}
-					log.Infof("✓ Call %d %s file: %s", callNumber, fileType, filename)
+					// 验证目录名包含 identifier
+					if !strings.Contains(dirName, fmt.Sprintf("call_%d_test", callNumber)) {
+						t.Errorf("Directory for call %d should contain identifier 'call_%d_test', got: %s", callNumber, callNumber, dirName)
+					}
+					log.Infof("✓ Call %d %s file: %s (in dir: %s)", callNumber, fileType, filepath.Base(filePath), dirName)
 				}
 			}
 		}
@@ -231,19 +237,21 @@ LOOP:
 
 	log.Infof("✓ Multiple tool calls test completed successfully: %d calls, files: %v", toolCallCount, emittedFilesByCall)
 
-	// 清理：删除测试产生的临时文件
+	// 清理：删除测试产生的临时目录
 	defer func() {
+		deletedDirs := make(map[string]bool)
 		for _, files := range emittedFilesByCall {
 			for _, filePath := range files {
-				if utils.FileExists(filePath) {
-					if err := os.Remove(filePath); err != nil {
-						log.Warnf("Failed to remove test file %s: %v", filePath, err)
+				dirPath := filepath.Dir(filePath)
+				if !deletedDirs[dirPath] {
+					if err := os.RemoveAll(dirPath); err != nil {
+						log.Warnf("Failed to remove test directory %s: %v", dirPath, err)
 					} else {
-						log.Infof("Cleaned up test file: %s", filePath)
+						log.Infof("Cleaned up test directory: %s", dirPath)
 					}
+					deletedDirs[dirPath] = true
 				}
 			}
 		}
 	}()
 }
-
