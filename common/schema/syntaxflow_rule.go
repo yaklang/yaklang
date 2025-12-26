@@ -286,7 +286,7 @@ type SyntaxFlowRule struct {
 	Version string
 
 	// Hash 规则内容哈希值
-	// 基于 RuleId、RuleName、Content、Tag、OpCodes 计算
+	// 基于 RuleId、RuleName、Content、Tag 计算（不包含 OpCodes，因为 OpCodes 是编译后的派生数据）
 	// 用于快速检测规则内容是否变化，确保数据一致性
 	Hash string `json:"hash" gorm:"unique_index"`
 
@@ -409,7 +409,9 @@ type SyntaxFlowRule struct {
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {
-	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag, s.OpCodes)
+	// 注意：不包含 OpCodes，因为 OpCodes 是编译后的派生数据，不应该影响规则的 hash
+	// 如果包含 OpCodes，即使规则内容没有改变，hash 也会因为编译器版本、编译时间等因素而改变
+	s.Hash = utils.CalcSha256(s.RuleId, s.RuleName, s.Content, s.Tag)
 	return s.Hash
 }
 
