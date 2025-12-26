@@ -67,9 +67,8 @@ func (kc *KnowledgeCollection) UnsetUseless(uuid string) {
 }
 
 type EnhanceKnowledgeManager struct {
-	emitter         *Emitter
-	knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)
-
+	emitter             *Emitter
+	knowledgeGetter     func(ctx context.Context, emitter *Emitter, collections []string, query string) (<-chan EnhanceKnowledge, error)
 	mux                 sync.Mutex
 	knowledgeMap        map[string]EnhanceKnowledge
 	taskToKnowledgeUUID map[string]*KnowledgeCollection
@@ -83,10 +82,14 @@ func (m *EnhanceKnowledgeManager) SetEmitter(emitter *Emitter) {
 }
 
 func (m *EnhanceKnowledgeManager) FetchKnowledge(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	return m.FetchKnowledgeWithCollections(ctx, []string{}, query)
+}
+
+func (m *EnhanceKnowledgeManager) FetchKnowledgeWithCollections(ctx context.Context, collections []string, query string) (<-chan EnhanceKnowledge, error) {
 	//todo 支持多种来源的知识方式合并 rag ｜ web search
 
 	result := chanx.NewUnlimitedChan[EnhanceKnowledge](ctx, 10)
-	midResult, err := m.knowledgeGetter(ctx, m.emitter, query)
+	midResult, err := m.knowledgeGetter(ctx, m.emitter, collections, query)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +165,17 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, t
 }
 
 func NewEnhanceKnowledgeManager(knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
+	return &EnhanceKnowledgeManager{
+		knowledgeGetter: func(ctx context.Context, emitter *Emitter, collections []string, query string) (<-chan EnhanceKnowledge, error) {
+			return knowledgeGetter(ctx, emitter, query)
+		},
+		knowledgeMap:        make(map[string]EnhanceKnowledge),
+		taskToKnowledgeUUID: make(map[string]*KnowledgeCollection),
+		mux:                 sync.Mutex{},
+	}
+}
+
+func NewEnhanceKnowledgeManagerWithCollectionLimitGetter(knowledgeGetter func(ctx context.Context, emitter *Emitter, collections []string, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
 	return &EnhanceKnowledgeManager{
 		knowledgeGetter:     knowledgeGetter,
 		knowledgeMap:        make(map[string]EnhanceKnowledge),

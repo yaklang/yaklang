@@ -367,6 +367,10 @@ func (r *testRuntime) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[stri
 	return "", nil, nil
 }
 
+func (r *testRuntime) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
+	return false, nil
+}
+
 func (r *testRuntime) ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error) {
 	return nil, false, nil
 }
@@ -390,7 +394,11 @@ func (r *testRuntime) EnhanceKnowledgeAnswer(ctx context.Context, query string) 
 	return "", nil
 }
 
-func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
+	return "", nil
+}
+
+func (r *testRuntime) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
 	return "", nil
 }
 

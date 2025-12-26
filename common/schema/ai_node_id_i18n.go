@@ -515,6 +515,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "ReAct 任务执行成功",
 		En: "ReAct Task Execution Success",
 	},
+	"knowledge_enhance": {
+		Zh: "知识增强",
+		En: "Knowledge Enhancement",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{

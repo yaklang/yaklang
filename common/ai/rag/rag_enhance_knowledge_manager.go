@@ -12,9 +12,9 @@ import (
 )
 
 func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
-	return aicommon.NewEnhanceKnowledgeManager(func(ctx context.Context, e *aicommon.Emitter, query string) (<-chan aicommon.EnhanceKnowledge, error) {
+	return aicommon.NewEnhanceKnowledgeManagerWithCollectionLimitGetter(func(ctx context.Context, e *aicommon.Emitter, collections []string, query string) (<-chan aicommon.EnhanceKnowledge, error) {
 		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
-		_, err := QueryYakitProfile(query,
+		opts := []RAGSystemConfigOption{
 			WithRAGCtx(ctx),
 			WithEveryQueryResultCallback(func(data *ScoredResult) {
 				result.SafeFeed(data)
@@ -64,6 +64,14 @@ func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
 					return
 				}
 			}),
+		}
+
+		if len(collections) > 0 {
+			opts = append(opts, WithRAGCollectionNames(collections...))
+		}
+
+		_, err := QueryYakitProfile(query,
+			opts...,
 		)
 		if err != nil {
 			return nil, err
@@ -73,7 +81,7 @@ func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
 }
 
 func NewRagEnhanceKnowledgeManagerWithOptions(opts ...RAGSystemConfigOption) *aicommon.EnhanceKnowledgeManager {
-	return aicommon.NewEnhanceKnowledgeManager(func(ctx context.Context, e *aicommon.Emitter, query string) (<-chan aicommon.EnhanceKnowledge, error) {
+	return aicommon.NewEnhanceKnowledgeManagerWithCollectionLimitGetter(func(ctx context.Context, e *aicommon.Emitter, collections []string, query string) (<-chan aicommon.EnhanceKnowledge, error) {
 		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
 		allOpts := append(
 			opts,
@@ -127,6 +135,11 @@ func NewRagEnhanceKnowledgeManagerWithOptions(opts ...RAGSystemConfigOption) *ai
 				}
 			}),
 		)
+
+		if len(collections) > 0 {
+			allOpts = append(allOpts, WithRAGCollectionNames(collections...))
+		}
+
 		_, err := QueryYakitProfile(query,
 			allOpts...,
 		)
