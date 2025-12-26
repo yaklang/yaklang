@@ -79,10 +79,11 @@ REFERENCE
 <include('golang-file-read-path-sink')> as $sink;
 <include('golang-file-write-path-sink')> as $sink;
 
-.SaveToFile(* #-> as $sink)
+.SaveToFile(* as $sink)
+$sink #-> as $unsafe
 
-$sink.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
-$sink.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
+$unsafe.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
+$unsafe.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
 
 alert $low for {
 	solution: <<<SOLUTION

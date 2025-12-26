@@ -3,6 +3,7 @@ desc(
 	type: audit
 	level: info
 	lib: 'golang-file-write-path-os'
+	title_zh: "审计Golang使用os包进行文件路径写入"
 	desc: <<<DESC
 ### 规则描述
 
@@ -44,7 +45,6 @@ desc(
 
 DESC
 	rule_id: "8fa1347d-c895-4652-8fc7-08b5f022eab2"
-	title_zh: "审计Golang文件写入函数(os)"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -111,8 +111,8 @@ SOLUTION
 REFERENCE
 )
 
-os?{<fullTypeName>?{have: 'os'}} as $os
-$os.WriteFile(*<slice(index=0)> #-> as $output)
+os?{<fullTypeName>?{have: 'os'}} as $os;
+$os.WriteFile(*<slice(index=0)> as $output);
 
 alert $output for {
 	title_zh: "未验证的文件写入操作",

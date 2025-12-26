@@ -28,7 +28,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "137a07c6-00e9-443a-9c2c-f892782d5176"
-	title_zh: "检测Golang SQL注入漏洞"
+	title_zh: "检测Golang SQL注入漏洞gin.Context"
 	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议

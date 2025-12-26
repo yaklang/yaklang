@@ -95,8 +95,8 @@ REFERENCE
 )
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
-$entry.ReadAll().* as $output
-$entry.ReadFile().* as $output
+$entry.ReadAll as $output
+$entry.ReadFile as $output
 
 alert $output for {
 	title: "Audit Golang File Read ioutil Methods",
