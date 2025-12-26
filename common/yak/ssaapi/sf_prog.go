@@ -44,7 +44,8 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 			}
 		},
 	)
-	return res, boolRes
+	// 将 Values 转换为 sfvm.ValueOperator
+	return ValuesToSFValueList(res), boolRes
 }
 
 func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
@@ -170,7 +171,8 @@ func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, patte
 			}
 		},
 	)
-	return len(values) > 0, values, nil
+	// 将 Values 转换为 sfvm.ValueOperator
+	return len(values) > 0, ValuesToSFValueList(values), nil
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {

@@ -98,7 +98,7 @@ func (r *SyntaxFlowResult) GetValueCount(name string) int {
 			return ret
 		}
 	} else if name == "_" {
-		return r.GetUnNameValues().Len()
+		return len(r.GetUnNameValues())
 	}
 	return 0
 }

@@ -968,18 +968,18 @@ func (p *ProgramOverLay) queryMatch(
 		}
 
 		if matched {
-			if values, ok := vals.(Values); ok {
-				for _, v := range values {
+			vals.Recursive(func(op sfvm.ValueOperator) error {
+				if v, ok := op.(*Value); ok {
 					filePath := p.getValueFilePath(v)
 					if filePath == "" {
 						// 全局值，直接添加
 						results = append(results, v)
-						continue
+						return nil
 					}
 
 					// 如果文件已在更高层找到，跳过（被覆盖）
 					if foundFiles.Have(filePath) {
-						continue
+						return nil
 					}
 
 					// 检查文件是否在当前层
@@ -990,17 +990,18 @@ func (p *ProgramOverLay) queryMatch(
 						// 检查文件实际在哪个层
 						actualLayerIndex, exists := p.FileToLayerMap.Get(filePath)
 						if exists && actualLayerIndex > layer.LayerIndex {
-							continue
+							return nil
 						}
 						foundFiles.Set(filePath, struct{}{})
 						results = append(results, v)
 					}
 				}
-			}
+				return nil
+			})
 		}
 	}
 
-	return len(results) > 0, results, nil
+	return len(results) > 0, ValuesToSFValueList(results), nil
 }
 
 func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
