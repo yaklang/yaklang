@@ -2,8 +2,9 @@ package spec
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
 	"runtime"
+
+	"github.com/urfave/cli"
 )
 
 type AMQPConfig struct {
@@ -99,6 +100,10 @@ func GetCliBasicConfig(idPrefix string) []cli.Flag {
 			Name:  "server-port",
 			Value: "8082",
 			Usage: "port of web api",
+		},
+		cli.BoolFlag{
+			Name:  "enable-sfrule-sync",
+			Usage: "Enable SyntaxFlow rule synchronization from Legion server",
 		},
 	}
 }
