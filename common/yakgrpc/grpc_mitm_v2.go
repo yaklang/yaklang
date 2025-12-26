@@ -139,6 +139,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
+	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
+	allowChunkStaticJS := utils.NewBool(firstReq.GetAllowChunkStaticJS())
+
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
@@ -560,6 +564,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
 				})
 				continue
+			}
+
+			// AllowChunkStaticJS 为 optional bool：仅在前端显式设置时才更新，避免其他控制消息“误覆盖”为默认值。
+			if reqInstance.AllowChunkStaticJS != nil {
+				allowChunkStaticJS.SetTo(reqInstance.GetAllowChunkStaticJS())
 			}
 
 			if reqInstance.GetUpdateFilter() {
@@ -1071,8 +1080,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			httpctx.SetRequestURL(originReqIns, reqURL)
 		}
 
+		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
+			// 这里仅做“强路径”的提前过滤：避免影响普通 JS（弱路径由后续镜像阶段结合更多信号判定）。
+			if !allowChunkStaticJS.IsSet() && isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
+				ret = true
+			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
 			return ret
 		})
@@ -1114,6 +1128,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 		if urlRaw != nil {
 			urlStr = urlRaw.String()
+			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
 			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
 				extName = ret
@@ -1380,6 +1395,39 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		header, body := lowhttp.SplitHTTPPacketFast(plainResponse)
 		if responseOverSize {
 			plainResponse = []byte(header)
+		}
+
+		// 默认过滤 chunk/static JS（避免误伤：综合 path/mime/缓存头/少量 body 特征判定）
+		if !allowChunkStaticJS.IsSet() && rsp != nil {
+			urlPath := ""
+			if req != nil && req.URL != nil {
+				urlPath = req.URL.EscapedPath()
+			}
+			if urlPath == "" {
+				if u, err := url.Parse(reqUrl); err == nil && u != nil {
+					urlPath = u.EscapedPath()
+				}
+				if urlPath == "" {
+					urlPath = utils.ExtractRawPath(reqUrl)
+					if i := strings.IndexByte(urlPath, '?'); i >= 0 {
+						urlPath = urlPath[:i]
+					}
+				}
+			}
+			contentType := rsp.Header.Get("Content-Type")
+			cacheControl := rsp.Header.Get("Cache-Control")
+			contentLength := rsp.ContentLength
+			if contentLength <= 0 {
+				if cl := rsp.Header.Get("Content-Length"); cl != "" {
+					contentLength = int64(codec.Atoi(cl))
+				}
+			}
+
+			if shouldFilterBundledJavaScript(urlPath, contentType, cacheControl, contentLength, body) {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
+				isFilteredByResponse = true
+				isFiltered = true
+			}
 		}
 
 		shouldBeHijacked := !isFiltered
