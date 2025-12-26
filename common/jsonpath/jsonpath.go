@@ -29,19 +29,34 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strconv"
 	"strings"
 	"text/scanner"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func ToMapInterface(origin any) (map[string]interface{}, any, error) {
-	switch origin.(type) {
-	case string, []byte, []rune:
+	switch ret := origin.(type) {
+	case string:
 		var genericObj any
-		err := json.Unmarshal([]byte(fmt.Sprintf("%v", origin)), &genericObj)
+		err := json.Unmarshal([]byte(ret), &genericObj)
+		if err != nil {
+			return nil, origin, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
+		}
+		origin = genericObj
+	case []byte:
+		var genericObj any
+		err := json.Unmarshal(ret, &genericObj)
+		if err != nil {
+			return nil, origin, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
+		}
+		origin = genericObj
+	case []rune:
+		var genericObj any
+		err := json.Unmarshal([]byte(string(ret)), &genericObj)
 		if err != nil {
 			return nil, origin, utils.Errorf("jsonpath unmarshal origin[%v] failed: %s", spew.Sdump(origin), err)
 		}
