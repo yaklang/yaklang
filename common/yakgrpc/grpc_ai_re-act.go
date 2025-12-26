@@ -3,10 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -167,6 +168,9 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		log.Errorf("create re-act failed: %v", err)
 		return utils.Errorf("create re-act instance failed: %v", err)
 	}
+
+	reAct.GetConfig().SetConfig("MustProcessAttachedData", true)
+
 	_ = reAct // ensure reAct is not nil
 	for {
 		select {

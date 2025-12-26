@@ -162,8 +162,15 @@ func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, 
 func (m *AdvancedMockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }
-func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+func (m *AdvancedMockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
 	return "", nil
+}
+func (m *AdvancedMockInvoker) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
+	return "", nil
+}
+
+func (m *AdvancedMockInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
+	return false, nil
 }
 
 func (m *AdvancedMockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {

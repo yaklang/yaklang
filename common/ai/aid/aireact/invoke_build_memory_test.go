@@ -456,6 +456,10 @@ func (m *mockInvokerForMemoryTest) GetContext() context.Context {
 	return m.ctx
 }
 
+func (m *mockInvokerForMemoryTest) ExecuteLoopTaskIF(loopName string, task aicommon.AIStatefulTask, opts ...any) (bool, error) {
+	return false, nil
+}
+
 func (m *mockInvokerForMemoryTest) GetConfig() aicommon.AICallerConfigIf {
 	if m.config == nil {
 		m.config = aicommon.NewConfig(m.ctx)
@@ -515,10 +519,13 @@ func (m *mockInvokerForMemoryTest) EnhanceKnowledgeAnswer(ctx context.Context, s
 	return "", nil
 }
 
-func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
 	return "", nil
 }
 
+func (m *mockInvokerForMemoryTest) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
+	return "", nil
+}
 func (m *mockInvokerForMemoryTest) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
 }

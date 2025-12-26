@@ -31,7 +31,8 @@ type AIInvokeRuntime interface {
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
-	EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error)
+	EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error)
+	EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error)
 	// VerifyUserSatisfaction verifies if the user is satisfied with the result
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*VerifySatisfactionResult, error)
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))

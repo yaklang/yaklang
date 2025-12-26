@@ -3,12 +3,17 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (string, error) {
@@ -102,7 +107,73 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 	return finalResult, err
 }
 
-func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+func (r *ReAct) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
+	if utils.IsNil(ctx) {
+		ctx = r.config.GetContext()
+	}
+	_ = ctx // 预留 ctx 供后续使用
+
+	if n <= 0 {
+		n = 10
+	}
+
+	db := consts.GetGormProfileDatabase()
+	var allEntries []*schema.KnowledgeBaseEntry
+
+	// 遍历每个知识库获取随机条目
+	for _, collectionName := range collections {
+		// 获取知识库信息
+		kb, err := yakit.GetKnowledgeBaseByName(db, collectionName)
+		if err != nil {
+			log.Warnf("failed to get knowledge base %s: %v", collectionName, err)
+			continue
+		}
+
+		// 使用随机排序获取条目
+		var entries []*schema.KnowledgeBaseEntry
+		err = db.Model(&schema.KnowledgeBaseEntry{}).
+			Where("knowledge_base_id = ?", kb.ID).
+			Order("RANDOM()").
+			Limit(n).
+			Find(&entries).Error
+		if err != nil {
+			log.Warnf("failed to get random entries from knowledge base %s: %v", collectionName, err)
+			continue
+		}
+
+		allEntries = append(allEntries, entries...)
+	}
+
+	if len(allEntries) == 0 {
+		return "", nil
+	}
+
+	// 格式化输出
+	var result bytes.Buffer
+	result.WriteString(fmt.Sprintf("=== 知识库样本数据 (共 %d 条) ===\n\n", len(allEntries)))
+
+	for i, entry := range allEntries {
+		result.WriteString(fmt.Sprintf("【条目 %d】\n", i+1))
+		result.WriteString(fmt.Sprintf("标题: %s\n", entry.KnowledgeTitle))
+		if entry.Summary != "" {
+			result.WriteString(fmt.Sprintf("摘要: %s\n", entry.Summary))
+		}
+		if len(entry.Keywords) > 0 {
+			result.WriteString(fmt.Sprintf("关键词: %s\n", strings.Join(entry.Keywords, ", ")))
+		}
+		if entry.KnowledgeType != "" {
+			result.WriteString(fmt.Sprintf("类型: %s\n", entry.KnowledgeType))
+		}
+		if entry.KnowledgeDetails != "" {
+			result.WriteString(fmt.Sprintf("详细内容: %s\n", entry.KnowledgeDetails))
+		}
+		result.WriteString("\n")
+	}
+
+	return result.String(), nil
+}
+
+func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
 	if utils.IsNil(ctx) {
 		ctx = r.config.GetContext()
 	}
@@ -118,7 +189,7 @@ func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (s
 		ekm.SetEmitter(r.Emitter)
 	}
 
-	enhanceData, err := ekm.FetchKnowledge(ctx, userQuery)
+	enhanceData, err := ekm.FetchKnowledgeWithCollections(ctx, collections, userQuery)
 	if err != nil {
 		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}

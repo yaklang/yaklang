@@ -83,6 +83,7 @@ func isTextFileExtension(ext string) bool {
 	textExtensions := map[string]bool{
 		// 纯文本
 		".txt": true, ".text": true, ".log": true,
+		".yak": true,
 		// Markdown 和文档
 		".md": true, ".markdown": true, ".rst": true, ".adoc": true,
 		// 配置文件
@@ -116,8 +117,11 @@ const MaxFileContentSize = 1024
 
 func FileContextProvider(filePath string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		// 构建基本信息（即使出错也要包含）
+		baseInfo := fmt.Sprintf("User Prompt: %s\nFile: %s\n", strings.Join(userPrompt, " "), filePath)
+
 		if !utils.FileExists(filePath) {
-			return "", utils.Errorf("file %s does not exist", filePath)
+			return baseInfo + "[Error: file does not exist]", utils.Errorf("file %s does not exist", filePath)
 		}
 
 		ext := filepath.Ext(filePath)
@@ -144,22 +148,23 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 			}
 		}
 
-		// 3. 非文本类型，返回未实现错误
+		// 3. 非文本类型，返回未实现错误（包含文件路径信息）
 		if !isText {
-			return "", utils.Errorf("file type '%s' (MIME: %s) is not supported yet, only text files are supported", ext, mimeType)
+			errInfo := fmt.Sprintf("[Error: file type '%s' (MIME: %s) is not supported yet, only text files are supported]", ext, mimeType)
+			return baseInfo + errInfo, utils.Errorf("file %s: file type '%s' (MIME: %s) is not supported yet, only text files are supported", filePath, ext, mimeType)
 		}
 
 		// 4. 读取文本文件内容
 		file, err := os.Open(filePath)
 		if err != nil {
-			return "", utils.Errorf("failed to open file %s: %w", filePath, err)
+			return baseInfo + fmt.Sprintf("[Error: failed to open file: %v]", err), utils.Errorf("failed to open file %s: %w", filePath, err)
 		}
 		defer file.Close()
 
 		// 获取文件大小
 		fileInfo, err := file.Stat()
 		if err != nil {
-			return "", utils.Errorf("failed to stat file %s: %w", filePath, err)
+			return baseInfo + fmt.Sprintf("[Error: failed to stat file: %v]", err), utils.Errorf("failed to stat file %s: %w", filePath, err)
 		}
 		fileSize := fileInfo.Size()
 
@@ -171,7 +176,7 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 			buffer := make([]byte, MaxFileContentSize)
 			n, err := file.Read(buffer)
 			if err != nil {
-				return "", utils.Errorf("failed to read file %s: %w", filePath, err)
+				return baseInfo + fmt.Sprintf("File Size: %d bytes\n[Error: failed to read file: %v]", fileSize, err), utils.Errorf("failed to read file %s: %w", filePath, err)
 			}
 			content = string(buffer[:n])
 			truncated = true
@@ -179,15 +184,14 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 			// 文件较小，全部读取
 			contentBytes, err := os.ReadFile(filePath)
 			if err != nil {
-				return "", utils.Errorf("failed to read file %s: %w", filePath, err)
+				return baseInfo + fmt.Sprintf("File Size: %d bytes\n[Error: failed to read file: %v]", fileSize, err), utils.Errorf("failed to read file %s: %w", filePath, err)
 			}
 			content = string(contentBytes)
 		}
 
 		// 5. 构建提示词
 		var result bytes.Buffer
-		result.WriteString(fmt.Sprintf("User Prompt: %s\n", strings.Join(userPrompt, " ")))
-		result.WriteString(fmt.Sprintf("File: %s\n", filePath))
+		result.WriteString(baseInfo)
 		if mimeType != "" {
 			result.WriteString(fmt.Sprintf("MIME Type: %s\n", mimeType))
 		}
@@ -208,35 +212,37 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 
 func KnowledgeBaseContextProvider(knowledgeBaseName string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		// 构建基本信息（即使出错也要包含）
+		baseInfo := fmt.Sprintf("User Prompt: %s\n============== Knowledge Base Info ==============\nName: %s\n", strings.Join(userPrompt, " "), knowledgeBaseName)
+
 		knowledgeBase, err := yakit.GetKnowledgeBaseByName(consts.GetGormProfileDatabase(), knowledgeBaseName)
 		if err != nil {
-			return "", utils.Errorf("failed to get knowledge base %s: %w", knowledgeBaseName, err)
+			return baseInfo + fmt.Sprintf("[Error: failed to get knowledge base: %v]", err), utils.Errorf("failed to get knowledge base %s: %w", knowledgeBaseName, err)
 		}
 		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString("============== Knowledge Base Info ==============\n")
-		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", knowledgeBaseName))
+		infoBuffer.WriteString(baseInfo)
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", knowledgeBase.KnowledgeBaseDescription))
 		infoBuffer.WriteString(fmt.Sprintf("Type: %s\n", knowledgeBase.KnowledgeBaseType))
 		infoBuffer.WriteString(fmt.Sprintf("Tags: %s\n", knowledgeBase.Tags))
 		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
-		infoBuffer.WriteString("【重要提示】用户已附加此知识库作为问题的参考资源。\n")
-		infoBuffer.WriteString("当用户问及与此知识库相关的内容时，请务必使用 `knowledge_enhance_answer` action 或相关知识库查询工具来检索知识库内容。\n")
 		infoBuffer.WriteString(fmt.Sprintf("查询时请指定知识库名称为: %s\n", knowledgeBaseName))
 		infoBuffer.WriteString("请基于知识库查询结果来回答用户的问题，确保答案准确且有据可依。\n")
 		infoBuffer.WriteString("在回答时，请明确引用知识库中的相关信息。\n")
-		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+		return infoBuffer.String(), nil
 	}
 }
 
 func AIToolContextProvider(aitoolName string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		// 构建基本信息（即使出错也要包含）
+		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AITool Info ==============\nName: %s\n", strings.Join(userPrompt, " "), aitoolName)
+
 		aitool, err := config.GetAiToolManager().GetToolByName(aitoolName)
 		if err != nil {
-			return "", utils.Errorf("failed to get aitool %s: %w", aitoolName, err)
+			return baseInfo + fmt.Sprintf("[Error: failed to get aitool: %v]", err), utils.Errorf("failed to get aitool %s: %w", aitoolName, err)
 		}
 		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString("============== AITool Info ==============\n")
-		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aitool.Name))
+		infoBuffer.WriteString(baseInfo)
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aitool.Description))
 		infoBuffer.WriteString(fmt.Sprintf("Schema: %s\n", aitool.ToJSONSchemaString()))
 		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
@@ -244,19 +250,21 @@ func AIToolContextProvider(aitoolName string, userPrompt ...string) ContextProvi
 		infoBuffer.WriteString(fmt.Sprintf("请优先调用工具 '%s' 来解决用户的问题。\n", aitool.Name))
 		infoBuffer.WriteString("在执行任务时，请根据上述工具的Schema正确传入参数。\n")
 		infoBuffer.WriteString("如果此工具无法完全满足需求，可以结合其他工具辅助完成，但应以此工具为主。\n")
-		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+		return infoBuffer.String(), nil
 	}
 }
 
 func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		// 构建基本信息（即使出错也要包含）
+		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AIForge Info ==============\nName: %s\n", strings.Join(userPrompt, " "), aiforgeName)
+
 		aiforge, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), aiforgeName)
 		if err != nil {
-			return "", utils.Errorf("failed to get aiforge %s: %w", aiforgeName, err)
+			return baseInfo + fmt.Sprintf("[Error: failed to get aiforge: %v]", err), utils.Errorf("failed to get aiforge %s: %w", aiforgeName, err)
 		}
 		var infoBuffer bytes.Buffer
-		infoBuffer.WriteString("============== AIForge Info ==============\n")
-		infoBuffer.WriteString(fmt.Sprintf("Name: %s\n", aiforge.ForgeName))
+		infoBuffer.WriteString(baseInfo)
 		infoBuffer.WriteString(fmt.Sprintf("Description: %s\n", aiforge.Description))
 		infoBuffer.WriteString(fmt.Sprintf("Params: %s\n", aiforge.Params))
 		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
@@ -265,48 +273,51 @@ func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextPro
 		infoBuffer.WriteString("此蓝图专门设计用于处理特定类型的任务，能够提供更专业和高效的解决方案。\n")
 		infoBuffer.WriteString("在执行时，请根据上述参数Schema正确配置蓝图参数，确保任务顺利完成。\n")
 		infoBuffer.WriteString("如果蓝图执行过程中遇到问题，请及时向用户反馈并寻求进一步指导。\n")
-		return fmt.Sprintf("User Prompt: %s\n%s", userPrompt, infoBuffer.String()), nil
+		return infoBuffer.String(), nil
 	}
 }
 
 func NewContextProvider(typ string, key string, value string, userPrompt ...string) ContextProvider {
-	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+	return func(config AICallerConfigIf, emitter *Emitter, providerKey string) (string, error) {
+		// 构建基本信息（即使出错也要包含）
+		baseInfo := fmt.Sprintf("User Prompt: %s\nType: %s\nKey: %s\nValue: %s\n", strings.Join(userPrompt, " "), typ, key, value)
+
 		switch typ {
 		case CONTEXT_PROVIDER_TYPE_FILE:
 			switch key {
 			case CONTEXT_PROVIDER_KEY_FILE_PATH:
-				return FileContextProvider(value, userPrompt...)(config, emitter, key)
+				return FileContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			case CONTEXT_PROVIDER_KEY_FILE_CONTENT:
 				// TODO: 将文件存到 AI 工作目录
 				// 先暂时存到临时文件
 				tempFile := consts.TempAIFileFast("file-*.txt", value)
-				return FileContextProvider(tempFile, userPrompt...)(config, emitter, key)
+				return FileContextProvider(tempFile, userPrompt...)(config, emitter, providerKey)
 			default:
-				return "", utils.Errorf("unknown file context provider key: %s", key)
+				return baseInfo + fmt.Sprintf("[Error: unknown file context provider key: %s]", key), utils.Errorf("unknown file context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
 		case CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
 			switch key {
 			case CONTEXT_PROVIDER_KEY_NAME:
-				return KnowledgeBaseContextProvider(value, userPrompt...)(config, emitter, key)
+				return KnowledgeBaseContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
-				return "", utils.Errorf("unknown knowledge base context provider key: %s", key)
+				return baseInfo + fmt.Sprintf("[Error: unknown knowledge base context provider key: %s]", key), utils.Errorf("unknown knowledge base context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
 		case CONTEXT_PROVIDER_TYPE_AITOOL:
 			switch key {
 			case CONTEXT_PROVIDER_KEY_NAME:
-				return AIToolContextProvider(value, userPrompt...)(config, emitter, key)
+				return AIToolContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
-				return "", utils.Errorf("unknown aitool context provider key: %s", key)
+				return baseInfo + fmt.Sprintf("[Error: unknown aitool context provider key: %s]", key), utils.Errorf("unknown aitool context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
 		case CONTEXT_PROVIDER_TYPE_AIFORGE:
 			switch key {
 			case CONTEXT_PROVIDER_KEY_NAME:
-				return AIForgeContextProvider(value, userPrompt...)(config, emitter, key)
+				return AIForgeContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
-				return "", utils.Errorf("unknown aiforge context provider key: %s", key)
+				return baseInfo + fmt.Sprintf("[Error: unknown aiforge context provider key: %s]", key), utils.Errorf("unknown aiforge context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
 		}
-		return "", utils.Errorf("unknown context provider type: %s", typ)
+		return baseInfo + fmt.Sprintf("[Error: unknown context provider type: %s]", typ), utils.Errorf("unknown context provider type: %s (key: %s, value: %s)", typ, key, value)
 	}
 }
 

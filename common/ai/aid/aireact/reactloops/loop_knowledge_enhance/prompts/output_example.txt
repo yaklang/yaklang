@@ -1,70 +1,107 @@
 ## 输出示例
 
-### 1. 首次搜索知识库
-根据用户问题推测多个搜索查询和关键词：
+**任务目标**：收集与用户问题相关的信息（不是回答问题）
+
+---
+
+### 场景一：附加资源中有知识库（参考样本数据优化搜索）
+
+根据知识库样本数据了解知识库内容后，选择更准确的关键词进行搜索：
+
+#### 1. 首次搜索 - 根据样本数据选择合适的关键词
+假设样本数据显示知识库包含"Yaklang语法"、"安全编程"等内容：
 
 ```json
 {
   "@action": "search_knowledge",
-  "search_queries": ["什么是知识库增强", "RAG系统的工作原理", "检索增强生成技术"],
-  "keywords": ["知识库", "RAG", "检索增强"],
-  "limit": 5,
-  "human_readable_thought": "用户询问了知识库增强相关问题，我需要从多个角度搜索知识库获取相关信息"
+  "knowledge_bases": ["yaklang_docs"],
+  "search_queries": ["Yaklang如何进行网络请求", "Yaklang HTTP请求的使用方法", "使用Yak语言发送HTTP请求"],
+  "keywords": ["HTTP", "poc", "网络请求", "fuzz"],
+  "human_readable_thought": "从样本数据中看到知识库包含Yaklang编程相关内容，使用相关术语进行搜索"
 }
 ```
 
-### 2. 搜索无结果后重试
-使用不同角度的查询语句和关键词：
+#### 2. 继续搜索 - 根据样本数据中的专业术语搜索
 
 ```json
 {
   "@action": "search_knowledge",
-  "search_queries": ["向量数据库的应用", "语义搜索技术", "AI上下文增强"],
-  "keywords": ["向量搜索", "语义匹配", "Embedding"],
-  "limit": 5,
-  "human_readable_thought": "之前的搜索没有找到足够相关的内容，尝试使用不同的查询角度"
+  "knowledge_bases": ["yaklang_docs"],
+  "search_queries": ["poc模块的详细用法", "如何使用fuzz进行模糊测试"],
+  "keywords": ["poc.HTTP", "fuzz.HTTPRequest", "httpool"],
+  "human_readable_thought": "从样本中发现有poc和fuzz相关内容，深入搜索这些模块的用法"
 }
 ```
 
-### 3. 针对特定概念搜索
-当用户询问特定概念时：
-
-```json
-{
-  "@action": "search_knowledge",
-  "search_queries": ["Yaklang是什么", "Yaklang的主要功能", "Yaklang编程语言介绍"],
-  "keywords": ["Yaklang", "yak", "安全编程"],
-  "limit": 5,
-  "human_readable_thought": "用户想了解Yaklang，我需要搜索相关的基础介绍和功能说明"
-}
-```
-
-### 4. 搜索结果足够后的思考
-当搜索结果足够回答问题时，在下一轮直接基于结果回答：
+#### 3. 搜索完成后汇总信息
 
 ```json
 {
   "@action": "object",
   "next_action": {
     "type": "directly_answer",
-    "answer_payload": "根据知识库内容，[详细回答内容]..."
+    "answer_payload": "信息收集完成。已从知识库中收集到以下相关信息：\n\n1. [收集到的信息摘要1]\n2. [收集到的信息摘要2]\n3. [收集到的信息摘要3]\n\n这些信息可用于回答用户的问题。"
   },
-  "human_readable_thought": "搜索结果包含了用户需要的信息，可以直接回答",
-  "cumulative_summary": "已从知识库检索到相关信息并生成回答"
+  "human_readable_thought": "已从知识库中收集了足够的相关信息，信息收集任务完成"
 }
 ```
 
-### 5. 知识库无相关内容
-多次搜索仍未找到相关信息时：
+---
+
+### 场景二：附加资源中没有知识库（⚠️ 不要调用 search_knowledge）
+
+当附加资源中没有知识库时，**不要调用 search_knowledge**，直接对现有信息进行总结：
+
+#### 只有文件附加时
 
 ```json
 {
   "@action": "object",
   "next_action": {
     "type": "directly_answer",
-    "answer_payload": "抱歉，在知识库中未找到与您问题直接相关的信息。建议您：\n1. 尝试用不同的方式描述您的问题\n2. 咨询相关领域的专家\n3. 查阅其他资料来源"
+    "answer_payload": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- 文件: example.txt\n  文件内容摘要：[文件内容的关键信息]\n\n这些信息可用于回答用户的问题。"
   },
-  "human_readable_thought": "多次搜索后仍未找到相关内容，需要诚实告知用户",
-  "cumulative_summary": "知识库中没有找到相关信息"
+  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的文件信息"
+}
+```
+
+#### 只有工具或蓝图附加时
+
+```json
+{
+  "@action": "object",
+  "next_action": {
+    "type": "directly_answer",
+    "answer_payload": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- AI工具: tool_name - [工具功能描述]\n- AI蓝图: forge_name - [蓝图功能描述]\n\n这些工具和蓝图可用于后续处理用户的问题。"
+  },
+  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的工具和蓝图信息"
+}
+```
+
+#### 没有任何附加资源时
+
+```json
+{
+  "@action": "object",
+  "next_action": {
+    "type": "directly_answer",
+    "answer_payload": "信息收集完成。\n\n当前没有附加任何资源（知识库、文件、工具、蓝图）。\n\n无法从外部资源收集与用户问题相关的信息。"
+  },
+  "human_readable_thought": "没有附加任何资源，无法进行信息收集"
+}
+```
+
+---
+
+### 场景三：在知识库中未找到相关信息
+
+```json
+{
+  "@action": "object",
+  "next_action": {
+    "type": "directly_answer",
+    "answer_payload": "信息收集完成。\n\n已在以下知识库中搜索：[知识库名称列表]\n已尝试的搜索角度：\n- [搜索角度1]\n- [搜索角度2]\n\n未找到与用户问题直接相关的信息。\n\n注：知识库样本显示其主要包含[样本数据显示的主题]相关内容，可能不包含用户所询问的[用户问题主题]。"
+  },
+  "human_readable_thought": "多次搜索后未找到相关信息，结合样本数据分析原因"
 }
 ```

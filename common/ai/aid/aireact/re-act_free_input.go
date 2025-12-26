@@ -24,7 +24,7 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
 	for _, resource := range event.AttachedResourceInfo {
-		r.config.ContextProviderManager.RegisterTracedContent(resource.GetKey(), aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), userInput))
+		r.config.ContextProviderManager.RegisterTracedContent(resource.GetKey(), aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), resource.GetValue(), userInput))
 	}
 
 	if r.config.DebugEvent {
@@ -123,6 +123,14 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	if r.config.DebugEvent {
 		log.Infof("Task created: %s with input: %s", task.GetId(), event.FreeInput)
 	}
+
+	var attachedDatas []*aicommon.AttachedResource
+	if len(event.AttachedResourceInfo) > 0 {
+		for _, resource := range event.AttachedResourceInfo {
+			attachedDatas = append(attachedDatas, aicommon.NewAttachedResource(resource.GetType(), resource.GetKey(), resource.GetValue()))
+		}
+	}
+	task.SetAttachedDatas(attachedDatas)
 
 	log.Infof("Task enqueue started processing: %s", task.GetId())
 	// 任务不相关，进入排队状态
