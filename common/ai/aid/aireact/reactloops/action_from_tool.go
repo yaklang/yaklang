@@ -194,7 +194,7 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 					operator.Fail(err)
 					return
 				}
-				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex)
+				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements)
 
 				if verifyResult.Satisfied {
 					operator.Exit()

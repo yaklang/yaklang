@@ -66,7 +66,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			op.Fail(utils.Wrap(err, "knowledge_enhance action enhanced knowledge answer"))
 			return
 		}
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex)
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements)
 
 		if verifyResult.Satisfied {
 			// Only emit result once - EnhanceKnowledgeAnswer has already handled the stream output

@@ -24,10 +24,12 @@ type ReActLoopOption func(r *ReActLoop)
 type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
 type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
 
-type satisfactionRecord struct {
-	satisfactory       bool
-	reason             string
-	completedTaskIndex string // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
+// SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
+type SatisfactionRecord struct {
+	Satisfactory       bool   `json:"satisfactory"`         // 是否满足用户需求
+	Reason             string `json:"reason"`               // 满意/不满意的原因分析
+	CompletedTaskIndex string `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
+	NextMovements      string `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -91,7 +93,7 @@ type ReActLoop struct {
 	enableSelfReflection bool
 
 	// 记录历史 satisfaction 状态
-	historySatisfactionReasons []*satisfactionRecord
+	historySatisfactionReasons []*SatisfactionRecord
 
 	// action history tracking
 	actionHistory         []*ActionRecord
@@ -104,18 +106,19 @@ type ReActLoop struct {
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
-	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &satisfactionRecord{
-		satisfactory: satisfactory,
-		reason:       reason,
+	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &SatisfactionRecord{
+		Satisfactory: satisfactory,
+		Reason:       reason,
 	})
 }
 
-// PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引
-func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string) {
-	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &satisfactionRecord{
-		satisfactory:       satisfactory,
-		reason:             reason,
-		completedTaskIndex: completedTaskIndex,
+// PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements string) {
+	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &SatisfactionRecord{
+		Satisfactory:       satisfactory,
+		Reason:             reason,
+		CompletedTaskIndex: completedTaskIndex,
+		NextMovements:      nextMovements,
 	})
 }
 
@@ -124,16 +127,16 @@ func (r *ReActLoop) GetLastSatisfactionRecord() (bool, string) {
 		return false, ""
 	}
 	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
-	return lastRecord.satisfactory, lastRecord.reason
+	return lastRecord.Satisfactory, lastRecord.Reason
 }
 
-// GetLastSatisfactionRecordWithCompletedTaskIndex 获取最后一次满意度记录，包括已完成的任务索引
-func (r *ReActLoop) GetLastSatisfactionRecordWithCompletedTaskIndex() (bool, string, string) {
+// GetLastSatisfactionRecordFull 获取最后一次满意度记录的完整结构，包括已完成的任务索引和下一步行动计划
+// 返回 nil 表示没有记录
+func (r *ReActLoop) GetLastSatisfactionRecordFull() *SatisfactionRecord {
 	if len(r.historySatisfactionReasons) == 0 {
-		return false, "", ""
+		return nil
 	}
-	lastRecord := r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
-	return lastRecord.satisfactory, lastRecord.reason, lastRecord.completedTaskIndex
+	return r.historySatisfactionReasons[len(r.historySatisfactionReasons)-1]
 }
 
 func (r *ReActLoop) GetMaxIterations() int {
@@ -250,7 +253,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		currentMemories:             omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
 		memorySizeLimit:             10 * 1024,
 		enableSelfReflection:        true,
-		historySatisfactionReasons:  make([]*satisfactionRecord, 0),
+		historySatisfactionReasons:  make([]*SatisfactionRecord, 0),
 		actionHistory:               make([]*ActionRecord, 0),
 		actionHistoryMutex:          new(sync.Mutex),
 		currentIterationIndex:       0,

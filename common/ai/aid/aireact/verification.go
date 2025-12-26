@@ -177,7 +177,9 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
 
-			nextMovements := action.GetString("next_movements") // currently not used
+			nextMovements := action.GetString("next_movements")
+			// Store next_movements in result for status tracking
+			result.NextMovements = nextMovements
 			if nextMovements != "" {
 				r.AddToTimeline("next_movements", utils.MustRenderTemplate(`
 <|NEXT_MOVEMENTS_{{.Nonce}}|>
