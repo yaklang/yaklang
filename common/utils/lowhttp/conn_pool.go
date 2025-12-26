@@ -294,6 +294,9 @@ type persistConn struct {
 	// debug info
 	wPacket []packetInfo
 	rPacket []packetInfo
+
+	// request sequence for per-request timeout guards
+	reqSeq uint64
 }
 
 type requestAndResponseCh struct {
@@ -562,9 +565,23 @@ func (pc *persistConn) readLoop() {
 		if rc.option != nil && rc.option.Timeout > 0 {
 			timeout = rc.option.Timeout
 		}
+		seq := atomic.AddUint64(&pc.reqSeq, 1)
+		var hardTimeoutTimer *time.Timer
+		if timeout > 0 && !(rc.option != nil && rc.option.ExtendReadDeadline) {
+			hardTimeoutTimer = time.AfterFunc(timeout, func() {
+				if atomic.LoadUint64(&pc.reqSeq) != seq {
+					return
+				}
+				// Force the ongoing read to stop even if the server keeps streaming.
+				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+			})
+		}
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
 		_, err := pc.br.Peek(1)
 		if err != nil {
+			if hardTimeoutTimer != nil {
+				hardTimeoutTimer.Stop()
+			}
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 				closeErr = errServerClosedIdle
@@ -636,17 +653,30 @@ func (pc *persistConn) readLoop() {
 			if rc.option.NoBodyBuffer {
 				mirrorWriter = streamWriter
 			} else {
-				mirrorWriter = io.MultiWriter(&respBuffer, streamWriter)
+				rawWriter := io.Writer(&respBuffer)
+				if rc.option.AutoDetectSSE {
+					rawWriter = &responseRawCaptureWriter{
+						dst:           &respBuffer,
+						req:           stashRequest,
+						autoDetectSSE: true,
+					}
+				}
+				mirrorWriter = io.MultiWriter(rawWriter, streamWriter)
 			}
 		}
 
 		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
-		httpResponseReader = &deadlineExtendingReader{
-			conn:    pc.conn,
-			r:       httpResponseReader,
-			timeout: timeout,
+		if rc.option != nil && rc.option.ExtendReadDeadline {
+			httpResponseReader = &deadlineExtendingReader{
+				conn:    pc.conn,
+				r:       httpResponseReader,
+				timeout: timeout,
+			}
 		}
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
+		if hardTimeoutTimer != nil {
+			hardTimeoutTimer.Stop()
+		}
 		if resp != nil {
 			resp.Request = nil
 		}
