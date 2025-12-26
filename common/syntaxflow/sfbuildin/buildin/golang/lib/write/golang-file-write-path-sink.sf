@@ -37,7 +37,7 @@ desc(
 
 DESC
 	rule_id: "f2b7e07c-b395-4638-97d2-5010fe410ae3"
-	title_zh: "审计Golang文件写入功能汇点"
+	title_zh: "审计Golang文件路径写入功能汇点"
 	solution: <<<SOLUTION
 ### 修复建议
 

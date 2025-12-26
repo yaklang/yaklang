@@ -25,7 +25,7 @@ desc(
    - 敏感信息泄露（如栈中的密码或密钥）。
 DESC
 	rule_id: "0cd61cd7-0085-4152-80e9-9d934386e27c"
-	title_zh: "检测C语言缓冲区溢出漏洞"
+	title_zh: "检测C语言缓冲区溢出漏洞通用检查"
 	solution: <<<SOLUTION
 ### 修复建议
 
