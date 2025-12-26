@@ -361,7 +361,7 @@ func TestPromptManager_WithTracedFileContext_FileNotExist(t *testing.T) {
 	}
 
 	// Should contain error message for non-existent file
-	if !utils.MatchAllOfSubString(ctx, "Error getting context", "failed to read file") {
+	if !utils.MatchAllOfSubString(ctx, "Error getting context", "does not exist") {
 		t.Fatalf("Context should contain error message for non-existent file. Got: %s", ctx)
 	}
 

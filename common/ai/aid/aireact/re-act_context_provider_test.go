@@ -123,26 +123,31 @@ func TestReAct_AllContextProviders(t *testing.T) {
 	}
 
 	// Send input event with all AttachedResourceInfo types
+	// Key 是内部常量（如 file_path, name），Value 是实际值
 	go func() {
 		in <- &ypb.AIInputEvent{
 			IsFreeInput: true,
 			FreeInput:   "Please use all attached resources",
 			AttachedResourceInfo: []*ypb.AttachedResourceInfo{
 				{
-					Key:  tempFile.Name(),
-					Type: aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+					Key:   aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH,
+					Type:  aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+					Value: tempFile.Name(),
 				},
 				{
-					Key:  kbName,
-					Type: aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE,
+					Key:   aicommon.CONTEXT_PROVIDER_KEY_NAME,
+					Type:  aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE,
+					Value: kbName,
 				},
 				{
-					Key:  testForgeName,
-					Type: aicommon.CONTEXT_PROVIDER_TYPE_AIFORGE,
+					Key:   aicommon.CONTEXT_PROVIDER_KEY_NAME,
+					Type:  aicommon.CONTEXT_PROVIDER_TYPE_AIFORGE,
+					Value: testForgeName,
 				},
 				{
-					Key:  testToolName,
-					Type: aicommon.CONTEXT_PROVIDER_TYPE_AITOOL,
+					Key:   aicommon.CONTEXT_PROVIDER_KEY_NAME,
+					Type:  aicommon.CONTEXT_PROVIDER_TYPE_AITOOL,
+					Value: testToolName,
 				},
 			},
 		}
@@ -233,8 +238,9 @@ func TestReAct_ContextProvider_ErrorHandling(t *testing.T) {
 				FreeInput:   "Please read this file",
 				AttachedResourceInfo: []*ypb.AttachedResourceInfo{
 					{
-						Key:  nonExistentFile,
-						Type: aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+						Key:   aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH,
+						Type:  aicommon.CONTEXT_PROVIDER_TYPE_FILE,
+						Value: nonExistentFile,
 					},
 				},
 			}
