@@ -287,23 +287,22 @@ func run(t *testing.T, name string, c BuildinRuleTestCase) {
 							programName := ""
 							result := ssadb.CreateResult()
 							defer ssadb.DeleteResultByID(result.ID)
-							val.Recursive(func(operator sfvm.ValueOperator) error {
-								switch ret := operator.(type) {
-								case *ssaapi.Value:
-									if ret.GetProgramName() == "" {
-										return nil
-									}
-									programName = ret.GetProgramName()
-									return ssaapi.SaveValue(
-										ret,
-										ssaapi.OptionSaveValue_ResultID(result.ID),
-										ssaapi.OptionSaveValue_RuleTitle(r.Title),
-										ssaapi.OptionSaveValue_ProgramName(programName),
-										ssaapi.OptionSaveValue_RuleName(r.RuleName),
-									)
+							for _, value := range val {
+								if value.GetProgramName() == "" {
+									continue
 								}
-								return nil
-							})
+								programName = value.GetProgramName()
+								err := ssaapi.SaveValue(
+									value,
+									ssaapi.OptionSaveValue_ResultID(result.ID),
+									ssaapi.OptionSaveValue_RuleTitle(r.Title),
+									ssaapi.OptionSaveValue_ProgramName(programName),
+									ssaapi.OptionSaveValue_RuleName(r.RuleName),
+								)
+								if err != nil {
+									t.Fatal(err)
+								}
+							}
 							count := 0
 							for node := range ssadb.YieldAuditNodeByResultId(ssadb.GetDB(), result.ID) {
 								count++

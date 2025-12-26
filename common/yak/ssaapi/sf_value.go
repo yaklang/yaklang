@@ -74,14 +74,14 @@ func (v *Value) IsList() bool {
 
 func (v *Value) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return value.Len() != 0, value, nil
+	return len(value) > 0, ValuesToSFValueList(value), nil
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return value.Len() != 0, value, nil
+	return len(value) > 0, ValuesToSFValueList(value), nil
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -94,7 +94,7 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return value.Len() != 0, value, nil
+	return len(value) > 0, ValuesToSFValueList(value), nil
 }
 
 func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
@@ -179,13 +179,15 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 	if utils.IsNil(rets) {
 		return nil, utils.Errorf("ssa.Value no actual params")
 	}
-	return rets, nil
+	return ValuesToSFValueList(rets), nil
 }
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 	ret := v.GetCalledBy()
-	ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
-	return ret, nil
+	// 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
+	retValueList := ValuesToSFValueList(ret)
+	retValueList.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	return retValueList, nil
 }
 
 func (v *Value) GetFields() (sfvm.ValueOperator, error) {
@@ -212,16 +214,18 @@ func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 }
 
 func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
-	return v.GetUsers(), nil
+	return ValuesToSFValueList(v.GetUsers()), nil
 }
 func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
-	return v.GetOperands(), nil
+	return ValuesToSFValueList(v.GetOperands()), nil
 }
 func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
 	return DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...), nil
 }
 
 func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
 	return DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...), nil
 }
 
