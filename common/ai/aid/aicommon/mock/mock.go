@@ -143,6 +143,14 @@ func (m *MockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[stri
 	}, nil
 }
 
+func (m *MockInvoker) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
+	return "", nil
+}
+
+func (m *MockInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
+	return false, nil
+}
+
 func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	log.Infof("mock InvokeLiteForge called with action: %s", actionName)
 
@@ -217,7 +225,7 @@ func (m *MockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (str
 	return "", nil
 }
 
-func (m *MockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string) (string, error) {
+func (m *MockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error) {
 	return "", nil
 }
 

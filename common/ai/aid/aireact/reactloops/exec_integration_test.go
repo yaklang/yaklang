@@ -279,6 +279,13 @@ func (m *mockSimpleTask) GetDB() *gorm.DB {
 func (m *mockSimpleTask) SetDB(db *gorm.DB) {
 }
 
+func (m *mockSimpleTask) GetAttachedDatas() []*aicommon.AttachedResource {
+	return []*aicommon.AttachedResource{}
+}
+func (m *mockSimpleTask) SetAttachedDatas(datas []*aicommon.AttachedResource) {
+
+}
+
 func (m *mockSimpleTask) GetRisks() []*schema.Risk {
 	return []*schema.Risk{}
 }
