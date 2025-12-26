@@ -122,6 +122,7 @@ type ToolParamsPromptMeta struct {
 	Prompt     string
 	Nonce      string
 	ParamNames []string
+	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
 }
 
 // WithToolCaller_GenerateToolParamsBuilderWithMeta sets a builder that returns prompt with metadata for AITAG support
@@ -184,7 +185,13 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 	return t.CallToolWithExistedParams(tool, false, make(aitool.InvokeParams))
 }
 
-func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (aitool.InvokeParams, error) {
+// GenerateParamsResult contains the result of generateParams including params and identifier
+type GenerateParamsResult struct {
+	Params     aitool.InvokeParams
+	Identifier string // destination identifier, e.g. "query_large_file", "find_process"
+}
+
+func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
 	emitter := t.emitter
 
 	// Try to use the new builder with metadata first (for AITAG support)
@@ -210,6 +217,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	}
 
 	invokeParams := aitool.InvokeParams{}
+	var identifier string
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -235,6 +243,12 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			return utils.Errorf("error extracting action params: %v", err)
 		}
 
+		// Extract identifier from action (destination identifier for this tool call)
+		identifier = sanitizeIdentifier(callToolAction.GetString("identifier"))
+		if identifier != "" {
+			log.Debugf("extracted identifier[%s] for tool[%s]", identifier, tool.Name)
+		}
+
 		// First, get params from JSON
 		for k, v := range callToolAction.GetInvokeParams("params") {
 			invokeParams.Set(k, v)
@@ -258,7 +272,38 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
 		return nil, err
 	}
-	return invokeParams, nil
+	return &GenerateParamsResult{
+		Params:     invokeParams,
+		Identifier: identifier,
+	}, nil
+}
+
+// sanitizeIdentifier sanitizes the identifier to be safe for use in file paths
+// It converts to lowercase, replaces spaces with underscores, and removes invalid characters
+func sanitizeIdentifier(identifier string) string {
+	if identifier == "" {
+		return ""
+	}
+	// Convert to lowercase
+	result := ""
+	for _, r := range identifier {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			result += string(r)
+		} else if r >= 'A' && r <= 'Z' {
+			result += string(r - 'A' + 'a') // Convert to lowercase
+		} else if r == ' ' || r == '-' {
+			result += "_"
+		}
+		// Skip other characters
+	}
+	// Limit length to 30 characters
+	if len(result) > 30 {
+		result = result[:30]
+	}
+	if result == "" {
+		return ""
+	}
+	return result
 }
 
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
@@ -332,15 +377,20 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	// generate params
 	var invokeParams = make(aitool.InvokeParams)
+	var destinationIdentifier string // identifier describing the purpose of this tool call
 	if presetParams {
 		invokeParams = presetInvokeParams
 		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
 	} else {
-		generatedParams, err := t.generateParams(tool, handleError)
+		generateResult, err := t.generateParams(tool, handleError)
 		if err != nil {
 			return nil, false, utils.Errorf("error generating params for tool[%v]: %v", tool.Name, err)
 		}
-		invokeParams = generatedParams
+		invokeParams = generateResult.Params
+		destinationIdentifier = generateResult.Identifier
+		if destinationIdentifier != "" {
+			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
+		}
 	}
 	if utils.IsNil(invokeParams) {
 		invokeParams = make(aitool.InvokeParams)
@@ -438,7 +488,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 
 	// Save tool call files (params, stdout, stderr, result)
-	t.saveToolCallFiles(tool, callToolId, invokeParams, stdoutBuffer, stderrBuffer, toolResult)
+	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, stdoutBuffer, stderrBuffer, toolResult)
 
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	if toolResult.Data != nil {
@@ -455,6 +505,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 func (t *ToolCaller) saveToolCallFiles(
 	tool *aitool.Tool,
 	callToolId string,
+	destinationIdentifier string,
 	params aitool.InvokeParams,
 	stdoutBuffer *bytes.Buffer,
 	stderrBuffer *bytes.Buffer,
@@ -470,12 +521,6 @@ func (t *ToolCaller) saveToolCallFiles(
 	}
 	if workdir == "" {
 		workdir = consts.GetDefaultBaseHomeDir()
-	}
-
-	// Ensure workdir exists
-	if err := os.MkdirAll(workdir, 0755); err != nil {
-		log.Errorf("failed to create workdir %s: %v", workdir, err)
-		return
 	}
 
 	// Get task index for file naming
@@ -495,26 +540,36 @@ func (t *ToolCaller) saveToolCallFiles(
 		toolCallNumber = len(existingResults) + 1
 	}
 
-	// Generate file index in format: taskIndex_number
-	fileIndex := fmt.Sprintf("%s_%d", taskIndex, toolCallNumber)
-
-	// Generate tool identifier (sanitize tool name for filename)
-	toolIdentifier := sanitizeFilename(tool.Name)
-	if toolIdentifier == "" {
-		toolIdentifier = "unknown-tool"
-	}
-	// For stderr and result, use original tool name (sanitized)
+	// Generate tool name (sanitized for directory name)
 	toolName := sanitizeFilename(tool.Name)
 	if toolName == "" {
-		toolName = "unknown-tool"
+		toolName = "unknown_tool"
 	}
 
-	// Generate file names
-	// params and stdout use identifier, stderr and result use toolname
-	paramsFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-params-%s.txt", toolIdentifier, fileIndex))
-	stdoutFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-stdout-%s.txt", toolIdentifier, fileIndex))
-	stderrFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-stderr-%s.txt", toolName, fileIndex))
-	resultFilename := filepath.Join(workdir, fmt.Sprintf("tool-call-%s-result-%s.txt", toolName, fileIndex))
+	// Build directory name: {{index}}_{{tool-name}}_{{destination_identifier}}
+	// Example: 1_grep_query_large_file
+	var dirName string
+	if destinationIdentifier != "" {
+		dirName = fmt.Sprintf("%d_%s_%s", toolCallNumber, toolName, destinationIdentifier)
+	} else {
+		dirName = fmt.Sprintf("%d_%s", toolCallNumber, toolName)
+	}
+
+	// Build full directory path: task_{{task_index}}/tool_calls/{{dirName}}
+	// Example: task_1_1/tool_calls/1_grep_query_large_file
+	toolCallDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "tool_calls", dirName)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(toolCallDir, 0755); err != nil {
+		log.Errorf("failed to create tool call directory %s: %v", toolCallDir, err)
+		return
+	}
+
+	// Generate file names in the directory
+	paramsFilename := filepath.Join(toolCallDir, "params.txt")
+	stdoutFilename := filepath.Join(toolCallDir, "stdout.txt")
+	stderrFilename := filepath.Join(toolCallDir, "stderr.txt")
+	resultFilename := filepath.Join(toolCallDir, "result.txt")
 
 	// Save params file
 	paramsJSON := utils.Jsonify(params)

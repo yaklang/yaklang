@@ -51,12 +51,19 @@ For simple string/number/boolean parameters that don't contain special character
 {
   "@action": "call-tool",
   "tool": "tool_name",
+  "identifier": "short_intent_description",
   "params": {
     "param1": "simple_value",
     "param2": 123
   }
 }
 ```
+
+**IMPORTANT: The `identifier` field is REQUIRED**
+- The `identifier` should be a short, lowercase, underscore-separated string that describes the PURPOSE/INTENT of this tool call
+- Examples: `query_large_file`, `find_process`, `list_directory`, `search_log_error`, `check_disk_usage`
+- Format: use lowercase letters and underscores only (snake_case), keep it under 30 characters
+- This identifier will be used in file paths to help users quickly understand what this tool call is doing
 
 ### Method 2: AITAG Format (for complex parameters with multi-line content or special characters)
 For parameters that contain:
@@ -70,6 +77,7 @@ Use AITAG format to wrap the content safely:
 {
   "@action": "call-tool",
   "tool": "tool_name",
+  "identifier": "your_intent_here",
   "params": {
     "simple_param": "value"
   }
