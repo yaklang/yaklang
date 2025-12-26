@@ -3,10 +3,9 @@ package aicommon
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"os"
 	"sync"
-
-	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
