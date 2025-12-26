@@ -134,7 +134,8 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 			}
 			return i < j // all same just by index
 		})
-		return values
+		// 将 Values 转换为 sfvm.ValueOperator
+		return ValuesToSFValueList(values)
 	}
 	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.ValueOperator) (string, sfvm.ValueOperator, error) {
 		return s, sortFunc(vo), nil

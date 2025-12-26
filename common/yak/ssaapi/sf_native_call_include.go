@@ -78,9 +78,11 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	}
 
 	var queryValue sfvm.ValueOperator
-	queryValue = inputs
-	if inputs.IsEmpty() {
+	if len(inputs) == 0 {
 		queryValue = parent
+	} else {
+		// 将 Values 转换为 sfvm.ValueList
+		queryValue = ValuesToSFValueList(inputs)
 	}
 
 	config := frame.GetConfig()
@@ -132,7 +134,7 @@ func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values)
 		// Use program hash and rule name to generate a unique hash
 		hash = utils.CalcSha256(programHash + ruleName)
 		shouldCache = true
-		if inputValues != nil && !inputValues.IsEmpty() {
+		if inputValues != nil && len(inputValues) > 0 {
 			if valueHash, ok := inputValues.Hash(); ok {
 				hash = utils.CalcSha256(hash, valueHash)
 			} else {
