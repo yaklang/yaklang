@@ -458,7 +458,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				call2fun := fun.GetCalledBy()
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
-						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), call2fun.Len())
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), len(call2fun))
 						break
 					}
 					val := getActualValueByCall(call)
@@ -536,7 +536,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				call2fun := fun.GetCalledBy()
 				for index, call := range call2fun {
 					if index > dataflowValueLimit {
-						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), call2fun.Len())
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), len(call2fun))
 						break
 					}
 					val := getCalledByValue(call, true)

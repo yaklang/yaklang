@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -89,15 +88,11 @@ func (r *SyntaxFlowResult) DumpValuesJson(name string) string {
 	}
 
 	idMap := make(map[int64]struct{})
-	vs.Recursive(func(operator sfvm.ValueOperator) error {
-		val, ok := operator.(*Value)
-		if !ok {
-			return nil
-		}
-
+	// vs 是 Values 类型，直接遍历
+	for _, val := range vs {
 		_, existed := idMap[val.GetId()]
 		if existed {
-			return nil
+			continue
 		} else {
 			idMap[val.GetId()] = struct{}{}
 		}
@@ -116,8 +111,7 @@ func (r *SyntaxFlowResult) DumpValuesJson(name string) string {
 		}
 
 		valuesMap[val.GetId()] = valueMap
-		return nil
-	})
+	}
 
 	buffer := new(bytes.Buffer)
 	encoder := json.NewEncoder(buffer)
@@ -202,15 +196,11 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 			line("ALERT: %v", name)
 			increase()
 			m := map[int64]any{}
-			vs.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-
+			// vs 是 Values 类型，直接遍历
+			for _, val := range vs {
 				_, existed := m[val.GetId()]
 				if existed {
-					return nil
+					continue
 				} else {
 					m[val.GetId()] = true
 				}
@@ -262,8 +252,7 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 					}
 				}
 				decrease()
-				return nil
-			})
+			}
 			decrease()
 			return true
 		})

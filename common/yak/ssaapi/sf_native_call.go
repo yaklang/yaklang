@@ -389,9 +389,8 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				result = append(result, ret.GetUsers())
-			case *Values:
-				result = append(result, ret.GetUsers())
+				// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
+				result = append(result, ValuesToSFValueList(ret.GetUsers()))
 			}
 			return nil
 		})
@@ -404,16 +403,17 @@ func init() {
 			for _, v := range result {
 				switch ret := v.(type) {
 				case *Value:
-					temp = append(temp, ret.GetUsers())
-				case Values:
-					temp = append(temp, ret.GetUsers())
+					// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
+					temp = append(temp, ValuesToSFValueList(ret.GetUsers()))
 				case *sfvm.ValueList:
-					values, err := SFValueListToValues(ret)
-					if err == nil {
-						values.ForEach(func(value *Value) {
-							temp = append(temp, value.GetUsers())
-						})
-					}
+					// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
+					ret.Recursive(func(vo sfvm.ValueOperator) error {
+						if val, ok := vo.(*Value); ok {
+							// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
+							temp = append(temp, ValuesToSFValueList(val.GetUsers()))
+						}
+						return nil
+					})
 				}
 			}
 			result = temp
@@ -619,7 +619,8 @@ func init() {
 			}
 			callInst := value.GetCalledBy()
 			callInst.ForEach(func(call *Value) {
-				vals = append(vals, call.GetCallArgs())
+				// GetCallArgs() 返回 Values，需要转换为 sfvm.ValueOperator
+				vals = append(vals, ValuesToSFValueList(call.GetCallArgs()))
 			})
 
 			return vals
@@ -638,7 +639,8 @@ func init() {
 		case *Value:
 			vals := getCalledAndCheck(i)
 			res = append(res, vals...)
-		case Values:
+		case *sfvm.ValueList:
+			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
 			i.Recursive(func(operator sfvm.ValueOperator) error {
 				value, ok := operator.(*Value)
 				if !ok {
@@ -648,14 +650,6 @@ func init() {
 				res = append(res, vals...)
 				return nil
 			})
-		case *sfvm.ValueList:
-			values, err := SFValueListToValues(i)
-			if err == nil {
-				values.ForEach(func(value *Value) {
-					vals := getCalledAndCheck(value)
-					res = append(res, vals...)
-				})
-			}
 		default:
 			return false, nil, utils.Errorf("invalid value type %T", i)
 		}
@@ -714,33 +708,22 @@ func init() {
 		}
 
 		var results []sfvm.ValueOperator
-		switch i := v.(type) {
-		case *Values:
-			i.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-				ssaValue := val.GetSSAInst()
-				if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
-					return nil
-				}
-				ver := fmt.Sprint(ssaValue)
-				if compareIn(ver) {
-					results = append(results, val)
-				}
+		// Values 不再实现 ValueOperator，直接使用 Recursive 遍历所有值
+		v.Recursive(func(operator sfvm.ValueOperator) error {
+			val, ok := operator.(*Value)
+			if !ok {
 				return nil
-			})
-		case *Value:
-			ssaValue := i.GetSSAInst()
+			}
+			ssaValue := val.GetSSAInst()
 			if ssaValue.GetOpcode() != ssa.SSAOpcodeConstInst {
-				return false, nil, utils.Error("not value in version range")
+				return nil
 			}
 			ver := fmt.Sprint(ssaValue)
 			if compareIn(ver) {
-				results = append(results, i)
+				results = append(results, val)
 			}
-		}
+			return nil
+		})
 		if len(results) > 0 {
 			return true, sfvm.NewValues(results), nil
 		}
@@ -1420,7 +1403,7 @@ func init() {
 			})
 
 			if len(vals) == 0 {
-				return false, new(Values), utils.Errorf("no value found")
+				return false, sfvm.NewEmptyValues(), utils.Errorf("no value found")
 			}
 			return true, sfvm.NewValues(vals), nil
 		}),

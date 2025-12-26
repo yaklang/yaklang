@@ -26,7 +26,7 @@ func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.
 
 func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
-	if values.IsEmpty() {
+	if len(values) == 0 {
 		return newValue
 	}
 
@@ -39,6 +39,8 @@ func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisCon
 	return newValue
 }
 
+// SyntaxFlowVariableToValues 将 sfvm.ValueOperator 转换为 ssaapi.Values
+// 注意：Values 不再实现 ValueOperator 接口，此函数仅用于从 ValueOperator 中提取 *Value
 func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	var rets Values
 	for _, v := range vs {
@@ -49,15 +51,14 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 			switch ret := operator.(type) {
 			case *Value:
 				rets = append(rets, ret)
-			case Values:
-				rets = append(rets, ret...)
 			case *sfvm.ValueList:
-				values, err := SFValueListToValues(ret)
-				if err != nil {
-					log.Warnf("cannot handle type: %T error: %v", operator, err)
-				} else {
-					rets = append(rets, values...)
-				}
+				// ValueList 内部可能包含 *Value，递归提取
+				ret.Recursive(func(vo sfvm.ValueOperator) error {
+					if val, ok := vo.(*Value); ok {
+						rets = append(rets, val)
+					}
+					return nil
+				})
 			default:
 				log.Warnf("cannot handle type: %T", operator)
 			}
@@ -70,44 +71,18 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	return rets
 }
 
-func SFValueListToValues(list *sfvm.ValueList) (Values, error) {
-	return _SFValueListToValues(0, list)
-}
-
-func _SFValueListToValues(count int, list *sfvm.ValueList) (Values, error) {
-	if count > 1000 {
-		return nil, utils.Errorf("too many nested ValueList: %d", count)
-	}
-	var vals Values
-	list.Recursive(func(i sfvm.ValueOperator) error {
-		switch element := i.(type) {
-		case *Value:
-			vals = append(vals, element)
-		case Values:
-			vals = append(vals, element...)
-		case *sfvm.ValueList:
-			ret, err := _SFValueListToValues(count+1, element)
-			if err != nil {
-				log.Warnf("cannot handle type: %T error: %v", i, err)
-			} else {
-				vals = append(vals, ret...)
-			}
-		default:
-			log.Warnf("cannot handle type: %T", i)
-		}
-		return nil
-	})
-	return vals, nil
-}
-
-func ValuesToSFValueList(values Values) sfvm.ValueOperator {
+// ValuesToSFValueList 将 ssaapi.Values 转换为 sfvm.ValueList
+// 这是从 ssaapi 层创建 sfvm.ValueList 的标准方法
+func ValuesToSFValueList(values Values) *sfvm.ValueList {
 	var list []sfvm.ValueOperator
 	for _, value := range values {
 		list = append(list, value)
 	}
-	return sfvm.NewValues(list)
+	return &sfvm.ValueList{Values: list}
 }
 
+// MergeSFValueOperator 合并多个 sfvm.ValueOperator 为一个 sfvm.ValueList
+// 这是合并 ValueOperator 的标准方法
 func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
 	ret := []sfvm.ValueOperator{}
 	values := make(Values, 0)
@@ -122,6 +97,7 @@ func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
 			return nil
 		})
 	}
+	// 合并重复的 Value
 	for _, v := range MergeValues(values) {
 		ret = append(ret, v)
 	}
