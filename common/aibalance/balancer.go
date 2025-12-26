@@ -17,6 +17,9 @@ import (
 // Used to ensure the health check scheduler is started only once
 var healthCheckSchedulerStarted sync.Once
 
+// Used to ensure the latency watcher is started only once
+var latencyWatcherStarted sync.Once
+
 type Balancer struct {
 	config   *ServerConfig
 	listener net.Listener
@@ -57,6 +60,11 @@ func NewBalancerFromRawConfig(raw []byte, files ...string) (*Balancer, error) {
 		StartHealthCheckScheduler(b, 10*time.Minute) // Check every 10 minutes
 	})
 
+	// Start latency watcher (ensure it only starts once)
+	latencyWatcherStarted.Do(func() {
+		StartLatencyWatcher()
+	})
+
 	return b, nil
 }
 
@@ -87,6 +95,11 @@ func NewBalancer(configFile string) (*Balancer, error) {
 		// Start health check scheduler (ensure it only starts once)
 		healthCheckSchedulerStarted.Do(func() {
 			StartHealthCheckScheduler(b, 10*time.Minute) // Check every 10 minutes
+		})
+
+		// Start latency watcher (ensure it only starts once)
+		latencyWatcherStarted.Do(func() {
+			StartLatencyWatcher()
 		})
 
 		return b, nil
