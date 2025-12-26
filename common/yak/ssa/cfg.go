@@ -813,6 +813,7 @@ func (t *GotoBuilder) Finish() func() {
 		if !find {
 			target = builder.target
 		}
+		_break = target._break
 		builder.EmitJump(_break)
 		return func() { /* 在某些情况下，_break.ScopeTable可能要等loop循环执行完毕后才加载，这里暂时返回一个回调函数 */
 			gotoBuilder := ssautil.NewGotoStmt(ssautil.ScopedVersionedTableIF[Value](enter), ssautil.ScopedVersionedTableIF[Value](_break.ScopeTable))
