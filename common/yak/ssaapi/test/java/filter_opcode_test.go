@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -28,7 +27,7 @@ alert $param;
 			t.Fatal(err)
 		}
 		count := 0
-		if result.GetValues("param").Recursive(func(operator sfvm.ValueOperator) error {
+		if result.GetValues("param").Recursive(func(value *ssaapi.Value) error {
 			count++
 			return nil
 		}) != nil {
@@ -48,7 +47,7 @@ alert $param;
 			t.Fatal(err)
 		}
 		result.Show()
-		dotGraph := ssaapi.SyntaxFlowVariableToValues(result.GetValues("param")).DotGraph()
+		dotGraph := result.GetValues("param").NewDotGraph()
 		fmt.Println(dotGraph)
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))

@@ -281,13 +281,10 @@ func TestAuditResult(t *testing.T) {
 	values := dbResult.GetValues("print")
 	values.Show()
 	require.True(t, len(values) != 0)
-	values.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *ssaapi.Value:
-			require.True(t, ret.GetId() == -1)
-			require.True(t, ret.GetRange() != nil)
-			require.True(t, ret.GetRange().String() == codeRange.String())
-		}
+	values.Recursive(func(value *ssaapi.Value) error {
+		require.True(t, value.GetId() == -1)
+		require.True(t, value.GetRange() != nil)
+		require.True(t, value.GetRange().String() == codeRange.String())
 		return nil
 	})
 }

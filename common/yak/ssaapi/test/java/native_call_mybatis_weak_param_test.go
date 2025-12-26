@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -166,19 +165,17 @@ public interface UserMapper {
 
 			check := false
 			checkRng := false
-			params.Recursive(func(vo sfvm.ValueOperator) error {
-				if v, ok := vo.(*ssaapi.Value); ok {
-					for _, p := range v.Predecessors {
-						p.Node.ShowWithRange()
-						rng := p.Node.GetRange()
-						// str := p.Node.StringWithSourceCode()
-						// log.Infof("str: %s", str)
-						if editor := rng.GetEditor(); editor != nil && editor.GetFilename() == "sqlmap.xml" {
-							check = true
-						}
-						if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
-							checkRng = true
-						}
+			params.Recursive(func(value *ssaapi.Value) error {
+				for _, p := range value.Predecessors {
+					p.Node.ShowWithRange()
+					rng := p.Node.GetRange()
+					// str := p.Node.StringWithSourceCode()
+					// log.Infof("str: %s", str)
+					if editor := rng.GetEditor(); editor != nil && editor.GetFilename() == "sqlmap.xml" {
+						check = true
+					}
+					if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
+						checkRng = true
 					}
 				}
 				return nil
@@ -236,13 +233,11 @@ public interface UserMapper {
 			params := res.GetValues("params")
 
 			checkRng := false
-			params.Recursive(func(vo sfvm.ValueOperator) error {
-				if v, ok := vo.(*ssaapi.Value); ok {
-					for _, p := range v.Predecessors {
-						p.Node.ShowWithRange()
-						if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
-							checkRng = true
-						}
+			params.Recursive(func(value *ssaapi.Value) error {
+				for _, p := range value.Predecessors {
+					p.Node.ShowWithRange()
+					if strings.Contains(p.Node.StringWithRange(), "\"${id}\"\t22:63 - 22:68: ${id}") {
+						checkRng = true
 					}
 				}
 				return nil
@@ -311,13 +306,11 @@ public interface ReportMapper extends BaseMapper<User>{
 		params := res.GetValues("params")
 
 		checkRng := false
-		params.Recursive(func(vo sfvm.ValueOperator) error {
-			if v, ok := vo.(*ssaapi.Value); ok {
-				for _, p := range v.Predecessors {
-					p.Node.ShowWithRange()
-					if strings.Contains(p.Node.StringWithRange(), `"${subject}"	8:12 - 8:22: ${subject}`) {
-						checkRng = true
-					}
+		params.Recursive(func(value *ssaapi.Value) error {
+			for _, p := range value.Predecessors {
+				p.Node.ShowWithRange()
+				if strings.Contains(p.Node.StringWithRange(), `"${subject}"	8:12 - 8:22: ${subject}`) {
+					checkRng = true
 				}
 			}
 			return nil

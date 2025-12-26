@@ -91,7 +91,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			vals = append(vals, ret...)
 		}
 	})
-	if vals.Len() == 0 {
+	if len(vals) == 0 {
 		return Values{v}
 	}
 	return vals
@@ -263,7 +263,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				}
 			}
 		}
-		if vals.Len() > 0 {
+		if len(vals) > 0 {
 			return vals
 		} else {
 			return v.visitUserFallback(actx, opt...)
@@ -320,7 +320,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				}
 			}
 		}
-		if vals.Len() == 0 {
+		if len(vals) == 0 {
 			vals = append(vals, v.NewValue(call.innerValue).getBottomUses(actx, opt...)...)
 		}
 		return vals

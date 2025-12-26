@@ -32,21 +32,16 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 			if bp := getBlueprint(ret); bp != nil {
 				rets = append(rets, bp)
 			}
-		case Values:
-			ret.ForEach(func(value *Value) {
-				if bp := getBlueprint(value); bp != nil {
-					rets = append(rets, bp)
-				}
-			})
 		case *sfvm.ValueList:
-			values, err := SFValueListToValues(ret)
-			if err == nil {
-				values.ForEach(func(value *Value) {
-					if bp := getBlueprint(value); bp != nil {
+			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
+			ret.Recursive(func(vo sfvm.ValueOperator) error {
+				if val, ok := vo.(*Value); ok {
+					if bp := getBlueprint(val); bp != nil {
 						rets = append(rets, bp)
 					}
-				})
-			}
+				}
+				return nil
+			})
 		default:
 			return nil
 		}

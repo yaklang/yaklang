@@ -32,7 +32,7 @@ func DataFlowWithSFConfig(
 	value *Value,
 	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
-) Values {
+) sfvm.ValueOperator {
 	filterCondition := make([]*filterCondition, 0)
 	addHandler := func(key sf.RecursiveConfigKey, code string) {
 		filterCondition = append(filterCondition, withFilterCondition(key, code))
@@ -98,9 +98,10 @@ func DataFlowWithSFConfig(
 	ret := dataflowRecursiveFunc(options...)
 	// filter the result
 	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
-	// set predecessor label
-	ret.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
-	return ret
+	// set predecessor label - 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
+	retValue := ValuesToSFValueList(ret)
+	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
+	return retValue
 }
 
 var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -145,7 +146,8 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
 
 	if len(ret) > 0 {
-		return true, ret, nil
+		// 将 Values 转换为 sfvm.ValueOperator
+		return true, ValuesToSFValueList(ret), nil
 	}
 	return false, sfvm.NewEmptyValues(), nil
 }
@@ -202,7 +204,8 @@ func dataFlowFilter(
 	//foreach every path,A-> B-> C-> D-> E
 	//if E start dataflow. include: A && exclude:D this path is not match
 	checkMatch := func(path Values) bool {
-		return pathCheck.CheckMatch(path)
+		// CheckMatch 需要 sfvm.ValueOperator，将 Values 转换为 sfvm.ValueList
+		return pathCheck.CheckMatch(ValuesToSFValueList(path))
 	}
 	var ret []*Value
 	all := make(map[*Value]struct{})
@@ -212,17 +215,16 @@ func dataFlowFilter(
 	if end != nil {
 		var endValues Values
 		switch i := end.(type) {
-		case Values:
-			endValues = i
 		case *Value:
 			endValues = Values{i}
 		case *sf.ValueList:
-			values, err := SFValueListToValues(i)
-			if err != nil {
-				log.Warnf("cannot handle type: %T error: %v", i, err)
-			} else {
-				endValues = append(endValues, values...)
-			}
+			// 直接使用 ValueList 的 Recursive 方法提取其中的 Value
+			i.Recursive(func(operator sf.ValueOperator) error {
+				if val, ok := operator.(*Value); ok {
+					endValues = append(endValues, val)
+				}
+				return nil
+			})
 		default:
 			log.Warnf("dataFlowFilter: end type is not supported: %T", end)
 		}
