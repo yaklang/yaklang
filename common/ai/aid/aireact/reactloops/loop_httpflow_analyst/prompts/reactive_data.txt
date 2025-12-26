@@ -1,0 +1,40 @@
+## HTTPFlow 分析状态
+
+### 分析目标
+{{ .AnalysisGoal }}
+
+### 查询范围
+{{ .QueryScope }}
+
+### 已收集证据
+{{ .EvidencePack }}
+
+### 结论索引
+{{ .ClaimsIndex }}
+
+---
+
+{{- if .FeedbackMessages }}
+## 系统反馈
+{{ .FeedbackMessages }}
+{{- end }}
+
+---
+
+## 下一步行动提示
+
+根据当前状态，考虑：
+1. 是否需要更多查询来补充证据？
+2. 已有证据是否足够支撑结论？
+3. 是否可以开始写报告章节？
+4. 是否可以完成分析并输出报告？
+
+**注意**：
+- 使用 `query_httpflow` 收集数据
+- 使用 `aggregate_evidence` 整理证据
+- 使用 `write_report` 写报告章节
+- 使用 `conclude_analysis` 完成分析
+
+---
+NONCE: {{ .Nonce }}
+

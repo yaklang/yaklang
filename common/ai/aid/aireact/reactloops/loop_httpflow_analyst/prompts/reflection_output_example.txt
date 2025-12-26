@@ -1,0 +1,89 @@
+## 反思输出示例
+
+### 示例 1：开始分析
+```json
+{
+  "@action": "query_httpflow",
+  "human_readable_thought": "用户想了解最近的 HTTP 流量分布，我先执行一个聚合查询来获取整体统计",
+  "query_type": "aggregate",
+  "limit": 100,
+  "reason": "获取 HTTP 流量的状态码、方法、主机分布统计"
+}
+```
+
+### 示例 2：查找异常
+```json
+{
+  "@action": "query_httpflow",
+  "human_readable_thought": "发现有大量 500 错误，需要采样具体的失败请求",
+  "query_type": "sample",
+  "status_code": "500,502,503",
+  "limit": 20,
+  "reason": "采样服务器错误请求，分析失败原因"
+}
+```
+
+### 示例 3：关键词搜索
+```json
+{
+  "@action": "query_httpflow",
+  "human_readable_thought": "用户想找敏感数据外发，搜索包含 password 关键词的请求",
+  "query_type": "search",
+  "keyword": "password",
+  "keyword_type": "request",
+  "method": "POST",
+  "limit": 50,
+  "reason": "搜索可能包含密码的 POST 请求"
+}
+```
+
+### 示例 4：构建证据
+```json
+{
+  "@action": "aggregate_evidence",
+  "human_readable_thought": "根据查询结果，发现 10% 的请求返回 5xx 错误，这是一个重要观察",
+  "evidence_type": "observation",
+  "claim": "在分析时间窗口内，10.3% 的 HTTP 请求返回 5xx 服务器错误",
+  "supporting_evidence": "aggregate 查询显示：500(245次)、502(89次)、503(43次)，总错误 377 次，占总请求 3654 次的 10.3%",
+  "flow_ids": [12345, 12346, 12347],
+  "query_reference": "query_aggregate_1734567890",
+  "confidence": "high",
+  "limitations": ["仅基于采样数据", "未区分不同服务"],
+  "reason": "这个错误率显著高于正常水平，需要进一步分析根因"
+}
+```
+
+### 示例 5：写报告章节
+```json
+{
+  "@action": "write_report",
+  "human_readable_thought": "已收集足够的服务器错误相关证据，可以写这个分析章节了",
+  "section_title": "服务器错误分析",
+  "section_content": "在分析时间窗口内，系统表现出较高的服务器错误率...\n\n根据证据 [E_12345]，10.3% 的请求返回 5xx 错误...",
+  "evidence_refs": ["E_12345", "E_12346"],
+  "scope_declaration": "时间窗口：2024-01-01 至 2024-01-07；数据源：HTTPFlow；过滤：无；去重：按 flow_id",
+  "findings": ["错误率 10.3% 高于正常水平", "主要集中在 /api/v1/users 路径", "高峰期在每天 14:00-16:00"]
+}
+```
+
+### 示例 6：完成分析
+```json
+{
+  "@action": "conclude_analysis",
+  "human_readable_thought": "已完成所有分析章节，可以生成最终报告了",
+  "report_title": "HTTPFlow 安全分析报告 - 2024年1月",
+  "executive_summary": "本报告分析了 2024 年 1 月期间的 HTTP 流量数据。主要发现包括：1) 服务器错误率偏高（10.3%），主要影响用户服务接口；2) 检测到 3 个异常外联行为...",
+  "conclusions": [
+    "[E_12345] 服务器错误率（10.3%）显著高于行业标准（<1%），需要运维关注",
+    "[E_12346] 检测到 3 次向未知 IP 的大量数据外发，需要安全团队审查",
+    "[E_12347] API 接口响应时间在高峰期显著增加，存在性能瓶颈"
+  ],
+  "recommendations": [
+    "建议检查 /api/v1/users 服务的健康状况",
+    "建议审查外联到 203.x.x.x 的流量",
+    "建议增加 API 服务器资源或优化查询"
+  ],
+  "risk_level": "medium"
+}
+```
+

@@ -4,6 +4,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_explore_filesystem"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_differ"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_httpflow_analyst"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_yaklangcode"

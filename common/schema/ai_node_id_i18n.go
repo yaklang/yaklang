@@ -515,6 +515,42 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "ReAct 任务执行成功",
 		En: "ReAct Task Execution Success",
 	},
+
+	// HTTPFlow Analyst focus mode nodeIds
+	"init-httpflow-analyst": {
+		Zh: "初始化 HTTPFlow 分析",
+		En: "Initialize HTTPFlow Analysis",
+	},
+	"httpflow_analyst": {
+		Zh: "HTTPFlow 分析器",
+		En: "HTTPFlow Analyst",
+	},
+	"httpflow-query-reason": {
+		Zh: "HTTPFlow 查询原因",
+		En: "HTTPFlow Query Reason",
+	},
+	"evidence-reasoning": {
+		Zh: "证据推理",
+		En: "Evidence Reasoning",
+	},
+	"report-section-content": {
+		Zh: "报告章节内容",
+		En: "Report Section Content",
+	},
+	"analysis-conclusion": {
+		Zh: "分析结论",
+		En: "Analysis Conclusion",
+	},
+
+	// Explore Filesystem focus mode nodeIds
+	"init-explore-filesystem": {
+		Zh: "初始化文件系统探索",
+		En: "Initialize Filesystem Exploration",
+	},
+	"exploration-conclusion": {
+		Zh: "探索结论",
+		En: "Exploration Conclusion",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{
