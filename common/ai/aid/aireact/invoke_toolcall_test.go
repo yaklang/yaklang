@@ -41,7 +41,8 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 
 	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+		// Include identifier field for new directory structure
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -117,6 +118,7 @@ func TestReAct_ToolUse(t *testing.T) {
 	materialFetched := false
 	var iid string
 	taskDone := false
+	iterationDone := false // Track if ReAct Iteration Done is written to timeline
 LOOP:
 	for {
 		select {
@@ -163,7 +165,16 @@ LOOP:
 				}
 			}
 
-			if materialFetched && taskDone {
+			// Check if ReAct Iteration Done is written to timeline to avoid race condition
+			if e.NodeId == "timeline_item" {
+				content := string(e.GetContent())
+				if strings.Contains(content, "ReAct Iteration Done") {
+					iterationDone = true
+				}
+			}
+
+			// Wait for all conditions including iterationDone to avoid timeline race condition
+			if materialFetched && taskDone && iterationDone {
 				break LOOP
 			}
 		case <-after:
@@ -462,7 +473,8 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 
 		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+			// Include identifier field for new directory structure
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
 			rsp.Close()
 			return rsp, nil
 		}
