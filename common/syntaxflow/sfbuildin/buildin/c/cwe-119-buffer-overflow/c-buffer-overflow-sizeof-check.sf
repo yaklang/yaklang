@@ -26,7 +26,7 @@ desc(
    - 导致服务拒绝（DoS）。
 DESC
 	rule_id: "364b224d-5ed5-4fe8-8edc-43f318dd7d9d"
-	title_zh: "检测C语言缓冲区溢出漏洞"
+	title_zh: "检测C语言缓冲区溢出漏洞sizeof检查"
 	solution: <<<SOLUTION
 ### 修复建议
 

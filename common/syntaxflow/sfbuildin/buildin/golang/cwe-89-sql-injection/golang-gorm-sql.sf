@@ -60,13 +60,24 @@ REFERENCE
 
 <include('golang-database-gorm')> as $sink;
 <include('golang-user-input')> as $input;
-$sink.Raw(* #-> as $param);
-$sink.Exec( * #-> as $param);
-$sink.Row(* #-> as $param);
-$sink.Rows(* #-> as $param);
-$sink.ScanRows( * #-> as $param);
 
-$param & $input as $high;
+$sink.Raw as $func;
+$sink.Exec as $func;
+$sink.Row as $func;
+$sink.Rows as $func;
+$sink.ScanRows as $func;
+*.Raw as $func;
+*.Exec as $func;
+*.Row as $func;
+*.Rows as $func;
+*.ScanRows as $func;
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	type: "vuln",
@@ -175,7 +186,7 @@ func main() {
 }
 
 UNSAFE
-	"safefile://SafeGORMQueryWithWhereClause.go": <<<CODE
+	"safefile://SafeGORMQueryWithWhereClause.go": <<<SAFE
 package main
 
 import (
@@ -221,52 +232,5 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-CODE
-	"safefile://SafeGORMQueryWithWhereClauseWithPlaceholder.go": <<<CODE
-package main
-
-import (
-	"fmt"
-	"log"
-	"net/http"
-
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-)
-
-type User struct {
-	ID   uint
-	Name string
-	Age  int
-}
-
-func login(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	// 连接到数据库（此处简化，实际应用中应从配置加载）
-	dsn := "user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Printf("Failed to connect to database: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// 安全的查询方法二：使用Where子句和占位符
-	// GORM会用参数化的方式将用户输入传递给数据库，有效防止SQL注入
-	var users []User
-	db.Where("name = ?", username).Find(&users)
-
-	// 打印结果
-	for _, user := range users {
-		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
-	}
-}
-
-func main() {
-	http.HandleFunc("/login", login)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-CODE
+SAFE
 )

@@ -120,14 +120,14 @@ SOLUTION
 REFERENCE
 )
 
-os?{<fullTypeName>?{have: 'os'}} as $entry
-$entry.Create(* #-> as $output) 
-$entry.Open(* #-> as $output) 
-$entry.Remove(* #-> as $output) 
-$entry.RemoveAll(* #-> as $output) 
-$entry.Mkdir(* #-> as $output) 
-$entry.MkdirAll(* #-> as $output) 
-$entry.ReadDir(* #-> as $output) 
+os?{<fullTypeName>?{have: 'os'}} as $entry;
+$entry.Create as $output;
+$entry.Open as $output;
+$entry.Remove as $output;
+$entry.RemoveAll as $output;
+$entry.Mkdir as $output;
+$entry.MkdirAll as $output;
+$entry.ReadDir as $output;
 
 alert $output for {
 	title: "Unvalidated File Operation",

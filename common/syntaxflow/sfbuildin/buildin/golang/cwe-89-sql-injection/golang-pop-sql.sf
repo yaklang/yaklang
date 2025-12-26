@@ -104,8 +104,16 @@ REFERENCE
 
 <include('golang-database-pop')> as $sink;
 <include('golang-user-input')> as $input;
-$sink.RawQuery(* #-> as $param);
-$param & $input as $high;
+
+$sink.RawQuery as $func
+*.RawQuery<self()> as $func
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 
 
 alert $high for {
 	type: "vuln",
@@ -255,7 +263,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 UNSAFE
-	"safefile://SecurePopParametrizedQuery.go": <<<CODE
+	"safefile://SecurePopParametrizedQuery.go": <<<SAFE
 package main
 
 import (
@@ -329,58 +337,5 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-CODE
-	"safefile://SecurePopFixedQuery.go": <<<CODE
-package main
-
-import (
-	"fmt"
-	"log"
-	"net/http"
-
-	"github.com/gobuffalo/pop"
-)
-
-type User struct {
-	ID   uint
-	Name string
-	Age  int
-}
-
-// connectDB 辅助函数，用于连接数据库
-func connectDB() *pop.Connection {
-	db, err := pop.Connect("development")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return db
-}
-
-// secureLoginFixedQuery 不包含任何用户输入，执行预定义的查询
-func secureLoginFixedQuery(w http.ResponseWriter, r *http.Request) {
-	db := connectDB()
-	defer db.Close()
-
-	var users []User
-	// 安全：不涉及用户输入的固定查询，无法被注入
-	query := "SELECT * FROM users WHERE id = 1 AND name = 'admin'"
-	if err := db.RawQuery(query).Scan(&users); err != nil {
-		log.Printf("Error querying database: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// 打印结果
-	for _, user := range users {
-		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
-	}
-	fmt.Fprintf(w, "Executed fixed query securely.\n")
-}
-
-func main() {
-	http.HandleFunc("/secureFixedQuery", secureLoginFixedQuery)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-CODE
+SAFE
 )

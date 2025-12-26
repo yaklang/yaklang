@@ -28,7 +28,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 - 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "137a07c6-00e9-443a-9c2c-f892782d5176"
-	title_zh: "检测Golang SQL注入漏洞"
+	title_zh: "检测Golang SQL注入漏洞gin.Context"
 	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -73,12 +73,20 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-http-sink')> as $sink;
-<include('golang-database-sink')> as $db;
-$sink.QueryRow(* #-> as $param)
-$sink.Query(* #-> as $param)
+<include('golang-database-sql')> as $sink;
+<include('golang-user-input')> as $input;
 
-$param & $sink as $high;
+$sink.QueryRow as $func;
+$sink.Query as $func;
+*.QueryRow as $func;
+*.Query as $func;
+
+$func(* as $param);
+$param #{
+    until: "Sprintf | *?{opcode:add}"
+}-> as $unsafe;
+
+$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	desc: <<<DESC

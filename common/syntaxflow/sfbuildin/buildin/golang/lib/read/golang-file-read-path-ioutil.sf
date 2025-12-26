@@ -38,7 +38,7 @@ desc(
    - 如果结合其他漏洞（如目录遍历），可能导致更严重的信息泄露问题。
 DESC
 	rule_id: "46cba5f6-bb9e-492e-9842-980cc8514dbd"
-	title_zh: "审计Golang ioutil文件读取方法"
+	title_zh: "审计Golang ioutil文件路径读取方法"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -131,12 +131,12 @@ REFERENCE
 
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 
-$entry.ReadAll(* #-> as $output) 
-$entry.ReadFile(* #-> as $output)
+$entry.ReadAll(* as $output) 
+$entry.ReadFile(* as $output)
 
 alert $output for {
 	title: "Audit Golang ioutil File Read Path",
-	title_zh: "审计Golang ioutil文件读取方法",
+	title_zh: "审计Golang ioutil文件路径读取方法",
 	level: "info",
 	desc: <<<DESC
 ### 规则目的

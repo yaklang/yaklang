@@ -1,5 +1,5 @@
 desc(
-	title: "Audit Golang File Write With Bufio"
+	title: "Audit Golang File Write Using Bufio"
 	type: audit
 	level: info
 	lib: 'golang-file-write-bufio'
@@ -40,7 +40,7 @@ writer.Flush()
 - 不安全的文件权限：宽泛的文件权限设置可能导致非授权访问和数据篡改。
 DESC
 	rule_id: "72e2d1ff-51a4-4033-817a-435108c306ca"
-	title_zh: "审计Golang使用bufio进行文件写入的代码"
+	title_zh: "审计Golang使用bufio进行文件写入"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 严格校验用户控制的文件路径
@@ -98,11 +98,11 @@ REFERENCE
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
 $entry.NewWriter <getCall> as $writer;
-$writer.WriteString(*<slice(index=1)> #-> as $output);
+$writer.WriteString as $output;
 
 alert $output for {
 	title: "Audit Golang File Write With Bufio",
-	title_zh: "审计Golang使用bufio进行文件写入的代码",
+	title_zh: "审计Golang使用bufio进行文件写入",
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 严格校验用户控制的文件路径
