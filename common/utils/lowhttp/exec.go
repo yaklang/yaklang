@@ -1025,11 +1025,27 @@ RECONNECT:
 			if option.NoBodyBuffer {
 				mirrorWriter = writer
 			} else {
-				mirrorWriter = io.MultiWriter(&responseRaw, writer)
+				rawWriter := io.Writer(&responseRaw)
+				if option.AutoDetectSSE {
+					rawWriter = &responseRawCaptureWriter{
+						dst:           &responseRaw,
+						req:           reqIns,
+						autoDetectSSE: true,
+					}
+				}
+				mirrorWriter = io.MultiWriter(rawWriter, writer)
 			}
 		}
 
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
+		// Enforce a total timeout even when the server keeps streaming (reads may never block).
+		// For long-lived streaming use-cases (e.g. MITM), ExtendReadDeadline switches Timeout to idle-timeout semantics.
+		if timeout > 0 && option != nil && !option.ExtendReadDeadline {
+			hardTimeoutTimer := time.AfterFunc(timeout, func() {
+				_ = conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+			})
+			defer hardTimeoutTimer.Stop()
+		}
 
 		//log.Infof("dns time + dial time cost + write request finished: %v", time.Since(dnsStart))
 		// 服务器响应第一个字节
