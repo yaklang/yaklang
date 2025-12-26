@@ -1,0 +1,189 @@
+// Test script for explore_filesystem focus mode with artifact output
+// Usage: go run common/yak/cmd/yak.go common/ai/aid/aireact/reactloops/loop_explore_filesystem/test_explore_filesystem.yak
+//
+// This script tests the explore_filesystem focus mode with multiple test cases
+// and verifies the generated markdown artifacts.
+
+println("=" * 60)
+println("=== explore_filesystem Focus Mode Test Suite ===")
+println("=" * 60)
+
+// Define output directory for test artifacts
+outputDir := "/tmp/explore_filesystem_test_results"
+
+// Create output directory
+err := file.MkdirAll(outputDir)
+if err != nil {
+    println(sprintf("[WARN] Failed to create output directory: %v", err))
+}
+println(sprintf("\n[CONFIG] Artifact output directory: %s", outputDir))
+
+// Test cases definition
+testCases := [
+    {
+        "name": "Test 1: Find tool call functions",
+        "query": "找到 /Users/v1ll4n/Projects/yaklang/common/ai/aid/aireact/reactloops 这个文件夹下，工具调用的所有的函数内容，描述工具调用过程。",
+    },
+    // Uncomment to run more tests:
+    // {
+    //     "name": "Test 2: Find ReAct loop structure",
+    //     "query": "在 /Users/v1ll4n/Projects/yaklang/common/ai/aid/aireact/reactloops 目录下，分析 ReActLoop 的主要结构和执行流程。",
+    // },
+    // {
+    //     "name": "Test 3: Find action registration pattern",
+    //     "query": "探索 /Users/v1ll4n/Projects/yaklang/common/ai/aid/aireact/reactloops 中如何注册和管理 action，找出 action 注册的模式。",
+    // },
+]
+
+// Track test results
+testResults := []
+totalTests := len(testCases)
+passedTests := 0
+
+// Run each test case
+for idx, testCase := range testCases {
+    testName := testCase["name"]
+    query := testCase["query"]
+    
+    println("\n" + "-" * 60)
+    println(sprintf("[TEST %d/%d] %s", idx + 1, totalTests, testName))
+    println("-" * 60)
+    println(sprintf("[QUERY] %s", query))
+    println("")
+    
+    // Track events for this test
+    streamCount := 0
+    eventCount := 0
+    artifactPath := ""
+    testPassed := false
+    errorMsg := ""
+    
+    // Run the exploration
+    err := aim.InvokeReAct(
+        query,
+        aim.focus("explore_filesystem"),
+        aim.yoloMode(),
+        aim.maxIteration(15),
+        aim.onStream((react, event, nodeId, data) => {
+            streamCount++
+            // Show progress for key streams
+            if nodeId == "exploration-conclusion" || nodeId == "init-explore-filesystem" {
+                dataStr := string(data)
+                if len(dataStr) > 100 {
+                    dataStr = dataStr[:100] + "..."
+                }
+                println(sprintf("  [STREAM:%s] %s", nodeId, dataStr))
+            }
+        }),
+        aim.onEvent((react, event) => {
+            eventCount++
+            // Track artifact path from events
+            if event.Type == "structured" {
+                // Check for artifact path in timeline
+            }
+        }),
+        aim.onFinished((react) => {
+            println("\n  [FINISHED] Exploration loop completed")
+        }),
+    )
+    
+    if err != nil {
+        errorMsg = sprintf("%v", err)
+        println(sprintf("  [ERROR] Test failed: %s", errorMsg))
+    } else {
+        testPassed = true
+        println(sprintf("  [SUCCESS] Test completed successfully"))
+        println(sprintf("  [STATS] Streams: %d, Events: %d", streamCount, eventCount))
+    }
+    
+    // Store test result
+    result := {
+        "name": testName,
+        "passed": testPassed,
+        "streams": streamCount,
+        "events": eventCount,
+        "error": errorMsg,
+    }
+    testResults = append(testResults, result)
+    
+    if testPassed {
+        passedTests++
+    }
+}
+
+// Print summary
+println("\n" + "=" * 60)
+println("=== Test Summary ===")
+println("=" * 60)
+println(sprintf("Total Tests: %d", totalTests))
+println(sprintf("Passed: %d", passedTests))
+println(sprintf("Failed: %d", totalTests - passedTests))
+println("")
+
+for idx, result := range testResults {
+    status := "✓ PASS"
+    if !result["passed"] {
+        status = "✗ FAIL"
+    }
+    println(sprintf("[%d] %s: %s (streams: %d, events: %d)", 
+        idx + 1, status, result["name"], result["streams"], result["events"]))
+    if result["error"] != "" {
+        println(sprintf("    Error: %s", result["error"]))
+    }
+}
+
+// Check for generated artifacts
+println("\n" + "-" * 60)
+println("=== Generated Artifacts ===")
+println("-" * 60)
+
+// List files in the actual artifact directory (the target path + .explore_results)
+// Since the artifact is saved to target_path/.explore_results, we check there
+artifactDir := "/Users/v1ll4n/Projects/yaklang/common/ai/aid/aireact/reactloops/.explore_results"
+println(sprintf("[INFO] Checking artifact directory: %s", artifactDir))
+
+files := file.Ls(artifactDir)
+if files == nil || len(files) == 0 {
+    println("No artifacts generated yet.")
+} else {
+    for _, f := range files {
+        if str.HasSuffix(f.Name, ".md") {
+            filePath := artifactDir + "/" + f.Name
+            println(sprintf("\n[ARTIFACT] %s", filePath))
+            
+            // Read and display first 1200 chars of the artifact
+            content, readErr := file.ReadFile(filePath)
+            if readErr == nil && content != nil {
+                contentStr := string(content)
+                // Find a good truncation point (end of line)
+                if len(contentStr) > 1200 {
+                    truncIdx := 1200
+                    // Try to find end of line near truncation point
+                    for i := truncIdx; i < len(contentStr) && i < truncIdx + 100; i++ {
+                        if contentStr[i] == '\n' {
+                            truncIdx = i
+                            break
+                        }
+                    }
+                    contentStr = contentStr[:truncIdx] + "\n\n... (truncated, see full file for complete content)"
+                }
+                println("--- Content Preview ---")
+                println(contentStr)
+                println("--- End Preview ---")
+            } else {
+                println(sprintf("[WARN] Failed to read artifact: %v", readErr))
+            }
+        }
+    }
+}
+
+println("\n" + "=" * 60)
+println("=== Test Suite Complete ===")
+println("=" * 60)
+
+// Return overall success status
+if passedTests == totalTests {
+    println("\n✓ All tests passed!")
+} else {
+    println(sprintf("\n✗ %d test(s) failed", totalTests - passedTests))
+}

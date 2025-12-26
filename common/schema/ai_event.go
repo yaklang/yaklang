@@ -36,12 +36,13 @@ const (
 )
 
 const (
-	AI_REACT_LOOP_NAME_DEFAULT         = "default"
-	AI_REACT_LOOP_NAME_WRITE_YAKLANG   = "write_yaklang_code"
-	AI_REACT_LOOP_NAME_JAVA_DECOMPILER = "java_decompiler"
-	AI_REACT_LOOP_NAME_HTTP_DIFFER     = "http_differ"
-	AI_REACT_LOOP_NAME_PE_TASK         = "pe_task"
-	AI_REACT_LOOP_NAME_PLAN            = "plan"
+	AI_REACT_LOOP_NAME_DEFAULT            = "default"
+	AI_REACT_LOOP_NAME_WRITE_YAKLANG      = "write_yaklang_code"
+	AI_REACT_LOOP_NAME_JAVA_DECOMPILER    = "java_decompiler"
+	AI_REACT_LOOP_NAME_HTTP_DIFFER        = "http_differ"
+	AI_REACT_LOOP_NAME_PE_TASK            = "pe_task"
+	AI_REACT_LOOP_NAME_PLAN               = "plan"
+	AI_REACT_LOOP_NAME_EXPLORE_FILESYSTEM = "explore_filesystem"
 )
 
 const (
