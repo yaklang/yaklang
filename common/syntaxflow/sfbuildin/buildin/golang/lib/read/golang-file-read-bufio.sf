@@ -57,7 +57,7 @@ REFERENCE
 )
 
 bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
-$entry.NewReader().ReadString() as $output;
+$entry.NewReader().ReadString as $output;
 
 alert $output for {
 	title: "Audit Golang File Read bufio",

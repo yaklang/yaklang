@@ -40,7 +40,7 @@ desc(
 
 DESC
 	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
-	title_zh: "检测Golang SQL注入漏洞"
+	title_zh: "检测Golang SQL注入漏洞Service"
 	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议

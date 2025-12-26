@@ -1,6 +1,6 @@
 desc(
-	title: "Audit PHP Hard-coded Password"
-	title_zh: "审计PHP硬编码密码"
+	title: "Audit PHP Hard-coded FTP Password"
+	title_zh: "审计PHP硬编码FTP密码"
 	risk: "audit"
 	level: "low"
 	desc: <<<DESC

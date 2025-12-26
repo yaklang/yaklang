@@ -46,7 +46,7 @@ DESC
 [ioutil package - io/ioutil - Go Packages (go.dev)](https://pkg.go.dev/io/ioutil)
 [CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
 REFERENCE
-	title_zh: "审计Golang文件写入(ioutil)"
+	title_zh: "审计Golang使用ioutil包进行文件写入"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 迁移至`os`包和`io`包的新API
@@ -98,12 +98,12 @@ return nil
 SOLUTION
 )
 
-ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
-$entry.WriteAll(*<slice(index=1)> #-> as $output)
-$entry.WriteFile(*<slice(index=1)> #-> as $output)
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry;
+$entry.WriteAll as $output;
+$entry.WriteFile as $output;
 
 alert $output for {
-	title_zh: "审计Golang文件写入(ioutil)",
+	title_zh: "审计Golang使用ioutil包进行文件写入",
 	solution: <<<SOLUTION
 ### 修复建议
 根据 Go 语言的发展和安全实践，建议遵循以下方法重构使用 `ioutil` 进行文件写入的代码：

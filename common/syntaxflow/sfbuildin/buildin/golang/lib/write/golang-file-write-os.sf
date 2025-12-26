@@ -40,7 +40,7 @@ http.ListenAndServe(":8080", nil)
 - 如果未正确限制文件权限，可能导致敏感信息泄露或被篡改。
 DESC
 	rule_id: "785265e2-bc75-48f6-9e9b-1d329dc75f87"
-	title_zh: "审计Golang文件写入函数(os)"
+	title_zh: "审计Golang使用os包进行文件写入"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用安全的路径拼接
@@ -75,8 +75,8 @@ SOLUTION
 REFERENCE
 )
 
-os?{<fullTypeName>?{have: 'os'}} as $os
-$os.WriteFile(*<slice(index=1)> #-> as $output)
+os?{<fullTypeName>?{have: 'os'}} as $os;
+$os.WriteFile as $output;
 
 alert $output for {
 	title_zh: "未验证的文件写入操作",
