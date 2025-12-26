@@ -294,6 +294,9 @@ type persistConn struct {
 	// debug info
 	wPacket []packetInfo
 	rPacket []packetInfo
+
+	// request sequence for per-request timeout guards
+	reqSeq uint64
 }
 
 type requestAndResponseCh struct {
@@ -505,6 +508,26 @@ func (pc *persistConn) h2Conn() {
 	pc.alt = newH2Conn
 }
 
+type deadlineExtendingReader struct {
+	conn    net.Conn
+	r       io.Reader
+	timeout time.Duration
+}
+
+func (d *deadlineExtendingReader) Read(p []byte) (int, error) {
+	if d == nil || d.r == nil {
+		return 0, io.EOF
+	}
+	if d.conn != nil && d.timeout > 0 {
+		_ = d.conn.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	n, err := d.r.Read(p)
+	if n > 0 && d.conn != nil && d.timeout > 0 {
+		_ = d.conn.SetReadDeadline(time.Now().Add(d.timeout))
+	}
+	return n, err
+}
+
 func (pc *persistConn) readLoop() {
 	var closeErr error
 	defer func() {
@@ -525,31 +548,50 @@ func (pc *persistConn) readLoop() {
 	alive := true
 	firstAuth := true
 	for alive {
-		// if failed, handle it (re-conn / or abandoned)
-		_ = pc.conn.SetReadDeadline(time.Time{})
-		_, err := pc.br.Peek(1)
+		if firstAuth {
+			select {
+			case rc = <-pc.reqCh:
+			case <-pc.ctx.Done():
+				if pc.closed != nil {
+					closeErr = pc.closed
+				} else {
+					closeErr = pc.ctx.Err()
+				}
+				return
+			}
+		}
 
-		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
+		timeout := 10 * time.Second
+		if rc.option != nil && rc.option.Timeout > 0 {
+			timeout = rc.option.Timeout
+		}
+		seq := atomic.AddUint64(&pc.reqSeq, 1)
+		var hardTimeoutTimer *time.Timer
+		if timeout > 0 && !(rc.option != nil && rc.option.ExtendReadDeadline) {
+			hardTimeoutTimer = time.AfterFunc(timeout, func() {
+				if atomic.LoadUint64(&pc.reqSeq) != seq {
+					return
+				}
+				// Force the ongoing read to stop even if the server keeps streaming.
+				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+			})
+		}
+		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
+		_, err := pc.br.Peek(1)
 		if err != nil {
+			if hardTimeoutTimer != nil {
+				hardTimeoutTimer.Stop()
+			}
 			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 				closeErr = errServerClosedIdle
 			} else {
 				closeErr = connPoolReadFromServerError{err}
-			} // read error just return and close
+			}
 			return
 		}
-		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
-		if firstAuth {
-			select {
-			case rc = <-pc.reqCh:
-			case <-time.After(time.Second * 5):
-				closeErr = utils.Error("lowhttp: readLoop reqCh timeout, met abnormal event: got response before request arrived")
-				log.Error(closeErr)
-				return
-			}
-		}
+		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
 		var resp *http.Response
 
@@ -611,13 +653,30 @@ func (pc *persistConn) readLoop() {
 			if rc.option.NoBodyBuffer {
 				mirrorWriter = streamWriter
 			} else {
-				mirrorWriter = io.MultiWriter(&respBuffer, streamWriter)
+				rawWriter := io.Writer(&respBuffer)
+				if rc.option.AutoDetectSSE {
+					rawWriter = &responseRawCaptureWriter{
+						dst:           &respBuffer,
+						req:           stashRequest,
+						autoDetectSSE: true,
+					}
+				}
+				mirrorWriter = io.MultiWriter(rawWriter, streamWriter)
 			}
 		}
 
 		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
-		_ = pc.conn.SetReadDeadline(time.Time{})
+		if rc.option != nil && rc.option.ExtendReadDeadline {
+			httpResponseReader = &deadlineExtendingReader{
+				conn:    pc.conn,
+				r:       httpResponseReader,
+				timeout: timeout,
+			}
+		}
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, pc.conn, stashRequest)
+		if hardTimeoutTimer != nil {
+			hardTimeoutTimer.Stop()
+		}
 		if resp != nil {
 			resp.Request = nil
 		}
