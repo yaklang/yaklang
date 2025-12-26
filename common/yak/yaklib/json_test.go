@@ -33,3 +33,9 @@ func TestJsonLoads(t *testing.T) {
 		require.Equal(t, `true`, dumps)
 	})
 }
+
+func TestJsonDumpsWithNoEscapeHTML(t *testing.T) {
+	v := _jsonLoad(`{"a": "<b>c</b>"}`)
+	dumps := _jsonDumps(v, _withIndent(""), _withPrefix(""), _withNoEscapeHTML())
+	require.Equal(t, `{"a":"<b>c</b>"}`, dumps)
+}
