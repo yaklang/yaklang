@@ -174,6 +174,7 @@ func (e *Entrypoints) PeekProvider(model string) *Provider {
 
 // PeekOrderedProviders returns providers for the given model in random order
 // Only returns providers with latency < 10s, randomly shuffled
+// If no low-latency providers are available but providers exist, triggers immediate health check
 func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 	providers, ok := e.providers[model]
 	if !ok || len(providers) == 0 {
@@ -191,6 +192,7 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 
 	// 过滤出延迟小于10秒的提供者
 	var validProviders []*Provider
+	var highLatencyProviders []*Provider // 跟踪高延迟或无延迟数据的提供者
 	for _, p := range providers {
 		if p.DbProvider == nil {
 			log.Debugf("Provider %s skipped (no DbProvider)", p.TypeName)
@@ -203,8 +205,35 @@ func (e *Entrypoints) PeekOrderedProviders(model string) []*Provider {
 			log.Debugf("Provider %s accepted (latency: %dms, healthy: %v)",
 				p.TypeName, p.DbProvider.LastLatency, p.DbProvider.IsHealthy)
 		} else {
+			highLatencyProviders = append(highLatencyProviders, p)
 			log.Infof("Provider %s filtered out (latency: %dms >= 10s or no latency data)",
 				p.TypeName, p.DbProvider.LastLatency)
+		}
+	}
+
+	// 如果没有低延迟的提供者，但有高延迟或无数据的提供者，触发主动健康检测
+	if len(validProviders) == 0 && len(highLatencyProviders) > 0 {
+		log.Warnf("No low-latency providers found for model %s, triggering immediate health check for %d providers",
+			model, len(highLatencyProviders))
+
+		// 触发立即健康检查并获取可用的 providers
+		availableProviders := TriggerImmediateHealthCheckForModel(model, highLatencyProviders)
+
+		if len(availableProviders) > 0 {
+			log.Infof("After immediate health check, found %d available providers for model %s",
+				len(availableProviders), model)
+			// 使用健康检查后可用的提供者作为结果
+			validProviders = availableProviders
+		} else {
+			// 仍然没有可用的提供者，通知 LatencyWatcher 监控这些问题提供者
+			watcher := GetGlobalLatencyWatcher()
+			for _, p := range highLatencyProviders {
+				if p.DbProvider != nil {
+					watcher.MarkProviderAsProblematic(p.DbProvider.ID, p.DbProvider.WrapperName)
+				}
+			}
+			log.Warnf("No available providers found for model %s after health check", model)
+			return nil
 		}
 	}
 
