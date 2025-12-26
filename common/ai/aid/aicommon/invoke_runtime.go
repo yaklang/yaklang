@@ -12,6 +12,7 @@ type VerifySatisfactionResult struct {
 	Satisfied          bool   `json:"satisfied"`            // Whether the user is satisfied
 	Reasoning          string `json:"reasoning"`            // The reasoning for the satisfaction status
 	CompletedTaskIndex string `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
+	NextMovements      string `json:"next_movements"`       // AI's next action plan for in-progress status tracking
 }
 
 // NewVerifySatisfactionResult creates a new VerifySatisfactionResult
@@ -20,6 +21,16 @@ func NewVerifySatisfactionResult(satisfied bool, reasoning string, completedTask
 		Satisfied:          satisfied,
 		Reasoning:          reasoning,
 		CompletedTaskIndex: completedTaskIndex,
+	}
+}
+
+// NewVerifySatisfactionResultWithNextMovements creates a new VerifySatisfactionResult with next movements
+func NewVerifySatisfactionResultWithNextMovements(satisfied bool, reasoning string, completedTaskIndex string, nextMovements string) *VerifySatisfactionResult {
+	return &VerifySatisfactionResult{
+		Satisfied:          satisfied,
+		Reasoning:          reasoning,
+		CompletedTaskIndex: completedTaskIndex,
+		NextMovements:      nextMovements,
 	}
 }
 

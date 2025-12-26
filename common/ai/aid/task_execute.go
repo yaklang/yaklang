@@ -57,7 +57,13 @@ func (t *AiTask) execute() error {
 
 			// Check if completed_task_index indicates this task should be marked as done
 			// This provides an additional mechanism to end tasks beyond just isDone
-			_, summary, completedTaskIndex := loop.GetLastSatisfactionRecordWithCompletedTaskIndex()
+			lastRecord := loop.GetLastSatisfactionRecordFull()
+			var summary, completedTaskIndex, nextMovements string
+			if lastRecord != nil {
+				summary = lastRecord.Reason
+				completedTaskIndex = lastRecord.CompletedTaskIndex
+				nextMovements = lastRecord.NextMovements
+			}
 
 			// Check if current task index is in the completed_task_index list
 			shouldComplete := isDone
@@ -93,9 +99,9 @@ func (t *AiTask) execute() error {
 				// Emit continuing status
 				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
 
-				if summary != "" {
-					t.StatusSummary = summary
-				}
+				// Combine summary (reasoning) and next_movements as Processing status
+				// This ensures both are captured in StatusSummary to avoid context loss
+				t.updateProcessingStatus(summary, nextMovements)
 			}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
@@ -347,4 +353,30 @@ func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
 		return task.StatusSummary
 	}
 	return string(utils.Jsonify(callResult.Data))
+}
+
+// updateProcessingStatus combines summary (reasoning) and next_movements into StatusSummary
+// This ensures both the current status analysis and next action plan are preserved
+// to avoid context loss when timeline becomes too long
+func (t *AiTask) updateProcessingStatus(summary string, nextMovements string) {
+	if summary == "" && nextMovements == "" {
+		return
+	}
+
+	var statusParts []string
+
+	// Add summary (reasoning) as current status
+	if summary != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【当前状态】%s", summary))
+	}
+
+	// Add next_movements as action plan
+	if nextMovements != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【下一步计划】%s", nextMovements))
+	}
+
+	// Combine both parts into StatusSummary
+	t.StatusSummary = strings.Join(statusParts, "\n")
+
+	log.Infof("task %s processing status updated: summary=%q, nextMovements=%q", t.Index, summary, nextMovements)
 }
