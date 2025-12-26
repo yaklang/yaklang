@@ -158,14 +158,18 @@ func (w *LatencyWatcher) checkProviders(isNormalCheck bool) {
 // isProviderProblematic checks if a provider is problematic based on latency and health status
 func (w *LatencyWatcher) isProviderProblematic(p *schema.AiProvider) bool {
 	// Provider is problematic if:
-	// 1. Not healthy
-	// 2. Latency is 0 (no latency data)
-	// 3. Latency exceeds threshold
-	// 4. First check not completed
+	// 1. First check not completed (highest priority - need to complete first check)
+	if !p.IsFirstCheckCompleted {
+		return true
+	}
+
+	// After first check is completed, check other conditions:
+	// 2. Not healthy
+	// 3. Latency is 0 (no latency data)
+	// 4. Latency exceeds threshold
 	return !p.IsHealthy ||
 		p.LastLatency <= 0 ||
-		p.LastLatency >= w.latencyThreshold ||
-		!p.IsFirstCheckCompleted
+		p.LastLatency >= w.latencyThreshold
 }
 
 // triggerHealthCheck triggers a health check for a specific provider
