@@ -51,24 +51,12 @@ func SetDefaultKnowledgeBase(db *gorm.DB, id int64) error {
 
 // UpdateKnowledgeBase 更新知识库信息
 func UpdateKnowledgeBaseInfo(db *gorm.DB, id int64, knowledgeBase *schema.KnowledgeBaseInfo) error {
-	db = db.Model(&schema.KnowledgeBaseInfo{})
-	var existingKnowledgeBase schema.KnowledgeBaseInfo
-	err := db.Where("id = ?", id).First(&existingKnowledgeBase).Error
-	if err != nil {
-		return utils.Wrap(err, "get KnowledgeBase failed")
-	}
-
-	// 保留系统字段，避免更新元信息时意外清空 rag_id / serial_version_uid 等字段
-	if knowledgeBase.RAGID == "" {
-		knowledgeBase.RAGID = existingKnowledgeBase.RAGID
-	}
-	if knowledgeBase.SerialVersionUID == "" {
-		knowledgeBase.SerialVersionUID = existingKnowledgeBase.SerialVersionUID
-	}
-
-	knowledgeBase.ID = existingKnowledgeBase.ID
-	knowledgeBase.CreatedAt = existingKnowledgeBase.CreatedAt
-	err = db.Save(knowledgeBase).Error
+	// 使用 Select 指定允许更新的字段，确保即使是零值（如空字符串）也会被更新
+	// 同时避免影响 RAGID, SerialVersionUID 等系统字段
+	err := db.Model(&schema.KnowledgeBaseInfo{}).
+		Where("id = ?", id).
+		Select("knowledge_base_name", "knowledge_base_description", "knowledge_base_type", "tags").
+		Updates(knowledgeBase).Error
 	if err != nil {
 		return utils.Wrap(err, "update KnowledgeBase failed")
 	}
