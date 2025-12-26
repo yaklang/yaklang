@@ -161,6 +161,83 @@ var a = isEven(4)
 			"res": {"true", "false", "Function-isOdd"},
 		}, ssaapi.WithLanguage(ssaconfig.TS))
 	})
+
+	t.Run("call back side-effect 0.0", func(t *testing.T) {
+		code := `
+var state = 111111
+var handlers = {}
+
+var on = (event, handler) => {
+    handlers[event] = handler
+}
+
+var emit = (event, data) => {
+    var h = handlers[event]
+    if (h) {
+        h(data)
+    }
+}
+
+on("update", (v) => {state = v})
+on("updatee", (f) => {state = f})
+emit("update", 222222)
+emit("updatee", 333333)
+var a = state
+`
+		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
+			"res": {"111111", "222222", "333333"},
+		}, ssaapi.WithLanguage(ssaconfig.TS))
+	})
+
+	t.Run("call back side-effect 0.1", func(t *testing.T) {
+		code := `
+var state = 111111
+var handlers = {}
+
+var on = (event, handler) => {
+    handlers[event] = handler
+}
+
+var emit = (event, data) => {
+    var h = handlers[event]
+    if (h) {
+        h(data)
+    }
+}
+
+on("update", (v) => {state = v})
+emit("update", 222222)
+var a = state
+`
+		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
+			"res": {"111111", "222222"},
+		}, ssaapi.WithLanguage(ssaconfig.TS))
+	})
+
+	t.Run("call back side-effect 1.0", func(t *testing.T) {
+		code := `
+var state = 111111
+var handlers
+
+var on = (event, handler) => {
+    handlers = handler
+}
+
+var emit = (event, data) => {
+    var h = handlers
+    if (h) {
+        h(data)
+    }
+}
+
+on("update", (v) => {state = v})
+emit("update", 222222)
+var a = state
+`
+		ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
+			"res": {"111111", "222222"},
+		}, ssaapi.WithLanguage(ssaconfig.TS))
+	})
 }
 
 // TestSideEffect_Debug_Analysis 是一个辅助调试测试，用于分析 SideEffect 机制的工作原理

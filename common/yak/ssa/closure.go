@@ -146,6 +146,56 @@ func (s *FunctionType) SetSideEffect(se []*FunctionSideEffect) {
 	s.SideEffects = se
 }
 
+// getActualKeyFromCall 获取调用时的实际 key 值
+// 如果 key 是一个 Parameter，则从调用参数中获取实际值
+func getActualKeyFromCall(c *Call, key Value) Value {
+	if param, ok := ToParameter(key); ok && !param.IsFreeValue {
+		// 从 c.Args 中获取实际的参数值
+		if param.FormalParameterIndex < len(c.Args) {
+			if argVal, ok := c.GetValueById(c.Args[param.FormalParameterIndex]); ok && argVal != nil {
+				return argVal
+			}
+		}
+	}
+	return key
+}
+
+// computeActualVerboseName 计算调用时的实际 VerboseName
+// 如果 VerboseName 中包含参数名，则替换为实际的参数值
+func computeActualVerboseName(c *Call, se *FunctionSideEffect) string {
+	// 如果没有 MemberCallKey，直接返回原始 VerboseName
+	if se.MemberCallKey <= 0 {
+		return se.VerboseName
+	}
+
+	key, ok := c.GetValueById(se.MemberCallKey)
+	if !ok || key == nil {
+		return se.VerboseName
+	}
+
+	// 获取实际的 key 值
+	actualKey := getActualKeyFromCall(c, key)
+	if actualKey == key {
+		// key 没有变化，返回原始 VerboseName
+		return se.VerboseName
+	}
+
+	// 构造新的 VerboseName
+	// 原始 VerboseName 格式: "objectName.keyName"
+	// 新的 VerboseName 格式: "objectName.actualKeyValue"
+	actualKeyStr := GetKeyString(actualKey)
+	if actualKeyStr == "" {
+		return se.VerboseName
+	}
+
+	// 找到最后一个 "." 并替换后面的部分
+	if idx := strings.LastIndex(se.VerboseName, "."); idx != -1 {
+		return se.VerboseName[:idx+1] + actualKeyStr
+	}
+
+	return se.VerboseName
+}
+
 func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
@@ -241,7 +291,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffect] skip parameter member %s: member key missing", se.Name)
 				continue
@@ -263,7 +315,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffect] skip call member %s: member key missing", se.Name)
 				continue
@@ -285,7 +339,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffect] skip default member %s: member key missing", se.Name)
 				continue
@@ -309,15 +365,19 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			}
 
 			builder.AssignVariable(variable, sideEffect)
-			if strings.Contains(se.VerboseName, "this") {
-				sideEffect.SetVerboseName(se.VerboseName)
+
+			// 计算实际的 VerboseName（使用调用时的实际参数值）
+			actualVerboseName := computeActualVerboseName(c, se)
+			if strings.Contains(actualVerboseName, "this") {
+				sideEffect.SetVerboseName(actualVerboseName)
 			}
 			sideEffectId := sideEffect.GetId()
 			if sideEffectId == -1 {
 				log.Warnf("[ssa.handleSideEffect] skip side effect %s: side effect id is 0", se.Name)
 				continue
 			}
-			c.SideEffectValue[se.VerboseName] = sideEffectId
+			// 使用实际的 VerboseName 作为 SideEffectValue 的 key
+			c.SideEffectValue[actualVerboseName] = sideEffectId
 			if buildPointer {
 				if se.parameterMemberInner.MemberCallObjectIndex < len(c.Args) {
 					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffectId
@@ -411,7 +471,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffectBind] skip parameter member %s: key missing", se.Name)
 				continue
@@ -433,7 +495,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				obj = builder.GetOriginValue(obj)
 			}
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffectBind] skip call member %s: key missing", se.Name)
 				continue
@@ -463,7 +527,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			// is object
 			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
-				variable = builder.CreateMemberCallVariable(obj, key)
+				// 使用实际的 key 值（如果 key 是 Parameter，则从调用参数中获取实际值）
+				actualKey := getActualKeyFromCall(c, key)
+				variable = builder.CreateMemberCallVariable(obj, actualKey)
 			} else {
 				log.Warnf("[ssa.handleSideEffectBind] skip default member %s: key missing", se.Name)
 				continue
@@ -481,6 +547,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 
+			// 计算实际的 VerboseName（使用调用时的实际参数值）
+			actualVerboseName := computeActualVerboseName(c, se)
+
 			AddSideEffect := func() {
 				// TODO: handle side effect in loop scope,
 				// will replace value in scope and create new phi
@@ -489,8 +558,8 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 					variable.SetCaptured(se.Variable)
 				}
 				builder.AssignVariable(variable, sideEffect)
-				sideEffect.SetVerboseName(se.VerboseName)
-				c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+				sideEffect.SetVerboseName(actualVerboseName)
+				c.SideEffectValue[actualVerboseName] = sideEffect.GetId()
 			}
 
 			SetCapturedSideEffect := func() {
@@ -499,10 +568,10 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 					log.Warnf("BUG: variable.Assign error: %v", err)
 					return
 				}
-				if strings.Contains(se.VerboseName, "this") {
-					sideEffect.SetVerboseName(se.VerboseName)
+				if strings.Contains(actualVerboseName, "this") {
+					sideEffect.SetVerboseName(actualVerboseName)
 				}
-				currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.Variable)
+				currentScope.SetCapturedSideEffect(actualVerboseName, variable, se.Variable)
 
 				function.SideEffects = append(function.SideEffects, se)
 			}

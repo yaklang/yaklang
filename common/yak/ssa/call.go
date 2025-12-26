@@ -389,6 +389,19 @@ func (c *Call) handleCalleeFunction() {
 			if !ok || utils.IsNil(key) {
 				continue
 			}
+
+			// 如果 key 是一个 Parameter，尝试从调用参数中获取实际值
+			// 这处理了 handlers[event] 这样的场景，其中 event 是函数参数
+			actualKey := key
+			if param, ok := ToParameter(key); ok && !param.IsFreeValue {
+				// 从 c.Args 中获取实际的参数值
+				if param.FormalParameterIndex < len(c.Args) {
+					if argVal, ok := c.GetValueById(c.Args[param.FormalParameterIndex]); ok && argVal != nil {
+						actualKey = argVal
+					}
+				}
+			}
+
 			object, ok := p.GetActualParam(c)
 			if !ok {
 				continue
@@ -397,30 +410,30 @@ func (c *Call) handleCalleeFunction() {
 				continue
 			}
 
-			if res := checkCanMemberCallExist(object, key); !res.exist {
+			if res := checkCanMemberCallExist(object, actualKey); !res.exist {
 				builder.NewErrorWithPos(Error, SSATAG,
 					p.GetRange(),
 					ValueNotMember(
 						object.GetOpcode(),
 						objectName,
-						key.String(),
+						actualKey.String(),
 						c.GetRange(),
 					),
 				)
 				c.NewError(Error, SSATAG,
 					ValueNotMemberInCall(
 						objectName,
-						key.String(),
+						actualKey.String(),
 					),
 				)
 				continue
 			}
 
 			var val Value
-			if val = builder.ReadMemberCallValueByName(object, key.String()); val == nil {
+			if val = builder.ReadMemberCallValueByName(object, actualKey.String()); val == nil {
 				if o, ok := object.GetType().(*ObjectType); ok {
 					for n, a := range o.AnonymousField {
-						if k := a.GetKeybyName(key.String()); k != nil {
+						if k := a.GetKeybyName(actualKey.String()); k != nil {
 							objectt := builder.ReadMemberCallValueByName(object, n)
 							if objectt == nil {
 								log.Warnf("anonymous object %v not find", n)
@@ -437,7 +450,7 @@ func (c *Call) handleCalleeFunction() {
 			}
 
 			if utils.IsNil(val) {
-				val = builder.ReadMemberCallValue(object, key)
+				val = builder.ReadMemberCallValue(object, actualKey)
 			}
 			val.AddUser(c)
 			c.ArgMember = append(c.ArgMember, val.GetId())
