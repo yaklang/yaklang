@@ -1,0 +1,36 @@
+## 探索输出示例
+
+### 示例 1: 使用 grep_filesystem 搜索代码
+```json
+{"@action": "grep_filesystem", "path": "/Users/project/src", "pattern": "func.*HandleToolCall", "file_pattern": "*.go", "context_lines": 15, "human_readable_thought": "我需要找到 HandleToolCall 函数的实现，了解工具调用的处理流程"}
+```
+
+### 示例 2: 追踪函数调用关系
+```json
+{"@action": "grep_filesystem", "path": "/Users/project/src", "pattern": "HandleToolCall\\(", "context_lines": 20, "human_readable_thought": "找到函数定义后，我需要追踪哪些地方调用了这个函数"}
+```
+
+### 示例 3: 搜索特定类型定义
+```json
+{"@action": "grep_filesystem", "path": "/Users/project/src", "pattern": "type.*ToolCall.*struct", "file_pattern": "*.go", "human_readable_thought": "我需要理解 ToolCall 的数据结构"}
+```
+
+### 示例 4: 结束探索并给出结论
+```json
+{"@action": "conclude_exploration", "conclusion": "通过探索发现，工具调用流程分为三个阶段：1) 解析用户请求；2) 路由到对应的工具处理器；3) 执行工具并返回结果。核心实现在 handler.go 的 HandleToolCall 函数中，该函数接收 ToolRequest 参数，根据 tool_name 字段路由到不同的处理器。", "key_findings": ["HandleToolCall 是核心入口函数，位于 handler.go:45", "ToolRequest 结构体定义在 types.go:12，包含 tool_name 和 parameters 字段", "工具注册使用 RegisterTool 函数，在 registry.go 中实现", "目前注册了 15 个内置工具"], "code_references": ["handler.go:45-120", "types.go:12-35", "registry.go:1-50"], "recommendations": ["如需添加新工具，参考 RegisterTool 的实现", "建议查看 tools/ 目录了解具体工具实现"], "human_readable_thought": "我已经找到了工具调用的完整实现流程，可以给出结论了"}
+```
+
+### 搜索策略建议
+
+1. **从大到小**: 先搜索大范围关键词，再缩小到具体函数
+2. **追踪调用链**: 找到函数定义后，搜索调用点
+3. **理解结构**: 搜索相关类型和接口定义
+4. **记录发现**: 每次搜索后注意有价值的信息
+
+### 何时结束探索
+
+- ✅ 已回答用户的原始问题
+- ✅ 找到了关键代码位置
+- ✅ 理解了代码结构和流程
+- ❌ 多次搜索无新发现（应该调整策略或结束）
+

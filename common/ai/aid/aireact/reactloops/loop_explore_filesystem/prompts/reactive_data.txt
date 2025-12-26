@@ -1,0 +1,60 @@
+## 当前探索状态
+
+<|EXPLORE_CONTEXT_{{ .Nonce }}|>
+**目标路径**: {{ .TargetPath }}
+**探索目标**: {{ .ExplorationGoal }}
+<|EXPLORE_CONTEXT_END_{{ .Nonce }}|>
+
+{{ if .Findings }}## 已收集的发现
+
+以下是之前搜索收集到的代码片段和发现：
+
+<|EXPLORATION_FINDINGS_{{ .Nonce }}|>
+{{ .Findings }}
+<|EXPLORATION_FINDINGS_END_{{ .Nonce }}|>
+
+### 下一步行动指南
+
+请根据已有发现决定下一步：
+
+1. **继续搜索** - 如果还需要更多信息
+   - 调整搜索模式
+   - 探索相关代码
+   - 追踪调用链
+
+2. **总结结论** - 如果已收集足够信息
+   - 使用 `conclude_exploration` 
+   - 提供完整的分析结果
+
+{{ else }}## 尚无探索发现
+
+当前还没有收集到代码发现。请开始使用 `grep_filesystem` 进行探索。
+
+### 建议的搜索策略
+
+1. 使用初始搜索模式开始
+2. 根据结果调整关键词
+3. 逐步深入相关代码
+{{ end }}
+
+{{ if .FeedbackMessages }}## 系统反馈
+
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+{{ end }}
+
+## 可用操作
+
+1. **grep_filesystem** - 搜索代码
+   ```json
+   {"@action": "grep_filesystem", "path": "...", "pattern": "...", "file_pattern": "*.go"}
+   ```
+
+2. **conclude_exploration** - 结束探索并给出结论
+   ```json
+   {"@action": "conclude_exploration", "conclusion": "...", "key_findings": [...]}
+   ```
+
+**记住**: 每次搜索都应该有明确目的，避免重复搜索相同内容！
+
