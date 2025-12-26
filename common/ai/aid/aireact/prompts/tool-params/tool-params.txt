@@ -62,6 +62,13 @@ If generating parameters for shell execution tools (bash, cmd, powershell), you 
 4. Consider the current user's permission level
 5. Use specific, targeted commands rather than broad scans
 
+## RESPONSE FORMAT
+
+You can generate parameters in TWO ways:
+
+### Method 1: Standard JSON Format (for simple parameters)
+For simple string/number/boolean parameters that don't contain special characters or multi-line content:
+
 RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Example):
 
 ```json
@@ -74,3 +81,82 @@ RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Exampl
   }
 }
 ```
+
+For your current tool '{{ .ToolName }}':
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "{{ .ToolName }}",
+  "params": {
+    "param1": "simple_value",
+    "param2": 123
+  }
+}
+```
+
+### Method 2: AITAG Format (for complex parameters with multi-line content or special characters)
+For parameters that contain:
+- Multi-line text (code, scripts, long content)
+- Special characters that need escaping in JSON (\n, \t, ", \, etc.)
+- Large text blocks
+
+Use AITAG format to wrap the content safely:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "{{ .ToolName }}",
+  "params": {
+    "simple_param": "value"
+  }
+}
+```
+
+<|TOOL_PARAM_complex_param_{{ .Nonce }}|>
+Your multi-line content here.
+Can include special characters: "quotes", \backslashes\, 
+newlines, tabs, and any other content without escaping.
+<|TOOL_PARAM_complex_param_END_{{ .Nonce }}|>
+
+### Hybrid Mode (Recommended for mixed parameters)
+You can combine both methods - use JSON for simple parameters and AITAG for complex ones:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "{{ .ToolName }}",
+  "params": {
+    "timeout": 30,
+    "verbose": true
+  }
+}
+```
+
+<|TOOL_PARAM_script_{{ .Nonce }}|>
+#!/bin/bash
+echo "Hello World"
+for i in {1..10}; do
+    echo "Line $i"
+done
+<|TOOL_PARAM_script_END_{{ .Nonce }}|>
+
+<|TOOL_PARAM_config_{{ .Nonce }}|>
+{
+  "nested": "json",
+  "with": ["arrays", "and", "special chars: \"quotes\""]
+}
+<|TOOL_PARAM_config_END_{{ .Nonce }}|>
+
+### AITAG Format Rules:
+- Start tag: `<|TOOL_PARAM_{param_name}_{{ .Nonce }}|>`
+- End tag: `<|TOOL_PARAM_{param_name}_END_{{ .Nonce }}|>`
+- Replace `{param_name}` with the actual parameter name
+- Content between tags is used as-is without any escaping
+- AITAG parameters will override any same-named parameters in the JSON `params` object
+{{ if .ParamNames }}
+### Available Parameters for this tool:
+{{- range .ParamNames }}
+- {{ . }}: Use `<|TOOL_PARAM_{{ . }}_{{ $.Nonce }}|>...<|TOOL_PARAM_{{ . }}_END_{{ $.Nonce }}|>` for complex content
+{{- end }}
+{{ end }}

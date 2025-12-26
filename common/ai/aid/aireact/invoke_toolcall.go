@@ -95,8 +95,8 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 	// Only add parameter generation builder if we need AI to generate params
 	if !skipRequire {
 		toolCallerOptions = append(toolCallerOptions,
-			aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
-				return r.generateToolParamsPrompt(tool, toolName)
+			aicommon.WithToolCaller_GenerateToolParamsBuilderWithMeta(func(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
+				return r.generateToolParamsPromptWithMeta(tool, toolName)
 			}),
 		)
 	}
@@ -154,19 +154,32 @@ func (r *ReAct) ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, t
 
 // generateToolParamsPrompt generates the prompt for tool parameter generation
 func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (string, error) {
+	result, err := r.generateToolParamsPromptWithMeta(tool, toolName)
+	if err != nil {
+		return "", err
+	}
+	return result.Prompt, nil
+}
+
+// generateToolParamsPromptWithMeta generates the prompt for tool parameter generation with AITAG metadata
+func (r *ReAct) generateToolParamsPromptWithMeta(tool *aitool.Tool, toolName string) (*aicommon.ToolParamsPromptMeta, error) {
 	if tool == nil {
-		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
+		return nil, fmt.Errorf("tool '%s' not found", toolName)
 	}
 
-	// Use PromptManager to generate the prompt
-	prompt, err := r.promptManager.GenerateToolParamsPrompt(tool)
+	// Use PromptManager to generate the prompt with metadata
+	promptResult, err := r.promptManager.GenerateToolParamsPromptWithMeta(tool)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate tool params prompt: %w", err)
+		return nil, fmt.Errorf("failed to generate tool params prompt: %w", err)
 	}
 
 	if r.config.DebugPrompt {
-		log.Infof("Tool params prompt: %s", prompt)
+		log.Infof("Tool params prompt: %s", promptResult.Prompt)
 	}
 
-	return prompt, nil
+	return &aicommon.ToolParamsPromptMeta{
+		Prompt:     promptResult.Prompt,
+		Nonce:      promptResult.Nonce,
+		ParamNames: promptResult.ParamNames,
+	}, nil
 }

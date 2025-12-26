@@ -32,7 +32,8 @@ type ToolCaller struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	generateToolParamsBuilder func(tool *aitool.Tool, toolName string) (string, error)
+	generateToolParamsBuilder         func(tool *aitool.Tool, toolName string) (string, error)
+	generateToolParamsBuilderWithMeta func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error)
 
 	m               *sync.Mutex
 	onCallToolStart func(callToolId string)
@@ -116,6 +117,22 @@ func WithToolCaller_GenerateToolParamsBuilder(
 	}
 }
 
+// ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
+type ToolParamsPromptMeta struct {
+	Prompt     string
+	Nonce      string
+	ParamNames []string
+}
+
+// WithToolCaller_GenerateToolParamsBuilderWithMeta sets a builder that returns prompt with metadata for AITAG support
+func WithToolCaller_GenerateToolParamsBuilderWithMeta(
+	builder func(tool *aitool.Tool, toolName string) (*ToolParamsPromptMeta, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.generateToolParamsBuilderWithMeta = builder
+	}
+}
+
 func NewToolCaller(ctx context.Context, opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
 		callToolId: ksuid.New().String(),
@@ -169,26 +186,71 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (aitool.InvokeParams, error) {
 	emitter := t.emitter
-	paramsPrompt, err := t.GetParamGeneratingPrompt(tool, tool.Name)
-	if err != nil {
-		emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
-		handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
-		return nil, err
+
+	// Try to use the new builder with metadata first (for AITAG support)
+	var paramsPrompt string
+	var promptMeta *ToolParamsPromptMeta
+	var err error
+
+	if t.generateToolParamsBuilderWithMeta != nil {
+		promptMeta, err = t.generateToolParamsBuilderWithMeta(tool, tool.Name)
+		if err != nil {
+			emitter.EmitError("error generate tool[%v] params with meta in task: %v", tool.Name, t.task.GetName())
+			handleError(fmt.Sprintf("error generate tool[%v] params with meta in task: %v", tool.Name, t.task.GetName()))
+			return nil, err
+		}
+		paramsPrompt = promptMeta.Prompt
+	} else {
+		paramsPrompt, err = t.GetParamGeneratingPrompt(tool, tool.Name)
+		if err != nil {
+			emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+			handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
+			return nil, err
+		}
 	}
+
 	invokeParams := aitool.InvokeParams{}
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("call-tools", false, emitter)
-		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool")
+
+		// Build action maker options for AITAG support
+		var actionOpts []ActionMakerOption
+		if promptMeta != nil && promptMeta.Nonce != "" && len(promptMeta.ParamNames) > 0 {
+			actionOpts = append(actionOpts, WithActionNonce(promptMeta.Nonce))
+			// Register AITAG handlers for each parameter
+			for _, paramName := range promptMeta.ParamNames {
+				tagName := fmt.Sprintf("TOOL_PARAM_%s", paramName)
+				// Map the tag to a special key in params that we'll merge later
+				actionOpts = append(actionOpts, WithActionTagToKey(tagName, fmt.Sprintf("__aitag__%s", paramName)))
+			}
+			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
+		}
+
+		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool", actionOpts...)
 		if err != nil {
 			emitter.EmitError("error extract tool params: %v", err)
 			return utils.Errorf("error extracting action params: %v", err)
 		}
+
+		// First, get params from JSON
 		for k, v := range callToolAction.GetInvokeParams("params") {
 			invokeParams.Set(k, v)
 		}
+
+		// Then, merge AITAG params (they take precedence over JSON params)
+		if promptMeta != nil && len(promptMeta.ParamNames) > 0 {
+			for _, paramName := range promptMeta.ParamNames {
+				aitagKey := fmt.Sprintf("__aitag__%s", paramName)
+				if aitagValue := callToolAction.GetString(aitagKey); aitagValue != "" {
+					invokeParams.Set(paramName, aitagValue)
+					log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

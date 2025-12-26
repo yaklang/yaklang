@@ -109,6 +109,8 @@ type ToolParamsPromptData struct {
 	MaxIterations     int
 	Timeline          string
 	DynamicContext    string
+	Nonce             string   // Nonce for AITAG format
+	ParamNames        []string // List of parameter names for AITAG hints
 }
 
 // VerificationPromptData contains data for verification prompt
@@ -189,6 +191,7 @@ type ReGenerateToolParamsPromptData struct {
 	OldParams          string
 	Schema             string
 	DynamicContext     string
+	ParamNames         []string // List of parameter names for AITAG hints
 }
 
 // AIBlueprintForgeParamsPromptData contains data for AI blueprint forge parameter generation prompt
@@ -336,17 +339,42 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	return basePrompt, result, nil
 }
 
+// ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing
+type ToolParamsPromptResult struct {
+	Prompt     string
+	Nonce      string
+	ParamNames []string
+}
+
 // GenerateToolParamsPrompt generates tool parameter generation prompt using template
 func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, error) {
+	result, err := pm.GenerateToolParamsPromptWithMeta(tool)
+	if err != nil {
+		return "", err
+	}
+	return result.Prompt, nil
+}
+
+// GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
+func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
+	generatedNonce := nonce()
 	data := &ToolParamsPromptData{
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
 		DynamicContext:  pm.DynamicContext(),
+		Nonce:           generatedNonce, // Generate nonce for AITAG format
 	}
 
 	// Set tool schema if available
 	if tool.Tool != nil {
 		data.ToolSchema = tool.ToJSONSchemaString()
+		// Extract parameter names for AITAG hints
+		if tool.Tool.InputSchema.Properties != nil {
+			tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
+				data.ParamNames = append(data.ParamNames, name)
+				return true
+			})
+		}
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
@@ -360,7 +388,16 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
-	return pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
+	prompt, err := pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ToolParamsPromptResult{
+		Prompt:     prompt,
+		Nonce:      generatedNonce,
+		ParamNames: data.ParamNames,
+	}, nil
 }
 
 // GenerateVerificationPrompt generates verification prompt using template
@@ -502,14 +539,32 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 
 // GenerateReGenerateToolParamsPrompt generates tool parameter regeneration prompt using template
 func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (string, error) {
+	result, err := pm.GenerateReGenerateToolParamsPromptWithMeta(userQuery, oldParams, oldTool)
+	if err != nil {
+		return "", err
+	}
+	return result.Prompt, nil
+}
+
+// GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
+func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (*ToolParamsPromptResult, error) {
+	generatedNonce := nonce()
 	data := &ReGenerateToolParamsPromptData{
 		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:      userQuery,
-		Nonce:          utils.RandStringBytes(4),
+		Nonce:          generatedNonce,
 		OldParams:      oldParams.Dump(),
 		Schema:         oldTool.ToJSONSchemaString(),
 		DynamicContext: pm.DynamicContext(),
+	}
+
+	// Extract parameter names for AITAG hints
+	if oldTool.Tool != nil && oldTool.Tool.InputSchema.Properties != nil {
+		oldTool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
+			data.ParamNames = append(data.ParamNames, name)
+			return true
+		})
 	}
 
 	// Set working directory
@@ -528,7 +583,16 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 		data.Timeline = t.Dump()
 	}
 
-	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
+	prompt, err := pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ToolParamsPromptResult{
+		Prompt:     prompt,
+		Nonce:      generatedNonce,
+		ParamNames: data.ParamNames,
+	}, nil
 }
 
 func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
