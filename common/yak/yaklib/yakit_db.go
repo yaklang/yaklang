@@ -476,4 +476,26 @@ func init() {
 	// DeletePayload
 	YakitExports["DeletePayloadByGroup"] = deletePayloadByGroup
 
+	// AI Event
+	YakitExports["DeleteAllAIEvent"] = deleteAllAIEvent
+	YakitExports["YieldAllAIEvent"] = yieldAllAIEvent
+
+}
+
+func deleteAllAIEvent() error {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return utils.Errorf("cannot found database")
+	}
+	return yakit.DeleteAllAIEvent(db)
+}
+
+func yieldAllAIEvent() chan *schema.AiOutputEvent {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		c := make(chan *schema.AiOutputEvent)
+		close(c)
+		return c
+	}
+	return yakit.YieldAllAIEvent(db, context.Background())
 }
