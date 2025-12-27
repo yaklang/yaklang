@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,6 +34,21 @@ func (t *AiTask) execute() error {
 		fmt.Println(taskUserInput)
 		fmt.Println("-----------------------------------------------------------------------")
 	})
+
+	// Record timeline baseline before task execution starts
+	// We use the global timeline differ to track changes during task execution
+	if t.Coordinator != nil {
+		timeline := t.Coordinator.ContextProvider.GetTimelineInstance()
+		if timeline != nil {
+			// Create a new TimelineDiffer for this task to track changes during execution
+			// This differ will be used to calculate the diff at the end of task execution
+			taskTimelineDiffer := aicommon.NewTimelineDiffer(timeline)
+			taskTimelineDiffer.SetBaseline()
+			// Store the differ for later use in generateTaskSummary
+			t.taskTimelineDiffer = taskTimelineDiffer
+			log.Debugf("task %s timeline baseline recorded", t.Index)
+		}
+	}
 
 	// Emit task execution start status
 	t.planLoadingStatus(fmt.Sprintf("执行子任务 [%s] / Executing Subtask [%s]: %s", t.Index, t.Index, t.Name))
@@ -85,7 +103,7 @@ func (t *AiTask) execute() error {
 				// Emit task completing status
 				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
 
-				err := t.generateTaskSummary()
+				err := t.generateTaskSummary(summary, nextMovements)
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
 					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
@@ -213,7 +231,7 @@ func (t *AiTask) executeTask() error {
 	return nil
 }
 
-func (t *AiTask) generateTaskSummary() error {
+func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
 
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
@@ -252,37 +270,43 @@ func (t *AiTask) generateTaskSummary() error {
 					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 处理 %s / Task [%s] Processing %s", t.Index, key, t.Index, key))
 
 					// get the corresponding nodeId for this key
-					nodeId := summaryNodeIdMapper[key]
-					if nodeId == "" {
+					nodeId, ok := summaryNodeIdMapper[key]
+					if nodeId == "" || !ok {
 						nodeId = "summary" // fallback
 					}
 
 					// Use TeeReader to capture content while streaming
 					var contentBuffer bytes.Buffer
-					teeReader := io.TeeReader(utils.UTF8Reader(r), &contentBuffer)
+					teeReader := io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(r)), &contentBuffer)
 
 					var event *schema.AiOutputEvent
 					var emitErr error
 					streamStart := time.Now()
-					// Emit stream event with callback for reference material
-					event, emitErr = t.EmitDefaultStreamEvent(nodeId, teeReader, t.GetIndex(),
-						func() {
-							// This callback is called after stream finishes
-							log.Debugf("summary stream callback for field [%s] triggered, buffer size: %d, took: %v", key, contentBuffer.Len(), time.Since(streamStart))
-							// Emit reference material here (once per transaction)
-							if event != nil && summaryPromptWellFormed != "" && contentBuffer.Len() > 0 {
-								referenceEmittedOnce.Do(func() {
-									streamId := event.GetContentJSONPath(`$.event_writer_id`)
-									if streamId != "" {
-										_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
-										if refErr != nil {
-											log.Warnf("emit reference material for summary field [%s] failed: %v", key, refErr)
-										}
+
+					onEnd := func() {
+						// This callback is called after stream finishes
+						log.Debugf("summary stream callback for field [%s] triggered, buffer size: %d, took: %v", key, contentBuffer.Len(), time.Since(streamStart))
+						// Emit reference material here (once per transaction)
+						if event != nil && summaryPromptWellFormed != "" && contentBuffer.Len() > 0 {
+							referenceEmittedOnce.Do(func() {
+								streamId := event.GetContentJSONPath(`$.event_writer_id`)
+								if streamId != "" {
+									_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+									if refErr != nil {
+										log.Warnf("emit reference material for summary field [%s] failed: %v", key, refErr)
 									}
-								})
-							}
-						},
-					)
+								}
+							})
+						}
+					}
+
+					// Emit stream event with callback for reference material
+					if nodeId == "summary-long" {
+						event, emitErr = t.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
+					} else {
+						event, emitErr = t.EmitDefaultStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
+					}
+
 					if emitErr != nil {
 						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
 						return
@@ -326,6 +350,128 @@ func (t *AiTask) generateTaskSummary() error {
 	}
 
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
+
+	// Save timeline diff and result summary artifacts
+	if err := t.saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+		log.Warnf("failed to save task artifacts for task %s: %v", t.Index, err)
+		// Don't return error, as summary generation is already successful
+	}
+
+	return nil
+}
+
+// saveTaskArtifacts saves timeline diff and result summary to files in the task directory
+func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+	// Get workdir
+	workdir := ""
+	if t.Coordinator != nil && t.Coordinator.Workdir != "" {
+		workdir = t.Coordinator.Workdir
+	}
+	if workdir == "" && t.Coordinator != nil {
+		workdir = consts.TempAIDir(t.Coordinator.GetRuntimeId())
+	}
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+
+	// Build task directory path: task_{{task_index}}
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	taskDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex))
+
+	// Ensure task directory exists
+	if err := os.MkdirAll(taskDir, 0755); err != nil {
+		return fmt.Errorf("failed to create task directory %s: %w", taskDir, err)
+	}
+
+	// Save timeline diff
+	if err := t.saveTimelineDiff(taskDir); err != nil {
+		log.Warnf("failed to save timeline diff for task %s: %v", t.Index, err)
+	}
+
+	// Save result summary
+	if err := t.saveResultSummary(taskDir, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+		log.Warnf("failed to save result summary for task %s: %v", t.Index, err)
+	}
+
+	return nil
+}
+
+// saveTimelineDiff saves the timeline diff to timeline-diff.txt
+func (t *AiTask) saveTimelineDiff(taskDir string) error {
+	if t.taskTimelineDiffer == nil {
+		log.Debugf("task %s has no timeline differ, skipping timeline diff save", t.Index)
+		return nil
+	}
+
+	// Calculate timeline diff
+	diff, err := t.taskTimelineDiffer.Diff()
+	if err != nil {
+		return fmt.Errorf("failed to calculate timeline diff: %w", err)
+	}
+
+	// Save to file
+	timelineDiffPath := filepath.Join(taskDir, "timeline-diff.txt")
+	if err := os.WriteFile(timelineDiffPath, []byte(diff), 0644); err != nil {
+		return fmt.Errorf("failed to write timeline diff file: %w", err)
+	}
+
+	// Emit pin filename event
+	if t.GetEmitter() != nil {
+		t.GetEmitter().EmitPinFilename(timelineDiffPath)
+		log.Infof("saved timeline diff to file: %s", timelineDiffPath)
+	}
+
+	return nil
+}
+
+// saveResultSummary saves the result summary to result-summary.txt
+func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+	var resultParts []string
+
+	// Only include non-empty fields
+	if summary != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Summary:\n%s", summary))
+	}
+	if nextMovements != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Next Movements:\n%s", nextMovements))
+	}
+	if statusSummary != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Status Summary:\n%s", statusSummary))
+	}
+	if taskSummary != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Task Summary:\n%s", taskSummary))
+	}
+	if shortSummary != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Short Summary:\n%s", shortSummary))
+	}
+	if longSummary != "" {
+		resultParts = append(resultParts, fmt.Sprintf("Long Summary:\n%s", longSummary))
+	}
+
+	// If no content, skip saving
+	if len(resultParts) == 0 {
+		log.Debugf("task %s has no result summary content, skipping save", t.Index)
+		return nil
+	}
+
+	// Combine all parts
+	resultContent := strings.Join(resultParts, "\n\n---\n\n")
+
+	// Save to file
+	resultSummaryPath := filepath.Join(taskDir, "result-summary.txt")
+	if err := os.WriteFile(resultSummaryPath, []byte(resultContent), 0644); err != nil {
+		return fmt.Errorf("failed to write result summary file: %w", err)
+	}
+
+	// Emit pin filename event
+	if t.GetEmitter() != nil {
+		t.GetEmitter().EmitPinFilename(resultSummaryPath)
+		log.Infof("saved result summary to file: %s", resultSummaryPath)
+	}
+
 	return nil
 }
 
