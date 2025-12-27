@@ -236,7 +236,9 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 					}
 				}
 			}
-			r.config.Emit(e)
+			// Fix: Use EventHandler instead of Emit to avoid duplicate event saving
+			// Events are already saved by the emitter's baseEmitter before EventHandler is called
+			r.config.EventHandler(e)
 		}
 		opts = append(opts, aicommon.WithEventHandler(eventHandler))
 
