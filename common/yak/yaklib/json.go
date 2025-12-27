@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -15,19 +16,21 @@ import (
 var literalReflectType_OrderedMap = reflect.TypeOf((*orderedmap.OrderedMap)(nil))
 
 type jsonConfig struct {
-	prefix string
-	indent string
+	prefix       string
+	indent       string
+	noEscapeHTML bool
 }
 
 type JsonOpt func(opt *jsonConfig)
 
 var JsonExports = map[string]interface{}{
-	"New":        _yakJson,
-	"Marshal":    _jsonMarshal,
-	"dumps":      _jsonDumps,
-	"loads":      _jsonLoad,
-	"withPrefix": _withPrefix,
-	"withIndent": _withIndent,
+	"New":          _yakJson,
+	"Marshal":      _jsonMarshal,
+	"dumps":        _jsonDumps,
+	"loads":        _jsonLoad,
+	"withPrefix":   _withPrefix,
+	"withIndent":   _withIndent,
+	"noEscapeHTML": _withNoEscapeHTML,
 
 	// 这是 JSONPath 模块
 	"Find":          jsonpath.Find,
@@ -52,6 +55,17 @@ func NewJsonConfig() *jsonConfig {
 func _withPrefix(prefix string) JsonOpt {
 	return func(opt *jsonConfig) {
 		opt.prefix = prefix
+	}
+}
+
+// withNoEscapeHTML 设置 JSON dumps时是否不转义 HTML
+// Example:
+// ```
+// v = json.dumps({"a": "b", "c": "d"}, json.noEscapeHTML())
+// ```
+func _withNoEscapeHTML() JsonOpt {
+	return func(opt *jsonConfig) {
+		opt.noEscapeHTML = true
 	}
 }
 
@@ -87,22 +101,44 @@ func _jsonDumps(raw interface{}, opts ...JsonOpt) string {
 	for _, opt := range opts {
 		opt(config)
 	}
+
+	// 如果需要禁用 HTML 转义，使用 Encoder
+	if config.noEscapeHTML {
+		var buf bytes.Buffer
+		encoder := json.NewEncoder(&buf)
+		encoder.SetEscapeHTML(false)
+		if config.prefix != "" || config.indent != "" {
+			encoder.SetIndent(config.prefix, config.indent)
+		}
+		if err := encoder.Encode(raw); err != nil {
+			log.Errorf("json dumps error: %v", err)
+			return ""
+		}
+		// Encode 会在末尾添加换行符，需要去掉
+		result := buf.String()
+		if len(result) > 0 && result[len(result)-1] == '\n' {
+			result = result[:len(result)-1]
+		}
+		return result
+	}
+
+	// 默认使用标准 Marshal
 	var (
-		bytes []byte
-		err   error
+		resultBytes []byte
+		err         error
 	)
 
 	if config.prefix == "" && config.indent == "" {
-		bytes, err = json.Marshal(raw)
+		resultBytes, err = json.Marshal(raw)
 	} else {
-		bytes, err = json.MarshalIndent(raw, config.prefix, config.indent)
+		resultBytes, err = json.MarshalIndent(raw, config.prefix, config.indent)
 	}
 
 	if err != nil {
 		log.Errorf("json dumps error: %v", err)
 		return ""
 	}
-	return string(bytes)
+	return string(resultBytes)
 }
 
 // loads 将一个 JSON 字符串转换为对象，返回转换后的对象，通常是一个omap
