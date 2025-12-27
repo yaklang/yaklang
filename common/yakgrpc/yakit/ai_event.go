@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -113,4 +115,27 @@ func QueryAIEventIDByProcessID(db *gorm.DB, processID string) ([]string, error) 
 		eventIDs = append(eventIDs, a.EventId)
 	}
 	return eventIDs, nil
+}
+
+// DeleteAllAIEvent deletes all AI events from the database
+func DeleteAllAIEvent(db *gorm.DB) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// First, delete all associations
+		if err := tx.Model(&schema.AiProcessAndAiEvent{}).Delete(&schema.AiProcessAndAiEvent{}).Error; err != nil {
+			log.Errorf("delete AI event associations failed: %v", err)
+			return err
+		}
+		// Then, delete all events
+		if err := tx.Model(&schema.AiOutputEvent{}).Delete(&schema.AiOutputEvent{}).Error; err != nil {
+			log.Errorf("delete all AI events failed: %v", err)
+			return err
+		}
+		return nil
+	})
+}
+
+// YieldAllAIEvent yields all AI events from the database
+func YieldAllAIEvent(db *gorm.DB, ctx context.Context) chan *schema.AiOutputEvent {
+	db = db.Model(&schema.AiOutputEvent{})
+	return bizhelper.YieldModel[*schema.AiOutputEvent](ctx, db)
 }
