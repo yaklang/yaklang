@@ -1,10 +1,12 @@
 package test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -44,12 +46,15 @@ func TestTaskArtifacts_SaveTimelineDiff(t *testing.T) {
 	require.NotEmpty(t, diff, "diff should not be empty after adding content")
 	require.Contains(t, diff, "test_tool", "diff should contain the tool name")
 
-	// Verify the diff can be saved to file
+	// Verify the diff can be saved to file with new naming format
 	taskDir := filepath.Join(tmpDir, "task_1-1")
 	err = os.MkdirAll(taskDir, 0755)
 	require.NoError(t, err)
 
-	timelineDiffPath := filepath.Join(taskDir, "timeline-diff.txt")
+	// New filename format: task_{{index}}_timeline_diff.txt
+	taskIndex := "1-1"
+	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
+	timelineDiffPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_timeline_diff.txt", safeTaskIndex))
 	err = os.WriteFile(timelineDiffPath, []byte(diff), 0644)
 	require.NoError(t, err)
 
@@ -61,7 +66,7 @@ func TestTaskArtifacts_SaveTimelineDiff(t *testing.T) {
 	t.Log("TestTaskArtifacts_SaveTimelineDiff passed")
 }
 
-// TestTaskArtifacts_SaveResultSummary tests that result summary is correctly saved
+// TestTaskArtifacts_SaveResultSummary tests that result summary is correctly saved with new format
 func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "task_artifacts_test")
@@ -72,132 +77,101 @@ func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 	err = os.MkdirAll(taskDir, 0755)
 	require.NoError(t, err)
 
-	// Test with all fields populated
-	t.Run("AllFieldsPopulated", func(t *testing.T) {
+	// Test with all fields populated - simulating new format
+	t.Run("NewFormatWithAllFields", func(t *testing.T) {
+		taskIndex := "1-1"
+		taskName := "Test Task"
+		taskGoal := "Test the result summary"
+		startTime := time.Now().Add(-5 * time.Minute)
+		endTime := time.Now()
+		duration := endTime.Sub(startTime)
+
 		summary := "This is the main summary"
-		nextMovements := "Next step is to continue with task 1-2"
 		statusSummary := "Task completed successfully"
-		taskSummary := "Executed file search operation"
 		shortSummary := "File search done"
-		longSummary := "The file search operation completed successfully, found 10 files matching the criteria"
+		longSummary := "The file search operation completed successfully"
 
-		// Build result content similar to saveResultSummary
-		var resultParts []string
+		// Build content similar to new saveResultSummary
+		var contentBuilder strings.Builder
+		contentBuilder.WriteString("============================================================\n")
+		contentBuilder.WriteString(fmt.Sprintf(" Task %s Result Summary\n", taskIndex))
+		contentBuilder.WriteString("============================================================\n\n")
+
+		contentBuilder.WriteString("## Basic Information\n\n")
+		contentBuilder.WriteString(fmt.Sprintf("Task Index: %s\n", taskIndex))
+		contentBuilder.WriteString(fmt.Sprintf("Task Name: %s\n", taskName))
+		contentBuilder.WriteString(fmt.Sprintf("Task Goal: %s\n", taskGoal))
+		contentBuilder.WriteString(fmt.Sprintf("Generated At: %s\n", endTime.Format("2006-01-02 15:04:05")))
+		contentBuilder.WriteString(fmt.Sprintf("Execution Duration: %.2f seconds\n", duration.Seconds()))
+		contentBuilder.WriteString(fmt.Sprintf("Start Time: %s\n", startTime.Format("2006-01-02 15:04:05")))
+		contentBuilder.WriteString(fmt.Sprintf("End Time: %s\n", endTime.Format("2006-01-02 15:04:05")))
+		contentBuilder.WriteString("Task Status: completed\n")
+		contentBuilder.WriteString("Total Tool Calls: 3 (Success: 2, Failed: 1)\n\n")
+
+		contentBuilder.WriteString("## Task Input\n\n")
+		contentBuilder.WriteString("Test user input for task\n\n")
+
+		contentBuilder.WriteString("## Progress Information\n\n")
+		contentBuilder.WriteString("[x] Task 1-1 completed\n\n")
+
+		contentBuilder.WriteString("## Summary Results\n\n")
 		if summary != "" {
-			resultParts = append(resultParts, "Summary:\n"+summary)
-		}
-		if nextMovements != "" {
-			resultParts = append(resultParts, "Next Movements:\n"+nextMovements)
+			contentBuilder.WriteString("### Summary\n")
+			contentBuilder.WriteString(summary + "\n\n")
 		}
 		if statusSummary != "" {
-			resultParts = append(resultParts, "Status Summary:\n"+statusSummary)
-		}
-		if taskSummary != "" {
-			resultParts = append(resultParts, "Task Summary:\n"+taskSummary)
+			contentBuilder.WriteString("### Status Summary\n")
+			contentBuilder.WriteString(statusSummary + "\n\n")
 		}
 		if shortSummary != "" {
-			resultParts = append(resultParts, "Short Summary:\n"+shortSummary)
+			contentBuilder.WriteString("### Short Summary\n")
+			contentBuilder.WriteString(shortSummary + "\n\n")
 		}
 		if longSummary != "" {
-			resultParts = append(resultParts, "Long Summary:\n"+longSummary)
+			contentBuilder.WriteString("### Long Summary\n")
+			contentBuilder.WriteString(longSummary + "\n\n")
 		}
 
-		resultContent := strings.Join(resultParts, "\n\n---\n\n")
-		resultSummaryPath := filepath.Join(taskDir, "result-summary-all.txt")
-		err = os.WriteFile(resultSummaryPath, []byte(resultContent), 0644)
+		contentBuilder.WriteString("============================================================\n")
+		contentBuilder.WriteString(" End of Task 1-1 Result Summary\n")
+		contentBuilder.WriteString("============================================================\n")
+
+		// New filename format: task_{{index}}_result_summary.txt
+		safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
+		resultSummaryPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex))
+		err = os.WriteFile(resultSummaryPath, []byte(contentBuilder.String()), 0644)
 		require.NoError(t, err)
 
 		// Read back and verify
 		content, err := os.ReadFile(resultSummaryPath)
 		require.NoError(t, err)
-		require.Contains(t, string(content), "Summary:")
-		require.Contains(t, string(content), "Next Movements:")
-		require.Contains(t, string(content), "Status Summary:")
-		require.Contains(t, string(content), "Task Summary:")
-		require.Contains(t, string(content), "Short Summary:")
-		require.Contains(t, string(content), "Long Summary:")
+		require.Contains(t, string(content), "Task 1-1 Result Summary")
+		require.Contains(t, string(content), "## Basic Information")
+		require.Contains(t, string(content), "Task Index: 1-1")
+		require.Contains(t, string(content), "Task Name: Test Task")
+		require.Contains(t, string(content), "## Task Input")
+		require.Contains(t, string(content), "## Progress Information")
+		require.Contains(t, string(content), "## Summary Results")
+		require.Contains(t, string(content), "### Summary")
 		require.Contains(t, string(content), summary)
-		require.Contains(t, string(content), nextMovements)
 	})
 
-	// Test with only some fields populated
-	t.Run("PartialFieldsPopulated", func(t *testing.T) {
-		summary := ""
-		nextMovements := ""
-		statusSummary := "Task completed"
-		taskSummary := ""
-		shortSummary := "Done"
-		longSummary := ""
-
-		var resultParts []string
-		if summary != "" {
-			resultParts = append(resultParts, "Summary:\n"+summary)
-		}
-		if nextMovements != "" {
-			resultParts = append(resultParts, "Next Movements:\n"+nextMovements)
-		}
-		if statusSummary != "" {
-			resultParts = append(resultParts, "Status Summary:\n"+statusSummary)
-		}
-		if taskSummary != "" {
-			resultParts = append(resultParts, "Task Summary:\n"+taskSummary)
-		}
-		if shortSummary != "" {
-			resultParts = append(resultParts, "Short Summary:\n"+shortSummary)
-		}
-		if longSummary != "" {
-			resultParts = append(resultParts, "Long Summary:\n"+longSummary)
+	// Test filename format with different task indexes
+	t.Run("FilenameFormat", func(t *testing.T) {
+		testCases := []struct {
+			taskIndex    string
+			expectedFile string
+		}{
+			{"1", "task_1_result_summary.txt"},
+			{"1-1", "task_1_1_result_summary.txt"},
+			{"1-2-3", "task_1_2_3_result_summary.txt"},
 		}
 
-		resultContent := strings.Join(resultParts, "\n\n---\n\n")
-		resultSummaryPath := filepath.Join(taskDir, "result-summary-partial.txt")
-		err = os.WriteFile(resultSummaryPath, []byte(resultContent), 0644)
-		require.NoError(t, err)
-
-		// Read back and verify
-		content, err := os.ReadFile(resultSummaryPath)
-		require.NoError(t, err)
-		require.Contains(t, string(content), "Status Summary:")
-		require.Contains(t, string(content), "Short Summary:")
-		// Verify that only the expected sections are present
-		// Note: "Status Summary:" contains "Summary:" so we check for standalone "Summary:\n" at the beginning
-		require.False(t, strings.HasPrefix(string(content), "Summary:\n"), "Should not start with empty Summary section")
-		require.NotContains(t, string(content), "Next Movements:")
-		require.NotContains(t, string(content), "Task Summary:")
-		require.NotContains(t, string(content), "Long Summary:")
-	})
-
-	// Test with no fields populated
-	t.Run("NoFieldsPopulated", func(t *testing.T) {
-		summary := ""
-		nextMovements := ""
-		statusSummary := ""
-		taskSummary := ""
-		shortSummary := ""
-		longSummary := ""
-
-		var resultParts []string
-		if summary != "" {
-			resultParts = append(resultParts, "Summary:\n"+summary)
+		for _, tc := range testCases {
+			safeTaskIndex := strings.ReplaceAll(tc.taskIndex, "-", "_")
+			expectedFilename := fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex)
+			require.Equal(t, tc.expectedFile, expectedFilename, "filename should match expected format for index %s", tc.taskIndex)
 		}
-		if nextMovements != "" {
-			resultParts = append(resultParts, "Next Movements:\n"+nextMovements)
-		}
-		if statusSummary != "" {
-			resultParts = append(resultParts, "Status Summary:\n"+statusSummary)
-		}
-		if taskSummary != "" {
-			resultParts = append(resultParts, "Task Summary:\n"+taskSummary)
-		}
-		if shortSummary != "" {
-			resultParts = append(resultParts, "Short Summary:\n"+shortSummary)
-		}
-		if longSummary != "" {
-			resultParts = append(resultParts, "Long Summary:\n"+longSummary)
-		}
-
-		// Should skip saving when no content
-		require.Empty(t, resultParts, "resultParts should be empty when no fields are populated")
 	})
 
 	t.Log("TestTaskArtifacts_SaveResultSummary passed")
@@ -210,24 +184,21 @@ func TestTaskArtifacts_TaskDirectoryStructure(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	// Test different task index formats
+	// Test different task index formats with new filenames
 	testCases := []struct {
-		taskIndex   string
-		expectedDir string
+		taskIndex           string
+		expectedDir         string
+		expectedDiffFile    string
+		expectedSummaryFile string
 	}{
-		{"1", "task_1"},
-		{"1-1", "task_1-1"},
-		{"1-2-3", "task_1-2-3"},
-		{"", "task_0"}, // Empty index should default to "0"
+		{"1", "task_1", "task_1_timeline_diff.txt", "task_1_result_summary.txt"},
+		{"1-1", "task_1-1", "task_1_1_timeline_diff.txt", "task_1_1_result_summary.txt"},
+		{"1-2-3", "task_1-2-3", "task_1_2_3_timeline_diff.txt", "task_1_2_3_result_summary.txt"},
 	}
 
 	for _, tc := range testCases {
 		t.Run("TaskIndex_"+tc.taskIndex, func(t *testing.T) {
-			taskIndex := tc.taskIndex
-			if taskIndex == "" {
-				taskIndex = "0"
-			}
-			taskDir := filepath.Join(tmpDir, "task_"+taskIndex)
+			taskDir := filepath.Join(tmpDir, tc.expectedDir)
 
 			err := os.MkdirAll(taskDir, 0755)
 			require.NoError(t, err)
@@ -237,14 +208,14 @@ func TestTaskArtifacts_TaskDirectoryStructure(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, info.IsDir())
 
-			// Create timeline-diff.txt and result-summary.txt
-			timelineDiffPath := filepath.Join(taskDir, "timeline-diff.txt")
-			resultSummaryPath := filepath.Join(taskDir, "result-summary.txt")
+			// Create files with new naming format
+			timelineDiffPath := filepath.Join(taskDir, tc.expectedDiffFile)
+			resultSummaryPath := filepath.Join(taskDir, tc.expectedSummaryFile)
 
-			err = os.WriteFile(timelineDiffPath, []byte("test timeline diff"), 0644)
+			err = os.WriteFile(timelineDiffPath, []byte("# Task timeline diff\ntest content"), 0644)
 			require.NoError(t, err)
 
-			err = os.WriteFile(resultSummaryPath, []byte("test result summary"), 0644)
+			err = os.WriteFile(resultSummaryPath, []byte("# Task result summary\ntest content"), 0644)
 			require.NoError(t, err)
 
 			// Verify files exist
@@ -277,6 +248,10 @@ func TestTaskArtifacts_TimelineDifferIntegration(t *testing.T) {
 	differ := aicommon.NewTimelineDiffer(timeline)
 	differ.SetBaseline()
 
+	// Verify baseline is recorded
+	lastDump := differ.GetLastDump()
+	require.NotEmpty(t, lastDump, "baseline should be recorded")
+
 	// Add content during task execution
 	timeline.PushToolResult(&aitool.ToolResult{
 		ID:          2,
@@ -308,10 +283,72 @@ func TestTaskArtifacts_TimelineDifferIntegration(t *testing.T) {
 	require.Contains(t, diff, "task_tool_2", "diff should contain second task tool")
 	require.Contains(t, diff, "user approved", "diff should contain user interaction")
 
-	// The initial tool should either not be in diff, or if it is, the diff should show it as removed/unchanged
-	// Since we set baseline after initial_tool, the diff should focus on changes after baseline
-
 	t.Log("TestTaskArtifacts_TimelineDifferIntegration passed")
+}
+
+// TestTaskArtifacts_TimelineDifferEmptyDiff tests the case when timeline diff is empty
+func TestTaskArtifacts_TimelineDifferEmptyDiff(t *testing.T) {
+	// Create a timeline with some content
+	timeline := aicommon.NewTimeline(nil, nil)
+	timeline.PushToolResult(&aitool.ToolResult{
+		ID:          1,
+		Name:        "existing_tool",
+		Description: "existing tool",
+		Success:     true,
+		Data:        "existing data",
+	})
+
+	// Create differ and set baseline
+	differ := aicommon.NewTimelineDiffer(timeline)
+	differ.SetBaseline()
+
+	// Don't add any new content - simulate no changes during task
+
+	// Calculate diff - should be empty
+	diff, err := differ.Diff()
+	require.NoError(t, err)
+	require.Empty(t, diff, "diff should be empty when no changes after baseline")
+
+	// But we can still get the current dump
+	currentDump := differ.GetCurrentDump()
+	require.NotEmpty(t, currentDump, "current dump should still have content")
+
+	t.Log("TestTaskArtifacts_TimelineDifferEmptyDiff passed")
+}
+
+// TestTaskArtifacts_FormatDuration tests duration formatting
+func TestTaskArtifacts_FormatDuration(t *testing.T) {
+	testCases := []struct {
+		duration time.Duration
+		expected string
+	}{
+		{30 * time.Second, "30.00 seconds"},
+		{90 * time.Second, "1 min 30 sec"},
+		{3661 * time.Second, "1 hr 1 min 1 sec"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.expected, func(t *testing.T) {
+			// Format duration
+			var result string
+			d := tc.duration
+			if d < time.Minute {
+				result = fmt.Sprintf("%.2f seconds", d.Seconds())
+			} else if d < time.Hour {
+				minutes := int(d.Minutes())
+				seconds := int(d.Seconds()) % 60
+				result = fmt.Sprintf("%d min %d sec", minutes, seconds)
+			} else {
+				hours := int(d.Hours())
+				minutes := int(d.Minutes()) % 60
+				seconds := int(d.Seconds()) % 60
+				result = fmt.Sprintf("%d hr %d min %d sec", hours, minutes, seconds)
+			}
+			require.Equal(t, tc.expected, result)
+		})
+	}
+
+	t.Log("TestTaskArtifacts_FormatDuration passed")
 }
 
 // TestAiTask_TaskTimelineDifferField tests that AiTask has taskTimelineDiffer field
@@ -329,4 +366,205 @@ func TestAiTask_TaskTimelineDifferField(t *testing.T) {
 	require.Equal(t, "Test Task", task.Name)
 
 	t.Log("TestAiTask_TaskTimelineDifferField passed")
+}
+
+// TestTimelineDiffer_DiffCalculation tests that timeline differ correctly calculates diff
+func TestTimelineDiffer_DiffCalculation(t *testing.T) {
+	t.Run("DiffAfterAddingContent", func(t *testing.T) {
+		// Create a timeline
+		timeline := aicommon.NewTimeline(nil, nil)
+
+		// Add initial content
+		timeline.PushText(1, "Initial content before baseline")
+
+		// Create differ and set baseline
+		differ := aicommon.NewTimelineDiffer(timeline)
+		differ.SetBaseline()
+
+		// Record baseline length
+		baselineLen := len(differ.GetLastDump())
+		require.Greater(t, baselineLen, 0, "baseline should have content")
+
+		// Add new content after baseline
+		timeline.PushText(2, "New content after baseline - task execution started")
+		timeline.PushToolResult(&aitool.ToolResult{
+			ID:          3,
+			Name:        "test_tool",
+			Description: "test tool",
+			Success:     true,
+			Data:        "tool execution result",
+		})
+		timeline.PushText(4, "Another entry during task execution")
+
+		// Get current dump and verify it's larger
+		currentLen := len(differ.GetCurrentDump())
+		require.Greater(t, currentLen, baselineLen, "current should have more content than baseline")
+
+		// Calculate diff
+		diff, err := differ.Diff()
+		require.NoError(t, err)
+		require.NotEmpty(t, diff, "diff should not be empty")
+
+		// Verify diff contains new content
+		require.Contains(t, diff, "New content after baseline", "diff should contain new text")
+		require.Contains(t, diff, "test_tool", "diff should contain tool name")
+		require.Contains(t, diff, "Another entry", "diff should contain additional entry")
+
+		t.Logf("Baseline: %d bytes, Current: %d bytes, Diff: %d bytes", baselineLen, currentLen, len(diff))
+	})
+
+	t.Run("EmptyDiffWhenNoChanges", func(t *testing.T) {
+		// Create a timeline with content
+		timeline := aicommon.NewTimeline(nil, nil)
+		timeline.PushText(1, "Existing content")
+
+		// Create differ and set baseline
+		differ := aicommon.NewTimelineDiffer(timeline)
+		differ.SetBaseline()
+
+		// Don't add any content
+
+		// Calculate diff - should be empty
+		diff, err := differ.Diff()
+		require.NoError(t, err)
+		require.Empty(t, diff, "diff should be empty when no changes")
+	})
+
+	t.Run("MultipleToolResults", func(t *testing.T) {
+		// Create a timeline
+		timeline := aicommon.NewTimeline(nil, nil)
+
+		// Set baseline on empty timeline
+		differ := aicommon.NewTimelineDiffer(timeline)
+		differ.SetBaseline()
+
+		// Add multiple tool results
+		for i := 1; i <= 5; i++ {
+			timeline.PushToolResult(&aitool.ToolResult{
+				ID:          int64(i),
+				Name:        fmt.Sprintf("tool_%d", i),
+				Description: fmt.Sprintf("Tool %d description", i),
+				Success:     i%2 == 0, // alternate success/failure
+				Data:        fmt.Sprintf("Result from tool %d", i),
+			})
+		}
+
+		// Calculate diff
+		diff, err := differ.Diff()
+		require.NoError(t, err)
+		require.NotEmpty(t, diff)
+
+		// Verify all tools are in diff
+		for i := 1; i <= 5; i++ {
+			require.Contains(t, diff, fmt.Sprintf("tool_%d", i), "diff should contain tool_%d", i)
+		}
+	})
+
+	t.Run("UserInteractionInDiff", func(t *testing.T) {
+		timeline := aicommon.NewTimeline(nil, nil)
+
+		differ := aicommon.NewTimelineDiffer(timeline)
+		differ.SetBaseline()
+
+		// Add user interaction
+		timeline.PushUserInteraction(
+			aicommon.UserInteractionStage_Review,
+			100,
+			"Do you approve this action?",
+			"User approved the action",
+		)
+
+		diff, err := differ.Diff()
+		require.NoError(t, err)
+		require.NotEmpty(t, diff)
+		require.Contains(t, diff, "User approved", "diff should contain user response")
+	})
+}
+
+// TestTimelineDiffer_BaselineReset tests that baseline can be reset correctly
+func TestTimelineDiffer_BaselineReset(t *testing.T) {
+	timeline := aicommon.NewTimeline(nil, nil)
+
+	// Add initial content
+	timeline.PushText(1, "First content")
+
+	// Create differ and set baseline
+	differ := aicommon.NewTimelineDiffer(timeline)
+	differ.SetBaseline()
+
+	// Add more content
+	timeline.PushText(2, "Second content")
+
+	// Verify diff has content
+	diff1, err := differ.Diff()
+	require.NoError(t, err)
+	require.NotEmpty(t, diff1)
+	require.Contains(t, diff1, "Second content")
+
+	// After Diff(), baseline should be updated to current
+	// So next diff should be empty (no new changes)
+	diff2, err := differ.Diff()
+	require.NoError(t, err)
+	require.Empty(t, diff2, "second diff should be empty as baseline was updated")
+
+	// Add more content
+	timeline.PushText(3, "Third content")
+
+	// This diff should contain "Third content" as the new addition
+	// Note: diff format may include some context lines from before, but the key is
+	// that "Third content" appears in the added lines (with + prefix in unified diff)
+	diff3, err := differ.Diff()
+	require.NoError(t, err)
+	require.NotEmpty(t, diff3)
+	require.Contains(t, diff3, "Third content", "diff3 should contain the new content")
+
+	// Verify that "Third content" is in the added lines (+ prefix)
+	require.Contains(t, diff3, "+", "diff should have added lines")
+}
+
+// TestTimelineDiffer_GetCurrentDumpWithoutUpdate tests GetCurrentDump doesn't update baseline
+func TestTimelineDiffer_GetCurrentDumpWithoutUpdate(t *testing.T) {
+	timeline := aicommon.NewTimeline(nil, nil)
+	timeline.PushText(1, "Initial content")
+
+	differ := aicommon.NewTimelineDiffer(timeline)
+	differ.SetBaseline()
+
+	// Add new content
+	timeline.PushText(2, "New content")
+
+	// Get current dump multiple times
+	current1 := differ.GetCurrentDump()
+	current2 := differ.GetCurrentDump()
+
+	// Both should be the same
+	require.Equal(t, current1, current2)
+
+	// Baseline should still be unchanged
+	baseline := differ.GetLastDump()
+	require.NotEqual(t, baseline, current1, "baseline should be different from current")
+	require.NotContains(t, baseline, "New content", "baseline should not contain new content")
+
+	// Now calculate diff - this should work since baseline wasn't updated
+	diff, err := differ.Diff()
+	require.NoError(t, err)
+	require.NotEmpty(t, diff)
+	require.Contains(t, diff, "New content")
+}
+
+// TestReActLoopIF_GetTimelineDiff tests that ReActLoopIF interface has GetTimelineDiff method
+func TestReActLoopIF_GetTimelineDiff(t *testing.T) {
+	// This test verifies the interface definition by type assertion
+	// The actual implementation is tested in integration tests
+
+	// Verify GetTimelineDiff is part of ReActLoopIF interface
+	// This is a compile-time check - if the method doesn't exist, this won't compile
+	type hasGetTimelineDiff interface {
+		GetTimelineDiff() (string, error)
+	}
+
+	// Verify ReActLoopIF satisfies hasGetTimelineDiff
+	var _ hasGetTimelineDiff = (aicommon.ReActLoopIF)(nil)
+
+	t.Log("ReActLoopIF has GetTimelineDiff method")
 }

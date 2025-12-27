@@ -40,4 +40,7 @@ type ReActLoopIF interface {
 
 	// User interaction control
 	DisallowAskForClarification()
+
+	// Timeline diff tracking
+	GetTimelineDiff() (string, error)
 }

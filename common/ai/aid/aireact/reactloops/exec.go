@@ -465,6 +465,20 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}()
 
 	taskStartProcessing()
+
+	// Initialize timeline differ to track changes during this task execution
+	// This captures the baseline BEFORE any task-related timeline entries are added
+	// We get the timeline from the invoker's config
+	if invoker := r.GetInvoker(); invoker != nil {
+		if cfg := invoker.GetConfig(); cfg != nil {
+			if configWithTimeline, ok := cfg.(*aicommon.Config); ok && configWithTimeline.Timeline != nil {
+				r.timelineDiffer = aicommon.NewTimelineDiffer(configWithTimeline.Timeline)
+				r.timelineDiffer.SetBaseline()
+				log.Debugf("ReactLoop[%s] timeline baseline set, items: %d", r.loopName, configWithTimeline.Timeline.GetIdToTimelineItem().Len())
+			}
+		}
+	}
+
 	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetUserInput()))
 
 	if r.GetCurrentMemoriesContent() == "" {

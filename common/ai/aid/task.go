@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -48,6 +49,7 @@ type AiTask struct {
 
 	toolCallResultIds  *omap.OrderedMap[int64, *aitool.ToolResult]
 	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
+	taskStartTime      time.Time                // Task execution start time for duration calculation
 }
 
 func (t *AiTask) GetUserInput() string {

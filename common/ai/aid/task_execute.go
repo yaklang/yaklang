@@ -35,6 +35,9 @@ func (t *AiTask) execute() error {
 		fmt.Println("-----------------------------------------------------------------------")
 	})
 
+	// Record task start time for duration calculation
+	t.taskStartTime = time.Now()
+
 	// Record timeline baseline before task execution starts
 	// We use the global timeline differ to track changes during task execution
 	if t.Coordinator != nil {
@@ -46,7 +49,7 @@ func (t *AiTask) execute() error {
 			taskTimelineDiffer.SetBaseline()
 			// Store the differ for later use in generateTaskSummary
 			t.taskTimelineDiffer = taskTimelineDiffer
-			log.Debugf("task %s timeline baseline recorded", t.Index)
+			log.Debugf("task %s timeline baseline recorded, baseline content length: %d", t.Index, len(taskTimelineDiffer.GetLastDump()))
 		}
 	}
 
@@ -399,70 +402,213 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 	return nil
 }
 
-// saveTimelineDiff saves the timeline diff to timeline-diff.txt
+// saveTimelineDiff saves the timeline diff to task_{{index}}_timeline_diff.txt
+// It gets the diff from the ReactLoop which tracks timeline changes during task execution
 func (t *AiTask) saveTimelineDiff(taskDir string) error {
-	if t.taskTimelineDiffer == nil {
-		log.Debugf("task %s has no timeline differ, skipping timeline diff save", t.Index)
-		return nil
+	// Get task index for filename
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	// Sanitize task index for filename (replace - with _)
+	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
+
+	var diff string
+	var err error
+
+	// Try to get diff from ReactLoop first (this is the correct source)
+	if t.GetReActLoop() != nil {
+		diff, err = t.GetReActLoop().GetTimelineDiff()
+		if err != nil {
+			log.Warnf("failed to get timeline diff from ReactLoop: %v", err)
+		}
 	}
 
-	// Calculate timeline diff
-	diff, err := t.taskTimelineDiffer.Diff()
-	if err != nil {
-		return fmt.Errorf("failed to calculate timeline diff: %w", err)
+	// Fallback to taskTimelineDiffer if ReactLoop didn't provide a diff
+	if diff == "" && t.taskTimelineDiffer != nil {
+		diff, err = t.taskTimelineDiffer.Diff()
+		if err != nil {
+			log.Warnf("failed to calculate timeline diff from taskTimelineDiffer: %v", err)
+		}
 	}
 
-	// Save to file
-	timelineDiffPath := filepath.Join(taskDir, "timeline-diff.txt")
-	if err := os.WriteFile(timelineDiffPath, []byte(diff), 0644); err != nil {
+	// Build content with header information
+	var contentBuilder strings.Builder
+	contentBuilder.WriteString(fmt.Sprintf("# Task %s Timeline Diff\n", taskIndex))
+	contentBuilder.WriteString(fmt.Sprintf("# Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	contentBuilder.WriteString("\n")
+
+	if diff == "" {
+		// If diff is empty, provide debug information
+		contentBuilder.WriteString("## Note: No changes detected during task execution\n\n")
+
+		// Try to get current timeline content for debugging
+		if t.taskTimelineDiffer != nil {
+			currentDump := t.taskTimelineDiffer.GetCurrentDump()
+			lastDump := t.taskTimelineDiffer.GetLastDump()
+			contentBuilder.WriteString(fmt.Sprintf("Baseline content length: %d bytes\n", len(lastDump)))
+			contentBuilder.WriteString(fmt.Sprintf("Current content length: %d bytes\n", len(currentDump)))
+
+			if currentDump != "" {
+				contentBuilder.WriteString("\n## Current Timeline Content:\n")
+				contentBuilder.WriteString(currentDump)
+			} else {
+				contentBuilder.WriteString("\n(Timeline is empty)\n")
+			}
+		}
+	} else {
+		contentBuilder.WriteString("## Timeline Changes:\n\n")
+		contentBuilder.WriteString(diff)
+	}
+
+	// Save to file with task index in filename
+	timelineDiffPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_timeline_diff.txt", safeTaskIndex))
+	if err := os.WriteFile(timelineDiffPath, []byte(contentBuilder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write timeline diff file: %w", err)
 	}
 
 	// Emit pin filename event
 	if t.GetEmitter() != nil {
 		t.GetEmitter().EmitPinFilename(timelineDiffPath)
-		log.Infof("saved timeline diff to file: %s", timelineDiffPath)
+		log.Infof("saved timeline diff to file: %s (diff length: %d)", timelineDiffPath, len(diff))
 	}
 
 	return nil
 }
 
-// saveResultSummary saves the result summary to result-summary.txt
+// saveResultSummary saves the result summary to task_{{index}}_result_summary.txt
 func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
-	var resultParts []string
+	// Get task index for filename
+	taskIndex := t.Index
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	// Sanitize task index for filename (replace - with _)
+	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
 
-	// Only include non-empty fields
+	var contentBuilder strings.Builder
+
+	// === Header Section ===
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
+	contentBuilder.WriteString(fmt.Sprintf(" Task %s Result Summary\n", taskIndex))
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n\n")
+
+	// === Basic Information Section ===
+	contentBuilder.WriteString("## Basic Information\n\n")
+	contentBuilder.WriteString(fmt.Sprintf("Task Index: %s\n", taskIndex))
+	contentBuilder.WriteString(fmt.Sprintf("Task Name: %s\n", t.Name))
+	contentBuilder.WriteString(fmt.Sprintf("Task Goal: %s\n", t.Goal))
+	contentBuilder.WriteString(fmt.Sprintf("Generated At: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+
+	// Calculate and display execution duration
+	if !t.taskStartTime.IsZero() {
+		duration := time.Since(t.taskStartTime)
+		contentBuilder.WriteString(fmt.Sprintf("Execution Duration: %s\n", formatDuration(duration)))
+		contentBuilder.WriteString(fmt.Sprintf("Start Time: %s\n", t.taskStartTime.Format("2006-01-02 15:04:05")))
+		contentBuilder.WriteString(fmt.Sprintf("End Time: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	}
+
+	// Task status
+	contentBuilder.WriteString(fmt.Sprintf("Task Status: %s\n", t.GetStatus()))
+
+	// Tool call statistics
+	toolCallResults := t.GetAllToolCallResults()
+	successCount := 0
+	failCount := 0
+	for _, result := range toolCallResults {
+		if result.Success {
+			successCount++
+		} else {
+			failCount++
+		}
+	}
+	contentBuilder.WriteString(fmt.Sprintf("Total Tool Calls: %d (Success: %d, Failed: %d)\n", len(toolCallResults), successCount, failCount))
+
+	contentBuilder.WriteString("\n")
+
+	// === Task Input Section ===
+	contentBuilder.WriteString("## Task Input\n\n")
+	userInput := t.GetUserInput()
+	if userInput != "" {
+		// Limit input display to avoid very long content
+		if len(userInput) > 2000 {
+			contentBuilder.WriteString(userInput[:2000])
+			contentBuilder.WriteString("\n... (truncated, total " + fmt.Sprintf("%d", len(userInput)) + " chars)\n")
+		} else {
+			contentBuilder.WriteString(userInput)
+		}
+	} else {
+		contentBuilder.WriteString("(No input provided)\n")
+	}
+	contentBuilder.WriteString("\n")
+
+	// === Progress Information Section ===
+	contentBuilder.WriteString("## Progress Information\n\n")
+	if t.rootTask != nil {
+		progress := t.rootTask.Progress()
+		if progress != "" {
+			contentBuilder.WriteString(progress)
+		} else {
+			contentBuilder.WriteString("(No progress information available)\n")
+		}
+	} else {
+		contentBuilder.WriteString("(No root task available)\n")
+	}
+	contentBuilder.WriteString("\n")
+
+	// === Summary Results Section ===
+	contentBuilder.WriteString("## Summary Results\n\n")
+
+	hasContent := false
 	if summary != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Summary:\n%s", summary))
+		contentBuilder.WriteString("### Summary\n")
+		contentBuilder.WriteString(summary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 	if nextMovements != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Next Movements:\n%s", nextMovements))
+		contentBuilder.WriteString("### Next Movements\n")
+		contentBuilder.WriteString(nextMovements)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 	if statusSummary != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Status Summary:\n%s", statusSummary))
+		contentBuilder.WriteString("### Status Summary\n")
+		contentBuilder.WriteString(statusSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 	if taskSummary != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Task Summary:\n%s", taskSummary))
+		contentBuilder.WriteString("### Task Summary\n")
+		contentBuilder.WriteString(taskSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 	if shortSummary != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Short Summary:\n%s", shortSummary))
+		contentBuilder.WriteString("### Short Summary\n")
+		contentBuilder.WriteString(shortSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 	if longSummary != "" {
-		resultParts = append(resultParts, fmt.Sprintf("Long Summary:\n%s", longSummary))
+		contentBuilder.WriteString("### Long Summary\n")
+		contentBuilder.WriteString(longSummary)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
 	}
 
-	// If no content, skip saving
-	if len(resultParts) == 0 {
-		log.Debugf("task %s has no result summary content, skipping save", t.Index)
-		return nil
+	if !hasContent {
+		contentBuilder.WriteString("(No summary content available)\n\n")
 	}
 
-	// Combine all parts
-	resultContent := strings.Join(resultParts, "\n\n---\n\n")
+	// === Footer ===
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
+	contentBuilder.WriteString(" End of Task " + taskIndex + " Result Summary\n")
+	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
 
-	// Save to file
-	resultSummaryPath := filepath.Join(taskDir, "result-summary.txt")
-	if err := os.WriteFile(resultSummaryPath, []byte(resultContent), 0644); err != nil {
+	// Save to file with task index in filename
+	resultSummaryPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex))
+	if err := os.WriteFile(resultSummaryPath, []byte(contentBuilder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write result summary file: %w", err)
 	}
 
@@ -473,6 +619,22 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 	}
 
 	return nil
+}
+
+// formatDuration formats a duration in a human-readable format
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.2f seconds", d.Seconds())
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		return fmt.Sprintf("%d min %d sec", minutes, seconds)
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+	return fmt.Sprintf("%d hr %d min %d sec", hours, minutes, seconds)
 }
 
 func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
