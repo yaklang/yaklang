@@ -246,8 +246,15 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
 		}
 	}
-	config.Timeline = NewTimeline(config, nil)
-	config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
+	// Only create new Timeline if not already set via options (e.g., WithTimeline)
+	// This ensures that when a parent coordinator passes its Timeline to a child invoker,
+	// the child uses the same Timeline instance for proper timeline diff tracking
+	if config.Timeline == nil {
+		config.Timeline = NewTimeline(config, nil)
+	}
+	if config.TimelineDiffer == nil {
+		config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
+	}
 	config.Timeline.BindConfig(config, config)
 
 	// init default task

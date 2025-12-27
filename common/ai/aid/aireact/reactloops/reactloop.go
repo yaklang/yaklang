@@ -96,8 +96,11 @@ type ReActLoop struct {
 	historySatisfactionReasons []*SatisfactionRecord
 
 	// action history tracking
-	actionHistory         []*ActionRecord
-	actionHistoryMutex    *sync.Mutex
+	actionHistory      []*ActionRecord
+	actionHistoryMutex *sync.Mutex
+
+	// timeline differ for tracking changes during task execution
+	timelineDiffer        *aicommon.TimelineDiffer
 	currentIterationIndex int
 
 	// SPIN detection thresholds
@@ -506,4 +509,28 @@ func (r *ReActLoop) GetAllExistedActionRecord() []*ActionRecord {
 	result := make([]*ActionRecord, len(r.actionHistory))
 	copy(result, r.actionHistory)
 	return result
+}
+
+// GetTimelineDiff calculates and returns the timeline diff from baseline to current state
+// This captures all changes made during the task execution in this ReactLoop
+func (r *ReActLoop) GetTimelineDiff() (string, error) {
+	if r.timelineDiffer == nil {
+		return "", nil
+	}
+	return r.timelineDiffer.Diff()
+}
+
+// GetTimelineDiffWithoutUpdate gets the timeline diff without updating the baseline
+// Useful for peeking at the diff without affecting future diff calculations
+func (r *ReActLoop) GetTimelineDiffWithoutUpdate() string {
+	if r.timelineDiffer == nil {
+		return ""
+	}
+	baseline := r.timelineDiffer.GetLastDump()
+	current := r.timelineDiffer.GetCurrentDump()
+	if baseline == current {
+		return ""
+	}
+	// Return current content as diff representation since we don't want to update baseline
+	return current
 }

@@ -328,8 +328,10 @@ func (r *ReAct) AddToTimeline(entryType, content string) {
 	}
 
 	t := r.GetCurrentTask()
+	taskId := ""
 	if t != nil {
-		msg.WriteString(fmt.Sprintf(" [task:%s]:\n", t.GetId()))
+		taskId = t.GetId()
+		msg.WriteString(fmt.Sprintf(" [task:%s]:\n", taskId))
 	} else {
 		msg.WriteString(":\n")
 	}
