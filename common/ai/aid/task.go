@@ -46,7 +46,8 @@ type AiTask struct {
 	ShortSummary  string `json:"short_summary"`
 	LongSummary   string `json:"long_summary"`
 
-	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
+	toolCallResultIds  *omap.OrderedMap[int64, *aitool.ToolResult]
+	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
 }
 
 func (t *AiTask) GetUserInput() string {
