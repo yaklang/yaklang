@@ -28,18 +28,20 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 	case ssaconfig.CodeSourceLocal:
 		baseFS = filesys.NewRelLocalFs(c.GetCodeSourceLocalFile())
 	case ssaconfig.CodeSourceCompression:
-		baseFS, err = getZipFile(c)
+		zipfs, err := getZipFile(c)
 		if err != nil {
 			return nil, err
 		}
+		baseFS = filesys.NewHookFS(zipfs)
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(c)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		baseFS = filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
+		unifiedFS := filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
+		baseFS = filesys.NewHookFS(unifiedFS)
 	case ssaconfig.CodeSourceGit:
 		baseFS, err = gitFs(c)
 		if err != nil {

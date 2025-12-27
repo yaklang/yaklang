@@ -12,7 +12,7 @@ import (
 
 // listJarDirectory lists the contents of a directory in a JAR file
 // If hideInnerClasses is true, it will add hide=true and outerClass attributes to inner class resources
-func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string, jarFS *javaclassparser.FS, hideInnerClasses bool) (*ypb.RequestYakURLResponse, error) {
+func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string, jarFS *javaclassparser.JarFS, hideInnerClasses bool) (*ypb.RequestYakURLResponse, error) {
 	// List directory
 	entries, err := jarFS.ReadDir(currentDirPath)
 	if err != nil {

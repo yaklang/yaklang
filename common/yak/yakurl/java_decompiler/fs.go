@@ -2,6 +2,7 @@ package java_decompiler
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
@@ -9,8 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-// getJarFS gets or creates a javaclassparser.FS for the given jar path
-func (a *Action) getJarFS(jarPath string) (*javaclassparser.FS, error) {
+// getJarFS gets or creates a javaclassparser.JarFS for the given jar path
+func (a *Action) getJarFS(jarPath string) (*javaclassparser.JarFS, error) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -25,13 +26,43 @@ func (a *Action) getJarFS(jarPath string) (*javaclassparser.FS, error) {
 	a.jarFS[jarPath] = fs
 	return fs, nil
 }
-func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparser.FS, string, string, error) {
+func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparser.JarFS, string, string, error) {
 	currentDirPath := dirPath
 	currentJarPath := jarPath
-	jarFs, err := a.getJarFS(currentJarPath)
-	if err != nil {
-		return nil, "", "", err
+
+	ext := strings.ToLower(filepath.Ext(jarPath))
+	var jarFs *javaclassparser.JarFS
+	var err error
+
+	if ext == ".zip" {
+		zipFS, err := filesys.NewZipFSFromLocal(jarPath)
+		if err != nil {
+			return nil, "", "", utils.Wrapf(err, "failed to open zip file: %s", jarPath)
+		}
+
+		physicalJarPath, internalPath, err := a.parseNestedJarPath(dirPath)
+		if err == nil {
+			jarContent, err := zipFS.ReadFile(physicalJarPath)
+			if err != nil {
+				return nil, "", "", utils.Wrapf(err, "failed to read jar from zip: %s", physicalJarPath)
+			}
+			innerZipFS, err := filesys.NewZipFSRaw(bytes.NewReader(jarContent), int64(len(jarContent)))
+			if err != nil {
+				return nil, "", "", err
+			}
+			jarFs = javaclassparser.NewJarFS(innerZipFS)
+			currentDirPath = internalPath
+			currentJarPath = physicalJarPath
+		} else {
+			return nil, "", "", utils.Errorf("zip file does not contain jar path: %s", dirPath)
+		}
+	} else {
+		jarFs, err = a.getJarFS(currentJarPath)
+		if err != nil {
+			return nil, "", "", err
+		}
 	}
+
 	for {
 		physicalJarPath, internalPath, err := a.parseNestedJarPath(currentDirPath)
 		if err == nil {

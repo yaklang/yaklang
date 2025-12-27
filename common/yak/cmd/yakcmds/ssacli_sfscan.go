@@ -98,7 +98,28 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// target path -> code source
 	if targetPath := c.String("target"); targetPath != "" {
-		opts = append(opts, ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal))
+		// 自动检测文件类型
+		var codeSourceKind ssaconfig.CodeSourceKind
+		// 标准化路径分隔符
+		normalizedPath := filepath.ToSlash(targetPath)
+		ext := strings.ToLower(filepath.Ext(normalizedPath))
+
+		// 检查是否为文件（而非目录）
+		if info, err := os.Stat(targetPath); err == nil && !info.IsDir() {
+			switch ext {
+			case ".zip":
+				codeSourceKind = ssaconfig.CodeSourceCompression
+			case ".jar", ".war":
+				codeSourceKind = ssaconfig.CodeSourceJar
+			default:
+				codeSourceKind = ssaconfig.CodeSourceLocal
+			}
+		} else {
+			// 目录或文件不存在，默认为本地目录
+			codeSourceKind = ssaconfig.CodeSourceLocal
+		}
+
+		opts = append(opts, ssaconfig.WithCodeSourceKind(codeSourceKind))
 		opts = append(opts, ssaconfig.WithCodeSourceLocalFile(targetPath))
 	}
 
