@@ -14,7 +14,12 @@ __DESC__ = `一个跨平台的Shell命令执行工具，支持bash、cmd、power
    - 检查网络: netstat -tuln, ss -tuln, lsof -i（限制端口）
    - 检查端口: lsof -i:端口号
 
-【Windows注意】当使用cmd类型时，路径中的反斜杠(\)需要转义，例如应使用 C:\\Users 而不是 C:\Users。`
+【Windows注意】当使用cmd类型时，路径中的反斜杠(\)需要转义，例如应使用 C:\\Users 而不是 C:\Users。
+
+【Bash执行特性】
+- 脚本以 set -e 模式执行，遇到错误立即退出，避免灾难性后果
+- 脚本以 set -x 模式执行（trace），输出每条执行的命令，便于调试和错误定位
+- 错误输出包含行号信息，便于识别问题位置`
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制"
 
@@ -47,8 +52,6 @@ if shellType == "" {
     yakit.Info("Using specified shell: %v", shellType)
 }
 
-yakit.Info("Executing %v command with %d seconds timeout: %#v", shellType, timeoutSeconds, command)
-
 // 验证超时参数，确保不为零或负数
 if timeoutSeconds <= 0 {
     timeoutSeconds = 60
@@ -62,13 +65,106 @@ defer cancel()
 // 根据shell类型构建相应的命令执行器
 var cmd
 var err
+var scriptFile = ""
+
 switch shellType {
 case "bash":
-    cmd, err = exec.CommandContext(ctx, "bash -c %#v" % command)
+    // Generate a temporary script file with proper bash settings
+    // - set -e: Exit immediately if a command exits with a non-zero status
+    // - set -x: Print commands and their arguments as they are executed (trace mode)
+    // This approach avoids all quoting/escaping issues and provides better debugging
+    
+    scriptContent := `#!/bin/bash
+# Auto-generated script by AI tool
+# Exit on error (prevents catastrophic cascading failures)
+set -e
+# Trace mode (shows each command with line numbers for debugging)
+set -x
+
+# User command starts here (line 8)
+` + command + `
+`
+    
+    // Create temporary script file
+    scriptFile, err = file.TempFileName("ai_bash_script_*.sh")
+    if err != nil {
+        yakit.Error("Failed to create temporary script file: %v", err)
+        return
+    }
+    
+    // Ensure cleanup of temporary file
+    defer func() {
+        if scriptFile != "" {
+            removeErr := file.Remove(scriptFile)
+            if removeErr != nil {
+                yakit.Info("Note: Failed to remove temporary script file %v: %v", scriptFile, removeErr)
+            }
+        }
+    }()
+    
+    // Write script content to file
+    err = file.Save(scriptFile, scriptContent)
+    if err != nil {
+        yakit.Error("Failed to write script content to file: %v", err)
+        return
+    }
+    
+    // Make script executable (optional, since we run via 'bash scriptfile')
+    chmodErr := os.Chmod(scriptFile, 0755)
+    if chmodErr != nil {
+        yakit.Info("Note: Failed to chmod script file: %v (continuing anyway)", chmodErr)
+    }
+    
+    yakit.Info("Executing bash script with %d seconds timeout", timeoutSeconds)
+    yakit.Info("Script file: %v", scriptFile)
+    yakit.Info("Script content preview:\n---\n%v\n---", scriptContent)
+    
+    // Execute the script using bash
+    cmd, err = exec.CommandContext(ctx, "bash " + scriptFile)
+    
 case "cmd":
-    cmd, err = exec.CommandContext(ctx, "cmd /c %v" % command)
+    // For Windows cmd, use direct command execution
+    yakit.Info("Executing cmd command with %d seconds timeout: %v", timeoutSeconds, command)
+    cmd, err = exec.CommandContext(ctx, "cmd /c " + command)
+    
 case "powershell":
-    cmd, err = exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
+    // For PowerShell, create a temporary script file as well
+    scriptContent := `# Auto-generated PowerShell script by AI tool
+# Stop on first error
+$ErrorActionPreference = "Stop"
+# Enable verbose output for debugging
+Set-PSDebug -Trace 1
+
+# User command starts here
+` + command + `
+`
+    
+    scriptFile, err = file.TempFileName("ai_powershell_script_*.ps1")
+    if err != nil {
+        yakit.Error("Failed to create temporary PowerShell script file: %v", err)
+        return
+    }
+    
+    defer func() {
+        if scriptFile != "" {
+            removeErr := file.Remove(scriptFile)
+            if removeErr != nil {
+                yakit.Info("Note: Failed to remove temporary script file %v: %v", scriptFile, removeErr)
+            }
+        }
+    }()
+    
+    err = file.Save(scriptFile, scriptContent)
+    if err != nil {
+        yakit.Error("Failed to write PowerShell script content to file: %v", err)
+        return
+    }
+    
+    yakit.Info("Executing PowerShell script with %d seconds timeout", timeoutSeconds)
+    yakit.Info("Script file: %v", scriptFile)
+    
+    cmd, err = exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + scriptFile)
+    
 default:
     yakit.Error("Unsupported shell type: %v. Supported types: bash, cmd, powershell", shellType)
     return
@@ -88,6 +184,8 @@ cmd.Stderr = stderrbuf
 // 执行命令并处理结果
 err = cmd.Run()
 isTimeout = false
+exitCode = 0
+
 if err != nil {
     errStr = sprint(err)
     // 检查是否是超时导致的错误（通过错误信息判断）
@@ -96,7 +194,19 @@ if err != nil {
         yakit.Info("⚠️ COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
         yakit.Info("💡 SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
     } else {
-        yakit.Error("%v command execution failed: %v", shellType, err)
+        // Extract exit code if available
+        if str.Contains(errStr, "exit status") {
+            // Parse exit code from error message like "exit status 1"
+            parts = str.Split(errStr, " ")
+            if len(parts) >= 3 {
+                exitCode = parseInt(parts[len(parts)-1])
+            }
+        }
+        yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
+        if shellType == "bash" {
+            yakit.Info("💡 TIP: With 'set -e' enabled, the script exits on the first error. Check the trace output (lines starting with '+') to identify which command failed.")
+            yakit.Info("💡 TIP: Line numbers in error messages are offset by 7 from the original command (due to script header). Subtract 7 to get the actual line in your command.")
+        }
     }
 }
 
@@ -116,12 +226,17 @@ if stdoutbuf.Len() > 0 {
 }
 if stderrbuf.Len() > 0 {
     count++
-    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+    // For bash with set -x, stderr contains trace output which is useful for debugging
+    if shellType == "bash" {
+        yakit.Info("Stderr (includes trace output from 'set -x', lines starting with '+' show executed commands):\n%v", toUtf8(stderrbuf.String()))
+    } else {
+        yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+    }
 }
 if count <= 0 {
     if isTimeout {
         yakit.Info("No output captured before timeout")
     } else {
-        yakit.Info("No output found, %v command execution failed or output is empty", shellType)
+        yakit.Info("No output found, %v command execution completed (possibly with empty output)", shellType)
     }
 }

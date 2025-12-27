@@ -96,3 +96,112 @@ func TestANSICQuotedSplit(t *testing.T) {
 		require.Equal(t, want[i], got[i], "Split(%q)[%v] -> %v. Want: %v", testString, i, got[i], want[i])
 	}
 }
+
+// TestSingleQuotePreservesNewlines tests that single quotes preserve newlines and other characters
+func TestSingleQuotePreservesNewlines(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			// Single quotes preserve everything including newlines
+			name:     "single quotes with newline",
+			input:    "bash -c 'echo hello\necho world'",
+			expected: []string{"bash", "-c", "echo hello\necho world"},
+		},
+		{
+			// Single quotes preserve backslash-n as two characters
+			name:     "single quotes with backslash n",
+			input:    `bash -c 'echo hello\necho world'`,
+			expected: []string{"bash", "-c", `echo hello\necho world`},
+		},
+		{
+			// Real multiline bash command
+			name:     "multiline bash command",
+			input:    "bash -c 'echo \"=== 系统信息 ===\";\nsw_vers -productVersion;\necho -e \"\\n=== 架构 ===\";\nuname -m'",
+			expected: []string{"bash", "-c", "echo \"=== 系统信息 ===\";\nsw_vers -productVersion;\necho -e \"\\n=== 架构 ===\";\nuname -m"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Split(tt.input)
+			require.NoError(t, err, "Split(%q) failed: %v", tt.input, err)
+			require.Equal(t, tt.expected, got, "Split(%q) = %v, want %v", tt.input, got, tt.expected)
+		})
+	}
+}
+
+// TestDoubleQuoteEscapePreservation tests that backslashes are preserved for
+// characters that cannot be escaped in double quotes (POSIX compliance)
+func TestDoubleQuoteEscapePreservation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			// Valid escape: \" -> "
+			name:     "valid escape double quote",
+			input:    `echo "hello\"world"`,
+			expected: []string{"echo", `hello"world`},
+		},
+		{
+			// Valid escape: \\ -> \
+			name:     "valid escape backslash",
+			input:    `echo "hello\\world"`,
+			expected: []string{"echo", `hello\world`},
+		},
+		{
+			// Valid escape: \$ -> $
+			name:     "valid escape dollar",
+			input:    `echo "hello\$world"`,
+			expected: []string{"echo", `hello$world`},
+		},
+		{
+			// Valid escape: \` -> `
+			name:     "valid escape backtick",
+			input:    "echo \"hello\\`world\"",
+			expected: []string{"echo", "hello`world"},
+		},
+		{
+			// Invalid escape: \n should preserve backslash (this is the bug fix)
+			name:     "invalid escape n preserves backslash",
+			input:    `echo "hello\nworld"`,
+			expected: []string{"echo", `hello\nworld`},
+		},
+		{
+			// Invalid escape: \t should preserve backslash
+			name:     "invalid escape t preserves backslash",
+			input:    `echo "hello\tworld"`,
+			expected: []string{"echo", `hello\tworld`},
+		},
+		{
+			// Invalid escape: \r should preserve backslash
+			name:     "invalid escape r preserves backslash",
+			input:    `echo "hello\rworld"`,
+			expected: []string{"echo", `hello\rworld`},
+		},
+		{
+			// Mixed: bash -c with escaped newlines
+			name:     "bash command with escaped newlines",
+			input:    `bash -c "echo hello\necho world"`,
+			expected: []string{"bash", "-c", `echo hello\necho world`},
+		},
+		{
+			// Real case: multiple commands with \n separators
+			name:     "multiple commands separated by backslash n",
+			input:    `bash -c "echo 'test';\nps aux"`,
+			expected: []string{"bash", "-c", `echo 'test';\nps aux`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Split(tt.input)
+			require.NoError(t, err, "Split(%q) failed: %v", tt.input, err)
+			require.Equal(t, tt.expected, got, "Split(%q) = %v, want %v", tt.input, got, tt.expected)
+		})
+	}
+}
