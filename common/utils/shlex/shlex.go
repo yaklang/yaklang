@@ -279,6 +279,9 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 				value = append(value, nextRune)
 			}
 		case escapingQuotedState: // the next rune after an escape character, in double quotes
+			// According to POSIX shell specification, within double quotes, only these
+			// characters can be escaped: $ ` " \ and newline
+			// For other characters, the backslash should be preserved as a literal character
 			switch nextRuneType {
 			case eofRuneClass:
 				err = fmt.Errorf("EOF found after escape character")
@@ -287,9 +290,23 @@ func (t *Tokenizer) scanStream() (*Token, error) {
 					value:     string(value),
 				}
 				return token, err
-			default:
+			case doubleQuoteRuneClass, escapeRuneClass:
+				// These characters are valid escape targets, consume the backslash
 				state = quotingEscapingState
 				value = append(value, nextRune)
+			default:
+				// For characters that cannot be escaped in double quotes (like 'n' in \n),
+				// preserve the backslash as a literal character
+				// Also handle $ and ` which are valid escape targets
+				if nextRune == '$' || nextRune == '`' || nextRune == '\n' {
+					// Valid escape targets, consume the backslash
+					state = quotingEscapingState
+					value = append(value, nextRune)
+				} else {
+					// Invalid escape sequence, preserve both backslash and the character
+					state = quotingEscapingState
+					value = append(value, '\\', nextRune)
+				}
 			}
 		case quotingEscapingState: // in escaping double quotes
 			switch nextRuneType {
