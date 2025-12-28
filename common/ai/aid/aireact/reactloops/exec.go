@@ -343,6 +343,13 @@ func (r *ReActLoop) loadingStatus(i string) {
 	r.emitter.EmitStatus(ReActLoadingStatusKey, i)
 }
 
+func (r *ReActLoop) LoadingStatus(i string) {
+	if utils.IsNil(r) {
+		return
+	}
+	r.loadingStatus(i)
+}
+
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	r.loadingStatus("初始化 / initializing...")
 	defer r.loadingStatus("end")
