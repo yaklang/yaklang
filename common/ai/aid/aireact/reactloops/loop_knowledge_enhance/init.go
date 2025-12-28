@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -34,7 +35,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithMaxIterations(3),
+				reactloops.WithMaxIterations(2),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					userQuery := loop.Get("user_query")
 					attachedResources := loop.Get("attached_resources")
@@ -53,8 +54,9 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				// Register actions
-				searchKnowledgeAction(r),
+				// Register actions: semantic and keyword search variants
+				searchKnowledgeSemanticAction(r),
+				searchKnowledgeKeywordAction(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, r, preset...)
@@ -119,10 +121,60 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			if err != nil {
 				log.Warnf("failed to get knowledge base samples: %v", err)
 			} else if sampleData != "" {
-				resourcesInfo.WriteString("### 知识库样本内容 (Knowledge Base Samples)\n")
-				resourcesInfo.WriteString("以下是知识库中的部分知识条目，帮助你了解知识库的领域和内容，便于后续搜索：\n\n")
-				resourcesInfo.WriteString(sampleData)
-				resourcesInfo.WriteString("\n")
+				// 检查样本数据大小，控制在30k字节以内
+				const maxSampleSize = 30 * 1024 // 30KB
+				if len(sampleData) > maxSampleSize {
+					log.Infof("knowledge base samples too large (%d bytes), chunking and emitting to artifacts", len(sampleData))
+
+					// 将大内容分块处理，每块最大10k字节
+					const chunkSize = 10 * 1024 // 10KB per chunk
+					chunks := make([]string, 0)
+					currentChunk := strings.Builder{}
+					lines := strings.Split(sampleData, "\n")
+
+					for _, line := range lines {
+						// 如果添加这行会导致当前块超过限制，开始新块
+						if currentChunk.Len()+len(line)+1 > chunkSize && currentChunk.Len() > 0 {
+							chunks = append(chunks, currentChunk.String())
+							currentChunk.Reset()
+						}
+						currentChunk.WriteString(line)
+						currentChunk.WriteString("\n")
+					}
+
+					// 添加最后一块
+					if currentChunk.Len() > 0 {
+						chunks = append(chunks, currentChunk.String())
+					}
+
+					// 为每个块创建 artifacts
+					emitter := loop.GetEmitter()
+					artifactFilenames := make([]string, 0, len(chunks))
+
+					for i, chunk := range chunks {
+						filename := r.EmitFileArtifactWithExt(fmt.Sprintf("kb_samples_chunk_%d", i+1), ".txt", "")
+						emitter.EmitPinFilename(filename)
+						artifactFilenames = append(artifactFilenames, filename)
+
+						// 写入文件内容
+						err := os.WriteFile(filename, []byte(chunk), 0644)
+						if err != nil {
+							log.Warnf("failed to write knowledge base sample chunk %d: %v", i+1, err)
+						}
+					}
+
+					resourcesInfo.WriteString("### 知识库样本内容 (Knowledge Base Samples)\n")
+					resourcesInfo.WriteString(fmt.Sprintf("知识库样本数据较大（%d 字节），已分块存储到 artifacts 中：\n", len(sampleData)))
+					for i, filename := range artifactFilenames {
+						resourcesInfo.WriteString(fmt.Sprintf("- 样本块 %d: %s\n", i+1, filename))
+					}
+					resourcesInfo.WriteString("\n请根据需要查看相关 artifacts 获取完整样本内容。\n\n")
+				} else {
+					resourcesInfo.WriteString("### 知识库样本内容 (Knowledge Base Samples)\n")
+					resourcesInfo.WriteString("以下是知识库中的部分知识条目，帮助你了解知识库的领域和内容，便于后续搜索：\n\n")
+					resourcesInfo.WriteString(sampleData)
+					resourcesInfo.WriteString("\n")
+				}
 			}
 		}
 
