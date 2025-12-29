@@ -57,9 +57,23 @@ func (f *FuzzHTTPRequest) NoAutoEncode() bool {
 	return f.noAutoEncode
 }
 
+func (f *FuzzHTTPRequest) NoEscapeHTML() bool {
+	if f == nil {
+		return false
+	}
+	return f.noEscapeHTML
+}
+
 func (f *FuzzHTTPRequest) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 	if f != nil {
 		f.noAutoEncode = b
+	}
+	return f
+}
+
+func (f *FuzzHTTPRequest) DisableEscapeHTML(b bool) FuzzHTTPRequestIf {
+	if f != nil {
+		f.noEscapeHTML = b
 	}
 	return f
 }
