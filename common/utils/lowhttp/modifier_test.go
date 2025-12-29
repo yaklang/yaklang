@@ -2013,6 +2013,95 @@ Host: www.baidu.com
 	}
 }
 
+func TestReplaceHTTPPacketPathFunc(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		handle   func(string) string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				return "path"
+			},
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				return "/path"
+			},
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET invalid HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				return "/path"
+			},
+			expected: `GET /path HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /prefix HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				return s + "/suffix"
+			},
+			expected: `GET /prefix/suffix HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /prefix HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				if strings.Contains(s, "prefix") {
+					return "/suffix"
+				}
+				return s
+			},
+			expected: `GET /suffix HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /no HTTP/1.1
+Host: www.baidu.com
+`,
+			handle: func(s string) string {
+				if strings.Contains(s, "prefix") {
+					return "/suffix"
+				}
+				return s
+			},
+			expected: `GET /no HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+
+		actual := ReplaceHTTPPacketPathFunc([]byte(testcase.origin), testcase.handle)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceHTTPPacketPath failed: \n actual:\n%s\n expected: \n%s", string(actual), string(expected))
+		}
+	}
+}
+
 func TestAppendHTTPPacketPath(t *testing.T) {
 	testcases := []struct {
 		origin   string
@@ -2921,7 +3010,7 @@ Host: www.baidu.com
 			jsonMap: map[string]interface{}{"a": 1, "b": map[string]interface{}{"c": "d", "e": 2}},
 			expected: `GET / HTTP/1.1
 Host: www.baidu.com
-Content-Length: 27 
+Content-Length: 27
 
 {"a":1,"b":{"c":"d","e":2}}`,
 		},
