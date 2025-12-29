@@ -91,6 +91,13 @@ type LowhttpExecConfig struct {
 
 	// BodyStreamReaderHandler is a callback function to handle the body stream reader
 	BodyStreamReaderHandler func(responseHeader []byte, closer io.ReadCloser)
+	// AutoDetectSSE enables SSE auto-detection by response headers (Content-Type: text/event-stream)
+	// to automatically switch into stream/no-body-buffer mode even when request headers don't include
+	// Accept: text/event-stream.
+	AutoDetectSSE bool
+	// ExtendReadDeadline refreshes read deadline on every read in conn-pool mode,
+	// effectively turning Timeout into an idle-timeout instead of a total-timeout.
+	ExtendReadDeadline bool
 
 	// SNI
 	SNI *string
@@ -418,6 +425,18 @@ func WithETCHosts(hosts map[string]string) LowhttpOpt {
 func WithBodyStreamReaderHandler(t func(headerBytes []byte, bodyReader io.ReadCloser)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.BodyStreamReaderHandler = t
+	}
+}
+
+func WithExtendReadDeadline(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ExtendReadDeadline = b
+	}
+}
+
+func WithAutoDetectSSE(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.AutoDetectSSE = b
 	}
 }
 

@@ -115,15 +115,17 @@ func rulePatternsMatchHost(rule *ypb.ProxyRoute, host string) bool {
 func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
 	ruleID := strings.TrimSpace(req.GetProxyRuleId())
-	if ruleID == "" {
-		return proxies, nil
-	}
-
 	cfg, err := yakit.GetGlobalProxyRulesConfig()
 	if err != nil {
+		if ruleID == "" {
+			return proxies, nil
+		}
 		return nil, err
 	}
 	if cfg == nil {
+		if ruleID == "" {
+			return proxies, nil
+		}
 		return nil, utils.Errorf("proxy rule config not initialized")
 	}
 
@@ -137,6 +139,39 @@ func buildFuzzerProxyList(req *ypb.FuzzerRequest) ([]string, error) {
 			continue
 		}
 		endpointURLByID[endpoint.GetId()] = url
+	}
+
+	// 兼容一下前端把 proxy 当作 id 的错误传参行为
+	if ruleID == "" && len(proxies) > 0 {
+		if len(proxies) == 1 {
+			candidate := strings.TrimSpace(proxies[0])
+			for _, route := range cfg.GetRoutes() {
+				if route == nil {
+					continue
+				}
+				if strings.EqualFold(route.GetId(), candidate) {
+					ruleID = candidate
+					proxies = nil
+					break
+				}
+			}
+		}
+		if ruleID == "" {
+			expanded := make([]string, 0, len(proxies))
+			for _, p := range proxies {
+				if url := strings.TrimSpace(endpointURLByID[strings.TrimSpace(p)]); url != "" {
+					expanded = append(expanded, url)
+					continue
+				}
+				expanded = append(expanded, p)
+			}
+			proxies = utils.StringArrayFilterEmpty(lo.Uniq(expanded))
+			return proxies, nil
+		}
+	}
+
+	if ruleID == "" {
+		return proxies, nil
 	}
 
 	var rule *ypb.ProxyRoute
@@ -901,6 +936,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
 			mutate.WithPoolOpt_SaveHTTPFlow(false),
 			mutate.WithPoolOpt_NoReadMultiResponse(req.GetNoReadMultiResponse()),
+			// Auto-detect SSE streams by response headers so users don't need to set Accept: text/event-stream.
+			mutate.WithPoolOpt_AutoDetectSSE(true),
 			//mutate.WithPoolOpt_ConnPool(true),
 		}
 
@@ -976,6 +1013,45 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 			nowTime = time.Now()
 
+			// SSE incremental updates (chunk-style). The final aggregated response will be handled by normal path.
+			if result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_update"] == "1" {
+				streamID := result.ExtraInfo["__yak_sse_stream_id"]
+				if streamID == "" {
+					// Fallback: keep it stable across updates (e.g. older engines not providing stream-id).
+					streamID = uuid.NewSHA1(uuid.Nil, result.RequestRaw).String()
+				}
+				method, _, _ := lowhttp.GetHTTPPacketFirstLine(result.RequestRaw)
+				host := lowhttp.GetHTTPPacketHeader(result.RequestRaw, "Host")
+				respHeaders, respBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+				statusLine := strings.SplitN(respHeaders, "\r\n", 2)[0]
+				_, statusCode, _, _ := utils.ParseHTTPResponseLine(statusLine)
+
+				rsp := &ypb.FuzzerResponse{
+					Ok:          true,
+					Url:         utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
+					Method:      utils.EscapeInvalidUTF8Byte([]byte(method)),
+					Host:        utils.EscapeInvalidUTF8Byte([]byte(host)),
+					StatusCode:  int32(statusCode),
+					ContentType: utils.EscapeInvalidUTF8Byte([]byte(lowhttp.GetHTTPPacketHeader(result.ResponseRaw, "Content-Type"))),
+					ResponseRaw: result.ResponseRaw,
+					RequestRaw:  result.RequestRaw,
+					UUID:        streamID,
+					Timestamp:   result.Timestamp,
+					TaskId:      int64(taskID),
+					Payloads:    result.Payloads,
+					RuntimeID:   runtimeID,
+					BodyLength:  int64(len(respBody)),
+					DurationMs:  result.DurationMs,
+				}
+				if result.RandomChunkedData != nil {
+					for _, chunkInfo := range result.RandomChunkedData {
+						rsp.RandomChunkedData = append(rsp.RandomChunkedData, chunkInfo.ToGRPCModel())
+					}
+				}
+				_ = feedbackResponse(rsp, true)
+				continue
+			}
+
 			// 2M
 			if len(result.RequestRaw) > 2*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:2*1024*1024]
@@ -1001,6 +1077,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			if result != nil && result.ExtraInfo != nil {
 				for k, v := range result.ExtraInfo {
+					if strings.HasPrefix(k, "__yak_") {
+						continue
+					}
 					extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v)), MarshalValue: marshalValue(v)})
 				}
 			}
@@ -1098,7 +1177,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 
-			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() && result.LowhttpResponse != nil {
 				yakit.SaveLowHTTPFlow(result.LowhttpResponse, false)
 			}
 
@@ -1122,6 +1201,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			feedbackNormalResponseStart := time.Now()
 			task.HTTPFlowSuccessCount++
+			isAutoFixContentType := false
+			originContentType := ""
+			fixContentType := ""
+			isSetContentTypeOptions := false
+			if lowhttpResponse != nil {
+				isAutoFixContentType = lowhttpResponse.IsFixContentType
+				originContentType = lowhttpResponse.OriginContentType
+				fixContentType = lowhttpResponse.FixContentType
+				isSetContentTypeOptions = lowhttpResponse.IsSetContentTypeOptions
+			}
 			rsp := &ypb.FuzzerResponse{
 				Ok:                         true,
 				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
@@ -1139,20 +1228,27 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
 				RuntimeID:                  runtimeID,
-				IsAutoFixContentType:       lowhttpResponse.IsFixContentType,
-				OriginalContentType:        lowhttpResponse.OriginContentType,
-				FixContentType:             lowhttpResponse.FixContentType,
-				IsSetContentTypeOptions:    lowhttpResponse.IsSetContentTypeOptions,
+				IsAutoFixContentType:       isAutoFixContentType,
+				OriginalContentType:        originContentType,
+				FixContentType:             fixContentType,
+				IsSetContentTypeOptions:    isSetContentTypeOptions,
+			}
+			// For SSE, keep UUID stable across incremental updates and final aggregated response.
+			if result.ExtraInfo != nil {
+				if streamID := result.ExtraInfo["__yak_sse_stream_id"]; streamID != "" {
+					rsp.UUID = streamID
+				}
 			}
 
-			if req.GetEnableRandomChunked() && result.RandomChunkedData != nil {
+			if result.RandomChunkedData != nil {
 				for _, chunkInfo := range result.RandomChunkedData {
 					rsp.RandomChunkedData = append(rsp.RandomChunkedData, chunkInfo.ToGRPCModel())
 				}
 			}
 
-			redirectPacket := result.LowhttpResponse.RedirectRawPackets
+			var redirectPacket []*lowhttp.RedirectFlow
 			if result.LowhttpResponse != nil {
+				redirectPacket = result.LowhttpResponse.RedirectRawPackets
 				// redirect
 				for _, f := range redirectPacket {
 					rsp.RedirectFlows = append(rsp.RedirectFlows, &ypb.RedirectHTTPFlow{
@@ -1193,7 +1289,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 
-			rsp.UUID = uuid.New().String()
+			if rsp.UUID == "" {
+				rsp.UUID = uuid.New().String()
+			}
 			rsp.Timestamp = result.Timestamp
 			rsp.DurationMs = result.DurationMs
 			rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(result.Request.Header.Get("Host")))

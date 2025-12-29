@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +30,131 @@ import (
 var poolingList sync.Map
 
 type RandomChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
+
+const (
+	httpPoolExtraInfoSSEUpdate   = "__yak_sse_update"
+	httpPoolExtraInfoSSEStreamID = "__yak_sse_stream_id"
+	httpPoolExtraInfoSSEIndex    = "__yak_sse_index"
+)
+
+func httpPoolIsSSERequest(reqRaw []byte) bool {
+	accept := strings.ToLower(strings.TrimSpace(lowhttp.GetHTTPPacketHeader(reqRaw, "Accept")))
+	return strings.Contains(accept, "text/event-stream")
+}
+
+func httpPoolIsSSEResponseHeader(respHeaderRaw []byte) (isSSE bool, isChunked bool) {
+	headerLower := strings.ToLower(string(respHeaderRaw))
+	isSSE = strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream")
+	isChunked = strings.Contains(headerLower, "transfer-encoding:") && strings.Contains(headerLower, "chunked")
+	return
+}
+
+func httpPoolBuildSyntheticResponseHeader(respHeaderRaw []byte, bodyLen int) []byte {
+	raw := strings.TrimRight(string(respHeaderRaw), "\r\n")
+	if raw == "" {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n", bodyLen))
+	}
+	lines := strings.Split(raw, "\r\n")
+	out := make([]string, 0, len(lines)+1)
+	out = append(out, lines[0])
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "transfer-encoding:") || strings.HasPrefix(lower, "content-length:") {
+			continue
+		}
+		out = append(out, line)
+	}
+	out = append(out, fmt.Sprintf("Content-Length: %d", bodyLen))
+	return []byte(strings.Join(out, "\r\n") + "\r\n\r\n")
+}
+
+func httpPoolIsTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return utils.MatchAnyOfSubString(strings.ToLower(err.Error()), "timeout", "i/o timeout", "context deadline exceeded")
+}
+
+func httpPoolIsAcceptableSSEError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	if httpPoolIsTimeoutError(err) {
+		return true
+	}
+	// When SSE connections are interrupted by deadlines, low-level chunked parsing may fail.
+	// We still want to return the aggregated response as long as we captured some body bytes.
+	return strings.Contains(lower, "chunked decoder error")
+}
+
+func httpPoolChunkedStreamDecode(ctx context.Context, r io.Reader, onData func([]byte)) error {
+	br := bufio.NewReader(r)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		line, err := br.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			continue
+		}
+		sizeHex, _, _ := strings.Cut(line, ";")
+		size, err := strconv.ParseInt(strings.TrimSpace(sizeHex), 16, 64)
+		if err != nil {
+			return err
+		}
+		if size == 0 {
+			for {
+				trailerLine, err := br.ReadString('\n')
+				if err != nil {
+					return err
+				}
+				if strings.TrimRight(trailerLine, "\r\n") == "" {
+					return nil
+				}
+			}
+		}
+
+		buf := make([]byte, int(size))
+		_, err = io.ReadFull(br, buf)
+		if err != nil {
+			return err
+		}
+		onData(buf)
+
+		crlf := make([]byte, 2)
+		_, err = io.ReadFull(br, crlf)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func httpPoolRawStreamRead(ctx context.Context, r io.Reader, onData func([]byte)) error {
+	buf := make([]byte, 32*1024)
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		n, err := r.Read(buf)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
+			onData(chunk)
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
 type httpPoolConfig struct {
 	Size                         int
 	SizedWaitGroupInstance       *utils.SizedWaitGroup
@@ -120,6 +248,7 @@ type httpPoolConfig struct {
 	MaxChunkedLength    int
 	MinChunkDelayTime   time.Duration
 	MaxChunkDelayTime   time.Duration
+	AutoDetectSSE       bool
 
 	NoReadMultiResponse bool
 }
@@ -589,6 +718,12 @@ func _httpPool_enableRandomChunked(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_AutoDetectSSE(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.AutoDetectSSE = b
+	}
+}
+
 func _httpPool_RandomChunkedLength(min, max int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.MinChunkedLength = min
@@ -904,6 +1039,20 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							return
 						}
 
+						needSSEStream := httpPoolIsSSERequest(targetRequest) || config.AutoDetectSSE
+						sseStreamID := ""
+						var (
+							sseConfirmed   atomic.Bool
+							sseHeaderBytes []byte
+
+							sseStateMu   sync.Mutex
+							sseStartTime time.Time
+							sseLastFlush time.Time
+							sseIndex     int
+							sseBody      bytes.Buffer
+							sseChunks    []*RandomChunkedInfo
+						)
+
 						// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
 						var host string
 						var port int
@@ -925,6 +1074,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						if config.NoFollowRedirect {
 							redictTimes = 0
 						}
+						requestStart := time.Now()
+						useConnPool := config.WithConnPool
 						lowhttpOptions := []lowhttp.LowhttpOpt{
 							lowhttp.WithHttps(https),
 							lowhttp.WithRuntimeId(config.RuntimeId),
@@ -948,10 +1099,171 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithETCHosts(config.EtcHosts),
 							lowhttp.WithGmTLS(config.IsGmTLS),
 							lowhttp.WithRandomJA3FingerPrint(config.IsRandomJA3),
-							lowhttp.WithConnPool(config.WithConnPool),
+							lowhttp.WithConnPool(useConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
 							lowhttp.WithNoReadMultiResponse(config.NoReadMultiResponse),
+						}
+
+						if needSSEStream {
+							if httpPoolIsSSERequest(targetRequest) {
+								lowhttpOptions = append(lowhttpOptions, lowhttp.WithNoBodyBuffer(true))
+							}
+							if config.AutoDetectSSE {
+								lowhttpOptions = append(lowhttpOptions, lowhttp.WithAutoDetectSSE(true))
+							}
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithBodyStreamReaderHandler(func(respHeaderRaw []byte, bodyReader io.ReadCloser) {
+								defer bodyReader.Close()
+
+								isSSE, isChunked := httpPoolIsSSEResponseHeader(respHeaderRaw)
+								if !isSSE {
+									_, _ = io.Copy(io.Discard, bodyReader)
+									return
+								}
+
+								sseConfirmed.Store(true)
+								sseStateMu.Lock()
+								if sseStreamID == "" {
+									sseStreamID = uuid.NewString()
+								}
+								sseStartTime = time.Now()
+								sseLastFlush = sseStartTime
+								sseHeaderBytes = append([]byte(nil), respHeaderRaw...)
+								sseStateMu.Unlock()
+
+								dataCh := make(chan []byte, 64)
+								doneCh := make(chan struct{})
+
+								go func() {
+									defer close(doneCh)
+									onData := func(b []byte) {
+										select {
+										case <-config.Ctx.Done():
+											return
+										case dataCh <- b:
+										default:
+										}
+									}
+									var err error
+									if isChunked {
+										err = httpPoolChunkedStreamDecode(config.Ctx, bodyReader, onData)
+									} else {
+										err = httpPoolRawStreamRead(config.Ctx, bodyReader, onData)
+									}
+									_ = err
+									close(dataCh)
+								}()
+
+								window := 250 * time.Millisecond
+								ticker := time.NewTicker(window)
+								defer ticker.Stop()
+
+								var buf bytes.Buffer
+								const maxBufferedPerChunk = 256 * 1024
+								var maxTotalBody int64 = 2 * 1024 * 1024
+								if config.EnableMaxContentLength && config.MaxContentLength > 0 {
+									maxTotalBody = config.MaxContentLength
+								}
+								const maxChunks = 2048
+
+								flush := func() {
+									if buf.Len() == 0 {
+										return
+									}
+									now := time.Now()
+
+									data := make([]byte, buf.Len())
+									copy(data, buf.Bytes())
+									buf.Reset()
+
+									sseStateMu.Lock()
+									sseIndex++
+									curDelay := now.Sub(sseLastFlush)
+									totalDelay := now.Sub(sseStartTime)
+									sseLastFlush = now
+
+									sseChunks = append(sseChunks, &RandomChunkedInfo{
+										Index:            sseIndex,
+										Data:             data,
+										ChunkedLength:    len(data),
+										CurrentDelayTime: curDelay,
+										TotalDelayTime:   totalDelay,
+									})
+									if len(sseChunks) > maxChunks {
+										sseChunks = sseChunks[:maxChunks]
+									}
+
+									remaining := maxTotalBody - int64(sseBody.Len())
+									if remaining <= 0 {
+										// still emit chunk update for UI even if body is truncated
+									} else {
+										if int64(len(data)) > remaining {
+											sseBody.Write(data[:remaining])
+										} else {
+											sseBody.Write(data)
+										}
+									}
+
+									// Emit incremental update as an extra result so the frontend can show progress.
+									// Keep the same UUID via stream-id so frontend can choose to merge updates.
+									streamID := sseStreamID
+									headerSnapshot := append([]byte(nil), sseHeaderBytes...)
+									bodySnapshot := append([]byte(nil), sseBody.Bytes()...)
+									bodyLen := len(bodySnapshot)
+									sseStateMu.Unlock()
+
+									headerRaw := httpPoolBuildSyntheticResponseHeader(headerSnapshot, bodyLen)
+									rspRaw := append(append([]byte(nil), headerRaw...), bodySnapshot...)
+									cache.SafeFeed(&HttpResult{
+										Url:         urlStr,
+										Request:     reqIns,
+										RequestRaw:  targetRequest,
+										ResponseRaw: rspRaw,
+										Timestamp:   time.Now().Unix(),
+										DurationMs:  time.Since(requestStart).Milliseconds(),
+										Payloads:    payloads,
+										Source:      config.Source,
+										ExtraInfo: map[string]string{
+											httpPoolExtraInfoSSEUpdate:   "1",
+											httpPoolExtraInfoSSEStreamID: streamID,
+											httpPoolExtraInfoSSEIndex:    strconv.Itoa(sseIndex),
+										},
+										RandomChunkedData: []*RandomChunkedInfo{
+											{
+												Index:            sseIndex,
+												Data:             data,
+												ChunkedLength:    len(data),
+												CurrentDelayTime: curDelay,
+												TotalDelayTime:   totalDelay,
+											},
+										},
+									})
+									requestFeedbackCounterAdd()
+								}
+
+								for {
+									select {
+									case <-config.Ctx.Done():
+										return
+									case <-doneCh:
+										flush()
+										return
+									case b, ok := <-dataCh:
+										if !ok {
+											continue
+										}
+										if len(b) == 0 {
+											continue
+										}
+										if buf.Len()+len(b) > maxBufferedPerChunk {
+											flush()
+										}
+										buf.Write(b)
+									case <-ticker.C:
+										flush()
+									}
+								}
+							}))
 						}
 
 						if config.RetryHandler != nil {
@@ -962,7 +1274,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithCustomFailureChecker(config.CustomFailureChecker))
 						}
 
-						if config.ConnPool != nil {
+						if useConnPool && config.ConnPool != nil {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.ConnPool(config.ConnPool))
 						}
 
@@ -991,7 +1303,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
 
-						var chunkedData []*RandomChunkedInfo
+						var requestChunkedData []*RandomChunkedInfo
 						if config.EnableRandomChunked {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableRandomChunked(config.EnableRandomChunked))
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedLength(config.MinChunkedLength, config.MaxChunkedLength))
@@ -1007,7 +1319,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								}
 								copy(chunkedInfo.Data, chunkRaw)
 
-								chunkedData = append(chunkedData, chunkedInfo)
+								requestChunkedData = append(requestChunkedData, chunkedInfo)
 							}
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedHandler(chunkedHandler))
 						}
@@ -1067,6 +1379,53 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							}
 						}
 
+						// If this is SSE, the underlying lowhttp reading may time out (by design).
+						// We'll treat it as success as long as we have captured some body bytes.
+						var sseCaptured bool
+						if needSSEStream && sseConfirmed.Load() {
+							sseStateMu.Lock()
+							bodyBytes := append([]byte(nil), sseBody.Bytes()...)
+							chunks := append([]*RandomChunkedInfo(nil), sseChunks...)
+							headerBytes := append([]byte(nil), sseHeaderBytes...)
+							sseStateMu.Unlock()
+
+							if len(bodyBytes) > 0 && len(headerBytes) > 0 {
+								headerRaw := httpPoolBuildSyntheticResponseHeader(headerBytes, len(bodyBytes))
+								rsp = append(append([]byte(nil), headerRaw...), bodyBytes...)
+								requestChunkedData = append(requestChunkedData, chunks...)
+								sseCaptured = true
+							}
+						}
+
+						if err != nil && sseCaptured && httpPoolIsAcceptableSSEError(err) {
+							err = nil
+						}
+						if sseCaptured && rspInstance == nil {
+							rspInstance = &lowhttp.LowhttpResponse{
+								RawPacket:        rsp,
+								RawRequest:       targetRequest,
+								Url:              urlStr,
+								RemoteAddr:       "",
+								Proxy:            "",
+								Https:            https,
+								Http2:            false,
+								Source:           config.Source,
+								RuntimeId:        config.RuntimeId,
+								FromPlugin:       config.FromPlugin,
+								MultiResponse:    false,
+								RequestInstance:  reqIns,
+								Payloads:         payloads,
+								Tags:             nil,
+								IsFixContentType: false,
+							}
+						}
+						if rspInstance != nil && rspInstance.TraceInfo == nil {
+							rspInstance.TraceInfo = &lowhttp.LowhttpTraceInfo{
+								TotalTime:  time.Since(requestStart),
+								ServerTime: time.Since(requestStart),
+							}
+						}
+
 						existedParams := make(map[string]string)
 						if config.FuzzParams != nil {
 							for k, v := range config.FuzzParams {
@@ -1075,6 +1434,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 
 						extra := make(map[string]string)
+						if needSSEStream && sseConfirmed.Load() && sseStreamID != "" {
+							extra[httpPoolExtraInfoSSEStreamID] = sseStreamID
+						}
 						if config.MirrorHTTPFlow != nil {
 							copiedParams := make(map[string]string)
 							for k, v := range existedParams {
@@ -1106,9 +1468,14 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								Source:            config.Source,
 								LowhttpResponse:   rspInstance,
 								ExtraInfo:         extra,
-								RandomChunkedData: chunkedData,
+								RandomChunkedData: requestChunkedData,
 							}
 							return
+						}
+
+						durationMs := int64(time.Since(requestStart).Milliseconds())
+						if rspInstance != nil && rspInstance.TraceInfo != nil {
+							durationMs = rspInstance.TraceInfo.GetServerDurationMS()
 						}
 						finalResult = &HttpResult{
 							Url:               urlStr,
@@ -1117,13 +1484,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							ExtraInfo:         extra,
 							RequestRaw:        targetRequest,
 							ResponseRaw:       rsp,
-							DurationMs:        rspInstance.TraceInfo.GetServerDurationMS(),
-							ServerDurationMs:  rspInstance.TraceInfo.GetServerDurationMS(),
+							DurationMs:        durationMs,
+							ServerDurationMs:  durationMs,
 							Timestamp:         time.Now().Unix(),
 							Payloads:          payloads,
 							Source:            config.Source,
 							LowhttpResponse:   rspInstance,
-							RandomChunkedData: chunkedData,
+							RandomChunkedData: requestChunkedData,
 						}
 						if len(rsp) <= 0 {
 							finalResult.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
@@ -1345,6 +1712,7 @@ var (
 	WithPoolOpt_RandomSession              = _httpPool_withRandomSession
 	WithPoolOpt_SaveHTTPFlow               = _httpPool_withSaveHTTPFlow
 	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
+	WithPoolOpt_AutoDetectSSE              = _httpPool_AutoDetectSSE
 	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
 	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
 	WithPoolOpt_NoReadMultiResponse        = _httpPool_NoReadMultiResponse
