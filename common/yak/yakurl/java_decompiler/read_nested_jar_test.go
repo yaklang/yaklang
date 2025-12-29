@@ -4,23 +4,25 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
+func createTestJarWithNested(t *testing.T) (string, map[string][]byte) {
 	t.Helper()
 
 	// Create temp directory
 	tempDir, err := os.MkdirTemp("", "jar-parser-test-*")
 	require.NoError(t, err)
 
-	cleanup := func() {
-		os.RemoveAll(tempDir)
-	}
+	// cleanup := func() {
+	// 	os.RemoveAll(tempDir)
+	// }
 
 	// Create temp JAR file paths
 	mainJarPath := filepath.Join(tempDir, "test.jar")
@@ -160,13 +162,12 @@ func createTestJarWithNested(t *testing.T) (string, map[string][]byte, func()) {
 	err = mainJarWriter.Close()
 	require.NoError(t, err)
 
-	return mainJarPath, jarContent, cleanup
+	return mainJarPath, jarContent
 }
 
 func TestReadJarDirectory(t *testing.T) {
 	// Create a temporary JAR file with nested JARs for testing
-	tempJarPath, _, cleanup := createTestJarWithNested(t)
-	defer cleanup()
+	tempJarPath, _ := createTestJarWithNested(t)
 
 	// Test listing the root directory of the main JAR
 	dirPath := "."
@@ -195,8 +196,7 @@ func TestReadJarDirectory(t *testing.T) {
 
 func TestReadJarClass(t *testing.T) {
 	// Create a temporary JAR file with nested JARs for testing
-	tempJarPath, _, cleanup := createTestJarWithNested(t)
-	defer cleanup()
+	tempJarPath, _ := createTestJarWithNested(t)
 
 	// Test accessing a class in the main JAR
 	classPath := "com/example/MainClass.class"
@@ -225,148 +225,190 @@ func TestReadJarClass(t *testing.T) {
 
 func TestNestedJarAccess(t *testing.T) {
 	// Create a temporary JAR file with nested JARs for testing
-	tempJarPath, _, cleanup := createTestJarWithNested(t)
-	defer cleanup()
+	tempJarPath, _ := createTestJarWithNested(t)
 
-	// First check if we can list the directory containing the nested JAR
-	dirPath := "lib"
-	rootURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + tempJarPath + "&dir=" + dirPath)
-	require.NoError(t, err)
+	tempDir := t.TempDir()
+	var nestedJarPath string
+	var actions []*Action
 
-	rootParams := &ypb.RequestYakURLParams{
-		Url:    rootURL,
-		Method: "GET",
-	}
-	rootResp, err := NewJavaDecompilerAction().Get(rootParams)
-	require.NoError(t, err)
-
-	// Verify we can see the nested JAR
-	nestedJarFound := false
-	for _, res := range rootResp.Resources {
-		t.Logf("Path in lib dir: %s", res.Path)
-		if strings.Contains(res.Path, "nested.jar") {
-			nestedJarFound = true
+	t.Cleanup(func() {
+		for _, action := range actions {
+			action.ClearCache()
 		}
-	}
-	require.True(t, nestedJarFound, "Should find nested.jar in lib directory")
+		// Force GC twice to ensure all references are released (Windows file handles
+		// may require multiple GC cycles to be fully released)
+		runtime.GC()
+		runtime.GC()
+		time.Sleep(200 * time.Millisecond)
+	})
 
-	// Create a copy of the nested JAR for testing
-	action := NewJavaDecompilerAction()
-	jarFS, err := action.getJarFS(tempJarPath)
-	require.NoError(t, err)
+	t.Run("list nested jar", func(t *testing.T) {
+		dirPath := "lib"
+		rootURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + tempJarPath + "&dir=" + dirPath)
+		require.NoError(t, err)
 
-	// Read the nested JAR content
-	nestedJarContent, err := jarFS.ZipFS.ReadFile("lib/nested.jar")
-	require.NoError(t, err)
-
-	// Create temporary file for nested JAR
-	nestedJarPath := filepath.Join(t.TempDir(), "nested.jar")
-	err = os.WriteFile(nestedJarPath, nestedJarContent, 0644)
-	require.NoError(t, err)
-
-	// Now we can properly test nested JAR access using the extracted file
-	nestedDirPath := "com/example"
-	nestedURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + nestedJarPath + "&dir=" + nestedDirPath)
-	require.NoError(t, err)
-
-	nestedParams := &ypb.RequestYakURLParams{
-		Url:    nestedURL,
-		Method: "GET",
-	}
-	nestedResp, err := action.Get(nestedParams)
-	require.NoError(t, err)
-
-	// Verify we can see content in the nested JAR
-	classFound := false
-	for _, res := range nestedResp.Resources {
-		t.Logf("Path in nested JAR: %s, Type: %s", res.Path, res.ResourceType)
-		if strings.Contains(res.Path, "NestedClass.class") {
-			classFound = true
+		rootParams := &ypb.RequestYakURLParams{
+			Url:    rootURL,
+			Method: "GET",
 		}
-	}
-	require.True(t, classFound, "Should find NestedClass.class in nested JAR")
+		rootAction := NewJavaDecompilerAction()
+		actions = append(actions, rootAction)
+		rootResp, err := rootAction.Get(rootParams)
+		require.NoError(t, err)
+
+		nestedJarFound := false
+		for _, res := range rootResp.Resources {
+			t.Logf("Path in lib dir: %s", res.Path)
+			if strings.Contains(res.Path, "nested.jar") {
+				nestedJarFound = true
+			}
+		}
+		require.True(t, nestedJarFound, "Should find nested.jar in lib directory")
+	})
+
+	t.Run("extract nested jar", func(t *testing.T) {
+		mainAction := NewJavaDecompilerAction()
+		actions = append(actions, mainAction)
+
+		jarFS, err := mainAction.getJarFS(tempJarPath)
+		require.NoError(t, err)
+
+		nestedJarContent, err := jarFS.ZipFS.ReadFile("lib/nested.jar")
+		require.NoError(t, err)
+
+		nestedJarPath = filepath.Join(tempDir, "nested.jar")
+		err = os.WriteFile(nestedJarPath, nestedJarContent, 0644)
+		require.NoError(t, err)
+	})
+
+	t.Run("access nested jar", func(t *testing.T) {
+		nestedAction := NewJavaDecompilerAction()
+		actions = append(actions, nestedAction)
+
+		nestedDirPath := "com/example"
+		nestedURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + nestedJarPath + "&dir=" + nestedDirPath)
+		require.NoError(t, err)
+
+		nestedParams := &ypb.RequestYakURLParams{
+			Url:    nestedURL,
+			Method: "GET",
+		}
+		nestedResp, err := nestedAction.Get(nestedParams)
+		require.NoError(t, err)
+
+		classFound := false
+		for _, res := range nestedResp.Resources {
+			t.Logf("Path in nested JAR: %s, Type: %s", res.Path, res.ResourceType)
+			if strings.Contains(res.Path, "NestedClass.class") {
+				classFound = true
+			}
+		}
+		require.True(t, classFound, "Should find NestedClass.class in nested JAR")
+	})
 }
 
 func TestDeeplyNestedJarAccess(t *testing.T) {
 	// Create a temporary JAR file with nested JARs for testing
-	tempJarPath, _, cleanup := createTestJarWithNested(t)
-	defer cleanup()
+	tempJarPath, _ := createTestJarWithNested(t)
 
-	// Create a copy of the nested JAR for testing
-	action := NewJavaDecompilerAction()
-	jarFS, err := action.getJarFS(tempJarPath)
-	require.NoError(t, err)
-
-	// Read the nested JAR content
-	nestedJarContent, err := jarFS.ZipFS.ReadFile("lib/nested.jar")
-	require.NoError(t, err)
-
-	// Create temporary file for nested JAR
 	tempDir := t.TempDir()
-	nestedJarPath := filepath.Join(tempDir, "nested.jar")
-	err = os.WriteFile(nestedJarPath, nestedJarContent, 0644)
-	require.NoError(t, err)
+	var nestedJarPath string
+	var innerJarPath string
+	var actions []*Action
 
-	// Now extract the inner JAR from nested JAR
-	nestedJarFS, err := action.getJarFS(nestedJarPath)
-	require.NoError(t, err)
-
-	// Read the inner JAR content
-	innerJarContent, err := nestedJarFS.ZipFS.ReadFile("lib/inner.jar")
-	require.NoError(t, err)
-
-	// Create temporary file for inner JAR
-	innerJarPath := filepath.Join(tempDir, "inner.jar")
-	err = os.WriteFile(innerJarPath, innerJarContent, 0644)
-	require.NoError(t, err)
-
-	// Now we can properly test inner JAR access
-	innerDirPath := "com/example"
-	innerURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + innerJarPath + "&dir=" + innerDirPath)
-	require.NoError(t, err)
-
-	innerParams := &ypb.RequestYakURLParams{
-		Url:    innerURL,
-		Method: "GET",
-	}
-	innerResp, err := action.Get(innerParams)
-	require.NoError(t, err)
-
-	// Verify we can see content in the inner JAR
-	classFound := false
-	for _, res := range innerResp.Resources {
-		t.Logf("Path in inner JAR: %s, Type: %s", res.Path, res.ResourceType)
-		if strings.Contains(res.Path, "InnerClass.class") {
-			classFound = true
+	t.Cleanup(func() {
+		for _, action := range actions {
+			action.ClearCache()
 		}
-	}
-	require.True(t, classFound, "Should find InnerClass.class in inner JAR")
+		// Force GC twice to ensure all references are released (Windows file handles
+		// may require multiple GC cycles to be fully released)
+		runtime.GC()
+		runtime.GC()
+		time.Sleep(200 * time.Millisecond)
+	})
 
-	// Test reading a class from the inner JAR
-	classPath := "com/example/InnerClass.class"
-	classURL, err := CreateUrlFromString("javadec:///class-aifix?jar=" + innerJarPath + "&class=" + classPath)
-	require.NoError(t, err)
+	t.Run("extract nested jar", func(t *testing.T) {
+		mainAction := NewJavaDecompilerAction()
+		actions = append(actions, mainAction)
 
-	classParams := &ypb.RequestYakURLParams{
-		Url:    classURL,
-		Method: "GET",
-	}
-	classResp, err := action.Get(classParams)
-	require.NoError(t, err)
+		jarFS, err := mainAction.getJarFS(tempJarPath)
+		require.NoError(t, err)
 
-	// Verify we can access the class in the inner JAR
-	classContentFound := false
-	for _, res := range classResp.Resources {
-		t.Logf("Resource: %s, Type: %s", res.Path, res.ResourceType)
-		if strings.Contains(res.Path, "InnerClass.class") {
-			classContentFound = true
-			// Check for extra data that should contain decompiled content
-			for _, extra := range res.Extra {
-				if extra.Key == "content" {
-					t.Logf("Found class content, length: %d", len(extra.Value))
+		nestedJarContent, err := jarFS.ZipFS.ReadFile("lib/nested.jar")
+		require.NoError(t, err)
+
+		nestedJarPath = filepath.Join(tempDir, "nested.jar")
+		err = os.WriteFile(nestedJarPath, nestedJarContent, 0644)
+		require.NoError(t, err)
+	})
+
+	t.Run("extract inner jar", func(t *testing.T) {
+		nestedAction := NewJavaDecompilerAction()
+		actions = append(actions, nestedAction)
+
+		nestedJarFS, err := nestedAction.getJarFS(nestedJarPath)
+		require.NoError(t, err)
+
+		innerJarContent, err := nestedJarFS.ZipFS.ReadFile("lib/inner.jar")
+		require.NoError(t, err)
+
+		innerJarPath = filepath.Join(tempDir, "inner.jar")
+		err = os.WriteFile(innerJarPath, innerJarContent, 0644)
+		require.NoError(t, err)
+	})
+
+	t.Run("access inner jar", func(t *testing.T) {
+		innerAction := NewJavaDecompilerAction()
+		actions = append(actions, innerAction)
+
+		innerDirPath := "com/example"
+		innerURL, err := CreateUrlFromString("javadec:///jar-aifix?jar=" + innerJarPath + "&dir=" + innerDirPath)
+		require.NoError(t, err)
+
+		innerParams := &ypb.RequestYakURLParams{
+			Url:    innerURL,
+			Method: "GET",
+		}
+		innerResp, err := innerAction.Get(innerParams)
+		require.NoError(t, err)
+
+		classFound := false
+		for _, res := range innerResp.Resources {
+			t.Logf("Path in inner JAR: %s, Type: %s", res.Path, res.ResourceType)
+			if strings.Contains(res.Path, "InnerClass.class") {
+				classFound = true
+			}
+		}
+		require.True(t, classFound, "Should find InnerClass.class in inner JAR")
+	})
+
+	t.Run("read class from inner jar", func(t *testing.T) {
+		innerAction := NewJavaDecompilerAction()
+		actions = append(actions, innerAction)
+
+		classPath := "com/example/InnerClass.class"
+		classURL, err := CreateUrlFromString("javadec:///class-aifix?jar=" + innerJarPath + "&class=" + classPath)
+		require.NoError(t, err)
+
+		classParams := &ypb.RequestYakURLParams{
+			Url:    classURL,
+			Method: "GET",
+		}
+		classResp, err := innerAction.Get(classParams)
+		require.NoError(t, err)
+
+		classContentFound := false
+		for _, res := range classResp.Resources {
+			t.Logf("Resource: %s, Type: %s", res.Path, res.ResourceType)
+			if strings.Contains(res.Path, "InnerClass.class") {
+				classContentFound = true
+				for _, extra := range res.Extra {
+					if extra.Key == "content" {
+						t.Logf("Found class content, length: %d", len(extra.Value))
+					}
 				}
 			}
 		}
-	}
-	require.True(t, classContentFound, "Should find InnerClass.class content in inner JAR")
+		require.True(t, classContentFound, "Should find InnerClass.class content in inner JAR")
+	})
 }

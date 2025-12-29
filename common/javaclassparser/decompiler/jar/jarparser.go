@@ -21,7 +21,7 @@ type JarParser struct {
 	jarPath string
 
 	// jarFS is the filesystem interface for accessing JAR contents
-	jarFS *javaclassparser.FS
+	jarFS *javaclassparser.JarFS
 
 	// mutex protects concurrent access to resources
 	mutex sync.Mutex
@@ -66,7 +66,7 @@ func NewJarParserFromBytes(jarContent []byte) (*JarParser, error) {
 }
 
 // GetJarFS returns the underlying filesystem for the JAR
-func (j *JarParser) GetJarFS() *javaclassparser.FS {
+func (j *JarParser) GetJarFS() *javaclassparser.JarFS {
 	return j.jarFS
 }
 
@@ -311,7 +311,7 @@ func (j *JarParser) parseMultiLevelJarPath(fullPath string) ([]string, string, e
 // Deprecated: This is a simple version that only handles a single level of nesting.
 // For multi-level nested JARs, the ListDirectory and DecompileClass methods now
 // automatically handle multiple levels of nesting.
-func (j *JarParser) GetNestedJarFS(nestedJarPath string) (*javaclassparser.FS, error) {
+func (j *JarParser) GetNestedJarFS(nestedJarPath string) (*javaclassparser.JarFS, error) {
 	content, err := j.jarFS.ZipFS.ReadFile(nestedJarPath)
 	if err != nil {
 		return nil, utils.Wrapf(err, "failed to read nested jar: %s", nestedJarPath)
