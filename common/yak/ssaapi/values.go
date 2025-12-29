@@ -1225,6 +1225,14 @@ func (v Values) ForEach(f func(*Value)) Values {
 	}
 	return v
 }
+func (v Values) Recursive(f func(value *Value) error) error {
+	for _, v := range v {
+		if err := f(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (v Values) Flat(f func(*Value) Values) Values {
 	var newVals Values
@@ -1297,6 +1305,9 @@ func (vs Values) DotGraph() string {
 	return dotGraph.String()
 }
 
+func (vs Values) Len() int {
+	return len(vs)
+}
 func (vs Values) Count() int {
 	return len(vs)
 }

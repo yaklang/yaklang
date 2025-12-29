@@ -14,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -422,8 +421,8 @@ func TestNativeCall_Java_RegexpForMybatisAnnotation(t *testing.T) {
 `).Show()
 		checked = false
 		if results.Len() >= 1 {
-			results.Recursive(func(operator sfvm.ValueOperator) error {
-				if strings.Contains(operator.String(), "tableName") {
+			results.Recursive(func(value *ssaapi.Value) error {
+				if strings.Contains(value.String(), "tableName") {
 					checked = true
 					return nil
 				}
@@ -441,8 +440,8 @@ func TestNativeCall_Java_RegexpForMybatisAnnotation(t *testing.T) {
 `).Show()
 		checked = false
 		if results.Len() >= 1 {
-			results.Recursive(func(operator sfvm.ValueOperator) error {
-				if strings.Contains(operator.String(), "email") {
+			results.Recursive(func(value *ssaapi.Value) error {
+				if strings.Contains(value.String(), "email") {
 					checked = true
 					return nil
 				}
@@ -487,14 +486,11 @@ alert $output
 			require.NotNil(t, result)
 			values := result.GetValues("sink").Show()
 			require.Greater(t, values.Len(), 0)
-			values.Recursive(func(operator sfvm.ValueOperator) error {
-				switch ret := operator.(type) {
-				case *ssaapi.Value:
-					require.True(t, ret.GetRange() != nil && ret.GetRange().GetEditor() != nil)
-					editor := ret.GetRange().GetEditor()
-					require.True(t, editor.GetFilename() == "a.java")
-					require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
-				}
+			values.Recursive(func(value *ssaapi.Value) error {
+				require.True(t, value.GetRange() != nil && value.GetRange().GetEditor() != nil)
+				editor := value.GetRange().GetEditor()
+				require.True(t, editor.GetFilename() == "a.java")
+				require.True(t, editor.GetFullRange().String() == value.GetRange().String())
 				return nil
 			})
 			return nil
@@ -524,16 +520,13 @@ func TestNativeCall_GetFileFullName(t *testing.T) {
 		log.Infof("dbResult: %v", dbResult)
 		dbResult.Show()
 		values := dbResult.GetValues("sink")
-		require.True(t, !values.IsEmpty())
-		values.Recursive(func(operator sfvm.ValueOperator) error {
-			switch ret := operator.(type) {
-			case *ssaapi.Value:
-				require.True(t, ret.GetRange() != nil)
-				require.True(t, ret.GetRange().GetEditor() != nil)
-				editor := ret.GetRange().GetEditor()
-				require.Contains(t, editor.GetUrl(), "src/main/java/abc.java")
-				require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
-			}
+		require.True(t, values.Len() > 0)
+		values.Recursive(func(value *ssaapi.Value) error {
+			require.True(t, value.GetRange() != nil)
+			require.True(t, value.GetRange().GetEditor() != nil)
+			editor := value.GetRange().GetEditor()
+			require.Contains(t, editor.GetUrl(), "src/main/java/abc.java")
+			require.True(t, editor.GetFullRange().String() == value.GetRange().String())
 			return nil
 		})
 	})
