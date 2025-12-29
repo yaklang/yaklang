@@ -230,7 +230,11 @@ func ReplaceHTTPPacketPathWithoutEncoding(packet []byte, p string) []byte {
 	return handleHTTPPacketPath(packet, true, p)
 }
 
-func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
+func ReplaceHTTPPacketPathFunc(packet []byte, callback func(originPath string) string) []byte {
+	return handleHTTPPacketPathWithCallback(packet, false, callback)
+}
+
+func handleHTTPPacketPathWithCallback(packet []byte, noAutoEncode bool, callback func(originPath string) string) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
 	var header []string
@@ -247,6 +251,8 @@ func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
 			if u == nil { // invalid url
 				return nil
 			}
+
+			p := callback(requestUri)
 
 			if !strings.HasPrefix(p, "/") {
 				p = "/" + p
@@ -274,6 +280,12 @@ func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
 		buf.WriteString(CRLF)
 	}
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
+	return handleHTTPPacketPathWithCallback(packet, noAutoEncode, func(originPath string) string {
+		return p
+	})
 }
 
 // AppendHTTPPacketPath 是一个辅助函数，用于改变请求报文，在现有请求路径后添加请求路径

@@ -1065,6 +1065,24 @@ func WithReplaceHttpPacketPath(path string) PocConfigOption {
 	}
 }
 
+// replacePathFunc 是一个请求选项参数，用于使用回调改变请求报文，修改请求路径
+// Example:
+// ```
+//
+//	poc.Get("https://pie.dev/post", poc.replacePath(func(a){
+//		return "/get"
+//	})) // 向 pie.dev 发起请求，实际上请求路径为/get
+//
+// ```
+func WithReplaceHttpPacketPathFunc(handle func(string) string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketPathFunc(packet, handle)
+		},
+		)
+	}
+}
+
 func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -2132,6 +2150,7 @@ var PoCExports = map[string]interface{}{
 	"replaceQueryParam":                  WithReplaceHttpPacketQueryParam,
 	"replacePostParam":                   WithReplaceHttpPacketPostParam,
 	"replacePath":                        WithReplaceHttpPacketPath,
+	"replacePathFunc":                    WithReplaceHttpPacketPathFunc,
 	"replaceFormEncoded":                 WithReplaceHttpPacketFormEncoded,
 	"replaceUploadFile":                  WithReplaceHttpPacketUploadFile,
 	"appendHeader":                       WithAppendHeader,
@@ -2183,6 +2202,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketQueryParamWithoutEscape":     lowhttp.ReplaceHTTPPacketQueryParamWithoutEscape,
 	"ReplaceHTTPPacketPostParam":                   lowhttp.ReplaceHTTPPacketPostParam,
 	"ReplaceHTTPPacketPath":                        lowhttp.ReplaceHTTPPacketPath,
+	"ReplaceHTTPPacketPathFunc":                    lowhttp.ReplaceHTTPPacketPathFunc,
 	"ReplaceHTTPPacketFormEncoded":                 lowhttp.ReplaceHTTPPacketFormEncoded,
 	"ReplaceHTTPPacketUploadFile":                  lowhttp.ReplaceHTTPPacketUploadFile,
 	"AppendHTTPPacketHeader":                       lowhttp.AppendHTTPPacketHeader,
