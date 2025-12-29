@@ -36,6 +36,7 @@ type FuzzHTTPRequest struct {
 	source                 string
 	runtimeId              string
 	noAutoEncode           bool
+	noEscapeHTML           bool
 	friendlyDisplay        bool
 	proxy                  string
 	originRequest          []byte
@@ -239,6 +240,7 @@ type buildFuzzHTTPRequestConfig struct {
 	Source          string
 	RuntimeId       string
 	NoAutoEncode    bool
+	NoEscapeHTML    bool
 	FriendlyDisplay bool
 	QueryParams     *lowhttp.QueryParams
 	Proxy           string
@@ -257,6 +259,12 @@ func OptProxy(i string) BuildFuzzHTTPRequestOption {
 func OptDisableAutoEncode(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.NoAutoEncode = i
+	}
+}
+
+func OptNoEscapeHTML(i bool) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.NoEscapeHTML = i
 	}
 }
 
@@ -469,6 +477,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		runtimeId:       config.RuntimeId,
 		proxy:           config.Proxy,
 		noAutoEncode:    config.NoAutoEncode,
+		noEscapeHTML:    config.NoEscapeHTML,
 		friendlyDisplay: config.FriendlyDisplay,
 		queryParams:     config.QueryParams,
 		ctx:             config.Ctx,

@@ -1,6 +1,7 @@
 package jsonpath
 
 import (
+	"bytes"
 	"container/list"
 	"encoding/json"
 	"fmt"
@@ -100,6 +101,26 @@ func RecursiveDeepReplaceString(i string, val any) []string {
 		m[k] = rStr
 	}
 	return m
+}
+
+func ReplaceStringWithNoEscapeHTML(i string, jp string, replaced any) string {
+	data, err := Replace(i, jp, replaced)
+	if err != nil {
+		log.Warnf("jsonpath(jp) replace %s failed: %s", jp, err)
+		return ""
+	}
+	buffer := &bytes.Buffer{}
+	encoder := json.NewEncoder(buffer)
+	encoder.SetEscapeHTML(false)
+	err = encoder.Encode(data)
+	if err != nil {
+		return ""
+	}
+	result := buffer.String()
+	if len(result) > 0 && result[len(result)-1] == '\n' {
+		result = result[:len(result)-1]
+	}
+	return result
 }
 
 func ReplaceString(i string, jp string, replaced any) string {
