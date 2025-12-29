@@ -139,7 +139,7 @@ func (f *FuzzHTTPRequest) fuzzPostBase64JsonPath(key any, jsonPath string, val a
 		{keyStr}, InterfaceToFuzzResults(val),
 	}, func(result []string) error {
 		value := result[1]
-		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 		value := result[1]
 		// var replaced = valueToJsonValue(value)
 
-		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			return err
 		}

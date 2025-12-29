@@ -69,7 +69,7 @@ func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any, 
 		{kStr}, values,
 	}, func(result []string) error {
 		_, value := result[0], result[1]
-		modifiedParams, err := modifyJSONValue(originJson, jsonPath, value, val, valueIndex)
+		modifiedParams, err := modifyJSONValue(originJson, jsonPath, value, val, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			return err
 		}

@@ -419,7 +419,7 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
 
-		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex)
+		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			return err
 		}
@@ -443,7 +443,7 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 	return reqs, nil
 }
 
-func modifyJSONValue(rawJson, jsonPath, value string, val any, index int) (string, error) {
+func modifyJSONValue(rawJson, jsonPath, value string, val any, index int, noEscapeHtml bool) (string, error) {
 	defer func() {
 		index++
 	}()
@@ -497,7 +497,11 @@ func modifyJSONValue(rawJson, jsonPath, value string, val any, index int) (strin
 		newValue = gjson.ParseBytes(jsonStr).Value()
 	}
 
-	return jsonpath.ReplaceString(rawJson, jsonPath, newValue), nil
+	if noEscapeHtml {
+		return jsonpath.ReplaceStringWithNoEscapeHTML(rawJson, jsonPath, newValue), nil
+	} else {
+		return jsonpath.ReplaceString(rawJson, jsonPath, newValue), nil
+	}
 }
 
 func handleJSONVal(value string, val any, index int) (any, any) {
@@ -551,7 +555,7 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 	valueIndex := 0
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex)
+		modifiedParams, err := modifyJSONValue(rawJson, jsonPath, value, val, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			log.Errorf("modify json value failed: %s", err)
 			return nil
@@ -775,7 +779,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 	}, func(result []string) error {
 		value := result[0]
 
-		modifiedBody, err := modifyJSONValue(jsonBody, p.path, value, originValue, valueIndex)
+		modifiedBody, err := modifyJSONValue(jsonBody, p.path, value, originValue, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			return err
 		}
@@ -893,7 +897,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		pair := m.Value()
 		key, value := pair[0], pair[1]
 
-		modifiedBody, err := modifyJSONValue(string(originBody), key, value, v, valueIndex)
+		modifiedBody, err := modifyJSONValue(string(originBody), key, value, v, valueIndex, f.noEscapeHTML)
 		if err != nil {
 			break
 		}

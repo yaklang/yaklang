@@ -887,3 +887,76 @@ HOST: www.example.com`,
 		}
 	}
 }
+
+func TestFuzzRequestParam_JSON_NoEscapeHTML(t *testing.T) {
+	// 创建一个 JSON 请求
+	jsonReq := `POST /api HTTP/1.1
+Host: example.com
+Content-Type: application/json
+
+{"key": "value"}
+`
+	// 使用 OptNoEscapeHTML(true) 选项创建 FuzzHTTPRequest
+	req, err := NewFuzzHTTPRequest(jsonReq, OptNoEscapeHTML(true))
+	if err != nil {
+		t.Fatalf("NewFuzzHTTPRequest failed: %v", err)
+	}
+
+	// 执行 Fuzz，注入包含 HTML 字符的值
+	fuzzValue := "<b>bold</b>"
+	results, err := req.FuzzPostJsonParams("key", fuzzValue).Results()
+	if err != nil {
+		t.Fatalf("FuzzPostJsonParams failed: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("No results generated")
+	}
+
+	// 检查结果是否包含未转义的 HTML 字符
+	found := false
+	for _, res := range results {
+		raw, err := utils.DumpHTTPRequest(res, true)
+		if err != nil {
+			t.Fatalf("DumpHTTPRequest failed: %v", err)
+		}
+		if bytes.Contains(raw, []byte(fuzzValue)) {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("Expected to find unescaped HTML '%s' in fuzz results, but did not.", fuzzValue)
+	}
+
+	// 对比测试：如果不开启 NoEscapeHTML，应该被转义
+	reqEscape, err := NewFuzzHTTPRequest(jsonReq) // 默认 OptNoEscapeHTML(false)
+	if err != nil {
+		t.Fatalf("NewFuzzHTTPRequest failed: %v", err)
+	}
+	resultsEscape, err := reqEscape.FuzzPostJsonParams("key", fuzzValue).Results()
+	if err != nil {
+		t.Fatalf("FuzzPostJsonParams failed: %v", err)
+	}
+
+	escapedValue := "\\u003cb\\u003ebold\\u003c/b\\u003e"
+	foundEscaped := false
+	for _, res := range resultsEscape {
+		raw, err := utils.DumpHTTPRequest(res, true)
+		if err != nil {
+			t.Fatalf("DumpHTTPRequest failed: %v", err)
+		}
+		if bytes.Contains(raw, []byte(escapedValue)) {
+			foundEscaped = true
+			break
+		}
+		if bytes.Contains(raw, []byte(fuzzValue)) {
+			t.Errorf("Did not expect to find unescaped HTML '%s' in default fuzz results (should be escaped).", fuzzValue)
+		}
+	}
+
+	if !foundEscaped {
+		t.Fatalf("Did not find specific escaped string '%s', but also did not find unescaped string.", escapedValue)
+	}
+}
