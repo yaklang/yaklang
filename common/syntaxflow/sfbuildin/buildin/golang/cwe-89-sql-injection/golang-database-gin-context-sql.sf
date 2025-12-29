@@ -83,7 +83,8 @@ $sink.Query as $func;
 
 $func(* as $param);
 $param #{
-    until: "Sprintf | *?{opcode:add}"
+    until: `/Sprintf/`,
+	until: `*?{opcode:add}`,
 }-> as $unsafe;
 
 $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
