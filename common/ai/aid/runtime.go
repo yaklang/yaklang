@@ -20,9 +20,21 @@ type runtime struct {
 	RootTask *AiTask
 	config   *Coordinator
 
-	currentIndex int
-	TaskLink     *linktable.LinkedList[*AiTask]
-	statusMutex  sync.Mutex
+	cursor      int
+	TaskLink    *linktable.LinkedList[*AiTask]
+	statusMutex sync.Mutex
+}
+
+func (r *runtime) currentIndex() int {
+	if r.cursor <= 0 {
+		return 0
+	}
+	return r.cursor - 1
+}
+
+// currentProgressIndex returns the current progress index (1-based)
+func (r *runtime) currentProgressIndex() int {
+	return r.cursor
 }
 
 func (c *Coordinator) createRuntime() *runtime {
@@ -145,10 +157,12 @@ func (r *runtime) Progress() string {
 }
 
 func (r *runtime) NextStep() (*AiTask, bool) {
-	defer func() {
-		r.currentIndex++
-	}()
-	return r.TaskLink.Get(r.currentIndex)
+	task, ok := r.TaskLink.Get(r.cursor)
+	if ok {
+		r.cursor++
+		return task, true
+	}
+	return task, false
 }
 
 func (r *runtime) Invoke(task *AiTask) error {
@@ -156,7 +170,7 @@ func (r *runtime) Invoke(task *AiTask) error {
 		r.RootTask = task
 	}
 	r.updateTaskLink()
-	r.currentIndex = 0
+	r.cursor = 0
 
 	// Calculate total tasks for progress display
 	totalTasks := r.TaskLink.Len()
@@ -224,7 +238,7 @@ func (r *runtime) Invoke(task *AiTask) error {
 
 		// Emit current progress
 		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 当前: [%s] / Progress: %d/%d - Current: [%s]",
-			r.currentIndex, totalTasks, currentTask.Index, r.currentIndex, totalTasks, currentTask.Index))
+			r.currentProgressIndex(), totalTasks, currentTask.Index, r.currentProgressIndex(), totalTasks, currentTask.Index))
 
 		if err := invokeTask(currentTask); err != nil {
 			// 检查是否是任务被用户主动跳过导致的错误

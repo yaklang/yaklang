@@ -598,7 +598,7 @@ func (c *Coordinator) AppendTask(t *AiTask) {
 		t.GenerateIndex()
 	}()
 	r := c.runtime
-	task, ok := r.TaskLink.Get(r.currentIndex)
+	task, ok := r.TaskLink.Get(r.currentIndex())
 	if !ok {
 		log.Warnf("coordinator: append task failed, current task not found")
 		return
@@ -610,7 +610,8 @@ func (c *Coordinator) AppendTask(t *AiTask) {
 
 // HandleSkipSubtaskInPlan 处理跳过子任务的同步事件
 // 输入参数:
-//   - subtask_index: 子任务的索引，如 "1-1", "1-2"（必需）
+//   - subtask_index: 子任务的索引，如 "1-1", "1-2" （当 current task 为false的时候必须）
+//   - skip_current_task: 跳过当前任务（可选）
 //   - reason: 用户跳过该任务的理由（可选）
 //
 // 注意：此函数不会返回错误导致整体中断，而是通过同步响应返回失败信息
@@ -653,8 +654,18 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 
 	subtaskIndex := utils.InterfaceToString(params["subtask_index"])
 	if subtaskIndex == "" {
-		sendFailResponse("subtask_index is required for skip_subtask_in_plan")
-		return nil
+		if utils.InterfaceToBoolean(params["skip_current_task"]) {
+			// 跳过当前任务
+			currentTask, ok := c.runtime.TaskLink.Get(c.runtime.currentIndex())
+			if !ok || currentTask == nil {
+				sendFailResponse("no current task found to skip")
+				return nil
+			}
+			subtaskIndex = currentTask.Index
+		} else {
+			sendFailResponse("subtask_index is required for skip_subtask_in_plan")
+			return nil
+		}
 	}
 
 	// 获取用户理由（可选）

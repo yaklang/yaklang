@@ -524,6 +524,20 @@ LOOP:
 	require.True(t, skipSuccess, "skip with reason should succeed")
 }
 
+// TestCoordinator_SkipSubtaskAndContinueNextUseCurrent 验证 skip 子任务后，下一个子任务立即开始执行, 但是使用的是skip current task flag
+func TestCoordinator_SkipSubtaskAndContinueNextUseCurrent(t *testing.T) {
+	const maxRetries = 10
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(20 * time.Millisecond)
+		}
+		if runSkipAndContinueTest(t, true) {
+			return // 测试成功
+		}
+	}
+	t.Fatal("Test failed after max retries - skip and continue mechanism may have issues")
+}
+
 // TestCoordinator_SkipSubtaskAndContinueNext 验证 skip 子任务后，下一个子任务立即开始执行
 // 这是一个关键测试，确保：
 // 1. 测试中有 1-1 和 1-2 两个任务
@@ -545,7 +559,7 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 		if attempt > 0 {
 			time.Sleep(20 * time.Millisecond)
 		}
-		if runSkipAndContinueTest(t) {
+		if runSkipAndContinueTest(t, false) {
 			return // 测试成功
 		}
 	}
@@ -553,7 +567,7 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 }
 
 // runSkipAndContinueTest 执行单次 skip 和继续测试，返回是否成功
-func runSkipAndContinueTest(t *testing.T) bool {
+func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 
@@ -685,13 +699,19 @@ LOOP:
 			// callback 已准备好，发送 skip 请求
 			if !skipSent {
 				skipSent = true
+
+				data := map[string]any{
+					"subtask_index": "1-1",
+					"reason":        "用户决定跳过任务1-1，希望立即执行任务1-2",
+				}
+				if useCurrentFlag {
+					data["skip_current_task"] = true
+					delete(data, "subtask_index")
+				}
 				inputChan.SafeFeed(SyncInputEventWithJSON(
 					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
 					syncId,
-					map[string]any{
-						"subtask_index": "1-1",
-						"reason":        "用户决定跳过任务1-1，希望立即执行任务1-2",
-					},
+					data,
 				))
 			}
 
