@@ -93,7 +93,7 @@ $entry.Open() <getMembers> as $client;
 
 $client.User.Query().Where(* as $param);
 $param #{
-    until: "Sprintf | *?{opcode:add}"
+    until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
 }-> as $unsafe;
 
 $unsafe<getCall> *?{*#{until: "*.FormValue"}-> } as $high;

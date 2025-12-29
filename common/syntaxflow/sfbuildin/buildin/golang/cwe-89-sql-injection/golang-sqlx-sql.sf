@@ -88,7 +88,7 @@ $sink.Where as $func
 $func(*<slice(index=2)> as $param);
 $func(*<slice(index=3)> as $param);
 $param #{
-    until: "Sprintf | *?{opcode:add}"
+    until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
 }-> as $unsafe
 
 $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 

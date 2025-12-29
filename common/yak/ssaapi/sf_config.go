@@ -47,17 +47,37 @@ func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
 			continue
 		}
 		frame, err := c.vm.Compile(item.Value)
-		if err == nil {
-			checkItem := &checkItem{
-				RecursiveConfigItem: item,
-				frame:               frame,
-			}
+		if err != nil {
+			var keyName string
 			switch item.Key {
-			case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
-				c.matchItem = append(c.matchItem, checkItem)
-			case sf.RecursiveConfig_Until, sf.RecursiveConfig_Hook:
-				c.untilItem = append(c.untilItem, checkItem)
+			case sf.RecursiveConfig_Include:
+				keyName = "include"
+			case sf.RecursiveConfig_Exclude:
+				keyName = "exclude"
+			case sf.RecursiveConfig_Until:
+				keyName = "until"
+			case sf.RecursiveConfig_Hook:
+				keyName = "hook"
+			default:
+				keyName = "unknown"
 			}
+			// 暴露编译错误，添加到结果中以便前端可以获取
+			errorMsg := utils.Errorf("SyntaxFlow compile error for %s rule [%s]: %v", keyName, item.Value, err).Error()
+			log.Errorf(errorMsg)
+			if c.contextResult != nil {
+				c.contextResult.Errors = append(c.contextResult.Errors, errorMsg)
+			}
+			continue
+		}
+		checkItem := &checkItem{
+			RecursiveConfigItem: item,
+			frame:               frame,
+		}
+		switch item.Key {
+		case sf.RecursiveConfig_Include, sf.RecursiveConfig_Exclude:
+			c.matchItem = append(c.matchItem, checkItem)
+		case sf.RecursiveConfig_Until, sf.RecursiveConfig_Hook:
+			c.untilItem = append(c.untilItem, checkItem)
 		}
 	}
 }

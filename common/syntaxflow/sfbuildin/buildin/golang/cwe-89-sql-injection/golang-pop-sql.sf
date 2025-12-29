@@ -110,7 +110,7 @@ $sink.RawQuery as $func
 
 $func(* as $param);
 $param #{
-    until: "Sprintf | *?{opcode:add}"
+    until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
 }-> as $unsafe
 
 $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high 
