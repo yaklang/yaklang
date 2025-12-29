@@ -14,14 +14,14 @@ import (
 
 type javaDecompilerAction struct {
 	BaseAction
-	jarFS map[string]*javaclassparser.FS
+	jarFS map[string]*javaclassparser.JarFS
 }
 
 var _ Action = (*javaDecompilerAction)(nil)
 
 func newJavaDecompilerAction() *javaDecompilerAction {
 	action := &javaDecompilerAction{
-		jarFS: make(map[string]*javaclassparser.FS),
+		jarFS: make(map[string]*javaclassparser.JarFS),
 	}
 
 	// Handle JAR directory listing
@@ -176,8 +176,8 @@ func newJavaDecompilerAction() *javaDecompilerAction {
 	return action
 }
 
-// getJarFS gets or creates a javaclassparser.FS for the given jar path
-func (j *javaDecompilerAction) getJarFS(jarPath string) (*javaclassparser.FS, error) {
+// getJarFS gets or creates a javaclassparser.JarFS for the given jar path
+func (j *javaDecompilerAction) getJarFS(jarPath string) (*javaclassparser.JarFS, error) {
 	if fs, ok := j.jarFS[jarPath]; ok {
 		return fs, nil
 	}
