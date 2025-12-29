@@ -2,11 +2,15 @@ package java2ssa
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -68,8 +72,77 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
+func extractZipFSFromUnderlying(underlying fi.FileSystem) *filesys.ZipFS {
+	if zfs, ok := underlying.(*filesys.ZipFS); ok {
+		return zfs
+	}
+	if jarFS, ok := underlying.(*javaclassparser.JarFS); ok {
+		return jarFS.ZipFS
+	}
+	return nil
+}
+
+func handleNestedJarHook() *filesys.ReadHook {
+	return &filesys.ReadHook{
+		Matcher: filesys.CustomMatcher(func(name string) bool {
+			return strings.Contains(name, ".jar/") || strings.Contains(name, ".jar!")
+		}),
+		AfterRead: func(ctx *filesys.ReadHookContext, data []byte) ([]byte, error) {
+			if len(data) > 0 {
+				return data, nil
+			}
+
+			targetZipFS := extractZipFSFromUnderlying(ctx.Underlying)
+			if targetZipFS == nil {
+				return data, nil
+			}
+
+			helper := javaclassparser.NewZipJarHelper(targetZipFS)
+			jarPath, internalPath, isJar := helper.ParseJarPath(ctx.Name)
+			if !isJar {
+				return data, nil
+			}
+
+			jarData, err := helper.ReadFileFromJar(jarPath, internalPath)
+			if err != nil {
+				return data, nil
+			}
+
+			return jarData, nil
+		},
+	}
+}
+
 func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
-	return fs
+	// HookFS 可能包装了两种类型：
+	// 1. CodeSourceCompression: ZipFS -> HookFS (压缩文件)
+	// 2. CodeSourceJar: ZipFS -> JarFS -> UnifiedFS -> HookFS (JAR 文件，已配置扩展名映射)
+	// 两种情况都需要处理嵌套 JAR，通过 hook 机制统一处理
+
+	var hasNestedJar bool
+	filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithFileStat(func(path string, info os.FileInfo) error {
+		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".jar") ||
+			strings.HasSuffix(strings.ToLower(path), ".war")) {
+			hasNestedJar = true
+		}
+		return nil
+	}))
+
+	if !hasNestedJar {
+		return fs
+	}
+
+	// 如果已经是 HookFS，直接添加嵌套 JAR 处理的 hook
+	// hook 中会通过 ReadHookContext.Underlying 访问底层文件系统（ZipFS 或 UnifiedFS）
+	if hookFS, ok := fs.(*filesys.HookFS); ok {
+		hookFS.AddReadHook(handleNestedJarHook())
+		return hookFS
+	}
+
+	// 否则创建新的 HookFS 来处理嵌套 JAR
+	newHookFS := filesys.NewHookFS(fs)
+	newHookFS.AddReadHook(handleNestedJarHook())
+	return newHookFS
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
