@@ -84,6 +84,10 @@ var RagExports = map[string]interface{}{
 
 	"BuildIndexKnowledgeFromFile": BuildIndexKnowledgeFromFile,
 
+	// Search index building functions - for building search indexes for tools/content
+	"BuildSearchIndexKnowledge":         BuildSearchIndexKnowledge,
+	"BuildSearchIndexKnowledgeFromFile": BuildSearchIndexKnowledgeFromFile,
+
 	"Import":             rag.ImportRAG,
 	"db":                 rag.WithDB,
 	"importOverwrite":    rag.WithExportOverwriteExisting,
@@ -117,6 +121,67 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) erro
 		log.Infof("indexed knowledge entry: %s", entry.KnowledgeTitle)
 	}
 	return nil
+}
+
+// BuildSearchIndexKnowledge builds a search index for the given text content.
+// It generates 5-10 search questions that users might ask to find this content,
+// and stores the original content as the knowledge entry.
+//
+// Parameters:
+//   - kbName: the knowledge base name
+//   - text: the content to index (e.g., tool description, usage, parameters)
+//   - options: optional configuration (rag options, AI options, etc.)
+//
+// The function will:
+// 1. Use AI to generate 5-10 search questions based on the text
+// 2. Store the original text as the knowledge entry
+// 3. Set docMetadata with question_index and search_target for each question
+//
+// Example:
+// ```yak
+// text = `
+// 工具名：端口扫描器
+// 目标：扫描目标主机的开放端口
+// 用法：指定目标IP和端口范围，工具会返回开放的端口列表
+// `
+// result = rag.BuildSearchIndexKnowledge("my-tools", text)~
+// println("Generated questions:", result.Questions)
+// ```
+func BuildSearchIndexKnowledge(kbName string, text string, option ...any) (*aiforge.SearchIndexResult, error) {
+	result, err := aiforge.BuildSearchIndexKnowledge(kbName, text, option...)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("built search index with %d questions for entry %s", len(result.Questions), result.EntryID)
+	for i, q := range result.Questions {
+		log.Infof("  Q%d: %s", i+1, q)
+	}
+	return result, nil
+}
+
+// BuildSearchIndexKnowledgeFromFile builds a search index from a file.
+// It reads the file content and calls BuildSearchIndexKnowledge.
+//
+// Parameters:
+//   - kbName: the knowledge base name
+//   - filename: the path to the file containing the content to index
+//   - options: optional configuration (rag options, AI options, etc.)
+//
+// Example:
+// ```yak
+// result = rag.BuildSearchIndexKnowledgeFromFile("my-tools", "/path/to/tool-description.txt")~
+// println("Generated questions:", result.Questions)
+// ```
+func BuildSearchIndexKnowledgeFromFile(kbName string, filename string, option ...any) (*aiforge.SearchIndexResult, error) {
+	result, err := aiforge.BuildSearchIndexKnowledgeFromFile(kbName, filename, option...)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("built search index from file %s with %d questions", filename, len(result.Questions))
+	for i, q := range result.Questions {
+		log.Infof("  Q%d: %s", i+1, q)
+	}
+	return result, nil
 }
 
 // _noEntityRepository 禁用实体仓库
