@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"io"
 	"os"
 	"path/filepath"
@@ -341,7 +342,11 @@ func initYaklangLib() {
 		ssaconfig.Exports,
 	}
 	yaklang.Import("ssa", lo.Assign(ssaExports...))
-	yaklang.Import("syntaxflow", syntaxflow.Exports)
+	sfExports := []map[string]any{
+		syntaxflow.Exports,
+		syntaxflow_scan.Exports,
+	}
+	yaklang.Import("syntaxflow", lo.Assign(sfExports...))
 	yaklang.Import("sfreport", sfreport.Exports)
 
 	// openapi

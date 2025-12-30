@@ -74,21 +74,6 @@ func (r *ScannerAgentReporter) Report(record *schema.Report) error {
 	return nil
 }
 
-// ReportSSARisk 上报 SSA 风险（sfreport 格式的完整 Report JSON）
-func (r *ScannerAgentReporter) ReportSSARisk(riskJSON string) error {
-	if r.agent == nil || riskJSON == "" {
-		return nil
-	}
-	r.agent.feedback(&spec.ScanResult{
-		Type:      spec.ScanResult_SSARisk,
-		Content:   []byte(riskJSON),
-		TaskId:    r.TaskId,
-		RuntimeId: r.RuntimeId,
-		SubTaskId: r.SubTaskId,
-	})
-	return nil
-}
-
 func (r *ScannerAgentReporter) ReportWeakPassword(result interface{}) error {
 	var s = r.agent
 	switch ret := result.(type) {
