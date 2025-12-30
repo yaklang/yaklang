@@ -424,7 +424,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 					netx.DialX_WithProxy(proxyStr),
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithTLSNextProto("h2"),
+					netx.DialX_WithAppendTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
 					netx.DialX_WithDialer(p.dialer),
 				}
@@ -594,7 +594,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 					netx.DialX_WithProxy(proxyStr),
 					netx.DialX_WithForceProxy(proxyStr != ""),
 					netx.DialX_WithEnableSystemProxyFromEnv(!p.disableSystemProxy),
-					netx.DialX_WithTLSNextProto("h2"),
+					netx.DialX_WithAppendTLSNextProto("h2"),
 					netx.DialX_WithTLS(true),
 					netx.DialX_WithDialer(p.dialer),
 				}

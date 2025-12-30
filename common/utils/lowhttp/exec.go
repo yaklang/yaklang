@@ -622,7 +622,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// configTLS
 	var dialopts []netx.DialXOption
 
-	dialopts = append(dialopts, netx.DialX_WithTimeout(connectTimeout), netx.DialX_WithTLSNextProto(nextProto...))
+	dialopts = append(dialopts, netx.DialX_WithTimeout(connectTimeout), netx.DialX_WithAppendTLSNextProto(nextProto...))
 
 	if https {
 		if gmTLS {

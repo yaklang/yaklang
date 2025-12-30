@@ -247,6 +247,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		TimeoutRetryMinWait: 100 * time.Millisecond,
 		TimeoutRetryMaxWait: 500 * time.Millisecond,
 		DisallowAddress:     utils.NewHostsFilter(),
+		TLSNextProto:        []string{"http/1.1"},
 	}
 
 	// default init
