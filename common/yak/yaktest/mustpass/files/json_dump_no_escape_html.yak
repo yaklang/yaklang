@@ -1,0 +1,9 @@
+jsonData = {"url": "http://xxx.com?a=1&b=2"}
+
+// escape html
+res = json.dumps(jsonData,json.withIndent(""))
+assert res == `{"url":"http://xxx.com?a=1\u0026b=2"}`
+
+// no escape
+res = json.dumps(jsonData,json.noEscapeHTML(),json.withIndent(""))
+assert res == `{"url":"http://xxx.com?a=1&b=2"}`
