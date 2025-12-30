@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiengine"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aiengine"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/netstack_exports"
@@ -61,6 +62,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/chaosmaker"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/cve"
@@ -613,6 +615,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	vars["YAK_MAIN"] = false
 	vars["YAK_FILENAME"] = ""
 	vars["YAK_DIR"] = ""
+	vars["YAK_VERSION"] = consts.GetYakVersion()
 
 	// 设置参数获取函数
 	paramGetter := func(key string) interface{} {
