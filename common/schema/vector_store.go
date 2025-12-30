@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	META_Data_UUID  = "meta_data_UUID"
-	META_Data_Title = "meta_data_title"
-	META_Repos_UUID = "meta_repos_UUID"
+	META_Data_UUID      = "meta_data_UUID"
+	META_Data_Title     = "meta_data_title"
+	META_Repos_UUID     = "meta_repos_UUID"
+	META_QUESTION_INDEX = "question_index"
 )
 
 // FloatArray 用于在数据库中存储浮点数数组的自定义类型
@@ -255,6 +256,14 @@ func (v *VectorStoreDocument) BeforeSave() error {
 
 func (v *VectorStoreDocument) TableName() string {
 	return "rag_vector_document_v1"
+}
+
+func (v *VectorStoreDocument) SetIsQuestionIndex(isQuestionIndex bool) {
+	if isQuestionIndex {
+		v.Metadata[META_QUESTION_INDEX] = true
+	} else {
+		delete(v.Metadata, META_QUESTION_INDEX)
+	}
 }
 
 const VectorStoreDocumentBroadcastType = "vector_store_document"

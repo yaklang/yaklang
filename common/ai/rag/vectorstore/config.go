@@ -373,6 +373,12 @@ func WithDocumentMetadataKeyValue(key string, value any) DocumentOption {
 	}
 }
 
+func WithDocumentQuestionIndex(questionIndex bool) DocumentOption {
+	return func(document *Document) {
+		document.SetIsQuestionIndex(questionIndex)
+	}
+}
+
 func WithDocumentRawMetadata(i map[string]any) DocumentOption {
 	return func(document *Document) {
 		document.Metadata = i

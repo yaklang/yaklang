@@ -1,0 +1,13 @@
+{{.content}}
+
+Analyze the content above and generate up to 10 potential questions that a user might ask to find this document.
+The questions should be specific and cover key information in the text.
+
+Return the result in the following JSON format:
+{
+    "@action": "generate-questions",
+    "questions": [
+        "question 1",
+        "question 2"
+    ]
+}

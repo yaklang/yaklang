@@ -48,6 +48,14 @@ type Document struct {
 	UID             []byte                 `json:"-"` // 文档全表唯一标识符
 }
 
+func (d *Document) SetIsQuestionIndex(questionIndex bool) {
+	if questionIndex {
+		d.Metadata[schema.META_QUESTION_INDEX] = true
+	} else {
+		delete(d.Metadata, schema.META_QUESTION_INDEX)
+	}
+}
+
 // SearchResult 表示检索结果
 type SearchResult struct {
 	Document *Document `json:"document"` // 检索到的文档
