@@ -1,0 +1,23 @@
+request1 := `POST /prefix HTTP/1.1
+Host: www.example.com
+`
+
+request2 := `POST /no HTTP/1.1
+Host: www.example.com
+`
+
+
+token := str.RandStr(10)
+replaceFunc := func(rawURI){
+    if str.Contains(rawURI, "prefix") {
+        return token
+    }
+    return rawURI
+}
+
+
+replaceRequest1 := poc.ReplaceHTTPPacketPathFunc(request1, replaceFunc)
+replaceRequest2 := poc.ReplaceHTTPPacketPathFunc(request2, replaceFunc)
+
+assert str.Contains(replaceRequest1, token),"replace fail"
+assert !str.Contains(replaceRequest2, token),"error replace"
