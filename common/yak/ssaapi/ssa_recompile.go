@@ -11,11 +11,11 @@ import (
 
 // save to Profile SSAProgram
 func SaveConfig(c *Config, prog *Program) {
-	if c.databaseKind == ssa.ProgramCacheMemory {
-		if c.EnableCache && c.GetProgramName() != "" {
+	if c.databaseKind == ssa.ProgramCacheMemory || c.EnableCache {
+		if c.GetProgramName() != "" {
+			log.Errorf("Compile program cache to memory: %s", c.GetProgramName())
 			SetProgramCache(prog)
 		}
-
 		return
 	}
 	irProg, err := ssadb.GetProgram(c.GetProgramName(), ssa.Application)
