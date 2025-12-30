@@ -114,7 +114,7 @@ $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
 $path.Join(* #-> as $check);
 
-$sink #{include: "$check"}-> as $safe;
+$sink #{include: `* & $check`}-> as $safe;
 $sink?{<getCall> #{ until: "* & $input - $safe",}->} as $low;
 
 alert $low for {
