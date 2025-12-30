@@ -68,6 +68,10 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			go func(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 				defer m.SaveTask()
 				defer swg.Done()
+				if utils.IsNil(prog) {
+					log.Errorf("SyntaxFlow Scan Failed:the program to search is nil")
+					return
+				}
 				m.Query(rule, prog)
 			}(rule, prog)
 		}
