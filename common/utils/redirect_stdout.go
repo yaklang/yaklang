@@ -317,14 +317,17 @@ func HandleStdout(ctx context.Context, handle func(string)) error {
 
 	// Cleanup function - ALWAYS called via defer
 	cleanup := func() {
-		// Stop mirrors first (this closes the pipe writers)
-		stdoutMirror.Stop()
-		stderrMirror.Stop()
-
-		// Restore original stdout/stderr
+		// CRITICAL: Restore original stdout/stderr FIRST before closing pipes.
+		// This ensures that any goroutines still writing to os.Stdout/Stderr
+		// will write to the original files instead of blocked pipes.
 		os.Stdout = originStdout
 		os.Stderr = originStderr
 		log.SetOutput(originStdout)
+
+		// Now it's safe to stop mirrors and close pipes
+		// No more writes to the pipes since stdout/stderr are restored
+		stdoutMirror.Stop()
+		stderrMirror.Stop()
 
 		// Unset attached flag
 		isInAttached.UnSet()
