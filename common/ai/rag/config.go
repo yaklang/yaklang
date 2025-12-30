@@ -130,6 +130,8 @@ type RAGSystemConfig struct {
 
 	importKeyAsUID      bool
 	tryRebuildHNSWIndex bool
+
+	enableDocumentQuestionIndex bool
 }
 
 // var defaultRAGSystemName = "default"
@@ -375,6 +377,12 @@ func WithVectorStoreOptions(vectorStoreOptions ...vectorstore.CollectionConfigFu
 func WithName(name string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.Name = name
+	}
+}
+
+func WithEnableDocumentQuestionIndex(enable bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.enableDocumentQuestionIndex = enable
 	}
 }
 

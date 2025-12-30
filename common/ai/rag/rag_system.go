@@ -2,13 +2,16 @@ package rag
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
@@ -19,6 +22,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+//go:embed prompt/gen_questions.txt
+var genQuestionsPrompt string
 
 // RAGSystem 表示完整的 RAG 系统
 type RAGSystem struct {
@@ -307,7 +313,27 @@ func (r *RAGSystem) Has(docId string) bool {
 
 func (r *RAGSystem) Add(docId string, content string, opts ...RAGSystemConfigOption) error {
 	docOpts := NewRAGSystemConfig(opts...).ConvertToDocumentOptions()
-	return r.VectorStore.AddWithOptions(docId, content, docOpts...)
+	err := r.VectorStore.AddWithOptions(docId, content, docOpts...)
+	if err != nil {
+		return utils.Wrap(err, "failed to add document")
+	}
+	if r.config.enableDocumentQuestionIndex {
+		prompt := strings.ReplaceAll(genQuestionsPrompt, "{{.content}}", content)
+		result, err := aicommon.InvokeLiteForge(prompt, aicommon.WithLiteForgeActionName("generate-questions"))
+		if err != nil {
+			log.Errorf("failed to generate questions for doc %s: %v", docId, err)
+		} else if result != nil && result.Action != nil {
+			questions := result.Action.GetStringSlice("questions")
+			for i, q := range questions {
+				qId := fmt.Sprintf("%s_q_%d", docId, i)
+				qDocOpts := append(docOpts, vectorstore.WithDocumentQuestionIndex(true))
+				if err := r.VectorStore.AddWithOptions(qId, q, qDocOpts...); err != nil {
+					log.Warnf("failed to add question index %s: %v", qId, err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (r *RAGSystem) GetEmbedder() vectorstore.EmbeddingClient {
@@ -479,4 +505,8 @@ func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options 
 
 func (r *RAGSystem) GetKnowledgeBaseID() int64 {
 	return r.KnowledgeBase.GetID()
+}
+
+func (r *RAGSystem) GenerateQuestions() error {
+
 }
