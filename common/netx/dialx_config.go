@@ -252,6 +252,15 @@ func DialX_WithTLSNextProto(nextProtos ...string) DialXOption {
 	}
 }
 
+func DialX_WithAppendTLSNextProto(nextProtos ...string) DialXOption {
+	return func(c *dialXConfig) {
+		if c.TLSNextProto == nil {
+			c.TLSNextProto = make([]string, 0)
+		}
+		c.TLSNextProto = append(c.TLSNextProto, nextProtos...)
+	}
+}
+
 func DialX_WithTLSConfig(tlsConfig any) DialXOption {
 	return func(c *dialXConfig) {
 		c.EnableTLS = true
