@@ -31,6 +31,8 @@ func NewThrottle(wait float64) func(f func()) {
 		if timer == nil {
 			f()
 			timer = time.AfterFunc(FloatSecondDuration(wait), func() {
+				mu.Lock()
+				defer mu.Unlock()
 				timer = nil
 			})
 		}

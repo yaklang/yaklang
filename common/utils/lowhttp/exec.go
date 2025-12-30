@@ -669,6 +669,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	// retry use DialX
 	dnsStart := time.Now()
 	dnsEnd := time.Now()
+	var dnsEndOnce sync.Once
 	dialTraceInfo := netx.NewDialXTraceInfo()
 	dialopts = append(
 		dialopts,
@@ -679,7 +680,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		),
 		netx.DialX_WithDNSOptions(
 			netx.WithDNSOnFinished(func() {
-				dnsEnd = time.Now()
+				dnsEndOnce.Do(func() {
+					dnsEnd = time.Now()
+				})
 			}),
 			netx.WithDNSServers(dnsServers...),
 			netx.WithTemporaryHosts(dnsHosts),
