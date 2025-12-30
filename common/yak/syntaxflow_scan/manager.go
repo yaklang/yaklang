@@ -262,9 +262,13 @@ func (m *scanManager) initByConfig() error {
 		for _, name := range config.GetProgramNames() {
 			prog, err := ssaapi.FromDatabase(name)
 			if err != nil {
-				log.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database", name)
+				log.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database or cache", name)
+				continue
 			}
 			config.Programs = append(config.Programs, prog)
+		}
+		if len(config.Programs) == 0 {
+			return utils.Errorf("SyntaxFlow Scan Failed: SSA Programs not found in database or cache,stop the scan task")
 		}
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
