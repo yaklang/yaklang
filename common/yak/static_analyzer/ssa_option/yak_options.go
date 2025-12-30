@@ -34,6 +34,7 @@ func YakGetTypeSSAOpt() []ssaconfig.Option {
 	valueTable["YAK_DIR"] = ""
 	valueTable["YAK_FILENAME"] = ""
 	valueTable["YAK_MAIN"] = false
+	valueTable["YAK_VERSION"] = ""
 	valueTable["id"] = ""
 	// param
 	getParam := func(key string) interface{} {
