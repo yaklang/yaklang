@@ -1,18 +1,17 @@
 package utils
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/hpcloud/tail"
-	"github.com/yaklang/yaklang/common/log"
-	"io/ioutil"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -23,11 +22,15 @@ var (
 )
 
 func GetCachedLog() (res []string) {
+	if cachedLog == nil {
+		return nil
+	}
 	for _, e := range cachedLog.GetElements() {
 		res = append(res, e.(string))
 	}
 	return
 }
+
 func StartCacheLog(ctx context.Context, n int) {
 	cachedLog = NewCircularQueue(n)
 	if isInCached.IsSet() {
@@ -56,7 +59,10 @@ func HandleStdoutBackgroundForTest(handle func(string)) (func(), func(), error) 
 	}
 	checkEndMsg := func(s string) {
 		if strings.Contains(s, msg) {
-			endCh <- struct{}{}
+			select {
+			case endCh <- struct{}{}:
+			default:
+			}
 		}
 	}
 	waitEnd := func() {
@@ -71,13 +77,19 @@ func HandleStdoutBackgroundForTest(handle func(string)) (func(), func(), error) 
 	go func() {
 		err = HandleStdout(ctx, func(s string) {
 			once.Do(func() {
-				startCh <- struct{}{}
+				select {
+				case startCh <- struct{}{}:
+				default:
+				}
 			})
 			handle(s)
 			checkEndMsg(s)
 		})
 		once.Do(func() {
-			startCh <- struct{}{}
+			select {
+			case startCh <- struct{}{}:
+			default:
+			}
 		})
 	}()
 	for i := 0; i < 10; i++ {
@@ -90,136 +102,259 @@ func HandleStdoutBackgroundForTest(handle func(string)) (func(), func(), error) 
 	}
 	return nil, nil, Errorf("wait for mirror stdout start signal timeout")
 }
+
+// safeOutputMirror reads from a pipe and writes to both the original file and a callback.
+// It guarantees that:
+// 1. Output is ALWAYS written to the original file first (screen output never lost)
+// 2. Callback panics are recovered and don't affect output
+// 3. Clean shutdown on context cancellation
+type safeOutputMirror struct {
+	name       string       // "stdout" or "stderr" for debugging
+	original   *os.File     // Original stdout/stderr to write to
+	pipeReader *os.File     // Read end of the pipe
+	pipeWriter *os.File     // Write end of the pipe (assigned to os.Stdout/Stderr)
+	callback   func(string) // Callback to receive mirrored output
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	stopped    bool
+	mu         sync.Mutex
+}
+
+func newSafeOutputMirror(ctx context.Context, name string, original *os.File, callback func(string)) (*safeOutputMirror, error) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		return nil, Errorf("failed to create %s pipe: %v", name, err)
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	m := &safeOutputMirror{
+		name:       name,
+		original:   original,
+		pipeReader: reader,
+		pipeWriter: writer,
+		callback:   callback,
+		ctx:        ctx,
+		cancel:     cancel,
+	}
+
+	m.start()
+	return m, nil
+}
+
+func (m *safeOutputMirror) start() {
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				// Write to original on panic - this should never happen but just in case
+				m.original.Write([]byte(fmt.Sprintf("[%s-mirror] recovered from panic: %v\n", m.name, r)))
+			}
+		}()
+
+		scanner := bufio.NewScanner(m.pipeReader)
+		// Use a larger buffer to handle long lines
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 1024*1024) // Max 1MB per line
+
+		for {
+			// Check if we should stop
+			select {
+			case <-m.ctx.Done():
+				// Drain remaining content before exit
+				for scanner.Scan() {
+					line := scanner.Text()
+					m.processLine(line)
+				}
+				return
+			default:
+			}
+
+			// Scan with a timeout to check context periodically
+			if !scanner.Scan() {
+				// EOF or error
+				if err := scanner.Err(); err != nil {
+					// Only log if not caused by pipe close
+					if !strings.Contains(err.Error(), "file already closed") {
+						m.original.Write([]byte(fmt.Sprintf("[%s-mirror] scanner error: %v\n", m.name, err)))
+					}
+				}
+				return
+			}
+
+			line := scanner.Text()
+			m.processLine(line)
+		}
+	}()
+}
+
+func (m *safeOutputMirror) processLine(line string) {
+	// ALWAYS write to original first - this is the safety guarantee
+	// Even if callback fails, output is never lost
+	m.original.Write([]byte(line + "\n"))
+
+	// Then call callback safely
+	if m.callback != nil {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					// Log panic to original, not to the mirrored stream to avoid recursion
+					m.original.Write([]byte(fmt.Sprintf("[%s-mirror] callback panic: %v\n", m.name, r)))
+				}
+			}()
+			m.callback(line)
+		}()
+	}
+}
+
+func (m *safeOutputMirror) Writer() *os.File {
+	return m.pipeWriter
+}
+
+func (m *safeOutputMirror) Stop() {
+	m.mu.Lock()
+	if m.stopped {
+		m.mu.Unlock()
+		return
+	}
+	m.stopped = true
+	m.mu.Unlock()
+
+	// Cancel context to signal goroutine to stop
+	m.cancel()
+
+	// Close writer to send EOF to reader
+	m.pipeWriter.Close()
+
+	// Wait for goroutine to finish (with timeout)
+	done := make(chan struct{})
+	go func() {
+		m.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		// Force close reader if goroutine is stuck
+		m.pipeReader.Close()
+	}
+}
+
+// HandleStdout mirrors stdout/stderr to a callback function.
+//
+// SAFETY GUARANTEES:
+// 1. All output is ALWAYS printed to the original stdout/stderr first
+// 2. Callback panics are recovered and don't affect output
+// 3. Original stdout/stderr are always restored on exit (normal or panic)
+// 4. Context cancellation properly cleans up all resources
+//
+// This function replaces os.Stdout and os.Stderr with pipe writers,
+// and starts goroutines that read from those pipes, write to the
+// original stdout/stderr, and call the callback function.
 func HandleStdout(ctx context.Context, handle func(string)) error {
+	// If already attached, just register a new callback
 	if isInAttached.IsSet() {
-		uuid := uuid.New().String()
-		attachOutputCallback.Store(uuid, func(result string) {
+		id := uuid.New().String()
+		attachOutputCallback.Store(id, func(result string) {
 			defer func() {
 				if err := recover(); err != nil {
+					// Silently recover
 				}
 			}()
 			handle(result)
 		})
 		select {
 		case <-ctx.Done():
-			attachOutputCallback.Delete(uuid)
+			attachOutputCallback.Delete(id)
 			return nil
 		}
 	} else {
 		isInAttached.Set()
 	}
-	GetDefaultYakitBaseTempDir := func() string {
-		if os.Getenv("YAKIT_HOME") != "" {
-			dirName := filepath.Join(os.Getenv("YAKIT_HOME"), "temp")
-			if b, _ := PathExists(dirName); !b {
-				os.MkdirAll(dirName, 0777)
-			}
-			return dirName
-		}
 
-		a := filepath.Join(GetHomeDirDefault("."), "yakit-projects", "temp")
-		if GetFirstExistedPath(a) == "" {
-			_ = os.MkdirAll(a, 0777)
-		}
-		return a
-	}
-	tempOutputs, err := ioutil.TempFile(GetDefaultYakitBaseTempDir(), "combined-outputs-*.txt")
-	if err != nil {
-		return Errorf("create tempfile to buffer stdout&err failed: %s", err)
-	}
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("tempfile sync panic: %s", err)
-			}
+	// Save original stdout/stderr - these will ALWAYS be used for output
+	originStdout := os.Stdout
+	originStderr := os.Stderr
+
+	// Create a unified callback that also notifies all attached callbacks
+	sendOutput := func(result string) {
+		// Call the main handler
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					originStdout.Write([]byte(fmt.Sprintf("[redirect_stdout] handle panic: %v\n", r)))
+				}
+			}()
+			handle(result)
 		}()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				time.Sleep(time.Second)
-				tempOutputs.Sync()
-			}
-		}
-	}()
-	defer func() {
-		os.RemoveAll(tempOutputs.Name())
-	}()
-	tailf, err := tail.TailFile(tempOutputs.Name(), tail.Config{
-		MustExist: true,
-		Follow:    true,
-	})
-	if err != nil {
-		return Errorf("tail -f `%v` failed: %s", tempOutputs.Name(), err)
-	}
-	ctx, cancelCtx := context.WithCancel(ctx)
-	defer func() {
-		cancelCtx()
-	}()
-
-	sendOutput := func(result string) {
-		handle(result)
+		// Call all attached callbacks
 		attachOutputCallback.Range(func(key, value any) bool {
-			va, _ := value.(func(result string))
-			if va != nil {
-				va(result)
+			if va, ok := value.(func(result string)); ok && va != nil {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							// Silently recover from callback panic
+						}
+					}()
+					va(result)
+				}()
 			}
 			return true
 		})
 	}
-	// 恢复标准错误与标准输出流
-	originStdout := os.Stdout
-	originStderr := os.Stderr
-	go func() {
-		defer func() {
-			if err := recover(); err != nil {
-				log.Errorf("attached panic: %s", err)
-			}
-			isInAttached.UnSet()
-		}()
-		for {
-			if tailf == nil {
-				continue
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case line, ok := <-tailf.Lines:
-				if !ok {
-					return
-				}
-				if line == nil {
-					continue
-				}
-				originStdout.Write([]byte(line.Text + "\n"))
-				sendOutput(line.Text)
-			}
-		}
-	}()
 
-	cancel := func() {
+	// Create safe mirrors for stdout and stderr
+	stdoutMirror, err := newSafeOutputMirror(ctx, "stdout", originStdout, sendOutput)
+	if err != nil {
+		isInAttached.UnSet()
+		return err
+	}
+
+	stderrMirror, err := newSafeOutputMirror(ctx, "stderr", originStderr, sendOutput)
+	if err != nil {
+		stdoutMirror.Stop()
+		isInAttached.UnSet()
+		return err
+	}
+
+	// Cleanup function - ALWAYS called via defer
+	cleanup := func() {
+		// Stop mirrors first (this closes the pipe writers)
+		stdoutMirror.Stop()
+		stderrMirror.Stop()
+
+		// Restore original stdout/stderr
 		os.Stdout = originStdout
 		os.Stderr = originStderr
-		log.SetOutput(os.Stdout)
+		log.SetOutput(originStdout)
+
+		// Unset attached flag
+		isInAttached.UnSet()
 	}
+
+	// Ensure cleanup is ALWAYS called
 	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("attach finished with panic: %s", err)
+		if r := recover(); r != nil {
+			// Restore on panic
+			cleanup()
+			originStdout.Write([]byte(fmt.Sprintf("[redirect_stdout] recovered from panic: %v\n", r)))
+		} else {
+			cleanup()
 		}
-		cancel()
 	}()
 
-	os.Stdout = tempOutputs
-	os.Stderr = tempOutputs
-	log.SetOutput(tempOutputs)
+	// Replace stdout/stderr with pipe writers
+	os.Stdout = stdoutMirror.Writer()
+	os.Stderr = stderrMirror.Writer()
+
+	// Set log output to our stdout mirror
+	log.SetOutput(stdoutMirror.Writer())
 	log.DefaultLogger.Printer.IsTerminal = true
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(time.Second):
-		}
-	}
+
+	// Wait for context cancellation
+	<-ctx.Done()
+	return nil
 }
