@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -20,11 +21,15 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 	sessionID := req.GetSessionID()
 	coordinatorIDs := req.GetCoordinatorIDs()
 	exportTypes := req.GetExportDataTypes()
+	memoryID := req.GetMemoryID()
 	outputPath := req.GetOutputPath()
 
+	if memoryID == "" {
+		memoryID = "default"
+	}
 	// If no output path provided, create a temp file
 	if outputPath == "" {
-		tmpFile, err := os.CreateTemp("", "ai-logs-*.zip")
+		tmpFile, err := os.CreateTemp(consts.GetDefaultYakitBaseTempDir(), "ai-logs-*.zip")
 		if err != nil {
 			return nil, utils.Errorf("failed to create temp file: %v", err)
 		}
@@ -56,10 +61,10 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 			}
 
 		case "memory":
-			// Memory uses SessionID
+			// Memory uses memoryID
 			var memories []*schema.AIMemoryEntity
-			if sessionID != "" {
-				if err := db.Where("session_id = ?", sessionID).Find(&memories).Error; err != nil {
+			if memoryID != "" {
+				if err := db.Where("session_id = ?", memoryID).Find(&memories).Error; err != nil {
 					return nil, utils.Errorf("failed to query memories: %v", err)
 				}
 				dataToExport["memory"] = memories
