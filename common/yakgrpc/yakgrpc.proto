@@ -894,6 +894,7 @@ service Yak {
   rpc DeleteAITask(AITaskDeleteRequest) returns (DbOperateMessage);
   rpc QueryAIEvent(AIEventQueryRequest) returns (AIEventQueryResponse);
   rpc GetRandomAIMaterials(GetRandomAIMaterialsRequest) returns (GetRandomAIMaterialsResponse);
+  rpc ExportAILogs(ExportAILogsRequest) returns (ExportAILogsResponse);
 
   rpc StartAITriage(stream AITriageInputEvent) returns(stream AIOutputEvent);
 
@@ -1964,6 +1965,17 @@ message QueryAIForgeResponse {
 message GetAIForgeRequest {
   int64 ID = 1;
   string ForgeName = 2;
+}
+
+message ExportAILogsRequest {
+  string SessionID = 1;
+  repeated string CoordinatorIDs = 2;
+  repeated string ExportDataTypes = 3;
+  string OutputPath = 4;
+}
+
+message ExportAILogsResponse {
+  string FilePath = 1;  
 }
 
 message StartMcpServerRequest {
