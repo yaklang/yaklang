@@ -116,7 +116,11 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 // createLogHandler creates a log handler for processing various types of scan results
 func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) func(string, string) {
 	return func(level string, info string) {
-		log.Infof("LEVEL: %v INFO: %v", level, info)
+		shrink := info
+		if len(info) > 256 {
+			shrink = string([]rune(info)[:100]) + "..."
+		}
+		log.Infof("LEVEL: %v INFO: %v", level, shrink)
 
 		switch strings.ToLower(level) {
 		case "fingerprint":
@@ -124,9 +128,6 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 
 		case "synscan-result":
 			s.handleSynScanLog(reporter, info)
-
-		case "ssa-risk":
-			reporter.ReportSSARisk(info)
 
 		case "json-risk":
 			s.handleRiskLog(reporter, info)
