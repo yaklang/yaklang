@@ -1,0 +1,40 @@
+raw =`GET /expr/injection HTTP/1.1
+Host: 127.0.0.1:8080
+
+{"b":"a"}
+`
+
+test_cases = {
+    "<a>http://xxx.com</a>":[
+        `<a>http://xxx.com</a>`,
+        `\u003ca\u003ehttp://xxx.com\u003c/a\u003e`
+    ],
+    `http://xxx.com/a=1&b=2`:[
+        `http://xxx.com/a=1&b=2`,
+        `http://xxx.com/a=1\u0026b=2`
+    ],
+}
+
+keys = test_cases.Keys()
+
+x.Sort(keys, (i,j)=>{ return keys[i] < keys[j] })
+
+for test in keys {
+    checks = test_cases[test]
+    checkCase = (check,isNoEscape)=>{
+        payload = test
+        var packetMerge = ``
+        // by options
+        freq = fuzz.HTTPRequest(raw, fuzz.noEncode(true),fuzz.noEscapeHTML(isNoEscape))~
+        freq = freq.FuzzPostJsonParams("b", payload)
+        reqBytes = freq.FirstHTTPRequestBytes()
+        assert str.MatchAllOfSubString(string(reqBytes), check)
+        // by Disable method
+        freq = fuzz.HTTPRequest(raw, fuzz.noEncode(true))~
+        freq = freq.DisableEscapeHTML(isNoEscape).FuzzPostJsonParams("b", payload)
+        reqBytes = freq.FirstHTTPRequestBytes()
+        assert str.MatchAllOfSubString(string(reqBytes), check)
+    }
+    checkCase(checks[0], true)
+    checkCase(checks[1], false)
+}
