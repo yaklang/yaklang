@@ -41,14 +41,14 @@ type sqlTraceLogger = SQLTraceLogger
 // LongSQLDescription 描述慢 SQL 的详细信息
 type LongSQLDescription struct {
 	Duration      time.Duration `json:"duration"`       // SQL 执行耗时
-	DurationMs    int64          `json:"duration_ms"`   // SQL 执行耗时（毫秒）
-	DurationStr   string         `json:"duration_str"`   // SQL 执行耗时（字符串形式）
-	FuncName      string         `json:"func_name"`      // 函数名
-	FuncPtr       string         `json:"func_ptr"`       // 函数指针（字符串形式）
-	QueueLen      int            `json:"queue_len"`      // 队列长度
-	LastSQL       string         `json:"last_sql"`      // 最后执行的 SQL
-	Timestamp     time.Time      `json:"timestamp"`     // 时间戳
-	TimestampUnix int64          `json:"timestamp_unix"` // 时间戳（Unix 秒）
+	DurationMs    int64         `json:"duration_ms"`    // SQL 执行耗时（毫秒）
+	DurationStr   string        `json:"duration_str"`   // SQL 执行耗时（字符串形式）
+	FuncName      string        `json:"func_name"`      // 函数名
+	FuncPtr       string        `json:"func_ptr"`       // 函数指针（字符串形式）
+	QueueLen      int           `json:"queue_len"`      // 队列长度
+	LastSQL       string        `json:"last_sql"`       // 最后执行的 SQL
+	Timestamp     time.Time     `json:"timestamp"`      // 时间戳
+	TimestampUnix int64         `json:"timestamp_unix"` // 时间戳（Unix 秒）
 }
 
 // HTTPFlowSQLCallback 慢 SQL 回调函数类型
@@ -57,7 +57,7 @@ type HTTPFlowSQLCallback func(avgCost time.Duration, items []*LongSQLDescription
 // SlowRuleHookDescription 描述慢规则 Hook 的详细信息
 type SlowRuleHookDescription struct {
 	Duration      time.Duration `json:"duration"`       // Hook 执行耗时
-	DurationMs    int64         `json:"duration_ms"`   // Hook 执行耗时（毫秒）
+	DurationMs    int64         `json:"duration_ms"`    // Hook 执行耗时（毫秒）
 	DurationStr   string        `json:"duration_str"`   // Hook 执行耗时（字符串形式）
 	Type          string        `json:"type"`           // Hook 类型：hook_color, hook_request, hook_response
 	RuleCount     int           `json:"rule_count"`     // 当前规则数量
@@ -94,9 +94,9 @@ var (
 
 	// MITMSlowRuleHookCallback 相关变量（慢规则 Hook）
 	mitmSlowRuleHookCallbackMutex sync.Mutex
-	mitmSlowRuleHookCallback     MITMSlowRuleHookCallback
-	slowRuleHookItems            []*SlowRuleHookDescription // 收集慢规则 Hook 信息
-	slowRuleHookItemsMutex       sync.Mutex
+	mitmSlowRuleHookCallback      MITMSlowRuleHookCallback
+	slowRuleHookItems             []*SlowRuleHookDescription // 收集慢规则 Hook 信息
+	slowRuleHookItemsMutex        sync.Mutex
 	slowRuleHookThrottle          = utils.NewThrottle(2) // 每2秒最多触发一次
 )
 
@@ -116,7 +116,8 @@ func init() {
 				tracer := &sqlTraceLogger{}
 				db := consts.GetGormProjectDatabase()
 				if db != nil {
-					// SetLogger 可能无返回值，分开调用以兼容
+					// 创建新的会话以避免数据竞争，因为 SetLogger 和 LogMode 会修改 db 的内部状态
+					db = db.New()
 					db.SetLogger(tracer)
 					db = db.LogMode(true)
 				}
