@@ -158,33 +158,21 @@ func (m *safeOutputMirror) start() {
 		buf := make([]byte, 0, 64*1024)
 		scanner.Buffer(buf, 1024*1024) // Max 1MB per line
 
-		for {
-			// Check if we should stop
-			select {
-			case <-m.ctx.Done():
-				// Drain remaining content before exit
-				for scanner.Scan() {
-					line := scanner.Text()
-					m.processLine(line)
-				}
-				return
-			default:
-			}
-
-			// Scan with a timeout to check context periodically
-			if !scanner.Scan() {
-				// EOF or error
-				if err := scanner.Err(); err != nil {
-					// Only log if not caused by pipe close
-					if !strings.Contains(err.Error(), "file already closed") {
-						m.original.Write([]byte(fmt.Sprintf("[%s-mirror] scanner error: %v\n", m.name, err)))
-					}
-				}
-				return
-			}
-
+		// Simple loop: scanner.Scan() will return false when pipeReader is closed by Stop()
+		// We rely on Stop() to close the pipe rather than checking context in the loop,
+		// because scanner.Scan() is blocking and won't respond to context cancellation.
+		for scanner.Scan() {
 			line := scanner.Text()
 			m.processLine(line)
+		}
+
+		if err := scanner.Err(); err != nil {
+			// Only log if not caused by pipe close
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "file already closed") &&
+				!strings.Contains(errMsg, "bad file descriptor") {
+				m.original.Write([]byte(fmt.Sprintf("[%s-mirror] scanner error: %v\n", m.name, err)))
+			}
 		}
 	}()
 }
@@ -224,10 +212,10 @@ func (m *safeOutputMirror) Stop() {
 	// Cancel context to signal goroutine to stop
 	m.cancel()
 
-	// Close writer to send EOF to reader
+	// Close writer first to signal EOF to reader
 	m.pipeWriter.Close()
 
-	// Wait for goroutine to finish (with timeout)
+	// Wait for goroutine to finish
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
@@ -236,9 +224,16 @@ func (m *safeOutputMirror) Stop() {
 
 	select {
 	case <-done:
-	case <-time.After(3 * time.Second):
-		// Force close reader if goroutine is stuck
+		// Goroutine finished normally after pipeWriter closed
+	case <-time.After(500 * time.Millisecond):
+		// If goroutine hasn't finished after 500ms, force close reader
+		// This ensures scanner.Scan() returns immediately
 		m.pipeReader.Close()
+		select {
+		case <-done:
+		case <-time.After(2500 * time.Millisecond):
+			// Should never happen, but just in case
+		}
 	}
 }
 
