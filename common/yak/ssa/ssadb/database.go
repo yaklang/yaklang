@@ -41,6 +41,39 @@ var SSAProjectTables = []any{
 
 func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
+}
+
+// patchIrSourceQuotedCode patches the QuotedCode column type based on database dialect
+// MySQL: use LONGTEXT for large text storage (up to 4GB)
+// PostgreSQL: use TEXT (unlimited length)
+// SQLite: use TEXT (supports up to 2GB, no modification needed)
+func patchIrSourceQuotedCode(db *gorm.DB) {
+	if !db.HasTable("ir_sources") {
+		return
+	}
+
+	dialect := db.Dialect().GetName()
+	switch dialect {
+	case "mysql":
+		// For MySQL, change TEXT to LONGTEXT to support larger source files
+		// TEXT in MySQL is limited to ~64KB, but LONGTEXT can store up to 4GB
+		err := db.Exec("ALTER TABLE ir_sources MODIFY COLUMN quoted_code LONGTEXT").Error
+		if err != nil {
+			log.Warnf("failed to modify ir_sources.quoted_code to LONGTEXT for MySQL: %v", err)
+		} else {
+			log.Infof("MySQL: ir_sources.quoted_code column type changed to LONGTEXT")
+		}
+	case "postgres", "postgresql":
+		// PostgreSQL TEXT type already supports unlimited length, no modification needed
+		log.Debugf("PostgreSQL: ir_sources.quoted_code uses TEXT type (unlimited length)")
+	case "sqlite3", "sqlite":
+		// SQLite TEXT type supports up to 2GB (SQLITE_MAX_LENGTH), no modification needed
+		log.Debugf("SQLite: ir_sources.quoted_code uses TEXT type (up to 2GB)")
+	default:
+		// For other databases, use default TEXT type
+		log.Debugf("Database dialect %s: using default TEXT type for ir_sources.quoted_code", dialect)
+	}
 }
 func GetDB() *gorm.DB {
 	return consts.GetGormSSAProjectDataBase()
