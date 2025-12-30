@@ -1972,6 +1972,7 @@ message ExportAILogsRequest {
   repeated string CoordinatorIDs = 2;
   repeated string ExportDataTypes = 3;
   string OutputPath = 4;
+  string MemoryID = 5;
 }
 
 message ExportAILogsResponse {

@@ -9579,6 +9579,7 @@ type ExportAILogsRequest struct {
 	CoordinatorIDs  []string               `protobuf:"bytes,2,rep,name=CoordinatorIDs,proto3" json:"CoordinatorIDs,omitempty"`
 	ExportDataTypes []string               `protobuf:"bytes,3,rep,name=ExportDataTypes,proto3" json:"ExportDataTypes,omitempty"`
 	OutputPath      string                 `protobuf:"bytes,4,opt,name=OutputPath,proto3" json:"OutputPath,omitempty"`
+	MemoryID        string                 `protobuf:"bytes,5,opt,name=MemoryID,proto3" json:"MemoryID,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -9637,6 +9638,13 @@ func (x *ExportAILogsRequest) GetExportDataTypes() []string {
 func (x *ExportAILogsRequest) GetOutputPath() string {
 	if x != nil {
 		return x.OutputPath
+	}
+	return ""
+}
+
+func (x *ExportAILogsRequest) GetMemoryID() string {
+	if x != nil {
+		return x.MemoryID
 	}
 	return ""
 }
@@ -65577,14 +65585,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Total\x18\x03 \x01(\x03R\x05Total\"A\n" +
 	"\x11GetAIForgeRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
-	"\tForgeName\x18\x02 \x01(\tR\tForgeName\"\xa5\x01\n" +
+	"\tForgeName\x18\x02 \x01(\tR\tForgeName\"\xc1\x01\n" +
 	"\x13ExportAILogsRequest\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x01(\tR\tSessionID\x12&\n" +
 	"\x0eCoordinatorIDs\x18\x02 \x03(\tR\x0eCoordinatorIDs\x12(\n" +
 	"\x0fExportDataTypes\x18\x03 \x03(\tR\x0fExportDataTypes\x12\x1e\n" +
 	"\n" +
 	"OutputPath\x18\x04 \x01(\tR\n" +
-	"OutputPath\"2\n" +
+	"OutputPath\x12\x1a\n" +
+	"\bMemoryID\x18\x05 \x01(\tR\bMemoryID\"2\n" +
 	"\x14ExportAILogsResponse\x12\x1a\n" +
 	"\bFilePath\x18\x01 \x01(\tR\bFilePath\"\x9b\x02\n" +
 	"\x15StartMcpServerRequest\x12\x12\n" +
