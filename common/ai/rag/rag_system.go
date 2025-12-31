@@ -499,8 +499,16 @@ func (r *RAGSystem) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, 
 }
 
 func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
-	docOpts := NewRAGSystemConfig(options...).ConvertToDocumentOptions()
-	return r.KnowledgeBase.AddKnowledgeEntry(entry, docOpts...)
+	ragConfig := NewRAGSystemConfig(options...)
+	docOpts := ragConfig.ConvertToDocumentOptions()
+	err := r.KnowledgeBase.AddKnowledgeEntry(entry, docOpts...)
+	if err != nil {
+		return utils.Wrap(err, "failed to add knowledge entry")
+	}
+	if ragConfig.enableDocumentQuestionIndex {
+		BuildIndexKnowledgeFormKnowledgeEntry(entry, options...)
+	}
+	return nil
 }
 
 func (r *RAGSystem) GetKnowledgeBaseID() int64 {
@@ -508,5 +516,5 @@ func (r *RAGSystem) GetKnowledgeBaseID() int64 {
 }
 
 func (r *RAGSystem) GenerateQuestions() error {
-
+	return nil
 }
