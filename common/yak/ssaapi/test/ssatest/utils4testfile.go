@@ -56,6 +56,22 @@ func GetZipFile() (string, error) {
 	return zipPath, nil
 }
 
+func GetZipWithJarFile() (string, error) {
+	// write zip file containing test.jar to template directory
+	dir := os.TempDir()
+	zipData, err := JavaTestFile.ReadFile("testfile/test-with-jar.zip")
+	if err != nil {
+		return "", err
+	}
+
+	zipPath := dir + "/test-with-jar.zip"
+	err = os.WriteFile(zipPath, zipData, 0644)
+	if err != nil {
+		return "", err
+	}
+	return zipPath, nil
+}
+
 func GetLocalGit() (string, error) {
 	// address
 	address := fmt.Sprintf("127.0.0.1:%d", utils.GetRandomAvailableTCPPort())

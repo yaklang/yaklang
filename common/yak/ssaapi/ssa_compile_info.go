@@ -32,7 +32,7 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 		if err != nil {
 			return nil, err
 		}
-		baseFS = filesys.NewHookFS(zipfs)
+		baseFS = zipfs
 	case ssaconfig.CodeSourceJar:
 		zipfs, err := getZipFile(c)
 		if err != nil {
@@ -41,7 +41,7 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 		unifiedFS := filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
-		baseFS = filesys.NewHookFS(unifiedFS)
+		baseFS = unifiedFS
 	case ssaconfig.CodeSourceGit:
 		baseFS, err = gitFs(c)
 		if err != nil {

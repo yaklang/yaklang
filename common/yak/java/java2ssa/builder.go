@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -19,6 +20,9 @@ import (
 )
 
 var INNER_CLASS_SPLIT = "$"
+
+// expandedZipFSCache 缓存 ExpandedZipFS 实例，避免重复创建和浪费缓存
+var expandedZipFSCache = utils.NewSafeMapWithKey[*filesys.ZipFS, *javaclassparser.ExpandedZipFS]()
 
 // ========================================== For SSAAPI ==========================================
 
@@ -72,6 +76,8 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	return nil
 }
 
+// extractZipFSFromUnderlying 从文件系统中提取底层的 ZipFS
+// 支持递归提取，处理 HookFS 包装的情况
 func extractZipFSFromUnderlying(underlying fi.FileSystem) *filesys.ZipFS {
 	if zfs, ok := underlying.(*filesys.ZipFS); ok {
 		return zfs
@@ -79,70 +85,62 @@ func extractZipFSFromUnderlying(underlying fi.FileSystem) *filesys.ZipFS {
 	if jarFS, ok := underlying.(*javaclassparser.JarFS); ok {
 		return jarFS.ZipFS
 	}
+	// 如果是 HookFS，使用反射递归检查 underlying
+	if hookFS, ok := underlying.(*filesys.HookFS); ok {
+		// 使用反射访问私有字段
+		v := reflect.ValueOf(hookFS).Elem()
+		underlyingField := v.FieldByName("underlying")
+		if underlyingField.IsValid() && underlyingField.CanInterface() {
+			if underlyingFS, ok := underlyingField.Interface().(fi.FileSystem); ok {
+				return extractZipFSFromUnderlying(underlyingFS)
+			}
+		}
+	}
 	return nil
 }
 
-func handleNestedJarHook() *filesys.ReadHook {
-	return &filesys.ReadHook{
-		Matcher: filesys.CustomMatcher(func(name string) bool {
-			return strings.Contains(name, ".jar/") || strings.Contains(name, ".jar!")
-		}),
-		AfterRead: func(ctx *filesys.ReadHookContext, data []byte) ([]byte, error) {
-			if len(data) > 0 {
-				return data, nil
-			}
-
-			targetZipFS := extractZipFSFromUnderlying(ctx.Underlying)
-			if targetZipFS == nil {
-				return data, nil
-			}
-
-			helper := javaclassparser.NewZipJarHelper(targetZipFS)
-			jarPath, internalPath, isJar := helper.ParseJarPath(ctx.Name)
-			if !isJar {
-				return data, nil
-			}
-
-			jarData, err := helper.ReadFileFromJar(jarPath, internalPath)
-			if err != nil {
-				return data, nil
-			}
-
-			return jarData, nil
-		},
-	}
-}
-
 func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
-	// HookFS 可能包装了两种类型：
-	// 1. CodeSourceCompression: ZipFS -> HookFS (压缩文件)
-	// 2. CodeSourceJar: ZipFS -> JarFS -> UnifiedFS -> HookFS (JAR 文件，已配置扩展名映射)
-	// 两种情况都需要处理嵌套 JAR，通过 hook 机制统一处理
+	// 文件系统可能有两种类型：
+	// 1. CodeSourceCompression: ZipFS (压缩文件，.zip 后缀)
+	// 2. CodeSourceJar: UnifiedFS -> JarFS -> ZipFS (JAR 文件，.jar 后缀，已配置扩展名映射 .class -> .java)
+	//
+	// 如果文件系统包含嵌套的 JAR/ZIP 文件，使用 ExpandedZipFS 来展开：
+	// - ExpandedZipFS 将 JAR/ZIP 文件视为目录，自动展开其内容
+	// - 实现了完整的嵌套归档处理（ReadDir、Stat、ReadFile）
+	// - 支持多层嵌套（ZIP 中包含 JAR，JAR 中包含 ZIP 等）
+	//
+	// 提取底层的 ZipFS
+	zipFS := extractZipFSFromUnderlying(fs)
+	if zipFS == nil {
+		// 如果没有 ZipFS，直接返回原文件系统
+		return fs
+	}
 
-	var hasNestedJar bool
+	// 检查是否有嵌套的归档文件
+	var hasNestedArchive bool
 	filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithFileStat(func(path string, info os.FileInfo) error {
 		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".jar") ||
-			strings.HasSuffix(strings.ToLower(path), ".war")) {
-			hasNestedJar = true
+			strings.HasSuffix(strings.ToLower(path), ".war") ||
+			strings.HasSuffix(strings.ToLower(path), ".zip")) {
+			hasNestedArchive = true
 		}
 		return nil
 	}))
 
-	if !hasNestedJar {
+	if !hasNestedArchive {
 		return fs
 	}
 
-	// 如果已经是 HookFS，直接添加嵌套 JAR 处理的 hook
-	// hook 中会通过 ReadHookContext.Underlying 访问底层文件系统（ZipFS 或 UnifiedFS）
-	if hookFS, ok := fs.(*filesys.HookFS); ok {
-		hookFS.AddReadHook(handleNestedJarHook())
-		return hookFS
+	expandedFS := expandedZipFSCache.GetOrLoad(zipFS, func() *javaclassparser.ExpandedZipFS {
+		return javaclassparser.NewExpandedZipFS(fs, zipFS)
+	})
+
+	// 如果原文件系统已经是 HookFS，保持 HookFS 包装以保留原有的 hook
+	if _, ok := fs.(*filesys.HookFS); ok {
+		return filesys.NewHookFS(expandedFS)
 	}
 
-	// 否则创建新的 HookFS 来处理嵌套 JAR
-	newHookFS := filesys.NewHookFS(fs)
-	newHookFS.AddReadHook(handleNestedJarHook())
-	return newHookFS
+	return expandedFS
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
