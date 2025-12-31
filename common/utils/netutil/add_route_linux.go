@@ -215,6 +215,48 @@ func BatchDeleteSpecificIPRoute(ipList []string) (success []string, failed map[s
 	return batchDeleteSpecificIPRoute(ipList, false)
 }
 
+// DeleteAllRoutesForInterface 删除特定网络接口的所有路由
+func DeleteAllRoutesForInterface(interfaceName string) (success []string, failed map[string]error, err error) {
+	if interfaceName == "" {
+		return nil, nil, utils.Errorf("interface name cannot be empty")
+	}
+
+	// Validate interface name
+	interfaceNamePattern := regexp.MustCompile(`^[a-zA-Z0-9_-]{1,15}$`)
+	if !interfaceNamePattern.MatchString(interfaceName) {
+		return nil, nil, utils.Errorf("invalid interface name format: %s", interfaceName)
+	}
+
+	// Check if the interface exists
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		return nil, nil, utils.Errorf("failed to get interface by name: %s", interfaceName)
+	}
+
+	// Ensure the interface is up
+	if iface.Flags&net.FlagUp == 0 {
+		return nil, nil, utils.Errorf("interface %s is not up", interfaceName)
+	}
+
+	// Construct the command to delete all routes for the interface
+	cmd := "ip route flush dev " + interfaceName
+
+	// Execute the command
+	exc := privileged.NewExecutor("Flush Routes for " + interfaceName)
+	output, err := exc.Execute(
+		utils.TimeoutContextSeconds(120), cmd,
+		privileged.WithTitle("Flush Routes"),
+		privileged.WithDescription("Deleting all routes for interface "+interfaceName),
+	)
+	if err != nil {
+		spew.Dump(err)
+		return nil, nil, utils.Errorf("(require root/administrator) failed to delete all routes for interface %s: %s, output: %s", interfaceName, err, string(output))
+	}
+	spew.Dump(output)
+
+	return nil, nil, nil
+}
+
 func formatIPStringAsCIDR(ipStr string) (string, error) {
 	// 检查是否为空
 	if ipStr == "" {
