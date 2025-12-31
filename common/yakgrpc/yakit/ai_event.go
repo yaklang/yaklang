@@ -73,6 +73,11 @@ func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 	return db
 }
 
+func YieldAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) chan *schema.AiOutputEvent {
+	db = FilterEvent(db, filter)
+	return bizhelper.YieldModel[*schema.AiOutputEvent](ctx, db)
+}
+
 func QueryAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) ([]*schema.AiOutputEvent, error) {
 	var event []*schema.AiOutputEvent
 	db = FilterEvent(db, filter)
