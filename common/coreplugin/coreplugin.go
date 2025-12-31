@@ -253,6 +253,13 @@ func init() {
 		)
 
 		registerBuildInPlugin(
+			"yak", "TCP Kill服务",
+			withPluginHelp("监控网络栈，触发式向目标发送TCP RST包以终止连接"),
+			withPluginAuthors("V1ll4n"),
+			withPluginEnableGenerateParam(true),
+		)
+
+		registerBuildInPlugin(
 			"yak", "路由表增加",
 			withPluginHelp("增加tun劫持的路由"),
 			withPluginAuthors("V1ll4n"),

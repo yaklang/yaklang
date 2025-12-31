@@ -1,7 +1,10 @@
 package netstackvm
 
 import (
+	"context"
 	"errors"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -169,4 +172,32 @@ func (driver *PCAPEndpoint) generateRSTFromPacket(pkt gopacket.Packet) (bool, er
 		return false, err
 	}
 	return true, nil
+}
+
+func FastKillTCP(killDuration time.Duration, target ...string) error {
+	route, gateway, srcIP, err := netutil.GetPublicRoute()
+	if err != nil {
+		return err
+	}
+	ifaceName := route.Name
+	_ = gateway
+	_ = srcIP
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	userStack, err := NewNetStackVirtualMachineEntry(
+		WithPcapDevice(ifaceName),
+		WithPCAPInboundFilter(func(packet gopacket.Packet) bool {
+			return true // filter all packets, just for killing tcp
+		}),
+		WithContext(ctx),
+	)
+
+	if err != nil {
+		return err
+	}
+	userStack.driver.MultiDisallowTCP(target...)
+	time.Sleep(killDuration)
+	userStack.GetStack().Close()
+	userStack.driver.Close()
+	return nil
 }
