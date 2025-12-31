@@ -163,6 +163,10 @@ func Index2KnowledgeEntity(
 	return entries, nil
 }
 
+func BuildIndexKnowledgeFormKnowledgeEntry(entry *schema.KnowledgeBaseEntry, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
+	return BuildIndexFromRaw(entry.KnowledgeDetails, option...)
+}
+
 func BuildIndexFormAnalyzeResult(res AnalysisResult, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
 	return BuildIndexFromRaw(res.Dump(), option...)
 }
