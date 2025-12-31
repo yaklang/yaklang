@@ -324,7 +324,7 @@ func MethodVerboseName(i string) string {
 	case EnhancePlanGeneralizeQuery:
 		return "泛化查询"
 	case EnhancePlanExactKeywordSearch:
-		return "泛化关键字"
+		return "精准关键词搜索"
 	default:
 		return "基础回答"
 	}
@@ -485,7 +485,7 @@ func NewRAGQueryConfig(opts ...CollectionQueryOption) *CollectionQueryConfig {
 		MsgCallBack:          nil,
 		CollectionNumLimit:   5,
 		CollectionScoreLimit: 0.3,
-		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery},
+		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery, EnhancePlanExactKeywordSearch},
 		Ctx:                  context.Background(),
 		EnhanceSearchHandler: enhancesearch.NewDefaultSearchHandler(),
 	}

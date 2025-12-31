@@ -34,15 +34,26 @@ var RagExports = map[string]interface{}{
 
 	"HasCollection": _hasCollection,
 
-	"Query":           rag.QueryYakitProfile,
-	"queryLimit":      rag.WithRAGLimit,
-	"queryType":       rag.WithRAGDocumentType,
-	"queryCollection": rag.WithRAGCollectionName,
-	"queryStatus":     rag.WithRAGQueryStatus,
-	"queryEnhance":    rag.WithRAGEnhance,
-	"queryCtx":        rag.WithRAGCtx,
-	"queryConcurrent": rag.WithRAGConcurrent,
-	"queryScoreLimit": rag.WithRAGCollectionScoreLimit,
+	// Query - 统一查询/搜索接口
+	"Query":                    _query,
+	"queryLimit":               rag.WithRAGLimit,
+	"queryType":                rag.WithRAGDocumentType,
+	"queryCollection":          rag.WithRAGCollectionName, // 单集合（兼容旧版）
+	"queryCollections":         _queryCollections,         // 多集合
+	"queryRAGFilename":         _queryRAGFilename,         // 从 RAG 文件导入后搜索
+	"queryStatus":              rag.WithRAGQueryStatus,
+	"queryEnhance":             rag.WithRAGEnhance,
+	"queryCtx":                 rag.WithRAGCtx,
+	"queryConcurrent":          rag.WithRAGConcurrent,
+	"queryScoreLimit":          rag.WithRAGCollectionScoreLimit,
+	"querySimilarityThreshold": rag.WithRAGSimilarityThreshold, // 语义相似度阈值
+
+	// Query enhance type constants - 查询增强类型常量
+	"QUERY_ENHANCE_TYPE_BASIC":                vectorstore.BasicPlan,
+	"QUERY_ENHANCE_TYPE_HYPOTHETICAL_ANSWER":  vectorstore.EnhancePlanHypotheticalAnswer,
+	"QUERY_ENHANCE_TYPE_SPLIT_QUERY":          vectorstore.EnhancePlanSplitQuery,
+	"QUERY_ENHANCE_TYPE_GENERALIZE_QUERY":     vectorstore.EnhancePlanGeneralizeQuery,
+	"QUERY_ENHANCE_TYPE_EXACT_KEYWORD_SEARCH": vectorstore.EnhancePlanExactKeywordSearch,
 
 	"AddDocument":    _addDocument,
 	"DeleteDocument": _deleteDocument,
@@ -447,4 +458,86 @@ func _localEmbedding(text string) ([]float32, error) {
 // ```
 func _onlineEmbedding(text string) ([]float32, error) {
 	return vectorstore.AIBalanceFreeEmbeddingFunc(text)
+}
+
+// _queryCollections 指定查询的多个集合名称
+// Example:
+// ```
+//
+//	results = rag.Query("如何使用 MITM 插件?", rag.queryCollections("collection1", "collection2", "collection3"))~
+//
+// ```
+func _queryCollections(names ...string) rag.RAGSystemConfigOption {
+	return rag.WithRAGCollectionNames(names...)
+}
+
+// _queryRAGFilename 从 RAG 文件导入后查询（自动导入）
+// 适合法规条文、技术规范等精确搜索场景
+// Example:
+// ```
+//
+//	results = rag.Query("法规第2.3条", rag.queryRAGFilename("/path/to/law.rag"))~
+//
+// ```
+func _queryRAGFilename(filename string) rag.RAGSystemConfigOption {
+	// 使用文件名生成集合名
+	baseName := filepath.Base(filename)
+	tempRagName := "imported_" + utils.CalcSha256(filename)[:8] + "_" + baseName
+
+	db := consts.GetGormProfileDatabase()
+
+	// 检查是否已导入
+	if !rag.HasRagSystem(db, tempRagName) {
+		// 导入 RAG 文件
+		err := rag.ImportRAG(filename,
+			rag.WithDB(db),
+			rag.WithRAGCollectionName(tempRagName),
+			rag.WithExportOverwriteExisting(false),
+		)
+		if err != nil {
+			log.Errorf("failed to import RAG file %s: %v", filename, err)
+		} else {
+			log.Infof("Imported RAG file %s as collection %s", filename, tempRagName)
+		}
+	}
+
+	// 返回集合名选项
+	return rag.WithRAGCollectionNames(tempRagName)
+}
+
+// _query 统一的查询/搜索接口
+// 支持多种查询模式:
+// 1. 无参数 - 查询所有集合
+// 2. queryCollection/queryCollections - 指定集合查询
+// 3. queryRAGFilename - 从 RAG 文件导入后查询
+//
+// Example:
+// ```
+//
+//	// 查询所有集合
+//	results = rag.Query("如何使用 XSS 检测?")~
+//
+//	// 查询指定集合（单个）
+//	results = rag.Query("如何使用 MITM 插件?", rag.queryCollection("yaklang-yakscript-plugins"))~
+//
+//	// 查询多个集合
+//	results = rag.Query("XSS 漏洞", rag.queryCollections("plugins", "tools", "docs"))~
+//
+//	// 从 RAG 文件导入后查询（适合法规条文等精确搜索）
+//	results = rag.Query("法规第2.3条", rag.queryRAGFilename("/path/to/law.rag"))~
+//
+//	// 组合使用
+//	results = rag.Query("XSS 漏洞",
+//	    rag.queryCollections("plugins"),
+//	    rag.queryLimit(20),
+//	    rag.querySimilarityThreshold(0.5),
+//	    rag.queryEnhance(
+//	        rag.QUERY_ENHANCE_TYPE_HYPOTHETICAL_ANSWER,
+//	        rag.QUERY_ENHANCE_TYPE_EXACT_KEYWORD_SEARCH,
+//	    ),
+//	)~
+//
+// ```
+func _query(query string, opts ...rag.RAGSystemConfigOption) (<-chan *rag.RAGSearchResult, error) {
+	return rag.QueryYakitProfile(query, opts...)
 }
