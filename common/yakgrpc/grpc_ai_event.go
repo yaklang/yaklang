@@ -2,9 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -25,6 +27,7 @@ func (s *Server) QueryAIEvent(ctx context.Context, req *ypb.AIEventQueryRequest)
 		}
 		filter.EventUUIDS = append(filter.EventUUIDS, eventIDs...)
 	}
+	paginator, err := bizhelper.NewPagination(db, 100)
 	event, err := yakit.QueryAIEvent(db, filter)
 	if err != nil {
 		return nil, err
