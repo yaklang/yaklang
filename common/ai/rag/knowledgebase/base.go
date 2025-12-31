@@ -214,14 +214,14 @@ func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, opt
 	return nil
 }
 
-func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
+func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, noPotentialQuestions bool, options ...vectorstore.DocumentOption) error {
 	entry.KnowledgeBaseID = kb.id
 	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("创建知识库条目失败: %v", err)
 	}
 
-	if err := kb.addQuestionToVectorIndex(entry, options...); err != nil {
+	if err := kb.addQuestionToVectorIndex(entry, noPotentialQuestions, options...); err != nil {
 		return utils.Errorf("添加知识问题索引失败: %v", err)
 	}
 
@@ -399,7 +399,7 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry,
 	return kb.vectorStore.AddWithOptions(documentID, content, options...)
 }
 
-func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
+func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEntry, noPotentialQuestions bool, options ...vectorstore.DocumentOption) error {
 	// 构建元数据
 	metadata := map[string]any{
 		"knowledge_base_id":    entry.KnowledgeBaseID,
@@ -408,9 +408,13 @@ func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEnt
 		"importance_score":     entry.ImportanceScore,
 		"keywords":             entry.Keywords,
 		"source_page":          entry.SourcePage,
-		"potential_questions":  entry.PotentialQuestions,
 		schema.META_Data_Title: entry.KnowledgeTitle,
 		schema.META_Data_UUID:  entry.HiddenIndex,
+	}
+
+	// 如果不排除 potential_questions，则添加到元数据
+	if !noPotentialQuestions {
+		metadata["potential_questions"] = entry.PotentialQuestions
 	}
 
 	// 使用条目ID作为文档ID

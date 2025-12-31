@@ -79,6 +79,24 @@ func (m MetadataMap) GetTitle() (string, bool) {
 	return utils.InterfaceToString(title), ok
 }
 
+// GetSearchTarget 获取搜索目标 (search_target)
+func (m MetadataMap) GetSearchTarget() (string, bool) {
+	target, ok := m["search_target"]
+	return utils.InterfaceToString(target), ok
+}
+
+// GetSearchType 获取搜索类型 (search_type)
+func (m MetadataMap) GetSearchType() (string, bool) {
+	searchType, ok := m["search_type"]
+	return utils.InterfaceToString(searchType), ok
+}
+
+// GetKnowledgeEntryUUID 获取关联的知识条目 UUID (meta_data_UUID)
+func (m MetadataMap) GetKnowledgeEntryUUID() (string, bool) {
+	uuid, ok := m[META_Data_UUID]
+	return utils.InterfaceToString(uuid), ok
+}
+
 // Value 实现 driver.Valuer 接口，用于将 map 转换为数据库可以存储的值
 func (m MetadataMap) Value() (driver.Value, error) {
 	if m == nil {

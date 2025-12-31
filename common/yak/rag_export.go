@@ -55,11 +55,13 @@ var RagExports = map[string]interface{}{
 	"ragCosineDistance": rag.WithCosineDistance,
 	"ragHNSWParameters": rag.WithHNSWParameters,
 
-	"docMetadata":        rag.WithDocumentMetadataKeyValue,
-	"docRawMetadata":     rag.WithDocumentRawMetadata,
-	"NewRagDatabase":     rag.NewVectorStoreDatabase,
-	"NewTempRagDatabase": _newTempRagDatabase,
-	"EnableMockMode":     _enableMockMode,
+	"docMetadata":          rag.WithDocumentMetadataKeyValue,
+	"docRawMetadata":       rag.WithDocumentRawMetadata,
+	"setSearchMeta":        _setSearchMeta,           // 快捷设置 search_type 和 search_target
+	"noPotentialQuestions": rag.NoPotentialQuestions, // 不保存 potential_questions 到元数据
+	"NewRagDatabase":       rag.NewVectorStoreDatabase,
+	"NewTempRagDatabase":   _newTempRagDatabase,
+	"EnableMockMode":       _enableMockMode,
 
 	"ctx":             aiforge.WithAnalyzeContext,    // use for analyzeContext
 	"log":             aiforge.WithAnalyzeLog,        // use for analyzeLog
@@ -182,6 +184,24 @@ func BuildSearchIndexKnowledgeFromFile(kbName string, filename string, option ..
 		log.Infof("  Q%d: %s", i+1, q)
 	}
 	return result, nil
+}
+
+// _setSearchMeta 快捷设置搜索元数据 (search_type 和 search_target)
+// 用于同时设置 search_type 和 search_target 两个元数据字段
+//
+// Parameters:
+//   - searchType: 搜索类型，例如 "AI工具", "Yak插件", "aiforge/模版/技能" 等
+//   - searchTarget: 搜索目标，例如插件名称、工具名称等
+//
+// Example:
+// ```yak
+// rag.BuildSearchIndexKnowledge("my-tools", text, rag.setSearchMeta("AI工具", "端口扫描器"))
+// ```
+func _setSearchMeta(searchType string, searchTarget string) rag.RAGSystemConfigOption {
+	return func(config *rag.RAGSystemConfig) {
+		rag.WithDocumentMetadataKeyValue("search_type", searchType)(config)
+		rag.WithDocumentMetadataKeyValue("search_target", searchTarget)(config)
+	}
 }
 
 // _noEntityRepository 禁用实体仓库

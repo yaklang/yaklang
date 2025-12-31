@@ -92,6 +92,7 @@ type RAGSystemConfig struct {
 	noHNSWGraph              bool
 	noMetadata               bool
 	noOriginInput            bool
+	noPotentialQuestions     bool // 不保存 potential_questions 到元数据，节约存储空间
 	onlyPQCode               bool
 	modelDimension           int
 	modelName                string
@@ -533,6 +534,31 @@ func (config *RAGSystemConfig) ConvertToDocumentOptions() []vectorstore.Document
 	return options
 }
 
+// GetDocumentMetadata returns the merged document metadata from both key-value and raw metadata
+func (config *RAGSystemConfig) GetDocumentMetadata() map[string]any {
+	result := make(map[string]any)
+
+	// First, add raw metadata
+	for k, v := range config.documentRawMetadata {
+		result[k] = v
+	}
+
+	// Then, add key-value metadata (overrides raw if same key)
+	for k, v := range config.documentMetadataKeyValue {
+		result[k] = v
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// GetNoPotentialQuestions returns whether to exclude potential_questions from metadata
+func (config *RAGSystemConfig) GetNoPotentialQuestions() bool {
+	return config.noPotentialQuestions
+}
+
 func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.CollectionQueryOption {
 	options := []vectorstore.CollectionQueryOption{}
 
@@ -816,6 +842,19 @@ func WithDocumentRawMetadata(metadata map[string]any) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.documentRawMetadata = metadata
 	}
+}
+
+// WithNoPotentialQuestions sets whether to exclude potential_questions from metadata to save storage
+func WithNoPotentialQuestions(noPQ bool) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.noPotentialQuestions = noPQ
+	}
+}
+
+// NoPotentialQuestions returns a RAGSystemConfigOption that excludes potential_questions from metadata
+// This is a convenient shortcut for WithNoPotentialQuestions(true)
+func NoPotentialQuestions() RAGSystemConfigOption {
+	return WithNoPotentialQuestions(true)
 }
 
 // WithDocumentType sets the document type
