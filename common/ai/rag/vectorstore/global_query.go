@@ -542,6 +542,32 @@ func (s *ScoredResult) GetContent() string {
 	return s.Document.Content
 }
 
+// GetSearchTarget 获取搜索目标 (用于展示插件/工具名称等)
+func (s *ScoredResult) GetSearchTarget() string {
+	target, _ := s.Document.Metadata.GetSearchTarget()
+	return target
+}
+
+// GetSearchType 获取搜索类型 (用于说明 search_target 的类型含义)
+func (s *ScoredResult) GetSearchType() string {
+	searchType, _ := s.Document.Metadata.GetSearchType()
+	return searchType
+}
+
+// GetKnowledgeEntryUUID 获取关联的知识条目 UUID
+func (s *ScoredResult) GetKnowledgeEntryUUID() string {
+	uuid, _ := s.Document.Metadata.GetKnowledgeEntryUUID()
+	return uuid
+}
+
+// GetKnowledgeTitle 获取关联知识的标题
+func (s *ScoredResult) GetKnowledgeTitle() string {
+	if title, ok := s.Document.Metadata["knowledge_title"].(string); ok {
+		return title
+	}
+	return ""
+}
+
 func (s *ScoredResult) GetSource() string {
 	return s.Source
 }
@@ -1060,7 +1086,43 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 						title = utils.ShrinkString(result.GetContent(), 50)
 					}
 					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f)\n", i+1, title, result.Source, result.Score))
-					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   内容摘要: %s\n\n", utils.ShrinkString(result.GetContent(), 200)))
+
+					// 如果有 search_target，展示搜索目标
+					// 格式: [TYPE:{{search_type}}]: [{{search_target}}] 或仅 [{{search_target}}]
+					searchTarget := result.GetSearchTarget()
+					searchType := result.GetSearchType()
+					if searchTarget != "" {
+						if searchType != "" {
+							subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   搜索目标: [TYPE:%s]: [%s]\n", searchType, searchTarget))
+						} else {
+							subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   搜索目标: [%s]\n", searchTarget))
+						}
+					}
+
+					// 如果关联到知识条目，展示知识标题
+					knowledgeTitle := result.GetKnowledgeTitle()
+					if knowledgeTitle != "" && knowledgeTitle != title {
+						subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   关联知识: %s\n", knowledgeTitle))
+					}
+
+					// 展示内容摘要（问题文本）
+					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   内容摘要: %s\n", utils.ShrinkString(result.GetContent(), 200)))
+
+					// 动态查询关联的知识条目详情（通过 entry_id）
+					if entryUUID := result.GetKnowledgeEntryUUID(); entryUUID != "" {
+						if db := consts.GetGormProfileDatabase(); db != nil {
+							if entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(db, entryUUID); err == nil && entry != nil {
+								// 展示知识详情（压缩到 300 字符）
+								if entry.KnowledgeDetails != "" {
+									subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   知识详情: %s\n", utils.ShrinkString(entry.KnowledgeDetails, 300)))
+								} else if entry.Summary != "" {
+									subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("   知识摘要: %s\n", entry.Summary))
+								}
+							}
+						}
+					}
+
+					subQueryInfo.ResultBuffer.WriteString("\n")
 				}
 			} else {
 				// No results found for this enhance method

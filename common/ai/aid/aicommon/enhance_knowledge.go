@@ -192,6 +192,10 @@ type EnhanceKnowledge interface {
 	GetTitle() string
 	GetScoreMethod() string
 	GetUUID() string
+	GetSearchTarget() string       // 搜索目标（如插件名、工具名等）
+	GetSearchType() string         // 搜索类型（如 AI工具、Yak插件 等）
+	GetKnowledgeTitle() string     // 关联知识的标题
+	GetKnowledgeEntryUUID() string // 关联知识条目的 UUID，用于动态查询详情
 }
 
 type BasicEnhanceKnowledge struct {
@@ -267,4 +271,20 @@ func (e *BasicEnhanceKnowledge) GetUUID() string {
 		e.UUID = uuid.NewString()
 	}
 	return e.UUID
+}
+
+func (e *BasicEnhanceKnowledge) GetSearchTarget() string {
+	return ""
+}
+
+func (e *BasicEnhanceKnowledge) GetSearchType() string {
+	return ""
+}
+
+func (e *BasicEnhanceKnowledge) GetKnowledgeTitle() string {
+	return ""
+}
+
+func (e *BasicEnhanceKnowledge) GetKnowledgeEntryUUID() string {
+	return ""
 }

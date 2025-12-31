@@ -466,8 +466,10 @@ func (r *RAGSystem) DeleteEmbeddingData() error {
 }
 
 func (r *RAGSystem) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
-	docOpts := NewRAGSystemConfig(options...).ConvertToDocumentOptions()
-	return r.KnowledgeBase.AddKnowledgeEntryQuestion(entry, docOpts...)
+	config := NewRAGSystemConfig(options...)
+	docOpts := config.ConvertToDocumentOptions()
+	noPQ := config.GetNoPotentialQuestions()
+	return r.KnowledgeBase.AddKnowledgeEntryQuestion(entry, noPQ, docOpts...)
 }
 
 func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {

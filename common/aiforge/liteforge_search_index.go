@@ -131,10 +131,22 @@ func BuildSearchIndexKnowledge(kbName string, text string, options ...any) (*Sea
 	// Step 2: Create KnowledgeBaseEntry with the content and questions
 	entryID := uuid.New().String()
 
-	// Use first question as title, or generate a summary
-	title := questions[0]
-	if len(title) > 100 {
-		title = title[:100] + "..."
+	// Determine title: use search_target from docMetadata if available, otherwise use first question
+	// Extract metadata from ragSystemOptions
+	metadataConfig := rag.NewRAGSystemConfig(refineConfig.ragSystemOptions...)
+	docMetadata := metadataConfig.GetDocumentMetadata()
+
+	title := ""
+	if docMetadata != nil {
+		if searchTarget, ok := docMetadata["search_target"]; ok {
+			title = utils.InterfaceToString(searchTarget)
+		}
+	}
+	if title == "" {
+		title = questions[0]
+		if len(title) > 100 {
+			title = title[:100] + "..."
+		}
 	}
 
 	entry := &schema.KnowledgeBaseEntry{
@@ -151,7 +163,9 @@ func BuildSearchIndexKnowledge(kbName string, text string, options ...any) (*Sea
 	// 1. Store the KnowledgeBaseEntry in the database
 	// 2. Create vector indexes for each question
 	// 3. Link questions to the entry via metadata
-	err = ragSystem.AddKnowledgeEntryQuestion(entry)
+	//
+	// Pass ragSystemOptions to AddKnowledgeEntryQuestion (includes docMetadata for search_target)
+	err = ragSystem.AddKnowledgeEntryQuestion(entry, refineConfig.ragSystemOptions...)
 	if err != nil {
 		return nil, utils.Errorf("failed to add knowledge entry: %v", err)
 	}

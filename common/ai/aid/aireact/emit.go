@@ -81,6 +81,21 @@ func (r *ReAct) EmitKnowledgeReferenceArtifact(knowledgeList []aicommon.EnhanceK
 	for i, k := range knowledgeList {
 		sb.WriteString(fmt.Sprintf("## 知识条目 #%d\n\n", i+1))
 		sb.WriteString(fmt.Sprintf("- **标题**: %s\n", k.GetTitle()))
+		// 如果有搜索目标，展示搜索目标
+		// 格式: [TYPE:{{search_type}}]: [{{search_target}}] 或仅 [{{search_target}}]
+		searchTarget := k.GetSearchTarget()
+		searchType := k.GetSearchType()
+		if searchTarget != "" {
+			if searchType != "" {
+				sb.WriteString(fmt.Sprintf("- **搜索目标**: [TYPE:%s]: [%s]\n", searchType, searchTarget))
+			} else {
+				sb.WriteString(fmt.Sprintf("- **搜索目标**: [%s]\n", searchTarget))
+			}
+		}
+		// 如果有关联知识标题且不同于当前标题，展示关联知识
+		if knowledgeTitle := k.GetKnowledgeTitle(); knowledgeTitle != "" && knowledgeTitle != k.GetTitle() {
+			sb.WriteString(fmt.Sprintf("- **关联知识**: %s\n", knowledgeTitle))
+		}
 		sb.WriteString(fmt.Sprintf("- **类型**: %s\n", k.GetType()))
 		sb.WriteString(fmt.Sprintf("- **来源**: %s\n", k.GetSource()))
 		sb.WriteString(fmt.Sprintf("- **相关度评分**: %.4f\n", k.GetScore()))
