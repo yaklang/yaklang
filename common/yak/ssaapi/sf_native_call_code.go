@@ -86,7 +86,7 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		result.AppendPredecessor(v, frame.WithPredecessorContext("opcodes"))
 		vals = append(vals, result)
 	}
-	return true, sfvm.NewValues(vals), nil
+	return true, sfvm.NewValueList(vals), nil
 }
 
 func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -118,5 +118,5 @@ func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfv
 		vals = append(vals, result)
 		return nil
 	})
-	return true, sfvm.NewValues(vals), nil
+	return true, sfvm.NewValueList(vals), nil
 }

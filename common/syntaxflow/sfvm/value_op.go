@@ -84,7 +84,6 @@ func WithAnalysisContext_Label(label string) AnalysisContextOption {
 	}
 }
 
-// type MatchMode int
 const (
 	NameMatch int = 1
 	KeyMatch      = 1 << 1
@@ -111,17 +110,18 @@ type ValueOperator interface {
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string
-	// Len() int
+
+	Count() int
 
 	// Recursive will execute with handler for every list or map
 	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
-	ExactMatch(context.Context, int, string) (bool, ValueOperator, error)
+	ExactMatch(context.Context, int, string) ValueOperator
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(context.Context, int, string) (bool, ValueOperator, error)
+	GlobMatch(context.Context, int, string) ValueOperator
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
+	RegexpMatch(context.Context, int, string) ValueOperator
 
 	GetCalled() (ValueOperator, error)
 	GetCallActualParams(int, bool) (ValueOperator, error)
@@ -146,8 +146,8 @@ type ValueOperator interface {
 	// fileFilter
 	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
 
-	CompareString(*StringComparator) (ValueOperator, []bool)
-	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
-	CompareConst(*ConstComparator) []bool
+	CompareString(*StringComparator) (ValueOperator, bool)
+	CompareOpcode(*OpcodeComparator) (ValueOperator, bool)
+	CompareConst(*ConstComparator) bool
 	NewConst(any, ...*memedit.Range) ValueOperator
 }

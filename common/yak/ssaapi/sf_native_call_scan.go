@@ -45,7 +45,7 @@ var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame 
 			vals = append(vals, results...)
 			return nil
 		})
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValueList(vals), nil
 	}
 }
 

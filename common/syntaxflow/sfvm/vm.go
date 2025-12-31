@@ -186,7 +186,8 @@ func (frame *SFFrame) Feed(i ValueOperator, opt ...Option) (*SFFrameResult, erro
 	for _, o := range opt {
 		o(frame.config)
 	}
-	err := frame.exec(i)
+	vs := NewFlatValues(i)
+	err := frame.exec(vs)
 	frame.result.rule = frame.rule
 	return frame.result, err
 }

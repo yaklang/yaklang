@@ -307,97 +307,107 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 	return nil
 }
 
-func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) sfvm.ValueOperator {
 	// Search in diff first
-	var results Values
+	var results []sfvm.ValueOperator
 	if p.Diff != nil {
-		matched, vals, err := p.Diff.ExactMatch(ctx, mod, want)
-		if err == nil && matched {
-			if values, ok := vals.(Values); ok {
-				results = append(results, values...)
+		vals := p.Diff.ExactMatch(ctx, mod, want)
+		vals.Recursive(func(vo sfvm.ValueOperator) error {
+			v, ok := vo.(*Value)
+			if !ok {
+				return nil
 			}
-		}
+			results = append(results, v)
+			return nil
+		})
 	}
 
 	// Search in base programs, filter shadow values
 	for _, base := range p.Base {
 		if base != nil {
-			matched, vals, err := base.ExactMatch(ctx, mod, want)
-			if err == nil && matched {
-				if values, ok := vals.(Values); ok {
-					for _, v := range values {
-						if !p.IsShadow(v) {
-							results = append(results, v)
-						}
-					}
+			vals := base.ExactMatch(ctx, mod, want)
+			vals.Recursive(func(vo sfvm.ValueOperator) error {
+				v, ok := vo.(*Value)
+				if !ok {
+					return nil
 				}
-			}
+				if !p.IsShadow(v) {
+					results = append(results, v)
+				}
+				return nil
+			})
 		}
 	}
 
-	return len(results) > 0, results, nil
+	return sfvm.NewValueList(results)
 }
 
-func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) sfvm.ValueOperator {
 	// Search in diff first
-	var results Values
+	var results []sfvm.ValueOperator
 	if p.Diff != nil {
-		matched, vals, err := p.Diff.GlobMatch(ctx, mod, g)
-		if err == nil && matched {
-			if values, ok := vals.(Values); ok {
-				results = append(results, values...)
+		vals := p.Diff.GlobMatch(ctx, mod, g)
+		vals.Recursive(func(vo sfvm.ValueOperator) error {
+			v, ok := vo.(*Value)
+			if !ok {
+				return nil
 			}
-		}
+			results = append(results, v)
+			return nil
+		})
 	}
 
 	// Search in base programs, filter shadow values
 	for _, base := range p.Base {
 		if base != nil {
-			matched, vals, err := base.GlobMatch(ctx, mod, g)
-			if err == nil && matched {
-				if values, ok := vals.(Values); ok {
-					for _, v := range values {
-						if !p.IsShadow(v) {
-							results = append(results, v)
-						}
-					}
+			vals := base.GlobMatch(ctx, mod, g)
+			vals.Recursive(func(vo sfvm.ValueOperator) error {
+				v, ok := vo.(*Value)
+				if !ok {
+					return nil
 				}
-			}
+				if !p.IsShadow(v) {
+					results = append(results, v)
+				}
+				return nil
+			})
 		}
 	}
 
-	return len(results) > 0, results, nil
+	return sfvm.NewValueList(results)
 }
 
-func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) sfvm.ValueOperator {
 	// Search in diff first
-	var results Values
+	var results []sfvm.ValueOperator
 	if p.Diff != nil {
-		matched, vals, err := p.Diff.RegexpMatch(ctx, mod, re)
-		if err == nil && matched {
-			if values, ok := vals.(Values); ok {
-				results = append(results, values...)
+		vals := p.Diff.RegexpMatch(ctx, mod, re)
+		vals.Recursive(func(vo sfvm.ValueOperator) error {
+			v, ok := vo.(*Value)
+			if !ok {
+				return nil
 			}
-		}
+			results = append(results, v)
+			return nil
+		})
 	}
 
 	// Search in base programs, filter shadow values
 	for _, base := range p.Base {
 		if base != nil {
-			matched, vals, err := base.RegexpMatch(ctx, mod, re)
-			if err == nil && matched {
-				if values, ok := vals.(Values); ok {
-					for _, v := range values {
-						if !p.IsShadow(v) {
-							results = append(results, v)
-						}
-					}
+			vals := base.RegexpMatch(ctx, mod, re)
+			vals.Recursive(func(vo sfvm.ValueOperator) error {
+				v, ok := vo.(*Value)
+				if !ok {
+					return nil
 				}
-			}
+				results = append(results, v)
+				return nil
+			})
 		}
 	}
 
-	return len(results) > 0, results, nil
+	return sfvm.NewValueList(results)
 }
 
 func (p *ProgramOverLay) GetCalled() (sfvm.ValueOperator, error) {
@@ -448,16 +458,18 @@ func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]s
 	return nil, utils.Error("ProgramOverLay does not support FileFilter")
 }
 
-func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, bool) {
+	return p, false
 }
 
-func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, bool) {
+	return p, false
 }
-
-func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return nil
+func (p *ProgramOverLay) Count() int {
+	return 1
+}
+func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return false
 }
 
 func (p *ProgramOverLay) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {

@@ -78,7 +78,7 @@ func ValuesToSFValueList(values Values) *sfvm.ValueList {
 	for _, value := range values {
 		list = append(list, value)
 	}
-	return &sfvm.ValueList{Values: list}
+	return sfvm.NewValueList(list)
 }
 
 // MergeSFValueOperator 合并多个 sfvm.ValueOperator 为一个 sfvm.ValueList

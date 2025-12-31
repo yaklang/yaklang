@@ -181,7 +181,14 @@ const (
 	OpFileFilterReg
 	OpFileFilterXpath
 	OpFileFilterJsonPath
+
+	// condition stack
+	OpToBool // cover
 )
+
+func (i SFVMOpCode) String() string {
+	return Opcode2String[i]
+}
 
 var Opcode2String = map[SFVMOpCode]string{
 	OpPass:                  "OpPass",
@@ -241,6 +248,7 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpCheckEmpty:            "OpCheckEmpty",
 	OpPopDuplicate:          "OpPopDuplicate",
 	OpEmptyCompare:          "OpEmptyCompare",
+	OpToBool:                "OpToBool",
 }
 
 type SFI struct {
@@ -309,11 +317,11 @@ func (s *SFI) String() string {
 	case OpDuplicate:
 		return fmt.Sprintf(verboseLen+" %v", "duplicate", s.UnaryStr)
 	case OpPushSearchGlob:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$glob", s.UnaryStr, MatchModeString(s.UnaryInt))
+		return fmt.Sprintf(verboseLen+" %v matchMode[%v]", "push$glob", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchExact:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$exact", s.UnaryStr, MatchModeString(s.UnaryInt))
+		return fmt.Sprintf(verboseLen+" %v matchMode[%v]", "push$exact", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpPushSearchRegexp:
-		return fmt.Sprintf(verboseLen+" %v isMember[%v]", "push$regexp", s.UnaryStr, MatchModeString(s.UnaryInt))
+		return fmt.Sprintf(verboseLen+" %v matchMode[%v]", "push$regexp", s.UnaryStr, MatchModeString(s.UnaryInt))
 	case OpGetCall:
 		return fmt.Sprintf(verboseLen+" %v", "getCall", s.UnaryStr)
 	case OpGetCallArgs:
@@ -424,6 +432,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" ", "pop-duplicate")
 	case OpEmptyCompare:
 		return fmt.Sprintf(verboseLen+" ", "empty compare")
+	case OpToBool:
+		return fmt.Sprintf(verboseLen+" ", "to bool")
 	default:
 		panic("unhandled default case")
 	}

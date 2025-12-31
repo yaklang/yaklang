@@ -67,7 +67,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValueList(vals), nil
 	}
 	return false, nil, utils.Error("no value found")
 }

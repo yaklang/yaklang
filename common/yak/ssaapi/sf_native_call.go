@@ -219,7 +219,7 @@ func init() {
 			}
 			return nil
 		})
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 
 	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -239,7 +239,7 @@ func init() {
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		count := 0
@@ -270,7 +270,7 @@ func init() {
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 
 	registerNativeCall(NativeCall_GetParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -290,7 +290,7 @@ func init() {
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 
 	registerNativeCall(NativeCall_GetBlurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -307,7 +307,7 @@ func init() {
 			}
 			return nil
 		})
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 	registerNativeCall(NativeCall_ExtendsBy, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		/*
@@ -356,7 +356,7 @@ func init() {
 			}
 			return nil
 		})
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -373,7 +373,7 @@ func init() {
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no blueprint found")
 		}
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 
 	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -419,7 +419,7 @@ func init() {
 			result = temp
 		}
 		if len(result) > 0 {
-			vs := sfvm.NewValues(result)
+			vs := sfvm.NewValueList(result)
 			vs.AppendPredecessor(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
 			return true, vs, nil
 		}
@@ -484,7 +484,7 @@ func init() {
 			return false, nil, utils.Errorf("no predecessors found within depth %d", depth)
 		}
 
-		return true, sfvm.NewValues(allFoundPredecessors), nil
+		return true, sfvm.NewValueList(allFoundPredecessors), nil
 
 	}), nc_desc("获取值的前驱节点"))
 
@@ -527,7 +527,7 @@ func init() {
 		matchFilename(func(filename string) bool {
 			return strings.EqualFold(filename, targetName)
 		})
-		return true, sfvm.NewValues(rs), nil
+		return true, sfvm.NewValueList(rs), nil
 	}))
 	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
@@ -560,7 +560,7 @@ func init() {
 			}
 			return nil
 		})
-		return true, sfvm.NewValues(rs), nil
+		return true, sfvm.NewValueList(rs), nil
 	}))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
 	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -586,7 +586,7 @@ func init() {
 			result = append(result, result1...)
 			return nil
 		})
-		return true, sfvm.NewValues(result), nil
+		return true, sfvm.NewValueList(result), nil
 	}))
 	registerNativeCall(NativeCall_Java_UnEscape_Output, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var res []sfvm.ValueOperator
@@ -655,7 +655,7 @@ func init() {
 		}
 
 		if len(res) > 0 {
-			return true, sfvm.NewValues(res), nil
+			return true, sfvm.NewValueList(res), nil
 		}
 		return false, nil, nil
 	}), nc_desc("获取Java模板语言中未转义的输出"))
@@ -725,7 +725,7 @@ func init() {
 			return nil
 		})
 		if len(results) > 0 {
-			return true, sfvm.NewValues(results), nil
+			return true, sfvm.NewValueList(results), nil
 		}
 		return false, nil, utils.Error("not value in version range")
 	}), nc_desc("获取版本信息"))
@@ -788,7 +788,7 @@ func init() {
 			}
 			return nil
 		})
-		return true, sfvm.NewValues(results), nil
+		return true, sfvm.NewValueList(results), nil
 	}))
 	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
 	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -859,7 +859,7 @@ func init() {
 			return nil
 		})
 		if len(vals) > 0 {
-			return true, sfvm.NewValues(vals), nil
+			return true, sfvm.NewValueList(vals), nil
 		}
 		return false, nil, utils.Error("no value found")
 	}))
@@ -887,7 +887,7 @@ func init() {
 			}
 			return nil
 		})
-		frame.GetSymbolTable().Set(varName, sfvm.NewValues(vals))
+		frame.GetSymbolTable().Set(varName, sfvm.NewValueList(vals))
 		return true, v, nil
 	}), nc_desc(`put vars to variables`))
 	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))
@@ -984,7 +984,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value found")
 		}),
@@ -1037,7 +1037,7 @@ func init() {
 				return false, nil, err
 			}
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value found")
 		}),
@@ -1076,7 +1076,7 @@ func init() {
 			})
 			if len(vals) > 0 {
 				// fmt.Println("getFormalParams: ", vals)
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(formal params) found")
 		}),
@@ -1121,7 +1121,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(returns) found")
 		}),
@@ -1148,7 +1148,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(callers) found")
 		}),
@@ -1172,7 +1172,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(func) found")
 		}),
@@ -1204,7 +1204,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(siblings) found")
 		}),
@@ -1232,7 +1232,7 @@ func init() {
 				return nil
 			})
 			if len(rets) > 0 {
-				return true, sfvm.NewValues(rets), nil
+				return true, sfvm.NewValueList(rets), nil
 			}
 			return false, nil, utils.Error("no value(members) found")
 		}),
@@ -1259,7 +1259,7 @@ func init() {
 				return nil
 			})
 			if len(rets) > 0 {
-				return true, sfvm.NewValues(rets), nil
+				return true, sfvm.NewValueList(rets), nil
 			}
 			return false, nil, utils.Error("no value(members) found")
 		}),
@@ -1284,7 +1284,7 @@ func init() {
 				return nil
 			})
 			if len(ret) > 0 {
-				return true, sfvm.NewValues(ret), nil
+				return true, sfvm.NewValueList(ret), nil
 			}
 			return false, nil, utils.Error("no value(parent object) found")
 		}),
@@ -1308,7 +1308,7 @@ func init() {
 				return nil
 			})
 			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
+				return true, sfvm.NewValueList(vals), nil
 			}
 			return false, nil, utils.Error("no value(call) found")
 		}),
@@ -1405,7 +1405,7 @@ func init() {
 			if len(vals) == 0 {
 				return false, sfvm.NewEmptyValues(), utils.Errorf("no value found")
 			}
-			return true, sfvm.NewValues(vals), nil
+			return true, sfvm.NewValueList(vals), nil
 		}),
 		nc_desc(`搜索输入指令的调用指令，输入可以是任何指令，但是会尽可能搜索到调用这个指令的调用指令`),
 	)

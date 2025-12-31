@@ -21,16 +21,18 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
-func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return []bool{false}
+func (p *Program) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return false
 }
 
 func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
+func (p *Program) Count() int {
+	return 0
+}
 
-func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	var boolRes []bool
+func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, bool) {
 	ctx := opcodeItems.Context
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
@@ -39,29 +41,27 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 				log.Errorf("CompareOpcode: new value failed: %v", err)
 				return v, false
 			} else {
-				boolRes = append(boolRes, true)
 				return v, true
 			}
 		},
 	)
 	// 将 Values 转换为 sfvm.ValueOperator
-	return ValuesToSFValueList(res), boolRes
+	return ValuesToSFValueList(res), true
 }
 
-func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, bool) {
 	var res []sfvm.ValueOperator
-	var boolRes []bool
 	ctx := comparator.Context
 
 	matchValue := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
 		var v sfvm.ValueOperator
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, v, _ = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			v = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			v = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
+			v = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
 		}
 		return v
 	}
@@ -99,12 +99,8 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 			}
 		}
 	}
-	result := sfvm.NewValues(res)
-	result.Recursive(func(operator sfvm.ValueOperator) error {
-		boolRes = append(boolRes, true)
-		return nil
-	})
-	return result, boolRes
+	result := sfvm.NewValueList(res)
+	return result, true
 }
 
 func (p *Program) String() string {
@@ -147,19 +143,19 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(ctx context.Context, mod int, s string) sfvm.ValueOperator {
 	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
 }
 
-func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(ctx context.Context, mod int, g string) sfvm.ValueOperator {
 	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
 }
 
-func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) sfvm.ValueOperator {
 	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
 }
 
-func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) sfvm.ValueOperator {
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionsByVariable(ctx, p.Program, compareMode, mod, pattern),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
@@ -172,7 +168,7 @@ func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, patte
 		},
 	)
 	// 将 Values 转换为 sfvm.ValueOperator
-	return len(values) > 0, ValuesToSFValueList(values), nil
+	return ValuesToSFValueList(values)
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
@@ -439,5 +435,5 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 		}
 		return nil, utils.Errorf("no file matched by path %s", path)
 	}
-	return sfvm.NewValues(res), nil
+	return sfvm.NewValueList(res), nil
 }

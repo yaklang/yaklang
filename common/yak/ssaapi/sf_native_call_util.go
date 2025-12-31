@@ -32,7 +32,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValueList(vals), nil
 	}
 	return false, nil, utils.Error("no value found")
 }
@@ -54,7 +54,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValueList(vals), nil
 	}
 	return false, nil, utils.Error("no value found")
 })
@@ -76,7 +76,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValueList(vals), nil
 	}
 	return false, nil, utils.Error("no value found")
 })
@@ -152,7 +152,7 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 		}
 	}
 	if len(results) > 0 {
-		return true, sfvm.NewValues(results), nil
+		return true, sfvm.NewValueList(results), nil
 	}
 	return false, nil, utils.Error("no value found")
 })

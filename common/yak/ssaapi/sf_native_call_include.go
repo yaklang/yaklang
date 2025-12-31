@@ -118,7 +118,7 @@ func CreateIncludeValue(vs Values) sfvm.ValueOperator {
 		val.AppendPredecessor(got, sfvm.WithAnalysisContext_Label("include"))
 		list = append(list, val)
 	}
-	return sfvm.NewValues(list)
+	return sfvm.NewValueList(list)
 }
 
 func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {

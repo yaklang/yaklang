@@ -260,7 +260,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	})
 
 	if len(res) > 0 {
-		return true, sfvm.NewValues(res), nil
+		return true, sfvm.NewValueList(res), nil
 	}
 	return false, nil, nil
 }

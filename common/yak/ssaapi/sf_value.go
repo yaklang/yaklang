@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
 
@@ -72,16 +71,16 @@ func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
-func (v *Value) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) ExactMatch(ctx context.Context, mod int, want string) sfvm.ValueOperator {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return ValuesToSFValueList(value)
 }
 
-func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) GlobMatch(ctx context.Context, mod int, g string) sfvm.ValueOperator {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return ValuesToSFValueList(value)
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -90,33 +89,33 @@ func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 	return MergeSFValueOperator(vals...), nil
 }
 
-func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) sfvm.ValueOperator {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return ValuesToSFValueList(value)
 }
 
-func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, bool) {
 	if v == nil || items == nil {
-		return nil, []bool{false}
+		return nil, false
 	}
 
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
-	return v, []bool{items.Matches(names...)}
+	return v, items.Matches(names...)
 }
 
-func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
+func (v *Value) CompareConst(comparator *sfvm.ConstComparator) bool {
 	if v == nil || comparator == nil {
-		return []bool{false}
+		return false
 	}
-	return []bool{comparator.Matches(v.String())}
+	return comparator.Matches(v.String())
 }
 
-func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, bool) {
 	if v == nil || comparator == nil {
-		return nil, []bool{false}
+		return nil, false
 	}
 	checkOp := func(opcode ssa.Opcode) bool {
 		return v.getOpcode() == opcode
@@ -125,11 +124,11 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
 		return slices.Contains(ops, binOp)
 	}
-	return v, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
+	return v, comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)
 }
 
 func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	err := sfvm.NewValues(sf).Recursive(func(operator sfvm.ValueOperator) error {
+	err := sfvm.NewValueList(sf).Recursive(func(operator sfvm.ValueOperator) error {
 		if raw, ok := operator.(ssa.GetIdIF); ok {
 			if v.GetId() == raw.GetId() {
 				return utils.Error("abort")
@@ -195,7 +194,7 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
 			return item
 		})
-		return sfvm.NewValues(members), nil
+		return sfvm.NewValueList(members), nil
 	}
 	return sfvm.NewEmptyValues(), nil
 }

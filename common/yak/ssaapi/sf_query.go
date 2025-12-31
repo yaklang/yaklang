@@ -129,6 +129,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	if utils.IsNil(value) {
 		return nil, utils.Errorf("SyntaxflowQuery: value is nil")
 	}
+	if _, ok := value.(*sfvm.ValueList); !ok {
+		value = sfvm.NewValueList([]sfvm.ValueOperator{value})
+	}
 
 	// set cache and have programName and kind
 	if config.useCache && (config.program != nil && config.kind != "") {
@@ -209,13 +212,13 @@ type QueryOption func(*queryConfig)
 func QueryWithProgram(program *Program) QueryOption {
 	return func(c *queryConfig) {
 		c.program = program
-		c.value = program
+		c.value = sfvm.NewValueList([]sfvm.ValueOperator{program})
 	}
 }
 
 func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
-		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator {
+		c.value = sfvm.NewValueList(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator {
 			return p
 		}))
 		c.program, _ = lo.Find(programs, func(item *Program) bool {

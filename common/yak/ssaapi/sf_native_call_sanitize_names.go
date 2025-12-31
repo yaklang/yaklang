@@ -25,7 +25,7 @@ var nativeCallSanitizeNames sfvm.NativeCallFunc = func(v sfvm.ValueOperator, fra
 		return nil
 	})
 	if len(results) > 0 {
-		return true, sfvm.NewValues(results), nil
+		return true, sfvm.NewValueList(results), nil
 	}
 	return false, nil, utils.Error("no sanitize name value found")
 }

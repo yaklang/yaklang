@@ -173,5 +173,5 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 	if len(rets) == 0 {
 		return false, nil, utils.Error("no fuzztag result found")
 	}
-	return true, sfvm.NewValues(rets), nil
+	return true, sfvm.NewValueList(rets), nil
 }

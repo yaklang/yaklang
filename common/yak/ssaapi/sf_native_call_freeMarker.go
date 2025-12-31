@@ -62,5 +62,5 @@ var nativeCallFreeMarker = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame 
 		return nil
 	})
 
-	return true, sfvm.NewValues(vals), nil
+	return true, sfvm.NewValueList(vals), nil
 })

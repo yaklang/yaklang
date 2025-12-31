@@ -50,7 +50,7 @@ type SFFrame struct {
 	idx            int     // current opcode index
 	currentProcess float64 // current process
 
-	stack          *utils.Stack[ValueOperator] // for filter
+	stack          *utils.Stack[Values]        // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
 	iterStack      *utils.Stack[*IterContext]  // for loop
 	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
@@ -210,12 +210,50 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 
 func (s *SFFrame) Flush() {
 	s.result = NewSFResult(s.rule, s.config)
-	s.stack = utils.NewStack[ValueOperator]()
+	s.stack = utils.NewStack[Values]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
 	s.iterStack = utils.NewStack[*IterContext]()
 	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
+}
+
+// stackPop safely pops a value from the stack and checks for nil
+// Returns the ValueList and an error if the stack is empty
+func (s *SFFrame) stackPop() (Values, error) {
+	if s.stack.Len() == 0 {
+		s.debugSubLog(">> pop Error: empty stack")
+		return nil, utils.Errorf("E: stack is empty, cannot pop")
+	}
+	val := s.stack.Pop()
+	if val == nil {
+		s.debugSubLog(">> pop Error: nil value")
+		return nil, utils.Errorf("E: stack pop returned nil")
+	}
+	s.debugSubLog(">> pop %v", len(val))
+	return val, nil
+}
+
+// stackPush safely pushes a value to the stack, ensuring width consistency
+// It uses Foreach to maintain the same width as the current stack top
+func (s *SFFrame) stackPush(value Values) {
+	s.debugSubLog("<< push %v", len(value))
+	s.stack.Push(value)
+	return
+}
+
+// stackPeek safely peeks at the top of the stack
+func (s *SFFrame) stackPeek() (Values, error) {
+	if s.stack.Len() == 0 {
+		s.debugSubLog(">> peek Error: empty stack")
+		return nil, utils.Errorf("E: stack is empty, cannot peek")
+	}
+	val := s.stack.Peek()
+	if val == nil {
+		s.debugSubLog(">> peek Error: nil value")
+		return nil, utils.Errorf("E: stack peek returned nil")
+	}
+	return val, nil
 }
 
 func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
@@ -255,7 +293,7 @@ func (s *SFFrame) ProcessCallback(msg string, args ...any) {
 		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
 	}
 }
-func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
+func (s *SFFrame) exec(feedValue Values) (ret error) {
 	s.predCounter = 0
 	defer func() {
 		s.predCounter = 0
@@ -287,7 +325,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	})
 }
 
-func (s *SFFrame) execRule(feedValue ValueOperator) error {
+func (s *SFFrame) execRule(feedValue Values) error {
 	for {
 		var msg string
 		if s.idx < len(s.Codes) {
@@ -329,7 +367,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 		case OpCheckStackTop:
 			if s.stack.Len() == 0 {
 				s.debugSubLog(">> stack top is nil (push input)")
-				s.stack.Push(feedValue)
+				s.stackPush(feedValue)
 			}
 		case OpEnterStatement:
 			s.errorSkipStack.Push(&errorSkipContext{
@@ -340,10 +378,11 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 
 		case OpCreateIter:
 			s.debugSubLog(">> peek")
-			vs := s.stack.Peek()
-			if vs == nil {
+			valList, err := s.stackPeek()
+			if err != nil {
 				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
 			}
+			vs := NewValueList(valList)
 			s.IterStart(vs)
 		case OpIterNext:
 			vs, next, err := s.IterNext()
@@ -358,12 +397,17 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 				continue
 			}
 			s.debugLog("next value: %v", ValuesLen(vs))
-			s.stack.Push(vs)
+			s.stackPush(vs)
 		case OpIterLatch:
 			if s.stack.IsEmpty() {
 				return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
 			}
-			if err := s.IterLatch(s.stack.Pop()); err != nil {
+			valList, err := s.stackPop()
+			if err != nil {
+				return err
+			}
+			vs := valList.ToList()
+			if err := s.IterLatch(vs); err != nil {
 				return err
 			}
 			// jump to next
@@ -409,13 +453,17 @@ func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 		if unnameValue := s.result.UnNameValue; ValuesLen(unnameValue) != 0 {
 			values = append(values, s.result.UnNameValue)
 		}
-		s.result.UnNameValue = NewValues(values) // for merge
+		s.result.UnNameValue = NewValueList(values) // for merge
 	} else {
 		if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
 			values = append(values, originValue)
 		}
-		value := NewValues(values) // for merge
-		s.GetSymbolTable().Set(resultName, value)
+		value := NewValueList(values)
+		val, err := value.Merge(operator)
+		if err != nil {
+			return err
+		}
+		s.GetSymbolTable().Set(resultName, val)
 	}
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {
