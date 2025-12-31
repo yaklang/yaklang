@@ -20,6 +20,7 @@ var Exports = map[string]interface{}{
 	"NewVMFromDeviceWithContext":      _newVMFromDeviceWithContext,
 	"GetSystemRouteManager":           netstackvm.GetSystemRouteManager,
 	"GetPrivilegedSystemRouteManager": netstackvm.GetPrivilegedSystemRouteManager,
+	"FastKillTCP":                     netstackvm.FastKillTCP,
 }
 
 // _createPrivilegedDevice creates a privileged TUN device with default MTU (1500)

@@ -201,7 +201,9 @@ func StartReserveDNSCache(ctx context.Context) (*PcapReserveDNSCache, error) {
 				}
 			}),
 		)
-		log.Errorf("pcap reserve dns cache exited: %s", err)
+		if err != nil {
+			log.Errorf("pcap reserve dns cache exited: %s", err)
+		}
 	}()
 	select {
 	case <-start:
