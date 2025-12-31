@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -241,9 +240,9 @@ func (r *ReAct) EnhanceKnowledgeGetter(ctx context.Context, userQuery string, co
 }
 
 // compressKnowledgeResults 使用 AI 智能压缩知识搜索结果
-// 参考 loop_yaklangcode 中的上下文压缩技术
+// 参考 loop_yaklangcode 和 aireducer 中的上下文压缩技术
 // 将长内容带行号展示，让 AI 筛选出与用户问题最相关的片段
-// 对于超大内容（>30KB），使用 chunkmaker 切片 + overlap 技术分批处理
+// 对于超大内容（>20KB），使用分片 + overlap 技术分批处理
 func (r *ReAct) compressKnowledgeResults(ctx context.Context, knowledgeContent string, userQuery string, maxRanges int) string {
 	if len(knowledgeContent) == 0 {
 		return knowledgeContent
@@ -260,13 +259,14 @@ func (r *ReAct) compressKnowledgeResults(ctx context.Context, knowledgeContent s
 		maxRanges = 15
 	}
 
-	// 对于超大内容（>30KB），使用分片处理
-	const maxChunkSize = 30 * 1024 // 30KB per chunk
-	const overlapSize = 2 * 1024   // 2KB overlap
+	// 对于超大内容（>20KB），使用分片处理
+	const maxChunkSize = 20 * 1024 // 20KB per chunk
+	const overlapLines = 20        // 20 行 overlap
+	const maxChunks = 10           // 最多 10 个分片
 
 	if len(knowledgeContent) > maxChunkSize {
 		log.Infof("compressKnowledgeResults: content too large (%d bytes), using chunked processing", len(knowledgeContent))
-		return r.compressKnowledgeResultsChunked(ctx, knowledgeContent, userQuery, maxRanges, maxChunkSize, overlapSize)
+		return r.compressKnowledgeResultsChunked(ctx, knowledgeContent, userQuery, maxRanges, maxChunkSize, overlapLines, maxChunks)
 	}
 
 	// 对于较小的内容，直接处理
@@ -274,90 +274,118 @@ func (r *ReAct) compressKnowledgeResults(ctx context.Context, knowledgeContent s
 }
 
 // compressKnowledgeResultsChunked 使用分片方式处理超大内容
-// 使用 chunkmaker 切片 + overlap 重叠分片，然后对每个分片进行 AI 筛选
-func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeContent string, userQuery string, maxRanges int, chunkSize int, overlapSize int) string {
-	log.Infof("compressKnowledgeResultsChunked: processing %d bytes with chunkSize=%d, overlap=%d", len(knowledgeContent), chunkSize, overlapSize)
+// 借鉴 aireducer 的设计：先给整个内容添加行号，然后按大小分片
+// 使用行号 overlap 确保上下文连贯
+func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeContent string, userQuery string, maxRanges int, chunkSize int, overlapLines int, maxChunks int) string {
+	// 步骤1: 先按行分割原始内容
+	originalLines := strings.Split(knowledgeContent, "\n")
+	totalLines := len(originalLines)
 
-	// 使用 utils.PrefixLinesWithLineNumbersReader 将内容转换为带行号的 Reader
-	// 然后使用 chunkmaker 进行分片
-	numberedReader := utils.PrefixLinesWithLineNumbersReader(strings.NewReader(knowledgeContent))
+	log.Infof("compressKnowledgeResultsChunked: processing %d bytes, %d lines, chunkSize=%d, overlapLines=%d, maxChunks=%d",
+		len(knowledgeContent), totalLines, chunkSize, overlapLines, maxChunks)
 
-	// 创建 TextChunkMaker，使用换行符作为分隔符优化切分
-	cm, err := chunkmaker.NewTextChunkMaker(
-		numberedReader,
-		chunkmaker.WithChunkSize(int64(chunkSize)),
-		chunkmaker.WithSeparatorTrigger("\n"), // 按行分隔，避免切断行中间
-		chunkmaker.WithCtx(ctx),
-	)
-	if err != nil {
-		log.Errorf("compressKnowledgeResultsChunked: failed to create chunkmaker: %v", err)
-		// 回退到单次处理
-		return r.compressKnowledgeResultsSingle(ctx, knowledgeContent, userQuery, maxRanges)
+	// 步骤2: 计算每个 chunk 应该包含多少行
+	// 估算平均每行长度（考虑行号前缀约 10 字符）
+	avgLineLen := len(knowledgeContent)/totalLines + 10
+	linesPerChunk := chunkSize / avgLineLen
+	if linesPerChunk < 50 {
+		linesPerChunk = 50
 	}
-	// 注意：不使用 defer cm.Close()，因为 for-range 结束后 chunkmaker 内部已关闭
-	// 只在提前 break 时需要调用 Close
 
-	// 收集每个 chunk 的筛选结果
+	// 调整以确保不超过 maxChunks
+	effectiveLinesPerChunk := linesPerChunk - overlapLines
+	if effectiveLinesPerChunk <= 0 {
+		effectiveLinesPerChunk = linesPerChunk / 2
+	}
+	estimatedChunks := (totalLines + effectiveLinesPerChunk - 1) / effectiveLinesPerChunk
+	if estimatedChunks > maxChunks {
+		effectiveLinesPerChunk = (totalLines + maxChunks - 1) / maxChunks
+		linesPerChunk = effectiveLinesPerChunk + overlapLines
+		log.Infof("compressKnowledgeResultsChunked: adjusted linesPerChunk to %d to limit chunks to %d", linesPerChunk, maxChunks)
+	}
+
+	// 步骤3: 分片处理
 	type ChunkResult struct {
 		ChunkIndex int
+		StartLine  int
+		EndLine    int
 		Ranges     []RankedRange
 	}
 	var allChunkResults []ChunkResult
 
-	// 处理每个 chunk
 	chunkIndex := 0
-	stoppedEarly := false
-	for chunk := range cm.OutputChannel() {
-		// 使用 DumpWithOverlap 获取带重叠的内容
-		// overlapSize 表示从前一个 chunk 获取的重叠字节数
-		chunkContentWithOverlap := chunk.DumpWithOverlap(overlapSize)
+	for startLineIdx := 0; startLineIdx < totalLines && chunkIndex < maxChunks; chunkIndex++ {
+		// 计算当前 chunk 的行范围（1-based 行号）
+		startLine := startLineIdx + 1
+		endLineIdx := startLineIdx + linesPerChunk
+		if endLineIdx > totalLines {
+			endLineIdx = totalLines
+		}
+		endLine := endLineIdx
 
-		// 获取 chunk 的原始内容（不带 overlap）用于提取行号范围
-		chunkData := string(chunk.Data())
+		// 提取当前 chunk 的行
+		chunkLines := originalLines[startLineIdx:endLineIdx]
 
-		// 从带行号的内容中提取起始和结束行号
-		startLine, endLine := extractLineNumberRange(chunkData)
+		// 构建带行号的 chunk 内容
+		var chunkBuilder strings.Builder
+		for i, line := range chunkLines {
+			lineNum := startLineIdx + i + 1
+			chunkBuilder.WriteString(fmt.Sprintf("%d | %s\n", lineNum, line))
+		}
+		chunkContent := chunkBuilder.String()
+
+		// 添加 overlap 上下文（从前面取 overlapLines 行）
+		var chunkWithOverlap string
+		if startLineIdx > 0 && overlapLines > 0 {
+			overlapStartIdx := startLineIdx - overlapLines
+			if overlapStartIdx < 0 {
+				overlapStartIdx = 0
+			}
+			overlapLinesContent := originalLines[overlapStartIdx:startLineIdx]
+			var overlapBuilder strings.Builder
+			overlapBuilder.WriteString("--- [上下文开始] ---\n")
+			for i, line := range overlapLinesContent {
+				lineNum := overlapStartIdx + i + 1
+				overlapBuilder.WriteString(fmt.Sprintf("%d | %s\n", lineNum, line))
+			}
+			overlapBuilder.WriteString("--- [上下文结束] ---\n\n")
+			chunkWithOverlap = overlapBuilder.String() + chunkContent
+		} else {
+			chunkWithOverlap = chunkContent
+		}
 
 		// 打印 chunk 内容摘要日志
-		chunkPreview := utils.ShrinkString(chunkData, 200)
-		log.Infof("compressKnowledgeResultsChunked: chunk %d preview:\n%s", chunkIndex, chunkPreview)
-
-		log.Infof("compressKnowledgeResultsChunked: processing chunk %d (lines %d-%d, size=%d bytes, overlap=%d bytes)",
-			chunkIndex, startLine, endLine, len(chunkData), len(chunkContentWithOverlap)-len(chunkData))
+		chunkPreview := utils.ShrinkString(chunkContent, 300)
+		log.Infof("compressKnowledgeResultsChunked: chunk %d/%d (lines %d-%d, %d lines, size=%d bytes):\n%s",
+			chunkIndex+1, maxChunks, startLine, endLine, len(chunkLines), len(chunkContent), chunkPreview)
 
 		// 对当前 chunk 进行 AI 筛选
-		// 传入带 overlap 的完整内容，让 AI 理解上下文
-		chunkRanges := r.compressKnowledgeChunk(ctx, chunkContentWithOverlap, "", userQuery, maxRanges/2+1, startLine, endLine)
+		chunkRanges := r.compressKnowledgeChunk(ctx, chunkWithOverlap, "", userQuery, maxRanges/2+1, startLine, endLine)
 
 		if len(chunkRanges) > 0 {
 			allChunkResults = append(allChunkResults, ChunkResult{
 				ChunkIndex: chunkIndex,
+				StartLine:  startLine,
+				EndLine:    endLine,
 				Ranges:     chunkRanges,
 			})
+			log.Infof("compressKnowledgeResultsChunked: chunk %d extracted %d ranges", chunkIndex+1, len(chunkRanges))
+		} else {
+			log.Infof("compressKnowledgeResultsChunked: chunk %d extracted 0 ranges", chunkIndex+1)
 		}
 
-		log.Infof("compressKnowledgeResultsChunked: chunk %d extracted %d ranges", chunkIndex, len(chunkRanges))
-
-		chunkIndex++
-
-		// 防止处理过多 chunk
-		if chunkIndex > 20 {
-			log.Warnf("compressKnowledgeResultsChunked: too many chunks (%d), stopping early", chunkIndex)
-			stoppedEarly = true
-			break
+		// 移动到下一个 chunk（减去 overlap 行数）
+		startLineIdx = endLineIdx - overlapLines
+		if startLineIdx < 0 {
+			startLineIdx = 0
+		}
+		// 确保向前推进
+		if startLineIdx <= (endLineIdx - linesPerChunk) {
+			startLineIdx = endLineIdx
 		}
 	}
 
-	// 只有在提前停止时才需要关闭（正常循环结束后 channel 已经关闭）
-	if stoppedEarly {
-		// chunkmaker 在 break 后不需要再调用 Close，channel 关闭即可
-		// 但消费完剩余的 channel 内容以避免阻塞
-		go func() {
-			for range cm.OutputChannel() {
-				// drain remaining chunks
-			}
-		}()
-	}
+	log.Infof("compressKnowledgeResultsChunked: processed %d chunks total", chunkIndex)
 
 	// 合并所有 chunk 的结果
 	var allRanges []RankedRange
@@ -423,40 +451,6 @@ func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeCo
 		len(knowledgeContent), len(finalResult), len(allRanges), len(allChunkResults))
 
 	return finalResult
-}
-
-// extractLineNumberRange 从带行号的内容中提取起始和结束行号
-// 内容格式类似: "  1 | content\n  2 | content\n..."
-func extractLineNumberRange(content string) (startLine int, endLine int) {
-	lines := strings.Split(content, "\n")
-	startLine = 0
-	endLine = 0
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		// 查找行号（格式: "数字 | 内容" 或 "数字|内容"）
-		parts := strings.SplitN(line, "|", 2)
-		if len(parts) >= 1 {
-			numStr := strings.TrimSpace(parts[0])
-			if num, err := strconv.Atoi(numStr); err == nil {
-				if startLine == 0 {
-					startLine = num
-				}
-				endLine = num
-			}
-		}
-	}
-
-	if startLine == 0 {
-		startLine = 1
-	}
-	if endLine == 0 {
-		endLine = startLine
-	}
-
-	return startLine, endLine
 }
 
 // RankedRange 表示一个带排名的行范围

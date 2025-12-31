@@ -154,14 +154,113 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledge(taskID string) string {
 
 func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, top int) string {
 	knowledges := m.GetKnowledgeByTaskID(taskID)
-	var sb strings.Builder
-	if top > 0 && len(knowledges) > top {
-		knowledges = knowledges[:top]
+	if len(knowledges) == 0 {
+		return ""
 	}
+
+	// 去重：使用 UUID 去重
+	seen := make(map[string]bool)
+	var uniqueKnowledges []EnhanceKnowledge
 	for _, ek := range knowledges {
-		sb.WriteString(fmt.Sprintf("-%s \n%s\n (Source: %s, Relevance: %.2f)\n", ek.GetTitle(), ek.GetContent(), ek.GetSource(), ek.GetScore()))
+		uuid := ek.GetUUID()
+		if uuid != "" && seen[uuid] {
+			continue
+		}
+		if uuid != "" {
+			seen[uuid] = true
+		}
+		uniqueKnowledges = append(uniqueKnowledges, ek)
 	}
+	knowledges = uniqueKnowledges
+
+	// 分类：知识条目 vs 直接搜索结果
+	var knowledgeEntries []EnhanceKnowledge
+	var directSearchResults []EnhanceKnowledge
+	for _, ek := range knowledges {
+		if ek.GetKnowledgeEntryUUID() != "" {
+			knowledgeEntries = append(knowledgeEntries, ek)
+		} else {
+			directSearchResults = append(directSearchResults, ek)
+		}
+	}
+
+	// 限制总数
+	if top > 0 {
+		totalKnowledge := len(knowledgeEntries)
+		totalDirect := len(directSearchResults)
+		if totalKnowledge+totalDirect > top {
+			// 优先保留知识条目
+			if totalKnowledge >= top {
+				knowledgeEntries = knowledgeEntries[:top]
+				directSearchResults = nil
+			} else {
+				remaining := top - totalKnowledge
+				if len(directSearchResults) > remaining {
+					directSearchResults = directSearchResults[:remaining]
+				}
+			}
+		}
+	}
+
+	var sb strings.Builder
+
+	// 先输出知识条目
+	if len(knowledgeEntries) > 0 {
+		sb.WriteString("=== 关联知识 ===\n")
+		for _, ek := range knowledgeEntries {
+			m.dumpSingleKnowledge(&sb, ek)
+		}
+	}
+
+	// 再输出直接搜索结果
+	if len(directSearchResults) > 0 {
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("=== 搜索结果 ===\n")
+		for _, ek := range directSearchResults {
+			m.dumpSingleKnowledge(&sb, ek)
+		}
+	}
+
 	return sb.String()
+}
+
+// dumpSingleKnowledge 输出单个知识条目的详细信息
+func (m *EnhanceKnowledgeManager) dumpSingleKnowledge(sb *strings.Builder, ek EnhanceKnowledge) {
+	// 标题行
+	title := ek.GetTitle()
+	if title == "" {
+		title = "[无标题]"
+	}
+
+	// 构建标识信息
+	var identifiers []string
+	if searchType := ek.GetSearchType(); searchType != "" {
+		identifiers = append(identifiers, fmt.Sprintf("类型:%s", searchType))
+	}
+	if searchTarget := ek.GetSearchTarget(); searchTarget != "" {
+		identifiers = append(identifiers, fmt.Sprintf("目标:%s", searchTarget))
+	}
+
+	if len(identifiers) > 0 {
+		sb.WriteString(fmt.Sprintf("【%s】", strings.Join(identifiers, " | ")))
+	}
+	sb.WriteString(fmt.Sprintf(" %s\n", title))
+
+	// 知识标题（如果有关联知识）
+	if knowledgeTitle := ek.GetKnowledgeTitle(); knowledgeTitle != "" {
+		sb.WriteString(fmt.Sprintf("  └─ 知识标题: %s\n", knowledgeTitle))
+	}
+
+	// 内容
+	content := ek.GetContent()
+	if content != "" {
+		sb.WriteString(fmt.Sprintf("%s\n", content))
+	}
+
+	// 来源和相关性
+	sb.WriteString(fmt.Sprintf("(来源: %s, 相关性: %.2f)\n\n", ek.GetSource(), ek.GetScore()))
 }
 
 func NewEnhanceKnowledgeManager(knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
