@@ -551,16 +551,7 @@ LOOP:
 		/* Generate AI Action */
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 
-		streamDone := make(chan bool)
-		go func() {
-			streamWg.Wait()
-			defer close(streamDone)
-		}()
-		select {
-		case <-time.After(500 * time.Millisecond):
-			log.Warnf("stream wait too long")
-		case <-streamDone:
-		}
+		streamWg.Wait()
 
 		if transactionErr != nil {
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
@@ -667,6 +658,36 @@ LOOP:
 		// 计算 action 执行时间
 		actionExecutionDuration := time.Since(actionStartTime)
 
+		// 先检查 operator 状态，如果 operator 已经表明要终止（无论成功或失败），
+		// 则 context canceled 不应该被视为错误
+		// 这处理了 focus loop 正常完成后 context 被取消的情况
+		if isTerminated, opErr := operator.IsTerminated(); isTerminated {
+			// operator 已经决定终止，跳过 context canceled 检查
+			log.Infof("ReactLoop[%v] terminated by operator after action execution", r.loopName)
+			if opErr != nil {
+				finalError = opErr
+				utils.Debug(func() {
+					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+					fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				})
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				return finalError
+			}
+			if !operator.isSilence {
+				// 正常退出
+				continueIter()
+			}
+			utils.Debug(func() {
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				fmt.Printf("[IsTerminated-Early] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			})
+			r.finishIterationLoopWithError(iterationCount, task, nil)
+			return nil
+		}
+
+		// 只有在 operator 没有明确终止时，才检查 context canceled
 		select {
 		case <-task.GetContext().Done():
 			return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())

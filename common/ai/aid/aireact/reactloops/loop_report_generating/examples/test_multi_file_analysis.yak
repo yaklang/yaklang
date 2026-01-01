@@ -1,0 +1,85 @@
+// test_multi_file_analysis.yak
+// 测试 loop_report_generating 的多文件分析功能
+// 使用 actions: read_reference_file（多个文件）, write_report, modify_section
+
+var reportFilename = ""
+var reportContent = ""
+var testPassed = false
+
+// 测试任务：分析多个文件并生成综合报告
+testPrompt = `请帮我分析 Yaklang 项目的文档结构，需要阅读以下文件：
+
+1. /Users/v1ll4n/Projects/yaklang/README.md - 中文版说明
+2. /Users/v1ll4n/Projects/yaklang/README_EN.md - 英文版说明
+3. /Users/v1ll4n/Projects/yaklang/LICENSE.md - 许可证文件
+
+任务要求：
+1. 使用 read_reference_file 分别阅读上述三个文件
+2. 生成一份对比分析报告，包含以下章节：
+   - 项目概述（基于 README）
+   - 国际化支持情况（对比中英文文档）
+   - 开源许可类型分析
+
+报告长度：200-300 字`
+
+log.Info("========================================")
+log.Info("Testing loop_report_generating - Multi-File Analysis")
+log.Info("========================================")
+log.Info("Test prompt: %s", testPrompt)
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("report_generating"),
+    aim.timeout(360), // 更长超时，因为要读取多个文件
+    aim.maxIteration(20),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        if eventType != "stream" && eventType != "consumption" && eventType != "pressure" {
+            log.Info("[EVENT] Type: %s, NodeId: %s", eventType, event.NodeId)
+        }
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            log.Info("[EVENT] Pin filename! Content: %s", contentStr)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    reportFilename = jsonData["path"]
+                    log.Info("[EVENT] Extracted filename: %s", reportFilename)
+                }
+            } catch e {
+                log.Warn("[EVENT] JSON parse failed: %v", e)
+            }
+        }
+    }),
+    aim.onData(func(react, event, nodeId, data) {
+        dataStr = string(data)
+        if event.Type == "stream" && nodeId != "fast-memory-fetch" {
+            print(dataStr)
+        }
+    }),
+    aim.onFinished(func(react) {
+        log.Info("[FINISHED] ReAct execution completed")
+        if reportFilename != "" {
+            content, readErr = file.ReadFile(reportFilename)
+            if readErr == nil {
+                reportContent = string(content)
+                if len(reportContent) > 100 {
+                    testPassed = true
+                    log.Info("Test PASSED!")
+                }
+            }
+        }
+    }),
+)
+
+if err != nil {
+    log.Error("ReAct execution failed: %v", err)
+}
+
+log.Info("========================================")
+log.Info("TEST RESULTS: Test Passed: %v", testPassed)
+log.Info("========================================")
+if reportContent != "" {
+    log.Info("Report Preview:\n%s", reportContent[:min(len(reportContent), 500)])
+}
+

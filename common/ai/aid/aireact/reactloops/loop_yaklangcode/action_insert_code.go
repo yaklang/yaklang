@@ -45,6 +45,8 @@ var insertLines = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				return
 			}
 
+			action.WaitStream(op.GetContext())
+
 			invoker := loop.GetInvoker()
 			fullCode := loop.Get("full_code")
 			partialCode := loop.Get("yak_code")

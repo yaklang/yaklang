@@ -1,0 +1,149 @@
+## 报告生成模式输出示例
+
+## ⚠️ 关键规则：使用写作工具时必须同时输出 <|GEN_REPORT_{{ .Nonce }}|> 标签！
+
+当使用 write_report、modify_section、insert_section 时，必须在 JSON 后紧接着输出 `<|GEN_REPORT_{{ .Nonce }}|>` 开始标签和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 结束标签包裹的内容。
+
+**标签格式说明：**
+- 开始标签：`<|GEN_REPORT_xxx|>` 其中 xxx 是系统提供的 Nonce
+- 结束标签：`<|GEN_REPORT_END_xxx|>` 必须与开始标签使用相同的 Nonce
+- **注意不是 `</GEN_REPORT>`！结束标签格式是 `<|GEN_REPORT_END_...|>`**
+
+### 示例1：开始调研
+当需要先收集资料时：
+```json
+{
+  "@action": "read_reference_file",
+  "human_readable_thought": "用户需要编写关于网络安全的报告，我需要先阅读提供的参考文件来收集相关信息",
+  "file_path": "/path/to/reference.txt"
+}
+```
+
+### 示例2：搜索参考资料
+当需要搜索特定信息时：
+```json
+{
+  "@action": "grep_reference",
+  "human_readable_thought": "需要在参考资料中搜索关于漏洞利用的具体内容",
+  "pattern": "漏洞.*利用",
+  "file_path": "/path/to/reference.txt"
+}
+```
+
+### 示例3：知识库搜索
+当需要从知识库获取信息时：
+```json
+{
+  "@action": "search_knowledge",
+  "human_readable_thought": "从知识库中搜索关于SQL注入的防护方案",
+  "knowledge_bases": ["security_kb"],
+  "search_query": "SQL注入攻击的防护方法有哪些？"
+}
+```
+
+### 示例4：创建报告初稿（必须包含 <|GEN_REPORT_{{ .Nonce }}|> 标签！）
+当资料收集完成，报告为空时：
+```json
+{
+  "@action": "write_report",
+  "human_readable_thought": "已收集足够的资料，现在创建报告初稿"
+}
+```
+**必须紧接着输出报告内容（这一步不能省略！）：**
+<|GEN_REPORT_{{ .Nonce }}|>
+# 网络安全调查报告
+
+## 1. 概述
+
+本报告旨在分析当前网络安全威胁态势...
+
+## 2. 主要发现
+
+### 2.1 漏洞分析
+
+根据收集的资料，主要存在以下类型的漏洞：
+- SQL注入漏洞
+- XSS跨站脚本攻击
+- ...
+
+## 3. 建议
+
+...
+<|GEN_REPORT_END_{{ .Nonce }}|>
+
+### 示例5：修改报告章节（必须包含 <|GEN_REPORT_{{ .Nonce }}|> 标签！）
+当需要修改已有内容时：
+```json
+{
+  "@action": "modify_section",
+  "human_readable_thought": "根据新收集的资料，需要完善第2章的内容，补充更多漏洞类型的说明",
+  "modify_start_line": 10,
+  "modify_end_line": 15,
+  "modify_reason": "补充漏洞类型的详细说明"
+}
+```
+**必须紧接着输出替换内容：**
+<|GEN_REPORT_{{ .Nonce }}|>
+### 2.1 漏洞类型详细分析
+
+经过深入调研，主要存在以下安全漏洞：
+
+1. **SQL注入漏洞** - 攻击者可通过恶意SQL语句获取数据库信息
+2. **XSS跨站脚本** - 可在用户浏览器中执行恶意脚本
+3. **CSRF跨站请求伪造** - 可诱导用户执行非授权操作
+<|GEN_REPORT_END_{{ .Nonce }}|>
+
+### 示例6：插入新内容（必须包含 <|GEN_REPORT_{{ .Nonce }}|> 标签！）
+当需要添加新章节时：
+```json
+{
+  "@action": "insert_section",
+  "human_readable_thought": "需要在第2章后添加一个新的分析章节",
+  "after_line": 20,
+  "insert_reason": "添加详细的技术分析章节"
+}
+```
+**必须紧接着输出新增内容：**
+<|GEN_REPORT_{{ .Nonce }}|>
+## 3. 技术深度分析
+
+本节将从技术角度深入分析发现的问题...
+<|GEN_REPORT_END_{{ .Nonce }}|>
+
+### 示例7：删除内容
+当需要删除冗余内容时（不需要 <|GEN_REPORT_{{ .Nonce }}|> 标签）：
+```json
+{
+  "@action": "delete_section",
+  "human_readable_thought": "发现第15-18行的内容与前文重复，需要删除",
+  "delete_start_line": 15,
+  "delete_end_line": 18
+}
+```
+
+### 示例8：完成报告
+当报告已完成时：
+```json
+{
+  "@action": "finish",
+  "human_readable_thought": "报告已完成编写，包含了所有要求的内容，结构清晰，引用了收集的资料"
+}
+```
+
+---
+
+## 📋 Action 类型总结
+
+### 需要 `<|GEN_REPORT_...|>` 标签对的 Actions：
+- ✅ `write_report` - 创建报告初稿
+- ✅ `modify_section` - 修改现有内容片段
+- ✅ `insert_section` - 插入新内容
+
+### 不需要 `<|GEN_REPORT_...|>` 标签对的 Actions：
+- ❌ `delete_section` - 删除内容（无需生成内容）
+- ❌ `read_reference_file` - 读取参考文件（查询类操作）
+- ❌ `grep_reference` - 搜索参考资料（查询类操作）
+- ❌ `search_knowledge` - 知识库搜索（查询类操作）
+- ❌ `finish` - 完成报告
+
+**记忆口诀**: 只有需要你"生成或提供报告内容片段"的 actions 才需要 `<|GEN_REPORT_...|>` 标签对！

@@ -43,6 +43,7 @@ const (
 	AI_REACT_LOOP_NAME_PE_TASK           = "pe_task"
 	AI_REACT_LOOP_NAME_PLAN              = "plan"
 	AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE = "knowledge_enhance"
+	AI_REACT_LOOP_NAME_REPORT_GENERATING = "report_generating"
 )
 
 const (
