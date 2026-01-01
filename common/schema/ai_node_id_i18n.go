@@ -519,6 +519,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "知识增强",
 		En: "Knowledge Enhancement",
 	},
+	"knowledge-single-relevance": {
+		Zh: "知识相关性分析",
+		En: "Knowledge Relevance Analysis",
+	},
+	"knowledge-chunk-relevance": {
+		Zh: "知识分片相关性分析",
+		En: "Knowledge Chunk Relevance Analysis",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{
