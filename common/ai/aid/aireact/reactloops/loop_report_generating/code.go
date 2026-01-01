@@ -35,7 +35,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithAITagFieldWithAINodeId("GEN_REPORT", "report_content", "report-content", "content/markdown"),
+				reactloops.WithAITagFieldWithAINodeId("GEN_REPORT", "report_content", "report-content", "text/markdown"),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					reportContent := loop.Get("full_report")
 					reportWithLine := utils.PrefixLinesWithLineNumbers(reportContent)
