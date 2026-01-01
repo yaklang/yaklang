@@ -140,11 +140,14 @@ LOOP:
 					// 任务完成后发送 MEMORY CONTEXT SYNC 请求
 					if !memoryContextSent {
 						memoryContextSent = true
-						// 立即发送同步请求
-						in <- &ypb.AIInputEvent{
-							IsSyncMessage: true,
-							SyncType:      SYNC_TYPE_MEMORY_CONTEXT,
-						}
+						// 等待后台内存搜索和裁剪操作完成
+						go func() {
+							time.Sleep(200 * time.Millisecond)
+							in <- &ypb.AIInputEvent{
+								IsSyncMessage: true,
+								SyncType:      SYNC_TYPE_MEMORY_CONTEXT,
+							}
+						}()
 					}
 				}
 			}
