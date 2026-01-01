@@ -123,6 +123,24 @@ var RagExports = map[string]interface{}{
 	"Embedding":       _embedding,
 	"LocalEmbedding":  _localEmbedding,
 	"OnlineEmbedding": _onlineEmbedding,
+
+	// DBQuery - 数据库直接查询接口（快速，不使用语义搜索）
+	// 用于去重检查、快速验证等场景
+	"DBQueryKnowledge":             _dbQueryKnowledge,             // 查询知识库条目
+	"DBQueryUniqueKnowledgeTitles": _dbQueryUniqueKnowledgeTitles, // 获取唯一的知识标题列表（高效去重）
+	"DBQueryEntity":                _dbQueryEntity,                // 查询实体
+	"DBQueryVectorDocument":        _dbQueryVectorDocument,        // 查询向量文档
+	"DBQueryKnowledgeExists":       _dbQueryKnowledgeExists,       // 检查知识条目是否存在且有向量索引
+	"DBQueryCountVectorsByEntry":   _dbQueryCountVectorsByEntryID, // 根据 entry_id 计算向量数量
+
+	// DBQuery 选项
+	"dbQueryCollection":  _dbQueryCollection,  // 指定集合（单个）
+	"dbQueryCollections": _dbQueryCollections, // 指定多个集合
+	"dbQueryLimit":       _dbQueryLimit,       // 限制数量
+	"dbQueryOffset":      _dbQueryOffset,      // 偏移量
+	"dbQueryRAGFilename": _dbQueryRAGFilename, // 从 RAG 文件导入后查询
+	"dbQueryDB":          _dbQueryDB,          // 指定数据库连接
+	"dbQueryCtx":         _dbQueryCtx,         // 设置上下文
 }
 
 func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) error {
