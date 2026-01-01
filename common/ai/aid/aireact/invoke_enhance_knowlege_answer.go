@@ -12,12 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (string, error) {
@@ -259,8 +261,8 @@ func (r *ReAct) compressKnowledgeResults(ctx context.Context, knowledgeContent s
 		maxRanges = 15
 	}
 
-	// 对于超大内容（>20KB），使用分片处理
-	const maxChunkSize = 20 * 1024 // 20KB per chunk
+	// 对于超大内容（>40KB），使用分片处理
+	const maxChunkSize = 40 * 1024 // 40KB per chunk
 	const overlapLines = 20        // 20 行 overlap
 	const maxChunks = 10           // 最多 10 个分片
 
@@ -527,6 +529,14 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 - rank 4-7: 相关背景/技术细节
 - rank 8+: 补充性信息
 
+【relevance_reason 输出格式】
+请用简洁优雅的语言描述相关性，格式为：
+"找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]"
+
+示例：
+- "找到第 18-45 行内容，与目标相关，因为：包含 HTTP 请求构造的核心代码和参数说明"
+- "找到第 102-130 行内容，与目标相关，因为：详细描述了漏洞利用的具体步骤"
+
 请输出 ranges 数组。
 <|INSTRUCT_END_{{ .nonce }}|>
 `
@@ -544,10 +554,12 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		return nil
 	}
 
-	forgeResult, err := aicommon.InvokeLiteForge(
-		materials,
-		aicommon.WithContext(ctx),
-		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
+	// Create LiteForge instance with stream field handler for relevance_reason
+	liteForgeIns, err := aiforge.NewLiteForge(
+		fmt.Sprintf("knowledge-chunk-compress-%d-%d", chunkStartLine, chunkEndLine),
+		aiforge.WithLiteForge_Emitter(r.Emitter),
+		aiforge.WithLiteForge_StreamableFieldWithAINodeId("knowledge-chunk-relevance", "relevance_reason"),
+		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -556,21 +568,32 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 				nil,
 				aitool.WithStringParam("range", aitool.WithParam_Description("原始行范围，格式: start-end")),
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("相关性排序，1最相关")),
-				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("相关性说明")),
+				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]")),
 			),
 		),
+		aiforge.WithExtendLiteForge_AIOption(
+			aicommon.WithContext(ctx),
+		),
 	)
+	if err != nil {
+		log.Errorf("compressKnowledgeChunk: NewLiteForge failed: %v", err)
+		return nil
+	}
+
+	forgeResult, err := liteForgeIns.Execute(ctx, []*ypb.ExecParamItem{
+		{Key: "query", Value: materials},
+	})
 
 	if err != nil {
-		log.Errorf("compressKnowledgeChunk: LiteForge failed: %v", err)
+		log.Errorf("compressKnowledgeChunk: LiteForge.Execute failed: %v", err)
 		return nil
 	}
 
-	if forgeResult == nil {
+	if forgeResult == nil || forgeResult.Action == nil {
 		return nil
 	}
 
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+	rangeItems := forgeResult.Action.GetInvokeParamsArray("ranges")
 	var results []RankedRange
 
 	for _, item := range rangeItems {
@@ -655,12 +678,21 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 - 提供补充性信息
 - 相关但不直接回答问题
 
+【relevance_reason 输出格式】
+请用简洁优雅的语言描述相关性，格式为：
+"找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]"
+
+示例：
+- "找到第 18-45 行内容，与目标相关，因为：包含 HTTP 请求构造的核心代码和参数说明"
+- "找到第 102-130 行内容，与目标相关，因为：详细描述了漏洞利用的具体步骤"
+- "找到第 56-78 行内容，与目标相关，因为：提供了 API 调用的完整示例代码"
+
 【输出格式】
 返回JSON数组，每个元素包含：
 {
   "range": "start-end", 
   "rank": 数字(1-15),
-  "relevance_reason": "与用户问题的相关性说明"
+  "relevance_reason": "找到第 X-Y 行内容，与目标相关，因为：..."
 }
 
 【严格要求】
@@ -684,10 +716,12 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		return knowledgeContent
 	}
 
-	forgeResult, err := aicommon.InvokeLiteForge(
-		materials,
-		aicommon.WithContext(ctx),
-		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
+	// Create LiteForge instance with stream field handler for relevance_reason
+	liteForgeIns, err := aiforge.NewLiteForge(
+		"knowledge-single-compress",
+		aiforge.WithLiteForge_Emitter(r.Emitter),
+		aiforge.WithLiteForge_StreamableFieldWithAINodeId("knowledge-single-relevance", "relevance_reason"),
+		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -696,22 +730,33 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 				nil,
 				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end，例如 18-45")),
 				aitool.WithIntegerParam("rank", aitool.WithParam_Description("相关性排序，1最相关，数字越大越不相关")),
-				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("与用户问题的相关性说明")),
+				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]")),
 			),
 		),
+		aiforge.WithExtendLiteForge_AIOption(
+			aicommon.WithContext(ctx),
+		),
 	)
-
 	if err != nil {
-		log.Errorf("compressKnowledgeResultsSingle: LiteForge failed: %v", err)
+		log.Errorf("compressKnowledgeResultsSingle: NewLiteForge failed: %v", err)
 		return knowledgeContent
 	}
 
-	if forgeResult == nil {
+	forgeResult, err := liteForgeIns.Execute(ctx, []*ypb.ExecParamItem{
+		{Key: "query", Value: materials},
+	})
+
+	if err != nil {
+		log.Errorf("compressKnowledgeResultsSingle: LiteForge.Execute failed: %v", err)
+		return knowledgeContent
+	}
+
+	if forgeResult == nil || forgeResult.Action == nil {
 		log.Warnf("compressKnowledgeResultsSingle: forge result is nil")
 		return knowledgeContent
 	}
 
-	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
+	rangeItems := forgeResult.Action.GetInvokeParamsArray("ranges")
 
 	if len(rangeItems) == 0 {
 		log.Warnf("compressKnowledgeResultsSingle: no ranges extracted")
