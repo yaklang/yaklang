@@ -24,15 +24,18 @@ var writeCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				filename = r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 			}
 
+			action.WaitStream(operator.GetContext())
+
 			log.Infof("loop yaklang coding start to exec writing code to file %s", filename)
 			invoker := loop.GetInvoker()
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
 			code := loop.Get("yak_code")
+			log.Infof("write_code: extracted yak_code length=%d", len(code))
 			loop.Set("full_code", code)
 			if code == "" {
-				r.AddToTimeline("error", "No code generated in write_code action")
-				operator.Fail("No code generated in 'write_code' action")
+				r.AddToTimeline("error", "No code generated in write_code action. The AI must use <|GEN_CODE_xxx|> and <|GEN_CODE_END_xxx|> tags to wrap the code.")
+				operator.Fail("No code generated in 'write_code' action. Please use <|GEN_CODE_...|> and <|GEN_CODE_END_...|> tags to wrap your code. Do NOT use markdown code blocks (```yak).")
 				return
 			}
 			err := os.WriteFile(filename, []byte(code), 0644)

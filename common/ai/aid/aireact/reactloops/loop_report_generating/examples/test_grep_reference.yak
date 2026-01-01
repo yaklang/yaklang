@@ -1,0 +1,84 @@
+// test_grep_reference.yak
+// 测试 loop_report_generating 的 grep_reference 功能
+// 使用 actions: grep_reference, read_reference_file, write_report
+
+var reportFilename = ""
+var reportContent = ""
+var testPassed = false
+
+// 测试任务：搜索特定关键词并生成报告
+testPrompt = `请帮我分析 /Users/v1ll4n/Projects/yaklang 项目中的 SSA（静态单赋值）相关功能。
+
+任务步骤：
+1. 首先使用 grep_reference 在 /Users/v1ll4n/Projects/yaklang/README.md 中搜索 "SSA" 或 "静态分析" 相关内容
+2. 使用 read_reference_file 阅读 README.md 获取更多上下文
+3. 基于搜索结果撰写一份简要的 SSA 功能分析报告
+
+报告要求：
+- 解释 Yaklang 中 SSA 的作用
+- 描述其在项目中的应用场景
+- 总结技术亮点
+
+报告长度：150-200 字`
+
+log.Info("========================================")
+log.Info("Testing loop_report_generating - Grep Reference")
+log.Info("========================================")
+log.Info("Test prompt: %s", testPrompt)
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("report_generating"),
+    aim.timeout(300),
+    aim.maxIteration(15),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        if eventType != "stream" && eventType != "consumption" && eventType != "pressure" {
+            log.Info("[EVENT] Type: %s, NodeId: %s", eventType, event.NodeId)
+        }
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            log.Info("[EVENT] Pin filename! Content: %s", contentStr)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    reportFilename = jsonData["path"]
+                    log.Info("[EVENT] Extracted filename: %s", reportFilename)
+                }
+            } catch e {
+                log.Warn("[EVENT] JSON parse failed: %v", e)
+            }
+        }
+    }),
+    aim.onData(func(react, event, nodeId, data) {
+        dataStr = string(data)
+        if event.Type == "stream" && nodeId != "fast-memory-fetch" {
+            print(dataStr)
+        }
+    }),
+    aim.onFinished(func(react) {
+        log.Info("[FINISHED] ReAct execution completed")
+        if reportFilename != "" {
+            content, readErr = file.ReadFile(reportFilename)
+            if readErr == nil {
+                reportContent = string(content)
+                if len(reportContent) > 50 {
+                    testPassed = true
+                    log.Info("Test PASSED!")
+                }
+            }
+        }
+    }),
+)
+
+if err != nil {
+    log.Error("ReAct execution failed: %v", err)
+}
+
+log.Info("========================================")
+log.Info("TEST RESULTS: Test Passed: %v", testPassed)
+log.Info("========================================")
+if reportContent != "" {
+    log.Info("Report Preview: %s", reportContent[:min(len(reportContent), 300)])
+}
+

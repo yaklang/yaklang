@@ -1,0 +1,81 @@
+## ⚠️ 写报告时必须使用以下格式
+
+当你使用 `write_report` 时，必须这样输出：
+```
+{"@action": "write_report", "human_readable_thought": "..."}
+
+<|GEN_REPORT_{{ .Nonce }}|>
+你的报告内容...
+<|GEN_REPORT_END_{{ .Nonce }}|>
+```
+
+**注意：Nonce 是 `{{ .Nonce }}`，你必须使用 `<|GEN_REPORT_{{ .Nonce }}|>` 和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 包裹内容！**
+
+---
+
+## 当前报告状态
+
+### 用户需求
+<|USER_REQUIREMENTS_{{ .Nonce }}|>
+{{ .UserRequirements }}
+<|USER_REQUIREMENTS_END_{{ .Nonce }}|>
+
+### 报告文件
+文件路径：{{ .Filename }}
+
+### 当前报告内容（带行号）
+<|REPORT_CONTENT_{{ .Nonce }}|>
+{{ .CurrentReportWithLineNumber }}
+<|REPORT_CONTENT_END_{{ .Nonce }}|>
+
+### 已收集的参考资料
+{{ if .CollectedReferences }}
+<|COLLECTED_REFERENCES_{{ .Nonce }}|>
+{{ .CollectedReferences }}
+<|COLLECTED_REFERENCES_END_{{ .Nonce }}|>
+{{ else }}
+暂无收集的参考资料，请先使用查资料工具收集信息。
+{{ end }}
+
+### 可用参考文件
+{{ if .AvailableFiles }}
+{{ .AvailableFiles }}
+{{ else }}
+暂无可用的参考文件。
+{{ end }}
+
+### 可用知识库
+{{ if .AvailableKnowledgeBases }}
+{{ .AvailableKnowledgeBases }}
+{{ else }}
+暂无可用的知识库。
+{{ end }}
+
+{{ if .FeedbackMessages }}
+### 反馈信息
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+{{ end }}
+
+## 下一步行动指南
+
+### 如果报告为空
+1. 先使用查资料工具收集信息：
+   - `read_reference_file` 阅读参考文件
+   - `grep_reference` 搜索关键词
+   - `search_knowledge` 知识库搜索
+2. 收集足够资料后使用 `write_report` 创建初稿
+
+### 如果报告已有内容
+1. 检查是否需要补充更多资料
+2. 使用 `modify_section` 修改现有内容
+3. 使用 `insert_section` 添加新章节
+4. 使用 `delete_section` 删除冗余内容
+
+### 修改操作说明
+- 行号从 1 开始计数
+- 修改范围必须指定 start_line 和 end_line
+- 插入时指定 after_line（在该行之后插入）
+- 每次操作后会自动更新行号
+
