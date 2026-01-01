@@ -376,6 +376,7 @@ func writeExtraDataToBinary(typeName string, writer io.Writer, data *bytes.Buffe
 }
 
 func writeKnowledgeEntryToBinary(writer io.Writer, entry *schema.KnowledgeBaseEntry) error {
+	// 注意：HiddenIndex 放在末尾以保持向后兼容
 	if err := pbWriteBytes(writer, []byte(entry.RelatedEntityUUIDS)); err != nil {
 		return utils.Wrap(err, "write related entity uuid s")
 	}
@@ -422,6 +423,20 @@ func writeKnowledgeEntryToBinary(writer io.Writer, entry *schema.KnowledgeBaseEn
 		}
 	}
 
+	// 扩展字段区域（版本号 + 扩展数据）
+	// 版本号定义：
+	//   - 无版本号（旧格式）：没有扩展字段
+	//   - 版本 1：HiddenIndex (UUID)
+	//   - 未来版本可以添加更多字段
+	const knowledgeEntryExtVersion = 1
+	if err := pbWriteUint32(writer, knowledgeEntryExtVersion); err != nil {
+		return utils.Wrap(err, "write ext version")
+	}
+	// v1 扩展字段：HiddenIndex
+	if err := pbWriteBytes(writer, []byte(entry.HiddenIndex)); err != nil {
+		return utils.Wrap(err, "write hidden index")
+	}
+
 	return nil
 }
 
@@ -429,10 +444,8 @@ func writeEntityToBinary(writer io.Writer, entity *schema.ERModelEntity) error {
 	if err := pbWriteBytes(writer, []byte(entity.EntityName)); err != nil {
 		return utils.Wrap(err, "write entity name")
 	}
-	// if err := pbWriteBytes(writer, []byte(entity.Uuid)); err != nil {
-	// 	return utils.Wrap(err, "write entity uuid")
-	// }
-	if err := pbWriteBytes(writer, []byte("")); err != nil {
+	// 写入实体 UUID 用于导入时去重
+	if err := pbWriteBytes(writer, []byte(entity.Uuid)); err != nil {
 		return utils.Wrap(err, "write entity uuid")
 	}
 	if err := pbWriteBytes(writer, []byte(entity.Description)); err != nil {
@@ -866,6 +879,40 @@ func readKnowledgeEntryFromStream(reader io.Reader) (*schema.KnowledgeBaseEntry,
 		vector[i] = value
 	}
 	entry.PotentialQuestionsVector = schema.FloatArray(vector)
+
+	// 扩展字段区域（版本号 + 扩展数据）
+	// 尝试读取版本号，如果失败说明是旧格式
+	extVersion, err := consumeUint32(reader)
+	if err != nil {
+		// 旧版本文件不包含扩展字段，使用 Title+Details+Type 的 MD5 作为唯一标识
+		content := entry.KnowledgeTitle + "|" + entry.KnowledgeDetails + "|" + entry.KnowledgeType
+		entry.HiddenIndex = utils.CalcMd5(content)
+		return entry, nil
+	}
+
+	// 根据版本号读取扩展字段
+	switch extVersion {
+	case 1:
+		// v1 扩展字段：HiddenIndex
+		hiddenIndexBytes, err := consumeBytes(reader)
+		if err != nil {
+			// 读取失败，使用 MD5 fallback
+			content := entry.KnowledgeTitle + "|" + entry.KnowledgeDetails + "|" + entry.KnowledgeType
+			entry.HiddenIndex = utils.CalcMd5(content)
+		} else {
+			entry.HiddenIndex = string(hiddenIndexBytes)
+			// 如果读取到的是空字符串，也需要生成一个
+			if entry.HiddenIndex == "" {
+				content := entry.KnowledgeTitle + "|" + entry.KnowledgeDetails + "|" + entry.KnowledgeType
+				entry.HiddenIndex = utils.CalcMd5(content)
+			}
+		}
+	default:
+		// 未知版本，使用 MD5 fallback
+		content := entry.KnowledgeTitle + "|" + entry.KnowledgeDetails + "|" + entry.KnowledgeType
+		entry.HiddenIndex = utils.CalcMd5(content)
+	}
+
 	return entry, nil
 }
 
@@ -954,6 +1001,12 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		return utils.Wrap(err, "create entity base info")
 	}
 
+	// 用于去重：记录已创建的知识条目
+	// 使用原始的 HiddenIndex (UUID) 作为唯一标识，最准确可靠
+	createdKnowledgeEntries := make(map[string]string) // originalHiddenIndex -> newHiddenIndex
+	// 用于去重：记录已创建的实体（按 Uuid 去重）
+	createdEntities := make(map[string]string) // originalUuid -> newUuid
+
 	// 读取文档数据
 	documents, err := readDocumentsFromStream(file, func(doc *ExportVectorStoreDocument, typeName string, extReader io.Reader) error {
 		switch typeName {
@@ -962,17 +1015,35 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 			if err != nil {
 				return utils.Wrap(err, "read knowledge entry")
 			}
+			// 获取原始的 HiddenIndex 用于去重
+			originalHiddenIndex := knowledgeEntry.HiddenIndex
+			// 去重：使用原始 HiddenIndex 检查是否已创建过该条目
+			if existingHiddenIndex, exists := createdKnowledgeEntries[originalHiddenIndex]; exists {
+				// 已存在，复用已创建的条目的 HiddenIndex
+				doc.Metadata[schema.META_Data_UUID] = existingHiddenIndex
+				return nil
+			}
+			// 新条目，生成新的 HiddenIndex 并创建
 			knowledgeEntry.HiddenIndex = uuid.NewString()
 			knowledgeEntry.KnowledgeBaseID = int64(knowledgeBaseInfo.ID)
 			err = yakit.CreateKnowledgeBaseEntry(ragSystemConfig.db, knowledgeEntry)
 			if err != nil {
 				return utils.Wrap(err, "create knowledge base entry")
 			}
+			// 记录原始 HiddenIndex 到新 HiddenIndex 的映射
+			createdKnowledgeEntries[originalHiddenIndex] = knowledgeEntry.HiddenIndex
 			doc.Metadata[schema.META_Data_UUID] = knowledgeEntry.HiddenIndex
 		case "entity":
 			entity, err := readEntityFromStream(extReader)
 			if err != nil {
 				return utils.Wrap(err, "read entity")
+			}
+			originalUuid := entity.Uuid
+			// 去重：检查是否已创建过相同 Uuid 的实体
+			if existingUuid, exists := createdEntities[originalUuid]; exists {
+				// 已存在，复用已创建的实体的 Uuid
+				doc.Metadata[schema.META_Data_UUID] = existingUuid
+				return nil
 			}
 			// 强制使用新uuid
 			entity.Uuid = uuid.NewString()
@@ -981,6 +1052,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 			if err != nil {
 				return utils.Wrap(err, "create entity")
 			}
+			createdEntities[originalUuid] = entity.Uuid
 			doc.Metadata[schema.META_Data_UUID] = entity.Uuid
 		}
 		return nil

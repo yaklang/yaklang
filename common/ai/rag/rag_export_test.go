@@ -612,3 +612,143 @@ func TestMUSTPASS_ExportWithNewUUID(t *testing.T) {
 
 	t.Log("所有UUID和HiddenIndex验证通过，导入后的数据已经使用新的标识符")
 }
+
+// TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors 测试一个知识条目对应多个向量文档的导出导入场景
+// 这个场景模拟了 BuildSearchIndexKnowledge 的输出：一个知识条目 + 多个问题索引（向量文档）
+func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
+	// 创建源数据库
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	collectionName := "test_one_knowledge_multi_vectors_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建 RAG 系统
+	ragSystem, err := Get(collectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+		WithEnableKnowledgeBase(true),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 创建一个知识条目
+	kbInfo := ragSystem.KnowledgeBase.GetKnowledgeBaseInfo()
+	knowledgeEntry := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:  int64(kbInfo.ID),
+		KnowledgeTitle:   "SQL注入漏洞检测插件",
+		KnowledgeType:    "question_index",
+		ImportanceScore:  9,
+		Keywords:         schema.StringArray{"SQL注入", "漏洞检测", "安全测试"},
+		KnowledgeDetails: "这是一个用于检测SQL注入漏洞的Yaklang插件，支持多种注入类型的检测。",
+		Summary:          "SQL注入检测插件",
+	}
+	err = sourceDB.Create(knowledgeEntry).Error
+	assert.NoError(t, err)
+
+	// 记录原始 HiddenIndex
+	originalHiddenIndex := knowledgeEntry.HiddenIndex
+	t.Logf("原始知识条目 HiddenIndex: %s", originalHiddenIndex)
+
+	// 创建多个向量文档，都指向同一个知识条目
+	// 模拟 BuildSearchIndexKnowledge 的输出：一个知识条目对应多个问题索引
+	questionIndexes := []string{
+		"如何检测SQL注入漏洞？",
+		"有什么插件可以扫描SQL注入？",
+		"怎么用Yaklang进行SQL注入测试？",
+		"推荐一个SQL注入检测工具",
+		"网站SQL注入怎么检测？",
+		"数据库注入漏洞如何发现？",
+		"我想扫描SQL注入",
+		"检测注入攻击的插件",
+		"SQL安全测试工具推荐",
+		"Web应用注入漏洞扫描",
+	}
+
+	for i, question := range questionIndexes {
+		docID := "question_index_" + utils.RandStringBytes(8)
+		err = ragSystem.VectorStore.AddWithOptions(docID, question,
+			vectorstore.WithDocumentRawMetadata(map[string]interface{}{
+				schema.META_Data_UUID: knowledgeEntry.HiddenIndex,
+				"index_type":          "question_index",
+				"question_index":      question,
+			}),
+		)
+		assert.NoError(t, err)
+		t.Logf("添加向量文档 %d: %s -> HiddenIndex: %s", i+1, question, knowledgeEntry.HiddenIndex)
+	}
+
+	// 验证源数据库状态
+	var sourceVectorCount int
+	sourceDB.Model(&schema.VectorStoreDocument{}).Count(&sourceVectorCount)
+	t.Logf("源数据库向量文档数量: %d", sourceVectorCount)
+	assert.Equal(t, 10, sourceVectorCount, "应该有10个向量文档")
+
+	var sourceKnowledgeCount int
+	sourceDB.Model(&schema.KnowledgeBaseEntry{}).Count(&sourceKnowledgeCount)
+	t.Logf("源数据库知识条目数量: %d", sourceKnowledgeCount)
+	assert.Equal(t, 1, sourceKnowledgeCount, "应该有1个知识条目")
+
+	// 导出 RAG 文件
+	tempFile, err := os.CreateTemp("", "test_one_knowledge_multi_vectors_*.rag")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	t.Logf("导出到文件: %s", tempFile.Name())
+	err = ExportRAG(collectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的目标数据库
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 导入 RAG 文件
+	t.Log("开始导入 RAG 文件...")
+	err = ImportRAG(tempFile.Name(), WithDB(targetDB))
+	assert.NoError(t, err)
+	t.Log("导入完成")
+
+	// 验证目标数据库状态
+	var targetVectorCount int
+	targetDB.Model(&schema.VectorStoreDocument{}).Count(&targetVectorCount)
+	t.Logf("目标数据库向量文档数量: %d", targetVectorCount)
+	assert.Equal(t, 10, targetVectorCount, "导入后应该有10个向量文档")
+
+	var targetKnowledgeCount int
+	targetDB.Model(&schema.KnowledgeBaseEntry{}).Count(&targetKnowledgeCount)
+	t.Logf("目标数据库知识条目数量: %d", targetKnowledgeCount)
+	assert.Equal(t, 1, targetKnowledgeCount, "导入后应该只有1个知识条目（去重后）")
+
+	// 获取导入后的知识条目
+	var importedEntry schema.KnowledgeBaseEntry
+	err = targetDB.First(&importedEntry).Error
+	assert.NoError(t, err)
+
+	t.Logf("导入后知识条目 HiddenIndex: %s", importedEntry.HiddenIndex)
+	t.Logf("导入后知识条目 Title: %s", importedEntry.KnowledgeTitle)
+
+	// 验证知识条目内容正确
+	assert.Equal(t, "SQL注入漏洞检测插件", importedEntry.KnowledgeTitle)
+	assert.Equal(t, "question_index", importedEntry.KnowledgeType)
+	assert.NotEqual(t, originalHiddenIndex, importedEntry.HiddenIndex, "导入后的 HiddenIndex 应该是新生成的")
+
+	// 验证所有向量文档都指向同一个新的 HiddenIndex
+	var importedDocs []schema.VectorStoreDocument
+	err = targetDB.Find(&importedDocs).Error
+	assert.NoError(t, err)
+
+	for _, doc := range importedDocs {
+		metaUUID, ok := doc.Metadata.GetDataUUID()
+		assert.True(t, ok, "向量文档应该有 META_Data_UUID")
+		assert.Equal(t, importedEntry.HiddenIndex, metaUUID, "所有向量文档应该指向同一个知识条目")
+		t.Logf("向量文档 %s -> HiddenIndex: %s", doc.DocumentID, metaUUID)
+	}
+
+	t.Log("✅ 测试通过：一个知识条目对应多个向量文档的导出导入正确工作")
+	t.Logf("   - 源数据库: 1个知识条目, 10个向量文档")
+	t.Logf("   - 目标数据库: 1个知识条目（去重后）, 10个向量文档")
+	t.Logf("   - 所有向量文档正确指向同一个知识条目")
+}
