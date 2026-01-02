@@ -3,12 +3,21 @@ package loop_report_generating
 import (
 	"bytes"
 	_ "embed"
+	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+)
+
+const (
+	// 默认展示的字符数限制，约 30K 字符
+	DefaultReportShowSize = 30000
+	// 默认起始行
+	DefaultOffsetLine = 1
 )
 
 //go:embed prompts/persistent_instruction.txt
@@ -38,7 +47,59 @@ func init() {
 				reactloops.WithAITagFieldWithAINodeId("GEN_REPORT", "report_content", "report-content", "text/markdown"),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					reportContent := loop.Get("full_report")
-					reportWithLine := utils.PrefixLinesWithLineNumbers(reportContent)
+
+					// 获取分页参数
+					offsetLine, _ := strconv.Atoi(loop.Get("offset_line"))
+					if offsetLine < 1 {
+						offsetLine = DefaultOffsetLine
+					}
+					showSize, _ := strconv.Atoi(loop.Get("report_show_size"))
+					if showSize <= 0 {
+						showSize = DefaultReportShowSize
+					}
+
+					// 计算分页展示的报告内容
+					lines := strings.Split(reportContent, "\n")
+					totalLines := len(lines)
+					totalSize := len(reportContent)
+
+					// 确保 offsetLine 不超过总行数
+					if offsetLine > totalLines {
+						offsetLine = totalLines
+					}
+
+					// 从 offsetLine 开始截取，直到达到 showSize 或文件结束
+					var visibleLines []string
+					var currentSize int
+					endLine := offsetLine - 1 // 转为 0-based index
+
+					for i := offsetLine - 1; i < totalLines && currentSize < showSize; i++ {
+						lineContent := lines[i]
+						lineSize := len(lineContent) + 1 // +1 for newline
+						if currentSize+lineSize > showSize && len(visibleLines) > 0 {
+							break
+						}
+						visibleLines = append(visibleLines, lineContent)
+						currentSize += lineSize
+						endLine = i + 1 // 转回 1-based
+					}
+
+					// 为可见行添加行号
+					var reportWithLine string
+					if len(visibleLines) > 0 {
+						// 使用带偏移的行号
+						var numberedLines []string
+						for i, line := range visibleLines {
+							lineNum := offsetLine + i
+							numberedLines = append(numberedLines, strconv.Itoa(lineNum)+"|"+line)
+						}
+						reportWithLine = strings.Join(numberedLines, "\n")
+					}
+
+					// 构建分页信息
+					hasMore := endLine < totalLines
+					hasPrev := offsetLine > 1
+
 					userRequirements := loop.Get("user_requirements")
 					collectedReferences := loop.Get("collected_references")
 					availableFiles := loop.Get("available_files")
@@ -55,6 +116,15 @@ func init() {
 						"AvailableKnowledgeBases":     availableKBs,
 						"FeedbackMessages":            feedbacks,
 						"Nonce":                       nonce,
+						// 分页相关信息
+						"OffsetLine":     offsetLine,
+						"EndLine":        endLine,
+						"TotalLines":     totalLines,
+						"TotalSize":      totalSize,
+						"VisibleSize":    currentSize,
+						"ShowSize":       showSize,
+						"HasMoreContent": hasMore,
+						"HasPrevContent": hasPrev,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
@@ -67,6 +137,8 @@ func init() {
 				modifySectionAction(r),
 				insertSectionAction(r),
 				deleteSectionAction(r),
+				// 注册视图控制 actions
+				changeOffsetLineAction(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, r, preset...)
