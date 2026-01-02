@@ -107,6 +107,29 @@
 - `insert_section`: 在指定行后插入新内容
 - `delete_section`: 删除指定行范围的内容
 
+### 视图控制工具
+- `change_view_offset`: 切换报告视图偏移，查看大型报告的不同部分
+
+## 📖 大报告导航说明
+
+当报告内容超过约 30KB 时，系统会自动分页显示。你只能看到报告的一部分内容。
+
+### 如何导航大报告
+1. **查看当前位置**：reactive data 中会显示当前显示的行范围（如：第 1-50 行，共 200 行）
+2. **向下查看**：使用 `change_view_offset` 设置 `offset_line` 为当前结束行号
+3. **回到开头**：设置 `offset_line=1`
+4. **跳转到指定位置**：设置 `offset_line` 为目标行号
+
+### 示例
+```json
+{"@action": "change_view_offset", "offset_line": 51, "human_readable_thought": "继续查看后面的内容"}
+```
+
+### 修改大报告时的注意事项
+- 修改前先导航到目标位置确认行号
+- 使用 `grep_reference` 搜索特定内容的位置
+- 修改后视图会自动更新
+
 ## 注意事项
 
 1. 写作前必须先收集足够的资料

@@ -23,10 +23,24 @@
 ### 报告文件
 文件路径：{{ .Filename }}
 
+### 📊 报告视图信息
+{{ if gt .TotalLines 0 }}
+- **当前显示**: 第 {{ .OffsetLine }} - {{ .EndLine }} 行 (共 {{ .TotalLines }} 行)
+- **内容大小**: 显示 {{ .VisibleSize }} / {{ .TotalSize }} 字节 (限制 {{ .ShowSize }} 字节)
+{{ if .HasPrevContent }}- ⬆️ **上方还有内容** - 使用 `change_view_offset` 设置 `offset_line=1` 回到开头{{ end }}
+{{ if .HasMoreContent }}- ⬇️ **下方还有更多内容** - 使用 `change_view_offset` 设置 `offset_line={{ .EndLine }}` 继续查看{{ end }}
+{{ else }}
+- 报告为空，请先创建报告
+{{ end }}
+
 ### 当前报告内容（带行号）
+{{ if .CurrentReportWithLineNumber }}
 <|REPORT_CONTENT_{{ .Nonce }}|>
 {{ .CurrentReportWithLineNumber }}
 <|REPORT_CONTENT_END_{{ .Nonce }}|>
+{{ else }}
+（报告为空）
+{{ end }}
 
 ### 已收集的参考资料
 {{ if .CollectedReferences }}
@@ -72,6 +86,12 @@
 2. 使用 `modify_section` 修改现有内容
 3. 使用 `insert_section` 添加新章节
 4. 使用 `delete_section` 删除冗余内容
+
+### 📖 大报告导航（重要！）
+当报告内容很大时，只会显示部分内容。使用 `change_view_offset` 来导航：
+- **查看开头**: `{"@action": "change_view_offset", "offset_line": 1}`
+- **继续往下看**: `{"@action": "change_view_offset", "offset_line": {{ .EndLine }}}`
+- **跳转到指定行**: `{"@action": "change_view_offset", "offset_line": 目标行号}`
 
 ### 修改操作说明
 - 行号从 1 开始计数
