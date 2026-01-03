@@ -97,6 +97,9 @@ var modifySectionAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			os.RemoveAll(filename)
 			os.WriteFile(filename, []byte(fullReport), 0644)
 
+			// 发送文件产物事件（确保 CI/客户端能正确获取更新后的文件）
+			loop.GetEmitter().EmitPinFilename(filename)
+
 			// 构建反馈消息
 			msg = fmt.Sprintf("Modified lines [%v-%v]:\n%s", startLine, endLine, utils.ShrinkTextBlock(newContent, 256))
 			r.AddToTimeline("section_modified", msg)

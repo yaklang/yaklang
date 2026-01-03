@@ -125,6 +125,9 @@ var insertSectionAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			os.RemoveAll(filename)
 			os.WriteFile(filename, []byte(fullReport), 0644)
 
+			// 发送文件产物事件（确保 CI/客户端能正确获取更新后的文件）
+			loop.GetEmitter().EmitPinFilename(filename)
+
 			// 构建反馈消息
 			newLines := len(strings.Split(newContent, "\n"))
 			msg = fmt.Sprintf("Inserted %d lines after line %d:\n%s", newLines, afterLine, utils.ShrinkTextBlock(newContent, 256))

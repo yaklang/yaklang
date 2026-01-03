@@ -115,7 +115,8 @@ loop_report_generating/
     ├── test_multi_file_analysis.yak   # 多文件分析测试
     ├── test_iterative_writing.yak     # 迭代写作测试
     ├── test_code_analysis_report.yak  # 代码分析报告测试
-    └── test_change_view_offset.yak    # 分页导航测试
+    ├── test_change_view_offset.yak    # 分页导航测试
+    └── test_modify_existing_file.yak  # 修改现有文件测试
 ```
 
 ## 使用示例
@@ -191,6 +192,18 @@ err = aim.InvokeReAct(
 
 **注意：** 由于测试生成的报告通常不会超过 30KB，AI 可能会判断无需使用分页功能。这是合理的行为——分页功能主要为处理超大报告设计。
 
+### test_modify_existing_file.yak
+测试修改现有文件功能。这是一个重要的集成测试，验证 AI 能够：
+1. 识别用户意图是"修改现有文件"而非"创建新文件"
+2. 正确读取现有文件内容
+3. 使用 `modify_section` 精确修改指定章节
+4. 保留其他未修改的内容
+
+**测试流程：**
+1. 先创建一个预先存在的 Markdown 报告文件（包含占位符内容）
+2. 让 AI 使用 `report_generating` 模式修改指定章节
+3. 验证修改成功且保留了原有结构
+
 ## 运行测试
 
 ```bash
@@ -217,6 +230,7 @@ done
 | test_iterative_writing.yak | ✅ PASSED | `write_report`, `insert_section` | ~30s |
 | test_code_analysis_report.yak | ✅ PASSED | `read_reference_file`, `grep_reference`, `write_report` | ~20s |
 | test_change_view_offset.yak | ✅ PASSED | `write_report`, `insert_section` | ~60s |
+| test_modify_existing_file.yak | ✅ PASSED | `modify_section`(多次) | ~30s |
 
 ### 生成报告示例
 
