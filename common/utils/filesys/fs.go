@@ -117,9 +117,11 @@ func glance(i filesys_interface.FileSystem) string {
 		buf.WriteString("\n")
 	}
 
-	log.Infof("start to dump tree view with limits for fs glance: depth: %v, lines: %v", 4, 50)
-	// 使用 DumpTreeViewWithLimits 直接从 FileSystem 生成树形视图，限制为 4 层深度，50 行输出
-	treeOutput := DumpTreeViewWithLimits(i, 4, 50)
+	log.Infof("start to dump tree view with limits for fs glance: depth: %v, lines: %v", 6, 200)
+	// 使用 DumpTreeViewWithLimits 直接从 FileSystem 生成树形视图
+	// 增大到 6 层深度，200 行输出，以支持约 10KB 的上下文大小
+	// 让 AI 能够看到 Artifacts 文件树的几乎全貌
+	treeOutput := DumpTreeViewWithLimits(i, 6, 200)
 	if treeOutput != "" {
 		buf.WriteString(treeOutput)
 	}
