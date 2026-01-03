@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicommon.ActionMakerOption {
+func (r *ReActLoop) buildActionTagOption(streamWG *sync.WaitGroup, taskIndex string, nonce string) []aicommon.ActionMakerOption {
 	var emitter = r.GetEmitter()
 	tagFields := r.aiTagFields.Copy()
 	for _, i := range r.GetAllActions() {
@@ -24,11 +24,19 @@ func (r *ReActLoop) buildActionTagOption(taskIndex string, nonce string) []aicom
 			tagFields.Set(field.TagName, field)
 		}
 	}
-
 	var actionOptions []aicommon.ActionMakerOption
 	actionOptions = append(actionOptions, aicommon.WithActionNonce(nonce))
 
+	waitStream := utils.NewOnce()
+
 	for _, _tagInstance := range tagFields.Values() {
+		waitStream.Do(func() {
+			streamWG.Add(1)
+			actionOptions = append(actionOptions, aicommon.WithActionOnReaderFinished(func() {
+				streamWG.Done()
+			}))
+		})
+
 		v := _tagInstance
 
 		actionOptions = append(actionOptions,
@@ -146,7 +154,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				true,
 				r.config.GetEmitter(),
 			)
-			tagOptions := r.buildActionTagOption(resp.GetTaskIndex(), nonce)
+			tagOptions := r.buildActionTagOption(streamWg, resp.GetTaskIndex(), nonce)
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
