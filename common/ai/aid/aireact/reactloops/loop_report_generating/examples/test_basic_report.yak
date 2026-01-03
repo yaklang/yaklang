@@ -1,11 +1,16 @@
 // test_basic_report.yak
 // 测试 loop_report_generating 的基本报告生成功能
 // 使用 action: write_report
+// 
+// 测试断言：
+// 1. 必须成功获取报告文件路径
+// 2. 报告内容长度必须大于 50 字节
+// 3. 报告内容必须包含 Markdown 标题
 
 // 存储最终报告文件路径
 var reportFilename = ""
 var reportContent = ""
-var testPassed = false
+var executionError = nil
 
 // 测试任务：基于 README 生成简要报告
 testPrompt = `请帮我基于 /Users/v1ll4n/Projects/yaklang/README.md 文件生成一份简要的 Yaklang 项目介绍报告。
@@ -20,7 +25,6 @@ testPrompt = `请帮我基于 /Users/v1ll4n/Projects/yaklang/README.md 文件生
 log.Info("========================================")
 log.Info("Testing loop_report_generating - Basic Report")
 log.Info("========================================")
-log.Info("Test prompt: %s", testPrompt)
 
 err = aim.InvokeReAct(
     testPrompt,
@@ -29,76 +33,78 @@ err = aim.InvokeReAct(
     aim.maxIteration(15),
     aim.onEvent(func(react, event) {
         eventType = string(event.Type)
-        if eventType != "stream" && eventType != "consumption" && eventType != "pressure" {
-            log.Info("[EVENT] Type: %s, NodeId: %s", eventType, event.NodeId)
-        }
         
         // 捕获 filesystem_pin_filename 事件
         if eventType == "filesystem_pin_filename" {
-            // event.Content 是 []byte 类型，需要转换为字符串
             contentStr = string(event.Content)
-            log.Info("[EVENT] Pin filename! Content: %s", contentStr)
             if len(contentStr) > 0 {
                 try {
                     jsonData = json.loads(contentStr)
                     if jsonData != nil && jsonData["path"] != nil {
                         reportFilename = jsonData["path"]
-                        log.Info("[EVENT] Extracted filename: %s", reportFilename)
                     }
                 } catch e {
-                    log.Warn("[EVENT] JSON parse failed: %v", e)
+                    // ignore
                 }
             }
         }
     }),
     aim.onData(func(react, event, nodeId, data) {
-        dataStr = string(data)
-        if event.Type == "stream" && nodeId != "fast-memory-fetch" {
-            print(dataStr)
-        }
-        
-        // 捕获 filesystem_pin_filename 数据
-        if event.Type == "filesystem_pin_filename" && len(data) > 0 {
+        // 备用：从 data 中捕获文件名
+        if event.Type == "filesystem_pin_filename" && len(data) > 0 && reportFilename == "" {
             try {
                 jsonData = json.loads(string(data))
-                if jsonData != nil && jsonData["path"] != nil && reportFilename == "" {
+                if jsonData != nil && jsonData["path"] != nil {
                     reportFilename = jsonData["path"]
-                    log.Info("[DATA] Extracted filename: %s", reportFilename)
                 }
             } catch e {
-                dataPath = string(data)
-                if str.HasSuffix(dataPath, ".md") && reportFilename == "" {
-                    reportFilename = dataPath
-                    log.Info("[DATA] Using data as filename: %s", reportFilename)
-                }
+                // ignore
             }
         }
     }),
     aim.onFinished(func(react) {
-        log.Info("[FINISHED] ReAct execution completed, filename: %s", reportFilename)
         if reportFilename != "" {
             content, readErr = file.ReadFile(reportFilename)
             if readErr == nil {
                 reportContent = string(content)
-                log.Info("Report content length: %d bytes", len(reportContent))
-                if len(reportContent) > 50 {
-                    testPassed = true
-                    log.Info("Test PASSED!")
-                }
-            } else {
-                log.Error("Failed to read report: %v", readErr)
             }
-        } else {
-            log.Warn("No filename captured")
         }
     }),
 )
 
 if err != nil {
-    log.Error("ReAct execution failed: %v", err)
+    executionError = err
 }
 
+// ========================================
+// 断言测试
+// ========================================
+
 log.Info("========================================")
-log.Info("TEST RESULTS: Test Passed: %v", testPassed)
+log.Info("RUNNING ASSERTIONS")
 log.Info("========================================")
 
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：必须获取到报告文件路径
+assert reportFilename != "", sprintf("Failed to capture report filename from events. reportFilename is empty.")
+
+// 断言3：报告文件必须存在
+fileExists = file.IsExisted(reportFilename)
+assert fileExists, sprintf("Report file does not exist: %s", reportFilename)
+
+// 断言4：报告内容长度必须大于 50 字节
+contentLen = len(reportContent)
+assert contentLen > 50, sprintf("Report content too short. Expected > 50 bytes, got %d bytes. Content: %s", contentLen, reportContent)
+
+// 断言5：报告内容必须包含 Markdown 标题（至少一个 #）
+hasMarkdownTitle = str.Contains(reportContent, "#")
+assert hasMarkdownTitle, sprintf("Report content does not contain Markdown title (#). Content preview: %s", reportContent[:min(len(reportContent), 200)])
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Report Filename: %s", reportFilename)
+log.Info("Report Content Length: %d bytes", contentLen)
+log.Info("Report Preview: %s", reportContent[:min(len(reportContent), 300)])

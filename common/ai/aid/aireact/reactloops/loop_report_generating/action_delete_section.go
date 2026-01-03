@@ -104,6 +104,9 @@ var deleteSectionAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			os.RemoveAll(filename)
 			os.WriteFile(filename, []byte(fullReport), 0644)
 
+			// 发送文件产物事件（确保 CI/客户端能正确获取更新后的文件）
+			loop.GetEmitter().EmitPinFilename(filename)
+
 			// 发送编辑器事件
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "delete_section", deletedContent)
 

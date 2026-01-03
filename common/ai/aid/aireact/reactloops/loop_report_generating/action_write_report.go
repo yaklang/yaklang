@@ -62,6 +62,9 @@ var writeReportAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 				return
 			}
 
+			// 发送文件产物事件（确保 CI/客户端能正确获取文件）
+			loop.GetEmitter().EmitPinFilename(filename)
+
 			// 添加到时间线
 			invoker.AddToTimeline("report_created", utils.ShrinkTextBlock(reportContent, 500))
 

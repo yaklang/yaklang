@@ -1,10 +1,15 @@
 // test_multi_file_analysis.yak
 // 测试 loop_report_generating 的多文件分析功能
 // 使用 actions: read_reference_file（多个文件）, write_report, modify_section
+//
+// 测试断言：
+// 1. 必须成功获取报告文件路径
+// 2. 报告内容长度必须大于 100 字节
+// 3. 报告应包含多个章节相关内容
 
 var reportFilename = ""
 var reportContent = ""
-var testPassed = false
+var executionError = nil
 
 // 测试任务：分析多个文件并生成综合报告
 testPrompt = `请帮我分析 Yaklang 项目的文档结构，需要阅读以下文件：
@@ -25,61 +30,68 @@ testPrompt = `请帮我分析 Yaklang 项目的文档结构，需要阅读以下
 log.Info("========================================")
 log.Info("Testing loop_report_generating - Multi-File Analysis")
 log.Info("========================================")
-log.Info("Test prompt: %s", testPrompt)
 
 err = aim.InvokeReAct(
     testPrompt,
     aim.focus("report_generating"),
-    aim.timeout(360), // 更长超时，因为要读取多个文件
+    aim.timeout(360),
     aim.maxIteration(20),
     aim.onEvent(func(react, event) {
         eventType = string(event.Type)
-        if eventType != "stream" && eventType != "consumption" && eventType != "pressure" {
-            log.Info("[EVENT] Type: %s, NodeId: %s", eventType, event.NodeId)
-        }
         if eventType == "filesystem_pin_filename" {
             contentStr = string(event.Content)
-            log.Info("[EVENT] Pin filename! Content: %s", contentStr)
             try {
                 jsonData = json.loads(contentStr)
                 if jsonData != nil && jsonData["path"] != nil {
                     reportFilename = jsonData["path"]
-                    log.Info("[EVENT] Extracted filename: %s", reportFilename)
                 }
             } catch e {
-                log.Warn("[EVENT] JSON parse failed: %v", e)
+                // ignore
             }
         }
     }),
-    aim.onData(func(react, event, nodeId, data) {
-        dataStr = string(data)
-        if event.Type == "stream" && nodeId != "fast-memory-fetch" {
-            print(dataStr)
-        }
-    }),
     aim.onFinished(func(react) {
-        log.Info("[FINISHED] ReAct execution completed")
         if reportFilename != "" {
             content, readErr = file.ReadFile(reportFilename)
             if readErr == nil {
                 reportContent = string(content)
-                if len(reportContent) > 100 {
-                    testPassed = true
-                    log.Info("Test PASSED!")
-                }
             }
         }
     }),
 )
 
 if err != nil {
-    log.Error("ReAct execution failed: %v", err)
+    executionError = err
 }
 
-log.Info("========================================")
-log.Info("TEST RESULTS: Test Passed: %v", testPassed)
-log.Info("========================================")
-if reportContent != "" {
-    log.Info("Report Preview:\n%s", reportContent[:min(len(reportContent), 500)])
-}
+// ========================================
+// 断言测试
+// ========================================
 
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：必须获取到报告文件路径
+assert reportFilename != "", "Failed to capture report filename from events"
+
+// 断言3：报告文件必须存在
+assert file.IsExisted(reportFilename), sprintf("Report file does not exist: %s", reportFilename)
+
+// 断言4：报告内容长度必须大于 100 字节
+contentLen = len(reportContent)
+assert contentLen > 100, sprintf("Report content too short. Expected > 100 bytes, got %d bytes", contentLen)
+
+// 断言5：报告应该包含项目概述或 README 相关内容
+hasProjectContent = str.Contains(reportContent, "项目") || str.Contains(reportContent, "Yaklang") || str.Contains(reportContent, "概述")
+assert hasProjectContent, sprintf("Report should mention project overview. Content: %s", reportContent[:min(len(reportContent), 300)])
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Report Filename: %s", reportFilename)
+log.Info("Report Content Length: %d bytes", contentLen)
+log.Info("Report Preview: %s", reportContent[:min(len(reportContent), 500)])

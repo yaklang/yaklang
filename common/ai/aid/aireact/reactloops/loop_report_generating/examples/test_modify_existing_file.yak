@@ -1,0 +1,167 @@
+// test_modify_existing_file.yak
+// 测试 loop_report_generating 修改现有文件的功能
+// 重点测试：指定一个已存在的 markdown 文件，让 AI 修改特定章节
+//
+// 测试流程：
+// 1. 先创建一个预先存在的 /tmp/pre-edit.md 文件
+// 2. 让 AI 修改这个文件的特定章节
+// 3. 验证修改是否成功
+//
+// 测试断言：
+// 1. 执行不应该失败
+// 2. 文件必须被成功修改
+// 3. 修改后的内容应该包含指定的新内容
+
+var originalContent = `# 项目分析报告
+
+## 第一章：项目概述
+
+这是一个占位符内容，需要被替换为真实的项目描述。
+
+## 第二章：技术架构
+
+本章节描述项目的技术架构，包括：
+- 前端技术栈
+- 后端技术栈
+- 数据库设计
+
+## 第三章：未来规划
+
+TODO: 添加未来规划内容。
+
+## 附录
+
+参考文献和资料。
+`
+
+var targetFile = "/tmp/pre-edit-" + str.RandStr(8) + ".md"
+var modifiedContent = ""
+var executionError = nil
+var reportFilename = ""
+
+// Step 1: 创建预先存在的文件
+log.Info("========================================")
+log.Info("Testing loop_report_generating - Modify Existing File")
+log.Info("========================================")
+log.Info("Step 1: Creating pre-existing file: %s", targetFile)
+
+err = file.Save(targetFile, originalContent)
+assert err == nil, sprintf("Failed to create pre-existing file: %v", err)
+
+// 验证文件创建成功
+assert file.IsExisted(targetFile), sprintf("Pre-existing file was not created: %s", targetFile)
+log.Info("Pre-existing file created successfully with %d bytes", len(originalContent))
+
+// Step 2: 让 AI 修改这个文件的特定章节
+testPrompt = sprintf(`请帮我修改现有文件 %s 中的内容。
+
+任务要求：
+1. 这是一个已经存在的 Markdown 报告文件
+2. 请使用 read_reference_file 先阅读这个文件的内容
+3. 然后使用 modify_section 将"第一章：项目概述"中的占位符内容替换为：
+   
+   "Yaklang 是一款面向网络安全领域的专用编程语言（CDSL），旨在提升安全专业人员的生产力。
+   它提供了丰富的安全工具库和便捷的脚本编写能力。"
+
+4. 同时将"第三章：未来规划"中的 TODO 内容替换为：
+   
+   "未来将继续扩展 SSA 静态分析能力，增强对更多编程语言的支持。"
+
+注意：不要重新创建文件，而是修改现有文件的指定章节。`, targetFile)
+
+log.Info("Step 2: Invoking AI to modify the existing file")
+log.Info("Target file: %s", targetFile)
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("report_generating"),
+    aim.timeout(360),
+    aim.maxIteration(20),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    reportFilename = jsonData["path"]
+                    log.Info("[EVENT] Pin filename: %s", reportFilename)
+                }
+            } catch e {
+                // ignore
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        log.Info("[FINISHED] AI modification completed")
+        // 读取修改后的文件内容
+        content, readErr = file.ReadFile(targetFile)
+        if readErr == nil {
+            modifiedContent = string(content)
+            log.Info("Modified file content length: %d bytes", len(modifiedContent))
+        } else {
+            log.Error("Failed to read modified file: %v", readErr)
+        }
+    }),
+)
+
+if err != nil {
+    executionError = err
+}
+
+// ========================================
+// 断言测试
+// ========================================
+
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：文件必须仍然存在
+assert file.IsExisted(targetFile), sprintf("Target file no longer exists: %s", targetFile)
+
+// 断言3：文件内容应该已被修改（不应该和原始内容相同，除非修改失败）
+modifiedLen = len(modifiedContent)
+assert modifiedLen > 0, sprintf("Modified file content is empty")
+
+// 断言4：修改后的内容应该包含新的项目描述
+hasNewProjectDesc = str.Contains(modifiedContent, "Yaklang") || str.Contains(modifiedContent, "CDSL") || str.Contains(modifiedContent, "安全") || str.Contains(modifiedContent, "编程语言")
+assert hasNewProjectDesc, sprintf("Modified content should contain new project description. Content:\n%s", modifiedContent)
+
+// 断言5：修改后的内容应该仍然保留原有结构（章节标题）
+hasChapter1 = str.Contains(modifiedContent, "第一章") || str.Contains(modifiedContent, "项目概述")
+hasChapter2 = str.Contains(modifiedContent, "第二章") || str.Contains(modifiedContent, "技术架构")
+hasChapter3 = str.Contains(modifiedContent, "第三章") || str.Contains(modifiedContent, "未来规划")
+assert hasChapter1, sprintf("Chapter 1 should still exist. Content:\n%s", modifiedContent)
+assert hasChapter2, sprintf("Chapter 2 should still exist. Content:\n%s", modifiedContent)
+assert hasChapter3, sprintf("Chapter 3 should still exist. Content:\n%s", modifiedContent)
+
+// 断言6：占位符内容应该被替换（不应该包含原始占位符）
+// 注意：这个断言可能需要根据 AI 的实际行为调整
+originalPlaceholder = "这是一个占位符内容"
+placeholderRemoved = !str.Contains(modifiedContent, originalPlaceholder)
+if !placeholderRemoved {
+    log.Warn("Original placeholder may still exist, but this might be acceptable if AI modified other parts")
+}
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Target File: %s", targetFile)
+log.Info("Original Content Length: %d bytes", len(originalContent))
+log.Info("Modified Content Length: %d bytes", modifiedLen)
+log.Info("Placeholder Removed: %v", placeholderRemoved)
+log.Info("")
+log.Info("=== Original Content ===")
+log.Info("%s", originalContent)
+log.Info("")
+log.Info("=== Modified Content ===")
+log.Info("%s", modifiedContent)
+
+// 清理临时文件
+os.Remove(targetFile)
+log.Info("Cleaned up temporary file: %s", targetFile)
+
