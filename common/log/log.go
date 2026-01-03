@@ -235,6 +235,13 @@ func Infof(format string, args ...interface{}) {
 	DefaultLogger.Infof(format, args...)
 }
 
+func Flush() {
+	if DefaultLogger.Printer != nil {
+		println("---FLUSHED---")
+		_, _ = DefaultLogger.Printer.Flush()
+	}
+}
+
 var _onceLog = new(sync.Map)
 
 func OnceInfoLog(key string, fmtStr string, args ...interface{}) {

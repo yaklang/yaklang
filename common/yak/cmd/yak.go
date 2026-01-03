@@ -644,7 +644,7 @@ var startGRPCServerCommand = cli.Command{
 			}
 		}
 
-		log.Infof("start to startup grpc server...")
+		log.Infof("start to startup grpc server(yak grpc ok)...")
 		if host == "127.0.0.1" {
 			if localPassword != "" {
 				log.Infof("the current yak grpc running in local-password mode on '127.0.0.1:%d'", port)
@@ -654,8 +654,8 @@ var startGRPCServerCommand = cli.Command{
 			}
 		}
 		log.Info("yak grpc ok") // 勿删
-		log.Info("net.Listener to start to serve grpc transport...")
-		fmt.Println("------init-finished------")
+		os.Stdout.WriteString("yak grpc ok\n")
+		log.Flush()
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)
