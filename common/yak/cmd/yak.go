@@ -653,7 +653,9 @@ var startGRPCServerCommand = cli.Command{
 					"    yak grpc --host 0.0.0.0")
 			}
 		}
-		log.Infof("yak grpc ok") // 勿删
+		log.Info("yak grpc ok") // 勿删
+		log.Info("net.Listener to start to serve grpc transport...")
+		fmt.Println("------init-finished------")
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)
