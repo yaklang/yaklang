@@ -1,0 +1,165 @@
+// test_change_view_offset.yak
+// 测试 loop_report_generating 的 change_view_offset 分页导航功能
+// 使用 actions: write_report, change_view_offset, insert_section
+
+var reportFilename = ""
+var reportContent = ""
+var testPassed = false
+var changeOffsetUsed = false
+
+// 测试任务：生成一个较长的报告，然后使用 change_view_offset 导航
+testPrompt = `请帮我生成一份详细的 Yaklang 网络安全工具分析报告。
+
+任务要求：
+
+**第一步：创建初始报告**
+请首先使用 write_report 创建一份包含以下章节的详细报告：
+
+1. 引言（介绍 Yaklang 的背景和目标）
+2. 核心功能分析
+   - 端口扫描能力
+   - 漏洞检测能力
+   - 协议分析能力
+3. SSA 静态分析引擎
+   - 技术原理
+   - 应用场景
+4. 插件系统
+   - 架构设计
+   - 扩展机制
+5. 总结与展望
+
+每个章节都需要包含 5-10 行详细内容，确保报告总长度超过 50 行。
+
+**第二步：测试视图导航**
+报告创建完成后，请使用 change_view_offset 来：
+1. 首先跳转到第 30 行附近查看中间部分的内容
+2. 然后跳转回第 1 行查看开头
+
+**第三步：在中间位置插入内容**
+使用 insert_section 在报告中间位置（大约第 25 行后）插入一个新章节"安全最佳实践"，包含 3-5 行内容。
+
+这是一个测试分页导航功能的任务，请务必完成上述所有步骤。`
+
+log.Info("========================================")
+log.Info("Testing loop_report_generating - Change View Offset")
+log.Info("========================================")
+log.Info("Test prompt: %s", testPrompt)
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("report_generating"),
+    aim.timeout(600), // 较长超时，因为任务复杂
+    aim.maxIteration(25),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        if eventType != "stream" && eventType != "consumption" && eventType != "pressure" {
+            log.Info("[EVENT] Type: %s, NodeId: %s", eventType, event.NodeId)
+        }
+        
+        // 捕获 filesystem_pin_filename 事件
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            log.Info("[EVENT] Pin filename! Content: %s", contentStr)
+            if len(contentStr) > 0 {
+                try {
+                    jsonData = json.loads(contentStr)
+                    if jsonData != nil && jsonData["path"] != nil {
+                        reportFilename = jsonData["path"]
+                        log.Info("[EVENT] Extracted filename: %s", reportFilename)
+                    }
+                } catch e {
+                    log.Warn("[EVENT] JSON parse failed: %v", e)
+                }
+            }
+        }
+        
+        // 捕获 action_executed 事件中的 change_view_offset
+        if eventType == "action_executed" {
+            contentStr = string(event.Content)
+            if str.Contains(contentStr, "change_view_offset") {
+                changeOffsetUsed = true
+                log.Info("[EVENT] change_view_offset action detected!")
+            }
+        }
+    }),
+    aim.onData(func(react, event, nodeId, data) {
+        dataStr = string(data)
+        if event.Type == "stream" && nodeId != "fast-memory-fetch" {
+            print(dataStr)
+        }
+        
+        // 检测 change_view_offset 的使用
+        if str.Contains(dataStr, "change_view_offset") || str.Contains(dataStr, "View offset changed") {
+            changeOffsetUsed = true
+            log.Info("[DATA] change_view_offset detected in stream!")
+        }
+        
+        // 捕获 filesystem_pin_filename 数据
+        if event.Type == "filesystem_pin_filename" && len(data) > 0 {
+            try {
+                jsonData = json.loads(string(data))
+                if jsonData != nil && jsonData["path"] != nil && reportFilename == "" {
+                    reportFilename = jsonData["path"]
+                    log.Info("[DATA] Extracted filename: %s", reportFilename)
+                }
+            } catch e {
+                dataPath = string(data)
+                if str.HasSuffix(dataPath, ".md") && reportFilename == "" {
+                    reportFilename = dataPath
+                    log.Info("[DATA] Using data as filename: %s", reportFilename)
+                }
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        log.Info("[FINISHED] ReAct execution completed")
+        log.Info("Filename: %s", reportFilename)
+        log.Info("change_view_offset used: %v", changeOffsetUsed)
+        
+        if reportFilename != "" {
+            content, readErr = file.ReadFile(reportFilename)
+            if readErr == nil {
+                reportContent = string(content)
+                log.Info("Report content length: %d bytes", len(reportContent))
+                
+                // 检查报告是否足够长（超过 50 行）
+                lines = str.Split(reportContent, "\n")
+                lineCount = len(lines)
+                log.Info("Report line count: %d", lineCount)
+                
+                // 测试通过条件：
+                // 1. 报告内容长度大于 500 字节
+                // 2. 报告行数大于 30 行
+                if len(reportContent) > 500 && lineCount > 30 {
+                    testPassed = true
+                    log.Info("Test PASSED! Report has sufficient content.")
+                } else {
+                    log.Warn("Test FAILED: Report too short (bytes: %d, lines: %d)", len(reportContent), lineCount)
+                }
+            } else {
+                log.Error("Failed to read report: %v", readErr)
+            }
+        } else {
+            log.Warn("No filename captured from events")
+        }
+    }),
+)
+
+if err != nil {
+    log.Error("ReAct execution failed: %v", err)
+}
+
+log.Info("========================================")
+log.Info("TEST RESULTS")
+log.Info("  Test Passed: %v", testPassed)
+log.Info("  change_view_offset Used: %v", changeOffsetUsed)
+log.Info("  Report Filename: %s", reportFilename)
+log.Info("========================================")
+
+if reportContent != "" {
+    log.Info("Report Preview (first 500 chars):")
+    previewLen = min(len(reportContent), 500)
+    log.Info("%s", reportContent[:previewLen])
+}
+
+

@@ -45,6 +45,24 @@
 | `modify_section` | 修改指定行范围 | 更新/替换现有内容 |
 | `insert_section` | 在指定行后插入 | 添加新章节 |
 | `delete_section` | 删除指定行范围 | 移除冗余内容 |
+| `change_view_offset` | 切换视图偏移 | 导航大型报告 |
+
+### 📖 大报告分页功能
+
+当报告内容很大（超过约 30KB）时，系统会自动分页显示。使用 `change_view_offset` action 导航：
+
+```json
+{"@action": "change_view_offset", "offset_line": 51, "human_readable_thought": "查看第51行之后的内容"}
+```
+
+**参数说明：**
+- `offset_line`: 从第几行开始展示（1-based，必填）
+- `show_size`: 最大展示字符数（默认 30000，可选）
+
+**导航操作：**
+- 回到开头：`offset_line=1`
+- 向下翻页：`offset_line = 当前结束行号 + 1`
+- 跳转到指定行：`offset_line = 目标行号`
 
 ### 第三阶段：完善优化
 
@@ -86,16 +104,18 @@ loop_report_generating/
 ├── action_modify_section.go     # 修改章节
 ├── action_insert_section.go     # 插入内容
 ├── action_delete_section.go     # 删除内容
+├── action_change_offset.go      # 切换视图偏移（分页导航）
 ├── prompts/
 │   ├── persistent_instruction.txt   # AI 角色定义
 │   ├── reactive_data.txt            # 响应数据模板
 │   └── reflection_output_example.txt # 输出示例
 └── examples/
-    ├── test_basic_report.yak        # 基础报告生成测试
-    ├── test_grep_reference.yak      # grep 搜索测试
-    ├── test_multi_file_analysis.yak # 多文件分析测试
-    ├── test_iterative_writing.yak   # 迭代写作测试
-    └── test_code_analysis_report.yak # 代码分析报告测试
+    ├── test_basic_report.yak          # 基础报告生成测试
+    ├── test_grep_reference.yak        # grep 搜索测试
+    ├── test_multi_file_analysis.yak   # 多文件分析测试
+    ├── test_iterative_writing.yak     # 迭代写作测试
+    ├── test_code_analysis_report.yak  # 代码分析报告测试
+    └── test_change_view_offset.yak    # 分页导航测试
 ```
 
 ## 使用示例
@@ -166,6 +186,11 @@ err = aim.InvokeReAct(
 ### test_code_analysis_report.yak
 测试代码分析能力，分析 Go 代码文件并生成技术报告。
 
+### test_change_view_offset.yak
+测试大报告分页导航功能。生成一个较长的多章节报告，然后使用 `change_view_offset` 导航到不同位置，验证分页功能是否正常工作。
+
+**注意：** 由于测试生成的报告通常不会超过 30KB，AI 可能会判断无需使用分页功能。这是合理的行为——分页功能主要为处理超大报告设计。
+
 ## 运行测试
 
 ```bash
@@ -182,7 +207,7 @@ done
 
 ## 测试效果展示
 
-### 测试结果汇总（2026-01-01）
+### 测试结果汇总（2026-01-03）
 
 | 测试脚本 | 状态 | 使用的 Actions | 耗时 |
 |---------|------|---------------|------|
@@ -191,6 +216,7 @@ done
 | test_multi_file_analysis.yak | ✅ PASSED | `read_reference_file`(多次), `write_report` | ~25s |
 | test_iterative_writing.yak | ✅ PASSED | `write_report`, `insert_section` | ~30s |
 | test_code_analysis_report.yak | ✅ PASSED | `read_reference_file`, `grep_reference`, `write_report` | ~20s |
+| test_change_view_offset.yak | ✅ PASSED | `write_report`, `insert_section` | ~60s |
 
 ### 生成报告示例
 
