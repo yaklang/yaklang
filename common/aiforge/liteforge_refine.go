@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -89,8 +90,8 @@ func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<
 	return _buildKnowledge(analyzeResult, option...)
 }
 
-func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	refineConfig := NewRefineConfig(option...)
+func _buildKnowledge(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
 	opts := []rag.RAGSystemConfigOption{
 		rag.WithDB(refineConfig.Database),
@@ -103,12 +104,58 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-cha
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
 
-	er, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start build erm from input: %v", err)
+	broadcasterChannel := chanx.NewBroadcastChannel[AnalysisResult](refineConfig.Ctx, 100)
+	go func() {
+		defer broadcasterChannel.Close()
+		for res := range analyzeChannel {
+			broadcasterChannel.Submit(res)
+		}
+	}()
+
+	outputChannel := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
+
+	closeWg := sync.WaitGroup{}
+	if !refineConfig.DisableBuildIndex {
+		indexBuildChannel := broadcasterChannel.Subscribe()
+		closeWg.Add(1)
+		go func() {
+			defer closeWg.Done()
+			indexEntry, err := _buildIndex(indexBuildChannel.OutputChannel(), options...)
+			if err != nil {
+				log.Errorf("failed to build index from analyze result: %v", err)
+				return
+			}
+			for res := range indexEntry {
+				outputChannel.SafeFeed(res)
+			}
+		}()
 	}
 
-	return BuildKnowledgeFromEntityRepository(er, ragSystem, append(option, entityrepos.WithRuntimeBuildOnly(true))...)
+	ermBuildChannel := broadcasterChannel.Subscribe()
+	closeWg.Add(1)
+	go func() {
+		defer closeWg.Done()
+		er, err := AnalyzeERMFromAnalysisResult(ermBuildChannel.OutputChannel(), options...)
+		if err != nil {
+			log.Errorf("failed to analyze ERM from analysis result: %v", err)
+			return
+		}
+		knowledgeEntry, err := BuildKnowledgeFromEntityRepository(er, ragSystem, append(options, entityrepos.WithRuntimeBuildOnly(true))...)
+		if err != nil {
+			log.Errorf("failed to build knowledge from entity repository: %v", err)
+			return
+		}
+		for res := range knowledgeEntry {
+			outputChannel.SafeFeed(res)
+		}
+	}()
+
+	go func() {
+		defer outputChannel.Close()
+		closeWg.Wait()
+	}()
+
+	return outputChannel.OutputChannel(), nil
 }
 
 func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, ragSystem *rag.RAGSystem, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
