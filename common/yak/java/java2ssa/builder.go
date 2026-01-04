@@ -109,14 +109,12 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
 	// - 实现了完整的嵌套归档处理（ReadDir、Stat、ReadFile）
 	// - 支持多层嵌套（ZIP 中包含 JAR，JAR 中包含 ZIP 等）
 	//
-	// 提取底层的 ZipFS
+
 	zipFS := extractZipFSFromUnderlying(fs)
 	if zipFS == nil {
-		// 如果没有 ZipFS，直接返回原文件系统
 		return fs
 	}
 
-	// 检查是否有嵌套的归档文件
 	var hasNestedArchive bool
 	filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithFileStat(func(path string, info os.FileInfo) error {
 		if !info.IsDir() && (strings.HasSuffix(strings.ToLower(path), ".jar") ||
@@ -134,11 +132,6 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
 	expandedFS := expandedZipFSCache.GetOrLoad(zipFS, func() *javaclassparser.ExpandedZipFS {
 		return javaclassparser.NewExpandedZipFS(fs, zipFS)
 	})
-
-	// 如果原文件系统已经是 HookFS，保持 HookFS 包装以保留原有的 hook
-	if _, ok := fs.(*filesys.HookFS); ok {
-		return filesys.NewHookFS(expandedFS)
-	}
 
 	return expandedFS
 }
