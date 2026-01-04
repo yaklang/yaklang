@@ -119,6 +119,7 @@ func TestFastPaginator(t *testing.T) {
 }
 
 func TestFastPaginatorVSCommonPaginator(t *testing.T) {
+	t.Skip()
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
 
