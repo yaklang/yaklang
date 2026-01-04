@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -74,8 +75,95 @@ func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 }
 
 func YieldAIEvent(ctx context.Context, db *gorm.DB, filter *ypb.AIEventFilter) chan *schema.AiOutputEvent {
+	outCh := make(chan *schema.AiOutputEvent)
+
+	chunkSlice := func(slice []string, chunkSize int) [][]string {
+		var chunks [][]string
+		for i := 0; i < len(slice); i += chunkSize {
+			end := i + chunkSize
+			if end > len(slice) {
+				end = len(slice)
+			}
+			chunks = append(chunks, slice[i:end])
+		}
+		return chunks
+	}
+
+	go func() {
+		defer close(outCh)
+
+		type filterChunk struct {
+			Field  string
+			Chunks [][]string
+		}
+		var allFilterChunks []filterChunk
+
+		if len(filter.GetEventUUIDS()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"event_uuid", chunkSlice(filter.GetEventUUIDS(), 10)})
+		}
+		if len(filter.GetCoordinatorId()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"coordinator_id", chunkSlice(filter.GetCoordinatorId(), 10)})
+		}
+		if len(filter.GetEventType()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"type", chunkSlice(filter.GetEventType(), 10)})
+		}
+		if len(filter.GetTaskIndex()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"task_index", chunkSlice(filter.GetTaskIndex(), 10)})
+		}
+		if len(filter.GetTaskUUID()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"task_uuid", chunkSlice(filter.GetTaskUUID(), 10)})
+		}
+
+		var sets [][][]string
+		for _, fc := range allFilterChunks {
+			sets = append(sets, fc.Chunks)
+		}
+
+		baseDB := db.Model(&schema.AiOutputEvent{})
+
+		handler := func(combination [][]string) error {
+			currentDB := baseDB
+			for i, chunkValues := range combination {
+				field := allFilterChunks[i].Field
+				currentDB = bizhelper.ExactQueryStringArrayOr(currentDB, field, chunkValues)
+			}
+
+			// Execute query for this combination
+			ch := bizhelper.YieldModel[*schema.AiOutputEvent](ctx, currentDB)
+			for item := range ch {
+				select {
+				case outCh <- item:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			return nil
+		}
+		var err error
+		if len(sets) == 0 {
+			err = handler(nil)
+		} else {
+			err = cartesian.ProductExContext(ctx, sets, handler)
+		}
+		if err != nil {
+			log.Errorf("yield AI event failed: %v", err)
+			return
+		}
+	}()
+
+	return outCh
+}
+
+func QueryAIEventPaging(db *gorm.DB, filter *ypb.AIEventFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.AiOutputEvent, error) {
 	db = FilterEvent(db, filter)
-	return bizhelper.YieldModel[*schema.AiOutputEvent](ctx, db)
+	db = bizhelper.OrderByPaging(db, paging)
+
+	var events []*schema.AiOutputEvent
+	paginator, db := bizhelper.YakitPagingQuery(db, paging, &events)
+	if db.Error != nil {
+		return nil, nil, db.Error
+	}
+	return paginator, events, nil
 }
 
 func QueryAIEvent(db *gorm.DB, filter *ypb.AIEventFilter) ([]*schema.AiOutputEvent, error) {
