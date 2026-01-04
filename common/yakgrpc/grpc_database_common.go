@@ -1,7 +1,10 @@
+//go:build !irify_exclude
+
 package yakgrpc
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
