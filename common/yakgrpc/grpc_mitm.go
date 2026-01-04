@@ -175,6 +175,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return utils.Errorf("recv first req failed: %s", err)
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
+
+	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
+	allowChunkStaticJS := utils.NewBool(firstReq.GetAllowChunkStaticJS())
 	hostMapping := make(map[string]string)
 	getDownstreamProxy := func(request *ypb.MITMRequest) ([]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
@@ -614,6 +618,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				continue
 			}
 
+			// AllowChunkStaticJS 为 optional bool：仅在前端显式设置时才更新，避免其他控制消息“误覆盖”为默认值。
+			if reqInstance.AllowChunkStaticJS != nil {
+				allowChunkStaticJS.SetTo(reqInstance.GetAllowChunkStaticJS())
+			}
+
 			// 更新过滤器
 			if reqInstance.UpdateFilter {
 				clearPluginHTTPFlowCache()
@@ -889,7 +898,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				urlStr := httpctx.GetRequestURL(req)
 				rules, rspHooked, dropped := replacer.Hook(false, true, urlStr, rsp)
 				hookDuration := time.Since(hookStart)
-				
+
 				// 监控慢规则 Hook（超过 300ms）
 				if hookDuration > 300*time.Millisecond {
 					now := time.Now()
@@ -907,7 +916,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					yakit.TriggerSlowRuleHookCallbackThrottled()
 					log.Warnf("MITM HookResponse took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 				}
-				
+
 				if dropped {
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 					log.Warn("response should be dropped(VIA replacer.hook)")
@@ -929,7 +938,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		urlStr = httpctx.GetRequestURL(req)
 		rules, rsp1, shouldBeDropped := replacer.Hook(false, true, urlStr, rsp)
 		hookDuration := time.Since(hookStart)
-		
+
 		// 监控慢规则 Hook（超过 300ms）
 		if hookDuration > 300*time.Millisecond {
 			now := time.Now()
@@ -947,7 +956,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			yakit.TriggerSlowRuleHookCallbackThrottled()
 			log.Warnf("MITM HookResponse took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 		}
-		
+
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
@@ -1218,8 +1227,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetRequestURL(originReqIns, reqURL)
 		}
 
+		var urlPath string
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
+			// 这里仅做“强路径”的提前过滤：避免影响普通 JS（弱路径由后续镜像阶段结合更多信号判定）。
+			if !allowChunkStaticJS.IsSet() && isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
+				ret = true
+			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
 			return ret
 		})
@@ -1263,6 +1277,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		if urlRaw != nil {
 			urlStr = utils.Url2UnEscapeString(urlRaw)
+			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
 			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
 				extName = ret
@@ -1297,7 +1312,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		urlStr = httpctx.GetRequestURL(originReqIns)
 		rules, req1, shouldBeDropped := replacer.Hook(true, false, urlStr, req, isHttps)
 		hookDuration := time.Since(hookStart)
-		
+
 		// 监控慢规则 Hook（超过 300ms）
 		if hookDuration > 300*time.Millisecond {
 			now := time.Now()
@@ -1315,7 +1330,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			yakit.TriggerSlowRuleHookCallbackThrottled()
 			log.Warnf("MITM HookRequest took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 		}
-		
+
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1568,6 +1583,39 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			plainResponse = []byte(header)
 		}
 
+		// 默认过滤 chunk/static JS（避免误伤：综合 path/mime/缓存头/少量 body 特征判定）
+		if !allowChunkStaticJS.IsSet() && rsp != nil {
+			urlPath := ""
+			if req != nil && req.URL != nil {
+				urlPath = req.URL.EscapedPath()
+			}
+			if urlPath == "" {
+				if u, err := url.Parse(reqUrl); err == nil && u != nil {
+					urlPath = u.EscapedPath()
+				}
+				if urlPath == "" {
+					urlPath = utils.ExtractRawPath(reqUrl)
+					if i := strings.IndexByte(urlPath, '?'); i >= 0 {
+						urlPath = urlPath[:i]
+					}
+				}
+			}
+			contentType := rsp.Header.Get("Content-Type")
+			cacheControl := rsp.Header.Get("Cache-Control")
+			contentLength := rsp.ContentLength
+			if contentLength <= 0 {
+				if cl := rsp.Header.Get("Content-Length"); cl != "" {
+					contentLength = int64(codec.Atoi(cl))
+				}
+			}
+
+			if shouldFilterBundledJavaScript(urlPath, contentType, cacheControl, contentLength, body) {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
+				isFilteredByResponse = true
+				isFiltered = true
+			}
+		}
+
 		shouldBeHijacked := !isFiltered
 
 		pluginCtx := httpctx.GetPluginContext(req)
@@ -1704,7 +1752,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				hookDuration := time.Since(hookStart)
 				close(colorCh)
-				
+
 				// 监控慢规则 Hook（超过 300ms）
 				if hookDuration > 300*time.Millisecond {
 					now := time.Now()
@@ -1722,7 +1770,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					yakit.TriggerSlowRuleHookCallbackThrottled()
 					log.Warnf("MITM HookColor took too long: %v, rule_count:%d, url:%s", hookDuration, ruleCount, urlStr)
 				}
-				
+
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
 					if err != nil {
