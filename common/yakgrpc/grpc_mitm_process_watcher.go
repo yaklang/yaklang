@@ -37,10 +37,19 @@ func (s *Server) WatchProcessConnection(stream ypb.Yak_WatchProcessConnectionSer
 	}
 
 	feedback := func(ActionType string, p *sysproc.ProcessBasicInfo) {
-		stream.Send(&ypb.WatchProcessResponse{
-			Action:  ActionType,
-			Process: ProcessInfo2GRPC(p),
-		})
+		select {
+		case <-stream.Context().Done():
+			log.Printf("Stream is closed by client, dropping message: %s", ActionType)
+			return
+		default:
+			err := stream.Send(&ypb.WatchProcessResponse{
+				Action:  ActionType,
+				Process: ProcessInfo2GRPC(p),
+			})
+			if err != nil {
+				log.Printf("Send error: %v", err)
+			}
+		}
 	}
 
 	processWatcher := sysproc.NewProcessesWatcher()
