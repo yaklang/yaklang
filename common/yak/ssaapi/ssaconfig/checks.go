@@ -23,7 +23,8 @@ func (c *Config) ensureSSACompile(field string) error {
 	if c == nil {
 		return nil
 	}
-	if c.Mode&ModeSSACompile == 0 {
+	// Check for the compile mode bit specifically, not ModeSSACompile which includes other modes
+	if c.Mode&modeSSACompile == 0 {
 		return utils.Errorf("Config: %s can only be set in Compile mode", field)
 	}
 	if c.SSACompile == nil {

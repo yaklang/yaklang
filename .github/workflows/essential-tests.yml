@@ -292,7 +292,8 @@ jobs:
                 {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
                 {"package": "./common/authhack/...", "timeout": "1m"},
                 {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS"},
-                {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"}
+                {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
+                {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
               ]
           # 2. AI相关 - 需要串行执行避免数据库锁定
           - name: "Test AI Infra / RAG / Knowledge"
