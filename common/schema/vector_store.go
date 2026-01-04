@@ -13,10 +13,11 @@ import (
 )
 
 const (
-	META_Data_UUID      = "meta_data_UUID"
-	META_Data_Title     = "meta_data_title"
-	META_Repos_UUID     = "meta_repos_UUID"
-	META_QUESTION_INDEX = "question_index"
+	META_Data_UUID       = "meta_data_UUID"
+	META_Data_Title      = "meta_data_title"
+	META_Repos_UUID      = "meta_repos_UUID"
+	META_QUESTION_INDEX  = "question_index"
+	META_KNOWLEDGE_TITLE = "knowledge_title"
 )
 
 // FloatArray 用于在数据库中存储浮点数数组的自定义类型

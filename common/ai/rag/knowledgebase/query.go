@@ -9,6 +9,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,6 +28,7 @@ type QueryConfig struct {
 	AIService            string
 	AICallback           aicommon.AICallbackType
 	MsgCallBack          func(*SearchKnowledgebaseResult)
+	EmbeddingClient      aispec.EmbeddingCaller
 }
 
 type QueryOption func(*QueryConfig)
@@ -58,6 +60,12 @@ func WithEnableAISummary(enableAISummary bool) QueryOption {
 func WithCollectionName(collectionName string) QueryOption {
 	return func(config *QueryConfig) {
 		config.CollectionName = collectionName
+	}
+}
+
+func WithEmbeddingClient(embeddingClient aispec.EmbeddingCaller) QueryOption {
+	return func(config *QueryConfig) {
+		config.EmbeddingClient = embeddingClient
 	}
 }
 
@@ -188,6 +196,10 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		vectorstore.WithRAGCtx(config.Ctx),
 	}
 
+	if config.EmbeddingClient != nil {
+		ragOpts = append(ragOpts, vectorstore.WithRAGSystemLoadConfig(vectorstore.WithEmbeddingClient(config.EmbeddingClient)))
+	}
+
 	// 如果有Filter配置，转换为RAG Filter
 	if config.Filter != nil {
 		ragFilter := func(key string, getDoc func() *vectorstore.Document) bool {
@@ -206,7 +218,11 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		ragOpts = append(ragOpts, vectorstore.WithRAGFilter(ragFilter))
 	} else {
 		ragOpts = append(ragOpts, vectorstore.WithRAGFilter(func(key string, getDoc func() *vectorstore.Document) bool {
-			return getDoc().Type == schema.RAGDocumentType_Knowledge
+			docIns := getDoc()
+			if docIns == nil {
+				return false
+			}
+			return docIns.Type == schema.RAGDocumentType_Knowledge
 		}))
 	}
 

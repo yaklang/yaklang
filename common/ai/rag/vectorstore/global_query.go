@@ -562,7 +562,7 @@ func (s *ScoredResult) GetKnowledgeEntryUUID() string {
 
 // GetKnowledgeTitle 获取关联知识的标题
 func (s *ScoredResult) GetKnowledgeTitle() string {
-	if title, ok := s.Document.Metadata["knowledge_title"].(string); ok {
+	if title, ok := s.Document.Metadata[schema.META_KNOWLEDGE_TITLE].(string); ok {
 		return title
 	}
 	return ""
@@ -1085,7 +1085,11 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 					if title == "" {
 						title = utils.ShrinkString(result.GetContent(), 50)
 					}
-					subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f)\n", i+1, title, result.Source, result.Score))
+					if result.Document.IsQuestionIndex() {
+						subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f, 向量类型： 问题索引)\n", i+1, title, result.Source, result.Score))
+					} else {
+						subQueryInfo.ResultBuffer.WriteString(fmt.Sprintf("**%d. [%s]** (来源: %s, 得分: %.4f)\n", i+1, title, result.Source, result.Score))
+					}
 
 					// 如果有 search_target，展示搜索目标
 					// 格式: [TYPE:{{search_type}}]: [{{search_target}}] 或仅 [{{search_target}}]
