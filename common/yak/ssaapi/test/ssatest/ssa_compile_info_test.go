@@ -234,6 +234,64 @@ func Test_Multiple_input(t *testing.T) {
 
 }
 
+func TestExpandedZipFS_JarMarkedAsDirectory_Compile(t *testing.T) {
+	zipPath, err := GetZipWithJarFile()
+	require.NoError(t, err)
+
+	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+	require.NoError(t, err)
+	defer zipFS.Close()
+
+	expandedFS := javaclassparser.NewExpandedZipFS(zipFS, zipFS)
+
+	t.Run("jar file should be marked as directory in Stat", func(t *testing.T) {
+		jarPath := "lib/test.jar"
+		info, err := expandedFS.Stat(jarPath)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		require.True(t, info.IsDir(), "jar file should be marked as directory")
+		log.Infof("jar file %s is marked as directory: %v", jarPath, info.IsDir())
+	})
+
+	t.Run("compile with parseProjectWithFS should handle jar as directory", func(t *testing.T) {
+		progName := uuid.NewString()
+		prog, err := ssaapi.ParseProjectWithFS(
+			expandedFS,
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(progName),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			fmt.Sprintf("/%s", progName),
+			filesys.WithFileSystem(ssadb.NewIrSourceFs()),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				fileList = append(fileList, s)
+				return nil
+			}),
+		)
+
+		require.Greater(t, len(fileList), 0, "should find files after compilation")
+		log.Infof("compiled file list: %v", fileList)
+
+		hasMainJava := false
+		for _, file := range fileList {
+			if strings.Contains(file, "Main.java") {
+				hasMainJava = true
+				log.Infof("found Main.java in compiled files: %s", file)
+				break
+			}
+		}
+		require.True(t, hasMainJava, "should find Main.java from nested jar after compilation")
+	})
+}
+
 func Test_Multiple_input_git(t *testing.T) {
 	url, err := GetLocalGit()
 	require.NoError(t, err)

@@ -18,6 +18,7 @@ import (
 type ZipFS struct {
 	r      *zip.Reader
 	forest *utils.PathForest
+	closer io.Closer // 用于关闭文件句柄（仅在 NewZipFSFromLocal 时设置）
 }
 
 func (z *ZipFS) IsAbs(s string) bool {
@@ -55,6 +56,15 @@ func (z *ZipFS) Delete(s string) error {
 
 func (z *ZipFS) MkdirAll(s string, mode os.FileMode) error {
 	return utils.Error("unsupported on readonly zipfs")
+}
+
+// Close 关闭 ZipFS 持有的文件句柄（如果存在）
+// 这对于在 Windows 上释放文件锁定很重要
+func (z *ZipFS) Close() error {
+	if z.closer != nil {
+		return z.closer.Close()
+	}
+	return nil
 }
 
 type zipDir struct {
@@ -253,6 +263,11 @@ func (f *ZipFS) ExtraInfo(string) map[string]any { return nil }
 func (f *ZipFS) Base(p string) string            { return path.Base(p) }
 
 func NewZipFSRaw(i io.ReaderAt, size int64) (*ZipFS, error) {
+	return NewZipFSRawWithCloser(i, size, nil)
+}
+
+// NewZipFSRawWithCloser 创建一个 ZipFS，并保存一个可选的 closer 用于关闭文件句柄
+func NewZipFSRawWithCloser(i io.ReaderAt, size int64, closer io.Closer) (*ZipFS, error) {
 	reader, err := zip.NewReader(i, size)
 	if err != nil {
 		return nil, err
@@ -272,7 +287,7 @@ func NewZipFSRaw(i io.ReaderAt, size int64) (*ZipFS, error) {
 		}
 	}
 	forest.ReadOnly()
-	return &ZipFS{r: reader, forest: forest}, nil
+	return &ZipFS{r: reader, forest: forest, closer: closer}, nil
 }
 
 func NewZipFSFromString(i string) (*ZipFS, error) {
@@ -288,11 +303,14 @@ func NewZipFSFromLocal(i string) (*ZipFS, error) {
 	}
 	ra, ok := f.(io.ReaderAt)
 	if !ok {
+		f.Close() // 如果类型转换失败，关闭文件句柄
 		return nil, err
 	}
 	info, err := f.Stat()
 	if err != nil {
+		f.Close() // 如果 Stat 失败，关闭文件句柄
 		return nil, err
 	}
-	return NewZipFSRaw(ra, info.Size())
+	// 保存文件句柄引用，以便后续关闭
+	return NewZipFSRawWithCloser(ra, info.Size(), f)
 }
