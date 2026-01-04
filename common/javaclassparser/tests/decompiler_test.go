@@ -1,6 +1,9 @@
 package tests
 
 import (
+	"archive/zip"
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -159,4 +162,90 @@ func TestSyntax(t *testing.T) {
 		})
 	}
 
+}
+
+func TestZipWithJar(t *testing.T) {
+	// 创建包含 JAR 的 ZIP 文件
+	dir := os.TempDir()
+	jar, err := classes.FS.ReadFile("test.jar")
+	require.NoError(t, err)
+
+	// 创建 ZIP 文件，包含 test.jar 和 readme.txt
+	var zipBuf bytes.Buffer
+	zipWriter := zip.NewWriter(&zipBuf)
+
+	// 添加 readme.txt
+	readmeEntry, err := zipWriter.Create("readme.txt")
+	require.NoError(t, err)
+	_, err = readmeEntry.Write([]byte("This is a test ZIP containing a JAR file."))
+	require.NoError(t, err)
+
+	// 添加 test.jar 到 lib/ 目录
+	jarEntry, err := zipWriter.Create("lib/test.jar")
+	require.NoError(t, err)
+	_, err = io.Copy(jarEntry, bytes.NewReader(jar))
+	require.NoError(t, err)
+
+	err = zipWriter.Close()
+	require.NoError(t, err)
+
+	zipPath := dir + "/test-with-jar.zip"
+	err = os.WriteFile(zipPath, zipBuf.Bytes(), 0644)
+	require.NoError(t, err)
+
+	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+	require.NoError(t, err)
+	expandedFS := javaclassparser.NewExpandedZipFS(zipFS, zipFS)
+
+	t.Run("test zip with nested jar Recursive", func(t *testing.T) {
+		// 测试 Recursive 遍历能够展开 JAR
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			".",
+			filesys.WithFileSystem(expandedFS),
+			filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+				if !isDir {
+					fileList = append(fileList, pathname)
+					if strings.Contains(pathname, ".jar/") {
+						data, err := expandedFS.ReadFile(pathname)
+						if err != nil {
+							log.Warnf("read file %s failed: %v", pathname, err)
+							return nil
+						}
+						require.NotEmpty(t, data, "file %s should have content", pathname)
+					}
+				}
+				return nil
+			}),
+		)
+		require.Greater(t, len(fileList), 0, "should find files")
+		log.Infof("file list: %v", fileList)
+		// 检查是否存在 readme.txt 文件（ZIP 根目录）
+		hasReadme := false
+		for _, file := range fileList {
+			if file == "readme.txt" || strings.HasSuffix(file, "readme.txt") {
+				hasReadme = true
+				break
+			}
+		}
+		require.True(t, hasReadme, "should find readme.txt in ZIP root: fileList=%v", fileList)
+
+		// 检查是否存在 Main.java 文件（嵌套 JAR 中）
+		hasMainClass := false
+		for _, file := range fileList {
+			if strings.Contains(file, "Main.java") || strings.HasSuffix(file, "Main.java") {
+				hasMainClass = true
+				break
+			}
+		}
+		require.True(t, hasMainClass, "should find Main.java in nested jar: fileList=%v", fileList)
+
+		// 直接使用 expandedFS 验证 Main.java 是否存在（因为 Recursive 可能无法遍历嵌套 JAR）
+		mainClassPath := "lib/test.jar/com/java/main/Main.java"
+		data, err := expandedFS.ReadFile(mainClassPath)
+		log.Info(data)
+		require.NoError(t, err, "should be able to read Main.java from nested jar: %s", mainClassPath)
+		require.NotEmpty(t, data, "Main.java should have content")
+		log.Infof("successfully read Main.java from nested jar: %s", mainClassPath)
+	})
 }

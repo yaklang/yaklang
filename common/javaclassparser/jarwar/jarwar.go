@@ -19,14 +19,14 @@ type JarWar struct {
 	// 通常从 META-INF/LICENSE 文件中读取
 	License    string
 	ManifestMF JarManifest
-	fs         *javaclassparser.FS
+	fs         *javaclassparser.JarFS
 
 	// 存储反编译失败的文件列表
 	failedDecompiledFiles map[string]struct{}
 	failedFilesLock       sync.RWMutex
 }
 
-func NewFromJarFS(fs *javaclassparser.FS) (*JarWar, error) {
+func NewFromJarFS(fs *javaclassparser.JarFS) (*JarWar, error) {
 	// Check jar or war
 	if entries, err := fs.ReadDir("WEB-INF/"); err == nil && len(entries) > 0 {
 		return &JarWar{

@@ -74,7 +74,8 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// Check if config file is provided
 	configFilePath := c.String("config")
-	if configFilePath != "" {
+	hasConfigFile := configFilePath != ""
+	if hasConfigFile {
 		log.Infof("Loading scan configuration from file: %s", configFilePath)
 		data, err := os.ReadFile(configFilePath)
 		if err != nil {
@@ -98,7 +99,6 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// target path -> code source
 	if targetPath := c.String("target"); targetPath != "" {
-		opts = append(opts, ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal))
 		opts = append(opts, ssaconfig.WithCodeSourceLocalFile(targetPath))
 	}
 

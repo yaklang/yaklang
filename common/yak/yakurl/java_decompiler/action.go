@@ -15,13 +15,13 @@ type Action struct {
 	mutex sync.Mutex
 
 	// jarFS maps JAR paths to their filesystem handlers
-	jarFS map[string]*javaclassparser.FS
+	jarFS map[string]*javaclassparser.JarFS
 }
 
 // NewJavaDecompilerAction creates and initializes a new Java decompiler action
 func NewJavaDecompilerAction() *Action {
 	action := &Action{
-		jarFS: make(map[string]*javaclassparser.FS),
+		jarFS: make(map[string]*javaclassparser.JarFS),	
 	}
 
 	// Register route handlers
@@ -29,4 +29,12 @@ func NewJavaDecompilerAction() *Action {
 	action.registerClassRoutes()
 
 	return action
+}
+
+// ClearCache clears all cached JarFS instances
+// This is useful for testing to release file handles on Windows
+func (a *Action) ClearCache() {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	a.jarFS = make(map[string]*javaclassparser.JarFS)
 }
