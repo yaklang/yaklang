@@ -23,4 +23,3 @@ func initIrifyLibs() {
 	yaklang.Import("ssa", lo.Assign(ssaExports...))
 	yaklang.Import("syntaxflow", syntaxflow.Exports)
 }
-

@@ -145,7 +145,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
 	rangeWordText := ssaRange.GetWordText()
-	word, containPoint, pointSuffix := trimSourceCode(rangeWordText)
+	word, containPoint, pointSuffix := trimSourceCodeHelper(rangeWordText)
 
 	// 计算代码哈希用于缓存
 	codeHash := getCodeHash(code)
@@ -239,6 +239,17 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 	}
 	fallbackAnalyzeCache.Set(id, result)
 	return result, err
+}
+
+// trimSourceCodeHelper 是一个辅助函数，用于处理源代码字符串
+// 与 grpc_language_suggestion.go 中的 trimSourceCode 功能相同
+func trimSourceCodeHelper(sourceCode string) (code string, containPoint bool, pointSuffix bool) {
+	containPoint = strings.Contains(sourceCode, ".")
+	pointSuffix = strings.HasSuffix(sourceCode, ".")
+	if pointSuffix {
+		sourceCode = sourceCode[:len(sourceCode)-1]
+	}
+	return strings.TrimSpace(sourceCode), containPoint, pointSuffix
 }
 
 func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *memedit.Range {
