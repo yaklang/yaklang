@@ -106,7 +106,10 @@ func (c *Config) Update(options ...Option) error {
 
 // default factory functions - used by With... option helpers to create nested configs
 func defaultCodeSourceConfig() *CodeSourceInfo {
-	return &CodeSourceInfo{}
+	return &CodeSourceInfo{
+		Auth:  &AuthConfigInfo{},
+		Proxy: &ProxyConfigInfo{},
+	}
 }
 
 func defaultSSACompileConfig() *SSACompileConfig {

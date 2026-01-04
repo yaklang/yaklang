@@ -62,14 +62,14 @@ func TestConfigWithOptions(t *testing.T) {
 
 	require.Equal(t, []string{"yak", "yaklang"}, cfg.BaseInfo.ProgramNames)
 	require.Equal(t, "yaklang project", cfg.BaseInfo.ProjectDescription)
-	require.Equal(t, "Go", cfg.BaseInfo.Language)
+	require.Equal(t, Language("golang"), cfg.BaseInfo.Language)
 
 	require.True(t, cfg.GetCompileStrictMode())
 	require.Equal(t, 42, cfg.GetCompilePeepholeSize())
 	require.Equal(t, []string{"*.tmp"}, cfg.GetCompileExcludeFiles())
 	require.True(t, cfg.GetCompileReCompile())
 	require.True(t, cfg.GetCompileMemory())
-	require.Equal(t, uint32(17), cfg.GetCompileConcurrency())
+	require.Equal(t, int(17), cfg.GetCompileConcurrency())
 
 	require.Equal(t, CodeSourceGit, cfg.GetCodeSourceKind())
 	require.Equal(t, "/tmp/yak", cfg.GetCodeSourceLocalFile())
@@ -90,7 +90,7 @@ func TestConfigWithOptions(t *testing.T) {
 	require.Equal(t, uint32(23), cfg.GetScanConcurrency())
 	require.True(t, cfg.GetScanIgnoreLanguage())
 	require.Equal(t, ControlModeResume, cfg.GetScanControlMode())
-	require.Equal(t, []string{"go", "java"}, cfg.GetScanLanguage())
+	require.Equal(t, []Language([]Language{"go", "java"}), cfg.GetScanLanguage())
 
 	require.NotNil(t, cfg.SyntaxFlowRule.RuleFilter)
 	require.Equal(t, []string{"go"}, cfg.SyntaxFlowRule.RuleFilter.Language)
@@ -130,7 +130,7 @@ func TestWithScanRaw(t *testing.T) {
 	require.Equal(t, []string{"prog1", "prog2"}, cfg.BaseInfo.ProgramNames)
 	require.Equal(t, "project", cfg.BaseInfo.ProjectName)
 	require.Same(t, req.Filter, cfg.GetRuleFilter())
-	require.Same(t, req.RuleInput, cfg.GetRuleInput())
+	require.Same(t, req.RuleInput, cfg.GetRuleInput()[0])
 }
 
 func TestExtraInfo(t *testing.T) {
@@ -259,7 +259,7 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Empty(t, config.ExcludeFiles)
 		require.False(t, config.ReCompile)
 		require.False(t, config.MemoryCompile)
-		require.Equal(t, uint32(1), config.Concurrency)
+		require.Equal(t, 1, config.Concurrency)
 	})
 
 	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {
@@ -299,7 +299,7 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 // TestModeBitmaskValidation verifies that options properly validate Mode bitmask
 func TestModeBitmaskValidation(t *testing.T) {
 	t.Run("BaseInfo options require ModeProjectBase", func(t *testing.T) {
-		cfg, _ := New(ModeSSACompile) // Wrong mode
+		cfg, _ := New(ModeSyntaxFlow) // Wrong mode - ModeSyntaxFlow doesn't include ModeProjectBase
 
 		err := WithProgramNames("test")(cfg)
 		require.Error(t, err)
@@ -546,7 +546,10 @@ func TestApplyExtraOptions(t *testing.T) {
 
 		// 4. 验证 ExtraInfo 仍然包含了这个"不相关"的选项 (它只是没被应用)
 		require.Contains(t, cfg.ExtraInfo, otherKey, "ExtraInfo should still contain the other key")
-		require.IsType(t, ExtraOption[*OtherScanConfig]{}, cfg.ExtraInfo[otherKey], "The stored type should be for OtherScanConfig")
+		extraInfoSlice, ok := cfg.ExtraInfo[otherKey]
+		require.True(t, ok, "ExtraInfo should contain the other key")
+		require.NotEmpty(t, extraInfoSlice, "ExtraInfo slice should not be empty")
+		require.IsType(t, ExtraOption[*OtherScanConfig]{}, extraInfoSlice[0], "The stored type should be for OtherScanConfig")
 	})
 }
 
