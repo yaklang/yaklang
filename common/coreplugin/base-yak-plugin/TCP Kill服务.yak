@@ -1,11 +1,10 @@
 yakit.AutoInitYakit()
 
-# Input your code!
+target := cli.String("target", cli.setRequired(true),cli.setVerboseName("Kill目标"),cli.setHelp("需要kill的tcp连接的目标的IP或者域名,支持逗号分隔与CIDR"))
+killDurationSecond := cli.Int("duration", cli.setVerboseName("持续时间"),cli.setHelp("Kill TCP 服务的监控持续时间(单位 秒)"),cli.setDefault(3))
 
-tunName := cli.String("name", cli.setVerboseName("tun设备名"),cli.setRequired(true))
-target := cli.String("target", cli.setVerboseName("目标列表"),cli.setHelp("需要劫持的目标列表，可以以逗号、换行分隔，并且会解析 CIDR 网段和域名"),cli.setRequired(true))
 cli.check()
-
+t := time.ParseDuration(sprintf("%ds", killDurationSecond))~
 parseTarget := func(t) {
     allTarget := str.ParseStringToHosts(t)
     ipV4Ip := []
@@ -42,25 +41,10 @@ parseTarget := func(t) {
         }(i)
     }
     wg.Wait()
+
     return ipV4Ip
 }
 
-
 ipArray := parseTarget(target)
-
-if len(ipArray) == 0 {
-    die("未解析出合法IP,请检查输入")
-}
-
-yakit.StatusCard("执行状态", "正在添加路由")
-yakit.Info("start add route ip list :%v", ipArray)
-m,err := netstack.GetPrivilegedSystemRouteManager()
-if err !=nil {
-    m = netstack.GetSystemRouteManager()
-}
-err := m.AddIPRoute(ipArray, tunName )
-if err !=nil {
-    die(err)
-}
-yakit.StatusCard("成功添加路由", len(ipArray))
-yakit.Info("sucess add ip route %d", len(ipArray))
+yakit.Info("start kill tcp: duration [%s] | ip %v", t.String(),ipArray)
+netstack.FastKillTCP(t, ipArray...)

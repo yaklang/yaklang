@@ -112,6 +112,17 @@ func (p *PCAPEndpoint) DisallowTCP(addr string) {
 	}
 }
 
+func (p *PCAPEndpoint) MultiDisallowTCP(addrs ...string) {
+	p.tcpKillMutex.Lock()
+	defer p.tcpKillMutex.Unlock()
+	for _, addr := range addrs {
+		hash := p.generateKillTCPHash(addr, "")
+		for _, h := range hash {
+			p.tcpKillMap[h] = struct{}{}
+		}
+	}
+}
+
 func (p *PCAPEndpoint) AllowTCP(addr string) {
 	hashes := p.generateKillTCPHash(addr, "")
 	p.tcpKillMutex.Lock()
