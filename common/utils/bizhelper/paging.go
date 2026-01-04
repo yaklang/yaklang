@@ -1,6 +1,7 @@
 package bizhelper
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/jinzhu/gorm"
@@ -13,6 +14,10 @@ type Param struct {
 	Limit   int
 	OrderBy []string
 	ShowSQL bool
+
+	QueryCountOnce     bool `json:"query_count_once"`    // 如果开启了，那么只有在NewPagination的时候才会查询Count，Next方法调用的时候就不查询Count
+	DisableTransaction bool `json:"disable_transaction"` // 如果开启了，那么不使用Transaction
+	totalRecord        *int `json:"-"`                   // cache
 }
 
 // Paginator 分页返回
@@ -25,6 +30,7 @@ type Paginator struct {
 	Page        int         `json:"page"`
 	PrevPage    int         `json:"prev_page"`
 	NextPage    int         `json:"next_page"`
+	param       *Param      `json:"-"`
 }
 
 // Paging 分页
@@ -49,11 +55,24 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	var paginator Paginator
 	var count int
 	var offset int
+	shouldQueryCount := true
 
-	db = utils.GormTransactionReturnDb(db, func(tx *gorm.DB) {
-		if tx.Count(&count); tx.Error != nil {
-			return
+	if p.QueryCountOnce && p.totalRecord != nil {
+		count = *p.totalRecord
+		shouldQueryCount = false
+	}
+
+	queryFunc := func(tx *gorm.DB) {
+		if shouldQueryCount {
+			if tx.Count(&count); tx.Error != nil {
+				return
+			}
+			if p.QueryCountOnce {
+				countVal := count
+				p.totalRecord = &countVal
+			}
 		}
+
 		if p.Limit == -1 {
 			tx.Find(result)
 		} else {
@@ -64,7 +83,13 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 			}
 			tx.Limit(p.Limit).Offset(offset).Find(result)
 		}
-	})
+	}
+
+	if p.DisableTransaction {
+		queryFunc(db)
+	} else {
+		db = utils.GormTransactionReturnDb(db, queryFunc)
+	}
 
 	if p.Limit == -1 {
 		paginator.TotalRecord = count
@@ -96,7 +121,24 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	} else {
 		paginator.NextPage = p.Page + 1
 	}
+	paginator.param = p
 	return &paginator, db
+}
+
+func (p *Paginator) Next(result interface{}) (error, bool) {
+	if p.param == nil {
+		return fmt.Errorf("paginator param is nil"), false
+	}
+	if p.Page >= p.TotalPage {
+		return nil, false
+	}
+	p.param.Page = p.Page + 1
+	newP, db := NewPagination(p.param, result)
+	if db.Error != nil {
+		return db.Error, false
+	}
+	*p = *newP
+	return nil, true
 }
 
 func countRecords(db *gorm.DB, anyType interface{}, done chan bool, count *int) {

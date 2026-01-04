@@ -1870,16 +1870,20 @@ message AIEventFilter {
   repeated string CoordinatorId = 3;
   repeated string TaskIndex = 4;
   repeated string TaskUUID = 5;
+  string SessionID = 6;
+  string ProcessID = 7;
 }
-
 
 message AIEventQueryRequest {
   AIEventFilter Filter = 1;
   string  ProcessID = 2;
+  Paging Pagination = 3;
 }
 
 message AIEventQueryResponse {
   repeated AIOutputEvent Events = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
 }
 
 message AITaskQueryRequest {

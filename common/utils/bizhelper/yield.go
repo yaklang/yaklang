@@ -13,11 +13,12 @@ import (
 var defaultYieldSize = 1024
 
 type YieldModelConfig struct {
-	Size          int
-	IndexField    string
-	CountCallback func(int)
-	Limit         int
-	Fast          bool
+	Size                     int
+	IndexField               string
+	CountCallback            func(int)
+	Limit                    int
+	Fast                     bool // 仅适用于存在 int 类型 id，并且 id 连续（不存在删除的情况），数据量可控的场景下，分页大小低于100的情况
+	NormalPaginationFastMode bool // 如果开启了，那么在使用 normalPagination 时，会启用 QueryCountOnce、DisableTransaction 选项，适用于不存在边写边查的连续多页查询场景下
 }
 
 func NewYieldModelConfig() *YieldModelConfig {
