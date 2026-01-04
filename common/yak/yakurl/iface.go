@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/wsm"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yakurl/java_decompiler"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -64,6 +63,12 @@ func (s *ActionService) GetAction(schema string) Action {
 }
 
 func (s *ActionService) CreateAction(schema string) Action {
+	// 先尝试创建 Irify 专用的 action（如果 schema 匹配）
+	if action := createIrifyAction(schema); action != nil {
+		return action
+	}
+
+	// 处理其他共享的 action
 	switch schema {
 	case "file":
 		return &fileSystemAction{
@@ -83,16 +88,6 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return newFacadeServerAction()
 	case "yakshell":
 		return &wsm.YakShellResourceAction{}
-	case "syntaxflow":
-		return NewSyntaxFlowAction()
-	case "ssadb":
-		return &fileSystemAction{
-			fs: ssadb.NewIrSourceFs(),
-		}
-	case "ssarisk":
-		return &riskTreeAction{
-			register: make(map[string]int),
-		}
 	case "javadec":
 		return java_decompiler.NewJavaDecompilerAction()
 	default:
