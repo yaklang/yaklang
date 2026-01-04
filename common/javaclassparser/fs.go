@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -199,15 +198,7 @@ func (e *ExpandedZipFS) expandArchive(archivePath string) ([]fs.DirEntry, error)
 		return nil, err
 	}
 
-	var result []fs.DirEntry
-	for _, entry := range entries {
-		result = append(result, &ArchiveDirEntry{
-			name:     entry.Name(),
-			isDir:    entry.IsDir(),
-			original: entry,
-		})
-	}
-	return result, nil
+	return entries, nil
 }
 
 func (e *ExpandedZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
@@ -231,16 +222,7 @@ func (e *ExpandedZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			expandedEntries = append(expandedEntries, entry)
 			continue
 		}
-		entryName := entry.Name()
-		if e.isArchiveFile(entryName) {
-			expandedEntries = append(expandedEntries, &ArchiveDirEntry{
-				name:     entryName,
-				isDir:    true,
-				original: entry,
-			})
-		} else {
-			expandedEntries = append(expandedEntries, entry)
-		}
+		expandedEntries = append(expandedEntries, entry)
 	}
 	return expandedEntries, nil
 }
@@ -261,15 +243,7 @@ func (e *ExpandedZipFS) readDirFromArchive(fullPath string) ([]fs.DirEntry, erro
 		return nil, err
 	}
 
-	var result []fs.DirEntry
-	for _, entry := range entries {
-		result = append(result, &ArchiveDirEntry{
-			name:     entry.Name(),
-			isDir:    entry.IsDir(),
-			original: entry,
-		})
-	}
-	return result, nil
+	return entries, nil
 }
 
 func (e *ExpandedZipFS) Stat(name string) (fs.FileInfo, error) {
@@ -282,6 +256,7 @@ func (e *ExpandedZipFS) Stat(name string) (fs.FileInfo, error) {
 			return nil, err
 		}
 		return &ArchiveFileInfo{
+			fs:    info,
 			name:  info.Name(),
 			isDir: true,
 		}, nil
@@ -304,6 +279,7 @@ func (e *ExpandedZipFS) statInArchive(name string) (fs.FileInfo, error) {
 	if err != nil {
 		if _, readErr := archiveFS.ReadDir(internalPath); readErr == nil {
 			return &ArchiveFileInfo{
+				fs:    info,
 				name:  name,
 				isDir: true,
 			}, nil
@@ -312,6 +288,7 @@ func (e *ExpandedZipFS) statInArchive(name string) (fs.FileInfo, error) {
 	}
 
 	return &ArchiveFileInfo{
+		fs:    info,
 		name:  name,
 		isDir: info.IsDir(),
 	}, nil
@@ -408,59 +385,29 @@ func (e *ExpandedZipFS) OpenFile(name string, flag int, perm os.FileMode) (fs.Fi
 	return e.underlying.OpenFile(name, flag, perm)
 }
 
-type ArchiveDirEntry struct {
-	name     string
-	isDir    bool
-	original fs.DirEntry
-}
-
-func (a *ArchiveDirEntry) Name() string {
-	return a.name
-}
-
-func (a *ArchiveDirEntry) IsDir() bool {
-	return a.isDir
-}
-
-func (a *ArchiveDirEntry) Type() fs.FileMode {
-	if a.isDir {
-		return fs.ModeDir
-	}
-	return 0
-}
-
-func (a *ArchiveDirEntry) Info() (fs.FileInfo, error) {
-	if a.original != nil {
-		return a.original.Info()
-	}
-	return &ArchiveFileInfo{
-		name:  a.name,
-		isDir: a.isDir,
-	}, nil
-}
-
 type ArchiveFileInfo struct {
+	fs    fs.FileInfo
 	name  string
 	isDir bool
 }
 
 func (a *ArchiveFileInfo) Name() string {
-	return filepath.Base(a.name)
+	return a.fs.Name()
 }
 
 func (a *ArchiveFileInfo) Size() int64 {
-	return 0
+	return a.fs.Size()
 }
 
 func (a *ArchiveFileInfo) Mode() fs.FileMode {
 	if a.isDir {
 		return fs.ModeDir
 	}
-	return 0
+	return a.fs.Mode()
 }
 
 func (a *ArchiveFileInfo) ModTime() time.Time {
-	return time.Time{}
+	return a.fs.ModTime()
 }
 
 func (a *ArchiveFileInfo) IsDir() bool {
@@ -468,5 +415,5 @@ func (a *ArchiveFileInfo) IsDir() bool {
 }
 
 func (a *ArchiveFileInfo) Sys() interface{} {
-	return nil
+	return a.fs.Sys()
 }
