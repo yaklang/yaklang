@@ -13,6 +13,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -35,6 +36,7 @@ type RAGSystem struct {
 	RAGID            string
 
 	config *RAGSystemConfig
+	opts   []RAGSystemConfigOption
 }
 
 func newDefaultRAGSystem() *RAGSystem {
@@ -133,7 +135,7 @@ func _newRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	ragConfig := NewRAGSystemConfig(options...)
 	ragSystem := newDefaultRAGSystem()
 	ragSystem.config = ragConfig
-
+	ragSystem.opts = options
 	// 创建collection
 	if ragConfig.vectorStore != nil {
 		ragSystem.VectorStore = ragConfig.vectorStore
@@ -309,6 +311,10 @@ func (r *RAGSystem) VectorSimilarity(text1, text2 string) (float64, error) {
 
 func (r *RAGSystem) Has(docId string) bool {
 	return r.VectorStore.Has(docId)
+}
+
+func (r *RAGSystem) newRagSystemConfig(opts ...RAGSystemConfigOption) *RAGSystemConfig {
+	return NewRAGSystemConfig(append(r.opts, opts...)...)
 }
 
 func (r *RAGSystem) Add(docId string, content string, opts ...RAGSystemConfigOption) error {
@@ -492,21 +498,38 @@ func (r *RAGSystem) DeleteEmbeddingData() error {
 }
 
 func (r *RAGSystem) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
-	config := NewRAGSystemConfig(options...)
+	config := r.newRagSystemConfig(options...)
 	docOpts := config.ConvertToDocumentOptions()
 	noPQ := config.GetNoPotentialQuestions()
 	return r.KnowledgeBase.AddKnowledgeEntryQuestion(entry, noPQ, docOpts...)
 }
 
 func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
-	ragConfig := NewRAGSystemConfig(options...)
+	if entry.HiddenIndex == "" {
+		entry.HiddenIndex = uuid.NewString()
+	}
+
+	ragConfig := r.newRagSystemConfig(options...)
 	docOpts := ragConfig.ConvertToDocumentOptions()
 	err := r.KnowledgeBase.AddKnowledgeEntry(entry, docOpts...)
 	if err != nil {
 		return utils.Wrap(err, "failed to add knowledge entry")
 	}
 	if ragConfig.enableDocumentQuestionIndex {
-		BuildIndexKnowledgeFormKnowledgeEntry(entry, options...)
+		questions, err := enhancesearch.BuildIndexQuestions(entry.KnowledgeDetails, ragConfig.GetAIService())
+		if err != nil {
+			return utils.Wrap(err, "failed to build index questions")
+		}
+		for _, question := range questions {
+			questionId := entry.HiddenIndex + "_question_" + utils.CalcSha1(question)
+			entry.PotentialQuestions = append(entry.PotentialQuestions, question)
+			r.VectorStore.AddWithOptions(questionId, question, append(docOpts,
+				vectorstore.WithDocumentQuestionIndex(true),
+				vectorstore.WithDocumentMetadataKeyValue(schema.META_Data_UUID, entry.HiddenIndex),
+				// vectorstore.WithDocumentMetadataKeyValue(schema.META_Data_Title, question),
+				vectorstore.WithDocumentMetadataKeyValue(schema.META_KNOWLEDGE_TITLE, entry.KnowledgeTitle),
+			)...)
+		}
 	}
 	return nil
 }

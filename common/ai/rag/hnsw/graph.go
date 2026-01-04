@@ -770,7 +770,9 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 		helper.SetStatus("delete existing node")
 		deleteStart := time.Now()
-		g.Delete(key)
+		if g.Has(key) {
+			g.Delete(key)
+		}
 		deleteTime := time.Since(deleteStart)
 
 		g.assertDims(vec)

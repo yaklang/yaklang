@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type EmbeddingClient interface {
@@ -54,6 +55,11 @@ func (d *Document) SetIsQuestionIndex(questionIndex bool) {
 	} else {
 		delete(d.Metadata, schema.META_QUESTION_INDEX)
 	}
+}
+
+func (d *Document) IsQuestionIndex() bool {
+	questionIndex, ok := d.Metadata[schema.META_QUESTION_INDEX]
+	return ok && utils.InterfaceToBoolean(questionIndex)
 }
 
 // SearchResult 表示检索结果
