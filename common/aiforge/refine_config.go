@@ -16,6 +16,7 @@ type RefineConfig struct {
 	KnowledgeEntryLength int
 	Strict               bool
 	FocusQuery           string
+	DisableBuildIndex    bool
 
 	Database *gorm.DB
 
@@ -59,6 +60,12 @@ type RefineOption func(*RefineConfig)
 func RefineWithCustomizeDatabase(db *gorm.DB) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.Database = db
+	}
+}
+
+func RefineWithDisableBuildIndex(disable bool) RefineOption {
+	return func(cfg *RefineConfig) {
+		cfg.DisableBuildIndex = disable
 	}
 }
 

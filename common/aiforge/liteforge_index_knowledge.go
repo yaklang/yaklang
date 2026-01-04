@@ -164,8 +164,11 @@ func Index2KnowledgeEntity(
 }
 
 func BuildIndexFormAnalyzeResult(res AnalysisResult, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
+	return BuildIndexFromRaw(res.Dump(), option...)
+}
+
+func BuildIndexFromRaw(rawInput string, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
-	rawInput := res.Dump()
 	linedInput := utils.PrefixLinesWithLineNumbers(rawInput)
 	query, err := LiteForgeQueryFromChunk(indexBuildPrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(linedInput)), 200)
 	if err != nil {
