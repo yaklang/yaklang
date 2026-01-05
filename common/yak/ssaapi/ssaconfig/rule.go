@@ -214,6 +214,7 @@ func WithRuleFilterTag(tag ...string) Option {
 }
 
 // WithRuleFilterIncludeLibraryRule 设置规则过滤器包含库规则
+// Deprecated: 此字段已废弃，请使用 WithRuleFilterLibRuleKind
 func WithRuleFilterIncludeLibraryRule(includeLibraryRule bool) Option {
 	return func(c *Config) error {
 		if err := c.ensureSyntaxFlowRule("Rule Filter Include Library Rule"); err != nil {
@@ -223,6 +224,27 @@ func WithRuleFilterIncludeLibraryRule(includeLibraryRule bool) Option {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
 		}
 		c.SyntaxFlowRule.RuleFilter.IncludeLibraryRule = includeLibraryRule
+		// 同时设置 FilterLibRuleKind 以确保兼容性
+		if !includeLibraryRule {
+			c.SyntaxFlowRule.RuleFilter.FilterLibRuleKind = "noLib"
+		} else {
+			c.SyntaxFlowRule.RuleFilter.FilterLibRuleKind = "lib"
+		}
+		return nil
+	}
+}
+
+// WithRuleFilterLibRuleKind 设置规则过滤器库规则类型
+// kind: "lib" 只包含库规则, "noLib" 不包含库规则, "" 所有规则
+func WithRuleFilterLibRuleKind(kind string) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowRule("Rule Filter Lib Rule Kind"); err != nil {
+			return err
+		}
+		if c.SyntaxFlowRule.RuleFilter == nil {
+			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		c.SyntaxFlowRule.RuleFilter.FilterLibRuleKind = kind
 		return nil
 	}
 }

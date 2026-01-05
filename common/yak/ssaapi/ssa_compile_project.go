@@ -48,6 +48,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
 	programName := c.GetProgramName()
 	defer func() {
+		// 无论成功还是失败，都要清理临时资源（如 Git 克隆的临时目录）
+		c.Cleanup()
+
 		if r := recover(); r != nil {
 			err = utils.Errorf("compile panic: %v", r)
 			log.Errorf("compile panic: %v", r)

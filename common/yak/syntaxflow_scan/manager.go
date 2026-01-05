@@ -55,6 +55,9 @@ type scanManager struct {
 
 	// 规则级别的性能统计
 	ruleProfiler *diagnostics.Recorder
+
+	// 扫描耗时（在 StartQuerySF 结束时记录，在 Stop 之后输出）
+	scanDuration time.Duration
 }
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
@@ -342,6 +345,11 @@ func (m *scanManager) Stop(runningID string) {
 	}
 	m.cancel()
 	m.processMonitor.Close()
+
+	// 在 processMonitor.Close() 之后输出 Scan Summary
+	// 此时所有 callback 都已完成，数据是准确的
+	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
+	m.logScanPerformance(m.scanDuration, enableRulePerf)
 }
 
 func (m *scanManager) IsStop() bool {

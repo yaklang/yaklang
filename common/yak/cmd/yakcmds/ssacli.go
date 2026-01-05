@@ -1197,13 +1197,8 @@ var ssaRisk = &cli.Command{
 var ssaCodeScan = &cli.Command{
 	Name:    "code-scan",
 	Aliases: []string{"codescan,sfscan"},
+	Usage:   "Compile and scan code using command line arguments (use config-scan for JSON config file)",
 	Flags: []cli.Flag{
-		// Config file
-		cli.StringFlag{
-			Name:  "config,c",
-			Usage: "load scan configuration from JSON file",
-		},
-
 		// Input {{{
 		// program name
 		cli.StringFlag{
@@ -1484,6 +1479,154 @@ var ssaCodeScan = &cli.Command{
 				}
 			}
 		}
+		return nil
+	},
+}
+
+// ssaConfigScan 是一个纯配置文件驱动的扫描命令
+// 与 code-scan 不同，它主要通过配置文件输入，但支持 -o 参数覆盖输出文件
+var ssaConfigScan = &cli.Command{
+	Name:    "config-scan",
+	Aliases: []string{"configscan"},
+	Usage:   "Run code scan using a JSON configuration file",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:     "config,c",
+			Usage:    "JSON configuration file path (required)",
+			Required: true,
+		},
+		cli.StringFlag{
+			Name:  "output,o",
+			Usage: "output file path (overrides config file setting)",
+		},
+		cli.StringFlag{
+			Name:  "pprof",
+			Usage: `enable pprof and save pprof file to the given path`,
+		},
+		cli.StringFlag{
+			Name:  "log-level,loglevel",
+			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
+		},
+	},
+	Action: func(c *cli.Context) (e error) {
+		defer func() {
+			log.Infof("config scan done")
+			if err := recover(); err != nil {
+				log.Errorf("config scan failed: %s", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+				e = utils.Errorf("config scan failed: %s", err)
+			}
+		}()
+		ctx := context.Background()
+
+		if pprofFile := c.String("pprof"); pprofFile != "" {
+			diagnostics.StartHeapMonitor(30*time.Second, diagnostics.WithFileName(pprofFile))
+		}
+
+		if logLevel := c.String("log-level"); logLevel != "" {
+			level, err := log.ParseLevel(logLevel)
+			if err != nil {
+				log.Warnf("parse log level %s failed: %v, use info level", logLevel, err)
+				level = log.InfoLevel
+			}
+			log.SetLevel(level)
+		}
+
+		log.Infof("============= start config-based code scan ==============")
+
+		ruleTimeStart := time.Now()
+		SyncEmbedRule()
+		ruleTime := time.Since(ruleTimeStart)
+		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
+
+		config, err := parseConfigFileWithCliFlagOverride(c)
+		if err != nil {
+			log.Errorf("parse config file failed: %s", err)
+			return err
+		}
+		defer config.DeferFunc()
+
+		// 获取程序（使用独立的编译逻辑，不经过 coreplugin 探测流程）
+		progs, err := getProgramForConfigScan(ctx, config)
+		if err != nil {
+			log.Errorf("get program failed: %s", err)
+			return err
+		}
+
+		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format)
+		if err != nil {
+			log.Errorf("create report instance failed: %s", err)
+			return err
+		}
+		reportInstance.SetWriter(config.OutputWriter)
+
+		scanOpt := make([]ssaconfig.Option, 0)
+
+		scanOpt = append(scanOpt,
+			syntaxflow_scan.WithPrograms(progs...),
+			ssaconfig.WithSyntaxFlowMemory(config.GetSyntaxFlowMemory()),
+			// 注意：不使用 WithRuleFilterLanguage 进行数据库级别的语言过滤
+			// 因为这会排除 general 语言的通用规则（如"检测通用硬编码凭据"）
+			// 语言过滤在运行时由 Query 函数处理，会自动包含 general 语言的规则
+			ssaconfig.WithRuleFilterLibRuleKind("noLib"), // 不包含辅助规则（使用 FilterLibRuleKind 字段）与前端和code-scan保持一致
+			syntaxflow_scan.WithReporter(reportInstance),
+			syntaxflow_scan.WithProcessRuleDetail(true),
+			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+				log.Infof("[Task %s]", taskID)
+				log.Infof("\tstatus=%s progress=%.2f%%", status, progress*100.0)
+
+				if info == nil {
+					return
+				}
+				log.Infof("\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
+					info.FailedQuery, info.SkippedQuery, info.SuccessQuery,
+					info.FinishedQuery, info.TotalQuery, info.RiskCount,
+				)
+
+				if len(info.Rules) == 0 {
+					return
+				}
+				var b bytes.Buffer
+				b.WriteString("\tRules:\n")
+				for _, rule := range info.Rules {
+					b.WriteString(fmt.Sprintf("  - [%6.2f%%]: [%s] [%s] status=%s\n",
+						rule.Progress*100, rule.ProgramName, rule.RuleName, rule.Info,
+					))
+				}
+				log.Info(b.String())
+			}),
+		)
+
+		err = syntaxflow_scan.StartScan(ctx, scanOpt...)
+		if err != nil {
+			log.Errorf("scan failed: %s", err)
+			return err
+		}
+
+		// 输出编译性能汇总表格
+		compileRecorder := diagnostics.DefaultRecorder()
+		if compileRecorder != nil {
+			snapshots := compileRecorder.Snapshot()
+			if len(snapshots) > 0 {
+				table := diagnostics.FormatPerformanceTable("Compilation Performance Summary", snapshots)
+				log.Info("\n" + table)
+			}
+		}
+
+		// 输出文件性能汇总表格
+		if len(progs) > 0 && progs[0] != nil {
+			if progConfig := progs[0].GetConfig(); progConfig != nil {
+				filePerfRecorder := progConfig.GetFilePerformanceRecorder()
+				if filePerfRecorder != nil {
+					snapshots := filePerfRecorder.Snapshot()
+					if len(snapshots) > 0 {
+						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+						log.Info("\n" + table)
+					}
+				}
+			}
+		}
+
 		return nil
 	},
 }
@@ -1931,7 +2074,8 @@ var SSACompilerCommands = []*cli.Command{
 	ssaQuery, // rule scan target from database
 
 	// all in one
-	ssaCodeScan, // compile and scan and export report
+	ssaCodeScan,   // compile and scan and export report (CLI args)
+	ssaConfigScan, // compile and scan and export report (config file only)
 }
 
 // SyntaxFlowQuery 函数用于执行语法流查询

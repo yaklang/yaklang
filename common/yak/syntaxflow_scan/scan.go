@@ -23,6 +23,10 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 		m.SaveTask()
 		m.StatusTask()
 		m.Stop(runningID)
+		// 在 Stop() 之后保存报告，确保所有结果都已被处理
+		// Stop() 会调用 processMonitor.Close()，等待后台 goroutine 完成
+		// 这样可以确保所有 AddSyntaxFlowResult 调用都已完成
+		m.saveReport()
 	}()
 	errC := make(chan error)
 	switch ssaconfig.ControlMode(config.GetScanControlMode()) {

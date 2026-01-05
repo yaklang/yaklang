@@ -19,6 +19,9 @@ type Config struct {
 
 	// 其他配置项可以在这里添加
 	ExtraInfo map[string][]any `json:"-"` // 用于存储外部传入的其他信息
+
+	// 清理函数列表，用于清理临时文件等资源
+	cleanupFuncs []func() `json:"-"`
 }
 
 type Option func(*Config) error
@@ -283,4 +286,26 @@ func WithJsonRawConfig(raw []byte) Option {
 		}
 		return nil
 	}
+}
+
+// AddCleanupFunc 添加清理函数，用于在编译完成后清理临时资源（如 Git 克隆的临时目录）
+func (c *Config) AddCleanupFunc(f func()) {
+	if c == nil || f == nil {
+		return
+	}
+	c.cleanupFuncs = append(c.cleanupFuncs, f)
+}
+
+// Cleanup 执行所有注册的清理函数
+func (c *Config) Cleanup() {
+	if c == nil {
+		return
+	}
+	for _, f := range c.cleanupFuncs {
+		if f != nil {
+			f()
+		}
+	}
+	// 清空清理函数列表，避免重复调用
+	c.cleanupFuncs = nil
 }
