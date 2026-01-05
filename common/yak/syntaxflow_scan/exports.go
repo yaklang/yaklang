@@ -7,4 +7,5 @@ var Exports = map[string]any{
 	// 进度
 	"withScanProcessCallback": WithProcessCallback,
 	"withScanResultCallback":  WithScanResultCallback,
+	"withScanPrograms":        withPrograms,
 }

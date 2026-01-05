@@ -86,12 +86,13 @@ var WithRulePerformanceLog = ssaconfig.SetOption("syntaxflow-scan/enableRulePerf
 	c.EnableRulePerformanceLog = enable
 })
 
-var withPrograms = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs []*ssaapi.Program) {
+var withPrograms = ssaconfig.SetOption("syntaxflow-scan/programs", func(c *Config, progs ssaapi.Programs) {
 	c.ScanTaskCallback.Programs = progs
 })
 
 func WithPrograms(programs ...*ssaapi.Program) ssaconfig.Option {
-	return withPrograms(programs)
+	p := ssaapi.Programs(programs)
+	return withPrograms(p)
 }
 
 func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
