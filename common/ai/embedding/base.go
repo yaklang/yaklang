@@ -150,8 +150,11 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 			poc.WithBody(string(jsonData)),
 			poc.WithAppendHeader("Content-Type", "application/json; charset=UTF-8"),
 			poc.WithAppendHeader("Accept", "application/json"),
-			poc.WithSave(false),    // do not save embedding requests to database
-			poc.WithConnPool(true), // enable connection pool for better performance
+			poc.WithAppendHeader("Accept-Encoding", "gzip, deflate, br"), // enable compression for better network performance
+			poc.WithSave(false),       // do not save embedding requests to database
+			poc.WithConnPool(true),    // enable connection pool for better performance
+			poc.WithConnectTimeout(5), // set connect timeout for faster failure detection
+			poc.WithRetryTimes(2),     // retry on transient failures
 		)...,
 	)
 
