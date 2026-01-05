@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mq"
+	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -137,6 +138,9 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 
 		case "json":
 			s.handleJSONLog(res, info)
+
+		case "feature-status-card-data":
+			s.handleStatusCardLog(reporter, info)
 		}
 	}
 }
@@ -228,6 +232,20 @@ func (s *ScanNode) handleJSONLog(res *scanrpc.SCAN_InvokeScriptResponse, info st
 		if data != nil {
 			res.Data = data
 		}
+	}
+}
+
+func (s *ScanNode) handleStatusCardLog(reporter *ScannerAgentReporter, info string) {
+	result := &spec.ScanResult{
+		Type:      spec.ScanResult_StatusCard,
+		Content:   []byte(info),
+		TaskId:    reporter.TaskId,
+		RuntimeId: reporter.RuntimeId,
+		SubTaskId: reporter.SubTaskId,
+	}
+	s.feedback(result)
+	if utils.InDebugMode() {
+		log.Infof("Reported status card: %s", info)
 	}
 }
 
