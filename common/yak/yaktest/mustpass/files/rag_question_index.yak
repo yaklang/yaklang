@@ -1,0 +1,81 @@
+// EnableMockMode
+rag.EnableMockMode()
+
+// 准备测试数据
+// knowledge1: 公司产品信息，将被关联生成一个问题索引
+knowledge1 = "Our flagship product, 'Visionary AI Suite', offers advanced image recognition and natural language processing. The official API endpoint is api.company.com/v1/visionary."
+// knowledge1_question: 这是一个关于 PTO 的问题，实际上它应该作为 knowledge1 的问题索引内容（虽然语义上有点不匹配，但为了测试 mock 流程）
+knowledge1_question = "How long can I take paid leave?"
+// knowledge2: 公司业绩信息
+knowledge2 = "In our successful third quarter, we celebrated the launch of the 'Visionary AI Suite', which drove a 15% increase in quarterly revenue."
+
+// knowledge1_question_query: 用于查询的文本
+knowledge1_question_query = "How long can I take paid leave?"
+
+// Mock AI 响应，用于 GenerateQuestionIndex
+// 这个响应会让系统以为 knowledge1 生成了一个问题，问题内容就是 knowledge1_question
+mockAIRsp = <<<EOF
+{
+    "@action": "object",
+    "question_list": [
+        {"question": "%s","answer_location": {"start_line": 1, "end_line": 2}}
+    ]
+}
+EOF
+
+// 创建 Mock AI 服务
+mockAIService = ai.MockAIService((req)=>{
+    // 无论请求什么，都返回我们预设的响应，包含 knowledge1_question
+    return mockAIRsp % [knowledge1_question]
+})
+
+// 创建 RAG 集合
+collectionName = "KnowledgeBase-" + randstr(10)
+// 使用 defer 确保测试结束后清理资源
+defer rag.DeleteRAG(collectionName)
+
+// 获取 Collection 实例，并配置 Mock AI 服务
+collection = rag.GetCollection(collectionName, 
+    rag.ragDescription("A test knowledge base for company info"),
+    rag.aiService(mockAIService)
+)~
+
+// 添加 knowledge1，并启用 enableQuestionIndex
+// 这会触发 AI 服务（我们 mock 的）为这条知识生成问题索引
+// 预期生成的 Question Index 内容为 knowledge1_question
+collection.AddKnowledge(knowledge1, rag.enableQuestionIndex(true))~
+
+// 添加 knowledge2，不启用 enableQuestionIndex
+collection.AddKnowledge(knowledge2)~
+
+// 验证数据计数
+// 1. 知识库应该有 2 条记录 (knowledge1 和 knowledge2)
+knowledgeCount = collection.CountKnowledge()~
+// 2. 向量库应该有 3 条记录:
+//    - knowledge1 对应的向量
+//    - knowledge1 生成的 Question Index 向量
+//    - knowledge2 对应的向量
+vectorStoreCount = collection.CountDocuments()~
+
+assert knowledgeCount == 2, "Expected 2 knowledge entries, got %v" % knowledgeCount
+assert vectorStoreCount == 3, "Expected 3 vector documents (2 knowledge + 1 question index), got %v" % vectorStoreCount
+
+// 测试查询
+// 使用 knowledge1_question_query 进行查询
+// 由于我们 mock 的问题索引内容正是 "How long can I take paid leave?"，
+// 且查询词也是这个，所以根据相似度（即便是 mock embedding，相同文本相似度也最高），
+// 应该首先匹配到 knowledge1 的那个 Question Index，从而召回 knowledge1
+res = collection.QueryKnowledge(knowledge1_question_query, 1)~
+
+assert len(res) == 1, "Expected 1 search result, got %v" % len(res)
+
+// 验证搜索结果的第一个元素应该是 knowledge1
+firstResult = res[0]
+// 检查召回的知识详情是否与 knowledge1 一致
+// 注意：QueryKnowledge 返回的是 SearchKnowledgebaseResult，
+// 在 Yak 脚本中，如果是一个 KnowledgeBaseEntry 对象，我们检查它的 KnowledgeDetails 字段
+printf("Search Result: %v\n", firstResult.KnowledgeDetails)
+
+assert firstResult.KnowledgeDetails == knowledge1, "Expected first result to be knowledge1, but got: %v" % firstResult.KnowledgeDetails
+
+println("Test passed: Knowledge Question Index works as expected.")

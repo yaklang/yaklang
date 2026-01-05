@@ -350,6 +350,15 @@ func (kb *KnowledgeBase) CountDocuments() (int, error) {
 	return kb.vectorStore.Count()
 }
 
+func (kb *KnowledgeBase) CountKnowledgeEntries() (int, error) {
+	var count int64
+	err := kb.db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", kb.id).Count(&count).Error
+	if err != nil {
+		return 0, utils.Errorf("获取知识库条目数量失败: %v", err)
+	}
+	return int(count), nil
+}
+
 // ClearDocuments 清空所有文档
 func (kb *KnowledgeBase) ClearDocuments() error {
 	kb.vectorStore.Clear()
@@ -370,14 +379,17 @@ func (kb *KnowledgeBase) GetVectorStore() *vectorstore.SQLiteVectorStoreHNSW {
 // addEntryToVectorIndex 将知识条目添加到向量索引
 func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...vectorstore.DocumentOption) error {
 	// 构建文档内容
-	content := entry.KnowledgeTitle
+	contentitems := make([]string, 0)
+	if entry.KnowledgeTitle != "" {
+		contentitems = append(contentitems, entry.KnowledgeTitle)
+	}
 	if entry.Summary != "" {
-		content += "\n\n" + entry.Summary
+		contentitems = append(contentitems, entry.Summary)
 	}
 	if entry.KnowledgeDetails != "" {
-		content += "\n\n" + entry.KnowledgeDetails
+		contentitems = append(contentitems, entry.KnowledgeDetails)
 	}
-
+	content := strings.Join(contentitems, "\n\n")
 	// 构建元数据
 	metadata := map[string]any{
 		"knowledge_base_id":    entry.KnowledgeBaseID,

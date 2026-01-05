@@ -1,4 +1,4 @@
-package rag_test
+package ragtests
 
 import (
 	"fmt"
