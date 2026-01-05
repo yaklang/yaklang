@@ -363,6 +363,10 @@ var (
 )
 
 func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2Security) {
+	if n.negotiateMessage == nil {
+		// In some flows we skip the explicit negotiate step; ensure MIC has a baseline negotiate message.
+		n.GetNegotiateMessage()
+	}
 	challengeMsg := &ChallengeMessage{}
 	r := bytes.NewReader(s)
 	err := struc.Unpack(r, challengeMsg)
