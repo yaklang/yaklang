@@ -213,9 +213,9 @@ func search[K cmp.Ordered](
 			visited[neighborID] = true
 
 			// Apply filter if provided
-			// if filter != nil && !filter(neighbor.GetKey(), neighbor.GetVector()) {
-			// 	continue
-			// }
+			if filter != nil && !filter(neighbor.GetKey(), neighbor.GetVector()) {
+				continue
+			}
 
 			unvisitedNeighbors = append(unvisitedNeighbors, neighbor)
 		}
@@ -263,14 +263,10 @@ func search[K cmp.Ordered](
 				improved = true
 			}
 			if result.Len() < k {
-				if filter == nil || filter(neighbor.GetKey(), neighbor.GetVector()) {
-					result.Push(searchCandidate[K]{node: neighbor, dist: dist})
-				}
+				result.Push(searchCandidate[K]{node: neighbor, dist: dist})
 			} else if dist < result.Max().dist {
-				if filter == nil || filter(neighbor.GetKey(), neighbor.GetVector()) {
-					result.PopLast()
-					result.Push(searchCandidate[K]{node: neighbor, dist: dist})
-				}
+				result.PopLast()
+				result.Push(searchCandidate[K]{node: neighbor, dist: dist})
 			}
 
 			candidates.Push(searchCandidate[K]{node: neighbor, dist: dist})

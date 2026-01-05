@@ -398,6 +398,9 @@ type KnowledgeBaseEntry struct {
 
 	// 唯一标识符，用于在向量索引中唯一标识该知识条目
 	HiddenIndex string `gorm:"unique_index"`
+
+	// HasQuestionIndex 标记该知识条目是否已经生成了问题索引
+	HasQuestionIndex bool `gorm:"index" json:"has_question_index"`
 }
 
 const KnowledgeBaseEntryBroadcastType = "knowledge_base_entry"

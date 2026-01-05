@@ -311,7 +311,7 @@ jobs:
                 {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
                 {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
                 {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1}
-                {"package": "./common/ai/rag/rag_test/...", "timeout": "1m"}
+                {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"}
               ]          
 
           - name: "Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan"

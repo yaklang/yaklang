@@ -456,3 +456,7 @@ func (s *Server) GetKnowledgeBaseTypeList(ctx context.Context, req *ypb.Empty) (
 		KnowledgeBaseTypes: types,
 	}, nil
 }
+
+func (s *Server) GenerateQuestionIndexForKnowledgeBase(ctx context.Context, req *ypb.GenerateQuestionIndexForKnowledgeBaseRequest) (*ypb.GenerateQuestionIndexForKnowledgeBaseResponse, error) {
+	return nil, nil
+}

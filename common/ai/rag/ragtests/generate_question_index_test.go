@@ -92,3 +92,115 @@ func TestMUSTPASS_RAGSystem_GenerateQuestionIndex(t *testing.T) {
 	db.Model(&schema.VectorStoreDocument{}).Find(&documents)
 	assert.Equal(t, 3, len(documents))
 }
+
+func TestMUSTPASS_RAGSystem_GenerateQuestionIndex_With_Multiple_Inputs(t *testing.T) {
+	db, err := rag.NewTemporaryRAGDB()
+	assert.NoError(t, err)
+	exportCollectionName := "test_generate_question_index_multi_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	input1 := mockEmbedding.GenerateRandomText(20)
+	input2 := mockEmbedding.GenerateRandomText(20)
+	input3 := mockEmbedding.GenerateRandomText(20)
+	input4 := mockEmbedding.GenerateRandomText(20)
+	input5 := mockEmbedding.GenerateRandomText(20)
+
+	question1 := mockEmbedding.GenerateRandomText(5)
+	question2 := mockEmbedding.GenerateRandomText(5)
+	question3 := mockEmbedding.GenerateRandomText(5)
+	question4 := mockEmbedding.GenerateRandomText(5)
+	question5 := mockEmbedding.GenerateRandomText(5)
+
+	mockAICallback := aicommon.AIChatToAICallbackType(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
+		// 简单的模拟返回，根据 prompt 内容或者直接返回固定结构
+		// 这里我们直接返回两个问题，分别对应第1行和第2行
+		rspStr := `{
+			"@action": "object",
+			"question_list": [
+				{"question": "%s","answer_location": {"start_line": 1, "end_line": 3}},
+				{"question": "%s","answer_location": {"start_line": 2, "end_line": 3}},
+				{"question": "%s","answer_location": {"start_line": 3, "end_line": 5}},
+				{"question": "%s","answer_location": {"start_line": 4, "end_line": 5}},
+				{"question": "%s","answer_location": {"start_line": 5, "end_line": 5}}
+			]
+		}`
+		return fmt.Sprintf(rspStr, question1, question2, question3, question4, question5), nil
+	})
+
+	ragSystem, err := rag.Get(exportCollectionName,
+		rag.WithDB(db),
+		rag.WithDisableEmbedCollectionInfo(true),
+		rag.WithLazyLoadEmbeddingClient(true),
+		rag.WithEmbeddingClient(mockEmbedding),
+		rag.WithAIService(mockAICallback),
+	)
+	assert.NoError(t, err)
+	defer rag.DeleteRAG(db, exportCollectionName)
+
+	err = ragSystem.AddKnowledge(input1, rag.WithEnableDocumentQuestionIndex(false))
+	assert.NoError(t, err)
+
+	err = ragSystem.AddKnowledge(input2, rag.WithEnableDocumentQuestionIndex(false))
+	assert.NoError(t, err)
+
+	err = ragSystem.AddKnowledge(input3, rag.WithEnableDocumentQuestionIndex(false))
+	assert.NoError(t, err)
+
+	err = ragSystem.AddKnowledge(input4, rag.WithEnableDocumentQuestionIndex(false))
+	assert.NoError(t, err)
+
+	err = ragSystem.AddKnowledge(input5, rag.WithEnableDocumentQuestionIndex(false))
+	assert.NoError(t, err)
+
+	// 调用 GenerateQuestionIndex，它应该会批量处理这两个条目
+	err = ragSystem.GenerateQuestionIndex(rag.WithAIService(mockAICallback))
+	assert.NoError(t, err)
+
+	// 验证生成的问题索引是否正确关联到了对应的知识条目
+	// 1. 获取所有知识条目，建立 内容 -> UUID 的映射
+	var entries []*schema.KnowledgeBaseEntry
+	err = db.Model(&schema.KnowledgeBaseEntry{}).Find(&entries).Error
+	assert.NoError(t, err)
+
+	contentToUUID := make(map[string]string)
+	for _, e := range entries {
+		contentToUUID[e.KnowledgeDetails] = e.HiddenIndex
+	}
+
+	// 2. 获取所有向量文档，筛选出问题索引
+	docs, err := ragSystem.VectorStore.List()
+	assert.NoError(t, err)
+
+	// 问题 -> 关联的知识条目UUID列表
+	actualMapping := make(map[string][]string)
+
+	for _, doc := range docs {
+		if doc.Metadata[schema.META_QUESTION_INDEX] == true {
+			q := doc.Content
+			uuidStr := doc.Metadata[schema.META_Data_UUID].(string)
+			actualMapping[q] = append(actualMapping[q], uuidStr)
+		}
+	}
+
+	// 3. 定义预期的映射关系
+	// 根据 mockAICallback 的定义：
+	// question1 (1-3) -> input1, input2, input3
+	// question2 (2-3) -> input2, input3
+	// question3 (3-5) -> input3, input4, input5
+	// question4 (4-5) -> input4, input5
+	// question5 (5-5) -> input5
+	expectedMapping := map[string][]string{
+		question1: {contentToUUID[input1], contentToUUID[input2], contentToUUID[input3]},
+		question2: {contentToUUID[input2], contentToUUID[input3]},
+		question3: {contentToUUID[input3], contentToUUID[input4], contentToUUID[input5]},
+		question4: {contentToUUID[input4], contentToUUID[input5]},
+		question5: {contentToUUID[input5]},
+	}
+
+	// 4. 验证
+	for q, expectedUUIDs := range expectedMapping {
+		actualUUIDs, ok := actualMapping[q]
+		assert.True(t, ok, "Question %s not found in actual mapping", q)
+		assert.ElementsMatch(t, expectedUUIDs, actualUUIDs, "Question %s mapping mismatch", q)
+	}
+}
