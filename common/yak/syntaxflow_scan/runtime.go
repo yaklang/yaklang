@@ -17,10 +17,9 @@ import (
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	scanStart := time.Now()
 	defer func() {
-		// 输出性能统计报告
-		enableRulePerf := m.Config.IsEnableRulePerformanceLog()
-		totalDuration := time.Since(scanStart)
-		m.logScanPerformance(totalDuration, enableRulePerf)
+		// 记录扫描耗时，但不在这里输出 Scan Summary
+		// Scan Summary 应该在 processMonitor.Close() 之后输出，以确保所有 callback 都已完成
+		m.scanDuration = time.Since(scanStart)
 
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -28,7 +27,6 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
-		m.saveReport()
 	}()
 
 	var start int64
@@ -196,7 +194,7 @@ func (m *scanManager) logScanPerformance(totalDuration time.Duration, enableRule
 			log.Info("\n" + table)
 		} else {
 			log.Infof("Rule Performance (scan): no data recorded")
-	}
+		}
 	}
 	// 总是输出扫描汇总表格
 	summaryData := map[string]string{

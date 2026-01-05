@@ -90,7 +90,15 @@ func gitFs(codeSource *Config) (fi.FileSystem, error) {
 	if err := os.MkdirAll(local, 0755); err != nil {
 		return nil, utils.Errorf("create temp dir error: %v", err)
 	}
-	log.Info("local : ", local)
+	log.Info("git clone temp dir: ", local)
+
+	// 注册清理函数，在编译完成后清理临时目录
+	codeSource.AddCleanupFunc(func() {
+		log.Infof("cleaning up git temp dir: %s", local)
+		if err := os.RemoveAll(local); err != nil {
+			log.Errorf("failed to cleanup git temp dir %s: %v", local, err)
+		}
+	})
 
 	opts := make([]yakgit.Option, 0)
 	opts = append(opts, yakgit.WithBranch(codeSource.GetCodeSourceBranch()))

@@ -98,7 +98,6 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		return
 	}
 
-	r.RiskNums = len(r.Risks)
 	// get result
 	var result *ssaapi.SyntaxFlowResult = nil
 	if len(results) > 0 {
@@ -139,6 +138,9 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	// create risk with detailed structure
 	risk, toAddIrSourceHashes := NewRisk(ssarisk, r, value)
 	r.AddRisks(risk)
+
+	// update RiskNums after adding risk
+	r.RiskNums = len(r.Risks)
 
 	// create report.file
 	file, ok := r.FirstOrCreateFile(editor)
