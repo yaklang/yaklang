@@ -59,6 +59,10 @@ func WithUnifiedFsExtMap(extReal, extVirtual string) func(config *UnifiedFSConfi
 	}
 }
 
+func (u *UnifiedFS) GetFileSystem() fi.FileSystem {
+	return u.fs
+}
+
 func (u *UnifiedFS) GetSeparators() rune {
 	return u.config.Separator
 }
@@ -219,7 +223,7 @@ func (u *UnifiedFS) convertToVirtualPath(name string) string {
 }
 
 func (f *UnifiedFS) String() string {
-	return fmt.Sprintf("%s",f.fs)
+	return fmt.Sprintf("%s", f.fs)
 }
 
 type UnifiedDirEntry struct {
