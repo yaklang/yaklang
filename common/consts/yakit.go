@@ -1,6 +1,8 @@
 package consts
 
 import (
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -15,9 +17,12 @@ var (
 	initYakitDatabaseRetError error
 	initYakitDatabaseOnce     = new(sync.Once)
 	projectDataBase           *gorm.DB
+	projectReadDatabase       *gorm.DB
 	profileDatabase           *gorm.DB
 	debugProjectDatabase      = false
 	debugProfileDatabase      = false
+	initProjectReadDBOnce     = new(sync.Once)
+	initProjectReadDBErr      error
 )
 
 func DebugProjectDatabase() {
@@ -73,6 +78,60 @@ func GetGormProjectDatabase() *gorm.DB {
 		return projectDataBase.Debug()
 	}
 	return projectDataBase
+}
+
+// GetGormProjectDatabaseForRead returns a DB handle optimized for concurrent read queries.
+//
+// Background:
+// - The main project DB is configured with MaxOpenConns=1 for write safety and to reduce "database is locked".
+// - That makes read-heavy endpoints (like QueryHTTPFlows) queue behind writes and can become minutes-long under load.
+// - A separate read-only handle avoids the connection pool bottleneck for reads.
+func GetGormProjectDatabaseForRead() *gorm.DB {
+	initYakitDatabase()
+
+	initProjectReadDBOnce.Do(func() {
+		baseDir := GetDefaultYakitBaseDir()
+		projectDatabaseName := GetDefaultYakitProjectDatabase(baseDir)
+
+		// Prefer a read-only SQLite connection when using SQLite drivers.
+		// Fall back to the main DB on any failure.
+		driver := DEFAULT_DRIVER
+		var dsn string
+		switch driver {
+		case SQLite, SQLiteExtend:
+			dsn = projectDatabaseName + "?mode=ro"
+		default:
+			dsn = projectDatabaseName
+		}
+
+		db, err := createAndConfigDatabase(dsn, driver)
+		if err != nil {
+			initProjectReadDBErr = err
+			return
+		}
+
+		// Override pool settings for reads: allow concurrency.
+		// WAL allows readers/writers concurrently; writes are still serialized by the write path.
+		maxOpen := runtime.NumCPU()
+		if maxOpen < 4 {
+			maxOpen = 4
+		}
+		db.DB().SetMaxIdleConns(maxOpen)
+		db.DB().SetMaxOpenConns(maxOpen)
+
+		// Ensure read-only intent for SQLite (best-effort; ignore errors for non-SQLite dialects).
+		_ = db.Exec("PRAGMA query_only = ON;").Error
+
+		projectReadDatabase = db
+	})
+
+	if projectReadDatabase == nil {
+		return GetGormProjectDatabase()
+	}
+	if debugProjectDatabase {
+		return projectReadDatabase.Debug()
+	}
+	return projectReadDatabase
 }
 
 func InitializeYakitDatabase(projectDB string, profileDB string, ssaDB string) error {
@@ -168,21 +227,153 @@ func doHTTPFlowPatch(db *gorm.DB) {
 	if !db.HasTable("http_flows") {
 		return
 	}
-	err = db.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source"
-ON "http_flows" (
-  "source_type" ASC
-);`).Unscoped().Error
-	if err != nil {
-		log.Warnf("failed to add index on http_flows.source_type: %v", err)
-	}
+	// Drop the redundant single-column index in favor of the composite index below.
+	_ = db.Exec(`DROP INDEX IF EXISTS "main"."idx_http_flows_source";`).Error
 
-	err = db.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_tags"
+	// Drop the tags index to reduce write overhead; revisit if tag filtering becomes hot.
+	_ = db.Exec(`DROP INDEX IF EXISTS "main"."idx_http_flows_tags";`).Error
+
+	// Drop the standalone updated_at index; composite indexes cover current query paths.
+	_ = db.Exec(`DROP INDEX IF EXISTS "main"."idx_http_flows_updated_at";`).Error
+
+	// Frequent filters combined with time ordering.
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_source_updated_at"
 ON "http_flows" (
-  "tags" ASC
+  "source_type" ASC,
+  "updated_at" DESC
 );`).Error
 	if err != nil {
-		log.Warnf("failed to add index on table: http_flows.tags: %v", err)
+		log.Warnf("failed to add composite index on table: http_flows(source_type, updated_at): %v", err)
 	}
+
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS "main"."idx_http_flows_runtime_id_updated_at"
+ON "http_flows" (
+  "runtime_id" ASC,
+  "updated_at" DESC
+);`).Error
+	if err != nil {
+		log.Warnf("failed to add composite index on table: http_flows(runtime_id, updated_at): %v", err)
+	}
+
+	ensureHTTPFlowFTS(db)
+}
+
+func ensureHTTPFlowFTS(db *gorm.DB) {
+	if !isSQLiteDialect(db) {
+		return
+	}
+
+	// Fast check: if FTS5 module is not compiled in, skip and remove stale triggers to keep inserts working.
+	if !supportsFTS5(db) {
+		disableHTTPFlowFTS(db)
+		return
+	}
+
+	// Trigram tokenizer makes MATCH a superset of LIKE for keywords >= 3 chars.
+	// We still apply LIKE after MATCH to preserve exact semantics.
+	if err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS "http_flows_fts" USING fts5(
+	request,
+	response,
+	url,
+	path,
+	tags,
+	remote_addr,
+	content='http_flows',
+	content_rowid='id',
+	tokenize='trigram'
+	);`).Error; err != nil {
+		log.Warnf("failed to create http_flows_fts: %v", err)
+		disableHTTPFlowFTS(db)
+		return
+	}
+
+	if IsHTTPFlowFTSAsyncEnabled() {
+		// Async FTS updates: drop triggers to avoid synchronous write amplification.
+		dropHTTPFlowFTSTriggers(db)
+	} else {
+		// Keep FTS index in sync via triggers.
+		triggers := []string{
+			`CREATE TRIGGER IF NOT EXISTS "http_flows_fts_ai" AFTER INSERT ON "http_flows" BEGIN
+  INSERT INTO "http_flows_fts"(rowid, request, response, url, path, tags, remote_addr)
+  VALUES (new.id, new.request, new.response, new.url, new.path, new.tags, new.remote_addr);
+END;`,
+			`CREATE TRIGGER IF NOT EXISTS "http_flows_fts_ad" AFTER DELETE ON "http_flows" BEGIN
+  INSERT INTO "http_flows_fts"("http_flows_fts", rowid, request, response, url, path, tags, remote_addr)
+  VALUES ('delete', old.id, old.request, old.response, old.url, old.path, old.tags, old.remote_addr);
+END;`,
+			`CREATE TRIGGER IF NOT EXISTS "http_flows_fts_au" AFTER UPDATE ON "http_flows" BEGIN
+  INSERT INTO "http_flows_fts"("http_flows_fts", rowid, request, response, url, path, tags, remote_addr)
+  VALUES ('delete', old.id, old.request, old.response, old.url, old.path, old.tags, old.remote_addr);
+  INSERT INTO "http_flows_fts"(rowid, request, response, url, path, tags, remote_addr)
+  VALUES (new.id, new.request, new.response, new.url, new.path, new.tags, new.remote_addr);
+END;`,
+		}
+		for _, stmt := range triggers {
+			if err := db.Exec(stmt).Error; err != nil {
+				log.Warnf("failed to create http_flows_fts trigger: %v", err)
+				return
+			}
+		}
+	}
+
+	// Rebuild in background only if the FTS table is empty.
+	go func() {
+		tx := db.New()
+		var count int
+		if err := tx.Raw(`SELECT COUNT(*) FROM "http_flows_fts";`).Row().Scan(&count); err != nil {
+			return
+		}
+		if count != 0 {
+			return
+		}
+		if err := tx.Exec(`INSERT INTO "http_flows_fts"("http_flows_fts") VALUES('rebuild');`).Error; err != nil {
+			log.Warnf("http_flows_fts rebuild failed: %v", err)
+		}
+	}()
+}
+
+// supportsFTS5 checks whether sqlite is built with the fts5 module.
+// It uses a lightweight temp virtual table probe to avoid coupling to compile_options availability.
+func supportsFTS5(db *gorm.DB) bool {
+	if db == nil || db.Dialect() == nil {
+		return false
+	}
+	if !isSQLiteDialect(db) {
+		return false
+	}
+	// Probe creation; if fts5 is missing this returns "no such module: fts5".
+	if err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS temp.__fts5_probe USING fts5(content);`).Error; err != nil {
+		return false
+	}
+	_ = db.Exec(`DROP TABLE IF EXISTS temp.__fts5_probe;`).Error
+	return true
+}
+
+// disableHTTPFlowFTS removes triggers so inserts won't fail when fts5 module is unavailable.
+func disableHTTPFlowFTS(db *gorm.DB) {
+	dropHTTPFlowFTSTriggers(db)
+	// Best effort: drop the virtual table if present (ignore errors if module is missing).
+	_ = db.Exec(`DROP TABLE IF EXISTS "http_flows_fts";`).Error
+	log.Infof("http_flows_fts disabled because sqlite fts5 module is unavailable")
+}
+
+func dropHTTPFlowFTSTriggers(db *gorm.DB) {
+	stmts := []string{
+		`DROP TRIGGER IF EXISTS "http_flows_fts_ai";`,
+		`DROP TRIGGER IF EXISTS "http_flows_fts_ad";`,
+		`DROP TRIGGER IF EXISTS "http_flows_fts_au";`,
+	}
+	for _, stmt := range stmts {
+		_ = db.Exec(stmt).Error
+	}
+}
+
+func isSQLiteDialect(db *gorm.DB) bool {
+	if db == nil || db.Dialect() == nil {
+		return false
+	}
+	name := strings.ToLower(db.Dialect().GetName())
+	return strings.Contains(name, "sqlite")
 }
 
 func doDBRiskPatch(db *gorm.DB) {

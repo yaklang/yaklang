@@ -1,13 +1,15 @@
 package yakit
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -73,6 +75,23 @@ func SetProjectKeyWithGroup(db *gorm.DB, key interface{}, value interface{}, gro
 	if value != "" {
 		valueStr = strconv.Quote(utils.InterfaceToString(value))
 	}
+	if isSQLiteDialect(db) {
+		now := time.Now()
+		table := db.NewScope(&schema.ProjectGeneralStorage{}).TableName()
+		stmt := fmt.Sprintf(
+			`INSERT INTO "%s" ("key","value","group","created_at","updated_at")
+VALUES (?,?,?,?,?)
+ON CONFLICT("key") DO UPDATE SET
+"value"=excluded."value",
+"group"=excluded."group",
+"updated_at"=excluded."updated_at"`,
+			table,
+		)
+		if err := db.Exec(stmt, keyStr, valueStr, group, now, now).Error; err != nil {
+			return utils.Errorf("create project storage kv failed: %s", err)
+		}
+		return nil
+	}
 	if db := db.Model(&schema.ProjectGeneralStorage{}).Where(`key = ?`, keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "group": group,
 	}).FirstOrCreate(&schema.ProjectGeneralStorage{}); db.Error != nil {
@@ -97,6 +116,14 @@ func SetProjectKey(db *gorm.DB, key interface{}, value interface{}) error {
 		return utils.Errorf("create project storage kv failed: %s", db.Error)
 	}
 	return nil
+}
+
+func isSQLiteDialect(db *gorm.DB) bool {
+	if db == nil || db.Dialect() == nil {
+		return false
+	}
+	name := strings.ToLower(db.Dialect().GetName())
+	return strings.Contains(name, "sqlite")
 }
 
 func GetProjectKeyModel(db *gorm.DB, key interface{}) (*schema.ProjectGeneralStorage, error) {
