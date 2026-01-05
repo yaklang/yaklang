@@ -3,6 +3,7 @@ package ssaapi_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -10,15 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-var progNameBaseUUID = "TestMultipleLayer_BaseProgram"
-var progNameExtendUUID = "TestMultipleLayer_ExtendProgram"
-
 var valueName = "valueStr"
 
 var baseValueStr = "Value from Base"
 var extendValueStr = "Value from Extend"
 
-func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Program) {
+func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Program, progNameBaseUUID string, progNameExtendUUID string) {
+	progNameBaseUUID = uuid.NewString()
+	progNameExtendUUID = uuid.NewString()
 
 	vf1 := filesys.NewVirtualFs()
 	var err error
@@ -94,7 +94,7 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 
 func TestOverlay_Easy(t *testing.T) {
 
-	progBase, progExtend := InitProgram(t)
+	progBase, progExtend, progNameBaseUUID, progNameExtendUUID := InitProgram(t)
 	require.NotNil(t, progBase)
 	require.NotNil(t, progExtend)
 	defer func() {
@@ -106,22 +106,32 @@ func TestOverlay_Easy(t *testing.T) {
 	t.Logf("progBase: %v", progBase.GetProgramName())
 	t.Logf("progExtend: %v", progExtend.GetProgramName())
 
-	// 创建 ProgramOverLay，注意参数顺序：diff 在前，base 在后
-	overProg := ssaapi.NewProgramOverLay(progExtend, progBase)
+	// 创建 ProgramOverLay，注意参数顺序：layers[0] = Layer1（最底层），layers[1] = Layer2（上层）
+	// progBase = Layer1 (最底层)
+	// progExtend = Layer2 (上层，会覆盖 Layer1 中的同名文件)
+	overProg := ssaapi.NewProgramOverLay(progBase, progExtend)
 	require.NotNil(t, overProg)
 
-	t.Run("test shadow set built correctly", func(t *testing.T) {
-		// 验证 Shadow Set 已经构建
-		shadowCount := overProg.GetShadowFileCount()
-		shadowFiles := overProg.GetShadowFiles()
-		t.Logf("Shadow file count: %d", shadowCount)
-		for _, file := range shadowFiles {
-			t.Logf("Shadow file: %s", file)
-		}
+	t.Run("test layer structure built correctly", func(t *testing.T) {
+		// 验证 Layer 结构已经构建
+		layerCount := overProg.GetLayerCount()
+		fileCount := overProg.GetFileCount()
+		t.Logf("Layer count: %d", layerCount)
+		t.Logf("Unique file count: %d", fileCount)
+		require.Equal(t, layerCount, 2, "Should have 2 layers")
 
-		require.Equal(t, shadowCount, 1)
+		// 检查 Layer1 的文件
+		layer1Files := overProg.GetFilesInLayer(1)
+		t.Logf("Layer1 files: %v", layer1Files)
+		require.Greater(t, len(layer1Files), 0, "Layer1 should have files")
+
+		// 检查 Layer2 的文件
+		layer2Files := overProg.GetFilesInLayer(2)
+		t.Logf("Layer2 files: %v", layer2Files)
+		require.Greater(t, len(layer2Files), 0, "Layer2 should have files")
 	})
-	check := func(p ssaapi.SyntaxFlowQueryInstance, rule string, expectShadow bool, expectData string) {
+
+	check := func(p ssaapi.SyntaxFlowQueryInstance, rule string, expectOverridden bool, expectData string) {
 		res, err := p.SyntaxFlowWithError(rule)
 		res.Show()
 		require.NoError(t, err)
@@ -129,37 +139,35 @@ func TestOverlay_Easy(t *testing.T) {
 		require.NotEmpty(t, values, "Should find values for rule: %s", rule)
 		require.Len(t, values, 1, "Should find exactly one value for rule: %s", rule)
 		v := values[0]
-		isShadow := overProg.IsShadow(v)
-		require.Equalf(t, expectShadow, isShadow, "Value %s shadow status should be %v", v.String(), expectShadow)
+		isOverridden := overProg.IsOverridden(v)
+		require.Equalf(t, expectOverridden, isOverridden, "Value %s overridden status should be %v", v.String(), expectOverridden)
 		require.Containsf(t, v.String(), expectData, "Value %s data should contain %s", v.String(), expectData)
 	}
 
-	t.Run("test IsShadow method : valueStr", func(t *testing.T) {
-
+	t.Run("test IsOverridden method : valueStr", func(t *testing.T) {
 		rule := "valueStr as $res"
-		// 从 progBase 获取一个 Value
+		// 从 progBase 获取一个 Value（应该被上层覆盖）
 		check(progBase, rule, true, baseValueStr)
-		// 从 progExtend 获取一个 Value
+		// 从 progExtend 获取一个 Value（不会被覆盖，因为是最上层）
 		check(progExtend, rule, false, extendValueStr)
 
-		// 从 overlay 获取一个 Value
+		// 从 overlay 获取一个 Value（应该返回上层的值）
 		check(overProg, rule, false, extendValueStr)
 	})
 
-	t.Run("test IsShadow method : A.valueStr", func(t *testing.T) {
-
+	t.Run("test IsOverridden method : A.valueStr", func(t *testing.T) {
 		rule := "A.valueStr as $res"
-		// 从 progBase 获取一个 Value
+		// 从 progBase 获取一个 Value（应该被上层覆盖）
 		check(progBase, rule, true, baseValueStr)
-		// 从 progExtend 获取一个 Value
+		// 从 progExtend 获取一个 Value（不会被覆盖）
 		check(progExtend, rule, false, extendValueStr)
 
-		// 从 overlay 获取一个 Value
+		// 从 overlay 获取一个 Value（应该返回上层的值）
 		check(overProg, rule, false, extendValueStr)
 	})
 
 	t.Run("test Relocate method", func(t *testing.T) {
-		// 从 base 获取一个 Value
+		// 从 Layer1 (progBase) 获取一个 Value
 		baseValues := progBase.Ref(valueName)
 		require.Equal(t, baseValues.Len(), 1)
 
@@ -171,21 +179,22 @@ func TestOverlay_Easy(t *testing.T) {
 		t.Logf("Original value: %s", baseValue.String())
 		t.Logf("Relocated value: %s", relocatedValue.String())
 
-		// 如果文件被修改，重定位后的值应该来自 Diff
+		// 如果文件在上层也存在，重定位后的值应该来自上层 Layer
 		// 这里我们只验证重定位功能可以正常工作
 		require.NotNil(t, relocatedValue)
-		require.Equalf(t, relocatedValue.GetProgramName(), progNameExtendUUID, "Relocated value should come from extend program")
+		require.Equalf(t, relocatedValue.GetProgramName(), progNameExtendUUID, "Relocated value should come from extend program (Layer2)")
 	})
 }
 
 func TestOverlay_CrossLayer_Flow(t *testing.T) {
-	progBase, progExtend := InitProgram(t)
+	progBase, progExtend, progNameBaseUUID, progNameExtendUUID := InitProgram(t)
 	defer func() {
 		ssadb.DeleteProgram(ssadb.GetDB(), progNameBaseUUID)
 		ssadb.DeleteProgram(ssadb.GetDB(), progNameExtendUUID)
 	}()
 
-	overProg := ssaapi.NewProgramOverLay(progExtend, progBase)
+	// 创建多层 Layer：progBase = Layer1 (最底层), progExtend = Layer2 (上层)
+	overProg := ssaapi.NewProgramOverLay(progBase, progExtend)
 	require.NotNil(t, overProg)
 
 	rule := "println(, * as $arg); $arg #->  as $data"
