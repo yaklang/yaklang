@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed prompt/gen_questions.txt
@@ -46,7 +47,7 @@ func newDefaultRAGSystem() *RAGSystem {
 func NewRAGSystem(options ...RAGSystemConfigOption) (*RAGSystem, error) {
 	config := NewRAGSystemConfig(options...)
 
-	if utils.IsNil(config.embeddingClient) {
+	if utils.IsNil(config.embeddingClient) && !vectorstore.IsMockMode {
 		embedder, err := vectorstore.GetAIBalanceFreeEmbeddingService()
 		if err != nil {
 			return nil, utils.Wrap(err, "aibalance embedder and local embedder all failed")
@@ -468,6 +469,25 @@ func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]*Sea
 	return results, nil
 }
 
+func (r *RAGSystem) QueryKnowledge(query string, topN int, limits ...float64) ([]*knowledgebase.SearchKnowledgebaseResult, error) {
+	resCh, err := knowledgebase.Query(r.config.db, query,
+		knowledgebase.WithLimit(topN),
+		knowledgebase.WithCollectionName(r.KnowledgeBase.GetName()),
+		knowledgebase.WithEmbeddingClient(r.GetEmbedder()),
+		knowledgebase.WithFilter(func(key string, getDoc func() *vectorstore.Document, knowledgeBaseEntryGetter func() (*schema.KnowledgeBaseEntry, error)) bool {
+			return getDoc().Type == schema.RAGDocumentType_Knowledge
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*knowledgebase.SearchKnowledgebaseResult, 0)
+	for result := range resCh {
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 // DeleteDocuments 删除文档
 func (r *RAGSystem) DeleteDocuments(ids ...string) error {
 	return r.VectorStore.Delete(ids...)
@@ -493,6 +513,10 @@ func (r *RAGSystem) CountDocuments() (int, error) {
 	return r.VectorStore.Count()
 }
 
+func (r *RAGSystem) CountKnowledge() (int, error) {
+	return r.KnowledgeBase.CountKnowledgeEntries()
+}
+
 func (r *RAGSystem) DeleteEmbeddingData() error {
 	return r.VectorStore.DeleteEmbeddingData()
 }
@@ -502,6 +526,34 @@ func (r *RAGSystem) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, 
 	docOpts := config.ConvertToDocumentOptions()
 	noPQ := config.GetNoPotentialQuestions()
 	return r.KnowledgeBase.AddKnowledgeEntryQuestion(entry, noPQ, docOpts...)
+}
+
+func (r *RAGSystem) AddKnowledge(knowledge any, options ...RAGSystemConfigOption) error {
+	switch ret := knowledge.(type) {
+	case *schema.KnowledgeBaseEntry:
+		return r.AddKnowledgeEntry(knowledge.(*schema.KnowledgeBaseEntry), options...)
+	case string:
+		return r.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
+			KnowledgeBaseID:  r.GetKnowledgeBaseID(),
+			KnowledgeType:    "Standard",
+			KnowledgeDetails: knowledge.(string),
+			HiddenIndex:      uuid.NewString(),
+		}, options...)
+	case map[string]any:
+		return r.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
+			KnowledgeBaseID:    r.GetKnowledgeBaseID(),
+			KnowledgeType:      utils.InterfaceToString(ret["knowledge_type"]),
+			KnowledgeTitle:     utils.InterfaceToString(ret["title"]),
+			KnowledgeDetails:   utils.InterfaceToString(ret["details"]),
+			Summary:            utils.InterfaceToString(ret["summary"]),
+			Keywords:           utils.InterfaceToStringSlice(ret["keywords"]),
+			ImportanceScore:    utils.InterfaceToInt(ret["importance_score"]),
+			SourcePage:         utils.InterfaceToInt(ret["source_page"]),
+			PotentialQuestions: utils.InterfaceToStringSlice(ret["potential_questions"]),
+			HiddenIndex:        uuid.NewString(),
+		}, options...)
+	}
+	return nil
 }
 
 func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...RAGSystemConfigOption) error {
@@ -538,6 +590,99 @@ func (r *RAGSystem) GetKnowledgeBaseID() int64 {
 	return r.KnowledgeBase.GetID()
 }
 
-func (r *RAGSystem) GenerateQuestions() error {
+func (r *RAGSystem) GenerateQuestionIndex(options ...RAGSystemConfigOption) error {
+	config := r.newRagSystemConfig(options...)
+	if config.progressHandler == nil {
+		config.progressHandler = func(percent float64, message string, messageType string) {
+			log.Infof("GenerateQuestionIndex progress: %f%%, message: %s", percent, message)
+		}
+	}
+	// 1. 遍历知识库的所有项
+	page := 1
+	limit := 50
+	db := config.db
+
+	var totalEntries int
+	db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", r.GetKnowledgeBaseID()).Count(&totalEntries)
+	config.progressHandler(0, fmt.Sprintf("start to generate question index for %d entries", totalEntries), "info")
+	processedCount := 0
+
+	collectionID := r.VectorStore.GetCollectionInfo().ID
+
+	for {
+		paging := &ypb.Paging{
+			Page:  int64(page),
+			Limit: int64(limit),
+		}
+		_, entries, err := yakit.GetKnowledgeBaseEntryByFilter(db, r.GetKnowledgeBaseID(), "", paging)
+		if err != nil {
+			return utils.Errorf("failed to get knowledge base entries: %v", err)
+		}
+		if len(entries) == 0 {
+			break
+		}
+
+		for _, entry := range entries {
+			processedCount++
+			percent := float64(processedCount) / float64(totalEntries) * 100
+			config.progressHandler(percent, fmt.Sprintf("processing entry: %s", entry.KnowledgeTitle), "info")
+
+			// 2. 检查向量表的metadata字段时候有知识的HidenIndex
+			// 检查是否有metadata存在schema.META_QUESTION_INDEX的向量（问题向量）
+			// 直接从数据库查询 vector_store_document 表
+			var docs []schema.VectorStoreDocument
+			err := db.Model(&schema.VectorStoreDocument{}).
+				Where("collection_id = ? AND metadata LIKE ?", collectionID, fmt.Sprintf("%%%s%%", entry.HiddenIndex)).
+				Find(&docs).Error
+			if err != nil {
+				log.Errorf("failed to query vector store documents for entry %s: %v", entry.HiddenIndex, err)
+				continue
+			}
+
+			// 检查是否有文档关联，并且是否有问题索引
+			hasRelatedDoc := false
+			hasQuestionIndex := false
+			for _, doc := range docs {
+				// double check metadata
+				if metaUUID, ok := doc.Metadata.GetDataUUID(); ok && metaUUID == entry.HiddenIndex {
+					hasRelatedDoc = true
+					// 检查是否是问题索引
+					if isQuestion, ok := doc.Metadata[schema.META_QUESTION_INDEX]; ok && utils.InterfaceToBoolean(isQuestion) {
+						hasQuestionIndex = true
+						break
+					}
+				}
+			}
+
+			// 如果有关联文档但没有问题向量，则对当前知识生成问题向量并添加
+			if hasRelatedDoc && !hasQuestionIndex {
+				log.Infof("generating question index for entry: %s", entry.KnowledgeTitle)
+				questions, err := enhancesearch.BuildIndexQuestions(entry.KnowledgeDetails, config.GetAIService())
+				if err != nil {
+					log.Errorf("failed to build index questions for entry %s: %v", entry.HiddenIndex, err)
+					continue
+				}
+
+				docOpts := config.ConvertToDocumentOptions()
+				for _, question := range questions {
+					questionId := entry.HiddenIndex + "_question_" + utils.CalcSha1(question)
+					err := r.VectorStore.AddWithOptions(questionId, question, append(docOpts,
+						vectorstore.WithDocumentQuestionIndex(true),
+						vectorstore.WithDocumentMetadataKeyValue(schema.META_Data_UUID, entry.HiddenIndex),
+						vectorstore.WithDocumentMetadataKeyValue(schema.META_KNOWLEDGE_TITLE, entry.KnowledgeTitle),
+					)...)
+					if err != nil {
+						log.Errorf("failed to add question index %s: %v", questionId, err)
+					}
+				}
+			}
+		}
+
+		if len(entries) < limit {
+			break
+		}
+		page++
+	}
+	config.progressHandler(100, "generate question index finished", "success")
 	return nil
 }

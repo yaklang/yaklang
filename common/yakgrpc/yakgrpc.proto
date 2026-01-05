@@ -969,6 +969,7 @@ service Yak {
 
   rpc BuildVectorIndexForKnowledgeBase(BuildVectorIndexForKnowledgeBaseRequest) returns(GeneralResponse);
   rpc BuildVectorIndexForKnowledgeBaseEntry(BuildVectorIndexForKnowledgeBaseEntryRequest) returns(GeneralResponse);
+  rpc GenerateQuestionIndexForKnowledgeBase(GenerateQuestionIndexForKnowledgeBaseRequest) returns(GenerateQuestionIndexForKnowledgeBaseResponse);
 
   // Entity Repository
   rpc ListEntityRepository(Empty) returns(ListEntityRepositoryResponse);
@@ -1323,6 +1324,18 @@ message IsThirdPartyBinaryReadyResponse {
 message StartThirdPartyBinaryRequest {
   string Name = 1;
   repeated string Args = 2;
+}
+
+message GenerateQuestionIndexForKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+  string KnowledgeBaseName = 2;
+  bool Force = 3;
+}
+
+message GenerateQuestionIndexForKnowledgeBaseResponse {
+  string Message = 1;
+  string MessageType = 2;
+  string Data = 3;
 }
 
 message BuildVectorIndexForKnowledgeBaseEntryRequest {
