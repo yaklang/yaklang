@@ -41,8 +41,7 @@ const (
 	//扫描任务进度
 	ScanResult_Process ScanResultType = "process"
 
-	// SSA 风险数据（sfreport 格式 JSON）
-	ScanResult_SSARisk ScanResultType = "ssa-risk"
+	ScanResult_StatusCard ScanResultType = "status"
 )
 
 type ScanResult struct {
