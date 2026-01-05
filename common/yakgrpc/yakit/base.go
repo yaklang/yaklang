@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,20 +37,187 @@ func (l *SQLTraceLogger) Last() string {
 	return l.last
 }
 
+const slowSQLLogMaxLen = 256
+const asyncQueueLogInterval = 10 * time.Second
+const asyncQueueStatsInterval = 10 * time.Second
+const asyncQueueStatsTopN = 5
+
+func summarizeSQL(sql string) (string, int) {
+	sql = trimSQLArgs(normalizeSQL(sql))
+	if sql == "" {
+		return "", 0
+	}
+	if len(sql) <= slowSQLLogMaxLen {
+		return sql, len(sql)
+	}
+	return sql[:slowSQLLogMaxLen] + "...", len(sql)
+}
+
+func normalizeSQL(sql string) string {
+	sql = strings.TrimSpace(sql)
+	if sql == "" {
+		return ""
+	}
+	upper := strings.ToUpper(sql)
+	keywords := []string{"SELECT ", "INSERT ", "UPDATE ", "DELETE ", "WITH ", "REPLACE "}
+	first := -1
+	for _, kw := range keywords {
+		if pos := strings.Index(upper, kw); pos >= 0 && (first == -1 || pos < first) {
+			first = pos
+		}
+	}
+	if first > 0 {
+		return strings.TrimSpace(sql[first:])
+	}
+	return sql
+}
+
+func trimSQLArgs(sql string) string {
+	if sql == "" {
+		return sql
+	}
+	if idx := strings.Index(sql, ";["); idx >= 0 {
+		return strings.TrimSpace(sql[:idx+1])
+	}
+	if idx := strings.Index(sql, " ["); idx >= 0 && strings.Contains(sql[idx:], "]") {
+		return strings.TrimSpace(sql[:idx])
+	}
+	return sql
+}
+
+func extractSQLRows(sql string) int {
+	end := strings.LastIndex(sql, "]")
+	if end == -1 {
+		return 0
+	}
+	tail := strings.TrimSpace(sql[end+1:])
+	if tail == "" {
+		return 0
+	}
+	fields := strings.Fields(tail)
+	if len(fields) == 0 {
+		return 0
+	}
+	rows, _ := strconv.Atoi(fields[len(fields)-1])
+	return rows
+}
+
+func countSQLInArgs(sql string) int {
+	upper := strings.ToUpper(sql)
+	idx := strings.Index(upper, " IN (")
+	if idx == -1 {
+		return 0
+	}
+	rest := sql[idx+len(" IN ("):]
+	end := strings.Index(rest, ")")
+	if end == -1 {
+		return 0
+	}
+	return strings.Count(rest[:end], "?")
+}
+
+func startAsyncQueueMonitor() {
+	ticker := time.NewTicker(asyncQueueLogInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		dbLen := len(DBSaveAsyncChannel)
+		ftsLen := len(httpFlowFTSAsyncCh)
+		if dbLen == 0 && ftsLen == 0 {
+			continue
+		}
+		log.Infof("async queue backlog: db_queue=%d fts_queue=%d", dbLen, ftsLen)
+	}
+}
+
+type dbExecStats struct {
+	count int64
+	total time.Duration
+	max   time.Duration
+}
+
+type dbExecStatsItem struct {
+	name  string
+	count int64
+	total time.Duration
+	max   time.Duration
+}
+
+func resolveExecFuncName(f DbExecFunc) string {
+	if f == nil {
+		return "<nil>"
+	}
+	ptr := reflect.ValueOf(f).Pointer()
+	fn := runtime.FuncForPC(ptr)
+	if fn == nil {
+		return "<unknown>"
+	}
+	return fn.Name()
+}
+
+func shortFuncName(name string) string {
+	if name == "" {
+		return "<unknown>"
+	}
+	if idx := strings.LastIndex(name, "/"); idx >= 0 && idx+1 < len(name) {
+		return name[idx+1:]
+	}
+	return name
+}
+
+func formatDBExecStats(stats map[string]*dbExecStats, limit int) string {
+	if len(stats) == 0 || limit <= 0 {
+		return ""
+	}
+	items := make([]dbExecStatsItem, 0, len(stats))
+	for name, st := range stats {
+		if st == nil || st.count == 0 {
+			continue
+		}
+		items = append(items, dbExecStatsItem{
+			name:  name,
+			count: st.count,
+			total: st.total,
+			max:   st.max,
+		})
+	}
+	if len(items) == 0 {
+		return ""
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].total == items[j].total {
+			return items[i].max > items[j].max
+		}
+		return items[i].total > items[j].total
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		avg := time.Duration(0)
+		if item.count > 0 {
+			avg = time.Duration(int64(item.total) / item.count)
+		}
+		parts = append(parts, fmt.Sprintf("%s(count=%d avg=%s max=%s)",
+			shortFuncName(item.name), item.count, avg, item.max))
+	}
+	return strings.Join(parts, ", ")
+}
+
 // sqlTraceLogger 用于内部使用（保持向后兼容）
 type sqlTraceLogger = SQLTraceLogger
 
 // LongSQLDescription 描述慢 SQL 的详细信息
 type LongSQLDescription struct {
 	Duration      time.Duration `json:"duration"`       // SQL 执行耗时
-	DurationMs    int64         `json:"duration_ms"`    // SQL 执行耗时（毫秒）
-	DurationStr   string        `json:"duration_str"`   // SQL 执行耗时（字符串形式）
-	FuncName      string        `json:"func_name"`      // 函数名
-	FuncPtr       string        `json:"func_ptr"`       // 函数指针（字符串形式）
-	QueueLen      int           `json:"queue_len"`      // 队列长度
-	LastSQL       string        `json:"last_sql"`       // 最后执行的 SQL
-	Timestamp     time.Time     `json:"timestamp"`      // 时间戳
-	TimestampUnix int64         `json:"timestamp_unix"` // 时间戳（Unix 秒）
+	DurationMs    int64          `json:"duration_ms"`   // SQL 执行耗时（毫秒）
+	DurationStr   string         `json:"duration_str"`   // SQL 执行耗时（字符串形式）
+	FuncName      string         `json:"func_name"`      // 函数名
+	FuncPtr       string         `json:"func_ptr"`       // 函数指针（字符串形式）
+	QueueLen      int            `json:"queue_len"`      // 队列长度
+	LastSQL       string         `json:"last_sql"`      // 最后执行的 SQL
+	Timestamp     time.Time      `json:"timestamp"`     // 时间戳
+	TimestampUnix int64          `json:"timestamp_unix"` // 时间戳（Unix 秒）
 }
 
 // HTTPFlowSQLCallback 慢 SQL 回调函数类型
@@ -106,8 +275,14 @@ var DBSaveAsyncChannel = make(chan DbExecFunc, 40960)
 
 func init() {
 	throttle := utils.NewThrottle(2)
+	go startAsyncQueueMonitor()
 	go func() {
 		var count uint64 = 0
+		stats := make(map[string]*dbExecStats)
+		var statsCount int64
+		var statsTotal time.Duration
+		var statsMax time.Duration
+		nextStatsAt := time.Now().Add(asyncQueueStatsInterval)
 		for {
 			select {
 			case f := <-DBSaveAsyncChannel:
@@ -118,22 +293,36 @@ func init() {
 				if db != nil {
 					// 创建新的会话以避免数据竞争，因为 SetLogger 和 LogMode 会修改 db 的内部状态
 					db = db.New()
+					// SetLogger 可能无返回值，分开调用以兼容
 					db.SetLogger(tracer)
 					db = db.LogMode(true)
 				}
 
 				err := f(db)
 				elapsed := time.Since(start)
-				if elapsed > 2*time.Second {
-					// 提供更多信息帮助定位耗时的执行
-					ptr := reflect.ValueOf(f).Pointer()
-					fn := runtime.FuncForPC(ptr)
-					fnName := "<unknown>"
-					if fn != nil {
-						fnName = fn.Name()
+				fnName := resolveExecFuncName(f)
+				if stat := stats[fnName]; stat != nil {
+					stat.count++
+					stat.total += elapsed
+					if elapsed > stat.max {
+						stat.max = elapsed
 					}
-					log.Warnf("SQL execution took too long: %v, func_ptr:%p, func_name:%s, queue_len:%d, last_sql:%s",
-						elapsed, f, fnName, len(DBSaveAsyncChannel), tracer.Last())
+				} else {
+					stats[fnName] = &dbExecStats{count: 1, total: elapsed, max: elapsed}
+				}
+				statsCount++
+				statsTotal += elapsed
+				if elapsed > statsMax {
+					statsMax = elapsed
+				}
+
+				if elapsed > 2*time.Second {
+					lastSQL := tracer.Last()
+					sqlPreview, sqlLen := summarizeSQL(lastSQL)
+					sqlRows := extractSQLRows(lastSQL)
+					inArgs := countSQLInArgs(lastSQL)
+					log.Warnf("SQL slow: %s func=%s queue_len=%d sql_len=%d sql_rows=%d in_args=%d sql=%s",
+						elapsed, fnName, len(DBSaveAsyncChannel), sqlLen, sqlRows, inArgs, sqlPreview)
 
 					// 收集慢 SQL 信息
 					now := time.Now()
@@ -167,6 +356,23 @@ func init() {
 				}
 				if err != nil {
 					log.Errorf("Throttle sql exec failed: %s", err)
+				}
+
+				if time.Now().After(nextStatsAt) && statsCount > 0 {
+					avg := time.Duration(int64(statsTotal) / statsCount)
+					top := formatDBExecStats(stats, asyncQueueStatsTopN)
+					if top != "" {
+						log.Infof("async queue stats: ops=%d avg=%s max=%s queue_len=%d top=%s",
+							statsCount, avg, statsMax, len(DBSaveAsyncChannel), top)
+					} else {
+						log.Infof("async queue stats: ops=%d avg=%s max=%s queue_len=%d",
+							statsCount, avg, statsMax, len(DBSaveAsyncChannel))
+					}
+					stats = make(map[string]*dbExecStats)
+					statsCount = 0
+					statsTotal = 0
+					statsMax = 0
+					nextStatsAt = time.Now().Add(asyncQueueStatsInterval)
 				}
 			}
 		}

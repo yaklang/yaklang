@@ -113,7 +113,7 @@ jobs:
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
           $outputName = if ("${{ inputs.os }}" -eq "windows7") { "yak_windows_legacy_amd64.exe" } else { "yak_windows_amd64.exe" }
-          go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+          go build -tags "gzip_embed sqlite_fts5" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
           echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
       - name: Validate signing secrets
@@ -179,7 +179,7 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
           fi
 
-          go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
+          go build -tags "gzip_embed sqlite_fts5" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 

@@ -42,7 +42,10 @@ type MatchResult struct {
 
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
 	if mainId <= 0 {
-		if db := db.Model(&schema.ExtractedData{}).Save(i); db.Error != nil {
+		if ed, ok := i.(*schema.ExtractedData); ok {
+			ed.ID = 0
+		}
+		if db := db.Create(i); db.Error != nil {
 			return db.Error
 		}
 		return nil
