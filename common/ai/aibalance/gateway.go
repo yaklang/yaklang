@@ -417,11 +417,16 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 
 	log.Infof("Fetching TOTP UUID from: %s", totpURL)
 
-	// Make HTTP request
+	// Make HTTP request with connection pool enabled
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(map[string]string{
-			"Accept": "application/json",
+			"Accept":          "application/json",
+			"Accept-Encoding": "gzip, deflate, br", // enable compression for better network performance
 		}),
+		poc.WithConnPool(true),     // enable connection pool for better performance
+		poc.WithSave(false),        // do not save TOTP requests to database
+		poc.WithConnectTimeout(10), // set connect timeout
+		poc.WithRetryTimes(2),      // retry on failure
 	}
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
@@ -521,9 +526,10 @@ func (g *GatewayClient) generateTOTPCode() string {
 
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	headers := map[string]string{
-		"Content-Type":  "application/json; charset=UTF-8",
-		"Accept":        "application/json",
-		"Authorization": "Bearer " + g.config.APIKey,
+		"Content-Type":    "application/json; charset=UTF-8",
+		"Accept":          "application/json",
+		"Accept-Encoding": "gzip, deflate, br", // enable compression for better network performance
+		"Authorization":   "Bearer " + g.config.APIKey,
 	}
 
 	// Add TOTP header for memfit models
@@ -541,6 +547,8 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 
 	opts := []poc.PocConfigOption{
 		poc.WithReplaceAllHttpPacketHeaders(headers),
+		poc.WithConnPool(true), // enable connection pool for better performance
+		poc.WithSave(false),    // do not save AI chat requests to database
 	}
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
