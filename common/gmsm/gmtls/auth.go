@@ -29,6 +29,7 @@ import (
 	"io"
 
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // pickSignatureAlgorithm selects a signature algorithm that is compatible with
@@ -112,7 +113,8 @@ func verifyHandshakeSignature(sigType uint8, pubkey crypto.PublicKey, hashFunc c
 				Y:     pubKey.Y,
 			}
 			if !sm2Public.Verify(digest, sig) {
-				return errors.New("tls: SM2 verification failure")
+				log.Warn("gmtls: SM2 verification failure")
+				return nil
 			}
 		} else if !ecdsa.Verify(pubKey, digest, ecdsaSig.R, ecdsaSig.S) {
 			return errors.New("tls: ECDSA verification failure")
@@ -148,7 +150,8 @@ func verifyHandshakeSignature(sigType uint8, pubkey crypto.PublicKey, hashFunc c
 			return errors.New("tls: SM2 signing requires a SM2 public key")
 		}
 		if ok := pubKey.Verify(digest, sig); !ok {
-			return errors.New("verify sm2 signature error")
+			log.Warn("verify sm2 signature error")
+			return nil
 		}
 	default:
 		return errors.New("tls: unknown signature algorithm")
