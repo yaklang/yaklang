@@ -79,11 +79,14 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 // extractZipFSFromUnderlying 从文件系统中提取底层的 ZipFS
 // 支持递归提取，处理 HookFS 包装的情况
 func extractZipFSFromUnderlying(underlying fi.FileSystem) *filesys.ZipFS {
-	if zfs, ok := underlying.(*filesys.ZipFS); ok {
-		return zfs
+	unifiedFs, ok := underlying.(*filesys.UnifiedFS)
+	if !ok {
+		// 在测试中
+		return nil
 	}
-	if jarFS, ok := underlying.(*javaclassparser.JarFS); ok {
-		return jarFS.ZipFS
+
+	if zfs, ok := unifiedFs.GetFileSystem().(*filesys.ZipFS); ok {
+		return zfs
 	}
 	// 如果是 HookFS，使用反射递归检查 underlying
 	if hookFS, ok := underlying.(*filesys.HookFS); ok {

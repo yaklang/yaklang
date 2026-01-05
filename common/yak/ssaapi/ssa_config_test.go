@@ -196,10 +196,10 @@ func TestUnifiedFsWithFileSystem(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, config.fs)
 
-		zipFs, ok := config.fs.(*filesys.ZipFS)
+		unifiedFs, ok := config.fs.(*filesys.UnifiedFS)
 		require.True(t, ok)
 
-		separator := zipFs.GetSeparators()
+		separator := unifiedFs.GetSeparators()
 		require.Equal(t, '/', separator)
 	})
 
