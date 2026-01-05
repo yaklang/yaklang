@@ -492,7 +492,7 @@ func CalcMd5(items ...interface{}) string {
 
 func CalcSha1(items ...interface{}) string {
 	h := sha1.New()
-	_, _ = fmt.Fprint(h, items)
+	_, _ = fmt.Fprint(h, items...)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
