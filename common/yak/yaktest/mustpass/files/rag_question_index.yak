@@ -4,8 +4,8 @@ rag.EnableMockMode()
 // 准备测试数据
 // knowledge1: 公司产品信息，将被关联生成一个问题索引
 knowledge1 = "Our flagship product, 'Visionary AI Suite', offers advanced image recognition and natural language processing. The official API endpoint is api.company.com/v1/visionary."
-// knowledge1_question: 这是一个关于 PTO 的问题，实际上它应该作为 knowledge1 的问题索引内容（虽然语义上有点不匹配，但为了测试 mock 流程）
-knowledge1_question = "How long can I take paid leave?"
+// 这是另外一条知识，用这条知识作为knowledge1的问题索引，如果查询这条知识的问题查询到了knowledge1，说明问题索引生效
+knowledge1_question = "All full-time employees are entitled to 20 days of paid time off (PTO) annually. Please submit leave requests through the 'HR-Connect' portal at least one week in advance."
 // knowledge2: 公司业绩信息
 knowledge2 = "In our successful third quarter, we celebrated the launch of the 'Visionary AI Suite', which drove a 15% increase in quarterly revenue."
 
@@ -77,5 +77,14 @@ firstResult = res[0]
 printf("Search Result: %v\n", firstResult.KnowledgeDetails)
 
 assert firstResult.KnowledgeDetails == knowledge1, "Expected first result to be knowledge1, but got: %v" % firstResult.KnowledgeDetails
+
+// 验证查询到的向量是knowledge1_question
+vectorStoreRes = collection.Query(knowledge1_question_query, 1)~
+
+assert len(vectorStoreRes) == 1, "Expected 1 vector store search result, got %v" % len(vectorStoreRes)
+
+firstResult = vectorStoreRes[0]
+
+assert firstResult.Document.Content == knowledge1_question, "Expected first result to be knowledge1_question, but got: %v" % firstResult.Document.Content
 
 println("Test passed: Knowledge Question Index works as expected.")

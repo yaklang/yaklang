@@ -121,7 +121,7 @@ func LiteForgeQueryFromChunk(prompt string, extraPrompt string, chunk chunkmaker
 	return buf.String(), nil
 }
 
-func BuildIndexQuestions(rawInput string, aiService aicommon.AICallbackType) ([]string, error) {
+func BuildIndexQuestions(rawInput []string, aiService aicommon.AICallbackType) (map[string][]string, error) {
 	linedInput := utils.PrefixLinesWithLineNumbers(rawInput)
 	query, err := LiteForgeQueryFromChunk(indexBuildPrompt, "", chunkmaker.NewBufferChunk([]byte(linedInput)), 200)
 	if err != nil {
@@ -148,12 +148,13 @@ func BuildIndexQuestions(rawInput string, aiService aicommon.AICallbackType) ([]
 
 func index2KnowledgeEntity(
 	action *aicommon.Action,
-	Input string,
-) ([]string, error) {
+	inputs []string,
+) (map[string][]string, error) {
 	if action == nil {
 		return nil, utils.Errorf("action is nil")
 	}
-	inputLineList := utils.ParseStringToRawLines(Input)
+	input := strings.Join(inputs, "\n")
+	inputLineList := utils.ParseStringToRawLines(input)
 
 	questionList := action.GetInvokeParamsArray("question_list")
 	if len(questionList) == 0 {
@@ -164,7 +165,7 @@ func index2KnowledgeEntity(
 
 	safeGetSnippet := func(startLine, endLine int) string {
 		if startLine < 1 || endLine > len(inputLineList) || startLine > endLine {
-			return Input // fallback to full input
+			return input // fallback to full input
 		}
 		return strings.Join(inputLineList[startLine-1:endLine], "\n")
 	}
@@ -184,9 +185,5 @@ func index2KnowledgeEntity(
 		}
 	}
 
-	var questionListResult []string
-	for _, questions := range knowledgeMap {
-		questionListResult = append(questionListResult, questions...)
-	}
-	return questionListResult, nil
+	return knowledgeMap, nil
 }
