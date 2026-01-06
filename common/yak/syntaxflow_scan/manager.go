@@ -264,9 +264,6 @@ func (m *scanManager) initByConfig() error {
 			}
 			config.Programs = append(config.Programs, prog)
 		}
-		if len(config.Programs) == 0 {
-			return utils.Errorf("SyntaxFlow Scan Failed: SSA Programs not found in database or cache,stop the scan task")
-		}
 	} else if config.GetProjectID() != 0 {
 		// 前端如果没传programName扫描功能默认选择最新的programName进行扫描
 		name, err := yakit.QueryLatestSSAProgramNameByProjectId(consts.GetGormSSAProjectDataBase(), config.GetProjectID())
@@ -282,10 +279,6 @@ func (m *scanManager) initByConfig() error {
 		if config.Config != nil {
 			config.Config.SetProgramName(name)
 		}
-	}
-
-	if len(config.Programs) == 0 {
-		return utils.Errorf("SyntaxFlow Scan Failed: SSA Program is empty")
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
