@@ -191,6 +191,10 @@ func (c *Config) SkipTLSVerify(skip bool) {
 // SetOrganization sets the organization of the certificate.
 func (c *Config) SetOrganization(org string) {
 	c.org = org
+	// 同时设置国密 TLS 的 organization
+	if c.obsoleteConfig != nil {
+		c.obsoleteConfig.SetOrganization(org)
+	}
 }
 
 // SetH2Config configures processing of HTTP/2 streams.

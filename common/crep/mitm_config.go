@@ -197,7 +197,15 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) 
 		}
 
 		mc.SkipTLSVerify(true)
-		mc.SetOrganization("MITMServer")
+
+		if len(cert.Subject.Organization) > 0 {
+			// 从 CA 证书继承 Organization
+			mc.SetOrganization(cert.Subject.Organization[0])
+		} else {
+			// 都没有才使用默认值
+			mc.SetOrganization("MITMServer")
+		}
+
 		mc.SetValidity(time.Hour * 24 * 90)
 
 		// 配置H2支持
