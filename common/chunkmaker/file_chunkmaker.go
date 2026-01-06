@@ -1,7 +1,11 @@
 package chunkmaker
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/utils/fileparser"
+	"github.com/yaklang/yaklang/common/utils/fileparser/types"
 	"io/fs"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -37,6 +41,34 @@ func NewChunkMakerFromFile(targetFile string, opts ...Option) (ChunkMaker, error
 		}
 		return NewTextChunkMakerEx(NewChunkChannelFromReader(cfg.ctx, fp), cfg)
 	} else {
+		if fileparser.IsSupportedExtension(targetFile) {
+			result, err := fileparser.ParseFileElements(targetFile)
+			if err != nil {
+				return nil, err
+			}
+			elements := chanx.NewUnlimitedChan[types.File](cfg.ctx, 10)
+			go func() {
+				defer elements.Close()
+				for _, files := range result {
+					for _, file := range files {
+						elements.SafeFeed(file)
+					}
+				}
+			}()
+
+			return NewSimpleChunkMaker[types.File](
+				elements.OutputChannel(),
+				func(result types.File) Chunk {
+					var buffer bytes.Buffer
+					buffer.WriteString("Type: ")
+					buffer.WriteString(result.Type)
+					buffer.WriteString("\n")
+					buffer.WriteString("Content:\n")
+					buffer.Write(result.BinaryData)
+					return NewBufferChunk(buffer.Bytes())
+				},
+				opts...)
+		}
 		return NewImageChunkMakerFromFileEx(targetFile, cfg)
 	}
 }
