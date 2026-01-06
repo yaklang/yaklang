@@ -136,9 +136,12 @@ func (r *Recorder) ensureEntry(name string, stepCount int) (*measurementData, er
 	if r == nil {
 		return nil, nil
 	}
-	entry := r.entries.GetOrLoad(name, func() *measurementData {
-		return newMeasurementData(name, stepCount)
+	entry, err := r.entries.GetOrLoad(name, func() (*measurementData, error) {
+		return newMeasurementData(name, stepCount), nil
 	})
+	if err != nil {
+		return nil, err
+	}
 	entry.ensureStepCapacity(stepCount)
 	return entry, nil
 }

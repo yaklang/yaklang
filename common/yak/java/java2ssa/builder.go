@@ -21,9 +21,6 @@ import (
 
 var INNER_CLASS_SPLIT = "$"
 
-// expandedZipFSCache 缓存 ExpandedZipFS 实例，避免重复创建和浪费缓存
-var expandedZipFSCache = utils.NewSafeMapWithKey[*filesys.ZipFS, *javaclassparser.ExpandedZipFS]()
-
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
@@ -124,6 +121,7 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
 			strings.HasSuffix(strings.ToLower(path), ".war") ||
 			strings.HasSuffix(strings.ToLower(path), ".zip")) {
 			hasNestedArchive = true
+			return filepath.SkipAll // skip all other file // break
 		}
 		return nil
 	}))
@@ -132,9 +130,7 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem) fi.FileSystem {
 		return fs
 	}
 
-	expandedFS := expandedZipFSCache.GetOrLoad(zipFS, func() *javaclassparser.ExpandedZipFS {
-		return javaclassparser.NewExpandedZipFS(fs, zipFS)
-	})
+	expandedFS := javaclassparser.NewExpandedZipFS(fs, zipFS)
 
 	return expandedFS
 }
