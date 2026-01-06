@@ -30,11 +30,11 @@ func (sm *SafeMapWithKey[K, V]) Get(key K) (V, bool) {
 	return val, ok
 }
 
-func (sm *SafeMapWithKey[K, V]) GetOrLoad(key K, f func() V) V {
+func (sm *SafeMapWithKey[K, V]) GetOrLoad(key K, f func() (V, error)) (V, error) {
 	sm.mu.RLock()
 	if val, ok := sm.m[key]; ok {
 		sm.mu.RUnlock()
-		return val
+		return val, nil
 	}
 	sm.mu.RUnlock()
 
@@ -43,12 +43,16 @@ func (sm *SafeMapWithKey[K, V]) GetOrLoad(key K, f func() V) V {
 	// 3. 再次检查！
 	//    (防止在等待写锁期间，已有其他协程完成了加载)
 	if val, ok := sm.m[key]; ok {
-		return val
+		return val, nil
 	}
 
-	val := f()
+	val, err := f()
+	if err != nil {
+		var zero V
+		return zero, err
+	}
 	sm.m[key] = val
-	return val
+	return val, nil
 }
 
 func (sm *SafeMapWithKey[K, V]) Have(key K) bool {

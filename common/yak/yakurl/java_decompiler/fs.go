@@ -12,19 +12,14 @@ import (
 
 // getJarFS gets or creates a javaclassparser.JarFS for the given jar path
 func (a *Action) getJarFS(jarPath string) (*javaclassparser.JarFS, error) {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
+	return a.jarFS.GetOrLoad(jarPath, func() (*javaclassparser.JarFS, error) {
+		fs, err := javaclassparser.NewJarFSFromLocal(jarPath)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to open jar file: %s", jarPath)
 
-	if fs, ok := a.jarFS[jarPath]; ok {
+		}
 		return fs, nil
-	}
-
-	fs, err := javaclassparser.NewJarFSFromLocal(jarPath)
-	if err != nil {
-		return nil, utils.Wrapf(err, "failed to open jar file: %s", jarPath)
-	}
-	a.jarFS[jarPath] = fs
-	return fs, nil
+	})
 }
 func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparser.JarFS, string, string, error) {
 	currentDirPath := dirPath
