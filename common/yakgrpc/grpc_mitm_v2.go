@@ -143,7 +143,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
 	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
-	allowChunkStaticJS := utils.NewBool(firstReq.GetAllowChunkStaticJS())
+	// 统一走 FilterData.AllowChunkStaticJS。
+	allowChunkStaticJS := utils.NewBool(false)
+	if filterData := firstReq.GetFilterData(); filterData != nil && filterData.AllowChunkStaticJS != nil {
+		allowChunkStaticJS.SetTo(filterData.GetAllowChunkStaticJS())
+	}
 
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
 		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
@@ -571,8 +575,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 
 			// AllowChunkStaticJS 为 optional bool：仅在前端显式设置时才更新，避免其他控制消息“误覆盖”为默认值。
-			if reqInstance.AllowChunkStaticJS != nil {
-				allowChunkStaticJS.SetTo(reqInstance.GetAllowChunkStaticJS())
+			// 统一走 FilterData.AllowChunkStaticJS。
+			if filterData := reqInstance.GetFilterData(); filterData != nil && filterData.AllowChunkStaticJS != nil {
+				allowChunkStaticJS.SetTo(filterData.GetAllowChunkStaticJS())
 			}
 
 			if reqInstance.GetUpdateFilter() {
