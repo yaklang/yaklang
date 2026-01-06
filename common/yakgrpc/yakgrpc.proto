@@ -969,7 +969,7 @@ service Yak {
 
   rpc BuildVectorIndexForKnowledgeBase(BuildVectorIndexForKnowledgeBaseRequest) returns(GeneralResponse);
   rpc BuildVectorIndexForKnowledgeBaseEntry(BuildVectorIndexForKnowledgeBaseEntryRequest) returns(GeneralResponse);
-  rpc GenerateQuestionIndexForKnowledgeBase(GenerateQuestionIndexForKnowledgeBaseRequest) returns(GenerateQuestionIndexForKnowledgeBaseResponse);
+  rpc GenerateQuestionIndexForKnowledgeBase(GenerateQuestionIndexForKnowledgeBaseRequest) returns(stream GenerateQuestionIndexForKnowledgeBaseResponse);
 
   // Entity Repository
   rpc ListEntityRepository(Empty) returns(ListEntityRepositoryResponse);
@@ -1330,12 +1330,13 @@ message GenerateQuestionIndexForKnowledgeBaseRequest {
   int64 KnowledgeBaseId = 1;
   string KnowledgeBaseName = 2;
   bool Force = 3;
+  string HiddenIndex = 4;
 }
 
 message GenerateQuestionIndexForKnowledgeBaseResponse {
-  string Message = 1;
-  string MessageType = 2;
-  string Data = 3;
+  double Percent = 1;
+  string Message = 2;
+  string MessageType = 3;
 }
 
 message BuildVectorIndexForKnowledgeBaseEntryRequest {

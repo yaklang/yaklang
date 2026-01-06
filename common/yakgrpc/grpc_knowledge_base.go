@@ -457,6 +457,41 @@ func (s *Server) GetKnowledgeBaseTypeList(ctx context.Context, req *ypb.Empty) (
 	}, nil
 }
 
-func (s *Server) GenerateQuestionIndexForKnowledgeBase(ctx context.Context, req *ypb.GenerateQuestionIndexForKnowledgeBaseRequest) (*ypb.GenerateQuestionIndexForKnowledgeBaseResponse, error) {
-	return nil, nil
+func (s *Server) GenerateQuestionIndexForKnowledgeBase(req *ypb.GenerateQuestionIndexForKnowledgeBaseRequest, stream ypb.Yak_GenerateQuestionIndexForKnowledgeBaseServer) error {
+	id := req.GetKnowledgeBaseId()
+	knowbaseName := req.GetKnowledgeBaseName()
+	hiddenIndex := req.GetHiddenIndex()
+	if knowbaseName == "" && id != 0 {
+		kb, err := knowledgebase.LoadKnowledgeBaseByID(consts.GetGormProfileDatabase(), id)
+		if err != nil {
+			return utils.Errorf("加载知识库失败: %v", err)
+		}
+		knowbaseName = kb.GetKnowledgeBaseInfo().KnowledgeBaseName
+	}
+	if knowbaseName == "" && id == 0 {
+		return utils.Errorf("知识库名称或ID不能为空")
+	}
+
+	ragSystem, err := rag.Get(knowbaseName)
+	if err != nil {
+		return utils.Errorf("加载知识库失败: %v", err)
+	}
+	if hiddenIndex != "" {
+		err = ragSystem.GenerateQuestionIndexForKnowledge(hiddenIndex)
+		if err != nil {
+			return utils.Errorf("生成问题索引失败: %v", err)
+		}
+	} else {
+		err = ragSystem.GenerateQuestionIndex(rag.WithProgressHandler(func(percent float64, message string, messageType string) {
+			stream.Send(&ypb.GenerateQuestionIndexForKnowledgeBaseResponse{
+				Percent:     percent,
+				Message:     message,
+				MessageType: messageType,
+			})
+		}))
+		if err != nil {
+			return utils.Errorf("生成问题索引失败: %v", err)
+		}
+	}
+	return nil
 }

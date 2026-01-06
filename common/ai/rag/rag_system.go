@@ -585,6 +585,45 @@ func (r *RAGSystem) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options 
 	return nil
 }
 
+func (r *RAGSystem) GenerateQuestionIndexForKnowledge(hiddenIndex string, options ...RAGSystemConfigOption) error {
+	ragConfig := r.newRagSystemConfig(options...)
+	docOpts := ragConfig.ConvertToDocumentOptions()
+
+	entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(ragConfig.db, hiddenIndex)
+	if err != nil {
+		return utils.Wrap(err, "failed to get knowledge base entry")
+	}
+
+	questionsMap, err := enhancesearch.BuildIndexQuestions([]string{entry.KnowledgeDetails}, ragConfig.GetAIService())
+	if err != nil {
+		return utils.Wrap(err, "failed to build index questions")
+	}
+	var questions []string
+	for _, qs := range questionsMap {
+		questions = append(questions, qs...)
+	}
+	if len(questions) > 0 {
+		entry.HasQuestionIndex = true
+		// 注意：这里可能需要更新 entry 到数据库，但这通常在调用 AddKnowledgeEntry 的上层或者由 KnowledgeBase.AddKnowledgeEntry 处理
+		// 实际上，KnowledgeBase.AddKnowledgeEntry 已经将 entry 保存到数据库了。
+		// 我们需要在这里更新 HasQuestionIndex 字段
+		if err := ragConfig.db.Model(entry).Update("has_question_index", true).Error; err != nil {
+			log.Errorf("failed to update has_question_index for entry %s: %v", entry.HiddenIndex, err)
+		}
+	}
+	for _, question := range questions {
+		questionId := entry.HiddenIndex + "_question_" + utils.CalcSha1(question)
+		entry.PotentialQuestions = append(entry.PotentialQuestions, question)
+		r.VectorStore.AddWithOptions(questionId, question, append(docOpts,
+			vectorstore.WithDocumentQuestionIndex(true),
+			vectorstore.WithDocumentMetadataKeyValue(schema.META_Data_UUID, entry.HiddenIndex),
+			// vectorstore.WithDocumentMetadataKeyValue(schema.META_Data_Title, question),
+			vectorstore.WithDocumentMetadataKeyValue(schema.META_KNOWLEDGE_TITLE, entry.KnowledgeTitle),
+		)...)
+	}
+	return nil
+}
+
 func (r *RAGSystem) GetKnowledgeBaseID() int64 {
 	return r.KnowledgeBase.GetID()
 }

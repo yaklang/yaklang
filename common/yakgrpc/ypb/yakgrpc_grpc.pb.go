@@ -1311,7 +1311,7 @@ type YakClient interface {
 	QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error)
 	BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
-	GenerateQuestionIndexForKnowledgeBase(ctx context.Context, in *GenerateQuestionIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GenerateQuestionIndexForKnowledgeBaseResponse, error)
+	GenerateQuestionIndexForKnowledgeBase(ctx context.Context, in *GenerateQuestionIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GenerateQuestionIndexForKnowledgeBaseResponse], error)
 	// Entity Repository
 	ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error)
 	// Entity CRUD
@@ -7788,15 +7788,24 @@ func (c *yakClient) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, i
 	return out, nil
 }
 
-func (c *yakClient) GenerateQuestionIndexForKnowledgeBase(ctx context.Context, in *GenerateQuestionIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GenerateQuestionIndexForKnowledgeBaseResponse, error) {
+func (c *yakClient) GenerateQuestionIndexForKnowledgeBase(ctx context.Context, in *GenerateQuestionIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GenerateQuestionIndexForKnowledgeBaseResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GenerateQuestionIndexForKnowledgeBaseResponse)
-	err := c.cc.Invoke(ctx, Yak_GenerateQuestionIndexForKnowledgeBase_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[105], Yak_GenerateQuestionIndexForKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &grpc.GenericClientStream[GenerateQuestionIndexForKnowledgeBaseRequest, GenerateQuestionIndexForKnowledgeBaseResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_GenerateQuestionIndexForKnowledgeBaseClient = grpc.ServerStreamingClient[GenerateQuestionIndexForKnowledgeBaseResponse]
 
 func (c *yakClient) ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7910,7 +7919,7 @@ func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotReques
 
 func (c *yakClient) ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[105], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[106], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7929,7 +7938,7 @@ type Yak_ExportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
 
 func (c *yakClient) ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[106], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[107], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7988,7 +7997,7 @@ func (c *yakClient) GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRe
 
 func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[107], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[108], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8716,7 +8725,7 @@ type YakServer interface {
 	QueryKnowledgeBaseByAI(*QueryKnowledgeBaseByAIRequest, grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]) error
 	BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error)
 	BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error)
-	GenerateQuestionIndexForKnowledgeBase(context.Context, *GenerateQuestionIndexForKnowledgeBaseRequest) (*GenerateQuestionIndexForKnowledgeBaseResponse, error)
+	GenerateQuestionIndexForKnowledgeBase(*GenerateQuestionIndexForKnowledgeBaseRequest, grpc.ServerStreamingServer[GenerateQuestionIndexForKnowledgeBaseResponse]) error
 	// Entity Repository
 	ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error)
 	// Entity CRUD
@@ -10430,8 +10439,8 @@ func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBase(context.Context, 
 func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBaseEntry not implemented")
 }
-func (UnimplementedYakServer) GenerateQuestionIndexForKnowledgeBase(context.Context, *GenerateQuestionIndexForKnowledgeBaseRequest) (*GenerateQuestionIndexForKnowledgeBaseResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GenerateQuestionIndexForKnowledgeBase not implemented")
+func (UnimplementedYakServer) GenerateQuestionIndexForKnowledgeBase(*GenerateQuestionIndexForKnowledgeBaseRequest, grpc.ServerStreamingServer[GenerateQuestionIndexForKnowledgeBaseResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method GenerateQuestionIndexForKnowledgeBase not implemented")
 }
 func (UnimplementedYakServer) ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListEntityRepository not implemented")
@@ -19785,23 +19794,16 @@ func _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_GenerateQuestionIndexForKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GenerateQuestionIndexForKnowledgeBaseRequest)
-	if err := dec(in); err != nil {
-		return nil, err
+func _Yak_GenerateQuestionIndexForKnowledgeBase_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GenerateQuestionIndexForKnowledgeBaseRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(YakServer).GenerateQuestionIndexForKnowledgeBase(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Yak_GenerateQuestionIndexForKnowledgeBase_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).GenerateQuestionIndexForKnowledgeBase(ctx, req.(*GenerateQuestionIndexForKnowledgeBaseRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(YakServer).GenerateQuestionIndexForKnowledgeBase(m, &grpc.GenericServerStream[GenerateQuestionIndexForKnowledgeBaseRequest, GenerateQuestionIndexForKnowledgeBaseResponse]{ServerStream: stream})
 }
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_GenerateQuestionIndexForKnowledgeBaseServer = grpc.ServerStreamingServer[GenerateQuestionIndexForKnowledgeBaseResponse]
 
 func _Yak_ListEntityRepository_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -21934,10 +21936,6 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler,
 		},
 		{
-			MethodName: "GenerateQuestionIndexForKnowledgeBase",
-			Handler:    _Yak_GenerateQuestionIndexForKnowledgeBase_Handler,
-		},
-		{
 			MethodName: "ListEntityRepository",
 			Handler:    _Yak_ListEntityRepository_Handler,
 		},
@@ -22539,6 +22537,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "QueryKnowledgeBaseByAI",
 			Handler:       _Yak_QueryKnowledgeBaseByAI_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GenerateQuestionIndexForKnowledgeBase",
+			Handler:       _Yak_GenerateQuestionIndexForKnowledgeBase_Handler,
 			ServerStreams: true,
 		},
 		{
