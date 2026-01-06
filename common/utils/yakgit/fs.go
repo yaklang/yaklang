@@ -108,6 +108,42 @@ func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, er
 	return vfs, nil
 }
 
+// fetchCommitFullTree 获取指定 commit 的完整文件系统（不是相对于父提交的变更）
+func fetchCommitFullTree(res *git.Repository, commitHash string) (*filesys.VirtualFS, error) {
+	commit, err := GetCommitHashEx(res, commitHash)
+	if err != nil {
+		return nil, err
+	}
+
+	// 使用 commit.Files() 而不是 tree.Files() 来确保获取所有文件
+	// commit.Files() 会递归遍历整个提交树中的所有文件
+	files, err := commit.Files()
+	if err != nil {
+		return nil, utils.Wrap(err, "get commit files")
+	}
+
+	vfs := filesys.NewVirtualFs()
+	count := 0
+	err = files.ForEach(func(file *object.File) error {
+		raw, err := file.Contents()
+		if err != nil {
+			log.Warn(utils.Wrapf(err, "read file %s failed", file.Name))
+			return nil
+		}
+		vfs.AddFile(file.Name, raw)
+		count++
+		return nil
+	})
+	if err != nil {
+		return nil, utils.Wrap(err, "iterate commit files")
+	}
+
+	log.Infof("fetched %d files from commit %s", count, commitHash[:16])
+	// 即使没有文件，也返回空的 VirtualFS，而不是错误
+	// 因为某些 commit 可能确实没有文件（虽然很少见）
+	return vfs, nil
+}
+
 // FileSystemFromCommit 从指定的commit中获取文件系统
 //
 // Example:
@@ -207,7 +243,9 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	}
 
 	log.Infof("start to fetch base virtual-fs from start: %v", start)
-	basevfs, err := fetchRespos(res, start)
+	// 使用 fetchCommitFullTree 获取 start commit 的完整文件系统
+	// 而不是使用 fetchRespos（它只返回相对于父提交的变更）
+	basevfs, err := fetchCommitFullTree(res, start)
 	if err != nil {
 		return nil, err
 	}
@@ -269,13 +307,22 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 			count++
 			fs.AddFile(dst.Name, content)
 		case merkletrie.Delete:
-			// 对于删除的文件,不需要特殊处理,因为新的fs中本来就没有
-			continue
+			// 对于删除的文件,从 basevfs 中删除
+			src := change.From
+			if a, _ := fs.Exists(src.Name); a {
+				err := fs.RemoveFileOrDir(src.Name)
+				if err != nil {
+					log.Warn(err)
+				}
+				count++
+			}
 		}
 	}
 
+	// 如果没有文件变更，返回 basevfs（包含 start commit 的所有文件）
+	// 这通常发生在 start 和 end 相同，或者它们之间没有文件变更的情况
 	if count <= 0 {
-		return nil, utils.Error("no file changed")
+		return basevfs, nil
 	}
 
 	return fs, nil
