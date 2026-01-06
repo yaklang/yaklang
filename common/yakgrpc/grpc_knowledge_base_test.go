@@ -401,3 +401,81 @@ func TestMUSTPASS_TestOnlyIsDefaultFilter(t *testing.T) {
 	// 应该返回空结果
 	assert.Len(t, onlyDefaultWithWrongKeywordResponse.KnowledgeBases, 0, "OnlyIsDefault=true + 不存在的 Keyword 应该返回空结果")
 }
+
+func TestGenerateQuestionIndexForKnowledgeBase(t *testing.T) {
+	t.Skip("缺少对 ai 和 mebedding 的 mock，暂时跳过")
+	client, err := NewLocalClient()
+	require.NoError(t, err, "创建本地客户端失败")
+
+	ctx := context.Background()
+	kbName := "test_gen_q_idx_" + utils.RandStringBytes(6)
+
+	// 清理
+	defer func() {
+		client.DeleteKnowledgeBase(ctx, &ypb.DeleteKnowledgeBaseRequest{Name: kbName})
+	}()
+
+	// 1. 创建知识库
+	createResp, err := client.CreateKnowledgeBaseV2(ctx, &ypb.CreateKnowledgeBaseV2Request{
+		Name:        kbName,
+		Description: "test description",
+		Tags:        []string{"test"},
+	})
+	require.NoError(t, err)
+	require.True(t, createResp.IsSuccess)
+	kbId := createResp.KnowledgeBase.ID
+
+	// 2. 添加条目
+	_, err = client.CreateKnowledgeBaseEntry(ctx, &ypb.CreateKnowledgeBaseEntryRequest{
+		KnowledgeBaseID:  kbId,
+		KnowledgeTitle:   "Test Entry",
+		KnowledgeType:    "text",
+		KnowledgeDetails: "This is a test entry content for generating question index.",
+		ImportanceScore:  5,
+	})
+	require.NoError(t, err)
+
+	// 获取刚才创建的 entry 的 HiddenIndex
+	searchResp, err := client.SearchKnowledgeBaseEntry(ctx, &ypb.SearchKnowledgeBaseEntryRequest{
+		KnowledgeBaseId: kbId,
+		Pagination:      &ypb.Paging{Page: 1, Limit: 10},
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, searchResp.KnowledgeBaseEntries)
+	entryHiddenIndex := searchResp.KnowledgeBaseEntries[0].HiddenIndex
+
+	// 3. 调用 GenerateQuestionIndexForKnowledgeBase (指定条目)
+	stream, err := client.GenerateQuestionIndexForKnowledgeBase(ctx, &ypb.GenerateQuestionIndexForKnowledgeBaseRequest{
+		KnowledgeBaseId: kbId,
+		HiddenIndex:     entryHiddenIndex,
+	})
+	require.NoError(t, err)
+
+	// 对于单个条目生成，目前服务端实现可能不发送任何消息直接返回EOF（或者只发送错误）
+	// 我们只要确保没有返回错误即可
+	for {
+		_, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err, "接收流消息时出错")
+	}
+
+	// 4. 调用 GenerateQuestionIndexForKnowledgeBase (全量)
+	streamAll, err := client.GenerateQuestionIndexForKnowledgeBase(ctx, &ypb.GenerateQuestionIndexForKnowledgeBaseRequest{
+		KnowledgeBaseId: kbId,
+	})
+	require.NoError(t, err)
+
+	receivedMessages := false
+	for {
+		resp, err := streamAll.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err, "接收流消息时出错")
+		receivedMessages = true
+		t.Logf("收到进度: %.2f%%, 消息: %s", resp.Percent, resp.Message)
+	}
+	assert.True(t, receivedMessages, "全量生成应该收到进度消息")
+}

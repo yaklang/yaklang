@@ -242,6 +242,12 @@ func WithExportOnProgressHandler(progressHandler func(percent float64, message s
 	}
 }
 
+func WithProgressHandler(progressHandler func(percent float64, message string, messageType string)) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.progressHandler = progressHandler
+	}
+}
+
 func WithKnowledgeBaseType(knowledgeBaseType string) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.knowledgeBaseType = knowledgeBaseType

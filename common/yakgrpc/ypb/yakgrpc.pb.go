@@ -4112,6 +4112,7 @@ type GenerateQuestionIndexForKnowledgeBaseRequest struct {
 	KnowledgeBaseId   int64                  `protobuf:"varint,1,opt,name=KnowledgeBaseId,proto3" json:"KnowledgeBaseId,omitempty"`
 	KnowledgeBaseName string                 `protobuf:"bytes,2,opt,name=KnowledgeBaseName,proto3" json:"KnowledgeBaseName,omitempty"`
 	Force             bool                   `protobuf:"varint,3,opt,name=Force,proto3" json:"Force,omitempty"`
+	HiddenIndex       string                 `protobuf:"bytes,4,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -4167,11 +4168,18 @@ func (x *GenerateQuestionIndexForKnowledgeBaseRequest) GetForce() bool {
 	return false
 }
 
+func (x *GenerateQuestionIndexForKnowledgeBaseRequest) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
 type GenerateQuestionIndexForKnowledgeBaseResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=Message,proto3" json:"Message,omitempty"`
-	MessageType   string                 `protobuf:"bytes,2,opt,name=MessageType,proto3" json:"MessageType,omitempty"`
-	Data          string                 `protobuf:"bytes,3,opt,name=Data,proto3" json:"Data,omitempty"`
+	Percent       float64                `protobuf:"fixed64,1,opt,name=Percent,proto3" json:"Percent,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=Message,proto3" json:"Message,omitempty"`
+	MessageType   string                 `protobuf:"bytes,3,opt,name=MessageType,proto3" json:"MessageType,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4206,6 +4214,13 @@ func (*GenerateQuestionIndexForKnowledgeBaseResponse) Descriptor() ([]byte, []in
 	return file_yakgrpc_proto_rawDescGZIP(), []int{57}
 }
 
+func (x *GenerateQuestionIndexForKnowledgeBaseResponse) GetPercent() float64 {
+	if x != nil {
+		return x.Percent
+	}
+	return 0
+}
+
 func (x *GenerateQuestionIndexForKnowledgeBaseResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
@@ -4216,13 +4231,6 @@ func (x *GenerateQuestionIndexForKnowledgeBaseResponse) GetMessage() string {
 func (x *GenerateQuestionIndexForKnowledgeBaseResponse) GetMessageType() string {
 	if x != nil {
 		return x.MessageType
-	}
-	return ""
-}
-
-func (x *GenerateQuestionIndexForKnowledgeBaseResponse) GetData() string {
-	if x != nil {
-		return x.Data
 	}
 	return ""
 }
@@ -65233,15 +65241,16 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Error\x18\x02 \x01(\tR\x05Error\"F\n" +
 	"\x1cStartThirdPartyBinaryRequest\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Args\x18\x02 \x03(\tR\x04Args\"\x9c\x01\n" +
+	"\x04Args\x18\x02 \x03(\tR\x04Args\"\xbe\x01\n" +
 	",GenerateQuestionIndexForKnowledgeBaseRequest\x12(\n" +
 	"\x0fKnowledgeBaseId\x18\x01 \x01(\x03R\x0fKnowledgeBaseId\x12,\n" +
 	"\x11KnowledgeBaseName\x18\x02 \x01(\tR\x11KnowledgeBaseName\x12\x14\n" +
-	"\x05Force\x18\x03 \x01(\bR\x05Force\"\x7f\n" +
+	"\x05Force\x18\x03 \x01(\bR\x05Force\x12 \n" +
+	"\vHiddenIndex\x18\x04 \x01(\tR\vHiddenIndex\"\x85\x01\n" +
 	"-GenerateQuestionIndexForKnowledgeBaseResponse\x12\x18\n" +
-	"\aMessage\x18\x01 \x01(\tR\aMessage\x12 \n" +
-	"\vMessageType\x18\x02 \x01(\tR\vMessageType\x12\x12\n" +
-	"\x04Data\x18\x03 \x01(\tR\x04Data\"\x8e\x04\n" +
+	"\aPercent\x18\x01 \x01(\x01R\aPercent\x12\x18\n" +
+	"\aMessage\x18\x02 \x01(\tR\aMessage\x12 \n" +
+	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"\x8e\x04\n" +
 	",BuildVectorIndexForKnowledgeBaseEntryRequest\x122\n" +
 	"\x14KnowledgeBaseEntryId\x18\x01 \x01(\x03R\x14KnowledgeBaseEntryId\x12D\n" +
 	"\x1dKnowledgeBaseEntryHiddenIndex\x18\r \x01(\tR\x1dKnowledgeBaseEntryHiddenIndex\x12(\n" +
@@ -70559,7 +70568,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xc1\xd8\x02\n" +
+	"\tXorBase64\x10\x052\xc3\xd8\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -71337,8 +71346,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18SearchKnowledgeBaseEntry\x12$.ypb.SearchKnowledgeBaseEntryRequest\x1a%.ypb.SearchKnowledgeBaseEntryResponse\x12c\n" +
 	"\x16QueryKnowledgeBaseByAI\x12\".ypb.QueryKnowledgeBaseByAIRequest\x1a#.ypb.QueryKnowledgeBaseByAIResponse0\x01\x12f\n" +
 	" BuildVectorIndexForKnowledgeBase\x12,.ypb.BuildVectorIndexForKnowledgeBaseRequest\x1a\x14.ypb.GeneralResponse\x12p\n" +
-	"%BuildVectorIndexForKnowledgeBaseEntry\x121.ypb.BuildVectorIndexForKnowledgeBaseEntryRequest\x1a\x14.ypb.GeneralResponse\x12\x8e\x01\n" +
-	"%GenerateQuestionIndexForKnowledgeBase\x121.ypb.GenerateQuestionIndexForKnowledgeBaseRequest\x1a2.ypb.GenerateQuestionIndexForKnowledgeBaseResponse\x12E\n" +
+	"%BuildVectorIndexForKnowledgeBaseEntry\x121.ypb.BuildVectorIndexForKnowledgeBaseEntryRequest\x1a\x14.ypb.GeneralResponse\x12\x90\x01\n" +
+	"%GenerateQuestionIndexForKnowledgeBase\x121.ypb.GenerateQuestionIndexForKnowledgeBaseRequest\x1a2.ypb.GenerateQuestionIndexForKnowledgeBaseResponse0\x01\x12E\n" +
 	"\x14ListEntityRepository\x12\n" +
 	".ypb.Empty\x1a!.ypb.ListEntityRepositoryResponse\x12@\n" +
 	"\vQueryEntity\x12\x17.ypb.QueryEntityRequest\x1a\x18.ypb.QueryEntityResponse\x122\n" +
