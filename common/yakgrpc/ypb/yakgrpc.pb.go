@@ -48602,8 +48602,11 @@ type MITMFilterData struct {
 	ExcludeUri       []*FilterDataItem      `protobuf:"bytes,6,rep,name=ExcludeUri,proto3" json:"ExcludeUri,omitempty"`
 	ExcludeMethods   []*FilterDataItem      `protobuf:"bytes,7,rep,name=ExcludeMethods,proto3" json:"ExcludeMethods,omitempty"`
 	ExcludeMIME      []*FilterDataItem      `protobuf:"bytes,8,rep,name=ExcludeMIME,proto3" json:"ExcludeMIME,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	// 使用 optional 以区分“未设置”和“显式设置为 false”，便于运行时更新开关且不误伤其他控制消息。
+	AllowChunkStaticJS *bool `protobuf:"varint,9,opt,name=AllowChunkStaticJS,proto3,oneof" json:"AllowChunkStaticJS,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *MITMFilterData) Reset() {
@@ -48690,6 +48693,13 @@ func (x *MITMFilterData) GetExcludeMIME() []*FilterDataItem {
 		return x.ExcludeMIME
 	}
 	return nil
+}
+
+func (x *MITMFilterData) GetAllowChunkStaticJS() bool {
+	if x != nil && x.AllowChunkStaticJS != nil {
+		return *x.AllowChunkStaticJS
+	}
+	return false
 }
 
 type Certificate struct {
@@ -69180,7 +69190,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12updateHijackFilter\x18B \x01(\bR\x12updateHijackFilter\"H\n" +
 	"\x0eFilterDataItem\x12 \n" +
 	"\vMatcherType\x18\x01 \x01(\tR\vMatcherType\x12\x14\n" +
-	"\x05Group\x18\x02 \x03(\tR\x05Group\"\xe6\x03\n" +
+	"\x05Group\x18\x02 \x03(\tR\x05Group\"\xb2\x04\n" +
 	"\x0eMITMFilterData\x12?\n" +
 	"\x10IncludeHostnames\x18\x01 \x03(\v2\x13.ypb.FilterDataItemR\x10IncludeHostnames\x12?\n" +
 	"\x10ExcludeHostnames\x18\x02 \x03(\v2\x13.ypb.FilterDataItemR\x10ExcludeHostnames\x129\n" +
@@ -69193,7 +69203,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ExcludeUri\x18\x06 \x03(\v2\x13.ypb.FilterDataItemR\n" +
 	"ExcludeUri\x12;\n" +
 	"\x0eExcludeMethods\x18\a \x03(\v2\x13.ypb.FilterDataItemR\x0eExcludeMethods\x125\n" +
-	"\vExcludeMIME\x18\b \x03(\v2\x13.ypb.FilterDataItemR\vExcludeMIME\"\xc3\x01\n" +
+	"\vExcludeMIME\x18\b \x03(\v2\x13.ypb.FilterDataItemR\vExcludeMIME\x123\n" +
+	"\x12AllowChunkStaticJS\x18\t \x01(\bH\x00R\x12AllowChunkStaticJS\x88\x01\x01B\x15\n" +
+	"\x13_AllowChunkStaticJS\"\xc3\x01\n" +
 	"\vCertificate\x12\x16\n" +
 	"\x06CrtPem\x18\x01 \x01(\fR\x06CrtPem\x12\x16\n" +
 	"\x06KeyPem\x18\x02 \x01(\fR\x06KeyPem\x12&\n" +
@@ -74066,6 +74078,7 @@ func file_yakgrpc_proto_init() {
 	if File_yakgrpc_proto != nil {
 		return
 	}
+	file_yakgrpc_proto_msgTypes[662].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
