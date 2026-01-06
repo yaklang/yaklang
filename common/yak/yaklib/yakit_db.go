@@ -348,7 +348,7 @@ func queryPortsByRuntimeId(runtimeID string) (chan *schema.Port, error) {
 	return yakit.YieldPorts(db, context.Background()), nil
 }
 
-func queryHTTPFlowByID(id ...int64) chan *schema.HTTPFlow {
+func queryHTTPFlowsByID(id ...int64) chan *schema.HTTPFlow {
 	ch := make(chan *schema.HTTPFlow, 100)
 	go func() {
 		defer close(ch)
@@ -362,6 +362,19 @@ func queryHTTPFlowByID(id ...int64) chan *schema.HTTPFlow {
 		}
 	}()
 	return ch
+}
+
+func queryHTTPFlowByID(id int64) (*schema.HTTPFlow, error) {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return nil, utils.Errorf("Query HTTPFlow By ID Failed: cannot found database")
+	}
+	var flow schema.HTTPFlow
+	db.Model(&schema.HTTPFlow{}).Where("id = ?", id).First(&flow)
+	if db.Error != nil {
+		return nil, utils.Errorf("Query HTTPFlow By ID Failed: %s", db.Error)
+	}
+	return &flow, nil
 }
 
 func queryAllUrls() chan string {
