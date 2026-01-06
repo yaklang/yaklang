@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -52,11 +54,40 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 			}
 
 		case "output_event":
-			var events []*schema.AiOutputEvent
 			if len(coordinatorIDs) > 0 {
-				if err := db.Where("coordinator_id IN (?)", coordinatorIDs).Find(&events).Error; err != nil {
-					return nil, utils.Errorf("failed to query events: %v", err)
+				queryEventRsp, err := s.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+					Filter: &ypb.AIEventFilter{
+						CoordinatorId: coordinatorIDs,
+					},
+				})
+				if err != nil {
+					log.Errorf("failed to query events: %v", err)
+					continue
 				}
+				events := lo.Map(queryEventRsp.Events, func(item *ypb.AIOutputEvent, _ int) *schema.AiOutputEvent {
+					return &schema.AiOutputEvent{
+						CoordinatorId:   item.CoordinatorId,
+						Type:            schema.EventType(item.Type),
+						NodeId:          item.NodeId,
+						IsSystem:        item.IsSystem,
+						IsStream:        item.IsStream,
+						IsReason:        item.IsReason,
+						IsSync:          item.IsSync,
+						StreamDelta:     item.StreamDelta,
+						IsJson:          item.IsJson,
+						Content:         item.Content,
+						Timestamp:       item.Timestamp,
+						TaskIndex:       item.TaskIndex,
+						DisableMarkdown: item.DisableMarkdown,
+						SyncID:          item.SyncID,
+						EventUUID:       item.EventUUID,
+						CallToolID:      item.CallToolID,
+						ContentType:     item.ContentType,
+						AIService:       item.AIService,
+						TaskUUID:        item.TaskUUID,
+						AIModelName:     item.AIModelName,
+					}
+				})
 				dataToExport["AIOutputEvent"] = events
 			}
 
