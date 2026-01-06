@@ -120,10 +120,12 @@ func StartReserveDNSCache(ctx context.Context) (*PcapReserveDNSCache, error) {
 		return nil, err
 	}
 
+	subCtx, cancel := context.WithCancel(ctx)
+
 	m := &PcapReserveDNSCache{
 		aCache:     omap.NewOrderedMap[string, []string](map[string][]string{}),
 		cNameCache: omap.NewOrderedMap[string, []string](map[string][]string{}),
-		ctx:        ctx,
+		ctx:        subCtx,
 	}
 
 	localIP := make([]string, 0)
@@ -153,8 +155,9 @@ func StartReserveDNSCache(ctx context.Context) (*PcapReserveDNSCache, error) {
 
 	var start = make(chan struct{})
 	go func() {
+		defer cancel()
 		err = pcaputil.Start(
-			pcaputil.WithContext(ctx),
+			pcaputil.WithContext(subCtx),
 			pcaputil.WithCaptureStartedCallback(func() {
 				close(start)
 			}),
@@ -207,8 +210,8 @@ func StartReserveDNSCache(ctx context.Context) (*PcapReserveDNSCache, error) {
 	}()
 	select {
 	case <-start:
-	case <-ctx.Done():
-		return nil, utils.Errorf("pcap reserve dns context done before start: %s", ctx.Err())
+	case <-subCtx.Done():
+		return nil, utils.Errorf("pcap reserve dns context done before start: %s", subCtx.Err())
 	}
 	return m, nil
 }

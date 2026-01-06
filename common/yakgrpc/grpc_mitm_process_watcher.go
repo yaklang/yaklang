@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/sysproc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 	"time"
 )
 
@@ -36,19 +37,20 @@ func (s *Server) WatchProcessConnection(stream ypb.Yak_WatchProcessConnectionSer
 		}
 	}
 
+	var sendMu sync.Mutex // 必须在 feedback 外部定义，确保多个 feedback 调用共享一把锁
+
 	feedback := func(ActionType string, p *sysproc.ProcessBasicInfo) {
-		select {
-		case <-stream.Context().Done():
-			log.Printf("Stream is closed by client, dropping message: %s", ActionType)
+		if stream.Context().Err() != nil {
 			return
-		default:
-			err := stream.Send(&ypb.WatchProcessResponse{
-				Action:  ActionType,
-				Process: ProcessInfo2GRPC(p),
-			})
-			if err != nil {
-				log.Printf("Send error: %v", err)
-			}
+		}
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		err := stream.Send(&ypb.WatchProcessResponse{
+			Action:  ActionType,
+			Process: ProcessInfo2GRPC(p),
+		})
+		if err != nil {
+			log.Printf("Send error: %v", err)
 		}
 	}
 
@@ -56,10 +58,19 @@ func (s *Server) WatchProcessConnection(stream ypb.Yak_WatchProcessConnectionSer
 	processWatcher.Start(
 		ctx,
 		func(ctx context.Context, p *sysproc.ProcessBasicInfo) {
-			feedback("start", p)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				feedback("start", p)
+			}
 		},
 		func(ctx context.Context, p *sysproc.ProcessBasicInfo) {
-			feedback("exit", p)
+			select {
+			case <-ctx.Done():
+			default:
+				feedback("exit", p)
+			}
 		},
 		time.Duration(startParams.CheckIntervalSeconds)*time.Second,
 	)
@@ -86,7 +97,6 @@ func (s *Server) WatchProcessConnection(stream ypb.Yak_WatchProcessConnectionSer
 		if dnsWatcher != nil {
 			for _, connection := range connections {
 				rAddr := utils.HostPort(connection.Raddr.IP, int(connection.Raddr.Port))
-
 				if _, ok := connectionMap[rAddr]; !ok {
 					connectionMap[rAddr] = make([]string, 0)
 				}
