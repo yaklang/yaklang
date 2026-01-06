@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/wsm"
-	"github.com/yaklang/yaklang/common/yak/yakurl/java_decompiler"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -68,28 +66,17 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return action
 	}
 
+	// 再尝试创建 Yakit 专用的 action（如果 schema 匹配）
+	if action := createYakitAction(schema); action != nil {
+		return action
+	}
+
 	// 处理其他共享的 action
 	switch schema {
 	case "file":
 		return &fileSystemAction{
 			fs: filesys.NewLocalFs(),
 		}
-	case "website":
-		return &websiteFromHttpFlow{}
-	case "behinder":
-		return &wsm.BehidnerResourceSystemAction{}
-	case "godzilla":
-		return &wsm.GodzillaFileSystemAction{}
-	case "fuzztag":
-		return &fuzzTagDocAction{}
-	case "yakdocument":
-		return &documentAction{}
-	case "facades":
-		return newFacadeServerAction()
-	case "yakshell":
-		return &wsm.YakShellResourceAction{}
-	case "javadec":
-		return java_decompiler.NewJavaDecompilerAction()
 	default:
 		return nil
 	}
