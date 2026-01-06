@@ -201,11 +201,20 @@ var GitCommands = []*cli.Command{
 				Usage: "GitHub Pull Request number (e.g., 3774). When set, uses PR file changes instead of commit range",
 			},
 			cli.StringFlag{
+				Name:  "branch",
+				Usage: "Branch name (e.g., fix/yakgit/fs-diff-check). When set, uses branch diff against base branch. Convenient for local testing.",
+			},
+			cli.StringFlag{
+				Name:  "base-branch",
+				Usage: "Base branch name for comparison (default: main). Used with --branch",
+				Value: "main",
+			},
+			cli.StringFlag{
 				Name:  "owner",
 				Usage: "GitHub repository owner (e.g., yaklang). Required when using --pr",
 			},
 			cli.StringFlag{
-				Name:  "repo",
+				Name:  "github-repo",
 				Usage: "GitHub repository name (e.g., yaklang). Required when using --pr",
 			},
 			cli.StringFlag{
@@ -222,8 +231,10 @@ var GitCommands = []*cli.Command{
 			end := c.String("end")
 			output := c.String("output")
 			prNumber := c.Int("pr")
+			branchName := c.String("branch")
+			baseBranch := c.String("base-branch")
 			owner := c.String("owner")
-			repoName := c.String("repo")
+			repoName := c.String("github-repo")
 			token := c.String("token")
 			repos := c.String("repository")
 			if repos == "" {
@@ -240,6 +251,9 @@ var GitCommands = []*cli.Command{
 				if prNumber > 0 {
 					// PR 模式：使用 PR 编号
 					suffix = fmt.Sprintf("pr%d", prNumber)
+				} else if branchName != "" {
+					// 分支模式：使用分支名
+					suffix = strings.ReplaceAll(branchName, "/", "-")
 				} else if start == "" && end == "" {
 					suffix = strings.Join(lo.Map(c.Args(), func(i string, _ int) string {
 						if len(i) > 7 {
@@ -295,10 +309,33 @@ var GitCommands = []*cli.Command{
 				log.Infof("write zip file: %v (total %d files)", fileName, fileCount)
 			}
 
+			// 如果指定了分支名，使用分支模式（优先于 PR 模式，方便本地测试）
+			if branchName != "" {
+				log.Infof("Using branch mode: branch %s against base %s", branchName, baseBranch)
+				// 获取 base 分支的 commit hash
+				baseHash, err := yakgit.RevParse(repos, baseBranch)
+				if err != nil {
+					return utils.Wrapf(err, "failed to resolve base branch %s", baseBranch)
+				}
+				// 获取目标分支的 commit hash
+				branchHash, err := yakgit.RevParse(repos, branchName)
+				if err != nil {
+					return utils.Wrapf(err, "failed to resolve branch %s", branchName)
+				}
+				log.Infof("Base branch %s: %s, Branch %s: %s", baseBranch, baseHash[:8], branchName, branchHash[:8])
+				// 使用 commit range 模式
+				lfs, err := yakgit.FromCommitRange(repos, baseHash, branchHash)
+				if err != nil {
+					return utils.Wrap(err, "fetch branch diff failed")
+				}
+				handleResult(lfs)
+				return nil
+			}
+
 			// 如果指定了 PR，使用 PR 模式
 			if prNumber > 0 {
 				if owner == "" || repoName == "" {
-					return utils.Error("--owner and --repo are required when using --pr")
+					return utils.Error("--owner and --github-repo are required when using --pr")
 				}
 				log.Infof("Using PR mode: PR #%d from %s/%s", prNumber, owner, repoName)
 				lfs, err := yakgit.FromPullRequest(owner, repoName, prNumber, token, repos)

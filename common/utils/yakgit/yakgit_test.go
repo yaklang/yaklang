@@ -13,6 +13,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/stretchr/testify/assert"
@@ -202,12 +203,11 @@ func TestFSConverter_Short(t *testing.T) {
 	assert.Empty(t, raw)
 }
 
-// TestFromCommitRangeNoDirectChanges 测试当 start 和 end 之间没有直接变更时的场景
-// 场景：commit1 修改 file1，commit2 修改 file2，commit3 撤销 file3 的修改
-// 从 commit1 到 commit3 可能没有直接变更，但应该返回 commit3 的完整文件系统
-func TestFromCommitRangeNoDirectChanges(t *testing.T) {
+// TestFromCommitRangeWithBranch 测试使用分支名获取文件系统的功能
+// 场景：创建 main 分支和 feature 分支，测试从 main 到 feature 分支的 diff
+func TestFromCommitRangeWithBranch(t *testing.T) {
 	// 创建临时目录
-	tmpDir, err := os.MkdirTemp("", "yakgit-test-*")
+	tmpDir, err := os.MkdirTemp("", "yakgit-test-branch-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -219,7 +219,7 @@ func TestFromCommitRangeNoDirectChanges(t *testing.T) {
 	wt, err := repo.Worktree()
 	require.NoError(t, err)
 
-	// 第一次提交：创建 file1.txt
+	// 在 main 分支上：第一次提交：创建 file1.txt（必须先有提交才能获取 HEAD）
 	file1Path := "file1.txt"
 	err = os.WriteFile(filepath.Join(tmpDir, file1Path), []byte("Initial content of file1\n"), 0644)
 	require.NoError(t, err)
@@ -227,7 +227,7 @@ func TestFromCommitRangeNoDirectChanges(t *testing.T) {
 	_, err = wt.Add(file1Path)
 	require.NoError(t, err)
 
-	commit1Hash, err := wt.Commit("Commit 1: add file1", &git.CommitOptions{
+	commit1Hash, err := wt.Commit("Commit 1: add file1 on main", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "Test User",
 			Email: "test@example.com",
@@ -235,23 +235,57 @@ func TestFromCommitRangeNoDirectChanges(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	commit1HashStr := commit1Hash.String()
-	t.Logf("Commit 1 hash: %s", commit1HashStr)
+	t.Logf("Commit 1 hash: %s", commit1Hash.String())
 
-	// 第二次提交：修改 file1.txt，添加 file2.txt
-	err = os.WriteFile(filepath.Join(tmpDir, file1Path), []byte("Modified content of file1\n"), 0644)
+	// 获取当前分支名（可能是 master 或 main），现在 HEAD 已经存在
+	headRef, err := repo.Head()
+	require.NoError(t, err)
+	mainBranchName := headRef.Name().Short()
+	t.Logf("Default branch name: %s", mainBranchName)
+
+	// 在 main 分支上：第二次提交：添加 file2.txt
+	file2Path := "file2.txt"
+	err = os.WriteFile(filepath.Join(tmpDir, file2Path), []byte("Content of file2 on main\n"), 0644)
 	require.NoError(t, err)
 
-	file2Path := "file2.txt"
-	err = os.WriteFile(filepath.Join(tmpDir, file2Path), []byte("Content of file2\n"), 0644)
+	_, err = wt.Add(file2Path)
+	require.NoError(t, err)
+
+	commit2Hash, err := wt.Commit("Commit 2: add file2 on main", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test User",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	})
+	require.NoError(t, err)
+	t.Logf("Commit 2 hash: %s", commit2Hash.String())
+
+	// 创建 feature 分支
+	featureBranchName := "feature/test-branch"
+	headRef, err = repo.Head()
+	require.NoError(t, err)
+
+	// 创建新分支引用
+	featureRef := plumbing.NewBranchReferenceName(featureBranchName)
+	err = repo.Storer.SetReference(plumbing.NewHashReference(featureRef, headRef.Hash()))
+	require.NoError(t, err)
+
+	// 切换到 feature 分支
+	err = wt.Checkout(&git.CheckoutOptions{
+		Branch: featureRef,
+		Create: false,
+	})
+	require.NoError(t, err)
+
+	// 在 feature 分支上：修改 file1.txt
+	err = os.WriteFile(filepath.Join(tmpDir, file1Path), []byte("Modified content of file1 on feature branch\n"), 0644)
 	require.NoError(t, err)
 
 	_, err = wt.Add(file1Path)
 	require.NoError(t, err)
-	_, err = wt.Add(file2Path)
-	require.NoError(t, err)
 
-	commit2Hash, err := wt.Commit("Commit 2: modify file1, add file2", &git.CommitOptions{
+	commit3Hash, err := wt.Commit("Commit 3: modify file1 on feature", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "Test User",
 			Email: "test@example.com",
@@ -259,18 +293,17 @@ func TestFromCommitRangeNoDirectChanges(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	commit2HashStr := commit2Hash.String()
-	t.Logf("Commit 2 hash: %s", commit2HashStr)
+	t.Logf("Commit 3 hash: %s", commit3Hash.String())
 
-	// 第三次提交：添加 file3.txt，然后删除它（撤销）
+	// 在 feature 分支上：添加 file3.txt
 	file3Path := "file3.txt"
-	err = os.WriteFile(filepath.Join(tmpDir, file3Path), []byte("Content of file3\n"), 0644)
+	err = os.WriteFile(filepath.Join(tmpDir, file3Path), []byte("Content of file3 on feature branch\n"), 0644)
 	require.NoError(t, err)
 
 	_, err = wt.Add(file3Path)
 	require.NoError(t, err)
 
-	commit3Hash, err := wt.Commit("Commit 3: add file3", &git.CommitOptions{
+	commit4Hash, err := wt.Commit("Commit 4: add file3 on feature", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  "Test User",
 			Email: "test@example.com",
@@ -278,61 +311,130 @@ func TestFromCommitRangeNoDirectChanges(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	commit3HashStr := commit3Hash.String()
-	t.Logf("Commit 3 hash: %s", commit3HashStr)
+	t.Logf("Commit 4 hash: %s", commit4Hash.String())
 
-	// 第四次提交：删除 file3.txt（撤销 commit3 的修改）
-	_, err = wt.Remove(file3Path)
-	require.NoError(t, err)
+	// 辅助函数：获取分支的完整文件树
+	getBranchFileTree := func(branchName string) (*filesys.VirtualFS, error) {
+		res, err := GitOpenRepositoryWithCache(tmpDir)
+		if err != nil {
+			return nil, err
+		}
+		branchRef, err := res.Reference(plumbing.ReferenceName("refs/heads/"+branchName), true)
+		if err != nil {
+			return nil, err
+		}
+		commit, err := res.CommitObject(branchRef.Hash())
+		if err != nil {
+			return nil, err
+		}
+		files, err := commit.Files()
+		if err != nil {
+			return nil, err
+		}
+		vfs := filesys.NewVirtualFs()
+		err = files.ForEach(func(file *object.File) error {
+			raw, err := file.Contents()
+			if err != nil {
+				return err
+			}
+			vfs.AddFile(file.Name, raw)
+			return nil
+		})
+		return vfs, err
+	}
 
-	commit4Hash, err := wt.Commit("Commit 4: remove file3 (revert commit3)", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Test User",
-			Email: "test@example.com",
-			When:  time.Now(),
-		},
-	})
-	require.NoError(t, err)
-	commit4HashStr := commit4Hash.String()
-	t.Logf("Commit 4 hash: %s", commit4HashStr)
+	// 测试：使用分支名从 main 到 feature 分支
+	t.Run("FromCommitRange-main-to-feature-branch", func(t *testing.T) {
+		// 打印 main 分支的文件树
+		mainFs, err := getBranchFileTree(mainBranchName)
+		require.NoError(t, err)
+		t.Logf("=== %s branch file tree ===", mainBranchName)
+		filesys.TreeView(mainFs)
 
-	// 测试：从 commit1 到 commit4，commit1 和 commit4 之间可能没有直接变更
-	// 但应该返回 commit4 的完整文件系统
-	t.Run("FromCommitRange-commit1-to-commit4", func(t *testing.T) {
-		fs, err := FromCommitRange(tmpDir, commit1HashStr, commit4HashStr)
-		require.NoError(t, err, "should return commit4's full file system even if no direct changes")
+		// 打印 feature 分支的文件树
+		featureFs, err := getBranchFileTree(featureBranchName)
+		require.NoError(t, err)
+		t.Logf("=== %s branch file tree ===", featureBranchName)
+		filesys.TreeView(featureFs)
 
-		// 应该包含 commit4 的所有文件
+		// 说明修改情况
+		t.Logf("=== Changes from %s to %s ===", mainBranchName, featureBranchName)
+		t.Logf("  - file1.txt: MODIFIED (content changed)")
+		t.Logf("  - file2.txt: UNCHANGED (same content)")
+		t.Logf("  - file3.txt: ADDED (new file)")
+
+		// 使用分支名而不是 commit hash
+		fs, err := FromCommitRange(tmpDir, mainBranchName, featureBranchName)
+		require.NoError(t, err, "should return feature branch's file system diff from main")
+
+		// 打印 diff 文件树（使用与 gitefs 命令相同的功能）
+		t.Logf("=== Diff file tree (from %s to %s) ===", mainBranchName, featureBranchName)
+		filesys.TreeView(fs)
+
+		// file1 应该被修改（变更的文件）
 		raw, err := fs.ReadFile(file1Path)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "Modified content of file1")
+		assert.Contains(t, string(raw), "Modified content of file1 on feature branch")
 
-		raw, err = fs.ReadFile(file2Path)
+		// file2 不应该存在（未变更的文件）
+		exists, _ := fs.Exists(file2Path)
+		assert.False(t, exists, "file2 should not exist in diff (unchanged file)")
+
+		// file3 应该存在（feature 分支新增，变更的文件）
+		raw, err = fs.ReadFile(file3Path)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "Content of file2")
-
-		// file3 应该不存在（因为 commit4 删除了它）
-		exists, _ := fs.Exists(file3Path)
-		assert.False(t, exists, "file3 should not exist in commit4")
+		assert.Contains(t, string(raw), "Content of file3 on feature branch")
 	})
 
-	// 测试：从 commit3 到 commit4，commit3 添加了 file3，commit4 删除了 file3
-	// 这种情况下，start 和 end 之间没有净变更，但应该返回 commit4 的完整文件系统
-	t.Run("FromCommitRange-commit3-to-commit4", func(t *testing.T) {
-		fs, err := FromCommitRange(tmpDir, commit3HashStr, commit4HashStr)
-		require.NoError(t, err, "should return commit4's full file system even if file3 was added then removed")
+	// 测试：使用分支名从 feature 到 main（反向）
+	// 应该只返回变更的文件：file1.txt（修改）和 file3.txt（删除）
+	t.Run("FromCommitRange-feature-to-main-branch", func(t *testing.T) {
+		// 打印 feature 分支的文件树
+		featureFs, err := getBranchFileTree(featureBranchName)
+		require.NoError(t, err)
+		t.Logf("=== %s branch file tree ===", featureBranchName)
+		filesys.TreeView(featureFs)
 
-		// 应该包含 commit4 的所有文件
+		// 打印 main 分支的文件树
+		mainFs, err := getBranchFileTree(mainBranchName)
+		require.NoError(t, err)
+		t.Logf("=== %s branch file tree ===", mainBranchName)
+		filesys.TreeView(mainFs)
+
+		// 说明修改情况
+		t.Logf("=== Changes from %s to %s ===", featureBranchName, mainBranchName)
+		t.Logf("  - file1.txt: MODIFIED (revert to main content)")
+		t.Logf("  - file2.txt: UNCHANGED (not in diff)")
+		t.Logf("  - file3.txt: DELETED (removed in main)")
+
+		fs, err := FromCommitRange(tmpDir, featureBranchName, mainBranchName)
+		require.NoError(t, err, "should return changed files diff from feature to main")
+
+		// 打印 diff 文件树（使用与 gitefs 命令相同的功能）
+		t.Logf("=== Diff file tree (from %s to %s) ===", featureBranchName, mainBranchName)
+		filesys.TreeView(fs)
+
+		// file1 应该恢复为 main 的内容（变更的文件）
 		raw, err := fs.ReadFile(file1Path)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "Modified content of file1")
+		assert.Contains(t, string(raw), "Initial content of file1")
 
-		raw, err = fs.ReadFile(file2Path)
+		// file2 不应该存在（未变更的文件）
+		exists, _ := fs.Exists(file2Path)
+		assert.False(t, exists, "file2 should not exist in diff (unchanged file)")
+
+		// file3 应该不存在（main 分支没有这个文件，diff 中会删除）
+		exists, _ = fs.Exists(file3Path)
+		assert.False(t, exists, "file3 should not exist in main branch")
+	})
+
+	// 测试：使用 refs/heads/ 前缀的分支名
+	t.Run("FromCommitRange-with-refs-prefix", func(t *testing.T) {
+		fs, err := FromCommitRange(tmpDir, "refs/heads/"+mainBranchName, "refs/heads/"+featureBranchName)
+		require.NoError(t, err, "should work with refs/heads/ prefix")
+
+		raw, err := fs.ReadFile(file1Path)
 		require.NoError(t, err)
-		assert.Contains(t, string(raw), "Content of file2")
-
-		// file3 应该不存在
-		exists, _ := fs.Exists(file3Path)
-		assert.False(t, exists)
+		assert.Contains(t, string(raw), "Modified content of file1 on feature branch")
 	})
 }

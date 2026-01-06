@@ -185,7 +185,8 @@ func FromPullRequest(owner, repo string, prNumber int, token, localRepo string) 
 		if err != nil {
 			log.Warnf("failed to open local repository, fallback to GitHub API: %v", err)
 		} else {
-			basevfs, err = fetchCommitFullTree(res, pr.Base.SHA)
+			// basevfs, err = fetchCommitFullTree(res, pr.Base.SHA)
+			basevfs, err = fetchRespos(res, pr.Base.SHA)
 			if err != nil {
 				log.Warnf("failed to fetch base commit from local repo, fallback to GitHub API: %v", err)
 			}
