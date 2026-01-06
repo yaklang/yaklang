@@ -245,6 +245,7 @@ var GitCommands = []*cli.Command{
 				log.Infof("start to prepare writing zip file: %v", fileName)
 				var buf bytes.Buffer
 				zw := zip.NewWriter(&buf)
+				fileCount := 0
 				filesys.SimpleRecursive(filesys.WithFileSystem(i), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 					fw, err := zw.Create(s)
 					if err != nil {
@@ -255,6 +256,10 @@ var GitCommands = []*cli.Command{
 						return err
 					}
 					_, err = fw.Write([]byte(raw))
+					if err != nil {
+						return err
+					}
+					fileCount++
 					return nil
 				}))
 				zw.Flush()
@@ -264,7 +269,7 @@ var GitCommands = []*cli.Command{
 					log.Warnf("write zip failed: %v", err)
 					return
 				}
-				log.Infof("write zip file: %v", fileName)
+				log.Infof("write zip file: %v (total %d files)", fileName, fileCount)
 			}
 
 			if start == "" && end == "" {
