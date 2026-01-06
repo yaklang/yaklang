@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"errors"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,6 +27,54 @@ func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, e
 func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
+}
+
+// CompileDiffProgramAndSaveToDB 编译差量程序并保存到数据库
+// baseFS: 基础文件系统（全量编译）
+// newFS: 新文件系统（用于计算差量）
+// baseProgramName: 基础程序的名称（用于设置 BaseProgramName）
+// diffProgramName: 差量程序的名称
+// language: 编译语言
+// 返回：编译后的差量程序（FileHashMap 已保存在数据库中）
+func CompileDiffProgramAndSaveToDB(
+	ctx context.Context,
+	baseFS, newFS fi.FileSystem,
+	baseProgramName, diffProgramName string,
+	language ssaconfig.Language,
+	opts ...ssaconfig.Option,
+) (*Program, error) {
+	// Step 1: 计算文件系统差异
+	diffFS, fileHashMap, err := calculateFileSystemDiff(ctx, baseFS, newFS)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to calculate file system diff")
+	}
+
+	// Step 2: 准备编译选项
+	diffOpts := []ssaconfig.Option{WithLanguage(language)}
+	if diffProgramName != "" {
+		diffOpts = append(diffOpts, WithProgramName(diffProgramName))
+	}
+	// 设置增量编译信息到编译选项
+	if baseProgramName != "" {
+		diffOpts = append(diffOpts, WithBaseProgramName(baseProgramName))
+	}
+	if fileHashMap != nil && len(fileHashMap) > 0 {
+		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
+	}
+	// 合并用户提供的选项
+	diffOpts = append(diffOpts, opts...)
+
+	// Step 3: 编译差量文件系统（只包含变更的文件：新增+修改）
+	diffPrograms, err := ParseProjectWithFS(diffFS, diffOpts...)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to compile diff file system")
+	}
+	if len(diffPrograms) == 0 {
+		return nil, utils.Errorf("diff file system compilation produced no programs")
+	}
+	diffProgram := diffPrograms[0]
+
+	return diffProgram, nil
 }
 
 func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
