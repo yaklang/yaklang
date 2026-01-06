@@ -68,6 +68,10 @@ type Config struct {
 	diagnosticsRecorder *diagnostics.Recorder
 	// file performance recorder
 	filePerformanceRecorder *diagnostics.Recorder
+
+	// incremental compilation information
+	baseProgramName string
+	fileHashMap     map[string]int
 }
 
 func (c *Config) CalcHash() string {
@@ -296,6 +300,16 @@ var WithEditor = ssaconfig.SetOption("ssa_compile/editor", func(c *Config, v *me
 })
 
 var WithContext = ssaconfig.WithContext
+
+// WithBaseProgramName 设置基础程序名称（用于差量编译）
+var WithBaseProgramName = ssaconfig.SetOption("ssa_compile/base_program_name", func(c *Config, v string) {
+	c.baseProgramName = v
+})
+
+// WithFileHashMap 设置文件哈希映射（用于差量编译）
+var WithFileHashMap = ssaconfig.SetOption("ssa_compile/file_hash_map", func(c *Config, v map[string]int) {
+	c.fileHashMap = v
+})
 
 func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	sc, err := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
