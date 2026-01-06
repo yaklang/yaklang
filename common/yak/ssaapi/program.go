@@ -97,6 +97,13 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 		} else {
 			prog.SetDiagnosticsRecorder(nil)
 		}
+		// 设置增量编译信息（如果存在）
+		if config.baseProgramName != "" {
+			prog.BaseProgramName = config.baseProgramName
+		}
+		if config.fileHashMap != nil && len(config.fileHashMap) > 0 {
+			prog.FileHashMap = config.fileHashMap
+		}
 	} else {
 		prog.SetDiagnosticsRecorder(nil)
 	}
