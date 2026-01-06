@@ -97,6 +97,11 @@ func NewObsoleteTLSConfig(ca, gmCA *gmx509.Certificate, privateKey, gmPrivateKey
 	}, nil
 }
 
+// SetOrganization sets the organization of the certificate for obsolete TLS (GM TLS).
+func (c *ObsoleteTLSConfig) SetOrganization(org string) {
+	c.org = org
+}
+
 // 生成签名证书（仅用于数字签名和身份验证）
 func (c *ObsoleteTLSConfig) getSigningCert(hostname string) (*gmtls.Certificate, error) {
 	if c.disableMimicGMServer {
