@@ -196,6 +196,22 @@ var GitCommands = []*cli.Command{
 				Name:  "end",
 				Usage: "end ref hash(range)",
 			},
+			cli.IntFlag{
+				Name:  "pr",
+				Usage: "GitHub Pull Request number (e.g., 3774). When set, uses PR file changes instead of commit range",
+			},
+			cli.StringFlag{
+				Name:  "owner",
+				Usage: "GitHub repository owner (e.g., yaklang). Required when using --pr",
+			},
+			cli.StringFlag{
+				Name:  "repo",
+				Usage: "GitHub repository name (e.g., yaklang). Required when using --pr",
+			},
+			cli.StringFlag{
+				Name:  "token",
+				Usage: "GitHub access token (optional, for private repos or higher rate limits)",
+			},
 			cli.StringFlag{
 				Name:  "output",
 				Usage: "output filename",
@@ -205,7 +221,11 @@ var GitCommands = []*cli.Command{
 			start := c.String("start")
 			end := c.String("end")
 			output := c.String("output")
-			repos := c.String("repo")
+			prNumber := c.Int("pr")
+			owner := c.String("owner")
+			repoName := c.String("repo")
+			token := c.String("token")
+			repos := c.String("repository")
 			if repos == "" {
 				pwd, err := os.Getwd()
 				if err != nil {
@@ -217,7 +237,10 @@ var GitCommands = []*cli.Command{
 			handleResult := func(i filesys_interface.FileSystem) {
 				filesys.TreeView(i)
 				suffix := ""
-				if start == "" && end == "" {
+				if prNumber > 0 {
+					// PR 模式：使用 PR 编号
+					suffix = fmt.Sprintf("pr%d", prNumber)
+				} else if start == "" && end == "" {
 					suffix = strings.Join(lo.Map(c.Args(), func(i string, _ int) string {
 						if len(i) > 7 {
 							return i[:7]
@@ -270,6 +293,20 @@ var GitCommands = []*cli.Command{
 					return
 				}
 				log.Infof("write zip file: %v (total %d files)", fileName, fileCount)
+			}
+
+			// 如果指定了 PR，使用 PR 模式
+			if prNumber > 0 {
+				if owner == "" || repoName == "" {
+					return utils.Error("--owner and --repo are required when using --pr")
+				}
+				log.Infof("Using PR mode: PR #%d from %s/%s", prNumber, owner, repoName)
+				lfs, err := yakgit.FromPullRequest(owner, repoName, prNumber, token, repos)
+				if err != nil {
+					return utils.Wrap(err, "fetch pull request files failed")
+				}
+				handleResult(lfs)
+				return nil
 			}
 
 			if start == "" && end == "" {
