@@ -239,15 +239,26 @@ jobs:
           echo "::endgroup::"
           
           echo "::group::Generating file system snapshot"
-          MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
-          if [ -z "$MERGE_BASE" ]; then
-            echo "::error::Failed to find merge base between main and ${{ env.HEAD_SHA }}"
-            exit 1
-          fi
-          echo "Merge base: $MERGE_BASE"
+          # Old method: using merge base and commit range
+          # MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
+          # if [ -z "$MERGE_BASE" ]; then
+          #   echo "::error::Failed to find merge base between main and ${{ env.HEAD_SHA }}"
+          #   exit 1
+          # fi
+          # echo "Merge base: $MERGE_BASE"
+          # 
+          # if ! yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip; then
+          #   echo "::error::Failed to generate file system snapshot"
+          #   exit 1
+          # fi
           
-          if ! yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip; then
-            echo "::error::Failed to generate file system snapshot"
+          # New method: using PR file changes API
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          echo "Using PR mode: PR #${{ env.PR_NUMBER }} from $REPO_OWNER/$REPO_NAME"
+          
+          if ! yak gitefs --pr ${{ env.PR_NUMBER }} --owner "$REPO_OWNER" --repo "$REPO_NAME" --token "${{ secrets.GITHUB_TOKEN }}" --output ./fs.zip; then
+            echo "::error::Failed to generate file system snapshot from PR"
             exit 1
           fi
           
