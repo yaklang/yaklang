@@ -219,7 +219,14 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 
 # Output Formatter
 
-请你根据下面 SCHEMA 构建数据
+请你根据下面 SCHEMA 构建数据 , 注意事项：
+1. 你必须严格按照 SCHEMA 格式生成数据，不能缺少任何字段，不能多余任何字段。
+2. 所有字符串类型的数据必须使用双引号括起来，数字类型的数据不能使用引号括起来，布尔类型的数据必须使用 true 或 false 。
+3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
+4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
+5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+
+# SCHEMA
 
 <schema_{{ .NONCE }}>
 {{ .SCHEMA }}
@@ -283,6 +290,10 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}
+			if len(action.GetInvokeParamsArray("rag_source_list")) == 0 {
+				fmt.Println("nononono")
+			}
+
 			if action == nil {
 				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}

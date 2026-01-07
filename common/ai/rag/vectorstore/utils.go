@@ -278,7 +278,7 @@ func parseHNSWGraphFromBinary(db *gorm.DB, collection *schema.VectorStoreCollect
 }
 
 func (s *SQLiteVectorStoreHNSW) parseHNSWGraphFromBinary(graphBinaryReader io.Reader) (*hnsw.Graph[string], error) {
-	cacheMinSize := s.cacheSize
+	cacheMinSize := s.config.CacheSize
 	db := s.db
 	collectionName := s.collection.Name
 	collectionID := s.collection.ID
