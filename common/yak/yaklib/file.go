@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/mimetype"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/mimetype"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hpcloud/tail"

@@ -332,6 +332,9 @@ func initYaklangLib() {
 	// binx
 	yaklang.Import("bin", binx.Exports)
 
+	// elf
+	yaklang.Import("elf", yaklib.ElfExports)
+
 	// ssa
 	ssaExports := []map[string]any{
 		ssaapi.Exports,

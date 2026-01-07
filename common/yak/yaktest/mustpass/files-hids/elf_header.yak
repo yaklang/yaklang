@@ -1,0 +1,58 @@
+// ELF文件头信息测试
+// 核心功能：测试ELF文件头的基本信息解析
+// 测试函数：IsELF, ReadELFHeader, GetELFArchitecture, GetELFEntryPoint, ParseELF
+
+// 使用测试目录构建ELF文件路径
+elfFile = ""
+testDir = getParam("TEST_DIR")
+if testDir != nil && testDir != "" {
+    elfFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            elfFile = candidate
+            break
+        }
+    }
+}
+
+assert elfFile != "" && file.IsExisted(elfFile), sprintf("ELF file not found: %s", elfFile)
+
+// 1. 测试 IsELF - 检查是否为ELF文件
+isElf = elf.IsELF(elfFile)
+assert isElf, sprintf("File %s should be a valid ELF file", elfFile)
+
+// 2. 测试 ReadELFHeader - 读取ELF文件头
+header, err = elf.ReadELFHeader(elfFile)
+assert err == nil, sprintf("ReadELFHeader failed: %v", err)
+assert header != nil, "ReadELFHeader should return non-nil header"
+assert header.Magic == "ELF", sprintf("Magic should be 'ELF', got: %s", header.Magic)
+assert header.Class in ["32-bit", "64-bit"], sprintf("Class should be 32-bit or 64-bit, got: %s", header.Class)
+assert header.Data in ["little-endian", "big-endian"], sprintf("Data should be little-endian or big-endian, got: %s", header.Data)
+assert header.Version > 0, sprintf("Version should be > 0, got: 0x%x", header.Version)
+assert header.Machine != "", sprintf("Machine should not be empty, got: %s", header.Machine)
+assert header.Type != "", sprintf("Type should not be empty, got: %s", header.Type)
+assert header.Entry > 0, sprintf("Entry point should be > 0, got: 0x%016x", header.Entry)
+
+// 3. 测试 GetELFArchitecture - 获取架构类型
+arch, err = elf.GetELFArchitecture(elfFile)
+assert err == nil, sprintf("GetELFArchitecture failed: %v", err)
+assert arch != "", "Architecture should not be empty"
+assert arch == header.Machine, sprintf("GetELFArchitecture should match header.Machine: %s vs %s", arch, header.Machine)
+
+// 4. 测试 GetELFEntryPoint - 获取入口地址
+entry, err = elf.GetELFEntryPoint(elfFile)
+assert err == nil, sprintf("GetELFEntryPoint failed: %v", err)
+assert entry > 0, sprintf("Entry point should be > 0, got: 0x%016x", entry)
+assert entry == header.Entry, sprintf("GetELFEntryPoint should match header.Entry: 0x%016x vs 0x%016x", entry, header.Entry)
+
+// 5. 测试 ParseELF - 解析完整ELF信息（验证Header部分）
+info, err = elf.ParseELF(elfFile)
+assert err == nil, sprintf("ParseELF failed: %v", err)
+assert info != nil, "ParseELF should return non-nil info"
+assert info.Header != nil, "Header should not be nil"
+assert info.Header.Magic == "ELF", sprintf("Magic from ParseELF should be 'ELF', got: %s", info.Header.Magic)
+assert info.Header.Class == header.Class, sprintf("Class should match: %s vs %s", info.Header.Class, header.Class)
+assert info.Header.Machine == header.Machine, sprintf("Machine should match: %s vs %s", info.Header.Machine, header.Machine)
+assert info.Header.Entry == header.Entry, sprintf("Entry point should match: 0x%016x vs 0x%016x", info.Header.Entry, header.Entry)

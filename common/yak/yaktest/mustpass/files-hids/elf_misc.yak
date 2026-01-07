@@ -1,0 +1,114 @@
+// ELF其他功能测试
+// 测试其他功能：DisplayELF、两种传入方式的对比、边界情况等
+
+// 使用测试目录构建ELF文件路径
+elfFile = ""
+testDir = getParam("TEST_DIR")
+if testDir != nil && testDir != "" {
+    elfFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            elfFile = candidate
+            break
+        }
+    }
+}
+
+assert elfFile != "" && file.IsExisted(elfFile), sprintf("ELF file not found: %s", elfFile)
+
+// 1. 测试 DisplayELF - 显示完整ELF信息（readelf风格）
+output, err = elf.DisplayELF(elfFile)
+println("DisplayELF output:", output)
+assert err == nil, sprintf("DisplayELF failed: %v", err)
+assert output != "", "DisplayELF should return non-empty output"
+assert "ELF Header:" in output, "Output should contain 'ELF Header:'"
+
+// 验证输出包含关键信息
+header, err = elf.ReadELFHeader(elfFile)
+assert err == nil, "ReadELFHeader should succeed"
+assert header.Machine in output, sprintf("Output should contain machine type: %s", header.Machine)
+
+// 2. 测试两种传入方式的一致性（文件名 vs 字节数组）
+fileData = file.ReadFile(elfFile)
+assert len(fileData) > 0, "File data should not be empty"
+
+// 测试 ParseELF 两种方式结果一致
+info1, err = elf.ParseELF(elfFile)
+assert err == nil, sprintf("ParseELF from file path failed: %v", err)
+
+info2, err = elf.ParseELF(fileData)
+assert err == nil, sprintf("ParseELF from bytes failed: %v", err)
+
+assert info1.Header.Magic == info2.Header.Magic, "Magic should match between two methods"
+assert info1.Header.Class == info2.Header.Class, "Class should match between two methods"
+assert info1.Header.Machine == info2.Header.Machine, "Machine should match between two methods"
+assert info1.Header.Entry == info2.Header.Entry, "Entry point should match between two methods"
+assert len(info1.Segments) == len(info2.Segments), "Segments count should match between two methods"
+assert len(info1.Sections) == len(info2.Sections), "Sections count should match between two methods"
+
+// 3. 测试 DisplayELF 两种方式的一致性
+output1, err = elf.DisplayELF(elfFile)
+println("DisplayELF from file path: ", output1)
+assert err == nil, sprintf("DisplayELF from file path failed: %v", err)
+
+output2, err = elf.DisplayELF(fileData)
+assert err == nil, sprintf("DisplayELF from bytes failed: %v", err)
+
+assert output1 != "", "DisplayELF from file path should return non-empty output"
+assert output2 != "", "DisplayELF from bytes should return non-empty output"
+assert "ELF Header:" in output1, "Output from file path should contain 'ELF Header:'"
+assert "ELF Header:" in output2, "Output from bytes should contain 'ELF Header:'"
+
+// 4. 测试 ReadELFHeader 两种方式的一致性
+header1, err = elf.ReadELFHeader(elfFile)
+assert err == nil, sprintf("ReadELFHeader from file path failed: %v", err)
+
+header2, err = elf.ReadELFHeader(fileData)
+assert err == nil, sprintf("ReadELFHeader from bytes failed: %v", err)
+
+assert header1.Magic == header2.Magic, "Header Magic should match between two methods"
+assert header1.Entry == header2.Entry, "Header Entry should match between two methods"
+
+// 5. 测试 ReadELFSegments 两种方式的一致性
+segments1, err = elf.ReadELFSegments(elfFile)
+assert err == nil, sprintf("ReadELFSegments from file path failed: %v", err)
+
+segments2, err = elf.ReadELFSegments(fileData)
+assert err == nil, sprintf("ReadELFSegments from bytes failed: %v", err)
+
+assert len(segments1) == len(segments2), sprintf("Segments count should match: %d vs %d", len(segments1), len(segments2))
+if len(segments1) > 0 {
+    assert segments1[0].Type == segments2[0].Type, "First segment type should match"
+}
+
+// 6. 测试 ReadELFSections 两种方式的一致性
+sections1, err = elf.ReadELFSections(elfFile)
+assert err == nil, sprintf("ReadELFSections from file path failed: %v", err)
+
+sections2, err = elf.ReadELFSections(fileData)
+assert err == nil, sprintf("ReadELFSections from bytes failed: %v", err)
+
+assert len(sections1) == len(sections2), sprintf("Sections count should match: %d vs %d", len(sections1), len(sections2))
+if len(sections1) > 0 {
+    assert sections1[0].Type == sections2[0].Type, "First section type should match"
+}
+
+// 7. 测试 GetELFArchitecture 和 GetELFEntryPoint 两种方式的一致性
+arch1, err = elf.GetELFArchitecture(elfFile)
+assert err == nil, sprintf("GetELFArchitecture from file path failed: %v", err)
+
+arch2, err = elf.GetELFArchitecture(fileData)
+assert err == nil, sprintf("GetELFArchitecture from bytes failed: %v", err)
+
+assert arch1 == arch2, sprintf("Architecture should match: %s vs %s", arch1, arch2)
+
+entry1, err = elf.GetELFEntryPoint(elfFile)
+assert err == nil, sprintf("GetELFEntryPoint from file path failed: %v", err)
+
+entry2, err = elf.GetELFEntryPoint(fileData)
+assert err == nil, sprintf("GetELFEntryPoint from bytes failed: %v", err)
+
+assert entry1 == entry2, sprintf("Entry point should match: 0x%016x vs 0x%016x", entry1, entry2)
+

@@ -14,9 +14,18 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "mitm_mock.yak"
+	debugName := "elf_header.yak"
 	var debugCases [][]string
+
+	// 检查通用测试文件
 	for k, v := range files {
+		if k == debugName {
+			debugCases = append(debugCases, []string{k, v})
+		}
+	}
+
+	// 检查 HIDS 测试文件
+	for k, v := range filesHids {
 		if k == debugName {
 			debugCases = append(debugCases, []string{k, v})
 		}
@@ -33,10 +42,15 @@ func TestMustPassDebug(t *testing.T) {
 	totalTest := t
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
-			_, err := yak.Execute(i[1], map[string]any{
+			vars := map[string]any{
 				"VULINBOX":      vulinboxAddr,
 				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
-			})
+			}
+			if testDir != "" {
+				vars["TEST_DIR"] = testDir
+			}
+
+			_, err := yak.Execute(i[1], vars)
 			if err != nil {
 				t.Fatalf("[%v] error: %v", i[0], err)
 				totalTest.FailNow()

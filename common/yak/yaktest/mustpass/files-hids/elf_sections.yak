@@ -1,0 +1,65 @@
+// ELF节（Section）信息测试
+// 核心功能：测试ELF文件的节信息，特别是符号表和字符串表的识别
+// 测试函数：ReadELFSections, ParseELF
+
+// 使用测试目录构建ELF文件路径
+elfFile = ""
+testDir = getParam("TEST_DIR")
+if testDir != nil && testDir != "" {
+    elfFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            elfFile = candidate
+            break
+        }
+    }
+}
+
+assert elfFile != "" && file.IsExisted(elfFile), sprintf("ELF file not found: %s", elfFile)
+
+// 1. 测试 ReadELFSections - 读取ELF节信息
+sections, err = elf.ReadELFSections(elfFile)
+assert err == nil, sprintf("ReadELFSections failed: %v", err)
+assert sections != nil, "ReadELFSections should return non-nil sections"
+assert len(sections) > 0, sprintf("Should have at least one section, got: %d", len(sections))
+
+// 2. 验证符号表和字符串表的识别
+symTabs = []
+strTabs = []
+
+for sect in sections {
+    assert sect.Type != "", sprintf("Section type should not be empty, got: %s", sect.Type)
+    
+    if sect.IsSymTab {
+        symTabs = append(symTabs, sect)
+        assert sect.Type in ["SHT_SYMTAB", "SHT_DYNSYM"], sprintf("Symbol table should have correct type, got: %s", sect.Type)
+    }
+    
+    if sect.IsStrTab {
+        strTabs = append(strTabs, sect)
+        assert sect.Type == "SHT_STRTAB", sprintf("String table should have SHT_STRTAB type, got: %s", sect.Type)
+    }
+}
+
+// 3. 测试 ParseELF - 验证Sections部分的一致性
+info, err = elf.ParseELF(elfFile)
+assert err == nil, sprintf("ParseELF failed: %v", err)
+assert info != nil, "ParseELF should return non-nil info"
+assert info.Sections != nil, "Sections should not be nil"
+assert len(info.Sections) == len(sections), sprintf("ParseELF sections count should match ReadELFSections: %d vs %d", len(info.Sections), len(sections))
+
+// 验证符号表和字符串表的识别一致性
+symTabCount = 0
+strTabCount = 0
+for sect in info.Sections {
+    if sect.IsSymTab {
+        symTabCount++
+    }
+    if sect.IsStrTab {
+        strTabCount++
+    }
+}
+assert symTabCount == len(symTabs), sprintf("Symbol table count should match: %d vs %d", symTabCount, len(symTabs))
+assert strTabCount == len(strTabs), sprintf("String table count should match: %d vs %d", strTabCount, len(strTabs))
