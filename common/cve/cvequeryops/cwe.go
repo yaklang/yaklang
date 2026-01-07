@@ -31,9 +31,6 @@ import (
 // DefaultCWEURL is the default URL to download CWE data from MITRE
 const DefaultCWEURL = "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip"
 
-// DefaultFallbackProxy is the default proxy to use when direct download fails
-const DefaultFallbackProxy = "http://127.0.0.1:7890"
-
 // CWEUpdateConfig holds configuration for CWE update operation
 type CWEUpdateConfig struct {
 	URL   string
@@ -69,8 +66,8 @@ func CWEUpdate(opts ...CWEUpdateOption) error {
 
 	log.Infof("start to download CWE data from: %s", config.URL)
 
-	// Download CWE zip file with retry and fallback proxy
-	zipPath, err := downloadCWEWithRetry(config)
+	// Download CWE zip file
+	zipPath, err := downloadCWEWithConfig(config)
 	if err != nil {
 		return utils.Errorf("download CWE data failed: %v", err)
 	}
@@ -111,36 +108,6 @@ func CWEUpdate(opts ...CWEUpdateOption) error {
 	log.Infof("CWE database updated successfully with %d entries", len(cwes))
 
 	return nil
-}
-
-// downloadCWEWithRetry attempts to download CWE data with retry and fallback proxy
-func downloadCWEWithRetry(config *CWEUpdateConfig) (string, error) {
-	var lastErr error
-
-	// First attempt with user-specified proxy (or no proxy)
-	zipPath, err := downloadCWEWithConfig(config)
-	if err == nil {
-		return zipPath, nil
-	}
-	lastErr = err
-	log.Warnf("first download attempt failed: %v", err)
-
-	// If no proxy was specified, try with fallback proxy
-	if config.Proxy == "" {
-		log.Infof("trying with fallback proxy: %s", DefaultFallbackProxy)
-		fallbackConfig := &CWEUpdateConfig{
-			URL:   config.URL,
-			Proxy: DefaultFallbackProxy,
-		}
-		zipPath, err = downloadCWEWithConfig(fallbackConfig)
-		if err == nil {
-			return zipPath, nil
-		}
-		lastErr = err
-		log.Warnf("fallback proxy download attempt failed: %v", err)
-	}
-
-	return "", utils.Errorf("all download attempts failed, last error: %v", lastErr)
 }
 
 // downloadCWEWithConfig downloads CWE data with the given configuration
