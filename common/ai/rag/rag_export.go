@@ -1473,9 +1473,11 @@ func extractCollectionNameFromFilePath(filePath string) string {
 
 	// 去掉扩展名
 	// 先尝试去掉常见的双扩展名（如 .tar.gz）
+	lowerFileName := strings.ToLower(fileName)
 	for _, ext := range []string{".tar.gz", ".tar.bz2", ".tar.xz"} {
-		if strings.HasSuffix(strings.ToLower(fileName), ext) {
-			return strings.TrimSuffix(fileName, ext)
+		if strings.HasSuffix(lowerFileName, ext) {
+			// 按长度截断以避免大小写不一致导致的 TrimSuffix 失效
+			return fileName[:len(fileName)-len(ext)]
 		}
 	}
 
