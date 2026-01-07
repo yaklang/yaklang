@@ -5,10 +5,7 @@
   "type": "object",
   "required": [
     "@action",
-    "source_metadata",
-    "content_type",
-    "embedding_text",
-    "structured_metadata"
+    "rag_source_list"
   ],
   "properties": {
     "@action": {

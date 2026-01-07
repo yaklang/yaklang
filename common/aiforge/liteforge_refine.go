@@ -44,7 +44,7 @@ func Action2RagKnowledgeEntries(
 		return nil, utils.Errorf("no knowledge-collection found in action")
 	}
 
-	entries := make([]*schema.KnowledgeBaseEntry, 0, len(collection))
+	entries := make([]*schema.KnowledgeBaseEntry, 0)
 	for _, item := range collection {
 		metadata := item.GetObject("structured_metadata")
 		if metadata == nil {

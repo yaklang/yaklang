@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
-
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -27,27 +25,33 @@ import (
 
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
 type SQLiteVectorStoreHNSW struct {
-	db       *gorm.DB
-	embedder EmbeddingClient
-
-	mu         sync.RWMutex // 用于并发安全的互斥锁
+	// config and meta information
+	config     *CollectionConfig
 	collection *schema.VectorStoreCollection
-	// 是否自动更新 graph_infos
-	hnsw *GraphWrapper[string]
 
-	EnableAutoUpdateGraphInfos bool
-	UIDType                    string
+	// vector embedder and graph alg
+	embedder EmbeddingClient
+	hnsw     *GraphWrapper[string]
 
-	cacheSize    int
-	preCacheSize int
+	asyncDBOnce  sync.Once
+	asyncDBQueue *chanx.UnlimitedChan[func(tx *gorm.DB) error]
+	db           *gorm.DB
 
-	config *CollectionConfig
+	mu sync.RWMutex // 用于并发安全的互斥锁
 }
 
 const (
 	Policy_UseDBCanche = "DB_Cache"
 	Policy_None        = "None"
 )
+
+func initSQLiteVectorStoreHNSW() *SQLiteVectorStoreHNSW { // 初始化 SQLiteVectorStoreHNSW 结构体
+	return &SQLiteVectorStoreHNSW{
+		asyncDBQueue: chanx.NewUnlimitedChan[func(tx *gorm.DB) error](context.Background(), 100),
+		asyncDBOnce:  sync.Once{},
+		mu:           sync.RWMutex{},
+	}
+}
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
@@ -64,17 +68,11 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...Colle
 	if err := collectionConfig.FixEmbeddingClient(); err != nil {
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
-
-	vectorStore := &SQLiteVectorStoreHNSW{
-		db:                         db,
-		EnableAutoUpdateGraphInfos: collectionConfig.EnableAutoUpdateGraphInfos,
-		collection:                 collection,
-		embedder:                   collectionConfig.EmbeddingClient,
-		cacheSize:                  collectionConfig.CacheSize,
-		preCacheSize:               collectionConfig.PreCacheSize,
-		config:                     collectionConfig,
-	}
-
+	vectorStore := initSQLiteVectorStoreHNSW()
+	vectorStore.db = db
+	vectorStore.config = collectionConfig
+	vectorStore.embedder = collectionConfig.EmbeddingClient
+	vectorStore.collection = collection
 	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, collectionConfig)
 	if err != nil {
 		log.Errorf("get graph wrapper err: %v", err)
@@ -261,14 +259,11 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 	if err := cfg.FixEmbeddingClient(); err != nil {
 		return nil, utils.Errorf("fix embedding client err: %v", err)
 	}
-	vectorStore := &SQLiteVectorStoreHNSW{
-		db:                         db,
-		EnableAutoUpdateGraphInfos: true,
-		embedder:                   cfg.EmbeddingClient,
-		collection:                 collection,
-		cacheSize:                  10000,
-		config:                     cfg,
-	}
+	vectorStore := initSQLiteVectorStoreHNSW()
+	vectorStore.db = db
+	vectorStore.config = cfg
+	vectorStore.embedder = cfg.EmbeddingClient
+	vectorStore.collection = collection
 
 	graphWrapper, err := GraphWrapperManager.GetGraphWrapper(db, collection, cfg)
 	if err != nil {
@@ -427,29 +422,8 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	if err != nil {
 		return utils.Wrap(err, "embed documents")
 	}
-
-	// 记录锁获取时间
-	helper := asynchelper.NewAsyncPerformanceHelper("Vector ADD")
-	defer helper.Close()
-
-	helper.MarkNow()
-	s.mu.Lock()
-	lockAcquireTime := helper.CheckLastMark1Second("lock acquire")
-	defer s.mu.Unlock()
-
-	totalStart := helper.MarkNow()
+	addStartTime := time.Now()
 	docCount := len(docs)
-
-	// 分析：当前使用单一大事务，可能导致长时间锁持有
-	// 如果事务持续时间过长，建议考虑分批处理或更小的事务粒度
-	defer func() {
-		helper.CheckMarkAndLog(totalStart, 2*time.Second, fmt.Sprintf("total time(lock acquire: %v, %d docs)", lockAcquireTime, docCount))
-	}()
-
-	// 开始事务 - 这是潜在的性能瓶颈点
-	helper.SetStatus("db transaction acquire")
-	tx := s.db.Begin()
-	txInitTime := helper.CheckLastMark1Second("db transaction acquire")
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding docs: %v", r)
@@ -457,101 +431,102 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		}
 	}()
 
-	// 记录文档处理时间
+	var txInitTime, transactionDuration, nodeCreationTime, commitTime time.Duration
 	var totalDbQueryTime, totalDocUpdateTime, totalDocCreateTime time.Duration
 	var dbQueryCount, docUpdateCount, docCreateCount int
+	var finishSingle = make(chan struct{})
 
-	for i, doc := range docs {
-		helper.SetStatus(fmt.Sprintf("db query id :%s", doc.ID))
-		docStart := helper.MarkNow()
+	s.enqueueDbAction(func(db *gorm.DB) error {
+		defer close(finishSingle)
 
-		// 确保文档有 ID
-		if doc.ID == "" {
-			tx.Rollback()
-			return utils.Errorf("文档必须有ID")
-		}
+		waitTxStart := time.Now()
+		tx := s.db.Begin()
+		txInitTime = time.Since(waitTxStart)
+		for _, doc := range docs {
 
-		// 确保文档有嵌入向量
-		if len(doc.Embedding) == 0 {
-			tx.Rollback()
-			return utils.Errorf("文档 %s 必须有嵌入向量", doc.ID)
-		}
-
-		// 数据库查询时间 - 这是另一个潜在瓶颈
-		queryStartTime := time.Now()
-		existingDoc, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
-		queryTime := time.Since(queryStartTime)
-		totalDbQueryTime += queryTime
-		dbQueryCount++
-
-		schemaDoc := s.toSchemaDocument(doc)
-		if existingDoc != nil {
-			// 更新现有文档
-			updateStartTime := time.Now()
-			existingDoc.Metadata = schemaDoc.Metadata
-			existingDoc.Embedding = schemaDoc.Embedding
-			existingDoc.Content = schemaDoc.Content
-			existingDoc.EntityID = schemaDoc.EntityID
-			existingDoc.RelatedEntities = schemaDoc.RelatedEntities
-			if err := yakit.UpdateRAGDocument(tx, existingDoc); err != nil {
+			if doc.ID == "" {
 				tx.Rollback()
-				return utils.Errorf("更新文档失败: %v", err)
+				return utils.Errorf("文档必须有ID")
 			}
-			updateTime := time.Since(updateStartTime)
-			totalDocUpdateTime += updateTime
-			docUpdateCount++
-			helper.CheckMarkAndLog(docStart, time.Second, fmt.Sprintf("doc[%d] %s update (query: %v, update: %v)", i, doc.ID, queryTime, updateTime))
-		} else if err == gorm.ErrRecordNotFound {
-			// 创建新文档
-			createStartTime := time.Now()
-			if err := tx.Create(schemaDoc).Error; err != nil {
+
+			// 确保文档有嵌入向量
+			if len(doc.Embedding) == 0 {
 				tx.Rollback()
-				return utils.Errorf("创建文档失败: %v", err)
+				return utils.Errorf("文档 %s 必须有嵌入向量", doc.ID)
 			}
-			createTime := time.Since(createStartTime)
-			totalDocCreateTime += createTime
-			docCreateCount++
 
-			helper.CheckMarkAndLog(docStart, time.Second, fmt.Sprintf("doc[%d] %s update (query: %v, update: %v)", i, doc.ID, queryTime, createTime))
+			// 数据库查询时间 - 这是另一个潜在瓶颈
+			queryStartTime := time.Now()
+			existingDoc, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
+			queryTime := time.Since(queryStartTime)
+			totalDbQueryTime += queryTime
+			dbQueryCount++
 
-		} else {
-			// 其他错误
-			tx.Rollback()
-			return utils.Errorf("查询文档失败: %v", err)
+			schemaDoc := s.toSchemaDocument(doc)
+			if existingDoc != nil {
+				// 更新现有文档
+				updateStartTime := time.Now()
+				existingDoc.Metadata = schemaDoc.Metadata
+				existingDoc.Embedding = schemaDoc.Embedding
+				existingDoc.Content = schemaDoc.Content
+				existingDoc.EntityID = schemaDoc.EntityID
+				existingDoc.RelatedEntities = schemaDoc.RelatedEntities
+				if err := yakit.UpdateRAGDocument(tx, existingDoc); err != nil {
+					tx.Rollback()
+					return utils.Errorf("更新文档失败: %v", err)
+				}
+				updateTime := time.Since(updateStartTime)
+				totalDocUpdateTime += updateTime
+				docUpdateCount++
+			} else if errors.Is(err, gorm.ErrRecordNotFound) {
+				// 创建新文档
+				createStartTime := time.Now()
+				if err := tx.Create(schemaDoc).Error; err != nil {
+					tx.Rollback()
+					return utils.Errorf("创建文档失败: %v", err)
+				}
+				createTime := time.Since(createStartTime)
+				totalDocCreateTime += createTime
+				docCreateCount++
+
+			} else {
+				// 其他错误
+				tx.Rollback()
+				return utils.Errorf("查询文档失败: %v", err)
+			}
 		}
-	}
 
-	// 记录节点创建时间
+		// 记录节点创建时间
+		startCommitTime := time.Now()
+		err = tx.Commit().Error
+		commitTime = time.Since(startCommitTime)
+		if err != nil {
+			log.Errorf("transaction commit failed: %v", err)
+			return err
+		}
+		transactionDuration = time.Since(waitTxStart)
+		return nil
+	})
+
+	<-finishSingle
+
 	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
-		helper.SetStatus(fmt.Sprintf("maker node id: %s", doc.ID))
 		docVecCache := doc.Embedding
 		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(doc.ID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
 			return docVecCache, nil
 		})
 	}
-	nodeCreationTime := time.Since(nodeCreationStartTime)
-
-	// 事务提交时间 - 提交可能成为瓶颈，特别是当事务很大时
-	helper.SetStatus(fmt.Sprint("db transaction commit"))
-	helper.MarkNow()
-	err = tx.Commit().Error
-	commitTime := helper.CheckLastMark1Second("db transaction commit")
-	if err != nil {
-		log.Errorf("transaction commit failed: %v", err)
-		return err
-	}
-	transactionDuration := helper.CheckLastMarkAndLog(2*time.Second, "db transaction total")
+	nodeCreationTime = time.Since(nodeCreationStartTime)
 
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	helper.SetStatus("hnsw add nodes")
-	helper.MarkNow()
+	hnswStartTime := time.Now()
 	s.hnsw.Add(nodes...)
-	hnswAddTime := helper.CheckLastMark1Second("hnsw add nodes")
+	hnswAddTime := time.Since(hnswStartTime)
 
 	// 记录详细性能指标
-	totalTime := helper.CheckMarkAndLog(totalStart, 2*time.Second, "total time")
+	totalTime := time.Since(addStartTime)
 
 	// 计算平均指标
 	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
@@ -573,8 +548,8 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		(docCount > 10 && avgQueryTime > 500*time.Millisecond)
 
 	if shouldWarn {
-		log.Warnf("HNSW Add performance breakdown - Total: %v (%d docs), LockAcquire: %v, TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v",
-			totalTime, docCount, lockAcquireTime, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
+		log.Warnf("HNSW Add performance breakdown - Total: %v (%d docs), TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v",
+			totalTime, docCount, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
 
 		log.Warnf("Database operations summary - TotalDocs: %d, Queries: %d (total: %v, avg: %v), Updates: %d (total: %v, avg: %v), Creates: %d (total: %v, avg: %v)",
 			docCount, dbQueryCount, totalDbQueryTime, avgQueryTime, docUpdateCount, totalDocUpdateTime, avgUpdateTime, docCreateCount, totalDocCreateTime, avgCreateTime)
@@ -596,9 +571,6 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		if hnswAddTime > 5*time.Second {
 			log.Warnf("HNSW INDEXING SLOW: %v for %d nodes - possible HNSW algorithm bottleneck", hnswAddTime, docCount)
 			log.Warnf("HNSW BOTTLENECK ANALYSIS: Check if collection has too many documents for current M/EfSearch parameters")
-		}
-		if lockAcquireTime > time.Second {
-			log.Warnf("LOCK CONTENTION: lock acquire took %v - possible concurrent access bottleneck", lockAcquireTime)
 		}
 
 		// 新增：事务效率分析
@@ -647,9 +619,6 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 	}
 
 	pageSize := 10
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
 		if key == DocumentTypeCollectionInfo {
 			return false
