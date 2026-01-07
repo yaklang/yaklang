@@ -171,6 +171,13 @@ func AESDecFactory(paddingFunc func([]byte, int) []byte, unpaddingFunc func([]by
 	}
 }
 
+// isAESStreamMode 判断 AES 模式是否为流模式
+// 流模式（CTR、CFB、OFB）不需要 padding，明文长度等于密文长度
+// 块模式（CBC、ECB）需要 padding，要求数据长度对齐到块大小
+func isAESStreamMode(mode string) bool {
+	return mode == CTR || mode == CFB || mode == OFB
+}
+
 // AESEncryptBasic 使用 AES 算法对数据进行加密，支持多种模式（CBC、CFB、ECB、OFB、CTR） 。
 // 注意：此函数是底层的高级用法，需要外部自行处理 padding，key，iv 等问题。
 // example：
@@ -180,7 +187,11 @@ func AESDecFactory(paddingFunc func([]byte, int) []byte, unpaddingFunc func([]by
 //
 // ```
 func AESEnc(key []byte, data []byte, iv []byte, mode string) ([]byte, error) {
-	data = ZeroPadding(data, aes.BlockSize) // 交给外部处理 padding问题，内部自动 zero padding避免外部传入padding后的数据后多次padding的同时，保证数据块正常
+	// 只对块模式（CBC、ECB）进行 padding，流模式（CTR、CFB、OFB）不需要 padding
+	if !isAESStreamMode(mode) {
+		data = ZeroPadding(data, aes.BlockSize)
+	}
+
 	c, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
