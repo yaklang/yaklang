@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
@@ -751,4 +752,325 @@ func TestMUSTPASS_ImportRAG_OneKnowledgeMultipleVectors(t *testing.T) {
 	t.Logf("   - 源数据库: 1个知识条目, 10个向量文档")
 	t.Logf("   - 目标数据库: 1个知识条目（去重后）, 10个向量文档")
 	t.Logf("   - 所有向量文档正确指向同一个知识条目")
+}
+
+// TestMUSTPASS_ExportImport_ExtFields_ExportedAt 测试扩展字段 exported_at 的导入导出
+func TestMUSTPASS_ExportImport_ExtFields_ExportedAt(t *testing.T) {
+	// 创建源数据库并准备测试数据
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	collectionName := "test_ext_fields_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建 RAG 系统
+	ragSystem, err := Get(collectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 添加一个向量文档
+	err = ragSystem.VectorStore.AddWithOptions("test_doc", "test content for ext fields")
+	assert.NoError(t, err)
+
+	// 验证导出前集合的 ExportedAt 为空
+	var originalCollection schema.VectorStoreCollection
+	err = sourceDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).First(&originalCollection).Error
+	assert.NoError(t, err)
+	assert.True(t, originalCollection.ExportedAt.IsZero(), "导出前集合的 ExportedAt 应该为零值")
+
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_ext_fields_*.rag")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	t.Logf("导出到文件: %s", tempFile.Name())
+	err = ExportRAG(collectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的目标数据库进行导入
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 执行导入
+	t.Log("开始导入 RAG 文件...")
+	err = ImportRAG(tempFile.Name(), WithDB(targetDB))
+	assert.NoError(t, err)
+	t.Log("导入完成")
+
+	// 验证导入后集合的 ExportedAt 不为空
+	var importedCollection schema.VectorStoreCollection
+	err = targetDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).First(&importedCollection).Error
+	assert.NoError(t, err)
+	assert.False(t, importedCollection.ExportedAt.IsZero(), "导入后集合的 ExportedAt 应该不为零值")
+
+	t.Logf("导入后集合的 ExportedAt: %s", importedCollection.ExportedAt.Format("2006-01-02 15:04:05 UTC"))
+
+	// 验证 ExportedAt 时间合理（应该是最近的时间，不超过1分钟前）
+	timeSinceExport := time.Since(importedCollection.ExportedAt)
+	assert.True(t, timeSinceExport < time.Minute, "ExportedAt 应该是最近的时间（不超过1分钟前）")
+	assert.True(t, timeSinceExport >= 0, "ExportedAt 不应该是未来的时间")
+
+	t.Log("✅ 测试通过：扩展字段 exported_at 正确导出导入")
+	t.Logf("   - 导出前 ExportedAt: %v (零值)", originalCollection.ExportedAt)
+	t.Logf("   - 导入后 ExportedAt: %s", importedCollection.ExportedAt.Format("2006-01-02 15:04:05 UTC"))
+	t.Logf("   - 距离现在: %v", timeSinceExport)
+}
+
+// TestMUSTPASS_ImportRAG_CustomCollectionName 测试导入时使用用户自定义的 CollectionName
+// 验证知识库、向量库、实体库都使用同一个用户自定义名称
+func TestMUSTPASS_ImportRAG_CustomCollectionName(t *testing.T) {
+	// 创建源数据库并准备测试数据
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 原始导出的集合名称
+	originalCollectionName := "original_collection_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建 RAG 系统
+	ragSystem, err := Get(originalCollectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+		WithEnableKnowledgeBase(true),
+		WithEnableEntityRepository(true),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 添加向量文档
+	err = ragSystem.VectorStore.AddWithOptions("test_doc", "test content for custom name")
+	assert.NoError(t, err)
+
+	// 添加知识条目
+	kbInfo := ragSystem.KnowledgeBase.GetKnowledgeBaseInfo()
+	entry := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:  int64(kbInfo.ID),
+		KnowledgeTitle:   "测试知识条目",
+		KnowledgeType:    "test",
+		KnowledgeDetails: "测试知识详情",
+	}
+	err = sourceDB.Create(entry).Error
+	assert.NoError(t, err)
+
+	// 获取并添加实体
+	entityRepoInfo, err := ragSystem.EntityRepository.GetInfo()
+	assert.NoError(t, err)
+	entity := &schema.ERModelEntity{
+		RepositoryUUID: entityRepoInfo.Uuid,
+		EntityName:     "测试实体",
+		Description:    "测试实体描述",
+		EntityType:     "test",
+	}
+	err = sourceDB.Create(entity).Error
+	assert.NoError(t, err)
+
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_custom_name_*.rag")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	t.Logf("原始集合名称: %s", originalCollectionName)
+	err = ExportRAG(originalCollectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的目标数据库进行导入
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 使用用户自定义的名称导入
+	customCollectionName := "custom_imported_" + utils.RandStringBytes(8)
+	t.Logf("用户自定义集合名称: %s", customCollectionName)
+
+	err = ImportRAG(tempFile.Name(),
+		WithDB(targetDB),
+		WithName(customCollectionName),
+	)
+	assert.NoError(t, err)
+
+	// 验证向量库使用了自定义名称
+	var importedCollection schema.VectorStoreCollection
+	err = targetDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", customCollectionName).First(&importedCollection).Error
+	assert.NoError(t, err, "向量库应该使用自定义名称")
+	assert.Equal(t, customCollectionName, importedCollection.Name)
+	t.Logf("✓ 向量库名称: %s", importedCollection.Name)
+
+	// 验证原始名称不存在
+	var originalCount int64
+	targetDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", originalCollectionName).Count(&originalCount)
+	assert.Equal(t, int64(0), originalCount, "不应该存在原始名称的向量库")
+
+	// 验证知识库使用了自定义名称
+	var importedKB schema.KnowledgeBaseInfo
+	err = targetDB.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", customCollectionName).First(&importedKB).Error
+	assert.NoError(t, err, "知识库应该使用自定义名称")
+	assert.Equal(t, customCollectionName, importedKB.KnowledgeBaseName)
+	t.Logf("✓ 知识库名称: %s", importedKB.KnowledgeBaseName)
+
+	// 验证实体库使用了自定义名称
+	var importedEntityRepo schema.EntityRepository
+	err = targetDB.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", customCollectionName).First(&importedEntityRepo).Error
+	assert.NoError(t, err, "实体库应该使用自定义名称")
+	assert.Equal(t, customCollectionName, importedEntityRepo.EntityBaseName)
+	t.Logf("✓ 实体库名称: %s", importedEntityRepo.EntityBaseName)
+
+	// 验证所有组件的 RAGID 一致
+	assert.Equal(t, importedCollection.RAGID, importedKB.RAGID, "向量库和知识库的 RAGID 应该一致")
+	t.Logf("✓ RAGID 一致: %s", importedCollection.RAGID)
+
+	t.Log("✅ 测试通过：用户自定义 CollectionName 正确应用到所有组件")
+}
+
+// TestMUSTPASS_ImportRAG_UseFileNameWhenNoCustomName 测试导入时未设置自定义名称时使用文件中的名称
+func TestMUSTPASS_ImportRAG_UseFileNameWhenNoCustomName(t *testing.T) {
+	// 创建源数据库并准备测试数据
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 原始导出的集合名称
+	originalCollectionName := "file_original_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建 RAG 系统
+	ragSystem, err := Get(originalCollectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 添加向量文档
+	err = ragSystem.VectorStore.AddWithOptions("test_doc", "test content")
+	assert.NoError(t, err)
+
+	// 执行导出
+	tempFile, err := os.CreateTemp("", "test_file_name_*.rag")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	t.Logf("原始集合名称: %s", originalCollectionName)
+	err = ExportRAG(originalCollectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的目标数据库进行导入
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 不设置自定义名称导入，应该使用文件中的原始名称
+	err = ImportRAG(tempFile.Name(), WithDB(targetDB))
+	assert.NoError(t, err)
+
+	// 验证向量库使用了文件中的原始名称
+	var importedCollection schema.VectorStoreCollection
+	err = targetDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", originalCollectionName).First(&importedCollection).Error
+	assert.NoError(t, err, "向量库应该使用文件中的原始名称")
+	assert.Equal(t, originalCollectionName, importedCollection.Name)
+	t.Logf("✓ 向量库名称: %s", importedCollection.Name)
+
+	// 验证知识库使用了文件中的原始名称
+	var importedKB schema.KnowledgeBaseInfo
+	err = targetDB.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", originalCollectionName).First(&importedKB).Error
+	assert.NoError(t, err, "知识库应该使用文件中的原始名称")
+	assert.Equal(t, originalCollectionName, importedKB.KnowledgeBaseName)
+	t.Logf("✓ 知识库名称: %s", importedKB.KnowledgeBaseName)
+
+	// 验证实体库使用了文件中的原始名称
+	var importedEntityRepo schema.EntityRepository
+	err = targetDB.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", originalCollectionName).First(&importedEntityRepo).Error
+	assert.NoError(t, err, "实体库应该使用文件中的原始名称")
+	assert.Equal(t, originalCollectionName, importedEntityRepo.EntityBaseName)
+	t.Logf("✓ 实体库名称: %s", importedEntityRepo.EntityBaseName)
+
+	t.Log("✅ 测试通过：未设置自定义名称时正确使用文件中的原始名称")
+}
+
+// TestMUSTPASS_ExtractCollectionNameFromFilePath 测试从文件路径提取集合名称的函数
+func TestMUSTPASS_ExtractCollectionNameFromFilePath(t *testing.T) {
+	testCases := []struct {
+		filePath string
+		expected string
+	}{
+		{"/path/to/my_knowledge.rag", "my_knowledge"},
+		{"exported_data.zip", "exported_data"},
+		{"/some/path/file.tar.gz", "file"},
+		{"simple_file", "simple_file"},
+		{"/path/to/knowledge_base.tar.bz2", "knowledge_base"},
+		{"test.rag", "test"},
+		{"/absolute/path/to/data.json", "data"},
+		{"relative/path/to/export.bin", "export"},
+	}
+
+	for _, tc := range testCases {
+		result := extractCollectionNameFromFilePath(tc.filePath)
+		assert.Equal(t, tc.expected, result, "文件路径 %s 应该提取为 %s，但得到 %s", tc.filePath, tc.expected, result)
+		t.Logf("✓ %s -> %s", tc.filePath, result)
+	}
+
+	t.Log("✅ 测试通过：从文件路径提取集合名称功能正常")
+}
+
+// TestMUSTPASS_ImportOldFormatWithoutExtFields 测试导入旧版本文件（不包含扩展字段）的兼容性
+func TestMUSTPASS_ImportOldFormatWithoutExtFields(t *testing.T) {
+	// 创建源数据库并准备测试数据
+	sourceDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	collectionName := "test_old_format_" + utils.RandStringBytes(8)
+	mockEmbedding := vectorstore.NewDefaultMockEmbedding()
+
+	// 创建 RAG 系统
+	ragSystem, err := Get(collectionName,
+		WithDB(sourceDB),
+		WithDisableEmbedCollectionInfo(true),
+		WithLazyLoadEmbeddingClient(true),
+		WithEmbeddingClient(mockEmbedding),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, ragSystem)
+
+	// 添加一个向量文档
+	err = ragSystem.VectorStore.AddWithOptions("test_doc", "test content")
+	assert.NoError(t, err)
+
+	// 执行导出（使用当前版本，包含扩展字段）
+	tempFile, err := os.CreateTemp("", "test_old_format_*.rag")
+	assert.NoError(t, err)
+	tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	err = ExportRAG(collectionName, tempFile.Name(), WithDB(sourceDB))
+	assert.NoError(t, err)
+
+	// 创建新的目标数据库进行导入
+	targetDB, err := createTempTestDatabaseForRAGSystem()
+	assert.NoError(t, err)
+
+	// 执行导入
+	err = ImportRAG(tempFile.Name(), WithDB(targetDB))
+	assert.NoError(t, err)
+
+	// 验证导入成功
+	var importedCollection schema.VectorStoreCollection
+	err = targetDB.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).First(&importedCollection).Error
+	assert.NoError(t, err)
+	assert.Equal(t, collectionName, importedCollection.Name)
+
+	// 验证向量文档也导入成功
+	var docCount int64
+	err = targetDB.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", importedCollection.ID).Count(&docCount).Error
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), docCount)
+
+	t.Log("✅ 测试通过：新版本导出文件可以正常导入")
 }
