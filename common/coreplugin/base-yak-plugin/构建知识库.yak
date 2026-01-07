@@ -30,9 +30,22 @@ if k > 0 {
     options = append(options, rag.khopk(k))
 }
 
+hasValidData := false
+
 for path in filePath {
     yakit.StatusCard("building target", path)
-    for i in rag.BuildCollectionFromFile(kbName, path,options...)~ {
+    fileReuslt,err :=  rag.BuildCollectionFromFile(kbName, path,options...)
+    if err != nil {
+        yakit.Error("Build collection for file [%s] fail: %v", path, err)
+        continue
+    }
+    for i in fileReuslt {
+        hasValidData = true
         yakit.Output(i.KnowledgeTitle)
     }
+}
+
+if !hasValidData {
+    yakit.StatusCard("提示","为获取到有效知识库数据")
+    die("未获取到有效知识库数据")
 }
