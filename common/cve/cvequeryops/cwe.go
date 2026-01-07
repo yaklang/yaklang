@@ -261,7 +261,7 @@ type cweTranslationResult struct {
 func AICompleteFields(opts ...any) error {
 	// Parse options
 	config := &CWEAICompleteConfig{
-		Concurrent: 5, // Default: sequential processing
+		Concurrent: 5, // Default: parallel processing with 5 concurrent workers
 		TestLimit:  0, // Default: no limit
 	}
 
