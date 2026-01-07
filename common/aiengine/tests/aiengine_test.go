@@ -1,4 +1,4 @@
-package aiengine
+package tests
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/schema"
 
 	// import aireact to register NewReAct factory
@@ -23,48 +23,46 @@ func TestNewAIEngine(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "basic")
 		},
-		WithMaxIteration(5),
-		WithSessionID("test-session"),
-		WithYOLOMode(),
+		aiengine.WithMaxIteration(5),
+		aiengine.WithSessionID("test-session"),
+		aiengine.WithYOLOMode(),
 	)
 	defer engine.Close()
 
 	// 验证配置是否正确设置
-	if engine.config.MaxIteration != 5 {
-		t.Errorf("expected MaxIteration to be 5, got %d", engine.config.MaxIteration)
+	if engine.Config().MaxIteration != 5 {
+		t.Errorf("expected MaxIteration to be 5, got %d", engine.Config().MaxIteration)
 	}
 
-	if engine.config.SessionID != "test-session" {
-		t.Errorf("expected SessionID to be 'test-session', got %s", engine.config.SessionID)
+	if engine.Config().SessionID != "test-session" {
+		t.Errorf("expected SessionID to be 'test-session', got %s", engine.Config().SessionID)
 	}
 
-	if engine.config.ReviewPolicy != "yolo" {
-		t.Errorf("expected ReviewPolicy to be 'yolo', got %s", engine.config.ReviewPolicy)
+	if engine.Config().ReviewPolicy != "yolo" {
+		t.Errorf("expected ReviewPolicy to be 'yolo', got %s", engine.Config().ReviewPolicy)
 	}
 
 	// 验证引擎的基本状态
-	if engine.ctx == nil {
+	if engine.Context() == nil {
 		t.Error("expected context to be initialized")
 	}
 
-	if engine.activeTasks == nil {
-		t.Error("expected activeTasks map to be initialized")
-	}
+	// 移除了对私有字段的检查
 }
 
 // TestAIEngineConfigOptions 测试各种配置选项
 func TestAIEngineConfigOptions(t *testing.T) {
 	tests := []struct {
 		name     string
-		options  []AIEngineConfigOption
-		validate func(*testing.T, *AIEngineConfig)
+		options  []aiengine.AIEngineConfigOption
+		validate func(*testing.T, *aiengine.AIEngineConfig)
 	}{
 		{
 			name: "WithMaxIteration",
-			options: []AIEngineConfigOption{
-				WithMaxIteration(20),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithMaxIteration(20),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if c.MaxIteration != 20 {
 					t.Errorf("expected MaxIteration=20, got %d", c.MaxIteration)
 				}
@@ -72,10 +70,10 @@ func TestAIEngineConfigOptions(t *testing.T) {
 		},
 		{
 			name: "WithYOLOMode",
-			options: []AIEngineConfigOption{
-				WithYOLOMode(),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithYOLOMode(),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if c.ReviewPolicy != "yolo" {
 					t.Errorf("expected ReviewPolicy=yolo, got %s", c.ReviewPolicy)
 				}
@@ -86,10 +84,10 @@ func TestAIEngineConfigOptions(t *testing.T) {
 		},
 		{
 			name: "WithManualMode",
-			options: []AIEngineConfigOption{
-				WithManualMode(),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithManualMode(),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if c.ReviewPolicy != "manual" {
 					t.Errorf("expected ReviewPolicy=manual, got %s", c.ReviewPolicy)
 				}
@@ -100,10 +98,10 @@ func TestAIEngineConfigOptions(t *testing.T) {
 		},
 		{
 			name: "WithKeywords",
-			options: []AIEngineConfigOption{
-				WithKeywords("test", "example"),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithKeywords("test", "example"),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if len(c.Keywords) != 2 {
 					t.Errorf("expected 2 keywords, got %d", len(c.Keywords))
 				}
@@ -114,10 +112,10 @@ func TestAIEngineConfigOptions(t *testing.T) {
 		},
 		{
 			name: "WithDebugMode",
-			options: []AIEngineConfigOption{
-				WithDebugMode(true),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithDebugMode(true),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if !c.DebugMode {
 					t.Error("expected DebugMode=true")
 				}
@@ -125,10 +123,10 @@ func TestAIEngineConfigOptions(t *testing.T) {
 		},
 		{
 			name: "WithAIService",
-			options: []AIEngineConfigOption{
-				WithAIService("custom-service"),
+			options: []aiengine.AIEngineConfigOption{
+				aiengine.WithAIService("custom-service"),
 			},
-			validate: func(t *testing.T, c *AIEngineConfig) {
+			validate: func(t *testing.T, c *aiengine.AIEngineConfig) {
 				if c.AIService != "custom-service" {
 					t.Errorf("expected AIService=custom-service, got %s", c.AIService)
 				}
@@ -138,7 +136,7 @@ func TestAIEngineConfigOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewAIEngineConfig(tt.options...)
+			config := aiengine.NewAIEngineConfig(tt.options...)
 			tt.validate(t, config)
 		})
 	}
@@ -146,12 +144,12 @@ func TestAIEngineConfigOptions(t *testing.T) {
 
 // TestAIEngineConfigOptions_MultipleOptions 测试组合多个配置选项
 func TestAIEngineConfigOptions_MultipleOptions(t *testing.T) {
-	config := NewAIEngineConfig(
-		WithMaxIteration(10),
-		WithSessionID("multi-test"),
-		WithYOLOMode(),
-		WithKeywords("keyword1", "keyword2", "keyword3"),
-		WithDebugMode(true),
+	config := aiengine.NewAIEngineConfig(
+		aiengine.WithMaxIteration(10),
+		aiengine.WithSessionID("multi-test"),
+		aiengine.WithYOLOMode(),
+		aiengine.WithKeywords("keyword1", "keyword2", "keyword3"),
+		aiengine.WithDebugMode(true),
 	)
 
 	if config.MaxIteration != 10 {
@@ -181,16 +179,16 @@ func TestAIEngineEventHandling(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "event")
 		},
-		WithMaxIteration(1),
-		WithYOLOMode(),
-		WithOnEvent(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
+		aiengine.WithMaxIteration(1),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnEvent(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
 			t.Logf("Received event: type=%s, isStream=%v", event.Type, event.IsStream)
 		}),
 	)
 	defer engine.Close()
 
 	// 验证事件处理器已设置
-	if engine.config.OnEvent == nil {
+	if engine.Config().OnEvent == nil {
 		t.Error("expected OnEvent callback to be set")
 	}
 
@@ -199,29 +197,29 @@ func TestAIEngineEventHandling(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "callbacks")
 		},
-		WithMaxIteration(1),
-		WithYOLOMode(),
-		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		aiengine.WithMaxIteration(1),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Stream received: %d bytes", len(data))
 		}),
-		WithOnData(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
+		aiengine.WithOnData(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, nodeId string, data []byte) {
 			t.Logf("Data received: %d bytes", len(data))
 		}),
-		WithOnFinished(func(react aicommon.AIEngineOperator) {
+		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
 			t.Logf("Finished")
 		}),
 	)
 	defer engine2.Close()
 
-	if engine2.config.OnStream == nil {
+	if engine2.Config().OnStream == nil {
 		t.Error("expected OnStream callback to be set")
 	}
 
-	if engine2.config.OnData == nil {
+	if engine2.Config().OnData == nil {
 		t.Error("expected OnData callback to be set")
 	}
 
-	if engine2.config.OnFinished == nil {
+	if engine2.Config().OnFinished == nil {
 		t.Error("expected OnFinished callback to be set")
 	}
 }
@@ -235,15 +233,15 @@ func TestAIEngineWithCancelledContext(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "cancelled")
 		},
-		WithContext(ctx),
-		WithMaxIteration(1),
-		WithYOLOMode(),
+		aiengine.WithContext(ctx),
+		aiengine.WithMaxIteration(1),
+		aiengine.WithYOLOMode(),
 	)
 	defer engine.Close()
 
 	// 验证上下文已被取消
 	select {
-	case <-engine.ctx.Done():
+	case <-engine.Context().Done():
 		// 预期行为：上下文已取消
 	default:
 		t.Error("expected context to be cancelled")
@@ -252,11 +250,11 @@ func TestAIEngineWithCancelledContext(t *testing.T) {
 
 // TestConvertToYPBAIStartParams 测试配置转换为 GRPC 参数
 func TestConvertToYPBAIStartParams(t *testing.T) {
-	config := NewAIEngineConfig(
-		WithMaxIteration(15),
-		WithSessionID("test-session"),
-		WithReviewPolicy("manual"),
-		WithKeywords("test", "example"),
+	config := aiengine.NewAIEngineConfig(
+		aiengine.WithMaxIteration(15),
+		aiengine.WithSessionID("test-session"),
+		aiengine.WithReviewPolicy("manual"),
+		aiengine.WithKeywords("test", "example"),
 	)
 
 	params := config.ConvertToYPBAIStartParams()
@@ -289,7 +287,7 @@ func TestConvertToYPBAIStartParams(t *testing.T) {
 
 // TestConvertToYPBAIStartParams_DefaultValues 测试默认值转换
 func TestConvertToYPBAIStartParams_DefaultValues(t *testing.T) {
-	config := NewAIEngineConfig()
+	config := aiengine.NewAIEngineConfig()
 	params := config.ConvertToYPBAIStartParams()
 
 	// 验证默认值
@@ -309,8 +307,8 @@ func TestMultipleTasksTracking(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "tracking")
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
 	)
 	defer engine.Close()
 
@@ -319,20 +317,7 @@ func TestMultipleTasksTracking(t *testing.T) {
 		t.Errorf("expected 0 active tasks initially, got %d", engine.GetActiveTaskCount())
 	}
 
-	// 验证 activeTasks map 已初始化
-	if engine.activeTasks == nil {
-		t.Error("expected activeTasks map to be initialized")
-	}
-
-	// 验证 allTasksEndpoint 已初始化
-	if engine.allTasksEndpoint == nil {
-		t.Error("expected allTasksEndpoint to be initialized")
-	}
-
-	// 验证 taskEndpoints 已初始化
-	if engine.taskEndpoints == nil {
-		t.Error("expected taskEndpoints map to be initialized")
-	}
+	// 移除了内部字段检查
 }
 
 // TestWaitTaskFinishByTaskName 测试按任务名等待任务完成
@@ -341,8 +326,8 @@ func TestWaitTaskFinishByTaskName(t *testing.T) {
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedDirectAnswer(i, "wait")
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
 	)
 	defer engine.Close()
 
@@ -353,11 +338,26 @@ func TestWaitTaskFinishByTaskName(t *testing.T) {
 	}
 
 	// 测试不存在的任务（应该超时或被取消）
+	// 注意：不能直接设置 engine.ctx，因为它是私有的。
+	// 但是 WaitTaskFinishByTaskName 会使用 engine.ctx，如果 engine 是用 timeout context 创建的，它会超时。
+	// 这里原来的代码是直接设置 engine.ctx，这是不可行的。
+	// 我们可以创建一个新的 engine with timeout context。
+
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	engine.ctx = ctx
-	err = engine.WaitTaskFinishByTaskName("non-existent-task")
+	// 重新创建一个 engine，使用 timeout context
+	engineWithTimeout := newTestAIEngine(t,
+		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedDirectAnswer(i, "wait")
+		},
+		aiengine.WithContext(ctx),
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+	)
+	defer engineWithTimeout.Close()
+
+	err = engineWithTimeout.WaitTaskFinishByTaskName("non-existent-task")
 	if err == nil {
 		t.Error("expected error for non-existent task")
 	}
@@ -366,11 +366,11 @@ func TestWaitTaskFinishByTaskName(t *testing.T) {
 // BenchmarkNewAIEngineConfig 基准测试：创建配置
 func BenchmarkNewAIEngineConfig(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = NewAIEngineConfig(
-			WithMaxIteration(10),
-			WithSessionID("bench-session"),
-			WithYOLOMode(),
-			WithKeywords("keyword1", "keyword2"),
+		_ = aiengine.NewAIEngineConfig(
+			aiengine.WithMaxIteration(10),
+			aiengine.WithSessionID("bench-session"),
+			aiengine.WithYOLOMode(),
+			aiengine.WithKeywords("keyword1", "keyword2"),
 		)
 	}
 }
@@ -397,24 +397,7 @@ func mockedDirectAnswer(i aicommon.AICallerConfigIf, flag string) (*aicommon.AIR
 	return rsp, nil
 }
 
-// newTestAIEngine 创建用于测试的 AI 引擎，使用 mock AI 回调
-func newTestAIEngine(t *testing.T, mockCallback func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error), options ...AIEngineConfigOption) *AIEngine {
-	// 添加 mock AI 回调
-	allOptions := append([]AIEngineConfigOption{
-		WithAICallback(mockCallback),
-		WithDisableMCPServers(true),
-		WithExtOptions(
-			aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
-			aicommon.WithEnableSelfReflection(false),
-		),
-	}, options...)
-
-	engine, err := NewAIEngine(allOptions...)
-	if err != nil {
-		t.Fatalf("failed to create test AI engine: %v", err)
-	}
-	return engine
-}
+// newTestAIEngine 定义在 aiengine_base_test.go 中
 
 // ==================== Mock 测试 ====================
 
@@ -426,18 +409,18 @@ func TestAIEngine_MockDirectAnswer(t *testing.T) {
 
 	engine := newTestAIEngine(t,
 		func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedDirectAnswer(i, "test123")
+			return mockedDirectAnswer(i, "test1234")
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			t.Logf("Stream: NodeId=%s, data=%s", NodeId, string(data))
 			if NodeId == "re-act-loop-answer-payload" {
 				streamBuffer.Write(data)
 				answerReceived = true
 			}
 		}),
-		WithOnFinished(func(react aicommon.AIEngineOperator) {
+		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
 			finishReceived = true
 			t.Logf("Finished")
 		}),
@@ -482,9 +465,9 @@ func TestAIEngine_MockMultipleTasks(t *testing.T) {
 			taskMutex.Unlock()
 			return mockedDirectAnswer(i, fmt.Sprintf("task%d", currentTask))
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.AIEngineOperator) {
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
 			taskMutex.Lock()
 			taskCount++
 			taskMutex.Unlock()
@@ -524,10 +507,10 @@ func TestAIEngine_MockWithTimeout(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 			return mockedDirectAnswer(i, "timeout_test")
 		},
-		WithContext(ctx),
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.AIEngineOperator) {
+		aiengine.WithContext(ctx),
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
 			finishReceived = true
 		}),
 	)
@@ -562,9 +545,9 @@ func TestAIEngine_MockErrorHandling(t *testing.T) {
 			// 后续调用返回正常响应
 			return mockedDirectAnswer(i, "recovered")
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithOnFinished(func(react aicommon.AIEngineOperator) {
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnFinished(func(react aicommon.AIEngineOperator) {
 			t.Logf("Finished")
 		}),
 	)
@@ -607,9 +590,9 @@ func TestAIEngine_MockStreamData(t *testing.T) {
 			rsp.Close()
 			return rsp, nil
 		},
-		WithMaxIteration(5),
-		WithYOLOMode(),
-		WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
+		aiengine.WithMaxIteration(5),
+		aiengine.WithYOLOMode(),
+		aiengine.WithOnStream(func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) {
 			if len(data) > 0 {
 				streamMutex.Lock()
 				streamChunks = append(streamChunks, string(data))

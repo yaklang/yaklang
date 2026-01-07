@@ -19,8 +19,8 @@ import (
 // AIEngine AI 引擎封装
 // 提供简化的 API 来使用 ReAct 和其他 AI 功能
 type AIEngine struct {
-	config   *AIEngineConfig
-	operator aicommon.AIEngineOperator // 可以是 ReAct 或其他 AI 引擎操作器
+	config     *AIEngineConfig
+	operator   aicommon.AIEngineOperator // 可以是 ReAct 或其他 AI 引擎操作器
 	outputChan chan *schema.AiOutputEvent
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -59,8 +59,8 @@ func NewAIEngine(options ...AIEngineConfigOption) (*AIEngine, error) {
 	epm := aicommon.NewEndpointManagerContext(ctx)
 
 	engine := &AIEngine{
-		config:   config,
-		operator: operator,
+		config:           config,
+		operator:         operator,
 		outputChan:       outputChan,
 		ctx:              ctx,
 		cancel:           cancel,
@@ -86,6 +86,16 @@ func (e *AIEngine) GetOperator() aicommon.AIEngineOperator {
 	return e.operator
 }
 
+// Config 返回 AI 引擎的配置
+func (e *AIEngine) Config() *AIEngineConfig {
+	return e.config
+}
+
+// Context 返回 AI 引擎的上下文
+func (e *AIEngine) Context() context.Context {
+	return e.ctx
+}
+
 // sendInitConfig 发送初始化配置
 func (e *AIEngine) sendInitConfig() error {
 	event := &ypb.AIInputEvent{
@@ -97,7 +107,7 @@ func (e *AIEngine) sendInitConfig() error {
 
 // sendMsgAndGetTaskName 发送消息并等待获取任务名称
 // 该函数使用互斥锁确保同一时间只有一个调用在执行
-func (e *AIEngine) sendMsgAndGetTaskName(input string) (string, error) {
+func (e *AIEngine) sendMsgAndGetTaskName(input string, attachedResources ...*aicommon.AttachedResource) (string, error) {
 	// 加锁，确保同一时间只有一个 sendMsgAndGetTaskName 在运行
 	e.sendMsgMutex.Lock()
 
@@ -138,9 +148,12 @@ func (e *AIEngine) sendMsgAndGetTaskName(input string) (string, error) {
 }
 
 // SendMsg 执行 AI 任务（阻塞直到该任务完成）
-func (e *AIEngine) SendMsg(input string) error {
+func (e *AIEngine) SendMsg(input string, options ...AIEngineConfigOption) error {
+	// 创建临时config
+	config := NewAIEngineConfig(options...)
+
 	// 发送消息并获取任务名称
-	taskID, err := e.sendMsgAndGetTaskName(input)
+	taskID, err := e.sendMsgAndGetTaskName(input, config.AttachedResources...)
 	if err != nil {
 		return err
 	}
@@ -230,8 +243,12 @@ func (e *AIEngine) GetActiveTaskCount() int {
 }
 
 // SendMsgAsync 异步执行 AI 任务（立即返回）
-func (e *AIEngine) SendMsgAsync(input string) error {
-	_, err := e.sendMsgAndGetTaskName(input)
+func (e *AIEngine) SendMsgAsync(input string, options ...AIEngineConfigOption) error {
+	// 创建临时config
+	config := NewAIEngineConfig(options...)
+
+	// 发送消息后直接返回
+	_, err := e.sendMsgAndGetTaskName(input, config.AttachedResources...)
 	if err != nil {
 		return err
 	}
@@ -525,7 +542,7 @@ func InvokeReAct(input string, options ...AIEngineConfigOption) error {
 	}
 	defer engine.Close()
 
-	return engine.SendMsg(input)
+	return engine.SendMsg(input, options...)
 }
 
 // InvokeReActAsync 异步执行 ReAct 任务，并返回引擎实例

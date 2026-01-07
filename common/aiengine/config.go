@@ -63,6 +63,8 @@ type AIEngineConfig struct {
 	Language string // 响应语言偏好
 
 	ExtOptions []aicommon.ConfigOption
+
+	AttachedResources []*aicommon.AttachedResource
 }
 
 // AIEngineConfigOption 配置选项函数
@@ -334,6 +336,44 @@ func WithAICallback(callback aicommon.AICallbackType) AIEngineConfigOption {
 	}
 }
 
+// WithAttachedResources 设置附加资源
+func WithAttachedResource(typ string, key string, value string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(typ, key, value))
+	}
+}
+
+func WithAttachedFilePath(filePath string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH, filePath))
+	}
+}
+
+func WithAttachedFileContent(content string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(aicommon.CONTEXT_PROVIDER_TYPE_FILE, aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT, content))
+	}
+}
+
+func WithAttachedKnowledgeBase(knowledgeBaseName string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE, aicommon.CONTEXT_PROVIDER_KEY_NAME, knowledgeBaseName))
+	}
+}
+
+func WithAttachedAITool(aitoolName string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(aicommon.CONTEXT_PROVIDER_TYPE_AITOOL, aicommon.CONTEXT_PROVIDER_KEY_NAME, aitoolName))
+	}
+}
+
+func WithAttachedAIForge(aiForgeName string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.AttachedResources = append(c.AttachedResources, aicommon.NewAttachedResource(aicommon.CONTEXT_PROVIDER_TYPE_AIFORGE, aicommon.CONTEXT_PROVIDER_KEY_NAME, aiForgeName))
+	}
+}
+
+// WithAIConfig 设置 AI 配置
 func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		chatter, err := ai.LoadChater(typeName, opts...)
@@ -344,6 +384,7 @@ func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfig
 	}
 }
 
+// WithExtOptions 设置扩展选项
 func WithExtOptions(opts ...aicommon.ConfigOption) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.ExtOptions = opts
