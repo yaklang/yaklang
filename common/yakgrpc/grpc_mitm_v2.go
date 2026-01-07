@@ -141,12 +141,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 
-	// 是否允许抓取 chunk/static JS（默认 false：不允许，即默认过滤 chunk/static JS）
+	// 是否过滤打包/构建产物的静态 JS（默认 true：过滤）
 	// 这里用原子变量：需要支持前端在运行时切换开关后立即生效（无需重启 MITM）。
-	// 统一走 FilterData.AllowChunkStaticJS。
-	allowChunkStaticJS := utils.NewBool(false)
-	if filterData := firstReq.GetFilterData(); filterData != nil && filterData.AllowChunkStaticJS != nil {
-		allowChunkStaticJS.SetTo(filterData.GetAllowChunkStaticJS())
+	filterBundledStaticJS := utils.NewBool(true)
+	if filterData := firstReq.GetFilterData(); filterData != nil {
+		filterBundledStaticJS.SetTo(filterData.GetFilterBundledStaticJS())
 	}
 
 	getDownstreamProxy := func(request *ypb.MITMV2Request) ([]string, map[string][]string, error) {
@@ -574,10 +573,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				continue
 			}
 
-			// AllowChunkStaticJS 为 optional bool：仅在前端显式设置时才更新，避免其他控制消息“误覆盖”为默认值。
-			// 统一走 FilterData.AllowChunkStaticJS。
-			if filterData := reqInstance.GetFilterData(); filterData != nil && filterData.AllowChunkStaticJS != nil {
-				allowChunkStaticJS.SetTo(filterData.GetAllowChunkStaticJS())
+			// 统一走 FilterData.FilterBundledStaticJS。
+			if filterData := reqInstance.GetFilterData(); filterData != nil {
+				filterBundledStaticJS.SetTo(filterData.GetFilterBundledStaticJS())
 			}
 
 			if reqInstance.GetUpdateFilter() {
@@ -1093,7 +1091,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
 			// 这里仅做“强路径”的提前过滤：避免影响普通 JS（弱路径由后续镜像阶段结合更多信号判定）。
-			if !allowChunkStaticJS.IsSet() && isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
+			if filterBundledStaticJS.IsSet() && isJavaScriptMIME(t) && isBundledJavaScriptStrongPath(strings.ToLower(urlPath)) {
 				ret = true
 			}
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
@@ -1407,7 +1405,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 
 		// 默认过滤 chunk/static JS（避免误伤：综合 path/mime/缓存头/少量 body 特征判定）
-		if !allowChunkStaticJS.IsSet() && rsp != nil {
+		if filterBundledStaticJS.IsSet() && rsp != nil {
 			urlPath := ""
 			if req != nil && req.URL != nil {
 				urlPath = req.URL.EscapedPath()
