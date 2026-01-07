@@ -8,28 +8,31 @@
 
 根据知识库样本数据了解知识库内容后，选择更准确的关键词进行搜索：
 
-#### 1. 首次搜索 - 根据样本数据选择合适的关键词
-假设样本数据显示知识库包含"Yaklang语法"、"安全编程"等内容：
+#### 1. 首次搜索 - 转化用户问题为适合知识库的语义查询
+用户问题："怎么发包？"
+知识库样本显示：包含 "Yaklang HTTP Request", "Send TCP Packet", "PoC编写指南" 等内容。
+
+**错误做法**：直接搜索 "怎么发包？"（知识库可能不包含这种口语化表述）
+**正确做法**：转化为知识库中的专业表述
 
 ```json
 {
-  "@action": "search_knowledge",
+  "@action": "search_knowledge_semantic",
   "knowledge_bases": ["yaklang_docs"],
-  "search_queries": ["Yaklang如何进行网络请求", "Yaklang HTTP请求的使用方法", "使用Yak语言发送HTTP请求"],
-  "keywords": ["HTTP", "poc", "网络请求", "fuzz"],
-  "human_readable_thought": "从样本数据中看到知识库包含Yaklang编程相关内容，使用相关术语进行搜索"
+  "search_query": "Yaklang发送HTTP网络请求的方法与示例",
+  "human_readable_thought": "用户询问'怎么发包'，结合Yaklang文档知识库，推测用户想了解如何使用Yak发送网络请求。将口语化问题转化为'Yaklang发送HTTP网络请求的方法与示例'进行搜索"
 }
 ```
 
-#### 2. 继续搜索 - 根据样本数据中的专业术语搜索
+#### 2. 继续搜索 - 使用关键词搜索查找特定模块
+发现需要了解特定的 `poc` 模块用法：
 
 ```json
 {
-  "@action": "search_knowledge",
+  "@action": "search_knowledge_keyword",
   "knowledge_bases": ["yaklang_docs"],
-  "search_queries": ["poc模块的详细用法", "如何使用fuzz进行模糊测试"],
-  "keywords": ["poc.HTTP", "fuzz.HTTPRequest", "httpool"],
-  "human_readable_thought": "从样本中发现有poc和fuzz相关内容，深入搜索这些模块的用法"
+  "keyword": "poc.HTTP",
+  "human_readable_thought": "从样本中发现有poc模块，使用关键词精确搜索该模块的定义和用法"
 }
 ```
 
@@ -48,9 +51,9 @@
 
 ---
 
-### 场景二：附加资源中没有知识库（⚠️ 不要调用 search_knowledge）
+### 场景二：附加资源中没有知识库（⚠️ 不要调用搜索工具）
 
-当附加资源中没有知识库时，**不要调用 search_knowledge**，直接对现有信息进行总结：
+当附加资源中没有知识库时，**不要调用搜索相关的 action**，直接对现有信息进行总结：
 
 #### 只有文件附加时
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
@@ -106,9 +107,32 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
+	defaultFocus := r.config.Focus
+	// Check for @__FOCUS__xxx syntax in user query
+	// Format: @__FOCUS__xxx ...
+	// Example: @__FOCUS__code_writer Help me write code
+	const focusPrefix = "@__FOCUS__"
+	if idx := strings.Index(userQuery, focusPrefix); idx != -1 {
+		// Found prefix, extract the focus name
+		// The focus name is the string after prefix until the next space
+		remaining := userQuery[idx+len(focusPrefix):]
+		if spaceIdx := strings.Index(remaining, " "); spaceIdx != -1 {
+			extractedFocus := remaining[:spaceIdx]
+			if extractedFocus != "" {
+				// Only use extracted focus if default focus is empty
+				// Priority: r.config.Focus > extractedFocus > default
+				if defaultFocus == "" {
+					defaultFocus = extractedFocus
+				}
+				// Remove the focus directive from user query
+				// @__FOCUS__xxx<space> -> ""
+				userQuery = userQuery[:idx] + remaining[spaceIdx+1:]
+			}
+		}
+	}
+
 	currentTask := r.GetCurrentTask()
 	currentTask.SetUserInput(userQuery)
-	defaultFocus := r.config.Focus
 	if defaultFocus == "" {
 		defaultFocus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
