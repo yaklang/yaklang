@@ -105,13 +105,6 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, options ...any) (<-ch
 	}
 
 	broadcasterChannel := chanx.NewBroadcastChannel[AnalysisResult](refineConfig.Ctx, 100)
-	go func() {
-		defer broadcasterChannel.Close()
-		for res := range analyzeChannel {
-			broadcasterChannel.Submit(res)
-		}
-	}()
-
 	outputChannel := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
 
 	closeWg := sync.WaitGroup{}
@@ -147,6 +140,13 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, options ...any) (<-ch
 		}
 		for res := range knowledgeEntry {
 			outputChannel.SafeFeed(res)
+		}
+	}()
+
+	go func() {
+		defer broadcasterChannel.Close()
+		for res := range analyzeChannel {
+			broadcasterChannel.Submit(res)
 		}
 	}()
 

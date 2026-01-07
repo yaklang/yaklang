@@ -29,11 +29,11 @@ func ParseFileElements(filePath string) (map[string][]types.File, error) {
 	// 根据扩展名识别文件类型
 	var fileType FileType
 	switch ext {
-	case ".docx", ".doc":
+	case ".docx":
 		fileType = FileTypeWord
-	case ".xls", ".xlsx":
+	case ".xlsx":
 		fileType = FileTypeExcel
-	case ".ppt", ".pptx", ".pptm":
+	case ".pptx", ".pptm":
 		fileType = FileTypePPT
 	default:
 		return nil, errors.New("不支持的文件类型：" + ext)
@@ -91,10 +91,7 @@ func ParseFileElements(filePath string) (map[string][]types.File, error) {
 func GetSupportedExtensions() []string {
 	return []string{
 		".docx",
-		".doc",
-		".xls",
 		".xlsx",
-		".ppt",
 		".pptx",
 		".pptm",
 		// 可以在这里添加其他支持的扩展名
