@@ -151,11 +151,13 @@ func TestFSConverter(t *testing.T) {
 		t.Fatal(err)
 	}
 	showFS(f)
+	// FromCommitRange 现在只返回变更的文件，不包含未变更的文件
 	raw, _ = f.ReadFile("./file1.txt")
 	spew.Dump(raw)
 	assert.Contains(t, string(raw), "Modified content of file1")
+	// file2.txt 未变更，所以不应该在 diff 结果中
 	raw, _ = f.ReadFile("file2.txt")
-	assert.Contains(t, string(raw), "Initial content of file2\n")
+	assert.Empty(t, raw, "file2.txt should not be in diff (unchanged file)")
 	spew.Dump(raw)
 	raw, _ = f.ReadFile("file3.txt")
 	spew.Dump(raw)
