@@ -1,0 +1,70 @@
+// ELF段（Segment）信息测试
+// 核心功能：测试ELF文件的段信息，特别是代码段和数据段的识别
+// 测试函数：ReadELFSegments, ParseELF
+
+// 使用测试目录构建ELF文件路径
+elfFile = ""
+testDir = getParam("TEST_DIR")
+if testDir != nil && testDir != "" {
+    elfFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            elfFile = candidate
+            break
+        }
+    }
+}
+
+assert elfFile != "" && file.IsExisted(elfFile), sprintf("ELF file not found: %s", elfFile)
+
+// 1. 测试 ReadELFSegments - 读取ELF段信息
+segments, err = elf.ReadELFSegments(elfFile)
+assert err == nil, sprintf("ReadELFSegments failed: %v", err)
+assert segments != nil, "ReadELFSegments should return non-nil segments"
+assert len(segments) > 0, sprintf("Should have at least one segment, got: %d", len(segments))
+
+// 2. 验证段的基本信息和代码段/数据段的识别
+hasLoadSegment = false
+hasCodeSegment = false
+hasDataSegment = false
+
+for seg in segments {
+    assert seg.Type != "", sprintf("Segment type should not be empty, got: %s", seg.Type)
+    assert seg.Flags != "", sprintf("Segment flags should not be empty, got: %s", seg.Flags)
+    assert seg.VAddr >= 0, sprintf("Virtual address should be >= 0, got: 0x%016x", seg.VAddr)
+    
+    if seg.Type == "PT_LOAD" {
+        hasLoadSegment = true
+    }
+    
+    if seg.IsCode {
+        hasCodeSegment = true
+        assert "X" in seg.Flags, sprintf("Code segment should have execute flag, flags: %s", seg.Flags)
+    }
+    
+    if seg.IsData {
+        hasDataSegment = true
+    }
+}
+
+assert hasLoadSegment, "Should have at least one PT_LOAD segment"
+
+// 3. 测试 ParseELF - 验证Segments部分的一致性
+info, err = elf.ParseELF(elfFile)
+assert err == nil, sprintf("ParseELF failed: %v", err)
+assert info != nil, "ParseELF should return non-nil info"
+assert info.Segments != nil, "Segments should not be nil"
+assert len(info.Segments) == len(segments), sprintf("ParseELF segments count should match ReadELFSegments: %d vs %d", len(info.Segments), len(segments))
+
+// 验证关键段信息一致性 - 使用辅助函数确保索引访问兼容性
+segCount = len(segments)
+for idx = 0; idx < segCount; idx++ {
+    seg = segments[idx]
+    parsedSeg, err = elf.GetELFSegment(info, idx)
+    assert err == nil, sprintf("GetELFSegment failed: %v", err)
+    assert parsedSeg.Type == seg.Type, sprintf("Segment type should match: %s vs %s", parsedSeg.Type, seg.Type)
+    assert parsedSeg.IsCode == seg.IsCode, sprintf("IsCode should match: %v vs %v", parsedSeg.IsCode, seg.IsCode)
+    assert parsedSeg.IsData == seg.IsData, sprintf("IsData should match: %v vs %v", parsedSeg.IsData, seg.IsData)
+}
