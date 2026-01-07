@@ -74,8 +74,9 @@ func CBCDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 func CFBEncode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// CFB 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	encrypter := cipher.NewCFBEncrypter(c, iv)
@@ -84,8 +85,9 @@ func CFBEncode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 func CFBDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// CFB 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	decrypter := cipher.NewCFBDecrypter(c, iv)
@@ -124,8 +126,9 @@ func ECBDecode(c cipher.Block, data []byte) ([]byte, error) {
 }
 
 func OFBEncode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// OFB 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	encrypter := cipher.NewOFB(c, iv)
@@ -134,8 +137,9 @@ func OFBEncode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 func OFBDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// OFB 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	decrypter := cipher.NewOFB(c, iv)
@@ -144,8 +148,9 @@ func OFBDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 func CTREncode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// CTR 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	encrypter := cipher.NewCTR(c, iv)
@@ -154,8 +159,9 @@ func CTREncode(c cipher.Block, iv, data []byte) ([]byte, error) {
 }
 
 func CTRDecode(c cipher.Block, iv, data []byte) ([]byte, error) {
-	if err := BlockCheck(iv, data, c.BlockSize()); err != nil {
-		return nil, err
+	// CTR 是流模式，不需要数据对齐到块大小，只需要检查 IV 长度
+	if len(iv) != c.BlockSize() {
+		return nil, errors.New("check iv length: invalid iv size " + strconv.Itoa(len(iv)))
 	}
 	out := make([]byte, len(data))
 	decrypter := cipher.NewCTR(c, iv)
