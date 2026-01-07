@@ -501,7 +501,7 @@ func generateCWETranslationPrompt(cwe *cveresources.CWE) string {
 func ListAllCWE() chan *cveresources.CWE {
 	db := consts.GetGormCVEDatabase()
 	if db == nil {
-		log.Error("cannot found CVE database")
+		log.Error("cannot find CVE database")
 		ch := make(chan *cveresources.CWE)
 		close(ch)
 		return ch
