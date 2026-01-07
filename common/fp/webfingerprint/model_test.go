@@ -1,11 +1,13 @@
-package webfingerprint
+package webfingerprint_test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
-	"testing"
+	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 )
 
 func TestParseToCPE(t *testing.T) {
@@ -28,7 +30,7 @@ func TestParseToCPE(t *testing.T) {
 	}
 
 	for origin, result := range trueCases {
-		r, err := ParseToCPE(origin)
+		r, err := webfingerprint.ParseToCPE(origin)
 		assert.Nil(t, err)
 
 		assert.Equal(t, r.String(), result.origin)
@@ -43,7 +45,7 @@ func TestParseToCPE1(t *testing.T) {
 	db := consts.GetGormCVEDatabase()
 
 	for _, cpe := range cpes {
-		r, err := ParseToCPE(cpe)
+		r, err := webfingerprint.ParseToCPE(cpe)
 		assert.Nil(t, err)
 		for res := range cvequeryops.QueryCVEYields(db, cvequeryops.ProductWithVersion(r.Product, r.Version)) {
 			fmt.Println(res.Product)
