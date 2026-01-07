@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -192,6 +193,10 @@ type VectorStoreCollection struct {
 	CodeBookBinary []byte `gorm:"type:blob" json:"code_book_binary"`
 
 	SerialVersionUID string `gorm:"index" json:"serial_version_uid"`
+
+	// ExportedAt 表示该 RAG 数据库是外部导入时的导出时间
+	// 如果是本地创建的，该字段为零值
+	ExportedAt time.Time `json:"exported_at"`
 }
 
 func (v *VectorStoreCollection) BeforeSave() error {

@@ -9,7 +9,11 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
@@ -195,13 +199,22 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 				return nil, utils.Wrap(err, "failed to write hnsw index data")
 			}
 		}
-		reportProgress(95, "HNSW索引导出完成", "info")
+		reportProgress(92, "HNSW索引导出完成", "info")
 	} else {
 		// 不包含HNSW索引，写入0长度
 		if err := pbWriteVarint(buf, 0); err != nil {
 			return nil, utils.Wrap(err, "failed to write empty hnsw index length")
 		}
-		reportProgress(95, "跳过HNSW索引导出", "info")
+		reportProgress(92, "跳过HNSW索引导出", "info")
+	}
+
+	// 写入扩展字段
+	reportProgress(95, "正在写入扩展字段", "info")
+	extFields := make(map[string]string)
+	// 记录导出时间（UTC 时间戳）
+	extFields[ExtFieldKey_ExportedAt] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	if err := writeExtFieldsToStream(buf, extFields); err != nil {
+		return nil, utils.Wrap(err, "failed to write ext fields")
 	}
 
 	reportProgress(100, "向量库数据导出完成", "success")
@@ -951,15 +964,30 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	}
 
 	ragSystemConfig := NewRAGSystemConfig(optFuncs...)
-	if !ragSystemConfig.overwriteExisting && CollectionIsExists(ragSystemConfig.db, ragSystemConfig.Name) {
-		return utils.Errorf("collection %s already exists", ragSystemConfig.Name)
-	}
 
+	// 确定最终使用的集合名称（优先级从高到低）：
+	// 1. 用户自定义名称
+	// 2. RAG 文件内部的名称
+	// 3. 导入文件的文件名（去掉路径和扩展名）
+	var collectionName string
 	if ragSystemConfig.Name != "" {
-		ragData.Collection.Name = ragSystemConfig.Name
+		// 优先使用用户自定义名称
+		collectionName = ragSystemConfig.Name
+	} else if ragData.Collection.Name != "" {
+		// 其次使用文件内部的名称
+		collectionName = ragData.Collection.Name
+	} else {
+		// 最后使用文件名作为备选
+		collectionName = extractCollectionNameFromFilePath(inputPath)
+	}
+	ragData.Collection.Name = collectionName
+
+	// 检查集合是否已存在
+	if !ragSystemConfig.overwriteExisting && CollectionIsExists(ragSystemConfig.db, collectionName) {
+		return utils.Errorf("collection %s already exists", collectionName)
 	}
 
-	DeleteRAG(ragSystemConfig.db, ragData.Collection.Name)
+	DeleteRAG(ragSystemConfig.db, collectionName)
 
 	// 创建集合
 	ragID := uuid.NewString()
@@ -968,7 +996,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		ragData.Collection.SerialVersionUID = uuid.NewString()
 	}
 	ragData.Collection.RAGID = ragID
-	collection, err := vectorstore.CreateCollectionRecord(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.ConvertToVectorStoreOptions()...)
+	collection, err := vectorstore.CreateCollectionRecord(ragSystemConfig.db, collectionName, ragSystemConfig.description, ragSystemConfig.ConvertToVectorStoreOptions()...)
 	if err != nil {
 		return utils.Wrap(err, "create collection record")
 	}
@@ -977,8 +1005,8 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 		return utils.Wrap(err, "update collection rag id")
 	}
 
-	// 创建知识库
-	knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragSystemConfig.db, ragSystemConfig.Name, ragSystemConfig.description, ragSystemConfig.knowledgeBaseType, ragSystemConfig.tags, nil)
+	// 创建知识库（使用相同的名称）
+	knowledgeBase, err := knowledgebase.NewKnowledgeBaseWithVectorStore(ragSystemConfig.db, collectionName, ragSystemConfig.description, ragSystemConfig.knowledgeBaseType, ragSystemConfig.tags, nil)
 	if err != nil {
 		return utils.Wrap(err, "create knowledge base")
 	}
@@ -991,8 +1019,9 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	}
 	knowledgeBaseInfo := knowledgeBase.GetKnowledgeBaseInfo()
 
+	// 创建实体库（使用相同的名称）
 	entityBaseInfo := &schema.EntityRepository{
-		EntityBaseName: ragSystemConfig.Name,
+		EntityBaseName: collectionName,
 		Description:    ragSystemConfig.description,
 		Uuid:           uuid.NewString(),
 	}
@@ -1069,6 +1098,17 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	ragData.Collection.GraphBinary = hnswIndex
 	ragData.Documents = documents
 
+	// 尝试读取扩展字段（兼容旧版本文件）
+	extFields, err := tryReadExtFieldsFromStream(file)
+	if err != nil {
+		log.Warnf("failed to read ext fields: %v", err)
+	}
+	// 解析 exported_at 并设置到 Collection
+	if exportedAt, ok := parseExportedAtFromExtFields(extFields); ok {
+		ragData.Collection.ExportedAt = exportedAt
+		log.Infof("imported RAG was exported at: %s", exportedAt.Format(time.RFC3339))
+	}
+
 	// 执行导入
 	return importRAGDataToDB(ragData, optFuncs...)
 }
@@ -1119,7 +1159,7 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 		}
 
 		// 更新集合信息
-		err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Updates(map[string]interface{}{
+		updateData := map[string]interface{}{
 			"description":        collection.Description,
 			"model_name":         collection.ModelName,
 			"dimension":          collection.Dimension,
@@ -1131,7 +1171,12 @@ func importRAGDataToDB(ragData *RAGBinaryData, optFuncs ...RAGSystemConfigOption
 			"distance_func_type": collection.DistanceFuncType,
 			"uuid":               collection.UUID,
 			"rag_id":             collection.RAGID,
-		}).Error
+		}
+		// 如果有 exported_at 则更新
+		if !collection.ExportedAt.IsZero() {
+			updateData["exported_at"] = collection.ExportedAt
+		}
+		err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Updates(updateData).Error
 		if err != nil {
 			return utils.Wrap(err, "failed to update collection")
 		}
@@ -1342,6 +1387,110 @@ func pbWriteBool(w io.Writer, value bool) error {
 	}
 	_, err := w.Write(i)
 	return err
+}
+
+// ExtFieldKey 扩展字段的键名常量
+const (
+	ExtFieldKey_ExportedAt = "exported_at"
+)
+
+// writeExtFieldsToStream 写入扩展字段到流
+// 格式: ext_count (varint) + [key_len (varint) + key_bytes + value_len (varint) + value_bytes] * ext_count
+func writeExtFieldsToStream(writer io.Writer, fields map[string]string) error {
+	// 写入扩展字段数量
+	if err := pbWriteVarint(writer, uint64(len(fields))); err != nil {
+		return utils.Wrap(err, "write ext fields count")
+	}
+
+	// 写入每个扩展字段
+	for key, value := range fields {
+		// 写入 key
+		if err := pbWriteBytes(writer, []byte(key)); err != nil {
+			return utils.Wrapf(err, "write ext field key: %s", key)
+		}
+		// 写入 value
+		if err := pbWriteBytes(writer, []byte(value)); err != nil {
+			return utils.Wrapf(err, "write ext field value for key: %s", key)
+		}
+	}
+
+	return nil
+}
+
+// tryReadExtFieldsFromStream 尝试从流中读取扩展字段
+// 如果流已结束或读取失败，返回空 map（兼容旧版本文件）
+// 格式: ext_count (varint) + [key_len (varint) + key_bytes + value_len (varint) + value_bytes] * ext_count
+func tryReadExtFieldsFromStream(reader io.Reader) (map[string]string, error) {
+	fields := make(map[string]string)
+
+	// 尝试读取扩展字段数量
+	extCount, err := consumeVarint(reader)
+	if err != nil {
+		// 读取失败说明没有扩展字段（旧版本文件），返回空 map
+		return fields, nil
+	}
+
+	// 读取每个扩展字段
+	for i := uint64(0); i < extCount; i++ {
+		// 读取 key
+		keyBytes, err := consumeBytes(reader)
+		if err != nil {
+			return fields, utils.Wrap(err, "read ext field key")
+		}
+		// 读取 value
+		valueBytes, err := consumeBytes(reader)
+		if err != nil {
+			return fields, utils.Wrapf(err, "read ext field value for key: %s", string(keyBytes))
+		}
+		fields[string(keyBytes)] = string(valueBytes)
+	}
+
+	return fields, nil
+}
+
+// parseExportedAtFromExtFields 从扩展字段中解析 exported_at 时间
+func parseExportedAtFromExtFields(fields map[string]string) (time.Time, bool) {
+	if exportedAtStr, ok := fields[ExtFieldKey_ExportedAt]; ok && exportedAtStr != "" {
+		// exported_at 存储为 UTC 时间戳（秒）
+		timestamp, err := strconv.ParseInt(exportedAtStr, 10, 64)
+		if err != nil {
+			log.Warnf("failed to parse exported_at timestamp: %v", err)
+			return time.Time{}, false
+		}
+		return time.Unix(timestamp, 0).UTC(), true
+	}
+	return time.Time{}, false
+}
+
+// extractCollectionNameFromFilePath 从文件路径中提取集合名称
+// 去掉路径和扩展名，例如：
+//   - "/path/to/my_knowledge.rag" -> "my_knowledge"
+//   - "exported_data.zip" -> "exported_data"
+//   - "/some/path/file.tar.gz" -> "file"
+func extractCollectionNameFromFilePath(filePath string) string {
+	// 获取文件名（去掉目录路径）
+	fileName := filepath.Base(filePath)
+
+	// 去掉扩展名
+	// 先尝试去掉常见的双扩展名（如 .tar.gz）
+	for _, ext := range []string{".tar.gz", ".tar.bz2", ".tar.xz"} {
+		if strings.HasSuffix(strings.ToLower(fileName), ext) {
+			return strings.TrimSuffix(fileName, ext)
+		}
+	}
+
+	// 去掉单个扩展名
+	ext := filepath.Ext(fileName)
+	if ext != "" {
+		fileName = strings.TrimSuffix(fileName, ext)
+	}
+
+	// 如果结果为空，使用默认名称
+	if fileName == "" {
+		fileName = "imported_rag"
+	}
+
+	return fileName
 }
 
 func VerifyImportFile(importFile string) error {
