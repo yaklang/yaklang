@@ -2,13 +2,14 @@ package cve
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"strings"
 )
 
 func queryEx(i ...interface{}) chan *cveresources.CVE {
@@ -64,7 +65,16 @@ func getCWE(i interface{}) *cveresources.CWE {
 }
 
 var CWEExports = map[string]interface{}{
-	"Get": getCWE,
+	"Get":              getCWE,
+	"Update":           cvequeryops.CWEUpdate,
+	"ListAll":          cvequeryops.ListAllCWE,
+	"AICompleteFields": cvequeryops.AICompleteFields,
+	// Update options
+	"proxy": cvequeryops.WithCWEProxy,
+	"url":   cvequeryops.WithCWEURL,
+	// AICompleteFields options
+	"aiConcurrent": cvequeryops.WithAIConcurrent,
+	"testLimit":    cvequeryops.WithTestLimit,
 }
 
 var CVEExports = map[string]interface{}{
