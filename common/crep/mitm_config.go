@@ -78,6 +78,26 @@ func MITM_RandomJA3(b bool) MITMConfig {
 	}
 }
 
+// MITM_SetSNI 设置 SNI (Server Name Indication) 配置
+// 支持三种模式：
+// 1. 自动模式（默认）：不调用此函数，或 overwrite=false
+//   - 根据请求的 Host 自动推断 SNI
+//
+// 2. 强制模式：MITM_SetSNI("custom.domain.com", true)
+//   - 无论访问什么网站，SNI 总是使用指定的值
+//   - 用于 CDN 测试、WAF 绕过、域前置等场景
+//
+// 3. 清空模式：MITM_SetSNI("", true)
+//   - 不发送 SNI（ServerName 为空）
+//   - 用于绕过某些基于 SNI 的检测或限制
+func MITM_SetSNI(sni string, overwrite bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.sni = sni
+		server.overwriteSNI = overwrite
+		return nil
+	}
+}
+
 func MITM_SetHijackedMaxContentLength(i int) MITMConfig {
 	return func(server *MITMServer) error {
 		server.hijackedMaxContentLength = i
