@@ -6,8 +6,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaproject"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -21,5 +23,11 @@ func initIrifyLibs() {
 		ssaconfig.Exports,
 	}
 	yaklang.Import("ssa", lo.Assign(ssaExports...))
-	yaklang.Import("syntaxflow", syntaxflow.Exports)
+	// SyntaxFlow
+	sfExports := []map[string]any{
+		syntaxflow.Exports,
+		syntaxflow_scan.Exports,
+	}
+	yaklang.Import("syntaxflow", lo.Assign(sfExports...))
+	yaklang.Import("sfreport", sfreport.Exports)
 }
