@@ -54,19 +54,19 @@ forceRebuild = cli.Bool(
     cli.setHelp("Force rebuild index, ignore existing RAG file")
 )
 
-// AI 服务配置（CI 环境中使用 aibalance）
+// AI 服务配置（可选，不指定时使用系统默认的免费 AI 服务）
 aiType = cli.String(
     "ai-type",
     cli.setVerboseName("AI服务类型"),
-    cli.setDefault("aibalance"),
-    cli.setHelp("AI service type (e.g., aibalance, openai, chatglm)")
+    cli.setDefault(""),
+    cli.setHelp("AI service type (e.g., aibalance, openai, chatglm). Leave empty to use default free service.")
 )
 
 aiModel = cli.String(
     "ai-model",
     cli.setVerboseName("AI模型"),
-    cli.setDefault("memfit-standard-free"),
-    cli.setHelp("AI model name (e.g., memfit-standard-free)")
+    cli.setDefault(""),
+    cli.setHelp("AI model name (e.g., memfit-standard-free). Leave empty to use default.")
 )
 
 cli.check()
@@ -83,8 +83,12 @@ if yakVersion == "" || yakVersion == undefined {
 
 log.Info("=== AI Tools and Skills Search Index Builder ===")
 log.Info("Yak Version: %s", yakVersion)
-log.Info("AI Type: %s", aiType)
-log.Info("AI Model: %s", aiModel)
+if aiType != "" {
+    log.Info("AI Type: %s", aiType)
+    log.Info("AI Model: %s", aiModel)
+} else {
+    log.Info("AI Config: Using default free AI service")
+}
 
 // 处理输出路径
 finalOutputPath = outputRagPath
@@ -484,16 +488,30 @@ processSingleItem = func(itemIndex, totalItems, itemInfo) {
 `, itemTypeCN, itemTypeCN, itemTypeCN)
 
         // 使用 BuildSearchIndexKnowledge 构建搜索索引
-        // 配置 AI 服务类型（使用 aibalance + memfit-standard-free）
-        log.Info("   Step 2: Calling AI (%s/%s) to generate search questions...", aiType, aiModel)
+        // 如果指定了 AI 类型则使用，否则使用默认的免费 AI 服务
+        if aiType != "" {
+            log.Info("   Step 2: Calling AI (%s/%s) to generate search questions...", aiType, aiModel)
+        } else {
+            log.Info("   Step 2: Calling AI (default free service) to generate search questions...")
+        }
         searchTypeDesc = itemTypeCN
+        
+        // 构建 RAG 选项
+        ragOpts = [
+            rag.extraPrompt(aiCapabilityExtraPrompt),
+            rag.setSearchMeta(searchTypeDesc, itemName),
+            rag.noPotentialQuestions()
+        ]
+        
+        // 只有在显式指定 AI 类型时才添加 AI 服务配置
+        if aiType != "" && aiModel != "" {
+            ragOpts = append(ragOpts, rag.aiServiceType(aiType, ai.model(aiModel)))
+        }
+        
         searchResult, buildErr = rag.BuildSearchIndexKnowledge(
             ragCollectionName, 
             itemDescription, 
-            rag.extraPrompt(aiCapabilityExtraPrompt),
-            rag.setSearchMeta(searchTypeDesc, itemName),
-            rag.noPotentialQuestions(),
-            rag.aiServiceType(aiType, ai.model(aiModel))
+            ragOpts...
         )
         if buildErr != nil {
             log.Error("   Failed to build search index: %v", buildErr)
