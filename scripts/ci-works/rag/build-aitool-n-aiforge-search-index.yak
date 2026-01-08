@@ -54,6 +54,21 @@ forceRebuild = cli.Bool(
     cli.setHelp("Force rebuild index, ignore existing RAG file")
 )
 
+// AI 服务配置（CI 环境中使用 aibalance）
+aiType = cli.String(
+    "ai-type",
+    cli.setVerboseName("AI服务类型"),
+    cli.setDefault("aibalance"),
+    cli.setHelp("AI service type (e.g., aibalance, openai, chatglm)")
+)
+
+aiModel = cli.String(
+    "ai-model",
+    cli.setVerboseName("AI模型"),
+    cli.setDefault("memfit-standard-free"),
+    cli.setHelp("AI model name (e.g., memfit-standard-free)")
+)
+
 cli.check()
 
 // =============================================================================
@@ -68,6 +83,8 @@ if yakVersion == "" || yakVersion == undefined {
 
 log.Info("=== AI Tools and Skills Search Index Builder ===")
 log.Info("Yak Version: %s", yakVersion)
+log.Info("AI Type: %s", aiType)
+log.Info("AI Model: %s", aiModel)
 
 // 处理输出路径
 finalOutputPath = outputRagPath
@@ -467,14 +484,16 @@ processSingleItem = func(itemIndex, totalItems, itemInfo) {
 `, itemTypeCN, itemTypeCN, itemTypeCN)
 
         // 使用 BuildSearchIndexKnowledge 构建搜索索引
-        log.Info("   Step 2: Calling AI to generate search questions...")
+        // 配置 AI 服务类型（使用 aibalance + memfit-standard-free）
+        log.Info("   Step 2: Calling AI (%s/%s) to generate search questions...", aiType, aiModel)
         searchTypeDesc = itemTypeCN
         searchResult, buildErr = rag.BuildSearchIndexKnowledge(
             ragCollectionName, 
             itemDescription, 
             rag.extraPrompt(aiCapabilityExtraPrompt),
             rag.setSearchMeta(searchTypeDesc, itemName),
-            rag.noPotentialQuestions()
+            rag.noPotentialQuestions(),
+            rag.aiServiceType(aiType, ai.model(aiModel))
         )
         if buildErr != nil {
             log.Error("   Failed to build search index: %v", buildErr)
