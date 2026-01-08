@@ -75,6 +75,7 @@ type LowhttpExecConfig struct {
 	FromPlugin                       string
 	WithConnPool                     bool
 	ConnPool                         *LowHttpConnPool
+	DisableHttp2Reuse                bool
 	NativeHTTPRequestInstance        *http.Request
 	Username                         string
 	Password                         string
@@ -367,6 +368,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		Packet:               []byte{},
 		Https:                false,
 		Http2:                false,
+		DisableHttp2Reuse:    false,
 		Timeout:              15 * time.Second,
 		ConnectTimeout:       15 * time.Second,
 		RetryTimes:           0,
@@ -563,6 +565,12 @@ func WithHttps(https bool) LowhttpOpt {
 func WithHttp2(Http2 bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Http2 = Http2
+	}
+}
+
+func WithDisableHttp2Reuse(disable bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.DisableHttp2Reuse = disable
 	}
 }
 

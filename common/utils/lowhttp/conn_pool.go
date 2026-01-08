@@ -115,32 +115,42 @@ func addGetIdleConnFinishedCounter() {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(key *connectKey, exclusive bool, opts ...netx.DialXOption) (*persistConn, error) {
 	//addGetIdleConnRequiredCounter()
 	if l.contextDone() {
 		return nil, utils.Error("lowhttp: context done")
 	}
 
+	if exclusive {
+		log.Debugf("[lowhttp-conn-pool] dialing exclusive connection scheme=%s addr=%s", key.scheme, key.addr)
+		pConn, err := newPersistConn(key, l, true, opts...)
+		if err != nil {
+			return nil, err
+		}
+		return pConn, nil
+	}
+
 	// 尝试获取复用连接
-	if oldPc, ok := l.getFromConn(key); ok {
+	if oldPc, ok := l.getFromConn(key, exclusive); ok {
 		//addGetIdleConnFinishedCounter()
 		return oldPc, nil
 	}
 	// 没有复用连接则新建一个连接
-	pConn, err := newPersistConn(key, l, opts...)
+	pConn, err := newPersistConn(key, l, false, opts...)
 	if err != nil {
 		// try get idle conn
-		if oldPc, ok := l.getFromConn(key); ok {
+		if oldPc, ok := l.getFromConn(key, exclusive); ok {
 			//addGetIdleConnFinishedCounter()
 			return oldPc, nil
 		}
 		return nil, err
 	}
 	//addGetIdleConnFinishedCounter()
+	pConn.exclusive = exclusive
 	return pConn, nil
 }
 
-func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getConn bool) {
+func (l *LowHttpConnPool) getFromConn(key *connectKey, exclusive bool) (oldPc *persistConn, getConn bool) {
 	if l.contextDone() {
 		return nil, false
 	}
@@ -161,7 +171,7 @@ func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getC
 	for len(connList) > 0 {
 		oldPc = connList[len(connList)-1]
 
-		if key.scheme == H2 {
+		if key.scheme == H2 && !exclusive {
 			// 检查获取的连接是否可用
 			canUse := !(oldPc.alt.readGoAway || oldPc.alt.closed || oldPc.alt.full)
 			if canUse {
@@ -173,8 +183,13 @@ func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getC
 			l.idleLRU.remove(oldPc)
 			tooOld := !oldTime.Before(oldPc.idleAt)
 			if !tooOld {
-				oldPc.closeTimer.Stop()
+				if oldPc.closeTimer != nil {
+					oldPc.closeTimer.Stop()
+				}
 				connList = connList[:len(connList)-1] // h1 conn need leave conn
+				if exclusive {
+					oldPc.exclusive = true
+				}
 				getConn = true
 				break
 			}
@@ -196,6 +211,10 @@ func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getC
 func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
+	if pc.exclusive {
+		pc.closeNetConn()
+		return nil
+	}
 
 	cacheKeyHash := pc.cacheKey.hash()
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
@@ -288,8 +307,9 @@ type persistConn struct {
 	reused bool  // 是否复用
 	closed error // 连接关闭原因
 
-	inPool bool
-	isIdle bool
+	inPool    bool
+	isIdle    bool
+	exclusive bool
 
 	// debug info
 	wPacket []packetInfo
@@ -400,7 +420,7 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+func newPersistConn(key *connectKey, pool *LowHttpConnPool, exclusive bool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
 	newConn, err := netx.DialX(key.addr, opt...)
@@ -428,6 +448,7 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		rPacket:         make([]packetInfo, 0),
 		//numExpectedResponses: 0,
 	}
+	pc.exclusive = exclusive
 
 	if key.scheme == H2 {
 		if key.https { // Negotiation fail downgrade
@@ -448,6 +469,14 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		pc.h2Conn()
 		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
+			if exclusive {
+				log.Debugf("[lowhttp-conn-pool] exclusive h2 connection established addr=%s", key.addr)
+			} else {
+				log.Debugf("[lowhttp-conn-pool] pooled h2 connection established addr=%s", key.addr)
+			}
+			if exclusive {
+				return pc, nil
+			}
 			err = pool.putIdleConn(pc)
 			if err != nil {
 				log.Errorf("h2 conn put idle conn failed: %v", err) // not care h2 conn put idle conn failed

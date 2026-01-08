@@ -854,6 +854,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	fuzzerRequestSwg := utils.NewSizedWaitGroup(int(concurrent))
 	executeBatchRequestsWithParams := func(mergedParams map[string]any) (retErr error) {
+		//batchID := uuid.NewString()
+		//batchStart := time.Now()
+		//log.Infof("[httpfuzzer-exec] batch=%s runtime=%s start concurrent=%d disablePool=%v matchedReqs=%v", batchID, runtimeID, req.GetConcurrent(), req.GetDisableUseConnPool(), len(mergedParams))
 		defer func() {
 			if err := recover(); err != nil {
 				retErr = utils.Errorf("panic from grpc.httpfuzzer executeBatchRequestsWithParams: %v", err)
@@ -861,6 +864,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					utils.PrintCurrentGoroutineRuntimeStack()
 				})
 			}
+			//log.Infof("[httpfuzzer-exec] batch=%s runtime=%s finished cost=%s", batchID, runtimeID, time.Since(batchStart))
 		}()
 
 		httpPoolOpts := []mutate.HttpPoolConfigOption{
@@ -901,6 +905,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_WithPayloads(true),
 			mutate.WithPoolOpt_RandomSession(true),
 			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
+			mutate.WithPoolOpt_DisableHttp2Reuse(req.GetDisableUseConnPool()),
 			mutate.WithPoolOpt_SaveHTTPFlow(false),
 			mutate.WithPoolOpt_NoReadMultiResponse(req.GetNoReadMultiResponse()),
 			//mutate.WithPoolOpt_ConnPool(true),
