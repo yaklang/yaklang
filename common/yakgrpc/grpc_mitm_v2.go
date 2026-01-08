@@ -263,6 +263,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		disableCACertPage           = firstReq.GetDisableCACertPage()
 		disableWebsocketCompression = firstReq.GetDisableWebsocketCompression()
 		randomJA3                   = firstReq.GetRandomJA3()
+		sni                         = firstReq.GetSNI()
+		overwriteSNI                = firstReq.GetOverwriteSNI()
 		filterWebSocket             = utils.NewBool(firstReq.GetFilterWebsocket())
 		pluginConcurrency           = firstReq.GetPluginConcurrency()
 	)
@@ -1612,6 +1614,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
 		crep.MITM_RandomJA3(randomJA3),
+		crep.MITM_SetSNI(sni, overwriteSNI),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetDisableSystemProxy(disableSystemProxy),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),

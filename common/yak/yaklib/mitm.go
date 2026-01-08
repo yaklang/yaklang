@@ -38,6 +38,7 @@ var MitmExports = map[string]interface{}{
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
 	"randomJA3":            mitmConfigRandomJA3,
+	"sni":                  mitmConfigSNI,
 	"extraIncomingConn":    mitmConfigExtraIncomingConn,
 	"extraIncomingConnChanWithStrongLocalHost": mitmConfigExtraIncomingConnChanWithStrongLocalHost,
 
@@ -82,6 +83,8 @@ type mitmConfig struct {
 	gmtlsPrefer            bool
 	gmtlsOnly              bool
 	randomJA3              bool
+	sni                    string
+	overwriteSNI           bool
 	dialer                 func(timeout time.Duration, target string) (net.Conn, error)
 
 	// 是否开启透明劫持
@@ -340,6 +343,32 @@ func mitmConfigRandomJA3(b bool) MitmConfigOpt {
 	}
 }
 
+// sni 是一个选项函数，用于控制 MITM 代理连接目标服务器时的 SNI (Server Name Indication)
+// 这在测试 CDN、WAF 或进行域前置 (Domain Fronting) 测试时非常有用
+//
+// 支持三种模式：
+// 1. 自动模式（默认）：不调用此函数，根据请求的 Host 自动推断 SNI
+// 2. 强制模式：mitm.sni("custom.domain.com", true)，总是使用指定的 SNI
+// 3. 清空模式：mitm.sni("", true)，不发送 SNI
+//
+// Example:
+// ```
+// // 强制模式：总是使用指定的 SNI
+// mitm.Start(8080, mitm.sni("admin.example.com", true))
+//
+// // 清空模式：不发送 SNI
+// mitm.Start(8080, mitm.sni("", true))
+//
+// // 自动模式：根据 Host 自动推断（默认行为）
+// mitm.Start(8080)  // 或 mitm.sni("", false)
+// ```
+func mitmConfigSNI(sni string, overwrite bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.sni = sni
+		config.overwriteSNI = overwrite
+	}
+}
+
 // extraIncomingConn 是一个选项函数，用于指定中间人代理服务器接受外部传入的连接通道
 // 通过该选项，可以将外部的 net.Conn 连接注入到 MITM 服务器中进行劫持处理
 // Example:
@@ -548,6 +577,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
 		crep.MITM_RandomJA3(config.randomJA3),
+		crep.MITM_SetSNI(config.sni, config.overwriteSNI),
 	)
 
 	// Add extra incoming connection channels (legacy)

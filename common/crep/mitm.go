@@ -369,6 +369,10 @@ type MITMServer struct {
 	// random JA3 fingerprint
 	randomJA3 bool
 
+	// SNI (Server Name Indication) configuration
+	sni          string // SNI 值
+	overwriteSNI bool   // 是否覆盖自动推断的 SNI
+
 	// connection pool for remote server connections
 	connPool           *lowhttp.LowHttpConnPool
 	strongHostConnPool *lowhttp.LowHttpConnPool
@@ -465,6 +469,9 @@ func (m *MITMServer) initConfig() error {
 	}
 	if m.randomJA3 {
 		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))
+	}
+	if m.overwriteSNI {
+		config = append(config, lowhttp.WithSNI(m.sni))
 	}
 	if m.GetMaxContentLength() != 0 && m.GetMaxContentLength() < 10*1024*1024 {
 		m.proxy.SetMaxContentLength(m.GetMaxContentLength())
