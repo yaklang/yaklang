@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -14,6 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // ProgramLayer 表示一个编译层
@@ -52,9 +53,101 @@ type ProgramOverLay struct {
 
 	// signatureCache 缓存 Value 的签名，用于重定位
 	signatureCache *utils.CacheWithKey[string, *Value]
+
+	// overlay 的元数据（用于实现 Program interface）
+	programName string
+	programKind ssadb.ProgramKind
+	language    ssaconfig.Language
+}
+
+// GetLayerProgramNames 获取所有 layer 的 program names（按顺序，从底层到上层）
+func (o *ProgramOverLay) GetLayerProgramNames() []string {
+	if o == nil || len(o.Layers) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(o.Layers))
+	for _, layer := range o.Layers {
+		if layer != nil && layer.Program != nil {
+			names = append(names, layer.Program.GetProgramName())
+		}
+	}
+	return names
 }
 
 var _ sfvm.ValueOperator = (*ProgramOverLay)(nil)
+
+func (p *ProgramOverLay) GetProgramName() string {
+	if p == nil {
+		return ""
+	}
+	// 如果设置了 programName，返回它；否则返回最上层 layer 的 program name
+	if p.programName != "" {
+		return p.programName
+	}
+	if len(p.Layers) > 0 {
+		topLayer := p.Layers[len(p.Layers)-1]
+		if topLayer != nil && topLayer.Program != nil {
+			return topLayer.Program.GetProgramName()
+		}
+	}
+	return ""
+}
+
+func (p *ProgramOverLay) GetProgramKind() ssadb.ProgramKind {
+	if p == nil {
+		return ""
+	}
+	// 如果设置了 programKind，返回它；否则返回最上层 layer 的 program kind
+	if p.programKind != "" {
+		return p.programKind
+	}
+	if len(p.Layers) > 0 {
+		topLayer := p.Layers[len(p.Layers)-1]
+		if topLayer != nil && topLayer.Program != nil {
+			return topLayer.Program.GetProgramKind()
+		}
+	}
+	return ssadb.Application // 默认返回 Application
+}
+
+func (p *ProgramOverLay) GetLanguage() ssaconfig.Language {
+	if p == nil {
+		return ""
+	}
+	// 如果设置了 language，返回它；否则返回最上层 layer 的 language
+	if p.language != "" {
+		return p.language
+	}
+	if len(p.Layers) > 0 {
+		topLayer := p.Layers[len(p.Layers)-1]
+		if topLayer != nil && topLayer.Program != nil {
+			return topLayer.Program.GetLanguage()
+		}
+	}
+	return ""
+}
+
+func (p *ProgramOverLay) Hash() (string, bool) {
+	if p == nil {
+		return "", false
+	}
+	// 使用所有 layer 的 program names 生成 hash
+	layerNames := p.GetLayerProgramNames()
+	if len(layerNames) == 0 {
+		return "", false
+	}
+	// 将 []string 转换为 []interface{} 用于 CalcSha256
+	args := make([]interface{}, len(layerNames))
+	for i, name := range layerNames {
+		args[i] = name
+	}
+	hash := utils.CalcSha256(args...)
+	return hash, true
+}
+
+func (p *ProgramOverLay) GetOverlay() *ProgramOverLay {
+	return p
+}
 
 // newEmptyOverlay 创建一个空的 ProgramOverLay
 func newEmptyOverlay() *ProgramOverLay {
@@ -65,8 +158,6 @@ func newEmptyOverlay() *ProgramOverLay {
 	}
 }
 
-// createLayer1FromProgram 从 Program 创建 Layer1（基础层）
-// Layer1 的所有文件都标记为 1（新增），因为这是第一个 layer
 func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
 	layer := &ProgramLayer{
 		LayerIndex:  layerIndex,
@@ -89,8 +180,6 @@ func createLayer1FromProgram(prog *Program, layerIndex int) *ProgramLayer {
 	return layer
 }
 
-// findFileInProgram 在 Program 中查找指定路径的文件内容
-// 返回是否找到以及文件内容
 func findFileInProgram(prog *Program, normalizedPath string) (found bool, content string) {
 	if prog == nil {
 		return false, ""
@@ -109,41 +198,6 @@ func findFileInProgram(prog *Program, normalizedPath string) (found bool, conten
 	return found, content
 }
 
-// populateLayerFromProgram 从 Program 填充 Layer 的文件集合和 FileToLayerMap
-// 如果 fileHashMap 不为 nil，则使用它来设置 FileHashMap；否则，对于新文件设置为 1
-func populateLayerFromProgram(layer *ProgramLayer, prog *Program, overlay *ProgramOverLay, layerIndex int, fileHashMap map[string]int) {
-	if layer == nil || prog == nil {
-		return
-	}
-
-	prog.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-		normalizedPath := normalizeFilePath(filePath)
-		if normalizedPath == "" {
-			return true
-		}
-
-		layer.FileSet.Set(normalizedPath, struct{}{})
-		overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
-
-		// 设置 FileHashMap
-		if fileHashMap != nil {
-			// 如果文件在 fileHashMap 中，使用该值；否则默认为 1（新增）
-			if hash, exists := fileHashMap[normalizedPath]; exists {
-				layer.FileHashMap.Set(normalizedPath, hash)
-			} else {
-				layer.FileHashMap.Set(normalizedPath, 1)
-			}
-		} else {
-			// 没有 fileHashMap，默认为 1（新增）
-			layer.FileHashMap.Set(normalizedPath, 1)
-		}
-
-		return true
-	})
-}
-
-// createOverlayFromLayers 从已编译的 layers 创建 ProgramOverLay
-// 注意：传入的 layers 应该已经是编译好的 Program，Layer2 应该是差量编译的结果
 func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	if len(layers) < 2 {
 		log.Errorf("createOverlayFromLayers requires at least 2 layers, got %d", len(layers))
@@ -172,48 +226,25 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 			FileHashMap: utils.NewSafeMap[int](),
 		}
 
-		// 尝试从 diffProgram 的 Program 结构体中获取 FileHashMap
-		// 如果 diffProgram 是差量编译的结果，Program.FileHashMap 应该已经设置
+		// 从 diffProgram 的 Program 结构体中获取 FileHashMap
+		// FileHashMap 必须存在，否则返回错误
 		var fileHashMap map[string]int
-		if diffProgram.Program != nil {
-			// 优先从 Program.FileHashMap 获取（这是最新的方式）
-			if len(diffProgram.Program.FileHashMap) > 0 {
-				fileHashMap = diffProgram.Program.FileHashMap
-			} else if diffProgram.Program.GetIrProgram() != nil {
-				// 向后兼容：如果 Program.FileHashMap 不存在，尝试从 irProgram.FileHashMap 获取
-				irProgram := diffProgram.Program.GetIrProgram()
-				if irProgram.BaseProgramName != "" && len(irProgram.FileHashMap) > 0 {
-					// 从 irProgram.FileHashMap 中获取文件 hash 状态
-					fileHashMap = make(map[string]int)
-					for filePath, hashStr := range irProgram.FileHashMap {
-						if hash, err := strconv.Atoi(hashStr); err == nil {
-							fileHashMap[filePath] = hash
-						}
-					}
-				}
-			}
+		if diffProgram.Program == nil {
+			log.Errorf("diffProgram.Program is nil for layer %d", layerIndex)
+			return nil
 		}
 
-		// 如果没有从 irProgram 获取到 FileHashMap，则通过比较文件系统计算
-		if fileHashMap == nil && i == 1 {
-			// 只对 Layer2 计算 diff（相对于 Layer1）
-			baseFS := programToFileSystem(layers[0])
-			diffFS := programToFileSystem(diffProgram)
-			ctx := context.Background()
-			_, calculatedHashMap, err := calculateFileSystemDiff(ctx, baseFS, diffFS)
-			if err != nil {
-				log.Errorf("failed to calculate file system diff for layer %d: %v", layerIndex, err)
-				// 如果计算失败，继续处理，但不设置 FileHashMap
-			} else {
-				fileHashMap = calculatedHashMap
-			}
+		// 必须从 Program.FileHashMap 获取
+		if len(diffProgram.Program.FileHashMap) == 0 {
+			log.Errorf("FileHashMap is required for diff program in layer %d, but it is empty", layerIndex)
+			return nil
 		}
+
+		fileHashMap = diffProgram.Program.FileHashMap
 
 		// 设置 Layer 的 FileHashMap
-		if fileHashMap != nil {
-			for filePath, hash := range fileHashMap {
-				layer.FileHashMap.Set(filePath, hash)
-			}
+		for filePath, hash := range fileHashMap {
+			layer.FileHashMap.Set(filePath, hash)
 		}
 
 		// 填充 Layer 的文件集合和 FileToLayerMap
@@ -281,12 +312,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	return overlay
 }
 
-// NewProgramOverLay 创建一个新的 ProgramOverLay
-// layers 按顺序传入：layers[0] = Layer1（最底层，全量编译），layers[1] = Layer2（差量编译），以此类推
-// 注意：传入的 layers 应该已经是编译好的 Program，Layer2 应该是差量编译的结果
-// 如果只有一个 layer，返回 nil（错误）
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
-	// 过滤掉 nil 的 layers
 	validLayers := make([]*Program, 0, len(layers))
 	for _, layer := range layers {
 		if layer != nil {
@@ -305,114 +331,17 @@ func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
 	}
 
 	// 直接使用传入的 layers 创建 overlay（不再进行内部 diff 计算和编译）
-	return createOverlayFromLayers(validLayers...)
-}
+	overlay := createOverlayFromLayers(validLayers...)
 
-// newProgramOverLayLegacy 旧的实现逻辑（用于多层情况或向后兼容）
-func newProgramOverLayLegacy(layers ...*Program) *ProgramOverLay {
-	overlay := &ProgramOverLay{
-		Layers:         make([]*ProgramLayer, 0, len(layers)),
-		FileToLayerMap: utils.NewSafeMap[int](),
-		signatureCache: utils.NewTTLCacheWithKey[string, *Value](0), // 永久缓存
-	}
-
-	// 第一遍：收集所有层的文件，构建 FileToLayerMap
-	// 同时收集每层的文件集合，用于后续检测删除
-	allLayerFileSets := make([]*utils.SafeMap[struct{}], 0, len(layers))
-
-	for i, prog := range layers {
-		if prog == nil {
-			allLayerFileSets = append(allLayerFileSets, utils.NewSafeMap[struct{}]())
-			continue
-		}
-
-		layer := &ProgramLayer{
-			LayerIndex:  i + 1, // 从1开始
-			Program:     prog,
-			FileSet:     utils.NewSafeMap[struct{}](),
-			FileHashMap: utils.NewSafeMap[int](),
-		}
-
-		// 对于第一个 layer，所有文件都标记为 1（新增）
-		if i == 0 {
-			layer1 := createLayer1FromProgram(prog, i+1)
-			layer.FileSet = layer1.FileSet
-			layer.FileHashMap = layer1.FileHashMap
-		}
-
-		layerFileSet := utils.NewSafeMap[struct{}]()
-
-		// 收集该层的所有文件
-		prog.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-			// 规范化文件路径，去掉 UUID 前缀
-			normalizedPath := normalizeFilePath(filePath)
-			if normalizedPath == "" {
-				return true
-			}
-
-			layer.FileSet.Set(normalizedPath, struct{}{})
-			layerFileSet.Set(normalizedPath, struct{}{})
-			// 如果文件已经在更高层出现，不更新映射（上层覆盖下层）
-			// 否则记录该文件在最上层出现的 Layer 索引
-			if !overlay.FileToLayerMap.Have(normalizedPath) {
-				overlay.FileToLayerMap.Set(normalizedPath, i+1)
-			} else {
-				// 更新为更上层的索引
-				currentLayer, _ := overlay.FileToLayerMap.Get(normalizedPath)
-				if i+1 > currentLayer {
-					overlay.FileToLayerMap.Set(normalizedPath, i+1)
-				}
-			}
-			return true
-		})
-
-		allLayerFileSets = append(allLayerFileSets, layerFileSet)
-		overlay.Layers = append(overlay.Layers, layer)
-	}
-
-	// 第二遍：检测删除的文件（简化版本）
-	// 删除语义：如果文件在底层存在但在上层不存在，且没有在更上层重新出现，则该文件应该被删除
-	// 简化策略：只检查文件是否在所有层中存在，如果不在最上层存在，则标记为删除
-	if len(allLayerFileSets) > 1 {
-		// 收集最上层的文件集合
-		topLayerFiles := make(map[string]bool)
-		topLayerSet := allLayerFileSets[len(allLayerFileSets)-1]
-		topLayerSet.ForEach(func(filePath string, _ struct{}) bool {
-			topLayerFiles[filePath] = true
-			return true
-		})
-
-		// 检查所有底层文件，如果不在最上层存在，则在最上层的 FileHashMap 中标记为删除
-		if len(overlay.Layers) > 0 {
-			topLayer := overlay.Layers[len(overlay.Layers)-1]
-			if topLayer != nil && topLayer.FileHashMap != nil {
-				for i := 0; i < len(allLayerFileSets)-1; i++ {
-					allLayerFileSets[i].ForEach(func(filePath string, _ struct{}) bool {
-						if !topLayerFiles[filePath] {
-							// 文件在底层存在但不在最上层存在，在最上层的 FileHashMap 中标记为删除
-							topLayer.FileHashMap.Set(filePath, -1)
-							// 从 FileToLayerMap 中移除（如果存在）
-							overlay.FileToLayerMap.Delete(filePath)
-						}
-						return true
-					})
-				}
-			}
+	// 设置 overlay 的元数据（从最上层 layer 获取）
+	if overlay != nil && len(validLayers) > 0 {
+		topLayer := validLayers[len(validLayers)-1]
+		if topLayer != nil {
+			overlay.programName = topLayer.GetProgramName()
+			overlay.programKind = topLayer.GetProgramKind()
+			overlay.language = topLayer.GetLanguage()
 		}
 	}
-
-	// 构建聚合文件系统（基于 FileToLayerMap，只包含最终存在的文件，排除被删除的文件）
-	if len(layers) > 0 {
-		aggregatedFS, err := overlay.aggregateFileSystems()
-		if err != nil {
-			log.Errorf("failed to aggregate file systems: %v", err)
-		} else {
-			overlay.AggregatedFS = aggregatedFS
-		}
-	}
-
-	log.Infof("ProgramOverLay: Built with %d layers (legacy mode), %d unique files",
-		len(overlay.Layers), overlay.FileToLayerMap.Count())
 
 	return overlay
 }
@@ -438,51 +367,32 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 		}
 	}
 
-	if hasFileHashMap {
-		// 增量编译模式：只包含 hash 值相加为 1 的文件
-		// 从最上层开始查找文件内容（上层覆盖下层）
-		aggregatedFilesSet.ForEach(func(normalizedPath string, _ struct{}) bool {
-			// 从最上层开始查找文件
-			for i := len(p.Layers) - 1; i >= 0; i-- {
-				layer := p.Layers[i]
-				if layer == nil {
-					continue
-				}
+	if !hasFileHashMap {
+		// 如果没有 FileHashMap，直接返回错误
+		return nil, utils.Errorf("FileHashMap is required for aggregateFileSystems, but no layer has FileHashMap")
+	}
 
-				found, content := findFileInProgram(layer.Program, normalizedPath)
-				if found {
-					aggregated.AddFile(normalizedPath, content)
-					return true // 文件已找到，停止查找
-				}
-			}
-
-			// 如果文件在所有层中都没有找到，记录警告
-			log.Warnf("file %s should be in aggregated file system but not found in any layer", normalizedPath)
-			return true
-		})
-	} else {
-		// 向后兼容：如果没有 FileHashMap，使用原有的逻辑
-		p.FileToLayerMap.ForEach(func(normalizedPath string, layerIndex int) bool {
-			// layerIndex 是从 1 开始的
-			if layerIndex < 1 || layerIndex > len(p.Layers) {
-				return true
-			}
-
-			layer := p.Layers[layerIndex-1]
+	// 增量编译模式：只包含 hash 值相加为 1 的文件
+	// 从最上层开始查找文件内容（上层覆盖下层）
+	aggregatedFilesSet.ForEach(func(normalizedPath string, _ struct{}) bool {
+		// 从最上层开始查找文件
+		for i := len(p.Layers) - 1; i >= 0; i-- {
+			layer := p.Layers[i]
 			if layer == nil {
-				return true
+				continue
 			}
 
 			found, content := findFileInProgram(layer.Program, normalizedPath)
 			if found {
 				aggregated.AddFile(normalizedPath, content)
-			} else {
-				log.Warnf("file %s found in FileToLayerMap (layer %d) but not found in layer program", normalizedPath, layerIndex)
+				return true // 文件已找到，停止查找
 			}
+		}
 
-			return true
-		})
-	}
+		// 如果文件在所有层中都没有找到，记录警告
+		log.Warnf("file %s should be in aggregated file system but not found in any layer", normalizedPath)
+		return true
+	})
 
 	return aggregated, nil
 }
@@ -560,7 +470,6 @@ func (p *ProgramOverLay) GetAggregatedFileSystem() fi.FileSystem {
 	return p.AggregatedFS
 }
 
-// programToFileSystem 从 Program 构建文件系统
 func programToFileSystem(prog *Program) fi.FileSystem {
 	if prog == nil {
 		return filesys.NewVirtualFs()
@@ -825,28 +734,47 @@ func (p *ProgramOverLay) Ref(name string) Values {
 				continue
 			}
 
+			normalizedPath := normalizeFilePath(filePath)
+
+			// 检查该文件是否在更高层（上层）被标记为删除
+			// 如果文件在更高层的 FileHashMap 中被标记为 -1（删除），则跳过
+			isDeleted := false
+			for j := i + 1; j < len(p.Layers); j++ {
+				upperLayer := p.Layers[j]
+				if upperLayer != nil && upperLayer.FileHashMap != nil {
+					if hash, exists := upperLayer.FileHashMap.Get(normalizedPath); exists && hash == -1 {
+						isDeleted = true
+						break
+					}
+				}
+			}
+			if isDeleted {
+				// 文件在更高层被删除，跳过
+				continue
+			}
+
 			// 检查该文件是否在更高层（上层）也存在
 			// 如果存在，说明上层覆盖了下层，跳过这个值
-			if foundFiles.Have(filePath) {
+			if foundFiles.Have(normalizedPath) {
 				// 该文件已经在更高层找到，跳过
 				continue
 			}
 
 			// 检查该文件是否在当前层
-			if layer.FileSet.Have(filePath) {
+			if layer.FileSet.Have(normalizedPath) {
 				// 文件在当前层，标记为已找到
-				foundFiles.Set(filePath, struct{}{})
+				foundFiles.Set(normalizedPath, struct{}{})
 				result = append(result, v)
 			} else {
 				// 文件不在当前层，可能是从其他层引用过来的
 				// 检查该文件实际在哪个层
-				actualLayerIndex, exists := p.FileToLayerMap.Get(filePath)
+				actualLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
 				if exists && actualLayerIndex > layer.LayerIndex {
 					// 文件在更高层，跳过（会被更高层处理）
 					continue
 				}
 				// 文件在当前层或更低层，添加
-				foundFiles.Set(filePath, struct{}{})
+				foundFiles.Set(normalizedPath, struct{}{})
 				result = append(result, v)
 			}
 		}

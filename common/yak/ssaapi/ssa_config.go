@@ -72,6 +72,7 @@ type Config struct {
 	// incremental compilation information
 	baseProgramName string
 	fileHashMap     map[string]int
+	baseFS          fi.FileSystem // 基础文件系统（用于增量编译）
 }
 
 func (c *Config) CalcHash() string {
@@ -309,6 +310,11 @@ var WithBaseProgramName = ssaconfig.SetOption("ssa_compile/base_program_name", f
 // WithFileHashMap 设置文件哈希映射（用于差量编译）
 var WithFileHashMap = ssaconfig.SetOption("ssa_compile/file_hash_map", func(c *Config, v map[string]int) {
 	c.fileHashMap = v
+})
+
+// WithBaseFileSystem 设置基础文件系统（用于增量编译）
+var WithBaseFileSystem = ssaconfig.SetOption("ssa_compile/base_file_system", func(c *Config, v fi.FileSystem) {
+	c.baseFS = v
 })
 
 func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {

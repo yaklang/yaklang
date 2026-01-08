@@ -24,6 +24,37 @@ func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, e
 	return ParseProject(opts...)
 }
 
+// ParseProjectWithIncrementalCompile 解析项目并支持增量编译
+// 如果提供了 baseFS 和 baseProgramName，将执行增量编译并返回包含 overlay 的 Programs
+// 调用者可以通过 program.GetOverlay() 获取 ProgramOverLay 用于规则扫描
+// baseFS: 基础文件系统（全量编译的文件系统）
+// newFS: 新文件系统（当前要编译的文件系统）
+// baseProgramName: 基础程序的名称（必须已存在于数据库中）
+// diffProgramName: 差量程序的名称
+// language: 编译语言
+// opts: 其他编译选项
+// 返回：包含差量程序的 Programs，可以通过 program.GetOverlay() 获取 ProgramOverLay
+func ParseProjectWithIncrementalCompile(
+	baseFS, newFS fi.FileSystem,
+	baseProgramName, diffProgramName string,
+	language ssaconfig.Language,
+	opts ...ssaconfig.Option,
+) (Programs, error) {
+	// 设置增量编译选项
+	incrementalOpts := []ssaconfig.Option{
+		WithFileSystem(newFS),
+		WithBaseFileSystem(baseFS),
+		WithBaseProgramName(baseProgramName),
+		WithProgramName(diffProgramName),
+		WithLanguage(language),
+	}
+	// 合并用户提供的选项
+	incrementalOpts = append(incrementalOpts, opts...)
+
+	// 调用 ParseProject，它会检测增量编译配置并执行增量编译
+	return ParseProject(incrementalOpts...)
+}
+
 func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Programs, error) {
 	opts = append(opts, WithFileSystem(fs), WithPeepholeSize(size))
 	return ParseProject(opts...)
@@ -58,7 +89,7 @@ func CompileDiffProgramAndSaveToDB(
 	if baseProgramName != "" {
 		diffOpts = append(diffOpts, WithBaseProgramName(baseProgramName))
 	}
-	if fileHashMap != nil && len(fileHashMap) > 0 {
+	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
 	}
 	// 合并用户提供的选项
@@ -126,6 +157,14 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	}
 
 	c.Processf(0, "recompile project, start compile")
+
+	// 检查是否启用增量编译
+	if c.baseProgramName != "" && c.baseFS != nil && c.fs != nil {
+		c.Processf(0.1, "incremental compile detected, base program: %s", c.baseProgramName)
+		// 增量编译：编译差量程序并创建 overlay
+		return c.parseProjectWithIncrementalCompile()
+	}
+
 	if c.GetCompilePeepholeSize() != 0 {
 		// peephole compile
 		if progs, err = c.peephole(); err != nil {
@@ -184,4 +223,150 @@ func (c *Config) peephole() (Programs, error) {
 		}),
 	)
 	return progs, errs
+}
+
+// parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
+func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
+	// Step 1: 编译差量程序并保存到数据库
+	c.Processf(0.2, "compiling diff program...")
+	diffProgram, err := CompileDiffProgramAndSaveToDB(
+		c.ctx,
+		c.baseFS,           // 基础文件系统
+		c.fs,               // 新文件系统
+		c.baseProgramName,  // 基础程序名称
+		c.GetProgramName(), // 差量程序名称
+		c.GetLanguage(),    // 语言
+	)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to compile diff program")
+	}
+	c.Processf(0.6, "diff program compiled: %s", diffProgram.GetProgramName())
+
+	// Step 2: 从数据库加载基础程序
+	c.Processf(0.7, "loading base program from database: %s", c.baseProgramName)
+	baseProgram, err := FromDatabase(c.baseProgramName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to load base program from database: %s", c.baseProgramName)
+	}
+	c.Processf(0.9, "base program loaded: %s", baseProgram.GetProgramName())
+
+	// Step 3: 创建 ProgramOverLay
+	c.Processf(0.95, "creating program overlay...")
+	var overlay *ProgramOverLay
+
+	// 检查 base program 是否本身就是一个 overlay
+	baseOverlay := baseProgram.GetOverlay()
+	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
+		// base program 是一个 overlay，需要合并所有 layers
+		// 收集所有 base overlay 的 layers
+		allLayers := make([]*Program, 0, len(baseOverlay.Layers)+1)
+		for _, layer := range baseOverlay.Layers {
+			if layer != nil && layer.Program != nil {
+				allLayers = append(allLayers, layer.Program)
+			}
+		}
+		// 添加新的 diff program 作为最上层 layer
+		allLayers = append(allLayers, diffProgram)
+
+		// 创建包含所有 layers 的新 overlay
+		overlay = NewProgramOverLay(allLayers...)
+	} else {
+		// base program 不是 overlay，直接创建包含 base 和 diff 的 overlay
+		overlay = NewProgramOverLay(baseProgram, diffProgram)
+	}
+
+	if overlay == nil {
+		return nil, utils.Errorf("failed to create program overlay")
+	}
+
+	// Step 4: 将 overlay 存储到 diffProgram 中，供规则扫描使用
+	diffProgram.overlay = overlay
+
+	// Step 5: 确保 diffProgram 本身已保存到数据库（在保存 overlay 之前）
+	c.Processf(0.94, "saving diff program to database...")
+	if diffProgram.Program != nil {
+		wait := diffProgram.Program.UpdateToDatabase()
+		if wait != nil {
+			wait() // 等待保存完成
+		}
+	}
+	c.Processf(0.95, "diff program saved to database")
+
+	// Step 6: 保存所有 layer 的 program 到数据库
+	c.Processf(0.96, "saving all layer programs to database...")
+	if err := saveOverlayToDatabase(overlay, diffProgram); err != nil {
+		return nil, utils.Wrap(err, "failed to save overlay to database")
+	}
+	c.Processf(0.98, "all layer programs saved to database")
+
+	// Step 7: 更新缓存（在设置 overlay 后）
+	SetProgramCache(diffProgram)
+
+	// Step 8: 保存配置
+	SaveConfig(c, diffProgram)
+	c.Processf(1, "incremental compile finish, overlay created and saved")
+
+	return Programs{diffProgram}, nil
+}
+
+// saveOverlayToDatabase 保存 overlay 及其所有 layer 到数据库
+func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error {
+	if overlay == nil || len(overlay.Layers) == 0 {
+		return utils.Errorf("overlay is nil or has no layers")
+	}
+
+	// Step 1: 确保所有 layer 的 program 都已保存到数据库
+	layerNames := make([]string, 0, len(overlay.Layers))
+	for _, layer := range overlay.Layers {
+		if layer == nil || layer.Program == nil {
+			continue
+		}
+		layerProg := layer.Program
+		layerName := layerProg.GetProgramName()
+		if layerName == "" {
+			continue
+		}
+
+		// 确保 layer program 已保存到数据库
+		if layerProg.Program != nil {
+			wait := layerProg.Program.UpdateToDatabase()
+			if wait != nil {
+				wait() // 等待保存完成
+			}
+		}
+		layerNames = append(layerNames, layerName)
+	}
+
+	if len(layerNames) == 0 {
+		return utils.Errorf("no valid layer programs found")
+	}
+
+	// Step 2: 保存 overlay 的 metadata 到 diffProgram 的 irProgram
+	if diffProgram.Program == nil {
+		return utils.Errorf("diffProgram.Program is nil")
+	}
+
+	// 确保 diffProgram 的 irProgram 存在
+	if diffProgram.Program.GetIrProgram() == nil {
+		// 如果 irProgram 不存在，需要先创建
+		diffProgram.Program.UpdateToDatabase()
+		// 等待保存完成
+		if wait := diffProgram.Program.UpdateToDatabase(); wait != nil {
+			wait()
+		}
+	}
+
+	irProgram := diffProgram.Program.GetIrProgram()
+	if irProgram == nil {
+		return utils.Errorf("failed to get irProgram for diffProgram")
+	}
+
+	// 设置 overlay 信息
+	irProgram.IsOverlay = true
+	irProgram.OverlayLayers = layerNames
+
+	// 更新数据库
+	ssadb.UpdateProgram(irProgram)
+
+	return nil
 }
