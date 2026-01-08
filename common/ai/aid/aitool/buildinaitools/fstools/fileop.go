@@ -76,7 +76,7 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 			var buf bytes.Buffer
 			for _, entry := range entries {
 				raw := map[string]any{
-					"path":  entry.Name(),
+					"path":  fsys.Join(pathName, entry.Name()),
 					"isDir": entry.IsDir(),
 					"type":  entry.Type().String(),
 				}
