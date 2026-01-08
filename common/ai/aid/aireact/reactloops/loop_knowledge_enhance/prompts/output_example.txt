@@ -19,7 +19,11 @@
 {
   "@action": "search_knowledge_semantic",
   "knowledge_bases": ["yaklang_docs"],
-  "search_query": "Yaklang发送HTTP网络请求的方法与示例",
+  "search_queries": [
+    "Yaklang发送HTTP网络请求的方法与示例",
+    "Send TCP Packet in Yaklang",
+    "Yaklang PoC 编写指南与示例"
+  ],
   "human_readable_thought": "用户询问'怎么发包'，结合Yaklang文档知识库，推测用户想了解如何使用Yak发送网络请求。将口语化问题转化为'Yaklang发送HTTP网络请求的方法与示例'进行搜索"
 }
 ```

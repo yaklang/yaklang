@@ -108,35 +108,66 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	defaultFocus := r.config.Focus
-	// Check for @__FOCUS__xxx syntax in user query
-	// Format: @__FOCUS__xxx ...
-	// Example: @__FOCUS__code_writer Help me write code
-	const focusPrefix = "@__FOCUS__"
-	if idx := strings.Index(userQuery, focusPrefix); idx != -1 {
-		// Found prefix, extract the focus name
-		// The focus name is the string after prefix until the next space
-		remaining := userQuery[idx+len(focusPrefix):]
-		if spaceIdx := strings.Index(remaining, " "); spaceIdx != -1 {
-			extractedFocus := remaining[:spaceIdx]
-			if extractedFocus != "" {
-				// Only use extracted focus if default focus is empty
-				// Priority: r.config.Focus > extractedFocus > default
-				if defaultFocus == "" {
-					defaultFocus = extractedFocus
-				}
-				// Remove the focus directive from user query
-				// @__FOCUS__xxx<space> -> ""
-				userQuery = userQuery[:idx] + remaining[spaceIdx+1:]
-			}
+	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus)
+
+	currentTask := r.GetCurrentTask()
+	currentTask.SetUserInput(parsedQuery)
+	if focus == "" {
+		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
+	}
+	return r.ExecuteLoopTask(focus, currentTask, loopOptions...)
+}
+
+func (r *ReAct) parseLoopDirectives(userQuery string, defaultFocus string) (string, string, []reactloops.ReActLoopOption) {
+	query := userQuery
+	focus := defaultFocus
+	var loopOptions []reactloops.ReActLoopOption
+
+	const loopConfigPrefix = "@__LOOP_CONFIG__"
+	if token, updatedQuery, ok := extractDirectiveToken(query, loopConfigPrefix); ok {
+		query = updatedQuery
+		if hasLoopConfigFlag(token, "enable_debug") {
+			loopOptions = append(loopOptions, reactloops.WithVar("debug_mode", true))
 		}
 	}
 
-	currentTask := r.GetCurrentTask()
-	currentTask.SetUserInput(userQuery)
-	if defaultFocus == "" {
-		defaultFocus = schema.AI_REACT_LOOP_NAME_DEFAULT
+	const focusPrefix = "@__FOCUS__"
+	if token, updatedQuery, ok := extractDirectiveToken(query, focusPrefix); ok {
+		query = updatedQuery
+		if token != "" && focus == "" {
+			focus = token
+		}
 	}
-	return r.ExecuteLoopTask(defaultFocus, currentTask)
+
+	return strings.TrimSpace(query), focus, loopOptions
+}
+
+func extractDirectiveToken(query string, prefix string) (string, string, bool) {
+	idx := strings.Index(query, prefix)
+	if idx == -1 {
+		return "", query, false
+	}
+	remaining := query[idx+len(prefix):]
+	if remaining == "" {
+		return "", strings.TrimSpace(query[:idx]), true
+	}
+	spaceIdx := strings.Index(remaining, " ")
+	if spaceIdx == -1 {
+		return remaining, strings.TrimSpace(query[:idx]), true
+	}
+	return remaining[:spaceIdx], strings.TrimSpace(query[:idx] + remaining[spaceIdx+1:]), true
+}
+
+func hasLoopConfigFlag(token string, flag string) bool {
+	parts := strings.FieldsFunc(token, func(r rune) bool {
+		return r == ',' || r == ';' || r == '|'
+	})
+	for _, part := range parts {
+		if part == flag {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {

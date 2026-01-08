@@ -5,10 +5,12 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,7 +30,9 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
+				reactloops.WithAllowRAG(false),
+				reactloops.WithAllowAIForge(false),
+				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
@@ -42,14 +46,11 @@ func init() {
 					searchResults := loop.Get("search_results")
 					searchHistory := loop.Get("search_history")
 
-					feedbacks := feedbacker.String()
-
 					renderMap := map[string]any{
 						"UserQuery":         userQuery,
 						"AttachedResources": attachedResources,
 						"SearchResults":     searchResults,
 						"SearchHistory":     searchHistory,
-						"FeedbackMessages":  feedbacks,
 						"Nonce":             nonce,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
@@ -93,6 +94,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		var files []string
 		var aiTools []string
 		var aiForges []string
+		var knowledgeCoreSummary string
 
 		for _, data := range attachedDatas {
 			switch data.Type {
@@ -117,10 +119,82 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 			// 获取知识库样本数据，帮助 AI 了解知识库的领域和内容
 			ctx := loop.GetConfig().GetContext()
+			if task != nil && !utils.IsNil(task.GetContext()) {
+				ctx = task.GetContext()
+			}
 			sampleData, err := r.EnhanceKnowledgeGetRandomN(ctx, DefaultKnowledgeSampleCount, knowledgeBases...)
 			if err != nil {
 				log.Warnf("failed to get knowledge base samples: %v", err)
 			} else if sampleData != "" {
+				// 使用 LiteForge 总结核心内容（多维度，最多 5 条）
+				const maxSummaryInputSize = 12 * 1024 // 12KB
+				summaryInput := sampleData
+				if len(summaryInput) > maxSummaryInputSize {
+					summaryInput = summaryInput[:maxSummaryInputSize] + "\n\n[... 内容已截断 ...]"
+				}
+
+				summaryPrompt := utils.MustRenderTemplate(`请根据以下知识库样本内容，提炼知识库的主要核心内容，从不同维度总结。
+要求：
+1. 输出不超过 5 条
+2. 每条包含“维度”和“核心内容”
+3. 用简洁中文表达
+4. 只根据样本内容，不要编造
+
+<|KNOWLEDGE_SAMPLES_{{ .Nonce }}|>
+{{ .Samples }}
+<|KNOWLEDGE_SAMPLES_END_{{ .Nonce }}|>
+`, map[string]any{
+					"Nonce":   utils.RandStringBytes(4),
+					"Samples": summaryInput,
+				})
+
+				summaryResult, sumErr := r.InvokeLiteForge(
+					ctx,
+					"summarize-knowledge-core",
+					summaryPrompt,
+					[]aitool.ToolOption{
+						aitool.WithStructArrayParam(
+							"core_summaries",
+							[]aitool.PropertyOption{
+								aitool.WithParam_Description("知识库核心内容多维度总结，最多 5 条"),
+								aitool.WithParam_Required(true),
+							},
+							nil,
+							aitool.WithStringParam("dimension", aitool.WithParam_Description("总结维度，如领域/主题/场景/方法/概念等")),
+							aitool.WithStringParam("summary", aitool.WithParam_Description("该维度下的核心内容总结")),
+						),
+					},
+				)
+				if sumErr != nil {
+					log.Warnf("failed to summarize knowledge core content: %v", sumErr)
+				} else if summaryResult != nil {
+					coreItems := summaryResult.GetInvokeParamsArray("core_summaries")
+					if len(coreItems) > 5 {
+						coreItems = coreItems[:5]
+					}
+					if len(coreItems) > 0 {
+						var summaryBuilder strings.Builder
+						for i, item := range coreItems {
+							dimension := strings.TrimSpace(item.GetString("dimension"))
+							summary := strings.TrimSpace(item.GetString("summary"))
+							if summary == "" {
+								continue
+							}
+							if dimension == "" {
+								dimension = fmt.Sprintf("维度%d", i+1)
+							}
+							summaryBuilder.WriteString(fmt.Sprintf("- %s：%s\n", dimension, summary))
+						}
+						knowledgeCoreSummary = strings.TrimSpace(summaryBuilder.String())
+						if knowledgeCoreSummary != "" {
+							resourcesInfo.WriteString("### 知识库核心内容总结 (Knowledge Core Summary)\n")
+							resourcesInfo.WriteString("以下为基于样本数据的核心内容多维度总结\n")
+							resourcesInfo.WriteString(knowledgeCoreSummary)
+							resourcesInfo.WriteString("\n\n")
+						}
+					}
+				}
+
 				// 检查样本数据大小，控制在30k字节以内
 				const maxSampleSize = 30 * 1024 // 30KB
 				if len(sampleData) > maxSampleSize {
@@ -202,6 +276,25 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			resourcesInfo.WriteString("\n")
 		}
 
+		loopDir := loop.Get("loop_directory")
+		if loopDir != "" {
+			var markdown strings.Builder
+			markdown.WriteString("# Attached Resources\n\n")
+			markdown.WriteString("## User Query\n\n")
+			markdown.WriteString(userQuery)
+			markdown.WriteString("\n\n## Resources\n\n")
+			markdown.WriteString(resourcesInfo.String())
+
+			filename := filepath.Join(loopDir, fmt.Sprintf("attached_resources_%s.md", utils.DatetimePretty2()))
+			if err := os.WriteFile(filename, []byte(markdown.String()), 0644); err != nil {
+				log.Warnf("failed to write knowledge enhance resources markdown: %v", err)
+			} else {
+				if emitter := loop.GetEmitter(); emitter != nil {
+					emitter.EmitPinFilename(filename)
+				}
+			}
+		}
+
 		// Initialize loop context
 		loop.Set("user_query", userQuery)
 		loop.Set("attached_resources", resourcesInfo.String())
@@ -209,6 +302,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("files", strings.Join(files, ","))
 		loop.Set("ai_tools", strings.Join(aiTools, ","))
 		loop.Set("ai_forges", strings.Join(aiForges, ","))
+		loop.Set("knowledge_core_summary", knowledgeCoreSummary)
 		loop.Set("search_results", "")
 		loop.Set("search_history", "")
 

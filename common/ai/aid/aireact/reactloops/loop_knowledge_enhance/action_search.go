@@ -3,6 +3,7 @@ package loop_knowledge_enhance
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -228,14 +229,35 @@ func compressKnowledgeResults(resultStr string, queries []string, userContext st
 
 		// 为重要知识条目创建 artifacts
 		if r.Rank <= 3 {
-			filename := invoker.EmitFileArtifactWithExt(fmt.Sprintf("key_knowledge_rank_%d", r.Rank), ".txt", "")
-			emitter.EmitPinFilename(filename)
+			iteration := loop.GetCurrentIterationIndex()
+			if iteration <= 0 {
+				iteration = 1
+			}
+			loopDir := loop.Get("loop_directory")
+			if loopDir == "" {
+				filename := invoker.EmitFileArtifactWithExt(fmt.Sprintf("key_knowledge_rank_%d_iter_%d", r.Rank, iteration), ".txt", "")
+				emitter.EmitPinFilename(filename)
 
-			// 写入文件内容，包含元信息
-			artifactContent := fmt.Sprintf("相关性排名：#%d\n选择理由：%s\n\n内容：\n%s", r.Rank, r.Reason, text)
-			err := os.WriteFile(filename, []byte(artifactContent), 0644)
-			if err != nil {
-				log.Warnf("failed to write key knowledge artifact rank %d: %v", r.Rank, err)
+				// 写入文件内容，包含元信息
+				artifactContent := fmt.Sprintf("迭代轮数：%d\n相关性排名：#%d\n选择理由：%s\n\n内容：\n%s", iteration, r.Rank, r.Reason, text)
+				err := os.WriteFile(filename, []byte(artifactContent), 0644)
+				if err != nil {
+					log.Warnf("failed to write key knowledge artifact rank %d: %v", r.Rank, err)
+				}
+			} else {
+				artifactDir := filepath.Join(loopDir, "key_knowledge", fmt.Sprintf("iter_%d", iteration))
+				if err := os.MkdirAll(artifactDir, 0755); err != nil {
+					log.Warnf("failed to create key knowledge directory: %v", err)
+				}
+				filename := filepath.Join(artifactDir, fmt.Sprintf("key_knowledge_rank_%d_iter_%d_%s.txt", r.Rank, iteration, utils.DatetimePretty2()))
+				emitter.EmitPinFilename(filename)
+
+				// 写入文件内容，包含元信息
+				artifactContent := fmt.Sprintf("迭代轮数：%d\n相关性排名：#%d\n选择理由：%s\n\n内容：\n%s", iteration, r.Rank, r.Reason, text)
+				err := os.WriteFile(filename, []byte(artifactContent), 0644)
+				if err != nil {
+					log.Warnf("failed to write key knowledge artifact rank %d: %v", r.Rank, err)
+				}
 			}
 		}
 	}
@@ -262,6 +284,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
+		aitool.WithStringArrayParam("search_queries", aitool.WithParam_Description("用于搜索的多条查询语句，支持多角度检索（优先使用）")),
 	}
 
 	if mode == "keyword" {
@@ -288,6 +311,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
 			// 获取参数
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
+			searchQueries := action.GetStringSlice("search_queries")
 			searchQuery := action.GetString("search_query")
 			keyword := action.GetString("keyword")
 
@@ -301,23 +325,38 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// 单条查询/关键词处理：优先使用 action 中提供的单条 query/keyword；
 			// 如果未提供，则尝试使用 loop 上次保存的 last 搜索（减少 AI 生成）
 			userContext := fmt.Sprintf("用户需求：%s", loop.Get("user_query"))
-			var queryToUse string
+			verifyQuery := buildVerifyQueryWithCoreSummary(loop)
+			var queriesToUse []string
 			if mode == "keyword" {
+				if len(searchQueries) > 0 {
+					queriesToUse = append(queriesToUse, searchQueries...)
+				}
 				if keyword != "" {
-					queryToUse = keyword
-				} else {
-					queryToUse = loop.Get("last_keyword_search_query")
+					queriesToUse = append(queriesToUse, keyword)
+				}
+				if len(queriesToUse) == 0 {
+					lastQuery := loop.Get("last_keyword_search_query")
+					if lastQuery != "" {
+						queriesToUse = append(queriesToUse, lastQuery)
+					}
 				}
 			} else {
+				if len(searchQueries) > 0 {
+					queriesToUse = append(queriesToUse, searchQueries...)
+				}
 				if searchQuery != "" {
-					queryToUse = searchQuery
-				} else {
-					queryToUse = loop.Get("last_semantic_search_query")
+					queriesToUse = append(queriesToUse, searchQuery)
+				}
+				if len(queriesToUse) == 0 {
+					lastQuery := loop.Get("last_semantic_search_query")
+					if lastQuery != "" {
+						queriesToUse = append(queriesToUse, lastQuery)
+					}
 				}
 			}
 
-			if queryToUse == "" {
-				op.Feedback("未提供查询，无法执行搜索。请提供单条查询或关键词。")
+			if len(queriesToUse) == 0 {
+				op.Feedback("未提供查询，无法执行搜索。请提供单条或多条查询语句。")
 				op.Continue()
 				return
 			}
@@ -325,23 +364,33 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// Emit search conditions to default stream so clients can show progress/filters
 			emitter := loop.GetEmitter()
 			// Announce prepared search conditions
-			loop.LoadingStatus(fmt.Sprintf("准备执行搜索 - preparing search: %s", queryToUse))
+			loop.LoadingStatus(fmt.Sprintf("准备执行搜索 - preparing search: %s", strings.Join(queriesToUse, "; ")))
 
 			var allResults []string
 			var successCount int
-			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying knowledge bases for: %s", queryToUse))
+			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying knowledge bases for: %s", strings.Join(queriesToUse, "; ")))
 
-			enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, queryToUse, knowledgeBases...)
-			if err != nil {
-				log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
-				loop.LoadingStatus(fmt.Sprintf("查询失败 - query failed for: %s", queryToUse))
-				emitter.EmitDefaultStreamEvent(
-					"search_progress",
-					strings.NewReader(fmt.Sprintf("stage:query_failed\nquery:%s\nerror:%v", queryToUse, err)),
-					loop.GetCurrentTask().GetIndex(),
-					func() {},
-				)
-			} else if enhanceData != "" {
+			for _, queryToUse := range queriesToUse {
+				queryToUse = strings.TrimSpace(queryToUse)
+				if queryToUse == "" {
+					continue
+				}
+				enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, queryToUse, knowledgeBases...)
+				if err != nil {
+					log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
+					loop.LoadingStatus(fmt.Sprintf("查询失败 - query failed for: %s", queryToUse))
+					emitter.EmitDefaultStreamEvent(
+						"search_progress",
+						strings.NewReader(fmt.Sprintf("stage:query_failed\nquery:%s\nerror:%v", queryToUse, err)),
+						loop.GetCurrentTask().GetIndex(),
+						func() {},
+					)
+					continue
+				}
+				if enhanceData == "" {
+					continue
+				}
+
 				loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
 
 				singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
@@ -356,7 +405,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 				// 验证满意度
 				loop.LoadingStatus("验证用户满意度中 - verifying user satisfaction")
-				vr, verr := invoker.VerifyUserSatisfaction(ctx, loop.Get("user_query"), false, compressedSingle)
+				vr, verr := invoker.VerifyUserSatisfaction(ctx, verifyQuery, false, compressedSingle)
 				if verr != nil {
 					log.Warnf("verify error for query '%s': %v", queryToUse, verr)
 					loop.LoadingStatus("验证失败 - verify error")
@@ -369,11 +418,6 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 					loop.LoadingStatus(fmt.Sprintf("验证完成 - verify done, satisfied=%v", vr.Satisfied))
 					// Verification completed
 					if vr.Satisfied {
-						fullAnswer, _ := invoker.EnhanceKnowledgeAnswer(ctx, loop.Get("user_query"))
-						if fullAnswer == "" {
-							fullAnswer = compressedSingle
-						}
-						op.Feedback(fullAnswer)
 						op.Exit()
 						return
 					}
@@ -385,7 +429,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			resultBuilder.WriteString("=== 知识库搜索结果 ===\n")
 			resultBuilder.WriteString(fmt.Sprintf("模式: %s\n", mode))
 			resultBuilder.WriteString(fmt.Sprintf("知识库: %s\n", strings.Join(knowledgeBases, ", ")))
-			resultBuilder.WriteString(fmt.Sprintf("查询: %s\n\n", queryToUse))
+			resultBuilder.WriteString(fmt.Sprintf("查询: %s\n\n", strings.Join(queriesToUse, "; ")))
 			if len(allResults) == 0 {
 				resultBuilder.WriteString("未找到相关知识条目。\n")
 			} else {
@@ -398,7 +442,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 			// 再次整体压缩
 			if len(allResults) > 2 {
-				compressedResult := compressKnowledgeResults(searchResults, []string{queryToUse}, userContext, invoker, op, loop)
+				compressedResult := compressKnowledgeResults(searchResults, queriesToUse, userContext, invoker, op, loop)
 				if len(compressedResult) < len(searchResults) {
 					searchResults = compressedResult
 				}
@@ -413,20 +457,15 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			loop.Set("search_history", searchHistory)
 			loop.Set("search_results", searchResults)
 
-			invoker.AddToTimeline("knowledge_searched", fmt.Sprintf("Mode: %s, Searched knowledge bases '%v' with query '%s', successful queries: %d", mode, knowledgeBases, queryToUse, successCount))
+			invoker.AddToTimeline("knowledge_searched", fmt.Sprintf("Mode: %s, Searched knowledge bases '%v' with queries '%s', successful queries: %d", mode, knowledgeBases, strings.Join(queriesToUse, "; "), successCount))
 
 			// 验证整体满足度
-			verifyResult, err := invoker.VerifyUserSatisfaction(ctx, loop.Get("user_query"), false, searchResults)
+			verifyResult, err := invoker.VerifyUserSatisfaction(ctx, verifyQuery, false, searchResults)
 			if err != nil {
 				log.Warnf("failed to verify user satisfaction: %v", err)
 			} else {
 				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements)
 				if verifyResult.Satisfied {
-					fullAnswer, _ := invoker.EnhanceKnowledgeAnswer(ctx, loop.Get("user_query"))
-					if fullAnswer == "" {
-						fullAnswer = searchResults
-					}
-					op.Feedback(fullAnswer)
 					op.Exit()
 					return
 				}
@@ -450,4 +489,13 @@ var searchKnowledgeSemanticAction = func(r aicommon.AIInvokeRuntime) reactloops.
 
 var searchKnowledgeKeywordAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return makeSearchAction(r, "keyword")
+}
+
+func buildVerifyQueryWithCoreSummary(loop *reactloops.ReActLoop) string {
+	userQuery := loop.Get("user_query")
+	coreSummary := strings.TrimSpace(loop.Get("knowledge_core_summary"))
+	if coreSummary == "" {
+		return userQuery
+	}
+	return fmt.Sprintf("%s\n\n补充要求：验证时需确保提交的payload覆盖以下知识库核心内容。\n%s", userQuery, coreSummary)
 }
