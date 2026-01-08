@@ -417,7 +417,9 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		result += "\n\n[Error]: " + err.Error()
 		task.SetResult(result)
 		done.Do(func() {
-			task.SetStatus(aicommon.AITaskState_Aborted)
+			if !testIsFinished(task) {
+				task.SetStatus(aicommon.AITaskState_Aborted)
+			}
 		})
 	}
 	complete := func(err any) {
@@ -804,4 +806,8 @@ func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AISt
 		}
 	}
 	return operator
+}
+
+func testIsFinished(task aicommon.AIStatefulTask) bool {
+	return task.GetStatus() == aicommon.AITaskState_Completed || task.GetStatus() == aicommon.AITaskState_Aborted || task.GetStatus() == aicommon.AITaskState_Skipped
 }

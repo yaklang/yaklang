@@ -208,27 +208,33 @@ func (t *AiTask) executeTask() error {
 		return err
 	}
 
-	// Start to wait for user review
-	t.planLoadingStatus(fmt.Sprintf("等待用户审查任务 [%s] / Waiting User Review for Task [%s]", t.Index, t.Index))
-	ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
-	ep.SetDefaultSuggestionContinue()
-	t.EmitInfo("start to wait for user review current task")
+	if t.GetStatus() != aicommon.AITaskState_Skipped {
+		// Start to wait for user review
+		t.planLoadingStatus(fmt.Sprintf("等待用户审查任务 [%s] / Waiting User Review for Task [%s]", t.Index, t.Index))
+		ep := t.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+		t.EmitInfo("start to wait for user review current task")
 
-	t.EmitRequireReviewForTask(t, ep.GetId())
+		t.EmitRequireReviewForTask(t, ep.GetId())
 
-	log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
+		log.Infof("task %s waiting for user review event: %v, now status: %v", t.Name, ep.GetId(), t.GetStatus())
 
-	t.DoWaitAgree(t.Ctx, ep)
+		t.DoWaitAgree(t.Ctx, ep)
 
-	// User review finished
-	t.planLoadingStatus(fmt.Sprintf("处理任务 [%s] 审查结果 / Processing Review for Task [%s]", t.Index, t.Index))
-	reviewResult := ep.GetParams()
-	t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
-	t.EmitInfo("start to handle review task event: %v", ep.GetId())
-	err := t.handleReviewResult(reviewResult)
-	t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
-	if err != nil {
-		log.Warnf("error handling review result: %v", err)
+		// User review finished
+		t.planLoadingStatus(fmt.Sprintf("处理任务 [%s] 审查结果 / Processing Review for Task [%s]", t.Index, t.Index))
+		reviewResult := ep.GetParams()
+		t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
+		t.EmitInfo("start to handle review task event: %v", ep.GetId())
+		err := t.handleReviewResult(reviewResult)
+		t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
+		if err != nil {
+			log.Warnf("error handling review result: %v", err)
+		}
+	} else {
+		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 已跳过 / Task [%s] Skipped", t.Index, t.Index))
+		t.EmitInfo("task %s was skipped by user, skip review", t.Name)
+		log.Infof("task %s was skipped by user, skip review", t.Name)
 	}
 
 	return nil
