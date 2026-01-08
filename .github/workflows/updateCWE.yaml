@@ -37,47 +37,48 @@ jobs:
           chmod +x ./yak
 
       - name: Create output directory
-        run: mkdir -p ~/yakit-projects
+        run: mkdir -p $HOME/yakit-projects
 
       - name: Download existing CWE data (if exists)
         continue-on-error: true
         run: |
-          wget -O ~/yakit-projects/cwe-data.jsonl.gz https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz || echo "No existing CWE data found, will create new"
-          if [ -f ~/yakit-projects/cwe-data.jsonl.gz ]; then
-            gunzip -f ~/yakit-projects/cwe-data.jsonl.gz || echo "Failed to decompress, will create new"
+          # 下载现有的 CWE 数据用于增量更新（路径与上传路径一致）
+          wget -O $HOME/yakit-projects/cwe-data.jsonl.gz https://yaklang.oss-accelerate.aliyuncs.com/rag/cwe.jsonl.gz || echo "No existing CWE data found, will create new"
+          if [ -f $HOME/yakit-projects/cwe-data.jsonl.gz ]; then
+            gunzip -f $HOME/yakit-projects/cwe-data.jsonl.gz || echo "Failed to decompress, will create new"
           fi
 
       - name: Update CWE Database
         run: |
           # 使用 aibalance 类型和 memfit-standard-free 模型
-          AI_OPTS="--ai-type aibalance --ai-model memfit-standard-free --ai-concurrent 10"
+          AI_OPTS="--ai-type aibalance --ai-model memfit-standard-free --ai-concurrent 20"
           
-          if [ -f ~/yakit-projects/cwe-data.jsonl ]; then
+          if [ -f $HOME/yakit-projects/cwe-data.jsonl ]; then
             echo "Importing existing CWE data and updating..."
             ./yak scripts/ci-works/rag/cwe.yak \
-              --input ~/yakit-projects/cwe-data.jsonl \
-              --output ~/yakit-projects/cwe-data-new.jsonl \
+              --input $HOME/yakit-projects/cwe-data.jsonl \
+              --output $HOME/yakit-projects/cwe-data-new.jsonl \
               $AI_OPTS
           else
             echo "Creating new CWE database..."
             ./yak scripts/ci-works/rag/cwe.yak \
-              --output ~/yakit-projects/cwe-data-new.jsonl \
+              --output $HOME/yakit-projects/cwe-data-new.jsonl \
               $AI_OPTS
           fi
 
       - name: Compress CWE data with gzip
         run: |
-          mv ~/yakit-projects/cwe-data-new.jsonl ~/yakit-projects/cwe-data.jsonl
+          mv $HOME/yakit-projects/cwe-data-new.jsonl $HOME/yakit-projects/cwe-data.jsonl
           # 使用 yak gzip 压缩（生成 .gzip 文件）
-          ./yak gzip -f ~/yakit-projects/cwe-data.jsonl
+          ./yak gzip -f $HOME/yakit-projects/cwe-data.jsonl
           # 重命名为 .gz 扩展名
-          mv ~/yakit-projects/cwe-data.jsonl.gzip ~/yakit-projects/cwe-data.jsonl.gz
+          mv $HOME/yakit-projects/cwe-data.jsonl.gzip $HOME/yakit-projects/cwe-data.jsonl.gz
           # 验证压缩结果
-          ls -la ~/yakit-projects/cwe-data.jsonl*
+          ls -la $HOME/yakit-projects/cwe-data.jsonl*
 
       - name: Check CWE data file size and Upload
         run: |
-          FILE_PATH=~/yakit-projects/cwe-data.jsonl.gz
+          FILE_PATH=$HOME/yakit-projects/cwe-data.jsonl.gz
           FILE_SIZE=$(stat -c%s "$FILE_PATH")
           echo "CWE data file size: $FILE_SIZE bytes"
           
@@ -138,17 +139,26 @@ jobs:
         continue-on-error: true
         run: |
           # 尝试下载最新的 rags-latest.json 获取现有版本
-          wget -q -O ~/yakit-projects/rags-latest.json https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json || echo "No existing rags-latest.json found"
+          wget -q -O $HOME/yakit-projects/rags-latest.json https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json || {
+            echo "No existing rags-latest.json found, creating empty array"
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          }
           
-          # 如果存在，解析并下载现有的 CWE RAG
-          if [ -f ~/yakit-projects/rags-latest.json ]; then
+          # 验证 JSON 文件内容有效
+          if ! jq empty $HOME/yakit-projects/rags-latest.json 2>/dev/null; then
+            echo "Invalid JSON in rags-latest.json, creating empty array"
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          fi
+          
+          # 如果存在有效内容，解析并下载现有的 CWE RAG
+          if [ -f $HOME/yakit-projects/rags-latest.json ]; then
             # 提取 CWE 的文件路径
-            CWE_RAG_PATH=$(cat ~/yakit-projects/rags-latest.json | jq -r '.[] | select(.name == "CWE KnowledgeBase") | .file' 2>/dev/null || echo "")
+            CWE_RAG_PATH=$(cat $HOME/yakit-projects/rags-latest.json | jq -r '.[] | select(.name == "CWE KnowledgeBase") | .file' 2>/dev/null || echo "")
             if [ -n "$CWE_RAG_PATH" ] && [ "$CWE_RAG_PATH" != "null" ]; then
               echo "Found existing CWE RAG at: $CWE_RAG_PATH"
-              wget -q -O ~/yakit-projects/cwe-existing.rag.gz "https://yaklang.oss-accelerate.aliyuncs.com${CWE_RAG_PATH}" || echo "Failed to download existing RAG"
-              if [ -f ~/yakit-projects/cwe-existing.rag.gz ]; then
-                ./yak gzip -d -f ~/yakit-projects/cwe-existing.rag.gz -o ~/yakit-projects/cwe-existing.rag || echo "Failed to decompress existing RAG"
+              wget -q -O $HOME/yakit-projects/cwe-existing.rag.gz "https://yaklang.oss-accelerate.aliyuncs.com${CWE_RAG_PATH}" || echo "Failed to download existing RAG"
+              if [ -f $HOME/yakit-projects/cwe-existing.rag.gz ]; then
+                ./yak gzip -d -f $HOME/yakit-projects/cwe-existing.rag.gz -o $HOME/yakit-projects/cwe-existing.rag || echo "Failed to decompress existing RAG"
               fi
             fi
           fi
@@ -159,18 +169,18 @@ jobs:
           echo "Building CWE RAG search index..."
           
           # 设置输出路径
-          RAG_OUTPUT=~/yakit-projects/cwe.rag
+          RAG_OUTPUT=$HOME/yakit-projects/cwe.rag
           
           # 如果存在现有的 RAG 文件，使用增量更新模式
-          if [ -f ~/yakit-projects/cwe-existing.rag ]; then
+          if [ -f $HOME/yakit-projects/cwe-existing.rag ]; then
             echo "Using incremental update mode with existing RAG file"
-            cp ~/yakit-projects/cwe-existing.rag $RAG_OUTPUT
+            cp $HOME/yakit-projects/cwe-existing.rag $RAG_OUTPUT
           fi
           
-          # 构建 RAG 索引
+          # 构建 RAG 索引（并发设置为 20）
           ./yak scripts/ci-works/rag/cwe-rag.yak \
             --output $RAG_OUTPUT \
-            --concurrency 5
+            --concurrency 20
           
           # 验证 RAG 文件生成
           if [ ! -f $RAG_OUTPUT ]; then
@@ -184,9 +194,9 @@ jobs:
       # 第四步：压缩 RAG 并生成 SHA256，然后立即上传
       - name: Compress and Upload RAG files
         run: |
-          RAG_FILE=~/yakit-projects/cwe.rag
-          RAG_GZ_FILE=~/yakit-projects/cwe.rag.gz
-          SHA256_FILE=~/yakit-projects/cwe.rag.gz.sha256.txt
+          RAG_FILE=$HOME/yakit-projects/cwe.rag
+          RAG_GZ_FILE=$HOME/yakit-projects/cwe.rag.gz
+          SHA256_FILE=$HOME/yakit-projects/cwe.rag.gz.sha256.txt
           
           # 压缩 RAG 文件（yak gzip 生成 .gzip，需要重命名）
           echo "Compressing RAG file..."
@@ -246,13 +256,19 @@ jobs:
         run: |
           echo "Updating rags-latest.json..."
           
-          SHA256_VALUE=$(cat ~/yakit-projects/cwe.rag.gz.sha256.txt)
+          SHA256_VALUE=$(cat $HOME/yakit-projects/cwe.rag.gz.sha256.txt)
+          
+          # 确保 rags-latest.json 存在
+          if [ ! -f $HOME/yakit-projects/rags-latest.json ]; then
+            echo "Creating empty rags-latest.json"
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          fi
           
           # 使用 yak rag-metainfo 命令维护 rags-latest.json
           # 如果存在旧文件则更新，不存在则创建
           ./yak rag-metainfo \
-            -f ~/yakit-projects/rags-latest.json \
-            -o ~/yakit-projects/rags-latest.json \
+            -f $HOME/yakit-projects/rags-latest.json \
+            -o $HOME/yakit-projects/rags-latest.json \
             --register-name "CWE KnowledgeBase" \
             --register-name-zh "CWE 知识库" \
             --version "$VERSION" \
@@ -261,7 +277,7 @@ jobs:
             --hash "$SHA256_VALUE"
           
           echo "New rags-latest.json content:"
-          cat ~/yakit-projects/rags-latest.json
+          cat $HOME/yakit-projects/rags-latest.json
 
       - name: Upload rags-latest.json to OSS
         run: |
@@ -272,14 +288,14 @@ jobs:
             -ak ${{ secrets.OSS_KEY_ID }} \
             -sk ${{ secrets.OSS_KEY_SECRET }} \
             -t 5 \
-            -f "~/yakit-projects/rags-latest.json:/rag/rags-latest.json"
+            -f "$HOME/yakit-projects/rags-latest.json:/rag/rags-latest.json"
 
       - name: Verify uploads
         run: |
           echo "Verifying uploads..."
           echo ""
-          echo "=== CWE Data File ==="
-          curl -I "https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz" | head -10
+          echo "=== CWE JSONL File ==="
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com/rag/cwe.jsonl.gz" | head -10
           echo ""
           echo "=== RAG File ==="
           curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz" | head -10
@@ -292,7 +308,7 @@ jobs:
           echo ""
           echo "=== Upload Summary ==="
           echo "Version: $VERSION"
-          echo "CWE Data: https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz"
+          echo "CWE JSONL: https://yaklang.oss-accelerate.aliyuncs.com/rag/cwe.jsonl.gz"
           echo "RAG File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz"
           echo "SHA256 File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt"
           echo "Index File: https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json"
