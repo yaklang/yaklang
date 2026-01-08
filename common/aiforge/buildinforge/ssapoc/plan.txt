@@ -31,10 +31,14 @@
     {
       "subtask_name": "目标API端点URL和参数信息分析",
       "subtask_goal": "通过已有信息或是通过ssa相关工具你能获取项目的结构，读取漏洞所在位置的上下文代码目录结构等信息。你应该提取目标应用的关键信息，包括：1）API端点和路由信息（从注解如@RequestMapping、@GetMapping等提取），但对于某些简单的项目场景也可能是通过目录结构和文件位置直接访问，例如PHP项目没有实现路由框架的情况下直接请求对应php脚本文件即可；2）POC请求中的参数和数据类型；3）认证和授权机制，端点是否存在访问控制需要Cookie；4）框架类型（如Spring、JAX-RS等）。这些信息将用于生成更精确和可执行的POC代码。- 不要主动输出文件， 最终的POC会嵌入到生成文档中"
-    }
+    },
+    {
+      "subtask_name": "使用专注模式生成Python POC代码",
+      "subtask_goal": "根据前面收集的漏洞信息、API端点、攻击向量等信息，生成完整的Python POC代码。你需要输出 `{\"@action\": \"python_poc\", \"human_readable_thought\": \"根据漏洞分析结果生成Python POC代码\"}` 进入python_poc专注模式。在专注模式中使用write_python_poc创建POC文件，如有语法错误使用modify_python_poc修复。POC代码必须：1）语法正确，可以通过Python解释器验证；2）包含完整的漏洞检测和利用逻辑；3）使用规范的代码结构（类封装、异常处理、文档字符串）；4）包含使用说明和免责声明。"
+    },
     {
       "subtask_name": "根据已有信息输出包含Python POC的MarkDown报告",
-      "subtask_goal": "基于已有信息生成包含Python POC的MarkDown报告， 这个报告无论如何都需要生成。MarkDown报告应该以文件的形式被写入到用户指定的save_path中，你应该调用工具来写文件。当生成 MarkDown 文件内容时：不要对换行符进行转义，不要使用 `\n` 形式，必须使用真实的多行文本，content 字段必须是原始 Markdown。 报告使用简体中文，对于某些专业术语可以使用对应英文单词"
+      "subtask_goal": "基于已有信息生成包含Python POC的MarkDown报告，报告必须包含前一步生成的Python POC代码。MarkDown报告应该以文件的形式被写入到用户指定的save_path中，你应该调用工具来写文件。报告内容包括：1）漏洞概述；2）影响范围；3）完整的Python POC代码（从专注模式生成的代码）；4）使用说明；5）修复建议；6）免责声明。当生成 MarkDown 文件内容时：不要对换行符进行转义，不要使用 `\\n` 形式，必须使用真实的多行文本，content 字段必须是原始 Markdown。报告使用简体中文，对于某些专业术语可以使用对应英文单词"
     }
   ]
 }
