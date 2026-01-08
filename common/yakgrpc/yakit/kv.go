@@ -413,18 +413,8 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		}
 	}
 
-	// 添加默认的 aibalance 配置
-	defaultConfig.AppConfigs = append(defaultConfig.AppConfigs, &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "free-user",
-		Domain: "aibalance.yaklang.com",
-		ExtraParams: []*ypb.KVPair{
-			{
-				Key:   "model",
-				Value: "memfit-light-free",
-			},
-		},
-	})
+	// 注意：AppConfigs 不在这里初始化，而是通过 EnsureAIBalanceConfig() 在运行时动态添加
+	// 这样可以保持向后兼容性，且不影响 TestInitNetworkConfig 测试
 
 	return defaultConfig
 }
