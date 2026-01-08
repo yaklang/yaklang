@@ -290,10 +290,6 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}
-			if len(action.GetInvokeParamsArray("rag_source_list")) == 0 {
-				fmt.Println("nononono")
-			}
-
 			if action == nil {
 				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
 			}

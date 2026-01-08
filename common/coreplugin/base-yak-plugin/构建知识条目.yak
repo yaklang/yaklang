@@ -54,5 +54,7 @@ if pathDepth > 0 {
 
 yakit.StatusCard("building target", kbName)
 for i in rag.BuildKnowledgeFromEntityRepos(kbName, options...)~ {
-    yakit.Output(i.KnowledgeTitle)
+    if i != nil {
+        yakit.Output(i.KnowledgeTitle)
+    }
 }

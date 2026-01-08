@@ -41,7 +41,9 @@ for path in filePath {
     }
     for i in fileReuslt {
         hasValidData = true
-        yakit.Output(i.KnowledgeTitle)
+        if i != nil {
+            yakit.Output(i.KnowledgeTitle)
+        }
     }
 }
 
