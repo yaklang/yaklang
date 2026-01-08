@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "cwe/*"
+      - "feature/cwe*"
   schedule:
     # 定时任务，在每周二0点更新（与CVE周一更新错开）
     - cron: '0 0 * * 2'
