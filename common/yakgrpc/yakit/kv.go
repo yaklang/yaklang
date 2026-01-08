@@ -403,7 +403,29 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig.DNSFallbackDoH = config.FallbackDoH
 	defaultConfig.DNSFallbackTCP = config.FallbackTCP
 	defaultConfig.DisableSystemDNS = config.DisableSystemResolver
-	defaultConfig.AiApiPriority = aispec.RegisteredAIGateways()
+
+	// 确保 aibalance 在 AI 优先级列表的最前面
+	registeredGateways := aispec.RegisteredAIGateways()
+	defaultConfig.AiApiPriority = []string{"aibalance"}
+	for _, gw := range registeredGateways {
+		if gw != "aibalance" {
+			defaultConfig.AiApiPriority = append(defaultConfig.AiApiPriority, gw)
+		}
+	}
+
+	// 添加默认的 aibalance 配置
+	defaultConfig.AppConfigs = append(defaultConfig.AppConfigs, &ypb.ThirdPartyApplicationConfig{
+		Type:   "aibalance",
+		APIKey: "free-user",
+		Domain: "aibalance.yaklang.com",
+		ExtraParams: []*ypb.KVPair{
+			{
+				Key:   "model",
+				Value: "memfit-light-free",
+			},
+		},
+	})
+
 	return defaultConfig
 }
 
