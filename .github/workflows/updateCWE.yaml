@@ -48,17 +48,20 @@ jobs:
 
       - name: Update CWE Database
         run: |
+          # 使用 aibalance 类型和 memfit-standard-free 模型
+          AI_OPTS="--ai-type aibalance --ai-model memfit-standard-free --ai-concurrent 10"
+          
           if [ -f ~/yakit-projects/cwe-data.jsonl ]; then
             echo "Importing existing CWE data and updating..."
             ./yak scripts/ci-works/rag/cwe.yak \
               --input ~/yakit-projects/cwe-data.jsonl \
               --output ~/yakit-projects/cwe-data-new.jsonl \
-              --ai-concurrent 10
+              $AI_OPTS
           else
             echo "Creating new CWE database..."
             ./yak scripts/ci-works/rag/cwe.yak \
               --output ~/yakit-projects/cwe-data-new.jsonl \
-              --ai-concurrent 10
+              $AI_OPTS
           fi
 
       - name: Compress CWE data with gzip
