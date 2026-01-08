@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
@@ -211,12 +212,28 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		id:     "temporary-liteforge",
 		ctx:    context.Background(),
 	}
+
+	// Collect aispec.AIConfigOption to build aicommon.WithAIChatInfo
+	var aiSpecConfig aispec.AIConfig
+	var hasAiSpecOpts bool
+
 	for _, optRaw := range opts {
 		switch opt := optRaw.(type) {
 		case LiteForgeExecOption:
 			opt(cfg)
 		case aicommon.ConfigOption:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
+		case aispec.AIConfigOption:
+			// Collect aispec options to extract Type and Model
+			opt(&aiSpecConfig)
+			hasAiSpecOpts = true
+		}
+	}
+
+	// Convert collected aispec options to aicommon.ConfigOption
+	if hasAiSpecOpts {
+		if aiSpecConfig.Type != "" || aiSpecConfig.Model != "" {
+			cfg.aidOptions = append(cfg.aidOptions, aicommon.WithAIChatInfo(aiSpecConfig.Type, aiSpecConfig.Model))
 		}
 	}
 
