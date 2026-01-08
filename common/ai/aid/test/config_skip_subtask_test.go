@@ -524,6 +524,142 @@ LOOP:
 	require.True(t, skipSuccess, "skip with reason should succeed")
 }
 
+func TestCoordinator_SkipSubtaskInPlan_CancelSkipsReview(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	taskStarted := make(chan struct{}, 1)
+	skipConfirmed := make(chan struct{})
+
+	ins, err := aid.NewCoordinator(
+		"测试取消后跳过审查逻辑",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "plan",
+    "query": "测试取消后跳过审查逻辑",
+    "main_task": "测试取消后跳过审查逻辑",
+    "main_task_goal": "验证 cancel 后不会进入任务审查逻辑",
+    "tasks": [{"subtask_name": "任务一", "subtask_goal": "这个任务会被取消并跳过审查"}]
+}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if isCurrentTask(prompt, "任务一") {
+					select {
+					case taskStarted <- struct{}{}:
+					default:
+					}
+				}
+
+				select {
+				case <-skipConfirmed:
+				case <-time.After(2 * time.Second):
+				}
+
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	skipSent := false
+	skipSuccess := false
+	skipReviewInfo := false
+	reviewEmitted := false
+	syncId := uuid.New().String()
+
+	ctx := utils.TimeoutContextSeconds(10)
+
+LOOP:
+	for {
+		select {
+		case <-taskStarted:
+			if !skipSent {
+				skipSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					syncId,
+					map[string]any{
+						"skip_current_task": true,
+						"reason":            "用户取消当前任务",
+					},
+				))
+			}
+
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
+				reviewEmitted = true
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success && !skipSuccess {
+						skipSuccess = true
+						close(skipConfirmed)
+					}
+				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED &&
+				strings.Contains(string(result.Content), "task 任务一 was skipped by user, skip review") {
+				skipReviewInfo = true
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "coordinator run finished") {
+				break LOOP
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: skipSent=%v, skipSuccess=%v, skipReviewInfo=%v, reviewEmitted=%v", skipSent, skipSuccess, skipReviewInfo, reviewEmitted)
+		}
+	}
+
+	require.True(t, skipSent, "skip request should be sent")
+	require.True(t, skipSuccess, "skip should succeed")
+	require.True(t, skipReviewInfo, "skip review info should be emitted")
+	require.False(t, reviewEmitted, "task review should not be emitted after cancel")
+}
+
 // TestCoordinator_SkipSubtaskAndContinueNextUseCurrent 验证 skip 子任务后，下一个子任务立即开始执行, 但是使用的是skip current task flag
 func TestCoordinator_SkipSubtaskAndContinueNextUseCurrent(t *testing.T) {
 	const maxRetries = 10
