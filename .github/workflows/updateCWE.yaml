@@ -75,7 +75,7 @@ jobs:
           # 验证压缩结果
           ls -la ~/yakit-projects/cwe-data.jsonl*
 
-      - name: Check CWE data file size
+      - name: Check CWE data file size and Upload
         run: |
           FILE_PATH=~/yakit-projects/cwe-data.jsonl.gz
           FILE_SIZE=$(stat -c%s "$FILE_PATH")
@@ -86,6 +86,17 @@ jobs:
             echo "File size is less than 100KB. Something might be wrong. Aborting."
             exit 1
           fi
+          
+          # 立即上传 JSONL 文件
+          echo "Uploading CWE JSONL data to OSS..."
+          ./yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$FILE_PATH:/rag/cwe.jsonl.gz"
+          echo "CWE JSONL uploaded to /rag/cwe.jsonl.gz"
 
       # =============================================================================
       # RAG 构建部分
@@ -228,19 +239,8 @@ jobs:
           echo "SHA256_HASH=$SHA256_HASH" >> $GITHUB_ENV
 
       # =============================================================================
-      # 上传 CWE 数据和更新 rags-latest.json
+      # 更新 rags-latest.json
       # =============================================================================
-
-      - name: Upload CWE data to yaklang OSS
-        run: |
-          echo "Uploading CWE data to yaklang OSS..."
-          ./yak upload-oss \
-            -b yaklang \
-            --endpoint oss-accelerate.aliyuncs.com \
-            -ak ${{ secrets.OSS_KEY_ID }} \
-            -sk ${{ secrets.OSS_KEY_SECRET }} \
-            -t 5 \
-            -f "~/yakit-projects/cwe-data.jsonl.gz:/cwe/cwe-data.jsonl.gz"
 
       - name: Update rags-latest.json
         run: |
