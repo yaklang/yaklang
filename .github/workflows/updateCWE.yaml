@@ -68,7 +68,12 @@ jobs:
       - name: Compress CWE data with gzip
         run: |
           mv ~/yakit-projects/cwe-data-new.jsonl ~/yakit-projects/cwe-data.jsonl
-          ./yak gzip -f ~/yakit-projects/cwe-data.jsonl -o ~/yakit-projects/cwe-data.jsonl.gz
+          # 使用 yak gzip 压缩（生成 .gzip 文件）
+          ./yak gzip -f ~/yakit-projects/cwe-data.jsonl
+          # 重命名为 .gz 扩展名
+          mv ~/yakit-projects/cwe-data.jsonl.gzip ~/yakit-projects/cwe-data.jsonl.gz
+          # 验证压缩结果
+          ls -la ~/yakit-projects/cwe-data.jsonl*
 
       - name: Check CWE data file size
         run: |
