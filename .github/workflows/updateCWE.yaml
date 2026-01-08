@@ -91,82 +91,7 @@ jobs:
       # RAG 构建部分
       # =============================================================================
 
-      - name: Download existing CWE RAG file (for incremental update)
-        continue-on-error: true
-        run: |
-          # 尝试下载最新的 rags-latest.json 获取现有版本
-          wget -q -O ~/yakit-projects/rags-latest.json https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json || echo "No existing rags-latest.json found"
-          
-          # 如果存在，解析并下载现有的 CWE RAG
-          if [ -f ~/yakit-projects/rags-latest.json ]; then
-            # 提取 CWE 的文件路径
-            CWE_RAG_PATH=$(cat ~/yakit-projects/rags-latest.json | jq -r '.[] | select(.name == "CWE KnowledgeBase") | .file' 2>/dev/null || echo "")
-            if [ -n "$CWE_RAG_PATH" ] && [ "$CWE_RAG_PATH" != "null" ]; then
-              echo "Found existing CWE RAG at: $CWE_RAG_PATH"
-              wget -q -O ~/yakit-projects/cwe-existing.rag.gz "https://yaklang.oss-accelerate.aliyuncs.com${CWE_RAG_PATH}" || echo "Failed to download existing RAG"
-              if [ -f ~/yakit-projects/cwe-existing.rag.gz ]; then
-                gunzip -c ~/yakit-projects/cwe-existing.rag.gz > ~/yakit-projects/cwe-existing.rag || echo "Failed to decompress existing RAG"
-              fi
-            fi
-          fi
-
-      - name: Build CWE RAG Index
-        run: |
-          echo "Building CWE RAG search index..."
-          
-          # 设置输出路径
-          RAG_OUTPUT=~/yakit-projects/cwe.rag
-          
-          # 如果存在现有的 RAG 文件，使用增量更新模式
-          if [ -f ~/yakit-projects/cwe-existing.rag ]; then
-            echo "Using incremental update mode with existing RAG file"
-            cp ~/yakit-projects/cwe-existing.rag $RAG_OUTPUT
-          fi
-          
-          # 构建 RAG 索引
-          ./yak scripts/ci-works/rag/cwe-rag.yak \
-            --output $RAG_OUTPUT \
-            --concurrency 5
-          
-          # 验证 RAG 文件生成
-          if [ ! -f $RAG_OUTPUT ]; then
-            echo "ERROR: RAG file not created!"
-            exit 1
-          fi
-          
-          echo "RAG file created successfully"
-          ls -la $RAG_OUTPUT
-
-      - name: Compress RAG and Generate SHA256
-        run: |
-          RAG_FILE=~/yakit-projects/cwe.rag
-          RAG_GZ_FILE=~/yakit-projects/cwe.rag.gz
-          SHA256_FILE=~/yakit-projects/cwe.rag.gz.sha256.txt
-          
-          # 压缩 RAG 文件
-          echo "Compressing RAG file..."
-          ./yak gzip -f $RAG_FILE -o $RAG_GZ_FILE
-          
-          # 生成 SHA256 校验和
-          echo "Generating SHA256 checksum..."
-          sha256sum $RAG_GZ_FILE | awk '{print $1}' > $SHA256_FILE
-          
-          echo "RAG compressed file: $(ls -la $RAG_GZ_FILE)"
-          echo "SHA256: $(cat $SHA256_FILE)"
-
-      - name: Check RAG file size
-        run: |
-          FILE_PATH=~/yakit-projects/cwe.rag.gz
-          FILE_SIZE=$(stat -c%s "$FILE_PATH")
-          echo "RAG file size: $FILE_SIZE bytes ($(echo "scale=2; $FILE_SIZE/1024/1024" | bc) MB)"
-          
-          # RAG 文件应该至少有 50KB
-          SIZE_LIMIT=$((50 * 1024))
-          if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
-            echo "RAG file size is less than 50KB. Something might be wrong. Aborting."
-            exit 1
-          fi
-
+      # 第一步：生成版本号
       - name: Generate Version
         run: |
           # 生成版本号: 日期-index
@@ -197,8 +122,113 @@ jobs:
           RAG_OSS_DIR="/rag/cwe/${VERSION}"
           echo "RAG_OSS_DIR=$RAG_OSS_DIR" >> $GITHUB_ENV
 
+      # 第二步：下载现有 RAG 文件用于增量更新
+      - name: Download existing CWE RAG file (for incremental update)
+        continue-on-error: true
+        run: |
+          # 尝试下载最新的 rags-latest.json 获取现有版本
+          wget -q -O ~/yakit-projects/rags-latest.json https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json || echo "No existing rags-latest.json found"
+          
+          # 如果存在，解析并下载现有的 CWE RAG
+          if [ -f ~/yakit-projects/rags-latest.json ]; then
+            # 提取 CWE 的文件路径
+            CWE_RAG_PATH=$(cat ~/yakit-projects/rags-latest.json | jq -r '.[] | select(.name == "CWE KnowledgeBase") | .file' 2>/dev/null || echo "")
+            if [ -n "$CWE_RAG_PATH" ] && [ "$CWE_RAG_PATH" != "null" ]; then
+              echo "Found existing CWE RAG at: $CWE_RAG_PATH"
+              wget -q -O ~/yakit-projects/cwe-existing.rag.gz "https://yaklang.oss-accelerate.aliyuncs.com${CWE_RAG_PATH}" || echo "Failed to download existing RAG"
+              if [ -f ~/yakit-projects/cwe-existing.rag.gz ]; then
+                ./yak gzip -d -f ~/yakit-projects/cwe-existing.rag.gz -o ~/yakit-projects/cwe-existing.rag || echo "Failed to decompress existing RAG"
+              fi
+            fi
+          fi
+
+      # 第三步：构建 RAG 索引
+      - name: Build CWE RAG Index
+        run: |
+          echo "Building CWE RAG search index..."
+          
+          # 设置输出路径
+          RAG_OUTPUT=~/yakit-projects/cwe.rag
+          
+          # 如果存在现有的 RAG 文件，使用增量更新模式
+          if [ -f ~/yakit-projects/cwe-existing.rag ]; then
+            echo "Using incremental update mode with existing RAG file"
+            cp ~/yakit-projects/cwe-existing.rag $RAG_OUTPUT
+          fi
+          
+          # 构建 RAG 索引
+          ./yak scripts/ci-works/rag/cwe-rag.yak \
+            --output $RAG_OUTPUT \
+            --concurrency 5
+          
+          # 验证 RAG 文件生成
+          if [ ! -f $RAG_OUTPUT ]; then
+            echo "ERROR: RAG file not created!"
+            exit 1
+          fi
+          
+          echo "RAG file created successfully"
+          ls -la $RAG_OUTPUT
+
+      # 第四步：压缩 RAG 并生成 SHA256，然后立即上传
+      - name: Compress and Upload RAG files
+        run: |
+          RAG_FILE=~/yakit-projects/cwe.rag
+          RAG_GZ_FILE=~/yakit-projects/cwe.rag.gz
+          SHA256_FILE=~/yakit-projects/cwe.rag.gz.sha256.txt
+          
+          # 压缩 RAG 文件（yak gzip 生成 .gzip，需要重命名）
+          echo "Compressing RAG file..."
+          ./yak gzip -f $RAG_FILE
+          mv ${RAG_FILE}.gzip $RAG_GZ_FILE
+          
+          # 验证压缩文件
+          FILE_SIZE=$(stat -c%s "$RAG_GZ_FILE")
+          echo "RAG file size: $FILE_SIZE bytes ($(echo "scale=2; $FILE_SIZE/1024/1024" | bc) MB)"
+          
+          # RAG 文件应该至少有 50KB
+          SIZE_LIMIT=$((50 * 1024))
+          if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
+            echo "RAG file size is less than 50KB. Something might be wrong. Aborting."
+            exit 1
+          fi
+          
+          # 生成 SHA256 校验和
+          echo "Generating SHA256 checksum..."
+          SHA256_HASH=$(sha256sum $RAG_GZ_FILE | awk '{print $1}')
+          echo "$SHA256_HASH" > $SHA256_FILE
+          echo "SHA256: $SHA256_HASH"
+          
+          # 立即上传 RAG 文件
+          echo "Uploading RAG files to OSS..."
+          echo "Version: $VERSION"
+          echo "OSS Directory: $RAG_OSS_DIR"
+          
+          # 上传 RAG 压缩文件
+          echo "Uploading cwe.rag.gz..."
+          ./yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$RAG_GZ_FILE:${RAG_OSS_DIR}/cwe.rag.gz"
+          
+          # 上传 SHA256 校验文件
+          echo "Uploading cwe.rag.gz.sha256.txt..."
+          ./yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$SHA256_FILE:${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt"
+          
+          # 保存 SHA256 hash 供后续使用
+          echo "SHA256_HASH=$SHA256_HASH" >> $GITHUB_ENV
+
       # =============================================================================
-      # 统一上传到 yaklang bucket (oss-accelerate.aliyuncs.com)
+      # 上传 CWE 数据和更新 rags-latest.json
       # =============================================================================
 
       - name: Upload CWE data to yaklang OSS
@@ -211,32 +241,6 @@ jobs:
             -sk ${{ secrets.OSS_KEY_SECRET }} \
             -t 5 \
             -f "~/yakit-projects/cwe-data.jsonl.gz:/cwe/cwe-data.jsonl.gz"
-
-      - name: Upload RAG files to yaklang OSS
-        run: |
-          echo "Uploading RAG files to yaklang OSS..."
-          echo "Version: $VERSION"
-          echo "OSS Directory: $RAG_OSS_DIR"
-          
-          # 上传 RAG 压缩文件
-          echo "Uploading cwe.rag.gz..."
-          ./yak upload-oss \
-            -b yaklang \
-            --endpoint oss-accelerate.aliyuncs.com \
-            -ak ${{ secrets.OSS_KEY_ID }} \
-            -sk ${{ secrets.OSS_KEY_SECRET }} \
-            -t 5 \
-            -f "~/yakit-projects/cwe.rag.gz:${RAG_OSS_DIR}/cwe.rag.gz"
-          
-          # 上传 SHA256 校验文件
-          echo "Uploading cwe.rag.gz.sha256.txt..."
-          ./yak upload-oss \
-            -b yaklang \
-            --endpoint oss-accelerate.aliyuncs.com \
-            -ak ${{ secrets.OSS_KEY_ID }} \
-            -sk ${{ secrets.OSS_KEY_SECRET }} \
-            -t 5 \
-            -f "~/yakit-projects/cwe.rag.gz.sha256.txt:${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt"
 
       - name: Update rags-latest.json
         run: |
