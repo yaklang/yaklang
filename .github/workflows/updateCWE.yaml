@@ -41,7 +41,7 @@ jobs:
       - name: Download existing CWE data (if exists)
         continue-on-error: true
         run: |
-          wget -O ~/yakit-projects/cwe-data.jsonl.gz https://cve-db.oss-cn-beijing.aliyuncs.com/cwe-data.jsonl.gz || echo "No existing CWE data found, will create new"
+          wget -O ~/yakit-projects/cwe-data.jsonl.gz https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz || echo "No existing CWE data found, will create new"
           if [ -f ~/yakit-projects/cwe-data.jsonl.gz ]; then
             gunzip -f ~/yakit-projects/cwe-data.jsonl.gz || echo "Failed to decompress, will create new"
           fi
@@ -66,11 +66,11 @@ jobs:
           mv ~/yakit-projects/cwe-data-new.jsonl ~/yakit-projects/cwe-data.jsonl
           ./yak gzip -f ~/yakit-projects/cwe-data.jsonl -o ~/yakit-projects/cwe-data.jsonl.gz
 
-      - name: Check file size
+      - name: Check CWE data file size
         run: |
           FILE_PATH=~/yakit-projects/cwe-data.jsonl.gz
           FILE_SIZE=$(stat -c%s "$FILE_PATH")
-          echo "File size: $FILE_SIZE bytes"
+          echo "CWE data file size: $FILE_SIZE bytes"
           
           SIZE_LIMIT=$((100 * 1024)) # 100KB size limit (CWE data is smaller than CVE)
           if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
@@ -78,18 +78,8 @@ jobs:
             exit 1
           fi
 
-      - name: Setup Ossutil
-        uses: manyuanrong/setup-ossutil@v3.0
-        with:
-          endpoint: "oss-cn-beijing.aliyuncs.com"
-          access-key-id: ${{ secrets.OSS_KEY_ID }}
-          access-key-secret: ${{ secrets.OSS_KEY_SECRET }}
-
-      - name: Deploy CWE Data To OSS (cve-db bucket)
-        run: ossutil cp ~/yakit-projects/cwe-data.jsonl.gz oss://cve-db/ -rf
-
       # =============================================================================
-      # RAG 构建和上传部分
+      # RAG 构建部分
       # =============================================================================
 
       - name: Download existing CWE RAG file (for incremental update)
@@ -168,7 +158,7 @@ jobs:
             exit 1
           fi
 
-      - name: Generate Version and Upload RAG to OSS
+      - name: Generate Version
         run: |
           # 生成版本号: 日期-index
           DATE_STR=$(date +%Y%m%d)
@@ -197,6 +187,21 @@ jobs:
           # 准备上传目录
           RAG_OSS_DIR="/rag/cwe/${VERSION}"
           echo "RAG_OSS_DIR=$RAG_OSS_DIR" >> $GITHUB_ENV
+
+      # =============================================================================
+      # 统一上传到 yaklang bucket (oss-accelerate.aliyuncs.com)
+      # =============================================================================
+
+      - name: Upload CWE data to yaklang OSS
+        run: |
+          echo "Uploading CWE data to yaklang OSS..."
+          ./yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "~/yakit-projects/cwe-data.jsonl.gz:/cwe/cwe-data.jsonl.gz"
 
       - name: Upload RAG files to yaklang OSS
         run: |
@@ -282,17 +287,21 @@ jobs:
         run: |
           echo "Verifying uploads..."
           echo ""
+          echo "=== CWE Data File ==="
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz" | head -10
+          echo ""
           echo "=== RAG File ==="
-          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz" | head -20
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz" | head -10
           echo ""
           echo "=== SHA256 File ==="
-          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt" | head -20
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt" | head -10
           echo ""
           echo "=== rags-latest.json ==="
           curl -s "https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json" | jq .
           echo ""
           echo "=== Upload Summary ==="
           echo "Version: $VERSION"
+          echo "CWE Data: https://yaklang.oss-accelerate.aliyuncs.com/cwe/cwe-data.jsonl.gz"
           echo "RAG File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz"
           echo "SHA256 File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/cwe.rag.gz.sha256.txt"
           echo "Index File: https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json"
