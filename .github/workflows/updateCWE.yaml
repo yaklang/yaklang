@@ -1,0 +1,89 @@
+name: updateCWE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "cwe/*"
+  schedule:
+    # 定时任务，在每周二0点更新（与CVE周一更新错开）
+    - cron: '0 0 * * 2'
+
+jobs:
+
+  update-cwe:
+    name: Update CWE Database
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+        id: go
+
+      - name: Init Module
+        run: |
+          go mod tidy
+
+      - name: Build yak
+        run: |
+          go build -o ./yak ./common/yak/cmd/yak.go
+          chmod +x ./yak
+
+      - name: Create output directory
+        run: mkdir -p ~/yakit-projects
+
+      - name: Download existing CWE data (if exists)
+        continue-on-error: true
+        run: |
+          wget -O ~/yakit-projects/cwe-data.jsonl.gz https://cve-db.oss-cn-beijing.aliyuncs.com/cwe-data.jsonl.gz || echo "No existing CWE data found, will create new"
+          if [ -f ~/yakit-projects/cwe-data.jsonl.gz ]; then
+            gunzip -f ~/yakit-projects/cwe-data.jsonl.gz || echo "Failed to decompress, will create new"
+          fi
+
+      - name: Update CWE Database
+        run: |
+          if [ -f ~/yakit-projects/cwe-data.jsonl ]; then
+            echo "Importing existing CWE data and updating..."
+            ./yak scripts/ci-works/rag/cwe.yak \
+              --input ~/yakit-projects/cwe-data.jsonl \
+              --output ~/yakit-projects/cwe-data-new.jsonl \
+              --ai-concurrent 10
+          else
+            echo "Creating new CWE database..."
+            ./yak scripts/ci-works/rag/cwe.yak \
+              --output ~/yakit-projects/cwe-data-new.jsonl \
+              --ai-concurrent 10
+          fi
+
+      - name: Compress CWE data with gzip
+        run: |
+          mv ~/yakit-projects/cwe-data-new.jsonl ~/yakit-projects/cwe-data.jsonl
+          ./yak gzip -f ~/yakit-projects/cwe-data.jsonl -o ~/yakit-projects/cwe-data.jsonl.gz
+
+      - name: Check file size
+        run: |
+          FILE_PATH=~/yakit-projects/cwe-data.jsonl.gz
+          FILE_SIZE=$(stat -c%s "$FILE_PATH")
+          echo "File size: $FILE_SIZE bytes"
+          
+          SIZE_LIMIT=$((100 * 1024)) # 100KB size limit (CWE data is smaller than CVE)
+          if [ $FILE_SIZE -lt $SIZE_LIMIT ]; then
+            echo "File size is less than 100KB. Something might be wrong. Aborting."
+            exit 1
+          fi
+
+      - name: Setup Ossutil
+        uses: manyuanrong/setup-ossutil@v3.0
+        with:
+          endpoint: "oss-cn-beijing.aliyuncs.com"
+          access-key-id: ${{ secrets.OSS_KEY_ID }}
+          access-key-secret: ${{ secrets.OSS_KEY_SECRET }}
+
+      - name: Deploy To OSS
+        run: ossutil cp ~/yakit-projects/cwe-data.jsonl.gz oss://cve-db/ -rf
