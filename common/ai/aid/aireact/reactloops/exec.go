@@ -6,12 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -380,6 +384,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}
 
 	r.SetCurrentTask(task)
+	r.ensureLoopDirectory(task)
 	if r.initHandler != nil {
 		r.loadingStatus("执行初始化函数 / execute init handler...")
 		utils.Debug(func() {
@@ -603,6 +608,8 @@ LOOP:
 		r.actionHistory = append(r.actionHistory, actionRecord)
 		r.actionHistoryMutex.Unlock()
 
+		r.emitActionExecutionRecord(task, actionParams, iterationCount, prompt)
+
 		// allow iteration info to be added to timeline
 		loopName := r.loopName
 		if loopName == "" {
@@ -810,4 +817,113 @@ func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AISt
 
 func testIsFinished(task aicommon.AIStatefulTask) bool {
 	return task.GetStatus() == aicommon.AITaskState_Completed || task.GetStatus() == aicommon.AITaskState_Aborted || task.GetStatus() == aicommon.AITaskState_Skipped
+}
+
+func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
+	if utils.IsNil(r) || utils.IsNil(task) {
+		return ""
+	}
+	workdir := consts.TempAIDir(r.config.GetRuntimeId())
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+	taskIndex := task.GetIndex()
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	loopName := r.loopName
+	if loopName == "" {
+		loopName = "unknown_loop"
+	}
+	loopDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "loops", sanitizeActionFilename(loopName))
+	if err := os.MkdirAll(loopDir, 0755); err != nil {
+		log.Errorf("failed to create loop directory %s: %v", loopDir, err)
+		return ""
+	}
+	r.Set("loop_directory", loopDir)
+	return loopDir
+}
+
+func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string) {
+	if utils.IsNil(r) || utils.IsNil(task) || utils.IsNil(action) {
+		return
+	}
+	emitter := r.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	workdir := consts.TempAIDir(r.config.GetRuntimeId())
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+	taskIndex := task.GetIndex()
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	actionDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "action_calls")
+	if err := os.MkdirAll(actionDir, 0755); err != nil {
+		log.Errorf("failed to create action record directory %s: %v", actionDir, err)
+		return
+	}
+
+	actionName := action.Name()
+	if actionName == "" {
+		actionName = action.ActionType()
+	}
+	filename := fmt.Sprintf("%d_%s.md", iteration, sanitizeActionFilename(actionName))
+	filePath := filepath.Join(actionDir, filename)
+
+	content := r.buildActionExecutionMarkdown(actionName, action.GetParams(), action.GetString("human_readable_thought"), prompt, r.isDebugModeEnabled())
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		log.Errorf("failed to save action execution record to file: %v", err)
+		return
+	}
+	emitter.EmitPinFilename(filePath)
+	log.Infof("saved action execution record to file: %s", filePath)
+}
+
+func (r *ReActLoop) buildActionExecutionMarkdown(actionName string, params map[string]any, thought string, prompt string, includePrompt bool) string {
+	var content strings.Builder
+	content.WriteString("# Action Call Record\n\n")
+	content.WriteString("## Action\n\n")
+	content.WriteString("- Name: " + actionName + "\n")
+	content.WriteString("- Human Readable Thought: " + thought + "\n\n")
+	content.WriteString("## Params\n\n")
+	content.WriteString("```json\n")
+	content.WriteString(string(utils.Jsonify(params)))
+	content.WriteString("\n```\n\n")
+	if includePrompt {
+		content.WriteString("## Prompt\n\n")
+		content.WriteString("```\n")
+		content.WriteString(prompt)
+		content.WriteString("\n```\n")
+	}
+	return content.String()
+}
+
+func (r *ReActLoop) isDebugModeEnabled() bool {
+	value := r.GetVariable("debug_mode")
+	if value == nil {
+		return false
+	}
+	if enabled, ok := value.(bool); ok {
+		return enabled
+	}
+	return strings.EqualFold(utils.InterfaceToString(value), "true")
+}
+
+func sanitizeActionFilename(name string) string {
+	result := ""
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			result += string(r)
+		} else {
+			result += "_"
+		}
+	}
+	if result == "" {
+		return "unknown"
+	}
+	return result
 }

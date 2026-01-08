@@ -328,3 +328,17 @@ func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
 		}
 	}
 }
+
+func WithVar(key string, value any) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.vars.Set(key, value)
+	}
+}
+
+func WithVars(vars map[string]any) ReActLoopOption {
+	return func(r *ReActLoop) {
+		for key, value := range vars {
+			r.vars.Set(key, value)
+		}
+	}
+}
