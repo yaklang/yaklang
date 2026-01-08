@@ -1,0 +1,102 @@
+// 文件扩展名匹配测试
+// 测试功能：通过文件扩展名匹配文件类型
+
+// 1. 测试 file.GetTypeByExtension() - 文件扩展名匹配
+// 测试常见扩展名
+txtMime = file.GetTypeByExtension(".txt")
+assert txtMime != "", sprintf("GetTypeByExtension('.txt') should return non-empty MIME type, got: %s", txtMime)
+assert "text" in txtMime, sprintf("Text file MIME type should contain 'text', got: %s", txtMime)
+
+jpgMime = file.GetTypeByExtension("jpg")
+assert jpgMime != "", sprintf("GetTypeByExtension('jpg') should return non-empty MIME type, got: %s", jpgMime)
+assert "image" in jpgMime, sprintf("Image file MIME type should contain 'image', got: %s", jpgMime)
+
+// 测试带点号和不带点号的扩展名应该返回相同结果
+jpgMimeWithDot = file.GetTypeByExtension(".jpg")
+assert jpgMime == jpgMimeWithDot, sprintf("GetTypeByExtension('jpg') and GetTypeByExtension('.jpg') should return same result: %s vs %s", jpgMime, jpgMimeWithDot)
+
+pngMime = file.GetTypeByExtension(".png")
+assert pngMime != "", sprintf("GetTypeByExtension('.png') should return non-empty MIME type, got: %s", pngMime)
+assert "image" in pngMime, sprintf("PNG file MIME type should contain 'image', got: %s", pngMime)
+
+pdfMime = file.GetTypeByExtension(".pdf")
+assert pdfMime != "", sprintf("GetTypeByExtension('.pdf') should return non-empty MIME type, got: %s", pdfMime)
+assert "application" in pdfMime, sprintf("PDF file MIME type should contain 'application', got: %s", pdfMime)
+
+// 2. 测试更多常见扩展名
+htmlMime = file.GetTypeByExtension(".html")
+assert htmlMime != "", sprintf("GetTypeByExtension('.html') should return non-empty MIME type, got: %s", htmlMime)
+assert "text" in htmlMime, sprintf("HTML file MIME type should contain 'text', got: %s", htmlMime)
+
+cssMime = file.GetTypeByExtension(".css")
+assert cssMime != "", sprintf("GetTypeByExtension('.css') should return non-empty MIME type, got: %s", cssMime)
+assert "text" in cssMime, sprintf("CSS file MIME type should contain 'text', got: %s", cssMime)
+
+jsMime = file.GetTypeByExtension(".js")
+assert jsMime != "", sprintf("GetTypeByExtension('.js') should return non-empty MIME type, got: %s", jsMime)
+assert "application" in jsMime || "text" in jsMime, sprintf("JavaScript file MIME type should contain 'application' or 'text', got: %s", jsMime)
+
+jsonMime = file.GetTypeByExtension(".json")
+assert jsonMime != "", sprintf("GetTypeByExtension('.json') should return non-empty MIME type, got: %s", jsonMime)
+assert "application" in jsonMime, sprintf("JSON file MIME type should contain 'application', got: %s", jsonMime)
+
+xmlMime = file.GetTypeByExtension(".xml")
+assert xmlMime != "", sprintf("GetTypeByExtension('.xml') should return non-empty MIME type, got: %s", xmlMime)
+assert "application" in xmlMime || "text" in xmlMime, sprintf("XML file MIME type should contain 'application' or 'text', got: %s", xmlMime)
+
+zipMime = file.GetTypeByExtension(".zip")
+assert zipMime != "", sprintf("GetTypeByExtension('.zip') should return non-empty MIME type, got: %s", zipMime)
+assert "application" in zipMime, sprintf("ZIP file MIME type should contain 'application', got: %s", zipMime)
+
+// 3. 测试未知扩展名应该返回默认类型
+unknownMime = file.GetTypeByExtension(".unknown_ext_12345")
+assert unknownMime == "application/octet-stream", sprintf("Unknown extension should return 'application/octet-stream', got: %s", unknownMime)
+
+emptyExtMime = file.GetTypeByExtension("")
+assert emptyExtMime == "application/octet-stream", sprintf("Empty extension should return 'application/octet-stream', got: %s", emptyExtMime)
+
+// 4. 测试一致性：相同扩展名应该返回相同结果
+txtMime1 = file.GetTypeByExtension(".txt")
+txtMime2 = file.GetTypeByExtension("txt")
+txtMime3 = file.GetTypeByExtension(".TXT")
+assert txtMime1 == txtMime2, sprintf("Same extension with/without dot should return same result: %s vs %s", txtMime1, txtMime2)
+// 注意：.TXT 可能返回不同结果，因为 Go 的 mime.TypeByExtension 是大小写敏感的
+
+// 5. 测试常见扩展名列表
+knownExts = [
+    [".txt", "text"],
+    [".jpg", "image"],
+    [".jpeg", "image"],
+    [".png", "image"],
+    [".gif", "image"],
+    [".pdf", "application"],
+    [".html", "text"],
+    [".css", "text"],
+    [".js", "text"],  // .js 返回 text/javascript
+    [".json", "application"],
+    [".xml", "text"],  // .xml 返回 text/xml，不是 application/xml
+    [".zip", "application"],
+    [".tar", "application"],
+    [".gz", "application"],
+]
+
+for extInfo in knownExts {
+    ext = extInfo[0]
+    expectedPrefix = extInfo[1]
+    extMime = file.GetTypeByExtension(ext)
+    assert extMime != "", sprintf("GetTypeByExtension('%s') should return non-empty MIME type", ext)
+    assert expectedPrefix in extMime, sprintf("Extension '%s' should map to MIME type starting with '%s', got: %s", ext, expectedPrefix, extMime)
+}
+
+// 6. 测试 file.DetectFileType() 使用扩展名作为回退
+// 创建一个没有魔数的文件（纯文本，但扩展名是 .json）
+jsonFile,err = file.TempFileName("test_extension_*.json")
+file.Save(jsonFile, "{}")
+detectedType, err = file.DetectFileType(jsonFile)
+assert err == nil, sprintf("DetectFileType failed: %v", err)
+assert detectedType != "", sprintf("DetectFileType should return non-empty MIME type, got: %s", detectedType)
+// 应该识别为 JSON 类型（通过扩展名或魔数）
+assert "json" in detectedType || "application" in detectedType, sprintf("JSON file should be detected as JSON or application type, got: %s", detectedType)
+
+println("All file extension matching tests passed!")
+
