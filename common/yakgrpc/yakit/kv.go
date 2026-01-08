@@ -121,11 +121,8 @@ func init() {
 		return nil
 	}, "refresh-process-env")
 
-	// 检测并自动添加 aibalance 配置
-	RegisterPostInitDatabaseFunction(func() error {
-		EnsureAIBalanceConfig()
-		return nil
-	}, "ensure-aibalance-config")
+	// 注意：aibalance 配置的初始化已移至 grpc_config_global_network.go 的 sync-global-config-from-db 中
+	// 确保在 ConfigureNetWork 之后执行，避免配置被覆盖
 }
 
 // EnsureAIBalanceConfig 检测全局配置中是否存在 aibalance 配置，如果不存在则添加默认配置
