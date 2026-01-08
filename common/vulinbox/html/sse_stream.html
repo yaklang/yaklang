@@ -9,6 +9,7 @@
       font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
       margin: 20px;
       color: #1f2937;
+      font-size: 16px;
     }
     h2 {
       margin-top: 0;
@@ -21,18 +22,18 @@
       margin-bottom: 12px;
     }
     label {
-      font-size: 14px;
+      font-size: 16px;
     }
     input {
       padding: 6px 8px;
-      font-size: 14px;
+      font-size: 16px;
       border: 1px solid #d1d5db;
       border-radius: 4px;
       width: 120px;
     }
     button {
       padding: 6px 12px;
-      font-size: 14px;
+      font-size: 16px;
       border-radius: 4px;
       border: 1px solid #1d4ed8;
       background: #2563eb;
@@ -44,7 +45,7 @@
       background: #6b7280;
     }
     .hint {
-      font-size: 12px;
+      font-size: 14px;
       color: #6b7280;
       margin-bottom: 10px;
     }
@@ -57,13 +58,34 @@
       overflow: auto;
       white-space: pre-wrap;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
+      font-size: 14px;
+    }
+    .copy-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .copy-row input {
+      width: 320px;
+    }
+    .copy-row button {
+      border-color: #16a34a;
+      background: #16a34a;
     }
   </style>
 </head>
 <body>
   <h2>SSE Streaming Demo</h2>
   <p class="hint">Use WebFuzzer to hit <code>/sse/stream</code> and observe streaming updates.</p>
+
+  <div class="copy-row">
+    <label>Stream URL
+      <input id="baseUrl" type="text" readonly>
+    </label>
+    <button id="copyBase">Copy</button>
+  </div>
 
   <div class="controls">
     <label>Interval(ms)
@@ -90,6 +112,10 @@
       log.scrollTop = log.scrollHeight;
     }
 
+    function baseUrl() {
+      return window.location.origin + "/sse/stream";
+    }
+
     function buildUrl() {
       const interval = document.getElementById("interval").value;
       const count = document.getElementById("count").value;
@@ -99,7 +125,24 @@
         count,
         message
       });
-      return "/sse/stream?" + params.toString();
+      return baseUrl() + "?" + params.toString();
+    }
+
+    function writeBaseUrl() {
+      const input = document.getElementById("baseUrl");
+      input.value = baseUrl();
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        append("[info] copied: " + text);
+      } catch (err) {
+        const input = document.getElementById("baseUrl");
+        input.select();
+        document.execCommand("copy");
+        append("[info] copied: " + text);
+      }
     }
 
     document.getElementById("start").addEventListener("click", () => {
@@ -129,6 +172,13 @@
         append("[info] stopped");
       }
     });
+
+    document.getElementById("copyBase").addEventListener("click", () => {
+      const url = baseUrl();
+      copyText(url);
+    });
+
+    writeBaseUrl();
   </script>
 </body>
 </html>
