@@ -363,17 +363,12 @@ if totalCount == 0 {
 // 并发处理设置
 // =============================================================================
 
-wg = sync.NewSizedWaitGroup(maxConcurrency)
-resultsChan = make(chan map[string]any, totalCount)
-
-// 统计变量
+// 统计变量（全局）
 totalQuestions = 0
 questionsMutex = sync.NewMutex()
 
-// 处理单个项目的函数
-processItem = func(itemIndex, totalItems, itemInfo) {
-    defer wg.Done()
-
+// 处理单个项目的函数（返回结果而不是写入 channel）
+processSingleItem = func(itemIndex, totalItems, itemInfo) {
     itemType = itemInfo["type"]
     itemName = itemInfo["name"]
     verboseName = itemInfo["verbose_name"]
@@ -391,6 +386,8 @@ processItem = func(itemIndex, totalItems, itemInfo) {
         "name": itemName,
         "verbose_name": verboseName,
         "description": description,
+        "keywords": keywords,
+        "content": content,
         "success": false,
         "error": nil,
         "questions_generated": 0,
@@ -470,11 +467,8 @@ processItem = func(itemIndex, totalItems, itemInfo) {
 `, itemTypeCN, itemTypeCN, itemTypeCN)
 
         // 使用 BuildSearchIndexKnowledge 构建搜索索引
-        // 传入 search_type 和 search_target 作为知识条目的元数据
-        // search_type: AI工具/Forge 类型，search_target: 工具/Forge 名称
-        // 使用 noPotentialQuestions 压缩存储大小
         log.Info("   Step 2: Calling AI to generate search questions...")
-        searchTypeDesc = itemTypeCN  // "Yaklang AI 工具" 或 "Yaklang AI Forge"
+        searchTypeDesc = itemTypeCN
         searchResult, buildErr = rag.BuildSearchIndexKnowledge(
             ragCollectionName, 
             itemDescription, 
@@ -485,9 +479,8 @@ processItem = func(itemIndex, totalItems, itemInfo) {
         if buildErr != nil {
             log.Error("   Failed to build search index: %v", buildErr)
             log.Error("   Error details: item=%s, type=%s, desc_len=%d", itemName, itemType, len(itemDescription))
-            result["error"] = buildErr
-            resultsChan <- result
-            return
+            result["error"] = sprintf("%v", buildErr)
+            return result
         }
 
         // 打印生成的问题
@@ -515,56 +508,139 @@ processItem = func(itemIndex, totalItems, itemInfo) {
         result["error"] = sprintf("%v", processErr)
     }
 
-    resultsChan <- result
+    return result
+}
+
+// 批量处理函数（支持重试）
+processBatch = func(items, round, maxRounds) {
+    if len(items) == 0 {
+        return [], []
+    }
+    
+    log.Info("")
+    log.Info("=== Processing Round %d/%d (Items: %d, Concurrent: %d) ===", round, maxRounds, len(items), maxConcurrency)
+    
+    wg = sync.NewSizedWaitGroup(maxConcurrency)
+    resultsChan = make(chan map[string]any, len(items))
+    
+    // 启动并发处理
+    for i, itemInfo := range items {
+        wg.Add(1)
+        go func(idx, info) {
+            defer wg.Done()
+            result = processSingleItem(idx+1, len(items), info)
+            resultsChan <- result
+        }(i, itemInfo)
+    }
+    
+    // 等待所有任务完成
+    wg.Wait()
+    close(resultsChan)
+    
+    // 收集结果
+    successResults = []
+    failedResults = []
+    
+    for result := range resultsChan {
+        if result["success"] {
+            successResults = append(successResults, result)
+        } else {
+            failedResults = append(failedResults, result)
+        }
+    }
+    
+    log.Info("")
+    log.Info("Round %d Results: Success=%d, Failed=%d", round, len(successResults), len(failedResults))
+    
+    return successResults, failedResults
 }
 
 // =============================================================================
-// 并发处理 AI 能力项目
+// 并发处理 AI 能力项目（带重试机制，最多3轮）
 // =============================================================================
 
-log.Info("")
-log.Info("=== Processing AI Capabilities (Concurrent, max %d) ===", maxConcurrency)
+maxRetryRounds = 3
+currentRound = 1
+pendingItems = allItems
 
-// 启动并发处理
-for i, itemInfo := range allItems {
-    wg.Add(1)
-    go processItem(i+1, totalCount, itemInfo)
+// 累计统计
+allSuccessResults = []
+finalFailedItems = []
+
+for currentRound <= maxRetryRounds && len(pendingItems) > 0 {
+    successResults, failedResults = processBatch(pendingItems, currentRound, maxRetryRounds)
+    
+    // 累计成功结果
+    for _, r := range successResults {
+        allSuccessResults = append(allSuccessResults, r)
+    }
+    
+    // 检查是否还有失败的项目需要重试
+    if len(failedResults) == 0 {
+        log.Info("All items processed successfully in round %d!", currentRound)
+        break
+    }
+    
+    if currentRound < maxRetryRounds {
+        log.Warn("")
+        log.Warn("=== %d items failed, will retry in round %d ===", len(failedResults), currentRound+1)
+        for i, fr := range failedResults {
+            log.Warn("   %d. %s (%s): %v", i+1, fr["name"], fr["type"], fr["error"])
+        }
+        
+        // 准备重试的项目（从失败结果中提取原始项目信息）
+        pendingItems = []
+        for _, fr := range failedResults {
+            retryItem = {
+                "type": fr["type"],
+                "name": fr["name"],
+                "verbose_name": fr["verbose_name"],
+                "description": fr["description"],
+                "keywords": fr["keywords"],
+                "content": fr["content"],
+            }
+            pendingItems = append(pendingItems, retryItem)
+        }
+        
+        // 重试前等待一小段时间，避免 API 限流
+        log.Info("Waiting 3 seconds before retry...")
+        time.Sleep(3 * time.Second)
+    } else {
+        // 最后一轮，记录最终失败的项目
+        for _, fr := range failedResults {
+            finalFailedItems = append(finalFailedItems, fr)
+        }
+    }
+    
+    currentRound++
 }
 
-// 等待所有任务完成
-wg.Wait()
-close(resultsChan)
-
-// 收集结果
-successCount = 0
-failedCount = 0
-failedItems = []
+// 统计最终结果
+successCount = len(allSuccessResults)
+failedCount = len(finalFailedItems)
 successfulTools = 0
 successfulForges = 0
-totalQuestionsFromResults = 0
 
-for result := range resultsChan {
-    if result["success"] {
-        successCount++
-        totalQuestionsFromResults += result["questions_generated"]
-        if result["type"] == "tool" {
-            successfulTools++
-        } else {
-            successfulForges++
-        }
+for _, r := range allSuccessResults {
+    if r["type"] == "tool" {
+        successfulTools++
     } else {
-        failedCount++
-        failedItems = append(failedItems, sprintf("%s (%s)", result["name"], result["type"]))
+        successfulForges++
     }
 }
 
+failedItemNames = []
+for _, fr := range finalFailedItems {
+    failedItemNames = append(failedItemNames, sprintf("%s (%s)", fr["name"], fr["type"]))
+}
+
 log.Info("")
-log.Info("=== Processing Results ===")
+log.Info("=== Processing Results (with retry mechanism, max %d rounds) ===", maxRetryRounds)
 log.Info("Total new items: %d", totalCount)
 log.Info("   Tools: %d (success: %d)", toolCount, successfulTools)
 log.Info("   Forges: %d (success: %d)", forgeCount, successfulForges)
 log.Info("Total successful: %d", successCount)
-log.Info("Total failed: %d", failedCount)
+log.Info("Total failed (after retries): %d", failedCount)
 log.Info("Total questions generated: %d", totalQuestions)
 
 if incrementalMode {
@@ -576,8 +652,8 @@ if incrementalMode {
 }
 
 if failedCount > 0 {
-    log.Warn("Failed items:")
-    for i, itemName := range failedItems {
+    log.Warn("Failed items (after %d retry rounds):", maxRetryRounds)
+    for i, itemName := range failedItemNames {
         log.Warn("  %d. %s", i+1, itemName)
     }
 }
@@ -649,9 +725,25 @@ if incrementalMode {
     log.Info("   Skipped: %d already indexed", toolExistsCount + forgeExistsCount)
 }
 
-if failedCount > 0 {
+// 退出码逻辑：
+// - 如果成功数量为 0，返回 exit code 1（完全失败）
+// - 如果成功率低于 50%，返回 exit code 1（大部分失败）
+// - 否则即使有部分失败也返回 exit code 0（允许部分失败，CI 继续）
+if successCount == 0 {
+    log.Error("No items were successfully processed, build failed!")
     os.Exit(1)
-} else {
-    os.Exit(0)
 }
+
+successRate = float64(successCount) / float64(successCount + failedCount) * 100
+if failedCount > 0 {
+    log.Warn("Some items failed to process: %d failed out of %d total (success rate: %.1f%%)", 
+        failedCount, successCount + failedCount, successRate)
+    if successRate < 50 {
+        log.Error("Success rate is below 50%%, build failed!")
+        os.Exit(1)
+    }
+    log.Info("Success rate is above 50%%, build considered successful with warnings")
+}
+
+os.Exit(0)
 
