@@ -59,6 +59,13 @@ type IrProgram struct {
 	// 0: modified (exists in both base and this program, but content differs)
 	// 1: new (only exists in this program, or for Layer1, all files are new)
 	FileHashMap StringMap `json:"file_hash_map" gorm:"type:text"`
+
+	// overlay information
+	// IsOverlay: if this is an overlay program (contains multiple layers)
+	IsOverlay bool `json:"is_overlay" gorm:"index"`
+	// OverlayLayers: program names of all layers in order (from bottom to top)
+	// e.g., ["base-program", "diff-program-1", "diff-program-2"]
+	OverlayLayers StringSlice `json:"overlay_layers" gorm:"type:text"`
 }
 
 func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
