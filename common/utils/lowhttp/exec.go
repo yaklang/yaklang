@@ -810,7 +810,7 @@ RECONNECT:
 				return nil, utils.Error("conn h2 Processor is nil")
 			}
 
-			h2Stream, err := h2Conn.newStream(reqIns, requestPacket)
+			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
 					goto RECONNECT

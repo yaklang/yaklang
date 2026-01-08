@@ -85,12 +85,101 @@ type http2ClientStream struct {
 	callbackLock           *sync.Mutex
 	readFirstFrameCallback func()
 	firstFrameCallbackOnce sync.Once // only read first frame callback once
+
+	option              *LowhttpExecConfig
+	bodyStreamReader    io.ReadCloser
+	bodyStreamWriter    io.WriteCloser
+	bodyStreamOnce      sync.Once
+	bodyStreamCloseOnce sync.Once
+	headersHandled      bool
+	noBodyBuffer        bool
 }
 
 func (s *http2ClientStream) SetReadFirstFrameCallback(callback func()) {
 	s.callbackLock.Lock()
 	defer s.callbackLock.Unlock()
 	s.readFirstFrameCallback = callback
+}
+
+func (s *http2ClientStream) handleHeadersDone() {
+	if s.headersHandled {
+		return
+	}
+	s.headersHandled = true
+
+	headerRaw := s.buildResponseHeaderRaw()
+	if s.option != nil && s.option.AutoDetectSSE {
+		headerLower := strings.ToLower(string(headerRaw))
+		if strings.Contains(headerLower, "content-type:") && strings.Contains(headerLower, "text/event-stream") {
+			s.noBodyBuffer = true
+			if s.req != nil {
+				httpctx.SetNoBodyBuffer(s.req, true)
+			}
+		}
+	}
+	s.startBodyStreamHandler(headerRaw)
+}
+
+func (s *http2ClientStream) buildResponseHeaderRaw() []byte {
+	if s.resp == nil {
+		return nil
+	}
+	proto := s.resp.Proto
+	if proto == "" {
+		proto = fmt.Sprintf("HTTP/%d.%d", s.resp.ProtoMajor, s.resp.ProtoMinor)
+	}
+	status := s.resp.Status
+	if status == "" {
+		code := s.resp.StatusCode
+		if code <= 0 {
+			code = http.StatusOK
+		}
+		status = fmt.Sprintf("%d %s", code, http.StatusText(code))
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString(proto)
+	buf.WriteByte(' ')
+	buf.WriteString(status)
+	buf.WriteString("\r\n")
+	for k, values := range s.resp.Header {
+		for _, v := range values {
+			buf.WriteString(k)
+			buf.WriteString(": ")
+			buf.WriteString(v)
+			buf.WriteString("\r\n")
+		}
+	}
+	buf.WriteString("\r\n")
+	return buf.Bytes()
+}
+
+func (s *http2ClientStream) startBodyStreamHandler(headerRaw []byte) {
+	if s.option == nil || s.option.BodyStreamReaderHandler == nil || s.bodyStreamReader == nil {
+		return
+	}
+	headerCopy := append([]byte(nil), headerRaw...)
+	reader := s.bodyStreamReader
+	handler := s.option.BodyStreamReaderHandler
+	s.bodyStreamOnce.Do(func() {
+		go func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("BodyStreamReaderHandler panic in http2: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			handler(headerCopy, reader)
+		}()
+	})
+}
+
+func (s *http2ClientStream) closeBodyStreamWriter() {
+	s.bodyStreamCloseOnce.Do(func() {
+		if s.bodyStreamWriter != nil {
+			_ = s.bodyStreamWriter.Close()
+		}
+	})
 }
 
 type http2ClientConnReadLoop struct {
@@ -170,7 +259,7 @@ func (h2Conn *http2ClientConn) setPreface() {
 var CreateStreamAfterGoAwayErr = utils.Errorf("h2 conn can not create new stream, because read go away flag")
 
 // new stream
-func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*http2ClientStream, error) {
+func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, option *LowhttpExecConfig) (*http2ClientStream, error) {
 	if h2Conn.readGoAway {
 		return nil, CreateStreamAfterGoAwayErr
 	}
@@ -193,6 +282,21 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*htt
 	cs.req = req
 	cs.reqPacket = packet
 	cs.resp.Header = make(http.Header) // init header
+	cs.option = option
+	cs.headersHandled = false
+	cs.bodyStreamOnce = sync.Once{}
+	cs.bodyStreamCloseOnce = sync.Once{}
+	cs.bodyStreamReader = nil
+	cs.bodyStreamWriter = nil
+	cs.noBodyBuffer = false
+	if option != nil {
+		cs.noBodyBuffer = option.NoBodyBuffer
+		if option.BodyStreamReaderHandler != nil {
+			reader, writer := utils.NewBufPipe(nil)
+			cs.bodyStreamReader = reader
+			cs.bodyStreamWriter = writer
+		}
+	}
 
 	h2Conn.mu.Lock()
 	h2Conn.streams[newStreamID] = cs
@@ -449,6 +553,7 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	select {
 	case <-time.After(timeout):
 		err = utils.Errorf("h2 stream-id %v wait response timeout : %s, maybe you can use HTTP/1.1 retry it", cs.ID, flow)
+		cs.setEndStream()
 	case <-cs.readEndStreamSignal:
 	case <-closeFlag:
 		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
@@ -461,7 +566,11 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 
 func (cs *http2ClientStream) setEndStream() {
 	cs.readEndStream = true
-	cs.readEndStreamSignal <- struct{}{}
+	select {
+	case cs.readEndStreamSignal <- struct{}{}:
+	default:
+	}
+	cs.closeBodyStreamWriter()
 }
 
 func streamAliveCheck(cs *http2ClientStream, id uint32) error {
@@ -511,6 +620,7 @@ func (rl *http2ClientConnReadLoop) processHeaders(f *http2.HeadersFrame) {
 
 		if f.HeadersEnded() {
 			cs.readHeaderEnd = true
+			cs.handleHeadersDone()
 		}
 
 		if f.StreamEnded() {
@@ -554,6 +664,7 @@ func (rl *http2ClientConnReadLoop) processContinuation(f *http2.ContinuationFram
 		}
 		if f.HeadersEnded() {
 			cs.readHeaderEnd = true
+			cs.handleHeadersDone()
 		}
 		return
 	}
@@ -594,7 +705,12 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 				return
 			}
 		}
-		cs.bodyBuffer.Write(f.Data())
+		if cs.bodyStreamWriter != nil {
+			_, _ = cs.bodyStreamWriter.Write(f.Data())
+		}
+		if !cs.noBodyBuffer {
+			cs.bodyBuffer.Write(f.Data())
+		}
 	}
 
 	return

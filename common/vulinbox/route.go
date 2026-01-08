@@ -124,6 +124,7 @@ func (s *VulinServer) init() {
 	s.registerMockVulShiro()
 	s.registerExprInj()
 	s.registerWebsocket()
+	s.registerSSE()
 	s.registerLoginRoute()
 	s.registerCryptoJS()
 	s.registerCryptoSM()

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SSE Streaming Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, system-ui, "Segoe UI", Arial, sans-serif;
+      margin: 20px;
+      color: #1f2937;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    label {
+      font-size: 14px;
+    }
+    input {
+      padding: 6px 8px;
+      font-size: 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      width: 120px;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #1d4ed8;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary {
+      border-color: #6b7280;
+      background: #6b7280;
+    }
+    .hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 10px;
+    }
+    #log {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 12px;
+      height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h2>SSE Streaming Demo</h2>
+  <p class="hint">Use WebFuzzer to hit <code>/sse/stream</code> and observe streaming updates.</p>
+
+  <div class="controls">
+    <label>Interval(ms)
+      <input id="interval" type="number" value="500" min="50" max="60000">
+    </label>
+    <label>Count
+      <input id="count" type="number" value="10" min="0">
+    </label>
+    <label>Message
+      <input id="message" type="text" value="yaklang sse message">
+    </label>
+    <button id="start">Start</button>
+    <button id="stop" class="secondary">Stop</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <script>
+    let source = null;
+    const log = document.getElementById("log");
+
+    function append(text) {
+      log.textContent += text + "\\n";
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function buildUrl() {
+      const interval = document.getElementById("interval").value;
+      const count = document.getElementById("count").value;
+      const message = document.getElementById("message").value;
+      const params = new URLSearchParams({
+        interval,
+        count,
+        message
+      });
+      return "/sse/stream?" + params.toString();
+    }
+
+    document.getElementById("start").addEventListener("click", () => {
+      if (source) {
+        source.close();
+      }
+      log.textContent = "";
+      const url = buildUrl();
+      append("Connecting: " + url);
+      source = new EventSource(url);
+      source.onmessage = (event) => {
+        append("[message] " + event.data);
+      };
+      source.onerror = () => {
+        append("[error] connection closed");
+        if (source) {
+          source.close();
+          source = null;
+        }
+      };
+    });
+
+    document.getElementById("stop").addEventListener("click", () => {
+      if (source) {
+        source.close();
+        source = null;
+        append("[info] stopped");
+      }
+    });
+  </script>
+</body>
+</html>
