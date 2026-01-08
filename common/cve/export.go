@@ -69,6 +69,9 @@ var CWEExports = map[string]interface{}{
 	"Update":           cvequeryops.CWEUpdate,
 	"ListAll":          cvequeryops.ListAllCWE,
 	"AICompleteFields": cvequeryops.AICompleteFields,
+	// Export and Import
+	"Export": cvequeryops.ExportCWE,
+	"Import": cvequeryops.ImportCWE,
 	// Update options
 	"proxy": cvequeryops.WithCWEProxy,
 	"url":   cvequeryops.WithCWEURL,

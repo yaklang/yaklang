@@ -1,0 +1,108 @@
+// CWE Database Maintenance Script
+// Usage:
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cwe.yak --input cwe_data.jsonl --output cwe_output.jsonl
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cwe.yak --output cwe_output.jsonl --proxy http://127.0.0.1:7890
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cwe.yak --output cwe_output.jsonl --ai-limit 10
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cwe.yak --output cwe_output.jsonl --ai-type openai --ai-key YOUR_API_KEY
+
+loglevel("info")
+
+// Parse CLI arguments
+inputFile = cli.String("input", cli.setHelp("Input JSONL file path, if exists will import first"))
+outputFile = cli.String("output", cli.setHelp("Output JSONL file path for export"), cli.setRequired(true))
+proxyAddr = cli.String("proxy", cli.setHelp("Proxy address for downloading CWE data, e.g., http://127.0.0.1:7890"))
+aiLimit = cli.Int("ai-limit", cli.setHelp("Limit number of CWEs to process with AI (for testing)"), cli.setDefault(0))
+aiConcurrent = cli.Int("ai-concurrent", cli.setHelp("Number of concurrent AI workers"), cli.setDefault(10))
+aiType = cli.String("ai-type", cli.setHelp("AI provider type, e.g., openai, chatglm, moonshot"))
+aiKey = cli.String("ai-key", cli.setHelp("AI API key"))
+aiModel = cli.String("ai-model", cli.setHelp("AI model name"))
+aiDomain = cli.String("ai-domain", cli.setHelp("AI API domain (for custom endpoints)"))
+
+cli.check()
+
+log.Info("CWE Database Maintenance Script started")
+log.Info("Input file: %s", inputFile)
+log.Info("Output file: %s", outputFile)
+log.Info("Proxy: %s", proxyAddr)
+log.Info("AI limit: %d", aiLimit)
+log.Info("AI concurrent: %d", aiConcurrent)
+log.Info("AI type: %s", aiType)
+log.Info("AI model: %s", aiModel)
+
+// Step 1: Import if input file exists
+if inputFile != "" && file.IsExisted(inputFile) {
+    log.Info("Input file exists, importing from: %s", inputFile)
+    err = cwe.Import(inputFile)
+    if err != nil {
+        log.Error("Import failed: %v", err)
+        die(err)
+    }
+    log.Info("Import completed successfully")
+} else if inputFile != "" {
+    log.Info("Input file does not exist: %s, skipping import", inputFile)
+} else {
+    log.Info("No input file specified, skipping import")
+}
+
+// Step 2: Update from remote
+log.Info("Updating CWE database from remote...")
+updateOpts = []
+if proxyAddr != "" {
+    log.Info("Using proxy: %s", proxyAddr)
+    updateOpts = append(updateOpts, cwe.proxy(proxyAddr))
+}
+
+err = cwe.Update(updateOpts...)
+if err != nil {
+    log.Error("Update failed: %v", err)
+    die(err)
+}
+log.Info("CWE database updated successfully")
+
+// Step 3: AI Complete Fields
+log.Info("Running AI completion for CWE fields...")
+aiOpts = []
+aiOpts = append(aiOpts, cwe.aiConcurrent(aiConcurrent))
+if aiLimit > 0 {
+    log.Info("Using AI limit: %d", aiLimit)
+    aiOpts = append(aiOpts, cwe.testLimit(aiLimit))
+}
+// Add AI configuration options
+if aiType != "" {
+    log.Info("Using AI type: %s", aiType)
+    aiOpts = append(aiOpts, ai.type(aiType))
+}
+if aiKey != "" {
+    log.Info("AI API key configured")
+    aiOpts = append(aiOpts, ai.apiKey(aiKey))
+}
+if aiModel != "" {
+    log.Info("Using AI model: %s", aiModel)
+    aiOpts = append(aiOpts, ai.model(aiModel))
+}
+if aiDomain != "" {
+    log.Info("Using AI domain: %s", aiDomain)
+    aiOpts = append(aiOpts, ai.domain(aiDomain))
+}
+if proxyAddr != "" {
+    log.Info("Using proxy for AI: %s", proxyAddr)
+    aiOpts = append(aiOpts, ai.proxy(proxyAddr))
+}
+
+err = cwe.AICompleteFields(aiOpts...)
+if err != nil {
+    log.Error("AI completion failed: %v", err)
+    die(err)
+}
+log.Info("AI completion finished successfully")
+
+// Step 4: Export to output file
+log.Info("Exporting CWE database to: %s", outputFile)
+err = cwe.Export(outputFile)
+if err != nil {
+    log.Error("Export failed: %v", err)
+    die(err)
+}
+log.Info("CWE database exported successfully to: %s", outputFile)
+
+log.Info("CWE Database Maintenance Script completed successfully")

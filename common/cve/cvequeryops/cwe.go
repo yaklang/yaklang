@@ -1,8 +1,11 @@
 package cvequeryops
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -513,13 +516,147 @@ func DownloadCWE() (string, error) {
 	return fp.Name(), nil
 }
 
+// SaveCWE saves CWE entries to database, checking for important field changes
+// and clearing Chinese translations if the source content has changed
 func SaveCWE(db *gorm.DB, cwes []*cveresources.CWE) {
-	for _, i := range cwes {
-		// log.Infof("start save cwe: %v", i.CWEString())
-		if d := db.Model(&cveresources.CWE{}).Save(i); d.Error != nil {
+	for _, newCWE := range cwes {
+		// Check if CWE already exists
+		var existingCWE cveresources.CWE
+		err := db.Where("id_str = ?", newCWE.IdStr).First(&existingCWE).Error
+
+		if err == nil {
+			// CWE exists, check if important fields have changed
+			fieldsChanged := hasImportantFieldsChanged(&existingCWE, newCWE)
+			if fieldsChanged {
+				// Clear Chinese translations when source content changed
+				log.Infof("CWE-%s: important fields changed, clearing Chinese translations for incremental update", newCWE.IdStr)
+				newCWE.NameZh = ""
+				newCWE.DescriptionZh = ""
+				newCWE.ExtendedDescriptionZh = ""
+				newCWE.CWESolution = ""
+			} else {
+				// Preserve existing translations if source content unchanged
+				newCWE.NameZh = existingCWE.NameZh
+				newCWE.DescriptionZh = existingCWE.DescriptionZh
+				newCWE.ExtendedDescriptionZh = existingCWE.ExtendedDescriptionZh
+				newCWE.CWESolution = existingCWE.CWESolution
+			}
+		}
+
+		if d := db.Model(&cveresources.CWE{}).Save(newCWE); d.Error != nil {
 			log.Errorf("save error: %s", d.Error)
 		}
 	}
+}
+
+// hasImportantFieldsChanged checks if any important source fields have changed
+func hasImportantFieldsChanged(existing, new *cveresources.CWE) bool {
+	// Check if name changed
+	if existing.Name != new.Name {
+		return true
+	}
+	// Check if description changed
+	if existing.Description != new.Description {
+		return true
+	}
+	// Check if extended description changed
+	if existing.ExtendedDescription != new.ExtendedDescription {
+		return true
+	}
+	// Check if status changed
+	if existing.Status != new.Status {
+		return true
+	}
+	return false
+}
+
+// ExportCWE exports all CWE entries to a JSONL file
+// Each line is a JSON object representing a CWE entry
+func ExportCWE(filename string) error {
+	db := consts.GetGormCVEDatabase()
+	if db == nil {
+		return utils.Errorf("cannot get CVE database")
+	}
+
+	fp, err := os.Create(filename)
+	if err != nil {
+		return utils.Errorf("create file failed: %v", err)
+	}
+	defer fp.Close()
+
+	ctx := context.Background()
+	count := 0
+
+	for cwe := range cveresources.YieldCWEs(db, ctx) {
+		// Clear the gorm ID to allow proper import
+		data, err := json.Marshal(cwe)
+		if err != nil {
+			log.Errorf("marshal CWE-%s failed: %v", cwe.IdStr, err)
+			continue
+		}
+		fp.Write(data)
+		fp.Write([]byte{'\n'})
+		count++
+	}
+
+	log.Infof("exported %d CWE entries to %s", count, filename)
+	return nil
+}
+
+// ImportCWE imports CWE entries from a JSONL file
+// Each line should be a JSON object representing a CWE entry
+func ImportCWE(filename string) error {
+	db := consts.GetGormCVEDatabase()
+	if db == nil {
+		return utils.Errorf("cannot get CVE database")
+	}
+
+	// Auto migrate CWE table
+	if err := db.AutoMigrate(&cveresources.CWE{}).Error; err != nil {
+		return utils.Errorf("auto migrate CWE table failed: %v", err)
+	}
+
+	fp, err := os.Open(filename)
+	if err != nil {
+		return utils.Errorf("open file failed: %v", err)
+	}
+	defer fp.Close()
+
+	scanner := bufio.NewReader(fp)
+	count := 0
+	errorCount := 0
+
+	for {
+		line, err := utils.BufioReadLine(scanner)
+		if err != nil {
+			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			}
+			return utils.Errorf("read line failed: %v", err)
+		}
+
+		if len(line) == 0 {
+			continue
+		}
+
+		var cwe cveresources.CWE
+		if err := json.Unmarshal(line, &cwe); err != nil {
+			log.Errorf("unmarshal CWE failed: %v", err)
+			errorCount++
+			continue
+		}
+
+		// Save to database
+		if err := db.Save(&cwe).Error; err != nil {
+			log.Errorf("save CWE-%s failed: %v", cwe.IdStr, err)
+			errorCount++
+			continue
+		}
+		count++
+	}
+
+	log.Infof("imported %d CWE entries from %s, %d errors", count, filename, errorCount)
+	return nil
 }
 
 func LoadCWE(cweXMLPath string) ([]*cveresources.CWE, error) {
