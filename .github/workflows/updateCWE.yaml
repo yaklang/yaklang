@@ -248,42 +248,20 @@ jobs:
           
           SHA256_VALUE=$(cat ~/yakit-projects/cwe.rag.gz.sha256.txt)
           
-          # 如果存在旧的 rags-latest.json，更新它；否则创建新的
-          if [ -f ~/yakit-projects/rags-latest.json ]; then
-            # 读取现有的 JSON，移除旧的 CWE 条目，添加新的
-            cat ~/yakit-projects/rags-latest.json | jq --arg version "$VERSION" --arg sha256 "$SHA256_VALUE" '
-              [.[] | select(.name != "CWE KnowledgeBase")] + 
-              [{
-                "name": "CWE KnowledgeBase",
-                "name_zh": "CWE 知识库",
-                "version": $version,
-                "file": "/rag/cwe/\($version)/cwe.rag.gz",
-                "hashfile": "/rag/cwe/\($version)/cwe.rag.gz.sha256.txt",
-                "hashtype": "sha256",
-                "hash": $sha256
-              }]
-            ' > ~/yakit-projects/rags-latest-new.json
-          else
-            # 创建新的 JSON
-            cat > ~/yakit-projects/rags-latest-new.json << EOF
-          [
-            {
-              "name": "CWE KnowledgeBase",
-              "name_zh": "CWE 知识库",
-              "version": "$VERSION",
-              "file": "/rag/cwe/$VERSION/cwe.rag.gz",
-              "hashfile": "/rag/cwe/$VERSION/cwe.rag.gz.sha256.txt",
-              "hashtype": "sha256",
-              "hash": "$SHA256_VALUE"
-            }
-          ]
-          EOF
-          fi
-          
-          mv ~/yakit-projects/rags-latest-new.json ~/yakit-projects/rags-latest.json
+          # 使用 yak rag-metainfo 命令维护 rags-latest.json
+          # 如果存在旧文件则更新，不存在则创建
+          ./yak rag-metainfo \
+            -f ~/yakit-projects/rags-latest.json \
+            -o ~/yakit-projects/rags-latest.json \
+            --register-name "CWE KnowledgeBase" \
+            --register-name-zh "CWE 知识库" \
+            --version "$VERSION" \
+            --rag-file "/rag/cwe/${VERSION}/cwe.rag.gz" \
+            --hash-file "/rag/cwe/${VERSION}/cwe.rag.gz.sha256.txt" \
+            --hash "$SHA256_VALUE"
           
           echo "New rags-latest.json content:"
-          cat ~/yakit-projects/rags-latest.json | jq .
+          cat ~/yakit-projects/rags-latest.json
 
       - name: Upload rags-latest.json to OSS
         run: |

@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -341,6 +342,143 @@ var UtilsCommands = []*cli.Command{
 			io.Copy(gzipWriter, originFp)
 			gzipWriter.Flush()
 			gzipWriter.Close()
+			return nil
+		},
+	},
+	{
+		Name:     "rag-metainfo",
+		Usage:    "Manage RAG metadata (rags-latest.json)",
+		Category: "RAG",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "f,file",
+				Usage: "Input rags-latest.json file path",
+			},
+			cli.StringFlag{
+				Name:  "o,output",
+				Usage: "Output file path (defaults to input file if not specified)",
+			},
+			cli.StringFlag{
+				Name:  "register-name",
+				Usage: "RAG name (e.g., 'CWE KnowledgeBase')",
+			},
+			cli.StringFlag{
+				Name:  "register-name-zh",
+				Usage: "RAG Chinese name (e.g., 'CWE 知识库')",
+			},
+			cli.StringFlag{
+				Name:  "version",
+				Usage: "Version string (e.g., '20260108-1')",
+			},
+			cli.StringFlag{
+				Name:  "rag-file",
+				Usage: "RAG file OSS path (e.g., '/rag/cwe/20260108-1/cwe.rag.gz')",
+			},
+			cli.StringFlag{
+				Name:  "hash-file",
+				Usage: "Hash file OSS path (e.g., '/rag/cwe/20260108-1/cwe.rag.gz.sha256.txt')",
+			},
+			cli.StringFlag{
+				Name:  "hash-type",
+				Usage: "Hash type (default: sha256)",
+				Value: "sha256",
+			},
+			cli.StringFlag{
+				Name:  "hash",
+				Usage: "Hash value",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			inputFile := c.String("file")
+			outputFile := c.String("output")
+			if outputFile == "" {
+				outputFile = inputFile
+			}
+
+			name := c.String("register-name")
+			nameZh := c.String("register-name-zh")
+			version := c.String("version")
+			ragFile := c.String("rag-file")
+			hashFile := c.String("hash-file")
+			hashType := c.String("hash-type")
+			hashValue := c.String("hash")
+
+			if name == "" {
+				return utils.Error("--register-name is required")
+			}
+			if version == "" {
+				return utils.Error("--version is required")
+			}
+			if ragFile == "" {
+				return utils.Error("--rag-file is required")
+			}
+
+			// Define RAG entry structure
+			type RagEntry struct {
+				Name     string `json:"name"`
+				NameZh   string `json:"name_zh,omitempty"`
+				Version  string `json:"version"`
+				File     string `json:"file"`
+				HashFile string `json:"hashfile,omitempty"`
+				HashType string `json:"hashtype,omitempty"`
+				Hash     string `json:"hash,omitempty"`
+			}
+
+			var entries []RagEntry
+
+			// Load existing file if exists
+			if inputFile != "" && utils.GetFirstExistedFile(inputFile) != "" {
+				data, err := os.ReadFile(inputFile)
+				if err != nil {
+					return utils.Errorf("failed to read input file: %v", err)
+				}
+				if err := json.Unmarshal(data, &entries); err != nil {
+					return utils.Errorf("failed to parse JSON: %v", err)
+				}
+				log.Infof("Loaded %d existing entries from %s", len(entries), inputFile)
+			}
+
+			// Create new entry
+			newEntry := RagEntry{
+				Name:     name,
+				NameZh:   nameZh,
+				Version:  version,
+				File:     ragFile,
+				HashFile: hashFile,
+				HashType: hashType,
+				Hash:     hashValue,
+			}
+
+			// Find and update or append
+			found := false
+			for i, entry := range entries {
+				if entry.Name == name {
+					entries[i] = newEntry
+					found = true
+					log.Infof("Updated existing entry: %s", name)
+					break
+				}
+			}
+			if !found {
+				entries = append(entries, newEntry)
+				log.Infof("Added new entry: %s", name)
+			}
+
+			// Marshal and output
+			output, err := json.MarshalIndent(entries, "", "  ")
+			if err != nil {
+				return utils.Errorf("failed to marshal JSON: %v", err)
+			}
+
+			if outputFile != "" {
+				if err := os.WriteFile(outputFile, output, 0644); err != nil {
+					return utils.Errorf("failed to write output file: %v", err)
+				}
+				log.Infof("Written to %s", outputFile)
+			}
+
+			// Always print to stdout
+			fmt.Println(string(output))
 			return nil
 		},
 	},
