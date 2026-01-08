@@ -124,15 +124,19 @@ jobs:
           # 设置输出路径
           RAG_OUTPUT=$HOME/yakit-projects/memfit-caps.rag
           
+          # 使用 aibalance 类型和 memfit-standard-free 模型（与 CWE CI 一致）
+          AI_OPTS="--ai-type aibalance --ai-model memfit-standard-free"
+          
           # 如果存在现有的 RAG 文件，使用增量更新模式
           if [ -f $HOME/yakit-projects/memfit-caps.rag ]; then
             echo "Using incremental update mode with existing RAG file"
           fi
           
-          # 构建 RAG 索引（并发设置为 20）
+          # 构建 RAG 索引（并发设置为 20，使用 aibalance）
           ./yak scripts/ci-works/rag/build-aitool-n-aiforge-search-index.yak \
             --output $RAG_OUTPUT \
-            --concurrency 20
+            --concurrency 20 \
+            $AI_OPTS
           
           # 验证 RAG 文件生成
           if [ ! -f $RAG_OUTPUT ]; then
