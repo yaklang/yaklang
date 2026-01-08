@@ -120,6 +120,29 @@ var DoubleDecodeUrl = func(i string) (string, error) {
 	return url.QueryUnescape(raw)
 }
 
+// convertSliceInterfaceToBytes 将 []interface{} 转换为 []byte（用于处理 yak VM 返回的数据）
+func convertSliceInterfaceToBytes(slice []interface{}) []byte {
+	bytes := make([]byte, 0, len(slice))
+	for _, item := range slice {
+		switch val := item.(type) {
+		case byte:
+			bytes = append(bytes, val)
+		case int:
+			if val >= 0 && val <= 255 {
+				bytes = append(bytes, byte(val))
+			}
+		case []byte:
+			bytes = append(bytes, val...)
+		default:
+			// 对于其他类型，尝试使用 AnyToBytes 转换
+			if b := AnyToBytes(val); len(b) > 0 {
+				bytes = append(bytes, b...)
+			}
+		}
+	}
+	return bytes
+}
+
 func interfaceToBytes(i interface{}) []byte {
 	var bytes []byte
 
@@ -131,6 +154,13 @@ func interfaceToBytes(i interface{}) []byte {
 	case io.Reader:
 		bytes, _ = ioutil.ReadAll(ret)
 	default:
+		// 尝试处理 []interface{}（来自 yak VM 的 file.ReadFile 返回值）
+		if slice, ok := i.([]interface{}); ok && len(slice) > 0 {
+			bytes = convertSliceInterfaceToBytes(slice)
+			if len(bytes) > 0 {
+				return bytes
+			}
+		}
 		bytes = []byte(fmt.Sprint(i))
 	}
 

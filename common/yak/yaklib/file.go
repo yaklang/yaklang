@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -716,6 +717,73 @@ func _clean(s string) string {
 	return filepath.Clean(s)
 }
 
+// Md5 计算文件的 MD5 哈希值
+// @param {string} filepath 文件路径
+// @return {string} MD5 哈希值（32位十六进制字符串），如果文件不存在或读取失败则返回空字符串
+// Example:
+// ```
+// md5Hash = file.Md5("/path/to/file")
+// println(md5Hash)  // "5d41402abc4b2a76b9719d911017c592"
+// ```
+func _fileMd5(filepath string) string {
+	return utils.GetFileMd5(filepath)
+}
+
+// GetTypeByExtension 根据文件扩展名获取 MIME 类型
+// @param {string} ext 文件扩展名（可以带或不带点号，如 ".txt" 或 "txt"）
+// @return {string} MIME 类型字符串，如果未找到则返回 "application/octet-stream"
+// Example:
+// ```
+// mimeType = file.GetTypeByExtension(".txt")  // "text/plain"
+// mimeType = file.GetTypeByExtension("jpg")    // "image/jpeg"
+// mimeType = file.GetTypeByExtension(".pdf")   // "application/pdf"
+// ```
+func _getTypeByExtension(ext string) string {
+	// 确保扩展名以点号开头
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType == "" {
+		return "application/octet-stream"
+	}
+	return mimeType
+}
+
+// DetectFileType 统一的文件类型识别函数，使用魔数识别文件类型
+// 支持常见操作系统（Linux、Windows、macOS）中的各种文件格式
+// @param {string} filepath 文件路径
+// @return {string} MIME 类型字符串
+// @return {error} 错误信息，如果无法识别文件类型则返回错误
+// Example:
+// ```
+// mimeType, err = file.DetectFileType("/path/to/file")
+//
+//	if err == nil {
+//	    println(mimeType)  // "text/plain" 或 "application/pdf" 等
+//	}
+//
+// ```
+func _detectFileType(filePath string) (string, error) {
+	// 使用魔数识别文件类型
+	mimeType, err := mimetype.DetectFile(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	if mimeType == nil {
+		return "", fmt.Errorf("failed to detect file type: %s", filePath)
+	}
+
+	mimeTypeStr := mimeType.String()
+	// 如果返回的是通用类型，说明无法识别，返回错误
+	if mimeTypeStr == "application/octet-stream" {
+		return "", fmt.Errorf("unable to detect file type (unknown format): %s", filePath)
+	}
+
+	return mimeTypeStr, nil
+}
+
 var FileExport = map[string]interface{}{
 	"ReadLines":             _fileReadLines,
 	"ReadLinesWithCallback": _fileReadLinesWithCallback,
@@ -760,6 +828,7 @@ var FileExport = map[string]interface{}{
 	"Lstat":    _fileLstat,
 	"Save":     _saveFile,
 	"SaveJson": _saveJson,
+	"Md5":      _fileMd5,
 
 	// 模仿 Linux 命令的一些函数
 	// 自定义的好用 API
@@ -779,4 +848,6 @@ var FileExport = map[string]interface{}{
 
 	"DetectMIMETypeFromRaw":  mimetype.Detect,
 	"DetectMIMETypeFromFile": mimetype.DetectFile,
+	"DetectFileType":         _detectFileType,
+	"GetTypeByExtension":     _getTypeByExtension,
 }

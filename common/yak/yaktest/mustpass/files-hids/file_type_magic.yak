@@ -1,0 +1,105 @@
+// 文件类型识别测试（魔数）
+// 测试功能：通过文件头魔数识别文件类型
+
+// 使用测试目录构建测试文件路径
+testDir = getParam("TEST_DIR")
+testFile = ""
+if testDir != nil && testDir != "" {
+    testFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    // 如果没有测试目录，尝试查找系统文件
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            testFile = candidate
+            break
+        }
+    }
+}
+
+// 如果找不到测试文件，创建一个临时文本文件进行测试
+if testFile == "" || !file.IsExisted(testFile) {
+    testFile,err = file.TempFileName("test_file_type_*.txt")
+    assert err == nil
+    file.Save(testFile, "Hello, Yaklang! This is a test file for file type detection.")
+}
+
+assert testFile != "" && file.IsExisted(testFile), sprintf("Test file not found: %s", testFile)
+
+// 1. 测试 file.DetectMIMETypeFromFile() - 文件类型识别（魔数）
+mimeType, err = file.DetectMIMETypeFromFile(testFile)
+assert err == nil, sprintf("DetectMIMETypeFromFile failed: %v", err)
+assert mimeType != nil, "DetectMIMETypeFromFile should return non-nil MIME type"
+mimeTypeStr = mimeType.String()
+assert mimeTypeStr != "", sprintf("MIME type string should not be empty, got: %s", mimeTypeStr)
+
+// 2. 测试 file.DetectMIMETypeFromRaw() - 从原始字节识别
+rawContent,err = file.ReadFile(testFile)
+assert err == nil
+assert len(rawContent) > 0, "File content should not be empty"
+// 将 []interface{} 转换为 []byte（使用 codec.EncodeToHex 和 DecodeHex）
+rawBytes,err = codec.DecodeHex(codec.EncodeToHex(rawContent))
+assert err == nil
+rawMime = file.DetectMIMETypeFromRaw(rawBytes)
+assert rawMime != nil, "DetectMIMETypeFromRaw should return non-nil MIME type"
+rawMimeStr = rawMime.String()
+assert rawMimeStr != "", sprintf("Raw MIME type string should not be empty, got: %s", rawMimeStr)
+
+// 验证从文件和从原始字节识别的结果应该一致
+assert rawMimeStr == mimeTypeStr, sprintf("DetectMIMETypeFromRaw and DetectMIMETypeFromFile should produce same result: %s vs %s", rawMimeStr, mimeTypeStr)
+
+// 3. 测试文本文件的识别
+textFile,err = file.TempFileName("test_text_*.txt")
+assert err == nil
+file.Save(textFile, "This is a plain text file for testing.")
+textMime, err = file.DetectMIMETypeFromFile(textFile)
+assert err == nil, sprintf("DetectMIMETypeFromFile failed for text file: %v", err)
+assert textMime != nil, "Text file MIME type should not be nil"
+textMimeStr = textMime.String()
+// 文本文件应该被识别为 text/plain（可能带 charset 等参数）
+assert str.HasPrefix(textMimeStr, "text/plain"), sprintf("Text file should be identified as text/plain, got: %s", textMimeStr)
+
+// 4. 测试 ELF 文件类型识别（如果测试文件是 ELF）
+if file.GetExt(testFile) == ".elf" || (testDir != nil && testDir != "" && file.IsExisted(file.Join(testDir, "hello.elf"))) {
+    elfFile = ""
+    if testDir != nil && testDir != "" {
+        elfFile = file.Join(testDir, "hello.elf")
+    }
+    if elfFile != "" && file.IsExisted(elfFile) {
+        // 测试 elf.IsELF()
+        isElf = elf.IsELF(elfFile)
+        assert isElf, sprintf("elf.IsELF() should return true for ELF file: %s", elfFile)
+        
+        // 测试 DetectMIMETypeFromFile 对 ELF 文件的识别
+        elfMime, err = file.DetectMIMETypeFromFile(elfFile)
+        assert err == nil, sprintf("DetectMIMETypeFromFile failed for ELF file: %v", err)
+        assert elfMime != nil, "ELF file MIME type should not be nil"
+        elfMimeStr = elfMime.String()
+        // ELF 文件可能被识别为多种类型：application/x-elf, application/x-executable, application/x-sharedlib, application/x-object, application/x-coredump, 或 application/octet-stream（可能带参数）
+        assert elfMimeStr != "", sprintf("ELF file MIME type should not be empty, got: %s", elfMimeStr)
+        assert str.HasPrefix(elfMimeStr, "application/x-elf") || str.HasPrefix(elfMimeStr, "application/x-executable") || str.HasPrefix(elfMimeStr, "application/x-sharedlib") || str.HasPrefix(elfMimeStr, "application/x-object") || str.HasPrefix(elfMimeStr, "application/x-coredump") || str.HasPrefix(elfMimeStr, "application/octet-stream"), sprintf("ELF file MIME type should be one of: application/x-elf, application/x-executable, application/x-sharedlib, application/x-object, application/x-coredump, or application/octet-stream, got: %s", elfMimeStr)
+    }
+}
+
+// 5. 测试空文件的识别
+emptyFile,err = file.TempFileName("test_empty_magic_*.txt")
+assert err == nil
+file.Save(emptyFile, "")
+emptyMime, err = file.DetectMIMETypeFromFile(emptyFile)
+// 空文件可能无法识别，但函数不应该报错
+if err == nil {
+    assert emptyMime != nil, "Empty file MIME type should not be nil if detection succeeds"
+}
+
+// 6. 测试二进制数据的识别
+binaryData,err = codec.DecodeHex("89504e470d0a1a0a0000000d49484452")  // PNG 文件头
+assert err == nil
+binaryMime = file.DetectMIMETypeFromRaw(binaryData)
+if binaryMime != nil {
+    binaryMimeStr = binaryMime.String()
+    // PNG 文件应该被识别为 image/png（可能带参数）
+    assert str.HasPrefix(binaryMimeStr, "image/png"), sprintf("PNG magic number should be identified as image/png, got: %s", binaryMimeStr)
+}
+
+println("All file type detection (magic number) tests passed!")
+

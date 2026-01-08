@@ -1,0 +1,66 @@
+// MD5哈希计算测试
+// 测试功能：使用MD5算法计算文件哈希值
+
+// 使用测试目录构建测试文件路径
+testDir = getParam("TEST_DIR")
+testFile = ""
+if testDir != nil && testDir != "" {
+    testFile = file.Join(testDir, "hello.elf")
+} else if os.OS == "linux" || os.OS == "darwin" {
+    // 如果没有测试目录，尝试查找系统文件
+    candidates = ["/bin/ls", "/usr/bin/ls", "/bin/sh", "/usr/bin/sh"]
+    for candidate in candidates {
+        if file.IsExisted(candidate) {
+            testFile = candidate
+            break
+        }
+    }
+}
+
+// 如果找不到测试文件，创建一个临时文件进行测试
+if testFile == "" || !file.IsExisted(testFile) {
+    testFile,err = file.TempFileName("test_file_md5_*.txt")
+    file.Save(testFile, "Hello, Yaklang! This is a test file for MD5 hash calculation.")
+}
+
+assert testFile != "" && file.IsExisted(testFile), sprintf("Test file not found: %s", testFile)
+
+// 1. 测试 file.Md5() - 文件 MD5 哈希计算
+md5Hash = file.Md5(testFile)
+assert md5Hash != "", sprintf("file.Md5() should return non-empty hash for file: %s", testFile)
+assert len(md5Hash) == 32, sprintf("MD5 hash should be 32 characters, got: %d", len(md5Hash))
+
+// 2. 测试 codec.Md5() 的一致性（对于文件内容）
+// file.ReadFile() 返回 []interface{}，codec.Md5() 现在可以正确处理
+fileContent = file.ReadFile(testFile)
+codecMd5 = codec.Md5(fileContent)
+assert codecMd5 == md5Hash, sprintf("file.Md5() and codec.Md5() should produce same hash: %s vs %s", md5Hash, codecMd5)
+
+// 3. 测试空文件的 MD5
+emptyFile,err = file.TempFileName("test_empty_*.txt")
+file.Save(emptyFile, string(""))
+emptyMd5 = file.Md5(emptyFile)
+assert emptyMd5 != "", "Empty file should have MD5 hash"
+assert len(emptyMd5) == 32, sprintf("Empty file MD5 should be 32 characters, got: %d", len(emptyMd5))
+// 空文件的 MD5 应该是 "d41d8cd98f00b204e9800998ecf8427e"
+expectedEmptyMd5 = "d41d8cd98f00b204e9800998ecf8427e"
+assert emptyMd5 == expectedEmptyMd5, sprintf("Empty file MD5 should be %s, got: %s", expectedEmptyMd5, emptyMd5)
+
+// 4. 测试相同内容的文件产生相同的 MD5
+testContent = "Test content for MD5 consistency check"
+file1,err = file.TempFileName("test_md5_1_*.txt")
+file2,err = file.TempFileName("test_md5_2_*.txt")
+file.Save(file1, testContent)
+file.Save(file2, testContent)
+md5_1 = file.Md5(file1)
+md5_2 = file.Md5(file2)
+assert md5_1 == md5_2, sprintf("Same content should produce same MD5: %s vs %s", md5_1, md5_2)
+
+// 5. 测试不同内容的文件产生不同的 MD5
+file3,err = file.TempFileName("test_md5_3_*.txt")
+file.Save(file3, "Different content")
+md5_3 = file.Md5(file3)
+assert md5_3 != md5_1, sprintf("Different content should produce different MD5: %s vs %s", md5_3, md5_1)
+
+println("All MD5 hash calculation tests passed!")
+
