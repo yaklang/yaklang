@@ -1,0 +1,121 @@
+## Python 环境状态
+
+{{ if .EnvChecked }}
+{{ if .PythonAvailable }}
+✅ **Python 可用**: `{{ .PythonCommand }}` ({{ .PythonVersion }})
+{{ else }}
+⚠️ **Python 不可用**: 语法检查将被跳过，代码将包含警告注释
+{{ end }}
+{{ else }}
+🔴 **环境未检查**: 你必须先使用 bash 工具检查 Python 环境，然后调用 `check_python_env` 报告结果！
+
+### 立即执行以下步骤：
+
+1. 使用 bash 工具检查 Python：
+```json
+{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "我需要先检查系统中是否有可用的 Python 环境"}
+```
+
+2. 执行命令：`python3 --version` 或 `python --version`
+
+3. 根据结果调用 `check_python_env`
+{{ end }}
+
+---
+
+{{ if .Code }}## 当前 POC 代码
+
+文件路径: `{{ .Filename }}`
+
+**重要提示：下面显示的代码包含行号是为了方便你定位和理解代码结构。但当你使用 'write_python_poc' 或 'modify_python_poc' 生成新代码时，生成的代码中绝对不能包含这些行号前缀！只生成纯净的 Python 代码！**
+
+<|CURRENT_PYTHON_POC_CODE_{{ .Nonce }}|>
+{{ .CurrentCodeWithLineNumber }}
+<|CURRENT_PYTHON_POC_CODE_END_{{ .Nonce }}|>
+
+### 下一步操作
+
+{{ if .PythonAvailable }}
+代码已保存，你需要：
+
+1. **验证语法**：使用 bash 工具执行 `{{ .PythonCommand }} -m py_compile {{ .Filename }}`
+2. **确认验证**：语法检查通过后，调用 `verify_syntax` 确认
+3. **修改代码**：如果有语法错误，使用 `modify_python_poc` 修复
+
+⚠️ **注意**：在调用 `verify_syntax` 之前，你无法完成任务。
+{{ else }}
+代码已保存。由于 Python 环境不可用，无法进行语法检查。
+
+你可以：
+- 继续使用 `modify_python_poc` 修改代码
+- 使用 `directly_answer` 完成任务
+{{ end }}
+
+{{ else }}## 当前没有 POC 代码
+
+{{ if .Filename }}文件路径: `{{ .Filename }}`{{ else }}**尚未创建文件**{{ end }}
+
+{{ if .EnvChecked }}
+### 生成 POC 代码
+
+使用 `write_python_poc` 创建代码：
+
+```json
+{"@action": "write_python_poc", "human_readable_thought": "创建Python POC"}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import requests
+# 你的代码...
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+### ⚠️ 错误格式（禁止使用）
+```python
+#!/usr/bin/env python3
+import requests
+# 这样是错误的！系统无法提取代码！
+```
+{{ else }}
+### ⚠️ 你必须先检查 Python 环境！
+
+在生成代码之前，请先：
+
+1. 使用 bash 工具检查 Python
+2. 调用 `check_python_env` 报告结果
+{{ end }}
+{{ end }}
+
+{{ if .FeedbackMessages }}
+## 反馈信息
+
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+
+### 处理反馈
+
+根据上面的反馈信息采取相应行动。
+
+{{ end }}
+
+## 代码生成循环使命
+
+代码生成需要按顺序完成：
+
+1. **检查环境**（必须）：使用 bash 工具检查 Python，然后调用 `check_python_env`
+2. **创建代码**：使用 `write_python_poc` 创建初始 POC 代码
+3. **验证语法**（如果 Python 可用）：使用 bash 工具检查语法，调用 `verify_syntax` 确认
+4. **迭代修复**：如果有语法错误，使用 `modify_python_poc` 修复
+5. **完成任务**：调用 `directly_answer` 完成
+
+### 核心循环结束条件
+
+当满足以下条件时，使用 `directly_answer` 结束循环：
+
+1. **环境已检查**：已调用 `check_python_env`
+2. **代码已生成**：已使用 `write_python_poc` 或 `modify_python_poc`
+3. **语法已验证**（如果 Python 可用）：已调用 `verify_syntax`
+4. **结构完整**：包含必要的导入、类定义、main 函数等
+5. **功能完整**：POC 代码能够实现预期的漏洞检测或利用功能

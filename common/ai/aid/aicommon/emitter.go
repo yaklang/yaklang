@@ -404,6 +404,7 @@ const (
 	TypeTextPlain          = "text/plain"
 	TypeTextMarkdown       = "text/markdown"
 	TypeCodeYaklang        = "code/yaklang"
+	TypeCodePython         = "code/python"
 	TypeCodeHTTPRequest    = "code/http-request"
 )
 
