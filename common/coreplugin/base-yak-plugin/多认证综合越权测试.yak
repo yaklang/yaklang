@@ -91,16 +91,21 @@ JSON,
 )
 disableDomain = cli.String("disable-domain", cli.setRequired(false), cli.setVerboseName("不检测的域名"), cli.setCliGroup("高级（可选参数）"))
 disablePath = cli.String("disable-path", cli.setRequired(false), cli.setVerboseName("不检测的路径"), cli.setCliGroup("高级（可选参数）"))
+disableSuffix = cli.StringSlice("disable-suffix", cli.setVerboseName("不检测的后缀类型"),cli.setCliGroup("高级（可选参数）"),cli.setMultipleSelect(true))
+
 
 enableDomain = cli.String("enable-domain", cli.setRequired(false), cli.setVerboseName("需检测域名"), cli.setCliGroup("高级（可选参数）"))
 enablePath = cli.String("enable-path", cli.setRequired(false), cli.setVerboseName("需检测路径"), cli.setCliGroup("高级（可选参数）"))
 enableResponseKeyword = cli.Text("enable-response-content", cli.setRequired(false), cli.setVerboseName("需检测响应内容标志值"), cli.setCliGroup("高级（可选参数）"))
 enableResponseKeywordRegexp = cli.Bool(
-    "enable-response-content-regexp", 
-    cli.setRequired(false), 
-    cli.setVerboseName("响应内容标志值开启正则"), 
-    cli.setCliGroup("高级（可选参数）"), 
+    "enable-response-content-regexp",
+    cli.setRequired(false),
+    cli.setVerboseName("响应内容标志值开启正则"),
+    cli.setCliGroup("高级（可选参数）"),
 )
+onlyCheckBody = cli.Bool("only-body", cli.setVerboseName("只检查响应体"),cli.setCliGroup("高级（可选参数）"))
+
+
 cli.check()
 
 yakit.AutoInitYakit()
@@ -148,13 +153,21 @@ func Product(sli) {
 
 handleReq = (https, reqBytes, baseResponse, handleTag) => {
     // yakit.Code(reqBytes)
+    if onlyCheckBody {
+        baseResponse = poc.GetHTTPPacketBody(baseResponse)
+    }
+
     poc.HTTP(
-        reqBytes, 
-        poc.https(https), 
+        reqBytes,
+        poc.https(https),
         poc.saveHandler(response => {
+            currentPacket := response.RawPacket
+            if onlyCheckBody {
+                currentPacket = response.GetBody()
+            }
             tag = ""
             if len(enableResponseKeywordList) > 0 {
-                if respMatch(response.RawPacket, enableResponseKeywordList...) {
+                if respMatch(currentPacket, enableResponseKeywordList...) {
                     tag = "响应内容标志值匹配"
                     response.Red()
                 } else {
@@ -162,7 +175,7 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
                     response.Green()
                 }
             } else {
-                sim := str.CalcSimilarity(baseResponse, response.RawPacket)
+                sim := str.CalcSimilarity(baseResponse, currentPacket)
                 if sim > 0.95 {
                     response.Red()
                 } elif sim <= 0.4 {
@@ -176,7 +189,7 @@ handleReq = (https, reqBytes, baseResponse, handleTag) => {
             }
             response.AddTag(tag)
             response.AddTag(handleTag)
-        }), 
+        }),
     )
 }
 
@@ -196,12 +209,13 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             skipped = false
             host, _, _ = str.ParseStringToHostPort(url)
             path = poc.GetHTTPRequestPath(req)
+            urlRawPath = poc.GetHTTPRequestPathWithoutQuery(req)
 
             if disableDomain != "" {
                 rules = disableDomain.Split(",").Map(i => i.Trim())
                 skipped = str.MatchAnyOfGlob(host, rules...)
             }
-            
+
 
             if !skipped && disablePath != "" {
                 skipped = str.MatchAnyOfGlob(path, disablePath.Split(",").Map(i => i.Trim())...)
@@ -211,7 +225,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
             if !skipped && enableDomain {
                 skipped = !str.MatchAnyOfGlob(host, enableDomain.Split(",").Map(i => i.Trim())...)
             }
-            
+
 
             if !skipped && enablePath {
                 skipped = !str.MatchAnyOfGlob(path, enablePath.Split(",").Map(i => i.Trim())...)
@@ -229,7 +243,10 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
                 enableResponseKeywordList = enableResponseKeyword.Split("\n")
                 skipped = !respMatch(rsp, enableResponseKeywordList...)
             }
-            
+
+            if !skipped && str.StringSliceContains(disableSuffix, file.GetExt(urlRawPath)) {
+                skipped = true
+            }
 
             if skipped {
                 return
