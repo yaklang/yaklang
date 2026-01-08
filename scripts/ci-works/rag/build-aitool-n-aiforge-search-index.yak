@@ -1,0 +1,657 @@
+#!/usr/bin/env yak
+
+// =============================================================================
+// AI 能力搜索索引构建工具 - Build AI Capabilities (Tools + Forges) Search Index
+// 功能: 从数据库中获取所有 AI Tools 和 AI Forges，构建统一的搜索索引
+// 用途: 为所有 AI 能力构建可搜索的问题索引，让用户能通过自然语言查询找到合适的工具/Forge
+//
+// 核心设计:
+// - 同时处理 db.YieldAllAITools() 和 db.YieldAllAIForges()
+// - 知识条目（工具/Forge描述）-> 多个问题索引
+// - 问题索引用于语义搜索
+// - 搜索结果通过 entry_id 关联到知识条目
+//
+// 增量更新机制:
+// - 如果指定的 RAG 文件已存在，自动加载并进行增量更新
+// - 使用预加载的 map 检查条目是否已存在，避免重复添加
+// - 节省 AI 调用成本和构建时间
+//
+// 使用示例:
+// go run common/yak/cmd/yak.go scripts/ci-works/rag/build-aitool-n-aiforge-search-index.yak --output /tmp/memfit-caps.rag
+//
+// 应用场景: AI 能力索引构建、工具/Forge搜索系统、自动化索引更新
+// =============================================================================
+
+__DESC__ = "Build search index for AI Tools and AI Forges using BuildSearchIndexKnowledge"
+
+yakit.AutoInitYakit()
+
+// =============================================================================
+// CLI 参数配置模块
+// 所有参数均为可选，默认使用内置服务，无需额外配置
+// =============================================================================
+
+// 输出 RAG 文件路径（必需）
+outputRagPath = cli.String(
+    "output",
+    cli.setVerboseName("输出路径"),
+    cli.setDefault("/tmp/memfit-caps.rag"),
+    cli.setHelp("Output RAG export file path. Example: /tmp/memfit-caps.rag")
+)
+
+// 并发数
+maxConcurrency = cli.Int(
+    "concurrency",
+    cli.setDefault(5),
+    cli.setHelp("Maximum number of concurrent processing tasks")
+)
+
+// 强制重建（忽略已有的 RAG 文件）
+forceRebuild = cli.Bool(
+    "force",
+    cli.setVerboseName("强制重建"),
+    cli.setDefault(false),
+    cli.setHelp("Force rebuild index, ignore existing RAG file")
+)
+
+cli.check()
+
+// =============================================================================
+// 版本检测和输出路径配置
+// =============================================================================
+
+// 使用内置的 YAK_VERSION 变量获取版本
+yakVersion = YAK_VERSION
+if yakVersion == "" || yakVersion == undefined {
+    yakVersion = "dev"
+}
+
+log.Info("=== AI Tools and Skills Search Index Builder ===")
+log.Info("Yak Version: %s", yakVersion)
+
+// 处理输出路径
+finalOutputPath = outputRagPath
+
+// 确保以 .rag 结尾
+if !str.HasSuffix(finalOutputPath, ".rag") {
+    finalOutputPath = finalOutputPath + ".rag"
+}
+
+log.Info("Output RAG: %s", finalOutputPath)
+log.Info("Concurrency: %d", maxConcurrency)
+log.Info("Force Rebuild: %v", forceRebuild)
+
+// =============================================================================
+// RAG 系统初始化（支持增量更新）
+// =============================================================================
+
+ragCollectionName = "yaklang-ai-capabilities"
+
+// 检查 RAG 文件是否存在，决定是增量更新还是全新构建
+existingRagFile = file.IsExisted(finalOutputPath)
+incrementalMode = existingRagFile && !forceRebuild
+
+if incrementalMode {
+    log.Info("")
+    log.Info("=== Incremental Update Mode ===")
+    log.Info("Found existing RAG file: %s", finalOutputPath)
+    log.Info("Will perform incremental update (use --force to rebuild)")
+    
+    // 先删除可能存在的同名集合，避免冲突
+    rag.DeleteCollection(ragCollectionName)
+    
+    // 导入现有的 RAG 文件
+    try {
+        err = rag.Import(finalOutputPath, rag.importName(ragCollectionName))
+        if err != nil {
+            log.Warn("Failed to import existing RAG file: %v", err)
+            log.Info("Falling back to full rebuild mode")
+            incrementalMode = false
+            rag.DeleteCollection(ragCollectionName)
+        } else {
+            log.Info("Successfully imported existing RAG file")
+        }
+    } catch importErr {
+        log.Warn("Failed to import existing RAG file: %v", importErr)
+        log.Info("Falling back to full rebuild mode")
+        incrementalMode = false
+        rag.DeleteCollection(ragCollectionName)
+    }
+} else {
+    log.Info("")
+    log.Info("=== Full Build Mode ===")
+    if existingRagFile && forceRebuild {
+        log.Info("Force rebuild requested, ignoring existing file")
+    } else {
+        log.Info("No existing RAG file found, creating new index")
+    }
+    // 移除现有集合
+    rag.DeleteCollection(ragCollectionName)
+}
+
+log.Info("")
+log.Info("=== Initializing RAG System ===")
+
+ragSystem, err = rag.Get(ragCollectionName)
+if err != nil {
+    log.Error("Failed to initialize RAG system: %v", err)
+    die(sprintf("Failed to initialize RAG system: %v", err))
+}
+
+log.Info("RAG system initialized successfully")
+log.Info("   Collection name: %s", ragCollectionName)
+
+// 获取现有文档数量
+existingDocCount = 0
+try {
+    existingDocCount, _ = ragSystem.CountDocuments()
+    log.Info("   Existing documents: %d", existingDocCount)
+} catch countErr {
+    log.Debug("Failed to count existing documents: %v", countErr)
+}
+
+// =============================================================================
+// 预加载已存在的知识条目（用于快速去重检查）
+// =============================================================================
+
+// 一次性预加载所有已存在的知识条目的 KnowledgeTitle
+// 存储在内存 map 中，用于 O(1) 快速查找
+existingKnowledgeTitles = {}  // map[string]bool
+
+// 预加载函数 - 一次性获取所有已存在的知识条目（使用 DISTINCT 高效查询）
+preloadExistingKnowledge = func() {
+    if !incrementalMode {
+        return
+    }
+    
+    log.Info("Preloading existing knowledge titles (using DISTINCT query)...")
+    preloadStart = time.Now()
+    
+    try {
+        // 使用 DBQueryUniqueKnowledgeTitles 直接获取唯一标题（SQL DISTINCT，高效）
+        titles, err = rag.DBQueryUniqueKnowledgeTitles(rag.dbQueryCollection(ragCollectionName), rag.dbQueryLimit(50000))
+        if err != nil {
+            log.Warn("Failed to preload knowledge titles: %v", err)
+            return
+        }
+        
+        // 存储到 map 中
+        for _, title := range titles {
+            if title != "" {
+                existingKnowledgeTitles[title] = true
+            }
+        }
+        
+        preloadElapsed = time.Since(preloadStart)
+        log.Info("Preloaded %d unique knowledge titles in %v", len(existingKnowledgeTitles), preloadElapsed)
+    } catch preloadErr {
+        log.Warn("Failed to preload knowledge titles: %v", preloadErr)
+    }
+}
+
+// 快速检查条目是否已存在（使用预加载的 map，O(1) 查找）
+checkItemExists = func(itemName, itemType) {
+    if !incrementalMode {
+        return false
+    }
+    
+    // 直接从内存 map 查找，O(1) 复杂度，纳秒级
+    if itemName in existingKnowledgeTitles {
+        return true
+    }
+    
+    return false
+}
+
+// =============================================================================
+// 过滤函数：跳过 mock 和 测试工具/Forge
+// =============================================================================
+
+shouldSkipItem = func(name) {
+    lowerName = str.ToLower(name)
+    // 过滤 mock_ 开头的工具（测试用）
+    if str.HasPrefix(lowerName, "mock_") {
+        return true
+    }
+    // 过滤包含 mock 的工具
+    if str.Contains(lowerName, "mock") {
+        return true
+    }
+    // 过滤 sleep 工具（测试用）
+    if lowerName == "sleep" || str.HasPrefix(lowerName, "sleep_") {
+        return true
+    }
+    // 过滤 test_ 开头的工具（测试用）
+    if str.HasPrefix(lowerName, "test_") {
+        return true
+    }
+    // 过滤包含 test 的工具
+    if str.Contains(lowerName, "test") {
+        return true
+    }
+    return false
+}
+
+// =============================================================================
+// 获取 AI 工具列表
+// =============================================================================
+
+log.Info("")
+log.Info("=== Loading AI Tools and Forges ===")
+
+// 预加载已存在的知识条目（增量模式下）
+if incrementalMode {
+    preloadExistingKnowledge()
+}
+
+allItems = []  // 统一存储所有待处理项
+toolCount = 0
+toolSkippedCount = 0
+toolExistsCount = 0
+
+log.Info("")
+log.Info("Collecting AI Tools...")
+
+for ins in db.YieldAllAITools() {
+    toolName = ins.Name || ""
+    // 过滤掉 mock 和 sleep 相关的工具
+    if shouldSkipItem(toolName) {
+        toolSkippedCount++
+        log.Debug("   Skipping mock/test tool: %s", toolName)
+        continue
+    }
+    
+    // 检查是否已存在（增量更新模式）
+    if checkItemExists(toolName, "tool") {
+        toolExistsCount++
+        log.Debug("   Tool already indexed: %s", toolName)
+        continue
+    }
+    
+    // 封装为统一格式
+    item = {
+        "type": "tool",
+        "name": toolName,
+        "verbose_name": ins.VerboseName || toolName,
+        "description": ins.Description || "",
+        "keywords": ins.Keywords || [],
+        "content": ins.Content || "",
+    }
+    allItems = append(allItems, item)
+    toolCount++
+}
+
+log.Info("Found %d new AI tools to process", toolCount)
+log.Info("   Skipped mock/test: %d", toolSkippedCount)
+if incrementalMode {
+    log.Info("   Already indexed: %d", toolExistsCount)
+}
+
+// =============================================================================
+// 获取 AI Forge 列表
+// =============================================================================
+
+log.Info("")
+log.Info("=== Loading AI Forges ===")
+
+forgeCount = 0
+forgeSkippedCount = 0
+forgeExistsCount = 0
+
+for ins in db.YieldAllAIForges() {
+    forgeName = ins.ForgeName || ""
+    // 过滤掉 mock 和 sleep 相关的 Forge
+    if shouldSkipItem(forgeName) {
+        forgeSkippedCount++
+        log.Debug("   Skipping mock/test forge: %s", forgeName)
+        continue
+    }
+    
+    // 检查是否已存在（增量更新模式）
+    if checkItemExists(forgeName, "forge") {
+        forgeExistsCount++
+        log.Debug("   Forge already indexed: %s", forgeName)
+        continue
+    }
+    
+    // 封装为统一格式
+    item = {
+        "type": "forge",
+        "name": forgeName,
+        "verbose_name": ins.ForgeVerboseName || forgeName,
+        "description": ins.Description || "",
+        "keywords": [],  // Forge 可能没有 keywords 字段
+        "content": ins.ForgeContent || "",
+    }
+    allItems = append(allItems, item)
+    forgeCount++
+}
+
+log.Info("Found %d new AI forges to process", forgeCount)
+log.Info("   Skipped mock/test: %d", forgeSkippedCount)
+if incrementalMode {
+    log.Info("   Already indexed: %d", forgeExistsCount)
+}
+
+totalCount = len(allItems)
+log.Info("")
+log.Info("Total new items to process: %d (Tools: %d, Forges: %d)", totalCount, toolCount, forgeCount)
+
+if totalCount == 0 {
+    if incrementalMode {
+        log.Info("All items are already indexed, nothing to update")
+        // 直接导出现有数据
+        try {
+            err = rag.Export(ragCollectionName, finalOutputPath)
+            if err != nil {
+                log.Error("Failed to export RAG file: %v", err)
+                die(sprintf("Failed to export RAG file: %v", err))
+            }
+            log.Info("RAG file exported (no changes): %s", finalOutputPath)
+        } catch exportErr {
+            log.Error("Failed to export RAG file: %v", exportErr)
+            die(sprintf("Failed to export RAG file: %v", exportErr))
+        }
+        os.Exit(0)
+    } else {
+        log.Warn("No AI tools or forges found in database")
+        die("No items to process")
+    }
+}
+
+// =============================================================================
+// 并发处理设置
+// =============================================================================
+
+wg = sync.NewSizedWaitGroup(maxConcurrency)
+resultsChan = make(chan map[string]any, totalCount)
+
+// 统计变量
+totalQuestions = 0
+questionsMutex = sync.NewMutex()
+
+// 处理单个项目的函数
+processItem = func(itemIndex, totalItems, itemInfo) {
+    defer wg.Done()
+
+    itemType = itemInfo["type"]
+    itemName = itemInfo["name"]
+    verboseName = itemInfo["verbose_name"]
+    description = itemInfo["description"]
+    keywords = itemInfo["keywords"]
+    content = itemInfo["content"]
+
+    typeLabel = "Tool"
+    if itemType == "forge" {
+        typeLabel = "Forge"
+    }
+
+    result = {
+        "type": itemType,
+        "name": itemName,
+        "verbose_name": verboseName,
+        "description": description,
+        "success": false,
+        "error": nil,
+        "questions_generated": 0,
+    }
+
+    try {
+        log.Info("")
+        log.Info("========================================")
+        log.Info("%s [%d/%d] Processing: %s", typeLabel, itemIndex, totalItems, itemName)
+        log.Info("   ID: %s", itemName)
+        if verboseName != itemName {
+            log.Info("   Verbose Name: %s", verboseName)
+        }
+        if description != "" {
+            descPreview = description
+            if len(descPreview) > 100 {
+                descPreview = descPreview[:100] + "..."
+            }
+            log.Info("   Description: %s", descPreview)
+        }
+        if len(keywords) > 0 {
+            log.Info("   Keywords: %s", str.Join(keywords, ", "))
+        }
+        log.Info("----------------------------------------")
+
+        // 构建描述文本（作为知识条目内容）
+        keywordsStr = ""
+        if len(keywords) > 0 {
+            keywordsStr = str.Join(keywords, ", ")
+        }
+
+        itemTypeCN = "Yaklang AI 工具"
+        if itemType == "forge" {
+            itemTypeCN = "Yaklang AI Forge"
+        }
+
+        itemDescription = sprintf(`名称: %s
+显示名称: %s
+类型: %s
+功能描述: %s
+关键词: %s
+
+这是一个 %s，可以用于:
+- %s
+
+使用场景:
+- 安全测试和漏洞评估
+- 自动化任务执行
+- 集成到 Yaklang 安全测试框架`,
+            itemName,
+            verboseName,
+            itemTypeCN,
+            description,
+            keywordsStr,
+            itemTypeCN,
+            description || "安全测试任务")
+
+        log.Info("   Step 1: Building search index...")
+        log.Info("   Description length: %d bytes", len(itemDescription))
+
+        // AI 能力场景的 extraPrompt - 强化工具/Forge意图识别
+        aiCapabilityExtraPrompt = sprintf(`
+【AI 能力搜索场景强化说明】
+这是一个 %s 的描述信息，用于安全测试、自动化任务、信息收集等场景。
+
+生成问题时，请特别关注：
+1. 用户可能用什么自然语言描述来找到这个%s？（如："我想扫描端口" → 端口扫描工具）
+2. 用户可能遇到什么问题需要这个%s？（如："如何获取域名IP？" → DNS查询工具）
+3. 用户可能有什么安全测试需求？（如："检测网站漏洞" → 漏洞扫描工具）
+4. 使用场景描述（如："需要分析网络流量" → PCAP分析工具）
+
+问题应该覆盖：
+- 场景意图描述（"我想要..."、"需要..."）
+- 功能查询（"有什么工具可以..."、"有什么 Forge 可以..."）
+- 问题解决（"如何..."、"怎么..."）
+- 工具推荐（"用什么工具..."、"推荐一个..."）
+`, itemTypeCN, itemTypeCN, itemTypeCN)
+
+        // 使用 BuildSearchIndexKnowledge 构建搜索索引
+        // 传入 search_type 和 search_target 作为知识条目的元数据
+        // search_type: AI工具/Forge 类型，search_target: 工具/Forge 名称
+        // 使用 noPotentialQuestions 压缩存储大小
+        log.Info("   Step 2: Calling AI to generate search questions...")
+        searchTypeDesc = itemTypeCN  // "Yaklang AI 工具" 或 "Yaklang AI Forge"
+        searchResult, buildErr = rag.BuildSearchIndexKnowledge(
+            ragCollectionName, 
+            itemDescription, 
+            rag.extraPrompt(aiCapabilityExtraPrompt),
+            rag.setSearchMeta(searchTypeDesc, itemName),
+            rag.noPotentialQuestions()
+        )
+        if buildErr != nil {
+            log.Error("   Failed to build search index: %v", buildErr)
+            log.Error("   Error details: item=%s, type=%s, desc_len=%d", itemName, itemType, len(itemDescription))
+            result["error"] = buildErr
+            resultsChan <- result
+            return
+        }
+
+        // 打印生成的问题
+        questionsGenerated = len(searchResult.Questions)
+        log.Info("   Step 3: AI generated %d question indexes", questionsGenerated)
+        log.Info("   Knowledge Entry ID: %s", searchResult.EntryID)
+        log.Info("   Generated questions:")
+        for i, q := range searchResult.Questions {
+            log.Info("      Q%d: %s", i+1, q)
+        }
+
+        // 更新全局计数
+        questionsMutex.Lock()
+        totalQuestions += questionsGenerated
+        questionsMutex.Unlock()
+
+        log.Info("   Successfully indexed %s: %s (entry_id: %s)", itemType, itemName, searchResult.EntryID)
+        
+        result["success"] = true
+        result["questions_generated"] = questionsGenerated
+        result["entry_id"] = searchResult.EntryID
+
+    } catch processErr {
+        log.Error("   Unexpected error: %v", processErr)
+        result["error"] = sprintf("%v", processErr)
+    }
+
+    resultsChan <- result
+}
+
+// =============================================================================
+// 并发处理 AI 能力项目
+// =============================================================================
+
+log.Info("")
+log.Info("=== Processing AI Capabilities (Concurrent, max %d) ===", maxConcurrency)
+
+// 启动并发处理
+for i, itemInfo := range allItems {
+    wg.Add(1)
+    go processItem(i+1, totalCount, itemInfo)
+}
+
+// 等待所有任务完成
+wg.Wait()
+close(resultsChan)
+
+// 收集结果
+successCount = 0
+failedCount = 0
+failedItems = []
+successfulTools = 0
+successfulForges = 0
+totalQuestionsFromResults = 0
+
+for result := range resultsChan {
+    if result["success"] {
+        successCount++
+        totalQuestionsFromResults += result["questions_generated"]
+        if result["type"] == "tool" {
+            successfulTools++
+        } else {
+            successfulForges++
+        }
+    } else {
+        failedCount++
+        failedItems = append(failedItems, sprintf("%s (%s)", result["name"], result["type"]))
+    }
+}
+
+log.Info("")
+log.Info("=== Processing Results ===")
+log.Info("Total new items: %d", totalCount)
+log.Info("   Tools: %d (success: %d)", toolCount, successfulTools)
+log.Info("   Forges: %d (success: %d)", forgeCount, successfulForges)
+log.Info("Total successful: %d", successCount)
+log.Info("Total failed: %d", failedCount)
+log.Info("Total questions generated: %d", totalQuestions)
+
+if incrementalMode {
+    log.Info("")
+    log.Info("=== Incremental Update Summary ===")
+    log.Info("   Previously indexed: %d documents", existingDocCount)
+    log.Info("   Skipped (already exists): Tools=%d, Forges=%d", toolExistsCount, forgeExistsCount)
+    log.Info("   Newly added: %d items", successCount)
+}
+
+if failedCount > 0 {
+    log.Warn("Failed items:")
+    for i, itemName := range failedItems {
+        log.Warn("  %d. %s", i+1, itemName)
+    }
+}
+
+// =============================================================================
+// 获取最终文档数量
+// =============================================================================
+
+log.Info("")
+log.Info("=== Final Statistics ===")
+
+finalDocCount = 0
+try {
+    finalDocCount, _ = ragSystem.CountDocuments()
+    log.Info("Final document count: %d", finalDocCount)
+    if incrementalMode {
+        log.Info("   - Previous documents: %d", existingDocCount)
+        log.Info("   - New documents added: %d", finalDocCount - existingDocCount)
+    } else {
+        log.Info("   - Knowledge entries: %d", successCount)
+        log.Info("   - Question indexes: %d", totalQuestions)
+    }
+} catch countErr {
+    log.Warn("Failed to get document count: %v", countErr)
+}
+
+// =============================================================================
+// 导出 RAG 文件
+// =============================================================================
+
+log.Info("")
+log.Info("=== Exporting RAG File ===")
+
+try {
+    err = rag.Export(ragCollectionName, finalOutputPath)
+    if err != nil {
+        log.Error("Failed to export RAG file: %v", err)
+        die(sprintf("Failed to export RAG file: %v", err))
+    }
+
+    if !file.IsExisted(finalOutputPath) {
+        log.Error("Export succeeded but file does not exist: %s", finalOutputPath)
+        die("Failed to verify exported RAG file")
+    }
+
+    fileInfo = file.Stat(finalOutputPath)~
+    fileSize = fileInfo.Size()
+
+    log.Info("RAG file exported: %s", finalOutputPath)
+    log.Info("   File size: %d bytes (%.2f MB)", fileSize, float64(fileSize)/1024/1024)
+
+} catch exportErr {
+    log.Error("Failed to export RAG file: %v", exportErr)
+    die(sprintf("Failed to export RAG file: %v", exportErr))
+}
+
+// =============================================================================
+// 最终总结
+// =============================================================================
+
+log.Info("")
+log.Info("=== Build Complete ===")
+log.Info("AI Tools and Skills search index built successfully")
+log.Info("   RAG File: %s", finalOutputPath)
+log.Info("   Items: %d processed (%d tools, %d forges)", successCount, successfulTools, successfulForges)
+log.Info("   Questions: %d generated", totalQuestions)
+if incrementalMode {
+    log.Info("   Mode: Incremental update")
+    log.Info("   Skipped: %d already indexed", toolExistsCount + forgeExistsCount)
+}
+
+if failedCount > 0 {
+    os.Exit(1)
+} else {
+    os.Exit(0)
+}
+
