@@ -31,6 +31,7 @@ type Program struct {
 	//value cache
 	nodeId2ValueCache *utils.CacheWithKey[string, *Value]
 	id                *atomic.Int64
+	overlay           *ProgramOverLay
 }
 
 type Programs []*Program
@@ -52,6 +53,11 @@ func (p *Program) GetProgramKind() ssadb.ProgramKind {
 
 func (p *Program) GetLanguage() ssaconfig.Language {
 	return p.Program.Language
+}
+
+// GetOverlay 获取增量编译的 ProgramOverLay（如果存在）
+func (p *Program) GetOverlay() *ProgramOverLay {
+	return p.overlay
 }
 
 func (p *Program) GetType(name string) *Type {
@@ -96,6 +102,13 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 			prog.SetDiagnosticsRecorder(config.DiagnosticsRecorder())
 		} else {
 			prog.SetDiagnosticsRecorder(nil)
+		}
+		// 设置增量编译信息（如果存在）
+		if config.baseProgramName != "" {
+			prog.BaseProgramName = config.baseProgramName
+		}
+		if config.fileHashMap != nil && len(config.fileHashMap) > 0 {
+			prog.FileHashMap = config.fileHashMap
 		}
 	} else {
 		prog.SetDiagnosticsRecorder(nil)

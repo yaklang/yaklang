@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -58,6 +59,18 @@ func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 		ir.FileList = prog.FileList
 		ir.LineCount = prog.LineCount
 		ir.ExtraFile = prog.ExtraFile
+		// 同步增量编译信息（如果存在）
+		if prog.BaseProgramName != "" {
+			ir.BaseProgramName = prog.BaseProgramName
+		}
+		if len(prog.FileHashMap) > 0 {
+			// 将 fileHashMap 转换为 StringMap 格式（int -> string）
+			fileHashMapStr := make(ssadb.StringMap)
+			for filePath, hash := range prog.FileHashMap {
+				fileHashMapStr[filePath] = fmt.Sprintf("%d", hash)
+			}
+			ir.FileHashMap = fileHashMapStr
+		}
 		ssadb.UpdateProgram(ir)
 	}()
 }

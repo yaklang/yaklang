@@ -49,6 +49,23 @@ type IrProgram struct {
 	// compile argument
 	ConfigInput  string `json:"config_input" gorm:"type:text"`
 	PeepholeSize int    `json:"peephole_size"`
+
+	// incremental compilation information
+	// BaseProgramName: if this is a diff program (incremental compilation), this is the name of the base (full) program
+	// If BaseProgramName is empty, this is a full compilation program
+	BaseProgramName string `json:"base_program_name" gorm:"index"`
+	// FileHashMap: file path -> hash status (relative to base program)
+	// -1: deleted (exists in base but not in this program)
+	// 0: modified (exists in both base and this program, but content differs)
+	// 1: new (only exists in this program, or for Layer1, all files are new)
+	FileHashMap StringMap `json:"file_hash_map" gorm:"type:text"`
+
+	// overlay information
+	// IsOverlay: if this is an overlay program (contains multiple layers)
+	IsOverlay bool `json:"is_overlay" gorm:"index"`
+	// OverlayLayers: program names of all layers in order (from bottom to top)
+	// e.g., ["base-program", "diff-program-1", "diff-program-2"]
+	OverlayLayers StringSlice `json:"overlay_layers" gorm:"type:text"`
 }
 
 func CreateProgram(name, version string, kind ProgramKind) *IrProgram {

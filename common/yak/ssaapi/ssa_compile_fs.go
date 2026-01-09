@@ -312,6 +312,13 @@ func (c *Config) parseProjectWithFS(
 	f4 := func() error {
 		process = 0.9 // %90
 		prog.Finish()
+		// 在保存到数据库之前，设置增量编译信息（如果存在）
+		if c.baseProgramName != "" {
+			prog.BaseProgramName = c.baseProgramName
+		}
+		if c.fileHashMap != nil && len(c.fileHashMap) > 0 {
+			prog.FileHashMap = c.fileHashMap
+		}
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
 			start := time.Now()
 			prog.UpdateToDatabaseWithWG(&wg)
