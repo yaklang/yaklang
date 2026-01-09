@@ -1,0 +1,63 @@
+// 文件哈希计算测试
+// 测试功能：文件哈希计算用于完整性校验
+
+// 创建临时测试文件
+testFile, err = file.TempFileName("file_hash_test_*.txt")
+assert err == nil, sprintf("Failed to create temp file: %v", err)
+defer file.Remove(testFile)
+
+testContent = "This is a test file for hash calculation"
+file.Save(testFile, testContent)
+
+// 1. 测试 MD5 哈希计算
+md5Hash = file.Md5(testFile)
+assert md5Hash != "", "MD5 hash should not be empty"
+assert len(md5Hash) == 32, sprintf("MD5 hash should be 32 characters, got: %d", len(md5Hash))
+println(sprintf("MD5 hash: %s", md5Hash))
+
+// 2. 测试 SHA1 哈希计算
+sha1Hash = file.Sha1(testFile)
+assert sha1Hash != "", "SHA1 hash should not be empty"
+assert len(sha1Hash) == 40, sprintf("SHA1 hash should be 40 characters, got: %d", len(sha1Hash))
+println(sprintf("SHA1 hash: %s", sha1Hash))
+
+// 3. 测试 SHA256 哈希计算
+sha256Hash = file.Sha256(testFile)
+assert sha256Hash != "", "SHA256 hash should not be empty"
+assert len(sha256Hash) == 64, sprintf("SHA256 hash should be 64 characters, got: %d", len(sha256Hash))
+println(sprintf("SHA256 hash: %s", sha256Hash))
+
+// 4. 测试相同内容产生相同哈希
+file2, err = file.TempFileName("file_hash_test2_*.txt")
+assert err == nil, sprintf("Failed to create temp file: %v", err)
+defer file.Remove(file2)
+file.Save(file2, testContent)
+
+hash1 = file.Sha256(testFile)
+hash2 = file.Sha256(file2)
+assert hash1 == hash2, sprintf("Same content should produce same hash: %s vs %s", hash1, hash2)
+
+// 5. 测试不同内容产生不同哈希
+file3, err = file.TempFileName("file_hash_test3_*.txt")
+assert err == nil, sprintf("Failed to create temp file: %v", err)
+defer file.Remove(file3)
+file.Save(file3, "Different content")
+
+hash3 = file.Sha256(file3)
+assert hash3 != hash1, sprintf("Different content should produce different hash: %s vs %s", hash3, hash1)
+
+// 6. 测试空文件哈希
+emptyFile, err = file.TempFileName("file_hash_empty_*.txt")
+assert err == nil, sprintf("Failed to create temp file: %v", err)
+defer file.Remove(emptyFile)
+file.Save(emptyFile, "")
+
+emptyHash = file.Sha256(emptyFile)
+assert emptyHash != "", "Empty file should have hash"
+
+// 7. 测试不存在的文件（应该返回空字符串）
+nonexistentHash = file.Sha256("/nonexistent/file.txt")
+assert nonexistentHash == "", "Should return empty string for nonexistent file"
+
+println("File hash calculation tests passed!")
+

@@ -443,6 +443,28 @@ func GetFileSha256(filepath string) string {
 	return sha256Value
 }
 
+// GetFileSha1 计算文件的SHA1值
+func GetFileSha1(filepath string) string {
+	var f *os.File
+	var err error
+	var sha1Value string = ""
+	if _, err = os.Stat(filepath); err != nil {
+		return ""
+	}
+
+	if f, err = os.Open(filepath); err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	hasher := sha1.New()
+	if _, err := io.Copy(hasher, f); err != nil {
+		return ""
+	}
+	sha1Value = hex.EncodeToString(hasher.Sum(nil))
+	return sha1Value
+}
+
 func GetFileMd5(filepath string) string {
 	var f *os.File
 	var err error

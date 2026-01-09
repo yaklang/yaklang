@@ -1,0 +1,111 @@
+// 文件权限变更检测测试
+// 测试功能：权限变更事件捕获、属主变更检测
+
+// 注意：此测试在 Windows 上可能无法完全运行，因为 Windows 的权限模型不同
+if os.OS == "windows" {
+    println("Skipping permission tests on Windows")
+    // 在 Windows 上跳过测试，直接返回
+    return
+}
+
+// 创建临时测试文件
+testFile, err = file.TempFileName("file_permission_test_*.txt")
+assert err == nil, sprintf("Failed to create temp file: %v", err)
+defer file.Remove(testFile)
+
+file.Save(testFile, "Test content for permission change")
+
+// 1. 测试权限变更检测
+config = {
+    "watch_paths": [file.GetDirPath(testFile)],
+    "recursive": false,
+    "monitor_ops": ["chmod", "chown"]
+}
+
+monitor, err = filemonitor.NewMonitor(config)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+permissionEvents = []
+monitor.SetEventCallback(func(event) {
+    if event.Type == "chmod" || event.Type == "chown" {
+        permissionEvents = append(permissionEvents, event)
+    }
+})
+
+err = monitor.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(1)
+
+// 获取当前权限
+currentInfo, err = os.Stat(testFile)
+assert err == nil, sprintf("Failed to stat file: %v", err)
+currentMode = currentInfo.Mode()
+
+// 修改文件权限（如果可能）
+// 注意：在某些系统上可能需要 root 权限
+newMode = currentMode | 0200 // 添加写权限
+err = os.Chmod(testFile, newMode)
+if err == nil {
+    sleep(1)
+    
+    // 验证权限变更事件
+    assert len(permissionEvents) > 0, "Should capture permission change event"
+    
+    chmodEvent = null
+    for event in permissionEvents {
+        if event.Type == "chmod" && event.Path == testFile {
+            chmodEvent = event
+            break
+        }
+    }
+    
+    assert chmodEvent != null, "Should have chmod event"
+    assert chmodEvent.OldMode != "", "Chmod event should have old mode"
+    assert chmodEvent.NewMode != "", "Chmod event should have new mode"
+    println(sprintf("Permission changed from %s to %s", chmodEvent.OldMode, chmodEvent.NewMode))
+    
+    // 恢复原权限
+    os.Chmod(testFile, currentMode)
+}
+
+monitor.Stop()
+
+// 2. 测试权限信息记录
+// 验证日志中包含权限信息
+config2 = {
+    "watch_paths": [file.GetDirPath(testFile)],
+    "recursive": false
+}
+
+monitor2, err = filemonitor.NewMonitor(config2)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+logEntries = []
+monitor2.SetLogCallback(func(log) {
+    logEntries = append(logEntries, log)
+})
+
+err = monitor2.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(1)
+
+// 触发一个文件操作
+file.Save(testFile, "Modified content")
+sleep(1)
+
+monitor2.Stop()
+
+// 验证日志包含权限信息
+assert len(logEntries) > 0, "Should have log entries"
+for logEntry in logEntries {
+    if logEntry.FilePath == testFile {
+        assert logEntry.FileMode != "", "Log entry should have file mode"
+        println(sprintf("File mode recorded: %s", logEntry.FileMode))
+        break
+    }
+}
+
+println("File permission tests passed!")
+

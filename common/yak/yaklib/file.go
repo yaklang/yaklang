@@ -729,6 +729,30 @@ func _fileMd5(filepath string) string {
 	return utils.GetFileMd5(filepath)
 }
 
+// Sha1 计算文件的 SHA1 哈希值
+// @param {string} filepath 文件路径
+// @return {string} SHA1 哈希值（40位十六进制字符串），如果文件不存在或读取失败则返回空字符串
+// Example:
+// ```
+// sha1Hash = file.Sha1("/path/to/file")
+// println(sha1Hash)  // "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+// ```
+func _fileSha1(filepath string) string {
+	return utils.GetFileSha1(filepath)
+}
+
+// Sha256 计算文件的 SHA256 哈希值
+// @param {string} filepath 文件路径
+// @return {string} SHA256 哈希值（64位十六进制字符串），如果文件不存在或读取失败则返回空字符串
+// Example:
+// ```
+// sha256Hash = file.Sha256("/path/to/file")
+// println(sha256Hash)  // "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+// ```
+func _fileSha256(filepath string) string {
+	return utils.GetFileSha256(filepath)
+}
+
 // GetTypeByExtension 根据文件扩展名获取 MIME 类型
 // @param {string} ext 文件扩展名（可以带或不带点号，如 ".txt" 或 "txt"）
 // @return {string} MIME 类型字符串，如果未找到则返回 "application/octet-stream"
@@ -829,6 +853,8 @@ var FileExport = map[string]interface{}{
 	"Save":     _saveFile,
 	"SaveJson": _saveJson,
 	"Md5":      _fileMd5,
+	"Sha1":     _fileSha1,
+	"Sha256":   _fileSha256,
 
 	// 模仿 Linux 命令的一些函数
 	// 自定义的好用 API
