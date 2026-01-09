@@ -477,6 +477,27 @@ func (fm *FileMonitor) handleFileSystemEvents(events *filesys.EventSet) {
 			return true
 		}
 
+		// 检查文件属性变更（权限、修改时间等）
+		if oldInfo, ok := fm.fileInfos.Load(path); ok {
+			oldFileInfo := oldInfo.(*FileInfo)
+			newFileInfo := fm.getFileInfo(path, info)
+
+			// 检查权限变更
+			if oldFileInfo.Mode != newFileInfo.Mode {
+				fm.recordEvent(FileOpChmod, path, info.IsDir(), info)
+			}
+
+			// 检查属主变更
+			if oldFileInfo.UID != 0 || newFileInfo.UID != 0 {
+				if oldFileInfo.UID != newFileInfo.UID || oldFileInfo.GID != newFileInfo.GID {
+					fm.recordEvent(FileOpChown, path, info.IsDir(), info)
+				}
+			}
+
+			// 更新文件信息
+			fm.fileInfos.Store(path, newFileInfo)
+		}
+
 		if !info.IsDir() {
 			// 使用哈希表快速判断文件是否被修改
 			var oldHash string
@@ -656,68 +677,59 @@ func (fm *FileMonitor) fillUserInfo(event *FileMonitorEvent) {
 	}
 }
 
+// parseStringSliceFromConfig 从配置中解析字符串切片，过滤空字符串
+func parseStringSliceFromConfig(config map[string]interface{}, key string) []string {
+	if value, ok := config[key]; ok {
+		rawSlice := utils.InterfaceToStringSlice(value)
+		result := make([]string, 0, len(rawSlice))
+		for _, item := range rawSlice {
+			if item != "" {
+				result = append(result, item)
+			}
+		}
+		return result
+	}
+	return nil
+}
+
+// parseFileMonitorConfigFromMap 从 map[string]interface{} 创建 FileMonitorConfig
+func parseFileMonitorConfigFromMap(config map[string]interface{}) *FileMonitorConfig {
+	monitorConfig := &FileMonitorConfig{
+		Recursive:   true,
+		MaxFileSize: 10 * 1024 * 1024,
+	}
+
+	if paths := parseStringSliceFromConfig(config, "watch_paths"); paths != nil {
+		monitorConfig.WatchPaths = paths
+	}
+
+	if recursive, ok := config["recursive"]; ok {
+		monitorConfig.Recursive = utils.InterfaceToBoolean(recursive)
+	}
+
+	if maxSize, ok := config["max_file_size"]; ok {
+		monitorConfig.MaxFileSize = int64(utils.InterfaceToInt(maxSize))
+	}
+
+	if includes := parseStringSliceFromConfig(config, "include_patterns"); includes != nil {
+		monitorConfig.IncludePatterns = includes
+	}
+
+	if excludes := parseStringSliceFromConfig(config, "exclude_patterns"); excludes != nil {
+		monitorConfig.ExcludePatterns = excludes
+	}
+
+	if ops := parseStringSliceFromConfig(config, "monitor_ops"); ops != nil {
+		monitorConfig.MonitorOps = ops
+	}
+
+	return monitorConfig
+}
+
 // FileMonitorExports 文件监控导出函数
 var FileMonitorExports = map[string]interface{}{
 	"NewMonitor": func(config map[string]interface{}) (*FileMonitor, error) {
-		monitorConfig := &FileMonitorConfig{
-			Recursive:   true,
-			MaxFileSize: 10 * 1024 * 1024,
-		}
-
-		if paths, ok := config["watch_paths"]; ok {
-			paths := utils.InterfaceToStringSlice(paths)
-			monitorConfig.WatchPaths = make([]string, 0, len(paths))
-			for _, path := range paths {
-				if path == "" {
-					continue
-				}
-				monitorConfig.WatchPaths = append(monitorConfig.WatchPaths, path)
-			}
-		}
-
-		if recursive, ok := config["recursive"]; ok {
-			recursive := utils.InterfaceToBoolean(recursive)
-			monitorConfig.Recursive = recursive
-		}
-
-		if maxSize, ok := config["max_file_size"]; ok {
-			maxSize := utils.InterfaceToInt(maxSize)
-			monitorConfig.MaxFileSize = int64(maxSize)
-		}
-
-		if includes, ok := config["include_patterns"]; ok {
-			includes := utils.InterfaceToStringSlice(includes)
-			monitorConfig.IncludePatterns = make([]string, 0, len(includes))
-			for _, include := range includes {
-				if include == "" {
-					continue
-				}
-				monitorConfig.IncludePatterns = append(monitorConfig.IncludePatterns, include)
-			}
-		}
-
-		if excludes, ok := config["exclude_patterns"]; ok {
-			excludes := utils.InterfaceToStringSlice(excludes)
-			monitorConfig.ExcludePatterns = make([]string, 0, len(excludes))
-			for _, exclude := range excludes {
-				if exclude == "" {
-					continue
-				}
-				monitorConfig.ExcludePatterns = append(monitorConfig.ExcludePatterns, exclude)
-			}
-		}
-
-		if ops, ok := config["monitor_ops"]; ok {
-			ops := utils.InterfaceToStringSlice(ops)
-			monitorConfig.MonitorOps = make([]string, 0, len(ops))
-			for _, op := range ops {
-				if op == "" {
-					continue
-				}
-				monitorConfig.MonitorOps = append(monitorConfig.MonitorOps, op)
-			}
-		}
-
+		monitorConfig := parseFileMonitorConfigFromMap(config)
 		return NewFileMonitor(monitorConfig)
 	},
 }

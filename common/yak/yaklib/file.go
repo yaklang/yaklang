@@ -808,6 +808,110 @@ func _detectFileType(filePath string) (string, error) {
 	return mimeTypeStr, nil
 }
 
+// MatchMalicious 检测文件或内容是否包含恶意特征
+// 支持两种输入类型：
+//   - string: 文件路径，会读取文件内容进行匹配
+//   - []byte: 文件内容，直接匹配内容
+// @param {string|[]byte} input 文件路径或文件内容
+// @return {[]string} 匹配到的特征名称列表
+// @return {error} 错误信息（仅当输入为文件路径且读取失败时返回）
+// Example:
+// ```
+// // 方式1: 匹配文件
+// matches, err = file.MatchMalicious("/path/to/suspicious.php")
+// if err == nil && len(matches) > 0 {
+//     println("发现恶意特征:", matches)
+// }
+//
+// // 方式2: 匹配内容
+// content = file.ReadFile("/path/to/suspicious.php")
+// matches, err = file.MatchMalicious(content)
+// if len(matches) > 0 {
+//     println("发现恶意特征:", matches)
+// }
+// ```
+func _matchMalicious(input interface{}) ([]string, error) {
+	matcher := NewMaliciousFileMatcher()
+
+	switch v := input.(type) {
+	case string:
+		// 文件路径
+		return matcher.MatchFile(v)
+	case []byte:
+		// 文件内容
+		return matcher.MatchContent(v), nil
+	case []interface{}:
+		// yaklang 中 []byte 可能被转换为 []interface{}
+		content := utils.InterfaceToBytesSlice(v)
+		if len(content) > 0 {
+			return matcher.MatchContent(content[0]), nil
+		}
+		return []string{}, nil
+	default:
+		return nil, utils.Errorf("unsupported input type: %T, expected string or []byte", input)
+	}
+}
+
+// MatchMaliciousWithDetails 检测文件或内容并返回详细信息
+// 支持两种输入类型：
+//   - string: 文件路径，会读取文件内容进行匹配
+//   - []byte: 文件内容，直接匹配内容
+// @param {string|[]byte} input 文件路径或文件内容
+// @return {[]map[string]interface{}} 匹配到的特征详细信息列表
+// @return {error} 错误信息（仅当输入为文件路径且读取失败时返回）
+// Example:
+// ```
+// // 方式1: 匹配文件
+// details, err = file.MatchMaliciousWithDetails("/path/to/suspicious.php")
+// if err == nil {
+//     for detail in details {
+//         println(sprintf("特征: %s, 分类: %s, 严重程度: %s",
+//             detail["name"], detail["category"], detail["severity"]))
+//     }
+// }
+//
+// // 方式2: 匹配内容
+// content = file.ReadFile("/path/to/suspicious.php")
+// details, err = file.MatchMaliciousWithDetails(content)
+// ```
+func _matchMaliciousWithDetails(input interface{}) ([]map[string]interface{}, error) {
+	matcher := NewMaliciousFileMatcher()
+
+	var sigs []*MaliciousSignature
+	var err error
+
+	switch v := input.(type) {
+	case string:
+		// 文件路径
+		sigs, err = matcher.MatchFileWithDetails(v)
+		if err != nil {
+			return nil, err
+		}
+	case []byte:
+		// 文件内容
+		sigs = matcher.MatchContentWithDetails(v)
+	case []interface{}:
+		// yaklang 中 []byte 可能被转换为 []interface{}
+		content := utils.InterfaceToBytesSlice(v)
+		if len(content) > 0 {
+			sigs = matcher.MatchContentWithDetails(content[0])
+		}
+	default:
+		return nil, utils.Errorf("unsupported input type: %T, expected string or []byte", input)
+	}
+
+	result := make([]map[string]interface{}, 0, len(sigs))
+	for _, sig := range sigs {
+		result = append(result, map[string]interface{}{
+			"name":        sig.Name,
+			"category":    sig.Category,
+			"description": sig.Description,
+			"severity":    sig.Severity,
+		})
+	}
+	return result, nil
+}
+
 var FileExport = map[string]interface{}{
 	"ReadLines":             _fileReadLines,
 	"ReadLinesWithCallback": _fileReadLinesWithCallback,
@@ -876,4 +980,9 @@ var FileExport = map[string]interface{}{
 	"DetectMIMETypeFromFile": mimetype.DetectFile,
 	"DetectFileType":         _detectFileType,
 	"GetTypeByExtension":     _getTypeByExtension,
+
+	// 恶意文件检测
+	"NewMaliciousFileMatcher":   NewMaliciousFileMatcher,
+	"MatchMalicious":            _matchMalicious,
+	"MatchMaliciousWithDetails": _matchMaliciousWithDetails,
 }
