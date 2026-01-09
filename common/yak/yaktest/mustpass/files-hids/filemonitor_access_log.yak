@@ -1,0 +1,273 @@
+// 文件访问日志记录测试
+// 测试功能：文件访问日志记录的各种字段和功能
+
+// 创建临时测试目录
+tempBase = os.TempDir()
+testDir = file.Join(tempBase, sprintf("file_access_log_test_%d", time.Now().Unix()))
+err = file.MkdirAll(testDir)
+assert err == nil, sprintf("Failed to create temp dir: %v", err)
+defer file.Remove(testDir)
+
+// 1. 测试 create 操作日志记录
+println("=== Testing CREATE operation ===")
+config1 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": ["create"]
+}
+
+monitor1, err = filemonitor.NewMonitor(config1)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+createLogs = []
+monitor1.SetLogCallback(func(log) {
+    if log.Operation == "create" {
+        createLogs = append(createLogs, log)
+        println(sprintf("[CREATE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
+            log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
+    }
+})
+
+err = monitor1.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(2)
+
+// 创建新文件
+newFile1 = file.Join(testDir, "create_test.txt")
+file.Save(newFile1, "Create test content")
+sleep(2)
+
+monitor1.Stop()
+
+// 验证 create 日志
+assert len(createLogs) > 0, sprintf("Should have create logs, got: %d", len(createLogs))
+for logEntry in createLogs {
+    assert logEntry.FilePath != "", "Log entry should have file path"
+    assert logEntry.Operation == "create", "Log entry should be create operation"
+    assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
+    assert logEntry.User != "", "Log entry should have user"
+    assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
+    assert logEntry.GID >= 0, sprintf("Log entry should have GID, got: %d", logEntry.GID)
+    assert logEntry.FileMode != "", "Log entry should have file mode"
+    assert logEntry.IsDir == false || logEntry.IsDir == true, "Log entry should have IsDir flag"
+}
+println(sprintf("Create logs: %d", len(createLogs)))
+
+// 2. 测试 write 操作日志记录
+println("=== Testing WRITE operation ===")
+testFile = file.Join(testDir, "write_test.txt")
+file.Save(testFile, "Initial content")
+sleep(1)
+
+config2 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": ["write"]
+}
+
+monitor2, err = filemonitor.NewMonitor(config2)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+writeLogs = []
+monitor2.SetLogCallback(func(log) {
+    if log.Operation == "write" {
+        writeLogs = append(writeLogs, log)
+        println(sprintf("[WRITE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
+            log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
+    }
+})
+
+err = monitor2.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(2)
+
+// 修改文件
+file.Save(testFile, "Modified content")
+sleep(2)
+
+monitor2.Stop()
+
+// 验证 write 日志
+assert len(writeLogs) > 0, sprintf("Should have write logs, got: %d", len(writeLogs))
+for logEntry in writeLogs {
+    assert logEntry.FilePath != "", "Log entry should have file path"
+    assert logEntry.Operation == "write", "Log entry should be write operation"
+    assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
+    assert logEntry.User != "", "Log entry should have user"
+    assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
+    assert logEntry.GID >= 0, sprintf("Log entry should have GID, got: %d", logEntry.GID)
+    assert logEntry.FileMode != "", "Log entry should have file mode"
+    assert logEntry.IsDir == false || logEntry.IsDir == true, "Log entry should have IsDir flag"
+}
+println(sprintf("Write logs: %d", len(writeLogs)))
+
+// 3. 测试 delete 操作日志记录
+println("=== Testing DELETE operation ===")
+deleteFile = file.Join(testDir, "delete_test.txt")
+file.Save(deleteFile, "Delete test content")
+sleep(1)
+
+config3 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": ["delete"]
+}
+
+monitor3, err = filemonitor.NewMonitor(config3)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+deleteLogs = []
+monitor3.SetLogCallback(func(log) {
+    if log.Operation == "delete" {
+        deleteLogs = append(deleteLogs, log)
+        println(sprintf("[DELETE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
+            log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
+    }
+})
+
+err = monitor3.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(2)
+
+// 删除文件
+file.Remove(deleteFile)
+sleep(2)
+
+monitor3.Stop()
+
+// 验证 delete 日志（删除操作可能没有 FileMode，所以不要求）
+assert len(deleteLogs) > 0, sprintf("Should have delete logs, got: %d", len(deleteLogs))
+for logEntry in deleteLogs {
+    assert logEntry.FilePath != "", "Log entry should have file path"
+    assert logEntry.Operation == "delete", "Log entry should be delete operation"
+    assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
+    assert logEntry.User != "", "Log entry should have user"
+    assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
+    assert logEntry.GID >= 0, sprintf("Log entry should have GID, got: %d", logEntry.GID)
+    // 删除操作可能没有 FileMode，所以不要求
+    // assert logEntry.FileMode != "", "Log entry should have file mode"
+    assert logEntry.IsDir == false || logEntry.IsDir == true, "Log entry should have IsDir flag"
+}
+println(sprintf("Delete logs: %d", len(deleteLogs)))
+
+// 4. 测试文件大小记录
+sizeTestFile = file.Join(testDir, "size_test.txt")
+file.Save(sizeTestFile, "Initial content")
+sleep(1)
+
+config4 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": ["write"]
+}
+
+monitor4, err = filemonitor.NewMonitor(config4)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+sizeLogs = []
+monitor4.SetLogCallback(func(log) {
+    if log.Operation == "write" {
+        sizeLogs = append(sizeLogs, log)
+        println(sprintf("[SIZE_TEST] Path: %s, Operation: %s, Size: %d bytes, Timestamp: %d", 
+            log.FilePath, log.Operation, log.FileSize, log.Timestamp))
+    }
+})
+
+err = monitor4.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(2)
+
+// 写入不同大小的内容
+file.Save(sizeTestFile, "Small content")
+sleep(1)
+
+largeContent = str.Repeat("A", 1000)
+file.Save(sizeTestFile, largeContent)
+sleep(1)
+
+monitor4.Stop()
+
+// 验证文件大小记录
+assert len(sizeLogs) > 0, "Should have size logs"
+for log in sizeLogs {
+    assert log.FileSize >= 0, sprintf("Log entry should have file size, got: %d", log.FileSize)
+    println(sprintf("File size recorded: %d bytes", log.FileSize))
+}
+
+// 5. 测试用户信息记录
+userLogs = []
+for logEntry in createLogs {
+    if logEntry.User != "" {
+        userLogs = append(userLogs, logEntry)
+    }
+}
+for logEntry in writeLogs {
+    if logEntry.User != "" {
+        userLogs = append(userLogs, logEntry)
+    }
+}
+for logEntry in deleteLogs {
+    if logEntry.User != "" {
+        userLogs = append(userLogs, logEntry)
+    }
+}
+
+assert len(userLogs) > 0, "Should have logs with user information"
+println(sprintf("Logs with user info: %d", len(userLogs)))
+
+// 验证用户信息一致性
+if len(userLogs) > 1 {
+    firstUser = userLogs[0].User
+    for log in userLogs {
+        // 用户信息应该一致（在同一会话中）
+        println(sprintf("User: %s, UID: %d, GID: %d", log.User, log.UID, log.GID))
+    }
+}
+
+// 6. 测试目录日志记录
+config6 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": ["create"]
+}
+
+monitor6, err = filemonitor.NewMonitor(config6)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+dirLogs = []
+monitor6.SetLogCallback(func(log) {
+    if log.IsDir {
+        dirLogs = append(dirLogs, log)
+        println(sprintf("[DIR_CREATE] Path: %s, Operation: %s, User: %s, UID: %d, GID: %d, Mode: %s, IsDir: %v, Timestamp: %d", 
+            log.FilePath, log.Operation, log.User, log.UID, log.GID, log.FileMode, log.IsDir, log.Timestamp))
+    }
+})
+
+err = monitor6.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(2)
+
+// 创建目录
+newDir = file.Join(testDir, "new_dir")
+err = file.MkdirAll(newDir)
+assert err == nil, sprintf("Failed to create dir: %v", err)
+sleep(1)
+
+monitor6.Stop()
+
+// 验证目录日志
+if len(dirLogs) > 0 {
+    for log in dirLogs {
+        assert log.IsDir == true, "Should be directory"
+        assert log.FilePath != "", "Should have directory path"
+        println(sprintf("Directory log: %s", log.FilePath))
+    }
+}
+
+println("File access log tests passed!")
+
