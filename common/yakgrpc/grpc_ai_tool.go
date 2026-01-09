@@ -141,6 +141,25 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 
 	_, err := yakit.CreateAIYakTool(db, tool)
 	if err != nil {
+		if isAIToolNameUniqueConflict(err) {
+			var existing schema.AIYakTool
+			if err := db.Unscoped().Where("name = ?", tool.Name).First(&existing).Error; err == nil {
+				if existing.DeletedAt != nil && !existing.DeletedAt.IsZero() {
+					if _, delErr := yakit.DeleteAIYakTools(db, tool.Name); delErr != nil {
+						return nil, utils.Errorf("failed to delete soft-deleted AI tool: %s", delErr)
+					}
+					if _, createErr := yakit.CreateAIYakTool(db, tool); createErr == nil {
+						return &ypb.SaveAIToolV2Response{
+							IsSuccess: true,
+							Message:   "AI tool created successfully",
+							AITool:    tool.ToGRPC(),
+						}, nil
+					} else {
+						return nil, utils.Errorf("failed to create AI tool: %s", createErr)
+					}
+				}
+			}
+		}
 		return nil, utils.Errorf("failed to create AI tool: %s", err)
 	}
 	return &ypb.SaveAIToolV2Response{
@@ -149,6 +168,16 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 		AITool:    tool.ToGRPC(),
 	}, nil
 
+}
+
+func isAIToolNameUniqueConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed: ai_yak_tools.name") ||
+		strings.Contains(msg, "duplicate key value violates unique constraint") ||
+		strings.Contains(msg, "duplicate entry")
 }
 
 func (s *Server) UpdateAITool(ctx context.Context, req *ypb.UpdateAIToolRequest) (*ypb.DbOperateMessage, error) {

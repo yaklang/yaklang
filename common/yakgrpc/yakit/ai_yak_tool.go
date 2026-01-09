@@ -34,6 +34,7 @@ func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	}
 	// 设置 CreatedAt 以确保执行 UPDATE 而不是 INSERT
 	tool.CreatedAt = existing.CreatedAt
+	tool.IsFavorite = existing.IsFavorite
 	if db := db.Save(tool); db.Error != nil {
 		return 0, utils.Errorf("update AIYakTool failed: %s", db.Error)
 	}
@@ -90,7 +91,7 @@ func DeleteAIYakTools(db *gorm.DB, names ...string) (int64, error) {
 
 func DeleteAIYakToolByID(db *gorm.DB, ids ...uint) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
-	if db := db.Where("id IN (?)", ids).Delete(&schema.AIYakTool{}); db.Error != nil {
+	if db := db.Where("id IN (?)", ids).Unscoped().Delete(&schema.AIYakTool{}); db.Error != nil {
 		return 0, utils.Errorf("delete AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
