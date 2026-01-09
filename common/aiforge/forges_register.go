@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -19,6 +18,7 @@ type ForgeExecutor func(context.Context, []*ypb.ExecParamItem, ...aicommon.Confi
 
 var forgeMutex = new(sync.RWMutex)
 var forges = make(map[string]ForgeExecutor)
+var yakForges = make(map[string]ForgeExecutor)
 
 type ForgeResult struct {
 	*aicommon.Action
@@ -31,7 +31,7 @@ func RegisterYakAiForge(cfg *YakForgeBlueprintConfig) error {
 	if err != nil {
 		return err
 	}
-	return RegisterForgeExecutor(cfg.Name, func(ctx context.Context, items []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
+	return RegisterYakForgeExecutor(cfg.Name, func(ctx context.Context, items []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
 		ins, err := blueprint.CreateCoordinator(ctx, items, opts...)
 		if err != nil {
 			return nil, err
@@ -76,6 +76,17 @@ func RegisterForgeExecutor(i string, f ForgeExecutor) error {
 	return nil
 }
 
+func RegisterYakForgeExecutor(i string, f ForgeExecutor) error {
+	forgeMutex.Lock()
+	if _, ok := yakForges[i]; ok {
+		forgeMutex.Unlock()
+		return utils.Errorf("forge %s already registered", i)
+	}
+	yakForges[i] = f
+	forgeMutex.Unlock()
+	return nil
+}
+
 var forgeNotFoundError = utils.Errorf("forge not found")
 
 func ExecuteForge(
@@ -88,6 +99,9 @@ func ExecuteForge(
 	// 这样可以避免在 forge 执行期间（可能很长时间）阻塞其他 forge 的注册
 	forgeMutex.RLock()
 	forge, ok := forges[forgeName]
+	if !ok {
+		forge, ok = yakForges[forgeName]
+	}
 	forgeMutex.RUnlock()
 
 	if ok {
@@ -98,26 +112,29 @@ func ExecuteForge(
 }
 
 func ExecuteForgeAndAutoRegister(forgeName string, ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
-	forgeRes, err := ExecuteForge(forgeName, ctx, params, opts...)
+	forgeIns, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), forgeName)
 	if err == nil {
+		cfg := NewYakForgeBlueprintConfigFromSchemaForge(forgeIns)
+		blueprint, buildErr := cfg.Build()
+		if buildErr != nil {
+			return nil, utils.Wrap(buildErr, "failed to build forge")
+		}
+		ins, buildErr := blueprint.CreateCoordinator(ctx, params, opts...)
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		if buildErr := ins.Run(); buildErr != nil {
+			return nil, buildErr
+		}
+		return cfg.ForgeResult, nil
+	}
+
+	forgeRes, execErr := ExecuteForge(forgeName, ctx, params, opts...)
+	if execErr == nil {
 		return forgeRes, nil
 	}
 
-	if !errors.Is(err, forgeNotFoundError) {
-		return nil, err
-	}
-
-	forgeIns, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), forgeName)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to get forge instance")
-	}
-	cfg := NewYakForgeBlueprintConfigFromSchemaForge(forgeIns)
-	err = RegisterYakAiForge(cfg)
-	if err != nil {
-		return nil, utils.Wrap(err, "failed to register forge")
-	}
-
-	return ExecuteForge(forgeName, ctx, params, opts...)
+	return nil, utils.Wrap(err, "failed to get forge instance")
 }
 
 func convertForgeResultIntoCommonForgeResult(fr *ForgeResult) *aicommon.ForgeResult {
