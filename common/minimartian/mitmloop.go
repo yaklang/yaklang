@@ -699,7 +699,12 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	if p.findProcessName {
 		_, name, err := sysproc.FindProcessNameByConn(conn)
 		if err != nil {
-			log.Errorf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
+			// Frequent "process not found" noise is expected when OS lookup cannot map the socket; keep it at debug.
+			if errors.Is(err, sysproc.ErrNotFound) || errors.Is(err, sysproc.ErrInvalidNetwork) {
+				log.Debugf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
+			} else {
+				log.Warnf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
+			}
 		} else {
 			httpctx.SetProcessName(req, name)
 		}

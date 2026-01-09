@@ -6302,6 +6302,7 @@ message QueryHTTPFlowRequest {
 
   string PayloadKeyword = 47;
   string ExcludeStatusCode = 48; // 排除状态码
+  bool SkipTotalCount = 49; // 跳过总数统计，仅返回当前页
 }
 
 message HTTPFlowsToOnlineRequest {

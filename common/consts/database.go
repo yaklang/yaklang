@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,9 +105,43 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	purePath := path
 	switch driver {
 	case SQLiteExtend, SQLite:
-		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
+		// Allow callers to provide their own DSN query parameters (e.g. mode=ro for read-only connections).
+		if strings.Contains(path, "?") {
+			base, query, _ := strings.Cut(path, "?")
+			seen := make(map[string]struct{})
+			for _, part := range strings.Split(query, "&") {
+				if part == "" {
+					continue
+				}
+				key, _, _ := strings.Cut(part, "=")
+				if key != "" {
+					seen[key] = struct{}{}
+				}
+			}
+			var extra []string
+			if _, ok := seen["cache"]; !ok {
+				extra = append(extra, "cache=shared")
+			}
+			if _, ok := seen["mode"]; !ok {
+				extra = append(extra, "mode=rwc")
+			}
+			if len(extra) > 0 {
+				if query == "" {
+					path = base + "?" + strings.Join(extra, "&")
+				} else {
+					path = base + "?" + query + "&" + strings.Join(extra, "&")
+				}
+			}
+		} else {
+			path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
+		}
 	case MySQL:
-		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
+		// Preserve existing DSN query parameters if present.
+		if strings.Contains(path, "?") {
+			path = fmt.Sprintf("%s&charset=utf8mb4&parseTime=True&loc=Local", path)
+		} else {
+			path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
+		}
 	default:
 	}
 

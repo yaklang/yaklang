@@ -244,8 +244,10 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	// 监控慢查询
 	queryStart := time.Now()
 	tracer := &yakit.SQLTraceLogger{}
-	db := s.GetProjectDatabase()
+	db := s.GetProjectDatabaseForRead()
 	if db != nil {
+		// Use a per-request session to avoid racing on shared DB logger/logmode.
+		db = db.New()
 		db.SetLogger(tracer)
 		db = db.LogMode(true)
 	}

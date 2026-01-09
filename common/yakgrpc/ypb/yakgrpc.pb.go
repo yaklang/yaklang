@@ -45350,6 +45350,7 @@ type QueryHTTPFlowRequest struct {
 	AnalyzedIds        []int64  `protobuf:"varint,46,rep,packed,name=AnalyzedIds,proto3" json:"AnalyzedIds,omitempty"`
 	PayloadKeyword     string   `protobuf:"bytes,47,opt,name=PayloadKeyword,proto3" json:"PayloadKeyword,omitempty"`
 	ExcludeStatusCode  string   `protobuf:"bytes,48,opt,name=ExcludeStatusCode,proto3" json:"ExcludeStatusCode,omitempty"` // 排除状态码
+	SkipTotalCount     bool     `protobuf:"varint,49,opt,name=SkipTotalCount,proto3" json:"SkipTotalCount,omitempty"`      // 跳过总数统计，仅返回当前页
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -45704,6 +45705,13 @@ func (x *QueryHTTPFlowRequest) GetExcludeStatusCode() string {
 		return x.ExcludeStatusCode
 	}
 	return ""
+}
+
+func (x *QueryHTTPFlowRequest) GetSkipTotalCount() bool {
+	if x != nil {
+		return x.SkipTotalCount
+	}
+	return false
 }
 
 type HTTPFlowsToOnlineRequest struct {
@@ -68826,7 +68834,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tIsRequest\x18\x02 \x01(\bR\tIsRequest\x12\x18\n" +
 	"\aBufSize\x18\x03 \x01(\x03R\aBufSize\x12\x1c\n" +
 	"\tRuntimeId\x18\x04 \x01(\tR\tRuntimeId\x12\x16\n" +
-	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xcf\f\n" +
+	"\x06IsRisk\x18\x05 \x01(\bR\x06IsRisk\"\xf7\f\n" +
 	"\x14QueryHTTPFlowRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -68884,7 +68892,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vKeywordType\x18- \x01(\tR\vKeywordType\x12 \n" +
 	"\vAnalyzedIds\x18. \x03(\x03R\vAnalyzedIds\x12&\n" +
 	"\x0ePayloadKeyword\x18/ \x01(\tR\x0ePayloadKeyword\x12,\n" +
-	"\x11ExcludeStatusCode\x180 \x01(\tR\x11ExcludeStatusCode\"\xdc\x01\n" +
+	"\x11ExcludeStatusCode\x180 \x01(\tR\x11ExcludeStatusCode\x12&\n" +
+	"\x0eSkipTotalCount\x181 \x01(\bR\x0eSkipTotalCount\"\xdc\x01\n" +
 	"\x18HTTPFlowsToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\x12.\n" +
