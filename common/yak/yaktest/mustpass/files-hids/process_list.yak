@@ -1,0 +1,44 @@
+// 进程列表获取测试
+// 核心功能：获取当前系统中所有运行进程的列表
+// 测试函数：PS, GetCurrentProcessInfo, ProcessExists
+
+// 1. 测试 PS - 获取所有进程列表
+processes, err = hids.PS()
+assert err == nil, sprintf("PS failed: %v", err)
+assert len(processes) > 0, "PS should return non-empty process list"
+printf("Total processes in system: %d\n", len(processes))
+
+// 2. 验证进程列表包含必要信息
+displayCount = 0
+for _, p := range processes {
+    if displayCount >= 5 { break } // 只显示前5个有效进程
+    if p.Pid > 0 {  // 跳过PID为0的特殊系统进程
+        printf("Process[%d]: PID=%d, Name=%s, User=%s\n", displayCount, p.Pid, p.Name, p.Username)
+        displayCount = displayCount + 1
+    }
+}
+
+// 3. 测试 GetCurrentProcessInfo - 获取当前进程
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+assert currentInfo.Pid > 0, sprintf("Current process PID should be > 0, got: %d", currentInfo.Pid)
+printf("Current process: PID=%d, Name=%s\n", currentInfo.Pid, currentInfo.Name)
+
+// 4. 验证当前进程在列表中
+foundCurrent = false
+for _, p := range processes {
+    if p.Pid == currentInfo.Pid {
+        foundCurrent = true
+        break
+    }
+}
+assert foundCurrent, sprintf("Current process %d should be in process list", currentInfo.Pid)
+
+// 5. 测试 ProcessExists - 检查进程存在性
+exists = hids.ProcessExists(currentInfo.Pid)
+assert exists == true, sprintf("Current process %d should exist", currentInfo.Pid)
+
+notExists = hids.ProcessExists(999999999)
+assert notExists == false, "Non-existent process 999999999 should not exist"
+
+println("All process list tests passed!")

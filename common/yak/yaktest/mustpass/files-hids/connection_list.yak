@@ -1,0 +1,106 @@
+// 连接列表获取测试
+// 核心功能：获取当前系统的网络连接列表
+// 测试函数：Netstat, GetTCPConnections, GetUDPConnections, GetListeningPorts, GetEstablishedConnections, GetConnectionsByPid, GetConnectionsByPort, GetConnectionStats
+
+// 1. 测试 Netstat - 获取所有连接
+conns, err = hids.Netstat()
+assert err == nil, sprintf("Netstat failed: %v", err)
+printf("Total network connections: %d\n", len(conns))
+
+// 2. 验证连接信息结构
+if len(conns) > 0 {
+    conn = conns[0]
+    printf("Sample connection:\n")
+    printf("  Fd: %d\n", conn.Fd)
+    printf("  Family: %s\n", conn.Family)
+    printf("  Type: %s\n", conn.Type)
+    printf("  LocalAddr: %s\n", conn.LocalAddr)
+    printf("  LocalIP: %s\n", conn.LocalIP)
+    printf("  LocalPort: %d\n", conn.LocalPort)
+    printf("  RemoteAddr: %s\n", conn.RemoteAddr)
+    printf("  RemoteIP: %s\n", conn.RemoteIP)
+    printf("  RemotePort: %d\n", conn.RemotePort)
+    printf("  Status: %s\n", conn.Status)
+    printf("  Pid: %d\n", conn.Pid)
+}
+
+// 3. 测试 GetTCPConnections
+tcpConns, err = hids.GetTCPConnections()
+assert err == nil, sprintf("GetTCPConnections failed: %v", err)
+printf("\nTCP connections: %d\n", len(tcpConns))
+
+for _, conn := range tcpConns {
+    assert str.Contains(conn.Type, "STREAM"), sprintf("TCP should be STREAM, got: %s", conn.Type)
+}
+
+// 4. 测试 GetUDPConnections
+udpConns, err = hids.GetUDPConnections()
+assert err == nil, sprintf("GetUDPConnections failed: %v", err)
+printf("UDP connections: %d\n", len(udpConns))
+
+for _, conn := range udpConns {
+    assert str.Contains(conn.Type, "DGRAM"), sprintf("UDP should be DGRAM, got: %s", conn.Type)
+}
+
+// 5. 测试 GetListeningPorts
+listeningConns, err = hids.GetListeningPorts()
+assert err == nil, sprintf("GetListeningPorts failed: %v", err)
+printf("Listening ports: %d\n", len(listeningConns))
+
+for _, conn := range listeningConns {
+    assert str.ToUpper(conn.Status) == "LISTEN", sprintf("Should be LISTEN, got: %s", conn.Status)
+}
+
+// 打印前5个监听端口
+for i, conn := range listeningConns {
+    if i >= 5 { break }
+    printf("  Listen[%d]: %s (PID=%d)\n", i, conn.LocalAddr, conn.Pid)
+}
+
+// 6. 测试 GetEstablishedConnections
+establishedConns, err = hids.GetEstablishedConnections()
+assert err == nil, sprintf("GetEstablishedConnections failed: %v", err)
+printf("\nEstablished connections: %d\n", len(establishedConns))
+
+for _, conn := range establishedConns {
+    assert str.ToUpper(conn.Status) == "ESTABLISHED", sprintf("Should be ESTABLISHED, got: %s", conn.Status)
+}
+
+// 7. 测试 GetConnectionsByPid
+currentInfo, _ = hids.GetCurrentProcessInfo()
+if currentInfo.Pid > 0 {
+    pidConns, err = hids.GetConnectionsByPid(currentInfo.Pid)
+    assert err == nil, sprintf("GetConnectionsByPid failed: %v", err)
+    printf("\nConnections for current PID %d: %d\n", currentInfo.Pid, len(pidConns))
+    
+    for _, conn := range pidConns {
+        assert conn.Pid == currentInfo.Pid, sprintf("PID mismatch: expected %d, got %d", currentInfo.Pid, conn.Pid)
+    }
+}
+
+// 8. 测试 GetConnectionsByPort
+if len(listeningConns) > 0 && listeningConns[0].LocalPort > 0 {
+    testPort = listeningConns[0].LocalPort
+    portConns, err = hids.GetConnectionsByPort(testPort)
+    assert err == nil, sprintf("GetConnectionsByPort failed: %v", err)
+    printf("\nConnections for port %d: %d\n", testPort, len(portConns))
+    assert len(portConns) >= 1, sprintf("Should find at least 1 connection for port %d", testPort)
+}
+
+// 9. 测试 GetConnectionStats
+stats, err = hids.GetConnectionStats()
+assert err == nil, sprintf("GetConnectionStats failed: %v", err)
+printf("\n=== Connection Statistics ===\n")
+printf("Total: %d\n", stats.Total)
+printf("TCP: %d\n", stats.TCPCount)
+printf("UDP: %d\n", stats.UDPCount)
+printf("Listening: %d\n", stats.ListenCount)
+printf("By Status: %v\n", stats.ByStatus)
+printf("By Protocol: %v\n", stats.ByProtocol)
+
+assert stats.Total >= 0, "Total should be >= 0"
+assert stats.TCPCount >= 0, "TCPCount should be >= 0"
+assert stats.UDPCount >= 0, "UDPCount should be >= 0"
+assert stats.ListenCount >= 0, "ListenCount should be >= 0"
+
+println("\nAll connection list tests passed!")

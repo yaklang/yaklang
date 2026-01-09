@@ -1,0 +1,124 @@
+// 白名单规则配置测试
+// 核心功能：配置进程白名单规则，支持路径、哈希值等多种匹配方式
+// 测试函数：NewWhitelistRule, NewProcessMonitor, WithWhitelist, IsWhitelisted, AddWhitelistRule, ClearWhitelist
+
+// 获取当前进程信息用于测试
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+printf("Current process: PID=%d, Name=%s, Exe=%s\n", currentInfo.Pid, currentInfo.Name, currentInfo.Exe)
+
+// 1. 测试 NewWhitelistRule 创建规则
+rule1 = hids.NewWhitelistRule()
+rule1.Name = currentInfo.Name
+printf("Created rule with Name: %s\n", rule1.Name)
+
+// 2. 测试按进程名匹配
+monitor1 = hids.NewProcessMonitor()
+monitor1.AddWhitelistRule(rule1)
+
+isWhitelisted = monitor1.IsWhitelisted(currentInfo)
+assert isWhitelisted == true, sprintf("Process '%s' should be whitelisted by name", currentInfo.Name)
+printf("Name-based whitelist test passed\n")
+
+// 3. 测试按用户名匹配
+if currentInfo.Username != "" {
+    rule2 = hids.NewWhitelistRule()
+    rule2.Username = currentInfo.Username
+
+    monitor2 = hids.NewProcessMonitor()
+    monitor2.AddWhitelistRule(rule2)
+
+    isWhitelisted = monitor2.IsWhitelisted(currentInfo)
+    assert isWhitelisted == true, sprintf("Process should be whitelisted by username '%s'", currentInfo.Username)
+    printf("Username-based whitelist test passed\n")
+}
+
+// 4. 测试按可执行文件路径匹配
+if currentInfo.Exe != "" {
+    rule3 = hids.NewWhitelistRule()
+    rule3.ExePath = currentInfo.Exe
+
+    monitor3 = hids.NewProcessMonitor()
+    monitor3.AddWhitelistRule(rule3)
+
+    isWhitelisted = monitor3.IsWhitelisted(currentInfo)
+    assert isWhitelisted == true, sprintf("Process should be whitelisted by exe path '%s'", currentInfo.Exe)
+    printf("ExePath-based whitelist test passed\n")
+}
+
+// 5. 测试按进程名正则匹配
+rule4 = hids.NewWhitelistRule()
+rule4.NamePattern = ".*"  // 匹配所有
+
+monitor4 = hids.NewProcessMonitor()
+monitor4.AddWhitelistRule(rule4)
+
+isWhitelisted = monitor4.IsWhitelisted(currentInfo)
+assert isWhitelisted == true, "Process should be whitelisted by name pattern '.*'"
+printf("NamePattern-based whitelist test passed\n")
+
+// 6. 测试按可执行文件路径正则匹配
+if currentInfo.Exe != "" {
+    rule5 = hids.NewWhitelistRule()
+    rule5.ExePattern = ".*"
+
+    monitor5 = hids.NewProcessMonitor()
+    monitor5.AddWhitelistRule(rule5)
+
+    isWhitelisted = monitor5.IsWhitelisted(currentInfo)
+    assert isWhitelisted == true, "Process should be whitelisted by exe pattern '.*'"
+    printf("ExePattern-based whitelist test passed\n")
+}
+
+// 7. 测试不匹配的规则
+ruleNoMatch = hids.NewWhitelistRule()
+ruleNoMatch.Name = "nonexistent_process_name_12345"
+
+monitorNoMatch = hids.NewProcessMonitor()
+monitorNoMatch.AddWhitelistRule(ruleNoMatch)
+
+isWhitelisted = monitorNoMatch.IsWhitelisted(currentInfo)
+assert isWhitelisted == false, "Process should NOT be whitelisted by non-matching rule"
+printf("Non-matching rule test passed\n")
+
+// 8. 测试多规则匹配（任一匹配即可）
+ruleMulti1 = hids.NewWhitelistRule()
+ruleMulti1.Name = "nonexistent_name"  // 不匹配
+
+ruleMulti2 = hids.NewWhitelistRule()
+ruleMulti2.Name = currentInfo.Name  // 匹配
+
+monitorMulti = hids.NewProcessMonitor()
+monitorMulti.AddWhitelistRule(ruleMulti1)
+monitorMulti.AddWhitelistRule(ruleMulti2)
+
+isWhitelisted = monitorMulti.IsWhitelisted(currentInfo)
+assert isWhitelisted == true, "Process should be whitelisted when any rule matches"
+printf("Multiple rules test passed\n")
+
+// 9. 测试 ClearWhitelist
+monitorClear = hids.NewProcessMonitor()
+clearRule = hids.NewWhitelistRule()
+clearRule.Name = currentInfo.Name
+monitorClear.AddWhitelistRule(clearRule)
+
+isWhitelisted = monitorClear.IsWhitelisted(currentInfo)
+assert isWhitelisted == true, "Process should be whitelisted before clear"
+
+monitorClear.ClearWhitelist()
+isWhitelisted = monitorClear.IsWhitelisted(currentInfo)
+assert isWhitelisted == false, "Process should NOT be whitelisted after ClearWhitelist"
+printf("ClearWhitelist test passed\n")
+
+// 10. 测试 WithWhitelist 初始化选项
+rules = [hids.NewWhitelistRule()]
+rules[0].Name = currentInfo.Name
+
+monitorWithRules = hids.NewProcessMonitor(
+    hids.WithWhitelist(rules),
+)
+isWhitelisted = monitorWithRules.IsWhitelisted(currentInfo)
+assert isWhitelisted == true, "Process should be whitelisted with WithWhitelist option"
+printf("WithWhitelist option test passed\n")
+
+println("\nAll process whitelist tests passed!")

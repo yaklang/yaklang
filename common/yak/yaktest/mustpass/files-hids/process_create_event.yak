@@ -1,0 +1,43 @@
+// 进程启动事件捕获测试
+// 核心功能：捕获新进程的启动事件
+// 测试函数：NewProcessMonitor, WithOnProcessCreate, WatchProcess
+
+// 1. 测试创建带进程创建回调的监控器
+createEvents = []
+
+monitor = hids.NewProcessMonitor(
+    hids.WithProcessMonitorInterval(0.5),
+    hids.WithOnProcessCreate(fn(event) {
+        createEvents = append(createEvents, event)
+    }),
+)
+
+// 2. 启动监控器
+err = monitor.Start()
+assert err == nil, sprintf("Monitor Start failed: %v", err)
+assert monitor.IsRunning() == true, "Monitor should be running"
+printf("Process monitor started\n")
+
+// 3. 短暂等待（减少测试时间）
+time.Sleep(0.5)
+
+// 4. 停止监控器
+monitor.Stop()
+assert monitor.IsRunning() == false, "Monitor should be stopped"
+printf("Monitor stopped. Captured %d create events\n", len(createEvents))
+
+// 5. 验证事件结构（如果有捕获到事件）
+for _, event := range createEvents {
+    assert string(event.Type) == "create", sprintf("Event type should be 'create', got: %s", event.Type)
+    assert event.Timestamp > 0, "Event timestamp should be positive"
+}
+
+// 6. 验证监控器可以正常创建和配置
+monitor2 = hids.NewProcessMonitor(
+    hids.WithProcessMonitorInterval(1),
+    hids.WithOnProcessCreate(fn(event) {}),
+)
+assert monitor2.IsRunning() == false, "New monitor should not be running"
+printf("Monitor configuration test passed\n")
+
+println("\nAll process create event tests passed!")
