@@ -1,0 +1,77 @@
+// 进程启动信息记录测试
+// 核心功能：记录进程启动的执行文件路径和启动用户信息
+// 测试函数：NewProcessMonitor, WithOnProcessCreate, GetFileHashMD5, GetFileHashSHA256
+
+// 1. 测试记录完整的进程启动信息
+createEvents = []
+
+monitor = hids.NewProcessMonitor(
+    hids.WithProcessMonitorInterval(0.5),
+    hids.WithOnProcessCreate(fn(event) {
+        createEvents = append(createEvents, event)
+        p = event.Process
+        printf("=== New Process Created ===\n")
+        printf("  PID: %d\n", p.Pid)
+        printf("  Name: %s\n", p.Name)
+        printf("  Username: %s\n", p.Username)
+        printf("  Exe: %s\n", p.Exe)
+        printf("  Cmdline: %s\n", p.Cmdline)
+        printf("  CreateTime: %d\n", p.CreateTime)
+        printf("  PPID: %d\n", p.PPid)
+    }),
+)
+
+err = monitor.Start()
+assert err == nil, sprintf("Monitor Start failed: %v", err)
+printf("Monitor started, recording process creation info...\n")
+
+time.Sleep(2)
+monitor.Stop()
+
+printf("Captured %d process creations\n", len(createEvents))
+
+// 2. 验证进程启动信息的完整性
+for _, event := range createEvents {
+    p = event.Process
+    // PID必须存在
+    assert p.Pid > 0, "Process PID should be positive"
+    // CreateTime必须存在
+    assert p.CreateTime > 0, "Process CreateTime should be positive"
+    // 其他字段可能为空但应该可访问
+    _ = p.Name
+    _ = p.Username
+    _ = p.Exe
+    _ = p.Cmdline
+    _ = p.PPid
+}
+
+// 3. 测试文件哈希计算（用于记录可执行文件信息）
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+
+if currentInfo.Exe != "" && file.IsExisted(currentInfo.Exe) {
+    printf("\n=== Executable File Info ===\n")
+    printf("Exe Path: %s\n", currentInfo.Exe)
+    
+    // MD5哈希
+    md5Hash, err = hids.GetFileHashMD5(currentInfo.Exe)
+    assert err == nil, sprintf("GetFileHashMD5 failed: %v", err)
+    assert len(md5Hash) == 32, sprintf("MD5 hash should be 32 chars, got: %d", len(md5Hash))
+    printf("MD5: %s\n", md5Hash)
+    
+    // SHA256哈希
+    sha256Hash, err = hids.GetFileHashSHA256(currentInfo.Exe)
+    assert err == nil, sprintf("GetFileHashSHA256 failed: %v", err)
+    assert len(sha256Hash) == 64, sprintf("SHA256 hash should be 64 chars, got: %d", len(sha256Hash))
+    printf("SHA256: %s\n", sha256Hash)
+}
+
+// 4. 测试哈希计算错误处理
+_, err = hids.GetFileHashMD5("/nonexistent/file/path")
+assert err != nil, "GetFileHashMD5 should fail for non-existent file"
+
+_, err = hids.GetFileHashSHA256("/nonexistent/file/path")
+assert err != nil, "GetFileHashSHA256 should fail for non-existent file"
+printf("\nHash error handling test passed\n")
+
+println("\nAll process create info tests passed!")

@@ -1,0 +1,48 @@
+// 进程列表过滤测试
+// 核心功能：支持按用户、状态等条件过滤进程列表
+// 测试函数：PS, NewProcessFilter
+
+// 获取当前进程作为测试基准
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+printf("Current process: PID=%d, Name=%s, User=%s\n", currentInfo.Pid, currentInfo.Name, currentInfo.Username)
+
+// 1. 测试按PID过滤（最快的过滤方式）
+pidFilter = hids.NewProcessFilter()
+pidFilter.Pid = currentInfo.Pid
+
+pidFiltered, err = hids.PS(pidFilter)
+assert err == nil, sprintf("PS with PID filter failed: %v", err)
+assert len(pidFiltered) == 1, sprintf("Filter by PID should return exactly 1 process, got: %d", len(pidFiltered))
+assert pidFiltered[0].Pid == currentInfo.Pid, sprintf("Filtered PID mismatch: expected %d, got %d", currentInfo.Pid, pidFiltered[0].Pid)
+printf("PID filter test passed: found process %d\n", pidFiltered[0].Pid)
+
+// 2. 测试按进程名过滤
+nameFilter = hids.NewProcessFilter()
+nameFilter.Name = currentInfo.Name
+
+nameFiltered, err = hids.PS(nameFilter)
+assert err == nil, sprintf("PS with name filter failed: %v", err)
+assert len(nameFiltered) >= 1, sprintf("Should find at least 1 process with name '%s', got: %d", currentInfo.Name, len(nameFiltered))
+printf("Name filter test passed: found %d processes with name '%s'\n", len(nameFiltered), currentInfo.Name)
+
+// 3. 测试无结果的过滤（使用PID过滤最快）
+emptyFilter = hids.NewProcessFilter()
+emptyFilter.Pid = 999999999  // 不存在的PID
+
+emptyFiltered, err = hids.PS(emptyFilter)
+assert err == nil, sprintf("PS with empty result filter failed: %v", err)
+assert len(emptyFiltered) == 0, sprintf("Should find 0 processes with non-existent PID, got: %d", len(emptyFiltered))
+printf("Empty result filter test passed\n")
+
+// 4. 测试NewProcessFilter的各个属性可以设置
+filter = hids.NewProcessFilter()
+filter.Username = "test"
+filter.Status = "running"
+filter.NamePattern = ".*test.*"
+filter.CmdPattern = ".*"
+filter.ExePattern = ".*"
+filter.PPid = 1
+printf("Filter properties can be set: Username=%s, Status=%s\n", filter.Username, filter.Status)
+
+println("All process filter tests passed!")

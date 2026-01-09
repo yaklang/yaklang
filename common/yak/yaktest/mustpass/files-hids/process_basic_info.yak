@@ -1,0 +1,78 @@
+// 进程基本信息查看测试
+// 核心功能：查看进程的基本信息，包括PID、PPID、用户等
+// 测试函数：GetProcessByPid, GetCurrentProcessInfo
+
+// 1. 获取当前进程信息
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+
+// 2. 验证基本信息字段
+printf("=== Process Basic Info ===\n")
+printf("PID: %d\n", currentInfo.Pid)
+assert currentInfo.Pid > 0, "PID should be positive"
+
+printf("PPID: %d\n", currentInfo.PPid)
+// PPID可能为0（对于init进程）
+
+printf("Name: %s\n", currentInfo.Name)
+assert currentInfo.Name != "", "Process name should not be empty"
+
+printf("Username: %s\n", currentInfo.Username)
+// Username在某些情况下可能为空
+
+printf("Exe: %s\n", currentInfo.Exe)
+// Exe路径
+
+printf("Cmdline: %s\n", currentInfo.Cmdline)
+// 命令行
+
+printf("Cwd: %s\n", currentInfo.Cwd)
+// 工作目录
+
+printf("Status: %s\n", currentInfo.Status)
+// 进程状态
+
+printf("CreateTime: %d\n", currentInfo.CreateTime)
+assert currentInfo.CreateTime > 0, "CreateTime should be positive"
+
+printf("CPUPercent: %.2f%%\n", currentInfo.CPUPercent)
+// CPU使用率
+
+printf("MemPercent: %.2f%%\n", currentInfo.MemPercent)
+// 内存使用率
+
+printf("NumThreads: %d\n", currentInfo.NumThreads)
+assert currentInfo.NumThreads >= 1, "NumThreads should be at least 1"
+
+printf("IsRunning: %v\n", currentInfo.IsRunning)
+assert currentInfo.IsRunning == true, "Current process should be running"
+
+printf("Nice: %d\n", currentInfo.Nice)
+// Nice值
+
+printf("NumFds: %d\n", currentInfo.NumFds)
+// 文件描述符数量
+
+// 3. 测试 GetProcessByPid
+procInfo, err = hids.GetProcessByPid(currentInfo.Pid)
+assert err == nil, sprintf("GetProcessByPid failed: %v", err)
+assert procInfo.Pid == currentInfo.Pid, sprintf("PID mismatch: expected %d, got %d", currentInfo.Pid, procInfo.Pid)
+assert procInfo.Name == currentInfo.Name, sprintf("Name mismatch: expected %s, got %s", currentInfo.Name, procInfo.Name)
+printf("\nGetProcessByPid verified: PID=%d, Name=%s\n", procInfo.Pid, procInfo.Name)
+
+// 4. 测试获取不存在的进程
+_, err = hids.GetProcessByPid(999999999)
+assert err != nil, "GetProcessByPid should fail for non-existent PID"
+printf("Non-existent PID error handling test passed\n")
+
+// 5. 如果有父进程，获取其信息
+if currentInfo.PPid > 0 {
+    parentInfo, err = hids.GetProcessByPid(currentInfo.PPid)
+    assert err == nil, sprintf("GetProcessByPid for parent failed: %v", err)
+    printf("\nParent Process Info:\n")
+    printf("  PID: %d\n", parentInfo.Pid)
+    printf("  Name: %s\n", parentInfo.Name)
+    printf("  Username: %s\n", parentInfo.Username)
+}
+
+println("\nAll process basic info tests passed!")

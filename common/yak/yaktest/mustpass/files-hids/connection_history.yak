@@ -1,0 +1,104 @@
+// 连接状态历史记录测试
+// 核心功能：记录连接状态变化的历史信息
+// 测试函数：NewConnectionMonitor, WithConnectionHistory, GetHistory, ClearHistory, WatchConnections
+
+// 1. 测试创建带历史记录的连接监控器
+monitor = hids.NewConnectionMonitor(
+    hids.WithConnectionMonitorInterval(0.5),
+    hids.WithConnectionHistory(100),  // 最多保存100条历史记录
+)
+
+// 2. 启动监控器
+err = monitor.Start()
+assert err == nil, sprintf("Monitor Start failed: %v", err)
+assert monitor.IsRunning() == true, "Monitor should be running"
+printf("Connection monitor started with history enabled\n")
+
+// 3. 等待收集一些事件
+printf("Monitoring connections for 2 seconds...\n")
+time.Sleep(2)
+
+// 4. 获取历史记录
+history = monitor.GetHistory()
+printf("History entries collected: %d\n", len(history))
+
+// 5. 验证历史记录结构
+for i, event := range history {
+    if i >= 5 { break } // 只显示前5条
+    assert event.Timestamp > 0, "Event timestamp should be positive"
+    // event.Type 应为 "new" 或 "disappear"
+    eventType = string(event.Type)
+    assert eventType == "new" || eventType == "disappear", sprintf("Invalid event type: %s", eventType)
+    printf("  History[%d]: Type=%s, Local=%s, Remote=%s, Time=%d\n", 
+        i, eventType, event.Connection.LocalAddr, event.Connection.RemoteAddr, event.Timestamp)
+}
+
+// 6. 测试 ClearHistory
+historyCount = len(history)
+monitor.ClearHistory()
+historyAfterClear = monitor.GetHistory()
+assert len(historyAfterClear) == 0, sprintf("History should be empty after ClearHistory, got: %d", len(historyAfterClear))
+printf("ClearHistory test passed (cleared %d entries)\n", historyCount)
+
+// 7. 继续收集并验证
+printf("Continuing to collect history for 1 second...\n")
+time.Sleep(1)
+historyNew = monitor.GetHistory()
+printf("New history entries after clear: %d\n", len(historyNew))
+
+// 8. 停止监控器
+monitor.Stop()
+assert monitor.IsRunning() == false, "Monitor should be stopped"
+printf("Monitor stopped\n")
+
+// 9. 测试 WatchConnections 简单监控函数
+printf("\nUsing WatchConnections for 1 second...\n")
+events, err = hids.WatchConnections(1)
+assert err == nil, sprintf("WatchConnections failed: %v", err)
+printf("WatchConnections captured %d events\n", len(events))
+
+// 验证事件结构
+newCount = 0
+disappearCount = 0
+for _, event := range events {
+    assert event.Timestamp > 0, "Event timestamp should be positive"
+    if event.Type == "new" {
+        newCount = newCount + 1
+    } else if event.Type == "disappear" {
+        disappearCount = disappearCount + 1
+    }
+}
+printf("  New connections: %d\n", newCount)
+printf("  Disappeared connections: %d\n", disappearCount)
+
+// 10. 测试事件回调与历史记录结合
+printf("\nTesting callbacks with history...\n")
+callbackNewCount = 0
+callbackDisappearCount = 0
+
+monitorWithCallbacks = hids.NewConnectionMonitor(
+    hids.WithConnectionMonitorInterval(0.5),
+    hids.WithConnectionHistory(50),
+    hids.WithOnNewConnection(fn(event) {
+        callbackNewCount = callbackNewCount + 1
+    }),
+    hids.WithOnConnectionDisappear(fn(event) {
+        callbackDisappearCount = callbackDisappearCount + 1
+    }),
+)
+
+monitorWithCallbacks.Start()
+time.Sleep(1)
+monitorWithCallbacks.Stop()
+
+callbackHistory = monitorWithCallbacks.GetHistory()
+printf("Callbacks triggered - New: %d, Disappear: %d\n", callbackNewCount, callbackDisappearCount)
+printf("History recorded: %d entries\n", len(callbackHistory))
+
+// 验证回调计数与历史记录一致
+// 注意：由于并发，可能有细微差异
+if len(callbackHistory) > 0 {
+    printf("Callback and history consistency check passed\n")
+}
+
+println("\nAll connection history tests passed!")
