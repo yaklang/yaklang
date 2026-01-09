@@ -158,3 +158,54 @@ func TestUpdateAIForgeWithZeroField(t *testing.T) {
 	require.Equal(t, name, forge.ForgeName)
 	require.Equal(t, "", forge.ForgeContent)
 }
+
+func TestUpdateAIForge_EmptyFieldsOverrideMetadata(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	content := `__DESC__ = "meta desc"
+__KEYWORDS__ = "meta1,meta2"
+__VERBOSE_NAME__ = "Meta Verbose"
+query = cli.String("query", cli.setRequired(true))`
+
+	_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+		ForgeName:        name,
+		ForgeType:        "yak",
+		ForgeContent:     content,
+		Description:      "explicit desc",
+		ForgeVerboseName: "Explicit Verbose",
+		ToolKeywords:     []string{"explicit"},
+		Tag:              []string{"explicit-tag"},
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
+			ForgeName: name,
+		})
+		require.NoError(t, err)
+	}()
+
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		ForgeName:        name,
+		ForgeType:        "yak",
+		ForgeContent:     content,
+		Description:      "",
+		ForgeVerboseName: "",
+		ToolKeywords:     nil,
+		Tag:              nil,
+	})
+	require.NoError(t, err)
+
+	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{
+		ForgeName: name,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, forge)
+	require.Equal(t, "", forge.Description)
+	require.Equal(t, "", forge.ForgeVerboseName)
+	require.Len(t, forge.ToolKeywords, 0)
+	require.Len(t, forge.Tag, 0)
+}

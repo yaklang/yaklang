@@ -2,8 +2,13 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -50,6 +55,8 @@ func (s *Server) DeleteAIForge(ctx context.Context, req *ypb.AIForgeFilter) (*yp
 
 func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOperateMessage, error) {
 	forge := schema.GRPC2AIForge(req)
+	applyForgeMetadata(s.GetProfileDatabase(), forge)
+	applyForgeRequestOverrides(req, forge)
 	err := yakit.UpdateAIForge(s.GetProfileDatabase(), forge)
 	if err != nil {
 		return nil, err
@@ -64,6 +71,8 @@ func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOp
 
 func (s *Server) CreateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOperateMessage, error) {
 	forgeIns := schema.GRPC2AIForge(req)
+	applyForgeMetadata(s.GetProfileDatabase(), forgeIns)
+	applyForgeRequestOverrides(req, forgeIns)
 	err := yakit.CreateAIForge(s.GetProfileDatabase(), forgeIns)
 	if err != nil {
 		return nil, err
@@ -92,4 +101,130 @@ func (s *Server) GetAIForge(ctx context.Context, req *ypb.GetAIForgeRequest) (*y
 	}
 
 	return forge.ToGRPC(), nil
+}
+
+func applyForgeMetadata(db *gorm.DB, forge *schema.AIForge) {
+	if forge == nil {
+		return
+	}
+	if forge.ForgeType == schema.FORGE_TYPE_Config {
+		applyForgeDefaultsFromDB(db, forge)
+	}
+	if forge.ForgeType != schema.FORGE_TYPE_YAK {
+		return
+	}
+	if forge.ForgeContent == "" {
+		return
+	}
+	prog, err := static_analyzer.SSAParse(forge.ForgeContent, "yak")
+	if err != nil {
+		log.Warnf("parse forge metadata failed: %v", err)
+		return
+	}
+	scriptMetadata, err := metadata.ParseYakScriptMetadataProg(forge.ForgeName, prog)
+	if err != nil {
+		log.Warnf("parse forge metadata failed: %v", err)
+		return
+	}
+	if forge.ForgeVerboseName == "" && scriptMetadata.VerboseName != "" {
+		forge.ForgeVerboseName = scriptMetadata.VerboseName
+	}
+	if forge.Description == "" && scriptMetadata.Description != "" {
+		forge.Description = scriptMetadata.Description
+	}
+	if forge.Tags == "" && len(scriptMetadata.Keywords) > 0 {
+		forge.Tags = strings.Join(scriptMetadata.Keywords, ",")
+	}
+	if forge.ToolKeywords == "" && len(scriptMetadata.Keywords) > 0 {
+		forge.ToolKeywords = strings.Join(scriptMetadata.Keywords, ",")
+	}
+}
+
+func applyForgeDefaultsFromDB(db *gorm.DB, forge *schema.AIForge) {
+	if db == nil {
+		return
+	}
+	var (
+		dbForge *schema.AIForge
+		err     error
+	)
+	if forge.ForgeName != "" {
+		dbForge, err = yakit.GetAIForgeByName(db, forge.ForgeName)
+	} else {
+		return
+	}
+	if err != nil || dbForge == nil {
+		return
+	}
+	if forge.ForgeName == "" {
+		forge.ForgeName = dbForge.ForgeName
+	}
+	if forge.ForgeType == "" {
+		forge.ForgeType = dbForge.ForgeType
+	}
+	if forge.ForgeVerboseName == "" {
+		forge.ForgeVerboseName = dbForge.ForgeVerboseName
+	}
+	if forge.ForgeContent == "" {
+		forge.ForgeContent = dbForge.ForgeContent
+	}
+	if forge.ParamsUIConfig == "" {
+		forge.ParamsUIConfig = dbForge.ParamsUIConfig
+	}
+	if forge.Params == "" {
+		forge.Params = dbForge.Params
+	}
+	if forge.UserPersistentData == "" {
+		forge.UserPersistentData = dbForge.UserPersistentData
+	}
+	if forge.Description == "" {
+		forge.Description = dbForge.Description
+	}
+	if forge.Tools == "" {
+		forge.Tools = dbForge.Tools
+	}
+	if forge.ToolKeywords == "" {
+		forge.ToolKeywords = dbForge.ToolKeywords
+	}
+	if forge.Actions == "" {
+		forge.Actions = dbForge.Actions
+	}
+	if forge.Tags == "" {
+		forge.Tags = dbForge.Tags
+	}
+	if forge.InitPrompt == "" {
+		forge.InitPrompt = dbForge.InitPrompt
+	}
+	if forge.PersistentPrompt == "" {
+		forge.PersistentPrompt = dbForge.PersistentPrompt
+	}
+	if forge.PlanPrompt == "" {
+		forge.PlanPrompt = dbForge.PlanPrompt
+	}
+	if forge.ResultPrompt == "" {
+		forge.ResultPrompt = dbForge.ResultPrompt
+	}
+}
+
+func applyForgeRequestOverrides(req *ypb.AIForge, forge *schema.AIForge) {
+	if req == nil || forge == nil {
+		return
+	}
+	forge.ID = uint(req.GetId())
+	forge.ForgeName = req.GetForgeName()
+	forge.ForgeVerboseName = req.GetForgeVerboseName()
+	forge.ForgeContent = req.GetForgeContent()
+	forge.ForgeType = req.GetForgeType()
+	forge.ParamsUIConfig = req.GetParamsUIConfig()
+	forge.Params = req.GetParams()
+	forge.UserPersistentData = req.GetUserPersistentData()
+	forge.Description = req.GetDescription()
+	forge.Tools = strings.Join(req.GetToolNames(), ",")
+	forge.ToolKeywords = strings.Join(req.GetToolKeywords(), ",")
+	forge.Actions = req.GetAction()
+	forge.Tags = strings.Join(req.GetTag(), ",")
+	forge.InitPrompt = req.GetInitPrompt()
+	forge.PersistentPrompt = req.GetPersistentPrompt()
+	forge.PlanPrompt = req.GetPlanPrompt()
+	forge.ResultPrompt = req.GetResultPrompt()
 }
