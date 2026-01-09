@@ -167,14 +167,14 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	}
 	after := time.After(du * time.Second)
 
-	var filename string
+	var filenames []string
 LOOP:
 	for {
 		select {
 		case e := <-out:
 			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
 				content := string(e.GetContent())
-				filename = utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
+				filenames = append(filenames, utils.InterfaceToString(jsonpath.FindFirst(content, "$.path")))
 			}
 			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
 				if e.GetNodeId() == "modify_code" {
@@ -186,6 +186,17 @@ LOOP:
 		}
 	}
 	close(in)
+
+	var filename string
+	for _, name := range filenames {
+		if strings.Contains(name, "gen_code_") {
+			filename = name
+			break
+		}
+	}
+	if filename == "" {
+		t.Fatal("gen_code_ filename not found")
+	}
 
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
