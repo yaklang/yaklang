@@ -75,6 +75,34 @@ func TestMUSTPASS_KnowledgeBaseCRUD(t *testing.T) {
 	assert.True(t, deleteResponse.Ok)
 }
 
+func TestMUSTPASS_CreateKnowledgeBaseV2_DuplicateName(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err, "创建本地客户端失败")
+
+	ctx := context.Background()
+	knowledgeBaseName := "test_kb_duplicate_" + utils.RandStringBytes(6)
+
+	defer func() {
+		client.DeleteKnowledgeBase(ctx, &ypb.DeleteKnowledgeBaseRequest{Name: knowledgeBaseName})
+	}()
+
+	createResponse, err := client.CreateKnowledgeBaseV2(ctx, &ypb.CreateKnowledgeBaseV2Request{
+		Name:        knowledgeBaseName,
+		Description: "duplicate name test",
+		Tags:        []string{"test"},
+	})
+	require.NoError(t, err, "首次创建知识库失败")
+	require.True(t, createResponse.IsSuccess)
+
+	_, err = client.CreateKnowledgeBaseV2(ctx, &ypb.CreateKnowledgeBaseV2Request{
+		Name:        knowledgeBaseName,
+		Description: "duplicate name test again",
+		Tags:        []string{"test"},
+	})
+	require.Error(t, err, "重复名称创建应返回错误")
+	assert.Contains(t, err.Error(), "知识库已存在")
+}
+
 func TestMUSTPASS_TestImportedFlag(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err, "创建本地客户端失败")

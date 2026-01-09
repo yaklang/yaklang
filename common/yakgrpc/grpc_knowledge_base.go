@@ -133,6 +133,11 @@ func (s *Server) CreateKnowledgeBaseV2(ctx context.Context, req *ypb.CreateKnowl
 	if req.GetName() == "" {
 		return nil, utils.Errorf("知识库名称不能为空")
 	}
+
+	if rag.HasRagSystem(db, req.GetName()) {
+		return nil, utils.Errorf("知识库已存在")
+	}
+
 	ragSystem, err := rag.Get(req.GetName(), rag.WithDB(db), rag.WithDescription(req.GetDescription()), rag.WithTags(req.GetTags()...), rag.WithTryRebuildHNSWIndex(true))
 	if err != nil {
 		return nil, utils.Wrap(err, "创建知识库失败")
