@@ -1,0 +1,78 @@
+// 进程父子关系识别测试
+// 核心功能：识别进程之间的父子关系
+// 测试函数：GetProcessParent, GetProcessChildren, GetProcessAncestors
+
+// 获取当前进程信息
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+printf("Current process: PID=%d, Name=%s, PPID=%d\n", currentInfo.Pid, currentInfo.Name, currentInfo.PPid)
+
+// 1. 测试 GetProcessParent - 获取父进程
+if currentInfo.PPid > 0 {
+    parentInfo, err = hids.GetProcessParent(currentInfo.Pid)
+    assert err == nil, sprintf("GetProcessParent failed: %v", err)
+    assert parentInfo.Pid == currentInfo.PPid, sprintf("Parent PID mismatch: expected %d, got %d", currentInfo.PPid, parentInfo.Pid)
+    printf("Parent process: PID=%d, Name=%s\n", parentInfo.Pid, parentInfo.Name)
+
+    // 验证父进程的子进程列表包含当前进程
+    parentChildren, err = hids.GetProcessChildren(parentInfo.Pid)
+    assert err == nil, sprintf("GetProcessChildren for parent failed: %v", err)
+    
+    foundInParentChildren = false
+    for _, child := range parentChildren {
+        if child.Pid == currentInfo.Pid {
+            foundInParentChildren = true
+            break
+        }
+    }
+    assert foundInParentChildren, sprintf("Current process %d should be in parent's children list", currentInfo.Pid)
+    printf("Parent-child relationship verified: Parent %d has child %d\n", parentInfo.Pid, currentInfo.Pid)
+} else {
+    printf("Current process has no parent (PPID=0, likely init process)\n")
+}
+
+// 2. 测试 GetProcessChildren - 获取子进程
+children, err = hids.GetProcessChildren(currentInfo.Pid)
+assert err == nil, sprintf("GetProcessChildren failed: %v", err)
+printf("Current process has %d children\n", len(children))
+
+for i, child := range children {
+    if i >= 5 { break } // 只显示前5个
+    assert child.PPid == currentInfo.Pid, sprintf("Child PPID should be %d, got %d", currentInfo.Pid, child.PPid)
+    printf("  Child[%d]: PID=%d, Name=%s\n", i, child.Pid, child.Name)
+}
+
+// 3. 测试 GetProcessAncestors - 获取祖先进程链
+ancestors, err = hids.GetProcessAncestors(currentInfo.Pid)
+assert err == nil, sprintf("GetProcessAncestors failed: %v", err)
+printf("Ancestor chain (from parent to root): %d processes\n", len(ancestors))
+
+for i, ancestor := range ancestors {
+    printf("  Ancestor[%d]: PID=%d, Name=%s, PPID=%d\n", i, ancestor.Pid, ancestor.Name, ancestor.PPid)
+}
+
+// 4. 验证祖先链的正确性
+if len(ancestors) > 0 && currentInfo.PPid > 0 {
+    // 第一个祖先应该是父进程
+    assert ancestors[0].Pid == currentInfo.PPid, sprintf("First ancestor should be parent: expected %d, got %d", currentInfo.PPid, ancestors[0].Pid)
+    printf("Ancestor chain verification passed: first ancestor is parent\n")
+
+    // 验证链的连续性
+    for i := 0; i < len(ancestors)-1; i++ {
+        // 下一个祖先应该是当前祖先的父进程
+        if ancestors[i].PPid > 0 {
+            assert ancestors[i+1].Pid == ancestors[i].PPid, sprintf("Ancestor chain broken at index %d", i)
+        }
+    }
+    printf("Ancestor chain continuity verified\n")
+}
+
+// 5. 测试对不存在进程的处理
+_, err = hids.GetProcessParent(999999999)
+assert err != nil, "GetProcessParent should fail for non-existent PID"
+
+_, err = hids.GetProcessChildren(999999999)
+// GetProcessChildren对不存在的进程可能返回空列表或错误
+printf("Non-existent PID handling test passed\n")
+
+println("\nAll process parent-child tests passed!")

@@ -1,0 +1,44 @@
+// 进程退出事件捕获测试
+// 核心功能：捕获进程的退出事件
+// 测试函数：NewProcessMonitor, WithOnProcessExit, WatchProcess
+
+// 1. 测试创建带进程退出回调的监控器
+exitEvents = []
+
+monitor = hids.NewProcessMonitor(
+    hids.WithProcessMonitorInterval(0.5),
+    hids.WithOnProcessExit(fn(event) {
+        exitEvents = append(exitEvents, event)
+    }),
+)
+
+// 2. 启动监控器
+err = monitor.Start()
+assert err == nil, sprintf("Monitor Start failed: %v", err)
+assert monitor.IsRunning() == true, "Monitor should be running"
+printf("Process monitor started\n")
+
+// 3. 短暂等待（减少测试时间）
+time.Sleep(0.5)
+
+// 4. 停止监控器
+monitor.Stop()
+assert monitor.IsRunning() == false, "Monitor should be stopped"
+printf("Monitor stopped. Captured %d exit events\n", len(exitEvents))
+
+// 5. 验证事件结构（如果有捕获到事件）
+for _, event := range exitEvents {
+    assert string(event.Type) == "exit", sprintf("Event type should be 'exit', got: %s", event.Type)
+    assert event.Timestamp > 0, "Event timestamp should be positive"
+}
+
+// 6. 测试同时配置创建和退出回调
+combinedMonitor = hids.NewProcessMonitor(
+    hids.WithProcessMonitorInterval(0.5),
+    hids.WithOnProcessCreate(fn(event) {}),
+    hids.WithOnProcessExit(fn(event) {}),
+)
+assert combinedMonitor.IsRunning() == false, "Combined monitor should not be running initially"
+printf("Combined monitor configuration test passed\n")
+
+println("\nAll process exit event tests passed!")

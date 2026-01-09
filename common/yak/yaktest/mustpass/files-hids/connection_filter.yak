@@ -1,0 +1,108 @@
+// 连接列表过滤测试
+// 核心功能：支持按协议、端口、状态等条件过滤连接列表
+// 测试函数：Netstat, NewConnectionFilter
+
+// 1. 测试 NewConnectionFilter 创建过滤器
+filter = hids.NewConnectionFilter()
+printf("Created connection filter\n")
+
+// 2. 测试按协议过滤 - TCP
+tcpFilter = hids.NewConnectionFilter()
+tcpFilter.Protocol = "tcp"
+
+tcpConns, err = hids.Netstat(tcpFilter)
+assert err == nil, sprintf("Netstat with TCP filter failed: %v", err)
+printf("TCP filtered connections: %d\n", len(tcpConns))
+
+for _, conn := range tcpConns {
+    assert str.Contains(conn.Type, "STREAM"), sprintf("TCP filter should return STREAM, got: %s", conn.Type)
+}
+
+// 3. 测试按协议过滤 - UDP
+udpFilter = hids.NewConnectionFilter()
+udpFilter.Protocol = "udp"
+
+udpConns, err = hids.Netstat(udpFilter)
+assert err == nil, sprintf("Netstat with UDP filter failed: %v", err)
+printf("UDP filtered connections: %d\n", len(udpConns))
+
+for _, conn := range udpConns {
+    assert str.Contains(conn.Type, "DGRAM"), sprintf("UDP filter should return DGRAM, got: %s", conn.Type)
+}
+
+// 4. 测试按状态过滤 - LISTEN
+listenFilter = hids.NewConnectionFilter()
+listenFilter.Status = "LISTEN"
+
+listenConns, err = hids.Netstat(listenFilter)
+assert err == nil, sprintf("Netstat with LISTEN filter failed: %v", err)
+printf("LISTEN filtered connections: %d\n", len(listenConns))
+
+for _, conn := range listenConns {
+    assert str.ToUpper(conn.Status) == "LISTEN", sprintf("LISTEN filter should return LISTEN, got: %s", conn.Status)
+}
+
+// 5. 测试按状态过滤 - ESTABLISHED
+estFilter = hids.NewConnectionFilter()
+estFilter.Status = "ESTABLISHED"
+
+estConns, err = hids.Netstat(estFilter)
+assert err == nil, sprintf("Netstat with ESTABLISHED filter failed: %v", err)
+printf("ESTABLISHED filtered connections: %d\n", len(estConns))
+
+for _, conn := range estConns {
+    assert str.ToUpper(conn.Status) == "ESTABLISHED", sprintf("ESTABLISHED filter should return ESTABLISHED, got: %s", conn.Status)
+}
+
+// 6. 测试按PID过滤
+currentInfo, _ = hids.GetCurrentProcessInfo()
+if currentInfo.Pid > 0 {
+    pidFilter = hids.NewConnectionFilter()
+    pidFilter.Pid = currentInfo.Pid
+
+    pidConns, err = hids.Netstat(pidFilter)
+    assert err == nil, sprintf("Netstat with PID filter failed: %v", err)
+    printf("PID %d filtered connections: %d\n", currentInfo.Pid, len(pidConns))
+
+    for _, conn := range pidConns {
+        assert conn.Pid == currentInfo.Pid, sprintf("PID filter mismatch: expected %d, got %d", currentInfo.Pid, conn.Pid)
+    }
+}
+
+// 7. 测试按本地端口过滤
+if len(listenConns) > 0 && listenConns[0].LocalPort > 0 {
+    portFilter = hids.NewConnectionFilter()
+    portFilter.LocalPort = listenConns[0].LocalPort
+
+    portConns, err = hids.Netstat(portFilter)
+    assert err == nil, sprintf("Netstat with LocalPort filter failed: %v", err)
+    printf("LocalPort %d filtered connections: %d\n", listenConns[0].LocalPort, len(portConns))
+
+    for _, conn := range portConns {
+        assert conn.LocalPort == listenConns[0].LocalPort, sprintf("LocalPort filter mismatch: expected %d, got %d", listenConns[0].LocalPort, conn.LocalPort)
+    }
+}
+
+// 8. 测试组合过滤 - TCP + LISTEN
+combinedFilter = hids.NewConnectionFilter()
+combinedFilter.Protocol = "tcp"
+combinedFilter.Status = "LISTEN"
+
+combinedConns, err = hids.Netstat(combinedFilter)
+assert err == nil, sprintf("Netstat with combined filter failed: %v", err)
+printf("TCP+LISTEN filtered connections: %d\n", len(combinedConns))
+
+for _, conn := range combinedConns {
+    assert str.Contains(conn.Type, "STREAM"), sprintf("Combined filter should return STREAM, got: %s", conn.Type)
+    assert str.ToUpper(conn.Status) == "LISTEN", sprintf("Combined filter should return LISTEN, got: %s", conn.Status)
+}
+
+// 9. 测试空结果的过滤
+emptyFilter = hids.NewConnectionFilter()
+emptyFilter.LocalPort = 65432  // 不太可能使用的端口
+
+emptyConns, err = hids.Netstat(emptyFilter)
+assert err == nil, sprintf("Netstat with empty result filter failed: %v", err)
+printf("Empty result filter: %d connections (expected 0 or few)\n", len(emptyConns))
+
+println("\nAll connection filter tests passed!")

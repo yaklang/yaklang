@@ -1,0 +1,82 @@
+// 进程依赖关系识别测试
+// 核心功能：识别进程之间的依赖关系，构建进程依赖图（进程树）
+// 测试函数：GetProcessTree
+
+// 获取当前进程信息
+currentInfo, err = hids.GetCurrentProcessInfo()
+assert err == nil, sprintf("GetCurrentProcessInfo failed: %v", err)
+printf("Current process: PID=%d, Name=%s, PPID=%d\n", currentInfo.Pid, currentInfo.Name, currentInfo.PPid)
+
+// 1. 从当前进程的父进程构建进程树
+if currentInfo.PPid > 0 {
+    tree, err = hids.GetProcessTree(currentInfo.PPid)
+    assert err == nil, sprintf("GetProcessTree failed: %v", err)
+    
+    printf("\n=== Process Tree (root: PPID=%d) ===\n", currentInfo.PPid)
+    printf("Root: PID=%d, Name=%s\n", tree.Info.Pid, tree.Info.Name)
+    assert tree.Info.Pid == currentInfo.PPid, sprintf("Tree root should be PPID: expected %d, got %d", currentInfo.PPid, tree.Info.Pid)
+    
+    // 验证当前进程在树的子节点中
+    foundInTree = false
+    for _, child := range tree.Children {
+        if child.Info.Pid == currentInfo.Pid {
+            foundInTree = true
+            printf("  Found current process in tree: PID=%d, Name=%s\n", child.Info.Pid, child.Info.Name)
+            break
+        }
+    }
+    assert foundInTree, sprintf("Current process %d should be in tree children", currentInfo.Pid)
+    
+    printf("Tree root has %d direct children\n", len(tree.Children))
+}
+
+// 2. 从当前进程构建进程树
+currentTree, err = hids.GetProcessTree(currentInfo.Pid)
+assert err == nil, sprintf("GetProcessTree for current process failed: %v", err)
+printf("\n=== Process Tree (root: current PID=%d) ===\n", currentInfo.Pid)
+printf("Root: PID=%d, Name=%s\n", currentTree.Info.Pid, currentTree.Info.Name)
+printf("Direct children: %d\n", len(currentTree.Children))
+
+// 递归统计子孙进程数量
+fn countDescendants(node) {
+    count = len(node.Children)
+    for _, child := range node.Children {
+        count = count + countDescendants(child)
+    }
+    return count
+}
+
+totalDescendants = countDescendants(currentTree)
+printf("Total descendants: %d\n", totalDescendants)
+
+// 3. 打印树结构（限制深度）
+fn printTree(node, indent, maxDepth) {
+    if indent >= maxDepth { return }
+    prefix = str.Repeat("  ", indent)
+    printf("%sPID=%d, Name=%s, Children=%d\n", prefix, node.Info.Pid, node.Info.Name, len(node.Children))
+    for _, child := range node.Children {
+        printTree(child, indent+1, maxDepth)
+    }
+}
+
+printf("\n=== Tree Structure (max depth 3) ===\n")
+printTree(currentTree, 0, 3)
+
+// 4. 尝试从PID 1构建系统进程树（如果权限允许）
+if hids.ProcessExists(1) {
+    systemTree, err = hids.GetProcessTree(1)
+    if err == nil {
+        printf("\n=== System Process Tree (root: PID=1) ===\n")
+        printf("System root: PID=%d, Name=%s\n", systemTree.Info.Pid, systemTree.Info.Name)
+        printf("Direct children of init: %d\n", len(systemTree.Children))
+    } else {
+        printf("\nNote: Could not build system tree from PID 1 (may need elevated permissions)\n")
+    }
+}
+
+// 5. 测试不存在进程的处理
+_, err = hids.GetProcessTree(999999999)
+assert err != nil, "GetProcessTree should fail for non-existent PID"
+printf("\nNon-existent PID handling test passed\n")
+
+println("\nAll process tree tests passed!")
