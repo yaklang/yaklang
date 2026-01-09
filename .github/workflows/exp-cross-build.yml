@@ -63,13 +63,13 @@ jobs:
           - os: windows7
             binary: yak_windows_legacy_amd64.exe
             env: $env:GITHUB_ENV
-          - os: macos-amd64
+          - os: macos-15-intel
             binary: yak_darwin_amd64
             env: $GITHUB_ENV
             CGO_ENABLED: 1
             GOOS: darwin
             GOARCH: amd64
-          - os: macos-arm64
+          - os: macos-15
             binary: yak_darwin_arm64
             env: $GITHUB_ENV
             CGO_ENABLED: 1
