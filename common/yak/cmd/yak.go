@@ -1140,6 +1140,7 @@ func main() {
 
 	mainCommands := []*cli.Command{
 		yakcmds.LSPCommand,
+		yakcmds.AIHTTPGatewayCommand,
 		{
 			Name: "version",
 			Flags: []cli.Flag{
