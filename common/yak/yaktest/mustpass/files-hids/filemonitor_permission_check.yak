@@ -38,7 +38,7 @@ assert err == nil, sprintf("Failed to start monitor: %v", err)
 sleep(1)
 
 // 获取当前权限
-currentInfo, err = os.Stat(testFile)
+currentInfo, err = file.Stat(testFile)
 assert err == nil, sprintf("Failed to stat file: %v", err)
 currentMode = currentInfo.Mode()
 
