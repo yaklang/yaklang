@@ -38,7 +38,10 @@ options {
 }
 
 root
-    : (single_input | file_input | eval_input)? EOF
+    : single_input EOF
+    | file_input EOF
+    | eval_input EOF
+    | EOF
     ;
 
 // A single interactive statement;
@@ -50,7 +53,7 @@ single_input
 
 // A module or sequence of commands read from an input file
 file_input
-    : (LINE_BREAK | stmt)+
+    : (stmt | LINE_BREAK)+
     ;
 
 // An input for the eval() and input() functions
