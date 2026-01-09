@@ -20,6 +20,7 @@ const (
 	GO      Language = "golang"
 	C       Language = "c"
 	TS      Language = "ts"
+	PYTHON  Language = "python"
 	General Language = "general"
 )
 
@@ -39,6 +40,8 @@ func (l Language) GetFileExt() string {
 		return ".c"
 	case PHP:
 		return ".php"
+	case PYTHON:
+		return ".py"
 	default:
 		return ""
 	}
@@ -53,6 +56,7 @@ func GetAllSupportedLanguages() []string {
 		string(GO),
 		string(C),
 		string(TS),
+		string(PYTHON),
 	}
 }
 
@@ -74,6 +78,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return C, nil
 	case "ts", "typescript":
 		return TS, nil
+	case "python", "py":
+		return PYTHON, nil
 	case "general":
 		return General, nil
 	}
