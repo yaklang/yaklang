@@ -50,8 +50,10 @@ jobs:
         os:
           - windows
           - windows7
-          - macos-amd64
-          - macos-arm64
+          # macos amd64
+          - macos-15-intel
+          # macos arm64
+          - macos-15
           - linux-amd64
           - linux-arm64
         include:
