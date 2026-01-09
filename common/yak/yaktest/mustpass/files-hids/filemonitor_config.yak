@@ -1,0 +1,136 @@
+// 文件监控规则配置测试
+// 测试功能：文件监控规则配置的各种选项
+
+// 创建临时测试目录
+tempBase = os.TempDir()
+testDir = file.Join(tempBase, sprintf("file_monitor_config_test_%d", time.Now().Unix()))
+err = file.MkdirAll(testDir)
+assert err == nil, sprintf("Failed to create temp dir: %v", err)
+defer file.Remove(testDir)
+
+// 创建测试文件
+testFile1 = file.Join(testDir, "test1.txt")
+testFile2 = file.Join(testDir, "test2.log")
+testFile3 = file.Join(testDir, "test3.tmp")
+file.Save(testFile1, "Test content 1")
+file.Save(testFile2, "Test content 2")
+file.Save(testFile3, "Test content 3")
+
+// 1. 测试基本配置
+config1 = {
+    "watch_paths": [testDir],
+    "recursive": true
+}
+
+monitor1, err = filemonitor.NewMonitor(config1)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+assert monitor1 != nil, "Monitor should not be nil"
+
+// 验证配置
+monitorConfig = monitor1.GetConfig()
+assert monitorConfig != nil, "Config should not be nil"
+assert len(monitorConfig.WatchPaths) == 1, sprintf("Should have 1 watch path, got: %d", len(monitorConfig.WatchPaths))
+assert monitorConfig.WatchPaths[0] == testDir, "Watch path should match"
+assert monitorConfig.Recursive == true, "Recursive should be true"
+
+monitor1.Stop()
+
+// 2. 测试包含模式配置
+config2 = {
+    "watch_paths": [testDir],
+    "recursive": false,
+    "include_patterns": ["*.txt", "*.log"]
+}
+
+monitor2, err = filemonitor.NewMonitor(config2)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+monitorConfig2 = monitor2.GetConfig()
+assert len(monitorConfig2.IncludePatterns) == 2, sprintf("Should have 2 include patterns, got: %d", len(monitorConfig2.IncludePatterns))
+assert "*.txt" in monitorConfig2.IncludePatterns, "Should include *.txt pattern"
+assert "*.log" in monitorConfig2.IncludePatterns, "Should include *.log pattern"
+
+monitor2.Stop()
+
+// 3. 测试排除模式配置
+config3 = {
+    "watch_paths": [testDir],
+    "recursive": false,
+    "exclude_patterns": ["*.tmp"]
+}
+
+monitor3, err = filemonitor.NewMonitor(config3)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+monitorConfig3 = monitor3.GetConfig()
+assert len(monitorConfig3.ExcludePatterns) == 1, sprintf("Should have 1 exclude pattern, got: %d", len(monitorConfig3.ExcludePatterns))
+assert "*.tmp" in monitorConfig3.ExcludePatterns, "Should exclude *.tmp pattern"
+
+monitor3.Stop()
+
+// 4. 测试监控操作类型配置
+config4 = {
+    "watch_paths": [testDir],
+    "recursive": false,
+    "monitor_ops": ["create", "write", "delete"]
+}
+
+monitor4, err = filemonitor.NewMonitor(config4)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+monitorConfig4 = monitor4.GetConfig()
+assert len(monitorConfig4.MonitorOps) == 3, sprintf("Should have 3 monitor ops, got: %d", len(monitorConfig4.MonitorOps))
+assert "create" in monitorConfig4.MonitorOps, "Should monitor create"
+assert "write" in monitorConfig4.MonitorOps, "Should monitor write"
+assert "delete" in monitorConfig4.MonitorOps, "Should monitor delete"
+
+monitor4.Stop()
+
+// 5. 测试最大文件大小配置
+config6 = {
+    "watch_paths": [testDir],
+    "recursive": false,
+    "max_file_size": 1024 * 1024 * 5 // 5MB
+}
+
+monitor6, err = filemonitor.NewMonitor(config6)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+monitorConfig6 = monitor6.GetConfig()
+assert monitorConfig6.MaxFileSize == 1024 * 1024 * 5, sprintf("Max file size should be 5MB, got: %d", monitorConfig6.MaxFileSize)
+
+monitor6.Stop()
+
+// 6. 测试完整配置
+config6 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "max_file_size": 10 * 1024 * 1024, // 10MB
+    "include_patterns": ["*.txt", "*.log"],
+    "exclude_patterns": ["*.tmp"],
+    "monitor_ops": ["create", "write", "delete", "chmod", "chown"]
+}
+
+monitor6, err = filemonitor.NewMonitor(config6)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+monitorConfig6 = monitor6.GetConfig()
+assert monitorConfig6.Recursive == true, "Recursive should be true"
+assert monitorConfig6.MaxFileSize == 10 * 1024 * 1024, "Max file size should be 10MB"
+assert len(monitorConfig6.IncludePatterns) == 2, "Should have 2 include patterns"
+assert len(monitorConfig6.ExcludePatterns) == 1, "Should have 1 exclude pattern"
+assert len(monitorConfig6.MonitorOps) == 5, "Should have 5 monitor ops"
+
+monitor6.Stop()
+
+// 7. 测试无效配置（空监控路径）
+config8 = {
+    "watch_paths": [],
+    "recursive": true
+}
+
+monitor8, err = filemonitor.NewMonitor(config8)
+assert err != nil, "Should return error for empty watch paths"
+
+println("File monitor config tests passed!")
+

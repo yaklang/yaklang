@@ -132,7 +132,7 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	// watch file
 	go func() {
 		for {
-			time.Sleep(1 * time.Second)
+			time.Sleep(200 * time.Millisecond) // 0.2秒轮询一次，提高检测灵敏度
 			select {
 			case <-m.Ctx.Done():
 				return
