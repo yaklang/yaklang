@@ -844,6 +844,139 @@ func init() {
 		ArgumentDescription: "{{string(abc:字符串)}}",
 	})
 
+	// split - 字符串切割取指定索引的元素
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "split",
+		Alias:       []string{"splitn"},
+		Description: "将字符串按指定分隔符切割，并取第N个元素。语法：{{split(data|separator|index)}}，index支持负数表示从后往前取。例如：{{split(a:b:c|:|0)}} 返回 'a'，{{split(a:b:c|:|-1)}} 返回 'c'",
+		Handler: func(s string) []string {
+			// 从后往前解析参数：data|separator|index
+			// 先取 index
+			lastPipe := strings.LastIndex(s, "|")
+			if lastPipe == -1 {
+				return []string{s}
+			}
+			indexStr := strings.TrimSpace(s[lastPipe+1:])
+			rest := s[:lastPipe]
+
+			// 再取 separator
+			secondLastPipe := strings.LastIndex(rest, "|")
+			if secondLastPipe == -1 {
+				// 没有分隔符参数，使用默认分隔符 ","
+				parts := strings.Split(rest, ",")
+				idx := codec.Atoi(indexStr)
+				if idx < 0 {
+					idx = len(parts) + idx
+				}
+				if idx >= 0 && idx < len(parts) {
+					return []string{parts[idx]}
+				}
+				return []string{""}
+			}
+
+			data := rest[:secondLastPipe]
+			sep := rest[secondLastPipe+1:]
+
+			// 处理转义的分隔符
+			if sep == "\\|" {
+				sep = "|"
+			}
+
+			parts := strings.Split(data, sep)
+			idx := codec.Atoi(indexStr)
+
+			// 支持负数索引
+			if idx < 0 {
+				idx = len(parts) + idx
+			}
+
+			if idx >= 0 && idx < len(parts) {
+				return []string{parts[idx]}
+			}
+			return []string{""}
+		},
+		TagNameVerbose:      "字符串切割取元素",
+		ArgumentDescription: "{{string(a:b:c:待切割字符串)}}{{string(::分隔符)}}{{number(0:索引，支持负数)}}",
+	})
+
+	// nth - 从多个结果中取第N个
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "nth",
+		Alias:       []string{"index", "get"},
+		Description: "从多个结果中取第N个元素。语法：{{nth({{file:line(xxx.txt)}}|0)}} 取第一个，{{nth({{array(a|b|c)}}|1)}} 取第二个，支持负数索引表示从后往前取",
+		Handler: func(s string) []string {
+			// 从后往前解析：data|index
+			lastPipe := strings.LastIndex(s, "|")
+			if lastPipe == -1 {
+				return []string{s}
+			}
+			indexStr := strings.TrimSpace(s[lastPipe+1:])
+			data := s[:lastPipe]
+
+			// 将数据按换行符分割（因为嵌套的多结果 tag 会用换行连接）
+			// 如果没有换行符，直接返回原数据
+			var parts []string
+			if strings.Contains(data, "\n") {
+				parts = strings.Split(data, "\n")
+			} else {
+				// 单个数据，直接返回
+				return []string{data}
+			}
+
+			idx := codec.Atoi(indexStr)
+
+			// 支持负数索引
+			if idx < 0 {
+				idx = len(parts) + idx
+			}
+
+			if idx >= 0 && idx < len(parts) {
+				return []string{parts[idx]}
+			}
+			return []string{""}
+		},
+		TagNameVerbose:      "取第N个元素",
+		ArgumentDescription: "{{string(多个结果:数据)}}{{number(0:索引，支持负数)}}",
+	})
+
+	// first - 取第一个元素（nth 的语法糖）
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "first",
+		Alias:       []string{"head"},
+		Description: "从多个结果中取第一个元素，等价于 {{nth(...|0)}}。例如：{{first({{file:line(xxx.txt)}})}} 取文件第一行",
+		Handler: func(s string) []string {
+			// 按换行符分割，取第一个
+			if strings.Contains(s, "\n") {
+				parts := strings.Split(s, "\n")
+				if len(parts) > 0 {
+					return []string{parts[0]}
+				}
+			}
+			return []string{s}
+		},
+		TagNameVerbose:      "取第一个元素",
+		ArgumentDescription: "{{string(多个结果:数据)}}",
+	})
+
+	// last - 取最后一个元素
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName:     "last",
+		Alias:       []string{"tail"},
+		Description: "从多个结果中取最后一个元素，等价于 {{nth(...|-1)}}。例如：{{last({{file:line(xxx.txt)}})}} 取文件最后一行",
+		Handler: func(s string) []string {
+			// 按换行符分割，取最后一个
+			if strings.Contains(s, "\n") {
+				parts := strings.Split(s, "\n")
+				if len(parts) > 0 {
+					return []string{parts[len(parts)-1]}
+				}
+			}
+			return []string{s}
+		},
+		TagNameVerbose:      "取最后一个元素",
+		ArgumentDescription: "{{string(多个结果:数据)}}",
+	})
+
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName:             "ico",
 		Handler:             func(s string) []string { return []string{"\x00\x00\x01\x00\x01\x00\x20\x20"} },

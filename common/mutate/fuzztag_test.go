@@ -440,3 +440,145 @@ func TestFlowControlTag(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 12)
 }
+
+func TestSplitFuzzTag(t *testing.T) {
+	// 测试基本的字符串切割
+	t.Run("basic split with colon", func(t *testing.T) {
+		results := MutateQuick(`{{split(a:b:c|:|0)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "a", results[0])
+	})
+
+	t.Run("split get second element", func(t *testing.T) {
+		results := MutateQuick(`{{split(a:b:c|:|1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "b", results[0])
+	})
+
+	t.Run("split get last element with negative index", func(t *testing.T) {
+		results := MutateQuick(`{{split(a:b:c|:|-1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "c", results[0])
+	})
+
+	t.Run("split get second to last element", func(t *testing.T) {
+		results := MutateQuick(`{{split(a:b:c|:|-2)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "b", results[0])
+	})
+
+	// 测试不同分隔符
+	t.Run("split with comma", func(t *testing.T) {
+		results := MutateQuick(`{{split(x,y,z|,|1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "y", results[0])
+	})
+
+	t.Run("split with slash", func(t *testing.T) {
+		// /path/to/file 分割后是 ["", "path", "to", "file"]
+		results := MutateQuick(`{{split(/path/to/file|/|1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "path", results[0])
+	})
+
+	// 测试 host:port 场景
+	t.Run("split host:port get host", func(t *testing.T) {
+		results := MutateQuick(`{{split(192.168.1.1:8080|:|0)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "192.168.1.1", results[0])
+	})
+
+	t.Run("split host:port get port", func(t *testing.T) {
+		results := MutateQuick(`{{split(192.168.1.1:8080|:|-1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "8080", results[0])
+	})
+
+	// 测试索引越界
+	t.Run("split index out of range", func(t *testing.T) {
+		results := MutateQuick(`{{split(a:b|:|5)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "", results[0])
+	})
+
+	// 测试只有两个参数（默认逗号分隔）
+	t.Run("split with default comma separator", func(t *testing.T) {
+		results := MutateQuick(`{{split(a,b,c|0)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "a", results[0])
+	})
+
+	// 测试嵌套使用
+	t.Run("split with nested array tag", func(t *testing.T) {
+		results := MutateQuick(`{{split({{array(host1:8080|host2:443)}}|:|0)}}`)
+		require.Len(t, results, 2)
+		require.Contains(t, results, "host1")
+		require.Contains(t, results, "host2")
+	})
+}
+
+func TestNthFuzzTag(t *testing.T) {
+	// 测试基本的取元素
+	t.Run("nth get first element", func(t *testing.T) {
+		results := MutateQuick(`{{nth(line1
+line2
+line3|0)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "line1", results[0])
+	})
+
+	t.Run("nth get second element", func(t *testing.T) {
+		results := MutateQuick(`{{nth(line1
+line2
+line3|1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "line2", results[0])
+	})
+
+	t.Run("nth get last element with negative index", func(t *testing.T) {
+		results := MutateQuick(`{{nth(line1
+line2
+line3|-1)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "line3", results[0])
+	})
+
+	// 测试单行数据
+	t.Run("nth with single line returns original", func(t *testing.T) {
+		results := MutateQuick(`{{nth(singleline|0)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "singleline", results[0])
+	})
+}
+
+func TestFirstFuzzTag(t *testing.T) {
+	t.Run("first get first line", func(t *testing.T) {
+		results := MutateQuick(`{{first(line1
+line2
+line3)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "line1", results[0])
+	})
+
+	t.Run("first with single line", func(t *testing.T) {
+		results := MutateQuick(`{{first(singleline)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "singleline", results[0])
+	})
+}
+
+func TestLastFuzzTag(t *testing.T) {
+	t.Run("last get last line", func(t *testing.T) {
+		results := MutateQuick(`{{last(line1
+line2
+line3)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "line3", results[0])
+	})
+
+	t.Run("last with single line", func(t *testing.T) {
+		results := MutateQuick(`{{last(singleline)}}`)
+		require.Len(t, results, 1)
+		require.Equal(t, "singleline", results[0])
+	})
+}
