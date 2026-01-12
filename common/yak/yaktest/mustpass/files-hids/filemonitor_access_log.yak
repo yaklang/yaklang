@@ -13,7 +13,7 @@ println("=== Testing CREATE operation ===")
 config1 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": ["create"]
+    "monitor_ops": [filemonitor.OP_CREATE]
 }
 
 monitor1, err = filemonitor.NewMonitor(config1)
@@ -21,7 +21,7 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 createLogs = []
 monitor1.SetLogCallback(func(log) {
-    if log.Operation == "create" {
+    if log.Operation == filemonitor.OP_CREATE {
         createLogs = append(createLogs, log)
         println(sprintf("[CREATE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
             log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
@@ -44,7 +44,7 @@ monitor1.Stop()
 assert len(createLogs) > 0, sprintf("Should have create logs, got: %d", len(createLogs))
 for logEntry in createLogs {
     assert logEntry.FilePath != "", "Log entry should have file path"
-    assert logEntry.Operation == "create", "Log entry should be create operation"
+    assert logEntry.Operation == filemonitor.OP_CREATE, "Log entry should be create operation"
     assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
     assert logEntry.User != "", "Log entry should have user"
     assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
@@ -63,7 +63,7 @@ sleep(1)
 config2 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": ["write"]
+    "monitor_ops": [filemonitor.OP_WRITE]
 }
 
 monitor2, err = filemonitor.NewMonitor(config2)
@@ -71,7 +71,7 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 writeLogs = []
 monitor2.SetLogCallback(func(log) {
-    if log.Operation == "write" {
+    if log.Operation == filemonitor.OP_WRITE {
         writeLogs = append(writeLogs, log)
         println(sprintf("[WRITE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
             log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
@@ -93,7 +93,7 @@ monitor2.Stop()
 assert len(writeLogs) > 0, sprintf("Should have write logs, got: %d", len(writeLogs))
 for logEntry in writeLogs {
     assert logEntry.FilePath != "", "Log entry should have file path"
-    assert logEntry.Operation == "write", "Log entry should be write operation"
+    assert logEntry.Operation == filemonitor.OP_WRITE, "Log entry should be write operation"
     assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
     assert logEntry.User != "", "Log entry should have user"
     assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
@@ -112,7 +112,7 @@ sleep(1)
 config3 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": ["delete"]
+    "monitor_ops": [filemonitor.OP_DELETE]
 }
 
 monitor3, err = filemonitor.NewMonitor(config3)
@@ -120,7 +120,7 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 deleteLogs = []
 monitor3.SetLogCallback(func(log) {
-    if log.Operation == "delete" {
+    if log.Operation == filemonitor.OP_DELETE {
         deleteLogs = append(deleteLogs, log)
         println(sprintf("[DELETE] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d", 
             log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
@@ -142,7 +142,7 @@ monitor3.Stop()
 assert len(deleteLogs) > 0, sprintf("Should have delete logs, got: %d", len(deleteLogs))
 for logEntry in deleteLogs {
     assert logEntry.FilePath != "", "Log entry should have file path"
-    assert logEntry.Operation == "delete", "Log entry should be delete operation"
+    assert logEntry.Operation == filemonitor.OP_DELETE, "Log entry should be delete operation"
     assert logEntry.Timestamp > 0, sprintf("Log entry should have timestamp, got: %d", logEntry.Timestamp)
     assert logEntry.User != "", "Log entry should have user"
     assert logEntry.UID >= 0, sprintf("Log entry should have UID, got: %d", logEntry.UID)
@@ -161,7 +161,7 @@ sleep(1)
 config4 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": ["write"]
+    "monitor_ops": [filemonitor.OP_WRITE]
 }
 
 monitor4, err = filemonitor.NewMonitor(config4)
@@ -169,7 +169,7 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 sizeLogs = []
 monitor4.SetLogCallback(func(log) {
-    if log.Operation == "write" {
+    if log.Operation == filemonitor.OP_WRITE {
         sizeLogs = append(sizeLogs, log)
         println(sprintf("[SIZE_TEST] Path: %s, Operation: %s, Size: %d bytes, Timestamp: %d", 
             log.FilePath, log.Operation, log.FileSize, log.Timestamp))
@@ -232,7 +232,7 @@ if len(userLogs) > 1 {
 config6 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": ["create"]
+    "monitor_ops": [filemonitor.OP_CREATE]
 }
 
 monitor6, err = filemonitor.NewMonitor(config6)

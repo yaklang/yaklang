@@ -1,12 +1,6 @@
 // 文件权限变更检测测试
 // 测试功能：权限变更事件捕获、属主变更检测
-
-// 注意：此测试在 Windows 上可能无法完全运行，因为 Windows 的权限模型不同
-if os.OS == "windows" {
-    println("Skipping permission tests on Windows")
-    // 在 Windows 上跳过测试，直接返回
-    return
-}
+// 兼容 Windows 和 Linux 平台
 
 // 创建临时测试文件
 testFile, err = file.TempFileName("file_permission_test_*.txt")
@@ -19,7 +13,7 @@ file.Save(testFile, "Test content for permission change")
 config = {
     "watch_paths": [file.GetDirPath(testFile)],
     "recursive": false,
-    "monitor_ops": ["chmod", "chown"]
+    "monitor_ops": [filemonitor.OP_CHMOD, filemonitor.OP_CHOWN]
 }
 
 monitor, err = filemonitor.NewMonitor(config)
@@ -27,7 +21,7 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 permissionEvents = []
 monitor.SetEventCallback(func(event) {
-    if event.Type == "chmod" || event.Type == "chown" {
+    if event.Type == filemonitor.OP_CHMOD || event.Type == filemonitor.OP_CHOWN {
         permissionEvents = append(permissionEvents, event)
     }
 })
@@ -35,38 +29,86 @@ monitor.SetEventCallback(func(event) {
 err = monitor.Start()
 assert err == nil, sprintf("Failed to start monitor: %v", err)
 
-sleep(1)
+// 等待文件信息初始化完成（initializeFileInfo 是异步的）
+// 轮询间隔是 0.2 秒，等待 3 秒确保文件信息被初始化
+// 需要等待足够的时间，因为文件信息初始化是异步的，而且需要等待至少一次轮询
+sleep(3)
 
 // 获取当前权限
 currentInfo, err = file.Stat(testFile)
 assert err == nil, sprintf("Failed to stat file: %v", err)
 currentMode = currentInfo.Mode()
+println(sprintf("Current file mode: %s (0%o)", currentInfo.Mode().String(), currentMode))
 
 // 修改文件权限（如果可能）
-// 注意：在某些系统上可能需要 root 权限
-newMode = currentMode | 0200 // 添加写权限
+// Windows 和 Linux 都支持 os.Chmod，但权限模型不同
+// 在 Windows 上，使用只读/可写权限切换；在 Linux 上，使用执行权限切换
+newMode = currentMode
+if os.OS == "windows" {
+    // Windows 上切换只读权限
+    if currentMode & 0200 != 0 {
+        // 如果当前有写权限，移除写权限
+        newMode = currentMode &^ 0200
+    } else {
+        // 如果当前没有写权限，添加写权限
+        newMode = currentMode | 0200
+    }
+} else {
+    // Linux 上切换执行权限
+    newMode = currentMode ^ 0100
+}
+
+println(sprintf("Attempting to change file mode from 0%o to 0%o", currentMode, newMode))
 err = os.Chmod(testFile, newMode)
 if err == nil {
-    sleep(1)
-    
-    // 验证权限变更事件
-    assert len(permissionEvents) > 0, "Should capture permission change event"
-    
-    chmodEvent = null
-    for event in permissionEvents {
-        if event.Type == "chmod" && event.Path == testFile {
-            chmodEvent = event
-            break
+    // 验证权限确实改变了
+    afterInfo, err2 = file.Stat(testFile)
+    modeChanged = false
+    if err2 == nil {
+        afterMode = afterInfo.Mode()
+        println(sprintf("File mode after chmod: %s (0%o)", afterInfo.Mode().String(), afterMode))
+        modeChanged = (afterMode != currentMode)
+        if !modeChanged {
+            println("Warning: File mode did not change after chmod, permission change may not be supported on this system")
         }
     }
     
-    assert chmodEvent != null, "Should have chmod event"
-    assert chmodEvent.OldMode != "", "Chmod event should have old mode"
-    assert chmodEvent.NewMode != "", "Chmod event should have new mode"
-    println(sprintf("Permission changed from %s to %s", chmodEvent.OldMode, chmodEvent.NewMode))
+    // 等待文件监控系统检测到权限变更（轮询间隔是 0.2 秒，等待 2 秒确保检测到）
+    sleep(2)
+    
+    println(sprintf("Total permission events captured: %d", len(permissionEvents)))
+    eventIndex = 0
+    for event in permissionEvents {
+        println(sprintf("Event %d: Type=%s, Path=%s", eventIndex, event.Type, event.Path))
+        eventIndex = eventIndex + 1
+    }
+    
+    // 只有在权限确实改变的情况下才验证权限变更事件
+    if modeChanged {
+        // 验证权限变更事件
+        assert len(permissionEvents) > 0, sprintf("Should capture permission change event, got %d events", len(permissionEvents))
+        
+        chmodEvent = nil
+        for event in permissionEvents {
+            if event.Type == filemonitor.OP_CHMOD && event.Path == testFile {
+                chmodEvent = event
+                break
+            }
+        }
+        
+        assert chmodEvent != nil, "Should have chmod event"
+        assert chmodEvent.OldMode != "", "Chmod event should have old mode"
+        assert chmodEvent.NewMode != "", "Chmod event should have new mode"
+        println(sprintf("Permission changed from %s to %s", chmodEvent.OldMode, chmodEvent.NewMode))
+    } else {
+        println("Skipping permission change event validation because mode did not change on this system")
+    }
     
     // 恢复原权限
     os.Chmod(testFile, currentMode)
+} else {
+    // 如果权限变更失败（某些系统上可能不支持），跳过权限变更测试
+    println(sprintf("Failed to change file permission (may not be supported on this system): %v", err))
 }
 
 monitor.Stop()

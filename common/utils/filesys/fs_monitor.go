@@ -157,9 +157,7 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 				return
 			case <-m.RecursiveFinish:
 				events := <-m.Events
-				if !events.IsEmpty() {
-					eventHandler(events)
-				}
+				eventHandler(events)
 			}
 		}
 	}()
