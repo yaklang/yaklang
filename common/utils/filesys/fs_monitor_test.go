@@ -43,21 +43,28 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for the event
-	select {
-	case events := <-eventsChan:
-		require.NotNil(t, events)
-		found := false
-		for _, event := range events.CreateEvents {
-			if event.Path == testFile {
-				found = true
-				require.Equal(t, filesys.FsMonitorCreate, event.Op)
-				require.False(t, event.IsDir)
-				break
+	// 可能需要处理多个事件（包括空事件），所以循环等待直到找到文件创建事件
+	timeout := time.After(5 * time.Second)
+	found := false
+	for !found {
+		select {
+		case events := <-eventsChan:
+			require.NotNil(t, events)
+			// 跳过空事件
+			if events.IsEmpty() {
+				continue
 			}
+			for _, event := range events.CreateEvents {
+				if event.Path == testFile {
+					found = true
+					require.Equal(t, filesys.FsMonitorCreate, event.Op)
+					require.False(t, event.IsDir)
+					break
+				}
+			}
+		case <-timeout:
+			t.Fatal("Timeout waiting for create event")
 		}
-		require.True(t, found, "Should detect file creation")
-	case <-time.After(5 * time.Second):
-		t.Fatal("Timeout waiting for create event")
 	}
 
 	// Delete the file
@@ -65,20 +72,27 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for the delete event
-	select {
-	case events := <-eventsChan:
-		require.NotNil(t, events)
-		found := false
-		for _, event := range events.DeleteEvents {
-			if event.Path == testFile {
-				found = true
-				require.Equal(t, filesys.FsMonitorDelete, event.Op)
-				break
+	// 可能需要处理多个事件（包括空事件），所以循环等待直到找到文件删除事件
+	timeout = time.After(5 * time.Second)
+	found = false
+	for !found {
+		select {
+		case events := <-eventsChan:
+			require.NotNil(t, events)
+			// 跳过空事件
+			if events.IsEmpty() {
+				continue
 			}
+			for _, event := range events.DeleteEvents {
+				if event.Path == testFile {
+					found = true
+					require.Equal(t, filesys.FsMonitorDelete, event.Op)
+					break
+				}
+			}
+		case <-timeout:
+			t.Fatal("Timeout waiting for delete event")
 		}
-		require.True(t, found, "Should detect file deletion")
-	case <-time.After(5 * time.Second):
-		t.Fatal("Timeout waiting for delete event")
 	}
 }
 
