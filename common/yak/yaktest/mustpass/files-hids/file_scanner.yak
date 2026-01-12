@@ -1,0 +1,71 @@
+// 文件扫描器测试
+// 覆盖：单文件扫描、目录扫描、包含/排除过滤
+
+tempBase = os.TempDir()
+testDir = file.Join(tempBase, sprintf("file_scanner_test_%d", time.Now().Unix()))
+err = file.MkdirAll(testDir)
+assert err == nil, sprintf("Failed to create temp dir: %v", err)
+defer file.Remove(testDir)
+
+malicious = `<?php
+eval($_POST['cmd']);
+system($_GET['exec']);
+?>`
+
+normal = `<?php
+echo "Hello World";
+?>`
+
+phpFile = file.Join(testDir, "webshell.php")
+normalFile = file.Join(testDir, "normal.php")
+txtFile = file.Join(testDir, "note.txt")
+file.Save(phpFile, malicious)
+file.Save(normalFile, normal)
+file.Save(txtFile, "just a note")
+
+config = {
+    "enable_risk": false,
+    "recursive": true,
+    "include_patterns": ["*.php", "*.txt"],
+}
+
+scanner, err = filescanner.NewScanner(config)
+assert err == nil, sprintf("Failed to create scanner: %v", err)
+
+result, err = scanner.ScanFile(phpFile)
+assert err == nil, sprintf("ScanFile failed: %v", err)
+assert result.Matched == true, "Malicious file should be matched"
+assert len(result.Matches) > 0, "Matches should not be empty"
+assert result.MimeType != "", "Mime type should not be empty"
+assert result.Md5 != "", "MD5 should not be empty"
+
+result2, err = scanner.ScanFile(normalFile)
+assert err == nil, sprintf("ScanFile failed: %v", err)
+assert result2.Skipped == false, "Normal file should not be skipped"
+
+results, err = scanner.ScanDir(testDir)
+assert err == nil, sprintf("ScanDir failed: %v", err)
+assert len(results) >= 2, sprintf("ScanDir should return results, got: %d", len(results))
+
+matchedCount = 0
+for r in results {
+    if r.Matched {
+        matchedCount = matchedCount + 1
+    }
+}
+assert matchedCount >= 1, sprintf("Expected at least one matched file, got: %d", matchedCount)
+
+config2 = {
+    "enable_risk": false,
+    "include_patterns": ["*.php"],
+    "exclude_patterns": ["normal.php"],
+}
+scanner2, err = filescanner.NewScanner(config2)
+assert err == nil, sprintf("Failed to create scanner: %v", err)
+
+result3, err = scanner2.ScanFile(normalFile)
+assert err == nil, sprintf("ScanFile failed: %v", err)
+assert result3.Skipped == true, "Excluded file should be skipped"
+assert result3.SkipReason == "excluded", sprintf("Unexpected skip reason: %s", result3.SkipReason)
+
+println("File scanner tests passed!")

@@ -144,6 +144,7 @@ func initYaklangLib() {
 	yaklang.Import("file", yaklib.FileExport)
 	yaklang.Import("fileparser", fileparser.Exports)
 	yaklang.Import("filemonitor", yaklib.FileMonitorExports)
+	yaklang.Import("filescanner", yaklib.FileScannerExports)
 	//excel
 	yaklang.Import("excel", excelparser.ExcelExports)
 	yaklang.Import("filesys", filesys.Exports)

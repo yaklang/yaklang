@@ -14,7 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "file_type_magic.yak"
+	debugName := "file_scanner.yak"
 	var debugCases [][]string
 
 	// 检查通用测试文件
