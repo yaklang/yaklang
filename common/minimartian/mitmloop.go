@@ -18,7 +18,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/sysproc"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -695,17 +694,15 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}
 	defer req.Body.Close()
 
+	session := ctx.Session()
+
 	// set process name
 	if p.findProcessName {
-		_, name, err := sysproc.FindProcessNameByConn(conn)
-		if err != nil {
-			log.Errorf("mitm: conn[%s->%s] failed to get process name: %v", conn.LocalAddr(), conn.RemoteAddr(), err)
-		} else {
+		name := p.getProcessNameCached(session, conn)
+		if name != "" {
 			httpctx.SetProcessName(req, name)
 		}
 	}
-
-	session := ctx.Session()
 	ctx, err := withSession(session)
 	if err != nil {
 		log.Errorf("mitm: failed to build new context: %v", err)

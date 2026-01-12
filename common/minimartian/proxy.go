@@ -32,6 +32,7 @@ import (
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/sysproc"
 )
 
 var (
@@ -379,6 +380,27 @@ func (p *Proxy) selectProxiesForHost(host string) []string {
 
 func (p *Proxy) SetFindProcessName(b bool) {
 	p.findProcessName = b
+}
+
+const sessionKeyProcessName = "__cached_process_name__"
+
+// getProcessNameCached 获取进程名，优先从 session 缓存读取
+func (p *Proxy) getProcessNameCached(session *Session, conn net.Conn) string {
+	if cached, ok := session.Get(sessionKeyProcessName); ok {
+		if name, ok := cached.(string); ok {
+			return name
+		}
+	}
+
+	_, name, err := sysproc.FindProcessNameByConn(conn)
+	if err != nil {
+		log.Errorf("mitm: conn[%s->%s] failed to get process name: %v",
+			conn.LocalAddr(), conn.RemoteAddr(), err)
+		return ""
+	}
+
+	session.Set(sessionKeyProcessName, name)
+	return name
 }
 
 func (p *Proxy) SetDisableSystemProxy(b bool) {
