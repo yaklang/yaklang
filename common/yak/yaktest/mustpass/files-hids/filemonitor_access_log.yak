@@ -13,7 +13,8 @@ println("=== Testing CREATE operation ===")
 config1 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": [filemonitor.OP_CREATE]
+    "monitor_ops": [filemonitor.OP_CREATE],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor1, err = filemonitor.NewMonitor(config1)
@@ -63,7 +64,8 @@ sleep(1)
 config2 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": [filemonitor.OP_WRITE]
+    "monitor_ops": [filemonitor.OP_WRITE],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor2, err = filemonitor.NewMonitor(config2)
@@ -112,7 +114,8 @@ sleep(1)
 config3 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": [filemonitor.OP_DELETE]
+    "monitor_ops": [filemonitor.OP_DELETE],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor3, err = filemonitor.NewMonitor(config3)
@@ -161,7 +164,8 @@ sleep(1)
 config4 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": [filemonitor.OP_WRITE]
+    "monitor_ops": [filemonitor.OP_WRITE],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor4, err = filemonitor.NewMonitor(config4)
@@ -232,7 +236,8 @@ if len(userLogs) > 1 {
 config6 = {
     "watch_paths": [testDir],
     "recursive": true,
-    "monitor_ops": [filemonitor.OP_CREATE]
+    "monitor_ops": [filemonitor.OP_CREATE],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor6, err = filemonitor.NewMonitor(config6)

@@ -28,7 +28,7 @@ func TestHandlerFileMonitor_FileChanges(t *testing.T) {
 	}
 
 	// Manually create a monitor (bypassing the handler for this test)
-	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler)
+	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler, filesys.WithPollInterval(200*time.Millisecond))
 	require.NoError(t, err)
 	defer func() {
 		monitor.CancelFunc()
@@ -113,7 +113,7 @@ func TestHandlerFileMonitor_DirectoryChanges(t *testing.T) {
 	}
 
 	// Manually create a monitor
-	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler)
+	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler, filesys.WithPollInterval(200*time.Millisecond))
 	require.NoError(t, err)
 	defer func() {
 		monitor.CancelFunc()
@@ -166,7 +166,7 @@ func TestHandlerFileMonitor_NestedFiles(t *testing.T) {
 	}
 
 	// Create a monitor
-	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler)
+	monitor, err := filesys.WatchPath(ctx, tmpDir, eventsHandler, filesys.WithPollInterval(200*time.Millisecond))
 	require.NoError(t, err)
 	defer func() {
 		monitor.CancelFunc()

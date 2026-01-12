@@ -51,6 +51,7 @@ type FileMonitorConfig struct {
 	Recursive       bool                    `json:"recursive"`
 	MonitorOps      []string                `json:"monitor_ops"`
 	MaxFileSize     int64                   `json:"max_file_size"`
+	PollInterval    time.Duration           `json:"poll_interval"`
 	LogCallback     func(*FileAccessLog)    `json:"-"`
 	EventCallback   func(*FileMonitorEvent) `json:"-"`
 }
@@ -152,7 +153,12 @@ func (fm *FileMonitor) Start() error {
 			fm.checkPermissionChanges()
 		}
 
-		monitor, err := filesys.WatchPath(fm.ctx, absPath, eventHandler)
+		var opts []filesys.WatchPathOption
+		if fm.config.PollInterval > 0 {
+			opts = append(opts, filesys.WithPollInterval(fm.config.PollInterval))
+		}
+
+		monitor, err := filesys.WatchPath(fm.ctx, absPath, eventHandler, opts...)
 		if err != nil {
 			return utils.Errorf("failed to watch path %s: %v", absPath, err)
 		}
@@ -768,15 +774,41 @@ func parseFileMonitorConfigFromMap(config map[string]interface{}) *FileMonitorCo
 		monitorConfig.MonitorOps = ops
 	}
 
+	if pollInterval, ok := config["poll_interval"]; ok {
+		var intervalSeconds float64
+		if interval, ok := pollInterval.(int); ok {
+			intervalSeconds = float64(interval)
+		} else if interval, ok := pollInterval.(int64); ok {
+			intervalSeconds = float64(interval)
+		} else if interval, ok := pollInterval.(float64); ok {
+			intervalSeconds = interval
+		}
+		if intervalSeconds > 0 {
+			monitorConfig.PollInterval = time.Duration(intervalSeconds * float64(time.Second))
+		}
+	}
+
 	return monitorConfig
+}
+
+// NewMonitor 创建新的文件监控器
+// 参数 config 支持的配置项：
+//   - watch_paths: []string，必需，要监控的路径列表
+//   - recursive: bool，可选，是否递归监控子目录，默认为 true
+//   - include_patterns: []string，可选，包含的文件模式（支持 glob 和正则表达式）
+//   - exclude_patterns: []string，可选，排除的文件模式（支持 glob 和正则表达式）
+//   - monitor_ops: []string，可选，要监控的操作类型，可选值：OP_CREATE, OP_WRITE, OP_DELETE, OP_CHMOD, OP_CHOWN
+//   - max_file_size: int，可选，最大文件大小（字节），默认 10MB
+//   - poll_interval: float64，可选，轮询间隔（秒），默认 5 秒
+// 返回文件监控器实例和错误信息
+func NewMonitor(config map[string]interface{}) (*FileMonitor, error) {
+	monitorConfig := parseFileMonitorConfigFromMap(config)
+	return NewFileMonitor(monitorConfig)
 }
 
 // FileMonitorExports 文件监控导出函数
 var FileMonitorExports = map[string]interface{}{
-	"NewMonitor": func(config map[string]interface{}) (*FileMonitor, error) {
-		monitorConfig := parseFileMonitorConfigFromMap(config)
-		return NewFileMonitor(monitorConfig)
-	},
+	"NewMonitor": NewMonitor,
 	// 文件操作类型常量
 	"OP_CREATE": FileOpCreate,
 	"OP_WRITE":  FileOpWrite,
