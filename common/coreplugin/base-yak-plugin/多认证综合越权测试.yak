@@ -89,9 +89,11 @@ JSON,
     ), 
     cli.setRequired(true), 
 )
+enableUnauth = cli.Bool("enable-unauth", cli.setRequired(true), cli.setVerboseName("未授权检测"), cli.setHelp("【开启】会测试两种场景：1) 用配置的认证信息发送请求（横向越权检测）；2) 移除认证信息发送请求（未授权访问检测）。【关闭】仅测试：用配置的认证信息发送请求（横向越权检测），不测试未授权访问。注意：此功能仅在配置了认证信息且认证Value不为空时生效"), cli.setDefault(true))
 disableDomain = cli.String("disable-domain", cli.setRequired(false), cli.setVerboseName("不检测的域名"), cli.setCliGroup("高级（可选参数）"))
 disablePath = cli.String("disable-path", cli.setRequired(false), cli.setVerboseName("不检测的路径"), cli.setCliGroup("高级（可选参数）"))
-disableSuffix = cli.StringSlice("disable-suffix", cli.setVerboseName("不检测的后缀类型"),cli.setCliGroup("高级（可选参数）"),cli.setMultipleSelect(true))
+disableTypes = cli.StringSlice("disable-types", cli.setMultipleSelect(true), cli.setSelectOption("js", "js"), cli.setSelectOption("css", "css"), cli.setSelectOption("img", "img"), cli.setSelectOption("font", "font"), cli.setDefault("js,css,img,font"), cli.setRequired(false), cli.setVerboseName("忽略静态资源类型"), cli.setCliGroup("高级（可选参数）"))
+disableSuffix = cli.StringSlice("disable-suffix", cli.setVerboseName("不检测的后缀类型"), cli.setCliGroup("高级（可选参数）"), cli.setMultipleSelect(true))
 
 
 enableDomain = cli.String("enable-domain", cli.setRequired(false), cli.setVerboseName("需检测域名"), cli.setCliGroup("高级（可选参数）"))
@@ -103,14 +105,32 @@ enableResponseKeywordRegexp = cli.Bool(
     cli.setVerboseName("响应内容标志值开启正则"),
     cli.setCliGroup("高级（可选参数）"),
 )
-onlyCheckBody = cli.Bool("only-body", cli.setVerboseName("只检查响应体"),cli.setCliGroup("高级（可选参数）"))
+onlyCheckBody = cli.Bool("only-body", cli.setVerboseName("只检查响应体"), cli.setDefault(true), cli.setCliGroup("高级（可选参数）"))
 
 
 cli.check()
 
 yakit.AutoInitYakit()
+
+ruleMap = {
+    "js": [
+        "*.js", "*.mjs", "*.jsx", "*.ts", "*.tsx", "*.map",
+    ],
+    "css": [
+        "*.css", "*.scss", "*.sass", "*.less",
+    ],
+    "img": [
+        "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.webp", "*.ico", "*.bmp",
+    ],
+    "font": [
+        "*.woff", "*.woff2", "*.ttf", "*.otf", "*.eot",
+    ],
+}
+
 once = sync.NewOnce()
 groupMap = make(map[string][]any)
+disableRules = []
+
 for _, item = range args["kvs"] {
     group = item["group"]
     if group == "" {
@@ -120,6 +140,10 @@ for _, item = range args["kvs"] {
         groupMap[group] = make([]any, 0, 1)
     }
     groupMap[group] = append(groupMap[group], item)
+}
+
+for _, types = range disableTypes {
+    disableRules = append(disableRules, ruleMap[types]...)
 }
 
 
@@ -238,6 +262,18 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
     replaceResults = []
     emptyResults = []
     originReq = req
+
+    // 判断当前是否存在认证信息（决定是否启用未授权测试）
+    hasAuth = false
+    for _, items = range groupMap {
+        for _, item = range items {
+            if str.TrimSpace(item.value) != "" {
+                hasAuth = true
+                break
+            }
+        }
+    }
+
     for _, items = range groupMap {
         replacedTmp = []
         emptyTmp  = []
@@ -285,8 +321,12 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
                 skipped = !respMatch(rsp, enableResponseKeywordList...)
             }
 
-            if !skipped && str.StringSliceContains(disableSuffix, file.GetExt(urlRawPath)) {
-                skipped = true
+            if !skipped && len(disableRules) > 0 {
+                skipped = str.MatchAnyOfGlob(str.Split(urlRawPath, "?")[0], disableRules...)
+            }
+
+            if !skipped && len(disableSuffix) > 0 {
+                skipped = str.StringSliceContains(disableSuffix, file.GetExt(urlRawPath))
             }
 
             if skipped {
@@ -340,23 +380,28 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
         handleReq(https, replaceReq, rsp, tag)
     }
 
-    for seq in Product(emptyResults) {
-        emptyReq = originReq
-        tags = []
-        for m in seq {
-            kind, key, value = m.kind, m.key, m.value
-            if kind == "Header" {
-                if poc.GetHTTPPacketHeader(emptyReq, key) {
-                    emptyReq = poc.ReplaceHTTPPacketHeader(emptyReq, key, value)
+    // 未授权测试：仅满足条件时才执行
+    // 1. 用户填写了认证信息
+    // 2. 勾选了未授权检测开关
+    if hasAuth && enableUnauth {
+        for seq in Product(emptyResults) {
+            emptyReq = originReq
+            tags = []
+            for m in seq {
+                kind, key, value = m.kind, m.key, m.value
+                if kind == "Header" {
+                    if poc.GetHTTPPacketHeader(emptyReq, key) {
+                        emptyReq = poc.ReplaceHTTPPacketHeader(emptyReq, key, value)
+                    }
+                } else if kind == "Cookie" {
+                    if poc.GetHTTPPacketCookie(emptyReq, key) {
+                        emptyReq = poc.ReplaceHTTPPacketCookie(emptyReq, key, value)
+                    }
                 }
-            } else if kind == "Cookie" {
-                if poc.GetHTTPPacketCookie(emptyReq, key) {
-                    emptyReq = poc.ReplaceHTTPPacketCookie(emptyReq, key, value)
-                }
+                tags = append(tags, f"${kind}[${key}]")
             }
-            tags = append(tags, f"${kind}[${key}]")
+            tag = f"未授权检测 | 移除 ${str.Join(tags, ", ")}"
+            handleReq(https, emptyReq, rsp, tag)
         }
-        tag = f"移除 ${str.Join(tags, ", ")}"
-        handleReq(https, emptyReq, rsp, tag)
     }
 }
