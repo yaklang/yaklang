@@ -5,9 +5,11 @@ import (
 	"net/netip"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"golang.org/x/sys/windows"
 )
@@ -18,6 +20,8 @@ const (
 	udpTableFunc      = "GetExtendedUdpTable"
 	udpTablePid       = 1
 	queryProcNameFunc = "QueryFullProcessImageNameW"
+
+	processCacheTTL = 30 * time.Second
 )
 
 var (
@@ -26,7 +30,14 @@ var (
 	queryProcName uintptr
 
 	once sync.Once
+
+	processCache = utils.NewTTLCache[*processInfo](processCacheTTL)
 )
+
+type processInfo struct {
+	pid  uint32
+	name string
+}
 
 func resolveSocketByNetlink(network string, ip netip.Addr, srcPort int) (uint32, uint32, error) {
 	return 0, 0, ErrPlatformNotSupport
@@ -70,6 +81,19 @@ func findProcessName(network string, ip netip.Addr, srcPort int) (uint32, string
 			return
 		}
 	})
+
+	cacheKey := fmt.Sprintf("%s:%s:%d", network, ip.String(), srcPort)
+
+	info, err := processCache.GetOrLoad(cacheKey, func() (*processInfo, error) {
+		return doFindProcessName(network, ip, srcPort)
+	})
+	if err != nil {
+		return 0, "", err
+	}
+	return info.pid, info.name, nil
+}
+
+func doFindProcessName(network string, ip netip.Addr, srcPort int) (*processInfo, error) {
 	family := windows.AF_INET
 	if ip.Is6() {
 		family = windows.AF_INET6
@@ -85,22 +109,27 @@ func findProcessName(network string, ip netip.Addr, srcPort int) (uint32, string
 		fn = getExUDPTable
 		class = udpTablePid
 	default:
-		return 0, "", ErrInvalidNetwork
+		return nil, ErrInvalidNetwork
 	}
 
 	buf, err := getTransportTable(fn, family, class)
 	if err != nil {
-		return 0, "", err
+		return nil, err
 	}
 
 	s := newSearcher(family == windows.AF_INET, network == TCP)
 
 	pid, err := s.Search(buf, ip, uint16(srcPort))
 	if err != nil {
-		return 0, "", err
+		return nil, err
 	}
-	pp, err := getExecPathFromPID(pid)
-	return 0, pp, err
+
+	name, err := getExecPathFromPID(pid)
+	if err != nil {
+		return nil, err
+	}
+
+	return &processInfo{pid: pid, name: name}, nil
 }
 
 type searcher struct {
