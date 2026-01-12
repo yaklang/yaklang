@@ -849,6 +849,12 @@ func (c *Crawler) preReq(r *Req) bool {
 
 func (c *Crawler) submit(r *Req) {
 	c.reqWaitGroup.Add(1)
+	defer func() {
+		if err := recover(); err != nil {
+			// channel 已关闭，回滚 WaitGroup 计数
+			c.reqWaitGroup.Done()
+		}
+	}()
 	select {
 	case c.reqChan <- r:
 	}
