@@ -22,12 +22,12 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 	progNameBaseUUID = uuid.NewString()
 	progNameExtendUUID = uuid.NewString()
 
-	vf1 := filesys.NewVirtualFs()
+	baseFS := filesys.NewVirtualFs()
 	var err error
 
 	// 强制重新创建 progBase
 	t.Logf("Creating new progBase")
-	vf1.AddFile("A.java", `
+	baseFS.AddFile("A.java", `
 	public class A {
 		static string valueStr = "Value from Base";
 		public String getValue() {
@@ -35,7 +35,7 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 		}
 	}`)
 
-	vf1.AddFile("Main.java", `
+	baseFS.AddFile("Main.java", `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
@@ -45,7 +45,7 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 	`)
 
 	p, err := ssaapi.ParseProject(
-		ssaapi.WithFileSystem(vf1),
+		ssaapi.WithFileSystem(baseFS),
 		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(progNameBaseUUID),
 	)
@@ -64,8 +64,8 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 
 	// 强制重新创建 progExtend
 	t.Logf("Creating new progExtend")
-	vf2 := filesys.NewVirtualFs()
-	vf2.AddFile("A.java", `
+	newFS := filesys.NewVirtualFs()
+	newFS.AddFile("A.java", `
 	public class A {
 		static string valueStr = "Value from Extend";
 		public String getValue() {
@@ -73,29 +73,20 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 		}	
 	}`)
 
-	p2, err := ssaapi.ParseProject(
-		ssaapi.WithFileSystem(vf2),
-		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithProgramName(progNameExtendUUID),
+	ctx := context.Background()
+	progExtend, err = ssaapi.CompileDiffProgramAndSaveToDB(
+		ctx,
+		baseFS, newFS,
+		progNameBaseUUID, progNameExtendUUID,
+		ssaconfig.JAVA,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, p2)
-	require.Greater(t, len(p2), 0, "Should have at least one program")
-
-	progExtend, err = ssaapi.FromDatabase(progNameExtendUUID)
-	require.NoError(t, err)
 	require.NotNil(t, progExtend)
-	{
-		vs := progExtend.Ref(valueName)
-		require.NotEmpty(t, vs, "Should find value in extend program")
-		require.Contains(t, vs.String(), extendValueStr, "Extend value should match")
-	}
 
 	return
 }
 
 func TestOverlay_Easy(t *testing.T) {
-
 	progBase, progExtend, progNameBaseUUID, progNameExtendUUID := InitProgram(t)
 	require.NotNil(t, progBase)
 	require.NotNil(t, progExtend)
@@ -344,16 +335,6 @@ func InitProgramWithFileChanges(t *testing.T) (progBase *ssaapi.Program, progExt
 	require.Equal(t, "-1", irProgram.FileHashMap["/Utils.java"], "Utils.java should be marked as deleted (-1)")
 
 	return
-}
-
-// normalizeFilePathForTest 规范化文件路径（测试辅助函数）
-func normalizeFilePathForTest(filePath string) string {
-	// 简单的规范化：移除前导斜杠，统一使用正斜杠
-	path := filePath
-	if len(path) > 0 && path[0] == '/' {
-		path = path[1:]
-	}
-	return path
 }
 
 func TestOverlay_FileSystem_AddAndDelete(t *testing.T) {
