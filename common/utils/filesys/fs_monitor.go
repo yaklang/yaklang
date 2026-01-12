@@ -51,7 +51,8 @@ type YakFileMonitor struct {
 	FileTreeMutex sync.Mutex
 	FileTree      *FileNode
 
-	WatchPatch string
+	WatchPatch   string
+	PollInterval time.Duration
 
 	Ctx        context.Context
 	CancelFunc context.CancelFunc
@@ -113,14 +114,23 @@ func (m *YakFileMonitor) SetFileTree(fileTree *FileNode) {
 	m.FileTree = fileTree
 }
 
-func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler) (*YakFileMonitor, error) {
+func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandler, opts ...WatchPathOption) (*YakFileMonitor, error) {
 	ctx, cancelFunc := context.WithCancel(ctx)
+	
+	config := &watchPathConfig{
+		PollInterval: 5 * time.Second,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	m := &YakFileMonitor{
 		Events:          make(chan *EventSet, 10),
 		Ctx:             ctx,
 		CancelFunc:      cancelFunc,
 		RecursiveFinish: make(chan struct{}, 10),
 		WatchPatch:      path,
+		PollInterval:    config.PollInterval,
 	}
 
 	var err error
@@ -129,10 +139,9 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 		return nil, utils.Errorf("failed to watch path: %s", err)
 	}
 
-	// watch file
 	go func() {
 		for {
-			time.Sleep(200 * time.Millisecond) // 0.2秒轮询一次，提高检测灵敏度
+			time.Sleep(m.PollInterval)
 			select {
 			case <-m.Ctx.Done():
 				return
@@ -163,6 +172,18 @@ func WatchPath(ctx context.Context, path string, eventHandler MonitorEventHandle
 	}()
 
 	return m, nil
+}
+
+type watchPathConfig struct {
+	PollInterval time.Duration
+}
+
+type WatchPathOption func(*watchPathConfig)
+
+func WithPollInterval(interval time.Duration) WatchPathOption {
+	return func(c *watchPathConfig) {
+		c.PollInterval = interval
+	}
 }
 
 func CompareFileTree(prev, current *FileNode) *EventSet {

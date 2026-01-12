@@ -13,7 +13,8 @@ file.Save(testFile, "Test content for permission change")
 config = {
     "watch_paths": [file.GetDirPath(testFile)],
     "recursive": false,
-    "monitor_ops": [filemonitor.OP_CHMOD, filemonitor.OP_CHOWN]
+    "monitor_ops": [filemonitor.OP_CHMOD, filemonitor.OP_CHOWN],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
 }
 
 monitor, err = filemonitor.NewMonitor(config)
@@ -30,9 +31,8 @@ err = monitor.Start()
 assert err == nil, sprintf("Failed to start monitor: %v", err)
 
 // 等待文件信息初始化完成（initializeFileInfo 是异步的）
-// 轮询间隔是 0.2 秒，等待 3 秒确保文件信息被初始化
-// 需要等待足够的时间，因为文件信息初始化是异步的，而且需要等待至少一次轮询
-sleep(3)
+// 轮询间隔是 200ms，等待 1 秒确保文件信息被初始化
+sleep(1)
 
 // 获取当前权限
 currentInfo, err = file.Stat(testFile)
@@ -73,8 +73,8 @@ if err == nil {
         }
     }
     
-    // 等待文件监控系统检测到权限变更（轮询间隔是 0.2 秒，等待 2 秒确保检测到）
-    sleep(2)
+    // 等待文件监控系统检测到权限变更（轮询间隔是 200ms，等待 1 秒确保检测到）
+    sleep(1)
     
     println(sprintf("Total permission events captured: %d", len(permissionEvents)))
     eventIndex = 0
