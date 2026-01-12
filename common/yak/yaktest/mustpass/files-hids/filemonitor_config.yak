@@ -72,7 +72,7 @@ monitor3.Stop()
 config4 = {
     "watch_paths": [testDir],
     "recursive": false,
-    "monitor_ops": ["create", "write", "delete"]
+    "monitor_ops": [filemonitor.OP_CREATE, filemonitor.OP_WRITE, filemonitor.OP_DELETE]
 }
 
 monitor4, err = filemonitor.NewMonitor(config4)
@@ -80,9 +80,9 @@ assert err == nil, sprintf("Failed to create monitor: %v", err)
 
 monitorConfig4 = monitor4.GetConfig()
 assert len(monitorConfig4.MonitorOps) == 3, sprintf("Should have 3 monitor ops, got: %d", len(monitorConfig4.MonitorOps))
-assert "create" in monitorConfig4.MonitorOps, "Should monitor create"
-assert "write" in monitorConfig4.MonitorOps, "Should monitor write"
-assert "delete" in monitorConfig4.MonitorOps, "Should monitor delete"
+assert filemonitor.OP_CREATE in monitorConfig4.MonitorOps, "Should monitor create"
+assert filemonitor.OP_WRITE in monitorConfig4.MonitorOps, "Should monitor write"
+assert filemonitor.OP_DELETE in monitorConfig4.MonitorOps, "Should monitor delete"
 
 monitor4.Stop()
 
@@ -108,7 +108,7 @@ config6 = {
     "max_file_size": 10 * 1024 * 1024, // 10MB
     "include_patterns": ["*.txt", "*.log"],
     "exclude_patterns": ["*.tmp"],
-    "monitor_ops": ["create", "write", "delete", "chmod", "chown"]
+    "monitor_ops": [filemonitor.OP_CREATE, filemonitor.OP_WRITE, filemonitor.OP_DELETE, filemonitor.OP_CHMOD, filemonitor.OP_CHOWN]
 }
 
 monitor6, err = filemonitor.NewMonitor(config6)

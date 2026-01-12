@@ -149,6 +149,7 @@ func (fm *FileMonitor) Start() error {
 
 		eventHandler := func(events *filesys.EventSet) {
 			fm.handleFileSystemEvents(events)
+			fm.checkPermissionChanges()
 		}
 
 		monitor, err := filesys.WatchPath(fm.ctx, absPath, eventHandler)
@@ -466,8 +467,29 @@ func (fm *FileMonitor) handleFileSystemEvents(events *filesys.EventSet) {
 		processedPaths[event.Path] = true
 	}
 
+	fm.checkPermissionChangesForPaths(processedPaths)
+}
+
+// checkPermissionChanges 检查所有已监控文件的权限变更
+func (fm *FileMonitor) checkPermissionChanges() {
+	fm.checkPermissionChangesForPaths(nil)
+}
+
+// checkPermissionChangesForPaths 检查指定路径的权限变更（排除已处理的路径）
+func (fm *FileMonitor) checkPermissionChangesForPaths(processedPaths map[string]bool) {
+	// 检查 fm 和 config 是否有效
+	if fm == nil || fm.config == nil || fm.fileInfos == nil {
+		return
+	}
+
+	if processedPaths == nil {
+		processedPaths = make(map[string]bool)
+	}
+
+	checkedCount := 0
 	fm.fileInfos.Range(func(key, value interface{}) bool {
 		path := key.(string)
+		checkedCount++
 
 		if processedPaths[path] {
 			return true
@@ -484,17 +506,32 @@ func (fm *FileMonitor) handleFileSystemEvents(events *filesys.EventSet) {
 
 			// 检查权限变更
 			if oldFileInfo.Mode != newFileInfo.Mode {
+				if log.GetLevel() == log.DebugLevel {
+					log.Debugf("detected permission change for %s: %s -> %s", path, oldFileInfo.Mode.String(), newFileInfo.Mode.String())
+				}
 				fm.recordEvent(FileOpChmod, path, info.IsDir(), info)
+				// 权限变更后更新文件信息
+				fm.fileInfos.Store(path, newFileInfo)
+			} else {
+				// 即使权限没有变更，也要更新文件信息（以防其他属性变更）
+				fm.fileInfos.Store(path, newFileInfo)
 			}
 
 			// 检查属主变更
 			if oldFileInfo.UID != 0 || newFileInfo.UID != 0 {
 				if oldFileInfo.UID != newFileInfo.UID || oldFileInfo.GID != newFileInfo.GID {
+					if log.GetLevel() == log.DebugLevel {
+						log.Debugf("detected ownership change for %s: UID %d->%d, GID %d->%d", path, oldFileInfo.UID, newFileInfo.UID, oldFileInfo.GID, newFileInfo.GID)
+					}
 					fm.recordEvent(FileOpChown, path, info.IsDir(), info)
+					// 属主变更后更新文件信息
+					fm.fileInfos.Store(path, newFileInfo)
 				}
 			}
-
-			// 更新文件信息
+		} else {
+			// 文件信息不存在，先初始化它（可能是异步初始化还没完成）
+			// 这种情况下不触发权限变更事件，因为无法知道之前的权限
+			newFileInfo := fm.getFileInfo(path, info)
 			fm.fileInfos.Store(path, newFileInfo)
 		}
 
@@ -556,6 +593,14 @@ func (fm *FileMonitor) recordEvent(opType, path string, isDir bool, info os.File
 }
 
 func (fm *FileMonitor) recordEventWithOldInfo(opType, path string, isDir bool, info os.FileInfo, oldInfo *FileInfo) {
+	// 检查 config 和 eventChan 是否有效
+	if fm.config == nil {
+		return
+	}
+	if fm.eventChan == nil {
+		return
+	}
+
 	if len(fm.config.MonitorOps) > 0 {
 		found := false
 		for _, op := range fm.config.MonitorOps {
@@ -732,4 +777,10 @@ var FileMonitorExports = map[string]interface{}{
 		monitorConfig := parseFileMonitorConfigFromMap(config)
 		return NewFileMonitor(monitorConfig)
 	},
+	// 文件操作类型常量
+	"OP_CREATE": FileOpCreate,
+	"OP_WRITE":  FileOpWrite,
+	"OP_DELETE": FileOpDelete,
+	"OP_CHMOD":  FileOpChmod,
+	"OP_CHOWN":  FileOpChown,
 }
