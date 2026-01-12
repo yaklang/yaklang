@@ -6,6 +6,8 @@ on:
     branches:
       - "aitool/*"
       - "feature/aitool*"
+    paths:
+      - ".github/workflows/updateAIToolsAndSkills.yaml"
   schedule:
     # 定时任务，在每周三0点更新（与CVE周一、CWE周二错开）
     - cron: '0 0 * * 3'
@@ -20,21 +22,13 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-        id: go
-
-      - name: Init Module
+      - name: Download Yak Engine from OSS
         run: |
-          go mod tidy
-
-      - name: Build yak
-        run: |
-          go build -o ./yak ./common/yak/cmd/yak.go
+          YAK_VERSION="1.4.5-beta5"
+          echo "Downloading Yak engine version: $YAK_VERSION"
+          wget -q -O './yak' "https://aliyun-oss.yaklang.com/yak/${YAK_VERSION}/yak_linux_amd64"
           chmod +x ./yak
+          ./yak version
 
       - name: Create output directory
         run: mkdir -p $HOME/yakit-projects
