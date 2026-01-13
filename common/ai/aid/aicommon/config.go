@@ -1674,6 +1674,20 @@ func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
 	_ = s
 }
 
+// EventFormat fills in common fields for AI output events
+func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+	// set ai service
+	if c.AiServerName != "" {
+		e.AIService = c.AiServerName  // set ai service name
+		e.AIModelName = c.AiModelName // set ai model name
+	}
+
+	if c.PersistentSessionId != "" {
+		e.SessionId = c.PersistentSessionId
+	}
+	return e
+}
+
 func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	select {
 	case <-c.Ctx.Done():
@@ -1681,11 +1695,7 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	default:
 	}
 
-	// set ai service
-	if c.AiServerName != "" {
-		e.AIService = c.AiServerName  // set ai service name
-		e.AIModelName = c.AiModelName // set ai model name
-	}
+	e = c.EventFormat(e)
 
 	if e.ShouldSave() {
 		err := yakit.CreateOrUpdateAIOutputEvent(consts.GetGormProjectDatabase(), e)
@@ -1949,6 +1959,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// PlanPrompt - additional context for plan phase only
 	if i.PlanPrompt != "" {
 		opts = append(opts, WithPlanPrompt(i.PlanPrompt))
+	}
+
+	if i.PersistentSessionId != "" {
+		opts = append(opts, WithPersistentSessionId(i.PersistentSessionId))
 	}
 
 	opts = append(opts, WithContext(i.Ctx))

@@ -174,6 +174,7 @@ type AiOutputEvent struct {
 	ContentType string
 	AIService   string
 	AIModelName string
+	SessionId   string
 }
 
 func (e *AiOutputEvent) GetContentJSONPath(p string) string {
