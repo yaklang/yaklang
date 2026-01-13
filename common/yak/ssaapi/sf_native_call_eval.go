@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	contextResult, err := frame.GetSFResult()
 	if err != nil {
 		return false, nil, err
@@ -19,7 +19,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		return false, nil, err
 	}
 
-	exec := func(codeRaw string) (bool, sfvm.ValueOperator, error) {
+	exec := func(codeRaw string) (bool, sfvm.Values, error) {
 		newResult, err := QuerySyntaxflow(
 			QueryWithProgram(program),
 			QueryWithRuleContent(codeRaw),
@@ -32,7 +32,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		if newResult != nil && newResult.memResult != nil {
 			contextResult.MergeByResult(newResult.memResult)
 		}
-		return true, v, nil
+		return true, sfvm.Values{v}, nil
 	}
 
 	fromProgram := false
@@ -55,7 +55,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			}
 			return nil
 		})
-		return true, v, nil
+		return true, sfvm.Values{v}, nil
 	}
 
 	var codes string
@@ -92,7 +92,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	return exec(codes)
 }
 
-var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	codes := params.GetString(0, "fuzztag", "f", "tag")
 	if codes == "" {
 		return false, nil, utils.Error("no fuzztag code found in <eval(...)>")
@@ -104,7 +104,7 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 	}
 
 	var vals = make(map[string][]sfvm.ValueOperator)
-	frame.GetSymbolTable().ForEach(func(name string, value sfvm.ValueOperator) bool {
+	frame.GetSymbolTable().ForEach(func(name string, value sfvm.Values) bool {
 		value.Recursive(func(operator sfvm.ValueOperator) error {
 			if operator.String() == "" {
 				return nil
@@ -129,7 +129,7 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 				existed = make([]sfvm.ValueOperator, 0)
 				vals[name] = existed
 			}
-			vals[name] = append(existed, results)
+			vals[name] = append(existed, results...)
 		}
 		return true
 	})
@@ -173,5 +173,5 @@ var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sf
 	if len(rets) == 0 {
 		return false, nil, utils.Error("no fuzztag result found")
 	}
-	return true, sfvm.NewValues(rets), nil
+	return true, sfvm.NewValues(rets...), nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -163,9 +164,11 @@ func (r *SyntaxFlowResult) CreateRisk() error {
 		return utils.Errorf("SyntaxFlowResult is nil")
 	}
 
-	r.GetAlertValues().ForEach(func(i string, v Values) bool {
-		for index, v := range v {
-			r.SaveRisk(i, index, v, false)
+	r.GetAlertValues().ForEach(func(i string, v sfvm.Values) bool {
+		for index, vo := range v {
+			if val, ok := vo.(*Value); ok {
+				r.SaveRisk(i, index, val, false)
+			}
 		}
 		return true
 	})

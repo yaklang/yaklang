@@ -110,7 +110,7 @@ func CreateCheckFromNativeCallParam(
 	return check
 }
 
-func (r *sfCheck) CheckMatch(path sf.ValueOperator) bool {
+func (r *sfCheck) CheckMatch(path sf.Values) bool {
 	if r.Empty() {
 		return true
 	}
@@ -134,7 +134,7 @@ func (r *sfCheck) CheckMatch(path sf.ValueOperator) bool {
 	})
 	return ret
 }
-func (r *sfCheck) CheckUntil(path sf.ValueOperator) bool {
+func (r *sfCheck) CheckUntil(path sf.Values) bool {
 	if r.Empty() {
 		return false
 	}
@@ -155,19 +155,19 @@ func (r *sfCheck) CheckUntil(path sf.ValueOperator) bool {
 	return until
 }
 func (r *sfCheck) check(
-	path sf.ValueOperator,
+	path sf.Values,
 	item []*checkItem,
 	fn func(string, bool) bool,
 ) {
 	opt := []QueryOption{
 		QueryWithVM(r.vm),
 		QueryWithInitVar(r.contextResult.SymbolTable),
-		QueryWithValue(path),
+		QueryWithValues(path),
 	}
 	for _, item := range item {
 		res, err := item.check(path, opt...)
 		if err != nil {
-			log.Errorf("check path value %v fail: %v", path.String(), err)
+			// log.Errorf("check path value %v fail: %v", path.String(), err)
 			continue
 		}
 
@@ -179,7 +179,7 @@ func (r *sfCheck) check(
 	}
 }
 
-func (item *checkItem) check(value sf.ValueOperator, opt ...QueryOption) (*SyntaxFlowResult, error) {
+func (item *checkItem) check(value sf.Values, opt ...QueryOption) (*SyntaxFlowResult, error) {
 	if item.frame == nil {
 		return nil, utils.Errorf("syntaxflow frame is nil")
 	}

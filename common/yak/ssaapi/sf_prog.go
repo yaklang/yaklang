@@ -21,16 +21,18 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
-func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return []bool{false}
+func (p *Program) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return false
 }
 
 func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
+func (p *Program) Count() int {
+	return 0
+}
 
-func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	var boolRes []bool
+func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.Values, bool) {
 	ctx := opcodeItems.Context
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
@@ -39,29 +41,27 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 				log.Errorf("CompareOpcode: new value failed: %v", err)
 				return v, false
 			} else {
-				boolRes = append(boolRes, true)
 				return v, true
 			}
 		},
 	)
-	// 将 Values 转换为 sfvm.ValueOperator
-	return ValuesToSFValueList(res), boolRes
+	// 将 Values 转换为 sfvm.Values
+	return sfvm.Values(lo.Map(res, func(v *Value, _ int) sfvm.ValueOperator { return v })), true
 }
 
-func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
-	var res []sfvm.ValueOperator
-	var boolRes []bool
+func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, bool) {
+	var res sfvm.Values
 	ctx := comparator.Context
 
-	matchValue := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
-		var v sfvm.ValueOperator
+	matchValue := func(condition *sfvm.StringCondition) sfvm.Values {
+		var v sfvm.Values
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, v, _ = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			v = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			v = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
+			v = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
 		}
 		return v
 	}
@@ -71,11 +71,11 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 		set := sfvm.NewValueSet()
 		for i, condition := range comparator.Conditions {
 			matched := matchValue(condition)
-			if matched == nil {
+			if len(matched) == 0 {
 				continue
 			}
 			otherSet := sfvm.NewValueSet()
-			matched.Recursive(func(vo sfvm.ValueOperator) error {
+			matched.ForEach(func(vo sfvm.ValueOperator) error {
 				if ret, ok := vo.(ssa.GetIdIF); ok {
 					id := ret.GetId()
 					if i == 0 {
@@ -94,17 +94,12 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 	case sfvm.MatchHaveAny:
 		for _, condition := range comparator.Conditions {
 			matched := matchValue(condition)
-			if matched != nil {
-				res = append(res, matched)
+			if len(matched) > 0 {
+				res = append(res, matched...)
 			}
 		}
 	}
-	result := sfvm.NewValues(res)
-	result.Recursive(func(operator sfvm.ValueOperator) error {
-		boolRes = append(boolRes, true)
-		return nil
-	})
-	return result, boolRes
+	return res, true
 }
 
 func (p *Program) String() string {
@@ -122,8 +117,11 @@ func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextO
 	return nil
 }
 
-func (p *Program) GetFields() (sfvm.ValueOperator, error) {
-	return sfvm.NewEmptyValues(), nil
+func (p *Program) GetFields() (sfvm.Values, error) {
+	// GetFields 返回 ValueOperator，但内部使用空 Values
+	// 由于接口要求返回 ValueOperator，我们需要返回一个实现了 ValueOperator 的对象
+	// 这里返回 nil 表示没有字段，调用者应该检查
+	return nil, nil
 }
 
 func (p *Program) IsList() bool {
@@ -147,25 +145,40 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
-	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
+func (p *Program) ExactMatch(ctx context.Context, mod int, s string) sfvm.Values {
+	// ignore boolean return
+	_, v, _ := p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
+	if len(v) > 0 {
+		return v
+	}
+	return nil
 }
 
-func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
-	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
+func (p *Program) GlobMatch(ctx context.Context, mod int, g string) sfvm.Values {
+	// ignore boolean return
+	_, v, _ := p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
+	if len(v) > 0 {
+		return v
+	}
+	return nil
 }
 
-func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
-	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
+func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) sfvm.Values {
+	// ignore boolean return
+	_, v, _ := p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
+	if len(v) > 0 {
+		return v
+	}
+	return nil
 }
 
-func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.Values, error) {
 	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
 }
 
 // matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
 // excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
-func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode, mod int, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode, mod int, pattern string, excludeFiles []string) (bool, sfvm.Values, error) {
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
@@ -177,42 +190,48 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 			}
 		},
 	)
-	// 将 Values 转换为 sfvm.ValueOperator
-	return len(values) > 0, ValuesToSFValueList(values), nil
+	// 将 Values 转换为 sfvm.Values
+	return len(values) > 0, sfvm.Values(lo.Map(values, func(v *Value, _ int) sfvm.ValueOperator { return v })), nil
 }
 
-func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported list index")
+func (p *Program) ListIndex(i int) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), utils.Error("ssa.Program is not supported list index")
 }
 
-func (p *Program) Merge(sfv ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+func (p *Program) Merge(sfv ...sfvm.ValueOperator) (sfvm.Values, error) {
 	sfv = append(sfv, p)
-	return MergeSFValueOperator(sfv...), nil
+	merged := MergeSFValueOperator(sfv...)
+	var res sfvm.Values
+	merged.ForEach(func(vo sfvm.ValueOperator) error {
+		res = append(res, vo)
+		return nil
+	})
+	return res, nil
 }
 
-func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported remove")
+func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), utils.Error("ssa.Program is not supported remove")
 }
 
-func (p *Program) GetCallActualParams(int, bool) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported call all actual params")
+func (p *Program) GetCallActualParams(int, bool) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), utils.Error("ssa.Program is not supported call all actual params")
 }
 
-func (p *Program) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowDef() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow def")
 }
-func (p *Program) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowUse() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow use")
 }
-func (p *Program) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported syntax flow top def")
+func (p *Program) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), utils.Error("ssa.Program is not supported syntax flow top def")
 }
 
-func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ssa.Program is not supported syntax flow bottom use")
+func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
+	return sfvm.NewEmptyValues(), utils.Error("ssa.Program is not supported syntax flow bottom use")
 }
 
-func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
+func (p *Program) GetCalled() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
@@ -402,7 +421,7 @@ func (p *Program) foreach(file2Hash map[string]string, callBack func(string, *me
 	}
 }
 
-func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
 	filter := NewFileFilter(path, match, rule2)
 	if filter == nil {
 		return nil, nil
@@ -441,9 +460,9 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	})
 	if len(res) == 0 {
 		if matchFile {
-			return nil, utils.Errorf("no file contains data matching rule %v %v", rule, rule2)
+			return sfvm.NewEmptyValues(), utils.Errorf("no file contains data matching rule %v %v", rule, rule2)
 		}
-		return nil, utils.Errorf("no file matched by path %s", path)
+		return sfvm.NewEmptyValues(), utils.Errorf("no file matched by path %s", path)
 	}
-	return sfvm.NewValues(res), nil
+	return sfvm.Values(res), nil
 }

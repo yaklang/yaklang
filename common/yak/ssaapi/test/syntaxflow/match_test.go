@@ -1,22 +1,43 @@
 package syntaxflow
 
 import (
+	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func TestProgramSyntaxFlow_Match(t *testing.T) {
-	check := func(t *testing.T, sf, expect string) {
-		code := `
+	code := `
 		a = Runtime.getRuntime()
 		a.exec("bash attack")
 		`
+	check := func(t *testing.T, sf, expect string) {
 		ssatest.CheckSyntaxFlow(t, code, sf, map[string][]string{
 			"target": {expect},
 		})
 	}
+
+	t.Run("simple", func(t *testing.T) {
+		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+			ctx := context.Background()
+			res := prog.ExactMatch(ctx, sfvm.NameMatch, "Runtime")
+			log.Errorf("result : %v", res)
+			require.Greater(t, len(res), 0)
+			res.Recursive(func(vo sfvm.ValueOperator) error {
+				switch v := vo.(type) {
+				case *ssaapi.Value:
+					v.Show()
+				}
+				return nil
+			})
+			return nil
+		})
+	})
 
 	t.Run("Test Match", func(t *testing.T) {
 		check(t, `Runtime as $target`, `Undefined-Runtime`)

@@ -41,7 +41,7 @@ func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisCon
 
 // SyntaxFlowVariableToValues 将 sfvm.ValueOperator 转换为 ssaapi.Values
 // 注意：Values 不再实现 ValueOperator 接口，此函数仅用于从 ValueOperator 中提取 *Value
-func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
+func SyntaxFlowVariableToValues(vs sfvm.Values) Values {
 	var rets Values
 	for _, v := range vs {
 		if utils.IsNil(v) {
@@ -51,14 +51,6 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 			switch ret := operator.(type) {
 			case *Value:
 				rets = append(rets, ret)
-			case *sfvm.ValueList:
-				// ValueList 内部可能包含 *Value，递归提取
-				ret.Recursive(func(vo sfvm.ValueOperator) error {
-					if val, ok := vo.(*Value); ok {
-						rets = append(rets, val)
-					}
-					return nil
-				})
 			default:
 				log.Warnf("cannot handle type: %T", operator)
 			}
@@ -71,20 +63,20 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	return rets
 }
 
-// ValuesToSFValueList 将 ssaapi.Values 转换为 sfvm.ValueList
+// ValuesToSFValues 将 ssaapi.Values 转换为 sfvm.ValueList
 // 这是从 ssaapi 层创建 sfvm.ValueList 的标准方法
-func ValuesToSFValueList(values Values) *sfvm.ValueList {
+func ValuesToSFValues(values Values) sfvm.Values {
 	var list []sfvm.ValueOperator
 	for _, value := range values {
 		list = append(list, value)
 	}
-	return &sfvm.ValueList{Values: list}
+	return sfvm.Values(list)
 }
 
 // MergeSFValueOperator 合并多个 sfvm.ValueOperator 为一个 sfvm.ValueList
 // 这是合并 ValueOperator 的标准方法
-func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
-	ret := []sfvm.ValueOperator{}
+func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.Values {
+	ret := sfvm.NewEmptyValues()
 	values := make(Values, 0)
 	for _, item := range sfv {
 		item.Recursive(func(vo sfvm.ValueOperator) error {
@@ -101,5 +93,5 @@ func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
 	for _, v := range MergeValues(values) {
 		ret = append(ret, v)
 	}
-	return &sfvm.ValueList{Values: ret}
+	return ret
 }

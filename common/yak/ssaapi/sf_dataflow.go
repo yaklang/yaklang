@@ -32,7 +32,7 @@ func DataFlowWithSFConfig(
 	value *Value,
 	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
-) sfvm.ValueOperator {
+) sfvm.Values {
 	filterCondition := make([]*filterCondition, 0)
 	addHandler := func(key sf.RecursiveConfigKey, code string) {
 		filterCondition = append(filterCondition, withFilterCondition(key, code))
@@ -74,14 +74,14 @@ func DataFlowWithSFConfig(
 
 	options = append(options,
 		WithHookEveryNode(func(value *Value) error {
-			hookRunner.CheckUntil(value)
+			hookRunner.CheckUntil(sf.Values{value})
 			return nil
 		}),
 	)
 	if !untilCheck.Empty() {
 		options = append(options,
 			WithUntilNode(func(v *Value) bool {
-				return untilCheck.CheckUntil(v)
+				return untilCheck.CheckUntil(sf.Values{v})
 			}),
 		)
 	}
@@ -99,12 +99,12 @@ func DataFlowWithSFConfig(
 	// filter the result
 	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
 	// set predecessor label - 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
-	retValue := ValuesToSFValueList(ret)
+	retValue := ValuesToSFValues(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return retValue
 }
 
-var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	contextResult, err := frame.GetSFResult()
 	if err != nil {
 		return false, nil, err
@@ -115,7 +115,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	if len(exclude) == 0 && len(include) == 0 {
 		return false, nil, utils.Errorf("exclude and include can't be empty")
 	}
-	var end sf.ValueOperator
+	var end sf.Values
 	endName := params.GetString("end", "dest", "destination")
 	if endName != "" {
 		var ok bool
@@ -147,7 +147,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 
 	if len(ret) > 0 {
 		// 将 Values 转换为 sfvm.ValueOperator
-		return true, ValuesToSFValueList(ret), nil
+		return true, ValuesToSFValues(ret), nil
 	}
 	return false, sfvm.NewEmptyValues(), nil
 }
@@ -178,7 +178,7 @@ func withFilterCondition(key sfvm.RecursiveConfigKey, code string) *filterCondit
 func dataFlowFilter(
 	vs Values,
 	contextResult *sf.SFFrameResult, config *sf.Config,
-	end sf.ValueOperator,
+	end sf.Values,
 	condition ...*filterCondition,
 ) Values {
 	// for _, f := range condition {
@@ -205,7 +205,7 @@ func dataFlowFilter(
 	//if E start dataflow. include: A && exclude:D this path is not match
 	checkMatch := func(path Values) bool {
 		// CheckMatch 需要 sfvm.ValueOperator，将 Values 转换为 sfvm.ValueList
-		return pathCheck.CheckMatch(ValuesToSFValueList(path))
+		return pathCheck.CheckMatch(ValuesToSFValues(path))
 	}
 	var ret []*Value
 	all := make(map[*Value]struct{})
@@ -213,20 +213,11 @@ func dataFlowFilter(
 		all[v] = struct{}{}
 	}
 	if end != nil {
-		var endValues Values
-		switch i := end.(type) {
-		case *Value:
-			endValues = Values{i}
-		case *sf.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法提取其中的 Value
-			i.Recursive(func(operator sf.ValueOperator) error {
-				if val, ok := operator.(*Value); ok {
-					endValues = append(endValues, val)
-				}
-				return nil
-			})
-		default:
-			log.Warnf("dataFlowFilter: end type is not supported: %T", end)
+		var endValues []*Value
+		for _, e := range end {
+			if v, ok := e.(*Value); ok {
+				endValues = append(endValues, v)
+			}
 		}
 		for _, v := range vs {
 			flag := false

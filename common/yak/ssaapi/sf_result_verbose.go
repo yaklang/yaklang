@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func (r *SyntaxFlowResult) GetAlertValue(name string) Values {
@@ -24,17 +24,17 @@ func (r *SyntaxFlowResult) IsLib() bool {
 	return false
 }
 
-func (r *SyntaxFlowResult) GetAlertValues() *omap.OrderedMap[string, Values] {
+func (r *SyntaxFlowResult) GetAlertValues() sfvm.VarMap {
 	if r == nil {
-		return omap.NewOrderedMap(make(map[string]Values))
+		return sfvm.NewVarMap()
 	}
 	if r.alertVariable == nil {
 		r.GetAllVariable()
 	}
-	ret := omap.NewOrderedMap(make(map[string]Values))
+	ret := sfvm.NewVarMap()
 	for _, name := range r.alertVariable {
 		if vs := r.GetValues(name); vs != nil && len(vs) > 0 {
-			ret.Set(name, vs)
+			ret.Set(name, ValuesToSFValues(vs))
 		}
 	}
 	return ret
@@ -192,12 +192,16 @@ func (r *SyntaxFlowResult) Dump(showCode bool) string {
 	if vals.Len() > 0 {
 		line("ALERT RESULTS (%v):", vals.Len())
 		increase()
-		vals.ForEach(func(name string, vs Values) bool {
+		vals.ForEach(func(name string, vs sfvm.Values) bool {
 			line("ALERT: %v", name)
 			increase()
 			m := map[int64]any{}
-			// vs 是 Values 类型，直接遍历
-			for _, val := range vs {
+			// vs 是 sfvm.Values 类型，遍历后转换为 *Value
+			for _, vo := range vs {
+				val, ok := vo.(*Value)
+				if !ok {
+					continue
+				}
 				_, existed := m[val.GetId()]
 				if existed {
 					continue

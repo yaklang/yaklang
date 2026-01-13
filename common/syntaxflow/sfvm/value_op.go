@@ -84,7 +84,6 @@ func WithAnalysisContext_Label(label string) AnalysisContextOption {
 	}
 }
 
-// type MatchMode int
 const (
 	NameMatch int = 1
 	KeyMatch      = 1 << 1
@@ -111,43 +110,44 @@ type ValueOperator interface {
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string
-	// Len() int
+
+	Count() int
 
 	// Recursive will execute with handler for every list or map
 	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
-	ExactMatch(context.Context, int, string) (bool, ValueOperator, error)
+	ExactMatch(context.Context, int, string) Values
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(context.Context, int, string) (bool, ValueOperator, error)
+	GlobMatch(context.Context, int, string) Values
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
+	RegexpMatch(context.Context, int, string) Values
 
-	GetCalled() (ValueOperator, error)
-	GetCallActualParams(int, bool) (ValueOperator, error)
-	GetFields() (ValueOperator, error)
+	GetCalled() (Values, error)
+	GetCallActualParams(int, bool) (Values, error)
+	GetFields() (Values, error)
 
 	// GetTopDef and GetBottomUse is for OpBottomUse
 	// use and def
-	GetSyntaxFlowUse() (ValueOperator, error)
-	GetSyntaxFlowDef() (ValueOperator, error)
+	GetSyntaxFlowUse() (Values, error)
+	GetSyntaxFlowDef() (Values, error)
 	// top and bottom
-	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
-	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
+	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (Values, error)
+	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (Values, error)
 
 	// ListIndex for OpListIndex, like a[1] a must be list...
-	ListIndex(i int) (ValueOperator, error)
+	ListIndex(i int) (Values, error)
 
-	Merge(...ValueOperator) (ValueOperator, error)
-	Remove(...ValueOperator) (ValueOperator, error)
+	Merge(...ValueOperator) (Values, error)
+	Remove(...ValueOperator) (Values, error)
 
 	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
 
 	// fileFilter
-	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
+	FileFilter(string, string, map[string]string, []string) (Values, error)
 
-	CompareString(*StringComparator) (ValueOperator, []bool)
-	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
-	CompareConst(*ConstComparator) []bool
+	CompareString(*StringComparator) (Values, bool)
+	CompareOpcode(*OpcodeComparator) (Values, bool)
+	CompareConst(*ConstComparator) bool
 	NewConst(any, ...*memedit.Range) ValueOperator
 }

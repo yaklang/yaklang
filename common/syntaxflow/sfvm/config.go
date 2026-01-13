@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func NewConfig(opts ...Option) *Config {
@@ -20,13 +19,13 @@ func NewConfig(opts ...Option) *Config {
 	return c
 }
 
-type ResultCapturedCallback func(name string, results ValueOperator) error
+type ResultCapturedCallback func(name string, results Values) error
 
 type Config struct {
 	debug                     bool
 	StrictMatch               bool
 	FailFast                  bool
-	initialContextVars        *omap.OrderedMap[string, ValueOperator]
+	initialContextVars        VarMap
 	onResultCapturedCallbacks []ResultCapturedCallback
 	ctx                       context.Context
 	processCallback           func(idx int, msg string)
@@ -44,7 +43,7 @@ func (c *Config) GetContext() context.Context {
 
 type Option func(*Config)
 
-func WithInitialContextVars(o *omap.OrderedMap[string, ValueOperator]) Option {
+func WithInitialContextVars(o VarMap) Option {
 	return func(config *Config) {
 		config.initialContextVars = o
 	}

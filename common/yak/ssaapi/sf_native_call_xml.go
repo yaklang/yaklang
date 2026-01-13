@@ -62,13 +62,13 @@ func (m *mybatisXMLQuery) Check() []sfvm.ValueOperator {
 	var res []sfvm.ValueOperator
 
 	for _, param := range m.CheckParams {
-		res = append(res, m.SyntaxFlowFirst(param.name, param.rng))
-		res = append(res, m.SyntaxFlowFinal(param.rng))
+		res = append(res, m.SyntaxFlowFirst(param.name, param.rng)...)
+		res = append(res, m.SyntaxFlowFinal(param.rng)...)
 	}
 	return res
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng *memedit.Range) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng *memedit.Range) sfvm.Values {
 	if m.mapper == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng *memedit.Range) sfvm.
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFinal(rng *memedit.Range) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFinal(rng *memedit.Range) sfvm.Values {
 	if m.mapper == nil {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFinal(rng *memedit.Range) sfvm.ValueOperator
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng *memedit.Range) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng *memedit.Range) sfvm.Values {
 	if m == nil || m.mapper == nil {
 		return nil
 	}
@@ -130,7 +130,7 @@ func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng *memed
 	return results
 }
 
-var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	prog, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
@@ -260,7 +260,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	})
 
 	if len(res) > 0 {
-		return true, sfvm.NewValues(res), nil
+		return true, sfvm.NewValues(res...), nil
 	}
 	return false, nil, nil
 }

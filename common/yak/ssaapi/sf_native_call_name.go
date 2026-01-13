@@ -42,7 +42,7 @@ func getValueNames(val *Value) []string {
 	return names
 }
 
-var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -67,7 +67,7 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValues(vals...), nil
 	}
 	return false, nil, utils.Error("no value found")
 }

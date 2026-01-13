@@ -39,6 +39,7 @@ require (
 	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
 	github.com/ebitengine/purego v0.9.1
 	github.com/elastic/go-libaudit v0.4.0
+
 	github.com/emersion/go-message v0.18.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
@@ -163,6 +164,10 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
+<<<<<<< HEAD
+=======
+	github.com/ebitengine/purego v0.8.2 // indirect
+>>>>>>> 294a79dd3 (refactor(sfvm): migrate ValueOperator to sfvm.Values slice implementation)
 	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect

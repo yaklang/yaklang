@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	if isProgram(v) {
 		return false, nil, utils.Error("string is not supported in program")
 	}
@@ -32,12 +32,12 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValues(vals...), nil
 	}
 	return false, nil, utils.Error("no value found")
 }
 
-var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -54,12 +54,12 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValues(vals...), nil
 	}
 	return false, nil, utils.Error("no value found")
 })
 
-var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -76,12 +76,12 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 		return nil
 	})
 	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+		return true, sfvm.NewValues(vals...), nil
 	}
 	return false, nil, utils.Error("no value found")
 })
 
-var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	if isProgram(v) {
 		return false, nil, utils.Error("regexp is not supported in program")
 	}
@@ -152,7 +152,7 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 		}
 	}
 	if len(results) > 0 {
-		return true, sfvm.NewValues(results), nil
+		return true, sfvm.NewValues(results...), nil
 	}
 	return false, nil, utils.Error("no value found")
 })

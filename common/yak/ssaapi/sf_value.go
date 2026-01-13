@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
 
@@ -72,51 +71,60 @@ func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
-func (v *Value) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) ExactMatch(ctx context.Context, mod int, want string) sfvm.Values {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return sfvm.Values(lo.Map(value, func(v *Value, _ int) sfvm.ValueOperator { return v }))
 }
 
-func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) GlobMatch(ctx context.Context, mod int, g string) sfvm.Values {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return sfvm.Values(lo.Map(value, func(v *Value, _ int) sfvm.ValueOperator { return v }))
 }
 
-func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.Values, error) {
 	var vals = []sfvm.ValueOperator{v}
 	vals = append(vals, sf...)
-	return MergeSFValueOperator(vals...), nil
+	merged := MergeSFValueOperator(vals...)
+	var res sfvm.Values
+	merged.ForEach(func(vo sfvm.ValueOperator) error {
+		res = append(res, vo)
+		return nil
+	})
+	return res, nil
 }
 
-func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) sfvm.Values {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	return sfvm.Values(lo.Map(value, func(v *Value, _ int) sfvm.ValueOperator { return v }))
 }
 
-func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.Values, bool) {
 	if v == nil || items == nil {
-		return nil, []bool{false}
+		return sfvm.NewEmptyValues(), false
 	}
 
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
-	return v, []bool{items.Matches(names...)}
-}
-
-func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	if v == nil || comparator == nil {
-		return []bool{false}
+	if items.Matches(names...) {
+		return sfvm.Values{v}, true
 	}
-	return []bool{comparator.Matches(v.String())}
+	return sfvm.NewEmptyValues(), false
 }
 
-func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareConst(comparator *sfvm.ConstComparator) bool {
 	if v == nil || comparator == nil {
-		return nil, []bool{false}
+		return false
+	}
+	return comparator.Matches(v.String())
+}
+
+func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, bool) {
+	if v == nil || comparator == nil {
+		return sfvm.NewEmptyValues(), false
 	}
 	checkOp := func(opcode ssa.Opcode) bool {
 		return v.getOpcode() == opcode
@@ -125,28 +133,33 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
 		return slices.Contains(ops, binOp)
 	}
-	return v, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
-}
-
-func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	err := sfvm.NewValues(sf).Recursive(func(operator sfvm.ValueOperator) error {
-		if raw, ok := operator.(ssa.GetIdIF); ok {
-			if v.GetId() == raw.GetId() {
-				return utils.Error("abort")
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return sfvm.NewEmptyValues(), nil
+	if comparator.AllSatisfy(checkOp, checkBinOrUnaryOp) {
+		return sfvm.Values{v}, true
 	}
-	return v, nil
+	return sfvm.NewEmptyValues(), false
 }
 
-func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator, error) {
-	call, isCall := ssa.ToCall(v.getValue())
+func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.Values, error) {
+	for _, operator := range sf {
+		err := operator.Recursive(func(vo sfvm.ValueOperator) error {
+			if raw, ok := vo.(ssa.GetIdIF); ok {
+				if v.GetId() == raw.GetId() {
+					return utils.Error("abort")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return sfvm.NewEmptyValues(), nil
+		}
+	}
+	return sfvm.Values{v}, nil
+}
+
+func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.Values, error) {
+	call, isCall := ssa.ToCall(v.innerValue)
 	if !isCall {
-		return nil, utils.Errorf("ssa.Value is not a call")
+		return sfvm.NewEmptyValues(), utils.Errorf("ssa.Value is not a call")
 	}
 
 	rets := make(Values, 0)
@@ -176,28 +189,27 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 		}
 	}
 	add(call.Args)
-	if utils.IsNil(rets) {
-		return nil, utils.Errorf("ssa.Value no actual params")
+	if len(rets) == 0 {
+		return sfvm.NewEmptyValues(), utils.Errorf("ssa.Value no actual params")
 	}
-	return ValuesToSFValueList(rets), nil
+	return sfvm.Values(lo.Map(rets, func(v *Value, _ int) sfvm.ValueOperator { return v })), nil
 }
 
-func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
-	ret := v.GetCalledBy()
-	// 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
-	retValueList := ValuesToSFValueList(ret)
-	retValueList.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
-	return retValueList, nil
+func (v *Value) GetCalled() (sfvm.Values, error) {
+	vs := v.GetCalledBy()
+	ret := ValuesToSFValues(vs)
+	ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	return ret, nil
 }
 
-func (v *Value) GetFields() (sfvm.ValueOperator, error) {
+func (v *Value) GetFields() (sfvm.Values, error) {
 	if v.IsMap() || v.IsObject() {
 		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
 			return item
 		})
-		return sfvm.NewValues(members), nil
+		return sfvm.Values(members), nil
 	}
-	return sfvm.NewEmptyValues(), nil
+	return nil, nil
 }
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
@@ -213,36 +225,54 @@ func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	return nil, false
 }
 
-func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
-	return ValuesToSFValueList(v.GetUsers()), nil
+func (v *Value) GetSyntaxFlowUse() (sfvm.Values, error) {
+	return sfvm.NewValues(lo.Map(v.GetUsers(), func(v *Value, _ int) sfvm.ValueOperator { return v })...), nil
 }
-func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
-	return ValuesToSFValueList(v.GetOperands()), nil
+func (v *Value) GetSyntaxFlowDef() (sfvm.Values, error) {
+	return ValuesToSFValues(v.GetOperands()), nil
 }
-func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
-	return DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...), nil
+func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
+	// DataFlowWithSFConfig 返回 sfvm.ValueOperator，需要提取其中的 Values
+	result := DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...)
+	if result == nil {
+		return sfvm.NewEmptyValues(), nil
+	}
+	var res sfvm.Values
+	result.ForEach(func(vo sfvm.ValueOperator) error {
+		res = append(res, vo)
+		return nil
+	})
+	return res, nil
 }
 
-func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
-	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
-	return DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...), nil
+func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
+	// DataFlowWithSFConfig 返回 sfvm.ValueOperator，需要提取其中的 Values
+	result := DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...)
+	if result == nil {
+		return sfvm.NewEmptyValues(), nil
+	}
+	var res sfvm.Values
+	result.ForEach(func(vo sfvm.ValueOperator) error {
+		res = append(res, vo)
+		return nil
+	})
+	return res, nil
 }
 
-func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
+func (v *Value) ListIndex(i int) (sfvm.Values, error) {
 	if i == 0 {
-		return v, nil
+		return sfvm.Values{v}, nil
 	}
 	if !v.IsList() {
-		return nil, utils.Error("ssa.Value is not a list")
+		return sfvm.NewEmptyValues(), utils.Error("ssa.Value is not a list")
 	}
 	members := v.GetMember(v.NewValue(ssa.NewConst(i)))
 	for _, member := range members {
 		if member != nil {
-			return member, nil
+			return sfvm.Values{member}, nil
 		}
 	}
-	return nil, utils.Errorf("ssa.Value %v cannot call by slice, like v[%v]", v.String(), i)
+	return sfvm.NewEmptyValues(), utils.Errorf("ssa.Value %v cannot call by slice, like v[%v]", v.String(), i)
 }
 
 func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.AnalysisContextOption) error {
@@ -263,7 +293,8 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 	})
 }
 
-func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
+	// FileFilter 现在返回 sfvm.Values，直接返回
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
 }
 

@@ -41,7 +41,7 @@ func createIncludeCache() *utils.Cache[Values] {
 	return utils.NewTTLCache[Values]()
 }
 
-func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
+func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
 	parent, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
@@ -77,12 +77,12 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		return false, nil, err
 	}
 
-	var queryValue sfvm.ValueOperator
+	var queryValue sfvm.Values
 	if len(inputs) == 0 {
-		queryValue = parent
+		queryValue = sfvm.NewValues(parent)
 	} else {
 		// 将 Values 转换为 sfvm.ValueList
-		queryValue = ValuesToSFValueList(inputs)
+		queryValue = ValuesToSFValues(inputs)
 	}
 
 	config := frame.GetConfig()
@@ -110,19 +110,19 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	return true, val, nil
 }
 
-func CreateIncludeValue(vs Values) sfvm.ValueOperator {
-	// value := ValuesToSFValueList(vals)
+func CreateIncludeValue(vs Values) sfvm.Values {
+	// value := ValuesToSFValues(vals)
 	var list []sfvm.ValueOperator
 	for _, got := range vs {
 		val := got.NewValue(got.getValue())
 		val.AppendPredecessor(got, sfvm.WithAnalysisContext_Label("include"))
 		list = append(list, val)
 	}
-	return sfvm.NewValues(list)
+	return sfvm.NewValues(list...)
 }
 
-func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {
-	getRetFromCache := func(hash string) sfvm.ValueOperator {
+func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.Values, shouldCache bool) {
+	getRetFromCache := func(hash string) sfvm.Values {
 		if ret, ok := includeCache.Get(hash); ok {
 			return CreateIncludeValue(ret)
 		} else {
@@ -131,6 +131,7 @@ func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values)
 	}
 
 	if programHash, ok := program.Hash(); ok {
+
 		// Use program hash and rule name to generate a unique hash
 		hash = utils.CalcSha256(programHash + ruleName)
 		shouldCache = true

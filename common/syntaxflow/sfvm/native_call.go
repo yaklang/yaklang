@@ -62,7 +62,7 @@ func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 	return -1
 }
 
-type NativeCallFunc func(v ValueOperator, frame *SFFrame, params *NativeCallActualParams) (bool, ValueOperator, error)
+type NativeCallFunc func(v ValueOperator, frame *SFFrame, params *NativeCallActualParams) (bool, Values, error)
 
 var nativeCallTable = map[string]NativeCallFunc{}
 

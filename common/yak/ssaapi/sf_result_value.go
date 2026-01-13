@@ -33,11 +33,11 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 
 	r.variable = orderedmap.New()
 	if r.memResult != nil {
-		r.memResult.SymbolTable.ForEach(func(name string, value sfvm.ValueOperator) bool {
-			r.variable.Set(name, sfvm.ValuesLen(value))
+		r.memResult.SymbolTable.ForEach(func(name string, value sfvm.Values) bool {
+			r.variable.Set(name, len(value))
 			return true
 		})
-		r.memResult.AlertSymbolTable.ForEach(func(key string, value sfvm.ValueOperator) bool {
+		r.memResult.AlertSymbolTable.ForEach(func(key string, value sfvm.Values) bool {
 			if v, ok := r.variable.Get(key); ok && v.(int) > 0 {
 				r.alertVariable = append(r.alertVariable, key)
 			}

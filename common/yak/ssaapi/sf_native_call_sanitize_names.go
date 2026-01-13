@@ -8,7 +8,7 @@ import (
 
 var filterFuncReg = regexp_utils.NewYakRegexpUtils(`(?i)(sanitiz|sanitis|encod(e|ing)|entit(y|ies)|escap(e|ing)|replace|regex|normaliz|canonical|anti|safe|secur|purif|purg|pure|valid(ate)?|strip|clean|clear|special|convert|remov|filter|whitelist|blacklist|render|encrypt|decrypt|hash|digest|xss|csrf|sql|protect|prevent|mitigat(e|ing))`)
 
-var nativeCallSanitizeNames sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallSanitizeNames sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var results []sfvm.ValueOperator
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		v, ok := operator.(*Value)
@@ -25,7 +25,7 @@ var nativeCallSanitizeNames sfvm.NativeCallFunc = func(v sfvm.ValueOperator, fra
 		return nil
 	})
 	if len(results) > 0 {
-		return true, sfvm.NewValues(results), nil
+		return true, sfvm.NewValues(results...), nil
 	}
 	return false, nil, utils.Error("no sanitize name value found")
 }

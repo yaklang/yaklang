@@ -472,7 +472,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 	for _, f := range verifyFs {
 		CheckWithFS(f.GetVirtualFs(), t, func(p ssaapi.Programs) error {
 			// Use the program as the init input var,so that the lib rule which have `$input` can be tested.
-			result, err := p.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithInitInputVar(p[0]))
+			result, err := p.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithInitInputVar(sfvm.NewValues(p[0])))
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
@@ -481,7 +481,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 			}
 
 			// in db
-			result2, err := p.SyntaxFlowRule(rule, ssaapi.QueryWithInitInputVar(p[0]))
+			result2, err := p.SyntaxFlowRule(rule, ssaapi.QueryWithInitInputVar(sfvm.NewValues(p[0])))
 			if err != nil {
 				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
@@ -514,7 +514,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 	if isStrict {
 		for _, f := range negativeFs {
 			CheckWithFS(f.GetVirtualFs(), t, func(programs ssaapi.Programs) error {
-				result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
+				result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(sfvm.NewValues(programs[0])))
 				if err != nil {
 					return utils.Errorf("syntax flow content failed: %v", err)
 				}
@@ -522,7 +522,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 					errs = utils.JoinErrors(errs, err)
 					return nil
 				}
-				result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
+				result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(sfvm.NewValues(programs[0])))
 				if err != nil {
 					return utils.Errorf("syntax flow content failed: %v", err)
 				}
