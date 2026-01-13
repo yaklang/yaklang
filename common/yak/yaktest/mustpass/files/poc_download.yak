@@ -159,7 +159,7 @@ filePath4, err = poc.Download(
 assert err == nil, f"  [失败] 下载出错: ${err}"
 assert file.IsExisted(filePath4), f"  [失败] 文件不存在"
 actualFilename4 = file.GetBase(filePath4)
-assert actualFilename4 == customFilename, f"  [失败] 文件名应为 {customFilename}，实际为: {actualFilename4}"
+assert actualFilename4 == customFilename, f"  [失败] 文件名应为 ${customFilename}，实际为: ${actualFilename4}"
 assert filePath4.Contains(customFilename), f"  [失败] 路径应包含自定义文件名"
 
 downloadedContent4 = file.ReadFile(filePath4)~
