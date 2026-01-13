@@ -404,9 +404,9 @@ func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeCo
 		return knowledgeContent
 	}
 
-	// 按 rank 排序
+	// 按 score 从高到低排序（分数越高越相关）
 	sort.Slice(allRanges, func(i, j int) bool {
-		return allRanges[i].Rank < allRanges[j].Rank
+		return allRanges[i].Score > allRanges[j].Score
 	})
 
 	// 限制最终结果数量
@@ -422,8 +422,8 @@ func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeCo
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("【AI 智能筛选】从 %d 字节内容中提取的 %d 个最相关知识片段：\n\n", len(knowledgeContent), len(allRanges)))
 
-	totalExtracted := 0
-	maxTotalLines := 200
+	totalExtractedBytes := 0
+	maxTotalBytes := 10 * 1024 // 10KB
 
 	for i, item := range allRanges {
 		text := resultEditor.GetTextFromPositionInt(item.StartLine, 1, item.EndLine, 1)
@@ -431,37 +431,33 @@ func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeCo
 			continue
 		}
 
-		lineCount := strings.Count(text, "\n") + 1
-		if totalExtracted+lineCount > maxTotalLines {
-			result.WriteString(fmt.Sprintf("\n[... 已达到 %d 行限制，剩余 %d 个片段未展示 ...]\n", maxTotalLines, len(allRanges)-i))
+		textBytes := len(text)
+		if totalExtractedBytes+textBytes > maxTotalBytes {
+			result.WriteString(fmt.Sprintf("\n[... 已达到 %d 字节限制，剩余 %d 个片段未展示 ...]\n", maxTotalBytes, len(allRanges)-i))
 			break
 		}
 
-		result.WriteString(fmt.Sprintf("=== [%d] 相关性排序: %d (行 %d-%d) ===\n", i+1, item.Rank, item.StartLine, item.EndLine))
-		if item.Reason != "" {
-			result.WriteString(fmt.Sprintf("相关性说明: %s\n", item.Reason))
-		}
+		result.WriteString(fmt.Sprintf("=== [%d] Score: %.2f (行 %d-%d) ===\n", i+1, item.Score, item.StartLine, item.EndLine))
 		result.WriteString(text)
 		result.WriteString("\n\n")
 
-		totalExtracted += lineCount
+		totalExtractedBytes += textBytes
 	}
 
 	finalResult := result.String()
 
-	log.Infof("compressKnowledgeResultsChunked: compressed from %d chars to %d chars, %d ranges from %d chunks",
-		len(knowledgeContent), len(finalResult), len(allRanges), len(allChunkResults))
+	log.Infof("compressKnowledgeResultsChunked: compressed from %d chars to %d chars (%d bytes), %d ranges from %d chunks",
+		len(knowledgeContent), len(finalResult), totalExtractedBytes, len(allRanges), len(allChunkResults))
 
 	return finalResult
 }
 
-// RankedRange 表示一个带排名的行范围
+// RankedRange 表示一个带评分的行范围
 type RankedRange struct {
 	Range     string
 	StartLine int
 	EndLine   int
-	Rank      int
-	Reason    string
+	Score     float64 // 相关性评分，0.0-1.0，越高越相关
 	Text      string
 }
 
@@ -522,20 +518,13 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 1. 最多提取 %d 个片段
 2. 每个片段 %d-%d 行
 3. 使用原始行号（第一列数字）
-4. 按相关性排序（1最相关）
+4. 给出 0.0-1.0 的相关性评分（score），越高越相关
 
-【评判标准】
-- rank 1-3: 直接回答用户问题
-- rank 4-7: 相关背景/技术细节
-- rank 8+: 补充性信息
-
-【relevance_reason 输出格式】
-请用简洁优雅的语言描述相关性，格式为：
-"找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]"
-
-示例：
-- "找到第 18-45 行内容，与目标相关，因为：包含 HTTP 请求构造的核心代码和参数说明"
-- "找到第 102-130 行内容，与目标相关，因为：详细描述了漏洞利用的具体步骤"
+【评分标准】
+- 0.8-1.0: 直接回答用户问题的核心内容
+- 0.6-0.8: 相关背景/技术细节
+- 0.4-0.6: 补充性信息
+- 0.0-0.4: 弱相关或无关内容（不建议输出）
 
 请输出 ranges 数组。
 <|INSTRUCT_END_{{ .nonce }}|>
@@ -554,21 +543,35 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		return nil
 	}
 
-	// Create LiteForge instance with stream field handler for relevance_reason
+	// Create pipe for streaming output
+	pr, pw := utils.NewPipe()
+
+	// Get task index for emit
+	var taskIndex string
+	if r.GetCurrentTask() != nil {
+		taskIndex = r.GetCurrentTask().GetIndex()
+	}
+
+	// Start streaming output
+	r.Emitter.EmitDefaultStreamEvent(
+		fmt.Sprintf("knowledge-chunk-compress-%d-%d", chunkStartLine, chunkEndLine),
+		pr,
+		taskIndex,
+	)
+
+	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
 		fmt.Sprintf("knowledge-chunk-compress-%d-%d", chunkStartLine, chunkEndLine),
 		aiforge.WithLiteForge_Emitter(r.Emitter),
-		aiforge.WithLiteForge_StreamableFieldWithAINodeId("knowledge-chunk-relevance", "relevance_reason"),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
-					aitool.WithParam_Description("按相关性排序的知识片段范围数组"),
+					aitool.WithParam_Description("按相关性评分排序的知识片段范围数组"),
 				},
 				nil,
 				aitool.WithStringParam("range", aitool.WithParam_Description("原始行范围，格式: start-end")),
-				aitool.WithIntegerParam("rank", aitool.WithParam_Description("相关性排序，1最相关")),
-				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]")),
+				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
 		),
 		aiforge.WithExtendLiteForge_AIOption(
@@ -577,6 +580,7 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 	)
 	if err != nil {
 		log.Errorf("compressKnowledgeChunk: NewLiteForge failed: %v", err)
+		pw.Close()
 		return nil
 	}
 
@@ -586,10 +590,12 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 
 	if err != nil {
 		log.Errorf("compressKnowledgeChunk: LiteForge.Execute failed: %v", err)
+		pw.Close()
 		return nil
 	}
 
 	if forgeResult == nil || forgeResult.Action == nil {
+		pw.Close()
 		return nil
 	}
 
@@ -598,8 +604,7 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 
 	for _, item := range rangeItems {
 		rangeStr := item.GetString("range")
-		rank := item.GetInt("rank")
-		reason := item.GetString("relevance_reason")
+		score := item.GetFloat("score")
 
 		if rangeStr == "" {
 			continue
@@ -617,15 +622,18 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 			continue
 		}
 
+		// Write to stream: 片段：[Score: 0.x] startLine-endLine
+		pw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, startLine, endLine))
+
 		results = append(results, RankedRange{
 			Range:     rangeStr,
 			StartLine: startLine,
 			EndLine:   endLine,
-			Rank:      int(rank),
-			Reason:    reason,
+			Score:     score,
 		})
 	}
 
+	pw.Close()
 	return results
 }
 
@@ -648,7 +656,7 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 <|INSTRUCT_{{ .nonce }}|>
 【智能知识筛选与排序】
 
-请严格根据用户问题从上述知识搜索结果中提取最有价值的知识片段，按相关性排序：
+请严格根据用户问题从上述知识搜索结果中提取最有价值的知识片段，按相关性评分排序：
 
 【核心原则】
 - 必须与用户问题直接相关
@@ -659,40 +667,32 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 【提取要求】
 1. 最多提取 %d 个知识片段
 2. 每个片段 %d-%d 行，确保上下文完整
-3. 按相关性从高到低排序（rank: 1最相关，数字越大越不相关）
+3. 给出 0.0-1.0 的相关性评分（score），越高越相关
 4. 严格过滤与用户问题无关的知识
 
-【相关性评判标准】（按优先级排序）
-🔥 最高相关 (rank 1-3)：
+【评分标准】
+🔥 高度相关 (0.8-1.0)：
 - 直接回答用户问题的知识
 - 包含用户问题中提到的关键实体/概念
 - 提供具体解决方案或操作步骤
 
-⭐ 高度相关 (rank 4-7)：
+⭐ 较高相关 (0.6-0.8)：
 - 与用户问题领域相关的知识
 - 提供背景信息或相关概念解释
 - 包含相关的技术细节或配置
 
-📝 一般相关 (rank 8-15)：
+📝 一般相关 (0.4-0.6)：
 - 可能对理解问题有帮助的知识
 - 提供补充性信息
 - 相关但不直接回答问题
 
-【relevance_reason 输出格式】
-请用简洁优雅的语言描述相关性，格式为：
-"找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]"
-
-示例：
-- "找到第 18-45 行内容，与目标相关，因为：包含 HTTP 请求构造的核心代码和参数说明"
-- "找到第 102-130 行内容，与目标相关，因为：详细描述了漏洞利用的具体步骤"
-- "找到第 56-78 行内容，与目标相关，因为：提供了 API 调用的完整示例代码"
+❌ 弱相关 (0.0-0.4)：不建议输出
 
 【输出格式】
 返回JSON数组，每个元素包含：
 {
   "range": "start-end", 
-  "rank": 数字(1-15),
-  "relevance_reason": "找到第 X-Y 行内容，与目标相关，因为：..."
+  "score": 0.0-1.0的小数
 }
 
 【严格要求】
@@ -701,7 +701,7 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 - 优先选择信息密度高的知识
 - 确保每个片段都对回答用户问题有价值
 
-请按相关性排序输出ranges数组。
+请按相关性评分从高到低输出ranges数组。
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
@@ -716,21 +716,35 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		return knowledgeContent
 	}
 
-	// Create LiteForge instance with stream field handler for relevance_reason
+	// Create pipe for streaming output
+	pr, pw := utils.NewPipe()
+
+	// Get task index for emit
+	var taskIndex string
+	if r.GetCurrentTask() != nil {
+		taskIndex = r.GetCurrentTask().GetIndex()
+	}
+
+	// Start streaming output
+	r.Emitter.EmitDefaultStreamEvent(
+		"knowledge-single-compress",
+		pr,
+		taskIndex,
+	)
+
+	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
 		"knowledge-single-compress",
 		aiforge.WithLiteForge_Emitter(r.Emitter),
-		aiforge.WithLiteForge_StreamableFieldWithAINodeId("knowledge-single-relevance", "relevance_reason"),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
-					aitool.WithParam_Description("按相关性排序的知识片段范围数组"),
+					aitool.WithParam_Description("按相关性评分排序的知识片段范围数组"),
 				},
 				nil,
 				aitool.WithStringParam("range", aitool.WithParam_Description("行范围，格式: start-end，例如 18-45")),
-				aitool.WithIntegerParam("rank", aitool.WithParam_Description("相关性排序，1最相关，数字越大越不相关")),
-				aitool.WithStringParam("relevance_reason", aitool.WithParam_Description("找到第 X-Y 行内容，与目标相关，因为：[具体原因说明]")),
+				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
 		),
 		aiforge.WithExtendLiteForge_AIOption(
@@ -739,6 +753,7 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 	)
 	if err != nil {
 		log.Errorf("compressKnowledgeResultsSingle: NewLiteForge failed: %v", err)
+		pw.Close()
 		return knowledgeContent
 	}
 
@@ -748,11 +763,13 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 
 	if err != nil {
 		log.Errorf("compressKnowledgeResultsSingle: LiteForge.Execute failed: %v", err)
+		pw.Close()
 		return knowledgeContent
 	}
 
 	if forgeResult == nil || forgeResult.Action == nil {
 		log.Warnf("compressKnowledgeResultsSingle: forge result is nil")
+		pw.Close()
 		return knowledgeContent
 	}
 
@@ -760,17 +777,17 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 
 	if len(rangeItems) == 0 {
 		log.Warnf("compressKnowledgeResultsSingle: no ranges extracted")
+		pw.Close()
 		return knowledgeContent
 	}
 
 	var rankedRanges []RankedRange
-	totalLines := 0
-	maxTotalLines := 150
+	totalBytes := 0
+	maxTotalBytes := 10 * 1024 // 10KB
 
 	for _, item := range rangeItems {
 		rangeStr := item.GetString("range")
-		rank := item.GetInt("rank")
-		reason := item.GetString("relevance_reason")
+		score := item.GetFloat("score")
 
 		if rangeStr == "" {
 			continue
@@ -801,49 +818,51 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 			continue
 		}
 
-		lineCount := strings.Count(text, "\n") + 1
-		if totalLines+lineCount > maxTotalLines {
-			log.Warnf("compressKnowledgeResultsSingle: would exceed %d lines limit, stopping at range: %s", maxTotalLines, rangeStr)
-			break
-		}
+		// Write to stream: 片段：[Score: 0.x] startLine-endLine
+		pw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, startLine, endLine))
 
 		rankedRanges = append(rankedRanges, RankedRange{
 			Range:     rangeStr,
 			StartLine: startLine,
 			EndLine:   endLine,
-			Rank:      int(rank),
-			Reason:    reason,
+			Score:     score,
 			Text:      text,
 		})
 
-		totalLines += lineCount
+		totalBytes += len(text)
 	}
+
+	pw.Close()
 
 	if len(rankedRanges) == 0 {
 		log.Warnf("compressKnowledgeResultsSingle: no valid ranges extracted")
 		return knowledgeContent
 	}
 
+	// Sort by score descending (higher score = more relevant)
 	sort.Slice(rankedRanges, func(i, j int) bool {
-		return rankedRanges[i].Rank < rankedRanges[j].Rank
+		return rankedRanges[i].Score > rankedRanges[j].Score
 	})
 
 	var result strings.Builder
-	result.WriteString("【AI 智能筛选】按相关性排序的知识片段：\n\n")
+	result.WriteString("【AI 智能筛选】按相关性评分排序的知识片段：\n\n")
 
+	currentBytes := 0
 	for i, item := range rankedRanges {
-		result.WriteString(fmt.Sprintf("=== [%d] 相关性排序: %d ===\n", i+1, item.Rank))
-		if item.Reason != "" {
-			result.WriteString(fmt.Sprintf("相关性说明: %s\n", item.Reason))
+		if currentBytes+len(item.Text) > maxTotalBytes {
+			log.Infof("compressKnowledgeResultsSingle: reached %d bytes limit, stopping at %d ranges", maxTotalBytes, i)
+			break
 		}
+		result.WriteString(fmt.Sprintf("=== [%d] Score: %.2f ===\n", i+1, item.Score))
 		result.WriteString(item.Text)
 		result.WriteString("\n\n")
+		currentBytes += len(item.Text)
 	}
 
 	finalResult := result.String()
 
-	log.Infof("compressKnowledgeResultsSingle: compressed from %d chars to %d chars, %d ranges extracted",
-		len(knowledgeContent), len(finalResult), len(rankedRanges))
+	log.Infof("compressKnowledgeResultsSingle: compressed from %d chars to %d chars (%d bytes), %d ranges extracted",
+		len(knowledgeContent), len(finalResult), currentBytes, len(rankedRanges))
 
 	return finalResult
 }
