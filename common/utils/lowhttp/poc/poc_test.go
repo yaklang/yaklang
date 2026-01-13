@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -161,5 +164,252 @@ func TestExtractPostParams(t *testing.T) {
 				t.Errorf("ExtractPostParams() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDownload_Basic(t *testing.T) {
+	// Create mock HTTP server with file content
+	fileContent := []byte("Hello, this is a test file content for download testing!")
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	// Create temp directory for download
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Download file
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/testfile.txt", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, filePath)
+
+	// Verify file exists and has correct content
+	downloadedContent, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, fileContent, downloadedContent)
+}
+
+func TestDownload_WithProgress(t *testing.T) {
+	// Create mock HTTP server with larger file content
+	fileContent := []byte(utils.RandStringBytes(1024 * 10)) // 10KB
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	var progressCalled int32
+	var lastPercent float64
+
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/largefile.bin", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+		WithDownloadProgress(func(downloaded, total int64, percent float64) {
+			atomic.AddInt32(&progressCalled, 1)
+			lastPercent = percent
+		}),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, filePath)
+
+	// Verify progress callback was called
+	require.Greater(t, atomic.LoadInt32(&progressCalled), int32(0), "progress callback should be called")
+	require.Equal(t, 100.0, lastPercent, "last progress should be 100%")
+
+	// Verify file content
+	downloadedContent, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, fileContent, downloadedContent)
+}
+
+func TestDownload_WithFinishedCallback(t *testing.T) {
+	fileContent := []byte("Finished callback test content")
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	var finishedFilePath string
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/callback.txt", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+		WithDownloadFinished(func(fp string) {
+			finishedFilePath = fp
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, filePath, finishedFilePath, "finished callback should receive correct file path")
+}
+
+func TestDownload_FilenameFromContentDisposition(t *testing.T) {
+	fileContent := []byte("Content disposition test")
+	expectedFilename := "custom_name.dat"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", expectedFilename))
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/download", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+	)
+	require.NoError(t, err)
+	require.Equal(t, expectedFilename, filepath.Base(filePath), "filename should be extracted from Content-Disposition")
+}
+
+func TestDownload_CustomFilename(t *testing.T) {
+	fileContent := []byte("Custom filename test")
+	customFilename := "my_custom_file.txt"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/anypath", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+		WithDownloadFilename(customFilename),
+	)
+	require.NoError(t, err)
+	require.Equal(t, customFilename, filepath.Base(filePath), "should use custom filename")
+}
+
+func TestDownload_FilenameFromURL(t *testing.T) {
+	fileContent := []byte("URL filename test")
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	filePath, err := Download(
+		fmt.Sprintf("http://%s/path/to/myfile.zip", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "myfile.zip", filepath.Base(filePath), "filename should be extracted from URL path")
+}
+
+func TestDownloadWithMethod_POST(t *testing.T) {
+	fileContent := []byte("POST download test")
+	var receivedMethod string
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		receivedMethod = request.Method
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+		writer.WriteHeader(200)
+		writer.Write(fileContent)
+	})
+
+	tmpDir, err := os.MkdirTemp("", "poc_download_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	filePath, err := DownloadWithMethod(
+		"POST",
+		fmt.Sprintf("http://%s/download", utils.HostPort(host, port)),
+		WithDownloadDir(tmpDir),
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, filePath)
+	require.Equal(t, "POST", receivedMethod, "should use POST method")
+
+	// Verify file content
+	downloadedContent, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, fileContent, downloadedContent)
+}
+
+func TestExtractFilenameHelpers(t *testing.T) {
+	// Test extractFilenameFromURL
+	tests := []struct {
+		url      string
+		expected string
+	}{
+		{"http://example.com/file.txt", "file.txt"},
+		{"http://example.com/path/to/document.pdf", "document.pdf"},
+		{"http://example.com/", ""},
+		{"http://example.com", ""},
+		{"http://example.com/dir/", ""},
+	}
+
+	for _, tt := range tests {
+		result := extractFilenameFromURL(tt.url)
+		require.Equal(t, tt.expected, result, "extractFilenameFromURL(%s)", tt.url)
+	}
+}
+
+func TestExtractFilenameFromHeader(t *testing.T) {
+	tests := []struct {
+		header   string
+		expected string
+	}{
+		{"attachment; filename=\"test.zip\"", "test.zip"},
+		{"attachment; filename=test.zip", "test.zip"},
+		{"attachment; filename=\"path/to/file.txt\"", "file.txt"},
+		{"inline; filename=\"document.pdf\"", "document.pdf"},
+		{"", ""},
+		{"attachment", ""},
+	}
+
+	for _, tt := range tests {
+		headerBytes := []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Disposition: %s\r\n\r\n", tt.header))
+		result := extractFilenameFromHeader(headerBytes)
+		require.Equal(t, tt.expected, result, "extractFilenameFromHeader for: %s", tt.header)
+	}
+}
+
+func TestExtractContentLength(t *testing.T) {
+	tests := []struct {
+		header   string
+		expected int64
+	}{
+		{"Content-Length: 1234", 1234},
+		{"Content-Length: 0", 0},
+		{"Content-Length: 999999999", 999999999},
+		{"", -1},
+		{"Content-Length: invalid", -1},
+	}
+
+	for _, tt := range tests {
+		headerBytes := []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n%s\r\n\r\n", tt.header))
+		result := extractContentLength(headerBytes)
+		require.Equal(t, tt.expected, result, "extractContentLength for: %s", tt.header)
 	}
 }

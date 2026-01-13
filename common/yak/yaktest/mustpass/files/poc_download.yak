@@ -1,0 +1,306 @@
+// =============================================================================
+// poc.Download 功能测试
+// 测试所有下载选项的正确性
+// =============================================================================
+
+println("========================================")
+println("poc.Download 功能测试开始")
+println("========================================")
+println("")
+
+// 创建临时下载目录
+tmpDir = os.TempDir()
+downloadDir = f"${tmpDir}/poc_download_test_${randstr(8)}"
+file.MkdirAll(downloadDir)~
+assert file.IsDir(downloadDir), f"下载目录创建失败: ${downloadDir}"
+
+// 测试内容
+testContent = randstr(1024) // 1KB 随机内容
+testContentLen = len(testContent)
+testFilename = "test_download.dat"
+
+// 回调状态变量
+progressCallCount = 0
+lastDownloaded = 0
+lastTotal = 0
+lastPercent = 0.0
+finishedCalled = false
+finishedPath = ""
+receivedMethod = ""
+
+// 启动测试 HTTP 服务器
+port = os.GetRandomAvailableTCPPort()
+assert port > 0, "获取随机端口失败"
+
+go func {
+    httpserver.Serve(
+        "0.0.0.0",
+        port,
+        httpserver.handler((rsp, req) => {
+            rawReq = http.dump(req)~
+            reqStr = string(rawReq)
+            
+            // 记录请求方法
+            if reqStr.Contains("GET /") {
+                receivedMethod = "GET"
+            } elif reqStr.Contains("POST /") {
+                receivedMethod = "POST"
+            }
+            
+            // 设置响应头
+            rsp.Header().Set("Content-Disposition", f"attachment; filename=\"${testFilename}\"")
+            rsp.Header().Set("Content-Type", "application/octet-stream")
+            rsp.Header().Set("Content-Length", string(testContentLen))
+            rsp.WriteHeader(200)
+            rsp.Write(testContent)
+        }),
+    )~
+}
+
+os.WaitConnect(f"127.0.0.1:${port}", 3)~
+baseUrl = f"http://127.0.0.1:${port}"
+
+// -----------------------------------------------------------------------------
+// 测试 1: 基本 GET 下载
+// -----------------------------------------------------------------------------
+println("[测试 1] 基本 GET 下载")
+receivedMethod = ""
+
+filePath1, err = poc.Download(
+    f"${baseUrl}/download.bin",
+    poc.downloadDir(downloadDir),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert filePath1 != "", "  [失败] 文件路径为空"
+assert file.IsExisted(filePath1), f"  [失败] 文件不存在: ${filePath1}"
+assert receivedMethod == "GET", f"  [失败] HTTP 方法应为 GET，实际为: ${receivedMethod}"
+
+downloadedContent1 = file.ReadFile(filePath1)~
+assert len(downloadedContent1) == testContentLen, f"  [失败] 内容长度不匹配"
+assert string(downloadedContent1) == testContent, "  [失败] 内容不匹配"
+assert file.GetBase(filePath1) == testFilename, f"  [失败] 文件名应从 Content-Disposition 获取"
+
+println(f"  [通过] 文件: ${file.GetBase(filePath1)}, 大小: ${len(downloadedContent1)} 字节")
+file.Remove(filePath1)~
+
+// -----------------------------------------------------------------------------
+// 测试 2: 进度回调测试
+// -----------------------------------------------------------------------------
+println("[测试 2] 进度回调测试")
+progressCallCount = 0
+lastDownloaded = 0
+lastTotal = 0
+lastPercent = 0.0
+
+filePath2, err = poc.Download(
+    f"${baseUrl}/download2.bin",
+    poc.downloadDir(downloadDir),
+    poc.downloadProgress((downloaded, total, percent) => {
+        progressCallCount++
+        lastDownloaded = downloaded
+        lastTotal = total
+        lastPercent = percent
+    }),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert progressCallCount > 0, f"  [失败] 进度回调未被调用"
+assert lastDownloaded == testContentLen, f"  [失败] 最终下载字节数不匹配"
+assert lastTotal == testContentLen, f"  [失败] 总字节数不匹配"
+assert lastPercent == 100.0, f"  [失败] 最终进度应为 100%，实际为: ${lastPercent}%"
+
+downloadedContent2 = file.ReadFile(filePath2)~
+assert string(downloadedContent2) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] 回调次数: ${progressCallCount}, 最终进度: ${lastDownloaded}/${lastTotal} (${lastPercent}%)")
+file.Remove(filePath2)~
+
+// -----------------------------------------------------------------------------
+// 测试 3: 完成回调测试
+// -----------------------------------------------------------------------------
+println("[测试 3] 完成回调测试")
+finishedCalled = false
+finishedPath = ""
+
+filePath3, err = poc.Download(
+    f"${baseUrl}/download3.bin",
+    poc.downloadDir(downloadDir),
+    poc.downloadFinished((fp) => {
+        finishedCalled = true
+        finishedPath = fp
+    }),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert finishedCalled == true, "  [失败] 完成回调未被调用"
+assert finishedPath != "", "  [失败] 完成回调路径为空"
+assert finishedPath == filePath3, f"  [失败] 回调路径与返回值不匹配"
+assert file.IsExisted(finishedPath), f"  [失败] 回调路径文件不存在"
+
+downloadedContent3 = file.ReadFile(filePath3)~
+assert string(downloadedContent3) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] 回调路径: ${file.GetBase(finishedPath)}")
+file.Remove(filePath3)~
+
+// -----------------------------------------------------------------------------
+// 测试 4: 自定义文件名
+// -----------------------------------------------------------------------------
+println("[测试 4] 自定义文件名")
+customFilename = "my_custom_file.bin"
+
+filePath4, err = poc.Download(
+    f"${baseUrl}/download4.dat",
+    poc.downloadDir(downloadDir),
+    poc.downloadFilename(customFilename),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert file.IsExisted(filePath4), f"  [失败] 文件不存在"
+actualFilename4 = file.GetBase(filePath4)
+assert actualFilename4 == customFilename, f"  [失败] 文件名应为 {customFilename}，实际为: {actualFilename4}"
+assert filePath4.Contains(customFilename), f"  [失败] 路径应包含自定义文件名"
+
+downloadedContent4 = file.ReadFile(filePath4)~
+assert len(downloadedContent4) == testContentLen, f"  [失败] 内容长度不匹配"
+assert string(downloadedContent4) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] 自定义文件名: ${actualFilename4}")
+file.Remove(filePath4)~
+
+// -----------------------------------------------------------------------------
+// 测试 5: POST 方法下载
+// -----------------------------------------------------------------------------
+println("[测试 5] POST 方法下载")
+receivedMethod = ""
+
+filePath5, err = poc.DownloadWithMethod(
+    "POST",
+    f"${baseUrl}/download5.bin",
+    poc.downloadDir(downloadDir),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert receivedMethod == "POST", f"  [失败] 服务器应收到 POST，实际为: {receivedMethod}"
+assert file.IsExisted(filePath5), f"  [失败] 文件不存在"
+
+downloadedContent5 = file.ReadFile(filePath5)~
+assert string(downloadedContent5) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] HTTP 方法: POST")
+file.Remove(filePath5)~
+
+// -----------------------------------------------------------------------------
+// 测试 6: Content-Disposition 文件名解析
+// -----------------------------------------------------------------------------
+println("[测试 6] Content-Disposition 文件名解析")
+
+filePath6, err = poc.Download(
+    f"${baseUrl}/somepath/noextension",  // URL 无有用文件名
+    poc.downloadDir(downloadDir),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+actualFilename6 = file.GetBase(filePath6)
+assert actualFilename6 == testFilename, f"  [失败] 文件名应从 Content-Disposition 获取: 期望 {testFilename}，实际 {actualFilename6}"
+assert file.IsExisted(filePath6), f"  [失败] 文件不存在"
+
+downloadedContent6 = file.ReadFile(filePath6)~
+assert string(downloadedContent6) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] 解析文件名: ${actualFilename6}")
+file.Remove(filePath6)~
+
+// -----------------------------------------------------------------------------
+// 测试 7: 组合选项测试
+// -----------------------------------------------------------------------------
+println("[测试 7] 组合选项测试 (progress + finished + filename)")
+progressCallCount = 0
+finishedCalled = false
+finishedPath = ""
+combinedFilename = "combined_test.zip"
+
+filePath7, err = poc.Download(
+    f"${baseUrl}/combined",
+    poc.downloadDir(downloadDir),
+    poc.downloadFilename(combinedFilename),
+    poc.downloadProgress((downloaded, total, percent) => {
+        progressCallCount++
+    }),
+    poc.downloadFinished((fp) => {
+        finishedCalled = true
+        finishedPath = fp
+    }),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+assert progressCallCount > 0, f"  [失败] 进度回调未调用"
+assert finishedCalled == true, "  [失败] 完成回调未调用"
+assert finishedPath == filePath7, f"  [失败] 完成回调路径不匹配"
+assert file.GetBase(filePath7) == combinedFilename, f"  [失败] 文件名不匹配"
+
+downloadedContent7 = file.ReadFile(filePath7)~
+assert string(downloadedContent7) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] 文件: ${file.GetBase(filePath7)}, 进度回调: ${progressCallCount}次, 完成回调: 已调用")
+file.Remove(filePath7)~
+
+// -----------------------------------------------------------------------------
+// 测试 8: 从 URL 路径提取文件名
+// -----------------------------------------------------------------------------
+println("[测试 8] 从 URL 路径提取文件名")
+
+// 启动无 Content-Disposition 的服务器
+port2 = os.GetRandomAvailableTCPPort()
+go func {
+    httpserver.Serve(
+        "0.0.0.0",
+        port2,
+        httpserver.handler((rsp, req) => {
+            // 不设置 Content-Disposition
+            rsp.Header().Set("Content-Type", "application/octet-stream")
+            rsp.Header().Set("Content-Length", string(testContentLen))
+            rsp.WriteHeader(200)
+            rsp.Write(testContent)
+        }),
+    )~
+}
+os.WaitConnect(f"127.0.0.1:${port2}", 3)~
+
+filePath8, err = poc.Download(
+    f"http://127.0.0.1:${port2}/path/to/myfile.exe",
+    poc.downloadDir(downloadDir),
+)
+
+assert err == nil, f"  [失败] 下载出错: ${err}"
+actualFilename8 = file.GetBase(filePath8)
+assert actualFilename8 == "myfile.exe", f"  [失败] 文件名应从 URL 获取: 期望 myfile.exe，实际 {actualFilename8}"
+assert file.IsExisted(filePath8), f"  [失败] 文件不存在"
+
+downloadedContent8 = file.ReadFile(filePath8)~
+assert string(downloadedContent8) == testContent, "  [失败] 内容不匹配"
+
+println(f"  [通过] URL 路径文件名: ${actualFilename8}")
+file.Remove(filePath8)~
+
+// -----------------------------------------------------------------------------
+// 清理
+// -----------------------------------------------------------------------------
+file.Remove(downloadDir)
+
+// 输出测试结果
+println("")
+println("========================================")
+println("所有测试通过! (8/8)")
+println("========================================")
+println("")
+println("测试覆盖:")
+println("  [1] 基本 GET 下载 - 验证文件内容、路径、HTTP 方法")
+println("  [2] 进度回调 - 验证 downloaded/total/percent 参数")
+println("  [3] 完成回调 - 验证回调路径与返回值一致")
+println("  [4] 自定义文件名 - 验证覆盖 Content-Disposition")
+println("  [5] POST 方法 - 验证 DownloadWithMethod")
+println("  [6] Content-Disposition - 验证响应头文件名解析")
+println("  [7] 组合选项 - 验证多选项同时使用")
+println("  [8] URL 路径文件名 - 无 Content-Disposition 时的降级策略")

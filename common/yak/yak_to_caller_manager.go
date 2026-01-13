@@ -1397,7 +1397,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 		return hookFunc.Interface()
 	}
-	pocFuncList := []string{"Get", "Post", "Head", "Delete", "Options", "Do", "Websocket", "HTTP", "HTTPEx", "BuildRequest"}
+	pocFuncList := []string{"Get", "Post", "Head", "Delete", "Options", "Do", "Websocket", "HTTP", "HTTPEx", "BuildRequest", "Download", "DownloadWithMethod"}
 	for _, funcName := range pocFuncList {
 		nIns.GetVM().RegisterMapMemberCallHandler("poc", funcName, hookPocFunc)
 	}

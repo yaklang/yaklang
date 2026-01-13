@@ -1188,8 +1188,9 @@ RECONNECT:
 		FixHTTPResponse will be executed when:
 		1. SMUGGLE: noFixContentLength is false
 		2. PIPELINE(multi response)
+		3. Not using NoBodyBuffer (stream mode has incomplete response body)
 	*/
-	if !noFixContentLength && !isMultiResponses {
+	if !noFixContentLength && !isMultiResponses && !option.NoBodyBuffer {
 		// return responseRaw.Bytes(), nil
 		header := GetHTTPPacketHeader(rawBytes, "Content-Type")
 		response.OriginContentType = header
