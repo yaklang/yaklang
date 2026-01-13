@@ -129,6 +129,7 @@ type RAGSystemConfig struct {
 	importFile string
 
 	importKeyAsUID      bool
+	serialVersionUID    string
 	tryRebuildHNSWIndex bool
 
 	enableDocumentQuestionIndex bool
@@ -414,6 +415,9 @@ func (config *RAGSystemConfig) ConvertToExportOptions() []vectorstore.RAGExportO
 	}
 	if config.progressHandler != nil {
 		options = append(options, vectorstore.WithProgressHandler(config.progressHandler))
+	}
+	if config.serialVersionUID != "" {
+		options = append(options, vectorstore.WithSerialVersionUID(config.serialVersionUID))
 	}
 	if config.Name != "" {
 		options = append(options, vectorstore.WithCollectionName(config.Name))
@@ -1019,5 +1023,11 @@ func WithKHopRuntimeBuildOnly(isRuntime bool) RAGSystemConfigOption {
 func WithTryRebuildHNSWIndex(tryRebuildHNSWIndex bool) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.tryRebuildHNSWIndex = tryRebuildHNSWIndex
+	}
+}
+
+func WithRAGSerialVersionUID(serialVersionUID string) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.serialVersionUID = serialVersionUID
 	}
 }

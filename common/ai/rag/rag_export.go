@@ -2,6 +2,7 @@ package rag
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"encoding/json"
 	"errors"
@@ -951,14 +952,25 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 }
 
 func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
-	// 读取二进制文件
+	// 读取二进制文件（支持 .gz）
 	file, err := os.Open(inputPath)
 	if err != nil {
 		return utils.Wrap(err, "failed to open input file")
 	}
 	defer file.Close()
 
-	ragData, err := LoadRAGFileHeader(file)
+	var gzReader *gzip.Reader
+	reader := io.Reader(file)
+	if strings.HasSuffix(strings.ToLower(inputPath), ".gz") {
+		gzReader, err = gzip.NewReader(file)
+		if err != nil {
+			return utils.Wrap(err, "failed to open gzip reader")
+		}
+		reader = gzReader
+		defer gzReader.Close()
+	}
+
+	ragData, err := LoadRAGFileHeader(reader)
 	if err != nil {
 		return utils.Wrap(err, "load rag file header")
 	}
@@ -982,6 +994,14 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	}
 	ragData.Collection.Name = collectionName
 
+	// 使用传入的 SerialVersionUID 作为最终标识
+	if ragData.Collection.SerialVersionUID == "" {
+		ragData.Collection.SerialVersionUID = uuid.NewString()
+	}
+	if ragSystemConfig.serialVersionUID != "" {
+		ragData.Collection.SerialVersionUID = ragSystemConfig.serialVersionUID
+	}
+
 	// 检查集合是否已存在
 	if !ragSystemConfig.overwriteExisting && CollectionIsExists(ragSystemConfig.db, collectionName) {
 		return utils.Errorf("collection %s already exists", collectionName)
@@ -991,10 +1011,6 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 
 	// 创建集合
 	ragID := uuid.NewString()
-	// 兼容旧版本导出文件（无 SerialVersionUID），导入时仍标记为“已导入”
-	if ragData.Collection.SerialVersionUID == "" {
-		ragData.Collection.SerialVersionUID = uuid.NewString()
-	}
 	ragData.Collection.RAGID = ragID
 	collection, err := vectorstore.CreateCollectionRecord(ragSystemConfig.db, collectionName, ragSystemConfig.description, ragSystemConfig.ConvertToVectorStoreOptions()...)
 	if err != nil {
@@ -1037,7 +1053,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	createdEntities := make(map[string]string) // originalUuid -> newUuid
 
 	// 读取文档数据
-	documents, err := readDocumentsFromStream(file, func(doc *ExportVectorStoreDocument, typeName string, extReader io.Reader) error {
+	documents, err := readDocumentsFromStream(reader, func(doc *ExportVectorStoreDocument, typeName string, extReader io.Reader) error {
 		switch typeName {
 		case "knowledge_entry":
 			knowledgeEntry, err := readKnowledgeEntryFromStream(extReader)
@@ -1091,7 +1107,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	}
 
 	// 读取HNSW索引
-	hnswIndex, err := readHNSWIndexFromStream(file)
+	hnswIndex, err := readHNSWIndexFromStream(reader)
 	if err != nil {
 		return utils.Wrap(err, "read hnsw index")
 	}
@@ -1099,7 +1115,7 @@ func ImportRAG(inputPath string, optFuncs ...RAGSystemConfigOption) error {
 	ragData.Documents = documents
 
 	// 尝试读取扩展字段（兼容旧版本文件）
-	extFields, err := tryReadExtFieldsFromStream(file)
+	extFields, err := tryReadExtFieldsFromStream(reader)
 	if err != nil {
 		log.Warnf("failed to read ext fields: %v", err)
 	}

@@ -408,6 +408,11 @@ func init() {
 			withPluginEnableGenerateParam(true),
 			withPluginIgnore(true),
 		)
+		registerBuildInPlugin("yak", "导入默认知识库",
+			withPluginHelp("导入默认知识库，支持多个知识库，使用逗号分隔，格式如 /path/a.rag:kb-name:<uid>,/path/b.rag:another-name:<uid>"),
+			withPluginEnableGenerateParam(true),
+			withPluginIgnore(true),
+		)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 
