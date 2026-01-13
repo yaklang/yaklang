@@ -224,8 +224,8 @@ func TestDownload_WithProgress(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, filePath)
 
-	// Verify progress callback was called
-	require.Greater(t, atomic.LoadInt32(&progressCalled), int32(0), "progress callback should be called")
+	// Verify progress callback was called at least twice (start + end)
+	require.GreaterOrEqual(t, atomic.LoadInt32(&progressCalled), int32(2), "progress callback should be called at least twice (start + end)")
 	require.Equal(t, 100.0, lastPercent, "last progress should be 100%")
 
 	// Verify file content

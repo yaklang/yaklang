@@ -105,7 +105,7 @@ filePath2, err = poc.Download(
 )
 
 assert err == nil, f"  [失败] 下载出错: ${err}"
-assert progressCallCount > 0, f"  [失败] 进度回调未被调用"
+assert progressCallCount >= 2, f"  [失败] 进度回调应至少调用2次(开始+结束)，实际: ${progressCallCount}"
 assert lastDownloaded == testContentLen, f"  [失败] 最终下载字节数不匹配"
 assert lastTotal == testContentLen, f"  [失败] 总字节数不匹配"
 assert lastPercent == 100.0, f"  [失败] 最终进度应为 100%，实际为: ${lastPercent}%"
@@ -235,7 +235,7 @@ filePath7, err = poc.Download(
 )
 
 assert err == nil, f"  [失败] 下载出错: ${err}"
-assert progressCallCount > 0, f"  [失败] 进度回调未调用"
+assert progressCallCount >= 2, f"  [失败] 进度回调应至少调用2次，实际: ${progressCallCount}"
 assert finishedCalled == true, "  [失败] 完成回调未调用"
 assert finishedPath == filePath7, f"  [失败] 完成回调路径不匹配"
 assert file.GetBase(filePath7) == combinedFilename, f"  [失败] 文件名不匹配"
