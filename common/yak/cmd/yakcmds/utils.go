@@ -387,6 +387,10 @@ var UtilsCommands = []*cli.Command{
 				Name:  "hash",
 				Usage: "Hash value",
 			},
+			cli.StringFlag{
+				Name:  "reference-artifacts",
+				Usage: "Reference artifact files (comma-separated OSS paths, e.g., '/rag/xxx/v1/data.zip,/rag/xxx/v1/index.json')",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			inputFile := c.String("file")
@@ -402,6 +406,18 @@ var UtilsCommands = []*cli.Command{
 			hashFile := c.String("hash-file")
 			hashType := c.String("hash-type")
 			hashValue := c.String("hash")
+			referenceArtifactsStr := c.String("reference-artifacts")
+
+			// Parse reference-artifacts (comma-separated)
+			var referenceArtifacts []string
+			if referenceArtifactsStr != "" {
+				for _, artifact := range strings.Split(referenceArtifactsStr, ",") {
+					artifact = strings.TrimSpace(artifact)
+					if artifact != "" {
+						referenceArtifacts = append(referenceArtifacts, artifact)
+					}
+				}
+			}
 
 			if name == "" {
 				return utils.Error("--register-name is required")
@@ -415,13 +431,14 @@ var UtilsCommands = []*cli.Command{
 
 			// Define RAG entry structure
 			type RagEntry struct {
-				Name     string `json:"name"`
-				NameZh   string `json:"name_zh,omitempty"`
-				Version  string `json:"version"`
-				File     string `json:"file"`
-				HashFile string `json:"hashfile,omitempty"`
-				HashType string `json:"hashtype,omitempty"`
-				Hash     string `json:"hash,omitempty"`
+				Name               string   `json:"name"`
+				NameZh             string   `json:"name_zh,omitempty"`
+				Version            string   `json:"version"`
+				File               string   `json:"file"`
+				HashFile           string   `json:"hashfile,omitempty"`
+				HashType           string   `json:"hashtype,omitempty"`
+				Hash               string   `json:"hash,omitempty"`
+				ReferenceArtifacts []string `json:"reference_artifacts,omitempty"`
 			}
 
 			var entries []RagEntry
@@ -440,13 +457,14 @@ var UtilsCommands = []*cli.Command{
 
 			// Create new entry
 			newEntry := RagEntry{
-				Name:     name,
-				NameZh:   nameZh,
-				Version:  version,
-				File:     ragFile,
-				HashFile: hashFile,
-				HashType: hashType,
-				Hash:     hashValue,
+				Name:               name,
+				NameZh:             nameZh,
+				Version:            version,
+				File:               ragFile,
+				HashFile:           hashFile,
+				HashType:           hashType,
+				Hash:               hashValue,
+				ReferenceArtifacts: referenceArtifacts,
 			}
 
 			// Find and update or append
