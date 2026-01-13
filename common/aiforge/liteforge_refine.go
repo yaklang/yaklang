@@ -306,7 +306,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, ragSys
 
 				// 只在保存明显慢时才警告
 				if saveTime > 3*time.Second {
-					refineConfig.AnalyzeLog("SLOW KNOWLEDGE SAVE: hop=%s took %v, entries=%d",
+					refineConfig.AnalyzeLog("SLOW KNOWLEDGE SAVE: hop=%s took %v, entries=%d maybe caused by queueing?",
 						currentHop.String()[:min(50, len(currentHop.String()))], saveTime, len(entries))
 				}
 			}(hop)

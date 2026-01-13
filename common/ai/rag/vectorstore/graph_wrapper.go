@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var GraphWrapperManager = NewGraphHNSWManager()
@@ -163,19 +165,22 @@ var (
 
 type graphOp struct {
 	opType string // read | write
+	desc   string
 	fn     func()
 }
 
 type GraphWrapper[K cmp.Ordered] struct {
-	graph            *hnsw.Graph[K]
-	operationChannel *chanx.UnlimitedChan[*graphOp]
-	mu               sync.RWMutex
+	graph                *hnsw.Graph[K]
+	operationChannel     *chanx.UnlimitedChan[*graphOp]
+	mu                   sync.RWMutex
+	singleOpWarnDuration time.Duration
 }
 
 func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K]) *GraphWrapper[K] {
 	wrapper := &GraphWrapper[K]{
-		graph:            graph,
-		operationChannel: chanx.NewUnlimitedChan[*graphOp](context.Background(), 10),
+		graph:                graph,
+		operationChannel:     chanx.NewUnlimitedChan[*graphOp](context.Background(), 10),
+		singleOpWarnDuration: 3 * time.Second,
 	}
 	go wrapper.start()
 	return wrapper
@@ -184,38 +189,58 @@ func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K]) *GraphWrapper[K] {
 func (gw *GraphWrapper[K]) start() {
 	for op := range gw.operationChannel.OutputChannel() {
 		switch op.opType {
-		case "write":
+		case opTypeWrite:
 			gw.mu.Lock()
-			safeCall := func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("recovered from panic in graph write operation: %v", r)
-					}
-					op.fn()
-				}()
-			}
-			safeCall()
+			gw.executeGraphOpInLock(op)
 			gw.mu.Unlock()
-		case "read":
+		case opTypeRead:
 			gw.mu.RLock()
-			go func(readFn func()) {
+			go func(op *graphOp) {
 				defer gw.mu.RUnlock()
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("recovered from panic in graph read operation: %v", r)
-					}
-					op.fn()
-				}()
-				readFn()
-			}(op.fn)
+				gw.executeGraphOpInLock(op)
+			}(op)
 		}
 	}
+}
+
+func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
+	warnAfter := gw.singleOpWarnDuration
+	if warnAfter <= 0 {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("recovered from panic in graph %s operation %q: %v", op.opType, op.desc, r)
+			}
+		}()
+		op.fn()
+		return
+	}
+
+	startedAt := time.Now()
+	var warned atomic.Bool
+	timer := time.AfterFunc(warnAfter, func() {
+		if warned.CompareAndSwap(false, true) {
+			log.Errorf("graph %s operation %q is running longer than %s", op.opType, op.desc, warnAfter)
+		}
+	})
+
+	defer func() {
+		timer.Stop()
+		if r := recover(); r != nil {
+			log.Errorf("recovered from panic in graph %s operation %q: %v", op.opType, op.desc, r)
+		}
+		if elapsed := time.Since(startedAt); elapsed > warnAfter && warned.CompareAndSwap(false, true) {
+			log.Errorf("graph %s operation %q took %s (> %s)", op.opType, op.desc, elapsed, warnAfter)
+		}
+	}()
+
+	op.fn()
 }
 
 func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) {
 	done := make(chan struct{}, 1)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
+		desc:   "Add",
 		fn: func() {
 			defer close(done)
 			gw.graph.Add(nodes...)
@@ -228,6 +253,7 @@ func (gw *GraphWrapper[K]) Delete(uids ...K) {
 	done := make(chan struct{}, 1)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
+		desc:   "Delete",
 		fn: func() {
 			defer close(done)
 			for _, uid := range uids {
@@ -243,6 +269,7 @@ func (gw *GraphWrapper[K]) SearchWithDistanceAndFilter(near []float32, k int, fi
 	resultChan := make(chan []hnsw.SearchResult[K], 2)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
+		desc:   "SearchWithDistanceAndFilter",
 		fn: func() {
 			results := gw.graph.SearchWithDistanceAndFilter(near, k, filter)
 			resultChan <- results
@@ -255,6 +282,7 @@ func (gw *GraphWrapper[K]) Has(docId K) bool {
 	resultChan := make(chan bool, 2)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
+		desc:   "Has",
 		fn: func() {
 			resultChan <- gw.graph.Has(docId)
 		},
@@ -266,6 +294,7 @@ func (gw *GraphWrapper[K]) GetSize() int {
 	resultChan := make(chan int, 2)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
+		desc:   "GetSize",
 		fn: func() {
 			var nodeNum int
 			if len(gw.graph.Layers) > 0 && len(gw.graph.Layers[0].Nodes) > 0 {
@@ -281,6 +310,7 @@ func (gw *GraphWrapper[K]) GetLayerLength() int {
 	resultChan := make(chan int, 2)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
+		desc:   "GetLayerLength",
 		fn: func() {
 			resultChan <- len(gw.graph.Layers)
 		},
@@ -294,6 +324,7 @@ func (gw *GraphWrapper[K]) TrainPQCodebookFromDataWithCallback(m, k int, callbac
 	done := make(chan struct{}, 1)
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
+		desc:   "TrainPQCodebookFromDataWithCallback",
 		fn: func() {
 			defer close(done)
 			codebook, err = gw.graph.TrainPQCodebookFromDataWithCallback(m, k, callback)
