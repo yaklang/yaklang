@@ -203,7 +203,7 @@ filePath6, err = poc.Download(
 
 assert err == nil, f"  [失败] 下载出错: ${err}"
 actualFilename6 = file.GetBase(filePath6)
-assert actualFilename6 == testFilename, f"  [失败] 文件名应从 Content-Disposition 获取: 期望 {testFilename}，实际 {actualFilename6}"
+assert actualFilename6 == testFilename, f"  [失败] 文件名应从 Content-Disposition 获取: 期望 ${testFilename}，实际 ${actualFilename6}"
 assert file.IsExisted(filePath6), f"  [失败] 文件不存在"
 
 downloadedContent6 = file.ReadFile(filePath6)~
