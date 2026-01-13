@@ -72,6 +72,22 @@ func GetZipWithJarFile() (string, error) {
 	return zipPath, nil
 }
 
+func GetNestedJarFile() (string, error) {
+	// write nested jar file (test-nested.jar contains test.jar) to template directory
+	dir := os.TempDir()
+	jarData, err := JavaTestFile.ReadFile("testfile/test-nested.jar")
+	if err != nil {
+		return "", err
+	}
+
+	jarPath := dir + "/test-nested.jar"
+	err = os.WriteFile(jarPath, jarData, 0644)
+	if err != nil {
+		return "", err
+	}
+	return jarPath, nil
+}
+
 func GetLocalGit() (string, error) {
 	// address
 	address := fmt.Sprintf("127.0.0.1:%d", utils.GetRandomAvailableTCPPort())
