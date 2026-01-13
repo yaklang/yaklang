@@ -629,8 +629,12 @@ func normalizeFilePath(filePath string) string {
 }
 
 // getValueFilePath 获取 Value 的文件路径（规范化后的）
-func (p *ProgramOverLay) getValueFilePath(v *Value) string {
-	if v == nil {
+func (p *ProgramOverLay) getValueFilePath(vo sfvm.ValueOperator) string {
+	if utils.IsNil(vo) {
+		return ""
+	}
+	v, ok := vo.(*Value)
+	if !ok {
 		return ""
 	}
 
@@ -945,14 +949,14 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 func (p *ProgramOverLay) queryMatch(
 	ctx context.Context,
 	mod int,
-	queryFunc func(*Program, context.Context, int, string) (bool, sfvm.ValueOperator, error),
+	queryFunc func(*Program, context.Context, int, string) sfvm.Values,
 	query string,
-) (bool, sfvm.ValueOperator, error) {
+) sfvm.Values {
 	if p == nil {
-		return false, nil, nil
+		return nil
 	}
 
-	var results Values
+	var results sfvm.Values
 	foundFiles := utils.NewSafeMap[struct{}]() // 去重：已找到的文件
 
 	// 从最上层开始查找（倒序遍历）
@@ -962,103 +966,95 @@ func (p *ProgramOverLay) queryMatch(
 			continue
 		}
 
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query)
-		if err != nil {
-			continue
-		}
-
-		if matched {
-			vals.Recursive(func(op sfvm.ValueOperator) error {
-				if v, ok := op.(*Value); ok {
-					filePath := p.getValueFilePath(v)
-					if filePath == "" {
-						// 全局值，直接添加
-						results = append(results, v)
-						return nil
-					}
-
-					// 如果文件已在更高层找到，跳过（被覆盖）
-					if foundFiles.Have(filePath) {
-						return nil
-					}
-
-					// 检查文件是否在当前层
-					if layer.FileSet.Have(filePath) {
-						foundFiles.Set(filePath, struct{}{})
-						results = append(results, v)
-					} else {
-						// 检查文件实际在哪个层
-						actualLayerIndex, exists := p.FileToLayerMap.Get(filePath)
-						if exists && actualLayerIndex > layer.LayerIndex {
-							return nil
-						}
-						foundFiles.Set(filePath, struct{}{})
-						results = append(results, v)
-					}
-				}
+		vals := queryFunc(layer.Program, ctx, mod, query)
+		vals.ForEach(func(v sfvm.ValueOperator) error {
+			filePath := p.getValueFilePath(v)
+			if filePath == "" {
+				// 全局值，直接添加
+				results = append(results, v)
 				return nil
-			})
-		}
+			}
+
+			// 如果文件已在更高层找到，跳过（被覆盖）
+			if foundFiles.Have(filePath) {
+				return nil
+			}
+
+			// 检查文件是否在当前层
+			if layer.FileSet.Have(filePath) {
+				foundFiles.Set(filePath, struct{}{})
+				results = append(results, v)
+			} else {
+				// 检查文件实际在哪个层
+				actualLayerIndex, exists := p.FileToLayerMap.Get(filePath)
+				if exists && actualLayerIndex > layer.LayerIndex {
+					return nil
+				}
+				foundFiles.Set(filePath, struct{}{})
+				results = append(results, v)
+			}
+			return nil
+		})
 	}
 
-	return len(results) > 0, ValuesToSFValueList(results), nil
+	return results
 }
 
-func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) sfvm.Values {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) sfvm.Values {
 		return prog.ExactMatch(ctx, mod, query)
 	}, want)
 }
 
-func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) sfvm.Values {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) sfvm.Values {
 		return prog.GlobMatch(ctx, mod, query)
 	}, g)
 }
 
-func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) sfvm.Values {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) sfvm.Values {
 		return prog.RegexpMatch(ctx, mod, query)
 	}, re)
 }
 
-func (p *ProgramOverLay) GetCalled() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetCalled() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetCalled")
 }
 
-func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetCallActualParams")
 }
 
-func (p *ProgramOverLay) GetFields() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetFields() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetFields")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowUse")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowDef() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowDef")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowTopDef")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowBottomUse")
 }
 
-func (p *ProgramOverLay) ListIndex(i int) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) ListIndex(i int) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support ListIndex")
 }
 
-func (p *ProgramOverLay) Merge(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) Merge(values ...sfvm.ValueOperator) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support Merge")
 }
 
-func (p *ProgramOverLay) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) Remove(values ...sfvm.ValueOperator) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support Remove")
 }
 
@@ -1066,22 +1062,26 @@ func (p *ProgramOverLay) AppendPredecessor(operator sfvm.ValueOperator, opts ...
 	return utils.Error("ProgramOverLay does not support AppendPredecessor")
 }
 
-func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support FileFilter")
 }
 
-func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, bool) {
+	return sfvm.Values{}, false
 }
 
-func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, bool) {
+	return sfvm.Values{}, false
 }
 
-func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return nil
+func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return true
 }
 
 func (p *ProgramOverLay) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return nil
+}
+
+func (p *ProgramOverLay) Count() int {
+	return 1
 }

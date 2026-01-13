@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -279,7 +280,7 @@ func (r *SyntaxFlowResult) YieldRisk() chan *schema.SSARisk {
 	go func() {
 		defer close(ch)
 		r.GetAlertVariables()
-		r.GetAlertValues().ForEach(func(variable string, v Values) bool {
+		r.GetAlertValues().ForEach(func(variable string, v sfvm.Values) bool {
 			for index := range v {
 				risk := r.GetRiskByValue(variable, index)
 				if risk != nil {

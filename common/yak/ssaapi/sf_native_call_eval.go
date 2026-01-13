@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	contextResult, err := frame.GetSFResult()
 	if err != nil {
 		return false, nil, err
@@ -19,7 +19,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 		return false, nil, err
 	}
 
-	exec := func(codeRaw string) (bool, sfvm.ValueOperator, error) {
+	exec := func(codeRaw string) (bool, sfvm.Values, error) {
 		newResult, err := QuerySyntaxflow(
 			QueryWithProgram(program),
 			QueryWithRuleContent(codeRaw),
@@ -92,7 +92,7 @@ var nativeCallEval sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 	return exec(codes)
 }
 
-var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallFuzztag sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	codes := params.GetString(0, "fuzztag", "f", "tag")
 	if codes == "" {
 		return false, nil, utils.Error("no fuzztag code found in <eval(...)>")

@@ -19,6 +19,10 @@ type SyntaxFlowVisitor struct {
 	codes        []*SFI
 }
 
+func (y *SyntaxFlowVisitor) GetCodes() []*SFI {
+	return y.codes
+}
+
 type VerifyFsInfo struct {
 	language           string
 	rawDesc            map[string]string
@@ -205,18 +209,13 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
-		y.EmitOpEmptyCompare()
-		ctx := y.EmitCreateIterator()
-		y.EmitNextIterator(ctx)
+		y.EmitDuplicate()
 		err := y.VisitFilterExpr(i.FilterExpr())
 		if err != nil {
 			log.Warnf("compile filter-expr in condition expression failed: %v", err)
 			return err
 		}
-		y.EmitDuplicate()
-		y.EmitOpCheckEmpty(ctx)
-		y.EmitLatchIterator(ctx)
-		y.EmitIterEnd(ctx)
+		y.EmitOpToBool()
 	case *sf.OpcodeTypeConditionContext:
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))
@@ -367,8 +366,8 @@ func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int
 	return -1
 }
 
-func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []func() (string, ConditionFilterMode) {
-	var result []func() (string, ConditionFilterMode)
+func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLiteralWithoutStarGroupContext) []ConditionItem {
+	var result = make([]ConditionItem, 0)
 	if y == nil || raw == nil {
 		return result
 	}
@@ -380,20 +379,21 @@ func (y *SyntaxFlowVisitor) VisitStringLiteralWithoutStarGroup(raw sf.IStringLit
 
 	for _, s := range i.AllStringLiteralWithoutStar() {
 		star := s.(*sf.StringLiteralWithoutStarContext)
-		result = append(result, func() (string, ConditionFilterMode) {
-			var (
-				mode = ExactConditionFilter
-				text = star.GetText()
-			)
+		var (
+			mode = ExactConditionFilter
+			text = star.GetText()
+		)
 
-			if star.RegexpLiteral() != nil {
-				mode = RegexpConditionFilter
-				text = strings.TrimSuffix(strings.TrimPrefix(star.RegexpLiteral().GetText(), "/"), "/")
-			} else if glob, b := y.FormatStringOrGlob(star.GetText()); b {
-				text = glob
-				mode = GlobalConditionFilter
-			}
-			return text, mode
+		if star.RegexpLiteral() != nil {
+			mode = RegexpConditionFilter
+			text = strings.TrimSuffix(strings.TrimPrefix(star.RegexpLiteral().GetText(), "/"), "/")
+		} else if glob, b := y.FormatStringOrGlob(star.GetText()); b {
+			text = glob
+			mode = GlobalConditionFilter
+		}
+		result = append(result, ConditionItem{
+			Text:       text,
+			FilterMode: mode,
 		})
 	}
 	return result

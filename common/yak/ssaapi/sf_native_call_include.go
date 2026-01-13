@@ -41,7 +41,7 @@ func createIncludeCache() *utils.Cache[Values] {
 	return utils.NewTTLCache[Values]()
 }
 
-func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
+func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
 	parent, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err

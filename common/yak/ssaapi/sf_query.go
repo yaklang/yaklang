@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type SyntaxFlowQueryInstance interface {
@@ -31,7 +30,7 @@ type queryConfig struct {
 	useCache bool
 	// input
 	program *Program
-	value   sfvm.ValueOperator // use this
+	value   sfvm.Values // use this
 	//  rule
 	ruleContent string
 	ruleName    string
@@ -209,7 +208,7 @@ type QueryOption func(*queryConfig)
 func QueryWithProgram(program *Program) QueryOption {
 	return func(c *queryConfig) {
 		c.program = program
-		c.value = program
+		c.value = sfvm.NewValues(program)
 	}
 }
 
@@ -217,7 +216,7 @@ func QueryWithPrograms(programs Programs) QueryOption {
 	return func(c *queryConfig) {
 		c.value = sfvm.NewValues(lo.Map(programs, func(p *Program, _ int) sfvm.ValueOperator {
 			return p
-		}))
+		})...)
 		c.program, _ = lo.Find(programs, func(item *Program) bool {
 			return item.GetProgramKind() == ssa.Application
 		})
@@ -226,7 +225,7 @@ func QueryWithPrograms(programs Programs) QueryOption {
 
 func QueryWithValue(value sfvm.ValueOperator) QueryOption {
 	return func(c *queryConfig) {
-		c.value = value
+		c.value = sfvm.NewValues(value)
 		c.program, _ = fetchProgram(value)
 	}
 }
@@ -304,7 +303,7 @@ func QueryWithSFConfig(config *sfvm.Config) QueryOption {
 	return QueryWithSFOption(sfvm.WithConfig(config))
 }
 
-func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
+func QueryWithInitVar(result sfvm.VarMap) QueryOption {
 	return func(c *queryConfig) {
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
 	}
@@ -312,8 +311,8 @@ func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) Query
 
 func QueryWithInitInputVar(value sfvm.ValueOperator) QueryOption {
 	return func(c *queryConfig) {
-		result := omap.NewOrderedMap(map[string]sfvm.ValueOperator{})
-		result.Set(DefaultInputVar, value)
+		result := sfvm.NewVarMap()
+		result.Set(DefaultInputVar, sfvm.Values{value})
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
 	}
 }
@@ -372,11 +371,11 @@ func QueryWithResultCaptured(capture sfvm.ResultCapturedCallback) QueryOption {
 }
 func QueryWithSyntaxFlowResult(expected string, handler func(*Value) error) QueryOption {
 	return func(c *queryConfig) {
-		c.opts = append(c.opts, sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+		c.opts = append(c.opts, sfvm.WithResultCaptured(func(name string, results sfvm.Values) error {
 			if name != expected {
 				return nil
 			}
-			return results.Recursive(func(operator sfvm.ValueOperator) error {
+			return results.ForEach(func(operator sfvm.ValueOperator) error {
 				result, ok := operator.(*Value)
 				if !ok {
 					return nil

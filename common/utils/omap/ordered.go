@@ -33,6 +33,10 @@ type OrderedMap[T comparable, V any] struct {
 	literalValue any
 }
 
+func (o *OrderedMap[T, V]) IsNil() bool {
+	return o == nil
+}
+
 func (o *OrderedMap[T, V]) init() {
 	if o == nil {
 		return

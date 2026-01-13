@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 )
 
@@ -91,6 +89,12 @@ func (y *SyntaxFlowVisitor) EmitOpEmptyCompare() {
 		OpCode: OpEmptyCompare,
 	})
 }
+func (y *SyntaxFlowVisitor) EmitOpToBool() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpToBool,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitOpCheckEmpty(index *IterIndex) {
 	//索引
 	y.codes = append(y.codes, &SFI{
@@ -212,7 +216,12 @@ func ValidConditionFilter(mode int) ConditionFilterMode {
 	return -1
 }
 
-func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, ConditionFilterMode), compareMode StringMatchMode) {
+type ConditionItem struct {
+	Text       string
+	FilterMode ConditionFilterMode
+}
+
+func (v *SyntaxFlowVisitor) EmitCompareString(i []ConditionItem, compareMode StringMatchMode) {
 	s := &SFI{
 		OpCode:   OpCompareString,
 		UnaryInt: int(compareMode),
@@ -236,13 +245,11 @@ func (v *SyntaxFlowVisitor) EmitCompareString(i []func() (string, ConditionFilte
 			return item
 		}
 	}
-	lo.ForEach(i, func(item func() (string, ConditionFilterMode), index int) {
-		s2, i2 := item()
-		s.Values[index] = handler(s2)
-		s.MultiOperator[index] = int(i2)
-	})
+	for index, item := range i {
+		s.Values[index] = handler(item.Text)
+		s.MultiOperator[index] = int(item.FilterMode)
+	}
 	v.codes = append(v.codes, s)
-
 }
 
 func (v *SyntaxFlowVisitor) EmitCondition() {
@@ -390,7 +397,7 @@ func (v *SyntaxFlowVisitor) Show() {
 	}
 }
 
-func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOperator]) *SFFrame {
+func (v *SyntaxFlowVisitor) CreateFrame(vars VarMap) *SFFrame {
 	return NewSFFrame(vars, v.rule.Content, v.codes)
 }
 

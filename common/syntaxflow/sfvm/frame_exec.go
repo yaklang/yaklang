@@ -20,7 +20,6 @@ package sfvm
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -30,25 +29,25 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
+func recursiveDeepChain(element []ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
 		visited = make(map[int64]struct{})
 	}
 
 	var next []ValueOperator
 
-	val, _ := element.GetCalled()
-	if val != nil {
-		_ = val.Recursive(func(operator ValueOperator) error {
-			if idGetter, ok := operator.(ssa.GetIdIF); ok {
+	for _, element := range element {
+		val, _ := element.GetCalled()
+		val.ForEach(func(vo ValueOperator) error {
+			if idGetter, ok := vo.(ssa.GetIdIF); ok {
 				if _, ok := visited[idGetter.GetId()]; ok {
 					return nil
 				}
 				visited[idGetter.GetId()] = struct{}{}
 
-				fields, _ := operator.GetFields()
+				fields, _ := vo.GetFields()
 				if fields != nil {
-					_ = fields.Recursive(func(fieldElement ValueOperator) error {
+					_ = fields.ForEach(func(fieldElement ValueOperator) error {
 						if idGetter, ok := fieldElement.(ssa.GetIdIF); ok {
 							if _, ok := visited[idGetter.GetId()]; ok {
 								return nil
@@ -65,50 +64,48 @@ func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperato
 			}
 			return nil
 		})
-	}
 
-	val, _ = element.GetFields()
-	if val != nil {
-		_ = val.Recursive(func(operator ValueOperator) error {
-			if idGetter, ok := operator.(ssa.GetIdIF); ok {
-				if _, ok := visited[idGetter.GetId()]; ok {
-					return nil
-				}
-				visited[idGetter.GetId()] = struct{}{}
+		fields, _ := element.GetFields()
+		if fields != nil {
+			_ = fields.ForEach(func(operator ValueOperator) error {
+				if idGetter, ok := operator.(ssa.GetIdIF); ok {
+					if _, ok := visited[idGetter.GetId()]; ok {
+						return nil
+					}
+					visited[idGetter.GetId()] = struct{}{}
 
-				if !handle(operator) {
-					next = append(next, operator)
+					if !handle(operator) {
+						next = append(next, operator)
+					}
 				}
-			}
-			return nil
-		})
+				return nil
+			})
+		}
 	}
 
 	if len(next) <= 0 {
 		return nil
 	}
 
-	nextValues := NewValues(next)
-	return recursiveDeepChain(nextValues, handle, visited)
+	return recursiveDeepChain(next, handle, visited)
 }
 
-func (s *SFFrame) opPop(unName bool) (ValueOperator, error) {
-	if s.stack.Len() == 0 {
-		s.debugSubLog(">> pop Error: empty stack")
-		return nil, utils.Errorf("E: stack is empty, cannot pop")
+func (s *SFFrame) opPop(unName bool) (Values, error) {
+	vs, err := s.stackPop()
+	if err != nil {
+		return nil, err
 	}
-	i := s.stack.Pop()
-	s.popStack.Push(i)
-	s.debugSubLog(">> pop %v", ValuesLen(i))
+	s.popStack.Push(vs)
+	s.debugSubLog(">> pop %v", len(vs))
 	if unName {
 		s.debugSubLog("save-to $_")
-		err := s.output("_", i)
+		err := s.output("_", vs)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return nil, utils.Errorf("output '_' error: %v", err)
 		}
 	}
-	return i, nil
+	return vs, nil
 }
 func (s *SFFrame) execStatement(i *SFI) error {
 	// Try filter and condition operations first
@@ -132,24 +129,25 @@ func (s *SFFrame) execStatement(i *SFI) error {
 }
 
 // execFilterAndCondition handles condition/logic/comparison operations
-func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
+func (s *SFFrame) execFilterAndCondition(i *SFI) (handler bool, e error) {
+	handler = true
+	e = nil
 	switch i.OpCode {
 	case OpEmptyCompare:
-		vals := s.stack.Peek()
-		if vals == nil {
+		vals, err := s.stackPeek()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		var flag []bool
-		vals.Recursive(func(operator ValueOperator) error {
+		flag := make([]bool, 0, len(vals))
+		for i := 0; i < len(vals); i++ {
 			flag = append(flag, true)
-			return nil
-		})
+		}
 		s.conditionStack.Push(flag)
-		return true, nil
+		return
 	case OpCompareOpcode:
 		s.debugSubLog(">> pop")
-		values := s.stack.Pop()
-		if values == nil {
+		values, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 
@@ -168,26 +166,30 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			log.Infof("invalid opcode: %v", v)
 		}
 
-		var newVal ValueOperator
+		var newVal Values
 		var condition []bool
+
 		if trackErr := s.track("value-op:CompareOpcode", func() error {
 			done := s.startValueOpTiming("CompareOpcode")
 			defer done()
-			newVal, condition = values.CompareOpcode(comparator)
+			newVal, condition = values.mapValuesWithBool(func(operator ValueOperator) (Values, bool) {
+				return operator.CompareOpcode(comparator)
+			})
 			return nil
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.stack.Push(newVal)
+		s.stackPush(newVal)
 		s.conditionStack.Push(condition)
 		return true, nil
 	case OpCompareString:
 		s.debugSubLog(">> pop")
 		//pop到原值
-		values := s.stack.Pop()
-		if values == nil {
+		valList, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
+		values := valList
 
 		mode := ValidStringMatchMode(i.UnaryInt)
 		if mode == -1 {
@@ -202,24 +204,27 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		for index, v := range i.Values {
 			comparator.AddCondition(v, ValidConditionFilter(i.MultiOperator[index]))
 		}
-		var newVal ValueOperator
+		var newVal Values
 		var condition []bool
 		if trackErr := s.track("value-op:CompareString", func() error {
 			done := s.startValueOpTiming("CompareString")
 			defer done()
-			newVal, condition = values.CompareString(comparator)
+			newVal, condition = values.mapValuesWithBool(func(operator ValueOperator) (Values, bool) {
+				return operator.CompareString(comparator)
+			})
 			return nil
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.stack.Push(newVal)
+		s.stackPush(newVal)
 		s.conditionStack.Push(condition)
 		return true, nil
 	case OpVersionIn:
-		value := s.stack.Peek()
-		if value == nil {
+		valList, err := s.stackPeek()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "compare version failed: stack top is empty")
 		}
+		value := valList
 		call, err := GetNativeCall("versionIn")
 		if err != nil {
 			s.debugSubLog("Err: %v", err)
@@ -247,151 +252,178 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(buffer.String())
 		var res []bool
-		_ = value.Recursive(func(v ValueOperator) error {
-			ok, _, _ := call(v, s, params)
-			res = append(res, ok)
-			return nil
-		})
+		for _, v := range value {
+			_, value, _ := call(v, s, params)
+			res = append(res, !value.IsEmpty())
+		}
 		s.conditionStack.Push(res)
 		return true, nil
 	case OpEq:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionEqual)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(Equal)", func() error {
-			done := s.startValueOpTiming("CompareConst(Equal)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
+		return true, utils.Errorf("unimplement")
+		// s.debugSubLog(">> pop")
+		// vs, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// s.debugSubLog(">> peek")
+		// vs2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionEqual)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(Equal)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(Equal)")
+		// 	defer done()
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
 		return true, nil
 	case OpNotEq:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionNotEqual)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(NotEqual)", func() error {
-			done := s.startValueOpTiming("CompareConst(NotEqual)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
-		return true, nil
+		return true, utils.Errorf("unimplement")
+
+		// s.debugSubLog(">> pop")
+		// valList1, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// vs1 := NewValueList(valList1)
+		// s.debugSubLog(">> peek")
+		// valList2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionNotEqual)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(NotEqual)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(NotEqual)")
+		// 	defer done()
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
+		// return true, nil
 	case OpGt:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionGt)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(Gt)", func() error {
-			done := s.startValueOpTiming("CompareConst(Gt)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
-		return true, nil
+		return true, utils.Errorf("unimplement")
+
+		// s.debugSubLog(">> pop")
+		// valList1, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// vs1 := NewValueList(valList1)
+		// s.debugSubLog(">> peek")
+		// valList2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionGt)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(Gt)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(Gt)")
+		// 	defer done()
+		// 	// conds = vs2.CompareConst(comparator)
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
+		// return true, nil
 	case OpGtEq:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionGtEq)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(GtEq)", func() error {
-			done := s.startValueOpTiming("CompareConst(GtEq)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
-		return true, nil
+		return true, utils.Errorf("unimplement")
+
+		// s.debugSubLog(">> pop")
+		// valList1, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// vs1 := NewValueList(valList1)
+		// s.debugSubLog(">> peek")
+		// valList2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionGtEq)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(GtEq)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(GtEq)")
+		// 	defer done()
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
+		// return true, nil
 	case OpLt:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionLt)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(Lt)", func() error {
-			done := s.startValueOpTiming("CompareConst(Lt)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
-		return true, nil
+		return true, utils.Errorf("unimplement")
+
+		// s.debugSubLog(">> pop")
+		// valList1, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// vs1 := NewValueList(valList1)
+		// s.debugSubLog(">> peek")
+		// valList2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionLt)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(Lt)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(Lt)")
+		// 	defer done()
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
+		// return true, nil
 	case OpLtEq:
-		s.debugSubLog(">> pop")
-		vs1 := s.stack.Pop()
-		if vs1 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		s.debugSubLog(">> peek")
-		vs2 := s.stack.Peek()
-		if vs2 == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
-		}
-		comparator := NewConstComparator(vs1.String(), BinaryConditionLtEq)
-		var conds []bool
-		if trackErr := s.track("value-op:CompareConst(LtEq)", func() error {
-			done := s.startValueOpTiming("CompareConst(LtEq)")
-			defer done()
-			conds = vs2.CompareConst(comparator)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.conditionStack.Push(conds)
-		return true, nil
+		return true, utils.Errorf("unimplement")
+		// s.debugSubLog(">> pop")
+		// valList1, err := s.stackPop()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// vs1 := NewValueList(valList1)
+		// s.debugSubLog(">> peek")
+		// valList2, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+		// }
+		// comparator := NewConstComparator(vs1.String(), BinaryConditionLtEq)
+		// var conds []bool
+		// if trackErr := s.track("value-op:CompareConst(LtEq)", func() error {
+		// 	done := s.startValueOpTiming("CompareConst(LtEq)")
+		// 	defer done()
+		// 	for _, operator := range valList2 {
+		// 		conds = append(conds, operator.CompareConst(comparator))
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// s.conditionStack.Push(conds)
+		// return true, nil
 	case OpLogicBang:
 		conds := s.conditionStack.Pop()
 		for i := 0; i < len(conds); i++ {
@@ -425,44 +457,68 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		return true, nil
 	case OpCondition:
 		s.debugSubLog(">> pop")
-		vs := s.stack.Pop()
-		if vs == nil {
+		valList, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
 		}
+		vs := valList
 		conds := s.conditionStack.Pop()
-		if len(conds) != ValuesLen(vs) {
-			return true, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", ValuesLen(vs), len(conds))
+		if len(conds) != len(vs) {
+			return true, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", len(vs), len(conds))
 		}
 		//log.Infof("condition: %v", conds)
-		res := make([]ValueOperator, 0, ValuesLen(vs))
+		res := make([]ValueOperator, 0, len(vs))
 		for i := 0; i < len(conds); i++ {
 			if conds[i] {
-				if v, err := vs.ListIndex(i); err == nil {
-					res = append(res, v)
+				if i < len(vs) {
+					res = append(res, vs[i])
 				}
 			}
 		}
-		s.stack.Push(NewValues(res))
+		s.stackPush(res)
 		return true, nil
 	case OpCheckEmpty:
-		if i.Iter == nil {
-			return true, utils.Wrap(CriticalError, "check empty failed: stack top is empty")
+		return true, utils.Errorf("unimplement")
+		// if i.Iter == nil {
+		// 	return true, utils.Wrap(CriticalError, "check empty failed: stack top is empty")
+		// }
+		// index := i.Iter.currentIndex
+		// conditions := s.conditionStack.Peek()
+		// //如果是null
+		// vs, err := s.stackPop()
+		// if err != nil {
+		// 	return true, err
+		// }
+		// val := valList
+		// for _, val := range vs {
+		// 	if len(conditions) == index+1 && !conditions[index] {
+		// 		return true, nil
+		// 	}
+		// }
+		// if len(conditions) == index+1 && !conditions[index] {
+		// 	return true, nil
+		// }
+		// conditions = s.conditionStack.Pop()
+		// if len(conditions) < index+1 {
+		// 	return true, utils.Errorf("check empty failed: stack top is empty")
+		// }
+		// conditions[index] = !val.IsEmpty()
+		// s.conditionStack.Push(conditions)
+		// s.popStack.Free()
+		// return true, nil
+	case OpToBool:
+		valList, err := s.stackPop()
+		if err != nil {
+			return true, utils.Wrap(CriticalError, "to bool failed: stack top is empty")
 		}
-		index := i.Iter.currentIndex
-		conditions := s.conditionStack.Peek()
-		//如果是null
-		val := s.stack.Pop()
-		if len(conditions) == index+1 && !conditions[index] {
-			return true, nil
+		value := valList
+		conditions := make([]bool, len(value))
+		for i, val := range value {
+			conditions[i] = !val.IsEmpty()
 		}
-		conditions = s.conditionStack.Pop()
-		if len(conditions) < index+1 {
-			return true, utils.Errorf("check empty failed: stack top is empty")
-		}
-		conditions[index] = !val.IsEmpty()
+		log.Errorf("toBool: %#v", conditions)
 		s.conditionStack.Push(conditions)
-		s.popStack.Free()
-		return true, nil
+		return
 	default:
 		return false, nil
 	}
@@ -473,8 +529,8 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 	switch i.OpCode {
 	case OpPushSearchExact:
 		s.debugSubLog(">> pop match exactly: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Errorf("search exact failed: stack top is empty")
 		}
 		mod := i.UnaryInt
@@ -483,13 +539,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 
 		// diagnostics: track value operation timing
-		var result bool
-		var next ValueOperator
-		var err error
+		var result Values
 		if trackErr := s.track("value-op:ExactMatch", func() error {
 			done := s.startValueOpTiming("ExactMatch")
 			defer done()
-			result, next, err = value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
+			result, _ = vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.ExactMatch(s.GetContext(), mod, i.UnaryStr), nil
+			})
+			// result, next, err = value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -498,34 +555,30 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			err = utils.Wrapf(err, "search exact failed")
 		}
-		if !result {
-			err = utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
+		if len(result) == 0 {
+			return true, utils.Errorf("search exact failed: not found: %v", i.UnaryStr)
 		}
 
-		s.debugSubLog("result next: %v", ValuesLen(next))
-		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
-		s.stack.Push(next)
+		s.debugSubLog("result next: %v", len(result))
+		s.stackPush(result)
 		s.debugSubLog("<< push next")
-		if next == nil || err != nil {
-			s.debugSubLog("error: %v", err)
-			return true, err
-		}
 		return true, nil
 	case OpRecursiveSearchExact:
 		s.debugSubLog(">> pop recursive search exactly: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "recursive search exact failed: stack top is empty")
 		}
-		var next []ValueOperator
-		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
+		value := vs
+		var next Values
+		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveExactMatch")
 			defer done()
-			ok, results, _ := operator.ExactMatch(s.GetContext(), BothMatch, i.UnaryStr)
-			if ok {
+			results := operator.ExactMatch(s.GetContext(), BothMatch, i.UnaryStr)
+			if !results.IsEmpty() {
 				have := false
 				// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
-				_ = results.Recursive(func(operator ValueOperator) error {
+				_ = results.ForEach(func(operator ValueOperator) error {
 					_, ok := operator.(ssa.GetIdIF)
 					if ok {
 						have = true
@@ -533,8 +586,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				next = append(next, results)
+				results.ForEach(func(operator ValueOperator) error {
+					operator.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+					return nil
+				})
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -545,17 +601,18 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			err = utils.Wrapf(err, "recursive search exact failed")
 		}
 
-		results := NewValues(next)
-		s.debugSubLog("result next: %v", ValuesLen(results))
-		s.stack.Push(results)
+		results := next
+		s.debugSubLog("result next: %v", len(results))
+		s.stackPush(results)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpRecursiveSearchGlob:
 		s.debugSubLog(">> pop recursive search glob: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "recursive search glob failed: stack top is empty")
 		}
+		value := vs
 
 		mod := i.UnaryInt
 
@@ -565,14 +622,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = globIns
 
-		var next []ValueOperator
+		var next Values
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveGlobMatch")
 			defer done()
-			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
-			if ok {
+			results := operator.GlobMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
+			if !results.IsEmpty() {
 				have := false
-				_ = results.Recursive(func(operator ValueOperator) error {
+				_ = results.ForEach(func(operator ValueOperator) error {
 					_, ok := operator.(ssa.GetIdIF)
 					if ok {
 						have = true
@@ -580,7 +637,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				next = append(next, results)
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -591,18 +648,21 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			err = utils.Wrapf(err, "recursive search glob failed")
 			s.debugSubLog("ERROR: %v", err)
 		}
-		results := NewValues(next)
-		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-		s.stack.Push(results)
+		s.debugSubLog("result next: %v", len(next))
+		_ = next.ForEach(func(operator ValueOperator) error {
+			operator.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+			return nil
+		})
+		s.stackPush(next)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpRecursiveSearchRegexp:
 		s.debugSubLog(">> pop recursive search regexp: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "recursive search regexp failed: stack top is empty")
 		}
+		value := vs
 		mod := i.UnaryInt
 
 		regexpIns, err := regexp.Compile(i.UnaryStr)
@@ -611,7 +671,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = regexpIns
 
-		var next []ValueOperator
+		var next Values
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveRegexpMatch")
 			defer done()
@@ -619,10 +679,10 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			//if strings.Contains(operator.String(), "aaa") {
 			//	spew.Dump(1)
 			//}
-			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
-			if ok {
+			results := operator.RegexpMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
+			if !results.IsEmpty() {
 				have := false
-				_ = results.Recursive(func(operator ValueOperator) error {
+				_ = results.ForEach(func(operator ValueOperator) error {
 					_, ok := operator.(ssa.GetIdIF)
 					if ok {
 						have = true
@@ -630,7 +690,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				next = append(next, results)
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -641,18 +701,21 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			err = utils.Wrapf(err, "recursive search regexp failed")
 			s.debugSubLog("ERROR: %v", err)
 		}
-		results := NewValues(next)
-		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-		s.stack.Push(results)
+		s.debugSubLog("result next: %v", len(next))
+		_ = next.ForEach(func(operator ValueOperator) error {
+			operator.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+			return nil
+		})
+		s.stackPush(next)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpPushSearchGlob:
 		s.debugSubLog(">> pop search glob: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "search glob failed: stack top is empty")
 		}
+		value := vs
 		globIns, err := glob.Compile(i.UnaryStr)
 		if err != nil {
 			err = utils.Wrap(CriticalError, "compile glob failed")
@@ -663,12 +726,13 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		var result bool
-		var next ValueOperator
+		var next Values
 		if trackErr := s.track("value-op:GlobMatch", func() error {
 			done := s.startValueOpTiming("GlobMatch")
 			defer done()
-			result, next, err = value.GlobMatch(s.GetContext(), mod, i.UnaryStr)
+			next, err = value.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GlobMatch(s.GetContext(), mod, i.UnaryStr), nil
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -676,24 +740,21 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			err = utils.Wrapf(err, "search glob failed")
 		}
-		if !result {
-			err = utils.Errorf("search glob failed: not found: %v", i.UnaryStr)
-		}
-		s.debugSubLog("result next: %v", ValuesLen(next))
-		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
-		s.stack.Push(next)
+		s.debugSubLog("result next: %v", len(next))
+		_ = next.ForEach(func(operator ValueOperator) error {
+			operator.AppendPredecessor(operator, s.WithPredecessorContext("search: "+i.UnaryStr))
+			return nil
+		})
+		s.stackPush(next)
 		s.debugSubLog("<< push next")
-		if next == nil || err != nil {
-			s.debugSubLog("error: %v", err)
-			return true, err
-		}
 		return true, nil
 	case OpPushSearchRegexp:
 		s.debugSubLog(">> pop search regexp: %v", i.UnaryStr)
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "search regexp failed: stack top is empty")
 		}
+		value := vs
 		regexpIns, err := regexp.Compile(i.UnaryStr)
 		if err != nil {
 			err = utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
@@ -702,43 +763,42 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if !s.config.StrictMatch {
 			mod |= KeyMatch
 		}
-		var result bool
-		var next ValueOperator
+		var next Values
 		if trackErr := s.track("value-op:RegexpMatch", func() error {
 			done := s.startValueOpTiming("RegexpMatch")
 			defer done()
-			result, next, err = value.RegexpMatch(s.GetContext(), mod, regexpIns.String())
-			return err
+			next, err = value.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.RegexpMatch(s.GetContext(), mod, regexpIns.String()), nil
+			})
+			return nil
 		}); trackErr != nil {
 			return true, trackErr
 		}
 		if err != nil {
 			err = utils.Wrap(err, "search regexp failed")
 		}
-		if !result {
-			err = utils.Errorf("search regexp failed: not found: %v", i.UnaryStr)
-		}
-		s.debugSubLog("result next: %v", ValuesLen(next))
-		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
-		s.stack.Push(next)
+		s.debugSubLog("result next: %v", len(next))
+		_ = next.ForEach(func(operator ValueOperator) error {
+			operator.AppendPredecessor(operator, s.WithPredecessorContext("search: "+i.UnaryStr))
+			return nil
+		})
+		s.stackPush(next)
 		s.debugSubLog("<< push next")
-		if next == nil || err != nil {
-			s.debugSubLog("error: %v", err)
-			return true, err
-		}
 		return true, nil
 	case OpGetCall:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "get call instruction failed: stack top is empty")
 		}
-		var results ValueOperator
-		var err error
+		value := vs
+		var results Values
 		if trackErr := s.track("value-op:GetCalled", func() error {
 			done := s.startValueOpTiming("GetCalled")
 			defer done()
-			results, err = value.GetCalled()
+			results, err = value.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetCalled()
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -749,28 +809,30 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			s.debugSubLog("error: %v", err)
 			s.debugSubLog("recover origin value")
-			s.stack.Push(NewEmptyValues())
+			s.stackPush(nil)
 			s.debugSubLog("<< push")
 			return true, err
 		}
-		callLen := ValuesLen(results)
+		callLen := len(results)
 		s.debugSubLog("<< push len: %v", callLen)
-		s.stack.Push(results)
+		s.stackPush(results)
 		return true, nil
 
 	case OpGetCallArgs:
 		s.debugSubLog("-- getCallArgs pop call args")
 		//in iterStack
-		value := s.stack.Peek()
-		if value == nil {
+		vs, err := s.stackPeek()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "get call args failed: stack top is empty")
 		}
-		var results ValueOperator
-		var err error
+		value := vs
+		var results Values
 		if trackErr := s.track("value-op:GetCallActualParams", func() error {
 			done := s.startValueOpTiming("GetCallActualParams")
 			defer done()
-			results, err = value.GetCallActualParams(i.UnaryInt, i.UnaryBool)
+			results, err = value.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetCallActualParams(i.UnaryInt, i.UnaryBool)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -778,28 +840,29 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("get calling argument failed: %s", err)
 		}
-		callLen := ValuesLen(results)
+		callLen := len(results)
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
-
-		s.stack.Push(results)
+		s.stackPush(results)
 		return true, nil
 
 	case OpGetUsers:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "get users failed: stack top is empty")
 		}
+		value := vs
 		s.debugSubLog("- call GetUser")
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
-		var err error
+		var vals Values
 		if trackErr := s.track("value-op:GetSyntaxFlowUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowUse")
 			defer done()
-			vals, err = value.GetSyntaxFlowUse()
+			vals, err = value.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowUse()
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -808,25 +871,24 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
-		vals.AppendPredecessor(value, s.WithPredecessorContext("getUser"))
-		s.debugSubLog("<< push users")
-		s.stack.Push(vals)
+		s.stackPush(vals)
 		return true, nil
 	case OpGetBottomUsers:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get bottom uses failed, empty stack")
 		}
 		s.debugSubLog("- call BottomUses")
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
-		var err error
+		var vals Values
 		if trackErr := s.track("value-op:GetSyntaxFlowBottomUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowBottomUse")
 			defer done()
-			vals, err = value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+			vals, err = vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -835,22 +897,22 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
-		s.debugSubLog("<< push bottom uses %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.stackPush(vals)
 		return true, nil
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "get users failed: stack top is empty")
 		}
 		s.debugSubLog("- call GetDefs")
-		var vals ValueOperator
-		var err error
+		var vals Values
 		if trackErr := s.track("value-op:GetSyntaxFlowDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowDef")
 			defer done()
-			vals, err = value.GetSyntaxFlowDef()
+			vals, err = vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowDef()
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -858,25 +920,25 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push users %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.stackPush(vals)
 		return true, nil
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
-		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
+		s.ProcessCallback("get topdef %v(%v)", len(vs), i.SyntaxFlowConfig)
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
-		var err error
+		var vals Values
 		if trackErr := s.track("value-op:GetSyntaxFlowTopDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowTopDef")
 			defer done()
-			vals, err = value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+			vals, err = vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -885,8 +947,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
-		s.debugSubLog("<< push top defs %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.stackPush(vals)
 		return true, nil
 	default:
 		return false, nil
@@ -901,21 +962,28 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "stack top is empty")
 		}
 		s.debugSubLog(">> duplicate (stack grow)")
-		v := s.stack.Peek()
-		s.stack.Push(v)
-		return true, nil
-	case OpPopDuplicate:
-		val := s.popStack.Peek()
-		if val == nil {
-			log.Errorf("pop duplicate failed: stack top is empty")
-			return true, nil
-		}
-		s.stack.Push(val)
-		return true, nil
-	case OpPop:
-		if _, err := s.opPop(true); err != nil {
+		valList, err := s.stackPeek()
+		if err != nil {
 			return true, err
 		}
+		s.stackPush(valList)
+		return true, nil
+	case OpPopDuplicate:
+		vs, err := s.stackPeek()
+		if err != nil {
+			return true, err
+		}
+		if vs == nil {
+			return true, utils.Wrap(CriticalError, "pop duplicate failed: stack top is empty")
+		}
+		s.stackPush(vs)
+		return true, nil
+	case OpPop:
+		vs, err := s.opPop(true)
+		if err != nil {
+			return true, err
+		}
+		s.stackPush(vs)
 		return true, nil
 	case OpNewRef:
 		if i.UnaryStr == "" {
@@ -925,27 +993,16 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		s.debugSubLog(">> from ref: %v ", i.UnaryStr)
 		vs, ok := s.GetSymbol(i)
 		if ok {
-			if vs == nil {
+			if vs.IsEmpty() {
 				return true, utils.Errorf("new ref failed: empty value: %v", i.UnaryStr)
 			}
-			var operator0 ValueOperator
-			count := 0
-			vs.Recursive(func(operator ValueOperator) error {
-				if count == 0 {
-					operator0 = operator
-				}
-				count++
-				return nil
-			})
-			_ = operator0
 			s.debugSubLog(">> get value: %v ", vs)
-			s.stack.Push(vs)
-		} else {
-			values := NewEmptyValues()
-			s.result.SymbolTable.Set(i.UnaryStr, values)
-			s.stack.Push(values)
+			s.stackPush(vs)
 			return true, nil
-			//return utils.Errorf("new ref failed: not found: %v", i.UnaryStr)
+		} else {
+			vs := NewEmptyValues()
+			s.result.SymbolTable.Set(i.UnaryStr, vs)
+			s.stackPush(vs)
 		}
 		return true, nil
 	case OpUpdateRef:
@@ -954,20 +1011,20 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, utils.Errorf("update ref failed: empty name")
 		}
 		s.debugSubLog(">> pop")
-		value, err := s.opPop(false)
+		vs, err := s.opPop(false)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return true, err
 		}
-		if value == nil {
+		if vs == nil {
 			return true, utils.Error("BUG: get top defs failed, empty stack")
 		}
-		err = s.output(i.UnaryStr, value)
+		err = s.output(i.UnaryStr, vs)
 		if err != nil {
 			s.debugSubLog("ERROR: %v", err)
 			return true, err
 		}
-		s.debugSubLog(">> save $%s [%v]", i.UnaryStr, ValuesLen(value))
+		s.debugSubLog(">> save $%s [%v]", i.UnaryStr, len(vs))
 		return true, nil
 	case OpAddDescription:
 		if i.UnaryStr == "" {
@@ -1027,13 +1084,21 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		} else if results == nil {
 			haveResult = false
 		} else {
-			_ = results.Recursive(func(operator ValueOperator) error {
-				if _, ok := operator.(ssa.GetIdIF); ok {
-					haveResult = true
-					return utils.Error("abort")
-				}
+			_ = results.ForEach(func(operator ValueOperator) error {
 				return nil
 			})
+			if haveResult {
+				s.result.CheckParams = append(s.result.CheckParams, i.UnaryStr)
+				if thenStr != "" {
+					s.result.Description.Set("$"+i.UnaryStr, thenStr)
+				}
+			} else {
+				s.debugSubLog("-   error: " + elseStr)
+				s.result.Errors = append(s.result.Errors, elseStr)
+				if s.config.FailFast {
+					return true, utils.Wrapf(AbortError, "check params failed: %v", elseStr)
+				}
+			}
 		}
 
 		if !haveResult {
@@ -1057,15 +1122,15 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, nil
 		}
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		value, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		val, err := value.Merge(vs)
+		ret, err := value.Merge(vs)
 		if err != nil {
 			return true, utils.Wrapf(CriticalError, "merge failed: %v", err)
 		}
-		s.stack.Push(val)
+		s.stackPush(ret)
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpRemoveRef:
@@ -1076,15 +1141,16 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, nil
 		}
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		value, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		newVal, err := value.Remove(vs)
-		if err != nil {
-			return true, utils.Wrapf(CriticalError, "remove failed: %v", err)
-		}
-		s.stack.Push(newVal)
+		_ = value
+		// ret, err := value.Remove(vs)
+		// if err != nil {
+		// 	return true, utils.Wrapf(CriticalError, "remove failed: %v", err)
+		// }
+		// s.stackPush(ret)
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpIntersectionRef:
@@ -1093,16 +1159,17 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		//vs, ok := s.result.SymbolTable.Get(i.UnaryStr)
 		if vs == nil || !ok {
 			s.debugLog("cannot find $%v", i.UnaryStr)
-			value := s.stack.Pop()
-			if value == nil {
+			valList, err := s.stackPop()
+			if err != nil {
 				return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 			}
-			s.stack.Push(NewEmptyValues())
+			_ = valList
+			s.stackPush(nil)
 			return true, nil
 		}
 		s.debugLog(">> pop")
-		m1 := make(map[int64]ValueOperator, ValuesLen(vs))
-		_ = vs.Recursive(func(operator ValueOperator) error {
+		m1 := make(map[int64]ValueOperator, len(vs))
+		_ = vs.ForEach(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
 				m1[id] = operator
@@ -1111,14 +1178,14 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		})
 		// s.debugSubLog("map: %v", lo.Keys(m1))
 
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 
 		var buf bytes.Buffer
 		var vals []ValueOperator
-		_ = value.Recursive(func(operator ValueOperator) error {
+		_ = vs.ForEach(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
 				if _, ok := m1[id]; ok {
@@ -1130,16 +1197,16 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		})
 		if len(vals) == 0 {
 			s.debugSubLog("no intersection")
-			s.stack.Push(NewEmptyValues())
+			s.stackPush(nil)
 		} else {
 			s.debugSubLog("intersection:%v", buf.String())
-			s.stack.Push(NewValues(vals))
+			s.stackPush(vals)
 		}
 		return true, nil
 	case OpNativeCall:
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "native call failed: stack top is empty")
 		}
 
@@ -1148,21 +1215,21 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if err != nil {
 			s.debugSubLog("Err: %v", err)
 			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-			s.stack.Push(NewEmptyValues())
+			s.stack.Push(nil)
 			return true, utils.Errorf("get native call failed: %v", err)
 		}
-
-		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
-		if err != nil || !ok {
-			s.debugSubLog("No Result in [%v]", i.UnaryStr)
-			s.stack.Push(NewEmptyValues())
-			if errors.Is(err, CriticalError) {
-				return true, err
+		ret, err := vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+			ok, ret, err := call(vo, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
+			_ = ok
+			if err != nil {
+				return nil, err
 			}
+			return ret, nil
+		})
+		if err != nil {
 			return true, utils.Errorf("get native call failed: %v", err)
 		}
-		s.debugSubLog("<< push: %v", ValuesLen(ret))
-		s.stack.Push(ret)
+		s.stackPush(ret)
 		return true, nil
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
 		opcode2strMap := map[SFVMOpCode]string{
@@ -1171,8 +1238,8 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			OpFileFilterXpath:    "xpath",
 		}
 		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
+		vs, err := s.stackPop()
+		if err != nil {
 			return true, utils.Wrap(CriticalError, "native call failed: stack top is empty")
 		}
 		s.debugSubLog(">> pop file name: %v", i.UnaryStr)
@@ -1183,12 +1250,13 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
 		strOpcode := opcode2strMap[i.OpCode]
-		var res ValueOperator
-		var err error
+		var ret Values
 		if trackErr := s.track("value-op:FileFilter", func() error {
 			done := s.startValueOpTiming("FileFilter")
 			defer done()
-			res, err = value.FileFilter(name, strOpcode, paramMap, paramList)
+			ret, err = vs.pipeLineRun(func(vo ValueOperator) (Values, error) {
+				return vo.FileFilter(name, strOpcode, paramMap, paramList)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -1196,68 +1264,87 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("file filter failed: %v", err)
 		}
-		s.stack.Push(res)
+		s.stackPush(ret)
 		return true, nil
 	case OpPushNumber:
-		s.debugSubLog(">> peek")
-		vs := s.stack.Peek()
-		if vs == nil {
-			return true, utils.Wrapf(CriticalError, "BUG: pushNumber: stack top is empty")
-		}
-		var val ValueOperator
-		if trackErr := s.track("value-op:NewConst", func() error {
-			done := s.startValueOpTiming("NewConst")
-			defer done()
-			val = vs.NewConst(i.UnaryInt)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
-		}
-		return true, nil
+		return true, utils.Errorf("unimplement")
+		// s.debugSubLog(">> peek")
+		// valList, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrapf(CriticalError, "BUG: pushNumber: stack top is empty")
+		// }
+		// var val Values
+		// if trackErr := s.track("value-op:NewConst", func() error {
+		// 	done := s.startValueOpTiming("NewConst")
+		// 	defer done()
+		// 	res := vs.NewConst(i.UnaryInt)
+		// 	if vl, ok := res.(*ValueList); ok {
+		// 		val = vl.Values
+		// 	} else if !res.IsEmpty() {
+		// 		val = Values{res}
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// if len(val) > 0 {
+		// 	s.debugSubLog(">> push: %v", len(val))
+		// 	s.stackPush(val)
+		// }
+		// return true, nil
 	case OpPushBool:
-		s.debugSubLog(">> peek")
-		vs := s.stack.Peek()
-		if vs == nil {
-			return true, utils.Wrapf(CriticalError, "BUG: pushBool: stack top is empty")
-		}
-		var val ValueOperator
-		if trackErr := s.track("value-op:NewConst", func() error {
-			done := s.startValueOpTiming("NewConst")
-			defer done()
-			val = vs.NewConst(i.UnaryBool)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
-		}
+		return true, utils.Errorf("unimplement")
+		// s.debugSubLog(">> peek")
+		// valList, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrapf(CriticalError, "BUG: pushBool: stack top is empty")
+		// }
+		// vs := NewValueList(valList)
+		// var val Values
+		// if trackErr := s.track("value-op:NewConst", func() error {
+		// 	done := s.startValueOpTiming("NewConst")
+		// 	defer done()
+		// 	res := vs.NewConst(i.UnaryBool)
+		// 	if vl, ok := res.(*ValueList); ok {
+		// 		val = vl.Values
+		// 	} else if !res.IsEmpty() {
+		// 		val = Values{res}
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// if len(val) > 0 {
+		// 	s.debugSubLog(">> push: %v", len(val))
+		// 	s.stackPush(val)
+		// }
 		return true, nil
 	case OpPushString:
-		s.debugSubLog(">> peek")
-		vs := s.stack.Peek()
-		if vs == nil {
-			return true, utils.Wrapf(CriticalError, "BUG: pushString: stack top is empty")
-		}
-		var val ValueOperator
-		if trackErr := s.track("value-op:NewConst", func() error {
-			done := s.startValueOpTiming("NewConst")
-			defer done()
-			val = vs.NewConst(i.UnaryStr)
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
-		}
-		return true, nil
+		return true, utils.Errorf("unimplement")
+		// s.debugSubLog(">> peek")
+		// vs, err := s.stackPeek()
+		// if err != nil {
+		// 	return true, utils.Wrapf(CriticalError, "BUG: pushString: stack top is empty")
+		// }
+		// var val Values
+		// if trackErr := s.track("value-op:NewConst", func() error {
+		// 	done := s.startValueOpTiming("NewConst")
+		// 	defer done()
+		// 	res := vs.NewConst(i.UnaryStr)
+		// 	if vl, ok := res.(*ValueList); ok {
+		// 		val = vl.Values
+		// 	} else if !res.IsEmpty() {
+		// 		val = Values{res}
+		// 	}
+		// 	return nil
+		// }); trackErr != nil {
+		// 	return true, trackErr
+		// }
+		// if len(val) > 0 {
+		// 	s.debugSubLog(">> push: %v", len(val))
+		// 	s.stackPush(val)
+		// }
+		// return true, nil
 	default:
 		return false, nil
 	}

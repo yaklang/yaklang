@@ -24,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -50,10 +49,9 @@ type SFFrame struct {
 	idx            int     // current opcode index
 	currentProcess float64 // current process
 
-	stack          *utils.Stack[ValueOperator] // for filter
-	conditionStack *utils.Stack[[]bool]        // for condition
-	iterStack      *utils.Stack[*IterContext]  // for loop
-	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
+	stack          *utils.Stack[Values] // for filter
+	conditionStack *utils.Stack[[]bool] // for condition
+	popStack       *utils.Stack[Values] //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -120,10 +118,10 @@ func (s *SFFrame) GetContext() context.Context {
 	return s.config.GetContext()
 }
 
-func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
+func newSfFrameEx(vars VarMap, text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
 	v := vars
-	if v == nil {
-		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
+	if v.IsNil() {
+		v = NewVarMap()
 	}
 	if rule == nil {
 		rule = &schema.SyntaxFlowRule{}
@@ -137,7 +135,7 @@ func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, cod
 	}
 }
 
-func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
+func NewSFFrame(vars VarMap, text string, codes []*SFI) *SFFrame {
 	return newSfFrameEx(vars, text, codes, nil, nil)
 }
 
@@ -210,28 +208,69 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 
 func (s *SFFrame) Flush() {
 	s.result = NewSFResult(s.rule, s.config)
-	s.stack = utils.NewStack[ValueOperator]()
+	s.stack = utils.NewStack[Values]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
-	s.iterStack = utils.NewStack[*IterContext]()
-	s.popStack = utils.NewStack[ValueOperator]()
+	s.popStack = utils.NewStack[Values]()
 	s.idx = 0
 }
 
-func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
+// stackPop safely pops a value from the stack and checks for nil
+// Returns the ValueList and an error if the stack is empty
+func (s *SFFrame) stackPop() (Values, error) {
+	if s.stack.Len() == 0 {
+		s.debugSubLog(">> pop Error: empty stack")
+		return nil, utils.Errorf("E: stack is empty, cannot pop")
+	}
+	val := s.stack.Pop()
+	if val == nil {
+		s.debugSubLog(">> pop Error: nil value")
+		return nil, utils.Errorf("E: stack pop returned nil")
+	}
+	s.debugSubLog(">> pop %v", len(val))
+	return val, nil
+}
+
+// stackPush safely pushes a value to the stack, ensuring width consistency
+// It uses Foreach to maintain the same width as the current stack top
+func (s *SFFrame) stackPush(value Values) {
+	s.debugSubLog("<< push %v", len(value))
+	s.stack.Push(value)
+	return
+}
+
+// stackPeek safely peeks at the top of the stack
+func (s *SFFrame) stackPeek() (Values, error) {
+	if s.stack.Len() == 0 {
+		s.debugSubLog(">> peek Error: empty stack")
+		return nil, utils.Errorf("E: stack is empty, cannot peek")
+	}
+	val := s.stack.Peek()
+	if val == nil {
+		s.debugSubLog(">> peek Error: nil value")
+		return nil, utils.Errorf("E: stack peek returned nil")
+	}
+	return val, nil
+}
+
+func (s *SFFrame) GetSymbolTable() VarMap {
 	return s.result.SymbolTable
 }
-func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
+func (s *SFFrame) GetSymbol(sfi *SFI) (Values, bool) {
 	if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
 		return val, b
 	}
-	if initVars := s.config.initialContextVars; initVars != nil {
-		return initVars.Get(sfi.UnaryStr)
+	if initVars := s.config.initialContextVars; !initVars.IsNil() {
+		val, ok := initVars.Get(sfi.UnaryStr)
+		if ok {
+			return val, ok
+		}
+		return Values{}, false
 	} else {
-		return NewEmptyValues(), true
+		return Values{}, true
 	}
 }
-func (s *SFFrame) GetSymbolByName(name string) (ValueOperator, bool) {
+func (s *SFFrame) GetSymbolByName(name string) (Values, bool) {
 	return s.result.SymbolTable.Get(name)
 }
 func (s *SFFrame) ToLeft() bool {
@@ -255,7 +294,7 @@ func (s *SFFrame) ProcessCallback(msg string, args ...any) {
 		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
 	}
 }
-func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
+func (s *SFFrame) exec(feedValue Values) (ret error) {
 	s.predCounter = 0
 	defer func() {
 		s.predCounter = 0
@@ -287,7 +326,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	})
 }
 
-func (s *SFFrame) execRule(feedValue ValueOperator) error {
+func (s *SFFrame) execRule(feedValue Values) error {
 	for {
 		var msg string
 		if s.idx < len(s.Codes) {
@@ -329,7 +368,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 		case OpCheckStackTop:
 			if s.stack.Len() == 0 {
 				s.debugSubLog(">> stack top is nil (push input)")
-				s.stack.Push(feedValue)
+				s.stackPush(feedValue)
 			}
 		case OpEnterStatement:
 			s.errorSkipStack.Push(&errorSkipContext{
@@ -338,46 +377,6 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 				stackDepth: s.stack.Len(),
 			})
 
-		case OpCreateIter:
-			s.debugSubLog(">> peek")
-			vs := s.stack.Peek()
-			if vs == nil {
-				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
-			}
-			s.IterStart(vs)
-		case OpIterNext:
-			vs, next, err := s.IterNext()
-			if err != nil {
-				return err
-			}
-			if !next {
-				// jump to end
-				end := i.Iter.End
-				s.debugSubLog("no next data, to %v", end)
-				s.idx = end
-				continue
-			}
-			s.debugLog("next value: %v", ValuesLen(vs))
-			s.stack.Push(vs)
-		case OpIterLatch:
-			if s.stack.IsEmpty() {
-				return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
-			}
-			if err := s.IterLatch(s.stack.Pop()); err != nil {
-				return err
-			}
-			// jump to next
-			next := i.Iter.Next
-			i.Iter.currentIndex++
-			s.debugSubLog("jump to next code: %v", next)
-			s.idx = next
-			continue
-		case OpIterEnd:
-			i.Iter.currentIndex = 0
-			// end iter, pop and collect results to conditionStack
-			if err := s.IterEnd(); err != nil {
-				return err
-			}
 		default:
 			if err := s.execStatement(i); err != nil {
 				s.debugSubLog("execStatement error: %v", err)
@@ -402,24 +401,23 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 var CriticalError = utils.Error("CriticalError(Immediately Abort)")
 var AbortError = utils.Error("AbortError(Normal Abort)")
 
-func (s *SFFrame) output(resultName string, operator ValueOperator) error {
-	var values = []ValueOperator{operator}
+func (s *SFFrame) output(resultName string, values Values) error {
 	// save to result, even if value is empty or nil
 	if resultName == "_" {
-		if unnameValue := s.result.UnNameValue; ValuesLen(unnameValue) != 0 {
-			values = append(values, s.result.UnNameValue)
+		if unnameValue := s.result.UnNameValue; len(unnameValue) != 0 {
+			values = append(values, s.result.UnNameValue...)
 		}
-		s.result.UnNameValue = NewValues(values) // for merge
+		s.result.UnNameValue = values // for merge
 	} else {
 		if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
-			values = append(values, originValue)
+			values = append(values, originValue...)
 		}
-		value := NewValues(values) // for merge
+		value := values
 		s.GetSymbolTable().Set(resultName, value)
 	}
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {
-			if err := callback(resultName, operator); err != nil {
+			if err := callback(resultName, values); err != nil {
 				return err
 			}
 		}

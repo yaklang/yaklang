@@ -10,11 +10,11 @@ import (
 )
 
 func WithSyntaxFlowResult(expected string, handler func(*ssaapi.Value) error) sfvm.Option {
-	return sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+	return sfvm.WithResultCaptured(func(name string, results sfvm.Values) error {
 		if name != expected {
 			return nil
 		}
-		return results.Recursive(func(operator sfvm.ValueOperator) error {
+		return results.ForEach(func(operator sfvm.ValueOperator) error {
 			result, ok := operator.(*ssaapi.Value)
 			if !ok {
 				return nil
@@ -41,20 +41,22 @@ dump(a(2))
 	var ssaValueCount = 0
 	var check2 = false
 	var check4 = false
-	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, ssaapi.QueryWithEnableDebug(true), ssaapi.QueryWithResultCaptured(func(name string, op sfvm.ValueOperator) error {
-		count++
-		return nil
-	}), ssaapi.QueryWithSyntaxFlowResult("abc", func(value *ssaapi.Value) error {
-		ssaValueCount++
-		spew.Dump(value.String())
-		switch value.String() {
-		case "2":
-			check2 = true
-		case "4":
-			check4 = true
-		}
-		return nil
-	}))
+	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, ssaapi.QueryWithEnableDebug(true),
+		ssaapi.QueryWithResultCaptured(func(name string, op sfvm.Values) error {
+			count++
+			return nil
+		}),
+		ssaapi.QueryWithSyntaxFlowResult("abc", func(value *ssaapi.Value) error {
+			ssaValueCount++
+			spew.Dump(value.String())
+			switch value.String() {
+			case "2":
+				check2 = true
+			case "4":
+				check4 = true
+			}
+			return nil
+		}))
 	assert.Equal(t, 2, count, `Default Params`)
 	assert.Equal(t, 2, ssaValueCount, `Default SSA Value`)
 	assert.True(t, check2, "check 2 is failed")

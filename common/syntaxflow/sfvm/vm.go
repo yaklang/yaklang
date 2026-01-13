@@ -13,10 +13,16 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 )
 
+type VarMap struct {
+	*omap.OrderedMap[string, Values]
+}
+
+func NewVarMap() VarMap { return VarMap{omap.NewEmptyOrderedMap[string, Values]()} }
+
 type SyntaxFlowVirtualMachine struct {
 	config *Config
 
-	vars          *omap.OrderedMap[string, ValueOperator]
+	vars          VarMap
 	compileErrors antlr4util.SourceCodeErrors
 
 	debug      bool
@@ -26,11 +32,11 @@ type SyntaxFlowVirtualMachine struct {
 
 func NewSyntaxFlowVirtualMachine(opts ...Option) *SyntaxFlowVirtualMachine {
 	config := NewConfig(opts...)
-	var vars *omap.OrderedMap[string, ValueOperator]
-	if config.initialContextVars != nil {
+	var vars VarMap
+	if config.initialContextVars.IsNil() {
 		vars = config.initialContextVars
 	} else {
-		vars = omap.NewEmptyOrderedMap[string, ValueOperator]()
+		vars = NewVarMap()
 	}
 	sfv := &SyntaxFlowVirtualMachine{
 		vars:       vars,
@@ -156,13 +162,13 @@ func (s *SyntaxFlowVirtualMachine) GetCompileErrors() antlr4util.SourceCodeError
 	return s.compileErrors
 }
 
-func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOperator] {
+func (s *SyntaxFlowVirtualMachine) Snapshot() VarMap {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
-	return s.vars.Copy()
+	return VarMap{s.vars.Copy()}
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, error) {
+func (s *SyntaxFlowVirtualMachine) Feed(i ...ValueOperator) ([]*SFFrameResult, error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
@@ -182,11 +188,11 @@ func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
 	s.config = config
 }
 
-func (frame *SFFrame) Feed(i ValueOperator, opt ...Option) (*SFFrameResult, error) {
+func (frame *SFFrame) Feed(vs Values, opt ...Option) (*SFFrameResult, error) {
 	for _, o := range opt {
 		o(frame.config)
 	}
-	err := frame.exec(i)
+	err := frame.exec(vs)
 	frame.result.rule = frame.rule
 	return frame.result, err
 }
