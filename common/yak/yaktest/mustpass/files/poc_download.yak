@@ -182,7 +182,7 @@ filePath5, err = poc.DownloadWithMethod(
 )
 
 assert err == nil, f"  [失败] 下载出错: ${err}"
-assert receivedMethod == "POST", f"  [失败] 服务器应收到 POST，实际为: {receivedMethod}"
+assert receivedMethod == "POST", f"  [失败] 服务器应收到 POST，实际为: ${receivedMethod}"
 assert file.IsExisted(filePath5), f"  [失败] 文件不存在"
 
 downloadedContent5 = file.ReadFile(filePath5)~
