@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	// "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -1760,7 +1760,7 @@ func TestFunctionCFG(t *testing.T) {
 
 	// 生成函数的控制流图
 	subLib, ok := prog.Program.Application.UpStream.Get("/")
-	assert.True(t, ok)
+	require.True(t, ok)
 	dot := ssaapi.FunctionDotGraph(subLib.Funcs.Values()[0])
 	log.Infof("函数控制流图DOT: \n%s", dot)
 

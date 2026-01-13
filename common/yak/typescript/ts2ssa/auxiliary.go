@@ -147,7 +147,9 @@ func (b *builder) resolveImportLibPath(importPath string) (resolvedPath string, 
 	candidates := b.getImportCandidates(importPath, dir)
 	for _, candidate := range candidates {
 		if exist, err := prog.Loader.GetFilesysFileSystem().Exists(candidate); exist && err == nil {
-			return candidate, false
+			// 使用 editor.JoinProgramPath 来获取包含 programName 的完整路径
+			// 这样 GetLibrary 才能在 UpStream 中找到正确的 Program
+			return editor.JoinProgramPath(candidate), false
 		}
 	}
 	ssalog.Log.Warnf("Can't find import path for %s", importPath)
@@ -401,6 +403,7 @@ func (b *builder) createLocalNamespaceObject(modulePath string, localName string
 	namespaceObj.AddLazyBuilder(func() {
 		// 尝试获取模块Program
 		moduleProgram, exists := prog.GetLibrary(modulePath)
+		fmt.Printf("DEBUG: createLocalNamespaceObject - modulePath=%s, exists=%v\n", modulePath, exists)
 		if !exists {
 			return
 		}

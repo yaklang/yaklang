@@ -179,6 +179,7 @@ c("d")
 
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
+	log.Infof("file path: %v", filepath)
 	includeHash := prog.Program.CreateEditor([]byte(includeCode), filepath, false).GetIrSourceHash()
 	// includeHash := memedit.NewMemEditorWithFileUrl(includeCode, filepath).GetIrSourceHash()
 	for result := range ssadb.YieldIrCode(ssadb.GetDB(), context.Background(), progName) {
@@ -188,6 +189,9 @@ c("d")
 		}
 		includeFile.Set(result.SourceCodeHash, struct{}{})
 		result.Show()
+		editor, err := ssadb.GetEditorByHash(result.SourceCodeHash)
+		require.NoError(t, err)
+		log.Infof("source code: %v", []string{editor.GetUrl()})
 		log.Infof("source code hash: %v vs %v", result.SourceCodeHash, includeHash)
 		if result.SourceCodeHash == includeHash {
 			haveIncluded = true
