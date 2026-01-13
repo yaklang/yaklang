@@ -239,6 +239,12 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
 			const maxParams = 150
 			var index int
+			// 限制 AutoTemplate 的总大小，防止数据膨胀
+			// 例如：150 个参数 × 1MB = 150MB
+			// 限制总大小为 20MB
+			const maxAutoTemplateTotalSize = 20 * 1024 * 1024 // 20MB 总限制
+			var autoTemplateTotalSize int
+
 			if fReq != nil {
 				for _, r := range fReq.GetCommonParams() {
 					if index >= maxParams {
@@ -251,8 +257,15 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 					}
 
 					if full {
-						// 详情模式，这个很耗时。
-						fParam = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS)
+						// 详情模式，生成 AutoTemplate（但限制总大小）
+						// 只有当前总大小未超限时才生成
+						shouldGenerateAutoTemplate := autoTemplateTotalSize < maxAutoTemplateTotalSize
+						fParam = FuzzParamsToGRPCFuzzableParam(r, flow.IsHTTPS, shouldGenerateAutoTemplate)
+
+						// 累加实际生成的 AutoTemplate 大小
+						if len(fParam.AutoTemplate) > 0 {
+							autoTemplateTotalSize += len(fParam.AutoTemplate)
+						}
 					}
 					fParam.ParamName = utf8safe(fParam.ParamName)
 					if r.IsGetParams() {
@@ -346,7 +359,7 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 	return flow, nil
 }
 
-func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool) *ypb.FuzzableParam {
+func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool, generateAutoTemplate bool) *ypb.FuzzableParam {
 	p := &ypb.FuzzableParam{
 		Position:  utf8safe(r.PositionVerbose()),
 		ParamName: utf8safe(r.Name()),
@@ -364,6 +377,10 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 		p.OriginValue = utils.InterfaceToBytes(ret)
 	}
 
+	if !generateAutoTemplate {
+		return p
+	}
+
 	flag := utils.RandNumberStringBytes(6)
 	res, err := r.FriendlyDisplay().Fuzz(flag).Results()
 	if err != nil {
@@ -377,6 +394,7 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 			continue
 		}
 	}
+
 	if raw != nil {
 		if bytes.Contains(raw, []byte(flag)) {
 			p.AutoTemplate = bytes.ReplaceAll(raw, []byte(flag), []byte("{{randstr(10,10,1)}}"))

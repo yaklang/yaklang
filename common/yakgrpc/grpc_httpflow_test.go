@@ -1890,3 +1890,148 @@ func TestGRPCMUSTPASS_Export_HAR_WithFieldSelection(t *testing.T) {
 		require.True(t, hasMetadata, "传递'path'字段时应该包含metadata")
 	})
 }
+
+func TestAutoTemplateSizeLimit(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 构造一个包含大量参数的大请求
+	// 模拟 JSON body 中有很多参数的情况
+	largeJsonData := make(map[string]interface{})
+	// 创建 100 个参数，每个参数值都是一个大字符串（模拟大请求体）
+	largeValue := strings.Repeat("x", 10000) // 10KB 每个参数
+	for i := 0; i < 100; i++ {
+		largeJsonData[fmt.Sprintf("param_%d", i)] = largeValue
+	}
+
+	jsonBody, _ := json.Marshal(largeJsonData)
+	requestRaw := []byte(fmt.Sprintf("POST /test HTTP/1.1\r\n"+
+		"Host: example.com\r\n"+
+		"Content-Type: application/json\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n"+
+		"%s", len(jsonBody), string(jsonBody)))
+
+	responseRaw := []byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Type: application/json\r\n" +
+		"\r\n" +
+		`{"status":"ok"}`)
+
+	token := utils.RandStringBytes(10)
+	url := "http://" + token + ".example.com/test"
+
+	flow, err := yakit.CreateHTTPFlow(
+		yakit.CreateHTTPFlowWithURL(url),
+		yakit.CreateHTTPFlowWithRequestRaw(requestRaw),
+		yakit.CreateHTTPFlowWithResponseRaw(responseRaw),
+	)
+	if err != nil {
+		t.Fatalf("创建 HTTPFlow 失败: %v", err)
+	}
+
+	db := consts.GetGormProjectDatabase()
+	err = yakit.InsertHTTPFlow(db, flow)
+	if err != nil {
+		t.Fatalf("插入 HTTPFlow 失败: %v", err)
+	}
+
+	defer func() {
+		yakit.DeleteHTTPFlowByID(db, int64(flow.ID))
+	}()
+
+	t.Logf("已创建测试 HTTPFlow ID=%d", flow.ID)
+	t.Logf("  Request 大小: %d bytes (%.2f KB)", len(requestRaw), float64(len(requestRaw))/1024)
+	t.Logf("  预计参数数量: ~100 个")
+
+	grpcFlow, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{
+		Id: int64(flow.ID),
+	})
+
+	if err != nil {
+		t.Fatalf("查询 HTTPFlow 失败: %v", err)
+	}
+
+	t.Logf("\n查询成功")
+
+	// 统计所有参数的 AutoTemplate 大小
+	totalParams := len(grpcFlow.GetParams) + len(grpcFlow.PostParams) + len(grpcFlow.CookieParams)
+	totalAutoTemplateSize := 0
+	paramsWithAutoTemplate := 0
+
+	for _, p := range grpcFlow.GetParams {
+		if len(p.AutoTemplate) > 0 {
+			totalAutoTemplateSize += len(p.AutoTemplate)
+			paramsWithAutoTemplate++
+		}
+	}
+	for _, p := range grpcFlow.PostParams {
+		if len(p.AutoTemplate) > 0 {
+			totalAutoTemplateSize += len(p.AutoTemplate)
+			paramsWithAutoTemplate++
+		}
+	}
+	for _, p := range grpcFlow.CookieParams {
+		if len(p.AutoTemplate) > 0 {
+			totalAutoTemplateSize += len(p.AutoTemplate)
+			paramsWithAutoTemplate++
+		}
+	}
+
+	t.Logf("\n参数统计:")
+	t.Logf("  总参数数: %d 个", totalParams)
+	t.Logf("  有 AutoTemplate 的参数: %d 个", paramsWithAutoTemplate)
+	t.Logf("  无 AutoTemplate 的参数: %d 个", totalParams-paramsWithAutoTemplate)
+	t.Logf("  AutoTemplate 总大小: %d bytes (%.2f MB)",
+		totalAutoTemplateSize, float64(totalAutoTemplateSize)/(1024*1024))
+
+	// 验证总大小限制
+	const maxAutoTemplateTotalSize = 20 * 1024 * 1024         // 20MB
+	const maxAllowedSize = maxAutoTemplateTotalSize * 12 / 10 // 允许 120%
+
+	t.Logf("\n总大小限制验证:")
+	t.Logf("  限制大小: %.2f MB", float64(maxAutoTemplateTotalSize)/(1024*1024))
+	t.Logf("  实际大小: %.2f MB", float64(totalAutoTemplateSize)/(1024*1024))
+	t.Logf("  容差范围: %.2f MB (120%%)", float64(maxAllowedSize)/(1024*1024))
+
+	if totalAutoTemplateSize > maxAllowedSize {
+		t.Errorf("❌ AutoTemplate 总大小超出限制: %.2f MB > %.2f MB",
+			float64(totalAutoTemplateSize)/(1024*1024),
+			float64(maxAllowedSize)/(1024*1024))
+	} else {
+		t.Logf("  ✓ 总大小在合理范围内")
+	}
+
+	// 验证至少有一些参数有 AutoTemplate
+	if paramsWithAutoTemplate == 0 && totalParams > 0 {
+		t.Errorf("❌ 没有参数生成 AutoTemplate（应该至少有一些）")
+	} else if paramsWithAutoTemplate > 0 {
+		t.Logf("  ✓ 有 %d 个参数成功生成了 AutoTemplate", paramsWithAutoTemplate)
+	}
+
+	// 验证不是所有参数都有 AutoTemplate（如果参数很多的话）
+	if totalParams > 30 && paramsWithAutoTemplate == totalParams {
+		// 如果有很多参数但都有 AutoTemplate，可能限制没生效
+		avgSize := totalAutoTemplateSize / paramsWithAutoTemplate
+		if avgSize > 100*1024 { // 平均每个超过 100KB
+			t.Logf("  ⚠ 警告: 所有参数都有 AutoTemplate，且平均大小较大 (%.2f KB)",
+				float64(avgSize)/1024)
+		}
+	}
+
+	// 验证所有参数都有基本信息
+	allHaveBasicInfo := true
+	for _, p := range grpcFlow.PostParams {
+		if p.ParamName == "" || p.Position == "" {
+			allHaveBasicInfo = false
+			break
+		}
+	}
+
+	if allHaveBasicInfo {
+		t.Logf("  ✓ 所有参数都保留了基本信息（Position, ParamName）")
+	} else {
+		t.Errorf("❌ 部分参数缺少基本信息")
+	}
+}
