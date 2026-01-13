@@ -235,6 +235,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, ragSys
 			}
 
 			feedbackKnowledgeHopTotal()
+			feedbackKnowledgeDoneAll()
 			hopAnalyzeWg.Add(1)
 			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
 				break
@@ -244,17 +245,9 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, ragSys
 
 				// 向量索引处理（异步）
 				go func() {
-					vectorStart := time.Now()
 					err := er.AddKHopToVectorIndex(currentHop)
-					vectorTime := time.Since(vectorStart)
-					atomic.AddInt64(&vectorIndexDuration, int64(vectorTime))
-
 					if err != nil {
 						refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
-					}
-					// 只在向量索引明显慢时才警告
-					if vectorTime > 2*time.Second {
-						refineConfig.AnalyzeLog("SLOW VECTOR INDEX: hop=%s took %v", currentHop.String()[:min(50, len(currentHop.String()))], vectorTime)
 					}
 				}()
 
