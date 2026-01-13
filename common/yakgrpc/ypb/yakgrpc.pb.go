@@ -8733,6 +8733,7 @@ type AIEventFilter struct {
 	TaskUUID      []string               `protobuf:"bytes,5,rep,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`
 	SessionID     string                 `protobuf:"bytes,6,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
 	ProcessID     string                 `protobuf:"bytes,7,opt,name=ProcessID,proto3" json:"ProcessID,omitempty"`
+	NodeId        []string               `protobuf:"bytes,8,rep,name=NodeId,proto3" json:"NodeId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8814,6 +8815,13 @@ func (x *AIEventFilter) GetProcessID() string {
 		return x.ProcessID
 	}
 	return ""
+}
+
+func (x *AIEventFilter) GetNodeId() []string {
+	if x != nil {
+		return x.NodeId
+	}
+	return nil
 }
 
 type AIEventQueryRequest struct {
@@ -65667,7 +65675,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
 	"\tForgeName\x18\x03 \x03(\tR\tForgeName\x12$\n" +
-	"\rCoordinatorId\x18\x05 \x03(\tR\rCoordinatorId\"\xe9\x01\n" +
+	"\rCoordinatorId\x18\x05 \x03(\tR\rCoordinatorId\"\x81\x02\n" +
 	"\rAIEventFilter\x12\x1e\n" +
 	"\n" +
 	"EventUUIDS\x18\x01 \x03(\tR\n" +
@@ -65677,7 +65685,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tTaskIndex\x18\x04 \x03(\tR\tTaskIndex\x12\x1a\n" +
 	"\bTaskUUID\x18\x05 \x03(\tR\bTaskUUID\x12\x1c\n" +
 	"\tSessionID\x18\x06 \x01(\tR\tSessionID\x12\x1c\n" +
-	"\tProcessID\x18\a \x01(\tR\tProcessID\"\x8c\x01\n" +
+	"\tProcessID\x18\a \x01(\tR\tProcessID\x12\x16\n" +
+	"\x06NodeId\x18\b \x03(\tR\x06NodeId\"\x8c\x01\n" +
 	"\x13AIEventQueryRequest\x12*\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x12.ypb.AIEventFilterR\x06Filter\x12\x1c\n" +
 	"\tProcessID\x18\x02 \x01(\tR\tProcessID\x12+\n" +

@@ -71,6 +71,8 @@ func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_index", filter.GetTaskIndex())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_uuid", filter.GetTaskUUID())
+	db = bizhelper.ExactQueryStringArrayOr(db, "node_id", filter.GetNodeId())
+	db = bizhelper.ExactQueryString(db, "session_id", filter.GetSessionID())
 	return db
 }
 
@@ -113,6 +115,9 @@ func YieldAIEvent(ctx context.Context, db *gorm.DB, filter *ypb.AIEventFilter) c
 		if len(filter.GetTaskUUID()) > 0 {
 			allFilterChunks = append(allFilterChunks, filterChunk{"task_uuid", chunkSlice(filter.GetTaskUUID(), 10)})
 		}
+		if len(filter.GetNodeId()) > 0 {
+			allFilterChunks = append(allFilterChunks, filterChunk{"node_id", chunkSlice(filter.GetNodeId(), 10)})
+		}
 
 		var sets [][][]string
 		for _, fc := range allFilterChunks {
@@ -120,6 +125,7 @@ func YieldAIEvent(ctx context.Context, db *gorm.DB, filter *ypb.AIEventFilter) c
 		}
 
 		baseDB := db.Model(&schema.AiOutputEvent{})
+		baseDB = bizhelper.ExactQueryString(baseDB, "session_id", filter.GetSessionID())
 
 		handler := func(combination [][]string) error {
 			currentDB := baseDB

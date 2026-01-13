@@ -179,7 +179,7 @@ func TestServer_QueryAIEvent_Paging(t *testing.T) {
 			Page:    1,
 			Limit:   10,
 			Order:   "asc", // older first
-			OrderBy: "timestamp",
+			OrderBy: "id",
 		},
 	}
 	resp1, err := client.QueryAIEvent(ctx, req1)
@@ -205,7 +205,7 @@ func TestServer_QueryAIEvent_Paging(t *testing.T) {
 			Page:    2,
 			Limit:   10,
 			Order:   "asc",
-			OrderBy: "timestamp",
+			OrderBy: "id",
 		},
 	}
 	resp2, err := client.QueryAIEvent(ctx, req2)
@@ -245,4 +245,178 @@ func TestServer_QueryAIEvent_Paging(t *testing.T) {
 	respProcNoPaging, err := client.QueryAIEvent(ctx, reqProcNoPaging)
 	require.NoError(t, err)
 	require.Equal(t, procEventsTotal, len(respProcNoPaging.Events))
+}
+
+func TestServer_QueryAIEvent_Filter_SessionAndNodeId(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	typeName := uuid.NewString()
+
+	session1 := "session-" + uuid.NewString()
+	session2 := "session-" + uuid.NewString()
+	node1 := "node-" + uuid.NewString()
+	node2 := "node-" + uuid.NewString()
+	node3 := "node-" + uuid.NewString()
+
+	a := uuid.NewString()
+	b := uuid.NewString()
+	c := uuid.NewString()
+	d := uuid.NewString()
+
+	events := []*schema.AiOutputEvent{
+		{EventUUID: a, Type: schema.EventType(typeName), SessionId: session1, NodeId: node1},
+		{EventUUID: b, Type: schema.EventType(typeName), SessionId: session1, NodeId: node2},
+		{EventUUID: c, Type: schema.EventType(typeName), SessionId: session2, NodeId: node1},
+		{EventUUID: d, Type: schema.EventType(typeName), SessionId: session2, NodeId: node3},
+	}
+	for _, event := range events {
+		require.NoError(t, yakit.CreateOrUpdateAIOutputEvent(db, event))
+	}
+	uuidToID := map[string]uint{
+		a: events[0].ID,
+		b: events[1].ID,
+		c: events[2].ID,
+		d: events[3].ID,
+	}
+	defer func() {
+		db.Where("event_uuid IN (?)", []string{a, b, c, d}).Delete(&schema.AiOutputEvent{})
+	}()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	assertEventUUIDs := func(t *testing.T, rsp *ypb.AIEventQueryResponse, want ...string) {
+		t.Helper()
+		got := make([]string, 0, len(rsp.GetEvents()))
+		for _, e := range rsp.GetEvents() {
+			got = append(got, e.GetEventUUID())
+		}
+		require.ElementsMatch(t, want, got)
+	}
+
+	assertSortedByIDAsc := func(t *testing.T, rsp *ypb.AIEventQueryResponse) {
+		t.Helper()
+		var prev uint
+		for i, e := range rsp.GetEvents() {
+			id, ok := uuidToID[e.GetEventUUID()]
+			require.True(t, ok, "missing id mapping for event_uuid=%s", e.GetEventUUID())
+			if i > 0 {
+				require.LessOrEqual(t, prev, id)
+			}
+			prev = id
+		}
+	}
+
+	// 1) No pagination: filter by SessionID.
+	rsp, err := client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{
+			EventType: []string{typeName},
+			SessionID: session1,
+		},
+	})
+	require.NoError(t, err)
+	assertEventUUIDs(t, rsp, a, b)
+
+	// 2) No pagination: filter by NodeId.
+	rsp, err = client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{
+			EventType: []string{typeName},
+			NodeId:    []string{node1},
+		},
+	})
+	require.NoError(t, err)
+	assertEventUUIDs(t, rsp, a, c)
+
+	// 3) With pagination: filter by SessionID + NodeId (intersection).
+	rsp, err = client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{
+			EventType: []string{typeName},
+			SessionID: session2,
+			NodeId:    []string{node1},
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   10,
+			OrderBy: "id",
+			Order:   "asc",
+		},
+	})
+	require.NoError(t, err)
+	assertEventUUIDs(t, rsp, c)
+	assertSortedByIDAsc(t, rsp)
+
+	// 4) With pagination: multi NodeId OR.
+	rsp, err = client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{
+			EventType: []string{typeName},
+			NodeId:    []string{node1, node3},
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   10,
+			OrderBy: "id",
+			Order:   "asc",
+		},
+	})
+	require.NoError(t, err)
+	assertEventUUIDs(t, rsp, a, c, d)
+	require.Len(t, rsp.GetEvents(), 3)
+	assertSortedByIDAsc(t, rsp)
+}
+
+func TestServer_QueryAIEvent_OrderByID_AscDesc(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	typeName := uuid.NewString()
+	defer func() {
+		db.Where("type = ?", typeName).Delete(&schema.AiOutputEvent{})
+	}()
+
+	uuidToID := make(map[string]uint, 5)
+	for i := int64(0); i < 5; i++ {
+		eventUUID := uuid.NewString()
+		event := &schema.AiOutputEvent{
+			EventUUID: eventUUID,
+			Type:      schema.EventType(typeName),
+		}
+		require.NoError(t, yakit.CreateOrUpdateAIOutputEvent(db, event))
+		uuidToID[eventUUID] = event.ID
+	}
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Ascending: smaller id first.
+	asc, err := client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{EventType: []string{typeName}},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   5,
+			OrderBy: "id",
+			Order:   "asc",
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, asc.GetEvents(), 5)
+	for i := 1; i < len(asc.GetEvents()); i++ {
+		require.LessOrEqual(t, uuidToID[asc.GetEvents()[i-1].GetEventUUID()], uuidToID[asc.GetEvents()[i].GetEventUUID()])
+	}
+
+	// Descending: larger id first.
+	desc, err := client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{EventType: []string{typeName}},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   5,
+			OrderBy: "id",
+			Order:   "desc",
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, desc.GetEvents(), 5)
+	for i := 1; i < len(desc.GetEvents()); i++ {
+		require.GreaterOrEqual(t, uuidToID[desc.GetEvents()[i-1].GetEventUUID()], uuidToID[desc.GetEvents()[i].GetEventUUID()])
+	}
 }
