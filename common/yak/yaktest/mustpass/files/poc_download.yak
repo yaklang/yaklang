@@ -275,7 +275,7 @@ filePath8, err = poc.Download(
 
 assert err == nil, f"  [失败] 下载出错: ${err}"
 actualFilename8 = file.GetBase(filePath8)
-assert actualFilename8 == "myfile.exe", f"  [失败] 文件名应从 URL 获取: 期望 myfile.exe，实际 {actualFilename8}"
+assert actualFilename8 == "myfile.exe", f"  [失败] 文件名应从 URL 获取: 期望 myfile.exe，实际 ${actualFilename8}"
 assert file.IsExisted(filePath8), f"  [失败] 文件不存在"
 
 downloadedContent8 = file.ReadFile(filePath8)~
