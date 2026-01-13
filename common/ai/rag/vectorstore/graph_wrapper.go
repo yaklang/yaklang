@@ -236,17 +236,23 @@ func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
 	op.fn()
 }
 
-func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) {
+func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) time.Duration {
 	done := make(chan struct{}, 1)
+	var pureUseTime time.Duration
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
 		desc:   "Add",
 		fn: func() {
+			start := time.Now()
+			defer func() {
+				pureUseTime = time.Since(start)
+			}()
 			defer close(done)
 			gw.graph.Add(nodes...)
 		},
 	})
 	<-done
+	return pureUseTime
 }
 
 func (gw *GraphWrapper[K]) Delete(uids ...K) {

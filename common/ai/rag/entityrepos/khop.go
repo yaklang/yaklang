@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
@@ -809,15 +807,6 @@ func (r *EntityRepository) pathToString(hop *HopBlock) string {
 }
 
 func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
-	addKHopStart := time.Now()
-	defer func() {
-		duration := time.Since(addKHopStart)
-		if duration > 500*time.Millisecond {
-			log.Warnf("SLOW AddKHopToVectorIndex: khop=%s took %v", kHop.String()[:min(50, len(kHop.String()))], duration)
-		}
-	}()
-
-	metadataStart := time.Now()
 	metadata := map[string]any{
 		schema.META_Repos_UUID: r.info.Uuid,
 		schema.META_Data_Title: fmt.Sprintf("k-hop[%s] path (k=%d)", r.info.EntityBaseName, kHop.K),
@@ -830,23 +819,9 @@ func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
 		vectorstore.WithDocumentRelatedEntities(kHop.GetRelatedEntityUUIDs()...),
 		vectorstore.WithDocumentRuntimeID(r.runtimeConfig.runtimeID),
 	)
-	metadataDuration := time.Since(metadataStart)
-
-	contentStart := time.Now()
 	documentID := fmt.Sprintf("%s_khop", uuid.NewString())
 	content := kHop.ToRAGContent()
-	contentDuration := time.Since(contentStart)
-
-	vectorIndexStart := time.Now()
 	err := r.AddVectorIndex(documentID, content, opts...)
-	vectorIndexDuration := time.Since(vectorIndexStart)
-
-	totalDuration := time.Since(addKHopStart)
-	if totalDuration > 2*time.Second {
-		log.Warnf("AddKHopToVectorIndex PERFORMANCE: total=%v, metadata=%v, content=%v (%d chars), vectorIndex=%v",
-			totalDuration, metadataDuration, contentDuration, len(content), vectorIndexDuration)
-	}
-
 	return err
 }
 
