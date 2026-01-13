@@ -6,10 +6,12 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
@@ -27,6 +29,10 @@ const (
 	CONTEXT_PROVIDER_KEY_FILE_PATH    = "file_path"
 	CONTEXT_PROVIDER_KEY_FILE_CONTENT = "file_content"
 	CONTEXT_PROVIDER_KEY_NAME         = "name"
+
+	CONTEXT_PROVIDER_KEY_SYSTEM_FLAG = "system_flag"
+
+	CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE = "all_knowledge_base"
 )
 
 type ContextProviderEntry struct {
@@ -299,6 +305,8 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 			switch key {
 			case CONTEXT_PROVIDER_KEY_NAME:
 				return KnowledgeBaseContextProvider(value, userPrompt...)(config, emitter, providerKey)
+			case CONTEXT_PROVIDER_KEY_SYSTEM_FLAG:
+				return KnowledgeBaseSystemFlagContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
 				return baseInfo + fmt.Sprintf("[Error: unknown knowledge base context provider key: %s]", key), utils.Errorf("unknown knowledge base context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
@@ -321,11 +329,73 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 	}
 }
 
+func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		baseInfo := fmt.Sprintf("User Prompt: %s\n============== Knowledge Base Info ==============\nSystemFlag: %s\n", strings.Join(userPrompt, " "), flag)
+
+		switch flag {
+		case CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE:
+			db := consts.GetGormProfileDatabase()
+			var knowledgeBases []schema.KnowledgeBaseInfo
+			if err := db.Model(&schema.KnowledgeBaseInfo{}).Find(&knowledgeBases).Error; err != nil {
+				return baseInfo + fmt.Sprintf("[Error: failed to list knowledge bases: %v]", err), utils.Errorf("failed to list knowledge bases: %w", err)
+			}
+			if len(knowledgeBases) == 0 {
+				return baseInfo + "No knowledge base available", nil
+			}
+
+			sort.Slice(knowledgeBases, func(i, j int) bool {
+				return knowledgeBases[i].KnowledgeBaseName < knowledgeBases[j].KnowledgeBaseName
+			})
+
+			var detailBuilder strings.Builder
+			detailBuilder.WriteString(baseInfo)
+			detailBuilder.WriteString(fmt.Sprintf("Total Knowledge Bases: %d\n\n", len(knowledgeBases)))
+			for idx, kb := range knowledgeBases {
+				detailBuilder.WriteString(fmt.Sprintf("%d) Name: %s\n", idx+1, kb.KnowledgeBaseName))
+				if kb.KnowledgeBaseDescription != "" {
+					detailBuilder.WriteString(fmt.Sprintf("   Description: %s\n", kb.KnowledgeBaseDescription))
+				}
+				if kb.KnowledgeBaseType != "" {
+					detailBuilder.WriteString(fmt.Sprintf("   Type: %s\n", kb.KnowledgeBaseType))
+				}
+				if kb.Tags != "" {
+					detailBuilder.WriteString(fmt.Sprintf("   Tags: %s\n", kb.Tags))
+				}
+				detailBuilder.WriteString("\n")
+			}
+
+			content := detailBuilder.String()
+			if len(content) > maxInlineKnowledgeBaseBytes {
+				filePath := consts.TempAIFileFast("knowledge-bases-*.txt", content)
+				if emitter != nil && filePath != "" {
+					emitter.EmitPinFilename(filePath)
+				}
+
+				var previewBuilder strings.Builder
+				previewBuilder.WriteString(baseInfo)
+				previewBuilder.WriteString(fmt.Sprintf("All knowledge base info is large (%d bytes). Saved to file: %s\n", len(content), filePath))
+				previewBuilder.WriteString("Knowledge Base Names:\n")
+				for _, kb := range knowledgeBases {
+					previewBuilder.WriteString(fmt.Sprintf("- %s\n", kb.KnowledgeBaseName))
+				}
+				return previewBuilder.String(), nil
+			}
+
+			return content, nil
+		default:
+			return baseInfo + fmt.Sprintf("[Error: unknown system flag: %s]", flag), utils.Errorf("unknown knowledge base system flag: %s", flag)
+		}
+	}
+}
+
 type ContextProviderManager struct {
 	maxBytes int
 	m        sync.RWMutex
 	callback *omap.OrderedMap[string, ContextProvider]
 }
+
+const maxInlineKnowledgeBaseBytes = 2 * 1024 // 8KB
 
 func NewContextProviderManager() *ContextProviderManager {
 	return &ContextProviderManager{

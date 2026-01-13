@@ -11,9 +11,11 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 //go:embed prompts/persistent_instruction.txt
@@ -127,6 +129,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		// Parse and format attached resources
 		var resourcesInfo strings.Builder
 		var knowledgeBases []string
+		includeAllKnowledgeBases := false
 		var files []string
 		var aiTools []string
 		var aiForges []string
@@ -135,6 +138,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		for _, data := range attachedDatas {
 			switch data.Type {
 			case aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
+				if data.Key == aicommon.CONTEXT_PROVIDER_KEY_SYSTEM_FLAG && data.Value == aicommon.CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE {
+					includeAllKnowledgeBases = true
+					continue
+				}
 				knowledgeBases = append(knowledgeBases, data.Value)
 			case aicommon.CONTEXT_PROVIDER_TYPE_FILE:
 				files = append(files, data.Value)
@@ -145,9 +152,23 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 
+		if includeAllKnowledgeBases {
+			allKBNames, err := yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
+			if err != nil {
+				log.Warnf("failed to load all knowledge base names: %v", err)
+			} else {
+				knowledgeBases = append(knowledgeBases, allKBNames...)
+			}
+		}
+
+		knowledgeBases = dedupStrings(knowledgeBases)
+
 		// Build attached resources info string
 		if len(knowledgeBases) > 0 {
 			resourcesInfo.WriteString("### 知识库 (Knowledge Bases)\n")
+			if includeAllKnowledgeBases {
+				resourcesInfo.WriteString("用户请求附加全部知识库，列表如下：\n")
+			}
 			for _, kb := range knowledgeBases {
 				resourcesInfo.WriteString(fmt.Sprintf("- %s\n", kb))
 			}
@@ -345,4 +366,21 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		r.AddToTimeline("task_initialized", fmt.Sprintf("Knowledge enhance task initialized with %d attached resources: %s", len(attachedDatas), userQuery))
 		return nil
 	}
+}
+
+func dedupStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }
