@@ -21,6 +21,7 @@ import (
 var RagExports = map[string]interface{}{
 	"Get":           rag.Get,
 	"GetCollection": rag.Get,
+	"lazyEmbedding": _lazyEmbedding,
 
 	"embeddingHandle": _embeddingHandle,
 
@@ -109,6 +110,7 @@ var RagExports = map[string]interface{}{
 	"importOverwrite":    rag.WithExportOverwriteExisting,
 	"importName":         rag.WithRAGCollectionName,
 	"importRebuildGraph": rag.WithImportRebuildHNSWIndex,
+	"serialVersionUID":   rag.WithRAGSerialVersionUID,
 	"documentHandler":    rag.WithExportDocumentHandler,
 	"progressHandler":    rag.WithExportOnProgressHandler,
 	"aiServiceType":      rag.WithAIServiceType,
@@ -155,6 +157,13 @@ func BuildIndexKnowledgeFromFile(kbName string, path string, option ...any) erro
 		log.Infof("indexed knowledge entry: %s", entry.KnowledgeTitle)
 	}
 	return nil
+}
+
+func _lazyEmbedding(lazy ...bool) rag.RAGSystemConfigOption {
+	if len(lazy) > 0 {
+		return rag.WithLazyLoadEmbeddingClient(lazy[0])
+	}
+	return rag.WithLazyLoadEmbeddingClient(true)
 }
 
 // BuildSearchIndexKnowledge builds a search index for the given text content.

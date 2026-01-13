@@ -1,0 +1,67 @@
+yakit.AutoInitYakit()
+
+// Import default knowledge base packages with explicit name + SerialVersionUID tags
+input := cli.String("imports", cli.setVerboseName("路径:名称:SerialVersionUID 列表"), cli.setHelp("使用逗号分隔多个，格式如 /path/a.rag:kb-name:<uid>,/path/b.rag:another-name:<uid>"), cli.setRequired(true))
+overwrite := cli.Bool("overwrite", cli.setVerboseName("覆盖已存在知识库"), cli.setDefault(true))
+cli.check()
+
+entries := str.Split(input, ",")
+if len(entries) == 0 {
+    die("未提供任何导入路径")
+}
+
+successCount := 0
+for item in entries {
+    spec := str.TrimSpace(item)
+    if spec == "" {
+        continue
+    }
+
+    parts := str.Split(spec, ":")
+    if len(parts) != 3 {
+        yakit.Error("格式错误，需为 路径:名称:SerialVersionUID -> %s", spec)
+        continue
+    }
+
+    ragPath := str.TrimSpace(parts[0])
+    kbName := str.TrimSpace(parts[1])
+    serialUID := str.TrimSpace(parts[2])
+    if ragPath == "" || kbName == "" || serialUID == "" {
+        yakit.Error("路径/名称/SerialVersionUID 不能为空: %s", spec)
+        continue
+    }
+    if !file.IsExisted(ragPath) {
+        yakit.Error("文件不存在: %s", ragPath)
+        continue
+    }
+
+    // 如果已有相同 SerialVersionUID 则跳过
+    if rag.HasCollection(kbName) {
+        exists, err := rag.Get(kbName)
+        if err != nil {
+            yakit.Warn("读取已存在的知识库失败，忽略跳过检查: %v", err)
+        } else if exists != nil && exists.VectorStore != nil {
+            existingUID := exists.VectorStore.GetCollectionInfo().SerialVersionUID
+            if existingUID == serialUID {
+                yakit.Info("已存在相同 SerialVersionUID，跳过导入: %s (%s)", kbName, serialUID)
+                continue
+            }
+        }
+    }
+
+    yakit.StatusCard("导入默认知识库", sprintf("%s -> %s (SerialVersionUID=%s)", ragPath, kbName, serialUID))
+    err := rag.Import(ragPath, rag.importOverwrite(overwrite), rag.importName(kbName), rag.serialVersionUID(serialUID))
+    if err != nil {
+        yakit.Error("导入失败 %s: %v", ragPath, err)
+        continue
+    }
+
+    successCount++
+    yakit.Info("导入成功: %s (SerialVersionUID=%s)", ragPath, serialUID)
+}
+
+if successCount == 0 {
+    die("未导入任何知识库，请检查参数")
+}
+
+yakit.StatusCard("完成", sprintf("成功导入 %d 个知识库", successCount))
