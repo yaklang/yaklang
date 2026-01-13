@@ -3,16 +3,33 @@ package rule
 import (
 	"bufio"
 	"errors"
+	"reflect"
+	"strings"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	config2 "github.com/yaklang/yaklang/common/suricata/config"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
-	"reflect"
-	"strings"
 )
 
+// ParseSuricata 解析 Suricata 规则字符串，返回解析后的规则对象列表。
+// 它接受一个包含一条或多条 Suricata 规则的字符串，以及可选的环境变量配置。
+// 支持标准的 Suricata 规则语法，包括 action、protocol、地址、端口和规则选项。
+// 环境变量格式为 "key=value"，用于替换规则中的变量（如 $HOME_NET、$EXTERNAL_NET）。
+// Example:
+// ```
+// 解析单条规则
+// rules, err = suricata.ParseSuricata(`alert tcp any any -> any 80 (msg:"HTTP Attack"; content:"attack"; sid:1001;)`)
+// 解析多条规则
+// rules, err = suricata.ParseSuricata(`
+// alert tcp $HOME_NET any -> $EXTERNAL_NET 80 (msg:"Outbound HTTP"; sid:1001;)
+// alert dns any any -> any 53 (msg:"DNS Query"; sid:1002;)
+// `)
+// 使用自定义环境变量
+// rules, err = suricata.ParseSuricata(ruleContent, "HOME_NET=192.168.1.0/24", "EXTERNAL_NET=any")
+// ```
 func Parse(data string, envs ...string) ([]*Rule, error) {
 	config, err := config2.ParseSuricataConfig(config2.DefaultConfigYaml)
 	if err != nil {

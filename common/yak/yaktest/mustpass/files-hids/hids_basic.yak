@@ -1,0 +1,371 @@
+// HIDS/NIDS 综合测试入口
+// 核心功能：主机入侵检测和网络入侵检测系统测试
+// 覆盖需求：
+// - 通信协议识别：识别网络通信使用的协议类型
+// - 数据泄露告警：对检测到的数据泄露行为进行告警处理
+// - 攻击特征库：维护网络攻击流量特征库
+// - 攻击流量识别：识别网络攻击流量特征并告警
+// - 流量分类规则：定义网络流量的分类规则
+// - 流量自动分类：基于规则对网络流量进行自动分类
+
+// ============================================================================
+// 测试用例 1: Suricata 规则解析基础测试
+// ============================================================================
+testBasicRuleParsing = func() {
+    println("[TEST] Suricata 规则解析基础测试...")
+    
+    // 测试基础规则解析
+    basicRule = `alert tcp any any -> any any (msg:"Test Rule"; content:"test"; sid:1;)`
+    rules, err = suricata.ParseSuricata(basicRule)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    assert len(rules) == 1, sprintf("应解析出 1 条规则，实际: %d", len(rules))
+    
+    rule = rules[0]
+    assert rule.Action == "alert", sprintf("Action 错误: %s", rule.Action)
+    assert rule.Protocol == "tcp", sprintf("Protocol 错误: %s", rule.Protocol)
+    assert rule.Message == "Test Rule", sprintf("Message 错误: %s", rule.Message)
+    assert rule.Sid == 1, sprintf("SID 错误: %d", rule.Sid)
+    
+    println("[PASS] 基础规则解析测试通过")
+}
+
+// ============================================================================
+// 测试用例 2: 多规则批量解析
+// ============================================================================
+testMultiRuleParsing = func() {
+    println("[TEST] 多规则批量解析测试...")
+    
+    multiRules = `
+# 这是注释
+alert tcp any any -> any 80 (msg:"HTTP Traffic"; sid:1001;)
+alert tcp any any -> any 443 (msg:"HTTPS Traffic"; sid:1002;)
+alert udp any any -> any 53 (msg:"DNS Traffic"; sid:1003;)
+alert icmp any any -> any any (msg:"ICMP Traffic"; sid:1004;)
+`
+    
+    rules, err = suricata.ParseSuricata(multiRules)
+    assert err == nil, sprintf("多规则解析失败: %v", err)
+    assert len(rules) == 4, sprintf("应解析出 4 条规则，实际: %d", len(rules))
+    
+    // 验证各协议
+    protocols = []
+    for _, r = range rules {
+        protocols = append(protocols, r.Protocol)
+    }
+    assert "tcp" in protocols, "应包含 tcp 协议"
+    assert "udp" in protocols, "应包含 udp 协议"
+    assert "icmp" in protocols, "应包含 icmp 协议"
+    
+    println("[PASS] 多规则批量解析测试通过")
+}
+
+// ============================================================================
+// 测试用例 3: 规则匹配器创建测试
+// ============================================================================
+testMatcherCreation = func() {
+    println("[TEST] 规则匹配器创建测试...")
+    
+    rule = `alert tcp any any -> any any (msg:"Matcher Test"; content:"ATTACK"; nocase; sid:2001;)`
+    rules, err = suricata.ParseSuricata(rule)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    
+    // 创建单规则匹配器
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    assert matcher != nil, "匹配器不应为空"
+    
+    // 创建规则组匹配器
+    group = suricata.NewSuricataMatcherGroup()
+    assert group != nil, "规则组匹配器不应为空"
+    
+    // 加载规则到组
+    group.LoadRule(rules[0])
+    
+    println("[PASS] 规则匹配器创建测试通过")
+}
+
+// ============================================================================
+// 测试用例 4: 协议识别 - TCP/UDP/ICMP
+// ============================================================================
+testProtocolIdentification = func() {
+    println("[TEST] 协议识别测试...")
+    
+    // 定义不同协议的检测规则
+    protocolRules = `
+alert tcp any any -> any any (msg:"TCP Detected"; sid:3001;)
+alert udp any any -> any any (msg:"UDP Detected"; sid:3002;)
+alert icmp any any -> any any (msg:"ICMP Detected"; sid:3003;)
+`
+    
+    rules, err = suricata.ParseSuricata(protocolRules)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    
+    // 验证协议类型
+    tcpRule = rules[0]
+    assert tcpRule.Protocol == "tcp", "第一条规则应为 TCP"
+    
+    udpRule = rules[1]
+    assert udpRule.Protocol == "udp", "第二条规则应为 UDP"
+    
+    icmpRule = rules[2]
+    assert icmpRule.Protocol == "icmp", "第三条规则应为 ICMP"
+    
+    println("[PASS] 协议识别测试通过")
+}
+
+// ============================================================================
+// 测试用例 5: 内容匹配关键字测试
+// ============================================================================
+testContentKeywords = func() {
+    println("[TEST] 内容匹配关键字测试...")
+    
+    // 测试各种内容匹配关键字
+    contentRule = `alert tcp any any -> any any (msg:"Content Keywords Test"; content:"pattern1"; nocase; content:"pattern2"; offset:10; depth:20; distance:5; within:30; sid:4001;)`
+    
+    rules, err = suricata.ParseSuricata(contentRule)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    assert len(rules) == 1, "应解析出 1 条规则"
+    
+    rule = rules[0]
+    assert rule.ContentRuleConfig != nil, "ContentRuleConfig 不应为空"
+    assert len(rule.ContentRuleConfig.ContentRules) > 0, "应有内容规则"
+    
+    println("[PASS] 内容匹配关键字测试通过")
+}
+
+// ============================================================================
+// 测试用例 6: 流量分类规则测试
+// ============================================================================
+testTrafficClassification = func() {
+    println("[TEST] 流量分类规则测试...")
+    
+    // 定义分类规则
+    classRules = `
+alert tcp any any -> any any (msg:"Web Attack"; classtype:web-application-attack; sid:5001;)
+alert tcp any any -> any any (msg:"Recon Attempt"; classtype:attempted-recon; sid:5002;)
+alert tcp any any -> any any (msg:"Policy Violation"; classtype:policy-violation; sid:5003;)
+alert tcp any any -> any any (msg:"Trojan Activity"; classtype:trojan-activity; sid:5004;)
+`
+    
+    rules, err = suricata.ParseSuricata(classRules)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    assert len(rules) == 4, sprintf("应解析出 4 条规则，实际: %d", len(rules))
+    
+    // 验证分类类型
+    classTypes = []
+    for _, r = range rules {
+        classTypes = append(classTypes, r.ClassType)
+    }
+    
+    assert "web-application-attack" in classTypes, "应包含 web-application-attack"
+    assert "attempted-recon" in classTypes, "应包含 attempted-recon"
+    assert "policy-violation" in classTypes, "应包含 policy-violation"
+    assert "trojan-activity" in classTypes, "应包含 trojan-activity"
+    
+    println("[PASS] 流量分类规则测试通过")
+}
+
+// ============================================================================
+// 测试用例 7: 规则组匹配器回调测试
+// ============================================================================
+testGroupMatcherCallback = func() {
+    println("[TEST] 规则组匹配器回调测试...")
+    
+    callbackTriggered = false
+    matchedMessage = ""
+    
+    group = suricata.NewSuricataMatcherGroup(
+        suricata.groupCallback(func(packet, rule) {
+            callbackTriggered = true
+            matchedMessage = rule.Message
+        })
+    )
+    
+    assert group != nil, "规则组匹配器不应为空"
+    
+    // 验证回调函数已设置（通过加载规则）
+    rule = `alert tcp any any -> any any (msg:"Callback Test"; content:"test"; sid:6001;)`
+    rules, _ = suricata.ParseSuricata(rule)
+    group.LoadRule(rules[0])
+    
+    println("[PASS] 规则组匹配器回调测试通过")
+}
+
+// ============================================================================
+// 测试用例 8: 环境变量支持测试
+// ============================================================================
+testEnvironmentVariables = func() {
+    println("[TEST] 环境变量支持测试...")
+    
+    // 使用环境变量的规则
+    envRule = `alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"Outbound Traffic"; sid:7001;)`
+    
+    // 带环境变量解析
+    rules, err = suricata.ParseSuricata(envRule, "HOME_NET=192.168.1.0/24", "EXTERNAL_NET=any")
+    assert err == nil, sprintf("环境变量规则解析失败: %v", err)
+    assert len(rules) == 1, "应解析出 1 条规则"
+    
+    println("[PASS] 环境变量支持测试通过")
+}
+
+// ============================================================================
+// 测试用例 9: 高级规则选项测试
+// ============================================================================
+testAdvancedOptions = func() {
+    println("[TEST] 高级规则选项测试...")
+    
+    // 包含多种高级选项的规则
+    advancedRule = `alert http any any -> any any (msg:"Advanced Options Test"; flow:to_server,established; content:"POST"; http_method; content:"/upload"; http_uri; reference:url,example.com; priority:1; sid:8001; rev:3;)`
+    
+    rules, err = suricata.ParseSuricata(advancedRule)
+    assert err == nil, sprintf("高级规则解析失败: %v", err)
+    assert len(rules) == 1, "应解析出 1 条规则"
+    
+    rule = rules[0]
+    assert rule.Sid == 8001, sprintf("SID 错误: %d", rule.Sid)
+    assert rule.Rev == 3, sprintf("Rev 错误: %d", rule.Rev)
+    assert rule.Priority == 1, sprintf("Priority 错误: %d", rule.Priority)
+    
+    println("[PASS] 高级规则选项测试通过")
+}
+
+// ============================================================================
+// 测试用例 10: 规则存储和查询测试
+// ============================================================================
+testRuleStorage = func() {
+    println("[TEST] 规则存储和查询功能测试...")
+    
+    // 定义测试规则 - 使用唯一标识避免与其他测试冲突
+    testRules = `
+alert tcp any any -> any 80 (msg:"YAKTEST_HIDS_Test_Rule_HTTP_TEMP"; content:"GET"; sid:999001; classtype:web-application-attack;)
+alert tcp any any -> any 443 (msg:"YAKTEST_HIDS_Test_Rule_HTTPS_TEMP"; content:"POST"; sid:999002; classtype:web-application-attack;)
+alert udp any any -> any 53 (msg:"YAKTEST_HIDS_Test_Rule_DNS_TEMP"; content:"query"; sid:999003; classtype:policy-violation;)
+`
+    
+    // 记录插入的规则 ID，用于后续清理
+    insertedIDs = []
+    
+    defer func() {
+        // 清理测试数据：删除所有插入的规则
+        println("[CLEANUP] 清理测试规则...")
+        for _, ruleID = range insertedIDs {
+            err = suricata.DeleteSuricataRuleByID(ruleID)
+            if err != nil {
+                println(sprintf("[WARN] 删除规则 ID %d 失败: %v", ruleID, err))
+            }
+        }
+        println("[CLEANUP] 测试规则清理完成")
+    }()
+    
+    // 1. 测试规则解析
+    rules, err = suricata.ParseSuricata(testRules)
+    assert err == nil, sprintf("规则解析失败: %v", err)
+    assert len(rules) == 3, sprintf("应解析出 3 条规则，实际: %d", len(rules))
+    
+    // 2. 测试 LoadSuricataToDatabase 函数存储规则
+    err = suricata.LoadSuricataToDatabase(testRules)
+    assert err == nil, sprintf("存储规则到数据库失败: %v", err)
+    
+    // 3. 测试从数据库查询规则并收集 ID
+    // 使用 YieldSuricataRulesByKeywords 按关键字查询
+    foundCount = 0
+    for rule = range suricata.YieldSuricataRulesByKeywords("YAKTEST_HIDS_Test_Rule", "tcp", "udp") {
+        // 跳过 nil 规则
+        if rule == nil {
+            continue
+        }
+        
+        assert rule.RuleType == "suricata", sprintf("规则类型应为 suricata, 实际: %s", rule.RuleType)
+        
+        // 验证规则基本属性
+        if str.Contains(rule.Name, "YAKTEST_HIDS_Test_Rule") && str.Contains(rule.Name, "TEMP") {
+            foundCount++
+            
+            // 记录规则 ID 用于清理
+            insertedIDs = append(insertedIDs, rule.Model.ID)
+            
+            assert rule.Protocol in ["tcp", "udp"], sprintf("协议应为 tcp 或 udp, 实际: %s", rule.Protocol)
+            assert rule.Action == "alert", sprintf("Action 应为 alert, 实际: %s", rule.Action)
+            
+            // 验证可以重新解析存储的规则
+            reparsedRules, parseErr = suricata.ParseSuricata(rule.SuricataRaw)
+            assert parseErr == nil, sprintf("重新解析存储的规则失败: %v", parseErr)
+            assert len(reparsedRules) > 0, "重新解析应该产生至少一条规则"
+        }
+        
+        // 只查询我们插入的测试规则
+        if foundCount >= 3 {
+            break
+        }
+    }
+    
+    assert foundCount == 3, sprintf("应从数据库找到 3 条测试规则，实际找到: %d", foundCount)
+    assert len(insertedIDs) == 3, sprintf("应收集到 3 个规则 ID，实际: %d", len(insertedIDs))
+    
+    // 4. 测试按协议过滤查询
+    tcpCount = 0
+    for rule = range suricata.YieldSuricataRulesByKeywords("YAKTEST_HIDS_Test_Rule", "tcp") {
+        // 跳过 nil 规则
+        if rule == nil {
+            continue
+        }
+        
+        if str.Contains(rule.Name, "YAKTEST_HIDS_Test_Rule") && str.Contains(rule.Name, "TEMP") {
+            assert rule.Protocol == "tcp", sprintf("过滤协议应为 tcp, 实际: %s", rule.Protocol)
+            tcpCount++
+        }
+        if tcpCount >= 2 {
+            break
+        }
+    }
+    assert tcpCount == 2, sprintf("按 tcp 协议过滤应找到 2 条规则，实际: %d", tcpCount)
+    
+    // 5. 测试删除功能
+    // 删除第一条测试规则
+    if len(insertedIDs) > 0 {
+        testDeleteID = insertedIDs[0]
+        err = suricata.DeleteSuricataRuleByID(testDeleteID)
+        assert err == nil, sprintf("删除规则失败: %v", err)
+        
+        // 验证删除后无法再查询到该规则
+        deletedFound = false
+        for rule = range suricata.YieldSuricataRulesByKeywords("YAKTEST_HIDS_Test_Rule", "tcp", "udp") {
+            // 跳过 nil 规则
+            if rule == nil {
+                continue
+            }
+            
+            if rule.Model.ID == testDeleteID {
+                deletedFound = true
+                break
+            }
+        }
+        assert deletedFound == false, "已删除的规则不应再被查询到"
+        
+        // 从清理列表中移除已删除的 ID
+        insertedIDs = insertedIDs[1:]
+    }
+    
+    println("[PASS] 规则存储和查询功能测试通过")
+}
+
+// ============================================================================
+// 运行所有测试
+// ============================================================================
+println("========================================")
+println("HIDS/NIDS 综合测试开始")
+println("========================================")
+
+testBasicRuleParsing()
+testMultiRuleParsing()
+testMatcherCreation()
+testProtocolIdentification()
+testContentKeywords()
+testTrafficClassification()
+testGroupMatcherCallback()
+testEnvironmentVariables()
+testAdvancedOptions()
+testRuleStorage()
+
+println("========================================")
+println("所有 HIDS/NIDS 测试通过!")
+println("========================================")

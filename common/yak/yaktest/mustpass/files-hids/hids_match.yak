@@ -1,0 +1,516 @@
+// NIDS 网络流量检测测试
+// 核心功能：测试 Suricata 规则引擎的流量检测能力
+// 覆盖需求：
+// - 通信协议识别：识别网络通信使用的协议类型
+// - 攻击特征库：维护网络攻击流量特征库
+// - 攻击流量识别：识别网络攻击流量特征并告警
+// - 流量分类规则：定义网络流量的分类规则
+// - 流量自动分类：基于规则对网络流量进行自动分类
+// - 数据泄露告警：对检测到的数据泄露行为进行告警处理
+
+// 使用固定 MAC 地址避免网络设备探测延迟
+testSrcMAC = "00:00:00:00:00:01"
+testDstMAC = "00:00:00:00:00:02"
+
+// ============================================================================
+// 测试用例 1: TCP 协议 - SQL 注入攻击检测
+// ============================================================================
+testSQLInjection = func() {
+    println("[TEST] SQL 注入攻击检测...")
+    
+    // 定义 SQL 注入检测规则
+    sqlInjectionRule = `alert tcp any any -> any any (msg:"SQL Injection Attack Detected"; content:"' OR '1'='1"; nocase; sid:1001; classtype:web-application-attack;)`
+    
+    rules, err = suricata.ParseSuricata(sqlInjectionRule)
+    assert err == nil, sprintf("解析 SQL 注入规则失败: %v", err)
+    assert len(rules) == 1, "规则数量应为 1"
+    assert rules[0].Message == "SQL Injection Attack Detected", "规则消息不匹配"
+    assert rules[0].Protocol == "tcp", "协议应为 tcp"
+    assert rules[0].ClassType == "web-application-attack", "分类类型不匹配"
+    
+    // 构建包含 SQL 注入 payload 的 HTTP 请求包
+    sqlPayload = "GET /login?id=1' OR '1'='1 HTTP/1.1\r\nHost: example.com\r\n\r\n"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte(sqlPayload)),
+    )
+    assert err == nil, sprintf("构建 TCP 包失败: %v", err)
+    assert len(packet) > 0, "包数据不应为空"
+    
+    // 测试匹配
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(packet)
+    assert matched == true, "SQL 注入攻击应被检测到"
+    
+    // 测试正常流量不触发
+    normalPayload = "GET /login?id=123 HTTP/1.1\r\nHost: example.com\r\n\r\n"
+    normalPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte(normalPayload)),
+    )
+    normalMatched = matcher.Match(normalPacket)
+    assert normalMatched == false, "正常流量不应触发告警"
+    
+    println("[PASS] SQL 注入攻击检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 2: HTTP 协议 - XSS 攻击检测
+// ============================================================================
+testXSSAttack = func() {
+    println("[TEST] XSS 攻击检测...")
+    
+    xssRule = `alert tcp any any -> any 80 (msg:"XSS Attack Detected"; content:"<script>"; nocase; sid:1002; classtype:web-application-attack;)`
+    
+    rules, err = suricata.ParseSuricata(xssRule)
+    assert err == nil, sprintf("解析 XSS 规则失败: %v", err)
+    
+    // 构建 XSS 攻击包
+    xssPayload = "GET /search?q=<script>alert('xss')</script> HTTP/1.1\r\nHost: example.com\r\n\r\n"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54321),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte(xssPayload)),
+    )
+    assert err == nil, sprintf("构建包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(packet)
+    assert matched == true, "XSS 攻击应被检测到"
+    
+    println("[PASS] XSS 攻击检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 3: UDP 协议 - DNS 查询内容检测
+// ============================================================================
+testDNSQuery = func() {
+    println("[TEST] UDP DNS 查询内容检测...")
+    
+    // 检测包含可疑域名的 DNS 查询
+    dnsRule = `alert udp any any -> any 53 (msg:"Suspicious DNS Query"; content:"malware"; nocase; sid:1003; classtype:policy-violation;)`
+    
+    rules, err = suricata.ParseSuricata(dnsRule)
+    assert err == nil, sprintf("解析 DNS 规则失败: %v", err)
+    assert rules[0].Protocol == "udp", "协议应为 udp"
+    
+    // 构建包含可疑域名的 DNS 查询包
+    dnsQuery = "malware.evil.com"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.udp_srcPort(12345),
+        pcapx.udp_dstPort(53),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("8.8.8.8"),
+        pcapx.WithPayload([]byte(dnsQuery)),
+    )
+    assert err == nil, sprintf("构建 UDP 包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(packet)
+    assert matched == true, "可疑 DNS 查询应被检测到"
+    
+    println("[PASS] UDP DNS 查询内容检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 4: ICMP 协议 - Ping 扫描检测
+// ============================================================================
+testICMPScan = func() {
+    println("[TEST] ICMP Ping 扫描检测...")
+    
+    icmpRule = `alert icmp any any -> any any (msg:"ICMP Ping Scan Detected"; itype:8; sid:1004; classtype:attempted-recon;)`
+    
+    rules, err = suricata.ParseSuricata(icmpRule)
+    assert err == nil, sprintf("解析 ICMP 规则失败: %v", err)
+    assert rules[0].Protocol == "icmp", "协议应为 icmp"
+    assert rules[0].ClassType == "attempted-recon", "分类类型应为侦察尝试"
+    
+    // 构建 ICMP Echo Request 包 (ping)
+    // icmp_type 函数接收两个参数: type 和 code
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.icmp_type(8, 0),  // Echo Request, code=0
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+    )
+    assert err == nil, sprintf("构建 ICMP 包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(packet)
+    assert matched == true, "ICMP 扫描应被检测到"
+    
+    println("[PASS] ICMP Ping 扫描检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 5: 数据泄露检测 - 敏感信息外传
+// ============================================================================
+testDataLeakage = func() {
+    println("[TEST] 数据泄露检测...")
+    
+    // 检测信用卡号泄露 (简化模式)
+    dataLeakRule = `alert tcp any any -> any any (msg:"Possible Credit Card Number Leakage"; content:"4111"; content:"1111"; distance:0; within:20; sid:1005; classtype:policy-violation;)`
+    
+    rules, err = suricata.ParseSuricata(dataLeakRule)
+    assert err == nil, sprintf("解析数据泄露规则失败: %v", err)
+    
+    // 构建包含信用卡号的数据包
+    sensitivePayload = "POST /api/payment HTTP/1.1\r\nHost: api.example.com\r\n\r\n{\"card\":\"4111111111111111\"}"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(45678),
+        pcapx.tcp_dstPort(443),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("203.0.113.50"),
+        pcapx.WithPayload([]byte(sensitivePayload)),
+    )
+    assert err == nil, sprintf("构建包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(packet)
+    assert matched == true, "信用卡号泄露应被检测到"
+    
+    println("[PASS] 数据泄露检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 6: 流量分类 - 多协议规则组匹配
+// ============================================================================
+testTrafficClassification = func() {
+    println("[TEST] 流量分类测试...")
+    
+    // 定义多个分类规则
+    classificationRules = `
+alert tcp any any -> any 22 (msg:"SSH Traffic"; sid:2001; classtype:protocol-command-decode;)
+alert tcp any any -> any 80 (msg:"HTTP Traffic"; sid:2002; classtype:protocol-command-decode;)
+alert tcp any any -> any 443 (msg:"HTTPS Traffic"; sid:2003; classtype:protocol-command-decode;)
+alert tcp any any -> any 3306 (msg:"MySQL Traffic"; sid:2004; classtype:protocol-command-decode;)
+alert tcp any any -> any 6379 (msg:"Redis Traffic"; sid:2005; classtype:protocol-command-decode;)
+`
+    
+    rules, err = suricata.ParseSuricata(classificationRules)
+    assert err == nil, sprintf("解析分类规则失败: %v", err)
+    assert len(rules) == 5, sprintf("应解析出 5 条规则，实际: %d", len(rules))
+    
+    // 创建匹配器组
+    matchedRules = []
+    group = suricata.NewSuricataMatcherGroup(
+        suricata.groupCallback(func(packet, rule) {
+            matchedRules = append(matchedRules, rule.Message)
+        })
+    )
+    
+    // 加载所有规则
+    for _, r = range rules {
+        group.LoadRule(r)
+    }
+    
+    // 测试 SSH 流量分类
+    sshPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54321),
+        pcapx.tcp_dstPort(22),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("SSH-2.0-OpenSSH")),
+    )
+    group.FeedFrame(sshPacket)
+    
+    // 测试 HTTP 流量分类
+    httpPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54322),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("GET / HTTP/1.1")),
+    )
+    group.FeedFrame(httpPacket)
+    
+    // 测试 MySQL 流量分类
+    mysqlPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54323),
+        pcapx.tcp_dstPort(3306),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte{0x00, 0x00, 0x00, 0x0a}),  // MySQL 握手包特征
+    )
+    group.FeedFrame(mysqlPacket)
+    
+    group.Wait()
+    
+    // 验证分类结果
+    assert len(matchedRules) >= 3, sprintf("应匹配至少 3 条规则，实际: %d", len(matchedRules))
+    
+    println("[PASS] 流量分类测试通过")
+}
+
+// ============================================================================
+// 测试用例 7: 攻击特征库 - 规则解析和元数据
+// ============================================================================
+testRuleMetadata = func() {
+    println("[TEST] 规则元数据解析测试...")
+    
+    // 包含完整元数据的规则
+    fullRule = `alert http any any -> any any (msg:"ET SCAN Nmap Scripting Engine User-Agent Detected"; flow:to_server,established; content:"Nmap Scripting Engine"; http_user_agent; reference:url,nmap.org; classtype:attempted-recon; sid:2009358; rev:5; metadata:created_at 2010_07_30, updated_at 2019_07_26;)`
+    
+    rules, err = suricata.ParseSuricata(fullRule)
+    assert err == nil, sprintf("解析规则失败: %v", err)
+    assert len(rules) == 1, "应解析出 1 条规则"
+    
+    rule = rules[0]
+    
+    // 验证规则元数据
+    assert rule.Action == "alert", sprintf("Action 应为 alert, 实际: %s", rule.Action)
+    assert rule.Protocol == "http", sprintf("Protocol 应为 http, 实际: %s", rule.Protocol)
+    assert rule.Sid == 2009358, sprintf("SID 应为 2009358, 实际: %d", rule.Sid)
+    assert rule.Rev == 5, sprintf("Rev 应为 5, 实际: %d", rule.Rev)
+    assert rule.ClassType == "attempted-recon", sprintf("ClassType 不匹配, 实际: %s", rule.ClassType)
+    assert str.Contains(rule.Message, "Nmap"), "消息应包含 Nmap"
+    
+    println("[PASS] 规则元数据解析测试通过")
+}
+
+// ============================================================================
+// 测试用例 8: 多协议内容匹配
+// ============================================================================
+testMultiProtocolMatching = func() {
+    println("[TEST] 多协议内容匹配测试...")
+    
+    // TCP 协议匹配
+    tcpRule = `alert tcp any any -> any any (msg:"TCP Pattern Match"; content:"MALWARE"; nocase; sid:3001;)`
+    tcpRules, _ = suricata.ParseSuricata(tcpRule)
+    
+    tcpPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(4444),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("This is MALWARE communication")),
+    )
+    
+    tcpMatcher = suricata.NewSuricataMatcher(tcpRules[0])
+    assert tcpMatcher.Match(tcpPacket) == true, "TCP 内容匹配失败"
+    
+    // UDP 协议匹配
+    udpRule = `alert udp any any -> any any (msg:"UDP Pattern Match"; content:"BEACON"; nocase; sid:3002;)`
+    udpRules, _ = suricata.ParseSuricata(udpRule)
+    
+    udpPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.udp_srcPort(12345),
+        pcapx.udp_dstPort(5555),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("BEACON_DATA_HERE")),
+    )
+    
+    udpMatcher = suricata.NewSuricataMatcher(udpRules[0])
+    assert udpMatcher.Match(udpPacket) == true, "UDP 内容匹配失败"
+    
+    println("[PASS] 多协议内容匹配测试通过")
+}
+
+// ============================================================================
+// 测试用例 9: 偏移和深度匹配
+// ============================================================================
+testOffsetDepthMatching = func() {
+    println("[TEST] 偏移和深度匹配测试...")
+    
+    // 测试 offset 和 depth 关键字
+    offsetRule = `alert tcp any any -> any any (msg:"Offset Depth Test"; content:"HTTP"; offset:0; depth:4; sid:4001;)`
+    
+    rules, err = suricata.ParseSuricata(offsetRule)
+    assert err == nil, sprintf("解析规则失败: %v", err)
+    
+    // 匹配的包 - HTTP 在开头
+    matchPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("HTTP/1.1 200 OK")),
+    )
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    assert matcher.Match(matchPacket) == true, "偏移深度匹配应成功"
+    
+    // 不匹配的包 - HTTP 不在开头
+    noMatchPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("GET / HTTP/1.1")),  // HTTP 不在 offset:0
+    )
+    
+    assert matcher.Match(noMatchPacket) == false, "偏移深度不匹配时不应触发"
+    
+    println("[PASS] 偏移和深度匹配测试通过")
+}
+
+// ============================================================================
+// 测试用例 10: IP 地址和端口匹配
+// ============================================================================
+testIPPortMatching = func() {
+    println("[TEST] IP 地址和端口匹配测试...")
+    
+    // 测试特定 IP 和端口的规则
+    ipPortRule = `alert tcp 192.168.1.0/24 any -> 10.0.0.0/8 80 (msg:"Internal to DMZ HTTP"; sid:5001;)`
+    
+    rules, err = suricata.ParseSuricata(ipPortRule)
+    assert err == nil, sprintf("解析规则失败: %v", err)
+    assert rules[0].SourceAddress != nil, "源地址不应为空"
+    assert rules[0].DestinationAddress != nil, "目的地址不应为空"
+    assert rules[0].DestinationPort != nil, "目的端口不应为空"
+    
+    // 匹配的包
+    matchPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54321),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("GET / HTTP/1.1")),
+    )
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    matched = matcher.Match(matchPacket)
+    assert matched == true, "IP/端口匹配应成功"
+    
+    // 不匹配的包 - 错误的目标端口
+    wrongPortPacket, _ = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(54321),
+        pcapx.tcp_dstPort(443),  // 不是 80
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte("GET / HTTP/1.1")),
+    )
+    
+    wrongPortMatched = matcher.Match(wrongPortPacket)
+    assert wrongPortMatched == false, "错误端口不应匹配"
+    
+    println("[PASS] IP 地址和端口匹配测试通过")
+}
+
+// ============================================================================
+// 测试用例 11: 命令注入检测
+// ============================================================================
+testCommandInjection = func() {
+    println("[TEST] 命令注入检测...")
+    
+    cmdRule = `alert tcp any any -> any any (msg:"Command Injection Detected"; content:"; cat /etc/passwd"; nocase; sid:6001; classtype:web-application-attack;)`
+    
+    rules, err = suricata.ParseSuricata(cmdRule)
+    assert err == nil, sprintf("解析规则失败: %v", err)
+    
+    // 构建命令注入攻击包
+    cmdPayload = "GET /api?cmd=ls; cat /etc/passwd HTTP/1.1\r\nHost: victim.com\r\n\r\n"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte(cmdPayload)),
+    )
+    assert err == nil, sprintf("构建包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    assert matcher.Match(packet) == true, "命令注入应被检测到"
+    
+    println("[PASS] 命令注入检测测试通过")
+}
+
+// ============================================================================
+// 测试用例 12: 目录遍历攻击检测
+// ============================================================================
+testPathTraversal = func() {
+    println("[TEST] 目录遍历攻击检测...")
+    
+    traversalRule = `alert tcp any any -> any 80 (msg:"Path Traversal Attack"; content:"../"; sid:6002; classtype:web-application-attack;)`
+    
+    rules, err = suricata.ParseSuricata(traversalRule)
+    assert err == nil, sprintf("解析规则失败: %v", err)
+    
+    // 构建目录遍历攻击包
+    traversalPayload = "GET /files/../../../etc/passwd HTTP/1.1\r\nHost: example.com\r\n\r\n"
+    
+    packet, err = pcapx.PacketBuilder(
+        pcapx.ethernet_srcMac(testSrcMAC),
+        pcapx.ethernet_dstMac(testDstMAC),
+        pcapx.tcp_srcPort(12345),
+        pcapx.tcp_dstPort(80),
+        pcapx.ipv4_srcIp("192.168.1.100"),
+        pcapx.ipv4_dstOp("10.0.0.1"),
+        pcapx.WithPayload([]byte(traversalPayload)),
+    )
+    assert err == nil, sprintf("构建包失败: %v", err)
+    
+    matcher = suricata.NewSuricataMatcher(rules[0])
+    assert matcher.Match(packet) == true, "目录遍历攻击应被检测到"
+    
+    println("[PASS] 目录遍历攻击检测测试通过")
+}
+
+// ============================================================================
+// 运行所有测试
+// ============================================================================
+println("========================================")
+println("NIDS 网络流量检测测试开始")
+println("========================================")
+
+testSQLInjection()
+testXSSAttack()
+testDNSQuery()
+testICMPScan()
+testDataLeakage()
+testTrafficClassification()
+testRuleMetadata()
+testMultiProtocolMatching()
+testOffsetDepthMatching()
+testIPPortMatching()
+testCommandInjection()
+testPathTraversal()
+
+println("========================================")
+println("所有 NIDS 测试通过!")
+println("========================================")
