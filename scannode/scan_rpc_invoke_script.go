@@ -97,10 +97,36 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	// Execute the Yak script
 	if err := s.executeScript(ctx, scanNodePath, scriptFile, params, runtimeId); err != nil {
 		log.Errorf("exec yakScript %v failed: %s", scriptFile, err)
+
+		// 使用脚本通过 yakit.Output 返回的错误详情
+		if detailedError := extractErrorFromResponse(res); detailedError != "" {
+			return nil, utils.Errorf("%s", detailedError)
+		}
+
+		// 返回通用错误
 		return nil, utils.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 	}
 
 	return res, nil
+}
+
+// extractErrorFromResponse 从响应中提取脚本返回的错误信息
+func extractErrorFromResponse(res *scanrpc.SCAN_InvokeScriptResponse) string {
+	if res == nil || res.Data == nil {
+		return ""
+	}
+
+	dataMap, ok := res.Data.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	errMsg, ok := dataMap["error"].(string)
+	if !ok || errMsg == "" {
+		return ""
+	}
+
+	return errMsg
 }
 
 // createYakitServer initializes a Yakit server with progress and log handlers
