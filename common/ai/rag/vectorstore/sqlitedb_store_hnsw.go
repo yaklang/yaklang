@@ -521,9 +521,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	nodeCreationTime = time.Since(nodeCreationStartTime)
 
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	hnswStartTime := time.Now()
-	s.hnsw.Add(nodes...)
-	hnswAddTime := time.Since(hnswStartTime)
+	hnswAddTime := s.hnsw.Add(nodes...) // 纯粹的 add 使用的时间不加排队使用的的时间
 
 	// 记录详细性能指标
 	totalTime := time.Since(addStartTime)

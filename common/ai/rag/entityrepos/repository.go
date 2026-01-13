@@ -141,7 +141,7 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 		close(finishCh)
 	}()
 
-	// 实现30秒超时机制
+	// 内部是队列单消费者模型，所以这里不做超时处理，只等待上下文取消，防止死锁
 	select {
 	case <-r.runtimeConfig.ctx.Done():
 		return utils.Errorf("context cacel")
@@ -440,11 +440,8 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 		return nil, err
 	}
 
-	totalDuration := time.Since(methodStartTime)
-
 	// 详细性能分析
-	if totalDuration > 30*time.Second {
-		log.Errorf("CRITICAL VECTOR SEARCH PERFORMANCE: entity [%s] total %v", entity.EntityName, totalDuration)
+	if dbQueryDuration > 3*time.Second {
 		log.Errorf("  - Query build: %v", queryBuildTime)
 		log.Errorf("  - Result filter: %v (filtered: %d/%d, low_score: %d, wrong_type: %d)",
 			filterDuration, filteredResultsCount, vectorResultsCount, lowScoreCount, wrongTypeCount)
@@ -479,18 +476,7 @@ func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ER
 }
 
 func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
-	addEntityStartTime := time.Now()
-	defer func() {
-		duration := time.Since(addEntityStartTime)
-		if duration > 3*time.Second {
-			log.Warnf("SLOW addEntityToVectorIndex: entity [%s] took %v", entry.EntityName, duration)
-		}
-		if duration > 10*time.Second {
-			log.Errorf("CRITICAL addEntityToVectorIndex: entity [%s] took %v - possible deadlock", entry.EntityName, duration)
-		}
-	}()
 
-	metadataStartTime := time.Now()
 	metadata := map[string]any{
 		schema.META_Data_UUID:  entry.Uuid,
 		schema.META_Data_Title: entry.EntityName,
@@ -507,19 +493,7 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
-	metadataDuration := time.Since(metadataStartTime)
-
-	vectorIndexStartTime := time.Now()
-	err := r.AddVectorIndex(documentID, content, opts...)
-	vectorIndexDuration := time.Since(vectorIndexStartTime)
-
-	totalDuration := time.Since(addEntityStartTime)
-	if totalDuration > 5*time.Second {
-		log.Warnf("addEntityToVectorIndex PERFORMANCE: entity [%s] total=%v, metadata=%v, vectorIndex=%v",
-			entry.EntityName, totalDuration, metadataDuration, vectorIndexDuration)
-	}
-
-	return err
+	return r.AddVectorIndex(documentID, content, opts...)
 }
 
 func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERModelRelationship) error {
@@ -692,14 +666,7 @@ func (r *EntityRepository) MergeAndSaveRelationship(newRelationship *schema.ERMo
 		log.Warnf("SLOW similarity checks: %d checks took %v", similarityChecks, similarityDuration)
 	}
 
-	addStartTime := time.Now()
 	err = r.AddRelationship(newRelationship.SourceEntityIndex, newRelationship.TargetEntityIndex, newRelationship.RelationshipType, newRelationship.RelationshipTypeVerbose, newRelationship.Attributes)
-	addDuration := time.Since(addStartTime)
-
-	if addDuration > time.Second {
-		log.Warnf("SLOW relationship add: took %v", addDuration)
-	}
-
 	return err
 }
 
