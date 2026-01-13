@@ -2281,8 +2281,12 @@ func DownloadWithMethod(method string, urlStr string, opts ...PocConfigOption) (
 		}
 		defer fp.Close()
 
-		// 5.3 Stream write with progress callback
+		// 5.3 Stream write with progress callback (throttled to 1s interval)
 		buffer := make([]byte, 32*1024) // 32KB buffer
+		var lastProgressTime time.Time
+		progressTriggered := false
+		progressInterval := time.Second // 1 second throttle
+
 		for {
 			n, readErr := bodyReader.Read(buffer)
 			if n > 0 {
@@ -2294,13 +2298,21 @@ func DownloadWithMethod(method string, urlStr string, opts ...PocConfigOption) (
 				}
 				downloadedSize += int64(n)
 
-				// Trigger progress callback
+				// Trigger progress callback with throttling
+				// - First trigger: immediately on first data
+				// - Subsequent triggers: at most once per second
 				if config.DownloadProgressCallback != nil {
-					percent := 0.0
-					if totalSize > 0 {
-						percent = float64(downloadedSize) / float64(totalSize) * 100
+					now := time.Now()
+					shouldTrigger := !progressTriggered || now.Sub(lastProgressTime) >= progressInterval
+					if shouldTrigger {
+						percent := 0.0
+						if totalSize > 0 {
+							percent = float64(downloadedSize) / float64(totalSize) * 100
+						}
+						config.DownloadProgressCallback(downloadedSize, totalSize, percent)
+						lastProgressTime = now
+						progressTriggered = true
 					}
-					config.DownloadProgressCallback(downloadedSize, totalSize, percent)
 				}
 			}
 			if readErr == io.EOF {
@@ -2311,6 +2323,12 @@ func DownloadWithMethod(method string, urlStr string, opts ...PocConfigOption) (
 				log.Errorf("Download: failed to read response body: %v", readErr)
 				return
 			}
+		}
+
+		// Always trigger final progress callback to ensure 100% is reported
+		if config.DownloadProgressCallback != nil && totalSize > 0 {
+			percent := float64(downloadedSize) / float64(totalSize) * 100
+			config.DownloadProgressCallback(downloadedSize, totalSize, percent)
 		}
 
 		// 5.4 Trigger finished callback
