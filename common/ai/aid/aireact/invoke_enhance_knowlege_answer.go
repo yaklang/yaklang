@@ -552,16 +552,16 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		taskIndex = r.GetCurrentTask().GetIndex()
 	}
 
-	// Start streaming output
+	// Start streaming output with unified nodeId
 	r.Emitter.EmitDefaultStreamEvent(
-		fmt.Sprintf("knowledge-chunk-compress-%d-%d", chunkStartLine, chunkEndLine),
+		"knowledge-compress",
 		pr,
 		taskIndex,
 	)
 
 	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
-		fmt.Sprintf("knowledge-chunk-compress-%d-%d", chunkStartLine, chunkEndLine),
+		"knowledge-compress",
 		aiforge.WithLiteForge_Emitter(r.Emitter),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
@@ -607,6 +607,11 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		score := item.GetFloat("score")
 
 		if rangeStr == "" {
+			continue
+		}
+
+		// Filter out low score items (< 0.4)
+		if score < 0.4 {
 			continue
 		}
 
@@ -725,16 +730,16 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		taskIndex = r.GetCurrentTask().GetIndex()
 	}
 
-	// Start streaming output
+	// Start streaming output with unified nodeId
 	r.Emitter.EmitDefaultStreamEvent(
-		"knowledge-single-compress",
+		"knowledge-compress",
 		pr,
 		taskIndex,
 	)
 
 	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
-		"knowledge-single-compress",
+		"knowledge-compress",
 		aiforge.WithLiteForge_Emitter(r.Emitter),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
@@ -790,6 +795,11 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		score := item.GetFloat("score")
 
 		if rangeStr == "" {
+			continue
+		}
+
+		// Filter out low score items (< 0.4)
+		if score < 0.4 {
 			continue
 		}
 
