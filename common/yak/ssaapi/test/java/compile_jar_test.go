@@ -46,4 +46,25 @@ func TestCompile_Jar(t *testing.T) {
 			return nil
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
+
+	t.Run("test should compile nested jar file", func(t *testing.T) {
+		// test-nested.jar contains test.jar inside it
+		nestedJarPath, err := ssatest.GetNestedJarFile()
+		require.NoError(t, err)
+
+		info := map[string]any{
+			"kind":       "jar",
+			"local_file": nestedJarPath,
+		}
+
+		prog, err := ssaapi.ParseProject(ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithConfigInfo(info))
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+		prog.Show()
+
+		vals, err := prog.SyntaxFlowWithError(`System.out.println(,* as $a)`)
+		require.NoError(t, err)
+		res := vals.GetValues("a")
+		require.Contains(t, res.String(), "Hello world", "should find Hello world from nested jar")
+	})
 }

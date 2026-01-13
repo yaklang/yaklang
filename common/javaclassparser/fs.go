@@ -15,6 +15,7 @@ import (
 
 type JarFS struct {
 	*filesys.ZipFS
+	jarCache *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
 }
 
 var _ fs.FS = (*JarFS)(nil)
@@ -31,11 +32,15 @@ func NewJarFSFromLocal(path string) (*JarFS, error) {
 
 func NewJarFS(zipFs *filesys.ZipFS) *JarFS {
 	return &JarFS{
-		ZipFS: zipFs,
+		ZipFS:    zipFs,
+		jarCache: utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
 	}
 }
 
 func (z *JarFS) ReadFile(name string) ([]byte, error) {
+	if isArchivePath(name) {
+		return z.readFileFromJar(name)
+	}
 	data, err := z.ZipFS.ReadFile(name)
 	if err != nil {
 		return nil, err
@@ -71,49 +76,57 @@ func (z *JarFS) Open(name string) (fs.File, error) {
 	return memfile.New([]byte(source)), nil
 }
 
-type ExpandedZipFS struct {
-	underlying fi.FileSystem
-	zipFS      *filesys.ZipFS
-	jarCache   *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
-	zipCache   *utils.SafeMapWithKey[string, *filesys.ZipFS]
-}
-
-var _ fi.FileSystem = (*ExpandedZipFS)(nil)
-
-func NewExpandedZipFS(underlying fi.FileSystem, zipFS *filesys.ZipFS) *ExpandedZipFS {
-	return &ExpandedZipFS{
-		underlying: underlying,
-		zipFS:      zipFS,
-		jarCache:   utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
-		zipCache:   utils.NewSafeMapWithKey[string, *filesys.ZipFS](),
+func (z *JarFS) Stat(name string) (fs.FileInfo, error) {
+	if isArchivePath(name) {
+		return z.statInJar(name)
 	}
+	if isArchiveFile(name) {
+		info, err := z.ZipFS.Stat(name)
+		if err != nil {
+			return nil, err
+		}
+		return &ArchiveFileInfo{
+			fs:    info,
+			name:  info.Name(),
+			isDir: true,
+		}, nil
+	}
+	info, err := z.ZipFS.Stat(name)
+	if err != nil {
+		return nil, err
+	}
+	return &ArchiveFileInfo{
+		fs:    info,
+		name:  info.Name(),
+		isDir: info.IsDir(),
+	}, nil
 }
 
-func (e *ExpandedZipFS) isArchiveFile(path string) bool {
+func isArchiveFile(path string) bool {
 	lowerPath := strings.ToLower(path)
 	return strings.HasSuffix(lowerPath, ".jar") ||
 		strings.HasSuffix(lowerPath, ".war") ||
 		strings.HasSuffix(lowerPath, ".zip")
 }
 
-func (e *ExpandedZipFS) isArchivePath(name string) bool {
+func isArchivePath(name string) bool {
 	return strings.Contains(name, ".jar/") || strings.Contains(name, ".jar!") ||
 		strings.Contains(name, ".zip/") || strings.Contains(name, ".zip!")
 }
 
-func (e *ExpandedZipFS) parseArchivePath(fullPath string) (archivePath, internalPath string, ok bool) {
+func parseArchivePath(fullPath string) (archivePath, internalPath string, ok bool) {
 	lowerPath := strings.ToLower(fullPath)
 
 	if strings.Contains(lowerPath, ".jar/") || strings.Contains(lowerPath, ".jar!") {
-		return e.parseJarOrZipPath(fullPath, ".jar")
+		return parseJarOrZipPath(fullPath, ".jar")
 	}
 	if strings.Contains(lowerPath, ".zip/") || strings.Contains(lowerPath, ".zip!") {
-		return e.parseJarOrZipPath(fullPath, ".zip")
+		return parseJarOrZipPath(fullPath, ".zip")
 	}
 	return "", "", false
 }
 
-func (e *ExpandedZipFS) parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, ok bool) {
+func parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, ok bool) {
 	extWithSlash := ext + "/"
 	extWithBang := ext + "!"
 
@@ -131,6 +144,125 @@ func (e *ExpandedZipFS) parseJarOrZipPath(fullPath, ext string) (archivePath, in
 	archivePath = fullPath[:idx]
 	internalPath = strings.TrimPrefix(fullPath[idx:], "/")
 	return archivePath, internalPath, true
+}
+
+func (z *JarFS) getNestedJarFS(jarPath string) (*filesys.UnifiedFS, error) {
+	if nestedJarFS, ok := z.jarCache.Get(jarPath); ok {
+		return nestedJarFS, nil
+	}
+
+	jarContent, err := z.ZipFS.ReadFile(jarPath)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to read jar file: %s", jarPath)
+	}
+
+	nestedZipFS, err := filesys.NewZipFSRaw(bytes.NewReader(jarContent), int64(len(jarContent)))
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to create zip filesystem for jar: %s", jarPath)
+	}
+
+	nestedJarFS := NewJarFS(nestedZipFS)
+	unifiedFS := filesys.NewUnifiedFS(nestedJarFS,
+		filesys.WithUnifiedFsExtMap(".class", ".java"),
+	)
+	z.jarCache.Set(jarPath, unifiedFS)
+	return unifiedFS, nil
+}
+
+func (z *JarFS) statInJar(name string) (fs.FileInfo, error) {
+	jarPath, internalPath, ok := parseArchivePath(name)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	unifiedFS, err := z.getNestedJarFS(jarPath)
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := unifiedFS.Stat(internalPath)
+	if err != nil {
+		if _, readErr := unifiedFS.ReadDir(internalPath); readErr == nil {
+			return &ArchiveFileInfo{
+				fs:    info,
+				name:  name,
+				isDir: true,
+			}, nil
+		}
+		return nil, err
+	}
+
+	return &ArchiveFileInfo{
+		fs:    info,
+		name:  name,
+		isDir: info.IsDir(),
+	}, nil
+}
+
+func (z *JarFS) readDirFromJar(fullPath string) ([]fs.DirEntry, error) {
+	jarPath, internalPath, ok := parseArchivePath(fullPath)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	unifiedFS, err := z.getNestedJarFS(jarPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return unifiedFS.ReadDir(internalPath)
+}
+
+func (z *JarFS) readFileFromJar(name string) ([]byte, error) {
+	jarPath, internalPath, ok := parseArchivePath(name)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+
+	unifiedFS, err := z.getNestedJarFS(jarPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return unifiedFS.ReadFile(internalPath)
+}
+
+func (z *JarFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	if isArchivePath(name) {
+		return z.readDirFromJar(name)
+	}
+	if isArchiveFile(name) {
+		info, err := z.ZipFS.Stat(name)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			unifiedFS, err := z.getNestedJarFS(name)
+			if err != nil {
+				return nil, err
+			}
+			return unifiedFS.ReadDir(".")
+		}
+	}
+	return z.ZipFS.ReadDir(name)
+}
+
+type ExpandedZipFS struct {
+	underlying fi.FileSystem
+	zipFS      *filesys.ZipFS
+	jarCache   *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
+	zipCache   *utils.SafeMapWithKey[string, *filesys.ZipFS]
+}
+
+var _ fi.FileSystem = (*ExpandedZipFS)(nil)
+
+func NewExpandedZipFS(underlying fi.FileSystem, zipFS *filesys.ZipFS) *ExpandedZipFS {
+	return &ExpandedZipFS{
+		underlying: underlying,
+		zipFS:      zipFS,
+		jarCache:   utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
+		zipCache:   utils.NewSafeMapWithKey[string, *filesys.ZipFS](),
+	}
 }
 
 func (e *ExpandedZipFS) getArchiveFS(archivePath string) (fi.FileSystem, error) {
@@ -202,10 +334,10 @@ func (e *ExpandedZipFS) expandArchive(archivePath string) ([]fs.DirEntry, error)
 }
 
 func (e *ExpandedZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if e.isArchivePath(name) {
+	if isArchivePath(name) {
 		return e.readDirFromArchive(name)
 	}
-	if e.isArchiveFile(name) {
+	if isArchiveFile(name) {
 		_, err := e.underlying.Stat(name)
 		if err != nil {
 			return nil, err
@@ -228,7 +360,7 @@ func (e *ExpandedZipFS) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 func (e *ExpandedZipFS) readDirFromArchive(fullPath string) ([]fs.DirEntry, error) {
-	archivePath, internalPath, ok := e.parseArchivePath(fullPath)
+	archivePath, internalPath, ok := parseArchivePath(fullPath)
 	if !ok {
 		return nil, os.ErrNotExist
 	}
@@ -247,10 +379,10 @@ func (e *ExpandedZipFS) readDirFromArchive(fullPath string) ([]fs.DirEntry, erro
 }
 
 func (e *ExpandedZipFS) Stat(name string) (fs.FileInfo, error) {
-	if e.isArchivePath(name) {
+	if isArchivePath(name) {
 		return e.statInArchive(name)
 	}
-	if e.isArchiveFile(name) {
+	if isArchiveFile(name) {
 		info, err := e.underlying.Stat(name)
 		if err != nil {
 			return nil, err
@@ -265,7 +397,7 @@ func (e *ExpandedZipFS) Stat(name string) (fs.FileInfo, error) {
 }
 
 func (e *ExpandedZipFS) statInArchive(name string) (fs.FileInfo, error) {
-	archivePath, internalPath, ok := e.parseArchivePath(name)
+	archivePath, internalPath, ok := parseArchivePath(name)
 	if !ok {
 		return nil, os.ErrNotExist
 	}
@@ -295,14 +427,14 @@ func (e *ExpandedZipFS) statInArchive(name string) (fs.FileInfo, error) {
 }
 
 func (e *ExpandedZipFS) ReadFile(name string) ([]byte, error) {
-	if e.isArchivePath(name) {
+	if isArchivePath(name) {
 		return e.readFileFromArchive(name)
 	}
 	return e.underlying.ReadFile(name)
 }
 
 func (e *ExpandedZipFS) readFileFromArchive(name string) ([]byte, error) {
-	archivePath, internalPath, ok := e.parseArchivePath(name)
+	archivePath, internalPath, ok := parseArchivePath(name)
 	if !ok {
 		return nil, os.ErrNotExist
 	}

@@ -255,6 +255,10 @@ func (i *UnifiedFileInfo) Name() string {
 	return i.name
 }
 
+func (i *UnifiedFileInfo) IsDir() bool {
+	return i.FileInfo.IsDir()
+}
+
 type UnifiedFile struct {
 	fs.File
 	name string

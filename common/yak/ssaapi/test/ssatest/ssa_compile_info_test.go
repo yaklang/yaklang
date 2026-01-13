@@ -75,6 +75,93 @@ func TestJar(t *testing.T) {
 		require.Greater(t, len(fileList), 0)
 	})
 }
+
+func TestNestedJar(t *testing.T) {
+	// test-nested.jar contains test.jar inside it
+	nestedJarPath, err := GetNestedJarFile()
+	require.NoError(t, err)
+
+	t.Run("test nested jar filesystem", func(t *testing.T) {
+		jarFs, err := javaclassparser.NewJarFSFromLocal(nestedJarPath)
+		require.NoError(t, err)
+
+		// Create ExpandedZipFS to handle nested jars
+		zipFS, err := filesys.NewZipFSFromLocal(nestedJarPath)
+		require.NoError(t, err)
+		defer zipFS.Close()
+
+		expandedFS := javaclassparser.NewExpandedZipFS(jarFs, zipFS)
+
+		// Test that we can read files from the nested jar
+		// The nested jar (test.jar) should be accessible as a directory
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			".",
+			filesys.WithFileSystem(expandedFS),
+			filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+				if !isDir {
+					fileList = append(fileList, pathname)
+					log.Infof("found file: %s", pathname)
+				}
+				return nil
+			}),
+		)
+		require.Greater(t, len(fileList), 0, "should find files in nested jar")
+
+		// Verify we can read Main.java from the nested jar
+		hasMainJava := false
+		for _, file := range fileList {
+			if strings.Contains(file, "Main.java") || strings.HasSuffix(file, "Main.java") {
+				hasMainJava = true
+				data, err := expandedFS.ReadFile(file)
+				require.NoError(t, err, "should be able to read Main.java from nested jar")
+				require.NotEmpty(t, data, "Main.java should have content")
+				require.Contains(t, string(data), "Hello world", "Main.java should contain Hello world")
+				log.Infof("successfully read Main.java from nested jar: %s", file)
+				break
+			}
+		}
+		require.True(t, hasMainJava, "should find Main.java in nested jar")
+	})
+
+	t.Run("test nested jar compile", func(t *testing.T) {
+		info := map[string]any{
+			"kind":       "jar",
+			"local_file": nestedJarPath,
+		}
+
+		progName := uuid.NewString()
+		prog, err := ssaapi.ParseProject(
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaconfig.WithCodeSourceMap(info),
+			ssaapi.WithProgramName(progName),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+
+		// Verify that files from nested jar are compiled
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			fmt.Sprintf("/%s", progName),
+			filesys.WithFileSystem(ssadb.NewIrSourceFs()),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				fileList = append(fileList, s)
+				return nil
+			}),
+		)
+		log.Infof("compiled file list: %v", fileList)
+		require.Greater(t, len(fileList), 0, "should compile files from nested jar")
+
+		// Test that we can query the compiled code
+		vals, err := prog.SyntaxFlowWithError(`System.out.println(* as $a)`)
+		require.NoError(t, err)
+		res := vals.GetValues("a")
+		require.Contains(t, res.String(), "Hello world", "should find Hello world from nested jar after compilation")
+	})
+}
 func checkFilelist(t *testing.T, language string, info map[string]any) {
 	progName := uuid.NewString()
 	res, err := ssaapi.ParseProject(
