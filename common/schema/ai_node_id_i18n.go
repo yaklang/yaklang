@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"knowledge-compress": {
+		Zh: "知识压缩",
+		En: "Knowledge Compress",
+	},
 	"reference_material": {
 		Zh: "参考资料",
 		En: "Reference Material",
