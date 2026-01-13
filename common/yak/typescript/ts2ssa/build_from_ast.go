@@ -35,8 +35,11 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	prog := b.GetProgram()
 
 	fileName := b.GetEditor().GetFilename()
-	folderPath := b.GetEditor().GetFolderPath()
+	folderPath := b.GetEditor().GetGlobalFolderPath()
 	fileUrl := path.Join([]string{folderPath, fileName}...)
+	if fileUrl == "" || fileUrl == "." {
+		fileUrl = "/"
+	}
 
 	if b.PreHandler() {
 		lib, _ := prog.GetLibrary(fileUrl)

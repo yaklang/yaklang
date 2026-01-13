@@ -70,19 +70,13 @@ func irSource2Editor(source *IrSource) *memedit.MemEditor {
 	if s, err := strconv.Unquote(code); err == nil {
 		code = s
 	}
-	folderPath := source.FolderPath
-	prefix := "/" + source.ProgramName + "/"
-	if strings.HasPrefix(folderPath, prefix) {
-		folderPath = folderPath[len(prefix):]
-	}
-	if !strings.HasSuffix(folderPath, "/") {
-		folderPath = folderPath + "/"
-	}
-	// _, folder := splitProjectPath(source.FolderPath)
 	ret := memedit.NewMemEditor(code)
-	ret.SetFolderPath(folderPath)
-	ret.SetFileName(source.FileName)
 	ret.SetProgramName(source.ProgramName)
+	// 数据库中的 FolderPath 以 / 开头，SetFolderPath 会自动规范化
+	ret.SetFolderPath(source.FolderPath)
+	ret.SetFileName(source.FileName)
+
+	// 验证 hash 是否匹配
 	if ret.GetIrSourceHash() != source.SourceCodeHash {
 		log.Errorf(
 			`ir source hash not match: [%s] != [%s]`,
@@ -140,26 +134,13 @@ func GetEditorByProgramName(programName string) ([]*memedit.MemEditor, error) {
 }
 
 func MarshalFile(editor *memedit.MemEditor) *IrSource {
-	prefix := "/" + editor.GetProgramName() + "/"
-	folderPath := editor.GetFolderPath()
-	if !strings.HasPrefix(folderPath, prefix) {
-		folderPath = prefix + folderPath
-	}
-	path := editor.GetFolderPath()
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
-	}
-	editor.SetFolderPath(path)
-
-	if !strings.HasSuffix(folderPath, "/") {
-		folderPath = folderPath + "/"
-	}
+	// editor 内部已经维护好了规范化的数据，直接使用即可
 	irSource := &IrSource{
 		ProgramName:    editor.GetProgramName(),
 		SourceCodeHash: editor.GetIrSourceHash(),
 		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
 		FileName:       editor.GetFilename(),
-		FolderPath:     folderPath,
+		FolderPath:     editor.GetGlobalFolderPath(), // 已经是规范化的
 		IsBigFile:      false,
 	}
 	return irSource
@@ -198,8 +179,14 @@ func (irSource *IrSource) Save(db *gorm.DB) error {
 }
 
 func (irSource *IrSource) BeforeSave(tx *gorm.DB) error {
+	// 数据库中存储的 FolderPath 格式：以 / 开头，不包含 programName
+	// 确保 FolderPath 以 / 开头
 	if len(irSource.FolderPath) > 0 && irSource.FolderPath[0] != '/' {
 		irSource.FolderPath = "/" + irSource.FolderPath
+	}
+	// 空路径也添加 /
+	if irSource.FolderPath == "" {
+		irSource.FolderPath = "/"
 	}
 	return nil
 }

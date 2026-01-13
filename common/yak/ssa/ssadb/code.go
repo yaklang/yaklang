@@ -2,11 +2,11 @@ package ssadb
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/jinzhu/gorm"
 )
@@ -126,6 +126,17 @@ func (ir *IrCode) Save(db *gorm.DB) error {
 	return db.Save(ir).Error
 }
 
+var hash = []string{
+	"", // empty string
+	"d41d8cd98f00b204e9800998ecf8427e",
+	"da39a3ee5e6b4b0d3255bfef95601890afd80709",
+	"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+	"/", // /
+	"6666cd76f96956469e7be39d750cc7d9",
+	"42099b4af021e53fd8fd4e056c2568d7c2e3ffa8",
+	"8a5edab282632443219e051e4ade2d1d5bbc671c781051bf1437897cbdfea0f1",
+}
+
 func (r *IrCode) IsEmptySourceCodeHash() bool {
 	if r == nil {
 		return true
@@ -133,15 +144,8 @@ func (r *IrCode) IsEmptySourceCodeHash() bool {
 	if r.SourceCodeHash == "" {
 		return true
 	}
-	for _, hash := range []func(any) string{
-		codec.Md5,
-		codec.Sha1,
-		codec.Sha256,
-	} {
-		hashx := hash("")
-		if r.SourceCodeHash == hashx {
-			return true
-		}
+	if slices.Contains(hash, r.SourceCodeHash) {
+		return true
 	}
 	return false
 }

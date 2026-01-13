@@ -76,7 +76,20 @@ func (ve *MemEditor) SetUrl(url string) {
 
 // GetUrl 返回文件的完整URL路径，格式为 /programName/folderPath/fileName
 func (ve *MemEditor) GetUrl() string {
-	return path.Join("/", ve.GetProgramName(), ve.GetFolderPath(), ve.GetFilename())
+	// 确保 folderPath 和 fileName 已初始化
+	if ve.folderPath == "" && ve.fileUrl != "" {
+		dir, name := path.Split(ve.fileUrl)
+		ve.fileName = name
+		ve.folderPath = ve.normalizeFolderPath(dir)
+	}
+	// 使用内部的 folderPath（不包含 programName），而不是 GetFolderPath()（它返回包含 programName 的路径）
+	// 这样可以避免 programName 在路径中重复
+	parts := []string{"/", ve.GetProgramName()}
+	if ve.folderPath != "" {
+		parts = append(parts, ve.folderPath)
+	}
+	parts = append(parts, ve.GetFilename())
+	return path.Join(parts...)
 }
 
 // GetFilePath 返回文件的路径，格式为 /folderPath/fileName
@@ -86,6 +99,10 @@ func (v *MemEditor) GetFilePath() string {
 
 func (ve *MemEditor) SetProgramName(programName string) {
 	ve.programName = programName
+	// 重新规范化 folderPath，因为 programName 改变可能会影响规范化结果
+	if ve.folderPath != "" {
+		ve.folderPath = ve.normalizeFolderPath(ve.folderPath)
+	}
 }
 
 // GetProgramName 返回程序名称
@@ -93,15 +110,93 @@ func (ve *MemEditor) GetProgramName() string {
 	return ve.programName
 }
 
-func (ve *MemEditor) SetFolderPath(folderPath string) {
-	ve.folderPath = folderPath
+// GetGlobalFolderPath 返回文件的完整路径，格式为 programName/folderPath/
+// 这个方法主要用于数据库查询和存储，确保路径包含 programName 且以斜杠结尾
+func (ve *MemEditor) GetGlobalFolderPath() string {
+	folderPath := ve.GetFolderPath()
+	programName := ve.GetProgramName()
+
+	if programName == "" {
+		if folderPath == "" {
+			return ""
+		}
+		// 确保以 / 结尾
+		if !strings.HasSuffix(folderPath, "/") {
+			return folderPath + "/"
+		}
+		return folderPath
+	}
+
+	// programName 不为空
+	ret := path.Join(programName, folderPath)
+	// 确保以 / 结尾
+	if !strings.HasSuffix(ret, "/") {
+		ret = ret + "/"
+	}
+	return ret
 }
 
-// GetFolderPath 返回文件夹路径
+// JoinGlobalPath 将路径与全局目录连接
+// 用于解析导入路径等需要全局唯一路径的场景
+func (ve *MemEditor) JoinGlobalPath(subPath string) string {
+	// 如果 subPath 已经是绝对路径或包含 programName（假设），可能需要特殊处理
+	// 但通常这里的 subPath 是相对路径或纯文件名
+
+	// 获取全局目录路径（带 programName）
+	// 注意：这里不需要结尾的 /，因为 path.Join 会处理
+	globalDir := ve.GetGlobalFolderPath()
+
+	// 如果 globalDir 为空，直接返回 subPath
+	if globalDir == "" {
+		return subPath
+	}
+
+	return path.Join(globalDir, subPath)
+}
+
+// JoinProgramPath 将路径与 programName 连接
+// 用于将相对根目录的路径转换为全局唯一的路径（带 programName 前缀）
+func (ve *MemEditor) JoinProgramPath(subPath string) string {
+	programName := ve.GetProgramName()
+	if programName == "" {
+		return subPath
+	}
+	return path.Join(programName, subPath)
+}
+
+// normalizeFolderPath 规范化 folderPath：移除前导斜杠，移除尾部斜杠，移除 programName 前缀
+func (ve *MemEditor) normalizeFolderPath(folderPath string) string {
+	// 移除前导斜杠
+	folderPath = strings.TrimPrefix(folderPath, "/")
+
+	// 移除尾部斜杠
+	folderPath = strings.TrimSuffix(folderPath, "/")
+
+	// 如果 folderPath 以 "{programName}/" 开头，移除这个前缀
+	if ve.programName != "" {
+		prefix := ve.programName + "/"
+		if strings.HasPrefix(folderPath, prefix) {
+			folderPath = strings.TrimPrefix(folderPath, prefix)
+		} else if folderPath == ve.programName {
+			// 如果 folderPath 恰好等于 programName，说明是空路径
+			folderPath = ""
+		}
+	}
+
+	return folderPath
+}
+
+func (ve *MemEditor) SetFolderPath(folderPath string) {
+	ve.folderPath = ve.normalizeFolderPath(folderPath)
+}
+
+// GetFolderPath 返回纯净的文件夹路径（不包含 programName）
 func (ve *MemEditor) GetFolderPath() string {
 	if ve.folderPath == "" && ve.fileUrl != "" {
 		// split from ve.GetUrl
-		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
+		dir, name := path.Split(ve.fileUrl)
+		ve.fileName = name
+		ve.folderPath = ve.normalizeFolderPath(dir)
 	}
 	return ve.folderPath
 }
@@ -112,17 +207,46 @@ func (ve *MemEditor) SetFileName(fileName string) {
 
 // GetFilename 返回文件名
 func (ve *MemEditor) GetFilename() string {
-	if ve.fileName == "" {
+	if ve.fileName == "" && ve.fileUrl != "" {
 		// split from ve.GetUrl
-		ve.folderPath, ve.fileName = path.Split(ve.fileUrl)
+		dir, name := path.Split(ve.fileUrl)
+		ve.folderPath = ve.normalizeFolderPath(dir)
+		ve.fileName = name
 	}
 	return ve.fileName
 }
 
 // GetIrSourceHash 使用程序名称、路径和源代码计算哈希值
+// 格式: programName + "/" + folderPath + "/" + fileName + "|" + sourceCode
+// 注意: folderPath 已经是规范化的，不包含 programName 前缀，无前导/尾部斜杠
 func (ve *MemEditor) GetIrSourceHash() string {
-	data := ve.GetProgramName() + ve.GetFolderPath() + ve.GetFilename() + ve.GetSourceCode()
-	hash := codec.Md5(data)
+	if ve == nil {
+		return ""
+	}
+	programName := ve.GetProgramName()
+	// 确保初始化
+	if ve.folderPath == "" && ve.fileUrl != "" {
+		ve.GetFolderPath()
+	}
+	folderPath := ve.folderPath // 使用内部规范化的路径
+	fileName := ve.GetFilename()
+	sourceCode := ve.GetSourceCode()
+
+	// 构建用于 hash 的字符串，使用明确的分隔符
+	// 格式: {programName}/{folderPath}/{fileName}|{sourceCode}
+	var hashData string
+	if folderPath == "" {
+		// 如果 folderPath 为空，格式为: {programName}/{fileName}|{sourceCode}
+		hashData = programName + "/" + fileName + "|" + sourceCode
+	} else {
+		// 正常情况: {programName}/{folderPath}/{fileName}|{sourceCode}
+		hashData = programName + "/" + folderPath + "/" + fileName + "|" + sourceCode
+	}
+	// 如果源代码为空，也返回空字符串
+	if hashData == "/|" {
+		return ""
+	}
+	hash := codec.Md5(hashData)
 	return hash
 }
 
