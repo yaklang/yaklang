@@ -53,6 +53,10 @@ func LoadSuricataToDatabase(raw string) error {
 	return nil
 }
 
+func DeleteSuricataRuleByID(id int64) error {
+	return rule.DeleteSuricataRuleByID(consts.GetGormProfileDatabase(), id)
+}
+
 var (
 	ChaosMakerExports = map[string]any{
 		"NewSuricataMatcherGroup": match.NewGroup,
@@ -62,8 +66,9 @@ var (
 		"ParseSuricata":                surirule.Parse,
 		"YieldRules":                   yieldRules,
 		"YieldRulesByKeyword":          YieldRulesByKeywords,
-		"YieldSuricataRulesByKeywords": YieldRulesByKeywords,
+		"YieldSuricataRulesByKeywords": YieldSuricataRulesByKeywords,
 		"LoadSuricataToDatabase":       LoadSuricataToDatabase,
+		"DeleteSuricataRuleByID":       DeleteSuricataRuleByID,
 		"TrafficGenerator":             NewChaosMaker,
 	}
 )

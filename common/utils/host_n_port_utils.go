@@ -793,6 +793,16 @@ func (f *HostsFilter) Add(block ...string) {
 	}
 }
 
+// AddCIDR 直接添加 CIDR 规则而不展开网段，适用于大网段场景
+func (f *HostsFilter) AddCIDR(cidr string) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	cidr = strings.TrimSpace(cidr)
+	// 直接调用 createAction，它会正确处理 CIDR 而不展开
+	f.createAction(cidr)
+}
+
 func (f *HostsFilter) Contains(target string) bool {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()

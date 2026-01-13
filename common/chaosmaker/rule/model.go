@@ -73,7 +73,7 @@ func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_PROFILE_DATABASE, &Storage{})
 }
 
-func (Storage) TableName() string {
+func (*Storage) TableName() string {
 	return "chaos_maker_rules"
 }
 

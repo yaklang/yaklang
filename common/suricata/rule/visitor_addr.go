@@ -64,14 +64,14 @@ func (a *AddressRule) _matchWithoutNegative(i string) bool {
 		if a.hostFilter == nil {
 			a.hostFilter = utils.NewHostsFilter()
 		}
-		a.hostFilter.Add(a.IPv4CIDR)
+		a.hostFilter.AddCIDR(a.IPv4CIDR)
 	}
 
 	if a.IPv6CIDR != "" {
 		if a.hostFilter == nil {
 			a.hostFilter = utils.NewHostsFilter()
 		}
-		a.hostFilter.Add(a.IPv6CIDR)
+		a.hostFilter.AddCIDR(a.IPv6CIDR)
 	}
 
 	if a.hostFilter != nil {

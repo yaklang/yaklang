@@ -421,6 +421,8 @@ var (
 		"InjectChaosTraffic": InjectChaosTraffic,
 		"FixPermission":      pcapfix.Fix,
 		"WithdrawPermission": pcapfix.Withdraw,
+		"PacketBuilder":      PacketBuilder,
+		"WithPayload":        WithPayload,
 	}
 )
 
