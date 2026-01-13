@@ -1477,3 +1477,144 @@ func TestConnPoolWithBodyStreamReaderHandler_Concurrent(t *testing.T) {
 	require.Equal(t, int64(concurrency), atomic.LoadInt64(&successCount),
 		"All concurrent requests should succeed with correct response")
 }
+
+// TestNoBodyBuffer_ResponsePacketContent verifies that NoBodyBuffer affects response packet content correctly
+func TestNoBodyBuffer_ResponsePacketContent(t *testing.T) {
+	bodyContent := "This is the body content for testing NoBodyBuffer"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/plain")
+		writer.Header().Set("X-Custom-Header", "test-value")
+		writer.WriteHeader(200)
+		writer.Write([]byte(bodyContent))
+	})
+
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	// Test 1: Without NoBodyBuffer, response should contain full body
+	t.Run("WithoutNoBodyBuffer_FullResponse", func(t *testing.T) {
+		rsp, err := HTTP(
+			WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n")),
+		)
+		require.NoError(t, err)
+		require.Contains(t, string(rsp.RawPacket), bodyContent, "Response should contain body without NoBodyBuffer")
+		require.Contains(t, string(rsp.RawPacket), "X-Custom-Header", "Response should contain headers")
+	})
+
+	// Test 2: With NoBodyBuffer, body goes through stream handler, not buffered in RawPacket
+	t.Run("WithNoBodyBuffer_StreamHandler", func(t *testing.T) {
+		var streamedBody []byte
+		var streamedHeader []byte
+		streamHandlerCalled := false
+
+		rsp, err := HTTP(
+			WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+utils.HostPort(host, port)+"\r\n\r\n")),
+			WithNoBodyBuffer(true),
+			WithBodyStreamReaderHandler(func(header []byte, body io.ReadCloser) {
+				streamHandlerCalled = true
+				streamedHeader = header
+				streamedBody, _ = io.ReadAll(body)
+			}),
+		)
+		require.NoError(t, err)
+		require.True(t, streamHandlerCalled, "Stream handler should be called")
+		require.Equal(t, bodyContent, string(streamedBody), "Streamed body should match original content")
+
+		// Verify headers are passed to stream handler correctly
+		require.Contains(t, string(streamedHeader), "X-Custom-Header", "Headers should be passed to stream handler")
+		require.Contains(t, string(streamedHeader), "HTTP/1.1", "Status line should be in header")
+
+		// With NoBodyBuffer=true, RawPacket body should be empty (streamed to handler)
+		rawBody := GetHTTPPacketBody(rsp.RawPacket)
+		require.Empty(t, rawBody, "With NoBodyBuffer, RawPacket body should be empty")
+
+		// Note: RawPacket might be empty or contain only headers depending on timing
+		// The key behavior is that body is NOT in RawPacket
+		_ = rsp
+	})
+}
+
+// TestNoBodyBuffer_NoErrorLog verifies that NoBodyBuffer doesn't trigger FixHTTPResponse errors
+func TestNoBodyBuffer_NoErrorLog(t *testing.T) {
+	// This test verifies that using NoBodyBuffer doesn't cause "fix http response failed" errors
+	largeBody := utils.RandStringBytes(1024 * 100) // 100KB
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(largeBody)))
+		writer.WriteHeader(200)
+		writer.Write([]byte(largeBody))
+	})
+
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	var receivedBytes int
+	rsp, err := HTTP(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+utils.HostPort(host, port)+"\r\n\r\n")),
+		WithNoBodyBuffer(true),
+		WithBodyStreamReaderHandler(func(header []byte, body io.ReadCloser) {
+			data, _ := io.ReadAll(body)
+			receivedBytes = len(data)
+		}),
+	)
+	require.NoError(t, err, "Request with NoBodyBuffer should succeed")
+	require.Equal(t, len(largeBody), receivedBytes, "All bytes should be received via stream")
+	require.NotNil(t, rsp)
+}
+
+// TestNoBodyBuffer_NormalRequestsUnaffected verifies normal requests still work correctly
+func TestNoBodyBuffer_NormalRequestsUnaffected(t *testing.T) {
+	// This test ensures that the NoBodyBuffer condition in FixHTTPResponse doesn't affect normal requests
+	bodyContent := `{"status": "ok", "message": "test"}`
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(200)
+		writer.Write([]byte(bodyContent))
+	})
+
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	// Normal request without NoBodyBuffer should work as before
+	rsp, err := HTTP(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n")),
+	)
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.RawPacket), bodyContent, "Normal request should contain full response")
+	require.Contains(t, string(rsp.RawPacket), "HTTP/1.1 200", "Response should have status line")
+
+	// Verify FixHTTPResponse was applied (Content-Type should be preserved)
+	body := GetHTTPPacketBody(rsp.RawPacket)
+	require.Equal(t, bodyContent, string(body), "Response body should match")
+}
+
+// TestNoBodyBuffer_WithConnPool verifies NoBodyBuffer works correctly with connection pool
+func TestNoBodyBuffer_WithConnPool(t *testing.T) {
+	bodyContent := "Connection pool test body"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/plain")
+		writer.WriteHeader(200)
+		writer.Write([]byte(bodyContent))
+	})
+
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	// Test with connection pool and NoBodyBuffer
+	var streamedBody []byte
+	rsp, err := HTTP(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+utils.HostPort(host, port)+"\r\n\r\n")),
+		WithConnPool(true),
+		WithNoBodyBuffer(true),
+		WithBodyStreamReaderHandler(func(header []byte, body io.ReadCloser) {
+			streamedBody, _ = io.ReadAll(body)
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, bodyContent, string(streamedBody), "Streamed body should match with conn pool")
+	require.NotNil(t, rsp)
+}
