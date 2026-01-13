@@ -3,9 +3,16 @@ package poc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,6 +115,12 @@ type PocConfig struct {
 	MinChunkDelay       time.Duration
 	MaxChunkDelay       time.Duration
 	ChunkedHandler      func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration)
+
+	// Download related options
+	DownloadProgressCallback func(downloaded int64, total int64, percent float64)
+	DownloadFinishedCallback func(filePath string)
+	DownloadFilename         *string // manually specify filename
+	DownloadDir              *string // download save directory
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -2056,6 +2069,272 @@ func WithFixQueryEscape(b bool) PocConfigOption {
 	}
 }
 
+// downloadProgress 是一个下载选项参数，用于设置下载进度回调函数
+// 回调函数接收三个参数：已下载字节数、总字节数、下载百分比(0-100)
+// Example:
+// ```
+// poc.Download("https://example.com/file.zip", poc.downloadProgress(func(downloaded, total, percent) {
+//
+//	println(sprintf("下载进度: %.2f%% (%d/%d)", percent, downloaded, total))
+//
+// }))
+// ```
+func WithDownloadProgress(callback func(downloaded int64, total int64, percent float64)) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DownloadProgressCallback = callback
+	}
+}
+
+// downloadFinished 是一个下载选项参数，用于设置下载完成回调函数
+// 回调函数接收一个参数：保存的文件完整路径
+// Example:
+// ```
+// poc.Download("https://example.com/file.zip", poc.downloadFinished(func(filePath) {
+//
+//	println("下载完成: " + filePath)
+//
+// }))
+// ```
+func WithDownloadFinished(callback func(filePath string)) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DownloadFinishedCallback = callback
+	}
+}
+
+// downloadFilename 是一个下载选项参数，用于手动指定保存的文件名
+// 如果不指定，将自动从 Content-Disposition 响应头或 URL 路径中提取文件名
+// Example:
+// ```
+// poc.Download("https://example.com/file.zip", poc.downloadFilename("my_file.zip"))
+// ```
+func WithDownloadFilename(filename string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DownloadFilename = &filename
+	}
+}
+
+// downloadDir 是一个下载选项参数，用于指定文件保存目录
+// 如果不指定，将保存到默认的 yakit 下载目录
+// Example:
+// ```
+// poc.Download("https://example.com/file.zip", poc.downloadDir("/tmp/downloads"))
+// ```
+func WithDownloadDir(dir string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DownloadDir = &dir
+	}
+}
+
+// getDownloadDir returns the download directory from config or default yakit downloads directory
+func getDownloadDir(config *PocConfig) string {
+	if config.DownloadDir != nil && *config.DownloadDir != "" {
+		return *config.DownloadDir
+	}
+	dir := filepath.Join(consts.GetDefaultYakitProjectsDir(), "downloads")
+	os.MkdirAll(dir, 0755)
+	return dir
+}
+
+// extractFilenameFromHeader extracts filename from Content-Disposition header
+func extractFilenameFromHeader(headerBytes []byte) string {
+	cd := lowhttp.GetHTTPPacketHeader(headerBytes, "Content-Disposition")
+	if cd == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(cd)
+	if err != nil {
+		return ""
+	}
+	if filename := params["filename"]; filename != "" {
+		return filepath.Base(filename)
+	}
+	return ""
+}
+
+// extractFilenameFromURL extracts filename from URL path
+func extractFilenameFromURL(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return ""
+	}
+	urlPath := strings.TrimSuffix(u.Path, "/")
+	if urlPath == "" {
+		return ""
+	}
+	base := path.Base(urlPath)
+	if base == "/" || base == "." || base == "" {
+		return ""
+	}
+	// Check if it looks like a directory (no extension and not a filename pattern)
+	// For download purposes, if path ends with slash, it's likely a directory
+	if strings.HasSuffix(u.Path, "/") {
+		return ""
+	}
+	return base
+}
+
+// extractDownloadFilename determines the filename for download
+// Priority: user specified > Content-Disposition > URL path > default name
+func extractDownloadFilename(headerBytes []byte, urlStr string, config *PocConfig) string {
+	// 1. User specified filename
+	if config.DownloadFilename != nil && *config.DownloadFilename != "" {
+		return *config.DownloadFilename
+	}
+
+	// 2. From Content-Disposition header
+	if filename := extractFilenameFromHeader(headerBytes); filename != "" {
+		return filename
+	}
+
+	// 3. From URL path
+	if filename := extractFilenameFromURL(urlStr); filename != "" {
+		return filename
+	}
+
+	// 4. Generate default filename
+	return fmt.Sprintf("download_%d", time.Now().Unix())
+}
+
+// extractContentLength extracts Content-Length from response header
+func extractContentLength(headerBytes []byte) int64 {
+	cl := lowhttp.GetHTTPPacketHeader(headerBytes, "Content-Length")
+	if cl == "" {
+		return -1
+	}
+	size, err := strconv.ParseInt(cl, 10, 64)
+	if err != nil {
+		return -1
+	}
+	return size
+}
+
+// Download 从指定 URL 下载文件并保存到本地，返回保存的文件路径和错误
+// 支持进度回调、完成回调、自定义文件名和保存目录等选项
+// Example:
+// ```
+// filename, err = poc.Download("https://example.com/file.zip")
+// filename, err = poc.Download("https://example.com/file.zip", poc.downloadProgress(func(downloaded, total, percent) {
+//
+//	println(sprintf("下载进度: %.2f%%", percent))
+//
+// }), poc.downloadFilename("my_file.zip"))
+// ```
+func Download(urlStr string, opts ...PocConfigOption) (string, error) {
+	return DownloadWithMethod("GET", urlStr, opts...)
+}
+
+// DownloadWithMethod 使用指定的 HTTP 方法从 URL 下载文件
+// Example:
+// ```
+// filename, err = poc.DownloadWithMethod("POST", "https://example.com/download", poc.body("token=xxx"))
+// ```
+func DownloadWithMethod(method string, urlStr string, opts ...PocConfigOption) (string, error) {
+	// 1. Parse config
+	config, err := handleUrlAndConfig(urlStr, opts...)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. Force disable HTTPFlow save and enable stream mode
+	saveFalse := false
+	noBodyBufferTrue := true
+	config.SaveHTTPFlow = &saveFalse
+	config.NoBodyBuffer = &noBodyBufferTrue
+
+	// 3. Build request packet
+	https := config.IsHTTPS()
+	packet := lowhttp.UrlToRequestPacket(method, urlStr, nil, https)
+	packet = fixPacketByConfig(packet, config)
+
+	// 4. Prepare download variables
+	downloadDir := getDownloadDir(config)
+	var finalFilename string
+	var totalSize int64
+	var downloadedSize int64
+	var downloadErr error
+	var filePath string
+
+	// Save original stream handler if any
+	originalStreamHandler := config.BodyStreamHandler
+
+	// 5. Set up stream handler for download
+	config.BodyStreamHandler = func(headerBytes []byte, bodyReader io.ReadCloser) {
+		defer bodyReader.Close()
+
+		// Call original handler if exists
+		if originalStreamHandler != nil {
+			// Create a tee reader to pass data to original handler as well
+			// But for simplicity, we skip this for now
+		}
+
+		// 5.1 Get filename and total size from response header
+		finalFilename = extractDownloadFilename(headerBytes, urlStr, config)
+		totalSize = extractContentLength(headerBytes)
+
+		// 5.2 Create file
+		filePath = filepath.Join(downloadDir, finalFilename)
+		fp, err := os.Create(filePath)
+		if err != nil {
+			downloadErr = utils.Errorf("failed to create file %s: %v", filePath, err)
+			log.Errorf("Download: failed to create file %s: %v", filePath, err)
+			return
+		}
+		defer fp.Close()
+
+		// 5.3 Stream write with progress callback
+		buffer := make([]byte, 32*1024) // 32KB buffer
+		for {
+			n, readErr := bodyReader.Read(buffer)
+			if n > 0 {
+				_, writeErr := fp.Write(buffer[:n])
+				if writeErr != nil {
+					downloadErr = utils.Errorf("failed to write to file: %v", writeErr)
+					log.Errorf("Download: failed to write to file: %v", writeErr)
+					return
+				}
+				downloadedSize += int64(n)
+
+				// Trigger progress callback
+				if config.DownloadProgressCallback != nil {
+					percent := 0.0
+					if totalSize > 0 {
+						percent = float64(downloadedSize) / float64(totalSize) * 100
+					}
+					config.DownloadProgressCallback(downloadedSize, totalSize, percent)
+				}
+			}
+			if readErr == io.EOF {
+				break
+			}
+			if readErr != nil {
+				downloadErr = utils.Errorf("failed to read response body: %v", readErr)
+				log.Errorf("Download: failed to read response body: %v", readErr)
+				return
+			}
+		}
+
+		// 5.4 Trigger finished callback
+		if config.DownloadFinishedCallback != nil {
+			config.DownloadFinishedCallback(filePath)
+		}
+
+		log.Infof("Download completed: %s (size: %d bytes)", filePath, downloadedSize)
+	}
+
+	// 6. Execute request
+	_, err = pochttp(packet, config)
+	if err != nil {
+		return "", err
+	}
+
+	// Check for download error
+	if downloadErr != nil {
+		return "", downloadErr
+	}
+
+	return filePath, nil
+}
+
 var PoCExports = map[string]interface{}{
 	"HTTP":          HTTP,
 	"HTTPEx":        HTTPEx,
@@ -2068,6 +2347,9 @@ var PoCExports = map[string]interface{}{
 	"Delete":        DoDELETE,
 	"Options":       DoOPTIONS,
 	"Do":            Do,
+	// download, 用于下载文件
+	"Download":           Download,
+	"DownloadWithMethod": DownloadWithMethod,
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": DoWebSocket,
 
@@ -2116,6 +2398,11 @@ var PoCExports = map[string]interface{}{
 	"gmTlsOnly":            WithGmTlsOnly,
 	"gmTLSPrefer":          WithGmTLSPrefer,
 	"fixQueryEscape":       WithFixQueryEscape,
+	// download options
+	"downloadProgress": WithDownloadProgress,
+	"downloadFinished": WithDownloadFinished,
+	"downloadFilename": WithDownloadFilename,
+	"downloadDir":      WithDownloadDir,
 
 	"json":       WithJSON,
 	"body":       WithBody,
