@@ -77,7 +77,7 @@ func (g *GatewayClient) StructuredStream(s string, function ...any) (chan *aispe
 	shouldRetry := (err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err)) || totpErrorDetected
 
 	if shouldRetry {
-		log.Warnf("TOTP authentication failed in StructuredStream, refreshing secret and retrying...")
+		log.Debugf("TOTP authentication issue in StructuredStream, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
 		totpErrorDetected = false
 
@@ -135,7 +135,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		// memfit 模型返回空结果时，尝试刷新 TOTP（可能是认证失败导致）
 		// 注意：这是一个保守策略，只对 memfit 模型生效
 		if result == "" && err == nil {
-			log.Warnf("Empty result for memfit model, may be TOTP auth failure, will try refresh")
+			log.Debugf("Empty result for memfit model, may be TOTP auth issue, will try refresh")
 			return true
 		}
 
@@ -156,7 +156,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 
 	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
 	if shouldRefreshAndRetry(result, err) {
-		log.Warnf("TOTP authentication failed for memfit model, refreshing secret and retrying...")
+		log.Debugf("TOTP authentication issue for memfit model, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
 
 		// 重置标志
@@ -222,7 +222,7 @@ func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]a
 
 	// 检查是否是 TOTP 认证失败
 	if shouldRefreshAndRetry(result, err) {
-		log.Warnf("TOTP authentication failed in ExtractData, refreshing secret and retrying...")
+		log.Debugf("TOTP authentication issue in ExtractData, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
 
 		// 重置标志
@@ -262,7 +262,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	shouldRetry := (err != nil && g.isMemfitModel() && g.isMemfitTOTPError(err)) || totpErrorDetected
 
 	if shouldRetry {
-		log.Warnf("TOTP authentication failed in ChatStream, refreshing secret and retrying...")
+		log.Debugf("TOTP authentication issue in ChatStream, refreshing secret and retrying...")
 		g.refreshTOTPSecretAndSave()
 		totpErrorDetected = false
 
@@ -345,13 +345,13 @@ func (g *GatewayClient) isMemfitModel() bool {
 // Priority: Memory cache -> Database -> Server
 func (g *GatewayClient) initTOTPSecretOnce() {
 	totpInitOnce.Do(func() {
-		log.Infof("Initializing TOTP secret for aibalance client...")
+		log.Debugf("Initializing TOTP secret for aibalance client...")
 
 		// 1. Check memory cache first
 		totpSecretCacheLock.RLock()
 		if totpSecretCache != "" {
 			totpSecretCacheLock.RUnlock()
-			log.Infof("TOTP secret already in memory cache")
+			// Note: Memory cache hit is normal operation, no need to log every time
 			return
 		}
 		totpSecretCacheLock.RUnlock()
@@ -361,7 +361,7 @@ func (g *GatewayClient) initTOTPSecretOnce() {
 		if db != nil {
 			secret := yakit.GetKey(db, AIBALANCE_TOTP_SECRET_KEY)
 			if secret != "" {
-				log.Infof("Loaded TOTP secret from database during initialization")
+				log.Debugf("Loaded TOTP secret from database")
 				totpSecretCacheLock.Lock()
 				totpSecretCache = secret
 				totpSecretCacheLock.Unlock()
@@ -376,7 +376,7 @@ func (g *GatewayClient) initTOTPSecretOnce() {
 			totpSecretCacheLock.Lock()
 			totpSecretCache = secret
 			totpSecretCacheLock.Unlock()
-			log.Infof("TOTP secret initialized from server")
+			log.Debugf("TOTP secret initialized from server")
 		}
 	})
 }
@@ -402,9 +402,8 @@ func (g *GatewayClient) saveTOTPSecretToDatabase(secret string) {
 		err := yakit.SetKey(db, AIBALANCE_TOTP_SECRET_KEY, secret)
 		if err != nil {
 			log.Errorf("Failed to save TOTP secret to database: %v", err)
-		} else {
-			log.Infof("TOTP secret saved to database")
 		}
+		// Note: Success is silent to keep logs clean
 	}
 }
 
@@ -415,7 +414,7 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 	// Replace /v1/chat/completions with /v1/memfit-totp-uuid
 	totpURL := strings.Replace(baseURL, "/v1/chat/completions", "/v1/memfit-totp-uuid", 1)
 
-	log.Infof("Fetching TOTP UUID from: %s", totpURL)
+	log.Debugf("Fetching TOTP UUID from: %s", totpURL)
 
 	// Make HTTP request with connection pool enabled
 	opts := []poc.PocConfigOption{
@@ -464,14 +463,14 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 	secret := strings.TrimPrefix(uuid, "MEMFIT-AI")
 	secret = strings.TrimSuffix(secret, "MEMFIT-AI")
 
-	log.Infof("Successfully fetched TOTP secret from server")
+	log.Debugf("Successfully fetched TOTP secret from server")
 	return secret
 }
 
 // refreshTOTPSecretAndSave clears the cache, fetches new secret from server, and saves to database
 // This function is called when TOTP authentication fails
 func (g *GatewayClient) refreshTOTPSecretAndSave() {
-	log.Warnf("Refreshing TOTP secret due to authentication failure...")
+	log.Debugf("Refreshing TOTP secret due to authentication failure...")
 
 	// Clear memory cache first
 	totpSecretCacheLock.Lock()
@@ -491,12 +490,11 @@ func (g *GatewayClient) refreshTOTPSecretAndSave() {
 		totpSecretCacheLock.Unlock()
 
 		if oldSecret != secret {
-			log.Infof("TOTP secret refreshed: old=%s... new=%s...", safeSecretPrefix(oldSecret), safeSecretPrefix(secret))
-		} else {
-			log.Warnf("TOTP secret unchanged after refresh, server may have same secret")
+			log.Debugf("TOTP secret refreshed successfully")
 		}
+		// Note: Same secret is normal, no need to warn
 	} else {
-		log.Errorf("Failed to refresh TOTP secret from server")
+		log.Warnf("Failed to refresh TOTP secret from server")
 		// Restore old secret if refresh failed
 		if oldSecret != "" {
 			totpSecretCacheLock.Lock()
@@ -539,7 +537,8 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 			// Base64 encode the TOTP code
 			encodedCode := base64.StdEncoding.EncodeToString([]byte(totpCode))
 			headers["X-Memfit-OTP-Auth"] = encodedCode
-			log.Infof("Added TOTP auth header for memfit model: %s", g.config.Model)
+			// Note: Removed verbose log to keep logs clean during normal operation
+			// TOTP header is silently added for memfit models
 		} else {
 			log.Warnf("Failed to generate TOTP code for memfit model: %s", g.config.Model)
 		}
