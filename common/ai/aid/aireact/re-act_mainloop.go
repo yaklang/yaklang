@@ -113,11 +113,6 @@ func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {
 	defaultFocus := r.config.Focus
 	userQuery := task.GetUserInput()
-	for _, resource := range task.GetAttachedDatas() {
-		if resource.Type == aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE {
-			defaultFocus = schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE
-		}
-	}
 	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus) // 遗留的输入指令解析
 	if task.GetFocusMode() != "" {
 		focus = task.GetFocusMode() // 任务级别的 focus 模式覆盖
