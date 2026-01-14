@@ -430,7 +430,7 @@ public interface UserMapper {
 		auditNodeIDs, err := ssadb.GetResultNodeByRiskHash(ssadb.GetDB(), importedRisks[0].Hash)
 		require.NoError(t, err)
 		require.Equal(t, len(auditNodeIDs), 1)
-		value := tmpProg.NewValueFromAuditNode(auditNodeIDs[0])
+		value := tmpProg.NewValueFromAuditNode(ssadb.GetDB(), auditNodeIDs[0])
 		require.NotNil(t, value)
 
 		graphStr := value.DotGraph()

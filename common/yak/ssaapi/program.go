@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/atomic"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
@@ -271,13 +272,16 @@ func (p *Program) GetValueByIdMust(id int64) *Value {
 
 // from audit node id
 func (v *Value) NewValueFromAuditNode(nodeID string) *Value {
-	value := v.ParentProgram.NewValueFromAuditNode(nodeID)
+	value := v.ParentProgram.NewValueFromAuditNode(ssadb.GetDB(), nodeID)
 	return value
 }
 
-func (p *Program) NewValueFromAuditNode(nodeID string) *Value {
+func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 	if nodeID == "" {
 		return nil
+	}
+	if db == nil {
+		db = ssadb.GetDB()
 	}
 
 	// check cache
@@ -285,7 +289,7 @@ func (p *Program) NewValueFromAuditNode(nodeID string) *Value {
 		return val
 	}
 
-	auditNode, err := ssadb.GetAuditNodeById(nodeID)
+	auditNode, err := ssadb.GetAuditNodeById(db, nodeID)
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %v", nodeID)
 		return nil
