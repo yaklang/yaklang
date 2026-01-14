@@ -229,6 +229,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 		forge.ToolKeywords = cfg.ToolKeywords
 		forge.Tools = cfg.Tools
 		forge.Description = cfg.Description
+		forge.Author = cfg.Author
 		forge.InitPrompt = cfg.InitPrompt
 		forge.PersistentPrompt = cfg.PersistentPrompt
 		forge.PlanPrompt = cfg.PlanPrompt
