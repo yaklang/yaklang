@@ -21,4 +21,6 @@ var Exports = map[string]interface{}{
 	"withCodeSourceAuthPassword":   WithCodeSourceAuthPassword,
 	"withCodeSourceAuthKeyPath":    WithSSAProjectCodeSourceAuthKeyPath,
 	"withCodeSourceAuthKeyContent": WithCodeSourceAuthKeyContent,
+	// Jar 递归解析配置选项
+	"withCodeSourceJarRecursiveParse": WithCodeSourceJarRecursiveParse,
 }

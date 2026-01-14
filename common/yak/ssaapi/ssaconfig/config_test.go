@@ -48,6 +48,7 @@ func TestConfigWithOptions(t *testing.T) {
 		WithSSAProjectCodeSourceAuthKeyPath("/tmp/key"),
 		WithCodeSourceProxyURL("http://proxy:8080"),
 		WithCodeSourceProxyAuth("proxyUser", "proxyPass"),
+		WithCodeSourceJarRecursiveParse(true),
 		WithSyntaxFlowMemory(true),
 		WithScanConcurrency(23),
 		WithScanIgnoreLanguage(true),
@@ -83,6 +84,7 @@ func TestConfigWithOptions(t *testing.T) {
 	proxyUser, proxyPass := cfg.GetCodeSourceProxyAuth()
 	require.Equal(t, "proxyUser", proxyUser)
 	require.Equal(t, "proxyPass", proxyPass)
+	require.True(t, cfg.GetCodeSourceJarRecursiveParse(), "jar recursive parse should be enabled")
 
 	require.Equal(t, SFResultSaveNone, cfg.GetSyntaxFlowResultKind())
 	require.True(t, cfg.GetScanMemory())
@@ -239,6 +241,49 @@ func TestLazyInitialization(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, cfg.CodeSource, "CodeSource should be created by WithCodeSourceKind")
 		require.Equal(t, CodeSourceGit, cfg.CodeSource.Kind)
+	})
+}
+
+func TestJarRecursiveParseOption(t *testing.T) {
+	t.Run("default should enable recursive parse", func(t *testing.T) {
+		cfg, err := New(ModeCodeSource)
+		require.NoError(t, err)
+
+		// Default should be true when not set
+		require.True(t, cfg.GetCodeSourceJarRecursiveParse(), "default should enable recursive parse")
+	})
+
+	t.Run("should set recursive parse to true", func(t *testing.T) {
+		cfg, err := New(ModeCodeSource,
+			WithCodeSourceKind(CodeSourceJar),
+			WithCodeSourceJarRecursiveParse(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.CodeSource)
+		require.True(t, cfg.GetCodeSourceJarRecursiveParse())
+		require.NotNil(t, cfg.CodeSource.JarRecursiveParse)
+		require.True(t, *cfg.CodeSource.JarRecursiveParse)
+	})
+
+	t.Run("should set recursive parse to false", func(t *testing.T) {
+		cfg, err := New(ModeCodeSource,
+			WithCodeSourceKind(CodeSourceJar),
+			WithCodeSourceJarRecursiveParse(false),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.CodeSource)
+		require.False(t, cfg.GetCodeSourceJarRecursiveParse())
+		require.NotNil(t, cfg.CodeSource.JarRecursiveParse)
+		require.False(t, *cfg.CodeSource.JarRecursiveParse)
+	})
+
+	t.Run("should require CodeSource mode", func(t *testing.T) {
+		cfg, err := New(ModeProjectBase)
+		require.NoError(t, err)
+
+		err = WithCodeSourceJarRecursiveParse(true)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Code Source mode")
 	})
 }
 

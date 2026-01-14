@@ -34,13 +34,14 @@ type ProxyConfigInfo struct {
 
 // CodeSourceInfo 代码源配置信息
 type CodeSourceInfo struct {
-	Kind      CodeSourceKind   `json:"kind"`                 // 源码获取方式: local/compression/jar/git/svn
-	LocalFile string           `json:"local_file,omitempty"` // 本地路径
-	URL       string           `json:"url,omitempty"`        // 远程URL (git/svn/tar/jar)
-	Branch    string           `json:"branch,omitempty"`     // git或svn分支
-	Path      string           `json:"path,omitempty"`       // git仓库中的子路径
-	Auth      *AuthConfigInfo  `json:"auth,omitempty"`       // 认证信息
-	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
+	Kind              CodeSourceKind   `json:"kind"`                          // 源码获取方式: local/compression/jar/git/svn
+	LocalFile         string           `json:"local_file,omitempty"`          // 本地路径
+	URL               string           `json:"url,omitempty"`                 // 远程URL (git/svn/tar/jar)
+	Branch            string           `json:"branch,omitempty"`              // git或svn分支
+	Path              string           `json:"path,omitempty"`                // git仓库中的子路径
+	Auth              *AuthConfigInfo  `json:"auth,omitempty"`                // 认证信息
+	Proxy             *ProxyConfigInfo `json:"proxy,omitempty"`               // 代理配置
+	JarRecursiveParse *bool            `json:"jar_recursive_parse,omitempty"` // Jar递归解析开关，nil或true表示启用，false表示禁用
 }
 
 func NewLocalFileCodeSourceConfig(localFile string) *CodeSourceInfo {
@@ -194,6 +195,16 @@ func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
 		return nil
 	}
 	return c.CodeSource.Auth
+}
+
+func (c *Config) GetCodeSourceJarRecursiveParse() bool {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
+		return true // 默认启用递归解析
+	}
+	if c.CodeSource.JarRecursiveParse == nil {
+		return true // 默认启用递归解析
+	}
+	return *c.CodeSource.JarRecursiveParse
 }
 
 // ---代码源配置 Options ---
@@ -386,6 +397,17 @@ func WithCodeSourceInfo(info *CodeSourceInfo) Option {
 			return err
 		}
 		c.CodeSource = info
+		return nil
+	}
+}
+
+// WithCodeSourceJarRecursiveParse 设置Jar递归解析开关
+func WithCodeSourceJarRecursiveParse(enable bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureCodeSource("Code Source Jar Recursive Parse"); err != nil {
+			return err
+		}
+		c.CodeSource.JarRecursiveParse = &enable
 		return nil
 	}
 }

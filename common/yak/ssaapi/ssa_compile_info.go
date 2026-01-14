@@ -38,7 +38,10 @@ func (c *Config) parseFSFromInfo() (fi.FileSystem, error) {
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
 		}
-		unifiedFS := filesys.NewUnifiedFS(javaclassparser.NewJarFS(zipfs),
+		// 检查是否启用递归解析
+		recursiveParse := c.GetCodeSourceJarRecursiveParse()
+		jarFS := javaclassparser.NewJarFSWithOptions(zipfs, recursiveParse)
+		unifiedFS := filesys.NewUnifiedFS(jarFS,
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
 		baseFS = unifiedFS
