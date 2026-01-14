@@ -90,10 +90,8 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	// 任务状态应该已经在调用前被设置为处理中，这里不需要重复设置
 
 	// 从任务中提取用户输入
-	userInput := task.GetUserInput()
-
 	r.currentIteration = 0
-	skipStatus, err := r.executeMainLoop(userInput)
+	skipStatus, err := r.executeMainLoop(task)
 	if err != nil {
 		log.Errorf("Task execution failed: %v", err)
 		task.SetStatus(aicommon.AITaskState_Aborted)
@@ -106,16 +104,23 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	skipStatusFallback.SetTo(skipStatus)
 }
 
-func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
+func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 	defaultFocus := r.config.Focus
-	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus)
-
-	currentTask := r.GetCurrentTask()
-	currentTask.SetUserInput(parsedQuery)
+	userQuery := task.GetUserInput()
+	for _, resource := range task.GetAttachedDatas() {
+		if resource.Type == aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE {
+			defaultFocus = schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE
+		}
+	}
+	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus) // 遗留的输入指令解析
+	task.SetUserInput(parsedQuery)
+	if task.GetFocusMode() != "" {
+		focus = task.GetFocusMode() // 任务级别的 focus 模式覆盖
+	}
 	if focus == "" {
 		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
-	return r.ExecuteLoopTask(focus, currentTask, loopOptions...)
+	return r.ExecuteLoopTask(focus, task, loopOptions...)
 }
 
 func (r *ReAct) parseLoopDirectives(userQuery string, defaultFocus string) (string, string, []reactloops.ReActLoopOption) {

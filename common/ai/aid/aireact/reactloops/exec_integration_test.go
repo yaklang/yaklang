@@ -272,6 +272,10 @@ type mockSimpleTask struct {
 	reActLoop aicommon.ReActLoopIF
 }
 
+func (s *mockSimpleTask) GetFocusMode() string {
+	return ""
+}
+
 func (m *mockSimpleTask) GetDB() *gorm.DB {
 	return nil
 }

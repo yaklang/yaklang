@@ -67,6 +67,8 @@ type AIStatefulTask interface {
 	SetDB(db *gorm.DB)
 	GetRisks() []*schema.Risk
 	GetUUID() string
+
+	GetFocusMode() string
 }
 
 type AIStatefulTaskBase struct {
@@ -93,6 +95,16 @@ type AIStatefulTaskBase struct {
 
 	uuid          string
 	attachedDatas []*AttachedResource
+
+	focusMode string
+}
+
+func (s *AIStatefulTaskBase) GetFocusMode() string {
+	return s.focusMode
+}
+
+func (s *AIStatefulTaskBase) SetFocusMode(mode string) {
+	s.focusMode = mode
 }
 
 func (s *AIStatefulTaskBase) GetUUID() string {

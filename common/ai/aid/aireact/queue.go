@@ -43,6 +43,7 @@ func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 		"react_task_input": t.GetUserInput(),
 		"reason":           reason,
 		"queue_len":        r.taskQueue.Len(),
+		"focus_mode":       t.GetFocusMode(),
 	})
 }
 

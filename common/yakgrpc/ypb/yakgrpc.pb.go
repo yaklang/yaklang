@@ -7991,8 +7991,10 @@ type AIInputEvent struct {
 	AttachedFilePath     []string       `protobuf:"bytes,14,rep,name=AttachedFilePath,proto3" json:"AttachedFilePath,omitempty"`
 	// 附加资源信息
 	AttachedResourceInfo []*AttachedResourceInfo `protobuf:"bytes,15,rep,name=AttachedResourceInfo,proto3" json:"AttachedResourceInfo,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// 设置专注模式
+	FocusModeLoop string `protobuf:"bytes,16,opt,name=FocusModeLoop,proto3" json:"FocusModeLoop,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AIInputEvent) Reset() {
@@ -8128,6 +8130,13 @@ func (x *AIInputEvent) GetAttachedResourceInfo() []*AttachedResourceInfo {
 		return x.AttachedResourceInfo
 	}
 	return nil
+}
+
+func (x *AIInputEvent) GetFocusModeLoop() string {
+	if x != nil {
+		return x.FocusModeLoop
+	}
+	return ""
 }
 
 type AttachedResourceInfo struct {
@@ -65602,7 +65611,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
-	"\x02En\x18\x02 \x01(\tR\x02En\"\xed\x04\n" +
+	"\x02En\x18\x02 \x01(\tR\x02En\"\x93\x05\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
@@ -65619,7 +65628,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vIsFreeInput\x18\v \x01(\bR\vIsFreeInput\x12\x1c\n" +
 	"\tFreeInput\x18\f \x01(\tR\tFreeInput\x12*\n" +
 	"\x10AttachedFilePath\x18\x0e \x03(\tR\x10AttachedFilePath\x12M\n" +
-	"\x14AttachedResourceInfo\x18\x0f \x03(\v2\x19.ypb.AttachedResourceInfoR\x14AttachedResourceInfo\"R\n" +
+	"\x14AttachedResourceInfo\x18\x0f \x03(\v2\x19.ypb.AttachedResourceInfoR\x14AttachedResourceInfo\x12$\n" +
+	"\rFocusModeLoop\x18\x10 \x01(\tR\rFocusModeLoop\"R\n" +
 	"\x14AttachedResourceInfo\x12\x10\n" +
 	"\x03Key\x18\x01 \x01(\tR\x03Key\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x14\n" +
