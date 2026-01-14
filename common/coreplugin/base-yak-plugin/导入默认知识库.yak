@@ -60,8 +60,4 @@ for item in entries {
     yakit.Info("导入成功: %s (SerialVersionUID=%s)", ragPath, serialUID)
 }
 
-if successCount == 0 {
-    die("未导入任何知识库，请检查参数")
-}
-
 yakit.StatusCard("完成", sprintf("成功导入 %d 个知识库", successCount))
