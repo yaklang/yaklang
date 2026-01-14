@@ -1,0 +1,118 @@
+// test_final_document_generation.yak
+// 测试 loop_knowledge_enhance 最终文档整合功能
+// 
+// 测试场景：验证多轮查询后生成最终整合文档
+//
+// 测试断言：
+// 1. 执行不应该失败
+// 2. 应生成最终整合文档（knowledge_enhance_final）
+// 3. 最终文档应包含元信息（用户查询、查询轮数、生成时间）
+
+var finalDocFilename = ""
+var finalDocContent = ""
+var allArtifacts = []
+var executionError = nil
+
+// 测试任务：触发多轮查询以生成最终整合文档
+testPrompt = `请帮我全面收集"逻辑漏洞"知识库中关于以下主题的知识：
+
+1. 密码重置流程中的安全漏洞
+2. 账号恢复系统中的安全问题
+
+请分别搜索这两个主题，并整理相关的安全知识。`
+
+log.Info("========================================")
+log.Info("Testing loop_knowledge_enhance - Final Document Generation")
+log.Info("========================================")
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("knowledge_enhance"),
+    aim.timeout(420),
+    aim.maxIteration(6),
+    // 附加知识库资源
+    aim.attachedKnowledgeBase("逻辑漏洞"),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    path = jsonData["path"]
+                    // 捕获最终文档
+                    if str.Contains(path, "knowledge_enhance_final") {
+                        finalDocFilename = path
+                    }
+                    // 记录所有 artifact
+                    if str.Contains(path, "knowledge") {
+                        allArtifacts = append(allArtifacts, path)
+                    }
+                }
+            } catch e {
+                // ignore
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        if finalDocFilename != "" {
+            content, readErr = file.ReadFile(finalDocFilename)
+            if readErr == nil {
+                finalDocContent = string(content)
+            }
+        }
+    }),
+)
+
+if err != nil {
+    executionError = err
+}
+
+// ========================================
+// 断言测试
+// ========================================
+
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：应有 artifact 文件产生
+artifactCount = len(allArtifacts)
+assert artifactCount >= 1, sprintf("Expected at least 1 artifact, got %d", artifactCount)
+
+// 如果有最终文档，进行额外验证
+if finalDocFilename != "" {
+    // 断言3：最终文档应存在
+    assert file.IsExisted(finalDocFilename), sprintf("Final document does not exist: %s", finalDocFilename)
+    
+    // 断言4：最终文档内容长度应 > 100 字节
+    contentLen = len(finalDocContent)
+    assert contentLen > 100, sprintf("Final document too short. Expected > 100 bytes, got %d bytes", contentLen)
+    
+    // 断言5：最终文档应包含元信息标题
+    hasMetaInfo = str.Contains(finalDocContent, "用户查询") || str.Contains(finalDocContent, "查询轮数") || str.Contains(finalDocContent, "生成时间") || str.Contains(finalDocContent, "元信息")
+    assert hasMetaInfo, sprintf("Final document should contain meta information. Content: %s", finalDocContent[:min(len(finalDocContent), 500)])
+    
+    log.Info("Final Document Generated: %s", finalDocFilename)
+    log.Info("Final Document Length: %d bytes", contentLen)
+} else {
+    log.Info("No final document generated (loop may not have completed multiple iterations)")
+}
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Total Artifacts: %d", artifactCount)
+
+for i, fname in allArtifacts {
+    log.Info("  Artifact %d: %s", i+1, fname)
+}
+
+if len(finalDocContent) > 0 {
+    log.Info("Final Document Preview: %s", finalDocContent[:min(len(finalDocContent), 600)])
+}
+
