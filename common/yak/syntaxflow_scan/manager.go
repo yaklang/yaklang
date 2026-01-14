@@ -262,7 +262,7 @@ func (m *scanManager) initByConfig() error {
 		for _, name := range config.GetProgramNames() {
 			prog, err := ssaapi.FromDatabase(name)
 			if err != nil {
-				log.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database or cache", name)
+				log.Errorf("SyntaxFlow Scan Init Program By Names Failed: SSA Program [%s] not found in database or cache", name)
 				continue
 			}
 			config.Programs = append(config.Programs, prog)
@@ -275,7 +275,7 @@ func (m *scanManager) initByConfig() error {
 		}
 		prog, err := ssaapi.FromDatabase(name)
 		if err != nil {
-			return utils.Errorf("SyntaxFlow Scan Failed: SSA Program [%s] not found in database", name)
+			log.Errorf("SyntaxFlow Scan Init Program By ProjectId By %d Failed", config.GetProjectID())
 		}
 		config.Programs = append(config.Programs, prog)
 		// 同步更新 BaseInfo.ProgramNames，确保保存时 programs 字段不为空
@@ -371,6 +371,13 @@ func (m *scanManager) CurrentTaskIndex() int64 {
 }
 
 func (m *scanManager) ScanNewTask() error {
+	if m.Config == nil {
+		return utils.Errorf("Start SyntaxFlow Scan Failed:config is nil")
+	}
+	programs := m.Config.Programs
+	if len(programs) == 0 {
+		return utils.Errorf("Start SyntaxFlow Scan Failed:programs is empty")
+	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	// start task
 	err := m.StartQuerySF()
