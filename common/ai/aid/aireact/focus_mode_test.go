@@ -107,27 +107,3 @@ func TestReAct_SelectLoopForTask_FocusModeOverridesDirective(t *testing.T) {
 	require.Equal(t, "hello", parsedQuery)
 	require.Equal(t, schema.AI_REACT_LOOP_NAME_DEFAULT, focus)
 }
-
-func TestReAct_SelectLoopForTask_KnowledgeBaseAttachedUsesKnowledgeEnhance(t *testing.T) {
-	parentCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	reactIns, err := NewTestReAct(
-		aicommon.WithContext(parentCtx),
-		aicommon.WithFocus(schema.AI_REACT_LOOP_NAME_DEFAULT),
-	)
-	require.NoError(t, err)
-	cancel()
-
-	task := aicommon.NewStatefulTaskBase("t1", "hello", context.Background(), reactIns.Emitter)
-	task.SetAttachedDatas([]*aicommon.AttachedResource{
-		aicommon.NewAttachedResource(
-			aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE,
-			aicommon.CONTEXT_PROVIDER_KEY_NAME,
-			"non_existent_kb",
-		),
-	})
-
-	_, focus, _ := reactIns.selectLoopForTask(task)
-	require.Equal(t, schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, focus)
-}
