@@ -559,7 +559,32 @@ func (b *singleFileBuilder) VisitClassdef(raw pythonparser.IClassdefContext) int
 	recoverRange := b.SetRange(raw)
 	defer recoverRange()
 
-	// TODO: Implement class definition handling
+	classdef, ok := raw.(*pythonparser.ClassdefContext)
+	if !ok {
+		return nil
+	}
+
+	nameCtx := classdef.Name()
+	if nameCtx == nil {
+		return nil
+	}
+	className := nameCtx.GetText()
+
+	arglist := classdef.Arglist()
+
+	suite := classdef.Suite()
+	if suite == nil {
+		return nil
+	}
+
+	blueprint := b.CreateBlueprint(className, classdef)
+	blueprint.SetKind(ssa.BlueprintClass)
+	b.GetProgram().SetExportType(className, blueprint)
+
+	b.handleClassInheritance(blueprint, arglist)
+
+	b.visitClassBody(suite, blueprint)
+
 	return nil
 }
 

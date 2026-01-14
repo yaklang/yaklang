@@ -582,3 +582,92 @@ func (b *singleFileBuilder) VisitYieldStmt(raw *pythonparser.Yield_stmtContext) 
 	// TODO: Implement yield statement handling
 	return nil
 }
+
+// extractMemberCallVariable extracts member call variable from a test context (e.g., self.x).
+// Returns nil if the expression is not a member call.
+func (b *singleFileBuilder) extractMemberCallVariable(testCtx *pythonparser.TestContext) *ssa.Variable {
+	if testCtx == nil {
+		return nil
+	}
+
+	logicalTests := testCtx.AllLogical_test()
+	if len(logicalTests) == 0 {
+		return nil
+	}
+
+	ltCtx, ok := logicalTests[0].(*pythonparser.Logical_testContext)
+	if !ok {
+		return nil
+	}
+
+	comparison := ltCtx.Comparison()
+	if comparison == nil {
+		return nil
+	}
+
+	compCtx, ok := comparison.(*pythonparser.ComparisonContext)
+	if !ok {
+		return nil
+	}
+
+	expr := compCtx.Expr()
+	if expr == nil {
+		return nil
+	}
+
+	exprCtx, ok := expr.(*pythonparser.ExprContext)
+	if !ok {
+		return nil
+	}
+
+	atom := exprCtx.Atom()
+	if atom == nil {
+		return nil
+	}
+
+	atomCtx, ok := atom.(*pythonparser.AtomContext)
+	if !ok {
+		return nil
+	}
+
+	trailers := exprCtx.AllTrailer()
+	if len(trailers) == 0 {
+		return nil
+	}
+
+	trailer, ok := trailers[0].(*pythonparser.TrailerContext)
+	if !ok || trailer.DOT() == nil {
+		return nil
+	}
+
+	name := atomCtx.Name()
+	if name == nil {
+		return nil
+	}
+
+	nameCtx, ok := name.(*pythonparser.NameContext)
+	if !ok {
+		return nil
+	}
+
+	attrName := trailer.Name()
+	if attrName == nil {
+		return nil
+	}
+
+	attrNameCtx, ok := attrName.(*pythonparser.NameContext)
+	if !ok {
+		return nil
+	}
+
+	objName := nameCtx.GetText()
+	obj := b.ReadValue(objName)
+	if obj == nil {
+		return nil
+	}
+
+	attrNameStr := attrNameCtx.GetText()
+	key := b.EmitConstInst(attrNameStr)
+
+	return b.CreateMemberCallVariable(obj, key)
+}
