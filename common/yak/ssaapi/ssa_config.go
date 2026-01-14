@@ -86,22 +86,45 @@ func (c *Config) CalcHash() string {
 
 var WithConfigInfo = ssaconfig.WithCodeSourceMap
 
+var DefaultExcludeFiles = []string{
+	"**/Vendor/**",
+	"Vendor/**",
+	"**/vendor/**",
+	"vendor/**",
+	"**/classes/**",
+	"**/target/**",
+	"**include/**",
+	"**caches/**",
+	"**cache/**",
+	"**tmp/**",
+	"**alipay/**",
+	"**includes/**",
+	"**temp/**",
+	"**zh_cn/**",
+	"**zh_en/**",
+	"**plugins/**",
+	"**PHPExcel/**",
+}
+
 func newExcludeFunc(patterns []string, basePath string) ExcludeFunc {
 	var compile []glob.Glob
-	var validPatterns []string
-
+	seenPatterns := make(map[string]bool)
+	patterns = append(patterns, DefaultExcludeFiles...)
 	addPattern := func(pattern string) {
 		pattern = strings.TrimSpace(pattern)
 		if pattern == "" {
 			return
 		}
+		if seenPatterns[pattern] {
+			return
+		}
+		seenPatterns[pattern] = true
 		g, err := glob.Compile(pattern)
 		if err != nil {
 			log.Warnf("failed to compile exclude pattern: %v, pattern: %s", err, pattern)
 			return
 		}
 		compile = append(compile, g)
-		validPatterns = append(validPatterns, pattern)
 	}
 
 	// normalizePattern handles folder patterns:

@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"context"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
@@ -343,6 +345,7 @@ type Program struct {
 	Template map[string]tl.TemplateGeneratedInfo
 
 	config *LanguageConfig
+	ctx    context.Context
 }
 
 // implement Value

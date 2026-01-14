@@ -87,6 +87,9 @@ func (s *Save[T]) processBuffer() {
 	for {
 		saveSize := s.config.saveSize
 		select {
+		case <-s.ctx.Done():
+			save(items)
+			return
 		case item, ok := <-s.buffer.OutputChannel():
 			if !ok {
 				save(items)
