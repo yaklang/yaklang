@@ -201,6 +201,10 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			verbose = "OpenRouter"
 			extTag["model"] = "default:qwen/qwq-32b:free"
 			extTag["domain"] = "default:openrouter.ai"
+		case "aibalance":
+			verbose = "AIBalance"
+			extTag["model"] = "default:memfit-light-free"
+			extTag["api_key"] = "default:free-user,required:false"
 		}
 		aiOptions, err := utils.ParseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {

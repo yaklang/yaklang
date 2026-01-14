@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 
@@ -27,7 +28,7 @@ type AIConfig struct {
 	NoHttps bool   `json:"no_https" app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
 
 	// basic model
-	Model    string  `json:"model" app:"name:model,verbose:模型名称,id:2,type:list"`
+	Model    string  `json:"model" app:"name:model,verbose:模型名称,id:2,type:list,required:true"`
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
