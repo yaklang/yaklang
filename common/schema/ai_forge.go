@@ -84,6 +84,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 		PersistentPrompt:   a.PersistentPrompt,
 		PlanPrompt:         a.PlanPrompt,
 		ResultPrompt:       a.ResultPrompt,
+		Author:             a.Author,
 	}
 }
 
@@ -104,6 +105,7 @@ func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
 		PersistentPrompt:   forge.GetPersistentPrompt(),
 		PlanPrompt:         forge.GetPlanPrompt(),
 		ResultPrompt:       forge.GetResultPrompt(),
+		Author:             forge.GetAuthor(),
 	}
 	forgeIns.ID = uint(forge.Id)
 	return forgeIns
