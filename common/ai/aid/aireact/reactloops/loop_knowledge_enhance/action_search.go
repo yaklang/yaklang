@@ -1,8 +1,10 @@
 package loop_knowledge_enhance
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,44 +16,52 @@ import (
 )
 
 // makeSearchAction builds a search action for the given mode ("semantic" or "keyword")
+// 每次只搜索一个条件，搜索后评估 next_movements 决定是否继续
 func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActLoopOption {
 	desc := "根据用户问题推测相关关键词并搜索指定的知识库，返回相关的知识条目"
 	if mode == "keyword" {
-		desc = "关键字搜索模式：为语义不擅长的结构化条目（如法条、章节）生成关键字并搜索知识库"
+		desc = "关键字搜索模式：为语义不擅长的结构化条目（如法条、章节）生成关键字并搜索知识库。每次只搜索一个关键词。"
 	} else if mode == "semantic" {
-		desc = "语义搜索模式：问题驱动的语义检索，优先返回高相关性知识片段"
+		desc = "语义搜索模式：问题驱动的语义检索，优先返回高相关性知识片段。每次只搜索一个查询语句。"
 	}
 
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
-		aitool.WithStringArrayParam("search_queries", aitool.WithParam_Description("用于搜索的多条查询语句，支持多角度检索（优先使用）")),
 	}
 
 	if mode == "keyword" {
-		toolOpts = append(toolOpts, aitool.WithStringParam("keyword", aitool.WithParam_Description("用于关键字优先搜索的单条关键词或短语")))
+		toolOpts = append(toolOpts, aitool.WithStringParam("keyword", aitool.WithParam_Description("用于关键字搜索的单条关键词或短语"), aitool.WithParam_Required(true)))
 	} else {
-		toolOpts = append(toolOpts, aitool.WithStringParam("search_query", aitool.WithParam_Description("用于语义搜索的单条查询语句（完整句子）")))
+		toolOpts = append(toolOpts, aitool.WithStringParam("search_query", aitool.WithParam_Description("用于语义搜索的单条查询语句（完整句子）"), aitool.WithParam_Required(true)))
 	}
 
 	return reactloops.WithRegisterLoopAction(
 		fmt.Sprintf("search_knowledge_%s", mode),
 		desc, toolOpts,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-			// Provide a bilingual, user-friendly loading status similar to exec.loadingStatus usage
 			loop.LoadingStatus(fmt.Sprintf("验证参数中 - search_knowledge:%s / validating parameters - mode:%s", mode, mode))
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			if len(knowledgeBases) == 0 {
 				return utils.Error("knowledge_bases is required and must contain at least one knowledge base name")
 			}
-			// search_queries 可选，如果未提供，AI 将尝试生成
+
+			if mode == "keyword" {
+				keyword := action.GetString("keyword")
+				if keyword == "" {
+					return utils.Error("keyword is required for keyword search mode")
+				}
+			} else {
+				searchQuery := action.GetString("search_query")
+				if searchQuery == "" {
+					return utils.Error("search_query is required for semantic search mode")
+				}
+			}
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			// Indicate start of execution with a clear bilingual status for clients
 			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
-			// 获取参数
+
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
-			searchQueries := action.GetStringSlice("search_queries")
 			searchQuery := action.GetString("search_query")
 			keyword := action.GetString("keyword")
 
@@ -62,101 +72,77 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				ctx = task.GetContext()
 			}
 
-			// 单条查询/关键词处理：优先使用 action 中提供的单条 query/keyword；
-			// 如果未提供，则尝试使用 loop 上次保存的 last 搜索（减少 AI 生成）
-			userContext := fmt.Sprintf("用户需求：%s", loop.Get("user_query"))
-			var queriesToUse []string
+			userQuery := loop.Get("user_query")
+			userContext := fmt.Sprintf("用户需求：%s", userQuery)
+
+			// 确定本次搜索的查询条件（只搜索一个）
+			var queryToUse string
 			if mode == "keyword" {
-				if len(searchQueries) > 0 {
-					queriesToUse = append(queriesToUse, searchQueries...)
-				}
-				if keyword != "" {
-					queriesToUse = append(queriesToUse, keyword)
-				}
-				if len(queriesToUse) == 0 {
-					lastQuery := loop.Get("last_keyword_search_query")
-					if lastQuery != "" {
-						queriesToUse = append(queriesToUse, lastQuery)
-					}
-				}
+				queryToUse = strings.TrimSpace(keyword)
 			} else {
-				if len(searchQueries) > 0 {
-					queriesToUse = append(queriesToUse, searchQueries...)
-				}
-				if searchQuery != "" {
-					queriesToUse = append(queriesToUse, searchQuery)
-				}
-				if len(queriesToUse) == 0 {
-					lastQuery := loop.Get("last_semantic_search_query")
-					if lastQuery != "" {
-						queriesToUse = append(queriesToUse, lastQuery)
-					}
-				}
+				queryToUse = strings.TrimSpace(searchQuery)
 			}
 
-			if len(queriesToUse) == 0 {
-				op.Feedback("未提供查询，无法执行搜索。请提供单条或多条查询语句。")
+			if queryToUse == "" {
+				op.Feedback("未提供查询条件，无法执行搜索。")
 				op.Continue()
 				return
 			}
 
-			// Emit search conditions to default stream so clients can show progress/filters
 			emitter := loop.GetEmitter()
-			// Announce prepared search conditions
-			loop.LoadingStatus(fmt.Sprintf("准备执行搜索 - preparing search: %s", strings.Join(queriesToUse, "; ")))
+			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying: %s", queryToUse))
 
-			var allResults []string
-			var successCount int
-			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying knowledge bases for: %s", strings.Join(queriesToUse, "; ")))
+			// 执行搜索
+			enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, queryToUse, knowledgeBases...)
+			if err != nil {
+				log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
+				op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
+				op.Continue()
+				return
+			}
 
-			for _, queryToUse := range queriesToUse {
-				queryToUse = strings.TrimSpace(queryToUse)
-				if queryToUse == "" {
-					continue
+			if enhanceData == "" {
+				op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
+				op.Continue()
+				return
+			}
+
+			loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
+
+			// 压缩搜索结果
+			singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
+			loop.LoadingStatus("压缩搜索结果中 - compressing search result")
+			compressedResult := compressKnowledgeResultsWithScore(singleResult, userContext, invoker, loop, 10*1024)
+			loop.LoadingStatus("压缩完成 - compression done")
+
+			// 记录到 timeline
+			invoker.AddToTimeline("knowledge_fragment_compressed", fmt.Sprintf("Mode: %s\nQuery: %s\n%s", mode, queryToUse, compressedResult))
+
+			// 获取迭代次数
+			iteration := loop.GetCurrentIterationIndex()
+			if iteration <= 0 {
+				iteration = 1
+			}
+
+			// 获取当前搜索计数
+			searchCountStr := loop.Get("search_count")
+			searchCount := 1
+			if searchCountStr != "" {
+				if c, err := strconv.Atoi(searchCountStr); err == nil {
+					searchCount = c + 1
 				}
-				enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, queryToUse, knowledgeBases...)
-				if err != nil {
-					log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
-					loop.LoadingStatus(fmt.Sprintf("查询失败 - query failed for: %s", queryToUse))
-					emitter.EmitDefaultStreamEvent(
-						"search_progress",
-						strings.NewReader(fmt.Sprintf("stage:query_failed\nquery:%s\nerror:%v", queryToUse, err)),
-						loop.GetCurrentTask().GetIndex(),
-						func() {},
-					)
-					continue
-				}
-				if enhanceData == "" {
-					continue
-				}
+			}
+			loop.Set("search_count", fmt.Sprintf("%d", searchCount))
 
-				loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
+			// 保存压缩结果到 artifact
+			artifactFilename := invoker.EmitFileArtifactWithExt(
+				fmt.Sprintf("knowledge_round_%d_search_%d_%s", iteration, searchCount, utils.DatetimePretty2()),
+				".md",
+				"",
+			)
+			emitter.EmitPinFilename(artifactFilename)
 
-				singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
-				// Use new scoring-based compression (10KB limit per result)
-				loop.LoadingStatus("压缩搜索结果中 - compressing search result")
-				compressedSingle := compressKnowledgeResultsWithScore(singleResult, userContext, invoker, loop, 10*1024)
-				loop.LoadingStatus("压缩完成 - compression done")
-
-				invoker.AddToTimeline("knowledge_fragment_compressed", fmt.Sprintf("Mode: %s\nQuery: %s\n%s", mode, queryToUse, compressedSingle))
-				allResults = append(allResults, compressedSingle)
-				successCount++
-
-				// Save to artifacts immediately after compression
-				iteration := loop.GetCurrentIterationIndex()
-				if iteration <= 0 {
-					iteration = 1
-				}
-
-				// Save compressed result to artifact file
-				artifactFilename := invoker.EmitFileArtifactWithExt(
-					fmt.Sprintf("knowledge_round_%d_%s", iteration, utils.DatetimePretty2()),
-					".md",
-					"",
-				)
-				emitter.EmitPinFilename(artifactFilename)
-
-				artifactContent := fmt.Sprintf(`# 知识查询结果 - 第 %d 轮
+			artifactContent := fmt.Sprintf(`# 知识查询结果 - 第 %d 轮搜索 #%d
 
 查询语句: %s
 知识库: %s
@@ -166,71 +152,192 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 ## 压缩后的关键内容
 
 %s
-`, iteration, queryToUse, strings.Join(knowledgeBases, ", "), mode, time.Now().Format("2006-01-02 15:04:05"), compressedSingle)
+`, iteration, searchCount, queryToUse, strings.Join(knowledgeBases, ", "), mode, time.Now().Format("2006-01-02 15:04:05"), compressedResult)
 
-				if err := os.WriteFile(artifactFilename, []byte(artifactContent), 0644); err != nil {
-					log.Warnf("failed to write knowledge artifact: %v", err)
-				} else {
-					log.Infof("knowledge artifact saved to: %s", artifactFilename)
-				}
-
-				// Record in loop context for later aggregation
-				loop.Set(fmt.Sprintf("artifact_round_%d_%d", iteration, successCount), artifactFilename)
-				loop.Set(fmt.Sprintf("compressed_result_round_%d_%d", iteration, successCount), compressedSingle)
-
-				// 记录查询完成，不再进行验证（避免死循环）
-				log.Infof("query '%s' completed, result saved to: %s", queryToUse, artifactFilename)
-			}
-
-			// 汇总并进一步压缩整体结果
-			var resultBuilder strings.Builder
-			resultBuilder.WriteString("=== 知识库搜索结果 ===\n")
-			resultBuilder.WriteString(fmt.Sprintf("模式: %s\n", mode))
-			resultBuilder.WriteString(fmt.Sprintf("知识库: %s\n", strings.Join(knowledgeBases, ", ")))
-			resultBuilder.WriteString(fmt.Sprintf("查询: %s\n\n", strings.Join(queriesToUse, "; ")))
-			if len(allResults) == 0 {
-				resultBuilder.WriteString("未找到相关知识条目。\n")
+			if err := os.WriteFile(artifactFilename, []byte(artifactContent), 0644); err != nil {
+				log.Warnf("failed to write knowledge artifact: %v", err)
 			} else {
-				for _, r := range allResults {
-					resultBuilder.WriteString(r)
-					resultBuilder.WriteString("\n\n")
-				}
-			}
-			searchResults := resultBuilder.String()
-
-			// Check total size and compress if exceeds 20KB
-			const maxContextBytes = 20 * 1024 // 20KB context limit
-			if len(searchResults) > maxContextBytes {
-				log.Infof("search results too large (%d bytes), compressing to 10KB", len(searchResults))
-				searchResults = compressKnowledgeResultsWithScore(searchResults, userContext, invoker, loop, 10*1024)
-			} else if len(allResults) > 2 {
-				// For multiple results, use legacy compression as a fallback
-				compressedResult := compressKnowledgeResults(searchResults, queriesToUse, userContext, invoker, op, loop)
-				if len(compressedResult) < len(searchResults) {
-					searchResults = compressedResult
-				}
+				log.Infof("knowledge artifact saved to: %s", artifactFilename)
 			}
 
-			// 更新历史与上下文
+			// 记录到 loop 上下文
+			loop.Set(fmt.Sprintf("artifact_round_%d_%d", iteration, searchCount), artifactFilename)
+			loop.Set(fmt.Sprintf("compressed_result_round_%d_%d", iteration, searchCount), compressedResult)
+
+			// 更新搜索历史
 			searchHistory := loop.Get("search_history")
 			if searchHistory != "" {
-				searchHistory += "\n---\n"
+				searchHistory += "\n"
 			}
-			searchHistory += fmt.Sprintf("[%s] 模式: %s, 知识库: %s, 查询数: %d", time.Now().Format("15:04:05"), mode, strings.Join(knowledgeBases, ", "), successCount)
+			searchHistory += fmt.Sprintf("[%s] #%d %s: %s -> %d bytes",
+				time.Now().Format("15:04:05"), searchCount, mode, queryToUse, len(compressedResult))
 			loop.Set("search_history", searchHistory)
-			loop.Set("search_results", searchResults)
 
-			invoker.AddToTimeline("knowledge_searched", fmt.Sprintf("Mode: %s, Searched knowledge bases '%v' with queries '%s', successful queries: %d", mode, knowledgeBases, strings.Join(queriesToUse, "; "), successCount))
+			// 累积所有压缩结果
+			allResults := loop.Get("all_compressed_results")
+			if allResults != "" {
+				allResults += "\n\n---\n\n"
+			}
+			allResults += fmt.Sprintf("### 搜索 #%d: %s\n\n%s", searchCount, queryToUse, compressedResult)
+			loop.Set("all_compressed_results", allResults)
 
-			// 直接输出结果并退出，不再验证用户满意度（避免死循环）
-			// 搜索完成后让 AI 自行决定是否需要继续搜索
-			log.Infof("knowledge search completed: mode=%s, queries=%d, success=%d, result_size=%d bytes",
-				mode, len(queriesToUse), successCount, len(searchResults))
+			// 使用 LiteForge 评估下一步行动
+			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next movements")
 
-			op.Feedback(searchResults)
-			op.Exit()
+			nextMovements := evaluateNextMovements(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
+
+			if nextMovements != "" {
+				// 记录 next_movements
+				currentNextMovements := loop.Get("next_movements_summary")
+				if currentNextMovements != "" {
+					currentNextMovements += "\n\n"
+				}
+				currentNextMovements += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, nextMovements)
+				loop.Set("next_movements_summary", currentNextMovements)
+
+				invoker.AddToTimeline("next_movements", fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, nextMovements))
+
+				// 构建反馈信息
+				feedback := fmt.Sprintf(`=== 搜索完成 ===
+查询: %s
+模式: %s
+结果大小: %d bytes
+已保存到: %s
+
+=== 下一步建议 ===
+%s
+
+请根据建议继续搜索或调用 finish_knowledge_search 完成信息收集。
+`, queryToUse, mode, len(compressedResult), artifactFilename, nextMovements)
+
+				op.Feedback(feedback)
+				op.Continue() // 继续循环，让 AI 决定下一步
+			} else {
+				// 没有 next_movements，认为搜索完成
+				log.Infof("no next movements suggested, search may be complete")
+
+				feedback := fmt.Sprintf(`=== 搜索完成 ===
+查询: %s
+模式: %s
+结果大小: %d bytes
+已保存到: %s
+
+当前搜索已获取足够信息，建议调用 finish_knowledge_search 完成信息收集并生成总结。
+`, queryToUse, mode, len(compressedResult), artifactFilename)
+
+				op.Feedback(feedback)
+				op.Continue() // 让 AI 决定是否调用 finish
+			}
 		},
 	)
+}
+
+// evaluateNextMovements 使用 LiteForge 评估下一步搜索需要补充什么内容
+func evaluateNextMovements(
+	ctxAny any,
+	invoker aicommon.AIInvokeRuntime,
+	loop *reactloops.ReActLoop,
+	userQuery string,
+	currentQuery string,
+	currentResult string,
+	searchCount int,
+) string {
+	// 转换 context
+	ctx, ok := ctxAny.(context.Context)
+	if !ok {
+		log.Warnf("evaluateNextMovements: context conversion failed")
+		ctx = context.Background()
+	}
+	dNonce := utils.RandStringBytes(4)
+
+	// 获取搜索历史
+	searchHistory := loop.Get("search_history")
+
+	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
+{{ .userQuery }}
+<|USER_QUERY_END_{{ .nonce }}|>
+
+<|SEARCH_HISTORY_{{ .nonce }}|>
+{{ .searchHistory }}
+<|SEARCH_HISTORY_END_{{ .nonce }}|>
+
+<|CURRENT_SEARCH_{{ .nonce }}|>
+查询条件: {{ .currentQuery }}
+搜索次数: 第 {{ .searchCount }} 次
+
+搜索结果摘要:
+{{ .currentResult }}
+<|CURRENT_SEARCH_END_{{ .nonce }}|>
+
+<|INSTRUCT_{{ .nonce }}|>
+【评估知识收集进度】
+
+请评估当前搜索结果是否足够回答用户问题，并给出下一步建议：
+
+【评估标准】
+1. 当前结果是否直接回答了用户的核心问题？
+2. 是否还有重要的知识维度未被覆盖？
+3. 是否需要从其他角度补充信息？
+
+【输出要求】
+- 如果需要继续搜索：输出具体的搜索建议（用什么关键词/查询语句）
+- 如果信息已足够：输出空字符串
+
+【限制】
+- 搜索次数不应超过 5 次
+- 避免重复相同或相似的搜索
+- 优先考虑用户问题中未被覆盖的方面
+
+请输出 next_movements。
+<|INSTRUCT_END_{{ .nonce }}|>
+`
+
+	// 限制结果长度
+	resultPreview := currentResult
+	if len(resultPreview) > 2000 {
+		resultPreview = resultPreview[:2000] + "\n...(已截断)"
+	}
+
+	materials, err := utils.RenderTemplate(promptTemplate, map[string]any{
+		"nonce":         dNonce,
+		"userQuery":     userQuery,
+		"searchHistory": searchHistory,
+		"currentQuery":  currentQuery,
+		"searchCount":   searchCount,
+		"currentResult": resultPreview,
+	})
+
+	if err != nil {
+		log.Errorf("evaluateNextMovements: template render failed: %v", err)
+		return ""
+	}
+
+	// 如果搜索次数已达上限，直接返回空
+	if searchCount >= 5 {
+		log.Infof("evaluateNextMovements: search count reached limit (%d), stopping", searchCount)
+		return ""
+	}
+
+	forgeResult, err := invoker.InvokeLiteForge(
+		ctx,
+		"evaluate-next-movements",
+		materials,
+		[]aitool.ToolOption{
+			aitool.WithStringParam("next_movements", aitool.WithParam_Description("下一步搜索建议，如果信息已足够则为空字符串")),
+		},
+	)
+
+	if err != nil {
+		log.Errorf("evaluateNextMovements: LiteForge failed: %v", err)
+		return ""
+	}
+
+	if forgeResult == nil {
+		return ""
+	}
+
+	nextMovements := strings.TrimSpace(forgeResult.GetString("next_movements"))
+	return nextMovements
 }
 
 // semantic and keyword action constructors
