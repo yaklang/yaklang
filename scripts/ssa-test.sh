@@ -5,6 +5,10 @@ echo "Start to Test Yak SSA"
 go test -timeout 20s ./common/yak/yak2ssa/test/...
 go test -timeout 1m ./common/yak/ssaapi/test/yak
 
+echo "Start to Test Python"
+go test -timeout 2m ./common/yak/python/...
+go test -timeout 1m ./common/yak/ssaapi/test/python
+
 echo "Start to Test JS"
 go test -timeout 1m ./common/yak/ssaapi/test/javascript
 go test -timeout 2m ./common/yak/typescript/...
