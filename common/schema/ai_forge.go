@@ -24,6 +24,8 @@ type AIForge struct {
 	Actions            string
 	Tags               string
 
+	Author string
+
 	InitPrompt       string
 	PersistentPrompt string
 	PlanPrompt       string

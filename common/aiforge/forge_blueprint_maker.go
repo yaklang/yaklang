@@ -52,6 +52,7 @@ type YakForgeBlueprintConfig struct {
 	// prompt
 	Name             string `json:"name,omitempty"`
 	VerboseName      string `json:"verbose_name"`
+	ForgeType        string `json:"forge_type,omitempty"`
 	InitPrompt       string `json:"init_prompt,omitempty"`
 	PersistentPrompt string `json:"persistent_prompt,omitempty"`
 	PlanPrompt       string `json:"plan_prompt,omitempty"`
@@ -61,10 +62,13 @@ type YakForgeBlueprintConfig struct {
 	CLIParameterRuleYaklangCode string `json:"cli_parameter_rule_yaklang_code,omitempty"`
 
 	// tools
-	ToolKeywords string `json:"tool_keywords,omitempty"`
-	Tools        string `json:"tools,omitempty"`
-	Description  string `json:"description,omitempty"`
-	ForgeContent string `json:"forge_content,omitempty"`
+	ToolKeywords       string `json:"tool_keywords,omitempty"`
+	Tools              string `json:"tools,omitempty"`
+	Description        string `json:"description,omitempty"`
+	ForgeContent       string `json:"forge_content,omitempty"`
+	ParamsUIConfig     string `json:"params_ui_config,omitempty"`
+	UserPersistentData string `json:"user_persistent_data,omitempty"`
+	Author             string `json:"author,omitempty"`
 	// aid options
 	YakForgeBlueprintAIDOptionsConfig *YakForgeBlueprintAIDOptionsConfig `json:"aid_options_config,omitempty"`
 
@@ -100,6 +104,8 @@ func NewYakForgeBlueprintConfigFromSchemaForge(forge *schema.AIForge) *YakForgeB
 }
 func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakForgeBlueprintConfig {
 	c.Name = forge.ForgeName
+	c.ForgeType = forge.ForgeType
+	c.VerboseName = forge.ForgeVerboseName
 	c.InitPrompt = forge.InitPrompt
 	c.PersistentPrompt = forge.PersistentPrompt
 	c.PlanPrompt = forge.PlanPrompt
@@ -109,7 +115,11 @@ func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakFor
 	c.Description = forge.Description
 	c.Actions = forge.Actions
 	c.ForgeContent = forge.ForgeContent
+	c.Tags = forge.Tags
 	c.CLIParameterRuleYaklangCode = forge.Params
+	c.ParamsUIConfig = forge.ParamsUIConfig
+	c.UserPersistentData = forge.UserPersistentData
+	c.Author = forge.Author
 	return c
 }
 func (c *YakForgeBlueprintConfig) WithActionName(name string) *YakForgeBlueprintConfig {
