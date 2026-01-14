@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	cache := prog.Cache
 	// enable cache save to database
@@ -101,7 +102,7 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	builded := false
@@ -155,7 +156,7 @@ func TestLazySaveType(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create a value to test with
@@ -216,7 +217,7 @@ func TestSetVirtualRegister(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create a new value
@@ -255,7 +256,7 @@ func TestEmitExCallsSetVirtualRegister(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create operands for binop

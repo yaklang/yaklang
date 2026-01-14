@@ -118,10 +118,26 @@ func NewPipeWithInit[T, U any](
 	return ret
 }
 
+func (p *Pipe[T, U]) IsContextCancel() bool {
+	if p.ctx == nil {
+		return false
+	}
+	select {
+	case <-p.ctx.Done():
+		return true
+	default:
+		return false
+	}
+	return false
+}
+
 func (p *Pipe[T, U]) FeedSlice(items []T) {
 	go func() {
 		defer p.Close()
 		for _, item := range items {
+			if p.IsContextCancel() {
+				return
+			}
 			p.in.SafeFeed(item)
 		}
 	}()
@@ -131,6 +147,9 @@ func (p *Pipe[T, U]) FeedChannel(ch <-chan T) {
 	go func() {
 		defer p.Close()
 		for item := range ch {
+			if p.IsContextCancel() {
+				return
+			}
 			p.in.SafeFeed(item)
 		}
 	}()

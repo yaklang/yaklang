@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -8,7 +9,7 @@ import (
 
 func newTestBuilder(t *testing.T) (*Program, *FunctionBuilder) {
 	t.Helper()
-	prog := NewProgram(t.Name(), ProgramCacheMemory, Application, nil, "", 0)
+	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	require.NotNil(t, builder)
 	return prog, builder

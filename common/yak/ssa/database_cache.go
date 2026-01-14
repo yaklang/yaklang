@@ -44,8 +44,8 @@ type ProgramCache struct {
 }
 
 // NewDBCache : create a new ssa db cache. if ttl is 0, the cache will never expire, and never save to database.
-func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
-	compileCtx := context.Background()
+func NewDBCache(compileCtx context.Context, prog *Program, databaseKind ProgramCacheKind, fileSize int, ConfigTTL ...time.Duration) *ProgramCache {
+	// compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
 		program:          prog,

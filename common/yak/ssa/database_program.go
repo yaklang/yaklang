@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -26,7 +27,7 @@ func GetProgram(program string, kind ssadb.ProgramKind) (*Program, error) {
 }
 
 func NewProgramFromDB(p *ssadb.IrProgram) *Program {
-	prog := NewProgram(p.ProgramName, ProgramCacheDBRead, p.ProgramKind, nil, "", 0)
+	prog := NewProgram(context.Background(), p.ProgramName, ProgramCacheDBRead, p.ProgramKind, nil, "", 0)
 	prog.irProgram = p
 	prog.Language = ssaconfig.Language(p.Language)
 	prog.FileList = p.FileList

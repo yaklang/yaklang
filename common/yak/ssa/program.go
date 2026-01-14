@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"context"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -19,6 +20,7 @@ import (
 )
 
 func NewProgram(
+	ctx context.Context,
 	ProgramName string, databaseKind ProgramCacheKind, kind ssadb.ProgramKind,
 	fs fi.FileSystem, programPath string, fileSize int,
 	ttl ...time.Duration,
@@ -58,7 +60,7 @@ func NewProgram(
 
 	if kind == Application {
 		prog.Application = prog
-		prog.Cache = NewDBCache(prog, databaseKind, fileSize, ttl...)
+		prog.Cache = NewDBCache(ctx, prog, databaseKind, fileSize, ttl...)
 	}
 	prog.DatabaseKind = databaseKind
 	prog.Loader = ssautil.NewPackageLoader(
@@ -66,6 +68,7 @@ func NewProgram(
 		ssautil.WithIncludePath(programPath),
 		ssautil.WithBasePath(programPath),
 	)
+	prog.ctx = ctx
 	return prog
 }
 
@@ -107,7 +110,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	fullPath := prog.GetCurrentEditor().GetFilename()
 	endPath := fs.Join(path...)
 	programPath, _, _ := strings.Cut(fullPath, endPath)
-	subProg := NewProgram(name, prog.DatabaseKind, kind, fs, programPath, 0)
+	subProg := NewProgram(prog.ctx, name, prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
 	subProg.SetDiagnosticsRecorder(prog.DiagnosticsRecorder())
