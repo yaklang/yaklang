@@ -105,6 +105,12 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 }
 
 func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
+	parsedQuery, focus, loopOptions := r.selectLoopForTask(task)
+	task.SetUserInput(parsedQuery)
+	return r.ExecuteLoopTask(focus, task, loopOptions...)
+}
+
+func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {
 	defaultFocus := r.config.Focus
 	userQuery := task.GetUserInput()
 	for _, resource := range task.GetAttachedDatas() {
@@ -113,14 +119,13 @@ func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 		}
 	}
 	parsedQuery, focus, loopOptions := r.parseLoopDirectives(userQuery, defaultFocus) // 遗留的输入指令解析
-	task.SetUserInput(parsedQuery)
 	if task.GetFocusMode() != "" {
 		focus = task.GetFocusMode() // 任务级别的 focus 模式覆盖
 	}
 	if focus == "" {
 		focus = schema.AI_REACT_LOOP_NAME_DEFAULT
 	}
-	return r.ExecuteLoopTask(focus, task, loopOptions...)
+	return parsedQuery, focus, loopOptions
 }
 
 func (r *ReAct) parseLoopDirectives(userQuery string, defaultFocus string) (string, string, []reactloops.ReActLoopOption) {
