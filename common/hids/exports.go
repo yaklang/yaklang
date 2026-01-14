@@ -71,4 +71,16 @@ var Exports = map[string]interface{}{
 	"WithOnConnectionDisappear":     WithOnConnectionDisappear,     // 设置连接消失回调
 	"WithConnectionHistory":         WithConnectionHistory,         // 启用历史记录
 	"WatchConnections":              WatchConnections,              // 简单连接监控函数
+
+	// ==================== Linux Audit 监控模块 ====================
+	// Audit监控器 - 基于Linux audit子系统进行用户行为审计
+	"NewAuditMonitor":         NewAuditMonitor,         // 创建Audit监控器
+	"WithAuditMonitorLogin":   WithAuditMonitorLogin,   // 设置是否监控登录事件
+	"WithAuditMonitorCommand": WithAuditMonitorCommand, // 设置是否监控命令执行事件
+	"WithOnLoginEvent":        WithOnLoginEvent,        // 设置登录事件回调
+	"WithOnCommandEvent":      WithOnCommandEvent,      // 设置命令执行事件回调
+	"WithAuditFilterUsers":    WithAuditFilterUsers,    // 设置用户过滤器
+	"WithAuditFilterCommands": WithAuditFilterCommands, // 设置命令过滤器
+	"WithAuditBufferSize":     WithAuditBufferSize,     // 设置缓冲区大小
+	"WatchAuditEvents":        WatchAuditEvents,        // 简化的audit监控函数
 }
