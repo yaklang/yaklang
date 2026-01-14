@@ -43,6 +43,14 @@ var Exports = map[string]interface{}{
 	"aiCallback":            WithAICallback,
 	"aiConfig":              WithAIConfig,
 
+	// attached resources
+	"attachedKnowledgeBase": WithAttachedKnowledgeBase,
+	"attachedFilePath":      WithAttachedFilePath,
+	"attachedFileContent":   WithAttachedFileContent,
+	"attachedAITool":        WithAttachedAITool,
+	"attachedAIForge":       WithAttachedAIForge,
+	"attachedResource":      WithAttachedResource,
+
 	// ai forge
 	// "BuildAIForge":      BuildAIForge,
 	// "forgePlan":         WithForgePlan,

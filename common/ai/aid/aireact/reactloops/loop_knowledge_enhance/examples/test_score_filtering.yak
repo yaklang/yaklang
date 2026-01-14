@@ -1,0 +1,139 @@
+// test_score_filtering.yak
+// 测试 loop_knowledge_enhance 的评分过滤机制
+// 
+// 测试场景：验证只有评分 >= 0.4 的内容会被保留
+//
+// 测试断言：
+// 1. 执行不应该失败
+// 2. 如果有 Score 输出，分数应 >= 0.4
+// 3. 应成功生成压缩后的知识内容
+
+var artifactFilename = ""
+var artifactContent = ""
+var executionError = nil
+var scoreValues = []
+var lowScoreFound = false
+
+// 测试任务：验证评分过滤
+testPrompt = `请帮我从附加的知识库中搜索"密码找回"相关的安全知识。
+
+要求：
+1. 使用语义搜索查找密码找回流程
+2. 关注相关的安全漏洞和风险点
+3. 提取最相关的知识片段
+
+请搜索并整理相关信息。`
+
+log.Info("========================================")
+log.Info("Testing loop_knowledge_enhance - Score Filtering")
+log.Info("========================================")
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("knowledge_enhance"),
+    aim.timeout(300),
+    aim.maxIteration(4),
+    // 附加知识库资源
+    aim.attachedKnowledgeBase("逻辑漏洞"),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    path = jsonData["path"]
+                    if str.Contains(path, "knowledge") {
+                        artifactFilename = path
+                    }
+                }
+            } catch e {
+                // ignore
+            }
+        }
+        
+        // 解析 Score 值
+        if eventType == "stream" {
+            contentStr = string(event.Content)
+            // 匹配 Score: 0.xx 格式
+            if str.Contains(contentStr, "Score:") {
+                // 简单解析 - 查找 Score: 后面的数字
+                lines = str.Split(contentStr, "\n")
+                for _, line in lines {
+                    if str.Contains(line, "Score:") {
+                        // 提取分数部分
+                        parts = str.Split(line, "Score:")
+                        if len(parts) > 1 {
+                            scorePart = str.TrimSpace(parts[1])
+                            // 取第一个 ] 之前的内容
+                            if str.Contains(scorePart, "]") {
+                                scorePart = str.Split(scorePart, "]")[0]
+                            }
+                            // 尝试解析分数
+                            scorePart = str.TrimSpace(scorePart)
+                            scorePart = str.TrimLeft(scorePart, "[")
+                            try {
+                                score = parseFloat(scorePart)
+                                if score > 0 {
+                                    scoreValues = append(scoreValues, score)
+                                    if score < 0.4 {
+                                        lowScoreFound = true
+                                    }
+                                }
+                            } catch e {
+                                // ignore parse errors
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        if artifactFilename != "" {
+            content, readErr = file.ReadFile(artifactFilename)
+            if readErr == nil {
+                artifactContent = string(content)
+            }
+        }
+    }),
+)
+
+if err != nil {
+    executionError = err
+}
+
+// ========================================
+// 断言测试
+// ========================================
+
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：如果有 Score 输出，应该都 >= 0.4（低分应被过滤）
+assert lowScoreFound == false, sprintf("Found score < 0.4 in output, which should have been filtered. Scores: %v", scoreValues)
+
+// 断言3：应获取到 artifact 文件
+assert artifactFilename != "", "Failed to capture knowledge artifact filename"
+
+// 断言4：文件应存在
+assert file.IsExisted(artifactFilename), sprintf("Knowledge artifact file does not exist: %s", artifactFilename)
+
+// 断言5：内容长度应 > 0
+contentLen = len(artifactContent)
+assert contentLen > 0, "Artifact content is empty"
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Artifact Filename: %s", artifactFilename)
+log.Info("Content Length: %d bytes", contentLen)
+log.Info("Captured Scores: %v", scoreValues)
+log.Info("Low Score Found (should be false): %v", lowScoreFound)
+log.Info("Content Preview: %s", artifactContent[:min(len(artifactContent), 400)])
+

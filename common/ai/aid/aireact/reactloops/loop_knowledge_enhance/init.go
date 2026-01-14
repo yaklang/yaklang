@@ -45,19 +45,25 @@ func init() {
 					attachedResources := loop.Get("attached_resources")
 					searchResults := loop.Get("search_results")
 					searchHistory := loop.Get("search_history")
+					nextMovementsSummary := loop.Get("next_movements_summary")
+					artifactsSummary := buildArtifactsSummary(loop)
 
 					renderMap := map[string]any{
-						"UserQuery":         userQuery,
-						"AttachedResources": attachedResources,
-						"SearchResults":     searchResults,
-						"SearchHistory":     searchHistory,
-						"Nonce":             nonce,
+						"UserQuery":            userQuery,
+						"AttachedResources":    attachedResources,
+						"SearchResults":        searchResults,
+						"SearchHistory":        searchHistory,
+						"NextMovementsSummary": nextMovementsSummary,
+						"ArtifactsSummary":     artifactsSummary,
+						"Nonce":                nonce,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				// Register actions: semantic and keyword search variants
 				searchKnowledgeSemanticAction(r),
 				searchKnowledgeKeywordAction(r),
+				// Register post-iteration hook for final document generation
+				BuildOnPostIterationHook(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, r, preset...)
@@ -78,6 +84,35 @@ AI会根据用户问题从附加资源中尽可能多地收集相关信息，这
 
 // DefaultKnowledgeSampleCount 默认获取的知识库样本数量
 const DefaultKnowledgeSampleCount = 10
+
+// buildArtifactsSummary collects artifact filenames from loop context
+func buildArtifactsSummary(loop *reactloops.ReActLoop) string {
+	var artifacts []string
+	maxIterations := loop.GetCurrentIterationIndex()
+	if maxIterations <= 0 {
+		maxIterations = 5 // check at least 5 iterations
+	}
+
+	for iteration := 1; iteration <= maxIterations+1; iteration++ {
+		for queryIdx := 1; queryIdx <= 20; queryIdx++ { // Support up to 20 queries per iteration
+			artifactFile := loop.Get(fmt.Sprintf("artifact_round_%d_%d", iteration, queryIdx))
+			if artifactFile != "" {
+				artifacts = append(artifacts, artifactFile)
+			}
+		}
+	}
+
+	if len(artifacts) == 0 {
+		return ""
+	}
+
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("已保存 %d 个知识查询结果文件：\n", len(artifacts)))
+	for i, filename := range artifacts {
+		summary.WriteString(fmt.Sprintf("  %d. %s\n", i+1, filename))
+	}
+	return summary.String()
+}
 
 // buildInitTask creates the initial task for the knowledge enhance loop
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {

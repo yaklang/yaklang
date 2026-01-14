@@ -1,0 +1,99 @@
+// test_keyword_search.yak
+// 测试 loop_knowledge_enhance 的关键字搜索功能
+// 使用 action: search_knowledge_keyword
+// 
+// 测试场景：使用关键字搜索验证码相关漏洞
+//
+// 测试断言：
+// 1. 执行不应该失败
+// 2. 搜索结果应包含验证码相关内容
+
+var artifactFilename = ""
+var artifactContent = ""
+var executionError = nil
+
+// 测试任务：使用关键字搜索验证码漏洞
+testPrompt = `请帮我从附加的知识库中查找"验证码"相关的安全漏洞。
+
+具体需求：
+1. 使用关键字搜索模式
+2. 搜索关键词：验证码、verification_code、短信验证
+3. 提取验证码漏洞的类型和特征
+
+请使用关键字搜索来查找相关信息。`
+
+log.Info("========================================")
+log.Info("Testing loop_knowledge_enhance - Keyword Search")
+log.Info("========================================")
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("knowledge_enhance"),
+    aim.timeout(300),
+    aim.maxIteration(5),
+    // 附加知识库资源
+    aim.attachedKnowledgeBase("逻辑漏洞"),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            try {
+                jsonData = json.loads(contentStr)
+                if jsonData != nil && jsonData["path"] != nil {
+                    path = jsonData["path"]
+                    if str.Contains(path, "knowledge") {
+                        artifactFilename = path
+                    }
+                }
+            } catch e {
+                // ignore
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        if artifactFilename != "" {
+            content, readErr = file.ReadFile(artifactFilename)
+            if readErr == nil {
+                artifactContent = string(content)
+            }
+        }
+    }),
+)
+
+if err != nil {
+    executionError = err
+}
+
+// ========================================
+// 断言测试
+// ========================================
+
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+// 断言1：执行不应该失败
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+// 断言2：必须获取到知识文件
+assert artifactFilename != "", "Failed to capture knowledge artifact filename"
+
+// 断言3：知识文件必须存在
+assert file.IsExisted(artifactFilename), sprintf("Knowledge artifact file does not exist: %s", artifactFilename)
+
+// 断言4：文件内容长度必须大于 50 字节
+contentLen = len(artifactContent)
+assert contentLen > 50, sprintf("Artifact content too short. Expected > 50 bytes, got %d bytes", contentLen)
+
+// 断言5：内容应包含验证码相关关键词
+hasVerificationContent = str.Contains(artifactContent, "验证码") || str.Contains(artifactContent, "verification") || str.Contains(artifactContent, "code") || str.Contains(artifactContent, "短信")
+assert hasVerificationContent, sprintf("Artifact should contain verification code related content. Content: %s", artifactContent[:min(len(artifactContent), 300)])
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Artifact Filename: %s", artifactFilename)
+log.Info("Content Length: %d bytes", contentLen)
+log.Info("Content Preview: %s", artifactContent[:min(len(artifactContent), 500)])
+
