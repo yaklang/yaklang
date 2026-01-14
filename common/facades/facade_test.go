@@ -2,14 +2,15 @@ package facades
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 func TestNewDNSServer(t *testing.T) {
@@ -184,6 +185,120 @@ func TestLookupAll(t *testing.T) {
 				t.Errorf("LookupAll() callback method = %v, want %v", currentTest.callback.method, currentTest.wantMethod)
 			}
 
+		})
+	}
+}
+
+func TestLookupAllWithGlobHosts(t *testing.T) {
+	type callbackInfo struct {
+		dnsType    string
+		domain     string
+		ip         string
+		fromServer string
+		method     string
+	}
+
+	type args struct {
+		host string
+		opt  []netx.DNSOption
+	}
+
+	tests := []struct {
+		name       string
+		args       args
+		wantMethod string
+		want       []string
+	}{
+		{
+			name: "glob pattern *.example.com matches sub.example.com",
+			args: args{
+				host: "sub.example.com",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"*.example.com": "10.10.10.1"}),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				},
+			},
+			wantMethod: "hosts-glob",
+			want:       []string{"10.10.10.1"},
+		},
+		{
+			name: "glob pattern *.*.example.com matches deep.sub.example.com",
+			args: args{
+				host: "deep.sub.example.com",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"*.*.example.com": "10.10.10.2"}),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				},
+			},
+			wantMethod: "hosts-glob",
+			want:       []string{"10.10.10.2"},
+		},
+		{
+			name: "glob pattern test?.local matches test1.local",
+			args: args{
+				host: "test1.local",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"test?.local": "10.10.10.3"}),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				},
+			},
+			wantMethod: "hosts-glob",
+			want:       []string{"10.10.10.3"},
+		},
+		{
+			name: "exact match takes priority over glob",
+			args: args{
+				host: "exact.example.com",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{
+						"exact.example.com": "10.10.10.4",
+						"*.example.com":     "10.10.10.5",
+					}),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				},
+			},
+			wantMethod: "hosts",
+			want:       []string{"10.10.10.4"},
+		},
+		{
+			name: "glob pattern [abc].test.com matches a.test.com",
+			args: args{
+				host: "a.test.com",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"[abc].test.com": "10.10.10.6"}),
+					netx.WithDNSDisableSystemResolver(true),
+					netx.WithDNSNoCache(true),
+				},
+			},
+			wantMethod: "hosts-glob",
+			want:       []string{"10.10.10.6"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var callback callbackInfo
+			dnsOptions := append(tt.args.opt, netx.WithDNSCallback(func(dnsType, domain, ip, fromServer, method string) {
+				callback = callbackInfo{
+					dnsType:    dnsType,
+					domain:     domain,
+					ip:         ip,
+					fromServer: fromServer,
+					method:     method,
+				}
+			}))
+
+			got := netx.LookupAll(tt.args.host, dnsOptions...)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("LookupAll() = %v, want %v", got, tt.want)
+			}
+			if callback.method != tt.wantMethod {
+				t.Errorf("LookupAll() callback method = %v, want %v", callback.method, tt.wantMethod)
+			}
 		})
 	}
 }

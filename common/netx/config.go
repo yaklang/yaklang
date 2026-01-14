@@ -2,11 +2,14 @@ package netx
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var defaultYakDNSMutex = new(sync.Mutex)
@@ -55,9 +58,15 @@ var defaultDoHHTTPClient = &http.Client{
 	Timeout: 5 * time.Second,
 }
 
+type hostGlobRule struct {
+	pattern glob.Glob
+	ip      string
+}
+
 type ReliableDNSConfig struct {
-	Timeout time.Duration
-	Hosts   map[string]string
+	Timeout   time.Duration
+	Hosts     map[string]string
+	hostGlobs []hostGlobRule
 
 	PreferTCP   bool
 	FallbackTCP bool
@@ -251,9 +260,36 @@ func WithTimeout(timeout time.Duration) DNSOption {
 	}
 }
 
+func (r *ReliableDNSConfig) matchHostGlob(host string) (string, bool) {
+	for _, rule := range r.hostGlobs {
+		if rule.pattern.Match(host) {
+			return rule.ip, true
+		}
+	}
+	return "", false
+}
+
+func isGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
 func WithTemporaryHosts(i map[string]string) DNSOption {
 	return func(config *ReliableDNSConfig) {
-		config.Hosts = i
+		exactHosts := make(map[string]string)
+		for k, v := range i {
+			if isGlobPattern(k) {
+				pattern, err := glob.Compile(k, '.')
+				if err != nil {
+					log.Warnf("invalid glob pattern for host mapping: %s", k)
+					exactHosts[k] = v
+					continue
+				}
+				config.hostGlobs = append(config.hostGlobs, hostGlobRule{pattern: pattern, ip: v})
+			} else {
+				exactHosts[k] = v
+			}
+		}
+		config.Hosts = exactHosts
 	}
 }
 
