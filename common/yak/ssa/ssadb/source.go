@@ -143,6 +143,11 @@ func MarshalFile(editor *memedit.MemEditor) *IrSource {
 		FolderPath:     editor.GetGlobalFolderPath(), // 已经是规范化的
 		IsBigFile:      false,
 	}
+	if len(irSourceHash) != 0 && irSourceHash[0] != "" {
+		irSource.SourceCodeHash = irSourceHash[0]
+	} else {
+		irSource.SourceCodeHash = editor.GetIrSourceHash()
+	}
 	return irSource
 }
 
