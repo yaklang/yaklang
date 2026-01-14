@@ -184,18 +184,40 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// 使用 LiteForge 评估下一步行动
 			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next movements")
 
-			nextMovements := evaluateNextMovements(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
+			evalResult := evaluateNextMovements(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
 
-			if nextMovements != "" {
+			if evalResult.Finished {
+				// 知识收集已完成，保存总结并退出循环
+				log.Infof("knowledge collection finished, summary: %s", evalResult.Summary)
+
+				// 保存总结到 loop 上下文
+				loop.Set("final_summary", evalResult.Summary)
+
+				feedback := fmt.Sprintf(`=== 搜索完成 ===
+查询: %s
+模式: %s
+结果大小: %d bytes
+已保存到: %s
+
+=== 知识收集完成 ===
+%s
+
+正在生成最终报告...
+`, queryToUse, mode, len(compressedResult), artifactFilename, evalResult.Summary)
+
+				op.Feedback(feedback)
+				r.AddToTimeline("knowledge_collection_finished", feedback)
+				op.Exit() // 主动结束循环，触发 OnFinished 回调生成报告
+			} else {
 				// 记录 next_movements
 				currentNextMovements := loop.Get("next_movements_summary")
 				if currentNextMovements != "" {
 					currentNextMovements += "\n\n"
 				}
-				currentNextMovements += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, nextMovements)
+				currentNextMovements += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, evalResult.NextMovements)
 				loop.Set("next_movements_summary", currentNextMovements)
 
-				invoker.AddToTimeline("next_movements", fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, nextMovements))
+				invoker.AddToTimeline("next_movements", fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, evalResult.NextMovements))
 
 				// 构建反馈信息
 				feedback := fmt.Sprintf(`=== 搜索完成 ===
@@ -207,29 +229,22 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 === 下一步建议 ===
 %s
 
-请根据建议继续搜索或调用 finish_knowledge_search 完成信息收集。
-`, queryToUse, mode, len(compressedResult), artifactFilename, nextMovements)
+请根据建议继续搜索。
+`, queryToUse, mode, len(compressedResult), artifactFilename, evalResult.NextMovements)
 
 				op.Feedback(feedback)
-				op.Continue() // 继续循环，让 AI 决定下一步
-			} else {
-				// 没有 next_movements，认为搜索完成
-				log.Infof("no next movements suggested, search may be complete")
-
-				feedback := fmt.Sprintf(`=== 搜索完成 ===
-查询: %s
-模式: %s
-结果大小: %d bytes
-已保存到: %s
-
-当前搜索已获取足够信息，建议调用 finish_knowledge_search 完成信息收集并生成总结。
-`, queryToUse, mode, len(compressedResult), artifactFilename)
-
-				op.Feedback(feedback)
-				op.Continue() // 让 AI 决定是否调用 finish
+				r.AddToTimeline("next_movements_feedback", feedback)
+				op.Continue() // 继续循环，让 AI 执行下一步搜索
 			}
 		},
 	)
+}
+
+// EvaluateResult 评估结果结构体
+type EvaluateResult struct {
+	NextMovements string // 下一步搜索建议
+	Finished      bool   // 是否已完成知识收集
+	Summary       string // 当 finished 时的总结
 }
 
 // evaluateNextMovements 使用 LiteForge 评估下一步搜索需要补充什么内容
@@ -241,7 +256,7 @@ func evaluateNextMovements(
 	currentQuery string,
 	currentResult string,
 	searchCount int,
-) string {
+) EvaluateResult {
 	// 转换 context
 	ctx, ok := ctxAny.(context.Context)
 	if !ok {
@@ -252,6 +267,16 @@ func evaluateNextMovements(
 
 	// 获取搜索历史
 	searchHistory := loop.Get("search_history")
+
+	// 如果搜索次数已达上限，直接返回 finished
+	if searchCount >= 5 {
+		log.Infof("evaluateNextMovements: search count reached limit (%d), stopping", searchCount)
+		return EvaluateResult{
+			NextMovements: "",
+			Finished:      true,
+			Summary:       "已达到最大搜索次数限制",
+		}
+	}
 
 	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
 {{ .userQuery }}
@@ -280,15 +305,16 @@ func evaluateNextMovements(
 3. 是否需要从其他角度补充信息？
 
 【输出要求】
-- 如果需要继续搜索：输出具体的搜索建议（用什么关键词/查询语句）
-- 如果信息已足够：输出空字符串
+- finished: 布尔值，如果信息已足够则为 true，否则为 false
+- next_movements: 如果 finished 为 false，输出具体的搜索建议（用什么关键词/查询语句）；如果 finished 为 true，输出空字符串
+- summary: 如果 finished 为 true，简要总结已收集的知识；如果 finished 为 false，输出空字符串
 
 【限制】
 - 搜索次数不应超过 5 次
 - 避免重复相同或相似的搜索
 - 优先考虑用户问题中未被覆盖的方面
 
-请输出 next_movements。
+请输出 finished、next_movements 和 summary。
 <|INSTRUCT_END_{{ .nonce }}|>
 `
 
@@ -309,13 +335,7 @@ func evaluateNextMovements(
 
 	if err != nil {
 		log.Errorf("evaluateNextMovements: template render failed: %v", err)
-		return ""
-	}
-
-	// 如果搜索次数已达上限，直接返回空
-	if searchCount >= 5 {
-		log.Infof("evaluateNextMovements: search count reached limit (%d), stopping", searchCount)
-		return ""
+		return EvaluateResult{Finished: true, Summary: "template render failed"}
 	}
 
 	forgeResult, err := invoker.InvokeLiteForge(
@@ -323,21 +343,30 @@ func evaluateNextMovements(
 		"evaluate-next-movements",
 		materials,
 		[]aitool.ToolOption{
-			aitool.WithStringParam("next_movements", aitool.WithParam_Description("下一步搜索建议，如果信息已足够则为空字符串")),
+			aitool.WithBoolParam("finished", aitool.WithParam_Description("是否已完成知识收集，true 表示信息已足够，false 表示需要继续搜索"), aitool.WithParam_Required(true)),
+			aitool.WithStringParam("next_movements", aitool.WithParam_Description("下一步搜索建议，如果 finished 为 true 则为空字符串")),
+			aitool.WithStringParam("summary", aitool.WithParam_Description("当 finished 为 true 时，简要总结已收集的知识")),
 		},
 	)
 
 	if err != nil {
 		log.Errorf("evaluateNextMovements: LiteForge failed: %v", err)
-		return ""
+		return EvaluateResult{Finished: true, Summary: "LiteForge evaluation failed"}
 	}
 
 	if forgeResult == nil {
-		return ""
+		return EvaluateResult{Finished: true, Summary: "LiteForge returned nil"}
 	}
 
+	finished := forgeResult.GetBool("finished")
 	nextMovements := strings.TrimSpace(forgeResult.GetString("next_movements"))
-	return nextMovements
+	summary := strings.TrimSpace(forgeResult.GetString("summary"))
+
+	return EvaluateResult{
+		NextMovements: nextMovements,
+		Finished:      finished,
+		Summary:       summary,
+	}
 }
 
 // semantic and keyword action constructors
