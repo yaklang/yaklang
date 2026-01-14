@@ -905,6 +905,9 @@ service Yak {
   rpc QueryAIForge(QueryAIForgeRequest) returns (QueryAIForgeResponse);
   rpc GetAIForge(GetAIForgeRequest) returns (AIForge);
 
+  // AI Focus CRUD
+  rpc QueryAIFocus(QueryAIFocusRequest) returns (QueryAIFocusResponse);
+
   // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
   rpc GetToolSetList(Empty) returns(GetToolSetListResponse);
@@ -1982,6 +1985,20 @@ message QueryAIForgeResponse {
 message GetAIForgeRequest {
   int64 ID = 1;
   string ForgeName = 2;
+}
+
+message AIFocus {
+  string Name = 1;
+  string Description = 2;
+  string OutputExamplePrompt = 3;
+  string UsagePrompt = 4;
+}
+
+message QueryAIFocusRequest {
+}
+
+message QueryAIFocusResponse {
+  repeated AIFocus Data = 1;
 }
 
 message ExportAILogsRequest {
