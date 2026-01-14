@@ -59,11 +59,11 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				// Register actions: semantic search, keyword search, and finish
+				// Register actions: semantic search and keyword search
+				// Note: finish action removed - loop exits automatically when evaluateNextMovements returns finished=true
 				searchKnowledgeSemanticAction(r),
 				searchKnowledgeKeywordAction(r),
-				finishKnowledgeSearchAction(r),
-				// Register post-iteration hook for final document generation
+				// Register post-iteration hook for final document generation (triggered on loop exit)
 				BuildOnPostIterationHook(r),
 			}
 			preset = append(preset, opts...)

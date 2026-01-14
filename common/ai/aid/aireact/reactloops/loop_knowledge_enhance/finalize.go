@@ -19,6 +19,7 @@ const maxFinalDocBytes = 50 * 1024 // 50KB
 // into a single document limited to 50KB
 func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
 	userQuery := loop.Get("user_query")
+	finalSummary := loop.Get("final_summary") // 从 evaluateNextMovements 获取的总结
 	maxIterations := loop.GetCurrentIterationIndex()
 
 	// Collect all compressed results and artifact files
@@ -66,49 +67,71 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Get search history for metadata
 	searchHistory := loop.Get("search_history")
+	searchCountStr := loop.Get("search_count")
 
 	// Get next movements summary
 	nextMovementsSummary := loop.Get("next_movements_summary")
 
 	// Build final document
 	var finalDoc strings.Builder
-	finalDoc.WriteString("# 知识增强最终整合文档\n\n")
+	finalDoc.WriteString("# 知识增强查询报告\n\n")
+
+	// User query section
+	finalDoc.WriteString("## 用户问题\n\n")
+	finalDoc.WriteString(userQuery)
+	finalDoc.WriteString("\n\n")
+
+	// Summary section (from evaluateNextMovements)
+	if finalSummary != "" {
+		finalDoc.WriteString("## 总体回答\n\n")
+		finalDoc.WriteString(finalSummary)
+		finalDoc.WriteString("\n\n")
+	}
 
 	// Metadata section
-	finalDoc.WriteString("## 元信息\n\n")
-	finalDoc.WriteString(fmt.Sprintf("- **用户查询**: %s\n", userQuery))
-	finalDoc.WriteString(fmt.Sprintf("- **查询轮数**: %d\n", maxIterations))
-	finalDoc.WriteString(fmt.Sprintf("- **生成时间**: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	finalDoc.WriteString("## 查询概况\n\n")
+	finalDoc.WriteString(fmt.Sprintf("- **查询时间**: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	finalDoc.WriteString(fmt.Sprintf("- **搜索轮次**: %s 次\n", searchCountStr))
+	finalDoc.WriteString(fmt.Sprintf("- **生成的文档数**: %d\n", len(artifactFiles)))
 	finalDoc.WriteString(fmt.Sprintf("- **压缩结果数**: %d\n", len(allCompressedResults)))
 	finalDoc.WriteString(fmt.Sprintf("- **最终文档大小**: %d 字节\n\n", len(mergedContent)))
 
 	// Search history section
 	if searchHistory != "" {
-		finalDoc.WriteString("## 查询历史\n\n")
+		finalDoc.WriteString("## 搜索历史\n\n")
 		finalDoc.WriteString("```\n")
 		finalDoc.WriteString(searchHistory)
 		finalDoc.WriteString("\n```\n\n")
 	}
 
 	// Main content section
-	finalDoc.WriteString("## 整合后的关键知识内容\n\n")
+	finalDoc.WriteString("## 详细知识内容\n\n")
 	finalDoc.WriteString(mergedContent)
 	finalDoc.WriteString("\n\n")
 
-	// Next movements summary
+	// Next movements summary (for reference)
 	if nextMovementsSummary != "" {
-		finalDoc.WriteString("## 下一步建议汇总\n\n")
+		finalDoc.WriteString("## 搜索过程中的建议记录\n\n")
+		finalDoc.WriteString("<details>\n<summary>点击展开</summary>\n\n")
 		finalDoc.WriteString(nextMovementsSummary)
-		finalDoc.WriteString("\n\n")
+		finalDoc.WriteString("\n\n</details>\n\n")
 	}
 
 	// Reference files section
 	if len(artifactFiles) > 0 {
-		finalDoc.WriteString("## 参考文件列表\n\n")
+		finalDoc.WriteString("## 参考文件\n\n")
 		for i, filename := range artifactFiles {
 			finalDoc.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, filename))
 		}
 		finalDoc.WriteString("\n")
+	}
+
+	// Ensure total size doesn't exceed limit
+	finalContent := finalDoc.String()
+	const maxTotalBytes = 50 * 1024
+	if len(finalContent) > maxTotalBytes {
+		log.Warnf("generateFinalKnowledgeDocument: final report too large (%d bytes), truncating", len(finalContent))
+		finalContent = finalContent[:maxTotalBytes-100] + "\n\n...(报告已截断，请查看详细文件)"
 	}
 
 	// Save final document
@@ -123,12 +146,15 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 		emitter.EmitPinFilename(finalFilename)
 	}
 
-	if err := os.WriteFile(finalFilename, []byte(finalDoc.String()), 0644); err != nil {
+	if err := os.WriteFile(finalFilename, []byte(finalContent), 0644); err != nil {
 		log.Warnf("generateFinalKnowledgeDocument: failed to write final document: %v", err)
 	} else {
 		log.Infof("generateFinalKnowledgeDocument: final document saved to: %s (%d bytes)",
-			finalFilename, len(finalDoc.String()))
+			finalFilename, len(finalContent))
 	}
+
+	// Record to timeline
+	invoker.AddToTimeline("knowledge_search_finished", fmt.Sprintf("Final report saved to: %s\nSummary: %s", finalFilename, finalSummary))
 
 	// Store final document path in loop context
 	loop.Set("final_knowledge_document", finalFilename)

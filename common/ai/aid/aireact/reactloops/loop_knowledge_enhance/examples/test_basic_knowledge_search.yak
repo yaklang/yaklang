@@ -5,8 +5,8 @@
  * 验证点：
  * 1. 搜索成功执行
  * 2. 结果被压缩并保存到 artifact
- * 3. AI 根据 next_movements 决定下一步
- * 4. 最终调用 finish_knowledge_search 生成报告
+ * 3. 系统根据 evaluateNextMovements 的 finished 字段决定是否继续
+ * 4. 系统自动判断完成后生成最终报告
  */
 
 log.info("========================================")
