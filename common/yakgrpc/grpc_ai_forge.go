@@ -6,8 +6,10 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -101,6 +103,62 @@ func (s *Server) GetAIForge(ctx context.Context, req *ypb.GetAIForgeRequest) (*y
 	}
 
 	return forge.ToGRPC(), nil
+}
+
+func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_ExportAIForgeServer) error {
+	names := req.GetForgeNames()
+	if len(names) == 0 {
+		return utils.Error("forge names are required")
+	}
+	progress := func(percent float64, msg string) {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent: percent,
+			Message: msg,
+		})
+	}
+	_, err := aiforge.ExportAIForgesToTarGz(
+		s.GetProfileDatabase(),
+		names,
+		"",
+		aiforge.WithForgeProgress(progress),
+		aiforge.WithForgeOverwrite(req.GetOverwrite()),
+		aiforge.WithForgeNewName(req.GetNewForgeName()),
+		aiforge.WithForgeAuthor(req.GetAuthor()),
+		aiforge.WithForgeOutputName(req.GetOutputName()),
+		aiforge.WithForgePassword(req.GetPassword()),
+	)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&ypb.GeneralProgress{
+		Percent: 100,
+		Message: "export completed",
+	})
+}
+
+func (s *Server) ImportAIForge(req *ypb.ImportAIForgeRequest, stream ypb.Yak_ImportAIForgeServer) error {
+	progress := func(percent float64, msg string) {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent: percent,
+			Message: msg,
+		})
+	}
+	_, err := aiforge.ImportAIForgesFromTarGz(
+		s.GetProfileDatabase(),
+		req.GetInputPath(),
+		aiforge.WithForgeProgress(progress),
+		aiforge.WithForgeOverwrite(req.GetOverwrite()),
+		aiforge.WithForgeNewName(req.GetNewForgeName()),
+		aiforge.WithForgeAuthor(req.GetAuthor()),
+		aiforge.WithForgePassword(req.GetPassword()),
+	)
+	if err != nil {
+		return err
+	}
+	return stream.Send(&ypb.GeneralProgress{
+		Percent: 100,
+		Message: "import completed",
+	})
 }
 
 func applyForgeMetadata(db *gorm.DB, forge *schema.AIForge) {
