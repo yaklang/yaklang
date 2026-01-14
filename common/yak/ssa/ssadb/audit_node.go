@@ -138,8 +138,10 @@ func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]string, error) {
 	return items, nil
 }
 
-func GetEffectOnEdgeByFromNodeId(id string) []string {
-	db := GetDB()
+func GetEffectOnEdgeByFromNodeId(db *gorm.DB, id string) []string {
+	if db == nil {
+		db = GetDB()
+	}
 	var effectOns []string
 	db.Model(&AuditEdge{}).
 		Where(" from_node = ? AND edge_type = ? ", id, EdgeType_EffectsOn).
@@ -147,8 +149,10 @@ func GetEffectOnEdgeByFromNodeId(id string) []string {
 	return effectOns
 }
 
-func GetDependEdgeOnByFromNodeId(id string) []string {
-	db := GetDB()
+func GetDependEdgeOnByFromNodeId(db *gorm.DB, id string) []string {
+	if db == nil {
+		db = GetDB()
+	}
 	var dependOns []string
 	db.Model(&AuditEdge{}).
 		Where("from_node =? AND edge_type = ? ", id, EdgeType_DependsOn).
@@ -156,8 +160,10 @@ func GetDependEdgeOnByFromNodeId(id string) []string {
 	return dependOns
 }
 
-func GetDataFlowEdgeByToNodeId(fromId uint) []string {
-	db := GetDB()
+func GetDataFlowEdgeByToNodeId(db *gorm.DB, fromId uint) []string {
+	if db == nil {
+		db = GetDB()
+	}
 	var edges []string
 	db.Model(&AuditEdge{}).
 		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_DataFlow).
@@ -165,8 +171,11 @@ func GetDataFlowEdgeByToNodeId(fromId uint) []string {
 	return edges
 }
 
-func GetPredecessorEdgeByFromID(fromId string) []*AuditEdge {
-	db := GetDB()
+func GetPredecessorEdgeByFromID(db *gorm.DB, fromId string) []*AuditEdge {
+	if db == nil {
+		db = GetDB()
+	}
+	db = db.Debug()
 	var edges []*AuditEdge
 	db.Model(&AuditEdge{}).
 		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_Predecessor).
@@ -174,8 +183,10 @@ func GetPredecessorEdgeByFromID(fromId string) []*AuditEdge {
 	return edges
 }
 
-func GetAuditNodeById(id string) (*AuditNode, error) {
-	db := GetDB()
+func GetAuditNodeById(db *gorm.DB, id string) (*AuditNode, error) {
+	if db == nil {
+		db = GetDB()
+	}
 	var an AuditNode
 	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&an).Error; err != nil {
 		return nil, err
@@ -184,8 +195,10 @@ func GetAuditNodeById(id string) (*AuditNode, error) {
 	}
 }
 
-func GetAuditNodesByIds(ids []string) ([]*AuditNode, error) {
-	db := GetDB()
+func GetAuditNodesByIds(db *gorm.DB, ids []string) ([]*AuditNode, error) {
+	if db == nil {
+		db = GetDB()
+	}
 	var ans []*AuditNode
 	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&ans).Error; err != nil {
 		return nil, err

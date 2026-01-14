@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -149,10 +150,10 @@ func (r *SyntaxFlowResult) GetValue(name string, index int) (*Value, error) {
 		id, err := ssadb.GetResultNodeByVariableIndex(ssadb.GetDB(), r.GetResultID(), name, uint(index))
 		if err == nil {
 			if r.program != nil {
-				return r.program.NewValueFromAuditNode(id), nil
+				return r.program.NewValueFromAuditNode(ssadb.GetDB(), id), nil
 			} else {
 				// 内存编译的program为空
-				return r.getValueFromTmpAuditNode(id), nil
+				return r.getValueFromTmpAuditNode(ssadb.GetDB(), id), nil
 			}
 		}
 	}
@@ -230,7 +231,7 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 	vs := make(Values, 0, len(auditNodeIDs))
 	if r.program != nil {
 		for _, nodeID := range auditNodeIDs {
-			v := r.program.NewValueFromAuditNode(nodeID)
+			v := r.program.NewValueFromAuditNode(ssadb.GetDB(), nodeID)
 			if v != nil {
 				vs = append(vs, v)
 			}
@@ -243,7 +244,7 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 }
 
 func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []string) Values {
-	auditNodes, err := ssadb.GetAuditNodesByIds(nodeIds)
+	auditNodes, err := ssadb.GetAuditNodesByIds(ssadb.GetDB(), nodeIds)
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %v", nodeIds)
 		return nil
@@ -273,8 +274,11 @@ func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []string) Values {
 	return vs
 }
 
-func (r *SyntaxFlowResult) getValueFromTmpAuditNode(nodeId string) *Value {
-	auditNode, err := ssadb.GetAuditNodeById(nodeId)
+func (r *SyntaxFlowResult) getValueFromTmpAuditNode(db *gorm.DB, nodeId string) *Value {
+	if db == nil {
+		db = ssadb.GetDB()
+	}
+	auditNode, err := ssadb.GetAuditNodeById(db, nodeId)
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %v", nodeId)
 		return nil

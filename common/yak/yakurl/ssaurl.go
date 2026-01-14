@@ -348,7 +348,7 @@ func GetValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Value
 	if p == nil || err != nil {
 		p = ssaapi.NewTmpProgram(programName)
 	}
-	value := p.NewValueFromAuditNode(auditNodeID)
+	value := p.NewValueFromAuditNode(ssadb.GetDB(), auditNodeID)
 	if utils.IsNil(value) {
 		return nil, utils.Errorf("value not found from audit node id: %s", auditNodeID)
 	}

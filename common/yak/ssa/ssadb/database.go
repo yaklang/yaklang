@@ -120,6 +120,10 @@ func GetDB() *gorm.DB {
 	return consts.GetGormSSAProjectDataBase()
 }
 
+func SetDB(db *gorm.DB) {
+	consts.SetGormSSAProjectDatabase(db)
+}
+
 func DeleteProgram(db *gorm.DB, program string) {
 	utils.GormTransaction(db, func(tx *gorm.DB) error {
 		tx.Model(&IrProgram{}).Where("program_name = ?", program).Unscoped().Delete(&IrProgram{})
