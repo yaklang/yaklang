@@ -12,11 +12,12 @@ import (
 )
 
 type File struct {
-	Path      string            `json:"path"`    // file path
-	Length    int64             `json:"length"`  // length of the code
-	Hash      map[string]string `json:"hash"`    // hash of the code
-	Content   string            `json:"content"` // long text
-	LineCount int               `json:"line_count"`
+	Path         string            `json:"path"`           // file path
+	Length       int64             `json:"length"`         // length of the code
+	Hash         map[string]string `json:"hash"`           // hash of the code
+	IrSourceHash string            `json:"ir_source_hash"` // Md5(ProgramName + FolderPath + FileName + SourceCode)
+	Content      string            `json:"content"`        // long text
+	LineCount    int               `json:"line_count"`
 
 	Risks []string `json:"risks"` // risk hash list
 }
@@ -33,7 +34,7 @@ func (f *File) SaveToDB(db *gorm.DB, programName string) error {
 	if err != nil {
 		return err
 	}
-	irSource := ssadb.MarshalFile(editor)
+	irSource := ssadb.MarshalFile(editor, f.IrSourceHash)
 	if err := irSource.Save(db); err != nil {
 		return utils.Wrapf(err, "Save File to DB failed")
 	}
@@ -49,9 +50,10 @@ func (f *File) AddRisk(risk *Risk) {
 
 func editor2File(editor *memedit.MemEditor, fullCode bool) *File {
 	ret := &File{
-		Path:      editor.GetUrl(),
-		Length:    int64(editor.GetLength()),
-		LineCount: editor.GetLineCount(),
+		Path:         editor.GetUrl(),
+		Length:       int64(editor.GetLength()),
+		LineCount:    editor.GetLineCount(),
+		IrSourceHash: editor.GetIrSourceHash(),
 		Hash: map[string]string{
 			"md5":    editor.SourceCodeMd5(),
 			"sha1":   editor.SourceCodeSha1(),
