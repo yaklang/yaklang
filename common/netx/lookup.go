@@ -45,6 +45,14 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 		}
 	}
 
+	if len(config.hostGlobs) > 0 {
+		if result, ok := config.matchHostGlob(host); ok && result != "" {
+			config.etcHostNoCache = true
+			config.call("", host, result, "hosts", "hosts-glob")
+			return nil
+		}
+	}
+
 	// handle hosts
 	result, ok := GetHost(host)
 	if ok && result != "" {
