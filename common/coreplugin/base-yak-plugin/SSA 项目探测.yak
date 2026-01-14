@@ -152,6 +152,8 @@ excludeFile := cli.String(
 
 filePerformanceLog := cli.Bool("filePerformanceLog", cli.setDefault(false), cli.setVerboseName("文件性能日志"), cli.setHelp("启用文件级别编译性能日志"), cli.setCliGroup("compile"))
 
+jarRecursiveParse := cli.Bool("jar-recursive-parse", cli.setDefault(true), cli.setVerboseName("Jar递归解析"), cli.setHelp("是否递归解析Jar文件中的嵌套Jar。默认开启，项目太大时可关闭以提高性能。"), cli.setCliGroup("compile"))
+
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
 strictMode = cli.Bool(
@@ -572,6 +574,7 @@ options = [
     ssa.withDescription(description),
     ssa.withEntryFile(entry...),
     ssa.withFilePerformanceLog(filePerformanceLog),
+    ssa.withCodeSourceJarRecursiveParse(jarRecursiveParse),
 ]
 
 // 添加认证配置（从 JSON Schema 配置中提取）

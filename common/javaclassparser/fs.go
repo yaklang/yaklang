@@ -15,7 +15,8 @@ import (
 
 type JarFS struct {
 	*filesys.ZipFS
-	jarCache *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
+	jarCache          *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
+	recursiveParse    bool // 是否递归解析嵌套的jar文件，默认为true
 }
 
 var _ fs.FS = (*JarFS)(nil)
@@ -31,9 +32,14 @@ func NewJarFSFromLocal(path string) (*JarFS, error) {
 }
 
 func NewJarFS(zipFs *filesys.ZipFS) *JarFS {
+	return NewJarFSWithOptions(zipFs, true) // 默认启用递归解析
+}
+
+func NewJarFSWithOptions(zipFs *filesys.ZipFS, recursiveParse bool) *JarFS {
 	return &JarFS{
-		ZipFS:    zipFs,
-		jarCache: utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
+		ZipFS:          zipFs,
+		jarCache:       utils.NewSafeMapWithKey[string, *filesys.UnifiedFS](),
+		recursiveParse: recursiveParse,
 	}
 }
 
@@ -147,6 +153,11 @@ func parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, 
 }
 
 func (z *JarFS) getNestedJarFS(jarPath string) (*filesys.UnifiedFS, error) {
+	// 如果禁用了递归解析，返回错误
+	if !z.recursiveParse {
+		return nil, os.ErrNotExist
+	}
+
 	if nestedJarFS, ok := z.jarCache.Get(jarPath); ok {
 		return nestedJarFS, nil
 	}
@@ -161,7 +172,8 @@ func (z *JarFS) getNestedJarFS(jarPath string) (*filesys.UnifiedFS, error) {
 		return nil, utils.Wrapf(err, "failed to create zip filesystem for jar: %s", jarPath)
 	}
 
-	nestedJarFS := NewJarFS(nestedZipFS)
+	// 嵌套的jar也继承递归解析设置
+	nestedJarFS := NewJarFSWithOptions(nestedZipFS, z.recursiveParse)
 	unifiedFS := filesys.NewUnifiedFS(nestedJarFS,
 		filesys.WithUnifiedFsExtMap(".class", ".java"),
 	)
@@ -292,7 +304,8 @@ func (e *ExpandedZipFS) GetJarFS(jarPath string) (*filesys.UnifiedFS, error) {
 		return nil, utils.Wrapf(err, "failed to create zip filesystem for jar: %s", jarPath)
 	}
 
-	jarFS := NewJarFS(zipFS)
+	// ExpandedZipFS 默认启用递归解析（保持向后兼容）
+	jarFS := NewJarFSWithOptions(zipFS, true)
 	undiFS := filesys.NewUnifiedFS(jarFS,
 		filesys.WithUnifiedFsExtMap(".class", ".java"),
 	)

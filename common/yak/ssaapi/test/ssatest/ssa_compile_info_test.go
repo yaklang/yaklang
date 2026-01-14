@@ -161,6 +161,96 @@ func TestNestedJar(t *testing.T) {
 		res := vals.GetValues("a")
 		require.Contains(t, res.String(), "Hello world", "should find Hello world from nested jar after compilation")
 	})
+
+	t.Run("test nested jar compile with recursive parse enabled", func(t *testing.T) {
+		info := map[string]any{
+			"kind":                "jar",
+			"local_file":          nestedJarPath,
+			"jar_recursive_parse": true,
+		}
+
+		progName := uuid.NewString()
+		prog, err := ssaapi.ParseProject(
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaconfig.WithCodeSourceMap(info),
+			ssaapi.WithProgramName(progName),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+
+		// Verify that files from nested jar are compiled when recursive parse is enabled
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			fmt.Sprintf("/%s", progName),
+			filesys.WithFileSystem(ssadb.NewIrSourceFs()),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				fileList = append(fileList, s)
+				return nil
+			}),
+		)
+		log.Infof("compiled file list with recursive parse enabled: %v", fileList)
+		require.Greater(t, len(fileList), 0, "should compile files from nested jar when recursive parse is enabled")
+
+		// Test that we can query the compiled code
+		vals, err := prog.SyntaxFlowWithError(`System.out.println(* as $a)`)
+		require.NoError(t, err)
+		res := vals.GetValues("a")
+		require.Contains(t, res.String(), "Hello world", "should find Hello world from nested jar when recursive parse is enabled")
+	})
+
+	t.Run("test nested jar compile with recursive parse disabled", func(t *testing.T) {
+		info := map[string]any{
+			"kind":                "jar",
+			"local_file":          nestedJarPath,
+			"jar_recursive_parse": false,
+		}
+
+		progName := uuid.NewString()
+		prog, err := ssaapi.ParseProject(
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaconfig.WithCodeSourceMap(info),
+			ssaapi.WithProgramName(progName),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+
+		// When recursive parse is disabled and the jar only contains nested jars (no direct Java files),
+		// compilation may fail or produce no files. This is expected behavior.
+		if err != nil {
+			// If compilation fails due to no compilable files, that's acceptable
+			require.Contains(t, err.Error(), "not found can compiled file", "should fail when no compilable files found")
+			log.Infof("compilation failed as expected when recursive parse is disabled: %v", err)
+			return
+		}
+
+		// If compilation succeeds, verify that files from nested jar are NOT compiled
+		require.NotNil(t, prog)
+		fileList := make([]string, 0)
+		filesys.Recursive(
+			fmt.Sprintf("/%s", progName),
+			filesys.WithFileSystem(ssadb.NewIrSourceFs()),
+			filesys.WithFileStat(func(s string, fi fs.FileInfo) error {
+				fileList = append(fileList, s)
+				return nil
+			}),
+		)
+		log.Infof("compiled file list with recursive parse disabled: %v", fileList)
+
+		// Count files that are from nested jar (should be 0 when recursive parse is disabled)
+		nestedJarFileCount := 0
+		for _, file := range fileList {
+			if strings.Contains(file, "test.jar/") || strings.Contains(file, "nested") {
+				nestedJarFileCount++
+			}
+		}
+		// When recursive parse is disabled, files from nested jar should not be compiled
+		require.Equal(t, 0, nestedJarFileCount, "should not compile files from nested jar when recursive parse is disabled")
+		log.Infof("files from nested jar: %d (should be 0)", nestedJarFileCount)
+	})
 }
 func checkFilelist(t *testing.T, language string, info map[string]any) {
 	progName := uuid.NewString()
