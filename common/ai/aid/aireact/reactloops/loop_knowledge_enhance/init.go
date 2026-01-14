@@ -39,7 +39,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithMaxIterations(8), // 支持多轮单条搜索
+				reactloops.WithMaxIterations(4), // 支持多轮单条搜索
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					userQuery := loop.Get("user_query")
 					attachedResources := loop.Get("attached_resources")
