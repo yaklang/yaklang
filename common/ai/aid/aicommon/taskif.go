@@ -69,6 +69,7 @@ type AIStatefulTask interface {
 	GetUUID() string
 
 	GetFocusMode() string
+	SetFocusMode(mode string)
 }
 
 type AIStatefulTaskBase struct {
