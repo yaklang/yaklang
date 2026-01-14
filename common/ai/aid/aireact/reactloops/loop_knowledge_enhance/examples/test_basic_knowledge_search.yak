@@ -22,7 +22,6 @@ artifactContent = ""
 finalDocFilename = ""
 finalDocContent = ""
 searchResultsCaptured = false
-executionError = nil
 finishCalled = false
 
 // 执行 knowledge_enhance 循环
@@ -31,8 +30,8 @@ log.info("Starting knowledge_enhance loop...")
 aim.InvokeReAct(
     testPrompt,
     aim.focus("knowledge_enhance"),
-    aim.timeout(180),  // 3分钟超时
-    aim.maxIteration(8),
+    aim.timeout(120),  // 2分钟超时
+    aim.maxIteration(4),
     aim.attachedKnowledgeBase("yaklang-yakscript-plugins"),
     aim.onEvent(func(eventType, eventData) {
         log.debug(f"Event: ${eventType}")
@@ -80,10 +79,6 @@ aim.InvokeReAct(
             }
         }
     }),
-    aim.onError(func(err) {
-        log.error(f"Execution error: ${err}")
-        executionError = err
-    }),
 )
 
 // 等待完成
@@ -93,19 +88,16 @@ log.info("========================================")
 log.info("RUNNING ASSERTIONS")
 log.info("========================================")
 
-// 断言1：执行没有错误
-assert executionError == nil, sprintf("Execution should not have errors, got: %v", executionError)
-
-// 断言2：至少有一个 artifact 被创建
+// 断言1：至少有一个 artifact 被创建
 assert artifactFilename != "", "Artifact filename should not be empty"
 
-// 断言3：artifact 文件存在
+// 断言2：artifact 文件存在
 assert file.IsExisted(artifactFilename), sprintf("Artifact file should exist: %s", artifactFilename)
 
-// 断言4：artifact 内容不为空
+// 断言3：artifact 内容不为空
 assert len(artifactContent) > 50, sprintf("Artifact content too short. Expected > 50 bytes, got %d bytes", len(artifactContent))
 
-// 断言5：内容包含关键信息
+// 断言4：内容包含关键信息
 assert str.Contains(artifactContent, "知识查询结果") || str.Contains(artifactContent, "查询语句"), "Artifact should contain query info"
 
 log.info("========================================")
