@@ -34,6 +34,7 @@ import (
 	"github.com/saintfish/chardet"
 	"github.com/yaklang/yaklang/common/gmsm/sm3"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
@@ -105,6 +106,13 @@ func StrConvUnquoteForce(s string) []byte {
 		return []byte(s)
 	}
 	return []byte(raw)
+}
+
+// UnescapeString 处理字符串中的转义字符，无需外层引号
+// 支持 \" \\ \n \r \t \xNN \uNNNN \UNNNNNNNN 等转义序列
+// 与 codec.StrconvUnquote 不同，本函数不要求输入带引号包裹
+func UnescapeString(s string) (string, error) {
+	return yakunquote.UnquoteInner(s, 0)
 }
 
 var DoubleEncodeUrl = func(i interface{}) string {

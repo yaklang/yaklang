@@ -44,6 +44,7 @@ var CodecExports = map[string]interface{}{
 	"DecodeChunked":     codec.HTTPChunkedDecode,
 	"StrconvQuote":      codec.StrConvQuote,
 	"StrconvUnquote":    codec.StrConvUnquote,
+	"UnescapeString":    codec.UnescapeString,
 	"UTF8ToGBK":         codec.Utf8ToGbk,
 	"UTF8ToGB18030":     codec.Utf8ToGB18030,
 	"UTF8ToHZGB2312":    codec.Utf8ToHZGB2312,
