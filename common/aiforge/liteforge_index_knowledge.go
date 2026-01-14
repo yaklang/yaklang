@@ -3,7 +3,6 @@ package aiforge
 import (
 	_ "embed"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -80,15 +79,14 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *
 	go func() {
 		defer output.Close()
 
-		buildWg := sync.WaitGroup{}
-		defer buildWg.Wait()
+		swg := utils.NewSizedWaitGroup(10, refineConfig.Ctx)
+		defer swg.Wait()
 
 		for res := range analyzeChannel {
-
-			buildWg.Add(1)
-			go func() {
-				defer buildWg.Done()
-				entries, err := BuildIndexFormAnalyzeResult(res, options...)
+			swg.Add()
+			go func(r AnalysisResult) {
+				defer swg.Done()
+				entries, err := BuildIndexFormAnalyzeResult(r, options...)
 				if err != nil {
 					log.Errorf("failed to build index from analyze result: %v", err)
 					return
@@ -102,7 +100,7 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *
 						return
 					}
 				}
-			}()
+			}(res)
 
 		}
 	}()
