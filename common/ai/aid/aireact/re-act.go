@@ -424,6 +424,7 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 			"user_input": task.GetUserInput(),
 			"status":     task.GetStatus(),
 			"created_at": task.GetCreatedAt(),
+			"focus_mode": task.GetFocusMode(),
 		}
 
 		taskInfos = append(taskInfos, taskInfo)

@@ -137,6 +137,7 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 
 	log.Infof("Task enqueue started processing: %s", task.GetId())
 	// 任务不相关，进入排队状态
+	task.SetFocusMode(event.GetFocusModeLoop())
 	task.SetStatus(aicommon.AITaskState_Queueing)
 	err := r.taskQueue.Append(task)
 	if err != nil {
