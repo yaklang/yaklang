@@ -3,6 +3,7 @@ package bruteutils
 import (
 	"database/sql"
 	"os"
+	"strings"
 	"sync"
 
 	go_ora "github.com/sijms/go-ora/v2"
@@ -47,6 +48,7 @@ var oracleAuth = &DefaultServiceAuthInfo{
 
 		setupUserEnvOnce.Do(setupUserEnv)
 
+		var lastErr error
 		for _, service := range oracleServiceNames {
 			dataSourceName := go_ora.BuildUrl(ip, port, service, i.Username, i.Password, urlOptions)
 			connector := go_ora.NewConnector(dataSourceName).(*go_ora.OracleConnector)
@@ -60,12 +62,39 @@ var oracleAuth = &DefaultServiceAuthInfo{
 			db.SetMaxIdleConns(0)
 
 			err = db.Ping()
-			defer db.Close()
+			db.Close()
 			if err == nil {
 				res.Ok = true
 				res.Finished = true
 				return res
 			}
+			lastErr = err
+			// 检查是否是连接错误，如果是则不再尝试其他service
+			if err != nil {
+				errStr := err.Error()
+				switch true {
+				case strings.Contains(errStr, "timeout"):
+					fallthrough
+				case strings.Contains(errStr, "i/o timeout"):
+					fallthrough
+				case strings.Contains(errStr, "dial tcp"):
+					fallthrough
+				case strings.Contains(errStr, "bad connection"):
+					fallthrough
+				case strings.Contains(errStr, "EOF"):
+					fallthrough
+				case strings.Contains(errStr, "connection refused"):
+					fallthrough
+				case strings.Contains(errStr, "no route to host"):
+					res.Finished = true
+					return res
+				}
+			}
+		}
+		// 所有service都尝试失败，停止爆破
+		if lastErr != nil {
+			log.Debugf("oracle all services failed: %v", lastErr)
+			res.Finished = true
 		}
 		return res
 	},
