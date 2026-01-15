@@ -124,24 +124,26 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, options ...any) (<-ch
 		}()
 	}
 
-	ermBuildChannel := broadcasterChannel.Subscribe()
-	closeWg.Add(1)
-	go func() {
-		defer closeWg.Done()
-		er, err := AnalyzeERMFromAnalysisResult(ermBuildChannel.OutputChannel(), options...)
-		if err != nil {
-			log.Errorf("failed to analyze ERM from analysis result: %v", err)
-			return
-		}
-		knowledgeEntry, err := BuildKnowledgeFromEntityRepository(er, ragSystem, append(options, entityrepos.WithRuntimeBuildOnly(true))...)
-		if err != nil {
-			log.Errorf("failed to build knowledge from entity repository: %v", err)
-			return
-		}
-		for res := range knowledgeEntry {
-			outputChannel.SafeFeed(res)
-		}
-	}()
+	if !refineConfig.DisableERMBuild {
+		ermBuildChannel := broadcasterChannel.Subscribe()
+		closeWg.Add(1)
+		go func() {
+			defer closeWg.Done()
+			er, err := AnalyzeERMFromAnalysisResult(ermBuildChannel.OutputChannel(), options...)
+			if err != nil {
+				log.Errorf("failed to analyze ERM from analysis result: %v", err)
+				return
+			}
+			knowledgeEntry, err := BuildKnowledgeFromEntityRepository(er, ragSystem, append(options, entityrepos.WithRuntimeBuildOnly(true))...)
+			if err != nil {
+				log.Errorf("failed to build knowledge from entity repository: %v", err)
+				return
+			}
+			for res := range knowledgeEntry {
+				outputChannel.SafeFeed(res)
+			}
+		}()
+	}
 
 	go func() {
 		defer broadcasterChannel.Close()

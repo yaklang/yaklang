@@ -80,6 +80,8 @@ var RagExports = map[string]interface{}{
 	"statusCard":      aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
 	"extraPrompt":     aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
 	"entryLength":     aiforge.RefineWithKnowledgeEntryLength,
+	"disableIndex":    aiforge.RefineWithDisableBuildIndex, // disable building index knowledge
+	"disableERM":      aiforge.RefineWithDisableERMBuild,   // disable building entity repository model
 	"chunkSize":       chunkmaker.WithChunkSize,
 	"khopk":           rag.WithKHopK,
 	"khopLimit":       rag.WithKHopLimit,

@@ -317,20 +317,26 @@ func KnowledgeBaseEntryListToGrpcModel(entries []*schema.KnowledgeBaseEntry) []*
 }
 
 func KnowledgeBaseEntryToGrpcModel(entry *schema.KnowledgeBaseEntry) *ypb.KnowledgeBaseEntry {
+	escapeArray := func(array []string) []string {
+		for i, v := range array {
+			array[i] = utils.EscapeInvalidUTF8Byte([]byte(v))
+		}
+		return array
+	}
 	return &ypb.KnowledgeBaseEntry{
 		ID:                       int64(entry.ID),
 		KnowledgeBaseId:          entry.KnowledgeBaseID,
-		KnowledgeTitle:           entry.KnowledgeTitle,
-		KnowledgeType:            entry.KnowledgeType,
+		KnowledgeTitle:           utils.EscapeInvalidUTF8Byte([]byte(entry.KnowledgeTitle)),
+		KnowledgeType:            utils.EscapeInvalidUTF8Byte([]byte(entry.KnowledgeType)),
 		ImportanceScore:          int32(entry.ImportanceScore),
-		Keywords:                 entry.Keywords,
-		KnowledgeDetails:         entry.KnowledgeDetails,
-		HiddenIndex:              entry.HiddenIndex,
-		Summary:                  entry.Summary,
+		Keywords:                 escapeArray(entry.Keywords),
+		KnowledgeDetails:         utils.EscapeInvalidUTF8Byte([]byte(entry.KnowledgeDetails)),
+		HiddenIndex:              utils.EscapeInvalidUTF8Byte([]byte(entry.HiddenIndex)),
+		Summary:                  utils.EscapeInvalidUTF8Byte([]byte(entry.Summary)),
 		SourcePage:               int32(entry.SourcePage),
-		PotentialQuestions:       entry.PotentialQuestions,
+		PotentialQuestions:       escapeArray(entry.PotentialQuestions),
 		PotentialQuestionsVector: entry.PotentialQuestionsVector,
-		RelatedEntityUUIDS:       entry.RelatedEntityUUIDS,
+		RelatedEntityUUIDS:       utils.EscapeInvalidUTF8Byte([]byte(entry.RelatedEntityUUIDS)),
 	}
 }
 
