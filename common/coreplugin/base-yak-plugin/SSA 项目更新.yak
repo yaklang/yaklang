@@ -31,7 +31,7 @@ configData = cli.Json("config_data",
         "language": {
           "title": "项目语言",
           "type": "string",
-          "enum": ["java", "php", "yak", "js", "ts", "go", "c"]
+          "enum": ["java", "php", "yak", "js", "ts", "golang", "c"]
         }
       },
       "required": ["project_name", "language"]

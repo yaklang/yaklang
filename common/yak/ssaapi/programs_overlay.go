@@ -886,6 +886,20 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 
 // Implement sfvm.ValueOperator interface
 
+func (p *ProgramOverLay) Show() *ProgramOverLay {
+	if p == nil {
+		return p
+	}
+	for i, layer := range p.Layers {
+		if layer != nil && layer.Program != nil {
+			fmt.Printf("=== Layer %d (Index: %d) ===\n", i+1, layer.LayerIndex)
+			layer.Program.Show()
+			fmt.Println()
+		}
+	}
+	return p
+}
+
 func (p *ProgramOverLay) String() string {
 	if p == nil {
 		return "ProgramOverLay(nil)"

@@ -52,6 +52,13 @@ func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 		// return utils.Errorf("The project compilation engine version is too old to recompile.\n该项目编译时引擎版本过旧，无法重新编译。")
 	}
 
+	// 检测是否是增量编译的 program
+	// 如果当前 program 是增量编译的，重编译时应该自动启用增量编译，使用当前 program 作为 base program
+	if prog.IsIncrementalCompile() {
+		log.Infof("检测到增量编译 program，自动启用增量编译，base program: %s", prog.Program.Name)
+		opt = append(opt, WithBaseProgramName(prog.Program.Name))
+	}
+
 	// append other options
 	opt = append(opt, WithProgramName(prog.Program.Name))
 	opt = append(opt, WithLanguage(prog.GetLanguage()))

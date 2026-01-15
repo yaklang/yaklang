@@ -61,6 +61,53 @@ func (p *Program) GetOverlay() *ProgramOverLay {
 	return p.overlay
 }
 
+// IsIncrementalCompile 判断这个 program 是否是增量编译的
+// 如果 IsOverlay 为 true，或者有 BaseProgramName/FileHashMap，说明这个 program 属于增量编译流程的一部分
+func (p *Program) IsIncrementalCompile() bool {
+	if p == nil {
+		return false
+	}
+	if p.irProgram != nil {
+		// 使用 IsOverlay 或 BaseProgramName 来判断是否是增量编译
+		return p.irProgram.IsOverlay || p.irProgram.BaseProgramName != "" || len(p.irProgram.FileHashMap) > 0
+	}
+	// 如果没有 irProgram，检查是否有 BaseProgramName 或 FileHashMap（向后兼容）
+	if p.Program != nil {
+		return p.Program.BaseProgramName != "" || len(p.Program.FileHashMap) > 0
+	}
+	return false
+}
+
+// IsBaseProgram 判断这个增量编译的 program 是否是 base program（第一个全量编译的 program）
+// base program 是增量编译流程中的第一个 program，它的 BaseProgramName 为空
+func (p *Program) IsBaseProgram() bool {
+	if !p.IsIncrementalCompile() {
+		return false
+	}
+	// base program 是增量编译的，但 BaseProgramName 为空
+	if p.irProgram != nil {
+		return p.irProgram.BaseProgramName == ""
+	}
+	if p.Program != nil {
+		return p.Program.BaseProgramName == ""
+	}
+	return false
+}
+
+// GetBaseProgramName 获取基础程序名称（用于增量编译）
+func (p *Program) GetBaseProgramName() string {
+	if p == nil {
+		return ""
+	}
+	if p.irProgram != nil && p.irProgram.BaseProgramName != "" {
+		return p.irProgram.BaseProgramName
+	}
+	if p.Program != nil && p.Program.BaseProgramName != "" {
+		return p.Program.BaseProgramName
+	}
+	return ""
+}
+
 func (p *Program) GetType(name string) *Type {
 	typ := p.Program.GetType(name)
 	if utils.IsNil(typ) {

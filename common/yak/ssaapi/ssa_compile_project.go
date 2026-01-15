@@ -61,12 +61,14 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Prog
 }
 
 // CompileDiffProgramAndSaveToDB 编译差量程序并保存到数据库
+// 注意：这个函数不应该通过选项触发增量编译，因为它已经在增量编译的上下文中被调用了
+// 它只负责编译差量文件系统，并在编译后手动设置增量编译元数据
 // baseFS: 基础文件系统（全量编译）
 // newFS: 新文件系统（用于计算差量）
 // baseProgramName: 基础程序的名称（用于设置 BaseProgramName）
 // diffProgramName: 差量程序的名称
 // language: 编译语言
-// 返回：编译后的差量程序（FileHashMap 已保存在数据库中）
+// 返回：编译后的差量程序（BaseProgramName 和 FileHashMap 已设置）
 func CompileDiffProgramAndSaveToDB(
 	ctx context.Context,
 	baseFS, newFS fi.FileSystem,
@@ -81,13 +83,17 @@ func CompileDiffProgramAndSaveToDB(
 	}
 
 	// Step 2: 准备编译选项
+	// 设置 WithBaseProgramName 以便在 parseProjectWithFS 中自动设置到 Program.BaseProgramName
+	// 但是显式禁用增量编译检测，避免触发增量编译逻辑（因为我们已经在这个上下文中了）
 	diffOpts := []ssaconfig.Option{WithLanguage(language)}
 	if diffProgramName != "" {
 		diffOpts = append(diffOpts, WithProgramName(diffProgramName))
 	}
-	// 设置增量编译信息到编译选项
 	if baseProgramName != "" {
 		diffOpts = append(diffOpts, WithBaseProgramName(baseProgramName))
+		// 显式禁用增量编译检测，避免循环调用
+		// 因为 CompileDiffProgramAndSaveToDB 已经在增量编译的上下文中被调用了
+		diffOpts = append(diffOpts, WithEnableIncrementalCompile(false))
 	}
 	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
@@ -96,6 +102,7 @@ func CompileDiffProgramAndSaveToDB(
 	diffOpts = append(diffOpts, opts...)
 
 	// Step 3: 编译差量文件系统（只包含变更的文件：新增+修改）
+	// 这里调用 ParseProjectWithFS 不会触发增量编译，因为我们显式设置了 WithEnableIncrementalCompile(false)
 	diffPrograms, err := ParseProjectWithFS(diffFS, diffOpts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff file system")
@@ -104,6 +111,19 @@ func CompileDiffProgramAndSaveToDB(
 		return nil, utils.Errorf("diff file system compilation produced no programs")
 	}
 	diffProgram := diffPrograms[0]
+
+	// Step 4: 确保增量编译元数据已正确设置
+	// WithBaseProgramName 和 WithFileHashMap 已经通过选项设置到 config 中，
+	// 并在 parseProjectWithFS 中自动设置到 Program.BaseProgramName 和 Program.FileHashMap
+	// 这里只需要确保一致性
+	if diffProgram.Program != nil {
+		if baseProgramName != "" && diffProgram.Program.BaseProgramName == "" {
+			diffProgram.Program.BaseProgramName = baseProgramName
+		}
+		if len(fileHashMap) > 0 && len(diffProgram.Program.FileHashMap) == 0 {
+			diffProgram.Program.FileHashMap = fileHashMap
+		}
+	}
 
 	return diffProgram, nil
 }
@@ -149,20 +169,40 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		}
 	}()
 
+	// 检查是否启用增量编译
+	// 如果 isIncremental 为 true，表示启用了增量编译
+	// 如果 baseProgramName 不为空，表示这是差量编译（基于已有程序）
+	// 如果 baseProgramName 为空，表示这是第一次增量编译（base program，全量编译但设置 IsOverlay = true）
+	isIncrementalCompile := c.isIncremental && c.fs != nil
+	isDiffCompile := isIncrementalCompile && c.baseProgramName != ""
+
 	if c.GetCompileReCompile() {
-		c.Processf(0, "recompile project, delete old data...")
-		ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
-		ProgramCache.Remove(programName)
-		c.Processf(0, "recompile project, delete old data finish")
+		// 非增量编译的项目会先删除原 program，然后重新编译
+		// 增量编译的项目不应该删除原 program，因为需要保留 base program
+		if !isIncrementalCompile {
+			c.Processf(0, "recompile project, delete old data...")
+			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
+			ProgramCache.Remove(programName)
+			c.Processf(0, "recompile project, delete old data finish")
+		} else {
+			c.Processf(0, "recompile incremental project, keep base program...")
+			// 只清理缓存，不删除数据库中的 program
+			ProgramCache.Remove(programName)
+		}
 	}
 
 	c.Processf(0, "recompile project, start compile")
 
-	// 检查是否启用增量编译
-	if c.baseProgramName != "" && c.baseFS != nil && c.fs != nil {
-		c.Processf(0.1, "incremental compile detected, base program: %s", c.baseProgramName)
-		// 增量编译：编译差量程序并创建 overlay
-		return c.parseProjectWithIncrementalCompile()
+	if isIncrementalCompile {
+		if isDiffCompile {
+			c.Processf(0.1, "incremental compile detected, base program: %s", c.baseProgramName)
+			// 差量编译：编译差量程序并创建 overlay
+			return c.parseProjectWithIncrementalCompile()
+		} else {
+			c.Processf(0.1, "first incremental compile (base program), performing full compilation")
+			// 第一次增量编译：全量编译但设置 IsOverlay = true
+			return c.parseProjectWithFirstIncrementalCompile()
+		}
 	}
 
 	if c.GetCompilePeepholeSize() != 0 {
@@ -227,11 +267,86 @@ func (c *Config) peephole() (Programs, error) {
 
 // parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
 func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
-	// Step 1: 编译差量程序并保存到数据库
-	c.Processf(0.2, "compiling diff program...")
+	// Step 1: 从数据库加载基础程序
+	c.Processf(0.1, "loading base program from database: %s", c.baseProgramName)
+	baseProgram, err := FromDatabase(c.baseProgramName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to load base program from database: %s", c.baseProgramName)
+	}
+	c.Processf(0.2, "base program loaded: %s", baseProgram.GetProgramName())
+
+	// Step 2: 处理 base program 的情况
+	// 问题2：当一个差量的 program 要继续进行增量编译时，需要先将这个差量 program 聚合生成 ProgramOverLay
+	var baseOverlay *ProgramOverLay
+	var baseFSForDiff fi.FileSystem
+
+	// 检查 base program 是否本身就是一个 overlay（已保存的 overlay）
+	baseOverlay = baseProgram.GetOverlay()
+	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
+		// base program 是一个已保存的 overlay，直接使用
+		baseFSForDiff = baseOverlay.GetAggregatedFileSystem()
+		if baseFSForDiff == nil {
+			return nil, utils.Errorf("base overlay has no aggregated file system")
+		}
+		c.Processf(0.3, "base program is an overlay with %d layers", len(baseOverlay.Layers))
+	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
+		// base program 是一个差量 program（增量编译但不是 base program），需要先聚合生成 ProgramOverLay
+		// 从数据库加载 base program 的 base program
+		baseProgramName := baseProgram.GetBaseProgramName()
+		baseBaseProgram, err := FromDatabase(baseProgramName)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to load base program's base program: %s", baseProgramName)
+		}
+		// 创建 overlay：baseBaseProgram 作为 Layer1，baseProgram 作为 Layer2
+		baseOverlay = NewProgramOverLay(baseBaseProgram, baseProgram)
+		if baseOverlay == nil {
+			return nil, utils.Errorf("failed to create overlay for diff base program")
+		}
+		baseFSForDiff = baseOverlay.GetAggregatedFileSystem()
+		if baseFSForDiff == nil {
+			return nil, utils.Errorf("base overlay has no aggregated file system")
+		}
+		c.Processf(0.3, "base program is a diff program, created overlay with 2 layers")
+	} else {
+		// base program 是全量编译的 program
+		// 如果提供了 baseFS，直接使用；否则从基础程序的配置重新构建文件系统
+		if c.baseFS != nil {
+			baseFSForDiff = c.baseFS
+			c.Processf(0.3, "base program is a full compilation program, using provided baseFS")
+		} else {
+			// 从基础程序的配置重新构建文件系统
+			baseConfig := baseProgram.GetConfig()
+			if baseConfig == nil {
+				// 尝试从数据库中的配置重建文件系统
+				if baseProgram.irProgram != nil && baseProgram.irProgram.ConfigInput != "" {
+					baseConfigRaw, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithConfigJson(baseProgram.irProgram.ConfigInput))
+					if err != nil {
+						return nil, utils.Wrapf(err, "failed to rebuild config from base program: %s", c.baseProgramName)
+					}
+					// 将 ssaconfig.Config 转换为 ssaapi.Config
+					baseConfig = &Config{Config: baseConfigRaw}
+				} else {
+					return nil, utils.Errorf("base program %s has no config to rebuild file system", c.baseProgramName)
+				}
+			}
+			// 使用基础程序的配置重新构建文件系统
+			var err error
+			baseFSForDiff, err = baseConfig.parseFSFromInfo()
+			if err != nil {
+				return nil, utils.Wrapf(err, "failed to rebuild file system from base program config: %s", c.baseProgramName)
+			}
+			if baseFSForDiff == nil {
+				return nil, utils.Errorf("failed to rebuild file system from base program: %s", c.baseProgramName)
+			}
+			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from config")
+		}
+	}
+
+	// Step 3: 编译差量程序并保存到数据库
+	c.Processf(0.4, "compiling diff program...")
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
-		c.baseFS,           // 基础文件系统
+		baseFSForDiff,      // 基础文件系统（可能是 overlay 的聚合文件系统）
 		c.fs,               // 新文件系统
 		c.baseProgramName,  // 基础程序名称
 		c.GetProgramName(), // 差量程序名称
@@ -240,22 +355,12 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff program")
 	}
-	c.Processf(0.6, "diff program compiled: %s", diffProgram.GetProgramName())
+	c.Processf(0.7, "diff program compiled: %s", diffProgram.GetProgramName())
 
-	// Step 2: 从数据库加载基础程序
-	c.Processf(0.7, "loading base program from database: %s", c.baseProgramName)
-	baseProgram, err := FromDatabase(c.baseProgramName)
-	if err != nil {
-		return nil, utils.Wrapf(err, "failed to load base program from database: %s", c.baseProgramName)
-	}
-	c.Processf(0.9, "base program loaded: %s", baseProgram.GetProgramName())
-
-	// Step 3: 创建 ProgramOverLay
-	c.Processf(0.95, "creating program overlay...")
+	// Step 4: 创建 ProgramOverLay
+	c.Processf(0.8, "creating program overlay...")
 	var overlay *ProgramOverLay
 
-	// 检查 base program 是否本身就是一个 overlay
-	baseOverlay := baseProgram.GetOverlay()
 	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
 		// base program 是一个 overlay，需要合并所有 layers
 		// 收集所有 base overlay 的 layers
@@ -307,6 +412,48 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	c.Processf(1, "incremental compile finish, overlay created and saved")
 
 	return Programs{diffProgram}, nil
+}
+
+// parseProjectWithFirstIncrementalCompile 处理第一次增量编译（base program）
+// 这种情况下进行全量编译，但设置 IsOverlay = true，表示这是增量编译流程的一部分
+func (c *Config) parseProjectWithFirstIncrementalCompile() (Programs, error) {
+	c.Processf(0.2, "first incremental compile (base program), performing full compilation")
+
+	// 进行全量编译
+	if prog, err := c.parseProjectWithFS(c.fs, func(f float64, s string, a ...any) {
+		c.Processf(0.2+f*0.7, s, a...)
+	}); err != nil {
+		return nil, err
+	} else {
+		// 确保 program 已保存到数据库
+		if prog.Program != nil {
+			wait := prog.Program.UpdateToDatabase()
+			if wait != nil {
+				wait()
+			}
+		}
+
+		// 确保 irProgram 存在
+		irProgram := prog.Program.GetIrProgram()
+		if irProgram != nil {
+			// 第一次增量编译：设置 IsOverlay = true，因为它是增量编译流程的一部分
+			// OverlayLayers 只包含它自己的名称，表示它是 overlay 的第一个层
+			programName := prog.GetProgramName()
+			irProgram.IsOverlay = true
+			if programName != "" {
+				irProgram.OverlayLayers = []string{programName}
+			} else {
+				irProgram.OverlayLayers = nil
+			}
+			ssadb.UpdateProgram(irProgram)
+			// 更新 prog.irProgram 字段，确保 IsIncrementalCompile() 能正确工作
+			prog.irProgram = irProgram
+		}
+
+		SaveConfig(c, prog)
+		c.Processf(1, "first incremental compile (base program) finish")
+		return Programs{prog}, nil
+	}
 }
 
 // saveOverlayToDatabase 保存 overlay 及其所有 layer 到数据库

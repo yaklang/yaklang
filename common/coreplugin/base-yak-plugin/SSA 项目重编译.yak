@@ -14,6 +14,18 @@ if err != nil {
     return 
 }
 
+// 检测是否是增量编译的 program
+isIncremental := prog.IsIncrementalCompile()
+if isIncremental {
+    isBaseProgram = prog.IsBaseProgram()
+    if isBaseProgram {
+        yakit.Info("检测到增量编译 program（base program，第一个全量编译的 program）")
+    } else {
+        baseProgramName = prog.Program.BaseProgramName
+        yakit.Info("检测到增量编译 program（差量 program），基础程序: %s", baseProgramName)
+    }
+    yakit.Info("重编译时将自动启用增量编译，使用当前 program 作为新的 base program")
+}
 
 opts = [
     ssa.withProcess((msg , process )=>{
