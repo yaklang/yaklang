@@ -52,7 +52,7 @@ type IrProgram struct {
 
 	// incremental compilation information
 	// BaseProgramName: if this is a diff program (incremental compilation), this is the name of the base (full) program
-	// If BaseProgramName is empty, this is a full compilation program
+	// If BaseProgramName is empty but IsOverlay is true, this is the first program in an incremental compilation series
 	BaseProgramName string `json:"base_program_name" gorm:"index"`
 	// FileHashMap: file path -> hash status (relative to base program)
 	// -1: deleted (exists in base but not in this program)

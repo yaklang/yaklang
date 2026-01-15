@@ -33,6 +33,20 @@ func NewProgramFromDB(p *ssadb.IrProgram) *Program {
 	prog.FileList = p.FileList
 	prog.LineCount = p.LineCount
 	prog.ExtraFile = p.ExtraFile
+	// 恢复增量编译信息（如果存在）
+	if p.BaseProgramName != "" {
+		prog.BaseProgramName = p.BaseProgramName
+	}
+	if len(p.FileHashMap) > 0 {
+		// 将 StringMap 转换为 map[string]int
+		prog.FileHashMap = make(map[string]int)
+		for filePath, hashStr := range p.FileHashMap {
+			var hash int
+			if _, err := fmt.Sscanf(hashStr, "%d", &hash); err == nil {
+				prog.FileHashMap[filePath] = hash
+			}
+		}
+	}
 	// TODO: handler up and down stream
 	return prog
 }

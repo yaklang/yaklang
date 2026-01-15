@@ -70,7 +70,8 @@ type Config struct {
 	filePerformanceRecorder *diagnostics.Recorder
 
 	// incremental compilation information
-	baseProgramName string
+	isIncremental   bool   // 是否启用增量编译
+	baseProgramName string // 基础程序名称（如果为空，表示这是第一次增量编译）
 	fileHashMap     map[string]int
 	baseFS          fi.FileSystem // 基础文件系统（用于增量编译）
 }
@@ -325,9 +326,19 @@ var WithEditor = ssaconfig.SetOption("ssa_compile/editor", func(c *Config, v *me
 
 var WithContext = ssaconfig.WithContext
 
+// WithEnableIncrementalCompile 启用增量编译
+// 如果启用增量编译但 BaseProgramName 为空，表示这是第一次增量编译（base program）
+var WithEnableIncrementalCompile = ssaconfig.SetOption("ssa_compile/enable_incremental", func(c *Config, v bool) {
+	c.isIncremental = v
+})
+
 // WithBaseProgramName 设置基础程序名称（用于差量编译）
 var WithBaseProgramName = ssaconfig.SetOption("ssa_compile/base_program_name", func(c *Config, v string) {
 	c.baseProgramName = v
+	// 如果设置了 baseProgramName，自动启用增量编译
+	if v != "" {
+		c.isIncremental = true
+	}
 })
 
 // WithFileHashMap 设置文件哈希映射（用于差量编译）
@@ -399,6 +410,11 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		}
 	}
 	return c, nil
+}
+
+// GetBaseProgramName 获取基础程序名称（用于增量编译）
+func (c *Config) GetBaseProgramName() string {
+	return c.baseProgramName
 }
 
 func WithLocalFs(path string) ssaconfig.Option {
