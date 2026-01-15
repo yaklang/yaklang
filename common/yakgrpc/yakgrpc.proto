@@ -1990,19 +1990,15 @@ message QueryAIForgeResponse {
 message ExportAIForgeRequest {
   repeated string ForgeNames = 1;
   string TargetPath = 2;
-  bool Overwrite = 3;
-  string NewForgeName = 4;
-  string Author = 5;
-  string OutputName = 6;
-  string Password = 7;
+  string OutputName = 3;
+  string Password = 4;
 }
 
 message ImportAIForgeRequest {
   string InputPath = 1;
   bool Overwrite = 2;
   string NewForgeName = 3;
-  string Author = 4;
-  string Password = 5;
+  string Password = 4;
 }
 
 message GetAIForgeRequest {

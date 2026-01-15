@@ -70,7 +70,7 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	}
 
 	target := filepath.Join(t.TempDir(), "yak.tar.gz")
-	exported, err := ExportAIForgesToTarGz(db, []string{forge.ForgeName}, target, WithForgeProgress(progress))
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, target, WithExportProgress(progress))
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 	require.NotEmpty(t, progressMsg)
@@ -78,7 +78,7 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
 
 	progressMsg = nil
-	imported, err := ImportAIForgesFromTarGz(db, exported, WithForgeProgress(progress))
+	imported, err := ImportAIForgesFromZip(db, exported, WithImportProgress(progress))
 	require.NoError(t, err)
 	require.Len(t, imported, 1)
 	require.NotEmpty(t, progressMsg)
@@ -89,7 +89,7 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	assertForgeFields(t, forge, imported[0])
 }
 
-func TestExportImportConfigForge_WithRenameAuthorAndOverwrite(t *testing.T) {
+func TestExportImportConfigForge_WithRenameAndOverwrite(t *testing.T) {
 	db := newTestForgeDB(t)
 	defer db.Close()
 
@@ -115,16 +115,15 @@ func TestExportImportConfigForge_WithRenameAuthorAndOverwrite(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, forge))
 
 	target := filepath.Join(t.TempDir(), "config.tar.gz")
-	exported, err := ExportAIForgesToTarGz(db, []string{forge.ForgeName}, target, WithForgeAuthor("export-author"))
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, target)
 	require.NoError(t, err)
 
 	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
 
 	newName := forge.ForgeName + "-new"
-	imported, err := ImportAIForgesFromTarGz(db, exported,
-		WithForgeNewName(newName),
-		WithForgeAuthor("new-author"),
-		WithForgeOverwrite(true),
+	imported, err := ImportAIForgesFromZip(db, exported,
+		WithImportNewName(newName),
+		WithImportOverwrite(true),
 	)
 	require.NoError(t, err)
 	require.Len(t, imported, 1)
@@ -136,7 +135,6 @@ func TestExportImportConfigForge_WithRenameAuthorAndOverwrite(t *testing.T) {
 	require.NoError(t, err)
 	forgeRenamed := *forge
 	forgeRenamed.ForgeName = newName
-	forgeRenamed.Author = "new-author"
 	assertForgeFields(t, &forgeRenamed, stored)
 	assertForgeFields(t, &forgeRenamed, imported[0])
 }
@@ -165,13 +163,13 @@ func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, cfgForge))
 
 	target := filepath.Join(t.TempDir(), "multi.tar.gz")
-	exported, err := ExportAIForgesToTarGz(db, []string{yakForge.ForgeName, cfgForge.ForgeName}, target, WithForgeOverwrite(true))
+	exported, err := ExportAIForgesToZip(db, []string{yakForge.ForgeName, cfgForge.ForgeName}, target)
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 
 	db.Unscoped().Where("forge_name IN (?)", []string{yakForge.ForgeName, cfgForge.ForgeName}).Delete(&schema.AIForge{})
 
-	imported, err := ImportAIForgesFromTarGz(db, exported, WithForgeOverwrite(true))
+	imported, err := ImportAIForgesFromZip(db, exported, WithImportOverwrite(true))
 	require.NoError(t, err)
 	require.Len(t, imported, 2)
 

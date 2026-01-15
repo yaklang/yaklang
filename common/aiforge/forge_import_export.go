@@ -18,62 +18,38 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-// ForgeTransferOption customizes import/export behavior.
-type ForgeTransferOption func(*forgeTransferOptions)
+// ForgeExportOption customizes export behavior.
+type ForgeExportOption func(*forgeExportOptions)
 
-type forgeTransferOptions struct {
-	progress  func(percent float64, message string)
-	overwrite bool
-	newName   string
-	author    string
-	password  string
-	output    string
+type forgeExportOptions struct {
+	progress func(percent float64, message string)
+	password string
+	output   string
 }
 
-// WithForgeProgress registers a progress callback (percent 0-100).
-func WithForgeProgress(cb func(percent float64, message string)) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
+// WithExportProgress registers a progress callback (percent 0-100) for export.
+func WithExportProgress(cb func(percent float64, message string)) ForgeExportOption {
+	return func(o *forgeExportOptions) {
 		o.progress = cb
 	}
 }
 
-// WithForgeOverwrite controls whether existing forge (or output file) is overwritten.
-func WithForgeOverwrite(overwrite bool) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
-		o.overwrite = overwrite
-	}
-}
-
-// WithForgeNewName overrides the forge name when a single forge is imported/exported.
-func WithForgeNewName(name string) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
-		o.newName = name
-	}
-}
-
-// WithForgeAuthor overrides the author metadata when exporting/importing.
-func WithForgeAuthor(author string) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
-		o.author = author
-	}
-}
-
-// WithForgePassword sets password to encrypt/decrypt the export zip (SM4-CBC).
-func WithForgePassword(password string) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
+// WithExportPassword sets password to encrypt the export zip (SM4-CBC).
+func WithExportPassword(password string) ForgeExportOption {
+	return func(o *forgeExportOptions) {
 		o.password = password
 	}
 }
 
-// WithForgeOutputName sets the output zip base name (without extension).
-func WithForgeOutputName(name string) ForgeTransferOption {
-	return func(o *forgeTransferOptions) {
+// WithExportOutputName sets the output zip base name (without extension).
+func WithExportOutputName(name string) ForgeExportOption {
+	return func(o *forgeExportOptions) {
 		o.output = name
 	}
 }
 
-func applyTransferOptions(opts ...ForgeTransferOption) *forgeTransferOptions {
-	cfg := &forgeTransferOptions{}
+func applyExportOptions(opts ...ForgeExportOption) *forgeExportOptions {
+	cfg := &forgeExportOptions{}
 	for _, o := range opts {
 		if o != nil {
 			o(cfg)
@@ -82,18 +58,66 @@ func applyTransferOptions(opts ...ForgeTransferOption) *forgeTransferOptions {
 	return cfg
 }
 
-// ExportAIForgesToTarGz exports one or more forges into a zip package.
+// ForgeImportOption customizes import behavior.
+type ForgeImportOption func(*forgeImportOptions)
+
+type forgeImportOptions struct {
+	progress  func(percent float64, message string)
+	overwrite bool
+	newName   string
+	password  string
+}
+
+// WithImportProgress registers a progress callback (percent 0-100) for import.
+func WithImportProgress(cb func(percent float64, message string)) ForgeImportOption {
+	return func(o *forgeImportOptions) {
+		o.progress = cb
+	}
+}
+
+// WithImportOverwrite controls whether existing forge is overwritten.
+func WithImportOverwrite(overwrite bool) ForgeImportOption {
+	return func(o *forgeImportOptions) {
+		o.overwrite = overwrite
+	}
+}
+
+// WithImportNewName overrides the forge name when a single forge is imported.
+func WithImportNewName(name string) ForgeImportOption {
+	return func(o *forgeImportOptions) {
+		o.newName = name
+	}
+}
+
+// WithImportPassword sets password to decrypt the import zip (SM4-CBC).
+func WithImportPassword(password string) ForgeImportOption {
+	return func(o *forgeImportOptions) {
+		o.password = password
+	}
+}
+
+func applyImportOptions(opts ...ForgeImportOption) *forgeImportOptions {
+	cfg := &forgeImportOptions{}
+	for _, o := range opts {
+		if o != nil {
+			o(cfg)
+		}
+	}
+	return cfg
+}
+
+// ExportAIForgesToZip exports one or more forges into a zip package.
 // Each forge will be placed in its own directory under the archive.
 // For config/json type, the package layout follows buildinforges (e.g. buildinforge/hostscan).
 // For yak type, only forge_cfg.json and <name>.yak are included.
-func ExportAIForgesToTarGz(db *gorm.DB, forgeNames []string, targetPath string, opts ...ForgeTransferOption) (string, error) {
+func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, opts ...ForgeExportOption) (string, error) {
 	if db == nil {
 		return "", utils.Error("db is required")
 	}
 	if len(forgeNames) == 0 {
 		return "", utils.Error("forge names are required")
 	}
-	opt := applyTransferOptions(opts...)
+	opt := applyExportOptions(opts...)
 
 	tmpDir, err := os.MkdirTemp("", "aiforge-export-*")
 	if err != nil {
@@ -117,12 +141,6 @@ func ExportAIForgesToTarGz(db *gorm.DB, forgeNames []string, targetPath string, 
 			return "", err
 		}
 		effectiveName := forge.ForgeName
-		if opt.newName != "" && len(forgeNames) == 1 {
-			effectiveName = opt.newName
-		}
-		if opt.author != "" {
-			forge.Author = opt.author
-		}
 		forgeDir := filepath.Join(tmpDir, effectiveName)
 		if err := dumpForgeToDir(forge, forgeDir, effectiveName); err != nil {
 			return "", err
@@ -148,12 +166,6 @@ func ExportAIForgesToTarGz(db *gorm.DB, forgeNames []string, targetPath string, 
 		return "", err
 	}
 
-	if !opt.overwrite {
-		if exist, _ := utils.PathExists(targetPath); exist {
-			return "", utils.Errorf("target file already exists: %s", targetPath)
-		}
-	}
-
 	zipBytes, err := createZipFromDir(tmpDir, tmpDir)
 	if err != nil {
 		return "", err
@@ -175,18 +187,18 @@ func ExportAIForgesToTarGz(db *gorm.DB, forgeNames []string, targetPath string, 
 	return targetPath, nil
 }
 
-// ImportAIForgesFromTarGz imports one or more forges from a tar.gz package.
-func ImportAIForgesFromTarGz(db *gorm.DB, tarPath string, opts ...ForgeTransferOption) ([]*schema.AIForge, error) {
+// ImportAIForgesFromZip imports one or more forges from a zip package.
+func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOption) ([]*schema.AIForge, error) {
 	if db == nil {
 		return nil, utils.Error("db is required")
 	}
-	if tarPath == "" {
-		return nil, utils.Error("tar.gz path is required")
+	if zipPath == "" {
+		return nil, utils.Error("zip path is required")
 	}
-	if exist, _ := utils.PathExists(tarPath); !exist {
-		return nil, utils.Errorf("tar.gz path not exists: %s", tarPath)
+	if exist, _ := utils.PathExists(zipPath); !exist {
+		return nil, utils.Errorf("zip path not exists: %s", zipPath)
 	}
-	opt := applyTransferOptions(opts...)
+	opt := applyImportOptions(opts...)
 
 	tmpDir, err := os.MkdirTemp("", "aiforge-import-*")
 	if err != nil {
@@ -201,7 +213,7 @@ func ImportAIForgesFromTarGz(db *gorm.DB, tarPath string, opts ...ForgeTransferO
 	}
 	progress(0, "start import")
 
-	fileBytes, err := os.ReadFile(tarPath)
+	fileBytes, err := os.ReadFile(zipPath)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +391,7 @@ func dumpForgeToDir(forge *schema.AIForge, forgeDir string, effectiveName string
 	return nil
 }
 
-func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forgeTransferOptions) (*schema.AIForge, error) {
+func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forgeImportOptions) (*schema.AIForge, error) {
 	cfgPath := filepath.Join(cfgDir, "forge_cfg.json")
 	cfgBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -450,9 +462,6 @@ func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forg
 	}
 
 	if opt != nil {
-		if opt.author != "" {
-			forge.Author = opt.author
-		}
 		if !opt.overwrite {
 			if _, err := yakit.GetAIForgeByName(db, forge.ForgeName); err == nil {
 				return nil, utils.Errorf("forge %s already exists", forge.ForgeName)
