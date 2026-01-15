@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +16,80 @@ import (
 	"github.com/elastic/go-libaudit"
 	"github.com/elastic/go-libaudit/auparse"
 )
+
+// uidToUsername 将 UID 映射到用户名
+func uidToUsername(uid string) string {
+	if uid == "" || uid == "unset" || uid == "4294967295" {
+		return ""
+	}
+
+	u, err := user.LookupId(uid)
+	if err != nil {
+		return uid // 如果查找失败，返回原始 UID
+	}
+	return u.Username
+}
+
+// CheckAuditSystem 检查 audit 子系统状态
+// Example:
+// ```
+// status, err = hids.CheckAuditSystem()
+// if err != nil { println("Audit not available:", err) }
+// println("Audit enabled:", status.Enabled)
+// ```
+func CheckAuditSystem() (*AuditStatus, error) {
+	status := &AuditStatus{}
+
+	// 检查是否有 root 权限
+	if os.Geteuid() != 0 {
+		return nil, fmt.Errorf("root privileges required to check audit status")
+	}
+
+	// 使用 libaudit 获取 audit 状态
+	client, err := libaudit.NewAuditClient(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to audit subsystem: %v", err)
+	}
+	defer client.Close()
+
+	// 获取 audit 状态
+	auditStatus, err := client.GetStatus()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audit status: %v", err)
+	}
+
+	status.Enabled = auditStatus.Enabled == 1
+	status.BacklogLimit = auditStatus.BacklogLimit
+	status.Backlog = auditStatus.Backlog
+	status.Lost = auditStatus.Lost
+	status.PID = auditStatus.PID
+	status.Running = auditStatus.PID > 0
+
+	return status, nil
+}
+
+// checkAuditAvailable 内部检查 audit 是否可用
+func checkAuditAvailable() error {
+	// 使用 libaudit 检查 audit 状态
+	client, err := libaudit.NewAuditClient(nil)
+	if err != nil {
+		return fmt.Errorf("audit subsystem not available: %v", err)
+	}
+	defer client.Close()
+
+	// 获取 audit 状态
+	auditStatus, err := client.GetStatus()
+	if err != nil {
+		return fmt.Errorf("failed to get audit status: %v", err)
+	}
+
+	// 检查 audit 是否启用
+	if auditStatus.Enabled != 1 {
+		return fmt.Errorf("audit subsystem is disabled (enabled=%d), enable it with: sudo auditctl -e 1", auditStatus.Enabled)
+	}
+
+	return nil
+}
 
 // NewAuditMonitor 创建Audit监控器
 // Example:
@@ -72,6 +147,12 @@ func (m *AuditMonitor) Start() error {
 	if os.Geteuid() != 0 {
 		m.mu.Unlock()
 		return fmt.Errorf("audit monitor requires root privileges")
+	}
+
+	// 检查 audit 子系统是否可用
+	if err := checkAuditAvailable(); err != nil {
+		m.mu.Unlock()
+		return err
 	}
 
 	m.running = true
@@ -185,30 +266,36 @@ func (s *auditStream) ReassemblyComplete(msgs []*auparse.AuditMessage) {
 		return
 	}
 
-	// 获取第一条消息的类型
-	firstMsg := msgs[0]
-	msgType := firstMsg.RecordType
+	// 遍历所有消息，检查包含的消息类型
+	var hasLoginEvent bool
+	var hasCommandEvent bool
+
+	for _, msg := range msgs {
+		msgType := msg.RecordType
+		if isLoginEvent(msgType) {
+			hasLoginEvent = true
+		}
+		if isCommandEvent(msgType) {
+			hasCommandEvent = true
+		}
+	}
 
 	// 处理登录事件
-	if s.monitor.monitorLogin {
-		if isLoginEvent(msgType) {
-			event := parseLoginEvent(msgs)
-			if event != nil && s.shouldProcessLogin(event) {
-				if s.monitor.onLoginEvent != nil {
-					go s.monitor.onLoginEvent(event)
-				}
+	if s.monitor.monitorLogin && hasLoginEvent {
+		event := parseLoginEvent(msgs)
+		if event != nil && s.shouldProcessLogin(event) {
+			if s.monitor.onLoginEvent != nil {
+				go s.monitor.onLoginEvent(event)
 			}
 		}
 	}
 
 	// 处理命令执行事件
-	if s.monitor.monitorCommand {
-		if isCommandEvent(msgType) {
-			event := parseCommandEvent(msgs)
-			if event != nil && s.shouldProcessCommand(event) {
-				if s.monitor.onCommandEvent != nil {
-					go s.monitor.onCommandEvent(event)
-				}
+	if s.monitor.monitorCommand && hasCommandEvent {
+		event := parseCommandEvent(msgs)
+		if event != nil && s.shouldProcessCommand(event) {
+			if s.monitor.onCommandEvent != nil {
+				go s.monitor.onCommandEvent(event)
 			}
 		}
 	}
@@ -233,8 +320,9 @@ func isLoginEvent(msgType auparse.AuditMessageType) bool {
 }
 
 // isCommandEvent 判断是否为命令执行事件
+// 命令执行事件必须包含 EXECVE 消息，SYSCALL 消息会作为同一事件组的一部分被自动处理
 func isCommandEvent(msgType auparse.AuditMessageType) bool {
-	return msgType == auparse.AUDIT_EXECVE || msgType == auparse.AUDIT_SYSCALL
+	return msgType == auparse.AUDIT_EXECVE
 }
 
 // parseLoginEvent 解析登录事件
@@ -259,11 +347,19 @@ func parseLoginEvent(msgs []*auparse.AuditMessage) *LoginEvent {
 		// 提取用户信息
 		if uid, ok := data["uid"]; ok {
 			event.UID = uid
+			// 使用 uid 映射到用户名
+			if event.Username == "" {
+				event.Username = uidToUsername(uid)
+			}
 		}
+		// auid (audit uid) 是登录时的原始用户 ID，优先使用
 		if auid, ok := data["auid"]; ok {
-			event.Username = auid
+			if username := uidToUsername(auid); username != "" {
+				event.Username = username
+			}
 		}
-		if acct, ok := data["acct"]; ok {
+		// acct 字段直接包含用户名，优先级最高
+		if acct, ok := data["acct"]; ok && acct != "" {
 			event.Username = acct
 		}
 
@@ -365,9 +461,16 @@ func parseCommandEvent(msgs []*auparse.AuditMessage) *CommandEvent {
 			// 提取用户信息
 			if uid, ok := data["uid"]; ok {
 				event.UID = uid
+				// 使用 uid 映射到用户名
+				if event.Username == "" {
+					event.Username = uidToUsername(uid)
+				}
 			}
+			// auid (audit uid) 是登录时的原始用户 ID，优先使用
 			if auid, ok := data["auid"]; ok {
-				event.Username = auid
+				if username := uidToUsername(auid); username != "" {
+					event.Username = username
+				}
 			}
 
 			// 提取终端和会话
