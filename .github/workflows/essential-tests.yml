@@ -329,7 +329,7 @@ jobs:
                 {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
               ]          
 
-          - name: "Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Golang | C | Java"
+          - name: "Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Python | Golang | C | Java"
             test_configs: |
               [
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s"},
@@ -342,6 +342,8 @@ jobs:
                 {"package": "./common/yak/typescript/ts2ssa/tests/...", "timeout": "2m"},
                 {"package": "./common/yak/php/...", "timeout": "2m"},
                 {"package": "./common/yak/ssaapi/test/php", "timeout": "2m"},
+                {"package": "./common/yak/python/...", "timeout": "2m"},
+                {"package": "./common/yak/ssaapi/test/python", "timeout": "1m"},
                 {"package": "./common/yak/go2ssa/...", "timeout": "30s"},
                 {"package": "./common/yak/antlr4go/...", "timeout": "30s"},
                 {"package": "./common/yak/ssaapi/test/golang", "timeout": "2m"},
