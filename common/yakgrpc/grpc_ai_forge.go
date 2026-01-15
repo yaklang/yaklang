@@ -127,10 +127,7 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 	if err != nil {
 		return err
 	}
-	return stream.Send(&ypb.GeneralProgress{
-		Percent: 100,
-		Message: "export completed",
-	})
+	return nil
 }
 
 func (s *Server) ImportAIForge(req *ypb.ImportAIForgeRequest, stream ypb.Yak_ImportAIForgeServer) error {
@@ -151,10 +148,7 @@ func (s *Server) ImportAIForge(req *ypb.ImportAIForgeRequest, stream ypb.Yak_Imp
 	if err != nil {
 		return err
 	}
-	return stream.Send(&ypb.GeneralProgress{
-		Percent: 100,
-		Message: "import completed",
-	})
+	return nil
 }
 
 func applyForgeMetadata(db *gorm.DB, forge *schema.AIForge) {
