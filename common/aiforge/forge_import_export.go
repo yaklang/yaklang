@@ -160,7 +160,7 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, op
 		finalName += ".enc"
 	}
 	if targetPath == "" {
-		targetPath = filepath.Join(consts.GetDefaultYakitBaseTempDir(), finalName)
+		targetPath = filepath.Join(consts.GetDefaultYakitProjectsDir(), finalName)
 	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return "", err
@@ -248,6 +248,7 @@ func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOptio
 		forges = append(forges, forge)
 		progress(float64(idx+1)/float64(len(cfgPaths))*100, fmt.Sprintf("imported %s", forge.ForgeName))
 	}
+	progress(100, "import completed")
 	return forges, nil
 }
 
