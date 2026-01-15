@@ -2,12 +2,11 @@ package bruteutils
 
 import (
 	"context"
-	"crypto/tls"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"time"
 
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const defaultTimeout = 10 * time.Second
@@ -29,15 +28,5 @@ func (d *NetXDialer) DialTCPContext(ctx context.Context, network, addr string) (
 }
 
 func (d *NetXDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
-	var (
-		conn net.Conn
-		err  error
-	)
-	// tls first
-	conn, err = netx.DialTLSTimeout(defaultTimeout, address, &tls.Config{InsecureSkipVerify: true})
-	if err == nil {
-		return conn, nil
-	}
-
 	return d.DialTCPContext(ctx, network, address)
 }
