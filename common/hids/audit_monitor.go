@@ -345,21 +345,19 @@ func parseLoginEvent(msgs []*auparse.AuditMessage) *LoginEvent {
 		}
 
 		// 提取用户信息
+		// uid 是当前执行操作的用户
 		if uid, ok := data["uid"]; ok {
 			event.UID = uid
-			// 使用 uid 映射到用户名
-			if event.Username == "" {
-				event.Username = uidToUsername(uid)
-			}
+			event.Username = uidToUsername(uid)
 		}
-		// auid (audit uid) 是登录时的原始用户 ID，优先使用
+		// auid (audit uid) 是原始登录用户 ID
 		if auid, ok := data["auid"]; ok {
-			if username := uidToUsername(auid); username != "" {
-				event.Username = username
-			}
+			event.AUID = auid
+			event.LoginUser = uidToUsername(auid)
 		}
-		// acct 字段直接包含用户名，优先级最高
+		// acct 字段直接包含用户名（登录事件特有）
 		if acct, ok := data["acct"]; ok && acct != "" {
+			// 对于登录事件，acct 通常是正在登录的用户
 			event.Username = acct
 		}
 
@@ -459,18 +457,15 @@ func parseCommandEvent(msgs []*auparse.AuditMessage) *CommandEvent {
 			}
 
 			// 提取用户信息
+			// uid 是当前执行命令的用户（例如 su 后的用户）
 			if uid, ok := data["uid"]; ok {
 				event.UID = uid
-				// 使用 uid 映射到用户名
-				if event.Username == "" {
-					event.Username = uidToUsername(uid)
-				}
+				event.Username = uidToUsername(uid)
 			}
-			// auid (audit uid) 是登录时的原始用户 ID，优先使用
+			// auid (audit uid) 是原始登录用户 ID（例如 SSH 登录的用户）
 			if auid, ok := data["auid"]; ok {
-				if username := uidToUsername(auid); username != "" {
-					event.Username = username
-				}
+				event.AUID = auid
+				event.LoginUser = uidToUsername(auid)
 			}
 
 			// 提取终端和会话
@@ -556,11 +551,25 @@ func parseCommandEvent(msgs []*auparse.AuditMessage) *CommandEvent {
 
 // shouldProcessLogin 检查是否应该处理该登录事件
 func (s *auditStream) shouldProcessLogin(event *LoginEvent) bool {
-	// 如果配置了用户过滤器
+	// 如果配置了当前用户过滤器 (按 Username 过滤)
 	if len(s.monitor.filterUsers) > 0 {
 		found := false
 		for _, user := range s.monitor.filterUsers {
 			if event.Username == user {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// 如果配置了原始登录用户过滤器 (按 LoginUser 过滤)
+	if len(s.monitor.filterLoginUsers) > 0 {
+		found := false
+		for _, user := range s.monitor.filterLoginUsers {
+			if event.LoginUser == user {
 				found = true
 				break
 			}
@@ -575,11 +584,25 @@ func (s *auditStream) shouldProcessLogin(event *LoginEvent) bool {
 
 // shouldProcessCommand 检查是否应该处理该命令事件
 func (s *auditStream) shouldProcessCommand(event *CommandEvent) bool {
-	// 如果配置了用户过滤器
+	// 如果配置了当前用户过滤器 (按 Username 过滤)
 	if len(s.monitor.filterUsers) > 0 {
 		found := false
 		for _, user := range s.monitor.filterUsers {
 			if event.Username == user {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// 如果配置了原始登录用户过滤器 (按 LoginUser 过滤)
+	if len(s.monitor.filterLoginUsers) > 0 {
+		found := false
+		for _, user := range s.monitor.filterLoginUsers {
+			if event.LoginUser == user {
 				found = true
 				break
 			}

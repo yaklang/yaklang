@@ -18,8 +18,10 @@ type AuditStatus struct {
 // LoginEvent 登录事件
 type LoginEvent struct {
 	Timestamp   time.Time         `json:"timestamp"`    // 登录时间
-	Username    string            `json:"username"`     // 用户名
-	UID         string            `json:"uid"`          // 用户ID
+	Username    string            `json:"username"`     // 当前用户名 (uid映射)
+	UID         string            `json:"uid"`          // 当前用户ID
+	LoginUser   string            `json:"login_user"`   // 原始登录用户名 (auid映射)
+	AUID        string            `json:"auid"`         // 原始登录用户ID (audit uid)
 	RemoteIP    string            `json:"remote_ip"`    // 远程IP地址
 	RemoteHost  string            `json:"remote_host"`  // 远程主机名
 	LoginMethod string            `json:"login_method"` // 登录方式 (ssh, console, etc)
@@ -34,8 +36,10 @@ type LoginEvent struct {
 // CommandEvent 命令执行事件
 type CommandEvent struct {
 	Timestamp   time.Time         `json:"timestamp"`    // 执行时间
-	Username    string            `json:"username"`     // 用户名
-	UID         string            `json:"uid"`          // 用户ID
+	Username    string            `json:"username"`     // 当前用户名 (uid映射)
+	UID         string            `json:"uid"`          // 当前用户ID
+	LoginUser   string            `json:"login_user"`   // 原始登录用户名 (auid映射)
+	AUID        string            `json:"auid"`         // 原始登录用户ID (audit uid)
 	PID         int32             `json:"pid"`          // 进程ID
 	PPID        int32             `json:"ppid"`         // 父进程ID
 	Command     string            `json:"command"`      // 命令名称
@@ -63,8 +67,9 @@ type AuditMonitor struct {
 	onCommandEvent func(*CommandEvent)
 
 	// 过滤器
-	filterUsers    []string
-	filterCommands []string
+	filterUsers      []string // 按当前用户(Username)过滤
+	filterLoginUsers []string // 按原始登录用户(LoginUser)过滤
+	filterCommands   []string // 按命令过滤
 
 	// 性能配置
 	bufferSize int
@@ -130,14 +135,29 @@ func WithOnCommandEvent(callback func(*CommandEvent)) AuditMonitorOption {
 	}
 }
 
-// WithAuditFilterUsers 设置用户过滤器
+// WithAuditFilterUsers 设置当前用户过滤器（按 Username 过滤）
+// 过滤当前执行操作的用户（例如 su 后的用户）
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithAuditFilterUsers("root", "admin"))
+// // 只监控 matrix 用户执行的命令
+// monitor = hids.NewAuditMonitor(hids.WithAuditFilterUsers("matrix", "admin"))
 // ```
 func WithAuditFilterUsers(users ...string) AuditMonitorOption {
 	return func(m *AuditMonitor) {
 		m.filterUsers = users
+	}
+}
+
+// WithAuditFilterLoginUsers 设置原始登录用户过滤器（按 LoginUser 过滤）
+// 过滤原始登录的用户（例如 SSH 登录的用户，即使后来 su 到其他用户）
+// Example:
+// ```
+// // 只监控原始登录用户为 root 的会话中的操作
+// monitor = hids.NewAuditMonitor(hids.WithAuditFilterLoginUsers("root"))
+// ```
+func WithAuditFilterLoginUsers(users ...string) AuditMonitorOption {
+	return func(m *AuditMonitor) {
+		m.filterLoginUsers = users
 	}
 }
 
