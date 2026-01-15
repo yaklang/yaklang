@@ -84,7 +84,7 @@ func (c *Config) HandleSyncTimelineEvent(event *ypb.AIInputEvent) error {
 func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 	updateConfig := map[string]interface{}{}
 	if event.Params.GetAIService() != "" {
-		err := c.LoadAIServiceByName(event.Params.GetAIService())
+		err := c.LoadAIServiceByName(event.Params.GetAIService(), event.Params.GetAIModelName())
 		if err != nil {
 			c.EmitError("load ai service failed: %v", err)
 		}

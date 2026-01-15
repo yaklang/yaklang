@@ -55,6 +55,7 @@ type Config struct {
 
 	// session id
 	PersistentSessionId string
+	SessionTitle        string
 
 	// memory triage id
 	MemoryTriageId string
@@ -238,7 +239,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	config.Epm.SetConfig(config)
 	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
 		if config.AiServerName != "" {
-			err := config.LoadAIServiceByName(config.AiServerName)
+			err := config.LoadAIServiceByName(config.AiServerName, config.AiModelName)
 			if err != nil {
 				log.Errorf("load ai service failed: %v", err)
 			}
@@ -1970,7 +1971,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	return opts
 }
 
-func (c *Config) LoadAIServiceByName(name string) error {
+func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 	aiConfig, err := ai.LoadAiGatewayConfig(name)
 	if err != nil {
 		return fmt.Errorf("%s not found", name)
@@ -1983,6 +1984,9 @@ func (c *Config) LoadAIServiceByName(name string) error {
 	c.SetAICallback(AIChatToAICallbackType(chat))
 	c.AiServerName = name
 	c.AiModelName = aiConfig.Model
+	if modelName != "" {
+		c.AiModelName = modelName
+	}
 
 	// submit hotpatch options
 	c.HotPatchBroadcaster.Submit(WithAIChatInfo(c.AiServerName, c.AiModelName))

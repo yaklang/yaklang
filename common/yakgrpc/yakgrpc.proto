@@ -1866,6 +1866,7 @@ message AIStartParams {
 
   // 选择 AI 服务
   string AIService = 26;
+  string AIModelName = 33;
 
   int64 ReActMaxIteration = 27;
 
