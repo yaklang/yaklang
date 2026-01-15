@@ -176,6 +176,9 @@ func CheckSyntaxFlow(t *testing.T, code string, sf string, wants map[string][]st
 func CheckSyntaxFlowPrintWithPhp(t *testing.T, code string, wants []string) {
 	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaconfig.Option{ssaapi.WithLanguage(ssaconfig.PHP)}, nil)
 }
+func CheckSyntaxFlowPrintWithPython(t *testing.T, code string, wants []string) {
+	checkSyntaxFlowEx(t, code, `println(* #-> * as $param)`, true, map[string][]string{"param": wants}, []ssaconfig.Option{ssaapi.WithLanguage(ssaconfig.PYTHON)}, nil)
+}
 func CheckSyntaxFlowContain(t *testing.T, code string, sf string, wants map[string][]string, opt ...ssaconfig.Option) {
 	checkSyntaxFlowEx(t, code, sf, true, wants, opt, nil)
 }
