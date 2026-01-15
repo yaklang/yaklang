@@ -347,9 +347,24 @@ func main() {
 			Usage: "Address to listen on",
 			Value: "127.0.0.1:8223",
 		},
+		cli.StringFlag{
+			Name:   "log-level",
+			Usage:  "Set log level (disable, fatal, error, warn, info, debug)",
+			Value:  "info",
+			EnvVar: "LOG_LEVEL",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
+		logLevel := context.GlobalString("log-level")
+		if logLevel != "" {
+			level, err := log.ParseLevel(logLevel)
+			if err != nil {
+				return cli.NewExitError("Invalid log level: "+logLevel+", valid levels: disable, fatal, error, warn, info, debug", 1)
+			}
+			log.SetLevel(level)
+			log.Debugf("Log level set to: %s", logLevel)
+		}
 		return nil
 	}
 
