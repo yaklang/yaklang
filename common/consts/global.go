@@ -52,6 +52,7 @@ var (
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
 
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(300)
+	GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT = atomic.NewFloat64(30)
 
 	// tls global config
 	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
@@ -95,6 +96,14 @@ func GetGlobalCallerCallPluginTimeout() float64 {
 
 func SetGlobalCallerCallPluginTimeout(i float64) {
 	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Store(i)
+}
+
+func GetGlobalCallerLoadPluginTimeout() float64 {
+	return GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Load()
+}
+
+func SetGlobalCallerLoadPluginTimeout(i float64) {
+	GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Store(i)
 }
 
 func GetGlobalMaxContentLength() uint64 {

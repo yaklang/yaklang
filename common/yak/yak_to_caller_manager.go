@@ -329,7 +329,7 @@ func NewYakToCallerManager() *YakToCallerManager {
 	caller := &YakToCallerManager{
 		table:                new(sync.Map),
 		baseWaitGroup:        new(sync.WaitGroup),
-		loadTimeout:          10 * time.Second,
+		loadTimeout:          time.Duration(consts.GetGlobalCallerLoadPluginTimeout() * float64(time.Second)),
 		callTimeout:          time.Duration(consts.GetGlobalCallerCallPluginTimeout() * float64(time.Second)),
 		ContextCancelFuncs:   new(sync.Map),
 		executionTracker:     NewPluginExecutionTracker(),

@@ -358,8 +358,8 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		},
 		ctx: context.Background(),
 	}
-	c.SetLoadPluginTimeout(10)
-	c.SetCallPluginTimeout(float64(consts.GetGlobalCallerCallPluginTimeout()))
+	c.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
+	c.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	c.swg = utils.NewSizedWaitGroup(30)
 	return c, nil
 }
@@ -381,7 +381,7 @@ func NewMixPluginCallerWithFilter(webFilter filter.Filterable) (*MixPluginCaller
 		},
 		ctx: context.Background(),
 	}
-	c.SetLoadPluginTimeout(10)
+	c.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	c.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	c.swg = utils.NewSizedWaitGroup(30)
 	return c, nil

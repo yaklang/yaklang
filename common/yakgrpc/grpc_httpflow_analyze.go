@@ -226,7 +226,7 @@ func NewHTTPFlowAnalyzeManger(
 	}
 	caller.SetDividedContext(true)
 	caller.SetConcurrent(20)
-	caller.SetLoadPluginTimeout(10)
+	caller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	caller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 	m.pluginCaller = caller
 	return m, nil

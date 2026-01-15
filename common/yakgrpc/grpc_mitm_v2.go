@@ -370,7 +370,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
 	mitmPluginCaller.SetConcurrent(int(pluginConcurrency))
-	mitmPluginCaller.SetLoadPluginTimeout(10)
+	mitmPluginCaller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
 
 	mitmPluginCallerGlobal = mitmPluginCaller
