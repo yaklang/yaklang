@@ -1,7 +1,6 @@
 package netx
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -348,19 +347,31 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 		return tlsConn, nil
 	}
 	if len(errs) > 0 {
-		var suffix bytes.Buffer
-		suffix.WriteString(fmt.Sprintf(" target-addr: %v", target))
-		if config.ForceDisableProxy {
-			suffix.WriteString(fmt.Sprintf("disable-proxy: %v", config.ForceDisableProxy))
-		} else {
-			suffix.WriteString(fmt.Sprintf("enable-system-proxy: %v", config.EnableSystemProxyFromEnv))
-			if len(config.Proxy) > 0 {
-				suffix.WriteString(fmt.Sprintf(" with proxy: %v", config.Proxy))
-			}
-		}
-		suffix.WriteString(fmt.Sprintf(" with sni: %v(override: %v)", config.SNI, config.ShouldOverrideSNI))
+		lastErr := errs[len(errs)-1]
+		reasonEN, reasonCN, suggestion := getFriendlyTLSError(lastErr)
 
-		return nil, utils.Errorf("all tls strategy failed: %v%v", errs, suffix.String())
+		var configParts []string
+		if config.ForceDisableProxy {
+			configParts = append(configParts, "proxy=disabled")
+		} else if len(config.Proxy) > 0 {
+			configParts = append(configParts, fmt.Sprintf("proxy=%v", config.Proxy))
+		} else if config.EnableSystemProxyFromEnv {
+			configParts = append(configParts, "proxy=system")
+		} else {
+			configParts = append(configParts, "proxy=none")
+		}
+		if config.SNI != "" {
+			sniInfo := fmt.Sprintf("sni=%v", config.SNI)
+			if config.ShouldOverrideSNI {
+				sniInfo += "(override)"
+			}
+			configParts = append(configParts, sniInfo)
+		}
+		configStr := strings.Join(configParts, ", ")
+
+		return nil, utils.Errorf("all tls strategy failed: TLS Connection Failed(%s): %s | Raw Error: %v | Config: %s\nTLS连接失败(%s): %s | 原始错误: %v | 调试配置: %s\n%s",
+			target, reasonEN, lastErr, configStr,
+			target, reasonCN, lastErr, configStr, suggestion)
 	}
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
 }
@@ -420,4 +431,52 @@ func DialUdpX(target string, opt ...DialXOption) (*net.UDPConn, *net.UDPAddr, er
 		o(config)
 	}
 	return dialPlainUdpConn(target, config)
+}
+
+func getFriendlyTLSError(err error) (en, cn, suggestion string) {
+	if err == nil {
+		return "Unknown Error", "未知错误", ""
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "EOF"), strings.Contains(msg, "unexpected EOF"):
+		return "Connection Closed by Remote", "连接被远程关闭(目标服务器主动断开连接)",
+			"建议: 1.检查目标是否支持HTTPS 2.尝试开启「随机TLS指纹」 3.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
+	case strings.Contains(msg, "permission denied"):
+		return "Permission Denied", "连接被系统拒绝(权限不足或被防火墙拦截)",
+			"建议: 1.检查防火墙设置 2.尝试以管理员权限运行 3.国产系统(如银河麒麟)请检查「安全中心」-「网络保护」-「应用程序联网」是否拦截了本程序"
+	case strings.Contains(msg, "connection refused"):
+		return "Connection Refused", "目标服务器拒绝连接(端口未开放或服务未启动)",
+			"建议: 1.确认目标端口正确 2.确认目标服务已启动"
+	case strings.Contains(msg, "connection reset"):
+		return "Connection Reset", "连接被重置(可能被防火墙或安全设备拦截)",
+			"建议: 1.尝试开启「随机TLS指纹」绕过检测 2.检查是否被WAF拦截 3.尝试使用代理"
+	case strings.Contains(msg, "i/o timeout"), strings.Contains(msg, "deadline exceeded"):
+		return "Connection Timeout", "连接超时(网络不通或目标无响应)",
+			"建议: 1.检查网络连接 2.确认目标可达 3.尝试增加超时时间"
+	case strings.Contains(msg, "no such host"):
+		return "DNS Lookup Failed", "域名解析失败(DNS无法解析该域名)",
+			"建议: 1.检查域名拼写 2.尝试更换DNS服务器 3.检查网络连接"
+	case strings.Contains(msg, "certificate"), strings.Contains(msg, "x509"):
+		return "Certificate Verify Failed", "证书验证失败",
+			"建议: 1.目标使用自签名证书属正常现象 2.如目标为国密站点可尝试开启「国密TLS」"
+	case strings.Contains(msg, "handshake failure"):
+		return "TLS Handshake Failed", "TLS握手失败(协议不兼容)",
+			"建议: 1.尝试开启「随机TLS指纹」 2.如目标为国密站点可尝试开启「国密TLS」 3.检查TLS版本兼容性"
+	case strings.Contains(msg, "network is unreachable"):
+		return "Network Unreachable", "网络不可达",
+			"建议: 1.检查网络连接 2.检查路由配置"
+	case strings.Contains(msg, "no route to host"):
+		return "No Route to Host", "无法路由到目标主机",
+			"建议: 1.检查目标IP是否正确 2.检查网络和路由配置"
+	case strings.Contains(msg, "protocol version"):
+		return "TLS Version Mismatch", "TLS协议版本不兼容",
+			"建议: 1.尝试开启「随机TLS指纹」 2.如目标为国密站点可尝试开启「国密TLS」"
+	case strings.Contains(msg, "closed"):
+		return "Connection Closed", "连接已关闭",
+			"建议: 1.尝试开启「随机TLS指纹」 2.检查是否与其他代理软件冲突: 如Clash/V2Ray开启了TUN或Fake-IP模式请尝试关闭"
+	default:
+		return "Connection Failed", "连接失败",
+			"建议: 1.尝试开启「随机TLS指纹」 2.检查网络连接"
+	}
 }
