@@ -10,6 +10,8 @@ khoplimit := cli.Int("klimit", cli.setVerboseName("实体子图数量限制"),cl
 k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
 kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
+disableERM := cli.Bool("disableERM", cli.setVerboseName("禁用实体库构建"),cli.setDefault(false))
+
 cli.check()
 
 options := [
@@ -20,6 +22,7 @@ options := [
     rag.log(yakit.Info),
     rag.khopkMin(kmin),
     rag.khopLimit(khoplimit),
+    rag.disableERM(disableERM),
 ]
 
 if kmax > kmin {

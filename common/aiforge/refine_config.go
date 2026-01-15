@@ -17,6 +17,7 @@ type RefineConfig struct {
 	Strict               bool
 	FocusQuery           string
 	DisableBuildIndex    bool
+	DisableERMBuild      bool
 
 	Database *gorm.DB
 
@@ -66,6 +67,12 @@ func RefineWithCustomizeDatabase(db *gorm.DB) RefineOption {
 func RefineWithDisableBuildIndex(disable bool) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.DisableBuildIndex = disable
+	}
+}
+
+func RefineWithDisableERMBuild(disable bool) RefineOption {
+	return func(cfg *RefineConfig) {
+		cfg.DisableERMBuild = disable
 	}
 }
 
