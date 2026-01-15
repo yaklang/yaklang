@@ -281,3 +281,9 @@ func loadEntityRepositoryInfoByConfig(config *RAGSystemConfig) (*schema.EntityRe
 	}
 	return nil, gorm.ErrRecordNotFound
 }
+
+func NewEmptyMockEmbedding() vectorstore.EmbeddingClient {
+	return vectorstore.NewMockEmbedder(func(text string) ([]float32, error) {
+		return nil, nil
+	})
+}

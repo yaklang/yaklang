@@ -67,7 +67,7 @@ func ExportRAGToBinary(collectionName string, opts ...RAGSystemConfigOption) (io
 	buf := new(bytes.Buffer)
 	db := cfg.db
 
-	ragSystem, err := LoadRAGSystem(collectionName, append(opts, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true))...)
+	ragSystem, err := LoadRAGSystem(collectionName, append(opts, WithLazyLoadEmbeddingClient(true), WithDisableEmbedCollectionInfo(true), WithEmbeddingClient(NewEmptyMockEmbedding()))...)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to load rag system")
 	}
