@@ -664,7 +664,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	chunkOption := []chunkmaker.Option{chunkmaker.WithCtx(analyzeConfig.Ctx)}
 	chunkOption = append(chunkOption, analyzeConfig.chunkOption...)
 
-	cm, err := chunkmaker.NewChunkMakerFromFile(mediaPath, chunkmaker.WithCtx(analyzeConfig.Ctx))
+	cm, err := chunkmaker.NewChunkMakerFromFile(mediaPath, chunkOption...)
 	if err != nil {
 		return nil, err
 	}
