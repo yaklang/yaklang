@@ -7,6 +7,11 @@ import (
 	"fmt"
 )
 
+// CheckAuditSystem 检查 audit 子系统状态 (非Linux平台不支持)
+func CheckAuditSystem() (*AuditStatus, error) {
+	return nil, fmt.Errorf("audit subsystem is only supported on Linux")
+}
+
 // NewAuditMonitor 创建Audit监控器 (非Linux平台不支持)
 // Example:
 // ```

@@ -74,6 +74,7 @@ var Exports = map[string]interface{}{
 
 	// ==================== Linux Audit 监控模块 ====================
 	// Audit监控器 - 基于Linux audit子系统进行用户行为审计
+	"CheckAuditSystem":        CheckAuditSystem,        // 检查audit子系统状态
 	"NewAuditMonitor":         NewAuditMonitor,         // 创建Audit监控器
 	"WithAuditMonitorLogin":   WithAuditMonitorLogin,   // 设置是否监控登录事件
 	"WithAuditMonitorCommand": WithAuditMonitorCommand, // 设置是否监控命令执行事件

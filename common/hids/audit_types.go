@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+// AuditStatus audit 子系统状态
+type AuditStatus struct {
+	Enabled      bool   `json:"enabled"`       // audit 是否启用
+	Running      bool   `json:"running"`       // auditd 是否运行
+	BacklogLimit uint32 `json:"backlog_limit"` // 积压限制
+	Backlog      uint32 `json:"backlog"`       // 当前积压
+	Lost         uint32 `json:"lost"`          // 丢失的事件数
+	PID          uint32 `json:"pid"`           // auditd 进程 PID
+}
+
 // LoginEvent 登录事件
 type LoginEvent struct {
 	Timestamp   time.Time         `json:"timestamp"`    // 登录时间
