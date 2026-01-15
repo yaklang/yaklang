@@ -573,8 +573,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 		}
 	} else {
 		// 即使不警告，也记录基本统计信息用于监控
-		log.Debugf("HNSW Add completed - Total: %v (%d docs), TxDuration: %v, DB: %v, HNSW: %v",
-			docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
+		log.Debugf("HNSW Add completed - Total: (%d docs), TxDuration: %v, DB: %v, HNSW: %v", docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
 	}
 
 	return nil

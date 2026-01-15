@@ -57,7 +57,7 @@ func (e *SaveEndpoint) SaveEntity(entity *schema.ERModelEntity) error {
 		return utils.Errorf("merge entity failed, %v", err)
 	}
 	if saveEntity.EntityName != tempName {
-		log.Infof("merge entity name changed, from %s to %s", tempName, saveEntity.EntityName)
+		log.Debugf("merge entity name changed, from %s to %s", tempName, saveEntity.EntityName)
 	}
 	e.nameToIndex.Set(tempName, saveEntity.Uuid)
 	sig.SetDataReady(saveEntity.Uuid)
