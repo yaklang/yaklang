@@ -23,6 +23,7 @@ import (
 
 const (
 	sessionTitleGeneratedKey = "session_title_generated"
+	sessionTitleDisableKey   = "disable_session_title_generation"
 )
 
 // updateRuntimeTasks 更新 runtime tasks
@@ -333,6 +334,10 @@ func init() {
 func (r *ReAct) ensureSessionTitle(userInput string) {
 	cfg := r.GetConfig()
 	if cfg == nil {
+		return
+	}
+
+	if cfg.GetConfigBool(sessionTitleDisableKey) {
 		return
 	}
 
