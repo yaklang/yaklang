@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -18,6 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+)
+
+const (
+	sessionTitleGeneratedKey = "session_title_generated"
 )
 
 // updateRuntimeTasks 更新 runtime tasks
@@ -90,6 +95,10 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	// 任务状态应该已经在调用前被设置为处理中，这里不需要重复设置
 
 	// 从任务中提取用户输入
+	userInput := task.GetUserInput()
+
+	r.ensureSessionTitle(userInput)
+
 	r.currentIteration = 0
 	skipStatus, err := r.executeMainLoop(task)
 	if err != nil {
@@ -319,6 +328,56 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 
 func init() {
 	aicommon.RegisterDefaultAIRuntimeInvoker(BuildReActInvoker)
+}
+
+func (r *ReAct) ensureSessionTitle(userInput string) {
+	cfg := r.GetConfig()
+	if cfg == nil {
+		return
+	}
+
+	if cfg.GetConfigString("session_title", "") != "" || cfg.GetConfigBool(sessionTitleGeneratedKey) {
+		return
+	}
+
+	cfg.SetConfig(sessionTitleGeneratedKey, true)
+
+	trimmedInput := strings.TrimSpace(userInput)
+	if trimmedInput == "" {
+		return
+	}
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Warnf("generate session title panic: %v", err)
+			}
+		}()
+
+		prompt := fmt.Sprintf(`Generate a concise title for this session based on the user's first request.
+- Keep it short (within 15 characters).
+- Return only the key idea of the request.
+- Use the same language as the user input without translating.
+
+User request:
+%s`, trimmedInput)
+
+		action, err := r.InvokeLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
+			aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
+		})
+		if err != nil {
+			log.Warnf("generate session title failed: %v", err)
+			return
+		}
+
+		sessionTitle := strings.TrimSpace(action.GetString("session_title"))
+		if sessionTitle == "" {
+			return
+		}
+
+		cfg.SetConfig("session_title", sessionTitle)
+		r.Emitter.EmitSessionTitle(sessionTitle)
+	}()
 }
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {

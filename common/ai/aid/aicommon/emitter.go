@@ -806,3 +806,9 @@ func (e *Emitter) EmitTimelineItem(item *TimelineItem) (*schema.AiOutputEvent, e
 	}
 	return e.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "timeline_item", humanReadable)
 }
+
+func (e *Emitter) EmitSessionTitle(title string) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "session_title", map[string]any{
+		"title": title,
+	})
+}

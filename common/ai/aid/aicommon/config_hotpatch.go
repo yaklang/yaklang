@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -73,6 +74,7 @@ var (
 	HotPatchType_AllowRequireForUserInteract = "AllowRequireForUserInteract"
 	HotPatchType_AgreePolicy                 = "AgreePolicy"
 	HotPatchType_AIService                   = "AIService"
+	HotPatchType_ModelName                   = "ModelName"
 	HotPatchType_RiskControlScore            = "RiskControlScore"
 )
 
@@ -118,5 +120,10 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 			}
 		}
 	}
+
+	if e.HotpatchType == HotPatchType_ModelName {
+		aiOption = append(aiOption, WithAIModelName(hotPatchParams.GetAIModelName()))
+	}
+
 	return aiOption
 }

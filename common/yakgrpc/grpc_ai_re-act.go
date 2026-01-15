@@ -82,6 +82,9 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 			} else {
 				opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
 				modelName = aiConfig.Model
+				if i.GetAIModelName() != "" {
+					modelName = i.GetAIModelName()
+				}
 			}
 		}
 		opts = append(opts, aicommon.WithAIChatInfo(serviceName, modelName))

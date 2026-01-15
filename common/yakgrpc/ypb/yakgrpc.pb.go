@@ -8406,6 +8406,7 @@ type AIStartParams struct {
 	TaskMaxContinueCount int64 `protobuf:"varint,25,opt,name=TaskMaxContinueCount,proto3" json:"TaskMaxContinueCount,omitempty"`
 	// 选择 AI 服务
 	AIService         string `protobuf:"bytes,26,opt,name=AIService,proto3" json:"AIService,omitempty"`
+	AIModelName       string `protobuf:"bytes,33,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`
 	ReActMaxIteration int64  `protobuf:"varint,27,opt,name=ReActMaxIteration,proto3" json:"ReActMaxIteration,omitempty"`
 	// 限制 Timeline 的最大条目和最大内容大小（bytes）
 	TimelineItemLimit        int64 `protobuf:"varint,28,opt,name=TimelineItemLimit,proto3" json:"TimelineItemLimit,omitempty"` // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
@@ -8626,6 +8627,13 @@ func (x *AIStartParams) GetTaskMaxContinueCount() int64 {
 func (x *AIStartParams) GetAIService() string {
 	if x != nil {
 		return x.AIService
+	}
+	return ""
+}
+
+func (x *AIStartParams) GetAIModelName() string {
+	if x != nil {
+		return x.AIModelName
 	}
 	return ""
 }
@@ -65793,7 +65801,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xfb\v\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\x9d\f\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -65823,7 +65831,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18PlanUserInteractMaxCount\x18\x17 \x01(\x03R\x18PlanUserInteractMaxCount\x120\n" +
 	"\x13AllowGenerateReport\x18\x18 \x01(\bR\x13AllowGenerateReport\x122\n" +
 	"\x14TaskMaxContinueCount\x18\x19 \x01(\x03R\x14TaskMaxContinueCount\x12\x1c\n" +
-	"\tAIService\x18\x1a \x01(\tR\tAIService\x12,\n" +
+	"\tAIService\x18\x1a \x01(\tR\tAIService\x12 \n" +
+	"\vAIModelName\x18! \x01(\tR\vAIModelName\x12,\n" +
 	"\x11ReActMaxIteration\x18\x1b \x01(\x03R\x11ReActMaxIteration\x12,\n" +
 	"\x11TimelineItemLimit\x18\x1c \x01(\x03R\x11TimelineItemLimit\x12:\n" +
 	"\x18TimelineContentSizeLimit\x18\x1d \x01(\x03R\x18TimelineContentSizeLimit\x12,\n" +
