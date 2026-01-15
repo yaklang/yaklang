@@ -38,7 +38,6 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 			return "Value from A";
 		}
 	}`)
-
 	baseFS.AddFile("Main.java", `
 	public class Main{
 		public static void main(String[] args) {
@@ -75,6 +74,14 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 			return "Value from Extended A";
 		}	
 	}`)
+	newFS.AddFile("Main.java", `
+	public class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			System.out.println(a.getValue());
+		}
+	}
+	`)
 
 	ctx := context.Background()
 	progExtend, err = ssaapi.CompileDiffProgramAndSaveToDB(
@@ -443,5 +450,90 @@ func TestOverlay_FileSystem_AddAndDelete(t *testing.T) {
 		valueStr := values[0].String()
 		require.Contains(t, valueStr, "Value from Extend", "Overlay should return value from Extend layer")
 		t.Logf("Overlay valueStr: %s", valueStr)
+	})
+
+	t.Run("test SQL level file exclusion optimization", func(t *testing.T) {
+		// 创建测试场景：两个 layer 都有同名文件，但内容不同
+		progName1 := uuid.NewString()
+		progName2 := uuid.NewString()
+
+		vf1 := filesys.NewVirtualFs()
+		vf1.AddFile("Test.java", `
+		public class Test {
+			public static String A = "Layer1 Value";
+		}
+		`)
+
+		p1, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(vf1),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(progName1),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, p1)
+		require.Greater(t, len(p1), 0)
+
+		prog1, err := ssaapi.FromDatabase(progName1)
+		require.NoError(t, err)
+		require.NotNil(t, prog1)
+
+		vf2 := filesys.NewVirtualFs()
+		vf2.AddFile("Test.java", `
+		public class Test {
+			public static String A = "Layer2 Value";
+		}
+		`)
+
+		ctx := context.Background()
+		prog2, err := ssaapi.CompileDiffProgramAndSaveToDB(
+			ctx,
+			vf1, vf2,
+			progName1, progName2,
+			ssaconfig.JAVA,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, prog2)
+
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName1)
+			ssadb.DeleteProgram(ssadb.GetDB(), progName2)
+		}()
+
+		overProg := ssaapi.NewProgramOverLay(prog1, prog2)
+		require.NotNil(t, overProg)
+
+		// 使用 ExactMatch 测试（会触发 queryMatch）
+		// 查询变量 A，应该只在 Layer2 中找到（因为 Layer2 覆盖了 Layer1）
+		matched, vals, err := overProg.ExactMatch(ctx, ssadb.NameMatch, "A")
+		require.NoError(t, err)
+		require.True(t, matched, "Should find variable A")
+		require.NotNil(t, vals)
+
+		values, ok := vals.(ssaapi.Values)
+		require.True(t, ok)
+		require.NotEmpty(t, values, "Should find at least one value")
+
+		// 应该只返回 Layer2 的值（Layer1 的值被 Layer2 覆盖）
+		// 由于 SQL 层面的优化，当在 Layer2 中找到 Test.java 中的变量 A 后，
+		// Layer1 的 SQL 查询应该排除 Test.java 文件，避免重复查询
+		foundLayer2 := false
+		for _, v := range values {
+			progName := v.GetProgramName()
+			if progName == progName2 {
+				foundLayer2 = true
+				require.Contains(t, v.String(), "Layer2 Value", "Should return value from Layer2")
+			}
+		}
+		require.True(t, foundLayer2, "Should find value from Layer2")
+
+		// 验证只返回一个值（Layer2 的值），而不是两个值
+		// 如果优化没有生效，可能会返回两个值（Layer1 和 Layer2 各一个）
+		// 但由于 SQL 层面的文件排除优化，Layer1 的查询会排除 Test.java，所以应该只返回 Layer2 的值
+		require.LessOrEqual(t, len(values), 1, "Should return at most one value (optimization: exclude files in subsequent layers)")
+
+		t.Logf("Found %d values for variable A (SQL optimization: files excluded in subsequent layers)", len(values))
+		for i, v := range values {
+			t.Logf("Value %d: %s (from program: %s)", i, v.String(), v.GetProgramName())
+		}
 	})
 }

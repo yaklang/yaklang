@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
@@ -49,6 +50,18 @@ func MatchInstructionsByVariable(
 	compareMode, matchMode int,
 	name string,
 ) (res []Instruction) {
+	return MatchInstructionsByVariableWithExcludeFiles(ctx, prog, compareMode, matchMode, name, nil)
+}
+
+// MatchInstructionsByVariableWithExcludeFiles 搜索变量，支持排除指定文件
+// excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
+func MatchInstructionsByVariableWithExcludeFiles(
+	ctx context.Context,
+	prog *Program,
+	compareMode, matchMode int,
+	name string,
+	excludeFiles []string,
+) (res []Instruction) {
 	var ret []Instruction
 	tmp := make(map[int64]struct{})
 	addRes := func(insts ...Instruction) {
@@ -85,9 +98,39 @@ func MatchInstructionsByVariable(
 		default:
 			return
 		}
-		addRes(prog.Cache._getByVariableEx(matchMode, check)...)
+		// 对于内存缓存，需要手动过滤排除的文件
+		insts := prog.Cache._getByVariableEx(matchMode, check)
+		if len(excludeFiles) > 0 {
+			// 过滤掉排除文件中的指令
+			filteredInsts := make([]Instruction, 0, len(insts))
+			for _, inst := range insts {
+				// 获取指令的文件路径
+				filePath := getInstructionFilePath(inst)
+				if filePath == "" {
+					// 无法确定文件路径，保留（可能是全局值）
+					filteredInsts = append(filteredInsts, inst)
+					continue
+				}
+				// 规范化路径
+				normalizedPath := normalizeFilePathForExclude(filePath)
+				// 检查是否在排除列表中
+				shouldExclude := false
+				for _, excludePath := range excludeFiles {
+					if normalizeFilePathForExclude(excludePath) == normalizedPath {
+						shouldExclude = true
+						break
+					}
+				}
+				if !shouldExclude {
+					filteredInsts = append(filteredInsts, inst)
+				}
+			}
+			addRes(filteredInsts...)
+		} else {
+			addRes(insts...)
+		}
 	case ProgramCacheDBRead, ProgramCacheDBWrite:
-		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, compareMode, matchMode, name)
+		ch := ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, compareMode, matchMode, name, excludeFiles)
 		for ir := range ch {
 			var inst Instruction
 			var err error
@@ -100,6 +143,32 @@ func MatchInstructionsByVariable(
 		}
 	}
 	return ret
+}
+
+// normalizeFilePathForExclude 规范化文件路径用于排除匹配
+func normalizeFilePathForExclude(path string) string {
+	if path == "" {
+		return ""
+	}
+	// 确保以 / 开头
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return path
+}
+
+// getInstructionFilePath 获取指令的文件路径
+func getInstructionFilePath(inst Instruction) string {
+	if inst == nil {
+		return ""
+	}
+	// 尝试从指令的 Range 获取文件路径
+	if r := inst.GetRange(); r != nil {
+		if editor := r.GetEditor(); editor != nil {
+			return editor.GetUrl()
+		}
+	}
+	return ""
 }
 
 func (c *ProgramCache) _getByVariableEx(

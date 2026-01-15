@@ -203,9 +203,15 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 }
 
 func (p *Program) Ref(name string) Values {
+	return p.refWithExcludeFiles(name, nil)
+}
+
+// refWithExcludeFiles 搜索变量，支持排除指定文件
+// excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
+func (p *Program) refWithExcludeFiles(name string, excludeFiles []string) Values {
 	return lo.FilterMap(
-		ssa.MatchInstructionsByVariable(
-			context.Background(), p.Program, ssadb.ExactCompare, ssadb.NameMatch, name,
+		ssa.MatchInstructionsByVariableWithExcludeFiles(
+			context.Background(), p.Program, ssadb.ExactCompare, ssadb.NameMatch, name, excludeFiles,
 		),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {

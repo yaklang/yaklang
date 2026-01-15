@@ -160,8 +160,14 @@ func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sf
 }
 
 func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
+	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
+}
+
+// matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
+// excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
+func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode, mod int, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
 	var values Values = lo.FilterMap(
-		ssa.MatchInstructionsByVariable(ctx, p.Program, compareMode, mod, pattern),
+		ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
 			if v, err := p.NewValue(i); err != nil {
 				log.Errorf("matchVariable: new value failed: %v", err)
