@@ -183,6 +183,7 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"Report":        client.YakitReport,
 		"File":          client.YakitFile,
 		"Output":        client.Output,
+		"AIOutput":      client.AIOutput,
 		"SetProgress":   client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
 		"Stream":        client.Stream,
@@ -218,6 +219,11 @@ type YakitLog struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+type YakitAIOutput struct {
+	Data      string `json:"data"`
+	Timestamp int64  `json:"timestamp"`
+}
+
 // 格式化输出 YakitLog
 func (y *YakitLog) String() string {
 	timestamp := time.Unix(y.Timestamp, 0).Format("2006-01-02 15:04:05")
@@ -234,7 +240,42 @@ func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb
 	return NewYakitLogExecResult(level, data)
 }
 
-func ConvertExecResultIntoAIToolCallStdoutLog(i *ypb.ExecResult) string {
+func ConvertExecResultIntoAIToolCallStdoutLog(i *ypb.ExecResult, onlyAIOutputOpt ...bool) string {
+	onlyAIOutput := false
+	if len(onlyAIOutputOpt) > 0 {
+		onlyAIOutput = onlyAIOutputOpt[0]
+	}
+
+	if onlyAIOutput {
+		if !i.IsMessage {
+			return ""
+		}
+		var yakitMsg YakitMessage
+		err := json.Unmarshal(i.Message, &yakitMsg)
+		if err != nil {
+			return ""
+		}
+		if yakitMsg.Type != "log" {
+			return ""
+		}
+		var logInfo YakitLog
+		err = json.Unmarshal(yakitMsg.Content, &logInfo)
+		if err != nil {
+			return ""
+		}
+		if logInfo.Level != "ai-output" {
+			return ""
+		}
+		var aiOutput YakitAIOutput
+		err = json.Unmarshal([]byte(logInfo.Data), &aiOutput)
+		if err != nil {
+			return ""
+		}
+		// timestamp := time.Unix(aiOutput.Timestamp, 0).Format(time.RFC3339)
+		// return fmt.Sprintf("[%s] %s", timestamp, aiOutput.Data)
+		return aiOutput.Data
+	}
+
 	if utils.IsNil(i) {
 		return ""
 	}
@@ -505,6 +546,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "feature-table-data", string(raw)
 	case *YakitDotGraphData:
 		return "dot-graph-data", string(raw)
+	case *YakitAIOutput:
+		return "ai-output", string(raw)
 	case *YakitTextTabData:
 		return "feature-text-data", string(raw)
 	case *YakitStatusCard:
@@ -771,6 +814,20 @@ func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
 
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
+}
+
+// AIOutput writes AI-focused output that can be filtered for AI tool stdout.
+// aiLevel is an optional category for downstream consumers.
+func (c *YakitClient) AIOutput(tmp string, items ...interface{}) {
+	var data = tmp
+	if len(items) > 0 {
+		data = fmt.Sprintf(tmp, items...)
+	}
+	logItem := &YakitAIOutput{
+		Data:      data,
+		Timestamp: time.Now().Unix(),
+	}
+	c.Output(logItem)
 }
 
 func init() {

@@ -136,3 +136,33 @@ func TestMUSTPASS_ConvertExecResultIntoAIToolCallStdoutLog(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertExecResultIntoAIToolCallStdoutLog_AIOutputOnly(t *testing.T) {
+	var mu sync.Mutex
+	var outputs []string
+	runtimeID := "runtime-ai-output"
+
+	client := NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
+		out := ConvertExecResultIntoAIToolCallStdoutLog(result, true)
+		if out != "" {
+			mu.Lock()
+			outputs = append(outputs, out)
+			mu.Unlock()
+		}
+		return nil
+	}, runtimeID)
+
+	aiOuptputStr := utils.RandString(20)
+	client.AIOutput(aiOuptputStr)
+
+	infoLogStr := utils.RandString(20)
+	client.YakitInfo(infoLogStr)
+
+	joined := strings.Join(outputs, "\n")
+	if !strings.Contains(joined, aiOuptputStr) {
+		t.Fatalf("expected AIOutput content to be shown, got: %s", joined)
+	}
+	if strings.Contains(joined, infoLogStr) {
+		t.Fatalf("expected non AIOutput logs to be hidden in AIOutput mode, got: %s", joined)
+	}
+}

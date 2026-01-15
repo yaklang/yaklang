@@ -1,6 +1,7 @@
 package yakscripttools
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -49,7 +50,43 @@ func init() {
 			OverrideYakScriptAiTools()
 			return nil
 		})
+		UpdateAIYakToolAIOutputOption()
+		return nil
 	}, "sync-ai-tool")
+}
+
+func UpdateAIYakToolAIOutputOption() {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	db = db.Model(&schema.AIYakTool{}).Where("enable_ai_output_log = ?", 0)
+	toolsChan := yakit.YieldAllAITools(context.Background(), db)
+	for tool := range toolsChan {
+		mode := ParseAIToolEnableAIOutputLog(tool.Content)
+		if mode == 0 {
+			continue
+		}
+		tool.EnableAIOutputLog = mode
+		if _, err := yakit.UpdateAIYakToolByID(db, tool); err != nil {
+			log.Errorf("failed to update AI tool[%s] AIOutput flag: %v", tool.Name, err)
+		}
+	}
+}
+
+func ParseAIToolEnableAIOutputLog(code string) int {
+	prog, err := static_analyzer.SSAParse(code, "yak")
+	if err != nil {
+		log.Warnf("failed to parse AI tool content for AIOutput: %v", err)
+		return 1
+	}
+	if prog.SyntaxFlowChain(`AIOutput<getCallee> as $call`).Len() > 0 {
+		return 2
+	}
+	if strings.Contains(code, "yakit.AIOutput") || strings.Contains(code, "AIOutput(") {
+		return 2
+	}
+	return 1
 }
 
 func BuildInAIToolHash() (string, error) {

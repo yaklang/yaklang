@@ -19,6 +19,8 @@ type AIYakTool struct {
 	Path        string `json:"path" gorm:"type:text;index"`
 	Hash        string `json:"hash"`
 	IsFavorite  bool   `json:"is_favorite" gorm:"default:false;index"`
+	// 0: unset, 1: disabled, 2: enabled
+	EnableAIOutputLog int `json:"enable_ai_output_log" gorm:"default:0"`
 }
 
 func (a *AIYakTool) ToGRPC() *ypb.AITool {

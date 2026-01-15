@@ -42,6 +42,9 @@ func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	remoteClient := NewYakitClient("")
 	remoteClient.send = func(i interface{}) error { // 对于脚本传递的消息，需要封装成 ExecResult
 		result := YakitOutputToExecResult(i)
+		if result != nil && result.RuntimeID == "" && remoteClient.runtimeID != "" {
+			result.RuntimeID = remoteClient.runtimeID
+		}
 		if h != nil && result != nil {
 			return h(result)
 		}
