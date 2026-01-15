@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java Hibernate SQL注入漏洞"
 	type: audit
 	level: high
-	risk: sqli
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
