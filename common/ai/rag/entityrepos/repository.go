@@ -415,7 +415,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 			}
 		}
 
-		log.Warnf("NO VALID ENTITIES: entity [%s] vector search found %d results but 0 valid entities (low_score: %d, wrong_type: %d, max_score: %.3f, threshold: %.3f)",
+		log.Debugf("NO VALID ENTITIES: entity [%s] vector search found %d results but 0 valid entities (low_score: %d, wrong_type: %d, max_score: %.3f, threshold: %.3f)",
 			entity.EntityName, vectorResultsCount, lowScoreCount, wrongTypeCount, maxScore, r.runtimeConfig.similarityThreshold)
 
 		// 如果最高分数非常接近阈值，建议调整阈值

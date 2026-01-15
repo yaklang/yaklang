@@ -78,7 +78,7 @@ func (r *SQLiteVectorStoreHNSW) QueryTopN(query string, topN int, limits ...floa
 		limit = -1
 	}
 
-	log.Infof("start to search in vector storage with query: %#v", query)
+	log.Debugf("start to search in vector storage with query: %#v", query)
 	results, err := r.Search(query, page, topN)
 	if err != nil {
 		return nil, err
