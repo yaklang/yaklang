@@ -109,6 +109,7 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 		Path:        req.GetToolPath(),
 		Keywords:    strings.Join(req.GetKeywords(), ","),
 	}
+	tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
 
 	affected, err := yakit.CreateAIYakTool(db, tool)
 	if err != nil {
@@ -138,6 +139,7 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 	if err := fixAIToolMetadata(tool); err != nil {
 		return nil, utils.Errorf("failed to fix AI tool metadata: %s", err)
 	}
+	tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
 
 	_, err := yakit.CreateAIYakTool(db, tool)
 	if err != nil {
@@ -197,6 +199,7 @@ func (s *Server) UpdateAITool(ctx context.Context, req *ypb.UpdateAIToolRequest)
 	if err := fixAIToolMetadata(aitool); err != nil {
 		return nil, utils.Errorf("failed to fix AI tool metadata: %s", err)
 	}
+	aitool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(aitool.Content)
 
 	aitool.ID = uint(req.GetID())
 	affected, err := yakit.UpdateAIYakToolByID(db, aitool)
