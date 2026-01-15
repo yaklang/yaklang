@@ -712,3 +712,56 @@ func BenchmarkFixUTF8SampleBoundaries(b *testing.B) {
 		fixUTF8SampleBoundaries(data)
 	}
 }
+
+func TestIsUtf8_TruncatedMultiByteSequence(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected bool
+	}{
+		{
+			name:     "valid ascii",
+			input:    []byte("hello"),
+			expected: true,
+		},
+		{
+			name:     "valid utf8 chinese",
+			input:    []byte("世界"),
+			expected: true,
+		},
+		{
+			name:     "truncated 3-byte sequence (2 bytes only)",
+			input:    []byte{0xE3, 0x9E},
+			expected: false,
+		},
+		{
+			name:     "truncated 3-byte sequence (1 byte only)",
+			input:    []byte{0xE3},
+			expected: false,
+		},
+		{
+			name:     "truncated 4-byte sequence (3 bytes only)",
+			input:    []byte{0xF0, 0x9F, 0x98},
+			expected: false,
+		},
+		{
+			name:     "truncated 4-byte sequence (2 bytes only)",
+			input:    []byte{0xF0, 0x9F},
+			expected: false,
+		},
+		{
+			name:     "empty input",
+			input:    []byte{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsUtf8(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsUtf8(%v) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}

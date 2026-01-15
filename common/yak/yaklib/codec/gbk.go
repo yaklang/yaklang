@@ -272,6 +272,9 @@ func IsUtf8(data []byte) bool {
 			// preNUm() 返回首个字节的8个bits中首个0bit前面1bit的个数，该数量也是该字符所使用的字节数
 			i++
 			for j := 0; j < num-1; j++ {
+				if i >= len(data) {
+					return false
+				}
 				//判断后面的 num - 1 个字节是不是都是10开头
 				if (data[i] & 0xc0) != 0x80 {
 					return false
