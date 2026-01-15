@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 )
 
 // chatJSONChunkWriter handles the streaming of chat completion responses
@@ -132,7 +133,7 @@ func (w *writerWrapper) Write(p []byte) (n int, err error) {
 	buf := bytes.Buffer{}
 	buf.WriteString("data: ")
 	buf.Write(delta)
-	buf.WriteString("\r\n\r\n")
+	buf.WriteString("\n\n")
 	w.writer.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
 	w.writer.writerClose.Write(buf.Bytes())
 	w.writer.writerClose.Write([]byte("\r\n"))
@@ -182,7 +183,7 @@ func (w *chatJSONChunkWriter) WriteError(err error) {
 		log.Printf("Failed to marshal error: %v", err)
 		return
 	}
-	msg := fmt.Sprintf("data: %s\r\n\r\n", string(msgBytes))
+	msg := fmt.Sprintf("data: %s\n\n", string(msgBytes))
 	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		log.Printf("Failed to write error: %v", err)
@@ -235,7 +236,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	if err != nil {
 		return err
 	}
-	msg := fmt.Sprintf("data: %s\r\n\r\n", string(msgBytes))
+	msg := fmt.Sprintf("data: %s\n\n", string(msgBytes))
 	chunk := fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 
 	// fmt.Println(string(chunk))
@@ -244,7 +245,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	}
 
 	// write data: [DONE]
-	msg = "data: [DONE]\r\n\r\n"
+	msg = "data: [DONE]\n\n"
 	chunk = fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
