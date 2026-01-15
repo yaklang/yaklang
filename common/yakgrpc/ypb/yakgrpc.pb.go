@@ -9678,11 +9678,8 @@ type ExportAIForgeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ForgeNames    []string               `protobuf:"bytes,1,rep,name=ForgeNames,proto3" json:"ForgeNames,omitempty"`
 	TargetPath    string                 `protobuf:"bytes,2,opt,name=TargetPath,proto3" json:"TargetPath,omitempty"`
-	Overwrite     bool                   `protobuf:"varint,3,opt,name=Overwrite,proto3" json:"Overwrite,omitempty"`
-	NewForgeName  string                 `protobuf:"bytes,4,opt,name=NewForgeName,proto3" json:"NewForgeName,omitempty"`
-	Author        string                 `protobuf:"bytes,5,opt,name=Author,proto3" json:"Author,omitempty"`
-	OutputName    string                 `protobuf:"bytes,6,opt,name=OutputName,proto3" json:"OutputName,omitempty"`
-	Password      string                 `protobuf:"bytes,7,opt,name=Password,proto3" json:"Password,omitempty"`
+	OutputName    string                 `protobuf:"bytes,3,opt,name=OutputName,proto3" json:"OutputName,omitempty"`
+	Password      string                 `protobuf:"bytes,4,opt,name=Password,proto3" json:"Password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9731,27 +9728,6 @@ func (x *ExportAIForgeRequest) GetTargetPath() string {
 	return ""
 }
 
-func (x *ExportAIForgeRequest) GetOverwrite() bool {
-	if x != nil {
-		return x.Overwrite
-	}
-	return false
-}
-
-func (x *ExportAIForgeRequest) GetNewForgeName() string {
-	if x != nil {
-		return x.NewForgeName
-	}
-	return ""
-}
-
-func (x *ExportAIForgeRequest) GetAuthor() string {
-	if x != nil {
-		return x.Author
-	}
-	return ""
-}
-
 func (x *ExportAIForgeRequest) GetOutputName() string {
 	if x != nil {
 		return x.OutputName
@@ -9771,8 +9747,7 @@ type ImportAIForgeRequest struct {
 	InputPath     string                 `protobuf:"bytes,1,opt,name=InputPath,proto3" json:"InputPath,omitempty"`
 	Overwrite     bool                   `protobuf:"varint,2,opt,name=Overwrite,proto3" json:"Overwrite,omitempty"`
 	NewForgeName  string                 `protobuf:"bytes,3,opt,name=NewForgeName,proto3" json:"NewForgeName,omitempty"`
-	Author        string                 `protobuf:"bytes,4,opt,name=Author,proto3" json:"Author,omitempty"`
-	Password      string                 `protobuf:"bytes,5,opt,name=Password,proto3" json:"Password,omitempty"`
+	Password      string                 `protobuf:"bytes,4,opt,name=Password,proto3" json:"Password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9824,13 +9799,6 @@ func (x *ImportAIForgeRequest) GetOverwrite() bool {
 func (x *ImportAIForgeRequest) GetNewForgeName() string {
 	if x != nil {
 		return x.NewForgeName
-	}
-	return ""
-}
-
-func (x *ImportAIForgeRequest) GetAuthor() string {
-	if x != nil {
-		return x.Author
 	}
 	return ""
 }
@@ -66102,27 +66070,23 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12 \n" +
 	"\x04Data\x18\x02 \x03(\v2\f.ypb.AIForgeR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\xec\x01\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"\x92\x01\n" +
 	"\x14ExportAIForgeRequest\x12\x1e\n" +
 	"\n" +
 	"ForgeNames\x18\x01 \x03(\tR\n" +
 	"ForgeNames\x12\x1e\n" +
 	"\n" +
 	"TargetPath\x18\x02 \x01(\tR\n" +
-	"TargetPath\x12\x1c\n" +
-	"\tOverwrite\x18\x03 \x01(\bR\tOverwrite\x12\"\n" +
-	"\fNewForgeName\x18\x04 \x01(\tR\fNewForgeName\x12\x16\n" +
-	"\x06Author\x18\x05 \x01(\tR\x06Author\x12\x1e\n" +
+	"TargetPath\x12\x1e\n" +
 	"\n" +
-	"OutputName\x18\x06 \x01(\tR\n" +
+	"OutputName\x18\x03 \x01(\tR\n" +
 	"OutputName\x12\x1a\n" +
-	"\bPassword\x18\a \x01(\tR\bPassword\"\xaa\x01\n" +
+	"\bPassword\x18\x04 \x01(\tR\bPassword\"\x92\x01\n" +
 	"\x14ImportAIForgeRequest\x12\x1c\n" +
 	"\tInputPath\x18\x01 \x01(\tR\tInputPath\x12\x1c\n" +
 	"\tOverwrite\x18\x02 \x01(\bR\tOverwrite\x12\"\n" +
-	"\fNewForgeName\x18\x03 \x01(\tR\fNewForgeName\x12\x16\n" +
-	"\x06Author\x18\x04 \x01(\tR\x06Author\x12\x1a\n" +
-	"\bPassword\x18\x05 \x01(\tR\bPassword\"A\n" +
+	"\fNewForgeName\x18\x03 \x01(\tR\fNewForgeName\x12\x1a\n" +
+	"\bPassword\x18\x04 \x01(\tR\bPassword\"A\n" +
 	"\x11GetAIForgeRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\"\x93\x01\n" +

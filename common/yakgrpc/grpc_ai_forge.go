@@ -116,16 +116,13 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 			Message: msg,
 		})
 	}
-	_, err := aiforge.ExportAIForgesToTarGz(
+	_, err := aiforge.ExportAIForgesToZip(
 		s.GetProfileDatabase(),
 		names,
 		"",
-		aiforge.WithForgeProgress(progress),
-		aiforge.WithForgeOverwrite(req.GetOverwrite()),
-		aiforge.WithForgeNewName(req.GetNewForgeName()),
-		aiforge.WithForgeAuthor(req.GetAuthor()),
-		aiforge.WithForgeOutputName(req.GetOutputName()),
-		aiforge.WithForgePassword(req.GetPassword()),
+		aiforge.WithExportProgress(progress),
+		aiforge.WithExportPassword(req.GetPassword()),
+		aiforge.WithExportOutputName(req.GetOutputName()),
 	)
 	if err != nil {
 		return err
@@ -143,14 +140,13 @@ func (s *Server) ImportAIForge(req *ypb.ImportAIForgeRequest, stream ypb.Yak_Imp
 			Message: msg,
 		})
 	}
-	_, err := aiforge.ImportAIForgesFromTarGz(
+	_, err := aiforge.ImportAIForgesFromZip(
 		s.GetProfileDatabase(),
 		req.GetInputPath(),
-		aiforge.WithForgeProgress(progress),
-		aiforge.WithForgeOverwrite(req.GetOverwrite()),
-		aiforge.WithForgeNewName(req.GetNewForgeName()),
-		aiforge.WithForgeAuthor(req.GetAuthor()),
-		aiforge.WithForgePassword(req.GetPassword()),
+		aiforge.WithImportProgress(progress),
+		aiforge.WithImportOverwrite(req.GetOverwrite()),
+		aiforge.WithImportNewName(req.GetNewForgeName()),
+		aiforge.WithImportPassword(req.GetPassword()),
 	)
 	if err != nil {
 		return err
