@@ -1114,6 +1114,14 @@ func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 	}
 }
 
+// WithDisableSessionTitleGeneration disables the automatic session title generation in ReAct
+func WithDisableSessionTitleGeneration(disable bool) ConfigOption {
+	return func(c *Config) error {
+		c.SetConfig("disable_session_title_generation", disable)
+		return nil
+	}
+}
+
 func WithContextProvider(cpm *ContextProviderManager) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {

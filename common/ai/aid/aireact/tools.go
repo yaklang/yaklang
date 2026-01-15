@@ -67,6 +67,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(
