@@ -243,8 +243,12 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		fileHashMap = diffProgram.Program.FileHashMap
 
 		// 设置 Layer 的 FileHashMap
+		// 注意：需要 normalize filePath，确保与查找时使用的格式一致
 		for filePath, hash := range fileHashMap {
-			layer.FileHashMap.Set(filePath, hash)
+			normalizedPath := normalizeFilePath(filePath)
+			if normalizedPath != "" {
+				layer.FileHashMap.Set(normalizedPath, hash)
+			}
 		}
 
 		// 填充 Layer 的文件集合和 FileToLayerMap
@@ -372,9 +376,47 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 		return nil, utils.Errorf("FileHashMap is required for aggregateFileSystems, but no layer has FileHashMap")
 	}
 
-	// 增量编译模式：只包含 hash 值相加为 1 的文件
-	// 从最上层开始查找文件内容（上层覆盖下层）
+	// 创建一个统一的文件集合，包含：
+	// 1. getAggregatedFilesSet() 返回的文件（hash 总和为 1 的文件）
+	// 2. Layer1（基础层）的所有文件，除非它们在后续层中被删除
+	allFilesSet := utils.NewSafeMap[struct{}]()
+	
+	// 添加 hash=1 的文件
 	aggregatedFilesSet.ForEach(func(normalizedPath string, _ struct{}) bool {
+		allFilesSet.Set(normalizedPath, struct{}{})
+		return true
+	})
+	
+	// 添加基础层（Layer1）的所有文件，除非它们在后续层中被删除
+	if len(p.Layers) > 0 && p.Layers[0] != nil && p.Layers[0].Program != nil {
+		p.Layers[0].Program.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
+			if me == nil {
+				return true
+			}
+			normalizedPath := normalizeFilePath(filePath)
+			if normalizedPath == "" {
+				return true
+			}
+			// 检查文件是否在后续层中被删除
+			isDeleted := false
+			for i := 1; i < len(p.Layers); i++ {
+				if p.Layers[i] != nil && p.Layers[i].FileHashMap != nil {
+					if hash, exists := p.Layers[i].FileHashMap.Get(normalizedPath); exists && hash == -1 {
+						isDeleted = true
+						break
+					}
+				}
+			}
+			// 如果文件没有被删除，添加到集合中
+			if !isDeleted {
+				allFilesSet.Set(normalizedPath, struct{}{})
+			}
+			return true
+		})
+	}
+
+	// 从最上层开始查找文件内容（上层覆盖下层）
+	allFilesSet.ForEach(func(normalizedPath string, _ struct{}) bool {
 		// 从最上层开始查找文件
 		for i := len(p.Layers) - 1; i >= 0; i-- {
 			layer := p.Layers[i]
@@ -655,6 +697,50 @@ func (p *ProgramOverLay) getValueFilePath(v *Value) string {
 	return normalizeFilePath(filePath)
 }
 
+// isFileDeleted 检查文件是否被删除
+// filePath: 原始文件路径（可能包含 UUID 前缀）
+// normalizedPath: 规范化后的文件路径
+// currentLayerIndex: 当前层的索引（在 p.Layers 中的索引）
+// 返回 true 表示文件已被删除，应该跳过该文件中的变量
+func (p *ProgramOverLay) isFileDeleted(filePath, normalizedPath string, currentLayerIndex int) bool {
+	if p == nil || normalizedPath == "" {
+		return false
+	}
+
+	// 优先使用 AggregatedFS 检查（最可靠的方式）
+	// AggregatedFS 已经排除了所有被删除的文件（hash 值相加不为 1 的文件）
+	aggregatedFS := p.GetAggregatedFileSystem()
+	if aggregatedFS != nil {
+		// 尝试多种路径格式进行匹配
+		exists1, _ := aggregatedFS.Exists(normalizedPath)
+		exists2, _ := aggregatedFS.Exists(filePath)
+
+		existsInFinalFS := exists1 || exists2
+		if !existsInFinalFS {
+			// 文件不在最终文件树中，已被删除
+			log.Debugf("File %s (normalized: %s) not found in aggregated file system, file is deleted", filePath, normalizedPath)
+			return true
+		}
+		return false
+	}
+
+	// 如果没有 AggregatedFS，回退到检查 FileHashMap
+	// 检查该文件是否在更高层（上层）被标记为删除
+	// 如果文件在更高层的 FileHashMap 中被标记为 -1（删除），则返回 true
+	for j := currentLayerIndex + 1; j < len(p.Layers); j++ {
+		upperLayer := p.Layers[j]
+		if upperLayer != nil && upperLayer.FileHashMap != nil {
+			hash, exists := upperLayer.FileHashMap.Get(normalizedPath)
+			if exists && hash == -1 {
+				log.Debugf("File %s is marked as deleted in layer %d (LayerIndex: %d)", normalizedPath, j, upperLayer.LayerIndex)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // getValueLayerIndex 获取 Value 所在的层索引
 func (p *ProgramOverLay) getValueLayerIndex(v *Value) int {
 	if v == nil || p == nil {
@@ -706,6 +792,10 @@ func (p *ProgramOverLay) IsOverridden(v *Value) bool {
 }
 
 // Ref 实现基于层的查找策略：从上层到下层，上层覆盖下层
+// 优化逻辑：当在某个文件中查找到变量后，就不需要再后续的 layer 中查找同名文件
+// 两种情况：
+// 1. 查找的变量A属于当前 layer，后续查找其他layer时需要排除同名文件（在 SQL 查询中排除）
+// 2. 查找的变量A所在文件不属于最终文件树，证明该文件已经被删除，需要丢弃这个变量
 func (p *ProgramOverLay) Ref(name string) Values {
 	var result Values
 	if p == nil {
@@ -714,6 +804,8 @@ func (p *ProgramOverLay) Ref(name string) Values {
 
 	// 用于去重：记录已经找到的文件路径，避免同一文件在不同层重复返回
 	foundFiles := utils.NewSafeMap[struct{}]()
+	// 用于优化：记录在当前 layer 中找到的文件，后续 layer 的 SQL 查询需要排除这些文件
+	excludeFiles := make([]string, 0)
 
 	// 从最上层开始查找（倒序遍历）
 	for i := len(p.Layers) - 1; i >= 0; i-- {
@@ -722,8 +814,17 @@ func (p *ProgramOverLay) Ref(name string) Values {
 			continue
 		}
 
-		// 在该层查找
-		layerValues := layer.Program.Ref(name)
+		// 在该层查找，排除已找到的文件（优化：在 SQL 查询层面排除）
+		var layerValues Values
+		if len(excludeFiles) > 0 {
+			// 使用带排除文件的查询（在 SQL 查询中排除）
+			layerValues = layer.Program.refWithExcludeFiles(name, excludeFiles)
+		} else {
+			layerValues = layer.Program.Ref(name)
+		}
+
+		// 记录在当前 layer 中找到的文件（用于后续 layer 的排除）
+		currentLayerFoundFiles := make([]string, 0)
 
 		for _, v := range layerValues {
 			// 获取 Value 的文件路径
@@ -736,20 +837,8 @@ func (p *ProgramOverLay) Ref(name string) Values {
 
 			normalizedPath := normalizeFilePath(filePath)
 
-			// 检查该文件是否在更高层（上层）被标记为删除
-			// 如果文件在更高层的 FileHashMap 中被标记为 -1（删除），则跳过
-			isDeleted := false
-			for j := i + 1; j < len(p.Layers); j++ {
-				upperLayer := p.Layers[j]
-				if upperLayer != nil && upperLayer.FileHashMap != nil {
-					if hash, exists := upperLayer.FileHashMap.Get(normalizedPath); exists && hash == -1 {
-						isDeleted = true
-						break
-					}
-				}
-			}
-			if isDeleted {
-				// 文件在更高层被删除，跳过
+			// 检查该文件是否被删除（情况2：文件已被删除，需要丢弃这个变量）
+			if p.isFileDeleted(filePath, normalizedPath, i) {
 				continue
 			}
 
@@ -762,8 +851,9 @@ func (p *ProgramOverLay) Ref(name string) Values {
 
 			// 检查该文件是否在当前层
 			if layer.FileSet.Have(normalizedPath) {
-				// 文件在当前层，标记为已找到
+				// 文件在当前层，标记为已找到（情况1：属于当前 layer，后续 layer 需要排除同名文件）
 				foundFiles.Set(normalizedPath, struct{}{})
+				currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
 				result = append(result, v)
 			} else {
 				// 文件不在当前层，可能是从其他层引用过来的
@@ -775,9 +865,13 @@ func (p *ProgramOverLay) Ref(name string) Values {
 				}
 				// 文件在当前层或更低层，添加
 				foundFiles.Set(normalizedPath, struct{}{})
+				currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
 				result = append(result, v)
 			}
 		}
+
+		// 将当前 layer 找到的文件添加到排除列表，供后续 layer 使用（情况1：在 SQL 查询中排除）
+		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
 	}
 
 	return result
@@ -956,10 +1050,14 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 }
 
 // queryMatch 通用的查询匹配方法，应用上层优先策略
+// 优化逻辑：当在某个文件中查找到变量后，就不需要再后续的 layer 中查找同名文件
+// 两种情况：
+// 1. 查找的变量A属于当前 layer，后续查找其他layer时需要排除同名文件（在 SQL 查询中排除）
+// 2. 查找的变量A所在文件不属于最终文件树，证明该文件已经被删除，需要丢弃这个变量
 func (p *ProgramOverLay) queryMatch(
 	ctx context.Context,
 	mod int,
-	queryFunc func(*Program, context.Context, int, string) (bool, sfvm.ValueOperator, error),
+	queryFunc func(*Program, context.Context, int, string, []string) (bool, sfvm.ValueOperator, error),
 	query string,
 ) (bool, sfvm.ValueOperator, error) {
 	if p == nil {
@@ -968,6 +1066,8 @@ func (p *ProgramOverLay) queryMatch(
 
 	var results Values
 	foundFiles := utils.NewSafeMap[struct{}]() // 去重：已找到的文件
+	// 用于优化：记录在当前 layer 中找到的文件，后续 layer 的 SQL 查询需要排除这些文件
+	excludeFiles := make([]string, 0)
 
 	// 从最上层开始查找（倒序遍历）
 	for i := len(p.Layers) - 1; i >= 0; i-- {
@@ -976,10 +1076,14 @@ func (p *ProgramOverLay) queryMatch(
 			continue
 		}
 
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query)
+		// 在该层查找，排除已找到的文件（优化：在 SQL 查询层面排除）
+		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, excludeFiles)
 		if err != nil {
 			continue
 		}
+
+		// 记录在当前 layer 中找到的文件（用于后续 layer 的排除）
+		currentLayerFoundFiles := make([]string, 0)
 
 		if matched {
 			vals.Recursive(func(op sfvm.ValueOperator) error {
@@ -988,51 +1092,63 @@ func (p *ProgramOverLay) queryMatch(
 					if filePath == "" {
 						// 全局值，直接添加
 						results = append(results, v)
-						return nil
+						continue
+					}
+
+					normalizedPath := normalizeFilePath(filePath)
+
+					// 检查该文件是否被删除（情况2：文件已被删除，需要丢弃这个变量）
+					if p.isFileDeleted(filePath, normalizedPath, i) {
+						continue
 					}
 
 					// 如果文件已在更高层找到，跳过（被覆盖）
-					if foundFiles.Have(filePath) {
-						return nil
+					if foundFiles.Have(normalizedPath) {
+						continue
 					}
 
 					// 检查文件是否在当前层
-					if layer.FileSet.Have(filePath) {
-						foundFiles.Set(filePath, struct{}{})
+					if layer.FileSet.Have(normalizedPath) {
+						// 文件在当前层，标记为已找到（情况1：属于当前 layer，后续 layer 需要排除同名文件）
+						foundFiles.Set(normalizedPath, struct{}{})
+						currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
 						results = append(results, v)
 					} else {
 						// 检查文件实际在哪个层
-						actualLayerIndex, exists := p.FileToLayerMap.Get(filePath)
+						actualLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
 						if exists && actualLayerIndex > layer.LayerIndex {
 							return nil
 						}
-						foundFiles.Set(filePath, struct{}{})
+						foundFiles.Set(normalizedPath, struct{}{})
+						currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
 						results = append(results, v)
 					}
 				}
-				return nil
-			})
+			}
 		}
+
+		// 将当前 layer 找到的文件添加到排除列表，供后续 layer 使用（情况1：在 SQL 查询中排除）
+		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
 	}
 
 	return len(results) > 0, ValuesToSFValueList(results), nil
 }
 
 func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
-		return prog.ExactMatch(ctx, mod, query)
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+		return prog.matchVariableWithExcludeFiles(ctx, ssadb.ExactCompare, mod, query, excludeFiles)
 	}, want)
 }
 
 func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
-		return prog.GlobMatch(ctx, mod, query)
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+		return prog.matchVariableWithExcludeFiles(ctx, ssadb.GlobCompare, mod, query, excludeFiles)
 	}, g)
 }
 
 func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string) (bool, sfvm.ValueOperator, error) {
-		return prog.RegexpMatch(ctx, mod, query)
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+		return prog.matchVariableWithExcludeFiles(ctx, ssadb.RegexpCompare, mod, query, excludeFiles)
 	}, re)
 }
 

@@ -95,6 +95,9 @@ func CompileDiffProgramAndSaveToDB(
 		// 因为 CompileDiffProgramAndSaveToDB 已经在增量编译的上下文中被调用了
 		diffOpts = append(diffOpts, WithEnableIncrementalCompile(false))
 	}
+	if baseFS != nil {
+		diffOpts = append(diffOpts, WithBaseFileSystem(baseFS))
+	}
 	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
 	}
