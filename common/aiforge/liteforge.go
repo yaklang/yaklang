@@ -200,7 +200,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	temp := `# Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
 
-作为系统的一部分你应该直接返回JSON，避免多余的解释。
+作为系统的一部分你应该直接返回JSON（如果使用 AITAG JSON 占位，则在 JSON 后紧跟对应的 AITAG 块），避免多余的解释。
 
 {{ if .PROMPT }}<background_{{ .NONCE }}>
 {{ .PROMPT }}
@@ -225,6 +225,16 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 3. 如果某个字段是可选的，你可以选择不返回该字段，但如果返回了该字段，必须符合 SCHEMA 的要求。
 4. 不要添加任何多余的解释或文本，只返回符合 SCHEMA 的 JSON 数据。
 5. 不要输出压缩成一行的 JSON，请保持良好的可读性和缩进。
+6. 若某个字段是复杂/超大 JSON（object/array）且容易因转义导致错误，可用 AITAG JSON 占位：
+   - 在 JSON 中用占位（两选一）：
+     A) "field": { "__aitag_json__": "TAGNAME" }
+     B) "field": "__aitag_json__:TAGNAME"
+   - 然后在 JSON 之后追加对应的 AITAG 块，提供真实 JSON 内容：
+     注意：占位中的 TAGNAME 不要带 "_{{ .NONCE }}" 后缀（不要写成 TAGNAME_{{ .NONCE }}）
+
+<|TAGNAME_{{ .NONCE }}|>
+{"k":"v","arr":[1,2,3]}
+<|TAGNAME_END_{{ .NONCE }}|>
 
 # SCHEMA
 

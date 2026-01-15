@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,24 @@ import (
 )
 
 var ActionMagicKey = "@action"
+
+const (
+	// AITagJSONPlaceholderKey is used as a placeholder object in JSON to indicate
+	// the real value should be parsed from a trailing AITAG block.
+	//
+	// Example:
+	//   "params": { "__aitag_json__": "TOOL_PARAMS" }
+	//   <|TOOL_PARAMS_{nonce}|> {"k":"v"} <|TOOL_PARAMS_END_{nonce}|>
+	//
+	// The placeholder tag name should be the base tag name (without the "_{nonce}" suffix).
+	// For backward compatibility, "TOOL_PARAMS_{nonce}" is also accepted.
+	AITagJSONPlaceholderKey = "__aitag_json__"
+
+	// AITagJSONPlaceholderPrefix is an alternative placeholder string form.
+	// Example:
+	//   "params": "__aitag_json__:TOOL_PARAMS"
+	AITagJSONPlaceholderPrefix = "__aitag_json__:"
+)
 
 type Action struct {
 	// meta data
@@ -181,6 +200,11 @@ type FieldStreamItem struct {
 	Handler   func(key string, reader io.Reader)
 }
 
+type aitagJSONPlaceholder struct {
+	Path    []string
+	TagName string
+}
+
 type ActionMakerOption func(maker *ActionMaker)
 
 func WithActionAlias(alias ...string) ActionMakerOption {
@@ -285,6 +309,16 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 
 	parserWG := sync.WaitGroup{}
 
+	// Collect raw AITAG contents (tagName -> raw content)
+	tagContents := make(map[string]string)
+	tagContentsMu := sync.Mutex{}
+
+	// Collect placeholders discovered in the extracted JSON
+	var rootObject map[string]any
+	rootObjectMu := sync.Mutex{}
+	placeholders := make([]aitagJSONPlaceholder, 0)
+	placeholdersMu := sync.Mutex{}
+
 	// make tag parsers
 	var tagsParseHandles []func(mReader io.Reader)
 	for tagName, fieldName := range m.tagToKey {
@@ -323,6 +357,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 						log.Errorf("Failed to read data for tag %s: %v", tagName, err)
 						return
 					}
+					tagContentsMu.Lock()
+					tagContents[tagName] = out.String()
+					tagContentsMu.Unlock()
 					action.ForceSet(fieldName, out.String()) // set the tag content to action param, tag content is primary over field stream handler
 				}))
 			if err != nil && err != io.EOF {
@@ -385,6 +422,18 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 			for k, v := range generalParams {
 				action.Set(k, v)
 			}
+			rootObjectMu.Lock()
+			if rootObject == nil {
+				rootObject = generalParams
+				var found []aitagJSONPlaceholder
+				findAITagJSONPlaceholders(generalParams, nil, &found)
+				if len(found) > 0 {
+					placeholdersMu.Lock()
+					placeholders = append(placeholders, found...)
+					placeholdersMu.Unlock()
+				}
+			}
+			rootObjectMu.Unlock()
 		}
 
 		opts = append(opts, jsonextractor.WithObjectCallback(func(data map[string]any) { // set the general object if @action matched
@@ -430,7 +479,68 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		}
 
 		parserWG.Wait() // wait tag parsers finished
-		parseFinish()   // signal parse finish
+
+		// Apply AITAG JSON placeholders (placeholder + trailing AITAG JSON block)
+		rootObjectMu.Lock()
+		curRoot := rootObject
+		rootObjectMu.Unlock()
+		if curRoot != nil {
+			placeholdersMu.Lock()
+			curPlaceholders := append([]aitagJSONPlaceholder(nil), placeholders...)
+			placeholdersMu.Unlock()
+
+			tagContentsMu.Lock()
+			curTagContents := make(map[string]string, len(tagContents))
+			for k, v := range tagContents {
+				curTagContents[k] = v
+			}
+			tagContentsMu.Unlock()
+
+			for _, ph := range curPlaceholders {
+				lookupTagName := ph.TagName
+				raw, ok := curTagContents[lookupTagName]
+				if (!ok || strings.TrimSpace(raw) == "") && m.nonce != "" {
+					// Backward compatibility: allow placeholder tag name to include the nonce suffix,
+					// e.g. "TOOL_PARAMS_px", but treat it as "TOOL_PARAMS".
+					suffix := "_" + m.nonce
+					if strings.HasSuffix(lookupTagName, suffix) {
+						lookupTagName = strings.TrimSuffix(lookupTagName, suffix)
+						raw, ok = curTagContents[lookupTagName]
+					}
+				}
+				if !ok || strings.TrimSpace(raw) == "" {
+					continue
+				}
+				parsed, err := parseJSONAnyFromText(raw)
+				if err != nil {
+					log.Warnf("Failed to parse JSON from AITAG[%s]: %v", lookupTagName, err)
+					continue
+				}
+				if !setValueAtPath(curRoot, ph.Path, parsed) {
+					continue
+				}
+				// Ensure the top-level object reference is updated in action params.
+				// (Streaming callbacks and object callback may produce different map instances.)
+				if len(ph.Path) > 0 {
+					top := ph.Path[0]
+					if topVal, ok := curRoot[top]; ok {
+						action.ForceSet(top, topVal)
+					}
+				}
+				fullKey := strings.Join(ph.Path, ".")
+				if fullKey != "" {
+					action.ForceSet(fullKey, parsed)
+				}
+				if len(ph.Path) > 0 {
+					last := ph.Path[len(ph.Path)-1]
+					if last != "" && !isNumericString(last) {
+						action.ForceSet(last, parsed)
+					}
+				}
+			}
+		}
+
+		parseFinish() // signal parse finish
 
 		streamWg.Wait() // wait all stream handlers finished
 		streamFinish()  // signal stream finish
@@ -524,4 +634,139 @@ func NewSimpleAction(name string, params aitool.InvokeParams) *Action {
 		streamFinish: ctx,
 		parseFinish:  ctx,
 	}
+}
+
+func getAITagJSONPlaceholderTagName(v any) (string, bool) {
+	if utils.IsNil(v) {
+		return "", false
+	}
+	switch val := v.(type) {
+	case string:
+		s := strings.TrimSpace(val)
+		if strings.HasPrefix(s, AITagJSONPlaceholderPrefix) {
+			tagName := strings.TrimSpace(strings.TrimPrefix(s, AITagJSONPlaceholderPrefix))
+			return tagName, tagName != ""
+		}
+		return "", false
+	case map[string]any:
+		raw, ok := val[AITagJSONPlaceholderKey]
+		if !ok {
+			return "", false
+		}
+		tagName := strings.TrimSpace(utils.InterfaceToString(raw))
+		return tagName, tagName != ""
+	default:
+		// try best-effort map conversion
+		m := utils.InterfaceToGeneralMap(v)
+		if len(m) == 0 {
+			return "", false
+		}
+		raw, ok := m[AITagJSONPlaceholderKey]
+		if !ok {
+			return "", false
+		}
+		tagName := strings.TrimSpace(utils.InterfaceToString(raw))
+		return tagName, tagName != ""
+	}
+}
+
+func findAITagJSONPlaceholders(v any, path []string, out *[]aitagJSONPlaceholder) {
+	if out == nil {
+		return
+	}
+	if tagName, ok := getAITagJSONPlaceholderTagName(v); ok {
+		*out = append(*out, aitagJSONPlaceholder{
+			Path:    append([]string(nil), path...),
+			TagName: tagName,
+		})
+		return
+	}
+	switch vv := v.(type) {
+	case map[string]any:
+		for k, child := range vv {
+			findAITagJSONPlaceholders(child, append(path, k), out)
+		}
+	case []any:
+		for i, child := range vv {
+			findAITagJSONPlaceholders(child, append(path, strconv.Itoa(i)), out)
+		}
+	default:
+		return
+	}
+}
+
+func isNumericString(s string) bool {
+	if s == "" {
+		return false
+	}
+	_, err := strconv.Atoi(s)
+	return err == nil
+}
+
+func setValueAtPath(root any, path []string, value any) bool {
+	if len(path) == 0 || utils.IsNil(root) {
+		return false
+	}
+	cur := root
+	for i := 0; i < len(path)-1; i++ {
+		seg := path[i]
+		switch c := cur.(type) {
+		case map[string]any:
+			cur = c[seg]
+		case []any:
+			idx, err := strconv.Atoi(seg)
+			if err != nil || idx < 0 || idx >= len(c) {
+				return false
+			}
+			cur = c[idx]
+		default:
+			return false
+		}
+	}
+	last := path[len(path)-1]
+	switch c := cur.(type) {
+	case map[string]any:
+		c[last] = value
+		return true
+	case []any:
+		idx, err := strconv.Atoi(last)
+		if err != nil || idx < 0 || idx >= len(c) {
+			return false
+		}
+		c[idx] = value
+		return true
+	default:
+		return false
+	}
+}
+
+func parseJSONAnyFromText(s string) (any, error) {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
+		return nil, fmt.Errorf("empty json")
+	}
+	var out any
+	if err := json.Unmarshal([]byte(raw), &out); err == nil {
+		return out, nil
+	}
+
+	// fallback: try to extract a JSON object/array from a noisy tag block
+	indexes := jsonextractor.ExtractObjectIndexes(raw)
+	if len(indexes) == 0 {
+		return nil, fmt.Errorf("invalid json")
+	}
+	bestStart, bestEnd := indexes[0][0], indexes[0][1]
+	for _, p := range indexes[1:] {
+		if p[0] < bestStart || (p[0] == bestStart && p[1] > bestEnd) {
+			bestStart, bestEnd = p[0], p[1]
+		}
+	}
+	if bestStart < 0 || bestEnd <= bestStart || bestEnd > len(raw) {
+		return nil, fmt.Errorf("invalid json indexes")
+	}
+	candidate := raw[bestStart:bestEnd]
+	if err := json.Unmarshal([]byte(candidate), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
