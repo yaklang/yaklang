@@ -422,7 +422,6 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	if err != nil {
 		return utils.Wrap(err, "embed documents")
 	}
-	addStartTime := time.Now()
 	docCount := len(docs)
 	defer func() {
 		if r := recover(); r != nil {
@@ -523,9 +522,6 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
 	hnswAddTime := s.hnsw.Add(nodes...) // 纯粹的 add 使用的时间不加排队使用的的时间
 
-	// 记录详细性能指标
-	totalTime := time.Since(addStartTime)
-
 	// 计算平均指标
 	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
 	if dbQueryCount > 0 {
@@ -539,15 +535,13 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	}
 
 	// 性能警告条件 - 包含事务持续时间检查
-	shouldWarn := totalTime > 5*time.Second ||
-		totalDbQueryTime > time.Second ||
+	shouldWarn := totalDbQueryTime > time.Second ||
 		hnswAddTime > time.Second ||
 		transactionDuration > 10*time.Second || // 新增：事务持续时间警告
 		(docCount > 10 && avgQueryTime > 500*time.Millisecond)
 
 	if shouldWarn {
-		log.Warnf("HNSW Add performance breakdown - Total: %v (%d docs), TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v",
-			totalTime, docCount, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
+		log.Warnf("HNSW Add performance breakdown - (%d docs), TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v", docCount, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
 
 		log.Warnf("Database operations summary - TotalDocs: %d, Queries: %d (total: %v, avg: %v), Updates: %d (total: %v, avg: %v), Creates: %d (total: %v, avg: %v)",
 			docCount, dbQueryCount, totalDbQueryTime, avgQueryTime, docUpdateCount, totalDocUpdateTime, avgUpdateTime, docCreateCount, totalDocCreateTime, avgCreateTime)
@@ -580,7 +574,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 	} else {
 		// 即使不警告，也记录基本统计信息用于监控
 		log.Debugf("HNSW Add completed - Total: %v (%d docs), TxDuration: %v, DB: %v, HNSW: %v",
-			totalTime, docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
+			docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
 	}
 
 	return nil

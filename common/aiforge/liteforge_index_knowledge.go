@@ -79,7 +79,7 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, options ...any) (<-chan *
 	go func() {
 		defer output.Close()
 
-		swg := utils.NewSizedWaitGroup(10, refineConfig.Ctx)
+		swg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
 		defer swg.Wait()
 
 		for res := range analyzeChannel {

@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -522,8 +521,6 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	helper := asynchelper.NewAsyncPerformanceHelper("merge_and_save_entity")
-	defer helper.Close()
 	cacheKey := entity.EntityName
 	if cacheData := r.getEntityCache(cacheKey); cacheData != nil {
 		cacheData.Attributes = utils.MergeGeneralMap(cacheData.Attributes, entity.Attributes)
@@ -533,22 +530,13 @@ func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*sc
 		}
 		return cacheData, nil
 	}
-
-	helper.MarkNow()
 	matchedEntity, isExactMatch, err := r.MatchEntities(entity)
 	if err != nil { // not critical error
 		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
 	}
-	matchDuration := helper.CheckLastMarkAndLog(3*time.Second, "match_entities")
-
 	if len(matchedEntity) <= 0 {
 		// 记录实体创建的原因和统计信息
-		log.Infof("Creating new entity: %s (no matches found after %v)", entity.EntityName, matchDuration)
-
-		helper.MarkNow()
 		err = r.CreateEntity(entity)
-		helper.CheckLastMarkAndLog(2*time.Second, "create_entity")
-
 		if err != nil {
 			return nil, utils.Errorf("failed to create entity [%s]: %v", entity.EntityName, err)
 		}
