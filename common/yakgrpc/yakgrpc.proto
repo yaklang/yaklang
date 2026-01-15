@@ -2504,6 +2504,8 @@ message GlobalNetworkConfig {
   uint64 MinTlsVersion = 21;
   uint64 MaxTlsVersion = 22;
   uint64 MaxContentLength = 23;
+  // 插件加载超时配置（秒）
+  float LoadPluginTimeout = 24;
 }
 
 message ProxyEndpoint {

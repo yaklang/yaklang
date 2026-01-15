@@ -369,6 +369,9 @@ func InitNetworkConfig(config *ypb.GlobalNetworkConfig) { // init some network c
 	if config.CallPluginTimeout == 0 {
 		config.CallPluginTimeout = float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()) // use global default instead of previous 60s
 	}
+	if config.LoadPluginTimeout == 0 {
+		config.LoadPluginTimeout = float32(consts.GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Load()) // 默认30秒
+	}
 	if config.MaxContentLength == 0 {
 		config.MaxContentLength = 1024 * 1024 * 10 // default 10M
 	}
@@ -390,6 +393,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		AuthInfos:         make([]*ypb.AuthInfo, 0),
 		DbSaveSync:        false,
 		CallPluginTimeout: float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
+		LoadPluginTimeout: float32(consts.GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Load()),
 		MaxTlsVersion:     tls.VersionTLS13,
 		MinTlsVersion:     tls.VersionSSL30,
 		MaxContentLength:  1024 * 1024 * 10,
@@ -440,6 +444,10 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	if c.GetCallPluginTimeout() > 0 {
 		consts.SetGlobalCallerCallPluginTimeout(float64(c.GetCallPluginTimeout()))
+	}
+
+	if c.GetLoadPluginTimeout() > 0 {
+		consts.SetGlobalCallerLoadPluginTimeout(float64(c.GetLoadPluginTimeout()))
 	}
 
 	netx.SetDefaultDNSOptions(
