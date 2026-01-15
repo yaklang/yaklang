@@ -612,7 +612,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		sendHeader := func() {
 			c.logInfo("Successfully obtained AI client, starting to send response header")
 			var header = "HTTP/1.1 200 OK\r\n" +
-				"Content-Type: application/json\r\n" +
+				"Content-Type: text/event-stream; charset=utf-8\r\n" +
+				"Cache-Control: no-cache\r\n" +
+				"Connection: keep-alive\r\n" +
 				"Transfer-Encoding: chunked\r\n" +
 				"\r\n"
 			_, err := conn.Write([]byte(header))
