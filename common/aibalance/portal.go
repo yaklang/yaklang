@@ -1,6 +1,7 @@
 package aibalance
 
 import (
+	"bufio"
 	"bytes"
 	"embed"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"runtime/pprof"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1089,6 +1092,8 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleMemoryStatsAPI(conn, request)
 	} else if uriIns.Path == "/portal/api/force-gc" && request.Method == "POST" {
 		c.handleForceGCAPI(conn, request)
+	} else if uriIns.Path == "/portal/api/goroutine-dump" {
+		c.handleGoroutineDumpAPI(conn, request)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
@@ -2391,17 +2396,17 @@ func (c *ServerConfig) handleMemoryStatsAPI(conn net.Conn, request *http.Request
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"memory": map[string]interface{}{
-			"alloc_mb":        memStats.Alloc / 1024 / 1024,
-			"total_alloc_mb":  memStats.TotalAlloc / 1024 / 1024,
-			"sys_mb":          memStats.Sys / 1024 / 1024,
-			"heap_alloc_mb":   memStats.HeapAlloc / 1024 / 1024,
-			"heap_sys_mb":     memStats.HeapSys / 1024 / 1024,
-			"heap_idle_mb":    memStats.HeapIdle / 1024 / 1024,
-			"heap_inuse_mb":   memStats.HeapInuse / 1024 / 1024,
+			"alloc_mb":         memStats.Alloc / 1024 / 1024,
+			"total_alloc_mb":   memStats.TotalAlloc / 1024 / 1024,
+			"sys_mb":           memStats.Sys / 1024 / 1024,
+			"heap_alloc_mb":    memStats.HeapAlloc / 1024 / 1024,
+			"heap_sys_mb":      memStats.HeapSys / 1024 / 1024,
+			"heap_idle_mb":     memStats.HeapIdle / 1024 / 1024,
+			"heap_inuse_mb":    memStats.HeapInuse / 1024 / 1024,
 			"heap_released_mb": memStats.HeapReleased / 1024 / 1024,
-			"heap_objects":    memStats.HeapObjects,
-			"num_gc":          memStats.NumGC,
-			"goroutines":      runtime.NumGoroutine(),
+			"heap_objects":     memStats.HeapObjects,
+			"num_gc":           memStats.NumGC,
+			"goroutines":       runtime.NumGoroutine(),
 		},
 	})
 }
@@ -2435,18 +2440,130 @@ func (c *ServerConfig) handleForceGCAPI(conn net.Conn, request *http.Request) {
 		beforeAllocMB, afterAllocMB, freedMB)
 
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success": true,
-		"message": "Garbage collection completed",
+		"success":   true,
+		"message":   "Garbage collection completed",
 		"before_mb": beforeAllocMB,
 		"after_mb":  afterAllocMB,
 		"freed_mb":  freedMB,
 		"memory": map[string]interface{}{
-			"alloc_mb":        afterStats.Alloc / 1024 / 1024,
-			"heap_alloc_mb":   afterStats.HeapAlloc / 1024 / 1024,
-			"heap_inuse_mb":   afterStats.HeapInuse / 1024 / 1024,
+			"alloc_mb":         afterStats.Alloc / 1024 / 1024,
+			"heap_alloc_mb":    afterStats.HeapAlloc / 1024 / 1024,
+			"heap_inuse_mb":    afterStats.HeapInuse / 1024 / 1024,
 			"heap_released_mb": afterStats.HeapReleased / 1024 / 1024,
-			"heap_objects":    afterStats.HeapObjects,
-			"goroutines":      runtime.NumGoroutine(),
+			"heap_objects":     afterStats.HeapObjects,
+			"goroutines":       runtime.NumGoroutine(),
 		},
+	})
+}
+
+// handleGoroutineDumpAPI returns goroutine stack traces for debugging
+func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Request) {
+	log.Warnf("[GOROUTINE_DUMP] API called, current goroutines: %d", runtime.NumGoroutine())
+
+	// Get goroutine profile
+	var buf bytes.Buffer
+	pprof.Lookup("goroutine").WriteTo(&buf, 1)
+
+	// Parse and count goroutines by stack signature
+	type goroutineInfo struct {
+		Count     int      `json:"count"`
+		Stack     string   `json:"stack"`
+		Functions []string `json:"functions"`
+	}
+
+	goroutineMap := make(map[string]*goroutineInfo)
+	scanner := bufio.NewScanner(&buf)
+	var currentStack strings.Builder
+	var currentFunctions []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "goroutine ") {
+			if currentStack.Len() > 0 {
+				// Extract first function as signature
+				stack := currentStack.String()
+				// Find first function call line
+				lines := strings.Split(stack, "\n")
+				var signature string
+				for _, l := range lines {
+					if strings.HasPrefix(l, "\t") || strings.Contains(l, "(") {
+						signature = strings.TrimSpace(l)
+						if strings.Contains(signature, "(") {
+							// Get just the function name
+							idx := strings.Index(signature, "(")
+							if idx > 0 {
+								signature = signature[:idx]
+							}
+						}
+						break
+					}
+				}
+
+				if signature == "" {
+					signature = "unknown"
+				}
+
+				if info, exists := goroutineMap[signature]; exists {
+					info.Count++
+				} else {
+					goroutineMap[signature] = &goroutineInfo{
+						Count:     1,
+						Stack:     stack,
+						Functions: currentFunctions,
+					}
+				}
+				currentStack.Reset()
+				currentFunctions = nil
+			}
+		}
+
+		currentStack.WriteString(line + "\n")
+
+		// Extract function names
+		if !strings.HasPrefix(line, "goroutine ") && strings.Contains(line, "(") && !strings.HasPrefix(line, "\t") {
+			currentFunctions = append(currentFunctions, strings.TrimSpace(line))
+		}
+	}
+
+	// Convert to sorted slice
+	type goroutineSummary struct {
+		Signature string `json:"signature"`
+		Count     int    `json:"count"`
+		Sample    string `json:"sample_stack"`
+	}
+
+	var summaries []goroutineSummary
+	for sig, info := range goroutineMap {
+		summaries = append(summaries, goroutineSummary{
+			Signature: sig,
+			Count:     info.Count,
+			Sample:    info.Stack,
+		})
+	}
+
+	// Sort by count (descending)
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].Count > summaries[j].Count
+	})
+
+	// Log top 5 for quick diagnosis
+	for i, s := range summaries {
+		if i >= 5 {
+			break
+		}
+		log.Warnf("[GOROUTINE_DUMP] Top %d: %d goroutines in %s", i+1, s.Count, s.Signature)
+	}
+
+	topN := 10
+	if len(summaries) < topN {
+		topN = len(summaries)
+	}
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success":        true,
+		"total":          runtime.NumGoroutine(),
+		"unique_stacks":  len(summaries),
+		"top_goroutines": summaries[:topN],
+		"full_dump":      buf.String(),
 	})
 }

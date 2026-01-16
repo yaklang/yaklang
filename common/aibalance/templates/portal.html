@@ -1568,17 +1568,19 @@
 
     <!-- Memory Diagnostic Dialog -->
     <div id="memory-dialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 25px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+        <div style="background: white; padding: 25px; border-radius: 8px; min-width: 500px; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;">
             <h2 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">🔧 内存诊断</h2>
             <div id="memory-stats-content" style="margin: 15px 0;">
                 <p>加载中...</p>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
                 <button class="btn" onclick="fetchMemoryStats()" style="background-color: #4285f4;">刷新状态</button>
                 <button class="btn" onclick="forceGC()" style="background-color: #ff9800;">强制 GC</button>
+                <button class="btn" onclick="fetchGoroutineDump()" style="background-color: #9c27b0;">Goroutine Dump</button>
                 <button class="btn" onclick="closeMemoryDialog()" style="background-color: #666;">关闭</button>
             </div>
             <div id="gc-result" style="margin-top: 15px; display: none; padding: 10px; border-radius: 5px;"></div>
+            <div id="goroutine-dump-result" style="margin-top: 15px; display: none; max-height: 400px; overflow-y: auto;"></div>
         </div>
     </div>
 
@@ -2647,6 +2649,63 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     gcResult.style.backgroundColor = '#ffebee';
                     gcResult.innerHTML = '❌ 请求错误: ' + err;
                 });
+        }
+
+        function fetchGoroutineDump() {
+            const dumpResult = document.getElementById('goroutine-dump-result');
+            dumpResult.style.display = 'block';
+            dumpResult.innerHTML = '<div style="padding: 10px; background: #fff3e0; border-radius: 5px;">🔄 正在获取 Goroutine Dump...</div>';
+            
+            fetch('/portal/api/goroutine-dump')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let html = `
+                            <div style="padding: 10px; background: #e8f5e9; border-radius: 5px; margin-bottom: 10px;">
+                                <strong>✅ 总 Goroutines: ${data.total}</strong> | 唯一堆栈: ${data.unique_stacks}
+                            </div>
+                            <div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
+                                <h4 style="margin-top: 0;">Top Goroutines (按数量排序):</h4>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr style="background: #e0e0e0;">
+                                        <th style="padding: 8px; text-align: left; border: 1px solid #ccc;">数量</th>
+                                        <th style="padding: 8px; text-align: left; border: 1px solid #ccc;">函数签名</th>
+                                    </tr>`;
+                        
+                        if (data.top_goroutines) {
+                            data.top_goroutines.forEach((g, i) => {
+                                const bgColor = g.count > 100 ? '#ffebee' : (g.count > 10 ? '#fff3e0' : '#ffffff');
+                                const countColor = g.count > 100 ? '#d32f2f' : (g.count > 10 ? '#f57c00' : '#333');
+                                html += `
+                                    <tr style="background: ${bgColor};">
+                                        <td style="padding: 8px; border: 1px solid #ccc; color: ${countColor}; font-weight: bold;">${g.count}</td>
+                                        <td style="padding: 8px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; word-break: break-all;">${escapeHtml(g.signature)}</td>
+                                    </tr>`;
+                            });
+                        }
+                        
+                        html += `</table>
+                            </div>
+                            <details style="margin-top: 10px;">
+                                <summary style="cursor: pointer; padding: 10px; background: #e3f2fd; border-radius: 5px;">查看完整 Dump (点击展开)</summary>
+                                <pre style="background: #263238; color: #aed581; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 11px; max-height: 300px; overflow-y: auto;">${escapeHtml(data.full_dump)}</pre>
+                            </details>`;
+                        
+                        dumpResult.innerHTML = html;
+                    } else {
+                        dumpResult.innerHTML = '<div style="padding: 10px; background: #ffebee; border-radius: 5px;">❌ 获取失败</div>';
+                    }
+                })
+                .catch(err => {
+                    dumpResult.innerHTML = '<div style="padding: 10px; background: #ffebee; border-radius: 5px;">❌ 请求错误: ' + err + '</div>';
+                });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // Auto-update memory display on page load
