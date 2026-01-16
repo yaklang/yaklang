@@ -1,0 +1,201 @@
+// 规则引擎基础能力测试（仅用 sandbox）
+// 覆盖：规则语法、条件配置、动作配置、启用/禁用、实时检测、触发记录
+
+// 定义规则的结构（规则标识符、元数据、字符串、条件）
+// 定义元数据的结构和格式规范：meta 中使用 key = value
+// 规则语法（类 C 表达式）：condition 使用 &&、||、== 等
+ruleText = `rule file_rule {
+  meta:
+    desc = "文件规则"
+    level = "low"
+  strings:
+    $a = "secret"
+    $b = /root/.*/
+  condition:
+    $a && $b && event["Type"] == "write"
+}`
+
+// 解析规则中的描述性元数据信息（meta 区块）
+parseRule = fn(text) {
+    rule = {
+        "id": "",
+        "meta": {},
+        "strings": {},
+        "condition": "",
+        "enabled": true,
+        "actions": [],
+    }
+    lines = str.Split(text, "\n")
+    section = ""
+    conditionLines = []
+    for line in lines {
+        line = str.TrimSpace(line)
+        if line == "" {
+            continue
+        }
+        if str.Contains(line, "//") {
+            parts = str.SplitN(line, "//", 2)
+            line = str.TrimSpace(parts[0])
+        }
+        if line == "" {
+            continue
+        }
+        if str.HasPrefix(line, "rule ") {
+            parts = str.SplitN(line, " ", 2)
+            if len(parts) > 1 {
+                idPart = str.TrimSpace(parts[1])
+                idPart = str.TrimSuffix(idPart, "{")
+                rule["id"] = str.TrimSpace(idPart)
+            }
+            continue
+        }
+        if line == "{" || line == "}" {
+            continue
+        }
+        if str.HasPrefix(line, "meta:") {
+            section = "meta"
+            continue
+        }
+        if str.HasPrefix(line, "strings:") {
+            section = "strings"
+            continue
+        }
+        if str.HasPrefix(line, "condition:") {
+            section = "condition"
+            rest = str.TrimSpace(str.TrimPrefix(line, "condition:"))
+            if rest != "" {
+                conditionLines = append(conditionLines, rest)
+            }
+            continue
+        }
+
+        if section == "meta" {
+            kv = str.SplitN(line, "=", 2)
+            if len(kv) == 2 {
+                key = str.TrimSpace(kv[0])
+                val = str.TrimSpace(kv[1])
+                val = str.Trim(val, "\"'")
+                rule["meta"][key] = val
+            }
+        } else if section == "strings" {
+            kv = str.SplitN(line, "=", 2)
+            if len(kv) == 2 {
+                name = str.TrimSpace(kv[0])
+                name = str.TrimPrefix(name, "$")
+                val = str.TrimSpace(kv[1])
+                isRegex = str.HasPrefix(val, "/") && str.HasSuffix(val, "/") && len(val) > 2
+                if isRegex {
+                    val = str.TrimSuffix(str.TrimPrefix(val, "/"), "/")
+                } else {
+                    val = str.Trim(val, "\"'")
+                }
+                rule["strings"][name] = {"pattern": val, "is_regex": isRegex}
+            }
+        } else if section == "condition" {
+            conditionLines = append(conditionLines, line)
+        }
+    }
+    rule["condition"] = str.ReplaceAll(str.Join(conditionLines, " "), "$", "")
+    return rule
+}
+
+// 支持文本字符串的匹配功能（str.Contains）
+// 支持正则表达式的匹配功能（str.RegexpMatch）
+matchStrings = fn(rule, text) {
+    matched = {}
+    for name, info in rule["strings"] {
+        if info["is_regex"] {
+            matched[name] = str.RegexpMatch(info["pattern"], text)
+        } else {
+            matched[name] = str.Contains(text, info["pattern"])
+        }
+    }
+    return matched
+}
+
+// 配置规则动作与执行方式
+actionCalls = []
+runActions = fn(rule, event, matches) {
+    results = []
+    for action in rule["actions"] {
+        if action["type"] == "log" {
+            actionCalls = append(actionCalls, action["params"]["tag"])
+            results = append(results, {"type": "log", "success": true})
+        } else {
+            results = append(results, {"type": action["type"], "success": false})
+        }
+    }
+    return results
+}
+
+box = sandbox.Create(sandbox.library({"str": str}))
+triggers = []
+
+evalRule = fn(rule, event) {
+    if !rule["enabled"] {
+        return []
+    }
+    matchText = ""
+    if "Content" in event {
+        matchText = event["Content"]
+    }
+    if "Path" in event {
+        matchText = matchText + "\n" + event["Path"]
+    }
+    matches = matchStrings(rule, matchText)
+    vars = {"event": event, "meta": rule["meta"], "strings": matches}
+    for k, v in matches {
+        vars[k] = v
+    }
+    ok = box.ExecuteAsBoolean(rule["condition"], vars)~
+    if ok {
+        actionResults = runActions(rule, event, matches)
+        trigger = {
+            "timestamp": time.Now().Unix(),
+            "condition": rule["condition"],
+            "event": event,
+            "action_results": actionResults,
+        }
+        triggers = append(triggers, trigger)
+        return [trigger]
+    }
+    return []
+}
+
+rule = parseRule(ruleText)
+rule["actions"] = [{"type": "log", "params": {"tag": "t1"}}]
+
+// 禁用规则后不触发
+rule["enabled"] = false
+event1 = {
+    "Type": "write",
+    "Path": "/root/secret.txt",
+    "Content": "secret data",
+}
+hits = evalRule(rule, event1)
+assert len(hits) == 0, "Disabled rule should not trigger"
+
+// 启用规则后触发
+rule["enabled"] = true
+hits = evalRule(rule, event1)
+assert len(hits) > 0, "Enabled rule should trigger"
+
+hit = hits[0]
+assert hit["timestamp"] > 0, "Trigger should have timestamp"
+assert hit["condition"] != "", "Trigger should have condition"
+assert len(hit["action_results"]) > 0, "Trigger should have action results"
+assert hit["action_results"][0]["success"] == true, "Action should be executed successfully"
+
+// 实时检测：不满足条件的事件不触发
+event2 = {
+    "Type": "read",
+    "Path": "/root/secret.txt",
+    "Content": "secret data",
+}
+hits2 = evalRule(rule, event2)
+assert len(hits2) == 0, "Non-matching event should not trigger"
+
+assert len(triggers) >= 1, "Should record trigger history"
+assert len(actionCalls) > 0, "Action should be called"
+
+println("Sandbox rule tests passed!")

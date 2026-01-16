@@ -99,6 +99,7 @@ if err == nil {
         assert chmodEvent != nil, "Should have chmod event"
         assert chmodEvent.OldMode != "", "Chmod event should have old mode"
         assert chmodEvent.NewMode != "", "Chmod event should have new mode"
+        assert chmodEvent.OldMode != chmodEvent.NewMode, "Chmod event old/new mode should differ"
         println(sprintf("Permission changed from %s to %s", chmodEvent.OldMode, chmodEvent.NewMode))
     } else {
         println("Skipping permission change event validation because mode did not change on this system")
@@ -150,4 +151,3 @@ for logEntry in logEntries {
 }
 
 println("File permission tests passed!")
-

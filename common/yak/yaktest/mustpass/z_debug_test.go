@@ -14,7 +14,7 @@ func TestMustPassDebug(t *testing.T) {
 		return
 	}
 
-	debugName := "file_scanner.yak"
+	debugName := "rule_engine_basic.yak"
 	var debugCases [][]string
 
 	// 检查通用测试文件

@@ -27,6 +27,7 @@ const (
 	FileOpDelete = "delete"
 	FileOpChmod  = "chmod"
 	FileOpChown  = "chown"
+	FileOpRead   = "read"
 )
 
 // FileAccessLog 文件访问日志结构
@@ -51,6 +52,7 @@ type FileMonitorConfig struct {
 	Recursive       bool                    `json:"recursive"`
 	MonitorOps      []string                `json:"monitor_ops"`
 	MaxFileSize     int64                   `json:"max_file_size"`
+	MaxContentSize  int64                   `json:"max_content_size"`
 	PollInterval    time.Duration           `json:"poll_interval"`
 	LogCallback     func(*FileAccessLog)    `json:"-"`
 	EventCallback   func(*FileMonitorEvent) `json:"-"`
@@ -58,17 +60,19 @@ type FileMonitorConfig struct {
 
 // FileMonitorEvent 文件监控事件
 type FileMonitorEvent struct {
-	Type      string    `json:"type"`
-	Path      string    `json:"path"`
-	IsDir     bool      `json:"is_dir"`
-	Timestamp time.Time `json:"timestamp"`
-	OldMode   string    `json:"old_mode,omitempty"`
-	NewMode   string    `json:"new_mode,omitempty"`
-	OldOwner  string    `json:"old_owner,omitempty"`
-	NewOwner  string    `json:"new_owner,omitempty"`
-	User      string    `json:"user"`
-	UID       int       `json:"uid"`
-	GID       int       `json:"gid"`
+	Type       string    `json:"type"`
+	Path       string    `json:"path"`
+	IsDir      bool      `json:"is_dir"`
+	Timestamp  time.Time `json:"timestamp"`
+	OldMode    string    `json:"old_mode,omitempty"`
+	NewMode    string    `json:"new_mode,omitempty"`
+	OldOwner   string    `json:"old_owner,omitempty"`
+	NewOwner   string    `json:"new_owner,omitempty"`
+	OldContent string    `json:"old_content,omitempty"`
+	NewContent string    `json:"new_content,omitempty"`
+	User       string    `json:"user"`
+	UID        int       `json:"uid"`
+	GID        int       `json:"gid"`
 }
 
 type eventRecord struct {
@@ -81,15 +85,16 @@ type eventRecord struct {
 
 // FileMonitor 文件监控器
 type FileMonitor struct {
-	config     *FileMonitorConfig
-	monitors   map[string]*filesys.YakFileMonitor
-	fileHashes *sync.Map // 文件哈希表，用于快速判断文件是否添加/修改/删除
-	fileInfos  *sync.Map
-	ctx        context.Context
-	cancel     context.CancelFunc
-	mu         sync.Mutex
-	eventChan  chan *eventRecord
-	wg         sync.WaitGroup
+	config       *FileMonitorConfig
+	monitors     map[string]*filesys.YakFileMonitor
+	fileHashes   *sync.Map // 文件哈希表，用于快速判断文件是否添加/修改/删除
+	fileContents *sync.Map
+	fileInfos    *sync.Map
+	ctx          context.Context
+	cancel       context.CancelFunc
+	mu           sync.Mutex
+	eventChan    chan *eventRecord
+	wg           sync.WaitGroup
 }
 
 // FileInfo 文件信息
@@ -110,9 +115,12 @@ type FileInfo struct {
 func NewFileMonitor(config *FileMonitorConfig) (*FileMonitor, error) {
 	if config == nil {
 		config = &FileMonitorConfig{
-			Recursive:   true,
-			MaxFileSize: 10 * 1024 * 1024, // 10MB
+			Recursive:      true,
+			MaxFileSize:    10 * 1024 * 1024, // 10MB
+			MaxContentSize: 64 * 1024,        // 64KB
 		}
+	} else if config.MaxContentSize <= 0 {
+		config.MaxContentSize = 64 * 1024
 	}
 
 	if len(config.WatchPaths) == 0 {
@@ -122,13 +130,14 @@ func NewFileMonitor(config *FileMonitorConfig) (*FileMonitor, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	fm := &FileMonitor{
-		config:     config,
-		monitors:   make(map[string]*filesys.YakFileMonitor),
-		fileHashes: new(sync.Map),
-		fileInfos:  new(sync.Map),
-		ctx:        ctx,
-		cancel:     cancel,
-		eventChan:  make(chan *eventRecord, 1000),
+		config:       config,
+		monitors:     make(map[string]*filesys.YakFileMonitor),
+		fileHashes:   new(sync.Map),
+		fileContents: new(sync.Map),
+		fileInfos:    new(sync.Map),
+		ctx:          ctx,
+		cancel:       cancel,
+		eventChan:    make(chan *eventRecord, 1000),
 	}
 
 	return fm, nil
@@ -167,6 +176,7 @@ func (fm *FileMonitor) Start() error {
 		go fm.initializeFileInfo(absPath)
 	}
 
+	registerActiveFileMonitor(fm)
 	return nil
 }
 
@@ -175,6 +185,7 @@ func (fm *FileMonitor) Stop() {
 	fm.mu.Lock()
 	defer fm.mu.Unlock()
 
+	unregisterActiveFileMonitor(fm)
 	fm.performFinalCheck()
 	fm.cancel()
 	close(fm.eventChan)
@@ -275,6 +286,8 @@ func (fm *FileMonitor) initializeFileInfo(path string) {
 				fm.fileHashes.Store(filePath, hash)
 			}
 		}
+
+		fm.storeFileContent(filePath, info)
 
 		return nil
 	})
@@ -418,12 +431,12 @@ func (fm *FileMonitor) handleFileSystemEvents(events *filesys.EventSet) {
 				newFileInfo := fm.getFileInfo(event.Path, info)
 
 				if oldFileInfo.Mode != newFileInfo.Mode {
-					fm.recordEvent(FileOpChmod, event.Path, event.IsDir, info)
+					fm.recordEventWithOldInfo(FileOpChmod, event.Path, event.IsDir, info, oldFileInfo)
 				}
 
 				if oldFileInfo.UID != 0 || newFileInfo.UID != 0 {
 					if oldFileInfo.UID != newFileInfo.UID || oldFileInfo.GID != newFileInfo.GID {
-						fm.recordEvent(FileOpChown, event.Path, event.IsDir, info)
+						fm.recordEventWithOldInfo(FileOpChown, event.Path, event.IsDir, info, oldFileInfo)
 					}
 				}
 
@@ -515,7 +528,7 @@ func (fm *FileMonitor) checkPermissionChangesForPaths(processedPaths map[string]
 				if log.GetLevel() == log.DebugLevel {
 					log.Debugf("detected permission change for %s: %s -> %s", path, oldFileInfo.Mode.String(), newFileInfo.Mode.String())
 				}
-				fm.recordEvent(FileOpChmod, path, info.IsDir(), info)
+				fm.recordEventWithOldInfo(FileOpChmod, path, info.IsDir(), info, oldFileInfo)
 				// 权限变更后更新文件信息
 				fm.fileInfos.Store(path, newFileInfo)
 			} else {
@@ -529,7 +542,7 @@ func (fm *FileMonitor) checkPermissionChangesForPaths(processedPaths map[string]
 					if log.GetLevel() == log.DebugLevel {
 						log.Debugf("detected ownership change for %s: UID %d->%d, GID %d->%d", path, oldFileInfo.UID, newFileInfo.UID, oldFileInfo.GID, newFileInfo.GID)
 					}
-					fm.recordEvent(FileOpChown, path, info.IsDir(), info)
+					fm.recordEventWithOldInfo(FileOpChown, path, info.IsDir(), info, oldFileInfo)
 					// 属主变更后更新文件信息
 					fm.fileInfos.Store(path, newFileInfo)
 				}
@@ -650,6 +663,7 @@ func (fm *FileMonitor) processEvent(record *eventRecord) {
 		fileInfo = fm.getFileInfo(record.path, record.info)
 		fileMode = fileInfo.Mode.String()
 		event.NewMode = fileMode
+		event.NewOwner = fileInfo.Owner
 
 		// 优先使用 record.oldInfo（如果提供），否则从缓存中获取
 		if record.oldInfo != nil {
@@ -680,6 +694,7 @@ func (fm *FileMonitor) processEvent(record *eventRecord) {
 	}
 
 	fm.fillUserInfo(event)
+	fm.fillContentInfo(event, record)
 
 	if fm.config.LogCallback != nil {
 		accessLog := &FileAccessLog{
@@ -728,6 +743,78 @@ func (fm *FileMonitor) fillUserInfo(event *FileMonitorEvent) {
 	}
 }
 
+func (fm *FileMonitor) fillContentInfo(event *FileMonitorEvent, record *eventRecord) {
+	if fm == nil || fm.config == nil || fm.fileContents == nil {
+		return
+	}
+	if fm.config.MaxContentSize <= 0 || event == nil || event.IsDir {
+		return
+	}
+
+	switch event.Type {
+	case FileOpWrite, FileOpDelete:
+		if oldRaw, ok := fm.fileContents.Load(event.Path); ok {
+			if data, ok := oldRaw.([]byte); ok {
+				event.OldContent = string(data)
+			}
+		}
+	}
+
+	if event.Type == FileOpDelete {
+		fm.fileContents.Delete(event.Path)
+		return
+	}
+
+	if event.Type == FileOpWrite || event.Type == FileOpCreate {
+		newContent, ok := fm.readFileContent(event.Path, record.info)
+		if ok {
+			event.NewContent = newContent
+			fm.fileContents.Store(event.Path, []byte(newContent))
+		} else {
+			fm.fileContents.Delete(event.Path)
+		}
+	}
+}
+
+func (fm *FileMonitor) storeFileContent(path string, info os.FileInfo) {
+	if fm == nil || fm.config == nil || fm.fileContents == nil {
+		return
+	}
+	content, ok := fm.readFileContent(path, info)
+	if !ok {
+		fm.fileContents.Delete(path)
+		return
+	}
+	fm.fileContents.Store(path, []byte(content))
+}
+
+func (fm *FileMonitor) readFileContent(path string, info os.FileInfo) (string, bool) {
+	if fm == nil || fm.config == nil {
+		return "", false
+	}
+	if fm.config.MaxContentSize <= 0 {
+		return "", false
+	}
+	if info == nil {
+		var err error
+		info, err = os.Stat(path)
+		if err != nil {
+			return "", false
+		}
+	}
+	if info.IsDir() || info.Size() > fm.config.MaxContentSize {
+		return "", false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	if int64(len(data)) > fm.config.MaxContentSize {
+		data = data[:fm.config.MaxContentSize]
+	}
+	return string(data), true
+}
+
 // parseStringSliceFromConfig 从配置中解析字符串切片，过滤空字符串
 func parseStringSliceFromConfig(config map[string]interface{}, key string) []string {
 	if value, ok := config[key]; ok {
@@ -746,8 +833,9 @@ func parseStringSliceFromConfig(config map[string]interface{}, key string) []str
 // parseFileMonitorConfigFromMap 从 map[string]interface{} 创建 FileMonitorConfig
 func parseFileMonitorConfigFromMap(config map[string]interface{}) *FileMonitorConfig {
 	monitorConfig := &FileMonitorConfig{
-		Recursive:   true,
-		MaxFileSize: 10 * 1024 * 1024,
+		Recursive:      true,
+		MaxFileSize:    10 * 1024 * 1024,
+		MaxContentSize: 64 * 1024,
 	}
 
 	if paths := parseStringSliceFromConfig(config, "watch_paths"); paths != nil {
@@ -760,6 +848,10 @@ func parseFileMonitorConfigFromMap(config map[string]interface{}) *FileMonitorCo
 
 	if maxSize, ok := config["max_file_size"]; ok {
 		monitorConfig.MaxFileSize = int64(utils.InterfaceToInt(maxSize))
+	}
+
+	if maxContentSize, ok := config["max_content_size"]; ok {
+		monitorConfig.MaxContentSize = int64(utils.InterfaceToInt(maxContentSize))
 	}
 
 	if includes := parseStringSliceFromConfig(config, "include_patterns"); includes != nil {
@@ -797,9 +889,11 @@ func parseFileMonitorConfigFromMap(config map[string]interface{}) *FileMonitorCo
 //   - recursive: bool，可选，是否递归监控子目录，默认为 true
 //   - include_patterns: []string，可选，包含的文件模式（支持 glob 和正则表达式）
 //   - exclude_patterns: []string，可选，排除的文件模式（支持 glob 和正则表达式）
-//   - monitor_ops: []string，可选，要监控的操作类型，可选值：OP_CREATE, OP_WRITE, OP_DELETE, OP_CHMOD, OP_CHOWN
+//   - monitor_ops: []string，可选，要监控的操作类型，可选值：OP_CREATE, OP_WRITE, OP_DELETE, OP_CHMOD, OP_CHOWN, OP_READ
 //   - max_file_size: int，可选，最大文件大小（字节），默认 10MB
+//   - max_content_size: int，可选，记录内容的最大大小（字节），默认 64KB
 //   - poll_interval: float64，可选，轮询间隔（秒），默认 5 秒
+//
 // 返回文件监控器实例和错误信息
 func NewMonitor(config map[string]interface{}) (*FileMonitor, error) {
 	monitorConfig := parseFileMonitorConfigFromMap(config)
@@ -815,4 +909,5 @@ var FileMonitorExports = map[string]interface{}{
 	"OP_DELETE": FileOpDelete,
 	"OP_CHMOD":  FileOpChmod,
 	"OP_CHOWN":  FileOpChown,
+	"OP_READ":   FileOpRead,
 }
