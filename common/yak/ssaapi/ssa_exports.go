@@ -16,6 +16,19 @@ import (
 )
 
 func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
+	if fs == nil {
+		return nil
+	}
+	
+	// 如果已经是 UnifiedFS 且分隔符匹配，直接返回，避免重复包装
+	if unifiedFS, ok := fs.(*filesys.UnifiedFS); ok {
+		if unifiedFS.GetSeparators() == ssadb.IrSourceFsSeparators {
+			return fs
+		}
+		// 如果分隔符不匹配，提取底层文件系统重新包装
+		fs = unifiedFS.GetFileSystem()
+	}
+	
 	return filesys.NewUnifiedFS(fs,
 		filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators),
 	)

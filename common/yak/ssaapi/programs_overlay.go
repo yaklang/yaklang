@@ -380,13 +380,13 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 	// 1. getAggregatedFilesSet() 返回的文件（hash 总和为 1 的文件）
 	// 2. Layer1（基础层）的所有文件，除非它们在后续层中被删除
 	allFilesSet := utils.NewSafeMap[struct{}]()
-	
+
 	// 添加 hash=1 的文件
 	aggregatedFilesSet.ForEach(func(normalizedPath string, _ struct{}) bool {
 		allFilesSet.Set(normalizedPath, struct{}{})
 		return true
 	})
-	
+
 	// 添加基础层（Layer1）的所有文件，除非它们在后续层中被删除
 	if len(p.Layers) > 0 && p.Layers[0] != nil && p.Layers[0].Program != nil {
 		p.Layers[0].Program.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
@@ -424,15 +424,12 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 				continue
 			}
 
-			found, content := findFileInProgram(layer.Program, normalizedPath)
-			if found {
+			foundInLayer, content := findFileInProgram(layer.Program, normalizedPath)
+			if foundInLayer {
 				aggregated.AddFile(normalizedPath, content)
-				return true // 文件已找到，停止查找
+				break // 文件已找到，停止查找
 			}
 		}
-
-		// 如果文件在所有层中都没有找到，记录警告
-		log.Warnf("file %s should be in aggregated file system but not found in any layer", normalizedPath)
 		return true
 	})
 
@@ -462,17 +459,34 @@ func (p *ProgramOverLay) getAggregatedFilesSet() *utils.SafeMap[struct{}] {
 
 	// 收集所有文件路径及其 hash 值的总和
 	fileHashSum := make(map[string]int)
+	layerHashDetails := make(map[int]map[string]int) // layer index -> file path -> hash
 
 	// 遍历所有 layer，累加每个文件的 hash 值
-	for _, layer := range p.Layers {
+	for layerIdx, layer := range p.Layers {
 		if layer == nil || layer.FileHashMap == nil {
 			continue
 		}
 
+		layerHashDetails[layerIdx+1] = make(map[string]int)
 		layer.FileHashMap.ForEach(func(normalizedPath string, hash int) bool {
 			fileHashSum[normalizedPath] += hash
+			layerHashDetails[layerIdx+1][normalizedPath] = hash
 			return true
 		})
+	}
+
+	// 记录每个文件的 hash 总和详情
+	hashSumDetails := make(map[string]string) // file path -> detail string
+	for filePath, sum := range fileHashSum {
+		details := make([]string, 0)
+		for layerIdx := 1; layerIdx <= len(p.Layers); layerIdx++ {
+			if layerHashes, ok := layerHashDetails[layerIdx]; ok {
+				if hash, exists := layerHashes[filePath]; exists {
+					details = append(details, fmt.Sprintf("L%d:%d", layerIdx, hash))
+				}
+			}
+		}
+		hashSumDetails[filePath] = fmt.Sprintf("sum=%d [%s]", sum, strings.Join(details, ", "))
 	}
 
 	// 只有最终结果为 1 的文件才应该被包含
@@ -509,28 +523,16 @@ func (p *ProgramOverLay) GetAggregatedFileSystem() fi.FileSystem {
 	if p == nil {
 		return nil
 	}
-	return p.AggregatedFS
-}
-
-func programToFileSystem(prog *Program) fi.FileSystem {
-	if prog == nil {
-		return filesys.NewVirtualFs()
+	// 如果 AggregatedFS 为 nil，尝试重新构建
+	if p.AggregatedFS == nil {
+		aggregatedFS, err := p.aggregateFileSystems()
+		if err != nil {
+			log.Warnf("failed to rebuild aggregated file system: %v", err)
+			return nil
+		}
+		p.AggregatedFS = aggregatedFS
 	}
-
-	vfs := filesys.NewVirtualFs()
-	prog.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-		if me == nil {
-			return true
-		}
-		normalizedPath := normalizeFilePath(filePath)
-		if normalizedPath == "" {
-			return true
-		}
-		content := me.GetSourceCode()
-		vfs.AddFile(normalizedPath, content)
-		return true
-	})
-	return vfs
+	return p.AggregatedFS
 }
 
 // calculateFileSystemDiff 计算两个文件系统的差异，返回差量文件系统和 hash 映射
@@ -565,7 +567,6 @@ func calculateFileSystemDiff(ctx context.Context, baseFS, newFS fi.FileSystem) (
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "failed to collect baseFS files")
 	}
-
 	// 收集 newFS 的所有文件（路径已规范化）
 	newFiles := make(map[string][]byte)
 	err = filesys.Recursive(".", filesys.WithFileSystem(newFS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
@@ -595,18 +596,27 @@ func calculateFileSystemDiff(ctx context.Context, baseFS, newFS fi.FileSystem) (
 
 	// 计算差异
 	// baseFiles 和 newFiles 中的路径已经是规范化后的路径
+	deletedFiles := make([]string, 0)
+	modifiedFiles := make([]string, 0)
+	addedFiles := make([]string, 0)
+	unchangedFiles := make([]string, 0)
+
 	// 1. 检查 baseFS 中的文件
 	for filePath, baseContent := range baseFiles {
 		newContent, existsInNew := newFiles[filePath]
 		if !existsInNew {
 			// 文件在 baseFS 存在但 newFS 不存在：删除
 			fileHashMap[filePath] = -1
+			deletedFiles = append(deletedFiles, filePath)
 		} else if !equalContent(baseContent, newContent) {
 			// 文件在两个文件系统都存在但内容不同：修改
 			fileHashMap[filePath] = 0
 			diffFS.AddFile(filePath, string(newContent))
+			modifiedFiles = append(modifiedFiles, filePath)
+		} else {
+			// 文件存在且内容相同：不变（不添加到 diffFS）
+			unchangedFiles = append(unchangedFiles, filePath)
 		}
-		// 如果文件存在且内容相同，不包含在差量中
 	}
 
 	// 2. 检查 newFS 中的新文件
@@ -615,6 +625,7 @@ func calculateFileSystemDiff(ctx context.Context, baseFS, newFS fi.FileSystem) (
 			// 文件在 newFS 存在但 baseFS 不存在：新增
 			fileHashMap[filePath] = 1
 			diffFS.AddFile(filePath, string(newContent))
+			addedFiles = append(addedFiles, filePath)
 		}
 	}
 
