@@ -209,7 +209,7 @@ func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getC
 				getConn = true
 				break
 			}
-			oldPc.closeNetConn() // close too old conn
+			oldPc.closeConnWithoutRemove(utils.Error("lowhttp: connection too old")) // close too old conn
 		}
 		connList = connList[:len(connList)-1]
 	}
@@ -232,7 +232,12 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 	// 如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
 	if len(l.idleConnMap[cacheKeyHash]) >= l.maxIdleConnPerHost || l.contextDone() {
 		if !pc.IsH2Conn() {
-			pc.closeNetConn() // if too many, close it
+			// CRITICAL FIX: Use closeConnWithoutRemove instead of closeNetConn
+			// closeNetConn only closes the network connection, but readLoop/writeLoop
+			// goroutines will keep running because they're waiting on channels, not network I/O
+			// closeConnWithoutRemove cancels the context which signals both goroutines to exit
+			// We can't use closeConn here because it would try to acquire the same lock (deadlock)
+			pc.closeConnWithoutRemove(utils.Error("lowhttp: too many idle connections per host"))
 		}
 		return nil
 	}
@@ -269,7 +274,9 @@ func (l *LowHttpConnPool) removeConnLocked(pc *persistConn, needClose bool) erro
 		pc.closeTimer.Stop()
 	}
 	if needClose {
-		pc.closeNetConn()
+		// CRITICAL FIX: Use closeConnWithoutRemove instead of closeNetConn
+		// This cancels the context to signal readLoop/writeLoop goroutines to exit
+		pc.closeConnWithoutRemove(utils.Error("lowhttp: connection removed from pool"))
 	}
 	key := pc.cacheKey.hash()
 	connList := l.idleConnMap[pc.cacheKey.hash()]
@@ -614,12 +621,6 @@ func (pc *persistConn) readLoop() {
 				log.Warnf("[conn_pool] hard timeout triggered after %v, closing connection and stream writer", timeout)
 				// Force the ongoing read to stop even if the server keeps streaming.
 				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
-				// CRITICAL FIX: Close streamWriter to unblock BufPipe readers
-				// This prevents goroutine leak in io.Copy(bodyWriter, packetReader)
-				if streamWriter != nil && !streamWriterClosed.Load() {
-					streamWriterClosed.Store(true)
-					streamWriter.Close()
-				}
 			})
 		}
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
@@ -695,6 +696,7 @@ func (pc *persistConn) readLoop() {
 						case streamBodyReaderCh <- bodyReader:
 						default:
 						}
+
 						go func() {
 							io.Copy(bodyWriter, packetReader)
 							bodyWriter.Close()
@@ -900,6 +902,20 @@ func (pc *persistConn) releaseConnSlot() {
 			pc.p.releaseConnSlot()
 		}
 	})
+}
+
+// closeConnWithoutRemove closes the connection and cancels context but doesn't try to remove from pool
+// This is used when we already have the pool lock to avoid deadlock
+func (pc *persistConn) closeConnWithoutRemove(err error) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	select {
+	case <-pc.ctx.Done(): // already closed
+	default:
+		pc.closed = err
+		pc.cancel()
+		pc.closeNetConn()
+	}
 }
 
 func (pc *persistConn) IsH2Conn() bool {
