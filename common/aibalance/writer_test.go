@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +25,25 @@ func newTestWriteCloser() io.WriteCloser {
 	return &testWriteCloser{Buffer: &bytes.Buffer{}}
 }
 
+type closeSpyWriteCloser struct {
+	*bytes.Buffer
+	closed bool
+	mu     sync.Mutex
+}
+
+func (c *closeSpyWriteCloser) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.closed = true
+	return nil
+}
+
+func (c *closeSpyWriteCloser) IsClosed() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.closed
+}
+
 func TestNewChatJSONChunkWriter(t *testing.T) {
 	buf := newTestWriteCloser()
 	uid := "test-uid"
@@ -38,6 +58,64 @@ func TestNewChatJSONChunkWriter(t *testing.T) {
 	}
 	if writer.created.IsZero() {
 		t.Error("Expected created time to be set")
+	}
+}
+
+func TestChatJSONChunkWriterCloseWaitReleasesBackgroundGoroutine(t *testing.T) {
+	// This verifies that Close()+Wait() returns (writer internal io.Copy goroutine exits),
+	// which is critical for preventing goroutine/memory leak in provider failover.
+	forceWait := func(w *chatJSONChunkWriter) {
+		done := make(chan struct{})
+		go func() {
+			_ = w.Close()
+			w.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("writer Close/Wait did not return in time (possible goroutine leak)")
+		}
+	}
+
+	base := runtime.NumGoroutine()
+	for i := 0; i < 50; i++ {
+		buf := newTestWriteCloser()
+		w := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+		forceWait(w)
+	}
+
+	// allow runtime goroutines noise; still, we should not continuously grow.
+	after := runtime.NumGoroutine()
+	if after > base+30 {
+		t.Fatalf("goroutine leak suspected: base=%d after=%d", base, after)
+	}
+}
+
+func TestChatJSONChunkWriterDoubleCloseIsSafe(t *testing.T) {
+	buf := &closeSpyWriteCloser{Buffer: &bytes.Buffer{}}
+	w := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("first close failed: %v", err)
+	}
+	// second close should be no-op
+	if err := w.Close(); err != nil {
+		t.Fatalf("second close failed: %v", err)
+	}
+	w.Wait()
+}
+
+func TestChatJSONChunkWriterCloseInNotStreamStillClosesUnderlyingWriter(t *testing.T) {
+	buf := &closeSpyWriteCloser{Buffer: &bytes.Buffer{}}
+	w := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+	w.notStream = true
+
+	_ = w.Close()
+	w.Wait()
+
+	if !buf.IsClosed() {
+		t.Fatalf("expected underlying writer to be closed in notStream mode")
 	}
 }
 
@@ -490,4 +568,40 @@ func TestConcurrentSafety(t *testing.T) {
 			t.Errorf("Invalid JSON found: %v, line: %s", err, line)
 		}
 	}
+}
+
+// TestWriterDoubleCloseIsSafe verifies that calling Close() multiple times
+// does not panic and is safe (idempotent).
+func TestWriterDoubleCloseIsSafe(t *testing.T) {
+	buf := newTestWriteCloser()
+	writer := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+
+	// Write some data
+	outputWriter := writer.GetOutputWriter()
+	_, err := outputWriter.Write([]byte("test content"))
+	if err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	// First close should succeed
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("First Close failed: %v", err)
+	}
+
+	// Second close should not panic and should return nil
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("Second Close failed: %v", err)
+	}
+
+	// Third close should also be safe
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("Third Close failed: %v", err)
+	}
+
+	// Wait should also be safe to call multiple times
+	writer.Wait()
+	writer.Wait()
 }
