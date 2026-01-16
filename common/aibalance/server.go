@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -571,6 +572,14 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	c.logInfo("Built prompt length: %d with image content: %d", prompt.Len(), len(imageContent))
 
+	// Log at WARN level for production visibility when processing large requests
+	if len(imageContent) > 0 || prompt.Len() > 10000 {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		log.Warnf("[REQUEST_START] model=%s images=%d prompt_len=%d goroutines=%d heap_mb=%d",
+			modelName, len(imageContent), prompt.Len(), runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
+	}
+
 	// model, ok := c.Models.Get(modelName)
 	// if !ok {
 	// 	c.logError("No model configuration found: %s", modelName)
@@ -638,7 +647,11 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			// Close the writer to release its internal goroutine
 			writer.Close()
 			writer.Wait()
-			c.logDebug("Resources cleaned up for provider %s", provider.TypeName)
+			// Log at WARN level for production visibility
+			var ms runtime.MemStats
+			runtime.ReadMemStats(&ms)
+			log.Warnf("[RESOURCE_CLEANUP] provider=%s goroutines=%d heap_mb=%d heap_objects=%d",
+				provider.TypeName, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024, ms.HeapObjects)
 		}
 
 		client, err := provider.GetAIClientWithImages(
@@ -853,11 +866,21 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		writer.Close()
 		utils.FlushWriter(conn)
 		writer.Wait()
+
+		// Log at WARN level for production visibility
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		log.Warnf("[REQUEST_SUCCESS] model=%s provider=%s bytes=%d duration=%v goroutines=%d heap_mb=%d",
+			modelName, successfulProvider.TypeName, total, endDuration, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
 		break // 成功处理，退出循环
 	}
 
 	// 如果所有提供者都失败了
 	if successfulProvider == nil {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		log.Warnf("[REQUEST_FAILED] model=%s error=%v goroutines=%d heap_mb=%d",
+			modelName, lastError, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
 		c.logError("All providers failed for model %s, last error: %v", modelName, lastError)
 		errorMsg := fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\nX-Reason: all providers failed for %v, last error: %v\r\n\r\n", modelName, lastError)
 		conn.Write([]byte(errorMsg))

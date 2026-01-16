@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,6 +20,17 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
+
+// forceGCAndFreeMemory performs aggressive garbage collection
+// and attempts to return memory to the operating system.
+// Go normally doesn't return memory to OS immediately after GC,
+// this function forces it.
+func forceGCAndFreeMemory() {
+	runtime.GC()
+	debug.FreeOSMemory()
+	runtime.GC()
+	debug.FreeOSMemory()
+}
 
 // startMemoryMonitor starts a goroutine that monitors memory usage
 // and sends alerts when memory exceeds the threshold
@@ -70,22 +82,44 @@ func startMemoryMonitor(webhookURL string, webhookSecret string, thresholdMB uin
 					continue
 				}
 
+				// First, try to force GC and free memory
+				// This helps distinguish between Go's normal memory retention
+				// and actual memory leaks
+				log.Warnf("Memory threshold exceeded (Alloc=%dMB > %dMB), attempting forced GC...", allocMB, thresholdMB)
+				forceGCAndFreeMemory()
+
+				// Re-check memory after GC
+				runtime.ReadMemStats(&memStats)
+				allocAfterGC := memStats.Alloc / 1024 / 1024
+				log.Infof("Memory after forced GC: Alloc=%dMB (was %dMB, freed %dMB)",
+					allocAfterGC, allocMB, allocMB-allocAfterGC)
+
+				// If memory is still above threshold after GC, send alert
+				if memStats.Alloc <= thresholdBytes {
+					log.Infof("Memory now below threshold after GC, no alert needed")
+					continue
+				}
+
 				alertMsg := fmt.Sprintf(
 					"🚨 AIBalance Memory Alert\n\n"+
 						"Host: %s\n"+
 						"Time: %s\n"+
-						"Memory Allocated: %d MB (threshold: %d MB)\n"+
+						"Memory Before GC: %d MB\n"+
+						"Memory After GC: %d MB (threshold: %d MB)\n"+
 						"System Memory: %d MB\n"+
 						"Goroutines: %d\n"+
-						"HeapObjects: %d\n\n"+
-						"Please check the service immediately!",
+						"HeapObjects: %d\n"+
+						"HeapInuse: %d MB\n\n"+
+						"Memory still high after forced GC - possible leak!",
 					hostname,
 					time.Now().Format("2006-01-02 15:04:05"),
 					allocMB,
+					allocAfterGC,
 					thresholdMB,
-					sysMB,
+					memStats.Sys/1024/1024,
 					numGoroutines,
 					memStats.HeapObjects,
+					memStats.HeapInuse/1024/1024,
 				)
 
 				log.Errorf("Memory threshold exceeded! Alloc=%dMB > %dMB, sending alert...", allocMB, thresholdMB)
@@ -95,6 +129,48 @@ func startMemoryMonitor(webhookURL string, webhookSecret string, thresholdMB uin
 				log.Infof("Memory alert sent successfully via bot")
 				lastAlertTime = time.Now()
 			}
+		}
+	}()
+}
+
+// startPeriodicGC starts a goroutine that periodically runs garbage collection
+// and logs memory statistics. This helps diagnose memory issues in production.
+func startPeriodicGC(intervalMinutes int) {
+	if intervalMinutes <= 0 {
+		return
+	}
+
+	interval := time.Duration(intervalMinutes) * time.Minute
+	log.Warnf("[PERIODIC_GC] Starting periodic GC with interval=%d minutes", intervalMinutes)
+
+	go func() {
+		for {
+			time.Sleep(interval)
+
+			// Capture memory before GC
+			var beforeStats runtime.MemStats
+			runtime.ReadMemStats(&beforeStats)
+			beforeAllocMB := beforeStats.Alloc / 1024 / 1024
+			beforeHeapMB := beforeStats.HeapInuse / 1024 / 1024
+
+			// Force GC
+			forceGCAndFreeMemory()
+
+			// Capture memory after GC
+			var afterStats runtime.MemStats
+			runtime.ReadMemStats(&afterStats)
+			afterAllocMB := afterStats.Alloc / 1024 / 1024
+			afterHeapMB := afterStats.HeapInuse / 1024 / 1024
+
+			freedMB := int64(beforeAllocMB) - int64(afterAllocMB)
+			if freedMB < 0 {
+				freedMB = 0
+			}
+
+			// Always log at WARN level for production visibility
+			log.Warnf("[PERIODIC_GC] before_alloc=%dMB after_alloc=%dMB freed=%dMB before_heap=%dMB after_heap=%dMB goroutines=%d heap_objects=%d",
+				beforeAllocMB, afterAllocMB, freedMB, beforeHeapMB, afterHeapMB,
+				runtime.NumGoroutine(), afterStats.HeapObjects)
 		}
 	}()
 }
@@ -459,6 +535,12 @@ func main() {
 			Value:  180,
 			EnvVar: "MEMORY_ALERT_INTERVAL_SECONDS",
 		},
+		cli.IntFlag{
+			Name:   "periodic-gc-minutes",
+			Usage:  "Run forced GC every N minutes (0 to disable, default: 10)",
+			Value:  10,
+			EnvVar: "PERIODIC_GC_MINUTES",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -480,6 +562,10 @@ func main() {
 		if alertWebhook != "" {
 			startMemoryMonitor(alertWebhook, alertWebhookSecret, memoryThresholdMB, checkIntervalSeconds)
 		}
+
+		// Start periodic GC if configured
+		periodicGCMinutes := context.GlobalInt("periodic-gc-minutes")
+		startPeriodicGC(periodicGCMinutes)
 
 		return nil
 	}

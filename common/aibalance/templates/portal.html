@@ -1560,6 +1560,26 @@
             <h3>流量计数</h3>
             <div class="value">{{.TotalTrafficStr}}</div>
         </div>
+        <div class="stat-card" id="memory-card" style="cursor: pointer;" onclick="showMemoryDialog()">
+            <h3>内存状态</h3>
+            <div class="value" id="memory-display">点击查看</div>
+        </div>
+    </div>
+
+    <!-- Memory Diagnostic Dialog -->
+    <div id="memory-dialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 25px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+            <h2 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">🔧 内存诊断</h2>
+            <div id="memory-stats-content" style="margin: 15px 0;">
+                <p>加载中...</p>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn" onclick="fetchMemoryStats()" style="background-color: #4285f4;">刷新状态</button>
+                <button class="btn" onclick="forceGC()" style="background-color: #ff9800;">强制 GC</button>
+                <button class="btn" onclick="closeMemoryDialog()" style="background-color: #666;">关闭</button>
+            </div>
+            <div id="gc-result" style="margin-top: 15px; display: none; padding: 10px; border-radius: 5px;"></div>
+        </div>
     </div>
 
     <div class="card">
@@ -2558,6 +2578,89 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // 重新插入排序后的行
             rows.forEach(row => tbody.appendChild(row));
         }
+
+        // ============ Memory Diagnostic Functions ============
+        function showMemoryDialog() {
+            document.getElementById('memory-dialog').style.display = 'flex';
+            fetchMemoryStats();
+        }
+
+        function closeMemoryDialog() {
+            document.getElementById('memory-dialog').style.display = 'none';
+        }
+
+        function fetchMemoryStats() {
+            document.getElementById('memory-stats-content').innerHTML = '<p>加载中...</p>';
+            fetch('/portal/api/memory-stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const m = data.memory;
+                        document.getElementById('memory-stats-content').innerHTML = `
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr style="background: #f5f5f5;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">指标</th><th style="padding: 8px; text-align: right; border: 1px solid #ddd;">值</th></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">当前分配 (Alloc)</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: ${m.alloc_mb > 500 ? '#e53935' : '#43a047'};">${m.alloc_mb} MB</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">堆使用 (HeapInuse)</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${m.heap_inuse_mb} MB</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">堆空闲 (HeapIdle)</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${m.heap_idle_mb} MB</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">系统内存 (Sys)</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${m.sys_mb} MB</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">堆对象数</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${m.heap_objects.toLocaleString()}</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">Goroutines</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd; font-weight: bold; color: ${m.goroutines > 100 ? '#e53935' : '#43a047'};">${m.goroutines}</td></tr>
+                                <tr><td style="padding: 8px; border: 1px solid #ddd;">GC 次数</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${m.num_gc}</td></tr>
+                            </table>
+                        `;
+                        // Update the card display
+                        document.getElementById('memory-display').textContent = m.alloc_mb + ' MB';
+                    } else {
+                        document.getElementById('memory-stats-content').innerHTML = '<p style="color: red;">获取失败</p>';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('memory-stats-content').innerHTML = '<p style="color: red;">请求错误: ' + err + '</p>';
+                });
+        }
+
+        function forceGC() {
+            const gcResult = document.getElementById('gc-result');
+            gcResult.style.display = 'block';
+            gcResult.style.backgroundColor = '#fff3e0';
+            gcResult.innerHTML = '🔄 正在执行 GC...';
+            
+            fetch('/portal/api/force-gc', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        gcResult.style.backgroundColor = '#e8f5e9';
+                        gcResult.innerHTML = `
+                            ✅ GC 完成!<br>
+                            GC 前: ${data.before_mb} MB<br>
+                            GC 后: ${data.after_mb} MB<br>
+                            <strong>释放: ${data.freed_mb} MB</strong>
+                        `;
+                        // Refresh stats
+                        fetchMemoryStats();
+                    } else {
+                        gcResult.style.backgroundColor = '#ffebee';
+                        gcResult.innerHTML = '❌ GC 失败';
+                    }
+                })
+                .catch(err => {
+                    gcResult.style.backgroundColor = '#ffebee';
+                    gcResult.innerHTML = '❌ 请求错误: ' + err;
+                });
+        }
+
+        // Auto-update memory display on page load
+        setTimeout(function() {
+            fetch('/portal/api/memory-stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('memory-display').textContent = data.memory.alloc_mb + ' MB';
+                    }
+                })
+                .catch(() => {});
+        }, 500);
+        // ============ End Memory Diagnostic Functions ============
         
         // 页面加载完成后的初始化
         document.addEventListener('DOMContentLoaded', function() {
