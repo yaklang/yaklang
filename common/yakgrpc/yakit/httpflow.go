@@ -894,6 +894,10 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	db = bizhelper.FuzzQueryStringArrayOrLike(db, "content_type",
 		utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(params.GetSearchContentType(), ",")))
 
+	if len(params.GetHostnameFilter()) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "url", params.GetHostnameFilter())
+	}
+
 	if len(params.GetIncludeInUrl()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "url", params.GetIncludeInUrl())
 	}
