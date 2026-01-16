@@ -101,7 +101,7 @@ func startMemoryMonitor(webhookURL string, webhookSecret string, thresholdMB uin
 				}
 
 				alertMsg := fmt.Sprintf(
-					"🚨 AIBalance Memory Alert\n\n"+
+					"[ALERT] AIBalance Memory Alert\n\n"+
 						"Host: %s\n"+
 						"Time: %s\n"+
 						"Memory Before GC: %d MB\n"+
