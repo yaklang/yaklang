@@ -381,10 +381,14 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
-	if fs, err := c.parseFSFromInfo(); err != nil {
-		return nil, err
-	} else if fs != nil {
-		c.fs = getUnifiedSeparatorFs(fs)
+	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统
+	// 这样可以避免覆盖通过 WithFileSystem 显式设置的文件系统
+	if c.fs == nil {
+		if fs, err := c.parseFSFromInfo(); err != nil {
+			return nil, err
+		} else if fs != nil {
+			c.fs = getUnifiedSeparatorFs(fs)
+		}
 	}
 	switch c.databaseKind {
 	case ssa.ProgramCacheNone:

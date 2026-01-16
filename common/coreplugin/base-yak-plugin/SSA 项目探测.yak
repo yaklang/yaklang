@@ -181,7 +181,6 @@ strictMode = cli.Bool(
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
 
 cli.check()
-excludeFile = "**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,"+excludeFile 
 target = target.Trim(" ", "\n", "\t")
 origin = target
 proxy = str.TrimSpace(proxy.Lower())

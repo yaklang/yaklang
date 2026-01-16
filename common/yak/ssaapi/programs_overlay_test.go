@@ -47,18 +47,16 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 	}
 	`)
 
-	p, err := ssaapi.ParseProject(
+	progBases, err := ssaapi.ParseProject(
 		ssaapi.WithFileSystem(baseFS),
 		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(progNameBaseUUID),
 	)
-	require.NoError(t, err)
-	require.NotNil(t, p)
-	require.Greater(t, len(p), 0, "Should have at least one program")
-
-	progBase, err = ssaapi.FromDatabase(progNameBaseUUID)
+	progBase = progBases[0]
 	require.NoError(t, err)
 	require.NotNil(t, progBase)
+	require.Greater(t, len(progBases), 0, "Should have at least one program")
+
 	{
 		vs := progBase.Ref(valueName)
 		require.NotEmpty(t, vs, "Should find value in base program")
@@ -248,18 +246,15 @@ func InitProgramWithFileChanges(t *testing.T) (progBase *ssaapi.Program, progExt
 	}
 	`)
 
-	p, err := ssaapi.ParseProject(
+	progBases, err := ssaapi.ParseProject(
 		ssaapi.WithFileSystem(vf1),
 		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProgramName(progNameBaseUUID),
 	)
-	require.NoError(t, err)
-	require.NotNil(t, p)
-	require.Greater(t, len(p), 0, "Should have at least one program")
-
-	progBase, err = ssaapi.FromDatabase(progNameBaseUUID)
+	progBase = progBases[0]
 	require.NoError(t, err)
 	require.NotNil(t, progBase)
+	require.Greater(t, len(progBases), 0, "Should have at least one program")
 
 	t.Logf("Creating new progExtend: override A.java, remove Utils.java, add NewFile.java")
 	vf2 := filesys.NewVirtualFs()
@@ -440,7 +435,7 @@ func TestOverlay_FileSystem_AddAndDelete(t *testing.T) {
 
 	t.Run("test overlay file override", func(t *testing.T) {
 		rule := "A.valueStr as $res"
-		res, err := overProg.SyntaxFlowWithError(rule)
+		res, err := overProg.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
 		require.NoError(t, err)
 		require.NotNil(t, res)
 

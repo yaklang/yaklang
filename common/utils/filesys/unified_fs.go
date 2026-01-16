@@ -181,10 +181,11 @@ func (u *UnifiedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 	unifiedEntries := make([]fs.DirEntry, 0, len(entries))
 	for _, entry := range entries {
-		entry.Name()
+		originalName := entry.Name()
+		virtualName := u.convertToVirtualPath(originalName)
 		unifiedEntries = append(unifiedEntries, &UnifiedDirEntry{
 			DirEntry: entry,
-			name:     u.convertToVirtualPath(entry.Name()),
+			name:     virtualName,
 		})
 	}
 	return unifiedEntries, nil
