@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -1083,6 +1085,10 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.handleRefreshTOTP(conn, request)
 	} else if uriIns.Path == "/portal/get-totp-code" {
 		c.handleGetTOTPCode(conn, request)
+	} else if uriIns.Path == "/portal/api/memory-stats" {
+		c.handleMemoryStatsAPI(conn, request)
+	} else if uriIns.Path == "/portal/api/force-gc" && request.Method == "POST" {
+		c.handleForceGCAPI(conn, request)
 	} else {
 		// Default return home page
 		c.servePortalWithAuth(conn)
@@ -2372,5 +2378,75 @@ func (c *ServerConfig) handleGetTOTPCode(conn net.Conn, request *http.Request) {
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"code":    code,
+	})
+}
+
+// handleMemoryStatsAPI returns current memory statistics for debugging
+func (c *ServerConfig) handleMemoryStatsAPI(conn net.Conn, request *http.Request) {
+	c.logInfo("Handling memory stats API request")
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"memory": map[string]interface{}{
+			"alloc_mb":        memStats.Alloc / 1024 / 1024,
+			"total_alloc_mb":  memStats.TotalAlloc / 1024 / 1024,
+			"sys_mb":          memStats.Sys / 1024 / 1024,
+			"heap_alloc_mb":   memStats.HeapAlloc / 1024 / 1024,
+			"heap_sys_mb":     memStats.HeapSys / 1024 / 1024,
+			"heap_idle_mb":    memStats.HeapIdle / 1024 / 1024,
+			"heap_inuse_mb":   memStats.HeapInuse / 1024 / 1024,
+			"heap_released_mb": memStats.HeapReleased / 1024 / 1024,
+			"heap_objects":    memStats.HeapObjects,
+			"num_gc":          memStats.NumGC,
+			"goroutines":      runtime.NumGoroutine(),
+		},
+	})
+}
+
+// handleForceGCAPI forces garbage collection and memory release
+func (c *ServerConfig) handleForceGCAPI(conn net.Conn, request *http.Request) {
+	c.logInfo("Handling force GC API request")
+
+	// Capture memory before GC
+	var beforeStats runtime.MemStats
+	runtime.ReadMemStats(&beforeStats)
+	beforeAllocMB := beforeStats.Alloc / 1024 / 1024
+
+	// Force GC and release memory to OS
+	runtime.GC()
+	debug.FreeOSMemory()
+	runtime.GC()
+	debug.FreeOSMemory()
+
+	// Capture memory after GC
+	var afterStats runtime.MemStats
+	runtime.ReadMemStats(&afterStats)
+	afterAllocMB := afterStats.Alloc / 1024 / 1024
+
+	freedMB := int64(beforeAllocMB) - int64(afterAllocMB)
+	if freedMB < 0 {
+		freedMB = 0
+	}
+
+	c.logInfo("Force GC completed: before=%dMB, after=%dMB, freed=%dMB",
+		beforeAllocMB, afterAllocMB, freedMB)
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Garbage collection completed",
+		"before_mb": beforeAllocMB,
+		"after_mb":  afterAllocMB,
+		"freed_mb":  freedMB,
+		"memory": map[string]interface{}{
+			"alloc_mb":        afterStats.Alloc / 1024 / 1024,
+			"heap_alloc_mb":   afterStats.HeapAlloc / 1024 / 1024,
+			"heap_inuse_mb":   afterStats.HeapInuse / 1024 / 1024,
+			"heap_released_mb": afterStats.HeapReleased / 1024 / 1024,
+			"heap_objects":    afterStats.HeapObjects,
+			"goroutines":      runtime.NumGoroutine(),
+		},
 	})
 }
