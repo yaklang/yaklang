@@ -154,7 +154,7 @@ func (c *OpenaiEmbeddingClient) EmbeddingRaw(text string) ([][]float32, error) {
 			poc.WithSave(false),       // do not save embedding requests to database
 			poc.WithConnPool(true),    // enable connection pool for better performance
 			poc.WithConnectTimeout(5), // set connect timeout for faster failure detection
-			poc.WithRetryTimes(2),     // retry on transient failures
+			poc.WithRetryTimes(5),     // retry on transient failures (5 times for network issues)
 		)...,
 	)
 
