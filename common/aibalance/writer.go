@@ -23,6 +23,7 @@ type chatJSONChunkWriter struct {
 	reasonBufWriter *bytes.Buffer
 	outputBufWriter *bytes.Buffer
 	mu              sync.Mutex
+	closed          bool // Track if writer has been closed to prevent double-close
 
 	uid     string    // Unique identifier for the chat session
 	created time.Time // Timestamp when the chat session was created
@@ -209,14 +210,22 @@ func (w *chatJSONChunkWriter) Wait() {
 
 // Close finalizes the streaming response
 // It sends the [DONE] marker and closes the underlying writer
+// Safe to call multiple times - subsequent calls are no-op
 func (w *chatJSONChunkWriter) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	// Prevent double-close
+	if w.closed {
+		return nil
+	}
+	w.closed = true
+
 	defer utils.FlushWriter(w.writerClose)
 
 	if w.notStream {
-		return nil
+		// Even for non-stream, we need to close the writer to release resources
+		return w.writerClose.Close()
 	}
 	log.Info("start to close ChatJsonChunkWriter")
 
@@ -234,6 +243,8 @@ func (w *chatJSONChunkWriter) Close() error {
 	}
 	msgBytes, err := json.Marshal(rawmsg)
 	if err != nil {
+		// Still need to close the writer even on error
+		w.writerClose.Close()
 		return err
 	}
 	msg := fmt.Sprintf("data: %s\n\n", string(msgBytes))
@@ -241,6 +252,7 @@ func (w *chatJSONChunkWriter) Close() error {
 
 	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
+		w.writerClose.Close()
 		return err
 	}
 
@@ -249,6 +261,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	chunk = fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg)
 	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
+		w.writerClose.Close()
 		return err
 	}
 
@@ -256,6 +269,7 @@ func (w *chatJSONChunkWriter) Close() error {
 	chunk = "0\r\n\r\n"
 	// fmt.Println(string(chunk))
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
+		w.writerClose.Close()
 		return err
 	}
 
