@@ -274,5 +274,41 @@ if len(dirLogs) > 0 {
     }
 }
 
-println("File access log tests passed!")
+// 7. 测试 read 操作日志记录（Yak API 读取）
+println("=== Testing READ operation ===")
+readFile = file.Join(testDir, "read_test.txt")
+file.Save(readFile, "Read test content")
 
+config7 = {
+    "watch_paths": [testDir],
+    "recursive": true,
+    "monitor_ops": [filemonitor.OP_READ],
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
+}
+
+monitor7, err = filemonitor.NewMonitor(config7)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+readLogs = []
+monitor7.SetLogCallback(func(log) {
+    if log.Operation == filemonitor.OP_READ {
+        readLogs = append(readLogs, log)
+        println(sprintf("[READ] Path: %s, User: %s, UID: %d, GID: %d, Mode: %s, Size: %d, IsDir: %v, Timestamp: %d",
+            log.FilePath, log.User, log.UID, log.GID, log.FileMode, log.FileSize, log.IsDir, log.Timestamp))
+    }
+})
+
+err = monitor7.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+sleep(1)
+content, err = file.ReadFile(readFile)
+assert err == nil, sprintf("Failed to read file: %v", err)
+assert len(content) > 0, "Read content should not be empty"
+sleep(1)
+
+monitor7.Stop()
+
+assert len(readLogs) > 0, sprintf("Should capture read log, got %d", len(readLogs))
+
+println("File access log tests passed!")

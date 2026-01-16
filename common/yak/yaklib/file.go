@@ -167,15 +167,27 @@ func (y *_yakFile) Close() error {
 }
 
 func (y *_yakFile) Read(b []byte) (int, error) {
-	return y.file.Read(b)
+	n, err := y.file.Read(b)
+	if n > 0 || err == nil {
+		recordYakFileRead(y.file.Name())
+	}
+	return n, err
 }
 
 func (y *_yakFile) ReadAt(b []byte, off int64) (int, error) {
-	return y.file.ReadAt(b, off)
+	n, err := y.file.ReadAt(b, off)
+	if n > 0 || err == nil {
+		recordYakFileRead(y.file.Name())
+	}
+	return n, err
 }
 
 func (y *_yakFile) ReadAll() ([]byte, error) {
-	return ioutil.ReadAll(y.file)
+	raw, err := ioutil.ReadAll(y.file)
+	if len(raw) > 0 || err == nil {
+		recordYakFileRead(y.file.Name())
+	}
+	return raw, err
 }
 
 func (y *_yakFile) ReadString() (string, error) {
@@ -187,7 +199,11 @@ func (y *_yakFile) ReadString() (string, error) {
 }
 
 func (y *_yakFile) ReadLine() (string, error) {
-	return utils.BufioReadLineString(y.rw.Reader)
+	line, err := utils.BufioReadLineString(y.rw.Reader)
+	if line != "" || err == nil {
+		recordYakFileRead(y.file.Name())
+	}
+	return line, err
 }
 
 func (y *_yakFile) ReadLines() []string {
@@ -199,6 +215,7 @@ func (y *_yakFile) ReadLines() []string {
 		}
 		lines = append(lines, line)
 	}
+	recordYakFileRead(y.file.Name())
 	return lines
 }
 
@@ -360,6 +377,7 @@ func _fileReadLines(i interface{}) []string {
 	if err != nil {
 		return make([]string, 0)
 	}
+	recordYakFileRead(f)
 	return utils.ParseStringToLines(string(c))
 }
 
@@ -374,6 +392,7 @@ func _fileReadLinesWithCallback(i interface{}, callback func(string)) error {
 	if err != nil {
 		return err
 	}
+	recordYakFileRead(filename)
 	for {
 		line, err := f.ReadLine()
 		if errors.Is(err, io.EOF) {
@@ -479,7 +498,11 @@ func _fileReadAll(r io.Reader) ([]byte, error) {
 // content, err = file.ReadFile("/tmp/test.txt")
 // ```
 func _fileReadFile(filename string) ([]byte, error) {
-	return os.ReadFile(filename)
+	raw, err := os.ReadFile(filename)
+	if err == nil {
+		recordYakFileRead(filename)
+	}
+	return raw, err
 }
 
 func _lsDirAll(i string) []*utils.FileInfo {
@@ -588,6 +611,7 @@ func _fileLstat(name string) (os.FileInfo, error) {
 func _cat(i string) {
 	raw, err := ioutil.ReadFile(i)
 	_diewith(err)
+	recordYakFileRead(i)
 	fmt.Print(string(raw))
 }
 
@@ -812,6 +836,7 @@ func _detectFileType(filePath string) (string, error) {
 // 支持两种输入类型：
 //   - string: 文件路径，会读取文件内容进行匹配
 //   - []byte: 文件内容，直接匹配内容
+//
 // @param {string|[]byte} input 文件路径或文件内容
 // @return {[]string} 匹配到的特征名称列表
 // @return {error} 错误信息（仅当输入为文件路径且读取失败时返回）
@@ -819,16 +844,19 @@ func _detectFileType(filePath string) (string, error) {
 // ```
 // // 方式1: 匹配文件
 // matches, err = file.MatchMalicious("/path/to/suspicious.php")
-// if err == nil && len(matches) > 0 {
-//     println("发现恶意特征:", matches)
-// }
+//
+//	if err == nil && len(matches) > 0 {
+//	    println("发现恶意特征:", matches)
+//	}
 //
 // // 方式2: 匹配内容
 // content = file.ReadFile("/path/to/suspicious.php")
 // matches, err = file.MatchMalicious(content)
-// if len(matches) > 0 {
-//     println("发现恶意特征:", matches)
-// }
+//
+//	if len(matches) > 0 {
+//	    println("发现恶意特征:", matches)
+//	}
+//
 // ```
 func _matchMalicious(input interface{}) ([]string, error) {
 	matcher := NewMaliciousFileMatcher()
@@ -856,6 +884,7 @@ func _matchMalicious(input interface{}) ([]string, error) {
 // 支持两种输入类型：
 //   - string: 文件路径，会读取文件内容进行匹配
 //   - []byte: 文件内容，直接匹配内容
+//
 // @param {string|[]byte} input 文件路径或文件内容
 // @return {[]map[string]interface{}} 匹配到的特征详细信息列表
 // @return {error} 错误信息（仅当输入为文件路径且读取失败时返回）
@@ -863,12 +892,13 @@ func _matchMalicious(input interface{}) ([]string, error) {
 // ```
 // // 方式1: 匹配文件
 // details, err = file.MatchMaliciousWithDetails("/path/to/suspicious.php")
-// if err == nil {
-//     for detail in details {
-//         println(sprintf("特征: %s, 分类: %s, 严重程度: %s",
-//             detail["name"], detail["category"], detail["severity"]))
-//     }
-// }
+//
+//	if err == nil {
+//	    for detail in details {
+//	        println(sprintf("特征: %s, 分类: %s, 严重程度: %s",
+//	            detail["name"], detail["category"], detail["severity"]))
+//	    }
+//	}
 //
 // // 方式2: 匹配内容
 // content = file.ReadFile("/path/to/suspicious.php")

@@ -1,0 +1,56 @@
+// 关键配置文件变更详情测试
+// 测试功能：捕获写入事件、记录变更前后内容、记录时间和用户
+
+// 创建临时测试目录和配置文件
+tempBase = os.TempDir()
+testDir = file.Join(tempBase, sprintf("file_config_change_test_%d", time.Now().Unix()))
+err = file.MkdirAll(testDir)
+assert err == nil, sprintf("Failed to create temp dir: %v", err)
+defer file.Remove(testDir)
+
+configFile = file.Join(testDir, "test.conf")
+file.Save(configFile, "old_config_value=1\n")
+
+// 配置监控器，模拟关键配置文件监控
+config = {
+    "watch_paths": [testDir],
+    "recursive": false,
+    "include_patterns": ["*.conf"],
+    "monitor_ops": [filemonitor.OP_WRITE],
+    "max_content_size": 65536,
+    "poll_interval": 0.2  // 轮询间隔，单位为秒（0.2秒 = 200毫秒）
+}
+
+monitor, err = filemonitor.NewMonitor(config)
+assert err == nil, sprintf("Failed to create monitor: %v", err)
+
+events = []
+monitor.SetEventCallback(func(event) {
+    if event.Type == filemonitor.OP_WRITE && event.Path == configFile {
+        events = append(events, event)
+        println(sprintf("[CONFIG_WRITE] Path: %s, User: %s, OldLen: %d, NewLen: %d, Time: %v",
+            event.Path, event.User, len(event.OldContent), len(event.NewContent), event.Timestamp))
+    }
+})
+
+err = monitor.Start()
+assert err == nil, sprintf("Failed to start monitor: %v", err)
+
+// 等待初始化完成
+sleep(1)
+
+// 修改配置文件内容
+file.Save(configFile, "old_config_value=2\nnew_feature=true\n")
+sleep(1)
+
+monitor.Stop()
+
+// 验证事件内容
+assert len(events) > 0, sprintf("Should capture config write event, got %d", len(events))
+configEvent = events[0]
+assert configEvent.OldContent != "", "Old content should not be empty"
+assert configEvent.NewContent != "", "New content should not be empty"
+assert configEvent.OldContent != configEvent.NewContent, "Old/New content should differ"
+assert configEvent.User != "", "User should not be empty"
+
+println("Config change detail tests passed!")
