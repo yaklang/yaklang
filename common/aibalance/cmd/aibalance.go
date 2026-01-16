@@ -1,8 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -16,6 +21,115 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
+
+// FeishuWebhookMessage represents the message format for Feishu webhook
+type FeishuWebhookMessage struct {
+	MsgType string               `json:"msg_type"`
+	Content FeishuWebhookContent `json:"content"`
+}
+
+type FeishuWebhookContent struct {
+	Text string `json:"text"`
+}
+
+// sendFeishuAlert sends an alert message to Feishu webhook
+func sendFeishuAlert(webhookURL string, message string) error {
+	msg := FeishuWebhookMessage{
+		MsgType: "text",
+		Content: FeishuWebhookContent{
+			Text: message,
+		},
+	}
+
+	jsonData, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal feishu message: %v", err)
+	}
+
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send feishu webhook: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("feishu webhook returned status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// startMemoryMonitor starts a goroutine that monitors memory usage
+// and sends alerts when memory exceeds the threshold
+func startMemoryMonitor(webhookURL string, thresholdMB uint64, checkIntervalSeconds int) {
+	if webhookURL == "" {
+		return
+	}
+
+	thresholdBytes := thresholdMB * 1024 * 1024
+	checkInterval := time.Duration(checkIntervalSeconds) * time.Second
+
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "unknown"
+	}
+
+	log.Infof("Starting memory monitor: threshold=%dMB, interval=%ds, webhook=%s",
+		thresholdMB, checkIntervalSeconds, webhookURL[:min(50, len(webhookURL))]+"...")
+
+	go func() {
+		var lastAlertTime time.Time
+		alertCooldown := 5 * time.Minute // Avoid spamming alerts
+
+		for {
+			time.Sleep(checkInterval)
+
+			var memStats runtime.MemStats
+			runtime.ReadMemStats(&memStats)
+
+			allocMB := memStats.Alloc / 1024 / 1024
+			sysMB := memStats.Sys / 1024 / 1024
+			numGoroutines := runtime.NumGoroutine()
+
+			log.Debugf("Memory stats: Alloc=%dMB, Sys=%dMB, Goroutines=%d", allocMB, sysMB, numGoroutines)
+
+			if memStats.Alloc > thresholdBytes {
+				// Check cooldown to avoid spamming
+				if time.Since(lastAlertTime) < alertCooldown {
+					log.Warnf("Memory threshold exceeded but in cooldown period, skipping alert")
+					continue
+				}
+
+				alertMsg := fmt.Sprintf(
+					"🚨 AIBalance Memory Alert\n\n"+
+						"Host: %s\n"+
+						"Time: %s\n"+
+						"Memory Allocated: %d MB (threshold: %d MB)\n"+
+						"System Memory: %d MB\n"+
+						"Goroutines: %d\n"+
+						"HeapObjects: %d\n\n"+
+						"Please check the service immediately!",
+					hostname,
+					time.Now().Format("2006-01-02 15:04:05"),
+					allocMB,
+					thresholdMB,
+					sysMB,
+					numGoroutines,
+					memStats.HeapObjects,
+				)
+
+				log.Errorf("Memory threshold exceeded! Alloc=%dMB > %dMB, sending alert...", allocMB, thresholdMB)
+
+				if err := sendFeishuAlert(webhookURL, alertMsg); err != nil {
+					log.Errorf("Failed to send Feishu alert: %v", err)
+				} else {
+					log.Infof("Feishu memory alert sent successfully")
+					lastAlertTime = time.Now()
+				}
+			}
+		}
+	}()
+}
 
 var (
 	sigExitOnce = new(sync.Once)
@@ -353,6 +467,24 @@ func main() {
 			Value:  "info",
 			EnvVar: "LOG_LEVEL",
 		},
+		cli.StringFlag{
+			Name:   "memory-alert-feishu-webhook",
+			Usage:  "Feishu webhook URL for memory alerts (e.g., https://open.feishu.cn/open-apis/bot/v2/hook/xxx)",
+			Value:  "",
+			EnvVar: "MEMORY_ALERT_FEISHU_WEBHOOK",
+		},
+		cli.Uint64Flag{
+			Name:   "memory-alert-threshold-mb",
+			Usage:  "Memory threshold in MB for triggering alerts",
+			Value:  2048,
+			EnvVar: "MEMORY_ALERT_THRESHOLD_MB",
+		},
+		cli.IntFlag{
+			Name:   "memory-alert-interval-seconds",
+			Usage:  "Memory check interval in seconds (default: 180 = 3 minutes)",
+			Value:  180,
+			EnvVar: "MEMORY_ALERT_INTERVAL_SECONDS",
+		},
 	}
 
 	app.Before = func(context *cli.Context) error {
@@ -365,6 +497,15 @@ func main() {
 			log.SetLevel(level)
 			log.Debugf("Log level set to: %s", logLevel)
 		}
+
+		// Start memory monitor if Feishu webhook is configured
+		feishuWebhook := context.GlobalString("memory-alert-feishu-webhook")
+		memoryThresholdMB := context.GlobalUint64("memory-alert-threshold-mb")
+		checkIntervalSeconds := context.GlobalInt("memory-alert-interval-seconds")
+		if feishuWebhook != "" {
+			startMemoryMonitor(feishuWebhook, memoryThresholdMB, checkIntervalSeconds)
+		}
+
 		return nil
 	}
 
