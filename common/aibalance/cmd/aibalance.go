@@ -483,7 +483,7 @@ func main() {
 							return cli.NewExitError("Failed to update API key: "+err.Error(), 1)
 						}
 
-						log.Infof("Successfully updated API key:")
+						log.Infof("Successfully updated API key: ")
 						log.Infof("  Key: %s", strings.Repeat("*", len(apiKey)))
 						log.Infof("  New Allowed Models: %s", strings.Join(models, ", "))
 						return nil
