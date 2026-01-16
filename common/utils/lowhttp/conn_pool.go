@@ -600,14 +600,26 @@ func (pc *persistConn) readLoop() {
 			timeout = rc.option.Timeout
 		}
 		seq := atomic.AddUint64(&pc.reqSeq, 1)
+
+		// Declare streamWriter before hardTimeoutTimer so it can be accessed in timeout callback
+		var streamWriter io.WriteCloser
+		var streamWriterClosed atomic.Bool
+
 		var hardTimeoutTimer *time.Timer
 		if timeout > 0 && !(rc.option != nil && rc.option.ExtendReadDeadline) {
 			hardTimeoutTimer = time.AfterFunc(timeout, func() {
 				if atomic.LoadUint64(&pc.reqSeq) != seq {
 					return
 				}
+				log.Warnf("[conn_pool] hard timeout triggered after %v, closing connection and stream writer", timeout)
 				// Force the ongoing read to stop even if the server keeps streaming.
 				_ = pc.conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+				// CRITICAL FIX: Close streamWriter to unblock BufPipe readers
+				// This prevents goroutine leak in io.Copy(bodyWriter, packetReader)
+				if streamWriter != nil && !streamWriterClosed.Load() {
+					streamWriterClosed.Store(true)
+					streamWriter.Close()
+				}
 			})
 		}
 		_ = pc.conn.SetReadDeadline(time.Now().Add(timeout))
@@ -647,8 +659,6 @@ func (pc *persistConn) readLoop() {
 
 		// Support BodyStreamReaderHandler in connection pool mode
 		var streamHandlerWg sync.WaitGroup
-		var streamWriter io.WriteCloser
-		var streamBodyReaderCh chan io.ReadCloser
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
 			streamBodyReaderCh = make(chan io.ReadCloser, 1)
 			streamReader, sw := utils.NewBufPipe(nil)
@@ -728,7 +738,8 @@ func (pc *persistConn) readLoop() {
 		}
 
 		// Close streamWriter after reading response to signal EOF to the handler
-		if streamWriter != nil {
+		if streamWriter != nil && !streamWriterClosed.Load() {
+			streamWriterClosed.Store(true)
 			streamWriter.Close()
 		}
 
