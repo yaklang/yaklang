@@ -84,7 +84,7 @@ func main() {
 							log.Errorf("%v", utils.ErrorStack(err))
 						}
 					}()
-					err := forwarder.Run()
+					err := forwarder.Run() // run server
 					if err != nil {
 						log.Errorf("start forwarder failed: %v", err)
 					}
