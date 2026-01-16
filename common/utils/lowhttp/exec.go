@@ -963,6 +963,7 @@ RECONNECT:
 		}
 
 		var mirrorWriter io.Writer = &responseRaw
+		var streamWriter io.WriteCloser // For timeout-based cleanup
 
 		// BodyStreamReaderHandler for non-pool connection
 		// Note: connection pool mode also supports BodyStreamReaderHandler (see conn_pool.go readLoop)
@@ -971,6 +972,7 @@ RECONNECT:
 				streamBodyReaderCh = make(chan io.ReadCloser, 1)
 			}
 			reader, writer := utils.NewBufPipe(nil)
+			streamWriter = writer // Save for timeout cleanup
 			defer func() {
 				utils.Debug(func() {
 					log.Infof("close reader and writer")
@@ -1058,7 +1060,15 @@ RECONNECT:
 		// For long-lived streaming use-cases (e.g. MITM), ExtendReadDeadline switches Timeout to idle-timeout semantics.
 		if timeout > 0 && option != nil && !option.ExtendReadDeadline {
 			hardTimeoutTimer := time.AfterFunc(timeout, func() {
+				log.Warnf("[lowhttp] hard timeout triggered after %v, closing connection", timeout)
 				_ = conn.SetReadDeadline(time.Now().Add(-1 * time.Second))
+				// CRITICAL FIX: Also close the stream writer to unblock BodyStreamReaderHandler goroutine
+				// BufPipe reads don't respect conn.SetReadDeadline, so we must close the writer
+				// to make the reader return EOF
+				if streamWriter != nil {
+					log.Warnf("[lowhttp] closing stream writer to unblock BodyStreamReaderHandler")
+					streamWriter.Close()
+				}
 			})
 			defer hardTimeoutTimer.Stop()
 		}

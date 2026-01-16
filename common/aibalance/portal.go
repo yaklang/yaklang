@@ -1,7 +1,6 @@
 package aibalance
 
 import (
-	"bufio"
 	"bytes"
 	"embed"
 	"encoding/json"
@@ -2460,85 +2459,72 @@ func (c *ServerConfig) handleForceGCAPI(conn net.Conn, request *http.Request) {
 func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Request) {
 	log.Warnf("[GOROUTINE_DUMP] API called, current goroutines: %d", runtime.NumGoroutine())
 
-	// Get goroutine profile
+	// Get goroutine profile with debug=2 for full stacks
 	var buf bytes.Buffer
-	pprof.Lookup("goroutine").WriteTo(&buf, 1)
+	pprof.Lookup("goroutine").WriteTo(&buf, 2)
 
-	// Parse and count goroutines by stack signature
-	type goroutineInfo struct {
-		Count     int      `json:"count"`
-		Stack     string   `json:"stack"`
-		Functions []string `json:"functions"`
-	}
+	fullDump := buf.String()
 
-	goroutineMap := make(map[string]*goroutineInfo)
-	scanner := bufio.NewScanner(&buf)
-	var currentStack strings.Builder
-	var currentFunctions []string
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "goroutine ") {
-			if currentStack.Len() > 0 {
-				// Extract first function as signature
-				stack := currentStack.String()
-				// Find first function call line
-				lines := strings.Split(stack, "\n")
-				var signature string
-				for _, l := range lines {
-					if strings.HasPrefix(l, "\t") || strings.Contains(l, "(") {
-						signature = strings.TrimSpace(l)
-						if strings.Contains(signature, "(") {
-							// Get just the function name
-							idx := strings.Index(signature, "(")
-							if idx > 0 {
-								signature = signature[:idx]
-							}
-						}
-						break
-					}
-				}
-
-				if signature == "" {
-					signature = "unknown"
-				}
-
-				if info, exists := goroutineMap[signature]; exists {
-					info.Count++
-				} else {
-					goroutineMap[signature] = &goroutineInfo{
-						Count:     1,
-						Stack:     stack,
-						Functions: currentFunctions,
-					}
-				}
-				currentStack.Reset()
-				currentFunctions = nil
-			}
-		}
-
-		currentStack.WriteString(line + "\n")
-
-		// Extract function names
-		if !strings.HasPrefix(line, "goroutine ") && strings.Contains(line, "(") && !strings.HasPrefix(line, "\t") {
-			currentFunctions = append(currentFunctions, strings.TrimSpace(line))
-		}
-	}
-
-	// Convert to sorted slice
+	// Parse goroutines - split by "goroutine " prefix
 	type goroutineSummary struct {
 		Signature string `json:"signature"`
 		Count     int    `json:"count"`
 		Sample    string `json:"sample_stack"`
 	}
 
+	goroutineMap := make(map[string]*goroutineSummary)
+
+	// Split by double newline to get individual goroutine blocks
+	blocks := strings.Split(fullDump, "\n\n")
+	for _, block := range blocks {
+		block = strings.TrimSpace(block)
+		if block == "" || !strings.HasPrefix(block, "goroutine ") {
+			continue
+		}
+
+		// Extract the first function call as signature
+		lines := strings.Split(block, "\n")
+		var signature string
+		for i, line := range lines {
+			if i == 0 {
+				continue // Skip "goroutine N [status]:" line
+			}
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Function name lines don't start with tab, file locations do
+			if !strings.HasPrefix(lines[i], "\t") && strings.Contains(line, "(") {
+				// This is a function call line like "runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)"
+				idx := strings.Index(line, "(")
+				if idx > 0 {
+					signature = line[:idx]
+				} else {
+					signature = line
+				}
+				break
+			}
+		}
+
+		if signature == "" {
+			signature = "unknown"
+		}
+
+		if info, exists := goroutineMap[signature]; exists {
+			info.Count++
+		} else {
+			goroutineMap[signature] = &goroutineSummary{
+				Signature: signature,
+				Count:     1,
+				Sample:    block,
+			}
+		}
+	}
+
+	// Convert to sorted slice
 	var summaries []goroutineSummary
-	for sig, info := range goroutineMap {
-		summaries = append(summaries, goroutineSummary{
-			Signature: sig,
-			Count:     info.Count,
-			Sample:    info.Stack,
-		})
+	for _, info := range goroutineMap {
+		summaries = append(summaries, *info)
 	}
 
 	// Sort by count (descending)
@@ -2564,6 +2550,6 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 		"total":          runtime.NumGoroutine(),
 		"unique_stacks":  len(summaries),
 		"top_goroutines": summaries[:topN],
-		"full_dump":      buf.String(),
+		"full_dump":      fullDump,
 	})
 }

@@ -163,6 +163,16 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 				case succeededChan <- false:
 				default:
 				}
+			} else {
+				// FIX: Must send success signal, otherwise the caller times out
+				// and this goroutine leaks (waiting for Chat to complete)
+				rspOnce.Do(func() {
+					firstByteDuration = time.Since(startTime)
+				})
+				select {
+				case succeededChan <- true:
+				default:
+				}
 			}
 		}()
 	}
