@@ -732,7 +732,31 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			c.logInfo("Output stream copy completed, bytes: %d", n)
 		}()
 
-		// Wait for all stream processing to complete
+		// CRITICAL FIX: Wait for AI chat to complete BEFORE wg.Wait()
+		// This prevents deadlock when AI provider stream hangs
+		// The previous logic had wg.Wait() before checking chatCompleted,
+		// but wg.Wait() depends on pipes being closed (which happens in stream handlers)
+		// If stream handlers never complete, wg.Wait() blocks forever
+
+		// Request timeout to prevent infinite blocking
+		const requestTimeout = 5 * time.Minute
+
+		var chatErr error
+		select {
+		case chatErr = <-chatCompleted:
+			c.logInfo("AI chat request completed")
+		case <-time.After(requestTimeout):
+			c.logError("AI chat request timeout after %v", requestTimeout)
+			chatErr = fmt.Errorf("request timeout after %v", requestTimeout)
+		}
+
+		// IMPORTANT: Close pipe writers BEFORE wg.Wait() to ensure
+		// the io.Copy goroutines can exit (they're blocked on pipe readers)
+		// This breaks the deadlock: pw.Close() -> pr.Read() returns EOF -> io.Copy exits -> wg.Done()
+		pw.Close()
+		rw.Close()
+
+		// Now safe to wait for stream processing goroutines
 		wg.Wait()
 		utils.FlushWriter(writer.writerClose)
 
@@ -749,37 +773,34 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		total := atomic.LoadInt64(totalBytes)
 		requestSucceeded := total > 0 // Determine actual request success based on data received
 
-		// 检查聊天请求是否成功完成
-		select {
-		case chatErr := <-chatCompleted:
-			if chatErr != nil {
-				c.logError("Provider %s chat failed: %v", provider.TypeName, chatErr)
-				lastError = chatErr
-				// 更新失败的提供者状态
-				latencyMs := firstByteDuration.Milliseconds()
-				go func() {
-					if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
-						c.logError("Failed to update failed provider status: %v", err)
-					}
-				}()
-				cleanupResources() // Clean up before trying next provider
-				continue           // 尝试下一个提供者
-			}
-		default:
-			// 如果聊天还在进行中，检查是否有数据传输
-			if !requestSucceeded {
-				c.logWarn("No data received from provider %s for model %s", provider.TypeName, modelName)
-				lastError = fmt.Errorf("no data received from provider")
-				// 更新失败的提供者状态
-				latencyMs := firstByteDuration.Milliseconds()
-				go func() {
-					if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
-						c.logError("Failed to update failed provider status: %v", err)
-					}
-				}()
-				cleanupResources() // Clean up before trying next provider
-				continue           // 尝试下一个提供者
-			}
+		// Check if chat request succeeded
+		if chatErr != nil {
+			c.logError("Provider %s chat failed: %v", provider.TypeName, chatErr)
+			lastError = chatErr
+			// Update failed provider status
+			latencyMs := firstByteDuration.Milliseconds()
+			go func() {
+				if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
+					c.logError("Failed to update failed provider status: %v", err)
+				}
+			}()
+			cleanupResources() // Clean up before trying next provider
+			continue           // Try next provider
+		}
+
+		// Check if any data was received
+		if !requestSucceeded {
+			c.logWarn("No data received from provider %s for model %s", provider.TypeName, modelName)
+			lastError = fmt.Errorf("no data received from provider")
+			// Update failed provider status
+			latencyMs := firstByteDuration.Milliseconds()
+			go func() {
+				if err := provider.UpdateDbProvider(false, latencyMs); err != nil {
+					c.logError("Failed to update failed provider status: %v", err)
+				}
+			}()
+			cleanupResources() // Clean up before trying next provider
+			continue           // Try next provider
 		}
 
 		// 如果到达这里，说明当前提供者成功了
