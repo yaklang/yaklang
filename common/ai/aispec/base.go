@@ -26,7 +26,7 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 		return nil, utils.Errorf("build config failed: %v", err)
 	}
 	opts = append(
-		opts, poc.WithTimeout(600), poc.WithConnectTimeout(8), poc.WithRetryTimes(3),
+		opts, poc.WithTimeout(30), poc.WithConnectTimeout(8), poc.WithRetryTimes(3), // 30s is enough for listing models
 		poc.WithSave(false),
 		poc.WithConnPool(true), // enable connection pool for better performance
 		poc.WithAppendHeader("Accept-Encoding", "gzip, deflate, br"), // enable compression for better network performance

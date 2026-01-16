@@ -559,7 +559,9 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	if g.config.Timeout > 0 {
 		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
 	}
-	opts = append(opts, poc.WithTimeout(600))
+	// Use a reasonable timeout: 200 seconds for AI requests
+	// This prevents goroutine leaks when AI providers hang
+	opts = append(opts, poc.WithTimeout(200))
 	if g.config.Host != "" {
 		opts = append(opts, poc.WithHost(g.config.Host))
 	}

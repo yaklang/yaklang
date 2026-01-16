@@ -121,7 +121,7 @@ func (c *Client) question(i string) (io.Reader, error) {
 			poc.WithReplaceHttpPacketBody(raw, false),
 			poc.WithContext(c.config.Context),
 			poc.WithConnectTimeout(c.config.Timeout),
-			poc.WithTimeout(600),
+			poc.WithTimeout(200), // 200 seconds timeout
 			poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
 				scanner := bufio.NewScanner(closer)
 				scanner.Split(bufio.ScanLines)

@@ -220,7 +220,7 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...any) (chan *ai
 		}
 		go func() {
 			opts, _ := d.BuildHTTPOptions()
-			opts = append(opts, poc.WithTimeout(600))
+			opts = append(opts, poc.WithTimeout(200)) // 200 seconds timeout
 			opts = append(opts, poc.WithReplaceHttpPacketHeader("Authorization", `Bearer `+d.dashscopeAPIKey))
 			opts = append(opts, poc.WithReplaceHttpPacketHeader("X-DashScope-SSE", "enable"))
 			opts = append(opts, poc.WithJSON(

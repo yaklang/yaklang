@@ -167,23 +167,23 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 		aispec.WithNoHTTPS(p.NoHTTPS),
 		aispec.WithAPIKey(p.APIKey),
 		aispec.WithModel(p.ModelName),
+		// NOTE: Do NOT create goroutines here!
+		// The stream handler is already called in a separate goroutine by the AI SDK.
+		// Creating additional goroutines here causes goroutine leaks because they
+		// block on reader.Read() and never exit when the connection is closed.
 		aispec.WithStreamHandler(func(reader io.Reader) {
-			go func() {
-				if onStream != nil {
-					onStream(reader)
-				} else {
-					io.Copy(os.Stdout, reader)
-				}
-			}()
+			if onStream != nil {
+				onStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
 		}),
 		aispec.WithReasonStreamHandler(func(reader io.Reader) {
-			go func() {
-				if onReasonStream != nil {
-					onReasonStream(reader)
-				} else {
-					io.Copy(os.Stdout, reader)
-				}
-			}()
+			if onReasonStream != nil {
+				onReasonStream(reader)
+			} else {
+				io.Copy(os.Stdout, reader)
+			}
 		}),
 	)
 
