@@ -628,6 +628,19 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		rr, rw := utils.NewBufPipe(nil)
 
 		writer := NewChatJSONChunkWriter(conn, apiKeyForStat, modelName)
+
+		// cleanupResources is a helper function to properly close all resources
+		// to prevent memory leaks when switching to next provider or on failure
+		cleanupResources := func() {
+			// Close pipe writers to unblock readers
+			pw.Close()
+			rw.Close()
+			// Close the writer to release its internal goroutine
+			writer.Close()
+			writer.Wait()
+			c.logDebug("Resources cleaned up for provider %s", provider.TypeName)
+		}
+
 		client, err := provider.GetAIClientWithImages(
 			imageContent,
 			func(reader io.Reader) {
@@ -652,7 +665,8 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		if err != nil {
 			c.logError("Failed to get AI client from provider %s: %v", provider.TypeName, err)
 			lastError = err
-			continue // 尝试下一个提供者
+			cleanupResources() // Clean up before trying next provider
+			continue           // 尝试下一个提供者
 		}
 
 		// 启动 AI 聊天请求
@@ -748,7 +762,8 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 						c.logError("Failed to update failed provider status: %v", err)
 					}
 				}()
-				continue // 尝试下一个提供者
+				cleanupResources() // Clean up before trying next provider
+				continue           // 尝试下一个提供者
 			}
 		default:
 			// 如果聊天还在进行中，检查是否有数据传输
@@ -762,7 +777,8 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 						c.logError("Failed to update failed provider status: %v", err)
 					}
 				}()
-				continue // 尝试下一个提供者
+				cleanupResources() // Clean up before trying next provider
+				continue           // 尝试下一个提供者
 			}
 		}
 

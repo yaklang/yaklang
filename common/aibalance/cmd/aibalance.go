@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -14,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bot"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/aibalance"
@@ -22,47 +20,19 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// FeishuWebhookMessage represents the message format for Feishu webhook
-type FeishuWebhookMessage struct {
-	MsgType string               `json:"msg_type"`
-	Content FeishuWebhookContent `json:"content"`
-}
-
-type FeishuWebhookContent struct {
-	Text string `json:"text"`
-}
-
-// sendFeishuAlert sends an alert message to Feishu webhook
-func sendFeishuAlert(webhookURL string, message string) error {
-	msg := FeishuWebhookMessage{
-		MsgType: "text",
-		Content: FeishuWebhookContent{
-			Text: message,
-		},
-	}
-
-	jsonData, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal feishu message: %v", err)
-	}
-
-	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to send feishu webhook: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("feishu webhook returned status: %d", resp.StatusCode)
-	}
-
-	return nil
-}
-
 // startMemoryMonitor starts a goroutine that monitors memory usage
 // and sends alerts when memory exceeds the threshold
-func startMemoryMonitor(webhookURL string, thresholdMB uint64, checkIntervalSeconds int) {
+// Uses yaklang's bot module which supports Feishu/DingTalk/WorkWechat automatically
+func startMemoryMonitor(webhookURL string, webhookSecret string, thresholdMB uint64, checkIntervalSeconds int) {
 	if webhookURL == "" {
+		return
+	}
+
+	// Create bot client using yaklang's bot module
+	// It automatically detects webhook type (Feishu/DingTalk/WorkWechat) from URL
+	botClient := bot.New(bot.WithWebhookWithSecret(webhookURL, webhookSecret))
+	if len(botClient.Configs()) == 0 {
+		log.Errorf("Failed to initialize bot client with webhook: %s", webhookURL)
 		return
 	}
 
@@ -75,7 +45,7 @@ func startMemoryMonitor(webhookURL string, thresholdMB uint64, checkIntervalSeco
 	}
 
 	log.Infof("Starting memory monitor: threshold=%dMB, interval=%ds, webhook=%s",
-		thresholdMB, checkIntervalSeconds, webhookURL[:min(50, len(webhookURL))]+"...")
+		thresholdMB, checkIntervalSeconds, utils.ShrinkString(webhookURL, 50))
 
 	go func() {
 		var lastAlertTime time.Time
@@ -120,12 +90,10 @@ func startMemoryMonitor(webhookURL string, thresholdMB uint64, checkIntervalSeco
 
 				log.Errorf("Memory threshold exceeded! Alloc=%dMB > %dMB, sending alert...", allocMB, thresholdMB)
 
-				if err := sendFeishuAlert(webhookURL, alertMsg); err != nil {
-					log.Errorf("Failed to send Feishu alert: %v", err)
-				} else {
-					log.Infof("Feishu memory alert sent successfully")
-					lastAlertTime = time.Now()
-				}
+				// Use bot module to send alert (supports Feishu/DingTalk/WorkWechat)
+				botClient.SendText(alertMsg)
+				log.Infof("Memory alert sent successfully via bot")
+				lastAlertTime = time.Now()
 			}
 		}
 	}()
@@ -468,10 +436,16 @@ func main() {
 			EnvVar: "LOG_LEVEL",
 		},
 		cli.StringFlag{
-			Name:   "memory-alert-feishu-webhook",
-			Usage:  "Feishu webhook URL for memory alerts (e.g., https://open.feishu.cn/open-apis/bot/v2/hook/xxx)",
+			Name:   "memory-alert-webhook",
+			Usage:  "Webhook URL for memory alerts (supports Feishu/DingTalk/WorkWechat, auto-detected from URL)",
 			Value:  "",
-			EnvVar: "MEMORY_ALERT_FEISHU_WEBHOOK",
+			EnvVar: "MEMORY_ALERT_WEBHOOK",
+		},
+		cli.StringFlag{
+			Name:   "memory-alert-webhook-secret",
+			Usage:  "Webhook secret for signed requests (optional, for Feishu/DingTalk)",
+			Value:  "",
+			EnvVar: "MEMORY_ALERT_WEBHOOK_SECRET",
 		},
 		cli.Uint64Flag{
 			Name:   "memory-alert-threshold-mb",
@@ -498,12 +472,13 @@ func main() {
 			log.Debugf("Log level set to: %s", logLevel)
 		}
 
-		// Start memory monitor if Feishu webhook is configured
-		feishuWebhook := context.GlobalString("memory-alert-feishu-webhook")
+		// Start memory monitor if webhook is configured
+		alertWebhook := context.GlobalString("memory-alert-webhook")
+		alertWebhookSecret := context.GlobalString("memory-alert-webhook-secret")
 		memoryThresholdMB := context.GlobalUint64("memory-alert-threshold-mb")
 		checkIntervalSeconds := context.GlobalInt("memory-alert-interval-seconds")
-		if feishuWebhook != "" {
-			startMemoryMonitor(feishuWebhook, memoryThresholdMB, checkIntervalSeconds)
+		if alertWebhook != "" {
+			startMemoryMonitor(alertWebhook, alertWebhookSecret, memoryThresholdMB, checkIntervalSeconds)
 		}
 
 		return nil
