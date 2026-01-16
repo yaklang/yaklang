@@ -309,12 +309,17 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
+	// Set default options BEFORE user options, so user can override
+	defaultOpts := []poc.PocConfigOption{
+		poc.WithConnectTimeout(5),
+		poc.WithTimeout(600), // 10 minutes max timeout to prevent goroutine leak (can be overridden by user)
+		poc.WithRetryTimes(3),
+		poc.WithSave(false),
+		poc.WithConnPool(true), // enable connection pool for better performance
+		poc.WithAppendHeader("Accept-Encoding", "gzip, deflate, br"), // enable compression for better network performance
+	}
+	opts = append(defaultOpts, opts...) // User options come AFTER defaults, so they can override
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-	opts = append(opts, poc.WithConnectTimeout(5))
-	opts = append(opts, poc.WithRetryTimes(3))
-	opts = append(opts, poc.WithSave(false))
-	opts = append(opts, poc.WithConnPool(true))                                       // enable connection pool for better performance
-	opts = append(opts, poc.WithAppendHeader("Accept-Encoding", "gzip, deflate, br")) // enable compression for better network performance
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
