@@ -30,7 +30,7 @@ func init() {
 		for {
 			select {
 			case <-c:
-				log.Errorf("Exiting due to signal [SIGTERM/SIGINT/SIGKILL]")
+				log.Errorf("Exiting due to signal [SIGTERM/SIGINT/SIGKILL] ")
 				os.Exit(1)
 				return
 			}
