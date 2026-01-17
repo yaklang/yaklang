@@ -37,7 +37,7 @@ var (
 )
 
 func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowHttpConnPool {
-	return &LowHttpConnPool{
+	pool := &LowHttpConnPool{
 		maxIdleConn:        idleCount,
 		maxIdleConnPerHost: perHostCount,
 		connCount:          0,
@@ -46,6 +46,10 @@ func NewHttpConnPool(ctx context.Context, idleCount int, perHostCount int) *LowH
 		keepAliveTimeout:   30 * time.Second,
 		ctx:                ctx,
 	}
+	if idleCount > 0 {
+		pool.connSem = make(chan struct{}, idleCount)
+	}
+	return pool
 }
 
 type LowHttpConnPool struct {
@@ -58,6 +62,7 @@ type LowHttpConnPool struct {
 	idleLRU            connLRU                   // 连接池 LRU
 	keepAliveTimeout   time.Duration
 	ctx                context.Context
+	connSem            chan struct{}
 }
 
 func (l *LowHttpConnPool) HostConnFull(key *connectKey) bool {
@@ -127,8 +132,12 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 		return oldPc, nil
 	}
 	// 没有复用连接则新建一个连接
+	if !l.acquireConnSlot() {
+		return nil, utils.Error("lowhttp: conn pool context done")
+	}
 	pConn, err := newPersistConn(key, l, opts...)
 	if err != nil {
+		l.releaseConnSlot()
 		// try get idle conn
 		if oldPc, ok := l.getFromConn(key); ok {
 			//addGetIdleConnFinishedCounter()
@@ -138,6 +147,28 @@ func (l *LowHttpConnPool) getIdleConn(key *connectKey, opts ...netx.DialXOption)
 	}
 	//addGetIdleConnFinishedCounter()
 	return pConn, nil
+}
+
+func (l *LowHttpConnPool) acquireConnSlot() bool {
+	if l == nil || l.connSem == nil {
+		return true
+	}
+	select {
+	case l.connSem <- struct{}{}:
+		return true
+	case <-l.ctx.Done():
+		return false
+	}
+}
+
+func (l *LowHttpConnPool) releaseConnSlot() {
+	if l == nil || l.connSem == nil {
+		return
+	}
+	select {
+	case <-l.connSem:
+	default:
+	}
 }
 
 func (l *LowHttpConnPool) getFromConn(key *connectKey) (oldPc *persistConn, getConn bool) {
@@ -297,6 +328,8 @@ type persistConn struct {
 
 	// request sequence for per-request timeout guards
 	reqSeq uint64
+	// release conn slot once
+	releaseOnce sync.Once
 }
 
 type requestAndResponseCh struct {
@@ -495,6 +528,7 @@ func (pc *persistConn) h2Conn() {
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		closeCond:         sync.NewCond(new(sync.Mutex)),
 		clientPrefaceOk:   utils.NewAtomicBool(),
+		closeCh:           make(chan struct{}),
 		http2StreamPool: &sync.Pool{
 			New: func() interface{} {
 				return new(http2ClientStream)
@@ -608,7 +642,9 @@ func (pc *persistConn) readLoop() {
 		// Support BodyStreamReaderHandler in connection pool mode
 		var streamHandlerWg sync.WaitGroup
 		var streamWriter io.WriteCloser
+		var streamBodyReaderCh chan io.ReadCloser
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
+			streamBodyReaderCh = make(chan io.ReadCloser, 1)
 			streamReader, sw := utils.NewBufPipe(nil)
 			streamWriter = sw
 
@@ -639,6 +675,10 @@ func (pc *persistConn) readLoop() {
 					if len(line) == 0 {
 						// Header finished, now handle body
 						bodyReader, bodyWriter := utils.NewBufPipe(nil)
+						select {
+						case streamBodyReaderCh <- bodyReader:
+						default:
+						}
 						go func() {
 							io.Copy(bodyWriter, packetReader)
 							bodyWriter.Close()
@@ -739,13 +779,21 @@ func (pc *persistConn) readLoop() {
 		}
 
 		// Wait for stream handler to complete before sending response
-		streamHandlerWg.Wait()
+		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
+			waitStreamHandlerDone(&streamHandlerWg, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
+		} else {
+			streamHandlerWg.Wait()
+		}
 
 		//pc.mu.Lock()
 		////pc.numExpectedResponses-- // 减少预期响应数量
 		//pc.mu.Unlock()
 
-		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
+		select {
+		case rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}:
+		default:
+			log.Warnf("conn pool response channel not received, drop response for request")
+		}
 		firstAuth = true
 		alive = alive &&
 			!pc.sawEOF &&
@@ -815,9 +863,20 @@ func (pc *persistConn) removeConn() {
 func (pc *persistConn) closeNetConn() error {
 	if pc.IsH2Conn() && pc.alt != nil {
 		pc.alt.setClose()
+		pc.releaseConnSlot()
 		return nil
 	}
-	return pc.conn.Close()
+	err := pc.conn.Close()
+	pc.releaseConnSlot()
+	return err
+}
+
+func (pc *persistConn) releaseConnSlot() {
+	pc.releaseOnce.Do(func() {
+		if pc.p != nil {
+			pc.p.releaseConnSlot()
+		}
+	})
 }
 
 func (pc *persistConn) IsH2Conn() bool {
