@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -10,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 
 	"github.com/yaklang/yaklang/common/filter"
@@ -116,6 +119,38 @@ func AddConnectionClosed(raw []byte) []byte {
 
 func TrimLeftHTTPPacket(raw []byte) []byte {
 	return bytes.TrimLeftFunc(raw, unicode.IsSpace)
+}
+
+func waitStreamHandlerDone(wg *sync.WaitGroup, bodyReaderCh <-chan io.ReadCloser, timeout time.Duration, label string) {
+	if wg == nil {
+		return
+	}
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return
+	case <-time.After(timeout):
+	}
+
+	var bodyReader io.ReadCloser
+	select {
+	case bodyReader = <-bodyReaderCh:
+	default:
+	}
+	if bodyReader != nil {
+		_ = bodyReader.Close()
+	}
+
+	select {
+	case <-done:
+		return
+	case <-time.After(timeout):
+		log.Warnf("stream handler wait timeout: %s", label)
+	}
 }
 
 func TrimLeftCRLF(raw []byte) []byte {

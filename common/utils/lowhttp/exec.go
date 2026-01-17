@@ -319,8 +319,13 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	bodyStreamReaderHandled := utils.NewAtomicBool()
 	// 等待 BodyStreamReaderHandler 调用结束
 	waitBodyStreamReaderHandledCallEnd := sync.WaitGroup{}
+	var streamBodyReaderCh chan io.ReadCloser
 	defer func() {
-		waitBodyStreamReaderHandledCallEnd.Wait()
+		if option != nil && option.BodyStreamReaderHandler != nil {
+			waitStreamHandlerDone(&waitBodyStreamReaderHandledCallEnd, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
+		} else {
+			waitBodyStreamReaderHandledCallEnd.Wait()
+		}
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			r, w := utils.NewPipe()
 			w.Close()
@@ -869,7 +874,7 @@ RECONNECT:
 			}
 		}
 
-		resc := make(chan responseInfo)
+		resc := make(chan responseInfo, 1)
 		pc.reqCh <- requestAndResponseCh{
 			reqPacket:   requestPacket,
 			ch:          resc,
@@ -958,6 +963,9 @@ RECONNECT:
 		// BodyStreamReaderHandler for non-pool connection
 		// Note: connection pool mode also supports BodyStreamReaderHandler (see conn_pool.go readLoop)
 		if option != nil && option.BodyStreamReaderHandler != nil {
+			if streamBodyReaderCh == nil {
+				streamBodyReaderCh = make(chan io.ReadCloser, 1)
+			}
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
 				utils.Debug(func() {
@@ -971,6 +979,10 @@ RECONNECT:
 			//onceForBody := new(sync.Once)
 			go func() {
 				bodyReader, bodyWriter := utils.NewBufPipe(nil)
+				select {
+				case streamBodyReaderCh <- bodyReader:
+				default:
+				}
 				defer func() {
 					bodyWriter.Close()
 					if err := recover(); err != nil {

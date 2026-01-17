@@ -48,6 +48,8 @@ type http2ClientConn struct {
 	closeCond       *sync.Cond
 	closed          bool
 	clientPrefaceOk *utils.AtomicBool
+	closeCh         chan struct{}
+	closeOnce       sync.Once
 
 	hDec *hpack.Decoder
 
@@ -249,6 +251,9 @@ func (h2Conn *http2ClientConn) setClose() {
 	h2Conn.closed = true
 	h2Conn.closeCond.L.Unlock()
 	h2Conn.closeCond.Broadcast()
+	h2Conn.closeOnce.Do(func() {
+		close(h2Conn.closeCh)
+	})
 	h2Conn.conn.Close()
 }
 
@@ -539,23 +544,15 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 	}
 
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
-	closeFlag := make(chan struct{}, 10) // get read frame err
-	go func() {
-		cs.h2Conn.closeCond.L.Lock()
-		for !cs.h2Conn.closed {
-			cs.h2Conn.closeCond.Wait()
-		}
-		closeFlag <- struct{}{}
-		cs.h2Conn.closeCond.L.Unlock()
-	}()
-
 	var err error
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
-	case <-time.After(timeout):
+	case <-timer.C:
 		err = utils.Errorf("h2 stream-id %v wait response timeout : %s, maybe you can use HTTP/1.1 retry it", cs.ID, flow)
 		cs.setEndStream()
 	case <-cs.readEndStreamSignal:
-	case <-closeFlag:
+	case <-cs.h2Conn.closeCh:
 		err = utils.Wrapf(errH2ConnClosed, "h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
 	}
 	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
