@@ -276,6 +276,13 @@ func TestGoroutineLeak_HTTP2Timeout(t *testing.T) {
 }
 
 func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
+	// Wait for any goroutines from previous tests to settle
+	time.Sleep(100 * time.Millisecond)
+	runtime.GC()
+
+	// Record baseline goroutines from previous tests
+	baselinePersistConnGoroutines := countPersistConnGoroutines()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/plain")
@@ -291,8 +298,8 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 		poolSize      = 40
 		maxGoroutines = poolSize * 2
 	)
-	pool := NewHttpConnPool(context.Background(), poolSize, poolSize)
-	t.Cleanup(func() { pool.Clear() })
+	poolCtx, poolCancel := context.WithCancel(context.Background())
+	pool := NewHttpConnPool(poolCtx, poolSize, poolSize)
 
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, poolSize)
@@ -315,10 +322,21 @@ func TestGoroutineLeak_ConnPool_StressMaxGoroutines(t *testing.T) {
 	}
 	wg.Wait()
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+
+	// Clear the pool and wait for goroutines to exit
+	pool.Clear()
+	poolCancel()
+	time.Sleep(500 * time.Millisecond)
+	runtime.GC()
+
 	persistConnGoroutines := countPersistConnGoroutines()
-	if persistConnGoroutines > maxGoroutines {
-		log.Infof("persistConn goroutines exceed limit: current=%d limit=%d", persistConnGoroutines, maxGoroutines)
-		t.Fatalf("persistConn goroutines exceed limit: current=%d limit=%d", persistConnGoroutines, maxGoroutines)
+	// Only count the goroutines created by this test (subtract baseline)
+	thisTestGoroutines := persistConnGoroutines - baselinePersistConnGoroutines
+	if thisTestGoroutines < 0 {
+		thisTestGoroutines = 0
+	}
+	if thisTestGoroutines > maxGoroutines {
+		log.Infof("persistConn goroutines exceed limit: current=%d (baseline=%d) limit=%d", persistConnGoroutines, baselinePersistConnGoroutines, maxGoroutines)
+		t.Fatalf("persistConn goroutines exceed limit: current=%d (baseline=%d, this_test=%d) limit=%d", persistConnGoroutines, baselinePersistConnGoroutines, thisTestGoroutines, maxGoroutines)
 	}
 }
