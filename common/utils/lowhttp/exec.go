@@ -818,6 +818,7 @@ RECONNECT:
 			h2Stream, err := h2Conn.newStream(reqIns, requestPacket, option)
 			if err != nil {
 				if err == CreateStreamAfterGoAwayErr {
+					pc.closeConn(err) // close old connection to avoid goroutine leak
 					goto RECONNECT
 				} else {
 					return nil, err
@@ -829,6 +830,7 @@ RECONNECT:
 				if h2Stream.ID == 1 { // first stream
 					return nil, err
 				} else {
+					pc.closeConn(err) // close old connection to avoid goroutine leak
 					goto RECONNECT
 				}
 			}
@@ -841,6 +843,7 @@ RECONNECT:
 			_ = resp
 			if err != nil {
 				if conn.(*persistConn).shouldRetryRequest(err) {
+					pc.closeConn(err) // close old connection to avoid goroutine leak
 					goto RECONNECT
 				} else {
 					return nil, err
@@ -889,6 +892,7 @@ RECONNECT:
 			// get response
 			if re.err != nil && len(rawBytes) == 0 { // get some bytes but get error too
 				if pc.shouldRetryRequest(re.err) {
+					pc.closeConn(re.err) // close old connection to avoid goroutine leak
 					goto RECONNECT
 				}
 				return nil, re.err
