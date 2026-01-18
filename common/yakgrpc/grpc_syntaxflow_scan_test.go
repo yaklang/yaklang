@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -122,6 +123,9 @@ func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Co
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
+	err := sfbuildin.SyncEmbedRule()
+	require.NoError(t, err)
+
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 

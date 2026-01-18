@@ -48,7 +48,7 @@ func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.Sy
 		require.NoError(t, err)
 
 		// memory
-		log.Infof("memory result")
+		log.Infof("compose memory result")
 		handler(res)
 
 		// database
@@ -57,7 +57,7 @@ func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.Sy
 			require.NoError(t, err)
 			res, err = ssaapi.LoadResultByID(id)
 			require.NoError(t, err)
-			log.Infof("database result ")
+			log.Infof("compose database result ")
 			handler(res)
 		}
 

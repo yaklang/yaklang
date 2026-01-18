@@ -110,15 +110,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		actx.depth--
 	}()
 
-	if ins, ok := ssa.ToLazyInstruction(v.innerValue); ok {
-		v.innerValue, ok = ins.Self().(ssa.Value)
-		if !ok {
-			log.Debugf("BUG: (lazy instruction) unknown instruction: %v - %v - ID:%v", v.String(), v.GetVerboseName(), v.GetId())
-			return Values{}
-		}
-		return v.getBottomUses(actx, opt...)
-	}
-
 	// if not shadow value return i self
 	v = actx.CovertShadowValue(v)
 
@@ -141,6 +132,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	}
 
 	switch inst := v.GetSSAInst().(type) {
+	case *ssa.LazyInstruction:
+		new := v.NewValue(v.getValue())
+		return new.getBottomUses(actx, opt...)
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
 	case *ssa.Call:
@@ -321,7 +315,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 		}
 		if len(vals) == 0 {
-			vals = append(vals, v.NewValue(call.innerValue).getBottomUses(actx, opt...)...)
+			vals = append(vals, v.NewValue(call.getValue()).getBottomUses(actx, opt...)...)
 		}
 		return vals
 	}

@@ -104,6 +104,11 @@ func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
 func (i *anInstruction) Self() Instruction {
 	inst, _ := i.GetProgram().GetInstructionById(i.GetId())
+	if !utils.IsNil(inst) {
+		if inst.IsLazy() {
+			return inst.Self()
+		}
+	}
 	return inst
 }
 

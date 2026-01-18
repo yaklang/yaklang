@@ -15,19 +15,19 @@ func (v *Value) GetFunction() *Value {
 }
 
 func (v *Value) InMainFunction() bool {
-	return v.innerValue.GetFunc().IsMain()
+	return v.getValue().GetFunc().IsMain()
 }
 
 func (v *Value) GetBlock() *Value {
-	return v.NewValue(v.innerValue.GetBlock())
+	return v.NewValue(v.getValue().GetBlock())
 }
 
 func (v *Value) IsReachable() ssa.BasicBlockReachableKind {
-	return v.innerValue.GetBlock().Reachable()
+	return v.getValue().GetBlock().Reachable()
 }
 
 func (v *Value) GetReachable() *Value {
-	node := v.innerValue
+	node := v.getValue()
 	condition, ok := node.GetValueById(node.GetBlock().Condition)
 	if !ok {
 		condition = nil

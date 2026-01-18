@@ -17,7 +17,7 @@ type userNodeItems struct {
 
 func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
-	inst := value.innerUser
+	inst := value.getUser()
 	if utils.IsNil(inst) {
 		return newValue
 	}
@@ -76,7 +76,7 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 func SearchWithValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 
-	inst := value.innerValue
+	inst := value.getValue()
 	if utils.IsNil(inst) {
 		return newValue
 	}

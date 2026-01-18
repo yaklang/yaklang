@@ -38,7 +38,7 @@ var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame 
 			if !ok {
 				return nil
 			}
-			results := searchAlongBasicBlock(val.innerValue, prog, frame, params, direction)
+			results := searchAlongBasicBlock(val.getValue(), prog, frame, params, direction)
 			if !ok {
 				return nil
 			}

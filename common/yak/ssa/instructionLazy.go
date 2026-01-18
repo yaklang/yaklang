@@ -806,6 +806,9 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	var handler func(i *anValue)
 
 	handler = func(i *anValue) {
+		if utils.IsNil(i) {
+			return
+		}
 		for _, vId := range i.occultation {
 			// Corrected: Use GetValueById from the program's cache
 			v, ok := lz.GetValueById(vId)
@@ -829,5 +832,8 @@ func (lz *LazyInstruction) getAnInstruction() *anInstruction {
 
 func (lz *LazyInstruction) getAnValue() *anValue {
 	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
 	return lz.Value.getAnValue()
 }

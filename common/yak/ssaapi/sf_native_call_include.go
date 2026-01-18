@@ -114,7 +114,7 @@ func CreateIncludeValue(vs Values) sfvm.ValueOperator {
 	// value := ValuesToSFValueList(vals)
 	var list []sfvm.ValueOperator
 	for _, got := range vs {
-		val := got.NewValue(got.innerValue)
+		val := got.NewValue(got.getValue())
 		val.AppendPredecessor(got, sfvm.WithAnalysisContext_Label("include"))
 		list = append(list, val)
 	}

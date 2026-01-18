@@ -215,7 +215,7 @@ func init() {
 			case *Program:
 				return nil
 			case *Value:
-				getRoot(ret.innerValue)
+				getRoot(ret.getValue())
 			}
 			return nil
 		})
@@ -298,7 +298,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				_, isBlueprint := ssa.ToClassBluePrintType(ret.innerValue.GetType())
+				_, isBlueprint := ssa.ToClassBluePrintType(ret.getValue().GetType())
 				if isBlueprint {
 					result = append(result, ret)
 				}
@@ -323,7 +323,7 @@ func init() {
 		val.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				typ, isBlueprint := ssa.ToClassBluePrintType(ret.innerValue.GetType())
+				typ, isBlueprint := ssa.ToClassBluePrintType(ret.getValue().GetType())
 				if isBlueprint {
 					extends = append(extends, typ)
 				}
@@ -347,7 +347,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				node := ret.innerValue
+				node := ret.getValue()
 				if check(node.GetType()) {
 					result = append(result, ret)
 				}
@@ -542,7 +542,7 @@ func init() {
 			case *Program:
 				return nil
 			case *Value:
-				vr := ret.innerValue.GetRange()
+				vr := ret.getValue().GetRange()
 				if vr == nil {
 					log.Errorf("node range is nil")
 					return nil
@@ -574,7 +574,7 @@ func init() {
 			if !ok {
 				return nil
 			}
-			function, flag := ssa.ToFunction(value.innerValue)
+			function, flag := ssa.ToFunction(value.getValue())
 			if !flag {
 				return nil
 			}
@@ -1056,7 +1056,7 @@ func init() {
 					return nil
 				}
 				if val.getOpcode() == ssa.SSAOpcodeFunction {
-					rets, ok := ssa.ToFunction(val.innerValue)
+					rets, ok := ssa.ToFunction(val.getValue())
 					if !ok {
 						return nil
 					}
@@ -1092,7 +1092,7 @@ func init() {
 				if !ok {
 					return nil
 				}
-				originIns := val.innerValue
+				originIns := val.getValue()
 				funcIns, ok := ssa.ToFunction(originIns)
 				if !ok {
 					return nil
@@ -1322,7 +1322,7 @@ func init() {
 				if val, ok := operator.(*Value); ok {
 					switch ins := val.getOpcode(); ins {
 					case ssa.SSAOpcodeParameterMember:
-						param, ok := ssa.ToParameterMember(val.innerValue)
+						param, ok := ssa.ToParameterMember(val.getValue())
 						if ok {
 							funcName := param.GetFunc().GetName()
 							if val.ParentProgram == nil {
@@ -1334,7 +1334,7 @@ func init() {
 							}
 						}
 					case ssa.SSAOpcodeParameter:
-						param, ok := ssa.ToParameter(val.innerValue)
+						param, ok := ssa.ToParameter(val.getValue())
 						if ok {
 							funcIns := param.GetFunc()
 							funcName := funcIns.GetName()
