@@ -818,11 +818,7 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 			}
 		}
 	}
-	if u, ok := ToUndefined(lz.Value); ok {
-		handler(u.anValue)
-	} else if e, ok := ToExternLib(lz.Value); ok {
-		handler(e.anValue)
-	}
+	handler(lz.getAnValue())
 
 	return ret
 }
@@ -832,5 +828,6 @@ func (lz *LazyInstruction) getAnInstruction() *anInstruction {
 }
 
 func (lz *LazyInstruction) getAnValue() *anValue {
+	lz.check()
 	return lz.Value.getAnValue()
 }
