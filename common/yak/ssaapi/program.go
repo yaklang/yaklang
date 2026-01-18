@@ -234,7 +234,7 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	// if lazy, get the real inst
 	checkInst := inst
 	// if inst.IsLazy() {
-	// checkInst = inst.Self()
+	// 	checkInst = inst.Self()
 	// }
 	if n, ok := checkInst.(ssa.Value); ok {
 		v.innerValue = n
@@ -242,7 +242,7 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if n, ok := checkInst.(ssa.User); ok {
 		v.innerUser = n
 	}
-	if v.innerValue == nil && v.innerUser == nil {
+	if v.getValue() == nil && v.innerUser == nil {
 		return nil, utils.Errorf("instruction is not a value or user: %s", inst.String())
 	}
 	return v, nil

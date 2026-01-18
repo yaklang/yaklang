@@ -56,10 +56,10 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	var vals Values
-	if i.innerValue == nil {
+	if i.getValue() == nil {
 		return vals
 	}
-	for _, def := range i.innerValue.GetValues() {
+	for _, def := range i.getValue().GetValues() {
 		if utils.IsNil(def) {
 			continue
 		}
@@ -71,7 +71,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 		vals = append(vals, i)
 	}
 
-	if maskable, ok := i.innerValue.(ssa.Maskable); ok {
+	if maskable, ok := i.getValue().(ssa.Maskable); ok {
 		if len(maskable.GetMask()) == 0 {
 			return vals
 		}
@@ -82,9 +82,9 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 		// 用以作为下个topdef的effecton的边
 		// 而不影响i作为结果result有多出来的边
 		if last != nil {
-			shadow = last.NewValue(i.innerValue)
+			shadow = last.NewValue(i.getValue())
 		} else {
-			shadow = i.NewValue(i.innerValue)
+			shadow = i.NewValue(i.getValue())
 		}
 		for _, def := range maskable.GetMask() {
 			if ret := shadow.NewValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
@@ -109,15 +109,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		actx.depth++
 	}()
 
-	if inst, ok := ssa.ToLazyInstruction(i.innerValue); ok {
-		var ok bool
-		i.innerValue, ok = inst.Self().(ssa.Value)
-		if !ok {
-			log.Errorf("BUG: %T is not ssa.Value", inst.Self())
-			return Values{}
-		}
-		return i.getTopDefs(actx, opt...)
-	}
+	// if inst, ok := ssa.ToLazyInstruction(i.getValue()); ok {
+	// 	var ok bool
+	// 	i.innerValue, ok = inst.Self().(ssa.Value)
+	// 	if !ok {
+	// 		log.Errorf("BUG: %T is not ssa.Value", inst.Self())
+	// 		return Values{}
+	// 	}
+	// 	return i.getTopDefs(actx, opt...)
+	// }
 
 	// if not shadow value return i self
 	i = actx.CovertShadowValue(i)
@@ -189,7 +189,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.visitedDefs(actx, opt...)
 	}
-	switch inst := i.innerValue.(type) {
+	switch inst := i.getValue().(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
 			return Values{}
@@ -364,7 +364,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 
 		handlerReturn := func(value *Value) {
-			fun, ok := ssa.ToFunction(value.innerValue)
+			fun, ok := ssa.ToFunction(value.getValue())
 			if !ok {
 				return
 			}
@@ -418,7 +418,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if called == nil {
 				return nil
 			}
-			calledInstance, ok := ssa.ToCall(called.innerValue)
+			calledInstance, ok := ssa.ToCall(called.getValue())
 			if !ok {
 				log.Warnf("BUG: Parameter getActualValueByCall called is not callInstruction %s", called.GetOpcode())
 				return Values{}
@@ -480,7 +480,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if len(isInners) > 0 {
 				isInner = isInners[0]
 			}
-			calledInstance, ok := ssa.ToCall(called.innerValue)
+			calledInstance, ok := ssa.ToCall(called.getValue())
 			if !ok {
 				log.Debugf("BUG: Parameter getCalledByValue called is not callInstruction %s", called.GetOpcode())
 				return Values{}
@@ -498,13 +498,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					}
 				} else {
 					log.Errorf("free value: %v is not found in binding", inst.GetName())
-					return getMemberCall(i, i.innerValue, actx)
+					return getMemberCall(i, i.getValue(), actx)
 				}
 			} else {
 				// parameter
 				if inst.FormalParameterIndex >= len(calledInstance.Args) {
 					log.Debugf("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-					return getMemberCall(i, i.innerValue, actx)
+					return getMemberCall(i, i.getValue(), actx)
 				}
 				actualParam, ok = inst.GetValueById(calledInstance.Args[inst.FormalParameterIndex])
 				if !ok {
@@ -583,10 +583,12 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 		}
 		return values
+	default:
+		log.Errorf("BUG: %T is not supported", inst)
 	}
 	// if if/loop/... control instruction, this innerValue is nil
-	if i.innerValue != nil {
-		return getMemberCall(i, i.innerValue, actx)
+	if i.getValue() != nil {
+		return getMemberCall(i, i.getValue(), actx)
 	} else {
 		return Values{i}
 	}

@@ -327,7 +327,7 @@ func (m *scanManager) initByConfig() error {
 	}
 
 	programCount := len(config.Programs)
-	log.Errorf("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
+	log.Infof("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
 	m.setTotalQuery(m.rulesCount * int64(programCount))
 	return nil
 }

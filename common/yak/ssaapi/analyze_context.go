@@ -214,7 +214,7 @@ func (a *AnalyzeContext) getContext() context.Context {
 // it is considered to cross the function boundary,
 // which means it is trying to cross process.
 func (a *AnalyzeContext) needCrossProcess(from *Value, to *Value) bool {
-	if from == nil || from.innerValue == nil || to == nil || to.innerValue == nil {
+	if from == nil || from.getValue() == nil || to == nil || to.getValue() == nil {
 		return false
 	}
 	return from.GetFunction().GetId() != to.GetFunction().GetId()

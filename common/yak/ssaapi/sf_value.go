@@ -144,7 +144,7 @@ func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator, error) {
-	call, isCall := ssa.ToCall(v.innerValue)
+	call, isCall := ssa.ToCall(v.getValue())
 	if !isCall {
 		return nil, utils.Errorf("ssa.Value is not a call")
 	}

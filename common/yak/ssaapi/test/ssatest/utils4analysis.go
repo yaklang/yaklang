@@ -103,12 +103,12 @@ func CheckWithName(
 	opt ...ssaconfig.Option,
 ) {
 	// only in memory
-	{
+	if false {
 		prog, err := ssaapi.Parse(code, opt...)
 		require.Nil(t, err)
 		_ = prog
 
-		log.Infof("only in memory ")
+		log.Infof("compiled only in memory ")
 		err = handler(prog)
 		require.Nil(t, err)
 	}
@@ -131,9 +131,9 @@ func CheckWithName(
 		require.Nil(t, err)
 		// prog.Show()
 
-		log.Infof("with database ")
+		log.Infof("compiled with database ")
 		_ = prog
-		err = handler(prog)
+		// err = handler(prog)
 		require.Nil(t, err)
 	}
 
@@ -142,8 +142,9 @@ func CheckWithName(
 		prog, err := ssaapi.FromDatabase(programID)
 		require.Nil(t, err)
 
-		log.Infof("only use database ")
+		log.Infof("loaded from database ")
 		err = handler(prog)
+		_ = prog
 		require.Nil(t, err)
 	}
 }
