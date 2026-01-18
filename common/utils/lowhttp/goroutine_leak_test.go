@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -272,6 +273,82 @@ func TestGoroutineLeak_HTTP2Timeout(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("serveH2 did not exit after closing connection")
 	}
+	checker.Check()
+}
+
+func TestGoroutineLeak_ConnPool_Reconnect(t *testing.T) {
+	// This test verifies that goroutines are properly cleaned up when RECONNECT is triggered
+	// Simulate a server that closes connections after each request (triggering retry logic)
+	var requestCount int32
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		count := atomic.AddInt32(&requestCount, 1)
+		if count%2 == 1 {
+			// First request: close connection immediately to trigger RECONNECT
+			writer.Header().Set("Connection", "close")
+		}
+		writer.WriteHeader(200)
+		_, _ = writer.Write([]byte("ok"))
+	})
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	pool := NewHttpConnPool(context.Background(), 10, 2)
+	t.Cleanup(func() { pool.Clear() })
+
+	checker := newGoroutineLeakChecker(t, 10, 3*time.Second)
+	for i := 0; i < 20; i++ {
+		_, err := HTTP(
+			WithPacketBytes(buildBasicRequest(host, port)),
+			WithConnPool(true),
+			ConnPool(pool),
+			WithTimeout(500*time.Millisecond),
+		)
+		if err != nil {
+			t.Logf("request %d failed: %v", i, err)
+		}
+	}
+	pool.Clear()
+	checker.Check()
+}
+
+func TestGoroutineLeak_ConnPool_ServerClose(t *testing.T) {
+	// Test goroutine cleanup when server closes connection unexpectedly
+	var requestCount int32
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		count := atomic.AddInt32(&requestCount, 1)
+		// Every 3rd request gets an immediate close
+		if count%3 == 0 {
+			// Force close by hijacking and closing the connection
+			hj, ok := writer.(http.Hijacker)
+			if ok {
+				conn, _, _ := hj.Hijack()
+				if conn != nil {
+					_ = conn.Close()
+				}
+				return
+			}
+		}
+		writer.WriteHeader(200)
+		_, _ = writer.Write([]byte("ok"))
+	})
+	if utils.WaitConnect(utils.HostPort(host, port), 3) != nil {
+		t.Fatal("debug server failed")
+	}
+
+	pool := NewHttpConnPool(context.Background(), 10, 2)
+	t.Cleanup(func() { pool.Clear() })
+
+	checker := newGoroutineLeakChecker(t, 10, 3*time.Second)
+	for i := 0; i < 30; i++ {
+		_, _ = HTTP(
+			WithPacketBytes(buildBasicRequest(host, port)),
+			WithConnPool(true),
+			ConnPool(pool),
+			WithTimeout(500*time.Millisecond),
+		)
+	}
+	pool.Clear()
 	checker.Check()
 }
 
