@@ -868,6 +868,11 @@ func (pc *persistConn) removeConn() {
 }
 
 func (pc *persistConn) closeNetConn() error {
+	// Cancel context to notify readLoop/writeLoop goroutines to exit
+	// This prevents goroutine leak when connection is closed from pool
+	if pc.cancel != nil {
+		pc.cancel()
+	}
 	if pc.IsH2Conn() && pc.alt != nil {
 		pc.alt.setClose()
 		pc.releaseConnSlot()
