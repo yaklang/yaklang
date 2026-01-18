@@ -2651,6 +2651,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 });
         }
 
+        // Store last goroutine dump data for copy functions
+        let lastGoroutineDumpData = null;
+
         function fetchGoroutineDump() {
             const dumpResult = document.getElementById('goroutine-dump-result');
             dumpResult.style.display = 'block';
@@ -2660,27 +2663,55 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
+                        lastGoroutineDumpData = data; // Store for copy functions
+                        
+                        // Build summary text for one-click copy
+                        let summaryText = `=== Goroutine Summary ===\n`;
+                        summaryText += `Total Goroutines: ${data.total}\n`;
+                        summaryText += `Unique Stacks: ${data.unique_stacks}\n\n`;
+                        summaryText += `=== Top Goroutines (by count) ===\n`;
+                        if (data.top_goroutines) {
+                            data.top_goroutines.forEach((g, i) => {
+                                summaryText += `\n[${i+1}] Count: ${g.count} - ${g.signature}\n`;
+                                if (g.stack_trace) {
+                                    summaryText += `Stack:\n${g.stack_trace}\n`;
+                                }
+                            });
+                        }
+                        
                         let html = `
-                            <div style="padding: 10px; background: #e8f5e9; border-radius: 5px; margin-bottom: 10px;">
-                                <strong>✅ 总 Goroutines: ${data.total}</strong> | 唯一堆栈: ${data.unique_stacks}
+                            <div style="padding: 10px; background: #e8f5e9; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <strong>✅ 总 Goroutines: ${data.total}</strong> | 唯一堆栈: ${data.unique_stacks}
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn" onclick="copyGoroutineSummary()" style="background-color: #4caf50; padding: 6px 12px; font-size: 12px;">📋 复制摘要</button>
+                                    <button class="btn" onclick="copyFullGoroutineDump()" style="background-color: #2196f3; padding: 6px 12px; font-size: 12px;">📄 复制完整Dump</button>
+                                </div>
                             </div>
                             <div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">
                                 <h4 style="margin-top: 0;">Top Goroutines (按数量排序):</h4>
                                 <div style="overflow-x: auto; width: 100%;">
                                     <table style="width: 100%; border-collapse: collapse; table-layout: auto; min-width: 100%;">
                                         <tr style="background: #e0e0e0;">
-                                            <th style="padding: 8px; text-align: left; border: 1px solid #ccc; width: 80px; min-width: 80px;">数量</th>
-                                            <th style="padding: 8px; text-align: left; border: 1px solid #ccc; min-width: 400px;">函数签名</th>
+                                            <th style="padding: 8px; text-align: center; border: 1px solid #ccc; width: 60px;">数量</th>
+                                            <th style="padding: 8px; text-align: left; border: 1px solid #ccc; width: 200px;">函数签名</th>
+                                            <th style="padding: 8px; text-align: left; border: 1px solid #ccc;">调用栈 (点击行复制)</th>
                                         </tr>`;
                         
                         if (data.top_goroutines) {
                             data.top_goroutines.forEach((g, i) => {
                                 const bgColor = g.count > 100 ? '#ffebee' : (g.count > 10 ? '#fff3e0' : '#ffffff');
                                 const countColor = g.count > 100 ? '#d32f2f' : (g.count > 10 ? '#f57c00' : '#333');
+                                const stackPreview = g.stack_trace ? escapeHtml(g.stack_trace) : '<em style="color: #999;">无栈信息</em>';
+                                
                                 html += `
-                                    <tr style="background: ${bgColor};">
-                                        <td style="padding: 8px; border: 1px solid #ccc; color: ${countColor}; font-weight: bold; width: 80px; min-width: 80px;">${g.count}</td>
-                                        <td style="padding: 8px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; word-break: break-word; white-space: normal; min-width: 400px;">${escapeHtml(g.signature)}</td>
+                                    <tr style="background: ${bgColor}; cursor: pointer;" onclick="copyGoroutineRow(${i})" title="点击复制此行完整信息">
+                                        <td style="padding: 8px; border: 1px solid #ccc; color: ${countColor}; font-weight: bold; text-align: center; width: 60px;">${g.count}</td>
+                                        <td style="padding: 8px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; word-break: break-word; white-space: normal; width: 200px; vertical-align: top;">
+                                            <strong>${escapeHtml(g.signature)}</strong>
+                                        </td>
+                                        <td style="padding: 8px; border: 1px solid #ccc; font-family: monospace; font-size: 11px; white-space: pre-wrap; word-break: break-word; vertical-align: top; background: #fafafa;">${stackPreview}</td>
                                     </tr>`;
                             });
                         }
@@ -2689,8 +2720,13 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                                 </div>
                             </div>
                             <details style="margin-top: 10px;">
-                                <summary style="cursor: pointer; padding: 10px; background: #e3f2fd; border-radius: 5px;">查看完整 Dump (点击展开)</summary>
-                                <pre style="background: #263238; color: #aed581; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 11px; max-height: 300px; overflow-y: auto;">${escapeHtml(data.full_dump)}</pre>
+                                <summary style="cursor: pointer; padding: 10px; background: #e3f2fd; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>查看完整 Dump (点击展开)</span>
+                                </summary>
+                                <div style="position: relative;">
+                                    <button class="btn" onclick="copyFullGoroutineDump()" style="position: absolute; top: 10px; right: 10px; background-color: #4caf50; padding: 4px 10px; font-size: 11px; z-index: 10;">📋 复制</button>
+                                    <pre id="full-dump-pre" style="background: #263238; color: #aed581; padding: 10px; padding-top: 40px; border-radius: 5px; overflow-x: auto; font-size: 11px; max-height: 400px; overflow-y: auto;">${escapeHtml(data.full_dump)}</pre>
+                                </div>
                             </details>`;
                         
                         dumpResult.innerHTML = html;
@@ -2701,6 +2737,105 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 .catch(err => {
                     dumpResult.innerHTML = '<div style="padding: 10px; background: #ffebee; border-radius: 5px;">❌ 请求错误: ' + err + '</div>';
                 });
+        }
+
+        function copyGoroutineSummary() {
+            if (!lastGoroutineDumpData) {
+                alert('没有可复制的数据，请先获取 Goroutine Dump');
+                return;
+            }
+            
+            let summaryText = `=== Goroutine Summary ===\n`;
+            summaryText += `Total Goroutines: ${lastGoroutineDumpData.total}\n`;
+            summaryText += `Unique Stacks: ${lastGoroutineDumpData.unique_stacks}\n\n`;
+            summaryText += `=== Top Goroutines (by count) ===\n`;
+            
+            if (lastGoroutineDumpData.top_goroutines) {
+                lastGoroutineDumpData.top_goroutines.forEach((g, i) => {
+                    summaryText += `\n[${i+1}] Count: ${g.count} - ${g.signature}\n`;
+                    if (g.stack_trace) {
+                        summaryText += `Stack:\n${g.stack_trace}\n`;
+                    }
+                });
+            }
+            
+            copyToClipboard(summaryText, '摘要已复制到剪贴板');
+        }
+
+        function copyFullGoroutineDump() {
+            if (!lastGoroutineDumpData || !lastGoroutineDumpData.full_dump) {
+                alert('没有可复制的数据，请先获取 Goroutine Dump');
+                return;
+            }
+            copyToClipboard(lastGoroutineDumpData.full_dump, '完整 Dump 已复制到剪贴板');
+        }
+
+        function copyGoroutineRow(index) {
+            if (!lastGoroutineDumpData || !lastGoroutineDumpData.top_goroutines || !lastGoroutineDumpData.top_goroutines[index]) {
+                alert('没有可复制的数据');
+                return;
+            }
+            
+            const g = lastGoroutineDumpData.top_goroutines[index];
+            let rowText = `=== Goroutine #${index + 1} ===\n`;
+            rowText += `Count: ${g.count}\n`;
+            rowText += `Signature: ${g.signature}\n`;
+            if (g.stack_trace) {
+                rowText += `\nStack Trace:\n${g.stack_trace}\n`;
+            }
+            if (g.sample_stack) {
+                rowText += `\nFull Sample Stack:\n${g.sample_stack}\n`;
+            }
+            
+            copyToClipboard(rowText, `Goroutine #${index + 1} 信息已复制到剪贴板`);
+        }
+
+        function copyToClipboard(text, successMessage) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyToast(successMessage || '已复制到剪贴板');
+                }).catch(err => {
+                    fallbackCopyToClipboard(text, successMessage);
+                });
+            } else {
+                fallbackCopyToClipboard(text, successMessage);
+            }
+        }
+
+        function fallbackCopyToClipboard(text, successMessage) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showCopyToast(successMessage || '已复制到剪贴板');
+            } catch (err) {
+                alert('复制失败: ' + err);
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function showCopyToast(message) {
+            // Remove existing toast if any
+            const existingToast = document.getElementById('copy-toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const toast = document.createElement('div');
+            toast.id = 'copy-toast';
+            toast.style.cssText = 'position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 14px;';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
         }
 
         function escapeHtml(text) {

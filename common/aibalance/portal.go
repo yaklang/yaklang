@@ -2467,9 +2467,11 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 
 	// Parse goroutines - split by "goroutine " prefix
 	type goroutineSummary struct {
-		Signature string `json:"signature"`
-		Count     int    `json:"count"`
-		Sample    string `json:"sample_stack"`
+		Signature  string `json:"signature"`
+		StackTrace string `json:"stack_trace"` // Top N lines of stack trace for debugging
+		Count      int    `json:"count"`
+		Sample     string `json:"sample_stack"` // Full sample stack for one goroutine
+		FirstLine  string `json:"first_line"`   // The goroutine header line (e.g., "goroutine 123 [running]:")
 	}
 
 	goroutineMap := make(map[string]*goroutineSummary)
@@ -2482,27 +2484,37 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 			continue
 		}
 
-		// Extract the first function call as signature
+		// Extract stack trace information
 		lines := strings.Split(block, "\n")
 		var signature string
+		var stackLines []string
+		var firstLine string
+
 		for i, line := range lines {
 			if i == 0 {
-				continue // Skip "goroutine N [status]:" line
-			}
-			line = strings.TrimSpace(line)
-			if line == "" {
+				firstLine = line // Save "goroutine N [status]:" line
 				continue
 			}
-			// Function name lines don't start with tab, file locations do
-			if !strings.HasPrefix(lines[i], "\t") && strings.Contains(line, "(") {
+
+			trimmedLine := strings.TrimSpace(line)
+			if trimmedLine == "" {
+				continue
+			}
+
+			// Collect stack trace lines (up to 6 lines = 3 function calls with file locations)
+			if len(stackLines) < 6 {
+				stackLines = append(stackLines, line)
+			}
+
+			// Extract signature from first function call (non-tab line with parentheses)
+			if signature == "" && !strings.HasPrefix(line, "\t") && strings.Contains(trimmedLine, "(") {
 				// This is a function call line like "runtime.gopark(0x0?, 0x0?, 0x0?, 0x0?, 0x0?)"
-				idx := strings.Index(line, "(")
+				idx := strings.Index(trimmedLine, "(")
 				if idx > 0 {
-					signature = line[:idx]
+					signature = trimmedLine[:idx]
 				} else {
-					signature = line
+					signature = trimmedLine
 				}
-				break
 			}
 		}
 
@@ -2510,13 +2522,18 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 			signature = "unknown"
 		}
 
+		// Build stack trace string
+		stackTrace := strings.Join(stackLines, "\n")
+
 		if info, exists := goroutineMap[signature]; exists {
 			info.Count++
 		} else {
 			goroutineMap[signature] = &goroutineSummary{
-				Signature: signature,
-				Count:     1,
-				Sample:    block,
+				Signature:  signature,
+				StackTrace: stackTrace,
+				Count:      1,
+				Sample:     block,
+				FirstLine:  firstLine,
 			}
 		}
 	}
@@ -2540,7 +2557,7 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 		log.Warnf("[GOROUTINE_DUMP] Top %d: %d goroutines in %s", i+1, s.Count, s.Signature)
 	}
 
-	topN := 10
+	topN := 15
 	if len(summaries) < topN {
 		topN = len(summaries)
 	}
