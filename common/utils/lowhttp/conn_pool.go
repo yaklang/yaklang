@@ -306,15 +306,15 @@ type persistConn struct {
 	alive    bool             // 存活判断
 	sawEOF   bool             // 连接是否EOF
 
-	idleAt          time.Time                 // 进入空闲的时间
-	closeTimer      *time.Timer               // 关闭定时器
-	dialOption      []netx.DialXOption        // dial 选项
-	br              *bufio.Reader             // from conn
-	bw              *bufio.Writer             // to conn
-	reqCh           chan requestAndResponseCh // 读取管道
-	writeCh         chan writeRequest         // 写入管道
-	writeErrCh      chan error                // 写入错误信号
-	serverStartTime time.Time                 // 响应时间
+	idleAt            time.Time                 // 进入空闲的时间
+	closeTimer        *time.Timer               // 关闭定时器
+	dialOption        []netx.DialXOption        // dial 选项
+	br                *bufio.Reader             // from conn
+	bw                *bufio.Writer             // to conn
+	reqCh             chan requestAndResponseCh // 读取管道
+	writeCh           chan writeRequest         // 写入管道
+	writeErrCh        chan error                // 写入错误信号
+	serverStartTimeNs atomic.Int64              // 响应时间 (纳秒时间戳，用于并发安全访问)
 	//numExpectedResponses int                       // 预期的响应数量
 	reused bool  // 是否复用
 	closed error // 连接关闭原因
@@ -445,23 +445,23 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	pc := &persistConn{
-		ctx:             ctx,
-		cancel:          cancel,
-		conn:            newConn,
-		mu:              sync.Mutex{},
-		p:               pool,
-		cacheKey:        key,
-		isProxy:         needProxy,
-		sawEOF:          false,
-		idleAt:          time.Time{},
-		closeTimer:      nil,
-		dialOption:      opt,
-		reqCh:           make(chan requestAndResponseCh, 2),
-		writeCh:         make(chan writeRequest, 2),
-		writeErrCh:      make(chan error, 2),
-		serverStartTime: time.Time{},
-		wPacket:         make([]packetInfo, 0),
-		rPacket:         make([]packetInfo, 0),
+		ctx:        ctx,
+		cancel:     cancel,
+		conn:       newConn,
+		mu:         sync.Mutex{},
+		p:          pool,
+		cacheKey:   key,
+		isProxy:    needProxy,
+		sawEOF:     false,
+		idleAt:     time.Time{},
+		closeTimer: nil,
+		dialOption: opt,
+		reqCh:      make(chan requestAndResponseCh, 2),
+		writeCh:    make(chan writeRequest, 2),
+		writeErrCh: make(chan error, 2),
+		// serverStartTimeNs is atomic.Int64, initialized to 0 by default
+		wPacket: make([]packetInfo, 0),
+		rPacket: make([]packetInfo, 0),
 		//numExpectedResponses: 0,
 	}
 
@@ -625,7 +625,13 @@ func (pc *persistConn) readLoop() {
 			return
 		}
 
-		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
+		// Atomically read server start time
+		serverStartNs := pc.serverStartTimeNs.Load()
+		var serverTime time.Duration
+		if serverStartNs > 0 {
+			serverTime = time.Since(time.Unix(0, serverStartNs))
+		}
+		info := httpInfo{ServerTime: serverTime}
 
 		var resp *http.Response
 
@@ -826,7 +832,8 @@ func (pc *persistConn) writeLoop() {
 
 			if err == nil {
 				err = pc.bw.Flush()
-				pc.serverStartTime = time.Now()
+				// Atomically store server start time
+				pc.serverStartTimeNs.Store(time.Now().UnixNano())
 			}
 			if err != nil {
 				closeErr = err

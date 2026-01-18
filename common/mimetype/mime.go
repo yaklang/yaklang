@@ -1,9 +1,10 @@
 package mimetype
 
 import (
-	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 	"mime"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/magic"
 )
@@ -126,15 +127,17 @@ func (m *MIME) match(in []byte, readLimit uint32) *MIME {
 
 	// ps holds optional MIME parameters.
 	ps := map[string]string{}
+	var detectedCharset string
+	var detectedNeedCharset bool
 	if f, ok := needsCharset[m.mime]; ok {
-		m.needCharset = ok
+		detectedNeedCharset = ok
 		if cset := f(in); cset != "" {
 			ps["charset"] = cset
-			m.charset = cset
+			detectedCharset = cset
 		}
 	}
 
-	return m.cloneHierarchy(ps)
+	return m.cloneHierarchyWithCharset(ps, detectedCharset, detectedNeedCharset)
 }
 
 // flatten transforms an hierarchy of MIMEs into a slice of MIMEs.
@@ -166,7 +169,16 @@ func (m *MIME) clone(ps map[string]string) *MIME {
 // cloneHierarchy creates a clone of m and all its ancestors. The optional MIME
 // parameters are set on the last child of the hierarchy.
 func (m *MIME) cloneHierarchy(ps map[string]string) *MIME {
+	return m.cloneHierarchyWithCharset(ps, "", false)
+}
+
+// cloneHierarchyWithCharset creates a clone of m and all its ancestors with charset info.
+// The optional MIME parameters are set on the last child of the hierarchy.
+func (m *MIME) cloneHierarchyWithCharset(ps map[string]string, charset string, needCharset bool) *MIME {
 	ret := m.clone(ps)
+	// Set charset info on the cloned object (thread-safe, not modifying global state)
+	ret.charset = charset
+	ret.needCharset = needCharset
 	lastChild := ret
 	for p := m.Parent(); p != nil; p = p.Parent() {
 		pClone := p.clone(nil)
