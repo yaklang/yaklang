@@ -196,8 +196,14 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 }
 
 func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
+	configLoadingStart := time.Now()
 	opts = append(opts, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
 	cfg := aicommon.NewConfig(context.Background(), opts...)
+
+	if du := time.Since(configLoadingStart); du > 500*time.Millisecond {
+		log.Warnf("loading ReAct config took %s, too long, maybe some events happened.", du.String())
+	}
+
 	dirname := consts.TempAIDir(cfg.GetRuntimeId())
 	if existed, _ := utils.PathExists(dirname); !existed {
 		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
@@ -212,6 +218,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		wg:                   new(sync.WaitGroup),
 	}
 
+	memoryLoadStart := time.Now()
 	if cfg.MemoryTriage != nil {
 		react.memoryTriage = cfg.MemoryTriage
 	} else {
@@ -225,6 +232,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 			return nil, utils.Errorf("create memory triage failed: %v", err)
 		}
 		react.config.MemoryTriage = react.memoryTriage
+	}
+	memoryLoad := time.Now().Sub(memoryLoadStart)
+	if memoryLoad.Milliseconds() > 500 {
+		log.Warnf("loading memory triage took %s, too long, maybe some events happened.", memoryLoad.String())
 	}
 
 	log.Infof("memory triage id: %s", react.memoryTriage.GetSessionID())

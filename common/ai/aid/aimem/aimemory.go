@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
@@ -42,6 +43,8 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	var system *rag.RAGSystem
 	var embeddingAvailable bool
 	var err error
+
+	ragCheckingStart := time.Now()
 	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragOpts...)
 	//  检查是否有默认的嵌入模型可用
 	if embeddingAvailable {
@@ -52,15 +55,21 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 			embeddingAvailable = false
 		}
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
+	if du := time.Since(ragCheckingStart); du > 500*time.Millisecond {
+		log.Warnf("[AI-Memory(%v)] checking RAG system embedding availability took %v, it's abnormal case.", name, du)
+	}
 
 	// 创建HNSW后端
+	hnswBackendStart := time.Now()
 	hnswBackend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionId), WithHNSWDatabase(db))
+	if du := time.Since(hnswBackendStart); du > 500*time.Millisecond {
+		log.Warnf("[AI-Memory(%v)] creating HNSW backend took %v, it's abnormal case.", name, du)
+	}
 	if err != nil {
 		return nil, utils.Errorf("create HNSW backend failed: %v", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	triage := &AIMemoryTriage{
 		ctx:                ctx,
 		cancel:             cancel,

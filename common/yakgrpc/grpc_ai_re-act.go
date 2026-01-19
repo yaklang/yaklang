@@ -166,6 +166,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	}
 	configOptions = append(configOptions, optsFromStartParams...)
 
+
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {
 		log.Errorf("create re-act failed: %v", err)

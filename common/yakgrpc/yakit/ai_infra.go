@@ -3,10 +3,12 @@ package yakit
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"time"
 )
 
 func CreateOrUpdateCheckpoint(db *gorm.DB, checkpoint *schema.AiCheckpoint) error {
@@ -95,6 +97,13 @@ func UpdateAIAgentRuntimeTimelineWithPersistentId(db *gorm.DB, persistentId stri
 
 // GetLatestAIAgentRuntimeByPersistentSession 获取某个持久化会话的最新运行时
 func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (*schema.AIAgentRuntime, error) {
+	start := time.Now()
+	defer func() {
+		if du := time.Since(start); du > time.Second {
+			log.Warnf("GetLatestAIAgentRuntimeByPersistentSession with sessionId '%s' took %v, it's abnormal case.", sessionId, du)
+		}
+	}()
+
 	var runtime schema.AIAgentRuntime
 	if err := db.Where("persistent_session = ?", sessionId).Order("updated_at DESC").First(&runtime).Error; err != nil {
 		return nil, err
