@@ -419,6 +419,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 			if !utf8.Valid(message.Response) {
 				message.Response = lowhttp.ConvertHTTPRequestToFuzzTag(message.Response)
+				// Mark this task as having binary response converted to {{unquote}} fuzztag
+				hijackManger.fuzztagConvertedTask.Set(message.TaskID, true)
 			}
 
 			if !utf8.Valid(message.Payload) {
@@ -958,11 +960,31 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 				if controlMessage.GetSendPacket() {
 					response := controlMessage.GetResponse()
-					taskInfo.Response = response
+					taskInfo.Response = response // use for front, should not render fuzztag
+
+					// Render ONLY {{unquote}} fuzztags if this response was converted by system
+					// This prevents rendering user-added fuzztags like {{timestamp(ms)}} or {{int(1-10)}}
+					wasFuzztagConverted, _ := hijackManger.fuzztagConvertedTask.Get(taskInfo.TaskID)
+					// Note: cleanup is handled by defer unRegister() at function exit
+
+					if wasFuzztagConverted {
+						// Get response body
+						_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(response)
+
+						// Only render {{unquote}} fuzztags, not other types
+						// This is paired with lowhttp.ConvertHTTPRequestToFuzzTag
+						renderedBody := renderOnlyUnquoteFuzztags(body)
+						if !bytes.Equal(renderedBody, body) {
+							// Body was modified, update the response
+							response = lowhttp.ReplaceHTTPPacketBody(response, renderedBody, false)
+						}
+					}
+
 					if handleResponseModified(response) {
 						httpctx.SetResponseModified(req, "manual")
 						httpctx.SetHijackedResponseBytes(req, response)
 					}
+
 					rspModified, _, err := lowhttp.FixHTTPResponse(response)
 					if err != nil {
 						log.Errorf("fix http response[req:%v] failed: %s", ptr, err.Error())
@@ -972,6 +994,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						log.Error("BUG: http response is empty... use origin")
 						return rsp
 					}
+
 					return rspModified
 				}
 			}
@@ -1728,17 +1751,19 @@ type manualHijackTask struct {
 }
 
 type manualHijackManager struct {
-	hijackTask      *omap.OrderedMap[string, *manualHijackTask]
-	messageChan     map[string]chan<- *ypb.SingleManualHijackControlMessage
-	manualHijacking bool
-	hijackLock      sync.Mutex
+	hijackTask           *omap.OrderedMap[string, *manualHijackTask]
+	messageChan          map[string]chan<- *ypb.SingleManualHijackControlMessage
+	manualHijacking      bool
+	hijackLock           sync.Mutex
+	fuzztagConvertedTask *utils.SafeMap[bool] // Track which tasks had binary response converted to fuzztag
 }
 
 func newManualHijackManager() *manualHijackManager {
 	return &manualHijackManager{
-		hijackTask:      omap.NewOrderedMap[string, *manualHijackTask](make(map[string]*manualHijackTask)),
-		messageChan:     make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
-		manualHijacking: false,
+		hijackTask:           omap.NewOrderedMap[string, *manualHijackTask](make(map[string]*manualHijackTask)),
+		messageChan:          make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
+		manualHijacking:      false,
+		fuzztagConvertedTask: utils.NewSafeMap[bool](),
 	}
 }
 
@@ -1752,6 +1777,8 @@ func (m *manualHijackManager) setCanRegister(b bool) {
 				close(ch)
 				delete(m.messageChan, id)
 			}
+			// Clean up fuzztag tracking to prevent memory leak
+			m.fuzztagConvertedTask.Delete(id)
 		}
 	}
 	m.manualHijacking = b
@@ -1806,6 +1833,8 @@ func (m *manualHijackManager) unRegister(id string) {
 		close(ch)
 		delete(m.messageChan, id)
 	}
+	// Clean up fuzztag tracking to prevent memory leak
+	m.fuzztagConvertedTask.Delete(id)
 }
 
 func (m *manualHijackManager) unicast(req *ypb.SingleManualHijackControlMessage) {
@@ -1826,6 +1855,74 @@ func (m *manualHijackManager) broadcastNeedLock(req *ypb.SingleManualHijackContr
 	for _, ch := range m.messageChan {
 		ch <- req
 	}
+}
+
+// renderOnlyUnquoteFuzztags renders only {{unquote(...)}} fuzztags, leaving other fuzztags untouched.
+// This is paired with lowhttp.ConvertHTTPRequestToFuzzTag (which converts binary to {{unquote}}).
+// It ensures only system-generated fuzztags are rendered, not user-added ones like {{timestamp}}.
+//
+// Performance optimizations:
+// - Fast path: early return if no {{unquote found
+// - Single-pass: build result buffer in one pass without repeated allocations
+// - Safety limit: max 100 iterations to prevent infinite loops
+func renderOnlyUnquoteFuzztags(data []byte) []byte {
+	// Fast path: check if there are any {{unquote fuzztags at all
+	if !bytes.Contains(data, []byte("{{unquote")) {
+		return data
+	}
+
+	// Build result buffer to avoid multiple allocations
+	var result bytes.Buffer
+	result.Grow(len(data)) // Pre-allocate expected size
+
+	remaining := data
+	maxIterations := 100 // Safety limit to prevent infinite loops
+	iterations := 0
+
+	for iterations < maxIterations {
+		iterations++
+
+		// Find {{unquote
+		start := bytes.Index(remaining, []byte("{{unquote"))
+		if start == -1 {
+			// No more fuzztags, append rest and break
+			result.Write(remaining)
+			break
+		}
+
+		// Write everything before the fuzztag
+		result.Write(remaining[:start])
+
+		// Find the matching }}
+		end := bytes.Index(remaining[start:], []byte("}}"))
+		if end == -1 {
+			// No closing }}, write rest as-is
+			result.Write(remaining[start:])
+			break
+		}
+		end += start + 2 // Adjust to absolute position and include }}
+
+		// Extract and render the fuzztag
+		fuzztagBytes := remaining[start:end]
+		rendered := mutate.MutateQuick(fuzztagBytes)
+		if len(rendered) > 0 {
+			result.WriteString(rendered[0])
+		} else {
+			// If rendering failed, keep original
+			result.Write(fuzztagBytes)
+		}
+
+		// Move to next part
+		remaining = remaining[end:]
+
+		// Check if there are more fuzztags
+		if !bytes.Contains(remaining, []byte("{{unquote")) {
+			result.Write(remaining)
+			break
+		}
+	}
+
+	return result.Bytes()
 }
 
 // PluginTrace 实现插件执行跟踪的双向流服务
