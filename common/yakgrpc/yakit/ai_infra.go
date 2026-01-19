@@ -148,3 +148,23 @@ func DeleteAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter) (int64, error) {
 	}
 	return db.RowsAffected, nil
 }
+
+// DeleteAgentRuntimeByPersistentSession deletes all runtimes under a persistent session.
+func DeleteAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (int64, error) {
+	if sessionId == "" {
+		return 0, utils.Errorf("sessionId is empty")
+	}
+	db = db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionId)
+	if db = db.Unscoped().Delete(&schema.AIAgentRuntime{}); db.Error != nil {
+		return 0, db.Error
+	}
+	return db.RowsAffected, nil
+}
+
+func DeleteAllAgentRuntime(db *gorm.DB) (int64, error) {
+	db = db.Model(&schema.AIAgentRuntime{})
+	if db = db.Unscoped().Delete(&schema.AIAgentRuntime{}); db.Error != nil {
+		return 0, db.Error
+	}
+	return db.RowsAffected, nil
+}
