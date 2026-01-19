@@ -90,7 +90,7 @@ func TestOverlaySaveAndLoadFromDatabase(t *testing.T) {
 		// 使用增量编译 API
 		ctx := context.Background()
 		diffPrograms, err := ssaapi.ParseProjectWithIncrementalCompile(
-			baseFS, newFS,
+			newFS,
 			baseProgramName, diffProgramName,
 			ssaconfig.JAVA,
 			ssaapi.WithContext(ctx),
@@ -251,8 +251,8 @@ func TestOverlaySaveAndLoadFromDatabase(t *testing.T) {
 		// 注意：baseFS 应该是第一个 diff program 对应的文件系统（newFS），而不是 baseFS
 		ctx := context.Background()
 		diffPrograms2, err := ssaapi.ParseProjectWithIncrementalCompile(
-			newFS, newFS2, // 使用第一个 diff 的 newFS 作为 baseFS
-			diffProgramName, diffProgramName2, // 使用第一个 diff 作为 base
+			newFS2, // 新的文件系统
+			diffProgramName, diffProgramName2, // 使用第一个 diff 作为 base（系统会从数据库构建基础文件系统）
 			ssaconfig.JAVA,
 			ssaapi.WithContext(ctx),
 		)

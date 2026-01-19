@@ -206,6 +206,17 @@ configData = cli.Json("config_data",
           "title": "编译并发数",
           "type": "integer",
           "default": 10
+        },
+        "enable_incremental_compile": {
+          "title": "启用增量编译",
+          "type": "boolean",
+          "default": false,
+          "description": "启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"
+        },
+        "base_program_name": {
+          "title": "基础程序名称",
+          "type": "string",
+          "description": "增量编译的基础程序名称。必须已存在于数据库中。如果不提供，当前编译将作为基础程序（首次增量编译）。"
         }
       }
     }

@@ -157,13 +157,13 @@ enableIncrementalCompile := cli.Bool(
     "incremental-compile", 
     cli.setDefault(false), 
     cli.setVerboseName("启用增量编译"), 
-    cli.setHelp("启用增量编译，基于已有程序进行差量编译"), 
+    cli.setHelp("启用增量编译模式。首次编译时作为基础程序；后续编译时基于基础程序进行差量编译，只编译变更的文件，提高编译速度。"), 
     cli.setCliGroup("compile"), 
 )
 baseProgramName := cli.String(
     "base-program-name", 
     cli.setVerboseName("基础程序名称"), 
-    cli.setHelp("增量编译的基础程序名称（必须已存在于数据库中）"), 
+    cli.setHelp("增量编译的基础程序名称。必须已存在于数据库中。如果不提供，当前编译将作为基础程序（首次增量编译）。"), 
     cli.setCliGroup("compile"), 
 )
 

@@ -73,7 +73,7 @@ type Config struct {
 	isIncremental   bool   // 是否启用增量编译
 	baseProgramName string // 基础程序名称（如果为空，表示这是第一次增量编译）
 	fileHashMap     map[string]int
-	baseFS          fi.FileSystem // 基础文件系统（用于增量编译）
+	// baseFS 已移除：现在从 baseProgramName 自动构建文件系统，不再需要显式提供
 }
 
 func (c *Config) CalcHash() string {
@@ -344,11 +344,6 @@ var WithBaseProgramName = ssaconfig.SetOption("ssa_compile/base_program_name", f
 // WithFileHashMap 设置文件哈希映射（用于差量编译）
 var WithFileHashMap = ssaconfig.SetOption("ssa_compile/file_hash_map", func(c *Config, v map[string]int) {
 	c.fileHashMap = v
-})
-
-// WithBaseFileSystem 设置基础文件系统（用于增量编译）
-var WithBaseFileSystem = ssaconfig.SetOption("ssa_compile/base_file_system", func(c *Config, v fi.FileSystem) {
-	c.baseFS = v
 })
 
 func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {

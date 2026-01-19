@@ -25,17 +25,16 @@ func ParseProjectWithFS(fs fi.FileSystem, opts ...ssaconfig.Option) (Programs, e
 }
 
 // ParseProjectWithIncrementalCompile 解析项目并支持增量编译
-// 如果提供了 baseFS 和 baseProgramName，将执行增量编译并返回包含 overlay 的 Programs
+// 如果提供了 baseProgramName，将执行增量编译并返回包含 overlay 的 Programs
 // 调用者可以通过 program.GetOverlay() 获取 ProgramOverLay 用于规则扫描
-// baseFS: 基础文件系统（全量编译的文件系统）
 // newFS: 新文件系统（当前要编译的文件系统）
-// baseProgramName: 基础程序的名称（必须已存在于数据库中）
+// baseProgramName: 基础程序的名称（必须已存在于数据库中，系统会从数据库构建基础文件系统）
 // diffProgramName: 差量程序的名称
 // language: 编译语言
 // opts: 其他编译选项
 // 返回：包含差量程序的 Programs，可以通过 program.GetOverlay() 获取 ProgramOverLay
 func ParseProjectWithIncrementalCompile(
-	baseFS, newFS fi.FileSystem,
+	newFS fi.FileSystem,
 	baseProgramName, diffProgramName string,
 	language ssaconfig.Language,
 	opts ...ssaconfig.Option,
@@ -43,7 +42,6 @@ func ParseProjectWithIncrementalCompile(
 	// 设置增量编译选项
 	incrementalOpts := []ssaconfig.Option{
 		WithFileSystem(newFS),
-		WithBaseFileSystem(baseFS),
 		WithBaseProgramName(baseProgramName),
 		WithProgramName(diffProgramName),
 		WithLanguage(language),
@@ -52,6 +50,7 @@ func ParseProjectWithIncrementalCompile(
 	incrementalOpts = append(incrementalOpts, opts...)
 
 	// 调用 ParseProject，它会检测增量编译配置并执行增量编译
+	// 系统会自动从 baseProgramName 构建基础文件系统
 	return ParseProject(incrementalOpts...)
 }
 
@@ -63,9 +62,8 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Prog
 // CompileDiffProgramAndSaveToDB 编译差量程序并保存到数据库
 // 注意：这个函数不应该通过选项触发增量编译，因为它已经在增量编译的上下文中被调用了
 // 它只负责编译差量文件系统，并在编译后手动设置增量编译元数据
-// baseFS: 基础文件系统（全量编译）
 // newFS: 新文件系统（用于计算差量）
-// baseProgramName: 基础程序的名称（用于设置 BaseProgramName）
+// baseProgramName: 基础程序的名称（用于设置 BaseProgramName，系统会从数据库构建基础文件系统）
 // diffProgramName: 差量程序的名称
 // language: 编译语言
 // 返回：编译后的差量程序（BaseProgramName 和 FileHashMap 已设置）
@@ -76,27 +74,37 @@ func CompileDiffProgramAndSaveToDB(
 	language ssaconfig.Language,
 	opts ...ssaconfig.Option,
 ) (*Program, error) {
-	// Step 1: 计算文件系统差异
-	diffFS, fileHashMap, err := calculateFileSystemDiff(ctx, baseFS, newFS)
+	var err error
+
+	// Step 1: 从 baseProgramName/baseFS 构建基础文件系统
+	if baseFS == nil {
+		baseFS, err = buildFileSystemFromProgramName(baseProgramName)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to build file system from base program name: %s", baseProgramName)
+		}
+	}
+
+	// Step 2: 计算文件系统差异
+	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to calculate file system diff")
 	}
 
-	// Step 2: 准备编译选项
-	// 设置 WithBaseProgramName 以便在 parseProjectWithFS 中自动设置到 Program.BaseProgramName
-	// 但是显式禁用增量编译检测，避免触发增量编译逻辑（因为我们已经在这个上下文中了）
-	diffOpts := []ssaconfig.Option{WithLanguage(language)}
+	// Step 3: 准备编译选项
+	// 注意：不要设置 WithEnableIncrementalCompile(true)，否则会触发增量编译检测导致死循环
+	// 我们直接使用底层 API parseProjectWithFS 来编译差量文件系统
+	diffOpts := []ssaconfig.Option{
+		WithLanguage(language),
+		WithFileSystem(diffFS),
+	}
 	if diffProgramName != "" {
 		diffOpts = append(diffOpts, WithProgramName(diffProgramName))
 	}
 	if baseProgramName != "" {
+		// 强制禁用增量编译检测，避免死循环
+		// 因为 CompileDiffProgramAndSaveToDB 已经在增量编译的上下文中，不应该再次触发增量编译检测
 		diffOpts = append(diffOpts, WithBaseProgramName(baseProgramName))
-		// 显式禁用增量编译检测，避免循环调用
-		// 因为 CompileDiffProgramAndSaveToDB 已经在增量编译的上下文中被调用了
 		diffOpts = append(diffOpts, WithEnableIncrementalCompile(false))
-	}
-	if baseFS != nil {
-		diffOpts = append(diffOpts, WithBaseFileSystem(baseFS))
 	}
 	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
@@ -104,29 +112,38 @@ func CompileDiffProgramAndSaveToDB(
 	// 合并用户提供的选项
 	diffOpts = append(diffOpts, opts...)
 
-	// Step 3: 编译差量文件系统（只包含变更的文件：新增+修改）
-	// 这里调用 ParseProjectWithFS 不会触发增量编译，因为我们显式设置了 WithEnableIncrementalCompile(false)
-	diffPrograms, err := ParseProjectWithFS(diffFS, diffOpts...)
+	// Step 3: 创建 Config 并直接调用 parseProjectWithFS（底层 API）
+	// 这样可以避免触发增量编译检测，直接编译差量文件系统
+	config, err := DefaultConfig(diffOpts...)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to create config")
+	}
+
+	// 直接调用 parseProjectWithFS，不会触发增量编译检测
+	diffProgram, err := config.parseProjectWithFS(diffFS, func(f float64, s string, a ...any) {
+		config.Processf(f, s, a...)
+	})
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff file system")
 	}
-	if len(diffPrograms) == 0 {
-		return nil, utils.Errorf("diff file system compilation produced no programs")
+	if diffProgram == nil {
+		return nil, utils.Errorf("diff file system compilation produced no program")
 	}
-	diffProgram := diffPrograms[0]
 
-	// Step 4: 确保增量编译元数据已正确设置
-	// WithBaseProgramName 和 WithFileHashMap 已经通过选项设置到 config 中，
-	// 并在 parseProjectWithFS 中自动设置到 Program.BaseProgramName 和 Program.FileHashMap
-	// 这里只需要确保一致性
+	// Step 4: 手动设置增量编译元数据
+	// 因为直接调用 parseProjectWithFS 不会自动设置这些元数据
 	if diffProgram.Program != nil {
-		if baseProgramName != "" && diffProgram.Program.BaseProgramName == "" {
+		if baseProgramName != "" {
 			diffProgram.Program.BaseProgramName = baseProgramName
 		}
-		if len(fileHashMap) > 0 && len(diffProgram.Program.FileHashMap) == 0 {
+		if len(fileHashMap) > 0 {
 			diffProgram.Program.FileHashMap = fileHashMap
 		}
 	}
+
+	// Step 5: 保存配置（包含增量编译元数据）
+	config.isIncremental = true
+	SaveConfig(config, diffProgram)
 
 	return diffProgram, nil
 }
@@ -176,12 +193,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// 如果 isIncremental 为 true，表示启用了增量编译
 	// 如果 baseProgramName 不为空，表示这是差量编译（基于已有程序）
 	// 如果 baseProgramName 为空，表示这是第一次增量编译（base program，全量编译但设置 IsOverlay = true）
-	isIncrementalCompile := c.isIncremental && c.fs != nil
-	isDiffCompile := isIncrementalCompile && c.baseProgramName != ""
 
 	if c.GetCompileReCompile() {
-		// 非增量编译的项目会先删除原 program，然后重新编译
-		// 增量编译的项目不应该删除原 program，因为需要保留 base program
+		isIncrementalCompile := c.isIncremental && c.fs != nil
 		if !isIncrementalCompile {
 			c.Processf(0, "recompile project, delete old data...")
 			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
@@ -189,10 +203,11 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			c.Processf(0, "recompile project, delete old data finish")
 		} else {
 			c.Processf(0, "recompile incremental project, keep base program...")
-			// 只清理缓存，不删除数据库中的 program
-			ProgramCache.Remove(programName)
 		}
 	}
+
+	isIncrementalCompile := c.isIncremental && c.fs != nil
+	isDiffCompile := isIncrementalCompile && c.baseProgramName != ""
 
 	c.Processf(0, "recompile project, start compile")
 
@@ -268,6 +283,98 @@ func (c *Config) peephole() (Programs, error) {
 	return progs, errs
 }
 
+func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
+	// Step 1: 从数据库获取 program
+	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to get program: %s", programName)
+	}
+
+	// Step 2: 构建 VirtualFS
+	vfs := filesys.NewVirtualFs()
+	fileCount := 0
+
+	// 优先使用 FileList（如果存在且不为空）
+	if len(irProg.FileList) > 0 {
+		for filePath, hash := range irProg.FileList {
+			editor, err := ssadb.GetEditorByHash(hash)
+			if err != nil {
+				log.Warnf("failed to get editor for file %s (hash: %s): %v", filePath, hash, err)
+				continue
+			}
+			vfs.AddFile(filePath, editor.GetSourceCode())
+			fileCount++
+		}
+		if fileCount > 0 {
+			return vfs, nil
+		}
+	}
+
+	// 回退：使用 GetEditorByProgramName
+	editors, err := ssadb.GetEditorByProgramName(programName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to get editors for program: %s", programName)
+	}
+
+	if len(editors) == 0 {
+		return nil, utils.Errorf("program %s has no files in database", programName)
+	}
+
+	for _, editor := range editors {
+		filePath := editor.GetFilename()
+		content := editor.GetSourceCode()
+		vfs.AddFile(filePath, content)
+	}
+
+	return vfs, nil
+}
+
+func buildFileSystemFromFileSystem(programName string) (fi.FileSystem, error) {
+	// Step 1: 从数据库获取 program
+	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to get program: %s", programName)
+	}
+
+	// Step 2: 构建 VirtualFS
+	vfs := filesys.NewVirtualFs()
+	fileCount := 0
+
+	// 优先使用 FileList（如果存在且不为空）
+	if len(irProg.FileList) > 0 {
+		for filePath, hash := range irProg.FileList {
+			editor, err := ssadb.GetEditorByHash(hash)
+			if err != nil {
+				log.Warnf("failed to get editor for file %s (hash: %s): %v", filePath, hash, err)
+				continue
+			}
+			vfs.AddFile(filePath, editor.GetSourceCode())
+			fileCount++
+		}
+		if fileCount > 0 {
+			return vfs, nil
+		}
+	}
+
+	// 回退：使用 GetEditorByProgramName
+	editors, err := ssadb.GetEditorByProgramName(programName)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to get editors for program: %s", programName)
+	}
+
+	if len(editors) == 0 {
+		return nil, utils.Errorf("program %s has no files in database", programName)
+	}
+
+	for _, editor := range editors {
+		filePath := editor.GetFilename()
+		content := editor.GetSourceCode()
+		vfs.AddFile(filePath, content)
+	}
+
+	return vfs, nil
+}
+
 // parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
 func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	// Step 1: 从数据库加载基础程序
@@ -293,7 +400,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 		}
 		c.Processf(0.3, "base program is an overlay with %d layers", len(baseOverlay.Layers))
 	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
-		// base program 是一个差量 program（增量编译但不是 base program），需要先聚合生成 ProgramOverLay
+		// base program 是一个差量 program，需要先聚合生成 ProgramOverLay
 		// 从数据库加载 base program 的 base program
 		baseProgramName := baseProgram.GetBaseProgramName()
 		baseBaseProgram, err := FromDatabase(baseProgramName)
@@ -312,12 +419,13 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 		c.Processf(0.3, "base program is a diff program, created overlay with 2 layers")
 	} else {
 		// base program 是全量编译的 program
-		// 如果提供了 baseFS，直接使用；否则从基础程序的配置重新构建文件系统
-		if c.baseFS != nil {
-			baseFSForDiff = c.baseFS
-			c.Processf(0.3, "base program is a full compilation program, using provided baseFS")
+		// 优先从 program name 构建文件系统，如果失败则回退到配置重建
+		var err error
+		baseFSForDiff, err = buildFileSystemFromProgramName(c.baseProgramName)
+		if err == nil && baseFSForDiff != nil {
+			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from program name")
 		} else {
-			// 从基础程序的配置重新构建文件系统
+			// 回退：从基础程序的配置重新构建文件系统
 			baseConfig := baseProgram.GetConfig()
 			if baseConfig == nil {
 				// 尝试从数据库中的配置重建文件系统
@@ -329,11 +437,10 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 					// 将 ssaconfig.Config 转换为 ssaapi.Config
 					baseConfig = &Config{Config: baseConfigRaw}
 				} else {
-					return nil, utils.Errorf("base program %s has no config to rebuild file system", c.baseProgramName)
+					return nil, utils.Errorf("base program %s has no config or files to rebuild file system", c.baseProgramName)
 				}
 			}
 			// 使用基础程序的配置重新构建文件系统
-			var err error
 			baseFSForDiff, err = baseConfig.parseFSFromInfo()
 			if err != nil {
 				return nil, utils.Wrapf(err, "failed to rebuild file system from base program config: %s", c.baseProgramName)
@@ -349,9 +456,8 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	c.Processf(0.4, "compiling diff program...")
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
-		baseFSForDiff,      // 基础文件系统（可能是 overlay 的聚合文件系统）
-		c.fs,               // 新文件系统
-		c.baseProgramName,  // 基础程序名称
+		baseFSForDiff, c.fs, // 新文件系统
+		c.baseProgramName,  // 基础程序名称（系统会从数据库构建基础文件系统）
 		c.GetProgramName(), // 差量程序名称
 		c.GetLanguage(),    // 语言
 	)

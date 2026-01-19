@@ -63,8 +63,14 @@ func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 		defer wg.Done()
 		ir := prog.irProgram
 		if ir == nil {
-			ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
-			prog.irProgram = ir
+			existingIr, err := ssadb.GetProgram(prog.Name, prog.ProgramKind)
+			if err == nil && existingIr != nil {
+				ir = existingIr
+				prog.irProgram = ir
+			} else {
+				ir = ssadb.CreateProgram(prog.Name, prog.Version, prog.ProgramKind)
+				prog.irProgram = ir
+			}
 		}
 		ir.Language = prog.Language
 		ir.ProgramKind = prog.ProgramKind
@@ -85,6 +91,11 @@ func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 				fileHashMapStr[filePath] = fmt.Sprintf("%d", hash)
 			}
 			ir.FileHashMap = fileHashMapStr
+		}
+		// 如果启用了增量编译（有 BaseProgramName 或 FileHashMap 不为 nil），设置 IsOverlay = true
+		// FileHashMap 不为 nil 表示启用了增量编译（即使为空 map，也表示这是增量编译流程的一部分）
+		if prog.BaseProgramName != "" || prog.FileHashMap != nil {
+			ir.IsOverlay = true
 		}
 		ssadb.UpdateProgram(ir)
 	}()
