@@ -146,7 +146,7 @@ type AiOutputEvent struct {
 	CoordinatorId string `gorm:"index"`
 	Type          EventType
 
-	NodeId      string
+	NodeId      string `gorm:"index"`
 	IsSystem    bool
 	IsStream    bool
 	IsReason    bool
