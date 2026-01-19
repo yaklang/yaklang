@@ -36,8 +36,9 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	},
 	StreamFields: []*LoopStreamField{
 		{
-			FieldName: "answer_payload",
-			AINodeId:  "re-act-loop-answer-payload",
+			FieldName:   "answer_payload",
+			AINodeId:    "re-act-loop-answer-payload",
+			ContentType: aicommon.TypeTextMarkdown,
 		},
 	},
 	ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
