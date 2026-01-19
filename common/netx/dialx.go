@@ -308,6 +308,8 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 	if config.ShouldOverrideSNI {
 		tlsConfig.ServerName = config.SNI
+		// Also update sni variable so it's passed correctly to UpgradeToTLSConnectionWithTimeout
+		sni = config.SNI
 	}
 
 	tlsTimeout := 10 * time.Second
@@ -319,7 +321,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	for _, strategy := range strategies {
 		tempTlsConfig := tlsConfig.Clone()
 		if config.Debug {
-			log.Infof("dial %v with tls strategy: %v", target, strategy)
+			log.Infof("dial %v with tls strategy: %v, SNI: %s", target, strategy, tempTlsConfig.ServerName)
 		}
 		conn, err := dialPlainTCPConnWithRetry(target, config)
 		if err != nil {

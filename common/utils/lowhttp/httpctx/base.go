@@ -313,6 +313,7 @@ const (
 	REQUEST_CONTEXT_KEY_IsListenedConn               = "listenedConn"        // exrat connection object
 	REQUEST_CONTEXT_KEY_MockResponseBytes            = "mockResponseBytes"   // Mock HTTP response bytes for mockHTTPRequest
 	REQUEST_CONTEXT_KEY_ShouldMockResponse           = "shouldMockResponse"  // Flag to indicate mock response should be used
+	REQUEST_CONTEXT_KEY_TLS_SNI                      = "tlsSNI"              // TLS Server Name Indication (domain name for TLS handshake)
 )
 
 func SetRequestMITMTaskID(req *http.Request, id string) {
