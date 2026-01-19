@@ -2,6 +2,7 @@ package vectorstore
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -51,6 +52,13 @@ func HasCollection(db *gorm.DB, name string) bool {
 }
 
 func GetCollection(db *gorm.DB, collectionName string, opts ...CollectionConfigFunc) (*SQLiteVectorStoreHNSW, error) {
+	start := time.Now()
+	defer func() {
+		loadCost := time.Since(start)
+		if loadCost > time.Second {
+			log.Warnf("GetCollection '%s' took %v, it's abnormal case.", collectionName, loadCost)
+		}
+	}()
 	if HasCollection(db, collectionName) {
 		log.Infof("collection '%s' exists, loading it", collectionName)
 		return LoadCollection(db, collectionName, opts...)
