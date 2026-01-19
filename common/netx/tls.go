@@ -88,8 +88,13 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
 
 	if isCustomClientHello {
+		// Use gmtlsConfig.ServerName if set, otherwise use sni parameter
+		actualSNI := sni
+		if gmtlsConfig.ServerName != "" {
+			actualSNI = gmtlsConfig.ServerName
+		}
 		utlsConfig = &utls.Config{
-			ServerName:         sni,
+			ServerName:         actualSNI,
 			MinVersion:         minVer,
 			MaxVersion:         maxVer,
 			InsecureSkipVerify: true,

@@ -143,9 +143,16 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 
 	connectedHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 
-	// Determine the hostname to use for strong host mode
+	// Determine the hostname to use for connection target
 	if connectedHost != "" {
 		opts = append(opts, lowhttp.WithHost(connectedHost))
+	}
+
+	// Set TLS SNI if available and different from connection host
+	// This is important when connectedHost is an IP but we need a domain for SNI
+	tlsSNI := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_TLS_SNI)
+	if isHttps && tlsSNI != "" && tlsSNI != connectedHost {
+		opts = append(opts, lowhttp.WithSNI(tlsSNI))
 	}
 
 	// In strong host mode, get localAddr from httpctx request context

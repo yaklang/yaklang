@@ -803,6 +803,18 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 		host = req.URL.Host
 	}
 
+	// Extract original host for TLS SNI before any modifications
+	// This is critical when connectedHost is an IP address but we need a domain for SNI
+	originalHostForSNI := host
+	if originalHostForSNI != "" && net.ParseIP(utils.FixForParseIP(originalHostForSNI)) == nil {
+		// originalHost is a domain name, extract hostname without port for SNI
+		sniHost, _, err := utils.ParseStringToHostPort(originalHostForSNI)
+		if err == nil && sniHost != "" {
+			originalHostForSNI = sniHost
+		}
+		httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_TLS_SNI, originalHostForSNI)
+	}
+
 	if host == "" {
 		host = ctx.GetSessionStringValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		port := ctx.GetSessionIntValue(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
