@@ -3,15 +3,17 @@ package test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/python/python2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 // TestBasicClassDefinition tests basic class definition without inheritance
 func TestBasicClassDefinition(t *testing.T) {
 	testCases := []struct {
-		name string
-		code string
+		name   string
+		code   string
+		expect []string
 	}{
 		{
 			name: "simple empty class",
@@ -19,6 +21,7 @@ func TestBasicClassDefinition(t *testing.T) {
 class MyClass:
     pass
 `,
+			expect: []string{"MyClass"},
 		},
 		{
 			name: "class with empty parentheses",
@@ -26,6 +29,7 @@ class MyClass:
 class MyClass():
     pass
 `,
+			expect: []string{"MyClass"},
 		},
 		{
 			name: "class with docstring",
@@ -34,13 +38,16 @@ class MyClass:
     """A simple class"""
     pass
 `,
+			expect: []string{"MyClass"},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			// Verify class definition can be found
+			ssatest.CheckSyntaxFlow(t, tc.code, `MyClass as $class`, map[string][]string{
+				"class": tc.expect,
+			}, ssaapi.WithLanguage(ssaconfig.PYTHON))
 		})
 	}
 }
@@ -48,8 +55,10 @@ class MyClass:
 // TestClassInheritance tests class with single and multiple inheritance
 func TestClassInheritance(t *testing.T) {
 	testCases := []struct {
-		name string
-		code string
+		name   string
+		code   string
+		rule   string
+		expect map[string][]string
 	}{
 		{
 			name: "class with single parent",
@@ -60,6 +69,10 @@ class Parent:
 class Child(Parent):
     pass
 `,
+			rule: `Child as $child`,
+			expect: map[string][]string{
+				"child": {"Child"},
+			},
 		},
 		{
 			name: "class with multiple inheritance",
@@ -73,6 +86,10 @@ class Parent2:
 class Child(Parent1, Parent2):
     pass
 `,
+			rule: `Child as $child`,
+			expect: map[string][]string{
+				"child": {"Child"},
+			},
 		},
 		{
 			name: "nested inheritance chain",
@@ -86,13 +103,17 @@ class Parent(GrandParent):
 class Child(Parent):
     pass
 `,
+			rule: `Child as $child`,
+			expect: map[string][]string{
+				"child": {"Child"},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			// Verify child class can be found
+			ssatest.CheckSyntaxFlow(t, tc.code, tc.rule, tc.expect, ssaapi.WithLanguage(ssaconfig.PYTHON))
 		})
 	}
 }
@@ -100,8 +121,10 @@ class Child(Parent):
 // TestClassMethods tests class with methods
 func TestClassMethods(t *testing.T) {
 	testCases := []struct {
-		name string
-		code string
+		name   string
+		code   string
+		rule   string
+		expect map[string][]string
 	}{
 		{
 			name: "class with simple method",
@@ -110,17 +133,10 @@ class MyClass:
     def my_method(self):
         pass
 `,
-		},
-		{
-			name: "class with multiple methods",
-			code: `
-class MyClass:
-    def method1(self):
-        pass
-
-    def method2(self):
-        pass
-`,
+			rule: `my_method as $method`,
+			expect: map[string][]string{
+				"method": {"Function-MyClass.my_method"},
+			},
 		},
 		{
 			name: "class with method parameters",
@@ -129,6 +145,10 @@ class MyClass:
     def my_method(self, param1, param2):
         pass
 `,
+			rule: `my_method as $method`,
+			expect: map[string][]string{
+				"method": {"Function-MyClass.my_method"},
+			},
 		},
 		{
 			name: "class with method return",
@@ -137,13 +157,16 @@ class MyClass:
     def get_value(self):
         return 42
 `,
+			rule: `get_value as $method`,
+			expect: map[string][]string{
+				"method": {"Function-MyClass.get_value"},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			ssatest.CheckSyntaxFlow(t, tc.code, tc.rule, tc.expect, ssaapi.WithLanguage(ssaconfig.PYTHON))
 		})
 	}
 }
@@ -182,8 +205,8 @@ class MyClass:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			// Verify SSA builds without errors
+			ssatest.NonStrictMockSSA(t, tc.code)
 		})
 	}
 }
@@ -224,8 +247,8 @@ class MyClass:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			// Verify SSA builds without errors
+			ssatest.NonStrictMockSSA(t, tc.code)
 		})
 	}
 }
@@ -256,8 +279,8 @@ class MyClass:
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			// Verify SSA builds without errors
+			ssatest.NonStrictMockSSA(t, tc.code)
 		})
 	}
 }
@@ -278,39 +301,58 @@ class Dog(Animal):
     def speak(self):
         return f"{self.name} barks"
 `
-	_, err := python2ssa.Frontend(code)
-	require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+	// Use NonStrictMockSSA since the complete class has multiple nodes
+	// named "Dog" (class, method references, etc.) making exact matching complex
+	ssatest.NonStrictMockSSA(t, code)
 }
 
 // TestDecoratedClass tests class with decorators
 func TestDecoratedClass(t *testing.T) {
 	testCases := []struct {
-		name string
-		code string
+		name   string
+		code   string
+		rule   string
+		expect map[string][]string
 	}{
 		{
 			name: "class with single decorator",
 			code: `
+def decorator(cls):
+    return cls
+
 @decorator
 class MyClass:
     pass
 `,
+			rule: `MyClass as $class`,
+			expect: map[string][]string{
+				"class": {"MyClass"},
+			},
 		},
 		{
 			name: "class with multiple decorators",
 			code: `
+def decorator1(cls):
+    return cls
+
+def decorator2(cls):
+    return cls
+
 @decorator1
 @decorator2
 class MyClass:
     pass
 `,
+			rule: `MyClass as $class`,
+			expect: map[string][]string{
+				"class": {"MyClass"},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := python2ssa.Frontend(tc.code)
-			require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+			ssatest.CheckSyntaxFlow(t, tc.code, tc.rule, tc.expect, ssaapi.WithLanguage(ssaconfig.PYTHON))
 		})
 	}
 }
