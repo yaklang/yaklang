@@ -2,6 +2,8 @@ package rag
 
 import (
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,19 +121,90 @@ func TextToDocuments(text string, maxChunkSize int, overlap int, metadata map[st
 	return docs
 }
 
+var DefaultEmbeddingAvailable = false
+
+const defaultEmbeddingModelName = "Qwen3-Embedding-0.6B-Q4_K_M"
+
+var (
+	defaultEmbeddingAvailableMu sync.RWMutex
+
+	embeddingAvailableCache sync.Map // map[string]*embeddingAvailableCacheEntry
+
+	// bounded negative caching to avoid hammering filesystem during startup storms
+	embeddingAvailabilityNegativeCacheTTL = 10 * time.Second
+
+	// test seam
+	getModelPath = localmodel.GetModelPath
+)
+
+type embeddingAvailableCacheEntry struct {
+	checkMu sync.Mutex
+
+	available   atomic.Bool
+	lastChecked atomic.Int64 // unix nano
+}
+
+func clearEmbeddingAvailableCache() {
+	embeddingAvailableCache.Range(func(key, _ any) bool {
+		embeddingAvailableCache.Delete(key)
+		return true
+	})
+}
+
 func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 	config := NewRAGSystemConfig(opts...)
-
 	if config.embeddingClient != nil {
 		return true
 	}
-	modelName := "Qwen3-Embedding-0.6B-Q4_K_M"
+
+	modelName := defaultEmbeddingModelName
 	if config.modelName != "" {
 		modelName = config.modelName
 	}
-	_, err := localmodel.GetModelPath(modelName)
-	return err == nil
+
+	if modelName == defaultEmbeddingModelName {
+		defaultEmbeddingAvailableMu.RLock()
+		if DefaultEmbeddingAvailable {
+			defaultEmbeddingAvailableMu.RUnlock()
+			return true
+		}
+		defaultEmbeddingAvailableMu.RUnlock()
+	}
+
+	entryAny, _ := embeddingAvailableCache.LoadOrStore(modelName, &embeddingAvailableCacheEntry{})
+	entry := entryAny.(*embeddingAvailableCacheEntry)
+
+	if entry.available.Load() {
+		return true
+	}
+	if last := entry.lastChecked.Load(); last != 0 && time.Since(time.Unix(0, last)) < embeddingAvailabilityNegativeCacheTTL {
+		return false
+	}
+
+	entry.checkMu.Lock()
+	defer entry.checkMu.Unlock()
+
+	if entry.available.Load() {
+		return true
+	}
+	if last := entry.lastChecked.Load(); last != 0 && time.Since(time.Unix(0, last)) < embeddingAvailabilityNegativeCacheTTL {
+		return false
+	}
+
+	_, err := getModelPath(modelName)
+	available := err == nil
+	entry.available.Store(available)
+	entry.lastChecked.Store(time.Now().UnixNano())
+
+	if modelName == defaultEmbeddingModelName {
+		defaultEmbeddingAvailableMu.Lock()
+		DefaultEmbeddingAvailable = available
+		defaultEmbeddingAvailableMu.Unlock()
+	}
+
+	return available
 }
+
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
 	db, err := gorm.Open("sqlite3", path)
 	if err != nil {
