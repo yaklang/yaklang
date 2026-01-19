@@ -316,8 +316,14 @@ func (c *Config) parseProjectWithFS(
 		if c.baseProgramName != "" {
 			prog.BaseProgramName = c.baseProgramName
 		}
-		if c.fileHashMap != nil && len(c.fileHashMap) > 0 {
+		if len(c.fileHashMap) > 0 {
 			prog.FileHashMap = c.fileHashMap
+		}
+		// 如果启用了增量编译，确保 IsOverlay 被设置
+		// 即使没有 baseProgramName 和 fileHashMap（第一次增量编译），也设置一个空的 FileHashMap 作为标记
+		// 这样 UpdateToDatabaseWithWG 会设置 IsOverlay = true
+		if c.isIncremental && prog.FileHashMap == nil {
+			prog.FileHashMap = make(map[string]int)
 		}
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
 			start := time.Now()

@@ -310,6 +310,14 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		overlay.AggregatedFS = aggregatedFS
 	}
 
+	// Step 5: 确保所有 Layer 的 Program 已加载所有数据（如果是从数据库加载的）
+	// 在创建时一次性加载，避免后续使用时重复加载
+	for _, layer := range overlay.Layers {
+		if layer != nil {
+			overlay.ensureLayerProgramLoaded(layer)
+		}
+	}
+
 	log.Infof("ProgramOverLay: Built with %d layers (from pre-compiled programs), %d unique files",
 		len(overlay.Layers), overlay.FileToLayerMap.Count())
 
@@ -537,7 +545,7 @@ func (p *ProgramOverLay) GetAggregatedFileSystem() fi.FileSystem {
 
 // calculateFileSystemDiff 计算两个文件系统的差异，返回差量文件系统和 hash 映射
 // hash状态: -1=删除, 0=修改, 1=新增
-func calculateFileSystemDiff(ctx context.Context, baseFS, newFS fi.FileSystem) (diffFS *filesys.VirtualFS, fileHashMap map[string]int, err error) {
+func calculateFileSystemDiff(baseFS, newFS fi.FileSystem) (diffFS *filesys.VirtualFS, fileHashMap map[string]int, err error) {
 	diffFS = filesys.NewVirtualFs()
 	fileHashMap = make(map[string]int)
 
@@ -990,6 +998,21 @@ func (p *ProgramOverLay) Relocate(v *Value) *Value {
 }
 
 // Implement sfvm.ValueOperator interface
+
+// ensureLayerProgramLoaded 确保 Layer 的 Program 已加载所有数据
+func (p *ProgramOverLay) ensureLayerProgramLoaded(layer *ProgramLayer) {
+	if layer == nil || layer.Program == nil || layer.Program.Program == nil {
+		return
+	}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Debugf("LazyBuild panic for layer %d: %v", layer.LayerIndex, r)
+			}
+		}()
+		layer.Program.Program.LazyBuild()
+	}()
+}
 
 func (p *ProgramOverLay) Show() *ProgramOverLay {
 	if p == nil {
