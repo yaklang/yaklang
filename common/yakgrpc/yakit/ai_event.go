@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -225,12 +226,43 @@ func DeleteAllAIEvent(db *gorm.DB) error {
 			return err
 		}
 		// Then, delete all events
-		if err := tx.Model(&schema.AiOutputEvent{}).Delete(&schema.AiOutputEvent{}).Error; err != nil {
+		if err := tx.Model(&schema.AiOutputEvent{}).Unscoped().Delete(&schema.AiOutputEvent{}).Error; err != nil {
 			log.Errorf("delete all AI events failed: %v", err)
 			return err
 		}
 		return nil
 	})
+}
+
+// DeleteAIEventBySessionID deletes AI events under a session and their process associations.
+func DeleteAIEventBySessionID(db *gorm.DB, sessionId string) (int64, error) {
+	if sessionId == "" {
+		return 0, utils.Errorf("sessionId is empty")
+	}
+
+	var deletedEvents int64
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// Delete associations in-DB to avoid loading huge UUID lists into memory.
+		eventTable := tx.NewScope(&schema.AiOutputEvent{}).TableName()
+		if r := tx.Model(&schema.AiProcessAndAiEvent{}).
+			Where(fmt.Sprintf("event_id IN (SELECT event_uuid FROM %s WHERE session_id = ?)", eventTable), sessionId).
+			Delete(&schema.AiProcessAndAiEvent{}); r.Error != nil {
+			log.Errorf("delete AI event associations by session failed: %v", r.Error)
+			return r.Error
+		}
+
+		r := tx.Model(&schema.AiOutputEvent{}).
+			Where("session_id = ?", sessionId).
+			Unscoped().
+			Delete(&schema.AiOutputEvent{})
+		if r.Error != nil {
+			log.Errorf("delete AI events by session failed: %v", r.Error)
+			return r.Error
+		}
+		deletedEvents = r.RowsAffected
+		return nil
+	})
+	return deletedEvents, err
 }
 
 // YieldAllAIEvent yields all AI events from the database

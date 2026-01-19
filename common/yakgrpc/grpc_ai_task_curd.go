@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -36,12 +37,31 @@ func (s *Server) QueryAITask(ctx context.Context, req *ypb.AITaskQueryRequest) (
 }
 
 func (s *Server) DeleteAITask(ctx context.Context, req *ypb.AITaskDeleteRequest) (*ypb.DbOperateMessage, error) {
-	effectCount, err := yakit.DeleteAgentRuntime(s.GetProfileDatabase(), req.GetFilter())
+	filter := (*ypb.AITaskFilter)(nil)
+	if req != nil {
+		filter = req.GetFilter()
+	}
+
+	// Fast clear (drop+recreate) for the "clear all" case.
+	if filter == nil || (len(filter.GetName()) == 0 && len(filter.GetKeyword()) == 0 && len(filter.GetForgeName()) == 0 && len(filter.GetCoordinatorId()) == 0) {
+		db := s.GetProfileDatabase()
+		if err := yakit.DropAIAgentRuntimeTable(db); err != nil {
+			return nil, err
+		}
+		return &ypb.DbOperateMessage{
+			TableName:    "ai_agent_runtimes",
+			Operation:    "clear",
+			EffectRows:   0,
+			ExtraMessage: "fast cleared by drop+automigrate",
+		}, nil
+	}
+
+	effectCount, err := yakit.DeleteAgentRuntime(s.GetProfileDatabase(), filter)
 	if err != nil {
 		return nil, err
 	}
 	return &ypb.DbOperateMessage{
-		TableName:  "ai_coordinator_runtime",
+		TableName:  "ai_agent_runtimes",
 		Operation:  "delete",
 		EffectRows: effectCount,
 	}, nil
