@@ -34,7 +34,7 @@ func (f *File) SaveToDB(db *gorm.DB, programName string) error {
 	if err != nil {
 		return err
 	}
-	irSource := ssadb.MarshalFile(editor, f.IrSourceHash)
+	irSource := ssadb.MarshalFile(editor)
 	if err := irSource.Save(db); err != nil {
 		return utils.Wrapf(err, "Save File to DB failed")
 	}
