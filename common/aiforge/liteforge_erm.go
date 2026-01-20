@@ -421,6 +421,14 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 		relationSwg := sync.WaitGroup{}
 		defer relationSwg.Wait()
 
+		var releaseOnce sync.Once
+		releaseEndpoint := func() {
+			releaseOnce.Do(func() {
+				entitySwg.Wait()
+				endpoint.FinishEntitySave()
+			})
+		}
+
 		chunkOptions := append(options, WithJsonExtractHook(
 			jsonextractor.WithRegisterConditionalObjectCallback([]string{"entity_type"}, func(data map[string]any) {
 				entity := invokeParams2ERMEntity(data)
@@ -458,12 +466,16 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 			}),
 			jsonextractor.WithObjectKeyValue(func(key string, _ any) {
 				if key == "entity_list" {
-					go func() {
-						entitySwg.Wait()
-						endpoint.FinishEntitySave()
-					}()
+					go releaseEndpoint()
 				}
 			})),
+			jsonextractor.WithStreamFinishedCallback(func() {
+				go releaseEndpoint()
+			}),
+			jsonextractor.WithStreamErrorCallback(func(err error) {
+				refineConfig.AnalyzeLog("error in json extract stream: %v", err)
+				go releaseEndpoint()
+			}),
 		)
 		return AnalyzeERMChunk(domainPrompt, i, chunkOptions...)
 	}
