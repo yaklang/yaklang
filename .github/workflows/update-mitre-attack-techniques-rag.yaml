@@ -2,6 +2,15 @@ name: Update MITRE ATT&CK Techniques RAG
 
 on:
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: '强制全量重建 RAG（忽略增量更新）'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   push:
     branches:
       - "attck/*"
@@ -303,7 +312,20 @@ jobs:
           
           RAG_OUTPUT=$HOME/yakit-projects/mitre_attack_techniques.rag
           
-          if [ "$HAS_EXISTING_RAG" = "true" ] && [ "$HAS_DIFF" = "true" ]; then
+          # 检查是否强制重建
+          FORCE_REBUILD="${{ github.event.inputs.force_rebuild }}"
+          if [ "$FORCE_REBUILD" = "true" ]; then
+            echo "=== Force Rebuild Mode (Manual Trigger) ==="
+            echo "Force rebuild enabled, ignoring incremental update..."
+            echo "Building from full ZIP: $NEW_ZIP"
+            
+            yak $HOME/scripts/build-atomic-red-team-rag.yak \
+              --input-zip $NEW_ZIP \
+              --output $RAG_OUTPUT \
+              --collection mitre-attack-techniques \
+              --concurrent 20
+              
+          elif [ "$HAS_EXISTING_RAG" = "true" ] && [ "$HAS_DIFF" = "true" ]; then
             # 增量更新模式：使用现有 RAG + diff ZIP
             echo "=== Incremental Update Mode ==="
             echo "Using existing RAG: $EXISTING_RAG"
@@ -475,6 +497,7 @@ jobs:
           echo ""
           echo "=== Build Summary ==="
           echo "Version: $VERSION"
+          echo "Force Rebuild: ${{ github.event.inputs.force_rebuild || 'false' }}"
           echo "Diff files processed: ${DIFF_COUNT:-0}"
           echo "RAG File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz"
           echo "ZIP File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.zip"
