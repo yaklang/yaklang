@@ -3,7 +3,6 @@ package rag
 import (
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,14 +120,10 @@ func TextToDocuments(text string, maxChunkSize int, overlap int, metadata map[st
 	return docs
 }
 
-var DefaultEmbeddingAvailable = false
-
 const defaultEmbeddingModelName = "Qwen3-Embedding-0.6B-Q4_K_M"
 
 var (
-	defaultEmbeddingAvailableMu sync.RWMutex
-
-	embeddingAvailableCache sync.Map // map[string]*embeddingAvailableCacheEntry
+	embeddingAvailableCache sync.Map // map[string]*embeddingAvailableChecker
 
 	// bounded negative caching to avoid hammering filesystem during startup storms
 	embeddingAvailabilityNegativeCacheTTL = 10 * time.Second
@@ -137,15 +132,53 @@ var (
 	getModelPath = localmodel.GetModelPath
 )
 
-type embeddingAvailableCacheEntry struct {
-	checkMu sync.Mutex
+type embeddingAvailableChecker struct {
+	check func() bool
+	close func()
+}
 
-	available   atomic.Bool
-	lastChecked atomic.Int64 // unix nano
+func newEmbeddingAvailableChecker(modelName string) *embeddingAvailableChecker {
+	cd := utils.NewCoolDown(embeddingAvailabilityNegativeCacheTTL)
+
+	available := utils.NewAtomicBool()
+
+	firstDone := make(chan struct{})
+	firstDoneOnce := sync.Once{}
+
+	check := func() bool {
+		if available.IsSet() {
+			return true
+		}
+
+		cd.DoOr(func() {
+			_, err := getModelPath(modelName)
+			ok := err == nil
+			available.SetTo(ok)
+			firstDoneOnce.Do(func() { close(firstDone) })
+		}, func() {
+			select {
+			case <-firstDone:
+			case <-time.After(10 * time.Second): // if first check hangs, avoid deadlock
+			}
+		})
+
+		return available.IsSet()
+	}
+
+	return &embeddingAvailableChecker{
+		check: check,
+		close: func() {
+			firstDoneOnce.Do(func() { close(firstDone) })
+			cd.Close()
+		},
+	}
 }
 
 func clearEmbeddingAvailableCache() {
-	embeddingAvailableCache.Range(func(key, _ any) bool {
+	embeddingAvailableCache.Range(func(key, value any) bool {
+		if checker, ok := value.(*embeddingAvailableChecker); ok && checker != nil && checker.close != nil {
+			checker.close()
+		}
 		embeddingAvailableCache.Delete(key)
 		return true
 	})
@@ -162,47 +195,9 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 		modelName = config.modelName
 	}
 
-	if modelName == defaultEmbeddingModelName {
-		defaultEmbeddingAvailableMu.RLock()
-		if DefaultEmbeddingAvailable {
-			defaultEmbeddingAvailableMu.RUnlock()
-			return true
-		}
-		defaultEmbeddingAvailableMu.RUnlock()
-	}
-
-	entryAny, _ := embeddingAvailableCache.LoadOrStore(modelName, &embeddingAvailableCacheEntry{})
-	entry := entryAny.(*embeddingAvailableCacheEntry)
-
-	if entry.available.Load() {
-		return true
-	}
-	if last := entry.lastChecked.Load(); last != 0 && time.Since(time.Unix(0, last)) < embeddingAvailabilityNegativeCacheTTL {
-		return false
-	}
-
-	entry.checkMu.Lock()
-	defer entry.checkMu.Unlock()
-
-	if entry.available.Load() {
-		return true
-	}
-	if last := entry.lastChecked.Load(); last != 0 && time.Since(time.Unix(0, last)) < embeddingAvailabilityNegativeCacheTTL {
-		return false
-	}
-
-	_, err := getModelPath(modelName)
-	available := err == nil
-	entry.available.Store(available)
-	entry.lastChecked.Store(time.Now().UnixNano())
-
-	if modelName == defaultEmbeddingModelName {
-		defaultEmbeddingAvailableMu.Lock()
-		DefaultEmbeddingAvailable = available
-		defaultEmbeddingAvailableMu.Unlock()
-	}
-
-	return available
+	checkerAny, _ := embeddingAvailableCache.LoadOrStore(modelName, newEmbeddingAvailableChecker(modelName))
+	checker := checkerAny.(*embeddingAvailableChecker)
+	return checker.check()
 }
 
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {
