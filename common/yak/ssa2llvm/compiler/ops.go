@@ -13,8 +13,14 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 	switch op := inst.(type) {
 	case *ssa.BinOp:
 		return c.compileBinOp(op, id)
+	case *ssa.Jump:
+		return c.compileJump(op)
+	case *ssa.If:
+		return c.compileIf(op)
 	case *ssa.Return:
 		return c.compileReturn(op)
+	case *ssa.Call:
+		return c.compileCall(op)
 	default:
 		// Ignore unimplemented instructions for now
 		return nil
