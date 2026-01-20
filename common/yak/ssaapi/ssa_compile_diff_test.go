@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -163,11 +164,11 @@ func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
 		checkDiffProgramMetadata(t, diffProgram, checkDiffProgramMetadataConfig{
 			BaseProgramName: baseProgramName,
 			ExpectedFiles: map[string]int{
-				"/A.java":     0,  // 修改
-				"/B.java":     1,  // 新增
-				"/Utils.java": -1, // 删除（注意：删除的文件不会出现在 diffProgram 中，但会在 FileHashMap 中标记为 -1）
+				"A.java":     0,  // 修改
+				"B.java":     1,  // 新增
+				"Utils.java": -1, // 删除（注意：删除的文件不会出现在 diffProgram 中，但会在 FileHashMap 中标记为 -1）
 			},
-			ExcludedFiles: []string{"/Main.java"}, // Main.java 没有变化，不应该在 FileHashMap 中
+			ExcludedFiles: []string{"Main.java"}, // Main.java 没有变化，不应该在 FileHashMap 中
 		})
 	})
 
@@ -179,11 +180,11 @@ func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
 		checkDiffProgramMetadataInDB(t, irProg, checkDiffProgramMetadataConfig{
 			BaseProgramName: baseProgramName,
 			ExpectedFiles: map[string]int{
-				"/A.java":     0,
-				"/B.java":     1,
-				"/Utils.java": -1,
+				"A.java":     0,
+				"B.java":     1,
+				"Utils.java": -1,
 			},
-			ExcludedFiles: []string{"/Main.java"},
+			ExcludedFiles: []string{"Main.java"},
 		})
 	})
 
@@ -195,7 +196,7 @@ func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
 			normalizedPath := normalizeFilePathForTest(filePath)
 			t.Logf("  Found file in diff program: %s", normalizedPath)
 			// diffProgram 应该只包含修改和新增的文件
-			require.Contains(t, []string{"/A.java", "/B.java"}, normalizedPath, "diffProgram should only contain modified or new files")
+			require.Contains(t, []string{"A.java", "B.java"}, normalizedPath, "diffProgram should only contain modified or new files")
 			return true
 		})
 		require.Equal(t, 2, fileCount, "diffProgram should contain exactly 2 files (A.java modified, B.java new)")
@@ -217,23 +218,24 @@ func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
 	})
 }
 
-// normalizeFilePathForTest 规范化文件路径用于测试（去掉 UUID 前缀）
+// normalizeFilePathForTest 规范化文件路径用于测试（去掉 program name 前缀）
+// 输入格式可能是: /d00c28ac-28e7-4f24-947c-8dc854e6161e/A.java 或 /programName/folder/file.java
+// 输出格式: A.java 或 folder/file.java
 func normalizeFilePathForTest(filePath string) string {
 	if filePath == "" {
 		return ""
 	}
-	// 简单的规范化：如果路径以 / 开头，去掉第一个 UUID 部分
-	// 实际实现应该使用 programs_overlay.go 中的 normalizeFilePath
-	parts := []rune(filePath)
-	if len(parts) > 0 && parts[0] == '/' {
-		// 查找第二个 / 的位置
-		for i := 1; i < len(parts); i++ {
-			if parts[i] == '/' {
-				return string(parts[i:])
-			}
-		}
+
+	path := strings.TrimPrefix(filePath, "/")
+	if path == "" {
+		return filePath
 	}
-	return filePath
+	firstSlashIndex := strings.Index(path, "/")
+	if firstSlashIndex == -1 {
+		return filePath
+	}
+	result := path[firstSlashIndex+1:]
+	return result
 }
 
 // TestIncrementalCompile_Twice 测试两次增量编译的场景
@@ -329,11 +331,11 @@ func TestIncrementalCompile_Twice(t *testing.T) {
 	checkDiffProgramMetadata(t, diffProgram1, checkDiffProgramMetadataConfig{
 		BaseProgramName: baseProgramName,
 		ExpectedFiles: map[string]int{
-			"/A.java":     0,  // 修改
-			"/B.java":     1,  // 新增
-			"/Utils.java": -1, // 删除
+			"A.java":     0,  // 修改
+			"B.java":     1,  // 新增
+			"Utils.java": -1, // 删除
 		},
-		ExcludedFiles: []string{"/Main.java"},
+		ExcludedFiles: []string{"Main.java"},
 	})
 
 	// ========== Step 3: 从数据库加载 diff program 1，验证 overlay 自动创建 ==========
@@ -416,11 +418,11 @@ func TestIncrementalCompile_Twice(t *testing.T) {
 	checkDiffProgramMetadata(t, diffProgram2, checkDiffProgramMetadataConfig{
 		BaseProgramName: diffProgram1Name, // base 应该是 diff program 1
 		ExpectedFiles: map[string]int{
-			"/A.java": 0,  // 修改
-			"/C.java": 1,  // 新增
-			"/B.java": -1, // 删除（在 diff1 中新增，在 diff2 中删除）
+			"A.java": 0,  // 修改
+			"C.java": 1,  // 新增
+			"B.java": -1, // 删除（在 diff1 中新增，在 diff2 中删除）
 		},
-		ExcludedFiles: []string{"/Main.java"},
+		ExcludedFiles: []string{"Main.java"},
 	})
 
 	// ========== Step 5: 验证 diff program 2 的 overlay ==========
@@ -438,16 +440,16 @@ func TestIncrementalCompile_Twice(t *testing.T) {
 	t.Logf("Layer 3 files: %v", layer3Files)
 
 	// Layer 1 应该包含基础文件
-	require.Contains(t, layer1Files, "/Main.java", "Layer 1 should contain Main.java")
-	require.Contains(t, layer1Files, "/Utils.java", "Layer 1 should contain Utils.java")
+	require.Contains(t, layer1Files, "Main.java", "Layer 1 should contain Main.java")
+	require.Contains(t, layer1Files, "Utils.java", "Layer 1 should contain Utils.java")
 
 	// Layer 2 应该包含 diff1 的变更文件
-	require.Contains(t, layer2Files, "/A.java", "Layer 2 should contain modified A.java")
-	require.Contains(t, layer2Files, "/B.java", "Layer 2 should contain new B.java")
+	require.Contains(t, layer2Files, "A.java", "Layer 2 should contain modified A.java")
+	require.Contains(t, layer2Files, "B.java", "Layer 2 should contain new B.java")
 
 	// Layer 3 应该包含 diff2 的变更文件
-	require.Contains(t, layer3Files, "/A.java", "Layer 3 should contain modified A.java")
-	require.Contains(t, layer3Files, "/C.java", "Layer 3 should contain new C.java")
+	require.Contains(t, layer3Files, "A.java", "Layer 3 should contain modified A.java")
+	require.Contains(t, layer3Files, "C.java", "Layer 3 should contain new C.java")
 
 	// ========== Step 6: 从数据库加载 diff program 2，验证 overlay 自动创建 ==========
 	t.Logf("Step 6: Loading diff program 2 from database and verifying overlay")

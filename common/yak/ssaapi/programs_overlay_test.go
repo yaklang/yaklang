@@ -298,12 +298,12 @@ func InitProgramWithFileChanges(t *testing.T) (progBase *ssaapi.Program, progExt
 	require.Equal(t, progNameBaseUUID, irProgram.BaseProgramName, "BaseProgramName should be set")
 	require.NotEmpty(t, irProgram.FileHashMap, "FileHashMap should be saved in database")
 
-	require.Contains(t, irProgram.FileHashMap, "/A.java", "FileHashMap should contain A.java (modified)")
-	require.Equal(t, "0", irProgram.FileHashMap["/A.java"], "A.java should be marked as modified (0)")
-	require.Contains(t, irProgram.FileHashMap, "/NewFile.java", "FileHashMap should contain NewFile.java (new)")
-	require.Equal(t, "1", irProgram.FileHashMap["/NewFile.java"], "NewFile.java should be marked as new (1)")
-	require.Contains(t, irProgram.FileHashMap, "/Utils.java", "FileHashMap should contain Utils.java (deleted)")
-	require.Equal(t, "-1", irProgram.FileHashMap["/Utils.java"], "Utils.java should be marked as deleted (-1)")
+	require.Contains(t, irProgram.FileHashMap, "A.java", "FileHashMap should contain A.java (modified)")
+	require.Equal(t, "0", irProgram.FileHashMap["A.java"], "A.java should be marked as modified (0)")
+	require.Contains(t, irProgram.FileHashMap, "NewFile.java", "FileHashMap should contain NewFile.java (new)")
+	require.Equal(t, "1", irProgram.FileHashMap["NewFile.java"], "NewFile.java should be marked as new (1)")
+	require.Contains(t, irProgram.FileHashMap, "Utils.java", "FileHashMap should contain Utils.java (deleted)")
+	require.Equal(t, "-1", irProgram.FileHashMap["Utils.java"], "Utils.java should be marked as deleted (-1)")
 
 	return
 }
@@ -344,17 +344,16 @@ func allFileSystemCheck(t *testing.T, overProg *ssaapi.ProgramOverLay, progBase,
 					normalizedPath = normalizedPath[1:]
 				}
 				overlayFiles[normalizedPath] = true
-				overlayFiles["/"+normalizedPath] = true // 同时支持带斜杠和不带斜杠的路径
 			}
 			return nil
 		}))
 
 		t.Logf("Files in aggregated file system: %v", overlayFiles)
 
-		require.True(t, overlayFiles["A.java"] || overlayFiles["/A.java"], "Aggregated FS should contain A.java")
-		require.True(t, overlayFiles["Main.java"] || overlayFiles["/Main.java"], "Aggregated FS should contain Main.java")
-		require.True(t, overlayFiles["NewFile.java"] || overlayFiles["/NewFile.java"], "Aggregated FS should contain NewFile.java")
-		require.False(t, overlayFiles["Utils.java"] || overlayFiles["/Utils.java"], "Aggregated FS should not contain Utils.java (deleted)")
+		require.True(t, overlayFiles["A.java"], "Aggregated FS should contain A.java")
+		require.True(t, overlayFiles["Main.java"], "Aggregated FS should contain Main.java")
+		require.True(t, overlayFiles["NewFile.java"], "Aggregated FS should contain NewFile.java")
+		require.False(t, overlayFiles["Utils.java"], "Aggregated FS should not contain Utils.java (deleted)")
 	})
 
 	t.Run("test overlay can access new file", func(t *testing.T) {
@@ -410,7 +409,6 @@ func allFileSystemCheck(t *testing.T, overProg *ssaapi.ProgramOverLay, progBase,
 					normalizedPath = normalizedPath[1:]
 				}
 				overlayFiles[normalizedPath] = true
-				overlayFiles["/"+normalizedPath] = true
 			}
 			return nil
 		}))
@@ -418,10 +416,10 @@ func allFileSystemCheck(t *testing.T, overProg *ssaapi.ProgramOverLay, progBase,
 		t.Logf("Files in aggregated file system: %v", overlayFiles)
 		t.Logf("Total files in aggregated FS: %d", len(overlayFiles))
 
-		require.True(t, overlayFiles["A.java"] || overlayFiles["/A.java"], "Aggregated FS should contain A.java")
-		require.True(t, overlayFiles["Main.java"] || overlayFiles["/Main.java"], "Aggregated FS should contain Main.java")
-		require.True(t, overlayFiles["NewFile.java"] || overlayFiles["/NewFile.java"], "Aggregated FS should contain NewFile.java")
-		require.False(t, overlayFiles["Utils.java"] || overlayFiles["/Utils.java"], "Aggregated FS should not contain Utils.java (deleted)")
+		require.True(t, overlayFiles["A.java"], "Aggregated FS should contain A.java")
+		require.True(t, overlayFiles["Main.java"], "Aggregated FS should contain Main.java")
+		require.True(t, overlayFiles["NewFile.java"], "Aggregated FS should contain NewFile.java")
+		require.False(t, overlayFiles["Utils.java"], "Aggregated FS should not contain Utils.java (deleted)")
 	})
 
 	t.Run("test overlay file override", func(t *testing.T) {

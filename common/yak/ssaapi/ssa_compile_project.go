@@ -3,6 +3,9 @@ package ssaapi
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -67,6 +70,7 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Prog
 // diffProgramName: 差量程序的名称
 // language: 编译语言
 // 返回：编译后的差量程序（BaseProgramName 和 FileHashMap 已设置）
+// 注意：projectID 会自动从 base program 中获取，确保 diff program 和 base program 属于同一个 project
 func CompileDiffProgramAndSaveToDB(
 	ctx context.Context,
 	baseFS, newFS fi.FileSystem,
@@ -84,7 +88,17 @@ func CompileDiffProgramAndSaveToDB(
 		}
 	}
 
+	// 从 base program 中获取 projectID（diff program 应该和 base program 属于同一个 project）
+	var projectID uint64
+	if baseProgramName != "" {
+		baseIrProgram, err := ssadb.GetProgram(baseProgramName, ssadb.Application)
+		if err == nil && baseIrProgram != nil && baseIrProgram.ProjectID > 0 {
+			projectID = baseIrProgram.ProjectID
+		}
+	}
+
 	// Step 2: 计算文件系统差异
+	// 传入 diffProgramName，确保 diff 文件系统中的路径包含 program name 前缀
 	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to calculate file system diff")
@@ -99,6 +113,9 @@ func CompileDiffProgramAndSaveToDB(
 	}
 	if diffProgramName != "" {
 		diffOpts = append(diffOpts, WithProgramName(diffProgramName))
+	}
+	if projectID > 0 {
+		diffOpts = append(diffOpts, ssaconfig.WithProjectID(projectID))
 	}
 	if baseProgramName != "" {
 		// 强制禁用增量编译检测，避免死循环
@@ -212,14 +229,22 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	c.Processf(0, "recompile project, start compile")
 
 	if isIncrementalCompile {
+		var prog *Program
 		if isDiffCompile {
 			c.Processf(0.1, "incremental compile detected, base program: %s", c.baseProgramName)
 			// 差量编译：编译差量程序并创建 overlay
-			return c.parseProjectWithIncrementalCompile()
+			prog, err = c.parseProjectWithIncrementalCompile()
 		} else {
 			c.Processf(0.1, "first incremental compile (base program), performing full compilation")
 			// 第一次增量编译：全量编译但设置 IsOverlay = true
-			return c.parseProjectWithFirstIncrementalCompile()
+			prog, err = c.parseProjectWithFirstIncrementalCompile()
+		}
+		if err != nil {
+			return nil, err
+		} else {
+			SaveConfig(c, prog)
+			c.Processf(1, "program %s finish", prog.GetProgramName())
+			return Programs{prog}, nil
 		}
 	}
 
@@ -283,6 +308,85 @@ func (c *Config) peephole() (Programs, error) {
 	return progs, errs
 }
 
+// removeProgramNamePrefix 去掉文件路径中的 program name 前缀
+// 输入格式可能是: /mytest(2026-01-20 11:48:20)/test.go 或 /mytest(2026-01-20 11:48:20)/folder/test.go
+// 输出格式: /test.go 或 /folder/test.go
+func removeProgramNamePrefix(filePath, programName string) string {
+	if filePath == "" || programName == "" {
+		return filePath
+	}
+
+	path := strings.TrimPrefix(filePath, "/")
+	if path == "" {
+		return filePath
+	}
+
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return filePath
+	}
+
+	firstPart := parts[0]
+	if firstPart == programName {
+		if len(parts) > 1 {
+			return strings.Join(parts[1:], "/")
+		}
+		return "/"
+	}
+
+	if strings.HasPrefix(firstPart, programName+"(") {
+		if len(parts) > 1 {
+			return "/" + strings.Join(parts[1:], "/")
+		}
+		return "/"
+	}
+
+	return filePath
+}
+
+// removeProgramNamePrefixFromFS 从文件系统中去掉 program name 前缀
+// 创建一个新的 VirtualFS，遍历原始文件系统的所有文件，去掉前缀后添加到新文件系统中
+func removeProgramNamePrefixFromFS(fs fi.FileSystem, programName string) (fi.FileSystem, error) {
+	if fs == nil {
+		return nil, utils.Errorf("file system is nil")
+	}
+	if programName == "" {
+		return fs, nil
+	}
+
+	vfs := filesys.NewVirtualFs()
+
+	err := filesys.Recursive(".", filesys.WithFileSystem(fs), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+		if isDir {
+			return nil
+		}
+		if pathname == "" {
+			return nil
+		}
+
+		content, err := fs.ReadFile(pathname)
+		if err != nil {
+			log.Warnf("failed to read file %s: %v", pathname, err)
+			return nil
+		}
+
+		// 去掉 program name 前缀
+		cleanPath := removeProgramNamePrefix(pathname, programName)
+		if cleanPath == "" || cleanPath == "/" {
+			return nil
+		}
+
+		vfs.AddFile(cleanPath, string(content))
+		return nil
+	}))
+
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to traverse file system")
+	}
+
+	return vfs, nil
+}
+
 func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 	// Step 1: 从数据库获取 program
 	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
@@ -297,12 +401,14 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 	// 优先使用 FileList（如果存在且不为空）
 	if len(irProg.FileList) > 0 {
 		for filePath, hash := range irProg.FileList {
+			// 去掉 program name 前缀
+			cleanPath := removeProgramNamePrefix(filePath, programName)
 			editor, err := ssadb.GetEditorByHash(hash)
 			if err != nil {
 				log.Warnf("failed to get editor for file %s (hash: %s): %v", filePath, hash, err)
 				continue
 			}
-			vfs.AddFile(filePath, editor.GetSourceCode())
+			vfs.AddFile(cleanPath, editor.GetSourceCode())
 			fileCount++
 		}
 		if fileCount > 0 {
@@ -321,62 +427,29 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 	}
 
 	for _, editor := range editors {
-		filePath := editor.GetFilename()
-		content := editor.GetSourceCode()
-		vfs.AddFile(filePath, content)
-	}
-
-	return vfs, nil
-}
-
-func buildFileSystemFromFileSystem(programName string) (fi.FileSystem, error) {
-	// Step 1: 从数据库获取 program
-	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
-	if err != nil {
-		return nil, utils.Wrapf(err, "failed to get program: %s", programName)
-	}
-
-	// Step 2: 构建 VirtualFS
-	vfs := filesys.NewVirtualFs()
-	fileCount := 0
-
-	// 优先使用 FileList（如果存在且不为空）
-	if len(irProg.FileList) > 0 {
-		for filePath, hash := range irProg.FileList {
-			editor, err := ssadb.GetEditorByHash(hash)
-			if err != nil {
-				log.Warnf("failed to get editor for file %s (hash: %s): %v", filePath, hash, err)
-				continue
+		// 使用 GetFilePath() 获取完整路径（不包含 program name）
+		filePath := editor.GetFilePath()
+		if filePath == "" {
+			// 如果 GetFilePath() 为空，尝试构建路径
+			folderPath := editor.GetFolderPath()
+			fileName := editor.GetFilename()
+			if folderPath != "" && fileName != "" {
+				filePath = filepath.Join("/", folderPath, fileName)
+			} else if fileName != "" {
+				filePath = "/" + fileName
 			}
-			vfs.AddFile(filePath, editor.GetSourceCode())
-			fileCount++
 		}
-		if fileCount > 0 {
-			return vfs, nil
-		}
-	}
-
-	// 回退：使用 GetEditorByProgramName
-	editors, err := ssadb.GetEditorByProgramName(programName)
-	if err != nil {
-		return nil, utils.Wrapf(err, "failed to get editors for program: %s", programName)
-	}
-
-	if len(editors) == 0 {
-		return nil, utils.Errorf("program %s has no files in database", programName)
-	}
-
-	for _, editor := range editors {
-		filePath := editor.GetFilename()
+		// 确保去掉 program name 前缀（如果存在）
+		cleanPath := removeProgramNamePrefix(filePath, programName)
 		content := editor.GetSourceCode()
-		vfs.AddFile(filePath, content)
+		vfs.AddFile(cleanPath, content)
 	}
 
 	return vfs, nil
 }
 
 // parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
-func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
+func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	// Step 1: 从数据库加载基础程序
 	c.Processf(0.1, "loading base program from database: %s", c.baseProgramName)
 	baseProgram, err := FromDatabase(c.baseProgramName)
@@ -394,9 +467,14 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	baseOverlay = baseProgram.GetOverlay()
 	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
 		// base program 是一个已保存的 overlay，直接使用
-		baseFSForDiff = baseOverlay.GetAggregatedFileSystem()
-		if baseFSForDiff == nil {
+		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
+		if aggregatedFS == nil {
 			return nil, utils.Errorf("base overlay has no aggregated file system")
+		}
+		// 去掉文件系统中的 program name 前缀
+		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, c.baseProgramName)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
 		}
 		c.Processf(0.3, "base program is an overlay with %d layers", len(baseOverlay.Layers))
 	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
@@ -412,9 +490,14 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 		if baseOverlay == nil {
 			return nil, utils.Errorf("failed to create overlay for diff base program")
 		}
-		baseFSForDiff = baseOverlay.GetAggregatedFileSystem()
-		if baseFSForDiff == nil {
+		aggregatedFS := baseOverlay.GetAggregatedFileSystem()
+		if aggregatedFS == nil {
 			return nil, utils.Errorf("base overlay has no aggregated file system")
+		}
+		// 去掉文件系统中的 program name 前缀
+		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
 		}
 		c.Processf(0.3, "base program is a diff program, created overlay with 2 layers")
 	} else {
@@ -520,12 +603,12 @@ func (c *Config) parseProjectWithIncrementalCompile() (Programs, error) {
 	SaveConfig(c, diffProgram)
 	c.Processf(1, "incremental compile finish, overlay created and saved")
 
-	return Programs{diffProgram}, nil
+	return diffProgram, nil
 }
 
 // parseProjectWithFirstIncrementalCompile 处理第一次增量编译（base program）
 // 这种情况下进行全量编译，但设置 IsOverlay = true，表示这是增量编译流程的一部分
-func (c *Config) parseProjectWithFirstIncrementalCompile() (Programs, error) {
+func (c *Config) parseProjectWithFirstIncrementalCompile() (*Program, error) {
 	c.Processf(0.2, "first incremental compile (base program), performing full compilation")
 
 	// 进行全量编译
@@ -561,7 +644,7 @@ func (c *Config) parseProjectWithFirstIncrementalCompile() (Programs, error) {
 
 		SaveConfig(c, prog)
 		c.Processf(1, "first incremental compile (base program) finish")
-		return Programs{prog}, nil
+		return prog, nil
 	}
 }
 
@@ -604,9 +687,7 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 
 	// 确保 diffProgram 的 irProgram 存在
 	if diffProgram.Program.GetIrProgram() == nil {
-		// 如果 irProgram 不存在，需要先创建
 		diffProgram.Program.UpdateToDatabase()
-		// 等待保存完成
 		if wait := diffProgram.Program.UpdateToDatabase(); wait != nil {
 			wait()
 		}

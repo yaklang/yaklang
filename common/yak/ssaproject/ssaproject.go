@@ -187,18 +187,18 @@ func NewSSAProject(opts ...ssaconfig.Option) (*SSAProject, error) {
 }
 
 func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProject, error) {
+	config, err := project.GetConfig()
+	if err != nil {
+		return nil, utils.Errorf("load SSA project failed: %s", err)
+	}
 	builder := &SSAProject{
 		ID:          uint64(project.ID),
 		ProjectName: project.ProjectName,
 		Description: project.Description,
 		Tags:        project.GetTagsList(),
-		Language:    project.Language,
+		Language:    config.GetLanguage(),
+		Config:      config,
 	}
-	config, err := project.GetConfig()
-	if err != nil {
-		return nil, utils.Errorf("load SSA project failed: %s", err)
-	}
-	builder.Config = config
 	return builder, nil
 }
 

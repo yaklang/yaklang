@@ -116,6 +116,25 @@ func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string
 	return names[0], nil
 }
 
+// QueryLatestSSAProgramNameByProjectName 通过项目名称查询最新的 program name
+func QueryLatestSSAProgramNameByProjectName(db *gorm.DB, projectName string) (string, error) {
+	if projectName == "" {
+		return "", utils.Errorf("project name is empty")
+	}
+	
+	// 先通过 project name 查找 project
+	var project schema.SSAProject
+	err := db.Model(&schema.SSAProject{}).
+		Where("project_name = ?", projectName).
+		First(&project).Error
+	if err != nil {
+		return "", utils.Errorf("find project by name %s failed: %s", projectName, err)
+	}
+	
+	// 通过 project ID 查询最新的 program name
+	return QueryLatestSSAProgramNameByProjectId(db, uint64(project.ID))
+}
+
 func Prog2GRPC(prog *ssadb.IrProgram) *ypb.SSAProgram {
 	ret := &ypb.SSAProgram{
 		Id: uint32(prog.ID),

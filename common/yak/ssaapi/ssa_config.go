@@ -328,18 +328,36 @@ var WithContext = ssaconfig.WithContext
 
 // WithEnableIncrementalCompile 启用增量编译
 // 如果启用增量编译但 BaseProgramName 为空，表示这是第一次增量编译（base program）
-var WithEnableIncrementalCompile = ssaconfig.SetOption("ssa_compile/enable_incremental", func(c *Config, v bool) {
-	c.isIncremental = v
-})
+func WithEnableIncrementalCompile(enable bool) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		// 使用 ssaconfig 中的函数设置配置
+		if err := ssaconfig.WithEnableIncrementalCompile(enable)(sc); err != nil {
+			return err
+		}
+		// 通过 ExtraOption 同步到 ssaapi.Config
+		return ssaconfig.SetOption("ssa_compile/enable_incremental", func(c *Config, v bool) {
+			c.isIncremental = v
+		})(enable)(sc)
+	}
+}
 
 // WithBaseProgramName 设置基础程序名称（用于差量编译）
-var WithBaseProgramName = ssaconfig.SetOption("ssa_compile/base_program_name", func(c *Config, v string) {
-	c.baseProgramName = v
-	// 如果设置了 baseProgramName，自动启用增量编译
-	if v != "" {
-		c.isIncremental = true
+func WithBaseProgramName(baseProgramName string) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		// 使用 ssaconfig 中的函数设置配置
+		if err := ssaconfig.WithBaseProgramName(baseProgramName)(sc); err != nil {
+			return err
+		}
+		// 通过 ExtraOption 同步到 ssaapi.Config
+		return ssaconfig.SetOption("ssa_compile/base_program_name", func(c *Config, v string) {
+			c.baseProgramName = v
+			// 如果设置了 baseProgramName，自动启用增量编译
+			if v != "" {
+				c.isIncremental = true
+			}
+		})(baseProgramName)(sc)
 	}
-})
+}
 
 // WithFileHashMap 设置文件哈希映射（用于差量编译）
 var WithFileHashMap = ssaconfig.SetOption("ssa_compile/file_hash_map", func(c *Config, v map[string]int) {
@@ -376,6 +394,18 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 
 	ssaconfig.ApplyExtraOptions(c, c.Config)
 
+	// 从 SSACompileConfig 中同步增量编译配置到 ssaapi.Config
+	if !utils.IsNil(sc.SSACompile) {
+		if sc.SSACompile.EnableIncrementalCompile {
+			c.isIncremental = true
+		}
+		if sc.SSACompile.BaseProgramName != "" {
+			c.baseProgramName = sc.SSACompile.BaseProgramName
+			// 如果设置了 baseProgramName，自动启用增量编译
+			c.isIncremental = true
+		}
+	}
+
 	// 只有当 c.fs 为 nil 时，才从配置中解析文件系统
 	// 这样可以避免覆盖通过 WithFileSystem 显式设置的文件系统
 	if c.fs == nil {
@@ -411,8 +441,23 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	return c, nil
 }
 
+// GetEnableIncrementalCompile 获取是否启用增量编译
+func (c *Config) GetEnableIncrementalCompile() bool {
+	// 优先从 SSACompileConfig 中读取（如果已设置）
+	if c.Config != nil && c.Config.SSACompile != nil {
+		return c.Config.SSACompile.EnableIncrementalCompile
+	}
+	// 否则从 isIncremental 字段读取
+	return c.isIncremental
+}
+
 // GetBaseProgramName 获取基础程序名称（用于增量编译）
 func (c *Config) GetBaseProgramName() string {
+	// 优先从 SSACompileConfig 中读取（如果已设置）
+	if c.Config != nil && c.Config.SSACompile != nil && c.Config.SSACompile.BaseProgramName != "" {
+		return c.Config.SSACompile.BaseProgramName
+	}
+	// 否则从 baseProgramName 字段读取
 	return c.baseProgramName
 }
 

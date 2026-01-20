@@ -167,15 +167,17 @@ func WithProjectLanguage(language Language) Option {
 
 // SSACompileConfig 编译配置
 type SSACompileConfig struct {
-	StrictMode         bool          `json:"strict_mode"`
-	PeepholeSize       int           `json:"peephole_size"`
-	ExcludeFiles       []string      `json:"exclude_files"`
-	ReCompile          bool          `json:"re_compile"`
-	MemoryCompile      bool          `json:"memory_compile"`
-	Concurrency        int           `json:"compile_concurrency"`
-	CompileIrCacheTTL  time.Duration `json:"compile_ir_cache_ttl"`
-	FilePerformanceLog bool          `json:"file_performance_log"`
-	StopOnCliCheck     bool          `json:"stop_on_cli_check"`
+	StrictMode               bool          `json:"strict_mode"`
+	PeepholeSize             int           `json:"peephole_size"`
+	ExcludeFiles             []string      `json:"exclude_files"`
+	ReCompile                bool          `json:"re_compile"`
+	MemoryCompile            bool          `json:"memory_compile"`
+	Concurrency              int           `json:"compile_concurrency"`
+	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
+	FilePerformanceLog       bool          `json:"file_performance_log"`
+	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
+	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
+	BaseProgramName          string        `json:"base_program_name"`
 }
 
 // --- 编译配置 Get/Set 方法 ---
@@ -397,6 +399,75 @@ func WithStopOnCliCheck(stopOnCliCheck bool) Option {
 			return err
 		}
 		c.SSACompile.StopOnCliCheck = stopOnCliCheck
+		return nil
+	}
+}
+
+// --- 增量编译配置 Get/Set 方法 ---
+
+func (c *Config) GetEnableIncrementalCompile() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.EnableIncrementalCompile
+}
+
+func (c *Config) SetEnableIncrementalCompile(enable bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.EnableIncrementalCompile = enable
+}
+
+func (c *Config) GetBaseProgramName() string {
+	if c == nil || c.SSACompile == nil {
+		return ""
+	}
+	return c.SSACompile.BaseProgramName
+}
+
+func (c *Config) SetBaseProgramName(baseProgramName string) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.BaseProgramName = baseProgramName
+	// 如果设置了 baseProgramName，自动启用增量编译
+	if baseProgramName != "" {
+		c.SSACompile.EnableIncrementalCompile = true
+	}
+}
+
+// --- 增量编译配置 Options ---
+
+// WithEnableIncrementalCompile 启用增量编译
+// 如果启用增量编译但 BaseProgramName 为空，表示这是第一次增量编译（base program）
+func WithEnableIncrementalCompile(enable bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Enable Incremental Compile"); err != nil {
+			return err
+		}
+		c.SSACompile.EnableIncrementalCompile = enable
+		return nil
+	}
+}
+
+// WithBaseProgramName 设置基础程序名称（用于差量编译）
+func WithBaseProgramName(baseProgramName string) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Base Program Name"); err != nil {
+			return err
+		}
+		c.SSACompile.BaseProgramName = baseProgramName
+		// 如果设置了 baseProgramName，自动启用增量编译
+		if baseProgramName != "" {
+			c.SSACompile.EnableIncrementalCompile = true
+		}
 		return nil
 	}
 }
