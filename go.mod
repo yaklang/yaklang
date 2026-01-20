@@ -253,4 +253,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	mellium.im/sasl v0.3.1 // indirect
+	tinygo.org/x/go-llvm v0.0.0-20250929104024-00fb4309ddd2 // indirect
 )
