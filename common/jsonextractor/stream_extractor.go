@@ -81,9 +81,26 @@ type callbackManager struct {
 	// 字段流处理相关
 	activeWriters         []io.WriteCloser    // 当前活跃的写入器列表，支持多字段同时写入
 	fieldStreamFrameStack []*fieldStreamFrame // 字段流写入栈，用于支持嵌套结构
+
+	// stream finish callback
+	streamFinishedCallback func()
+	// stream error callback
+	streamErrorCallback func(err error)
 }
 
 type CallbackOption func(*callbackManager)
+
+func WithStreamFinishedCallback(callback func()) CallbackOption {
+	return func(manager *callbackManager) {
+		manager.streamFinishedCallback = callback
+	}
+}
+
+func WithStreamErrorCallback(callback func(err error)) CallbackOption {
+	return func(manager *callbackManager) {
+		manager.streamErrorCallback = callback
+	}
+}
 
 func WithObjectKeyValue(callback func(string string, data any)) CallbackOption {
 	return func(c *callbackManager) {
@@ -399,11 +416,25 @@ func ExtractStructuredJSON(c string, options ...CallbackOption) error {
 	return ExtractStructuredJSONFromStream(bytes.NewBufferString(c), options...)
 }
 
-func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOption) error {
+func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOption) (err error) {
 	callbackManager := &callbackManager{}
 	for _, option := range options {
 		option(callbackManager)
 	}
+	defer func() {
+		if callbackManager == nil {
+			return
+		}
+		if err != nil {
+			if callbackManager.streamErrorCallback != nil {
+				callbackManager.streamErrorCallback(err)
+			}
+			return
+		}
+		if callbackManager.streamFinishedCallback != nil {
+			callbackManager.streamFinishedCallback()
+		}
+	}()
 	defer callbackManager.resetFieldStreamFrames()
 
 	var mirror = new(bytes.Buffer)
