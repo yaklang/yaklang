@@ -88,6 +88,13 @@ var CVEExports = map[string]interface{}{
 	"GetCVE":        getCVE,
 	"NewStatistics": NewStatistics,
 
+	// AI completion and import/export
+	"AICompleteFields": cvequeryops.CVEAICompleteFields,
+	"Export":           cvequeryops.ExportCVE,
+	"Import":           cvequeryops.ImportCVE,
+	"aiConcurrent":     cvequeryops.WithCVEAIConcurrent,
+	"testLimit":        cvequeryops.WithCVETestLimit,
+
 	//"LoadCNNVD":    cveAction.LoadCNNVD,
 	"cwe":        cvequeryops.CWE,
 	"cve":        cvequeryops.CVE,
