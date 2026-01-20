@@ -1,0 +1,92 @@
+// CVE Database AI Completion Script
+// Usage:
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cve.yak --output cve_output.jsonl --ai-limit 5
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cve.yak --output cve_output.jsonl --ai-type openai --ai-key YOUR_API_KEY
+//   go run common/yak/cmd/yak.go scripts/ci-works/rag/cve.yak --input cve_data.jsonl --output cve_output.jsonl
+
+loglevel("info")
+
+// Parse CLI arguments
+inputFile = cli.String("input", cli.setHelp("Input JSONL file path, if exists will import first"))
+outputFile = cli.String("output", cli.setHelp("Output JSONL file path for export"), cli.setRequired(true))
+aiLimit = cli.Int("ai-limit", cli.setHelp("Limit number of CVEs to process with AI (for testing)"), cli.setDefault(0))
+aiConcurrent = cli.Int("ai-concurrent", cli.setHelp("Number of concurrent AI workers"), cli.setDefault(5))
+aiType = cli.String("ai-type", cli.setHelp("AI provider type, e.g., openai, chatglm, moonshot"))
+aiKey = cli.String("ai-key", cli.setHelp("AI API key"))
+aiModel = cli.String("ai-model", cli.setHelp("AI model name"))
+aiDomain = cli.String("ai-domain", cli.setHelp("AI API domain (for custom endpoints)"))
+aiProxy = cli.String("ai-proxy", cli.setHelp("Proxy for AI requests"))
+skipAI = cli.Bool("skip-ai", cli.setHelp("Skip AI completion step"))
+
+cli.check()
+
+log.Info("=== CVE Database AI Completion Script ===")
+log.Info("Input file: %s", inputFile)
+log.Info("Output file: %s", outputFile)
+log.Info("AI limit: %d", aiLimit)
+log.Info("AI concurrent: %d", aiConcurrent)
+log.Info("AI type: %s", aiType)
+log.Info("AI model: %s", aiModel)
+log.Info("Skip AI: %v", skipAI)
+
+// Step 1: Import if input file exists
+if inputFile != "" && file.IsExisted(inputFile) {
+    log.Info("Importing from: %s", inputFile)
+    err = cve.Import(inputFile)
+    if err != nil {
+        log.Error("Import failed: %v", err)
+        die(err)
+    }
+    log.Info("Import completed")
+} else if inputFile != "" {
+    log.Warn("Input file does not exist: %s", inputFile)
+}
+
+// Step 2: AI Complete Fields (if not skipped)
+if !skipAI {
+    log.Info("Running AI completion...")
+    aiOpts = []
+    aiOpts = append(aiOpts, cve.aiConcurrent(aiConcurrent))
+
+    if aiLimit > 0 {
+        log.Info("AI limit: %d CVEs", aiLimit)
+        aiOpts = append(aiOpts, cve.testLimit(aiLimit))
+    }
+
+    // Add AI configuration options
+    if aiType != "" {
+        aiOpts = append(aiOpts, ai.type(aiType))
+    }
+    if aiKey != "" {
+        aiOpts = append(aiOpts, ai.apiKey(aiKey))
+    }
+    if aiModel != "" {
+        aiOpts = append(aiOpts, ai.model(aiModel))
+    }
+    if aiDomain != "" {
+        aiOpts = append(aiOpts, ai.domain(aiDomain))
+    }
+    if aiProxy != "" {
+        aiOpts = append(aiOpts, ai.proxy(aiProxy))
+    }
+
+    err = cve.AICompleteFields(aiOpts...)
+    if err != nil {
+        log.Error("AI completion failed: %v", err)
+        die(err)
+    }
+    log.Info("AI completion finished")
+} else {
+    log.Info("AI completion skipped")
+}
+
+// Step 3: Export to output file
+log.Info("Exporting to: %s", outputFile)
+err = cve.Export(outputFile)
+if err != nil {
+    log.Error("Export failed: %v", err)
+    die(err)
+}
+log.Info("Export completed")
+
+log.Info("=== Script completed ===")
