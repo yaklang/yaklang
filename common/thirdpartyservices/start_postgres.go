@@ -42,12 +42,64 @@ func EnvOr(f, value string) string {
 	}
 }
 
+// PostgresConfig holds the postgres connection configuration
+type PostgresConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	Database string
+}
+
+// GetPostgresParams returns connection params from environment variables (legacy behavior)
 func GetPostgresParams() string {
 	dbname := EnvOr("PALM_POSTGRES_DB", PostgresDatabaseName)
 	pwd := EnvOr("PALM_POSTGRES_PASSWORD", PostgresPassword)
 	host := EnvOr("PALM_POSTGRES_HOST", PostgresHost)
 	port := EnvOr("PALM_POSTGRES_PORT", fmt.Sprint(PostgresPort))
 	user := EnvOr("PALM_POSTGRES_USER", PostgresUser)
+
+	return fmt.Sprintf("host=%s port=%v user=%s dbname=%s password=%s sslmode=disable",
+		host, port, user,
+		dbname, pwd,
+	)
+}
+
+// GetPostgresParamsFromConfig returns connection params from config, with env fallback
+func GetPostgresParamsFromConfig(config *PostgresConfig) string {
+	if config == nil {
+		return GetPostgresParams()
+	}
+
+	host := config.Host
+	if host == "" {
+		host = EnvOr("PALM_POSTGRES_HOST", PostgresHost)
+	}
+
+	port := config.Port
+	if port == 0 {
+		port = PostgresPort
+		if portStr := os.Getenv("PALM_POSTGRES_PORT"); portStr != "" {
+			if p, err := fmt.Sscanf(portStr, "%d", &port); err != nil || p == 0 {
+				port = PostgresPort
+			}
+		}
+	}
+
+	user := config.Username
+	if user == "" {
+		user = EnvOr("PALM_POSTGRES_USER", PostgresUser)
+	}
+
+	pwd := config.Password
+	if pwd == "" {
+		pwd = EnvOr("PALM_POSTGRES_PASSWORD", PostgresPassword)
+	}
+
+	dbname := config.Database
+	if dbname == "" {
+		dbname = EnvOr("PALM_POSTGRES_DB", PostgresDatabaseName)
+	}
 
 	return fmt.Sprintf("host=%s port=%v user=%s dbname=%s password=%s sslmode=disable",
 		host, port, user,
@@ -86,7 +138,14 @@ func PullPostgresImage() error {
 	return nil
 }
 
+// StartPostgres starts postgres with legacy environment variable configuration
 func StartPostgres(pgdir string) error {
+	return StartPostgresWithConfig(pgdir, nil)
+}
+
+// StartPostgresWithConfig starts postgres with the given configuration
+// If config is nil, it falls back to environment variables
+func StartPostgresWithConfig(pgdir string, config *PostgresConfig) error {
 	if pgdir != "" {
 		if !filepath.IsAbs(pgdir) {
 			var err error
@@ -97,11 +156,34 @@ func StartPostgres(pgdir string) error {
 		}
 	}
 
-	param := GetPostgresParams()
-	password := PostgresPassword
-	dbname := PostgresDatabaseName
+	param := GetPostgresParamsFromConfig(config)
 
-	log.Info("detecting database connecting... pgdir=%v", pgdir)
+	// Determine password, user, dbname for container creation
+	password := PostgresPassword
+	user := PostgresUser
+	dbname := PostgresDatabaseName
+	host := PostgresHost
+	port := PostgresPort
+
+	if config != nil {
+		if config.Password != "" {
+			password = config.Password
+		}
+		if config.Username != "" {
+			user = config.Username
+		}
+		if config.Database != "" {
+			dbname = config.Database
+		}
+		if config.Host != "" {
+			host = config.Host
+		}
+		if config.Port != 0 {
+			port = config.Port
+		}
+	}
+
+	log.Info("detecting database connecting... pgdir=%v param=%v", pgdir, param)
 	d, err := gorm.Open("postgres", param)
 	if err == nil {
 		log.Info("detected exsited database.")
@@ -161,7 +243,7 @@ func StartPostgres(pgdir string) error {
 				},
 				Env: []string{
 					fmt.Sprintf("POSTGRES_PASSWORD=%s", password),
-					fmt.Sprintf("POSTGRES_USER=%s", PostgresUser),
+					fmt.Sprintf("POSTGRES_USER=%s", user),
 					fmt.Sprintf("POSTGRES_DB=%s", dbname),
 				},
 				Image: PostgresImageName,
@@ -172,8 +254,8 @@ func StartPostgres(pgdir string) error {
 				PortBindings: nat.PortMap{
 					"5432/tcp": []nat.PortBinding{
 						{
-							HostIP:   PostgresHost,
-							HostPort: fmt.Sprint(PostgresPort),
+							HostIP:   host,
+							HostPort: fmt.Sprint(port),
 						},
 					},
 				},
