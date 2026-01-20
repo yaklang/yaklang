@@ -276,9 +276,9 @@ jobs:
                 {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
                 {"package": "./common/yak/cmd/...", "timeout": "30s"},
                 {"package": "./common/javaclassparser/tests/...", "timeout": "30s"},
-                {"package": "./common/suricata/...", "timeout": "20s", "run": "TestMUSTPASS*"},
-                {"package": "./common/chaosmaker", "timeout": "20s", "run": "TestMUSTPASS*"},
-                {"package": "./common/pcapx", "timeout": "20s", "run": "TestSmoking_*"},
+                {"package": "./common/suricata/...", "timeout": "20s", "run": "TestMUSTPASS"},
+                {"package": "./common/chaosmaker", "timeout": "20s", "run": "TestMUSTPASS"},
+                {"package": "./common/pcapx", "timeout": "20s", "run": "TestSmoking_"},
                 {"package": "./common/netx/mustpass", "timeout": "20s"},
                 {"package": "./common/utils/pingutil", "timeout": "20s", "run": "TestPingAutoConfig"},
                 {"package": "./common/mutate_tests", "timeout": "20s"},
@@ -319,7 +319,7 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS*"},
+                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"},
                 {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
                 {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
                 {"package": "./common/syntaxflow/sfanalyzer/...", "timeout": "20s"},
@@ -377,8 +377,8 @@ jobs:
             test_configs: |
               [
               {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_*"},
-              {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_*"},
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_"},
+              {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_"},
               {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
               {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
               ]
@@ -394,26 +394,26 @@ jobs:
           - name: "Test gRPC MUSTPASS Language"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE*"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE"}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
             sync_rule: "1"
             test_configs: |
               [
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow*"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA*"},
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
+              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"},
               {"package": "./common/sfweb/...", "timeout": "4m"}
               ]
 
           - name: "Test gRPC In 2m"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow*"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_Fingerprint*"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan*"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS*"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON*"},
+                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow"},
+                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_Fingerprint"},
+                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan"},
+                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON"},
                 {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
               ]
 
