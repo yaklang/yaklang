@@ -1443,10 +1443,12 @@ func (s *Server) ExportPayloadBatch(req *ypb.ExportPayloadBatchRequest, stream y
 }
 
 func (s *Server) UploadPayloadToOnline(req *ypb.UploadPayloadToOnlineRequest, stream ypb.Yak_UploadPayloadToOnlineServer) error {
-	if req.Token == "" || req.Group == "" {
+	if req.Token == "" {
 		return utils.Errorf("empty token")
 	}
-
+	if req.Group == "" && req.Folder == "" {
+		return utils.Errorf("group and folder is empty")
+	}
 	db := s.GetProfileDatabase()
 	db = bizhelper.ExactQueryString(db, "`group`", req.GetGroup())
 	db = bizhelper.ExactQueryString(db, "folder", req.GetFolder())
