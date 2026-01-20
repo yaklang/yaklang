@@ -5,8 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaproject"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -165,4 +168,18 @@ var Exports = map[string]any{
 
 	// result
 	"NewResultFromDB": LoadResultByID,
+
+	// SSA Project operations
+	"GetSSAProjectByID":         ssaproject.LoadSSAProjectByID,
+	"GetSSAProjectByNameAndURL": ssaproject.LoadSSAProjectByNameAndURL,
+	"NewSSAProject":             ssaproject.NewSSAProject,
+	
+	// Query latest program name by project name
+	"GetLatestProgramNameByProjectName": func(projectName string) (string, error) {
+		if projectName == "" {
+			return "", utils.Errorf("project name is empty")
+		}
+		db := consts.GetGormProfileDatabase()
+		return yakit.QueryLatestSSAProgramNameByProjectName(db, projectName)
+	},
 }

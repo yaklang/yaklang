@@ -20,17 +20,63 @@ if config == nil {
 
 
 projectName = config.GetProjectName()
+projectID = config.GetProjectID()
 yakit.Info("项目名称: %s", projectName)
 yakit.Info("项目语言: %s", config.GetLanguage())
 
+reCompile = config.GetCompileReCompile()
+
+// 生成新的 programName（带时间戳）
 currentTime = time.Now().Format("2006-01-02 15:04:05")
 programName = sprintf("%s(%s)", projectName, currentTime)
 yakit.Info("程序名称: %s", programName)
+
+// 从配置中读取增量编译设置
+enableIncrementalCompile = config.GetEnableIncrementalCompile()
+baseProgramName = config.GetBaseProgramName()
+
+// 通过 projectName 从数据库中获取最新的 program name
+lastProgramName = ""
+if projectName != "" {
+    lastProgramName, err = ssa.GetLatestProgramNameByProjectName(projectName)
+    if err != nil {
+        yakit.Warn("查询项目 %s 的最新程序名称失败: %v", projectName, err)
+    } else if lastProgramName != "" {
+        yakit.Info("从数据库查询到项目 %s 的最新程序名称: %s", projectName, lastProgramName)
+    } else {
+        yakit.Info("项目 %s 中没有已编译的程序", projectName)
+    }
+} else {
+    yakit.Warn("项目名称为空，跳过查询最新程序名称")
+}
 
 opts = [ssa.withProcess((msg, process) => {
     yakit.SetProgressEx("compile", process)
     yakit.Info("%s: %f", msg, process)
 }), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withProgramName(programName)]
+
+if enableIncrementalCompile {
+    opts = append(opts, ssa.withEnableIncrementalCompile(true))
+    
+    // 核心逻辑：如果开启了重新编译和增量编译，自动填充 baseProgramName
+    // 优先使用配置中显式设置的 baseProgramName，否则使用上一次编译的 program name
+    if reCompile && baseProgramName == "" {
+        // 使用配置中记录的上一次编译的 program name
+        if lastProgramName != "" {
+            baseProgramName = lastProgramName
+            yakit.Info("重新编译已启用增量编译，使用上一次编译的程序名称作为基础程序: %s", baseProgramName)
+        } else {
+            yakit.Info("重新编译已启用增量编译，但未找到上一次编译的程序名称，将作为首次增量编译（基础程序）")
+        }
+    }
+    
+    if baseProgramName != "" {
+        opts = append(opts, ssa.withBaseProgramName(baseProgramName))
+        yakit.Info("已启用增量编译，基础程序: %s", baseProgramName)
+    } else {
+        yakit.Info("已启用增量编译（第一次编译，将作为基础程序）")
+    }
+}
 
 progs, err = ssa.ParseProject(opts...)
 if err != nil {
@@ -40,5 +86,8 @@ if err != nil {
 }
 
 yakit.Info("编译完成")
+
+// 注意：不再需要更新 LastProgramName，因为现在直接通过 projectName 查询最新的 program
+// 编译完成后，最新的 program 会自动成为下次查询的结果
 
 yakit.Code(json.dumps({"program_name": programName}))

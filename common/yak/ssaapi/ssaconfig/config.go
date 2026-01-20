@@ -117,14 +117,16 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 
 func defaultSSACompileConfig() *SSACompileConfig {
 	return &SSACompileConfig{
-		StrictMode:         false,
-		PeepholeSize:       0,
-		ExcludeFiles:       []string{},
-		ReCompile:          false,
-		MemoryCompile:      false,
-		Concurrency:        1,
-		FilePerformanceLog: false,
-		StopOnCliCheck:     false,
+		StrictMode:               false,
+		PeepholeSize:             0,
+		ExcludeFiles:             []string{},
+		ReCompile:                false,
+		MemoryCompile:            false,
+		Concurrency:              1,
+		FilePerformanceLog:       false,
+		StopOnCliCheck:           false,
+		EnableIncrementalCompile: false,
+		BaseProgramName:          "",
 	}
 }
 

@@ -251,7 +251,7 @@ func TestOverlaySaveAndLoadFromDatabase(t *testing.T) {
 		// 注意：baseFS 应该是第一个 diff program 对应的文件系统（newFS），而不是 baseFS
 		ctx := context.Background()
 		diffPrograms2, err := ssaapi.ParseProjectWithIncrementalCompile(
-			newFS2, // 新的文件系统
+			newFS2,                            // 新的文件系统
 			diffProgramName, diffProgramName2, // 使用第一个 diff 作为 base（系统会从数据库构建基础文件系统）
 			ssaconfig.JAVA,
 			ssaapi.WithContext(ctx),

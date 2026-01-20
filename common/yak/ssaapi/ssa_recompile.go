@@ -35,6 +35,7 @@ func SaveConfig(c *Config, prog *Program) {
 	ssadb.UpdateProgram(irProg)
 }
 
+// 已弃用
 // recompile from Profile SSAProgram
 func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 	opt := make([]ssaconfig.Option, 0)
