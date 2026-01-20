@@ -1,0 +1,483 @@
+name: Update MITRE ATT&CK Techniques RAG
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "attck/*"
+      - "feature/attck*"
+  schedule:
+    # 定时任务，每周三0点更新（与CWE周二更新错开）
+    - cron: '0 0 * * 3'
+
+jobs:
+
+  update-mitre-attack:
+    name: Update MITRE ATT&CK Techniques RAG
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out yaklang code
+        uses: actions/checkout@v4
+
+      - name: Download yak binary (1.4.5-beta7)
+        run: |
+          echo "Downloading yak binary version 1.4.5-beta7..."
+          mkdir -p $HOME/bin
+          wget -q -O $HOME/bin/yak https://yaklang.oss-accelerate.aliyuncs.com/yak/1.4.5-beta7/yak_linux_amd64
+          chmod +x $HOME/bin/yak
+          export PATH=$HOME/bin:$PATH
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
+          # 验证 yak 版本
+          $HOME/bin/yak version || echo "Version check failed, continuing..."
+          echo "Yak binary ready"
+
+      - name: Create working directories
+        run: |
+          mkdir -p $HOME/yakit-projects
+          mkdir -p $HOME/atomic-red-team
+          mkdir -p $HOME/scripts
+
+      - name: Clone Atomic Red Team repository
+        run: |
+          echo "Cloning Atomic Red Team repository..."
+          git clone --depth 1 https://github.com/redcanaryco/atomic-red-team.git $HOME/atomic-red-team
+          
+          # 验证克隆成功
+          if [ ! -d "$HOME/atomic-red-team/atomics" ]; then
+            echo "ERROR: Failed to clone atomic-red-team repository"
+            exit 1
+          fi
+          
+          echo "Atomic Red Team repository cloned successfully"
+          ls -la $HOME/atomic-red-team/
+
+      - name: Download build scripts from yaklang-ai-training-materials
+        run: |
+          echo "Downloading build scripts..."
+          
+          # 下载 merge-atomic-red-team.yak
+          wget -q -O $HOME/scripts/merge-atomic-red-team.yak \
+            https://raw.githubusercontent.com/yaklang/yaklang-ai-training-materials/main/scripts/merge-atomic-red-team.yak
+          
+          # 下载 build-atomic-red-team-rag.yak
+          wget -q -O $HOME/scripts/build-atomic-red-team-rag.yak \
+            https://raw.githubusercontent.com/yaklang/yaklang-ai-training-materials/main/scripts/build-atomic-red-team-rag.yak
+          
+          # 验证下载
+          if [ ! -f "$HOME/scripts/merge-atomic-red-team.yak" ]; then
+            echo "ERROR: Failed to download merge-atomic-red-team.yak"
+            exit 1
+          fi
+          
+          if [ ! -f "$HOME/scripts/build-atomic-red-team-rag.yak" ]; then
+            echo "ERROR: Failed to download build-atomic-red-team-rag.yak"
+            exit 1
+          fi
+          
+          echo "Build scripts downloaded successfully"
+          ls -la $HOME/scripts/
+
+      # =============================================================================
+      # 第一步：生成版本号
+      # =============================================================================
+      - name: Generate Version
+        run: |
+          # 生成版本号: 日期-index
+          DATE_STR=$(date +%Y%m%d)
+          
+          # 检查当天是否已有版本，确定 index
+          INDEX=1
+          while true; do
+            VERSION="${DATE_STR}-${INDEX}"
+            CHECK_URL="https://yaklang.oss-accelerate.aliyuncs.com/rag/mitre-attack-techniques/${VERSION}/mitre_attack_techniques.rag.gz"
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -I "$CHECK_URL" || echo "000")
+            if [ "$HTTP_STATUS" = "404" ] || [ "$HTTP_STATUS" = "000" ]; then
+              echo "Version $VERSION is available"
+              break
+            fi
+            echo "Version $VERSION already exists, trying next index..."
+            INDEX=$((INDEX + 1))
+            if [ $INDEX -gt 100 ]; then
+              echo "ERROR: Too many versions for today!"
+              exit 1
+            fi
+          done
+          
+          echo "Using version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          
+          # 准备上传目录
+          RAG_OSS_DIR="/rag/mitre-attack-techniques/${VERSION}"
+          echo "RAG_OSS_DIR=$RAG_OSS_DIR" >> $GITHUB_ENV
+
+      # =============================================================================
+      # 第二步：执行 merge 脚本生成新的 ZIP
+      # =============================================================================
+      - name: Run merge-atomic-red-team.yak to generate ZIP
+        run: |
+          echo "Running merge-atomic-red-team.yak..."
+          
+          NEW_ZIP=$HOME/yakit-projects/mitre_attack_techniques_new.zip
+          
+          yak $HOME/scripts/merge-atomic-red-team.yak \
+            --atomic-dir $HOME/atomic-red-team \
+            --output $NEW_ZIP
+          
+          # 验证 ZIP 文件
+          if [ ! -f "$NEW_ZIP" ]; then
+            echo "ERROR: Failed to create ZIP file"
+            exit 1
+          fi
+          
+          FILE_SIZE=$(stat -c%s "$NEW_ZIP")
+          echo "New ZIP file size: $FILE_SIZE bytes ($(echo "scale=2; $FILE_SIZE/1024/1024" | bc) MB)"
+          
+          # ZIP 文件应该至少有 100KB
+          if [ $FILE_SIZE -lt 102400 ]; then
+            echo "ERROR: ZIP file size is less than 100KB. Something might be wrong."
+            exit 1
+          fi
+          
+          echo "NEW_ZIP=$NEW_ZIP" >> $GITHUB_ENV
+
+      # =============================================================================
+      # 第三步：下载现有 ZIP 和 RAG 文件，计算 diff
+      # =============================================================================
+      - name: Download existing ZIP and RAG files
+        continue-on-error: true
+        run: |
+          echo "Downloading existing files for incremental update..."
+          
+          # 下载 rags-latest.json 获取现有版本信息
+          wget -q -O $HOME/yakit-projects/rags-latest.json \
+            https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json || {
+            echo "No existing rags-latest.json found"
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          }
+          
+          # 验证 JSON 文件
+          if ! jq empty $HOME/yakit-projects/rags-latest.json 2>/dev/null; then
+            echo "Invalid JSON, creating empty array"
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          fi
+          
+          # 提取 MITRE ATT&CK 的现有版本路径
+          EXISTING_RAG_PATH=$(cat $HOME/yakit-projects/rags-latest.json | \
+            jq -r '.[] | select(.name == "MITRE ATT&CK Techniques") | .file' 2>/dev/null || echo "")
+          
+          if [ -n "$EXISTING_RAG_PATH" ] && [ "$EXISTING_RAG_PATH" != "null" ]; then
+            echo "Found existing RAG at: $EXISTING_RAG_PATH"
+            
+            # 提取版本目录
+            EXISTING_VERSION_DIR=$(dirname "$EXISTING_RAG_PATH")
+            EXISTING_ZIP_URL="https://yaklang.oss-accelerate.aliyuncs.com${EXISTING_VERSION_DIR}/mitre_attack_techniques.zip"
+            
+            echo "Downloading existing ZIP from: $EXISTING_ZIP_URL"
+            wget -q -O $HOME/yakit-projects/mitre_attack_techniques_old.zip "$EXISTING_ZIP_URL" || {
+              echo "Failed to download existing ZIP"
+            }
+            
+            echo "Downloading existing RAG..."
+            wget -q -O $HOME/yakit-projects/mitre_attack_techniques.rag.gz \
+              "https://yaklang.oss-accelerate.aliyuncs.com${EXISTING_RAG_PATH}" || {
+              echo "Failed to download existing RAG"
+            }
+            
+            # 解压 RAG 文件
+            if [ -f $HOME/yakit-projects/mitre_attack_techniques.rag.gz ]; then
+              yak gzip -d -f $HOME/yakit-projects/mitre_attack_techniques.rag.gz \
+                -o $HOME/yakit-projects/mitre_attack_techniques_existing.rag || {
+                echo "Failed to decompress existing RAG"
+              }
+            fi
+          else
+            echo "No existing MITRE ATT&CK Techniques RAG found, will create new"
+          fi
+          
+          # 保存现有 ZIP 路径供后续使用
+          if [ -f $HOME/yakit-projects/mitre_attack_techniques_old.zip ]; then
+            echo "HAS_EXISTING_ZIP=true" >> $GITHUB_ENV
+            echo "OLD_ZIP=$HOME/yakit-projects/mitre_attack_techniques_old.zip" >> $GITHUB_ENV
+          else
+            echo "HAS_EXISTING_ZIP=false" >> $GITHUB_ENV
+          fi
+          
+          if [ -f $HOME/yakit-projects/mitre_attack_techniques_existing.rag ]; then
+            echo "HAS_EXISTING_RAG=true" >> $GITHUB_ENV
+            echo "EXISTING_RAG=$HOME/yakit-projects/mitre_attack_techniques_existing.rag" >> $GITHUB_ENV
+          else
+            echo "HAS_EXISTING_RAG=false" >> $GITHUB_ENV
+          fi
+
+      # =============================================================================
+      # 第四步：计算 ZIP 文件差异
+      # =============================================================================
+      - name: Calculate ZIP diff
+        run: |
+          echo "Calculating differences between old and new ZIP..."
+          
+          DIFF_ZIP=$HOME/yakit-projects/mitre_attack_techniques_diff.zip
+          
+          if [ "$HAS_EXISTING_ZIP" = "true" ]; then
+            echo "Existing ZIP found, calculating diff..."
+            
+            # 解压两个 ZIP 文件进行比较
+            mkdir -p $HOME/yakit-projects/old_content
+            mkdir -p $HOME/yakit-projects/new_content
+            
+            unzip -q $OLD_ZIP -d $HOME/yakit-projects/old_content || {
+              echo "Failed to extract old ZIP"
+            }
+            unzip -q $NEW_ZIP -d $HOME/yakit-projects/new_content || {
+              echo "Failed to extract new ZIP"
+              exit 1
+            }
+            
+            # 比较文件列表
+            echo "Comparing file lists..."
+            (cd $HOME/yakit-projects/old_content && find . -type f -name "*.yaml" | sort > $HOME/yakit-projects/old_files.txt)
+            (cd $HOME/yakit-projects/new_content && find . -type f -name "*.yaml" | sort > $HOME/yakit-projects/new_files.txt)
+            
+            # 找出新增和修改的文件
+            echo "Finding new and modified files..."
+            mkdir -p $HOME/yakit-projects/diff_content
+            
+            DIFF_COUNT=0
+            NEW_COUNT=0
+            MODIFIED_COUNT=0
+            
+            # 遍历新文件，检查是否是新增或修改
+            while IFS= read -r file; do
+              OLD_FILE="$HOME/yakit-projects/old_content/$file"
+              NEW_FILE="$HOME/yakit-projects/new_content/$file"
+              
+              if [ ! -f "$OLD_FILE" ]; then
+                # 新增文件
+                echo "NEW: $file"
+                mkdir -p "$(dirname "$HOME/yakit-projects/diff_content/$file")"
+                cp "$NEW_FILE" "$HOME/yakit-projects/diff_content/$file"
+                NEW_COUNT=$((NEW_COUNT + 1))
+                DIFF_COUNT=$((DIFF_COUNT + 1))
+              elif ! diff -q "$OLD_FILE" "$NEW_FILE" > /dev/null 2>&1; then
+                # 修改的文件
+                echo "MODIFIED: $file"
+                mkdir -p "$(dirname "$HOME/yakit-projects/diff_content/$file")"
+                cp "$NEW_FILE" "$HOME/yakit-projects/diff_content/$file"
+                MODIFIED_COUNT=$((MODIFIED_COUNT + 1))
+                DIFF_COUNT=$((DIFF_COUNT + 1))
+              fi
+            done < $HOME/yakit-projects/new_files.txt
+            
+            echo ""
+            echo "=== Diff Summary ==="
+            echo "New files: $NEW_COUNT"
+            echo "Modified files: $MODIFIED_COUNT"
+            echo "Total diff files: $DIFF_COUNT"
+            
+            if [ $DIFF_COUNT -gt 0 ]; then
+              # 创建差异 ZIP
+              echo "Creating diff ZIP..."
+              (cd $HOME/yakit-projects/diff_content && zip -r $DIFF_ZIP .)
+              echo "DIFF_ZIP=$DIFF_ZIP" >> $GITHUB_ENV
+              echo "HAS_DIFF=true" >> $GITHUB_ENV
+              echo "DIFF_COUNT=$DIFF_COUNT" >> $GITHUB_ENV
+            else
+              echo "No differences found, using full ZIP for rebuild"
+              echo "HAS_DIFF=false" >> $GITHUB_ENV
+              echo "DIFF_COUNT=0" >> $GITHUB_ENV
+            fi
+          else
+            echo "No existing ZIP, will build from full ZIP"
+            echo "HAS_DIFF=false" >> $GITHUB_ENV
+            echo "DIFF_COUNT=0" >> $GITHUB_ENV
+          fi
+
+      # =============================================================================
+      # 第五步：构建或增量更新 RAG
+      # =============================================================================
+      - name: Build/Update MITRE ATT&CK RAG
+        run: |
+          echo "Building MITRE ATT&CK Techniques RAG..."
+          
+          RAG_OUTPUT=$HOME/yakit-projects/mitre_attack_techniques.rag
+          
+          if [ "$HAS_EXISTING_RAG" = "true" ] && [ "$HAS_DIFF" = "true" ]; then
+            # 增量更新模式：使用现有 RAG + diff ZIP
+            echo "=== Incremental Update Mode ==="
+            echo "Using existing RAG: $EXISTING_RAG"
+            echo "Diff files count: $DIFF_COUNT"
+            
+            yak $HOME/scripts/build-atomic-red-team-rag.yak \
+              --rag-file $EXISTING_RAG \
+              --diff-zip $DIFF_ZIP \
+              --output $RAG_OUTPUT \
+              --collection mitre-attack-techniques \
+              --concurrent 20
+              
+          elif [ "$HAS_EXISTING_RAG" = "true" ] && [ "$HAS_DIFF" = "false" ] && [ "$DIFF_COUNT" = "0" ]; then
+            # 无变化，直接使用现有 RAG
+            echo "=== No Changes Detected ==="
+            echo "No differences found, copying existing RAG..."
+            cp $EXISTING_RAG $RAG_OUTPUT
+            
+          else
+            # 全量构建模式：使用完整 ZIP
+            echo "=== Full Build Mode ==="
+            echo "Building from full ZIP: $NEW_ZIP"
+            
+            yak $HOME/scripts/build-atomic-red-team-rag.yak \
+              --input-zip $NEW_ZIP \
+              --output $RAG_OUTPUT \
+              --collection mitre-attack-techniques \
+              --concurrent 20
+          fi
+          
+          # 验证 RAG 文件
+          if [ ! -f $RAG_OUTPUT ]; then
+            echo "ERROR: RAG file not created!"
+            exit 1
+          fi
+          
+          RAG_SIZE=$(stat -c%s "$RAG_OUTPUT")
+          echo "RAG file size: $RAG_SIZE bytes ($(echo "scale=2; $RAG_SIZE/1024/1024" | bc) MB)"
+          
+          # RAG 文件应该至少有 50KB
+          if [ $RAG_SIZE -lt 51200 ]; then
+            echo "ERROR: RAG file size is less than 50KB. Something might be wrong."
+            exit 1
+          fi
+          
+          echo "RAG_OUTPUT=$RAG_OUTPUT" >> $GITHUB_ENV
+
+      # =============================================================================
+      # 第六步：压缩并上传文件
+      # =============================================================================
+      - name: Compress and Upload files
+        run: |
+          echo "Compressing and uploading files..."
+          
+          # 文件路径
+          RAG_GZ=$HOME/yakit-projects/mitre_attack_techniques.rag.gz
+          ZIP_FILE=$NEW_ZIP
+          SHA256_FILE=$HOME/yakit-projects/mitre_attack_techniques.rag.gz.sha256.txt
+          
+          # 压缩 RAG 文件
+          echo "Compressing RAG file..."
+          yak gzip -f $RAG_OUTPUT
+          mv ${RAG_OUTPUT}.gzip $RAG_GZ
+          
+          # 生成 SHA256 校验和
+          echo "Generating SHA256 checksum..."
+          SHA256_HASH=$(sha256sum $RAG_GZ | awk '{print $1}')
+          echo "$SHA256_HASH" > $SHA256_FILE
+          echo "SHA256: $SHA256_HASH"
+          echo "SHA256_HASH=$SHA256_HASH" >> $GITHUB_ENV
+          
+          # 重命名 ZIP 文件
+          FINAL_ZIP=$HOME/yakit-projects/mitre_attack_techniques.zip
+          cp $NEW_ZIP $FINAL_ZIP
+          
+          # 验证文件大小
+          RAG_GZ_SIZE=$(stat -c%s "$RAG_GZ")
+          ZIP_SIZE=$(stat -c%s "$FINAL_ZIP")
+          echo "RAG.gz size: $RAG_GZ_SIZE bytes ($(echo "scale=2; $RAG_GZ_SIZE/1024/1024" | bc) MB)"
+          echo "ZIP size: $ZIP_SIZE bytes ($(echo "scale=2; $ZIP_SIZE/1024/1024" | bc) MB)"
+          
+          # 上传 RAG 压缩文件
+          echo "Uploading mitre_attack_techniques.rag.gz..."
+          yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$RAG_GZ:${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz"
+          
+          # 上传 ZIP 文件
+          echo "Uploading mitre_attack_techniques.zip..."
+          yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$FINAL_ZIP:${RAG_OSS_DIR}/mitre_attack_techniques.zip"
+          
+          # 上传 SHA256 校验文件
+          echo "Uploading SHA256 checksum..."
+          yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$SHA256_FILE:${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz.sha256.txt"
+
+      # =============================================================================
+      # 第七步：更新 rags-latest.json
+      # =============================================================================
+      - name: Update rags-latest.json
+        run: |
+          echo "Updating rags-latest.json..."
+          
+          SHA256_VALUE=$SHA256_HASH
+          
+          # 确保 rags-latest.json 存在
+          if [ ! -f $HOME/yakit-projects/rags-latest.json ]; then
+            echo "[]" > $HOME/yakit-projects/rags-latest.json
+          fi
+          
+          # 使用 yak rag-metainfo 命令维护 rags-latest.json
+          yak rag-metainfo \
+            -f $HOME/yakit-projects/rags-latest.json \
+            -o $HOME/yakit-projects/rags-latest.json \
+            --register-name "MITRE ATT&CK Techniques" \
+            --register-name-zh "MITRE ATT&CK 攻击技术库" \
+            --version "$VERSION" \
+            --rag-file "${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz" \
+            --hash-file "${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz.sha256.txt" \
+            --hash "$SHA256_VALUE"
+          
+          echo "New rags-latest.json content:"
+          cat $HOME/yakit-projects/rags-latest.json | jq .
+
+      - name: Upload rags-latest.json to OSS
+        run: |
+          echo "Uploading rags-latest.json..."
+          yak upload-oss \
+            -b yaklang \
+            --endpoint oss-accelerate.aliyuncs.com \
+            -ak ${{ secrets.OSS_KEY_ID }} \
+            -sk ${{ secrets.OSS_KEY_SECRET }} \
+            -t 5 \
+            -f "$HOME/yakit-projects/rags-latest.json:/rag/rags-latest.json"
+
+      # =============================================================================
+      # 验证上传
+      # =============================================================================
+      - name: Verify uploads
+        run: |
+          echo "Verifying uploads..."
+          echo ""
+          echo "=== RAG File ==="
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz" | head -10
+          echo ""
+          echo "=== ZIP File ==="
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.zip" | head -10
+          echo ""
+          echo "=== SHA256 File ==="
+          curl -I "https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz.sha256.txt" | head -10
+          echo ""
+          echo "=== rags-latest.json ==="
+          curl -s "https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json" | jq .
+          echo ""
+          echo "=== Build Summary ==="
+          echo "Version: $VERSION"
+          echo "Diff files processed: ${DIFF_COUNT:-0}"
+          echo "RAG File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz"
+          echo "ZIP File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/mitre_attack_techniques.zip"
+          echo "SHA256: $SHA256_HASH"
+          echo ""
+          echo "=== MITRE ATT&CK Techniques RAG Update Complete ==="
