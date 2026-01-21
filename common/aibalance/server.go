@@ -654,8 +654,10 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				provider.TypeName, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024, ms.HeapObjects)
 		}
 
-		client, err := provider.GetAIClientWithImages(
+		client, err := provider.GetAIClientWithImagesAndTools(
 			imageContent,
+			bodyIns.Tools,      // Forward tools from client request
+			bodyIns.ToolChoice, // Forward tool_choice from client request
 			func(reader io.Reader) {
 				defer func() {
 					pw.Close()

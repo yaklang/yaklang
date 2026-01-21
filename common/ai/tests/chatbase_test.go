@@ -1579,3 +1579,462 @@ func TestComplexReasoning_ConcurrentHandlers(t *testing.T) {
 	// Response should not contain legacy format
 	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain legacy format")
 }
+
+// ==================== Tools Parameter Tests ====================
+
+// mockAiToolCallWithToolsRsp 模拟当请求包含 tools 参数时，AI 返回 tool_calls 的响应
+const mockAiToolCallWithToolsRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "tools-test-123",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_tools_test_001",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Beijing\",\"unit\":\"celsius\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 50, "completion_tokens": 30, "total_tokens": 80 }
+}
+`
+
+// TestChatBase_WithTools tests that tools parameter is correctly passed to the request
+func TestChatBase_WithTools(t *testing.T) {
+	var capturedRequest []byte
+
+	// Use DebugMockHTTPEx to capture the request and verify tools field
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiToolCallWithToolsRsp)
+	})
+
+	// Define tools
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        "get_weather",
+				Description: "Get the current weather in a given location",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"location": map[string]any{
+							"type":        "string",
+							"description": "The city name",
+						},
+						"unit": map[string]any{
+							"type": "string",
+							"enum": []string{"celsius", "fahrenheit"},
+						},
+					},
+					"required": []string{"location"},
+				},
+			},
+		},
+	}
+
+	var receivedToolCalls []*aispec.ToolCall
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"What is the weather in Beijing?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		aispec.WithChatBase_ToolChoice("auto"),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = toolCalls
+		}),
+	)
+
+	assert.NoError(t, err, "Request with tools should succeed")
+
+	// ===== CRITICAL: Verify the request body contains tools field =====
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Request MUST contain 'tools' field when tools are provided")
+	assert.Contains(t, requestBody, `"tool_choice"`, "Request MUST contain 'tool_choice' field when tool_choice is provided")
+	assert.Contains(t, requestBody, `"get_weather"`, "Request should contain function name in tools")
+	assert.Contains(t, requestBody, `"function"`, "Request should contain function type in tools")
+	t.Logf("Request body contains tools: %v", strings.Contains(requestBody, `"tools"`))
+
+	// Verify tool calls were received
+	assert.Len(t, receivedToolCalls, 1, "Should receive 1 tool call")
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+	assert.Equal(t, "call_tools_test_001", receivedToolCalls[0].ID)
+	assert.Contains(t, receivedToolCalls[0].Function.Arguments, "Beijing")
+
+	// Verify no <|TOOL_CALL...|> in response when callback is set
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain legacy format when callback is set")
+
+	t.Logf("Tool call received: %s with args: %s", receivedToolCalls[0].Function.Name, receivedToolCalls[0].Function.Arguments)
+}
+
+// TestChatBase_WithTools_MultipleTools tests multiple tools in a single request
+func TestChatBase_WithTools_MultipleTools(t *testing.T) {
+	// Mock response with multiple tool calls
+	mockMultiToolRsp := `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "multi-tools-test",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "I'll check both for you.",
+        "tool_calls": [
+          {
+            "id": "call_multi_1",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Beijing\"}"
+            }
+          },
+          {
+            "id": "call_multi_2",
+            "type": "function",
+            "function": {
+              "name": "get_time",
+              "arguments": "{\"timezone\":\"Asia/Shanghai\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}
+`
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockMultiToolRsp)
+	})
+
+	// Define multiple tools
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        "get_weather",
+				Description: "Get weather",
+			},
+		},
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        "get_time",
+				Description: "Get current time",
+			},
+		},
+	}
+
+	var receivedToolCalls []*aispec.ToolCall
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"What is the weather and time in Beijing?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = append(receivedToolCalls, toolCalls...)
+		}),
+	)
+
+	assert.NoError(t, err, "Request with multiple tools should succeed")
+
+	// ===== CRITICAL: Verify the request body contains multiple tools =====
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Request MUST contain 'tools' field")
+	assert.Contains(t, requestBody, `"get_weather"`, "Request should contain get_weather function")
+	assert.Contains(t, requestBody, `"get_time"`, "Request should contain get_time function")
+	t.Logf("Request contains both tools: get_weather=%v, get_time=%v",
+		strings.Contains(requestBody, `"get_weather"`), strings.Contains(requestBody, `"get_time"`))
+
+	// Verify content was captured
+	assert.Contains(t, res, "check both", "Response should contain content")
+
+	// Verify both tool calls were received
+	assert.Len(t, receivedToolCalls, 2, "Should receive 2 tool calls")
+
+	// Verify tool call indices
+	for i, tc := range receivedToolCalls {
+		assert.Equal(t, i, tc.Index, "Tool call %d should have Index %d", i, i)
+	}
+
+	// Verify tool names
+	toolNames := make([]string, 0, 2)
+	for _, tc := range receivedToolCalls {
+		toolNames = append(toolNames, tc.Function.Name)
+	}
+	assert.Contains(t, toolNames, "get_weather", "Should have get_weather tool")
+	assert.Contains(t, toolNames, "get_time", "Should have get_time tool")
+}
+
+// TestChatBase_WithTools_NoCallback tests that legacy format is used when no callback is set
+func TestChatBase_WithTools_NoCallback(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiToolCallWithToolsRsp)
+	})
+
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        "get_weather",
+				Description: "Get weather",
+			},
+		},
+	}
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"What is the weather?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		// No ToolCallCallback - should use legacy format
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+
+	// ===== CRITICAL: Verify the request body still contains tools =====
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Request MUST contain 'tools' field even without callback")
+	assert.Contains(t, requestBody, `"get_weather"`, "Request should contain function name in tools")
+	t.Logf("Request contains tools field: %v", strings.Contains(requestBody, `"tools"`))
+
+	// Verify legacy format is used when no callback is set
+	assert.Contains(t, res, "<|TOOL_CALL_", "Response SHOULD contain legacy format when no callback is set")
+	assert.Contains(t, res, "get_weather", "Legacy format should contain function name")
+	assert.Contains(t, res, "Beijing", "Legacy format should contain arguments")
+}
+
+// TestChatBase_WithTools_ToolChoiceRequired tests tool_choice = "required"
+func TestChatBase_WithTools_ToolChoiceRequired(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiToolCallWithToolsRsp)
+	})
+
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name: "get_weather",
+			},
+		},
+	}
+
+	var callbackCalled bool
+
+	_, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Get weather",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		aispec.WithChatBase_ToolChoice("required"),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			callbackCalled = true
+		}),
+	)
+
+	assert.NoError(t, err, "Request with tool_choice=required should succeed")
+
+	// ===== CRITICAL: Verify tool_choice is correctly set in request =====
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Request MUST contain 'tools' field")
+	assert.Contains(t, requestBody, `"tool_choice"`, "Request MUST contain 'tool_choice' field")
+	assert.Contains(t, requestBody, `"required"`, "Request should contain tool_choice value 'required'")
+	t.Logf("Request contains tool_choice=required: %v", strings.Contains(requestBody, `"required"`))
+
+	assert.True(t, callbackCalled, "Tool call callback should be called")
+}
+
+// TestChatBase_WithTools_SpecificFunction tests tool_choice with specific function
+func TestChatBase_WithTools_SpecificFunction(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiToolCallWithToolsRsp)
+	})
+
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name: "get_weather",
+			},
+		},
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name: "get_time",
+			},
+		},
+	}
+
+	// Specific tool_choice format
+	toolChoice := map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name": "get_weather",
+		},
+	}
+
+	var receivedToolCalls []*aispec.ToolCall
+
+	_, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Tell me about Beijing",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		aispec.WithChatBase_ToolChoice(toolChoice),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = toolCalls
+		}),
+	)
+
+	assert.NoError(t, err, "Request with specific tool_choice should succeed")
+
+	// ===== CRITICAL: Verify complex tool_choice object is in request =====
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Request MUST contain 'tools' field")
+	assert.Contains(t, requestBody, `"tool_choice"`, "Request MUST contain 'tool_choice' field")
+	// Verify the specific function is included in tool_choice
+	assert.Contains(t, requestBody, `"function"`, "Request should contain 'function' in tool_choice")
+	t.Logf("Request contains specific tool_choice: %v", strings.Contains(requestBody, `"tool_choice"`))
+
+	assert.Len(t, receivedToolCalls, 1, "Should receive exactly 1 tool call")
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+}
+
+// TestChatBase_WithEmptyTools tests that empty tools array doesn't cause issues
+func TestChatBase_WithEmptyTools(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiRsp)
+	})
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Hello",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools([]aispec.Tool{}), // Empty tools array
+	)
+
+	assert.NoError(t, err, "Request with empty tools should succeed")
+	assert.Contains(t, res, "你好", "Normal response should work")
+
+	// ===== CRITICAL: Empty tools array should NOT include tools field in request =====
+	requestBody := string(capturedRequest)
+	// When tools is empty array, it should not include tools field
+	t.Logf("Request body with empty tools contains 'tools' field: %v", strings.Contains(requestBody, `"tools"`))
+}
+
+// TestChatBase_WithoutTools tests that no tools field is present when tools are not provided
+func TestChatBase_WithoutTools(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockAiRsp)
+	})
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Hello without tools",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		// NOTE: No WithChatBase_Tools option - should NOT include tools in request
+	)
+
+	assert.NoError(t, err, "Request without tools should succeed")
+	assert.NotEmpty(t, res, "Response should not be empty")
+
+	// ===== CRITICAL: Verify the request body does NOT contain tools field =====
+	requestBody := string(capturedRequest)
+	assert.NotContains(t, requestBody, `"tools"`, "Request MUST NOT contain 'tools' field when no tools provided")
+	assert.NotContains(t, requestBody, `"tool_choice"`, "Request MUST NOT contain 'tool_choice' field when no tools provided")
+	t.Logf("Request without tools does not contain 'tools' field: %v", !strings.Contains(requestBody, `"tools"`))
+}

@@ -188,6 +188,10 @@ type ChatBaseContext struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+	// Tools defines the available tools that the model may call
+	Tools []Tool
+	// ToolChoice controls which (if any) tool is called by the model
+	ToolChoice any
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -221,6 +225,21 @@ func WithChatBase_EnableThinkingEx(b bool, key string, value any) ChatBaseOption
 func WithChatBase_Function(b []any) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		//c.FS = b
+	}
+}
+
+// WithChatBase_Tools sets the available tools for the model to call
+func WithChatBase_Tools(tools []Tool) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.Tools = tools
+	}
+}
+
+// WithChatBase_ToolChoice controls which tool is called by the model
+// Can be "none", "auto", "required", or {"type": "function", "function": {"name": "my_function"}}
+func WithChatBase_ToolChoice(choice any) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ToolChoice = choice
 	}
 }
 
@@ -302,6 +321,14 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	msgIns := NewChatMessage(model, msgs)
 	msgIns.Stream = !ctx.DisableStream
 	handleStream := msgIns.Stream
+
+	// Add tools if provided
+	if len(ctx.Tools) > 0 {
+		msgIns.Tools = ctx.Tools
+	}
+	if ctx.ToolChoice != nil {
+		msgIns.ToolChoice = ctx.ToolChoice
+	}
 
 	var msgResult any = msgIns
 	var raw []byte

@@ -16,6 +16,25 @@ type ChatMessage struct {
 	Messages       []ChatDetail `json:"messages"`
 	Stream         bool         `json:"stream"`
 	EnableThinking bool         `json:"enable_thinking,omitempty"`
+	// Tools defines the available tools that the model may call
+	Tools []Tool `json:"tools,omitempty"`
+	// ToolChoice controls which (if any) tool is called by the model
+	// Can be "none", "auto", "required", or {"type": "function", "function": {"name": "my_function"}}
+	ToolChoice any `json:"tool_choice,omitempty"`
+}
+
+// Tool represents a tool that the model may call
+type Tool struct {
+	Type     string       `json:"type"` // Currently only "function" is supported
+	Function ToolFunction `json:"function"`
+}
+
+// ToolFunction represents the function details for a tool
+type ToolFunction struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	// Parameters is a JSON Schema object describing the function parameters
+	Parameters any `json:"parameters,omitempty"`
 }
 
 type ChatDetail struct {

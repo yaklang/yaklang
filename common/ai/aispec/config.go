@@ -57,6 +57,11 @@ type AIConfig struct {
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
 	ToolCallCallback func([]*ToolCall)
+
+	// Tools defines the available tools that the model may call
+	Tools []Tool
+	// ToolChoice controls which (if any) tool is called by the model
+	ToolChoice any
 }
 
 func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
@@ -414,5 +419,20 @@ func WithHTTPErrorHandler(h func(error)) AIConfigOption {
 func WithToolCallCallback(cb func([]*ToolCall)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ToolCallCallback = cb
+	}
+}
+
+// WithTools sets the available tools that the model may call
+func WithTools(tools []Tool) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Tools = tools
+	}
+}
+
+// WithToolChoice controls which (if any) tool is called by the model
+// Can be "none", "auto", "required", or a specific function: {"type": "function", "function": {"name": "my_function"}}
+func WithToolChoice(choice any) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ToolChoice = choice
 	}
 }
