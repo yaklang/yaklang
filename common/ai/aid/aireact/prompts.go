@@ -99,6 +99,8 @@ type LoopPromptData struct {
 	Language           string
 	Schema             string
 	DynamicContext     string
+	TaskType           string
+	ForgeName          string
 }
 
 // ToolParamsPromptData contains data for tool parameter generation prompt
@@ -288,6 +290,13 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
 	result["DynamicContext"] = pm.DynamicContext()
 	result["Language"] = pm.react.config.GetLanguage()
+
+	taskType := "react"
+	if forgeName := pm.react.config.GetForgeName(); forgeName != "" {
+		taskType = "forge"
+		result["ForgeName"] = forgeName
+	}
+	result["TaskType"] = taskType
 
 	// Use getters instead of direct field access
 

@@ -35,7 +35,9 @@ func init() {
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
-				reactloops.WithAllowToolCall(true),
+				reactloops.WithAllowToolCall(false),
+				reactloops.WithAllowAIForge(false),
+				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
@@ -68,7 +70,7 @@ func init() {
 				// Register post-iteration hook for final document generation (triggered on loop exit)
 				BuildOnPostIterationHook(r),
 			}
-			preset = append(preset, opts...)
+			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, r, preset...)
 		},
 		// Register metadata for better AI understanding

@@ -13,6 +13,10 @@ func (c *Config) GetAIForgeManager() AIForgeFactory {
 	return c.AiForgeManager
 }
 
+func (c *Config) GetForgeName() string {
+	return c.ForgeName
+}
+
 func (c *Config) GetInputConsumption() int64 {
 	return atomic.LoadInt64(c.InputConsumption)
 }

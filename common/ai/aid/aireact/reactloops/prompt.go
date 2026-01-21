@@ -3,8 +3,10 @@ package reactloops
 import (
 	_ "embed"
 	"fmt"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -15,16 +17,24 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
 	// build in code
 	values := r.GetAllActions()
+	disableActionList := []string{}
 	if disallowExit {
-		var filteredValues []*LoopAction
-		for _, v := range values {
-			if v.ActionType != loopAction_Finish.ActionType {
-				filteredValues = append(filteredValues, v)
-			} else {
-				log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
-			}
+		disableActionList = append(disableActionList, loopAction_Finish.ActionType)
+	}
+	if r.allowAIForge != nil && !r.allowAIForge() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
+	}
+	if r.allowPlanAndExec != nil && !r.allowPlanAndExec() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+	}
+
+	var filteredValues []*LoopAction
+	for _, v := range values {
+		if !slices.Contains(disableActionList, v.ActionType) {
+			filteredValues = append(filteredValues, v)
+		} else {
+			log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
 		}
-		values = filteredValues
 	}
 	schema := buildSchema(values...)
 	return schema, nil
