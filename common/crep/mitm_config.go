@@ -98,6 +98,13 @@ func MITM_SetSNI(sni string, overwrite bool) MITMConfig {
 	}
 }
 
+func MITM_SetSNIMapping(mapping map[string]string) MITMConfig {
+	return func(server *MITMServer) error {
+		server.sniMapping = mapping
+		return nil
+	}
+}
+
 func MITM_SetHijackedMaxContentLength(i int) MITMConfig {
 	return func(server *MITMServer) error {
 		server.hijackedMaxContentLength = i
