@@ -36,7 +36,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 			log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
 		}
 	}
-	schema := buildSchema(values...)
+	schema := buildSchema(filteredValues...)
 	return schema, nil
 }
 
