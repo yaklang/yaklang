@@ -1,7 +1,6 @@
 package reactloops
 
 import (
-	"bytes"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 
@@ -57,10 +56,5 @@ func (r *ReActLoop) GetCurrentMemoriesContent() string {
 		return ""
 	}
 
-	var buf bytes.Buffer
-	for _, v := range r.currentMemories.Values() {
-		buf.WriteString(v.Content)
-		buf.WriteString("\n")
-	}
-	return buf.String()
+	return aicommon.BuildPromptMemoriesMarkdownFromEntities(r.currentMemories.Values(), aicommon.MemoryIntentGeneric)
 }
