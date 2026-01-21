@@ -301,6 +301,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		hostMapping[pair.GetKey()] = pair.GetValue()
 	}
 
+	sniMapping := make(map[string]string)
+	for _, pair := range firstReq.GetSNIMapping() {
+		sniMapping[pair.GetKey()] = pair.GetValue()
+	}
+
 	if !firstReq.GetEnableProxyAuth() {
 		// 如果用户名密码不启用，设置为空
 		proxyUsername = ""
@@ -1691,6 +1696,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
 		crep.MITM_RandomJA3(randomJA3),
 		crep.MITM_SetSNI(sni, overwriteSNI),
+		crep.MITM_SetSNIMapping(sniMapping),
 		crep.MITM_ProxyAuth(proxyUsername, proxyPassword),
 		crep.MITM_SetDisableSystemProxy(disableSystemProxy),
 		crep.MITM_SetHijackedMaxContentLength(packetLimit),
