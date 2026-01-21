@@ -28,14 +28,31 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
 	}
 
+	if r.allowToolCall != nil && !r.allowToolCall() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
+	}
+
+	filterFunc := func(action *LoopAction) bool {
+		if r.actionFilters == nil {
+			return true
+		}
+		for _, filter := range r.actionFilters {
+			if !filter(action) {
+				return false
+			}
+		}
+		return true
+	}
+
 	var filteredValues []*LoopAction
 	for _, v := range values {
-		if !slices.Contains(disableActionList, v.ActionType) {
+		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
 			filteredValues = append(filteredValues, v)
 		} else {
 			log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
 		}
 	}
+
 	schema := buildSchema(filteredValues...)
 	return schema, nil
 }

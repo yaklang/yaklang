@@ -39,6 +39,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 		fmt.Sprintf("search_knowledge_%s", mode),
 		desc, toolOpts,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+			loop.Set("search_mode", mode)
 			loop.LoadingStatus(fmt.Sprintf("验证参数中 - search_knowledge:%s / validating parameters - mode:%s", mode, mode))
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			if len(knowledgeBases) == 0 {
@@ -59,6 +60,20 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			// 记录新知识
+			feedNewKnowledge := func(knowledge string, query string) {
+				var finalKnowledge string
+				oldKnowledges := loop.Get("search_results_summary")
+				if oldKnowledges == "" {
+					finalKnowledge = knowledge
+				} else {
+					newKnowledge := oldKnowledges + "\n\n" + knowledge
+					compressNewKnowledge := compressKnowledgeResultsWithScore(newKnowledge, query, loop.GetInvoker(), loop, 10*1024)
+					finalKnowledge = compressNewKnowledge
+				}
+				loop.Set("search_results_summary", finalKnowledge)
+			}
+
 			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
 
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
@@ -115,9 +130,8 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			compressedResult := compressKnowledgeResultsWithScore(singleResult, userContext, invoker, loop, 10*1024)
 			loop.LoadingStatus("压缩完成 - compression done")
 
-			// 记录到 timeline
-			invoker.AddToTimeline("knowledge_fragment_compressed", fmt.Sprintf("Mode: %s\nQuery: %s\n%s", mode, queryToUse, compressedResult))
-
+			// 将新知识记录
+			feedNewKnowledge(compressedResult, queryToUse)
 			// 获取迭代次数
 			iteration := loop.GetCurrentIterationIndex()
 			if iteration <= 0 {
@@ -173,13 +187,13 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				time.Now().Format("15:04:05"), searchCount, mode, queryToUse, len(compressedResult))
 			loop.Set("search_history", searchHistory)
 
-			// 累积所有压缩结果
-			allResults := loop.Get("all_compressed_results")
-			if allResults != "" {
-				allResults += "\n\n---\n\n"
-			}
-			allResults += fmt.Sprintf("### 搜索 #%d: %s\n\n%s", searchCount, queryToUse, compressedResult)
-			loop.Set("all_compressed_results", allResults)
+			// // 累积所有压缩结果
+			// allResults := loop.Get("all_compressed_results")
+			// if allResults != "" {
+			// 	allResults += "\n\n---\n\n"
+			// }
+			// allResults += fmt.Sprintf("### 搜索 #%d: %s\n\n%s", searchCount, queryToUse, compressedResult)
+			// loop.Set("all_compressed_results", allResults)
 
 			// 使用 LiteForge 评估下一步行动
 			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next movements")
@@ -217,9 +231,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 				currentNextMovements += fmt.Sprintf("【搜索 #%d: %s】\n%s", searchCount, queryToUse, evalResult.NextMovements)
 				loop.Set("next_movements_summary", currentNextMovements)
 
-				invoker.AddToTimeline("next_movements", fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, evalResult.NextMovements))
-
-				// 构建反馈信息
+				next_movements := fmt.Sprintf("Search #%d: %s\nNext: %s", searchCount, queryToUse, evalResult.NextMovements)
 				feedback := fmt.Sprintf(`=== 搜索完成 ===
 查询: %s
 模式: %s
@@ -232,8 +244,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 请根据建议继续搜索。
 `, queryToUse, mode, len(compressedResult), artifactFilename, evalResult.NextMovements)
 
-				op.Feedback(feedback)
-				r.AddToTimeline("next_movements_feedback", feedback)
+				loop.Set("next_movements", next_movements+"\n\n"+feedback)
 				op.Continue() // 继续循环，让 AI 执行下一步搜索
 			}
 		},

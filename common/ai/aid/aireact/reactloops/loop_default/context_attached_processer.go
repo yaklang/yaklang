@@ -20,8 +20,33 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 	)
 
 	newTask.SetAttachedDatas(task.GetAttachedDatas())
+	originOptions := r.GetConfig().OriginOptions()
 
-	ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE))
+	var opts []any
+	for _, option := range originOptions {
+		opts = append(opts, option)
+	}
+
+	var knowledgeEnhanceLoop *reactloops.ReActLoop
+	opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
+		knowledgeEnhanceLoop = loop
+	}))
+
+	ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
+
+	var searchResultsSummary string
+
+	finalSummary := knowledgeEnhanceLoop.Get("final_summary")
+	if finalSummary != "" {
+		searchResultsSummary = finalSummary
+	} else {
+		searchResultsSummary = loop.Get("search_results_summary")
+	}
+
+	if searchResultsSummary != "" {
+		loop.GetInvoker().AddToTimeline("knowledge_search_result_summary", searchResultsSummary)
+		loop.GetInvoker().AddToTimeline("import notice", "knowledge_search_result_summary has been set, no need to search the knowledge base again as it has already been queried")
+	}
 
 	if err != nil {
 		return utils.Wrap(err, "failed to execute loop task")

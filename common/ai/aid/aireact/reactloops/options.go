@@ -26,6 +26,12 @@ func WithAllowAIForgeGetter(allowAIForge func() bool) ReActLoopOption {
 	}
 }
 
+func WithOnLoopInstanceCreated(fn func(loop *ReActLoop)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.onLoopInstanceCreated = fn
+	}
+}
+
 func WithAllowPlanAndExecGetter(allowPlanAndExec func() bool) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.allowPlanAndExec = allowPlanAndExec
@@ -68,6 +74,12 @@ func WithAllowRAG(b ...bool) ReActLoopOption {
 func WithAllowToolCallGetter(allowToolCall func() bool) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.allowToolCall = allowToolCall
+	}
+}
+
+func WithActionFilter(filter func(action *LoopAction) bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.actionFilters = append(r.actionFilters, filter)
 	}
 }
 
