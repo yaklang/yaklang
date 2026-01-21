@@ -93,7 +93,14 @@ func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime, opts ...ReA
 	if !ok {
 		return nil, utils.Errorf("reactloop[%v] type assert error", name)
 	}
-	return factoryCreator(invoker, opts...)
+	loopIns, err := factoryCreator(invoker, opts...)
+	if err != nil {
+		return nil, utils.Wrap(err, "failed to create loop instance")
+	}
+	if loopIns.onLoopInstanceCreated != nil {
+		loopIns.onLoopInstanceCreated(loopIns)
+	}
+	return loopIns, nil
 }
 
 func GetLoopFactory(name string) (LoopFactory, bool) {

@@ -39,6 +39,7 @@ type AICallerConfigIf interface {
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
 	GetAiToolManager() *buildinaitools.AiToolManager
+	OriginOptions() []ConfigOption
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

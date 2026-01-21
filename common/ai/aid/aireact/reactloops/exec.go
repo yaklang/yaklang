@@ -562,6 +562,11 @@ LOOP:
 			return finalError
 		}
 
+		// Save prompt to file in debug mode
+		if r.isDebugModeEnabled() {
+			r.savePromptToFile(task, iterationCount, prompt)
+		}
+
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
@@ -844,6 +849,47 @@ func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 	return loopDir
 }
 
+func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int, prompt string) {
+	if utils.IsNil(r) || utils.IsNil(task) {
+		return
+	}
+	emitter := r.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	workdir := consts.TempAIDir(r.config.GetRuntimeId())
+	if workdir == "" {
+		workdir = consts.GetDefaultBaseHomeDir()
+	}
+	taskIndex := task.GetIndex()
+	if taskIndex == "" {
+		taskIndex = "0"
+	}
+	promptDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "prompts")
+	if err := os.MkdirAll(promptDir, 0755); err != nil {
+		log.Errorf("failed to create prompt directory %s: %v", promptDir, err)
+		return
+	}
+
+	filename := fmt.Sprintf("iteration_%d_prompt_%d.md", iteration, time.Now().Unix())
+	filePath := filepath.Join(promptDir, filename)
+
+	var content strings.Builder
+	content.WriteString(fmt.Sprintf("# Iteration %d - Generated Prompt\n\n", iteration))
+	content.WriteString(fmt.Sprintf("**Loop Name:** %s\n\n", r.loopName))
+	content.WriteString(fmt.Sprintf("**Generated at:** %s\n\n", utils.DatetimePretty()))
+	content.WriteString("---\n\n")
+	content.WriteString(prompt)
+
+	if err := os.WriteFile(filePath, []byte(content.String()), 0644); err != nil {
+		log.Errorf("failed to save prompt to file: %v", err)
+		return
+	}
+	emitter.EmitPinFilename(filePath)
+	log.Infof("saved prompt to file: %s", filePath)
+}
+
 func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string) {
 	if utils.IsNil(r) || utils.IsNil(task) || utils.IsNil(action) {
 		return
@@ -903,14 +949,17 @@ func (r *ReActLoop) buildActionExecutionMarkdown(actionName string, params map[s
 }
 
 func (r *ReActLoop) isDebugModeEnabled() bool {
+	// Check debug_mode variable first
 	value := r.GetVariable("debug_mode")
-	if value == nil {
-		return false
+	if value != nil {
+		if enabled, ok := value.(bool); ok && enabled {
+			return true
+		}
+		if strings.EqualFold(utils.InterfaceToString(value), "true") {
+			return true
+		}
 	}
-	if enabled, ok := value.(bool); ok {
-		return enabled
-	}
-	return strings.EqualFold(utils.InterfaceToString(value), "true")
+	return false
 }
 
 func sanitizeActionFilename(name string) string {

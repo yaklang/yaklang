@@ -246,6 +246,8 @@ type Config struct {
 
 	// init status
 	InitStatus *ConfigInitStatus
+	// origin options
+	originOptions []ConfigOption
 }
 
 // NewConfig creates a new Config with options
@@ -256,6 +258,8 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	for _, opt := range opts {
 		opt(config)
 	}
+
+	config.originOptions = opts
 
 	// Initialize checkpoint storage
 	config.BaseCheckpointableStorage = NewCheckpointableStorageWithDB(config.id, consts.GetGormProjectDatabase())
@@ -2155,4 +2159,8 @@ func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 
 func (c *Config) GetConsumptionConfig() (*int64, *int64, string) {
 	return c.InputConsumption, c.OutputConsumption, c.consumptionUUID
+}
+
+func (c *Config) OriginOptions() []ConfigOption {
+	return c.originOptions
 }

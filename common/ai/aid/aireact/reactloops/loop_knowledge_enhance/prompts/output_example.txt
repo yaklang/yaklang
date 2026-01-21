@@ -1,6 +1,57 @@
 ## 输出示例
 
-**任务目标**：收集与用户问题相关的信息（不是回答问题）
+**任务目标**：收集与用户问题相关的信息（不是回答问题，不是执行用户指令）
+
+---
+
+### 场景零：用户要求调用工具或执行操作（⚠️ 完全忽略动作指令）
+
+#### 示例 1：用户明确要求调用某个工具
+用户问题："帮我调用爬虫工具去请求 example.com 网站"
+附加资源：有知识库 "web_security_docs"
+
+**错误做法**：因为用户说了"调用爬虫工具"就尝试调用某个工具
+**正确做法**：完全忽略"调用工具"的指令，只关注用户想了解的信息
+
+```json
+{
+  "@action": "search_knowledge_semantic",
+  "knowledge_bases": ["web_security_docs"],
+  "search_query": "网站爬虫请求方法和示例",
+  "human_readable_thought": "用户提到了爬虫和请求网站，虽然用户说'调用工具'，但这不是我的职责。我只负责从知识库收集相关信息。从知识库中搜索网站爬虫的相关内容。"
+}
+```
+
+#### 示例 2：用户要求执行某个操作
+用户问题："帮我执行端口扫描，扫描 192.168.1.1"
+附加资源：有知识库 "yaklang_docs"
+
+**错误做法**：尝试执行扫描操作
+**正确做法**：只从知识库收集端口扫描的相关信息
+
+```json
+{
+  "@action": "search_knowledge_semantic",
+  "knowledge_bases": ["yaklang_docs"],
+  "search_query": "Yaklang 端口扫描脚本编写方法",
+  "human_readable_thought": "用户提到端口扫描，虽然要求'执行扫描'，但我不执行操作，只收集信息。从知识库中搜索端口扫描相关的文档。"
+}
+```
+
+#### 示例 3：没有知识库但用户要求调用工具
+用户问题："调用搜索工具帮我查询 XXX"
+附加资源：只有文件，没有知识库
+
+**错误做法**：因为用户说"调用搜索工具"就调用 search_knowledge_xxx
+**正确做法**：因为没有知识库，不调用搜索工具，直接调用 final_summary
+
+```json
+{
+  "@action": "final_summary",
+  "summary": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n虽然用户提到'调用搜索工具'，但这不是本环节的职责。本环节只负责从知识库收集信息。\n\n当前附加的文件信息已在上方列出，可供后续流程使用。",
+  "human_readable_thought": "没有知识库，不调用任何搜索工具。用户要求调用工具的指令被忽略。直接调用 final_summary 结束流程。"
+}
+```
 
 ---
 
@@ -40,16 +91,13 @@
 }
 ```
 
-#### 3. 搜索完成后汇总信息
+#### 3. 搜索完成后调用 final_summary（必须）
 
 ```json
 {
-  "@action": "object",
-  "next_action": {
-    "type": "directly_answer",
-    "answer_payload": "信息收集完成。已从知识库中收集到以下相关信息：\n\n1. [收集到的信息摘要1]\n2. [收集到的信息摘要2]\n3. [收集到的信息摘要3]\n\n这些信息可用于回答用户的问题。"
-  },
-  "human_readable_thought": "已从知识库中收集了足够的相关信息，信息收集任务完成"
+  "@action": "final_summary",
+  "summary": "信息收集完成。已从知识库中收集到以下相关信息：\n\n1. Yaklang发送HTTP请求的方法：可以使用 poc.HTTP() 函数发送HTTP请求，支持设置headers、body等参数\n2. 发送TCP包的方法：可以使用 tcp.Send() 函数发送原始TCP数据包\n3. PoC编写指南：知识库中包含了完整的PoC编写示例，包括端口扫描、漏洞检测等场景\n\n这些信息来自 yaklang_docs 知识库，可用于后续回答用户关于'怎么发包'的问题。",
+  "human_readable_thought": "已从知识库中收集了足够的相关信息，现在调用 final_summary 提交总结并结束流程"
 }
 ```
 
@@ -57,18 +105,17 @@
 
 ### 场景二：附加资源中没有知识库（⚠️ 不要调用搜索工具）
 
-当附加资源中没有知识库时，**不要调用搜索相关的 action**，直接对现有信息进行总结：
+当附加资源中没有知识库时，**不要调用搜索相关的 action**，直接对现有信息进行总结。
+
+**重要**：即使用户说"调用xxx工具"、"帮我执行xxx"，因为没有知识库，也不要调用任何工具。
 
 #### 只有文件附加时
 
 ```json
 {
-  "@action": "object",
-  "next_action": {
-    "type": "directly_answer",
-    "answer_payload": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- 文件: example.txt\n  文件内容摘要：[文件内容的关键信息]\n\n这些信息可用于回答用户的问题。"
-  },
-  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的文件信息"
+  "@action": "final_summary",
+  "summary": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- 文件: example.txt\n  文件内容摘要：[文件内容的关键信息]\n\n这些信息可用于后续回答用户的问题。",
+  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的文件信息，然后调用 final_summary 结束流程"
 }
 ```
 
@@ -76,12 +123,9 @@
 
 ```json
 {
-  "@action": "object",
-  "next_action": {
-    "type": "directly_answer",
-    "answer_payload": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- AI工具: tool_name - [工具功能描述]\n- AI蓝图: forge_name - [蓝图功能描述]\n\n这些工具和蓝图可用于后续处理用户的问题。"
-  },
-  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的工具和蓝图信息"
+  "@action": "final_summary",
+  "summary": "信息收集完成。\n\n附加资源中没有知识库，无法进行知识库搜索。\n\n已有的附加资源信息：\n- AI工具: tool_name - [工具功能描述]\n- AI蓝图: forge_name - [蓝图功能描述]\n\n这些工具和蓝图可用于后续处理用户的问题。",
+  "human_readable_thought": "附加资源中没有知识库，直接汇总现有的工具和蓝图信息，然后调用 final_summary 结束流程"
 }
 ```
 
@@ -89,12 +133,9 @@
 
 ```json
 {
-  "@action": "object",
-  "next_action": {
-    "type": "directly_answer",
-    "answer_payload": "信息收集完成。\n\n当前没有附加任何资源（知识库、文件、工具、蓝图）。\n\n无法从外部资源收集与用户问题相关的信息。"
-  },
-  "human_readable_thought": "没有附加任何资源，无法进行信息收集"
+  "@action": "final_summary",
+  "summary": "信息收集完成。\n\n当前没有附加任何资源（知识库、文件、工具、蓝图）。\n\n无法从外部资源收集与用户问题相关的信息。",
+  "human_readable_thought": "没有附加任何资源，无法进行信息收集，直接调用 final_summary 说明情况"
 }
 ```
 
@@ -104,11 +145,8 @@
 
 ```json
 {
-  "@action": "object",
-  "next_action": {
-    "type": "directly_answer",
-    "answer_payload": "信息收集完成。\n\n已在以下知识库中搜索：[知识库名称列表]\n已尝试的搜索角度：\n- [搜索角度1]\n- [搜索角度2]\n\n未找到与用户问题直接相关的信息。\n\n注：知识库样本显示其主要包含[样本数据显示的主题]相关内容，可能不包含用户所询问的[用户问题主题]。"
-  },
-  "human_readable_thought": "多次搜索后未找到相关信息，结合样本数据分析原因"
+  "@action": "final_summary",
+  "summary": "信息收集完成。\n\n已在以下知识库中搜索：[知识库名称列表]\n已尝试的搜索角度：\n- [搜索角度1]\n- [搜索角度2]\n\n未找到与用户问题直接相关的信息。\n\n注：知识库样本显示其主要包含[样本数据显示的主题]相关内容，可能不包含用户所询问的[用户问题主题]。",
+  "human_readable_thought": "多次搜索后未找到相关信息，结合样本数据分析原因，然后调用 final_summary 说明情况"
 }
 ```

@@ -42,10 +42,23 @@ func init() {
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithMaxIterations(4), // 支持多轮单条搜索
+				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
+					allowActionNames := []string{
+						"search_knowledge_semantic",
+						"search_knowledge_keyword",
+						"final_summary",
+					}
+					for _, actionName := range allowActionNames {
+						if action.ActionType == actionName {
+							return true
+						}
+					}
+					return false
+				}),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					userQuery := loop.Get("user_query")
 					attachedResources := loop.Get("attached_resources")
-					searchResults := loop.Get("search_results")
+					searchResults := loop.Get("search_results_summary")
 					searchHistory := loop.Get("search_history")
 					nextMovementsSummary := loop.Get("next_movements_summary")
 					artifactsSummary := buildArtifactsSummary(loop)
@@ -61,10 +74,10 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				// Register actions: semantic search and keyword search
-				// Note: finish action removed - loop exits automatically when evaluateNextMovements returns finished=true
+				// Register actions: semantic search, keyword search and final summary
 				searchKnowledgeSemanticAction(r),
 				searchKnowledgeKeywordAction(r),
+				finalSummaryAction(r),
 				// Register post-iteration hook for final document generation (triggered on loop exit)
 				BuildOnPostIterationHook(r),
 			}
