@@ -150,7 +150,7 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 	return allKeys
 }
 
-func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
+func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
 
 	var images []any
@@ -187,6 +187,12 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 		}),
 	)
 
+	// Add tool call callback if provided
+	// This enables forwarding tool_calls from AI provider to the client
+	if onToolCall != nil {
+		opts = append(opts, aispec.WithToolCallCallback(onToolCall))
+	}
+
 	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
 		if utils.IsHttpOrHttpsUrl(target) {
 			opts = append(opts, aispec.WithBaseURL(target))
@@ -203,7 +209,7 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 
 // GetAIClient gets the AI client
 func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
-	return p.GetAIClientWithImages(nil, onStream, onReasonStream)
+	return p.GetAIClientWithImages(nil, onStream, onReasonStream, nil)
 }
 
 // GetEmbeddingClient gets an embedding client for the provider

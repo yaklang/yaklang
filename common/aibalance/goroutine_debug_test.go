@@ -200,6 +200,7 @@ func TestGoroutineTracing(t *testing.T) {
 			io.Copy(rw, reader)
 			log.Warnf("[TRACE] onReasonStream completed")
 		},
+		nil, // onToolCall callback - not used in this test
 	)
 	if err != nil {
 		t.Fatalf("Failed to get client: %v", err)
@@ -498,6 +499,7 @@ func TestGoroutineLeakWithSlowAIProvider(t *testing.T) {
 					defer rw.Close()
 					io.Copy(rw, reader)
 				},
+				nil, // onToolCall callback
 			)
 			if err != nil {
 				log.Warnf("[REQUEST %d] Failed to get client: %v", id, err)
@@ -707,6 +709,7 @@ func TestGoroutineLeakWithHangingAIProvider(t *testing.T) {
 					defer rw.Close()
 					io.Copy(rw, reader)
 				},
+				nil, // onToolCall callback
 			)
 			if err != nil {
 				log.Warnf("[REQUEST %d] Failed to get client: %v", id, err)

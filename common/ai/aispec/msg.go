@@ -68,6 +68,9 @@ type ChatUsage struct {
 }
 
 type ToolCall struct {
+	// Index is used in streaming responses to identify which tool call this delta belongs to
+	// In non-streaming responses, the array order itself serves as the implicit index
+	Index    int        `json:"index,omitempty"`
 	ID       string     `json:"id"`
 	Type     string     `json:"type"`
 	Function FuncReturn `json:"function"`

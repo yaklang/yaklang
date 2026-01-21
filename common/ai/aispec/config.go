@@ -52,6 +52,11 @@ type AIConfig struct {
 	EnableThinking      bool
 	EnableThinkingField string
 	EnableThinkingValue any
+
+	// ToolCallCallback is called when the AI response contains tool_calls.
+	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
+	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
+	ToolCallCallback func([]*ToolCall)
 }
 
 func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
@@ -399,5 +404,15 @@ func WithFunctionCallRetryTimes(times int) AIConfigOption {
 func WithHTTPErrorHandler(h func(error)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.HTTPErrorHandler = h
+	}
+}
+
+// WithToolCallCallback sets a callback function that will be called when the AI response contains tool_calls.
+// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
+// Instead, the callback will be invoked with the parsed ToolCall objects.
+// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved for backward compatibility.
+func WithToolCallCallback(cb func([]*ToolCall)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ToolCallCallback = cb
 	}
 }
