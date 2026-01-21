@@ -36,8 +36,6 @@ func init() {
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(false),
-				reactloops.WithAllowAIForge(false),
-				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
