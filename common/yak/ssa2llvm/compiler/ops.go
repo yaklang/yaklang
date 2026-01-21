@@ -87,9 +87,21 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	case ssa.OpMul:
 		val = c.Builder.CreateMul(lhs, rhs, name)
 	case ssa.OpDiv:
-		val = c.Builder.CreateSDiv(lhs, rhs, name) // Signed div for now
+		val = c.Builder.CreateSDiv(lhs, rhs, name)
 	case ssa.OpMod:
-		val = c.Builder.CreateSRem(lhs, rhs, name) // Signed rem
+		val = c.Builder.CreateSRem(lhs, rhs, name)
+	case ssa.OpGt:
+		val = c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name)
+	case ssa.OpLt:
+		val = c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name)
+	case ssa.OpGtEq:
+		val = c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name)
+	case ssa.OpLtEq:
+		val = c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name)
+	case ssa.OpEq:
+		val = c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name)
+	case ssa.OpNotEq:
+		val = c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
