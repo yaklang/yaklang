@@ -1002,18 +1002,18 @@ func (p *ProgramOverLay) queryMatch(
 					filePath := p.getValueFilePath(v)
 					if filePath == "" {
 						results = append(results, v)
-						continue
+						return nil
 					}
 
 					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
 					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
 
 					if p.isFileDeleted(normalizedPath, i) {
-						continue
+						return nil
 					}
 
 					if foundFiles.Have(normalizedPath) {
-						continue
+						return nil
 					}
 
 					if layer.FileSet.Have(normalizedPath) {
@@ -1030,7 +1030,8 @@ func (p *ProgramOverLay) queryMatch(
 						results = append(results, v)
 					}
 				}
-			}
+				return nil
+			})
 		}
 
 		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
