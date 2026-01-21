@@ -63,11 +63,12 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	if !ok {
 		return fmt.Errorf("resolvePhi: phi value %d not found", inst.GetId())
 	}
-	// Removed IsAPHI check and IsNil check to avoid binding issues.
 
-	// Find the block where this Phi resides.
-	// inst.CFGEntryBasicBlock gives us the Block ID.
-	blockID := inst.CFGEntryBasicBlock
+	block := inst.GetBlock()
+	if block == nil {
+		return fmt.Errorf("resolvePhi: phi %d has no block", inst.GetId())
+	}
+	blockID := block.GetId()
 
 	fn := inst.GetFunc()
 	if fn == nil {
@@ -79,19 +80,10 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 		return fmt.Errorf("resolvePhi: block %d not found in function", blockID)
 	}
 
-	// Check if blockVal is actually a BasicBlock
 	bbSsa, ok := blockVal.(*ssa.BasicBlock)
 	if !ok {
-		// Attempt cast via interface if needed or check if it's *ssa.BasicBlock
 		return fmt.Errorf("resolvePhi: value %d is not *ssa.BasicBlock", blockID)
 	}
-
-	// Verify consistency between Edge (Values) and Preds (Blocks)
-	// ssa.Phi struct has Edge []int64 (Values)
-	// ssa.BasicBlock struct has Preds []int64 (BasicBlocks)
-	// They should match in length and order.
-
-	// We assume inst.Edge corresponds to bbSsa.Preds by index.
 
 	edges := inst.Edge
 	preds := bbSsa.Preds
@@ -104,13 +96,11 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	var incomingBlocks []llvm.BasicBlock
 
 	for i, edgeValID := range edges {
-		// Value
 		val, err := c.getValue(inst, edgeValID)
 		if err != nil {
 			return err
 		}
 
-		// Block
 		predBlockID := preds[i]
 		blk, ok := c.Blocks[predBlockID]
 		if !ok {

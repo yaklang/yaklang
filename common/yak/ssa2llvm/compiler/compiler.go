@@ -110,15 +110,25 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			return fmt.Errorf("block value %d not found in function", blockID)
 		}
 
-		blockObj, ok := val.(*ssa.BasicBlock) // Type assertion might need adjustment if it's wrapped
+		blockObj, ok := val.(*ssa.BasicBlock)
 		if !ok {
-			// ssa.go says: type BasicBlock struct { *anValue ... }
-			// It implements Value interface.
-			// Let's check if we need to dereference or cast differently.
-			// Based on ssa.go, it should work.
 			return fmt.Errorf("value %d is not a BasicBlock", blockID)
 		}
 
+		// First, create Phi nodes at the beginning of the block
+		for _, phiID := range blockObj.Phis {
+			phiVal, ok := fn.GetValueById(phiID)
+			if !ok {
+				continue
+			}
+			if phi, ok := phiVal.(*ssa.Phi); ok {
+				if err := c.compilePhi(phi); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Then compile regular instructions
 		hasTerminator := false
 		for _, instID := range blockObj.Insts {
 			instVal, ok := fn.GetValueById(instID)
@@ -126,7 +136,6 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				continue
 			}
 			if inst, ok := instVal.(ssa.Instruction); ok {
-				// Track if we compiled a terminator
 				switch inst.(type) {
 				case *ssa.Return, *ssa.Jump, *ssa.If:
 					hasTerminator = true
@@ -138,10 +147,46 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			}
 		}
 
-		// Add default terminator if block doesn't have one
+		// Add terminator based on block structure if not already present
 		if !hasTerminator {
-			// Default: return 0
-			c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+			if len(blockObj.Succs) == 2 {
+				// This is an If - find the condition from last BinOp (comparison)
+				// Look backwards in Insts for the last comparison
+				var condID int64 = -1
+				for i := len(blockObj.Insts) - 1; i >= 0; i-- {
+					instVal, ok := fn.GetValueById(blockObj.Insts[i])
+					if !ok {
+						continue
+					}
+					if binOp, ok := instVal.(*ssa.BinOp); ok {
+						// Check if it's a comparison
+						if binOp.Op == ssa.OpGt || binOp.Op == ssa.OpLt ||
+							binOp.Op == ssa.OpGtEq || binOp.Op == ssa.OpLtEq ||
+							binOp.Op == ssa.OpEq || binOp.Op == ssa.OpNotEq {
+							condID = blockObj.Insts[i]
+							break
+						}
+					}
+				}
+
+				if condID != -1 {
+					condVal, _ := c.Values[condID]
+					trueBlock := c.Blocks[blockObj.Succs[0]]
+					falseBlock := c.Blocks[blockObj.Succs[1]]
+					c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)
+					hasTerminator = true
+				}
+			} else if len(blockObj.Succs) == 1 {
+				// This is a Jump
+				targetBlock := c.Blocks[blockObj.Succs[0]]
+				c.Builder.CreateBr(targetBlock)
+				hasTerminator = true
+			}
+
+			// If still no terminator, add default return
+			if !hasTerminator {
+				c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+			}
 		}
 	}
 
@@ -156,12 +201,12 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			return fmt.Errorf("pass 2: value %d is not a BasicBlock", blockID)
 		}
 
-		for _, instID := range blockObj.Insts {
-			instVal, ok := fn.GetValueById(instID)
+		for _, phiID := range blockObj.Phis {
+			phiVal, ok := fn.GetValueById(phiID)
 			if !ok {
 				continue
 			}
-			if phi, ok := instVal.(*ssa.Phi); ok {
+			if phi, ok := phiVal.(*ssa.Phi); ok {
 				if err := c.resolvePhi(phi); err != nil {
 					return err
 				}
