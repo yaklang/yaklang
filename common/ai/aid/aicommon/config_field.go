@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 )
 
-func (c *Config) GetTimeline() *Timeline  {
+func (c *Config) GetTimeline() *Timeline {
 	return c.Timeline
 }
 
@@ -26,7 +26,7 @@ func (c *Config) InputConsumptionCallback(current int) {
 }
 
 func (c *Config) GetSequenceStart() int64 {
-	return c.IdSequence
+	return c.Seq
 }
 
 func (c *Config) GetLanguage() string {
@@ -61,6 +61,6 @@ func (c *Config) GetMaxIterations() int64 {
 	return c.MaxIterationCount
 }
 
-func (c *Config) GetEnableSelfReflection() bool  {
+func (c *Config) GetEnableSelfReflection() bool {
 	return c.EnableSelfReflection
 }

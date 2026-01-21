@@ -28,6 +28,28 @@ import (
 
 type ConfigOption func(*Config) error
 
+type ConfigInitStatus struct {
+	PersistentSessionRestored *utils.AtomicBool
+}
+
+func NewConfigInitStatus() *ConfigInitStatus {
+	return &ConfigInitStatus{
+		PersistentSessionRestored: utils.NewAtomicBool(),
+	}
+}
+
+func (cis *ConfigInitStatus) String() string {
+	return fmt.Sprintf("PersistentSessionRestored: %v", cis.PersistentSessionRestored.IsSet())
+}
+
+func (cis *ConfigInitStatus) SetPersistentSessionRestored(value bool) {
+	cis.PersistentSessionRestored.SetTo(value)
+}
+
+func (cis *ConfigInitStatus) IsPersistentSessionRestored() bool {
+	return cis.PersistentSessionRestored.IsSet()
+}
+
 type Config struct {
 	// Embedded structs
 	*Emitter
@@ -51,8 +73,8 @@ type Config struct {
 	cancel context.CancelFunc
 
 	// counter
-	IdSequence  int64
-	IdGenerator func() int64
+	Seq           int64
+	SeqIdProvider *utils.AtomicInt64IDProvider
 
 	// session id
 	PersistentSessionId string
@@ -221,6 +243,9 @@ type Config struct {
 	// worked for liteforge
 	LiteForgeActionName   string
 	LiteForgeOutputSchema string
+
+	// init status
+	InitStatus *ConfigInitStatus
 }
 
 // NewConfig creates a new Config with options
@@ -274,7 +299,9 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	}
 
 	// Restore persistent session if configured
-	config.restorePersistentSession()
+	if !config.InitStatus.IsPersistentSessionRestored() {
+		config.restorePersistentSession()
+	}
 
 	return config
 }
@@ -289,23 +316,21 @@ func newConfig(ctx context.Context) *Config {
 	id := uuid.New().String()
 
 	// Initialize ID generator
-	var idGenerator = new(int64)
-	offset := rand.Int64N(3000)
+	seq := rand.Int64N(300)
+	var provider = utils.NewAtomicInt64IDProvider(seq)
 
 	config := &Config{
-		HotPatchBroadcaster: chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
-		KeyValueConfig:      NewKeyValueConfig(),
-		Ctx:                 ctx,
-		cancel:              cancel,
-		StartInputEventOnce: sync.Once{},
-		EventInputChan:      chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
-		HotPatchOptionChan:  chanx.NewUnlimitedChan[ConfigOption](ctx, 10),
-		InputEventManager:   NewAIInputEventProcessor(),
-		Id:                  id,
-		IdSequence:          atomic.AddInt64(idGenerator, offset), // Start with offset
-		IdGenerator: func() int64 {
-			return atomic.AddInt64(idGenerator, 1)
-		},
+		HotPatchBroadcaster:                chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
+		KeyValueConfig:                     NewKeyValueConfig(),
+		Ctx:                                ctx,
+		cancel:                             cancel,
+		StartInputEventOnce:                sync.Once{},
+		EventInputChan:                     chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
+		HotPatchOptionChan:                 chanx.NewUnlimitedChan[ConfigOption](ctx, 10),
+		InputEventManager:                  NewAIInputEventProcessor(),
+		Id:                                 id,
+		Seq:                                seq,
+		SeqIdProvider:                      provider,
 		AgreePolicy:                        AgreePolicyManual,
 		AgreeAIScoreLow:                    0.4,
 		AgreeAIScoreMiddle:                 0.7,
@@ -330,6 +355,7 @@ func newConfig(ctx context.Context) *Config {
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
+		InitStatus:                         NewConfigInitStatus(),
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),
@@ -383,22 +409,6 @@ func WithContext(ctx context.Context) ConfigOption {
 		ctx, cancel := context.WithCancel(ctx)
 		c.Ctx = ctx
 		c.cancel = cancel
-		return nil
-	}
-}
-
-// WithIdGenerator sets a config option helpers that set common fields on Config (ID, context, callbacks, limits, handlers, memory/plan flags, metadata, debug flags, etc.).
-func WithIdGenerator(gen func() int64) ConfigOption {
-	return func(c *Config) error {
-		if gen == nil {
-			return utils.Error("id generator cannot be nil")
-		}
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		c.IdGenerator = gen
-		c.m.Unlock()
 		return nil
 	}
 }
@@ -1355,10 +1365,32 @@ func WithSequence(seq int64) ConfigOption {
 		}
 		c.m.Lock()
 		defer c.m.Unlock()
-		atomic.StoreInt64(&c.IdSequence, seq)
-		c.IdGenerator = func() int64 {
-			return atomic.AddInt64(&c.IdSequence, 1)
+		c.Seq = seq
+		c.SeqIdProvider = utils.NewAtomicInt64IDProvider(seq)
+		return nil
+	}
+}
+
+func WithSeqIdProvider(provider *utils.AtomicInt64IDProvider) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
 		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.SeqIdProvider = provider
+		return nil
+	}
+}
+
+func WithInitConfigStatus(status *ConfigInitStatus) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.InitStatus = status
 		return nil
 	}
 }
@@ -1716,14 +1748,13 @@ func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput ait
 }
 
 func (c *Config) AcquireId() int64 {
-	if c.IdGenerator == nil {
+	if c.SeqIdProvider == nil {
 		// fallback: create a simple generator if missing
 		var gen = rand.Int64N(3000)
-		c.IdGenerator = func() int64 {
-			return atomic.AddInt64(&gen, 1)
-		}
+		c.Seq = gen
+		c.SeqIdProvider = utils.NewAtomicInt64IDProvider(gen)
 	}
-	return c.IdGenerator()
+	return c.SeqIdProvider.NewID()
 }
 
 func (c *Config) GetRuntimeId() string {
@@ -1883,15 +1914,14 @@ func (c *Config) restorePersistentSession() {
 
 	// Reassign IDs to all restored timeline items to avoid ID conflicts
 	// This uses the current idGenerator to ensure sequential IDs
-	lastID := timelineInstance.ReassignIDs(c.IdGenerator)
+	lastID := timelineInstance.ReassignIDs(c.SeqIdProvider.CurrentID)
 	if lastID > 0 {
 		log.Infof("reassigned timeline IDs, last assigned ID: %d", lastID)
-		// Update idSequence to continue from the last assigned ID
-		atomic.StoreInt64(&c.IdSequence, lastID)
 	}
 
 	c.Timeline = timelineInstance
 	c.TimelineDiffer = NewTimelineDiffer(timelineInstance)
+	c.InitStatus.SetPersistentSessionRestored(true)
 	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",
 		c.PersistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
 }
@@ -2083,6 +2113,17 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.PersistentSessionId != "" {
 		opts = append(opts, WithPersistentSessionId(i.PersistentSessionId))
 	}
+
+	if i.Seq != 0 {
+		opts = append(opts, WithSequence(i.Seq))
+	}
+
+	if i.SeqIdProvider != nil {
+		opts = append(opts, WithSeqIdProvider(i.SeqIdProvider))
+	}
+
+	// once init config flag
+	opts = append(opts, WithInitConfigStatus(i.InitStatus))
 
 	opts = append(opts, WithContext(i.Ctx))
 

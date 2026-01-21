@@ -284,7 +284,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
 			Name:              "[re-act-runtime]",
-			Seq:               cfg.IdSequence,
+			Seq:               cfg.Seq,
 			TypeName:          schema.AIAgentRuntimeType_ReAct,
 			PersistentSession: cfg.PersistentSessionId,
 		},
