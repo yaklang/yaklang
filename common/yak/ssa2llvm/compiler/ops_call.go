@@ -30,16 +30,21 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	}
 
 	// 2. Get or declare LLVM function
-	llvmFn := c.Mod.NamedFunction(calleeName)
+	// Check externs first
+	llvmFn := c.ensureExternDeclaration(calleeName)
+
 	if llvmFn.IsNil() {
-		// Function not found, create a declaration (prototype)
-		// Default: all args and return are i64
-		argTypes := make([]llvm.Type, len(inst.Args))
-		for i := range argTypes {
-			argTypes[i] = c.LLVMCtx.Int64Type()
+		llvmFn = c.Mod.NamedFunction(calleeName)
+		if llvmFn.IsNil() {
+			// Function not found, create a declaration (prototype)
+			// Default: all args and return are i64
+			argTypes := make([]llvm.Type, len(inst.Args))
+			for i := range argTypes {
+				argTypes[i] = c.LLVMCtx.Int64Type()
+			}
+			funcType := llvm.FunctionType(c.LLVMCtx.Int64Type(), argTypes, false)
+			llvmFn = llvm.AddFunction(c.Mod, calleeName, funcType)
 		}
-		funcType := llvm.FunctionType(c.LLVMCtx.Int64Type(), argTypes, false)
-		llvmFn = llvm.AddFunction(c.Mod, calleeName, funcType)
 	}
 
 	// 3. Prepare arguments
