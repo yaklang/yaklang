@@ -1,0 +1,37 @@
+// Fibonacci calculator
+fib = (n) => {
+    if n <= 2 {
+        return 1
+    }
+    return fib(n-1) + fib(n-2)
+}
+
+// Factorial calculator
+factorial = (n) => {
+    result = 1
+    i = 1
+    for i <= n {
+        result = result * i
+        i = i + 1
+    }
+    return result
+}
+
+// Sum of range
+sumRange = (start, end) => {
+    sum = 0
+    i = start
+    for i <= end {
+        sum = sum + i
+        i = i + 1
+    }
+    return sum
+}
+
+// Entry point
+check = () => {
+    a = fib(8)
+    b = factorial(5)
+    c = sumRange(1, 10)
+    return a + b + c
+}
