@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1359,15 +1360,18 @@ func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) 
 
 	// Parse request to get query parameters
 	var nameFilter string
-	_, _ = lowhttp.SplitHTTPPacket(rawPacket, func(method string, requestUri string, proto string) error {
-		// Parse query parameters from URI
-		if idx := strings.Index(requestUri, "?"); idx != -1 {
-			queryStr := requestUri[idx+1:]
-			params, _ := url.ParseQuery(queryStr)
-			nameFilter = params.Get("name")
-		}
-		return nil
-	}, nil, nil)
+	// Guard against nil or empty rawPacket to prevent panic in SplitHTTPPacket
+	if len(rawPacket) > 0 {
+		_, _ = lowhttp.SplitHTTPPacket(rawPacket, func(method string, requestUri string, proto string) error {
+			// Parse query parameters from URI
+			if idx := strings.Index(requestUri, "?"); idx != -1 {
+				queryStr := requestUri[idx+1:]
+				params, _ := url.ParseQuery(queryStr)
+				nameFilter = params.Get("name")
+			}
+			return nil
+		}, nil, nil)
+	}
 
 	if nameFilter != "" {
 		c.logInfo("Filtering model meta info by name prefix: %s", nameFilter)
@@ -1426,6 +1430,11 @@ func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) 
 		}
 		response = append(response, info)
 	}
+
+	// Sort response by model name for stable ordering
+	sort.Slice(response, func(i, j int) bool {
+		return response[i].ModelName < response[j].ModelName
+	})
 
 	// Marshal response
 	responseJSON, err := json.Marshal(response)

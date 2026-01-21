@@ -1464,6 +1464,83 @@ func TestComplexReasoning_StreamToolCallDelta(t *testing.T) {
 	assert.Contains(t, res, "Boston", "Response should contain location value")
 }
 
+// TestComplexReasoning_StreamToolCallWithCallback_NoContentLeakage tests that streaming tool_calls
+// are ONLY passed to callback and do NOT leak into content stream.
+// This is critical for clients like Cursor that expect OpenAI-standard behavior.
+func TestComplexReasoning_StreamToolCallWithCallback_NoContentLeakage(t *testing.T) {
+	// Mock SSE response with streaming tool_calls in delta (use same format as mockAiStreamWithToolCallRsp)
+	mockStreamingToolCall := `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+data: {"id":"stream-nocontent-1","object":"chat.completion.chunk","created":1753329315,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"stream-nocontent-2","object":"chat.completion.chunk","created":1753329316,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Let me check that for you."},"finish_reason":null}]}
+
+data: {"id":"stream-nocontent-3","object":"chat.completion.chunk","created":1753329317,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_stream_001","type":"function","function":{"name":"read_file","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"stream-nocontent-4","object":"chat.completion.chunk","created":1753329318,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":\"/test/"}}]},"finish_reason":null}]}
+
+data: {"id":"stream-nocontent-5","object":"chat.completion.chunk","created":1753329319,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"README.md\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"stream-nocontent-6","object":"chat.completion.chunk","created":1753329320,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+`
+	host, port := utils.DebugMockHTTP([]byte(mockStreamingToolCall))
+
+	var receivedToolCalls []*aispec.ToolCall
+	var contentStream strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Read the README file",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			contentStream.Write(data)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = append(receivedToolCalls, toolCalls...)
+		}),
+	)
+
+	assert.NoError(t, err, "Streaming tool call should succeed")
+
+	// CRITICAL: Verify tool_calls data does NOT appear in content stream
+	assert.NotContains(t, res, "read_file", "Tool call function name should NOT be in content")
+	assert.NotContains(t, res, "README.md", "Tool call arguments should NOT be in content")
+	assert.NotContains(t, contentStream.String(), "read_file", "Stream content should NOT contain function name")
+	assert.NotContains(t, contentStream.String(), "README.md", "Stream content should NOT contain arguments")
+
+	// Verify content only contains actual content
+	assert.Contains(t, res, "Let me check", "Response should contain actual content")
+
+	// Verify tool calls were passed to callback
+	assert.Greater(t, len(receivedToolCalls), 0, "Should receive tool calls via callback")
+
+	// Verify tool call structure
+	var foundReadFile bool
+	for _, tc := range receivedToolCalls {
+		if tc.Function.Name == "read_file" {
+			foundReadFile = true
+			assert.Equal(t, "call_stream_001", tc.ID, "Tool call ID should match")
+			assert.Equal(t, "function", tc.Type, "Tool call type should be 'function'")
+			// Note: In streaming, arguments come in chunks, so we may have partial data
+			t.Logf("Tool call: %s, args: %s", tc.Function.Name, tc.Function.Arguments)
+		}
+	}
+	assert.True(t, foundReadFile, "Should have received read_file tool call")
+}
+
 // TestComplexReasoning_StreamNoCallback tests streaming without callback preserves legacy format
 func TestComplexReasoning_LegacyToolCallFormat(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallRsp))
