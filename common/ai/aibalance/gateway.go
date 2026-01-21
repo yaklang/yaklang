@@ -152,6 +152,9 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		aispec.WithChatBase_Tools(g.config.Tools),
+		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
+		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
 	)
 
 	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
@@ -173,6 +176,9 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 			aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+			aispec.WithChatBase_Tools(g.config.Tools),
+			aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
+			aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
 		)
 	}
 
