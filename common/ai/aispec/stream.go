@@ -225,12 +225,89 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 				reasonWriter.Write([]byte(reasonDelta))
 			}
 
+			// First, check for tool_calls in delta - this MUST be handled separately from content
+			toolCallsRaw := jsonpath.Find(j, `$..choices[*].delta.tool_calls`)
+			toolCallsList := utils.InterfaceToSliceInterface(toolCallsRaw)
+			if len(toolCallsList) > 0 {
+				handled = true
+				// Process tool_calls - either via callback or legacy format
+				for _, tcArrayRaw := range toolCallsList {
+					tcArray := utils.InterfaceToSliceInterface(tcArrayRaw)
+					if toolCallCallback != nil {
+						// Use callback mode: parse and pass ToolCall objects to callback
+						var toolCalls []*ToolCall
+						for i, toolcall := range tcArray {
+							toolcallMap := utils.InterfaceToGeneralMap(toolcall)
+							funcMap := utils.MapGetMapRaw(toolcallMap, "function")
+							name := utils.MapGetString(funcMap, "name")
+							args := utils.MapGetString(funcMap, "arguments")
+							// In streaming, tool_calls come incrementally - we may only have partial data
+							if name == "" && args == "" {
+								continue
+							}
+							// Extract index from response, default to array position if not present
+							index := i
+							if idxRaw, ok := toolcallMap["index"]; ok {
+								if idxFloat, ok := idxRaw.(float64); ok {
+									index = int(idxFloat)
+								} else if idxInt, ok := idxRaw.(int); ok {
+									index = idxInt
+								}
+							}
+							tc := &ToolCall{
+								Index: index,
+								ID:    utils.MapGetString(toolcallMap, "id"),
+								Type:  utils.MapGetString(toolcallMap, "type"),
+								Function: FuncReturn{
+									Name:      name,
+									Arguments: args,
+								},
+							}
+							toolCalls = append(toolCalls, tc)
+						}
+						if len(toolCalls) > 0 {
+							toolCallCallback(toolCalls)
+						}
+					} else {
+						// Legacy mode: convert to <|TOOL_CALL...|> format for complete tool calls,
+						// or accumulate incremental arguments to output
+						for _, toolcall := range tcArray {
+							toolcallMap := utils.InterfaceToGeneralMap(toolcall)
+							funcMap := utils.MapGetMapRaw(toolcallMap, "function")
+							name := utils.MapGetString(funcMap, "name")
+							args := utils.MapGetString(funcMap, "arguments")
+
+							if name != "" {
+								// Complete tool call with name - use template format
+								funcMapRaw, err := json.Marshal(funcMap)
+								if err != nil {
+									continue
+								}
+								callData, err := utils.RenderTemplate(`
+<|TOOL_CALL_{{ .Nonce }}|>
+{{ .Data }}
+<|TOOL_CALL_END{{ .Nonce }}|>
+`, map[string]any{
+									"Nonce": utils.RandStringBytes(4),
+									"Data":  string(funcMapRaw),
+								})
+								if err != nil {
+									continue
+								}
+								outWriter.Write([]byte(callData))
+							} else if args != "" {
+								// Incremental arguments only - append to output stream
+								// This maintains backward compatibility for legacy mode
+								outWriter.Write([]byte(args))
+							}
+						}
+					}
+				}
+			}
+
+			// Process regular content - only if it's NOT tool_calls arguments
 			results := jsonpath.Find(j, `$..choices[*].delta.content`)
 			wordList := utils.InterfaceToSliceInterface(results)
-			if len(wordList) <= 0 {
-				log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
-				wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
-			}
 			for _, raw := range wordList {
 				handled = true
 				data := codec.AnyToBytes(raw)

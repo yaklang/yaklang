@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
@@ -699,6 +701,103 @@ func TestWriteToolCalls(t *testing.T) {
 	if fn2["name"] != "get_time" {
 		t.Errorf("Expected name get_time, got %v", fn2["name"])
 	}
+}
+
+// TestWriteToolCalls_OpenAIStandardFormat verifies the tool_calls chunk follows OpenAI standard:
+// - tool_calls MUST be in delta.tool_calls, NOT in delta.content
+// - delta.content MUST be empty or null when tool_calls is present
+// - Each tool_call MUST have: index, id, type, function.name, function.arguments
+// This is critical for clients like Cursor to correctly recognize tool calls
+func TestWriteToolCalls_OpenAIStandardFormat(t *testing.T) {
+	buf := newTestWriteCloser()
+	writer := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+
+	toolCalls := []*aispec.ToolCall{
+		{
+			Index: 0,
+			ID:    "call_abc123",
+			Type:  "function",
+			Function: aispec.FuncReturn{
+				Name:      "read_file",
+				Arguments: `{"path":"/Users/test/README.md"}`,
+			},
+		},
+	}
+
+	err := writer.WriteToolCalls(toolCalls)
+	assert.NoError(t, err, "WriteToolCalls should succeed")
+
+	err = writer.Close()
+	assert.NoError(t, err, "Close should succeed")
+	writer.Wait()
+
+	output := buf.(*testWriteCloser).String()
+	t.Logf("Tool calls output:\n%s", output)
+
+	// Parse each data line and verify format
+	lines := strings.Split(output, "\r\n")
+	var toolCallChunkFound bool
+
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		jsonStr := strings.TrimPrefix(line, "data: ")
+		if jsonStr == "[DONE]" {
+			continue
+		}
+
+		var chunk map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonStr), &chunk); err != nil {
+			continue
+		}
+
+		choices, ok := chunk["choices"].([]interface{})
+		if !ok || len(choices) == 0 {
+			continue
+		}
+		choice := choices[0].(map[string]interface{})
+		delta, ok := choice["delta"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		// Check if this is a tool_calls chunk
+		if toolCallsRaw, hasToolCalls := delta["tool_calls"]; hasToolCalls {
+			toolCallChunkFound = true
+
+			// CRITICAL: When tool_calls is present, content MUST NOT contain tool call data
+			if content, hasContent := delta["content"]; hasContent {
+				contentStr, _ := content.(string)
+				// Content should be empty, null, or not contain tool-like patterns
+				assert.NotContains(t, contentStr, "<read_file>", "Content MUST NOT contain XML-style tool calls")
+				assert.NotContains(t, contentStr, "<function>", "Content MUST NOT contain XML-style function tags")
+				assert.NotContains(t, contentStr, "\"function\":", "Content MUST NOT contain JSON tool call data")
+			}
+
+			// Verify tool_calls structure
+			toolCallsArr := toolCallsRaw.([]interface{})
+			assert.Len(t, toolCallsArr, 1, "Should have 1 tool call")
+
+			tc := toolCallsArr[0].(map[string]interface{})
+
+			// REQUIRED fields per OpenAI spec
+			assert.Contains(t, tc, "index", "tool_call MUST have 'index' field")
+			assert.Contains(t, tc, "id", "tool_call MUST have 'id' field")
+			assert.Contains(t, tc, "type", "tool_call MUST have 'type' field")
+			assert.Contains(t, tc, "function", "tool_call MUST have 'function' field")
+
+			assert.Equal(t, float64(0), tc["index"], "First tool_call should have index 0")
+			assert.Equal(t, "call_abc123", tc["id"], "tool_call id should match")
+			assert.Equal(t, "function", tc["type"], "tool_call type should be 'function'")
+
+			fn := tc["function"].(map[string]interface{})
+			assert.Equal(t, "read_file", fn["name"], "function name should be 'read_file'")
+			assert.Contains(t, fn["arguments"], "README.md", "function arguments should contain path")
+		}
+	}
+
+	assert.True(t, toolCallChunkFound, "Output should contain a tool_calls chunk")
 }
 
 // TestWriteToolCallsWithContentAndReason tests that tool calls work with other stream types
