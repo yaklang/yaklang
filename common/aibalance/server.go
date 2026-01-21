@@ -674,6 +674,14 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				io.Copy(rw, reader)
 				utils.FlushWriter(writer.writerClose)
 			},
+			// Tool call callback: forward tool_calls from AI provider to client
+			func(toolCalls []*aispec.ToolCall) {
+				c.logInfo("Received %d tool calls from AI provider, forwarding to client", len(toolCalls))
+				sendHeaderOnce.Do(sendHeader)
+				if err := writer.WriteToolCalls(toolCalls); err != nil {
+					c.logError("Failed to write tool calls to client: %v", err)
+				}
+			},
 		)
 		if err != nil {
 			c.logError("Failed to get AI client from provider %s: %v", provider.TypeName, err)

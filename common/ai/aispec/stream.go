@@ -45,14 +45,10 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 	return pr
 }
 
-func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
-	out, reason, opts, _ := appendStreamHandlerPoCOptionEx(true, opts)
-	pr := mergeReasonIntoOutputStream(reason, out)
-	return pr, opts
-}
-
 // processAIResponse 处理流式响应
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer) {
+// If toolCallCallback is not nil, tool_calls will be passed to the callback instead of being
+// converted to <|TOOL_CALL...|> format in the output stream.
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
 	defer func() {
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
@@ -136,29 +132,65 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 					outWriter.Write([]byte(content))
 					if toolcallRaw, ok := result["tool_calls"]; ok {
 						toolcallList := utils.InterfaceToSliceInterface(toolcallRaw)
-						for _, toolcall := range toolcallList {
-							toolcallMap := utils.InterfaceToGeneralMap(toolcall)
-							funcMap := utils.MapGetMapRaw(toolcallMap, "function")
-							name := utils.MapGetString(funcMap, "name")
-							if name == "" {
-								continue
+						if toolCallCallback != nil {
+							// Use callback mode: parse and pass ToolCall objects to callback
+							var toolCalls []*ToolCall
+							for i, toolcall := range toolcallList {
+								toolcallMap := utils.InterfaceToGeneralMap(toolcall)
+								funcMap := utils.MapGetMapRaw(toolcallMap, "function")
+								name := utils.MapGetString(funcMap, "name")
+								if name == "" {
+									continue
+								}
+								// Extract index from response, default to array position if not present
+								index := i
+								if idxRaw, ok := toolcallMap["index"]; ok {
+									if idxFloat, ok := idxRaw.(float64); ok {
+										index = int(idxFloat)
+									} else if idxInt, ok := idxRaw.(int); ok {
+										index = idxInt
+									}
+								}
+								tc := &ToolCall{
+									Index: index,
+									ID:    utils.MapGetString(toolcallMap, "id"),
+									Type:  utils.MapGetString(toolcallMap, "type"),
+									Function: FuncReturn{
+										Name:      name,
+										Arguments: utils.MapGetString(funcMap, "arguments"),
+									},
+								}
+								toolCalls = append(toolCalls, tc)
 							}
-							funcMapRaw, err := json.Marshal(funcMap)
-							if err != nil {
-								continue
+							if len(toolCalls) > 0 {
+								toolCallCallback(toolCalls)
 							}
-							callData, err := utils.RenderTemplate(`
+						} else {
+							// Original behavior: convert to <|TOOL_CALL...|> format
+							for _, toolcall := range toolcallList {
+								toolcallMap := utils.InterfaceToGeneralMap(toolcall)
+								funcMap := utils.MapGetMapRaw(toolcallMap, "function")
+								name := utils.MapGetString(funcMap, "name")
+								if name == "" {
+									continue
+								}
+								funcMapRaw, err := json.Marshal(funcMap)
+								if err != nil {
+									continue
+								}
+								callData, err := utils.RenderTemplate(`
 <|TOOL_CALL_{{ .Nonce }}|>
 {{ .Data }}
 <|TOOL_CALL_END{{ .Nonce }}|>
 `, map[string]any{
-								"Nonce": utils.RandStringBytes(4),
-								"Data":  string(funcMapRaw),
-							})
-							if err != nil {
-								continue
+									"Nonce": utils.RandStringBytes(4),
+									"Data":  string(funcMapRaw),
+								})
+								if err != nil {
+									continue
+								}
+								outWriter.Write([]byte(callData))
 							}
-							outWriter.Write([]byte(callData))
 						}
 					}
 				}),
@@ -227,7 +259,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -237,7 +269,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption) (
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponse(r, closer, outWriter, reasonWriter)
+		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback)
 
 		//if isStream {
 		//} else {

@@ -101,7 +101,7 @@ func TestNonStreamChat(t *testing.T) {
 	// 调用ChatBase进行非流式聊天
 	// 不设置StreamHandler，默认为非流式处理
 	res, err := aispec.ChatBase(
-		"http://api.openai.com/v1/chat/completions",
+		"http://example.com/v1/chat/completions",
 		"gpt-4o-mini",
 		"hello",
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -138,7 +138,7 @@ func TestStreamChat(t *testing.T) {
 	// 调用ChatBase进行流式聊天
 	// 设置StreamHandler启用流式处理
 	res, err := aispec.ChatBase(
-		"http://api.openai.com/v1/chat/completions",
+		"http://example.com/v1/chat/completions",
 		"gpt-4o-mini",
 		"hello",
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -181,7 +181,7 @@ func TestNonStreamChatWithReasoning(t *testing.T) {
 
 	// 调用ChatBase，同时处理推理内容
 	res, err := aispec.ChatBase(
-		"http://api.openai.com/v1/chat/completions",
+		"http://example.com/v1/chat/completions",
 		"gpt-4o-mini",
 		"什么是生命、宇宙和一切的终极答案？",
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -219,16 +219,19 @@ func TestChatBaseErrorHandling(t *testing.T) {
 	// 用于捕获错误的变量
 	var capturedError error
 
-	// 调用ChatBase，使用不存在的服务器地址来触发错误
+	// 调用ChatBase，使用不存在的端口来触发错误
+	// 使用 127.0.0.1 和随机无效端口，避免外部网络连接
+	invalidPort := utils.GetRandomAvailableTCPPort() + 10000 // 使用一个很可能不存在的端口
 	_, err := aispec.ChatBase(
-		"http://nonexistent-server.com/v1/chat/completions",
+		"http://example.com/v1/chat/completions",
 		"gpt-4o-mini",
 		"hello",
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
 			return []poc.PocConfigOption{
-				poc.WithTimeout(1), // 短超时确保快速失败
-				poc.WithHost("127.0.0.1"),
-				poc.WithPort(9999999), // 不存在的端口
+				poc.WithTimeout(1),        // 短超时确保快速失败
+				poc.WithHost("127.0.0.1"), // 使用本地地址
+				poc.WithPort(invalidPort), // 不存在的本地端口
+				poc.WithForceHTTPS(false),
 			}, nil
 		}),
 		// 错误处理器：捕获HTTP错误
@@ -303,7 +306,7 @@ func TestChatBaseStability_StreamAndReasonHandlers(t *testing.T) {
 		var streamCallCount, reasonCallCount int
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -336,7 +339,7 @@ func TestChatBaseStability_StreamAndReasonHandlers(t *testing.T) {
 		var streamContent strings.Builder
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -361,7 +364,7 @@ func TestChatBaseStability_StreamAndReasonHandlers(t *testing.T) {
 		var reasonContent strings.Builder
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -385,7 +388,7 @@ func TestChatBaseStability_StreamAndReasonHandlers(t *testing.T) {
 		// 使用流式的mock响应，但不设置任何处理器
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -420,7 +423,7 @@ func TestChatBaseStability_ConcurrentRequests(t *testing.T) {
 		go func(index int) {
 			defer wg.Done()
 			res, err := aispec.ChatBase(
-				"http://api.openai.com/v1/chat/completions",
+				"http://example.com/v1/chat/completions",
 				"gpt-4o-mini",
 				fmt.Sprintf("concurrent request %d", index),
 				aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -476,7 +479,7 @@ func TestChatBaseStability_HandlerPanics(t *testing.T) {
 
 	t.Run("StreamHandlerPanic", func(t *testing.T) {
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -499,7 +502,7 @@ func TestChatBaseStability_HandlerPanics(t *testing.T) {
 
 	t.Run("ReasonHandlerPanic", func(t *testing.T) {
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -527,13 +530,18 @@ func TestChatBaseStability_HandlerPanics(t *testing.T) {
 			}
 		}()
 
+		// 使用 127.0.0.1 和随机无效端口来触发连接错误，避免外部网络连接
+		invalidPort := utils.GetRandomAvailableTCPPort() + 10000
 		_, err := aispec.ChatBase(
-			"http://nonexistent-server.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
 				return []poc.PocConfigOption{
 					poc.WithTimeout(1),
+					poc.WithHost("127.0.0.1"),
+					poc.WithPort(invalidPort), // 不存在的本地端口
+					poc.WithForceHTTPS(false),
 				}, nil
 			}),
 			aispec.WithChatBase_ErrHandler(func(httpErr error) {
@@ -553,7 +561,7 @@ func TestChatBaseStability_MalformedResponses(t *testing.T) {
 		var streamContent strings.Builder
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -580,7 +588,7 @@ func TestChatBaseStability_MalformedResponses(t *testing.T) {
 		var streamContent strings.Builder
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -611,7 +619,7 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 		// 使用流式响应测试EnableThinking
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -636,7 +644,7 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -660,7 +668,7 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -686,7 +694,7 @@ func TestChatBaseStability_EnableThinking(t *testing.T) {
 func TestChatBaseStability_PoCOptionsGeneration(t *testing.T) {
 	t.Run("PoCOptionsError", func(t *testing.T) {
 		_, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -701,7 +709,7 @@ func TestChatBaseStability_PoCOptionsGeneration(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"hello",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -729,7 +737,7 @@ func TestChatBaseStability_LongRunningStream(t *testing.T) {
 	var reasonData strings.Builder
 
 	res, err := aispec.ChatBase(
-		"http://api.openai.com/v1/chat/completions",
+		"http://example.com/v1/chat/completions",
 		"gpt-4o-mini",
 		"generate a long response",
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -766,7 +774,7 @@ func TestChatBaseStability_ImageHandling(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"描述这张图片",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -792,7 +800,7 @@ func TestChatBaseStability_ImageHandling(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"",
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -822,7 +830,7 @@ func TestChatBaseStability_EdgeCases(t *testing.T) {
 		// 使用流式响应
 		host, port := utils.DebugMockHTTP([]byte(mockAiStreamRsp))
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			"", // 空消息
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -847,7 +855,7 @@ func TestChatBaseStability_EdgeCases(t *testing.T) {
 		longMessage := strings.Repeat("这是一个很长的消息。", 100) // 减少长度避免超时
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			longMessage,
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -872,7 +880,7 @@ func TestChatBaseStability_EdgeCases(t *testing.T) {
 		specialMessage := "特殊字符测试: 🚀 💻 🔧 \n\t\r 中文字符 English テスト 🌟"
 
 		res, err := aispec.ChatBase(
-			"http://api.openai.com/v1/chat/completions",
+			"http://example.com/v1/chat/completions",
 			"gpt-4o-mini",
 			specialMessage,
 			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
@@ -890,4 +898,684 @@ func TestChatBaseStability_EdgeCases(t *testing.T) {
 		assert.NoError(t, err, "Special characters message should work")
 		assert.Equal(t, "你好", res)
 	})
+}
+
+// ==================== ToolCall Callback Tests ====================
+
+// mockAiToolCallRsp 模拟包含 tool_calls 的非流式 AI 响应
+// 用于测试 ToolCallCallback 功能
+const mockAiToolCallRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "chatcmpl-toolcall-test-123",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_abc123",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Boston\",\"unit\":\"celsius\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30 }
+}
+`
+
+// mockAiToolCallMultipleRsp 模拟包含多个 tool_calls 的响应
+const mockAiToolCallMultipleRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "chatcmpl-toolcall-multi-456",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "gpt-4o-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_first",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Boston\"}"
+            }
+          },
+          {
+            "id": "call_second",
+            "type": "function",
+            "function": {
+              "name": "get_time",
+              "arguments": "{\"timezone\":\"EST\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 10, "completion_tokens": 30, "total_tokens": 40 }
+}
+`
+
+// TestToolCallCallback_WithCallback tests that tool calls are passed to callback when set
+func TestToolCallCallback_WithCallback(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallRsp))
+
+	var receivedToolCalls []*aispec.ToolCall
+	var callbackInvoked bool
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			callbackInvoked = true
+			receivedToolCalls = toolCalls
+		}),
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+	assert.True(t, callbackInvoked, "ToolCallCallback should be invoked")
+	assert.Len(t, receivedToolCalls, 1, "Should receive 1 tool call")
+
+	// Verify tool call details
+	tc := receivedToolCalls[0]
+	assert.Equal(t, "call_abc123", tc.ID, "Tool call ID should match")
+	assert.Equal(t, "function", tc.Type, "Tool call type should be function")
+	assert.Equal(t, "get_weather", tc.Function.Name, "Function name should match")
+	assert.Contains(t, tc.Function.Arguments, "Boston", "Arguments should contain location")
+
+	// Verify that <|TOOL_CALL...|> is NOT in the response when callback is set
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain <|TOOL_CALL when callback is set")
+}
+
+// TestToolCallCallback_WithoutCallback tests that tool calls are converted to <|TOOL_CALL...|> format when no callback
+func TestToolCallCallback_WithoutCallback(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallRsp))
+
+	var streamContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			streamContent.Write(data)
+		}),
+		// No ToolCallCallback set - should use legacy <|TOOL_CALL...|> format
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+
+	// Verify that <|TOOL_CALL...|> IS in the response when no callback is set
+	assert.Contains(t, res, "<|TOOL_CALL_", "Response should contain <|TOOL_CALL_ when no callback is set")
+	assert.Contains(t, res, "<|TOOL_CALL_END", "Response should contain <|TOOL_CALL_END when no callback is set")
+	assert.Contains(t, res, "get_weather", "Response should contain function name")
+}
+
+// TestToolCallCallback_MultipleToolCalls tests handling of multiple tool calls
+func TestToolCallCallback_MultipleToolCalls(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallMultipleRsp))
+
+	var receivedToolCalls []*aispec.ToolCall
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"What is the weather and time in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = append(receivedToolCalls, toolCalls...)
+		}),
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+	assert.Len(t, receivedToolCalls, 2, "Should receive 2 tool calls")
+
+	// Verify first tool call
+	assert.Equal(t, "call_first", receivedToolCalls[0].ID)
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+
+	// Verify second tool call
+	assert.Equal(t, "call_second", receivedToolCalls[1].ID)
+	assert.Equal(t, "get_time", receivedToolCalls[1].Function.Name)
+
+	// Verify no <|TOOL_CALL...|> format
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain <|TOOL_CALL when callback is set")
+}
+
+// TestToolCallCallback_WithStreamHandler tests that both stream handler and tool call callback work together
+func TestToolCallCallback_WithStreamHandler(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallRsp))
+
+	var receivedToolCalls []*aispec.ToolCall
+	var streamHandlerCalled bool
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			streamHandlerCalled = true
+			io.Copy(io.Discard, reader)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = toolCalls
+		}),
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+	assert.True(t, streamHandlerCalled, "Stream handler should be called")
+	assert.Len(t, receivedToolCalls, 1, "Should receive 1 tool call")
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain <|TOOL_CALL when callback is set")
+}
+
+// TestToolCallCallback_NoToolCalls tests that callback is not invoked when response has no tool calls
+func TestToolCallCallback_NoToolCalls(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiRsp))
+
+	var callbackInvoked bool
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"hello",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			callbackInvoked = true
+		}),
+	)
+
+	assert.NoError(t, err, "Request should succeed")
+	assert.False(t, callbackInvoked, "ToolCallCallback should NOT be invoked when no tool calls in response")
+	assert.Equal(t, "你好！😊 很高兴见到你～有什么我可以帮你的吗？", res, "Normal response should still work")
+}
+
+// ==================== Complex Real-World SSE Tests ====================
+
+// mockAiComplexReasoningStreamRsp 模拟复杂的带推理内容的流式响应
+// 测试场景：AI 先进行推理（reasoning_content），然后输出结果
+const mockAiComplexReasoningStreamRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+data: {"id":"complex-reason-1","object":"chat.completion.chunk","created":1753329315,"model":"deepseek-r1","choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning_content":"Let me analyze this step by step..."},"finish_reason":null}]}
+
+data: {"id":"complex-reason-2","object":"chat.completion.chunk","created":1753329316,"model":"deepseek-r1","choices":[{"index":0,"delta":{"reasoning_content":" First, I need to understand the user's question."},"finish_reason":null}]}
+
+data: {"id":"complex-reason-3","object":"chat.completion.chunk","created":1753329317,"model":"deepseek-r1","choices":[{"index":0,"delta":{"reasoning_content":" The user wants to know about weather."},"finish_reason":null}]}
+
+data: {"id":"complex-reason-4","object":"chat.completion.chunk","created":1753329318,"model":"deepseek-r1","choices":[{"index":0,"delta":{"content":"Based on my analysis, "},"finish_reason":null}]}
+
+data: {"id":"complex-reason-5","object":"chat.completion.chunk","created":1753329319,"model":"deepseek-r1","choices":[{"index":0,"delta":{"content":"the weather today is sunny with a high of 25°C."},"finish_reason":null}]}
+
+data: {"id":"complex-reason-6","object":"chat.completion.chunk","created":1753329320,"model":"deepseek-r1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+`
+
+// mockAiStreamWithToolCallRsp 模拟流式响应中带有 tool_calls
+// 测试场景：流式响应最后包含 tool_calls delta
+const mockAiStreamWithToolCallRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+data: {"id":"stream-tool-1","object":"chat.completion.chunk","created":1753329315,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"stream-tool-2","object":"chat.completion.chunk","created":1753329316,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"I'll check the weather for you."},"finish_reason":null}]}
+
+data: {"id":"stream-tool-3","object":"chat.completion.chunk","created":1753329317,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_stream_abc","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"stream-tool-4","object":"chat.completion.chunk","created":1753329318,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"location\":"}}]},"finish_reason":null}]}
+
+data: {"id":"stream-tool-5","object":"chat.completion.chunk","created":1753329319,"model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"Boston\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"stream-tool-6","object":"chat.completion.chunk","created":1753329320,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+`
+
+// mockAiReasonThenToolCallRsp 模拟先推理后调用工具的非流式响应
+// 测试场景：AI 先输出 reasoning_content，然后决定调用工具
+const mockAiReasonThenToolCallRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "reason-tool-123",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "deepseek-r1",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "reasoning_content": "The user is asking about the current weather. I don't have real-time weather data, so I need to use the get_weather tool to fetch this information for Boston.",
+        "tool_calls": [
+          {
+            "id": "call_reason_tool_001",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Boston\",\"unit\":\"fahrenheit\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 15, "completion_tokens": 50, "total_tokens": 65 }
+}
+`
+
+// mockAiMultiToolCallWithContentRsp 模拟同时有内容和多个工具调用的响应
+const mockAiMultiToolCallWithContentRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "multi-tool-content-456",
+  "object": "chat.completion",
+  "created": 1753327376,
+  "model": "gpt-4o",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "I'll help you with that. Let me gather the information you need.",
+        "tool_calls": [
+          {
+            "id": "call_multi_1",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"location\":\"Boston\"}"
+            }
+          },
+          {
+            "id": "call_multi_2",
+            "type": "function",
+            "function": {
+              "name": "get_time",
+              "arguments": "{\"timezone\":\"America/New_York\"}"
+            }
+          },
+          {
+            "id": "call_multi_3",
+            "type": "function",
+            "function": {
+              "name": "search_restaurants",
+              "arguments": "{\"location\":\"Boston\",\"cuisine\":\"Italian\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 20, "completion_tokens": 80, "total_tokens": 100 }
+}
+`
+
+// TestComplexReasoning_StreamWithReason tests complex streaming with reasoning content
+func TestComplexReasoning_StreamWithReason(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiComplexReasoningStreamRsp))
+
+	var streamContent strings.Builder
+	var reasonContent strings.Builder
+	var streamHandlerCalled, reasonHandlerCalled bool
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"deepseek-r1",
+		"What is the weather today?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			streamHandlerCalled = true
+			data, _ := io.ReadAll(reader)
+			streamContent.Write(data)
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			reasonHandlerCalled = true
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err, "Complex reasoning stream should succeed")
+	assert.True(t, streamHandlerCalled, "Stream handler should be called")
+	assert.True(t, reasonHandlerCalled, "Reason handler should be called")
+
+	// Verify reasoning content
+	assert.Contains(t, reasonContent.String(), "step by step", "Reason content should contain reasoning")
+	assert.Contains(t, reasonContent.String(), "understand the user", "Reason content should contain analysis")
+
+	// Verify output content
+	assert.Contains(t, res, "Based on my analysis", "Response should contain conclusion")
+	assert.Contains(t, res, "sunny", "Response should contain weather info")
+}
+
+// TestComplexReasoning_ThenToolCall tests reasoning followed by tool call
+func TestComplexReasoning_ThenToolCall(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiReasonThenToolCallRsp))
+
+	var receivedToolCalls []*aispec.ToolCall
+	var reasonContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"deepseek-r1",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = toolCalls
+		}),
+	)
+
+	assert.NoError(t, err, "Reason then tool call should succeed")
+
+	// Verify reasoning content was captured
+	assert.Contains(t, reasonContent.String(), "real-time weather", "Reasoning should mention real-time weather")
+	assert.Contains(t, reasonContent.String(), "get_weather tool", "Reasoning should mention the tool")
+
+	// Verify tool call was captured
+	assert.Len(t, receivedToolCalls, 1, "Should receive 1 tool call")
+	assert.Equal(t, 0, receivedToolCalls[0].Index, "First tool call should have Index 0")
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+	assert.Equal(t, "call_reason_tool_001", receivedToolCalls[0].ID)
+	assert.Contains(t, receivedToolCalls[0].Function.Arguments, "Boston")
+
+	// Verify no <|TOOL_CALL...|> in response
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain <|TOOL_CALL when callback is set")
+}
+
+// TestComplexReasoning_MultiToolCallWithContent tests response with both content and multiple tool calls
+func TestComplexReasoning_MultiToolCallWithContent(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiMultiToolCallWithContentRsp))
+
+	var receivedToolCalls []*aispec.ToolCall
+	var streamContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"Tell me about Boston - weather, time, and restaurants",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			streamContent.Write(data)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = append(receivedToolCalls, toolCalls...)
+		}),
+	)
+
+	assert.NoError(t, err, "Multi tool call with content should succeed")
+
+	// Verify content was captured
+	assert.Contains(t, res, "help you with that", "Response should contain content")
+	assert.Contains(t, res, "gather the information", "Response should contain content")
+
+	// Verify all 3 tool calls were captured
+	assert.Len(t, receivedToolCalls, 3, "Should receive 3 tool calls")
+
+	// Verify each tool call has correct Index (0, 1, 2)
+	for i, tc := range receivedToolCalls {
+		assert.Equal(t, i, tc.Index, "Tool call at position %d should have Index %d", i, i)
+	}
+
+	// Verify each tool call
+	toolNames := make([]string, 0, 3)
+	for _, tc := range receivedToolCalls {
+		toolNames = append(toolNames, tc.Function.Name)
+	}
+	assert.Contains(t, toolNames, "get_weather", "Should have get_weather tool")
+	assert.Contains(t, toolNames, "get_time", "Should have get_time tool")
+	assert.Contains(t, toolNames, "search_restaurants", "Should have search_restaurants tool")
+
+	// Verify no <|TOOL_CALL...|> in response
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain <|TOOL_CALL when callback is set")
+}
+
+// TestComplexReasoning_StreamToolCallDelta tests streaming tool call with delta arguments
+func TestComplexReasoning_StreamToolCallDelta(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiStreamWithToolCallRsp))
+
+	var streamContent strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			streamContent.Write(data)
+		}),
+		// No ToolCallCallback - should use legacy format for streaming tool calls
+	)
+
+	assert.NoError(t, err, "Stream with tool call delta should succeed")
+
+	// Verify content was captured
+	assert.Contains(t, res, "check the weather", "Response should contain initial content")
+
+	// For streaming tool calls with delta arguments, verify the arguments are accumulated
+	// The arguments come in multiple chunks: {"location": and "Boston"}
+	assert.Contains(t, res, "location", "Response should contain accumulated arguments")
+	assert.Contains(t, res, "Boston", "Response should contain location value")
+}
+
+// TestComplexReasoning_StreamNoCallback tests streaming without callback preserves legacy format
+func TestComplexReasoning_LegacyToolCallFormat(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiToolCallRsp))
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"gpt-4o-mini",
+		"What is the weather in Boston?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		// Explicitly no ToolCallCallback to test legacy behavior
+	)
+
+	assert.NoError(t, err, "Legacy tool call format should succeed")
+
+	// Verify legacy <|TOOL_CALL...|> format is present
+	assert.Contains(t, res, "<|TOOL_CALL_", "Legacy format should contain <|TOOL_CALL_")
+	assert.Contains(t, res, "<|TOOL_CALL_END", "Legacy format should contain <|TOOL_CALL_END")
+	assert.Contains(t, res, "get_weather", "Legacy format should contain function name")
+	assert.Contains(t, res, "Boston", "Legacy format should contain arguments")
+}
+
+// TestComplexReasoning_ReasonWithoutToolCall tests pure reasoning without tool calls
+func TestComplexReasoning_PureReasoning(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiComplexReasoningStreamRsp))
+
+	var reasonContent strings.Builder
+	var callbackInvoked bool
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"deepseek-r1",
+		"Explain quantum computing",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			callbackInvoked = true
+		}),
+	)
+
+	assert.NoError(t, err, "Pure reasoning should succeed")
+	assert.False(t, callbackInvoked, "ToolCallCallback should NOT be invoked for pure reasoning")
+
+	// Verify reasoning was captured
+	assert.NotEmpty(t, reasonContent.String(), "Reasoning content should be captured")
+	assert.Contains(t, reasonContent.String(), "step by step", "Reasoning should be present")
+
+	// Verify content was captured
+	assert.Contains(t, res, "Based on my analysis", "Response should contain conclusion")
+}
+
+// TestComplexReasoning_ConcurrentHandlers tests that all handlers work correctly together
+func TestComplexReasoning_ConcurrentHandlers(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockAiReasonThenToolCallRsp))
+
+	var streamCallCount, reasonCallCount, toolCallCount int
+	var mutex sync.Mutex
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/chat/completions",
+		"deepseek-r1",
+		"What is the weather?",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			mutex.Lock()
+			streamCallCount++
+			mutex.Unlock()
+			io.Copy(io.Discard, reader)
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			mutex.Lock()
+			reasonCallCount++
+			mutex.Unlock()
+			io.Copy(io.Discard, reader)
+		}),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			mutex.Lock()
+			toolCallCount += len(toolCalls)
+			mutex.Unlock()
+		}),
+	)
+
+	assert.NoError(t, err, "Concurrent handlers should succeed")
+
+	// All handlers should be called
+	assert.Equal(t, 1, streamCallCount, "Stream handler should be called once")
+	assert.Equal(t, 1, reasonCallCount, "Reason handler should be called once")
+	assert.Equal(t, 1, toolCallCount, "Tool call callback should receive 1 tool call")
+
+	// Response should not contain legacy format
+	assert.NotContains(t, res, "<|TOOL_CALL", "Response should NOT contain legacy format")
 }

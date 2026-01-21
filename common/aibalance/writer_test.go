@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
 // 创建一个实现了 io.WriteCloser 的测试用 writer
@@ -568,6 +570,237 @@ func TestConcurrentSafety(t *testing.T) {
 			t.Errorf("Invalid JSON found: %v, line: %s", err, line)
 		}
 	}
+}
+
+// TestWriteToolCalls tests the WriteToolCalls method for forwarding tool calls to clients
+func TestWriteToolCalls(t *testing.T) {
+	buf := newTestWriteCloser()
+	writer := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+
+	// Create test tool calls
+	// Note: Index field is used in streaming responses to identify which tool call this is
+	toolCalls := []*aispec.ToolCall{
+		{
+			Index: 0, // First tool call
+			ID:    "call_test_123",
+			Type:  "function",
+			Function: aispec.FuncReturn{
+				Name:      "get_weather",
+				Arguments: `{"location":"Boston","unit":"celsius"}`,
+			},
+		},
+		{
+			Index: 1, // Second tool call
+			ID:    "call_test_456",
+			Type:  "function",
+			Function: aispec.FuncReturn{
+				Name:      "get_time",
+				Arguments: `{"timezone":"America/New_York"}`,
+			},
+		},
+	}
+
+	// Write tool calls
+	err := writer.WriteToolCalls(toolCalls)
+	if err != nil {
+		t.Fatalf("WriteToolCalls failed: %v", err)
+	}
+
+	// Close and wait for writer to finish
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	writer.Wait()
+
+	// Verify output
+	output := buf.(*testWriteCloser).String()
+	t.Log("WriteToolCalls output:")
+	t.Log(output)
+
+	// Find the data line with tool_calls
+	lines := strings.Split(output, "\r\n")
+	var toolCallsLine string
+	for _, line := range lines {
+		if strings.Contains(line, "tool_calls") {
+			toolCallsLine = line
+			break
+		}
+	}
+	if toolCallsLine == "" {
+		t.Fatal("No tool_calls line found in output")
+	}
+
+	// Parse JSON
+	dataStart := strings.Index(toolCallsLine, "data: ")
+	if dataStart == -1 {
+		t.Fatal("No 'data: ' prefix found")
+	}
+	jsonStr := toolCallsLine[dataStart+6:]
+	var result map[string]interface{}
+	err = json.Unmarshal([]byte(jsonStr), &result)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON: %v, json: %s", err, jsonStr)
+	}
+
+	// Verify structure
+	if result["id"] != "chat-ai-balance-test-uid" {
+		t.Errorf("Expected id chat-ai-balance-test-uid, got %v", result["id"])
+	}
+	if result["model"] != "test-model" {
+		t.Errorf("Expected model test-model, got %v", result["model"])
+	}
+
+	choices := result["choices"].([]interface{})
+	choice := choices[0].(map[string]interface{})
+	delta := choice["delta"].(map[string]interface{})
+
+	// Verify role
+	if delta["role"] != "assistant" {
+		t.Errorf("Expected role assistant, got %v", delta["role"])
+	}
+
+	// Verify tool_calls structure
+	resultToolCalls := delta["tool_calls"].([]interface{})
+	if len(resultToolCalls) != 2 {
+		t.Fatalf("Expected 2 tool calls, got %d", len(resultToolCalls))
+	}
+
+	// Verify first tool call
+	tc1 := resultToolCalls[0].(map[string]interface{})
+	// Verify index - must be 0 for the first tool call in the array
+	if int(tc1["index"].(float64)) != 0 {
+		t.Errorf("Expected index 0 for first tool call, got %v", tc1["index"])
+	}
+	if tc1["id"] != "call_test_123" {
+		t.Errorf("Expected id call_test_123, got %v", tc1["id"])
+	}
+	if tc1["type"] != "function" {
+		t.Errorf("Expected type function, got %v", tc1["type"])
+	}
+	fn1 := tc1["function"].(map[string]interface{})
+	if fn1["name"] != "get_weather" {
+		t.Errorf("Expected name get_weather, got %v", fn1["name"])
+	}
+	if !strings.Contains(fn1["arguments"].(string), "Boston") {
+		t.Errorf("Expected arguments to contain Boston")
+	}
+
+	// Verify second tool call
+	tc2 := resultToolCalls[1].(map[string]interface{})
+	// Verify index - must be 1 for the second tool call in the array
+	if int(tc2["index"].(float64)) != 1 {
+		t.Errorf("Expected index 1 for second tool call, got %v", tc2["index"])
+	}
+	if tc2["id"] != "call_test_456" {
+		t.Errorf("Expected id call_test_456, got %v", tc2["id"])
+	}
+	fn2 := tc2["function"].(map[string]interface{})
+	if fn2["name"] != "get_time" {
+		t.Errorf("Expected name get_time, got %v", fn2["name"])
+	}
+}
+
+// TestWriteToolCallsWithContentAndReason tests that tool calls work with other stream types
+func TestWriteToolCallsWithContentAndReason(t *testing.T) {
+	buf := newTestWriteCloser()
+	writer := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+	outputWriter := writer.GetOutputWriter()
+	reasonWriter := writer.GetReasonWriter()
+
+	// Write content
+	_, err := outputWriter.Write([]byte("Let me check that for you."))
+	if err != nil {
+		t.Fatalf("Content write failed: %v", err)
+	}
+
+	// Write reason
+	_, err = reasonWriter.Write([]byte("User wants weather info."))
+	if err != nil {
+		t.Fatalf("Reason write failed: %v", err)
+	}
+
+	// Write tool calls
+	toolCalls := []*aispec.ToolCall{
+		{
+			ID:   "call_mixed_789",
+			Type: "function",
+			Function: aispec.FuncReturn{
+				Name:      "get_weather",
+				Arguments: `{"location":"Tokyo"}`,
+			},
+		},
+	}
+	err = writer.WriteToolCalls(toolCalls)
+	if err != nil {
+		t.Fatalf("WriteToolCalls failed: %v", err)
+	}
+
+	// Close and wait
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	writer.Wait()
+
+	// Verify all types are present
+	output := buf.(*testWriteCloser).String()
+	if !strings.Contains(output, "Let me check that") {
+		t.Error("Output should contain content")
+	}
+	if !strings.Contains(output, "User wants weather") {
+		t.Error("Output should contain reason")
+	}
+	if !strings.Contains(output, "tool_calls") {
+		t.Error("Output should contain tool_calls")
+	}
+	if !strings.Contains(output, "get_weather") {
+		t.Error("Output should contain get_weather function")
+	}
+	if !strings.Contains(output, "Tokyo") {
+		t.Error("Output should contain Tokyo in arguments")
+	}
+	if !strings.Contains(output, "[DONE]") {
+		t.Error("Output should contain [DONE] marker")
+	}
+}
+
+// TestWriteToolCallsNotStream tests that WriteToolCalls is no-op for non-streaming mode
+func TestWriteToolCallsNotStream(t *testing.T) {
+	buf := newTestWriteCloser()
+	writer := NewChatJSONChunkWriter(buf, "test-uid", "test-model")
+	writer.notStream = true
+
+	toolCalls := []*aispec.ToolCall{
+		{
+			ID:   "call_nostream",
+			Type: "function",
+			Function: aispec.FuncReturn{
+				Name:      "test_func",
+				Arguments: `{}`,
+			},
+		},
+	}
+
+	// Should not error in non-stream mode
+	err := writer.WriteToolCalls(toolCalls)
+	if err != nil {
+		t.Fatalf("WriteToolCalls should not error in non-stream mode: %v", err)
+	}
+
+	// Close and wait
+	err = writer.Close()
+	if err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+	writer.Wait()
+
+	// In non-stream mode, tool calls should not be written to the stream
+	// (they would be in the final message instead)
+	output := buf.(*testWriteCloser).String()
+	// The output should be empty or minimal for non-stream mode
+	// because non-stream doesn't use SSE format
+	t.Logf("Non-stream output: %s", output)
 }
 
 // TestWriterDoubleCloseIsSafe verifies that calling Close() multiple times

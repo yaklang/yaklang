@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bufpipe"
@@ -189,6 +190,84 @@ func (w *chatJSONChunkWriter) WriteError(err error) {
 	if _, err := w.writerClose.Write([]byte(chunk)); err != nil {
 		log.Printf("Failed to write error: %v", err)
 	}
+}
+
+// buildToolCallsDelta constructs a delta message for tool calls streaming responses
+// toolCalls: The tool calls to be sent
+func (w *chatJSONChunkWriter) buildToolCallsDelta(toolCalls []*aispec.ToolCall) ([]byte, error) {
+	// Convert to OpenAI format tool_calls structure
+	// Use ToolCall.Index if set, otherwise fall back to array position
+	var formattedToolCalls []map[string]any
+	for i, tc := range toolCalls {
+		index := tc.Index
+		if index == 0 && i > 0 {
+			// If Index is 0 but this isn't the first element, use array position as fallback
+			// This handles cases where Index wasn't explicitly set
+			index = i
+		}
+		formattedToolCalls = append(formattedToolCalls, map[string]any{
+			"index": index,
+			"id":    tc.ID,
+			"type":  tc.Type,
+			"function": map[string]any{
+				"name":      tc.Function.Name,
+				"arguments": tc.Function.Arguments,
+			},
+		})
+	}
+
+	result := map[string]any{
+		"id":      "chat-ai-balance-" + w.uid,
+		"object":  "chat.completion.chunk",
+		"created": w.created.Unix(),
+		"model":   w.model,
+		"choices": []map[string]any{
+			{
+				"delta": map[string]any{
+					"role":       "assistant",
+					"tool_calls": formattedToolCalls,
+				},
+				"index":         0,
+				"finish_reason": nil, // tool_calls chunk doesn't have finish_reason yet
+			},
+		},
+	}
+	return json.Marshal(result)
+}
+
+// WriteToolCalls writes tool calls to the streaming response
+// toolCalls: The tool calls received from AI provider to be forwarded to client
+func (w *chatJSONChunkWriter) WriteToolCalls(toolCalls []*aispec.ToolCall) error {
+	if w.notStream {
+		// For non-streaming, tool calls would be included in the final message
+		// This is handled separately in the complete message response
+		return nil
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.closed {
+		return nil
+	}
+
+	delta, err := w.buildToolCallsDelta(toolCalls)
+	if err != nil {
+		log.Errorf("Failed to build tool calls delta: %v", err)
+		return err
+	}
+
+	buf := bytes.Buffer{}
+	buf.WriteString("data: ")
+	buf.Write(delta)
+	buf.WriteString("\n\n")
+	w.writerClose.Write([]byte(fmt.Sprintf("%x\r\n", buf.Len())))
+	w.writerClose.Write(buf.Bytes())
+	w.writerClose.Write([]byte("\r\n"))
+	utils.FlushWriter(w.writerClose)
+
+	log.Infof("WriteToolCalls: forwarded %d tool calls to client", len(toolCalls))
+	return nil
 }
 
 func (w *chatJSONChunkWriter) GetNotStreamBody() []byte {

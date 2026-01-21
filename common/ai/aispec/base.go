@@ -184,6 +184,10 @@ type ChatBaseContext struct {
 	ErrHandler          func(err error)
 	ImageUrls           []*ImageDescription
 	DisableStream       bool
+	// ToolCallCallback is called when the AI response contains tool_calls.
+	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
+	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
+	ToolCallCallback func([]*ToolCall)
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -247,6 +251,16 @@ func WithChatBase_PoCOptions(b func() ([]poc.PocConfigOption, error)) ChatBaseOp
 func WithChatBase_ImageRawInstance(images ...*ImageDescription) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.ImageUrls = append(c.ImageUrls, images...)
+	}
+}
+
+// WithChatBase_ToolCallCallback sets a callback function that will be called when the AI response contains tool_calls.
+// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
+// Instead, the callback will be invoked with the parsed ToolCall objects.
+// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved for backward compatibility.
+func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.ToolCallCallback = cb
 	}
 }
 
@@ -323,7 +337,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
-	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts)
+	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts, ctx.ToolCallCallback)
 	wg := new(sync.WaitGroup)
 
 	// 统一处理reasoning stream handler

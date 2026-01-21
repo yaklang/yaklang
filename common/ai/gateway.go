@@ -113,6 +113,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.Config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
+		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 	)
 }
 
@@ -420,4 +421,5 @@ var Exports = map[string]any{
 	"imageFile":          aispec.WithImageFile,
 	"imageBase64":        aispec.WithImageBase64,
 	"imageRaw":           aispec.WithImageRaw,
+	"toolCallCallback":   aispec.WithToolCallCallback,
 }
