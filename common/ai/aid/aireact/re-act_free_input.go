@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -24,11 +23,12 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	for _, path := range event.AttachedFilePath {
 		r.config.ContextProviderManager.RegisterTracedContent(path, aicommon.FileContextProvider(path, userInput))
 	}
-	for _, resource := range event.AttachedResourceInfo {
-		registrationKey := resource.GetType() + "_" + resource.GetKey() + resource.GetValue()
-		hashKey := codec.Md5(registrationKey)
-		r.config.ContextProviderManager.RegisterTracedContent(hashKey, aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), resource.GetValue(), userInput))
-	}
+	// 现已经被 knowledge enhance loop 替代
+	// for _, resource := range event.AttachedResourceInfo {
+	// 	registrationKey := resource.GetType() + "_" + resource.GetKey() + resource.GetValue()
+	// 	hashKey := codec.Md5(registrationKey)
+	// 	r.config.ContextProviderManager.RegisterTracedContent(hashKey, aicommon.NewContextProvider(resource.GetType(), resource.GetKey(), resource.GetValue(), userInput))
+	// }
 
 	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)

@@ -5,6 +5,11 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 var GraphWrapperManager = NewGraphHNSWManager()
@@ -145,7 +146,7 @@ func getGraphWrapperFromDB(db *gorm.DB, collection *schema.VectorStoreCollection
 			}
 		}
 	}
-	wrapper := NewGraphWrapper(hnswGraph)
+	wrapper := NewGraphWrapper(hnswGraph, collection.Name, collection.UUID)
 
 	if collectionConfig.EnableAutoUpdateGraphInfos {
 		wrapper.setOnLayerChange(func(Layers []*hnsw.Layer[string]) {
@@ -166,6 +167,7 @@ var (
 type graphOp struct {
 	opType string // read | write
 	desc   string
+	params string
 	fn     func()
 }
 
@@ -174,13 +176,17 @@ type GraphWrapper[K cmp.Ordered] struct {
 	operationChannel     *chanx.UnlimitedChan[*graphOp]
 	mu                   sync.RWMutex
 	singleOpWarnDuration time.Duration
+	collectionName       string
+	collectionUUID       string
 }
 
-func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K]) *GraphWrapper[K] {
+func NewGraphWrapper[K cmp.Ordered](graph *hnsw.Graph[K], collectionName, collectionUUID string) *GraphWrapper[K] {
 	wrapper := &GraphWrapper[K]{
 		graph:                graph,
 		operationChannel:     chanx.NewUnlimitedChan[*graphOp](context.Background(), 10),
 		singleOpWarnDuration: 3 * time.Second,
+		collectionName:       collectionName,
+		collectionUUID:       collectionUUID,
 	}
 	go wrapper.start()
 	return wrapper
@@ -208,7 +214,7 @@ func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
 	if warnAfter <= 0 {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Errorf("recovered from panic in graph %s operation %q: %v", op.opType, op.desc, r)
+				log.Errorf("recovered from panic in graph %s operation %q (%s): %v", op.opType, op.desc, gw.describeOp(op), r)
 			}
 		}()
 		op.fn()
@@ -216,24 +222,53 @@ func (gw *GraphWrapper[K]) executeGraphOpInLock(op *graphOp) {
 	}
 
 	startedAt := time.Now()
-	var warned atomic.Bool
-	timer := time.AfterFunc(warnAfter, func() {
-		if warned.CompareAndSwap(false, true) {
-			log.Errorf("graph %s operation %q is running longer than %s", op.opType, op.desc, warnAfter)
+	done := make(chan struct{})
+	ticker := time.NewTicker(warnAfter)
+	go func() {
+		defer ticker.Stop()
+		elapsedWarns := 0
+		for {
+			select {
+			case <-ticker.C:
+				elapsedWarns++
+				elapsed := time.Since(startedAt)
+				log.Errorf("graph %s operation %q (%s) is running longer than %s (elapsed %s, warn #%d)", op.opType, op.desc, gw.describeOp(op), warnAfter, elapsed, elapsedWarns)
+			case <-done:
+				return
+			}
 		}
-	})
+	}()
 
 	defer func() {
-		timer.Stop()
+		close(done)
 		if r := recover(); r != nil {
-			log.Errorf("recovered from panic in graph %s operation %q: %v", op.opType, op.desc, r)
+			log.Errorf("recovered from panic in graph %s operation %q (%s): %v", op.opType, op.desc, gw.describeOp(op), r)
 		}
-		if elapsed := time.Since(startedAt); elapsed > warnAfter && warned.CompareAndSwap(false, true) {
-			log.Errorf("graph %s operation %q took %s (> %s)", op.opType, op.desc, elapsed, warnAfter)
+		if elapsed := time.Since(startedAt); elapsed > warnAfter {
+			log.Errorf("graph %s operation %q (%s) took %s (> %s)", op.opType, op.desc, gw.describeOp(op), elapsed, warnAfter)
 		}
 	}()
 
 	op.fn()
+}
+
+func (gw *GraphWrapper[K]) describeOp(op *graphOp) string {
+	collectionInfo := gw.collectionName
+	switch {
+	case collectionInfo != "" && gw.collectionUUID != "":
+		collectionInfo = fmt.Sprintf("%s (%s)", collectionInfo, gw.collectionUUID)
+	case collectionInfo == "" && gw.collectionUUID != "":
+		collectionInfo = gw.collectionUUID
+	case collectionInfo == "":
+		collectionInfo = "unknown"
+	}
+
+	params := op.params
+	if params == "" {
+		params = "n/a"
+	}
+
+	return fmt.Sprintf("collection=%s, params=%s", collectionInfo, params)
 }
 
 func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) time.Duration {
@@ -242,6 +277,7 @@ func (gw *GraphWrapper[K]) Add(nodes ...hnsw.InputNode[K]) time.Duration {
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
 		desc:   "Add",
+		params: fmt.Sprintf("nodes_count=%d", len(nodes)),
 		fn: func() {
 			start := time.Now()
 			defer func() {
@@ -260,6 +296,7 @@ func (gw *GraphWrapper[K]) Delete(uids ...K) {
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
 		desc:   "Delete",
+		params: fmt.Sprintf("uids=%v", uids),
 		fn: func() {
 			defer close(done)
 			for _, uid := range uids {
@@ -276,6 +313,7 @@ func (gw *GraphWrapper[K]) SearchWithDistanceAndFilter(near []float32, k int, fi
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
 		desc:   "SearchWithDistanceAndFilter",
+		params: fmt.Sprintf("k=%d, near_len=%d, has_filter=%t", k, len(near), filter != nil),
 		fn: func() {
 			results := gw.graph.SearchWithDistanceAndFilter(near, k, filter)
 			resultChan <- results
@@ -289,6 +327,7 @@ func (gw *GraphWrapper[K]) Has(docId K) bool {
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
 		desc:   "Has",
+		params: fmt.Sprintf("doc_id=%v", docId),
 		fn: func() {
 			resultChan <- gw.graph.Has(docId)
 		},
@@ -301,6 +340,7 @@ func (gw *GraphWrapper[K]) GetSize() int {
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
 		desc:   "GetSize",
+		params: "none",
 		fn: func() {
 			var nodeNum int
 			if len(gw.graph.Layers) > 0 && len(gw.graph.Layers[0].Nodes) > 0 {
@@ -317,6 +357,7 @@ func (gw *GraphWrapper[K]) GetLayerLength() int {
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeRead,
 		desc:   "GetLayerLength",
+		params: "none",
 		fn: func() {
 			resultChan <- len(gw.graph.Layers)
 		},
@@ -331,6 +372,7 @@ func (gw *GraphWrapper[K]) TrainPQCodebookFromDataWithCallback(m, k int, callbac
 	gw.operationChannel.SafeFeed(&graphOp{
 		opType: opTypeWrite,
 		desc:   "TrainPQCodebookFromDataWithCallback",
+		params: fmt.Sprintf("m=%d,k=%d", m, k),
 		fn: func() {
 			defer close(done)
 			codebook, err = gw.graph.TrainPQCodebookFromDataWithCallback(m, k, callback)
