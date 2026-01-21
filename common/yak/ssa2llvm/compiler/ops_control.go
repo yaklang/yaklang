@@ -20,9 +20,9 @@ func (c *Compiler) compileJump(inst *ssa.Jump) error {
 // compileIf creates a conditional branch.
 // It handles conversion of the condition value to i1 if necessary.
 func (c *Compiler) compileIf(inst *ssa.If) error {
-	condVal, ok := c.Values[inst.Cond]
-	if !ok {
-		return fmt.Errorf("compileIf: condition value %d not found", inst.Cond)
+	condVal, err := c.getValue(inst, inst.Cond)
+	if err != nil {
+		return err
 	}
 
 	// Check type of condition. If it's not i1, compare it with 0 to get i1.
@@ -105,9 +105,9 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 
 	for i, edgeValID := range edges {
 		// Value
-		val, ok := c.Values[edgeValID]
-		if !ok {
-			return fmt.Errorf("resolvePhi: incoming value %d not found", edgeValID)
+		val, err := c.getValue(inst, edgeValID)
+		if err != nil {
+			return err
 		}
 
 		// Block

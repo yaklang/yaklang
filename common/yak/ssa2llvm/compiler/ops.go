@@ -19,6 +19,8 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileIf(op)
 	case *ssa.Return:
 		return c.compileReturn(op)
+	case *ssa.ConstInst:
+		return c.compileConst(op)
 	case *ssa.Call:
 		return c.compileCall(op)
 	default:
@@ -27,12 +29,51 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 	}
 }
 
-func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
-	lhs, ok1 := c.Values[inst.X]
-	rhs, ok2 := c.Values[inst.Y]
+// getValue resolves an SSA value ID to an LLVM value, performing lazy compilation
+// for constants if they haven't been visited yet.
+func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
+	// 1. Check cache
+	if val, ok := c.Values[id]; ok {
+		return val, nil
+	}
 
-	if !ok1 || !ok2 {
-		return fmt.Errorf("compileBinOp: operands not found (X:%d, Y:%d)", inst.X, inst.Y)
+	// 2. Not found, try to find in function and compile if it's a constant
+	fn := contextInst.GetFunc()
+	if fn == nil {
+		return llvm.Value{}, fmt.Errorf("getValue: context instruction has no function")
+	}
+
+	valObj, ok := fn.GetValueById(id)
+	if !ok {
+		return llvm.Value{}, fmt.Errorf("getValue: value %d not found in function", id)
+	}
+
+	// 3. Lazy compile if ConstInst
+	if constInst, ok := valObj.(*ssa.ConstInst); ok {
+		if err := c.compileConst(constInst); err != nil {
+			return llvm.Value{}, err
+		}
+		// Should be in cache now
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
+	}
+
+	// 4. Return error if not found and not a constant
+	// This usually means we are referencing an instruction that hasn't been compiled yet
+	// (back-edge or dependency order issue) or not implemented.
+	return llvm.Value{}, fmt.Errorf("getValue: value %d not found (dependency missing?)", id)
+}
+
+func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
+	lhs, err := c.getValue(inst, inst.X)
+	if err != nil {
+		return err
+	}
+	rhs, err := c.getValue(inst, inst.Y)
+	if err != nil {
+		return err
 	}
 
 	var val llvm.Value
@@ -57,6 +98,45 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	return nil
 }
 
+func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
+	id := inst.GetId()
+	if _, ok := c.Values[id]; ok {
+		return nil // Already compiled
+	}
+
+	// Handle different constant types
+	// For now, assume int64 unless we can detect otherwise
+	if inst.IsNumber() {
+		// Use Int64 for simplicity as per Phase 1
+		val := inst.Number()
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(val), true) // Signed
+		c.Values[id] = llvmVal
+		return nil
+	} else if inst.IsBoolean() {
+		// Represent bool as i64 0 or 1 for compatibility with mixed ops,
+		// or handle strictly.
+		// NOTE: BinOps expect i64 operands in our current implementation.
+		// If explicit bool type needed, we might need zext/sext.
+		// Let's use i64 0/1 for now.
+		bVal := inst.Boolean()
+		iVal := uint64(0)
+		if bVal {
+			iVal = 1
+		}
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
+		c.Values[id] = llvmVal
+		return nil
+	}
+
+	// Fallback/TODO: floats, strings, nil
+	// For now, log warning or create undef?
+	// Return 0 for unknown to prevent crash?
+	fmt.Printf("WARNING: Unsupported constant type for %v (ID: %d)\n", inst.GetRawValue(), id)
+	llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+	c.Values[id] = llvmVal
+	return nil
+}
+
 func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	if len(inst.Results) == 0 {
 		c.Builder.CreateRetVoid()
@@ -65,9 +145,9 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 
 	// Only support single return value for now
 	retID := inst.Results[0]
-	val, ok := c.Values[retID]
-	if !ok {
-		return fmt.Errorf("return value not found: %d", retID)
+	val, err := c.getValue(inst, retID)
+	if err != nil {
+		return err
 	}
 	c.Builder.CreateRet(val)
 	return nil

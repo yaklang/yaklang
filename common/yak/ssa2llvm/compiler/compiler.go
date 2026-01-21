@@ -49,10 +49,24 @@ func (c *Compiler) Dispose() {
 
 // Compile (placeholder for future phases)
 // currently just returns the module string for verification
-func (c *Compiler) Compile() string {
-	// Logic to visit functions, blocks, instructions will go here
-	// For now, we will test CompileFunction manually in tests
-	return c.Mod.String()
+// Compile iterates over all functions in the SSA program and compiles them to LLVM IR.
+func (c *Compiler) Compile() error {
+	var err error
+	// Iterate over all functions in the program
+	c.Program.EachFunction(func(fn *ssa.Function) {
+		if err != nil {
+			return
+		}
+		// Skip declaring external functions again if they serve as intrinsics
+		// defined elsewhere, or handle them appropriately.
+		// For now, assume all functions in SSA need compilation or declaration.
+
+		// Compile the function
+		if checkErr := c.CompileFunction(fn); checkErr != nil {
+			err = fmt.Errorf("failed to compile function %s: %w", fn.GetName(), checkErr)
+		}
+	})
+	return err
 }
 
 // CompileFunction compiles a single YakSSA function to LLVM IR.
@@ -105,13 +119,50 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			return fmt.Errorf("value %d is not a BasicBlock", blockID)
 		}
 
+		hasTerminator := false
 		for _, instID := range blockObj.Insts {
 			instVal, ok := fn.GetValueById(instID)
 			if !ok {
 				continue
 			}
 			if inst, ok := instVal.(ssa.Instruction); ok {
+				// Track if we compiled a terminator
+				switch inst.(type) {
+				case *ssa.Return, *ssa.Jump, *ssa.If:
+					hasTerminator = true
+				}
+
 				if err := c.compileInstruction(inst); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Add default terminator if block doesn't have one
+		if !hasTerminator {
+			// Default: return 0
+			c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+		}
+	}
+
+	// 5. Resolve Phis (Pass 2)
+	for _, blockID := range fn.Blocks {
+		val, ok := fn.GetValueById(blockID)
+		if !ok {
+			return fmt.Errorf("pass 2: block value %d not found", blockID)
+		}
+		blockObj, ok := val.(*ssa.BasicBlock)
+		if !ok {
+			return fmt.Errorf("pass 2: value %d is not a BasicBlock", blockID)
+		}
+
+		for _, instID := range blockObj.Insts {
+			instVal, ok := fn.GetValueById(instID)
+			if !ok {
+				continue
+			}
+			if phi, ok := instVal.(*ssa.Phi); ok {
+				if err := c.resolvePhi(phi); err != nil {
 					return err
 				}
 			}
