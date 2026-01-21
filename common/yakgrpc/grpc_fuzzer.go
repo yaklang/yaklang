@@ -1008,6 +1008,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 		nowTime := time.Now()
 		count := 0
+
+		type sseStreamMeta struct {
+			statusCode  int32
+			contentType string
+		}
+		var sseMetaCache sync.Map // streamID -> *sseStreamMeta
+
 		for result := range res {
 			count++
 			if count > 2 && time.Now().Sub(nowTime).Seconds() > 1 {
@@ -1024,17 +1031,49 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 				method, _, _ := lowhttp.GetHTTPPacketFirstLine(result.RequestRaw)
 				host := lowhttp.GetHTTPPacketHeader(result.RequestRaw, "Host")
-				respHeaders, respBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
-				statusLine := strings.SplitN(respHeaders, "\r\n", 2)[0]
-				_, statusCode, _, _ := utils.ParseHTTPResponseLine(statusLine)
+
+				var (
+					statusCode  int32
+					contentType string
+					respBody    []byte
+				)
+
+				// SSE updates are produced as:
+				// - first update: synthetic response header + first delta body
+				// - later updates: delta body only
+				hasHeader := result.ExtraInfo["__yak_sse_has_header"] == "1" || bytes.HasPrefix(result.ResponseRaw, []byte("HTTP/"))
+				if hasHeader {
+					respHeaders, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+					statusLine := strings.SplitN(respHeaders, "\r\n", 2)[0]
+					_, code, _, _ := utils.ParseHTTPResponseLine(statusLine)
+					if code <= 0 {
+						code = http.StatusOK
+					}
+					statusCode = int32(code)
+					contentType = lowhttp.GetHTTPPacketHeader(result.ResponseRaw, "Content-Type")
+					respBody = body
+					sseMetaCache.Store(streamID, &sseStreamMeta{
+						statusCode:  statusCode,
+						contentType: contentType,
+					})
+				} else {
+					respBody = result.ResponseRaw
+					if metaRaw, ok := sseMetaCache.Load(streamID); ok {
+						meta := metaRaw.(*sseStreamMeta)
+						statusCode = meta.statusCode
+						contentType = meta.contentType
+					} else {
+						statusCode = http.StatusOK
+					}
+				}
 
 				rsp := &ypb.FuzzerResponse{
 					Ok:          true,
 					Url:         utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
 					Method:      utils.EscapeInvalidUTF8Byte([]byte(method)),
 					Host:        utils.EscapeInvalidUTF8Byte([]byte(host)),
-					StatusCode:  int32(statusCode),
-					ContentType: utils.EscapeInvalidUTF8Byte([]byte(lowhttp.GetHTTPPacketHeader(result.ResponseRaw, "Content-Type"))),
+					StatusCode:  statusCode,
+					ContentType: utils.EscapeInvalidUTF8Byte([]byte(contentType)),
 					ResponseRaw: result.ResponseRaw,
 					RequestRaw:  result.RequestRaw,
 					UUID:        streamID,
@@ -1052,6 +1091,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 				_ = feedbackResponse(rsp, true)
 				continue
+			}
+
+			// For SSE streams, incremental updates are already pushed to the frontend.
+			// The final aggregated response (from normal path) can cause unnecessary UI re-render/flicker.
+			// Skip it when we have already streamed at least one update for the same stream-id.
+			if result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_final"] == "1" {
+				if streamID := result.ExtraInfo["__yak_sse_stream_id"]; streamID != "" {
+					if _, ok := sseMetaCache.Load(streamID); ok {
+						continue
+					}
+				}
 			}
 
 			// 2M

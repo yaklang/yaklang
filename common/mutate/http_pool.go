@@ -32,9 +32,11 @@ var poolingList sync.Map
 type RandomChunkedResultHandler func(id int, chunkRaw []byte, totalTime time.Duration, chunkSendTime time.Duration, isEnd bool)
 
 const (
-	httpPoolExtraInfoSSEUpdate   = "__yak_sse_update"
-	httpPoolExtraInfoSSEStreamID = "__yak_sse_stream_id"
-	httpPoolExtraInfoSSEIndex    = "__yak_sse_index"
+	httpPoolExtraInfoSSEUpdate    = "__yak_sse_update"
+	httpPoolExtraInfoSSEStreamID  = "__yak_sse_stream_id"
+	httpPoolExtraInfoSSEIndex     = "__yak_sse_index"
+	httpPoolExtraInfoSSEHasHeader = "__yak_sse_has_header"
+	httpPoolExtraInfoSSEFinal     = "__yak_sse_final"
 )
 
 func httpPoolIsSSERequest(reqRaw []byte) bool {
@@ -1045,12 +1047,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							sseConfirmed   atomic.Bool
 							sseHeaderBytes []byte
 
-							sseStateMu   sync.Mutex
-							sseStartTime time.Time
-							sseLastFlush time.Time
-							sseIndex     int
-							sseBody      bytes.Buffer
-							sseChunks    []*RandomChunkedInfo
+							sseStateMu    sync.Mutex
+							sseStartTime  time.Time
+							sseLastFlush  time.Time
+							sseIndex      int
+							sseHeaderSent bool
+							sseBody       bytes.Buffer
+							sseChunks     []*RandomChunkedInfo
 						)
 
 						// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
@@ -1208,12 +1211,29 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									// Keep the same UUID via stream-id so frontend can choose to merge updates.
 									streamID := sseStreamID
 									headerSnapshot := append([]byte(nil), sseHeaderBytes...)
-									bodySnapshot := append([]byte(nil), sseBody.Bytes()...)
-									bodyLen := len(bodySnapshot)
+									sentHeader := sseHeaderSent
+									if !sseHeaderSent {
+										sseHeaderSent = true
+									}
+									updateIndex := sseIndex
 									sseStateMu.Unlock()
 
-									headerRaw := httpPoolBuildSyntheticResponseHeader(headerSnapshot, bodyLen)
-									rspRaw := append(append([]byte(nil), headerRaw...), bodySnapshot...)
+									var rspRaw []byte
+									if !sentHeader {
+										// First chunk carries response headers + the first delta segment so consumers can
+										// initialize their parser/state.
+										headerRaw := httpPoolBuildSyntheticResponseHeader(headerSnapshot, len(data))
+										rspRaw = append(append([]byte(nil), headerRaw...), data...)
+									} else {
+										// Subsequent chunks are delta-only to avoid repeatedly pushing an ever-growing
+										// aggregated response to the UI (which can cause flicker).
+										rspRaw = make([]byte, len(data))
+										copy(rspRaw, data)
+									}
+									hasHeaderFlag := "0"
+									if !sentHeader {
+										hasHeaderFlag = "1"
+									}
 									cache.SafeFeed(&HttpResult{
 										Url:         urlStr,
 										Request:     reqIns,
@@ -1224,13 +1244,14 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 										Payloads:    payloads,
 										Source:      config.Source,
 										ExtraInfo: map[string]string{
-											httpPoolExtraInfoSSEUpdate:   "1",
-											httpPoolExtraInfoSSEStreamID: streamID,
-											httpPoolExtraInfoSSEIndex:    strconv.Itoa(sseIndex),
+											httpPoolExtraInfoSSEUpdate:    "1",
+											httpPoolExtraInfoSSEStreamID:  streamID,
+											httpPoolExtraInfoSSEIndex:     strconv.Itoa(updateIndex),
+											httpPoolExtraInfoSSEHasHeader: hasHeaderFlag,
 										},
 										RandomChunkedData: []*RandomChunkedInfo{
 											{
-												Index:            sseIndex,
+												Index:            updateIndex,
 												Data:             data,
 												ChunkedLength:    len(data),
 												CurrentDelayTime: curDelay,
@@ -1436,6 +1457,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						extra := make(map[string]string)
 						if needSSEStream && sseConfirmed.Load() && sseStreamID != "" {
 							extra[httpPoolExtraInfoSSEStreamID] = sseStreamID
+							extra[httpPoolExtraInfoSSEFinal] = "1"
 						}
 						if config.MirrorHTTPFlow != nil {
 							copiedParams := make(map[string]string)
