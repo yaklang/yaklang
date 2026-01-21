@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unsafe"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,22 +18,25 @@ import (
 )
 
 type CompileOptions struct {
-	SourceFile  string
-	Language    string
-	OutputFile  string
-	EmitLLVM    bool
-	EmitAsm     bool
-	CompileOnly bool
-	PrintIR     bool
+	SourceFile        string
+	SourceCode        string
+	Language          string
+	OutputFile        string
+	EntryFunctionName string
+	EmitLLVM          bool
+	EmitAsm           bool
+	CompileOnly       bool
+	PrintIR           bool
 }
 
 type RunOptions struct {
-	SourceFile   string   // Path to source file
-	SourceCode   string   // Raw source code string (optional, overrides SourceFile)
-	Language     string   // Source language (optional, detected from extension)
-	FunctionName string   // Function to execute (default: "check" or "main")
-	Args         []uint64 // Arguments to pass to the function
-	PrintIR      bool     // Print LLVM IR before execution
+	SourceFile    string
+	SourceCode    string
+	Language      string
+	FunctionName  string
+	Args          []uint64
+	PrintIR       bool
+	ExternalHooks map[string]unsafe.Pointer
 }
 
 // RunViaJIT compiles and executes the code using LLVM JIT.
@@ -61,6 +64,14 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 	if err != nil {
 		comp.Dispose()
 		return 0, utils.Errorf("failed to create JIT engine: %v", err)
+	}
+
+	// Register external hooks (mappings)
+	for name, addr := range opts.ExternalHooks {
+		fnVal := comp.Mod.NamedFunction(name)
+		if !fnVal.IsNil() {
+			engine.AddGlobalMapping(fnVal, addr)
+		}
 	}
 
 	// Dispose order is important (LIFO):
@@ -150,18 +161,32 @@ func compileToIR(sourceFile, language string) (*ssaapi.Program, *Compiler, strin
 		return nil, nil, "", err
 	}
 
-	// Add main wrapper for executable generation (this only affects the returned IR string)
-	ir = addMainWrapper(ir)
-
 	return prog, comp, ir, nil
 }
 
 func CompileToExecutable(opts CompileOptions) error {
-	_, comp, ir, err := compileToIR(opts.SourceFile, opts.Language)
+	var comp *Compiler
+	var ir string
+	var err error
+
+	if opts.SourceCode != "" {
+		_, comp, ir, err = compileToIRFromCode(opts.SourceCode, opts.Language)
+	} else {
+		_, comp, ir, err = compileToIR(opts.SourceFile, opts.Language)
+	}
+
 	if err != nil {
 		return err
 	}
 	defer comp.Dispose()
+
+	// Add main wrapper for executable generation
+	// Use configured entry function or default to "@main" (standard Yak SSA entry)
+	entryFunc := opts.EntryFunctionName
+	if entryFunc == "" {
+		entryFunc = "@main"
+	}
+	ir = addMainWrapper(ir, entryFunc)
 
 	if opts.PrintIR {
 		fmt.Println(ir)
@@ -204,7 +229,7 @@ func CompileToExecutable(opts CompileOptions) error {
 		} else {
 			outputFile = replaceExt(opts.SourceFile, ".s")
 		}
-		if err := compileLLVMToAsm(tmpLL.Name(), outputFile); err != nil {
+		if err := CompileLLVMToAsm(tmpLL.Name(), outputFile); err != nil {
 			return err
 		}
 		log.Infof("Assembly written to: %s", outputFile)
@@ -216,14 +241,14 @@ func CompileToExecutable(opts CompileOptions) error {
 		} else {
 			outputFile = replaceExt(opts.SourceFile, ".o")
 		}
-		if err := compileLLVMToObject(tmpLL.Name(), outputFile); err != nil {
+		if err := CompileLLVMToObject(tmpLL.Name(), outputFile); err != nil {
 			return err
 		}
 		log.Infof("Object file written to: %s", outputFile)
 		return nil
 	}
 
-	if err := compileLLVMToBinary(tmpLL.Name(), outputFile); err != nil {
+	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile); err != nil {
 		return err
 	}
 
@@ -231,102 +256,29 @@ func CompileToExecutable(opts CompileOptions) error {
 	return nil
 }
 
-func addMainWrapper(ir string) string {
-	mainWrapper := `
+func addMainWrapper(ir, entryFunc string) string {
+	// Construct call target name
+	// If entryFunc is "check", target is "@check"
+	// If entryFunc is "@main", target is @"@main" (quoted because of @)
+	callTarget := "@" + entryFunc
+	if entryFunc == "@main" {
+		callTarget = "@\"@main\""
+	}
+
+	mainWrapper := fmt.Sprintf(`
 define i32 @main() {
 entry:
-  %result = call i64 @check()
-  %exit_code = trunc i64 %result to i32
-  ret i32 %exit_code
+  %%result = call i64 %s()
+  %%exit_code = trunc i64 %%result to i32
+  ret i32 %%exit_code
 }
-`
+`, callTarget)
 	return ir + mainWrapper
 }
 
 func replaceExt(filename, newExt string) string {
 	base := strings.TrimSuffix(filename, filepath.Ext(filename))
 	return base + newExt
-}
-
-func compileLLVMToAsm(llFile, asmFile string) error {
-	llcPath, err := findLLVMTool("llc")
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command(llcPath, llFile, "-o", asmFile)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return utils.Errorf("llc failed: %v\n%s", err, output)
-	}
-	return nil
-}
-
-func compileLLVMToObject(llFile, objFile string) error {
-	llcPath, err := findLLVMTool("llc")
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command(llcPath, "-filetype=obj", llFile, "-o", objFile)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return utils.Errorf("llc failed: %v\n%s", err, output)
-	}
-	return nil
-}
-
-func compileLLVMToBinary(llFile, binFile string) error {
-	llcPath, err := findLLVMTool("llc")
-	if err != nil {
-		return err
-	}
-
-	tmpAsm, err := ioutil.TempFile("", "ssa2llvm-*.s")
-	if err != nil {
-		return utils.Errorf("failed to create temp asm file: %v", err)
-	}
-	defer os.Remove(tmpAsm.Name())
-	tmpAsm.Close()
-
-	cmd := exec.Command(llcPath, llFile, "-o", tmpAsm.Name())
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return utils.Errorf("llc failed: %v\n%s", err, output)
-	}
-
-	clangPath := "clang"
-	if p, err := exec.LookPath("clang"); err == nil {
-		clangPath = p
-	}
-
-	cmd = exec.Command(clangPath, tmpAsm.Name(), "-o", binFile)
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return utils.Errorf("clang linking failed: %v\n%s", err, output)
-	}
-
-	return nil
-}
-
-func findLLVMTool(tool string) (string, error) {
-	paths := []string{
-		tool,
-		"/opt/homebrew/opt/llvm/bin/" + tool,
-		"/usr/local/opt/llvm/bin/" + tool,
-		"/usr/bin/" + tool,
-	}
-
-	for _, p := range paths {
-		if _, err := exec.LookPath(p); err == nil {
-			return p, nil
-		}
-		if _, err := os.Stat(p); err == nil {
-			return p, nil
-		}
-	}
-
-	return "", utils.Errorf("%s not found, please install LLVM", tool)
 }
 
 func detectLanguageFromExt(filename string) string {
