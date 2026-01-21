@@ -370,8 +370,10 @@ type MITMServer struct {
 	randomJA3 bool
 
 	// SNI (Server Name Indication) configuration
-	sni          string // SNI 值
-	overwriteSNI bool   // 是否覆盖自动推断的 SNI
+	sni          string            // SNI 值
+	overwriteSNI bool              // 是否覆盖自动推断的 SNI
+	sniMapping   map[string]string // SNI 映射，针对不同 host 设置不同 SNI
+	sniResolver  *SNIResolver      // SNI 解析器
 
 	// connection pool for remote server connections
 	connPool           *lowhttp.LowHttpConnPool
@@ -470,9 +472,10 @@ func (m *MITMServer) initConfig() error {
 	if m.randomJA3 {
 		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))
 	}
-	if m.overwriteSNI {
-		config = append(config, lowhttp.WithSNI(m.sni))
-	}
+
+	m.sniResolver = NewSNIResolver(m.sniMapping, m.overwriteSNI, m.sni)
+	m.proxy.SetSNIResolver(m.sniResolver.Resolve)
+
 	if m.GetMaxContentLength() != 0 && m.GetMaxContentLength() < 10*1024*1024 {
 		m.proxy.SetMaxContentLength(m.GetMaxContentLength())
 	}
