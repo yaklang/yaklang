@@ -150,8 +150,9 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 	return allKeys
 }
 
-func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
-	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS)
+// GetAIClientWithImagesAndTools is the full-featured version that supports images and tools
+func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatContent, tools []aispec.Tool, toolChoice any, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(tools))
 
 	var images []any
 	for _, content := range imageContents {
@@ -193,6 +194,14 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 		opts = append(opts, aispec.WithToolCallCallback(onToolCall))
 	}
 
+	// Add tools and tool_choice if provided
+	if len(tools) > 0 {
+		opts = append(opts, aispec.WithTools(tools))
+	}
+	if toolChoice != nil {
+		opts = append(opts, aispec.WithToolChoice(toolChoice))
+	}
+
 	if target := strings.TrimSpace(p.DomainOrURL); target != "" {
 		if utils.IsHttpOrHttpsUrl(target) {
 			opts = append(opts, aispec.WithBaseURL(target))
@@ -205,6 +214,11 @@ func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, on
 		return nil, errors.New("failed to get ai client, no such type: " + p.TypeName)
 	}
 	return client, nil
+}
+
+// GetAIClientWithImages is kept for backward compatibility
+func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+	return p.GetAIClientWithImagesAndTools(imageContents, nil, nil, onStream, onReasonStream, onToolCall)
 }
 
 // GetAIClient gets the AI client
