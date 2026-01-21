@@ -1370,7 +1370,7 @@ func (c *ServerConfig) serveQueryModelMetaInfo(conn net.Conn, rawPacket []byte) 
 				nameFilter = params.Get("name")
 			}
 			return nil
-		}, nil, nil)
+		}, nil) // Remove nil hook parameters to prevent panic
 	}
 
 	if nameFilter != "" {
