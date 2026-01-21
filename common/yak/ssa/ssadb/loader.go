@@ -40,7 +40,7 @@ func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan 
 //
 //	AND (已应用的匹配条件，如 variable_name = ?)
 //	AND CONCAT(ir_sources.folder_path, ir_sources.file_name) NOT IN (排除的文件列表)
-func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) chan *IrCode {
+func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName string, excludeFiles []string) <-chan *IrCode {
 	var ids []int64
 
 	// 构建查询：通过 JOIN 排除指定文件
@@ -97,8 +97,8 @@ func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName
 	return yieldIrCodes(ctx, progName, ids)
 }
 
-func yieldIrCodes(ctx context.Context, progName string, ids []int64) chan *IrCode {
-	outC := make(chan *IrCode)
+func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrCode {
+	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
 	go func() {
 		defer outC.Close()
 		idsToLoad := make([]int64, 0, len(ids))
@@ -144,7 +144,7 @@ const (
 	OpcodeCompare
 )
 
-func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string) chan *IrCode {
+func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string) <-chan *IrCode {
 	return SearchVariableWithExcludeFiles(db, ctx, progName, compareMode, matchMod, value, nil)
 }
 
@@ -159,7 +159,7 @@ func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMo
 //
 //	AND (ir_indices.variable_name = ? OR ir_indices.class_name = ?)
 //	AND CONCAT(ir_sources.folder_path, ir_sources.file_name) NOT IN (排除的文件列表)
-func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string, excludeFiles []string) chan *IrCode {
+func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string, excludeFiles []string) <-chan *IrCode {
 	// 1. Handle Glob -> Regexp
 	if compareMode == GlobCompare {
 		value = glob.Glob2Regex(value)
@@ -191,7 +191,15 @@ func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 				query = query.Where(strings.Join(excludeConditions, " AND "), excludeArgs...)
 			}
 		}
-		return YieldIrCode(query, ctx, progName)
+		ch := YieldIrCode(query, ctx, progName)
+		resultCh := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+		go func() {
+			defer resultCh.Close()
+			for ir := range ch {
+				resultCh.SafeFeed(ir)
+			}
+		}()
+		return resultCh.OutputChannel()
 	}
 
 	// 3. Handle Variable/Field (Search in IrIndex)
@@ -199,10 +207,27 @@ func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 	query = applyMatchCondition(query, matchMod, compareMode, value)
 
 	// 如果有要排除的文件，使用带排除功能的查询
+	var resultCh *chanx.UnlimitedChan[*IrCode]
 	if len(excludeFiles) > 0 {
-		return yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
+		ch := yieldFromIrIndexWithExcludeFiles(query, ctx, progName, excludeFiles)
+		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+		go func() {
+			defer resultCh.Close()
+			for ir := range ch {
+				resultCh.SafeFeed(ir)
+			}
+		}()
+	} else {
+		ch := yieldFromIrIndex(query, ctx, progName)
+		resultCh = chanx.NewUnlimitedChan[*IrCode](ctx, 100)
+		go func() {
+			defer resultCh.Close()
+			for ir := range ch {
+				resultCh.SafeFeed(ir)
+			}
+		}()
 	}
-	return yieldFromIrIndex(query, ctx, progName)
+	return resultCh.OutputChannel()
 }
 
 func applyMatchCondition(db *gorm.DB, mod int, compareMode int, value string) *gorm.DB {
@@ -270,7 +295,7 @@ func getConcatExpression(db *gorm.DB) string {
 	}
 }
 
-func emptyIrCodeChan() chan *IrCode {
+func emptyIrCodeChan() <-chan *IrCode {
 	ch := make(chan *IrCode)
 	close(ch)
 	return ch

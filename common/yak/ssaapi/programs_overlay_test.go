@@ -513,8 +513,8 @@ func allFileSystemCheck(t *testing.T, overProg *ssaapi.ProgramOverLay, progBase,
 		require.True(t, matched, "Should find variable A")
 		require.NotNil(t, vals)
 
-		values, ok := vals.(ssaapi.Values)
-		require.True(t, ok)
+		// Extract Values from ValueOperator (which is *sfvm.ValueList)
+		values := ssaapi.SyntaxFlowVariableToValues(vals)
 		require.NotEmpty(t, values, "Should find at least one value")
 
 		// 应该只返回 Layer2 的值（Layer1 的值被 Layer2 覆盖）
