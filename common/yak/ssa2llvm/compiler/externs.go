@@ -1,7 +1,7 @@
 package compiler
 
 import (
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 var externs = map[string]string{

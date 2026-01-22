@@ -120,6 +120,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4
 	github.com/xuri/excelize/v2 v2.9.0
 	github.com/yaklang/fastgocaptcha v1.0.4
+	github.com/yaklang/go-llvm v0.0.0-20260122082310-c934b72c5bd9
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0

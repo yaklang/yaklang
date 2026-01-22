@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 func (c *Compiler) compileInstruction(inst ssa.Instruction) error {

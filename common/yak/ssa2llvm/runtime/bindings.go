@@ -4,7 +4,7 @@ package runtime
 // This file declares LLVM IR function prototypes for the C runtime
 
 import (
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 // RuntimeBindings holds references to runtime functions

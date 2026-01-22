@@ -10,11 +10,11 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"tinygo.org/x/go-llvm"
 )
 
 type CompileOptions struct {
@@ -94,6 +94,18 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 			fn = comp.Mod.NamedFunction("main")
 			if !fn.IsNil() {
 				functionName = "main"
+			} else {
+				// Try @main
+				fn = comp.Mod.NamedFunction("@main")
+				if !fn.IsNil() {
+					functionName = "@main"
+				}
+			}
+		} else {
+			// Try with @ prefix
+			fn = comp.Mod.NamedFunction("@" + functionName)
+			if !fn.IsNil() {
+				functionName = "@" + functionName
 			}
 		}
 		if fn.IsNil() {
@@ -184,8 +196,46 @@ func CompileToExecutable(opts CompileOptions) error {
 	// Use configured entry function or default to "@main" (standard Yak SSA entry)
 	entryFunc := opts.EntryFunctionName
 	if entryFunc == "" {
-		entryFunc = "@main"
+		entryFunc = "check"
 	}
+
+	// Logic to resolve entry function and avoid collision with wrapper @main
+	fn := comp.Mod.NamedFunction(entryFunc)
+	if fn.IsNil() {
+		// Fallback logic
+		if entryFunc == "check" {
+			fn = comp.Mod.NamedFunction("main")
+			if !fn.IsNil() {
+				entryFunc = "main"
+			} else {
+				fn = comp.Mod.NamedFunction("@main")
+				if !fn.IsNil() {
+					entryFunc = "@main"
+				}
+			}
+		}
+	}
+	// Try with @ if not found
+	if fn.IsNil() && !strings.HasPrefix(entryFunc, "@") {
+		fn = comp.Mod.NamedFunction("@" + entryFunc)
+		if !fn.IsNil() {
+			entryFunc = "@" + entryFunc
+		}
+	}
+
+	// Rename existing @main to avoid collision with C main wrapper (which uses @main in IR)
+	mainFn := comp.Mod.NamedFunction("@main")
+	if !mainFn.IsNil() {
+		mainFn.SetName("yak_internal_main")
+		// If our entry func was @main, update it
+		if entryFunc == "@main" {
+			entryFunc = "yak_internal_main"
+		}
+	}
+
+	// Regenerate IR because we modified the module (renamed function)
+	ir = comp.Mod.String()
+
 	ir = addMainWrapper(ir, entryFunc)
 
 	if opts.PrintIR {
