@@ -159,7 +159,7 @@ func CompileDiffProgramAndSaveToDB(
 	}
 
 	// Step 5: 保存配置（包含增量编译元数据）
-	config.isIncremental = true
+	config.SetEnableIncrementalCompile(true)
 	SaveConfig(config, diffProgram)
 
 	return diffProgram, nil
@@ -212,7 +212,7 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// 如果 baseProgramName 为空，表示这是第一次增量编译（base program，全量编译但设置 IsOverlay = true）
 
 	if c.GetCompileReCompile() {
-		isIncrementalCompile := c.isIncremental && c.fs != nil
+		isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
 		if !isIncrementalCompile {
 			c.Processf(0, "recompile project, delete old data...")
 			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
@@ -223,15 +223,15 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		}
 	}
 
-	isIncrementalCompile := c.isIncremental && c.fs != nil
-	isDiffCompile := isIncrementalCompile && c.baseProgramName != ""
+	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
+	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
 
 	c.Processf(0, "recompile project, start compile")
 
 	if isIncrementalCompile {
 		var prog *Program
 		if isDiffCompile {
-			c.Processf(0.1, "incremental compile detected, base program: %s", c.baseProgramName)
+			c.Processf(0.1, "incremental compile detected, base program: %s", c.GetBaseProgramName())
 			// 差量编译：编译差量程序并创建 overlay
 			prog, err = c.parseProjectWithIncrementalCompile()
 		} else {
@@ -451,10 +451,11 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 // parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
 func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	// Step 1: 从数据库加载基础程序
-	c.Processf(0.1, "loading base program from database: %s", c.baseProgramName)
-	baseProgram, err := FromDatabase(c.baseProgramName)
+	baseProgramName := c.GetBaseProgramName()
+	c.Processf(0.1, "loading base program from database: %s", baseProgramName)
+	baseProgram, err := FromDatabase(baseProgramName)
 	if err != nil {
-		return nil, utils.Wrapf(err, "failed to load base program from database: %s", c.baseProgramName)
+		return nil, utils.Wrapf(err, "failed to load base program from database: %s", baseProgramName)
 	}
 	c.Processf(0.2, "base program loaded: %s", baseProgram.GetProgramName())
 
@@ -472,7 +473,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 			return nil, utils.Errorf("base overlay has no aggregated file system")
 		}
 		// 去掉文件系统中的 program name 前缀
-		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, c.baseProgramName)
+		baseFSForDiff, err = removeProgramNamePrefixFromFS(aggregatedFS, baseProgramName)
 		if err != nil {
 			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
 		}
@@ -504,7 +505,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		// base program 是全量编译的 program
 		// 优先从 program name 构建文件系统，如果失败则回退到配置重建
 		var err error
-		baseFSForDiff, err = buildFileSystemFromProgramName(c.baseProgramName)
+		baseFSForDiff, err = buildFileSystemFromProgramName(baseProgramName)
 		if err == nil && baseFSForDiff != nil {
 			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from program name")
 		} else {
@@ -515,21 +516,21 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 				if baseProgram.irProgram != nil && baseProgram.irProgram.ConfigInput != "" {
 					baseConfigRaw, err := ssaconfig.New(ssaconfig.ModeAll, ssaconfig.WithConfigJson(baseProgram.irProgram.ConfigInput))
 					if err != nil {
-						return nil, utils.Wrapf(err, "failed to rebuild config from base program: %s", c.baseProgramName)
+						return nil, utils.Wrapf(err, "failed to rebuild config from base program: %s", baseProgramName)
 					}
 					// 将 ssaconfig.Config 转换为 ssaapi.Config
 					baseConfig = &Config{Config: baseConfigRaw}
 				} else {
-					return nil, utils.Errorf("base program %s has no config or files to rebuild file system", c.baseProgramName)
+					return nil, utils.Errorf("base program %s has no config or files to rebuild file system", baseProgramName)
 				}
 			}
 			// 使用基础程序的配置重新构建文件系统
 			baseFSForDiff, err = baseConfig.parseFSFromInfo()
 			if err != nil {
-				return nil, utils.Wrapf(err, "failed to rebuild file system from base program config: %s", c.baseProgramName)
+				return nil, utils.Wrapf(err, "failed to rebuild file system from base program config: %s", baseProgramName)
 			}
 			if baseFSForDiff == nil {
-				return nil, utils.Errorf("failed to rebuild file system from base program: %s", c.baseProgramName)
+				return nil, utils.Errorf("failed to rebuild file system from base program: %s", baseProgramName)
 			}
 			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from config")
 		}
@@ -540,7 +541,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
 		baseFSForDiff, c.fs, // 新文件系统
-		c.baseProgramName,  // 基础程序名称（系统会从数据库构建基础文件系统）
+		baseProgramName,    // 基础程序名称（系统会从数据库构建基础文件系统）
 		c.GetProgramName(), // 差量程序名称
 		c.GetLanguage(),    // 语言
 	)

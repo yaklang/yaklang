@@ -29,7 +29,7 @@ func SaveConfig(c *Config, prog *Program) {
 	irProg.ConfigInput = c.JSON()
 	irProg.PeepholeSize = c.GetCompilePeepholeSize()
 	// 如果启用了增量编译，设置 IsOverlay = true
-	if c.isIncremental {
+	if c.GetEnableIncrementalCompile() {
 		irProg.IsOverlay = true
 	}
 	ssadb.UpdateProgram(irProg)
