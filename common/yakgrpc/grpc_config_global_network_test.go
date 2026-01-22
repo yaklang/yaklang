@@ -97,6 +97,8 @@ func TestAiApiPriority(t *testing.T) {
 	}()
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	// Disable tiered AI config to test legacy AiApiPriority functionality
+	config.EnableTieredAIModelConfig = false
 	config.AiApiPriority = []string{"test", "test1", "test2"}
 	var ok, test1, test2 bool
 	aispec.Register("test", func() aispec.AIClient {
