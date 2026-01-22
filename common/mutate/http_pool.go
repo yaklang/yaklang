@@ -778,6 +778,7 @@ type RandomChunkedInfo struct {
 	ChunkedLength    int
 	CurrentDelayTime time.Duration
 	TotalDelayTime   time.Duration
+	IsFinal          bool
 }
 
 func (r *RandomChunkedInfo) ToGRPCModel() *ypb.RandomChunkedResponse {
@@ -790,6 +791,7 @@ func (r *RandomChunkedInfo) ToGRPCModel() *ypb.RandomChunkedResponse {
 		ChunkedLength:           int64(r.ChunkedLength),
 		CurrentChunkedDelayTime: r.CurrentDelayTime.Milliseconds(),
 		TotalDelayTime:          r.TotalDelayTime.Milliseconds(),
+		IsFinal:                 r.IsFinal,
 	}
 }
 
@@ -1045,6 +1047,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						sseStreamID := ""
 						var (
 							sseConfirmed   atomic.Bool
+							sseFinalSent   atomic.Bool
 							sseHeaderBytes []byte
 
 							sseStateMu    sync.Mutex
@@ -1124,6 +1127,15 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									return
 								}
 
+								// For fuzzing, SSE streams are bounded by per-request timeout; use a derived context
+								// so we can reliably terminate the stream reader and emit a final marker.
+								streamCtx := config.Ctx
+								var cancelStream context.CancelFunc
+								if config.PerRequestTimeout > 0 {
+									streamCtx, cancelStream = context.WithTimeout(config.Ctx, config.PerRequestTimeout)
+									defer cancelStream()
+								}
+
 								sseConfirmed.Store(true)
 								sseStateMu.Lock()
 								if sseStreamID == "" {
@@ -1141,7 +1153,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									defer close(doneCh)
 									onData := func(b []byte) {
 										select {
-										case <-config.Ctx.Done():
+										case <-streamCtx.Done():
 											return
 										case dataCh <- b:
 										default:
@@ -1149,9 +1161,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									}
 									var err error
 									if isChunked {
-										err = httpPoolChunkedStreamDecode(config.Ctx, bodyReader, onData)
+										err = httpPoolChunkedStreamDecode(streamCtx, bodyReader, onData)
 									} else {
-										err = httpPoolRawStreamRead(config.Ctx, bodyReader, onData)
+										err = httpPoolRawStreamRead(streamCtx, bodyReader, onData)
 									}
 									_ = err
 									close(dataCh)
@@ -1218,17 +1230,11 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 									updateIndex := sseIndex
 									sseStateMu.Unlock()
 
+									// SSE 增量：全面以 RandomChunkedData 为准（Data 永远是 body delta）。
+									// ResponseRaw 在首包仅携带 header（便于前端初始化显示与解析 meta），后续保持为空。
 									var rspRaw []byte
 									if !sentHeader {
-										// First chunk carries response headers + the first delta segment so consumers can
-										// initialize their parser/state.
-										headerRaw := httpPoolBuildSyntheticResponseHeader(headerSnapshot, len(data))
-										rspRaw = append(append([]byte(nil), headerRaw...), data...)
-									} else {
-										// Subsequent chunks are delta-only to avoid repeatedly pushing an ever-growing
-										// aggregated response to the UI (which can cause flicker).
-										rspRaw = make([]byte, len(data))
-										copy(rspRaw, data)
+										rspRaw = append([]byte(nil), headerSnapshot...)
 									}
 									hasHeaderFlag := "0"
 									if !sentHeader {
@@ -1256,18 +1262,73 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 												ChunkedLength:    len(data),
 												CurrentDelayTime: curDelay,
 												TotalDelayTime:   totalDelay,
+												IsFinal:          false,
 											},
 										},
 									})
 									requestFeedbackCounterAdd()
 								}
 
+								var finalOnce sync.Once
+								emitFinalMarker := func() {
+									finalOnce.Do(func() {
+										if sseFinalSent.Swap(true) {
+											return
+										}
+										// Emit a final marker event so the frontend can stop streaming without waiting for
+										// an extra "final full response" packet.
+										sseStateMu.Lock()
+										sseIndex++
+										finalIndex := sseIndex
+										now := time.Now()
+										curDelay := now.Sub(sseLastFlush)
+										totalDelay := now.Sub(sseStartTime)
+										sseLastFlush = now
+										streamID := sseStreamID
+										sseStateMu.Unlock()
+
+										if streamID == "" {
+											return
+										}
+										cache.SafeFeed(&HttpResult{
+											Url:         urlStr,
+											Request:     reqIns,
+											RequestRaw:  targetRequest,
+											ResponseRaw: nil,
+											Timestamp:   time.Now().Unix(),
+											DurationMs:  time.Since(requestStart).Milliseconds(),
+											Payloads:    payloads,
+											Source:      config.Source,
+											ExtraInfo: map[string]string{
+												httpPoolExtraInfoSSEUpdate:    "1",
+												httpPoolExtraInfoSSEStreamID:  streamID,
+												httpPoolExtraInfoSSEIndex:     strconv.Itoa(finalIndex),
+												httpPoolExtraInfoSSEHasHeader: "0",
+											},
+											RandomChunkedData: []*RandomChunkedInfo{
+												{
+													Index:            finalIndex,
+													Data:             nil,
+													ChunkedLength:    0,
+													CurrentDelayTime: curDelay,
+													TotalDelayTime:   totalDelay,
+													IsFinal:          true,
+												},
+											},
+										})
+										requestFeedbackCounterAdd()
+									})
+								}
+
 								for {
 									select {
-									case <-config.Ctx.Done():
+									case <-streamCtx.Done():
+										flush()
+										emitFinalMarker()
 										return
 									case <-doneCh:
 										flush()
+										emitFinalMarker()
 										return
 									case b, ok := <-dataCh:
 										if !ok {
@@ -1456,6 +1517,49 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 						extra := make(map[string]string)
 						if needSSEStream && sseConfirmed.Load() && sseStreamID != "" {
+							// Ensure we always emit a final marker before the request goroutine exits.
+							// The stream handler also tries to emit it, but in some timeout/race paths the
+							// handler might not get scheduled before the result channel is closed.
+							if !sseFinalSent.Swap(true) {
+								sseStateMu.Lock()
+								sseIndex++
+								finalIndex := sseIndex
+								now := time.Now()
+								curDelay := now.Sub(sseLastFlush)
+								totalDelay := now.Sub(sseStartTime)
+								sseLastFlush = now
+								streamID := sseStreamID
+								sseStateMu.Unlock()
+
+								cache.SafeFeed(&HttpResult{
+									Url:         urlStr,
+									Request:     reqIns,
+									RequestRaw:  targetRequest,
+									ResponseRaw: nil,
+									Timestamp:   time.Now().Unix(),
+									DurationMs:  time.Since(requestStart).Milliseconds(),
+									Payloads:    payloads,
+									Source:      config.Source,
+									ExtraInfo: map[string]string{
+										httpPoolExtraInfoSSEUpdate:    "1",
+										httpPoolExtraInfoSSEStreamID:  streamID,
+										httpPoolExtraInfoSSEIndex:     strconv.Itoa(finalIndex),
+										httpPoolExtraInfoSSEHasHeader: "0",
+									},
+									RandomChunkedData: []*RandomChunkedInfo{
+										{
+											Index:            finalIndex,
+											Data:             nil,
+											ChunkedLength:    0,
+											CurrentDelayTime: curDelay,
+											TotalDelayTime:   totalDelay,
+											IsFinal:          true,
+										},
+									},
+								})
+								requestFeedbackCounterAdd()
+							}
+
 							extra[httpPoolExtraInfoSSEStreamID] = sseStreamID
 							extra[httpPoolExtraInfoSSEFinal] = "1"
 						}

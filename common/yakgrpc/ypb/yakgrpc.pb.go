@@ -32826,13 +32826,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -42381,8 +42381,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -45247,6 +45247,7 @@ type RandomChunkedResponse struct {
 	ChunkedLength           int64                  `protobuf:"varint,3,opt,name=ChunkedLength,proto3" json:"ChunkedLength,omitempty"`                     // 当前的 chunked 长度
 	CurrentChunkedDelayTime int64                  `protobuf:"varint,4,opt,name=CurrentChunkedDelayTime,proto3" json:"CurrentChunkedDelayTime,omitempty"` // 当前的 chunked 延迟时间
 	TotalDelayTime          int64                  `protobuf:"varint,5,opt,name=TotalDelayTime,proto3" json:"TotalDelayTime,omitempty"`                   // 总的发送耗时
+	IsFinal                 bool                   `protobuf:"varint,6,opt,name=IsFinal,proto3" json:"IsFinal,omitempty"`                                 // 是否结束（结束标记事件；Data 可能为空）
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -45314,6 +45315,13 @@ func (x *RandomChunkedResponse) GetTotalDelayTime() int64 {
 		return x.TotalDelayTime
 	}
 	return 0
+}
+
+func (x *RandomChunkedResponse) GetIsFinal() bool {
+	if x != nil {
+		return x.IsFinal
+	}
+	return false
 }
 
 type RedirectHTTPFlow struct {
@@ -45729,10 +45737,6 @@ type QueryHTTPFlowRequest struct {
 	PayloadKeyword     string   `protobuf:"bytes,47,opt,name=PayloadKeyword,proto3" json:"PayloadKeyword,omitempty"`
 	ExcludeStatusCode  string   `protobuf:"bytes,48,opt,name=ExcludeStatusCode,proto3" json:"ExcludeStatusCode,omitempty"` // 排除状态码
 	// 高级配置的hostname过滤（模糊匹配）
-	// 与 IncludeInUrl 的关系：交集
-	// 最终结果 = (匹配 HostnameFilter) AND (匹配 IncludeInUrl)
-	// HostnameFilter: 模糊匹配 url 字段，基础过滤层（如 baidu.com 会匹配所有子域名）
-	// IncludeInUrl: 精确匹配 host 字段，精确选择层（网站树选择的具体域名）
 	HostnameFilter []string `protobuf:"bytes,49,rep,name=HostnameFilter,proto3" json:"HostnameFilter,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -69219,13 +69223,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13OriginalContentType\x18; \x01(\tR\x13OriginalContentType\x12&\n" +
 	"\x0eFixContentType\x18< \x01(\tR\x0eFixContentType\x128\n" +
 	"\x17IsSetContentTypeOptions\x18= \x01(\bR\x17IsSetContentTypeOptions\x12H\n" +
-	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\"\xc9\x01\n" +
+	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\"\xe3\x01\n" +
 	"\x15RandomChunkedResponse\x12\x14\n" +
 	"\x05Index\x18\x01 \x01(\x03R\x05Index\x12\x12\n" +
 	"\x04Data\x18\x02 \x01(\fR\x04Data\x12$\n" +
 	"\rChunkedLength\x18\x03 \x01(\x03R\rChunkedLength\x128\n" +
 	"\x17CurrentChunkedDelayTime\x18\x04 \x01(\x03R\x17CurrentChunkedDelayTime\x12&\n" +
-	"\x0eTotalDelayTime\x18\x05 \x01(\x03R\x0eTotalDelayTime\"b\n" +
+	"\x0eTotalDelayTime\x18\x05 \x01(\x03R\x0eTotalDelayTime\x12\x18\n" +
+	"\aIsFinal\x18\x06 \x01(\bR\aIsFinal\"b\n" +
 	"\x10RedirectHTTPFlow\x12\x18\n" +
 	"\aIsHttps\x18\x01 \x01(\bR\aIsHttps\x12\x18\n" +
 	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +
