@@ -123,7 +123,7 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		if err != nil {
 			continue
 		}
-		timeline.idToTimelineItem.Set(id, value)
+		timeline.OrderInsertId(id, value)
 	}
 
 	// 恢复 summary

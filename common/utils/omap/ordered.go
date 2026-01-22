@@ -152,6 +152,46 @@ func (o *OrderedMap[T, V]) Set(key T, v V) {
 	o.namedKey = true
 }
 
+// OrderInsert inserts (key, v) into the map and places the key in keyChain according to less.
+// less(a, b) should return true if a should be ordered before b.
+// If key already exists, it will be moved to the new ordered position and its value updated.
+// If less is nil, it falls back to Set (append-on-new).
+func (o *OrderedMap[T, V]) OrderInsert(key T, v V, less func(a, b T) bool) {
+	if o == nil {
+		return
+	}
+	if less == nil {
+		o.Set(key, v)
+		return
+	}
+	o.init()
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	// Upsert value first.
+	o.m[key] = v
+	o.namedKey = true
+
+	// Remove existing key from keyChain if present (to allow repositioning).
+	for i, k := range o.keyChain {
+		if k == key {
+			o.keyChain = append(o.keyChain[:i], o.keyChain[i+1:]...)
+			break
+		}
+	}
+
+	// Find insertion index (stable: insert after existing equals if less is strict).
+	insertAt := sort.Search(len(o.keyChain), func(i int) bool {
+		return less(key, o.keyChain[i])
+	})
+
+	// Insert key into keyChain at insertAt.
+	var zero T
+	o.keyChain = append(o.keyChain, zero)
+	copy(o.keyChain[insertAt+1:], o.keyChain[insertAt:])
+	o.keyChain[insertAt] = key
+}
+
 func (o *OrderedMap[T, V]) BringKeyToLastOne(target T) {
 	if o == nil {
 		return
