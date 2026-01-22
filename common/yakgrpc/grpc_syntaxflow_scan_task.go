@@ -12,6 +12,47 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+// findAllBasePrograms 递归查找所有相关的 base 程序
+// 返回所有相关的程序名列表（包括原始程序、所有中间 base、最基础的 base）
+func findAllBasePrograms(progName string) ([]string, error) {
+	if progName == "" {
+		return nil, nil
+	}
+
+	var programs []string
+	visited := make(map[string]bool) // 防止循环引用
+
+	currentProgName := progName
+	for {
+		if visited[currentProgName] {
+			break // 防止循环引用
+		}
+		visited[currentProgName] = true
+
+		prog, err := ssadb.GetApplicationProgram(currentProgName)
+		if err != nil {
+			// 如果获取失败，至少返回已收集的程序
+			if len(programs) > 0 {
+				return programs, nil
+			}
+			return nil, err
+		}
+
+		// 添加到列表中
+		programs = append(programs, currentProgName)
+
+		// 如果这个程序有 BaseProgramName，说明它是增量编译的，继续向上查找
+		if prog.BaseProgramName != "" && prog.BaseProgramName != currentProgName {
+			currentProgName = prog.BaseProgramName
+		} else {
+			// 如果没有 BaseProgramName，说明这就是最基础的 base 程序
+			break
+		}
+	}
+
+	return programs, nil
+}
+
 func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.QuerySyntaxFlowScanTaskRequest) (*ypb.QuerySyntaxFlowScanTaskResponse, error) {
 	if request.Pagination == nil {
 		request.Pagination = &ypb.Paging{
@@ -19,6 +60,22 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 			Limit:   30,
 			OrderBy: "updated_at",
 			Order:   "desc",
+		}
+	}
+
+	var originalProgName string
+	if filter := request.GetFilter(); filter != nil {
+		if progNames := filter.GetPrograms(); len(progNames) == 1 && len(filter.GetProjectIds()) == 0 {
+			progName := progNames[0]
+			originalProgName = progName
+			allPrograms, err := findAllBasePrograms(progName)
+			if err != nil {
+				return nil, err
+			}
+			// 合并并去重
+			request.Filter.Programs = lo.Uniq(append(request.Filter.Programs, allPrograms...))
+		} else if progNames := filter.GetPrograms(); len(progNames) == 1 {
+			originalProgName = progNames[0]
 		}
 	}
 
@@ -32,21 +89,20 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 		return data
 	})
 
-	if progNames := request.GetFilter().GetPrograms(); len(progNames) == 1 && request.ShowDiffRisk {
+	// 使用原始程序名进行 diff 计算
+	if originalProgName != "" && request.ShowDiffRisk {
 		var lastTask *ypb.SyntaxFlowScanTask
 		for i, task := range datas {
-			// lastTask为较新的扫描
-			// fmt.Printf("task time: %v\n", task.Model)
 			if i == 0 {
 				lastTask = task
 				continue
 			}
 			baseline := &ypb.SSARiskDiffItem{
-				ProgramName:   progNames[0],
+				ProgramName:   originalProgName,
 				RiskRuntimeId: lastTask.TaskId,
 			}
 			compare := &ypb.SSARiskDiffItem{
-				ProgramName:   progNames[0],
+				ProgramName:   originalProgName,
 				RiskRuntimeId: task.TaskId,
 			}
 			res, err := yakit.DoRiskDiff(ctx, baseline, compare)
