@@ -1,3 +1,6 @@
+//go:build sqlite_fts5 && cgo
+// +build sqlite_fts5,cgo
+
 package yakit
 
 import (
