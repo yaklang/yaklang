@@ -1,0 +1,24 @@
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "对代码项目进行安全审计",
+  "main_task_goal": "识别项目中的安全漏洞，验证可利用性，生成审计报告。",
+  "tasks": [
+    {
+      "subtask_name": "项目识别与结构分析",
+      "subtask_goal": "使用 list_files 扫描项目结构，识别编程语言和框架类型。重点关注: 1) 配置文件(pom.xml/composer.json/package.json/requirements.txt)确定依赖; 2) 路由配置和入口点; 3) Controller/Handler 目录。输出: 技术栈摘要和关键入口点清单。"
+    },
+    {
+      "subtask_name": "危险函数搜索",
+      "subtask_goal": "使用 grep 搜索危险函数模式: 1) SQL相关(query/execute/raw); 2) 命令执行(system/exec/popen/Runtime.exec); 3) 文件操作(include/require/file_get_contents/fopen); 4) 反序列化(unserialize/readObject/pickle.loads); 5) 动态执行(eval/assert)。记录所有匹配的文件路径和行号作为待验证的 Sink 点。"
+    },
+    {
+      "subtask_name": "漏洞验证",
+      "subtask_goal": "对每个发现的 Sink 点，使用 vuln_verify action 进入验证模式。在验证模式中: 1) 读取 Sink 点上下文代码; 2) 追踪参数来源直到 Source; 3) 检查中间过滤函数有效性; 4) 输出验证结论(confirmed/safe/uncertain)。只有经过验证的漏洞才记录到最终报告。"
+    },
+    {
+      "subtask_name": "生成审计报告",
+      "subtask_goal": "汇总所有验证结果，使用 write_file 生成 Markdown 格式审计报告。报告包含: 1) 项目概述(技术栈/入口点); 2) 审计发现汇总表; 3) 每个确认漏洞的详情(位置/类型/数据流/利用条件/修复建议); 4) 安全建议。如无漏洞，说明项目安全状态和已检查的范围。"
+    }
+  ]
+}

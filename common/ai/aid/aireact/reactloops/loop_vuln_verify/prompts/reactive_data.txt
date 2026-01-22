@@ -1,0 +1,83 @@
+# 当前验证状态
+
+## 待验证漏洞信息
+{{ if .VulnContext }}
+- **文件**: {{ .VulnContext.FilePath }}
+- **行号**: {{ .VulnContext.Line }}
+- **Sink 函数**: {{ .VulnContext.SinkFunction }}
+- **漏洞类型**: {{ .VulnContext.VulnType }}
+- **初步描述**: {{ .VulnContext.Description }}
+{{ if .VulnContext.SuspectedSource }}
+- **疑似 Source**: {{ .VulnContext.SuspectedSource }}
+{{ end }}
+{{ else }}
+**尚未设置漏洞上下文，请先使用 `set_vuln_context` 设置待验证的漏洞信息**
+{{ end }}
+
+## 追踪进度
+
+### 已读取的代码文件
+{{ if .ReadFiles }}
+{{ range .ReadFiles }}
+- {{ . }}
+{{ end }}
+{{ else }}
+（暂无）
+{{ end }}
+
+### 数据流追踪记录
+{{ if .TraceRecords }}
+{{ range $idx, $record := .TraceRecords }}
+**[{{ $idx }}] {{ $record.Location }}**
+- 变量: {{ $record.Variable }}
+- 来源: {{ $record.Source }}
+- 说明: {{ $record.Note }}
+{{ end }}
+{{ else }}
+（暂无追踪记录）
+{{ end }}
+
+### 发现的过滤/转义函数
+{{ if .Filters }}
+{{ range .Filters }}
+- **{{ .Function }}** @ {{ .Location }}
+  - 类型: {{ .FilterType }}
+  - 有效性: {{ .Effectiveness }}
+  - 备注: {{ .Note }}
+{{ end }}
+{{ else }}
+（暂未发现过滤函数）
+{{ end }}
+
+## 当前结论状态
+
+{{ if .Conclusion }}
+### 验证结论
+- **结果**: {{ .Conclusion.Result }}
+- **置信度**: {{ .Conclusion.Confidence }}
+- **理由**: {{ .Conclusion.Reason }}
+{{ if .Conclusion.ExploitCondition }}
+- **利用条件**: {{ .Conclusion.ExploitCondition }}
+{{ end }}
+{{ if .Conclusion.FixSuggestion }}
+- **修复建议**: {{ .Conclusion.FixSuggestion }}
+{{ end }}
+{{ else }}
+**验证尚未完成**
+{{ end }}
+
+---
+
+## 操作指南
+
+1. 如果尚未设置漏洞上下文，先使用 `set_vuln_context`
+2. 使用 `read_code` 读取相关代码文件
+3. 使用 `trace_backward` 记录数据流追踪
+4. 使用 `record_filter` 记录发现的过滤函数
+5. 分析完成后使用 `conclude` 输出最终结论（confirmed/safe/uncertain）
+
+{{ if .FeedbackMessages }}
+---
+## 系统反馈
+{{ .FeedbackMessages }}
+{{ end }}

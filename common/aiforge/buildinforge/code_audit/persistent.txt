@@ -1,0 +1,52 @@
+# 代码审计核心知识
+
+## 语言/版本特性
+
+### PHP
+- **PHP8 变化**: assert/create_function 不执行代码，XXE 基本消失，phar 反序列化失效，parse_str 必须传第二参数
+- **危险函数**: system, exec, shell_exec, passthru, eval, assert(PHP7-), include/require, unserialize, mysqli_query, PDO::query
+
+### Java
+- **JNDI 限制**: JDK 8u191+ 默认禁用远程类加载
+- **反序列化**: ObjectInputStream.readObject, XMLDecoder, SnakeYAML, Fastjson
+- **SQL**: Statement.execute*, PreparedStatement 参数拼接
+- **命令**: Runtime.exec, ProcessBuilder
+
+### Python
+- **危险函数**: eval, exec, os.system, subprocess.*, pickle.loads, yaml.load(Loader=Loader)
+- **SQL**: cursor.execute 字符串拼接
+- **模板注入**: render_template_string, Jinja2
+
+## 常见 Source（用户可控入口）
+
+```
+PHP: $_GET, $_POST, $_REQUEST, $_COOKIE, $_FILES, $_SERVER['HTTP_*']
+Java: request.getParameter, @RequestParam, @PathVariable, @RequestBody
+Python: request.args, request.form, request.json, request.data
+Node: req.query, req.body, req.params, req.cookies
+```
+
+## 常见 Sink（危险函数）
+
+```
+SQL: query, execute, raw, whereRaw
+命令: system, exec, popen, spawn, Runtime.exec
+文件: include, require, fopen, file_get_contents, readFile
+反序列化: unserialize, readObject, pickle.loads, yaml.load
+输出: echo, print, innerHTML, document.write
+```
+
+## 有效过滤判断
+
+| 过滤类型 | 有效性 | 说明 |
+|---------|--------|------|
+| 类型转换 (intval, (int)) | ✅ 有效 | 强制转换阻断注入 |
+| 白名单 | ✅ 有效 | 限定允许值范围 |
+| 预处理语句 | ✅ 有效 | 参数化查询 |
+| htmlspecialchars | ⚠️ 部分 | 仅防 XSS，不防 SQL |
+| addslashes | ⚠️ 部分 | 可能被绕过 |
+| 黑名单过滤 | ❌ 通常无效 | 容易遗漏或绕过 |
+
+## 验证漏洞
+
+发现潜在漏洞后，使用 `vuln_verify` action 进入验证模式，追踪完整数据流后给出结论。
