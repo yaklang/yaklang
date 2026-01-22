@@ -26,6 +26,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func init() {
@@ -271,6 +272,16 @@ func GetPrimaryAgent() aispec.AIClient {
 }
 
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	// Check if tiered AI model configuration is enabled
+	if consts.IsTieredAIModelConfigEnabled() {
+		return tieredChat(msg, opts...)
+	}
+	// Fall back to legacy chat logic
+	return legacyChat(msg, opts...)
+}
+
+// legacyChat is the original Chat implementation for backward compatibility
+func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
 	var err error
@@ -292,6 +303,158 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		return "", err
 	}
 	return responseRsp, nil
+}
+
+// tieredChat handles chat using the tiered AI model configuration
+func tieredChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	// Get the current routing policy
+	policy := consts.GetTieredAIRoutingPolicy()
+
+	// Select the appropriate tier based on policy
+	var configs []*ypb.ThirdPartyApplicationConfig
+	switch policy {
+	case consts.PolicyPerformance:
+		configs = consts.GetIntelligentAIConfigs()
+	case consts.PolicyCost:
+		configs = consts.GetLightweightAIConfigs()
+	case consts.PolicyBalance, consts.PolicyAuto:
+		// Balance mode: use lightweight by default
+		configs = consts.GetLightweightAIConfigs()
+	default:
+		configs = consts.GetLightweightAIConfigs()
+	}
+
+	if len(configs) == 0 {
+		log.Warnf("No tiered AI config available for policy %s, falling back to legacy chat", policy)
+		return legacyChat(msg, opts...)
+	}
+
+	// Try each config in order
+	for _, cfg := range configs {
+		result, err := chatWithThirdPartyConfig(msg, cfg, opts...)
+		if err == nil {
+			return result, nil
+		}
+		log.Debugf("Chat with config type=%s failed: %v, trying next", cfg.Type, err)
+	}
+
+	// Fallback to lightweight if not already using it
+	if policy != consts.PolicyCost && !consts.IsTieredAIFallbackDisabled() {
+		log.Debugf("Falling back to lightweight model")
+		lightweightConfigs := consts.GetLightweightAIConfigs()
+		for _, cfg := range lightweightConfigs {
+			result, err := chatWithThirdPartyConfig(msg, cfg, opts...)
+			if err == nil {
+				return result, nil
+			}
+		}
+	}
+
+	// Final fallback to legacy chat
+	log.Warnf("All tiered configs failed, falling back to legacy chat")
+	return legacyChat(msg, opts...)
+}
+
+// chatWithThirdPartyConfig performs chat using a specific ThirdPartyApplicationConfig
+func chatWithThirdPartyConfig(msg string, cfg *ypb.ThirdPartyApplicationConfig, opts ...aispec.AIConfigOption) (string, error) {
+	if cfg == nil {
+		return "", errors.New("config is nil")
+	}
+
+	// Build options from config
+	configOpts := buildOptionsFromThirdPartyConfig(cfg)
+	allOpts := append(configOpts, opts...)
+
+	// Create gateway and chat
+	agent := createAIGateway(cfg.Type)
+	if agent == nil {
+		return "", errors.New("failed to create AI gateway for type: " + cfg.Type)
+	}
+
+	agent.LoadOption(allOpts...)
+	if err := agent.CheckValid(); err != nil {
+		return "", err
+	}
+
+	log.Debugf("Start tiered chat with type=%s", cfg.Type)
+	return agent.Chat(msg)
+}
+
+// buildOptionsFromThirdPartyConfig builds AIConfigOption slice from ThirdPartyApplicationConfig
+func buildOptionsFromThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) []aispec.AIConfigOption {
+	var opts []aispec.AIConfigOption
+
+	if cfg.Type != "" {
+		opts = append(opts, aispec.WithType(cfg.Type))
+	}
+	if cfg.APIKey != "" {
+		opts = append(opts, aispec.WithAPIKey(cfg.APIKey))
+	}
+	if cfg.Domain != "" {
+		opts = append(opts, aispec.WithDomain(cfg.Domain))
+	}
+
+	// Extract model from ExtraParams
+	for _, param := range cfg.ExtraParams {
+		if param.Key == "model" {
+			opts = append(opts, aispec.WithModel(param.Value))
+			break
+		}
+	}
+
+	return opts
+}
+
+// TieredChat allows explicit selection of a model tier for chat
+type ModelTier string
+
+const (
+	TierIntelligent ModelTier = "intelligent"
+	TierLightweight ModelTier = "lightweight"
+	TierVision      ModelTier = "vision"
+)
+
+// TieredChatWithTier performs chat with a specific model tier
+func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOption) (string, error) {
+	if !consts.IsTieredAIModelConfigEnabled() {
+		log.Debugf("Tiered AI config not enabled, using legacy chat")
+		return legacyChat(msg, opts...)
+	}
+
+	var configs []*ypb.ThirdPartyApplicationConfig
+	switch tier {
+	case TierIntelligent:
+		configs = consts.GetIntelligentAIConfigs()
+	case TierLightweight:
+		configs = consts.GetLightweightAIConfigs()
+	case TierVision:
+		configs = consts.GetVisionAIConfigs()
+	default:
+		log.Warnf("Unknown tier %s, using intelligent", tier)
+		configs = consts.GetIntelligentAIConfigs()
+	}
+
+	if len(configs) == 0 {
+		return "", errors.New("no configuration available for tier: " + string(tier))
+	}
+
+	// Try the first config
+	return chatWithThirdPartyConfig(msg, configs[0], opts...)
+}
+
+// IntelligentChat uses the intelligent (high-quality) model
+func IntelligentChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	return TieredChatWithTier(TierIntelligent, msg, opts...)
+}
+
+// LightweightChat uses the lightweight (fast) model
+func LightweightChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	return TieredChatWithTier(TierLightweight, msg, opts...)
+}
+
+// VisionChat uses the vision model
+func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	return TieredChatWithTier(TierVision, msg, opts...)
 }
 
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {

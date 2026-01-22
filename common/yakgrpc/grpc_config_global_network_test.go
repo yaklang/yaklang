@@ -887,7 +887,8 @@ func TestInitNetworkConfig(t *testing.T) {
 	yakit.InitNetworkConfig(emptyConfig)
 	defaultConfig := yakit.GetDefaultNetworkConfig()
 
-	var notNeedCheckValue = []string{"ClientCertificates", "CustomDNSServers", "CustomDoHServers", "AuthInfos", "AiApiPriority"}
+	var notNeedCheckValue = []string{"ClientCertificates", "CustomDNSServers", "CustomDoHServers", "AuthInfos", "AiApiPriority",
+		"EnableTieredAIModelConfig", "TieredAIModelConfig", "IntelligentAIModelConfig", "LightweightAIModelConfig", "VisionAIModelConfig"}
 
 	defaultReflect := reflect.ValueOf(*defaultConfig)
 	emptyReflect := reflect.ValueOf(*emptyConfig)

@@ -417,6 +417,52 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	// 注意：AppConfigs 不在这里初始化，而是通过 EnsureAIBalanceConfig() 在运行时动态添加
 	// 这样可以保持向后兼容性，且不影响 TestInitNetworkConfig 测试
 
+	// ==================== Tiered AI Model Configuration ====================
+	// Enable tiered AI model configuration by default
+	defaultConfig.EnableTieredAIModelConfig = true
+
+	// Set default routing policy to "balance"
+	defaultConfig.TieredAIModelConfig = &ypb.TieredAIModelConfigDescriptor{
+		ModelRoutingPolicy:                string(consts.PolicyBalance),
+		DisableFallbackToLightweightModel: false,
+	}
+
+	// Default Intelligent AI Model Config (high-quality, for complex tasks)
+	defaultConfig.IntelligentAIModelConfig = []*ypb.ThirdPartyApplicationConfig{
+		{
+			Type:   "aibalance",
+			APIKey: "free-user",
+			Domain: "aibalance.yaklang.com",
+			ExtraParams: []*ypb.KVPair{
+				{Key: "model", Value: "memfit-standard-free"},
+			},
+		},
+	}
+
+	// Default Lightweight AI Model Config (fast, for simple tasks)
+	defaultConfig.LightweightAIModelConfig = []*ypb.ThirdPartyApplicationConfig{
+		{
+			Type:   "aibalance",
+			APIKey: "free-user",
+			Domain: "aibalance.yaklang.com",
+			ExtraParams: []*ypb.KVPair{
+				{Key: "model", Value: "memfit-light-free"},
+			},
+		},
+	}
+
+	// Default Vision AI Model Config (for image understanding tasks)
+	defaultConfig.VisionAIModelConfig = []*ypb.ThirdPartyApplicationConfig{
+		{
+			Type:   "aibalance",
+			APIKey: "free-user",
+			Domain: "aibalance.yaklang.com",
+			ExtraParams: []*ypb.KVPair{
+				{Key: "model", Value: "memfit-vision-free"},
+			},
+		},
+	}
+
 	return defaultConfig
 }
 
@@ -489,4 +535,36 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 			}
 		}
 	}
+
+	// ==================== Tiered AI Model Configuration ====================
+	// Store tiered AI model configuration in memory
+	tieredConfig := &consts.TieredAIConfig{
+		Enabled:            c.GetEnableTieredAIModelConfig(),
+		DisableFallback:    false,
+		IntelligentConfigs: c.GetIntelligentAIModelConfig(),
+		LightweightConfigs: c.GetLightweightAIModelConfig(),
+		VisionConfigs:      c.GetVisionAIModelConfig(),
+	}
+
+	// Parse routing policy from TieredAIModelConfig
+	if c.GetTieredAIModelConfig() != nil {
+		policy := c.GetTieredAIModelConfig().GetModelRoutingPolicy()
+		switch policy {
+		case "auto":
+			tieredConfig.RoutingPolicy = consts.PolicyAuto
+		case "performance":
+			tieredConfig.RoutingPolicy = consts.PolicyPerformance
+		case "cost":
+			tieredConfig.RoutingPolicy = consts.PolicyCost
+		case "balance":
+			tieredConfig.RoutingPolicy = consts.PolicyBalance
+		default:
+			tieredConfig.RoutingPolicy = consts.PolicyBalance
+		}
+		tieredConfig.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
+	} else {
+		tieredConfig.RoutingPolicy = consts.PolicyBalance
+	}
+
+	consts.SetTieredAIConfig(tieredConfig)
 }
