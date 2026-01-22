@@ -987,6 +987,267 @@ alert $high for {
 	})
 }
 
+func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_IncrementalCompile(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	t.Run("test scan task risk count with incremental compile", func(t *testing.T) {
+		// 创建基础程序和增量程序的名称
+		baseProgID := uuid.NewString()
+		diffProgID := uuid.NewString()
+		ruleNameIncremental := uuid.NewString()
+		taskIDBase := ""
+		taskIDDiff := ""
+
+		// 创建规则
+		client.CreateSyntaxFlowRule(context.Background(), &ypb.CreateSyntaxFlowRuleRequest{
+			SyntaxFlowInput: &ypb.SyntaxFlowRuleInput{
+				Content: `
+		Runtime.getRuntime().exec(* #-> as $high) 
+
+		alert $high for {
+			type: "vuln",
+			level: "high",
+		}`,
+				GroupNames: []string{"java"},
+				RuleName:   ruleNameIncremental,
+				Language:   "java",
+				Tags:       []string{"java"},
+			},
+		})
+
+		defer func() {
+			client.DeleteSyntaxFlowRule(context.Background(), &ypb.DeleteSyntaxFlowRuleRequest{
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleNameIncremental},
+				},
+			})
+			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskIDBase)
+			require.NoError(t, err)
+			err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskIDDiff)
+			require.NoError(t, err)
+			ssadb.DeleteProgram(ssadb.GetDB(), baseProgID)
+			ssadb.DeleteProgram(ssadb.GetDB(), diffProgID)
+			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskIDBase, taskIDDiff}, schema.RuntimeId)
+			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskIDBase, taskIDDiff}, schema.RuntimeId)
+		}()
+
+		// Step 1: 创建基础程序（全量编译）
+		baseFS := filesys.NewVirtualFs()
+		baseFS.AddFile("example/src/main/java/com/example/Base.java", `
+	package com.example;
+	import java.lang.Runtime;
+	
+	public class Base {
+		public static void main(String[] args) {
+			// 这个漏洞会在基础程序中检测到
+			Runtime.getRuntime().exec("ls");
+		}
+	}
+	`)
+
+		basePrograms, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(baseFS),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(baseProgID),
+			ssaapi.WithProgramPath("example"),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, basePrograms)
+		require.Greater(t, len(basePrograms), 0)
+
+		// Step 2: 创建增量程序（增量编译，基于基础程序）
+		diffFS := filesys.NewVirtualFs()
+		// 修改 Base.java，添加新的漏洞
+		diffFS.AddFile("example/src/main/java/com/example/Base.java", `
+	package com.example;
+	import java.lang.Runtime;
+	
+	public class Base {
+		public static void main(String[] args) {
+			// 保留原有的漏洞
+			Runtime.getRuntime().exec("ls");
+			// 新增的漏洞（应该在增量编译中检测到）
+			Runtime.getRuntime().exec(args[0]);
+		}
+	}
+	`)
+		// 新增文件，包含新的漏洞
+		diffFS.AddFile("example/src/main/java/com/example/NewClass.java", `
+	package com.example;
+	import java.lang.Runtime;
+	
+	public class NewClass {
+		public void process(String cmd) {
+			// 新增文件中的漏洞
+			Runtime.getRuntime().exec(cmd);
+		}
+	}
+	`)
+
+		diffPrograms, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(diffFS),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(diffProgID),
+			ssaapi.WithProgramPath("example"),
+			ssaapi.WithBaseProgramName(baseProgID), // 设置为增量编译
+		)
+		require.NoError(t, err)
+		require.NotNil(t, diffPrograms)
+		require.Greater(t, len(diffPrograms), 0)
+
+		// 验证增量程序的元数据
+		diffProgram := diffPrograms[0]
+		require.NotNil(t, diffProgram.Program)
+		require.Equal(t, baseProgID, diffProgram.Program.BaseProgramName, "BaseProgramName should be set for incremental compile")
+
+		// Step 3: 对基础程序进行扫描
+		{
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleNameIncremental},
+				},
+				ProgramName: []string{
+					baseProgID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskIDBase = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("Base program scan task ID: %s", taskIDBase)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+
+		// Step 4: 对增量程序进行扫描
+		{
+			stream, err := client.SyntaxFlowScan(context.Background())
+			require.NoError(t, err)
+
+			stream.Send(&ypb.SyntaxFlowScanRequest{
+				ControlMode: "start",
+				Filter: &ypb.SyntaxFlowRuleFilter{
+					RuleNames: []string{ruleNameIncremental},
+				},
+				ProgramName: []string{
+					diffProgID,
+				},
+			})
+
+			resp, err := stream.Recv()
+			taskIDDiff = resp.TaskID
+			require.NoError(t, err)
+			log.Infof("Diff program scan task ID: %s", taskIDDiff)
+
+			finishProcess := 0.0
+			var finishStatus string
+			checkSfScanRecvMsg(t, stream, func(status string) {
+				finishStatus = status
+			}, func(process float64) {
+				finishProcess = process
+			})
+			require.Equal(t, 1.0, finishProcess)
+			require.Equal(t, "done", finishStatus)
+		}
+
+		// Step 5: 验证基础程序和增量程序属于同一个 project
+		baseIrProgram, err := ssadb.GetApplicationProgram(baseProgID)
+		require.NoError(t, err)
+		require.NotNil(t, baseIrProgram)
+
+		diffIrProgram, err := ssadb.GetApplicationProgram(diffProgID)
+		require.NoError(t, err)
+		require.NotNil(t, diffIrProgram)
+
+		require.Equal(t, baseIrProgram.ProjectID, diffIrProgram.ProjectID, "Base and diff programs should belong to the same project")
+		log.Infof("Base program ProjectID: %d, Diff program ProjectID: %d", baseIrProgram.ProjectID, diffIrProgram.ProjectID)
+
+		// Step 6: 查询扫描任务，验证以 Project 为单位查询（真实场景）
+		// 真实场景：前端通过增量程序名称查询，后端应该：
+		// 1. 通过 diffProgID 获取程序信息，找到它的 BaseProgramName 或 ProjectID
+		// 2. 通过 ProjectID 自动识别 project 并返回该 project 下的所有扫描任务
+		// 包括基础程序和增量程序的扫描任务
+		rsp, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				Programs: []string{diffProgID}, // 只传入增量程序名称，模拟真实场景（通过 diff 找到 base）
+			},
+			ShowDiffRisk: true, // 启用新增漏洞计算
+		})
+
+		require.NoError(t, err)
+		// 应该返回基础程序和增量程序的扫描任务（因为它们属于同一个 project）
+		require.GreaterOrEqual(t, len(rsp.Data), 2, "Should return at least 2 tasks (base and diff) for the same project")
+
+		// 找到基础程序和增量程序的扫描任务
+		var baseTask, diffTask *ypb.SyntaxFlowScanTask
+		for _, task := range rsp.Data {
+			// 根据 Programs 字段判断是基础程序还是增量程序
+			if len(task.Programs) > 0 && task.Programs[0] == baseProgID {
+				baseTask = task
+			} else if len(task.Programs) > 0 && task.Programs[0] == diffProgID {
+				diffTask = task
+			}
+		}
+
+		require.NotNil(t, baseTask, "Base task should be found when querying by diff program name (same project)")
+		require.NotNil(t, diffTask, "Diff task should be found when querying by diff program name")
+
+		// 验证基础程序的扫描结果
+		require.Equal(t, baseTask.Programs, []string{baseProgID})
+		require.Equal(t, baseTask.Status, "done")
+		require.Greater(t, baseTask.RiskCount, int64(0), "Base program should have at least one risk")
+		// 基础程序是第一个扫描的，所以新增漏洞数应该为 0（因为没有之前的扫描进行比较）
+		require.Equal(t, baseTask.NewRiskCount, int64(0), "Base program should have 0 new risks (first scan)")
+
+		// 验证增量程序的扫描结果
+		require.Equal(t, diffTask.Programs, []string{diffProgID})
+		require.Equal(t, diffTask.Status, "done")
+		require.Greater(t, diffTask.RiskCount, baseTask.RiskCount, "Diff program should have more risks than base program")
+		// 增量程序应该检测到新增的漏洞（通过 RuntimeId 比较，不依赖 ProgramName）
+		require.Greater(t, diffTask.NewRiskCount, int64(0), "Diff program should have new risks detected via RuntimeId comparison")
+		log.Infof("Base task risks: %d, new risks: %d", baseTask.RiskCount, baseTask.NewRiskCount)
+		log.Infof("Diff task risks: %d, new risks: %d", diffTask.RiskCount, diffTask.NewRiskCount)
+
+		// Step 7: 验证通过增量程序名称查询也能返回同一 project 下的所有任务
+		rsp2, err := client.QuerySyntaxFlowScanTask(context.Background(), &ypb.QuerySyntaxFlowScanTaskRequest{
+			Filter: &ypb.SyntaxFlowScanTaskFilter{
+				Programs: []string{diffProgID}, // 通过增量程序名称查询
+			},
+			ShowDiffRisk: true,
+		})
+
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(rsp2.Data), 2, "Should return at least 2 tasks when querying by diff program name (same project)")
+
+		// 验证返回的任务包含基础程序和增量程序
+		hasBaseTask := false
+		hasDiffTask := false
+		for _, task := range rsp2.Data {
+			if len(task.Programs) > 0 && task.Programs[0] == baseProgID {
+				hasBaseTask = true
+			}
+			if len(task.Programs) > 0 && task.Programs[0] == diffProgID {
+				hasDiffTask = true
+			}
+		}
+		require.True(t, hasBaseTask, "Should return base task when querying by diff program name")
+		require.True(t, hasDiffTask, "Should return diff task when querying by diff program name")
+	})
+}
+
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffProg(t *testing.T) {
 	t.Skip("this task3 syntaxflow result not correct ")
 	progID := uuid.NewString()
