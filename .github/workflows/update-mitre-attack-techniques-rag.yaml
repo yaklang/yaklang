@@ -406,6 +406,7 @@ jobs:
           ZIP_SIZE=$(stat -c%s "$FINAL_ZIP")
           echo "RAG.gz size: $RAG_GZ_SIZE bytes ($(echo "scale=2; $RAG_GZ_SIZE/1024/1024" | bc) MB)"
           echo "ZIP size: $ZIP_SIZE bytes ($(echo "scale=2; $ZIP_SIZE/1024/1024" | bc) MB)"
+          echo "RAG_FILE_SIZE=$RAG_GZ_SIZE" >> $GITHUB_ENV
           
           # 上传 RAG 压缩文件
           echo "Uploading mitre_attack_techniques.rag.gz..."
@@ -460,7 +461,8 @@ jobs:
             --version "$VERSION" \
             --rag-file "${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz" \
             --hash-file "${RAG_OSS_DIR}/mitre_attack_techniques.rag.gz.sha256.txt" \
-            --hash "$SHA256_VALUE"
+            --hash "$SHA256_VALUE" \
+            --file-size "$RAG_FILE_SIZE"
           
           echo "New rags-latest.json content:"
           cat $HOME/yakit-projects/rags-latest.json | jq .

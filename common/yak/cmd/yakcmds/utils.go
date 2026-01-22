@@ -387,6 +387,10 @@ var UtilsCommands = []*cli.Command{
 				Name:  "hash",
 				Usage: "Hash value",
 			},
+			cli.Int64Flag{
+				Name:  "file-size",
+				Usage: "RAG file size in bytes",
+			},
 			cli.StringFlag{
 				Name:  "reference-artifacts",
 				Usage: "Reference artifact files (comma-separated OSS paths, e.g., '/rag/xxx/v1/data.zip,/rag/xxx/v1/index.json')",
@@ -406,6 +410,7 @@ var UtilsCommands = []*cli.Command{
 			hashFile := c.String("hash-file")
 			hashType := c.String("hash-type")
 			hashValue := c.String("hash")
+			fileSize := c.Int64("file-size")
 			referenceArtifactsStr := c.String("reference-artifacts")
 
 			// Parse reference-artifacts (comma-separated)
@@ -435,6 +440,7 @@ var UtilsCommands = []*cli.Command{
 				NameZh             string   `json:"name_zh,omitempty"`
 				Version            string   `json:"version"`
 				File               string   `json:"file"`
+				FileSize           int64    `json:"file_size,omitempty"`
 				HashFile           string   `json:"hashfile,omitempty"`
 				HashType           string   `json:"hashtype,omitempty"`
 				Hash               string   `json:"hash,omitempty"`
@@ -464,6 +470,7 @@ var UtilsCommands = []*cli.Command{
 				HashFile:           hashFile,
 				HashType:           hashType,
 				Hash:               hashValue,
+				FileSize:           fileSize,
 				ReferenceArtifacts: referenceArtifacts,
 			}
 

@@ -169,6 +169,7 @@ jobs:
             echo "RAG file size is less than 10KB. Something might be wrong. Aborting."
             exit 1
           fi
+          echo "RAG_FILE_SIZE=$FILE_SIZE" >> $GITHUB_ENV
           
           # 生成 SHA256 校验和
           echo "Generating SHA256 checksum..."
@@ -230,7 +231,8 @@ jobs:
             --version "$VERSION" \
             --rag-file "/rag/memfit-caps/${VERSION}/memfit-caps.rag.gz" \
             --hash-file "/rag/memfit-caps/${VERSION}/memfit-caps.rag.gz.sha256.txt" \
-            --hash "$SHA256_VALUE"
+            --hash "$SHA256_VALUE" \
+            --file-size "$RAG_FILE_SIZE"
           
           echo "New rags-latest.json content:"
           cat $HOME/yakit-projects/rags-latest.json
@@ -268,4 +270,3 @@ jobs:
           echo "RAG File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/memfit-caps.rag.gz"
           echo "SHA256 File: https://yaklang.oss-accelerate.aliyuncs.com${RAG_OSS_DIR}/memfit-caps.rag.gz.sha256.txt"
           echo "Index File: https://yaklang.oss-accelerate.aliyuncs.com/rag/rags-latest.json"
-
