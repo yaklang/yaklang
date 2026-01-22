@@ -49,6 +49,7 @@ type AIStatefulTask interface {
 	Cancel()
 	IsFinished() bool
 	GetUserInput() string
+	GetOriginUserInput() string
 	SetUserInput(string)
 	SetAttachedDatas([]*AttachedResource)
 	GetAttachedDatas() []*AttachedResource
@@ -278,8 +279,12 @@ func (s *AIStatefulTaskBase) IsFinished() bool {
 	}
 }
 
-func (s *AIStatefulTaskBase) GetUserInput() string {
+func (s *AIStatefulTaskBase) GetOriginUserInput() string {
 	return s.userInput
+}
+
+func (s *AIStatefulTaskBase) GetUserInput() string {
+	return s.GetOriginUserInput()
 }
 
 func (s *AIStatefulTaskBase) SetUserInput(s2 string) {

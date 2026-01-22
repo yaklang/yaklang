@@ -10,6 +10,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+func extractMarkdownBulletLines(s string) []string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(line, "- ") {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
 // TestCurrentMemorySize_Empty 测试空内存大小
 func TestCurrentMemorySize_Empty(t *testing.T) {
 	loop := &ReActLoop{
@@ -155,9 +166,11 @@ func TestGetCurrentMemoriesContent_WithNewlines(t *testing.T) {
 
 	content := loop.GetCurrentMemoriesContent()
 
-	// 检查是否有换行符分隔
-	if !strings.Contains(content, "First\n") {
-		t.Error("expected content to have newlines between memories")
+	if !strings.Contains(content, "First") || !strings.Contains(content, "Second") {
+		t.Errorf("expected content to contain both memories, got '%s'", content)
+	}
+	if got := len(extractMarkdownBulletLines(content)); got != 2 {
+		t.Errorf("expected 2 memory bullets, got %d: %q", got, content)
 	}
 
 	log.Infof("GetCurrentMemoriesContent newlines test passed")
@@ -219,13 +232,12 @@ func TestMemoryContent_Retrieval(t *testing.T) {
 		}
 	}
 
-	// 验证格式：每个条目后面都有换行符
-	lines := strings.Split(strings.TrimSuffix(content, "\n"), "\n")
-	if len(lines) != len(memories) {
-		t.Errorf("expected %d lines, got %d", len(memories), len(lines))
+	bullets := extractMarkdownBulletLines(content)
+	if len(bullets) != len(memories) {
+		t.Errorf("expected %d memory bullets, got %d: %q", len(memories), len(bullets), content)
 	}
 
-	log.Infof("Retrieval test passed: retrieved %d memories", len(lines))
+	log.Infof("Retrieval test passed: retrieved %d memories", len(bullets))
 }
 
 // TestMemorySize_Accuracy 测试内存大小计算的准确性
