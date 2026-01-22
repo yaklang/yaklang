@@ -760,7 +760,7 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 			}
 
 			// 任务 1-1：通知外部后等待 skip 确认
-			if isCurrentTask(prompt, "任务1-1") || strings.Contains(prompt, "任务名称: 任务1-1") {
+			if isCurrentTask(prompt, "任务1-1") {
 				atomic.StoreInt32(&task11DidStart, 1)
 
 				// 通知外部 callback 已开始
@@ -788,7 +788,7 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 			}
 
 			// 任务 1-2：正常执行
-			if isCurrentTask(prompt, "任务1-2") || strings.Contains(prompt, "任务名称: 任务1-2") {
+			if isCurrentTask(prompt, "任务1-2") {
 				defer rsp.Close()
 				atomic.StoreInt32(&task12Started, 1)
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "任务1-2完成"}}`))

@@ -272,6 +272,10 @@ type mockSimpleTask struct {
 	reActLoop aicommon.ReActLoopIF
 }
 
+func (s *mockSimpleTask) GetOriginUserInput() string {
+	return ""
+}
+
 func (s *mockSimpleTask) GetFocusMode() string {
 	return ""
 }

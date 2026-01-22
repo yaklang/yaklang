@@ -501,7 +501,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		}
 	}
 
-	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetUserInput()))
+	r.GetInvoker().AddToTimeline(aicommon.TIMELINE_ITEM_TYPE_CURRENT_TASK_USER_INPUT, fmt.Sprintf("%v", task.GetOriginUserInput()))
 
 	if r.GetCurrentMemoriesContent() == "" {
 		r.fastLoadSearchMemoryWithoutAI(task.GetUserInput())
