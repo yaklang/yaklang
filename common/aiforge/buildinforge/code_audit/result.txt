@@ -1,0 +1,53 @@
+# 审计报告输出规范
+
+## 报告格式
+
+使用 write_file 保存 Markdown 格式报告，文件名建议: `security_audit_report.md`
+
+## 报告结构
+
+```markdown
+# 代码安全审计报告
+
+## 1. 项目概述
+- 项目路径: xxx
+- 技术栈: xxx
+- 框架: xxx
+- 审计时间: xxx
+
+## 2. 审计范围
+- 已扫描文件数: xxx
+- 已检查入口点: xxx
+- 已验证 Sink 点: xxx
+
+## 3. 发现汇总
+
+| 序号 | 漏洞类型 | 风险等级 | 位置 | 状态 |
+|------|---------|---------|------|------|
+| 1 | SQL注入 | 高 | /path/file.php:42 | 已确认 |
+| 2 | XSS | 中 | /path/view.php:18 | 已确认 |
+
+## 4. 漏洞详情
+
+### 4.1 [高危] SQL 注入 - /path/file.php:42
+
+**Sink 函数**: mysqli_query
+**数据流**:
+1. Source: $_GET['id'] @ line 38
+2. 传递: $userId = $_GET['id'] @ line 39
+3. Sink: mysqli_query($conn, "SELECT * FROM users WHERE id = $userId") @ line 42
+
+**利用条件**: 攻击者可通过 id 参数注入 SQL 语句
+**修复建议**: 使用预处理语句或 intval() 转换
+
+## 5. 安全建议
+- 建议1
+- 建议2
+```
+
+## 注意事项
+
+1. 只报告经过 vuln_verify 验证的漏洞
+2. uncertain 状态的漏洞单独标注，说明不确定原因
+3. 使用真实多行文本，不要转义换行符
+4. 简体中文输出，专业术语保留英文

@@ -1,0 +1,14 @@
+project_path = cli.String("project_path", cli.setVerboseName("项目路径"), cli.setRequired(true), cli.setHelp("待审计的代码项目根目录路径"))
+save_path = cli.String("save_path", cli.setVerboseName("报告保存路径"), cli.setHelp("审计报告的保存路径，默认为项目目录下的 security_audit_report.md"))
+language_hint = cli.String("language_hint", cli.setVerboseName("语言提示"), cli.setHelp("项目主要编程语言提示（如 PHP、Java、Python 等）"))
+framework_hint = cli.String("framework_hint", cli.setVerboseName("框架提示"), cli.setHelp("项目使用的框架提示（如 Spring、Laravel、Django 等）"))
+focus_area = cli.String("focus_area", cli.setVerboseName("重点关注"), cli.setHelp("特别关注的漏洞类型或代码区域"))
+cli.check()
+
+forgeHandle = func(params, opts...) {
+    res, err = __DEFAULT_FORGE_HANDLE__(params, opts...)
+    if err != nil {
+        return nil
+    }
+    return res
+}

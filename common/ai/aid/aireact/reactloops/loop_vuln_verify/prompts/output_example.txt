@@ -1,0 +1,90 @@
+# Action 输出示例
+
+## 设置漏洞上下文
+```json
+{
+  "@action": "set_vuln_context",
+  "human_readable_thought": "设置待验证的SQL注入漏洞信息",
+  "file_path": "/src/controllers/UserController.php",
+  "line": 42,
+  "sink_function": "mysqli_query",
+  "vuln_type": "SQL Injection",
+  "description": "用户ID直接拼接到SQL查询中",
+  "suspected_source": "$_GET['id']"
+}
+```
+
+## 读取代码文件
+```json
+{
+  "@action": "read_code",
+  "human_readable_thought": "读取UserController.php查看SQL查询的上下文代码",
+  "file_path": "/src/controllers/UserController.php",
+  "start_line": 35,
+  "end_line": 55
+}
+```
+
+## 记录数据流追踪
+```json
+{
+  "@action": "trace_backward",
+  "human_readable_thought": "追踪$userId变量的来源",
+  "variable": "$userId",
+  "location": "UserController.php:40",
+  "source": "$_GET['id']",
+  "note": "直接从GET参数获取，未经过滤"
+}
+```
+
+## 记录过滤函数
+```json
+{
+  "@action": "record_filter",
+  "human_readable_thought": "发现intval类型转换，这是有效的过滤",
+  "function": "intval",
+  "location": "UserController.php:39",
+  "filter_type": "type_cast",
+  "effectiveness": "effective",
+  "note": "将输入强制转换为整数，可以防止SQL注入"
+}
+```
+
+## 输出验证结论 - 确认漏洞
+```json
+{
+  "@action": "conclude",
+  "human_readable_thought": "数据流完整，无有效过滤，确认存在SQL注入漏洞",
+  "result": "confirmed",
+  "confidence": "high",
+  "reason": "1. Source: $_GET['id'] 可由用户控制\n2. 数据流: $_GET['id'] -> $userId -> SQL查询\n3. 无过滤: 参数直接拼接到SQL语句中\n4. Sink: mysqli_query执行拼接后的SQL",
+  "exploit_condition": "攻击者可通过构造id参数注入SQL语句，如: ?id=1' OR '1'='1",
+  "fix_suggestion": "1. 使用预处理语句(PreparedStatement)\n2. 或对$_GET['id']使用intval()转换"
+}
+```
+
+## 输出验证结论 - 安全
+```json
+{
+  "@action": "conclude",
+  "human_readable_thought": "存在有效的类型转换过滤，判定为安全",
+  "result": "safe",
+  "confidence": "high",
+  "reason": "1. 虽然Source是$_GET['id']\n2. 但在第39行使用了intval()进行类型转换\n3. 整数类型无法包含SQL注入payload",
+  "exploit_condition": "",
+  "fix_suggestion": ""
+}
+```
+
+## 输出验证结论 - 需进一步分析
+```json
+{
+  "@action": "conclude",
+  "human_readable_thought": "存在自定义过滤函数，无法确定其有效性",
+  "result": "uncertain",
+  "confidence": "low",
+  "reason": "1. 数据流经过自定义函数sanitizeInput()\n2. 该函数实现在另一个文件中，逻辑复杂\n3. 无法确定过滤是否完备",
+  "exploit_condition": "如果sanitizeInput()存在绕过，则可能存在SQL注入",
+  "fix_suggestion": "建议审查sanitizeInput()函数实现"
+}
+```
