@@ -60,6 +60,10 @@ func (m *MockedAIConfig) AcquireId() int64 {
 	return atomic.AddInt64(&m.IdSequence, 1)
 }
 
+func (m *MockedAIConfig) OriginOptions() []aicommon.ConfigOption {
+	return nil
+}
+
 func (m *MockedAIConfig) GetRuntimeId() string {
 	return m.RuntimeId
 }

@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -13,6 +14,9 @@ func (s *Server) QueryAIFocus(ctx context.Context, _ *ypb.QueryAIFocusRequest) (
 	}
 	for _, meta := range metas {
 		if meta == nil {
+			continue
+		}
+		if meta.IsHidden {
 			continue
 		}
 		resp.Data = append(resp.Data, &ypb.AIFocus{

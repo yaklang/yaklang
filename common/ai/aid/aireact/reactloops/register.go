@@ -17,10 +17,18 @@ type LoopMetadata struct {
 	Description         string // describes what this loop does
 	OutputExamplePrompt string // example output for reflection_output_example.txt
 	UsagePrompt         string // usage description for x-@action-rules in schema
+	IsHidden            bool   // whether to hide this loop from the user
 }
 
 // LoopMetadataOption configures LoopMetadata
 type LoopMetadataOption func(*LoopMetadata)
+
+// WithLoopIsHidden sets whether to hide this loop from the user
+func WithLoopIsHidden(hidden bool) LoopMetadataOption {
+	return func(m *LoopMetadata) {
+		m.IsHidden = hidden
+	}
+}
 
 // WithLoopDescription sets the description of what this loop does
 func WithLoopDescription(desc string) LoopMetadataOption {
