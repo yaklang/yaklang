@@ -99,7 +99,7 @@ func TestReAct_PlanAndExecute_InheritPersistentId(t *testing.T) {
 	parentReAct = ins
 
 	// 在执行前先向 timeline 添加 marker
-	ins.config.Timeline.PushText(ins.config.IdGenerator(), timelineMarker)
+	ins.config.Timeline.PushText(ins.config.AcquireId(), timelineMarker)
 	ins.config.Timeline.Save(ins.config.GetDB(), persistentId)
 
 	go func() {
@@ -271,7 +271,7 @@ func TestReAct_Forge_InheritPersistentId(t *testing.T) {
 	parentReAct = ins
 
 	// 在执行前先向 timeline 添加 marker
-	ins.config.Timeline.PushText(ins.config.IdGenerator(), timelineMarker)
+	ins.config.Timeline.PushText(ins.config.AcquireId(), timelineMarker)
 	ins.config.Timeline.Save(ins.config.GetDB(), persistentId)
 
 	go func() {

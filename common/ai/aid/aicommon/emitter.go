@@ -398,6 +398,13 @@ func (r *Emitter) EmitToolCallResult(callToolId string, result any) (*schema.AiO
 	})
 }
 
+func (r *Emitter) EmitToolCallLogDir(callToolId string, dirPath string) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_LOG_DIR, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"dir_path":     dirPath,
+	})
+}
+
 const (
 	TypeLogTool            = "log/tool"
 	TypeLogToolErrorOutput = "log/tool-error-output"

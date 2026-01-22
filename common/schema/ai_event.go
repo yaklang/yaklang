@@ -82,6 +82,7 @@ const (
 	EVENT_TOOL_CALL_SUMMARY     = "tool_call_summary"     // tool call summary event, used to emit the tool call summary information
 	EVENT_TOOL_CALL_DECISION    = "tool_call_decision"    // tool call decision event, used to emit the tool call decision information
 	EVENT_TOOL_CALL_RESULT      = "tool_call_result"      // tool call result event, used to emit the tool call result information
+	EVENT_TOOL_CALL_LOG_DIR     = "tool_call_log_dir"     // tool call log dir event, used to emit the tool call log dir information
 
 	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
 	EVENT_TYPE_FAIL_PLAN_AND_EXECUTION     EventType = "fail_plan_and_execution"

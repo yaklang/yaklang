@@ -558,6 +558,7 @@ func (t *ToolCaller) saveToolCallFiles(
 	// Build full directory path: task_{{task_index}}/tool_calls/{{dirName}}
 	// Example: task_1_1/tool_calls/1_grep_query_large_file
 	toolCallDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "tool_calls", dirName)
+	t.emitter.EmitToolCallLogDir(callToolId, toolCallDir)
 
 	// Ensure directory exists
 	if err := os.MkdirAll(toolCallDir, 0755); err != nil {

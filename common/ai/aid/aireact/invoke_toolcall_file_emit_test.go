@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"path/filepath"
@@ -1002,6 +1003,172 @@ LOOP:
 				dirPath := filepath.Dir(filePath)
 				os.RemoveAll(dirPath)
 			}
+		}
+	}()
+}
+
+// TestReAct_ToolCall_LogDir tests tool_call_log_dir event is emitted and matches pinned file locations.
+func TestReAct_ToolCall_LogDir(t *testing.T) {
+	toolName := "test_tool_call_log_dir_" + ksuid.New().String()
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	testTool, err := aitool.New(
+		toolName,
+		aitool.WithStringParam("message"),
+		aitool.WithNumberParam("output_lines"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			message := params.GetString("message", "default message")
+			outputLines := int(params.GetInt("output_lines", 3))
+
+			for i := 0; i < outputLines; i++ {
+				fmt.Fprintf(stdout, "stdout line %d: %s\n", i+1, message)
+			}
+			fmt.Fprintf(stderr, "stderr: test\n")
+
+			return map[string]any{
+				"status":  "success",
+				"message": message,
+				"lines":   outputLines,
+			}, nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCallingForFileEmit(i, r, toolName)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(testTool),
+		aicommon.WithAgreeYOLO(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "please use " + toolName,
+		}
+	}()
+
+	du := time.Duration(8)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+	var toolCallLogDir string
+	var toolCallLogDirEventCallToolID string
+	var callToolID string
+	pinnedFiles := make([]string, 0, 4)
+	pinnedByName := make(map[string]string)
+	toolCallDone := false
+	taskDone := false
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == schema.EVENT_TOOL_CALL_START {
+				callToolID = utils.InterfaceToString(jsonpath.FindFirst(string(e.GetContent()), "$.call_tool_id"))
+				log.Infof("Tool call started. call_tool_id=%s", callToolID)
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_LOG_DIR) {
+				content := string(e.GetContent())
+				toolCallLogDir = utils.InterfaceToString(jsonpath.FindFirst(content, "$.dir_path"))
+				toolCallLogDirEventCallToolID = utils.InterfaceToString(jsonpath.FindFirst(content, "$.call_tool_id"))
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME) {
+				content := string(e.GetContent())
+				filePath := utils.InterfaceToString(jsonpath.FindFirst(content, "$.path"))
+				if filePath != "" {
+					switch filepath.Base(filePath) {
+					case "params.txt", "stdout.txt", "stderr.txt", "result.txt":
+						pinnedFiles = append(pinnedFiles, filePath)
+						pinnedByName[filepath.Base(filePath)] = filePath
+					}
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
+				toolCallDone = true
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					taskDone = true
+				}
+			}
+
+			if toolCallDone && taskDone {
+				time.Sleep(500 * time.Millisecond)
+				break LOOP
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !toolCallDone {
+		t.Fatal("Tool call was not completed")
+	}
+	if !taskDone {
+		t.Fatal("Task was not completed")
+	}
+
+	if toolCallLogDir == "" {
+		t.Fatal("Expected tool_call_log_dir event with dir_path, but got empty")
+	}
+
+	require.Equal(t, callToolID, toolCallLogDirEventCallToolID)
+
+	info, err := os.Stat(toolCallLogDir)
+	if err != nil {
+		t.Fatalf("Tool call log dir does not exist: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("Tool call log dir is not a directory: %s", toolCallLogDir)
+	}
+
+	if !strings.Contains(toolCallLogDir, "tool_calls") || !strings.Contains(toolCallLogDir, "task_") {
+		t.Fatalf("Tool call log dir path should contain 'task_' and 'tool_calls', got: %s", toolCallLogDir)
+	}
+	if !strings.Contains(filepath.Base(toolCallLogDir), "test_file_output") {
+		t.Fatalf("Tool call log dir name should contain identifier 'test_file_output', got: %s", filepath.Base(toolCallLogDir))
+	}
+
+	if len(pinnedFiles) == 0 {
+		t.Fatal("Expected at least one pinned tool-call file (params/stdout/stderr/result), got none")
+	}
+	if pinnedByName["params.txt"] == "" || pinnedByName["result.txt"] == "" {
+		t.Fatalf("Expected at least params.txt and result.txt to be pinned, got: %v", pinnedByName)
+	}
+	for _, pinned := range pinnedFiles {
+		rel, err := filepath.Rel(toolCallLogDir, pinned)
+		if err != nil {
+			t.Fatalf("Failed to build relative path from tool call log dir: %v", err)
+		}
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			t.Fatalf("Pinned file should be under tool call log dir. dir=%s file=%s", toolCallLogDir, pinned)
+		}
+	}
+
+	defer func() {
+		// Safety guard: only remove directories that match the expected structure.
+		if strings.Contains(toolCallLogDir, "tool_calls") && strings.Contains(toolCallLogDir, "task_") {
+			_ = os.RemoveAll(toolCallLogDir)
 		}
 	}()
 }
