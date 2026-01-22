@@ -28,8 +28,9 @@ type InvokeCallback func(ctx context.Context, params InvokeParams, invokeExConfi
 type Tool struct {
 	*mcp.Tool
 	// A list of keywords for tool indexing and searching.
-	Keywords []string       `json:"keywords,omitempty"`
-	Callback InvokeCallback // 添加回调函数字段
+	Keywords    []string       `json:"keywords,omitempty"`
+	VerboseName string         `json:"verbose_name,omitempty"`
+	Callback    InvokeCallback // 添加回调函数字段
 }
 
 // ToolOption 定义工具选项函数的类型
@@ -80,6 +81,12 @@ func newTool(name string, options ...ToolOption) *Tool {
 func WithDescription(description string) ToolOption {
 	return func(t *Tool) {
 		t.Description = description
+	}
+}
+
+func WithVerboseName(verboseName string) ToolOption {
+	return func(t *Tool) {
+		t.VerboseName = verboseName
 	}
 }
 
@@ -536,6 +543,10 @@ func (t *Tool) GetName() string {
 
 func (t *Tool) GetDescription() string {
 	return t.Description
+}
+
+func (t *Tool) GetVerboseName() string {
+	return t.VerboseName
 }
 
 func (t *Tool) GetKeywords() []string {

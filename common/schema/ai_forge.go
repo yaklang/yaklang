@@ -42,6 +42,10 @@ func (a *AIForge) GetDescription() string {
 	return a.Description
 }
 
+func (a *AIForge) GetVerboseName() string {
+	return a.ForgeVerboseName
+}
+
 func (a *AIForge) GetKeywords() []string {
 	return strings.Split(a.Tags, ",")
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -168,4 +169,25 @@ println("Another test tool executed with param:", param2)
 	}
 	assert.Check(t, foundFirst, "first tool should still be found")
 	assert.Check(t, foundSecond, "second tool should be found")
+}
+
+func TestKeywordSearcherPromptIncludesVerboseName(t *testing.T) {
+	var capturedPrompt string
+	searcher := searchtools.NewKeyWordSearcher[*aitool.Tool](func(prompt string) (io.Reader, error) {
+		capturedPrompt = prompt
+		return strings.NewReader(`[{"tool":"tool-1","matched_keywords":["alpha"]}]`), nil
+	})
+
+	tool := aitool.NewWithoutCallback(
+		"tool-1",
+		aitool.WithDescription("desc"),
+		aitool.WithKeywords([]string{"alpha"}),
+		aitool.WithVerboseName("Verbose Tool"),
+	)
+
+	_, err := searcher("need alpha", []*aitool.Tool{tool})
+	assert.NilError(t, err)
+
+	assert.Check(t, strings.Contains(capturedPrompt, "Verbose Tool"), "prompt should contain verbose name")
+	assert.Check(t, strings.Contains(capturedPrompt, "`tool-1` (Verbose Tool): alpha, Verbose Tool"), "prompt should include verbose name in tool line")
 }
