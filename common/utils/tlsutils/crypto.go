@@ -8,6 +8,7 @@ import (
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -516,4 +517,61 @@ func PemVerifySignSha256WithRSA(pemBytes []byte, originData any, sign []byte) er
 		origin[i] = v
 	}
 	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, origin, sign)
+}
+
+// SignSHA512WithRSA 使用RSA私钥对数据进行SHA512签名，返回签名与错误
+// Example:
+// ```
+// pemBytes = string(`-----BEGIN PRIVATE KEY-----
+// MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDZz5Zz3z3z3z3z
+// ...
+// -----END PRIVATE KEY-----`)
+// signBytes, err := tls.SignSHA512WithRSA(pemBytes, "hello")
+// die(err)
+// signString = string(signBytes)
+// ```
+func PemSignSha512WithRSA(pemBytes []byte, data interface{}) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	block, _ := pem.Decode(pemBytes)
+	pri, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		pri, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private (PKCS8 / PKCS1) key failed: %s", err)
+		}
+	}
+	pkey, ok := pri.(*rsa.PrivateKey)
+	if !ok {
+		return nil, utils.Errorf("need *rsa.PrivateKey, cannot found! but got: %T", pri)
+	}
+	var results []byte = make([]byte, 64)
+	for i, v := range sha512.Sum512(dataBytes) {
+		results[i] = v
+	}
+	return rsa.SignPKCS1v15(cryptorand.Reader, pkey, crypto.SHA512, results)
+}
+
+// SignVerifySHA512WithRSA 使用RSA公钥对数据进行SHA512签名验证，返回错误
+// Example:
+// ```
+// pemBytes = string(`-----BEGIN PUBLIC KEY-----
+// MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs1pvFYNQpPSPbshg6F7Z
+// ...
+// -----END PUBLIC KEY-----`)
+// err := tls.PemVerifySignSha512WithRSA(pemBytes, "hello", signBytes)
+// die(err)
+// ```
+func PemVerifySignSha512WithRSA(pemBytes []byte, originData any, sign []byte) error {
+	dataBytes := utils.InterfaceToBytes(originData)
+	block, _ := pem.Decode(pemBytes)
+
+	pub, err := ParseRsaPublicKeyFromPemBlock(block)
+	if err != nil {
+		return utils.Errorf("parse public key failed: %s", err)
+	}
+	var origin []byte = make([]byte, 64)
+	for i, v := range sha512.Sum512(dataBytes) {
+		origin[i] = v
+	}
+	return rsa.VerifyPKCS1v15(pub, crypto.SHA512, origin, sign)
 }
