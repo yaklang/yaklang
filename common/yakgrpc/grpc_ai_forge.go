@@ -119,6 +119,7 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 	_, err := aiforge.ExportAIForgesToZip(
 		s.GetProfileDatabase(),
 		names,
+		req.GetToolNames(),
 		"",
 		aiforge.WithExportProgress(progress),
 		aiforge.WithExportPassword(req.GetPassword()),

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -106,16 +107,16 @@ func applyImportOptions(opts ...ForgeImportOption) *forgeImportOptions {
 	return cfg
 }
 
-// ExportAIForgesToZip exports one or more forges into a zip package.
+// ExportAIForgesToZip exports one or more forges (and optional AI tools) into a zip package.
 // Each forge will be placed in its own directory under the archive.
 // For config/json type, the package layout follows buildinforges (e.g. buildinforge/hostscan).
 // For yak type, only forge_cfg.json and <name>.yak are included.
-func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, opts ...ForgeExportOption) (string, error) {
+func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, targetPath string, opts ...ForgeExportOption) (string, error) {
 	if db == nil {
 		return "", utils.Error("db is required")
 	}
-	if len(forgeNames) == 0 {
-		return "", utils.Error("forge names are required")
+	if len(forgeNames) == 0 && len(toolNames) == 0 {
+		return "", utils.Error("forge names or tool names are required")
 	}
 	opt := applyExportOptions(opts...)
 
@@ -132,7 +133,16 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, op
 	}
 	progress(0, "start export")
 
-	for idx, name := range forgeNames {
+	total := len(forgeNames) + len(toolNames)
+	progressStep := func(done int, name string) {
+		if total == 0 {
+			return
+		}
+		progress(float64(done)/float64(total)*100, name)
+	}
+
+	exported := 0
+	for _, name := range forgeNames {
 		if strings.TrimSpace(name) == "" {
 			return "", utils.Error("empty forge name detected")
 		}
@@ -145,14 +155,31 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, op
 		if err := dumpForgeToDir(forge, forgeDir, effectiveName); err != nil {
 			return "", err
 		}
-		progress(float64(idx+1)/float64(len(forgeNames))*100, fmt.Sprintf("exported %s", effectiveName))
+		exported++
+		progressStep(exported, fmt.Sprintf("exported forge %s", effectiveName))
+	}
+
+	for _, name := range toolNames {
+		if strings.TrimSpace(name) == "" {
+			return "", utils.Error("empty tool name detected")
+		}
+		tool, err := yakit.GetAIYakTool(db, name)
+		if err != nil {
+			return "", err
+		}
+		toolDir := filepath.Join(tmpDir, "tools", tool.Name)
+		if err := dumpAIToolToDir(tool, toolDir); err != nil {
+			return "", err
+		}
+		exported++
+		progressStep(exported, fmt.Sprintf("exported tool %s", tool.Name))
 	}
 
 	if opt.output == "" {
-		if len(forgeNames) == 1 {
+		if len(forgeNames) == 1 && len(toolNames) == 0 {
 			opt.output = forgeNames[0]
 		} else {
-			opt.output = "aiforges"
+			opt.output = "aiforge-package"
 		}
 	}
 	finalName := opt.output + ".zip"
@@ -187,7 +214,7 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, targetPath string, op
 	return targetPath, nil
 }
 
-// ImportAIForgesFromZip imports one or more forges from a zip package.
+// ImportAIForgesFromZip imports one or more forges (and optional AI tools) from a zip package.
 func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOption) ([]*schema.AIForge, error) {
 	if db == nil {
 		return nil, utils.Error("db is required")
@@ -235,8 +262,23 @@ func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOptio
 	if err != nil {
 		return nil, err
 	}
+	toolCfgPaths, err := findAllAIToolCfg(tmpDir)
+	if err != nil {
+		return nil, err
+	}
+	if len(cfgPaths) == 0 && len(toolCfgPaths) == 0 {
+		return nil, utils.Error("neither forge_cfg.json nor tool_cfg.json found in package")
+	}
+
+	total := len(cfgPaths) + len(toolCfgPaths)
+	current := 0
+	progressStep := func(msg string) {
+		current++
+		progress(float64(current)/float64(total)*100, msg)
+	}
+
 	var forges []*schema.AIForge
-	for idx, p := range cfgPaths {
+	for _, p := range cfgPaths {
 		effectiveName := ""
 		if opt.newName != "" && len(cfgPaths) == 1 {
 			effectiveName = opt.newName
@@ -246,8 +288,17 @@ func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOptio
 			return nil, err
 		}
 		forges = append(forges, forge)
-		progress(float64(idx+1)/float64(len(cfgPaths))*100, fmt.Sprintf("imported %s", forge.ForgeName))
+		progressStep(fmt.Sprintf("imported forge %s", forge.ForgeName))
 	}
+
+	for _, p := range toolCfgPaths {
+		tool, err := loadAIToolFromDir(db, filepath.Dir(p), opt)
+		if err != nil {
+			return nil, err
+		}
+		progressStep(fmt.Sprintf("imported tool %s", tool.Name))
+	}
+
 	progress(100, "import completed")
 	return forges, nil
 }
@@ -309,8 +360,35 @@ func findAllForgeCfg(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(res) == 0 {
-		return nil, utils.Error("forge_cfg.json not found in package")
+	return res, nil
+}
+
+type aiToolPackageConfig struct {
+	Name              string `json:"name,omitempty"`
+	VerboseName       string `json:"verbose_name,omitempty"`
+	Description       string `json:"description,omitempty"`
+	Keywords          string `json:"keywords,omitempty"`
+	Params            string `json:"params,omitempty"`
+	Path              string `json:"path,omitempty"`
+	EnableAIOutputLog int    `json:"enable_ai_output_log,omitempty"`
+}
+
+func findAllAIToolCfg(root string) ([]string, error) {
+	var res []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if info.Name() == "tool_cfg.json" {
+			res = append(res, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return res, nil
 }
@@ -388,6 +466,37 @@ func dumpForgeToDir(forge *schema.AIForge, forgeDir string, effectiveName string
 		if err := writePromptFiles(forgeDir, forge); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func dumpAIToolToDir(tool *schema.AIYakTool, dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	cfg := aiToolPackageConfig{
+		Name:              tool.Name,
+		VerboseName:       tool.VerboseName,
+		Description:       tool.Description,
+		Keywords:          tool.Keywords,
+		Params:            tool.Params,
+		Path:              tool.Path,
+		EnableAIOutputLog: tool.EnableAIOutputLog,
+	}
+	cfgBytes, err := json.MarshalIndent(cfg, "", "\t")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tool_cfg.json"), cfgBytes, 0o644); err != nil {
+		return err
+	}
+
+	yakName := tool.Name
+	if yakName == "" {
+		yakName = filepath.Base(dir)
+	}
+	if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%s.yak", yakName)), []byte(tool.Content), 0o644); err != nil {
+		return err
 	}
 	return nil
 }
@@ -474,6 +583,59 @@ func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forg
 		return nil, err
 	}
 	return forge, nil
+}
+
+func loadAIToolFromDir(db *gorm.DB, cfgDir string, opt *forgeImportOptions) (*schema.AIYakTool, error) {
+	cfgPath := filepath.Join(cfgDir, "tool_cfg.json")
+	cfgBytes, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return nil, err
+	}
+	var cfg aiToolPackageConfig
+	if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
+		return nil, err
+	}
+	toolName := cfg.Name
+	if toolName == "" {
+		toolName = filepath.Base(cfgDir)
+	}
+	content, err := readYakContent(cfgDir, toolName)
+	if err != nil {
+		return nil, err
+	}
+	tool := &schema.AIYakTool{
+		Name:              toolName,
+		VerboseName:       cfg.VerboseName,
+		Description:       cfg.Description,
+		Keywords:          cfg.Keywords,
+		Content:           content,
+		Params:            cfg.Params,
+		Path:              cfg.Path,
+		EnableAIOutputLog: cfg.EnableAIOutputLog,
+	}
+	if tool.EnableAIOutputLog == 0 {
+		tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
+	}
+
+	if opt != nil && !opt.overwrite {
+		if _, err := yakit.GetAIYakTool(db, tool.Name); err == nil {
+			return nil, utils.Errorf("tool %s already exists", tool.Name)
+		}
+	}
+
+	if existing, err := yakit.GetAIYakTool(db, tool.Name); err == nil {
+		tool.ID = existing.ID
+		tool.CreatedAt = existing.CreatedAt
+		if _, err := yakit.UpdateAIYakToolByID(db, tool); err != nil {
+			return nil, err
+		}
+		return tool, nil
+	}
+
+	if _, err := yakit.CreateAIYakTool(db, tool); err != nil {
+		return nil, err
+	}
+	return tool, nil
 }
 
 func createZipFromDir(srcDir, baseRoot string) ([]byte, error) {
