@@ -23,17 +23,20 @@ func GetGlobalManager() *AIConfigManager {
 	globalManagerOnce.Do(func() {
 		globalManager = &AIConfigManager{}
 	})
+	EnsureConfigLoaded()
 	return globalManager
 }
 
 // IsTieredAIConfig checks if tiered AI model configuration is enabled
 // This is used for compatibility checks to determine which config system to use
 func IsTieredAIConfig() bool {
+	EnsureConfigLoaded()
 	return consts.IsTieredAIModelConfigEnabled()
 }
 
 // GetCurrentPolicy returns the current user-configured routing policy
 func GetCurrentPolicy() RoutingPolicy {
+	EnsureConfigLoaded()
 	return consts.GetTieredAIRoutingPolicy()
 }
 
