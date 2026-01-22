@@ -4,7 +4,7 @@
 - 用户需求: {{ .UserRequirement }}
 - 工具列表: 
 {{ range .ToolsLists }}
-- `{{ .Name }}`: {{ .Keywords }}
+- `{{ .Name }}`{{if .VerboseName}} ({{ .VerboseName }}){{end}}: {{ .Keywords }}
 {{end}}
   (每个工具包含: 工具名称和该工具的关键词列表)
 

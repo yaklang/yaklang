@@ -28,6 +28,7 @@ type AISearchable interface {
 	GetName() string // 唯一标识
 	GetDescription() string
 	GetKeywords() []string
+	GetVerboseName() string
 }
 
 type SearchRequest struct {
@@ -59,22 +60,34 @@ func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, er
 		tools := searchList
 
 		type ToolWithKeywords struct {
-			Name     string `json:"Name"`
-			Keywords string `json:"Keywords"`
+			Name        string `json:"Name"`
+			Keywords    string `json:"Keywords"`
+			VerboseName string `json:"VerboseName,omitempty"`
 		}
 
 		toolsLists := []ToolWithKeywords{}
 		toolMap := map[string]T{}
 
 		for _, tool := range tools {
-			if len(tool.GetKeywords()) == 0 {
+			keywords := append([]string{}, tool.GetKeywords()...)
+
+			verboseName := strings.TrimSpace(tool.GetVerboseName())
+			if verboseName != "" {
+				keywords = append(keywords, verboseName)
+			}
+
+			if len(keywords) == 0 {
 				continue
 			}
 			toolsLists = append(toolsLists, ToolWithKeywords{
-				Name:     tool.GetName(),
-				Keywords: strings.Join(tool.GetKeywords(), ", "),
+				Name:        tool.GetName(),
+				Keywords:    strings.Join(keywords, ", "),
+				VerboseName: verboseName,
 			})
 			toolMap[tool.GetName()] = tool
+			if verboseName != "" {
+				toolMap[verboseName] = tool
+			}
 		}
 
 		prompt, err := template.New("search_by_keyword").Parse(__prompt_KeywordSearch)
