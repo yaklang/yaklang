@@ -2,7 +2,7 @@ package types
 
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 // TODO: Phase 2 - Type System Expansion

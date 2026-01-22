@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 // Compiler holds the LLVM context and state for compiling a YakSSA program.

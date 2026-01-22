@@ -9,7 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 func init() {

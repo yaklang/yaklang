@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"tinygo.org/x/go-llvm"
+	"github.com/yaklang/go-llvm"
 )
 
 func TestCompileTestdata(t *testing.T) {
