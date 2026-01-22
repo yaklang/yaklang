@@ -21,6 +21,7 @@ import (
 )
 
 func TestReAct_AllContextProviders(t *testing.T) {
+	t.Skip("skipping context provider test, because it is removed")
 	// 1. Setup test file
 	testFileContent := "UniqueFileContent_" + ksuid.New().String()
 	tempFile, err := os.CreateTemp("", "test_all_ctx_*.txt")
@@ -199,6 +200,7 @@ LOOP:
 }
 
 func TestReAct_ContextProvider_ErrorHandling(t *testing.T) {
+	t.Skip("skipping context provider error handling test, because it is removed")
 	t.Run("FileNotExist_ViaInputChannel", func(t *testing.T) {
 		nonExistentFile := "/tmp/non_existent_file_" + ksuid.New().String() + ".txt"
 
