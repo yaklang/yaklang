@@ -175,7 +175,6 @@ func GetPredecessorEdgeByFromID(db *gorm.DB, fromId string) []*AuditEdge {
 	if db == nil {
 		db = GetDB()
 	}
-	db = db.Debug()
 	var edges []*AuditEdge
 	db.Model(&AuditEdge{}).
 		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_Predecessor).
