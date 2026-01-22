@@ -1214,14 +1214,14 @@
   {
     "rule_id": "3c87f027-8ccb-487d-8183-b2773ceba895",
     "rule_name": "检测Java Hibernate SQL注入漏洞",
-    "hash": "558ff6982f030f7626d0366ca813a5a46cf32f879bae7a6f7cc084c0df7e15d2",
-    "version": "20251230.0001"
+    "hash": "f75fae20e35783d41c99421e9a467ad9c224743bd83c2562de0d4a9d41e9fa07",
+    "version": "20260122.0001"
   },
   {
     "rule_id": "5323c275-713f-4b22-a1cc-d22db1655fb2",
     "rule_name": "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
-    "hash": "4d0faf569eb35a06199dbccf29cc4746ddf6d97f5ce73d942234d50814019554",
-    "version": "20251230.0001"
+    "hash": "1c80afe494c374bbac0600be7ff39b99785880ae8829a724fc1626d9810dd1e8",
+    "version": "20260122.0001"
   },
   {
     "rule_id": "b86d3bfb-98d4-437d-bf7b-d5c43e012425",
