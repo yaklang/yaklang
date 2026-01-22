@@ -45351,6 +45351,7 @@ type RandomChunkedResponse struct {
 	ChunkedLength           int64                  `protobuf:"varint,3,opt,name=ChunkedLength,proto3" json:"ChunkedLength,omitempty"`                     // 当前的 chunked 长度
 	CurrentChunkedDelayTime int64                  `protobuf:"varint,4,opt,name=CurrentChunkedDelayTime,proto3" json:"CurrentChunkedDelayTime,omitempty"` // 当前的 chunked 延迟时间
 	TotalDelayTime          int64                  `protobuf:"varint,5,opt,name=TotalDelayTime,proto3" json:"TotalDelayTime,omitempty"`                   // 总的发送耗时
+	IsFinal                 bool                   `protobuf:"varint,6,opt,name=IsFinal,proto3" json:"IsFinal,omitempty"`                                 // 是否结束（结束标记事件；Data 可能为空）
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -45418,6 +45419,13 @@ func (x *RandomChunkedResponse) GetTotalDelayTime() int64 {
 		return x.TotalDelayTime
 	}
 	return 0
+}
+
+func (x *RandomChunkedResponse) GetIsFinal() bool {
+	if x != nil {
+		return x.IsFinal
+	}
+	return false
 }
 
 type RedirectHTTPFlow struct {
@@ -69328,13 +69336,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13OriginalContentType\x18; \x01(\tR\x13OriginalContentType\x12&\n" +
 	"\x0eFixContentType\x18< \x01(\tR\x0eFixContentType\x128\n" +
 	"\x17IsSetContentTypeOptions\x18= \x01(\bR\x17IsSetContentTypeOptions\x12H\n" +
-	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\"\xc9\x01\n" +
+	"\x11RandomChunkedData\x18> \x03(\v2\x1a.ypb.RandomChunkedResponseR\x11RandomChunkedData\"\xe3\x01\n" +
 	"\x15RandomChunkedResponse\x12\x14\n" +
 	"\x05Index\x18\x01 \x01(\x03R\x05Index\x12\x12\n" +
 	"\x04Data\x18\x02 \x01(\fR\x04Data\x12$\n" +
 	"\rChunkedLength\x18\x03 \x01(\x03R\rChunkedLength\x128\n" +
 	"\x17CurrentChunkedDelayTime\x18\x04 \x01(\x03R\x17CurrentChunkedDelayTime\x12&\n" +
-	"\x0eTotalDelayTime\x18\x05 \x01(\x03R\x0eTotalDelayTime\"b\n" +
+	"\x0eTotalDelayTime\x18\x05 \x01(\x03R\x0eTotalDelayTime\x12\x18\n" +
+	"\aIsFinal\x18\x06 \x01(\bR\aIsFinal\"b\n" +
 	"\x10RedirectHTTPFlow\x12\x18\n" +
 	"\aIsHttps\x18\x01 \x01(\bR\aIsHttps\x12\x18\n" +
 	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1a\n" +

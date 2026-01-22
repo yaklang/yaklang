@@ -1013,7 +1013,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			statusCode  int32
 			contentType string
 		}
-		var sseMetaCache sync.Map // streamID -> *sseStreamMeta
+		var sseMetaCache sync.Map    // streamID -> *sseStreamMeta
+		var sseBodyLenCache sync.Map // streamID -> int64 (累计 body bytes)
 
 		for result := range res {
 			count++
@@ -1035,15 +1036,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				var (
 					statusCode  int32
 					contentType string
-					respBody    []byte
+					deltaLen    int64
+					isFinal     bool
 				)
 
 				// SSE updates are produced as:
-				// - first update: synthetic response header + first delta body
-				// - later updates: delta body only
+				// - incremental body bytes are always delivered via RandomChunkedData.Data (delta-only)
+				// - ResponseRaw only carries response headers on the first update (to initialize meta/UI)
 				hasHeader := result.ExtraInfo["__yak_sse_has_header"] == "1" || bytes.HasPrefix(result.ResponseRaw, []byte("HTTP/"))
 				if hasHeader {
-					respHeaders, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
+					respHeaders, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
 					statusLine := strings.SplitN(respHeaders, "\r\n", 2)[0]
 					_, code, _, _ := utils.ParseHTTPResponseLine(statusLine)
 					if code <= 0 {
@@ -1051,13 +1053,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					statusCode = int32(code)
 					contentType = lowhttp.GetHTTPPacketHeader(result.ResponseRaw, "Content-Type")
-					respBody = body
 					sseMetaCache.Store(streamID, &sseStreamMeta{
 						statusCode:  statusCode,
 						contentType: contentType,
 					})
 				} else {
-					respBody = result.ResponseRaw
 					if metaRaw, ok := sseMetaCache.Load(streamID); ok {
 						meta := metaRaw.(*sseStreamMeta)
 						statusCode = meta.statusCode
@@ -1065,6 +1065,32 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					} else {
 						statusCode = http.StatusOK
 					}
+				}
+
+				if result.RandomChunkedData != nil {
+					for _, chunkInfo := range result.RandomChunkedData {
+						if chunkInfo == nil {
+							continue
+						}
+						deltaLen += int64(len(chunkInfo.Data))
+						if chunkInfo.IsFinal {
+							isFinal = true
+						}
+					}
+				}
+
+				// Track cumulative body length for UI stats.
+				var totalLen int64
+				if v, ok := sseBodyLenCache.Load(streamID); ok {
+					if n, ok := v.(int64); ok {
+						totalLen = n
+					}
+				}
+				if deltaLen > 0 {
+					totalLen = totalLen + deltaLen
+					sseBodyLenCache.Store(streamID, totalLen)
+				} else if !isFinal {
+					// keep previous totalLen as-is
 				}
 
 				rsp := &ypb.FuzzerResponse{
@@ -1081,7 +1107,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					TaskId:      int64(taskID),
 					Payloads:    result.Payloads,
 					RuntimeID:   runtimeID,
-					BodyLength:  int64(len(respBody)),
+					BodyLength:  totalLen,
 					DurationMs:  result.DurationMs,
 				}
 				if result.RandomChunkedData != nil {
