@@ -92,6 +92,7 @@ AI会根据用户问题从附加资源中尽可能多地收集相关信息，这
 * 当需要从附加资源中收集信息时：
   {"@action": "knowledge_enhance", "human_readable_thought": "需要从用户附加的资源中收集与问题相关的信息"}
 `),
+		reactloops.WithLoopIsHidden(true),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, err)
