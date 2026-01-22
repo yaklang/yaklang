@@ -166,22 +166,22 @@ func EnsureAIBalanceConfig() {
 		config.AppConfigs = append([]*ypb.ThirdPartyApplicationConfig{aibalanceConfig}, config.AppConfigs...)
 		configChanged = true
 		log.Infof("Added default AIBalance config (key: free-user, model: memfit-light-free)")
+	}
 
-		// 无论 aibalance 是否已存在，都确保它在 AI 优先级列表的最前面
-		// 因为 GetGlobalNetworkConfig 可能会把新的 AI 类型添加到末尾
-		newPriority := []string{"aibalance"}
-		for _, aiType := range config.AiApiPriority {
-			if aiType != "aibalance" {
-				newPriority = append(newPriority, aiType)
-			}
+	// 无论 aibalance 是否已存在，都确保它在 AI 优先级列表的最前面
+	// 因为 GetGlobalNetworkConfig 可能会把新的 AI 类型添加到末尾
+	newPriority := []string{"aibalance"}
+	for _, aiType := range config.AiApiPriority {
+		if aiType != "aibalance" {
+			newPriority = append(newPriority, aiType)
 		}
+	}
 
-		// 检查顺序是否需要更新
-		if len(config.AiApiPriority) == 0 || config.AiApiPriority[0] != "aibalance" {
-			config.AiApiPriority = newPriority
-			configChanged = true
-			log.Infof("Moved aibalance to the top of AI priority list")
-		}
+	// 检查顺序是否需要更新
+	if len(config.AiApiPriority) == 0 || config.AiApiPriority[0] != "aibalance" {
+		config.AiApiPriority = newPriority
+		configChanged = true
+		log.Infof("Moved aibalance to the top of AI priority list")
 	}
 
 	// 只有在配置发生变化时才保存
