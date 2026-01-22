@@ -133,7 +133,7 @@ func GetEditorByProgramName(programName string) ([]*memedit.MemEditor, error) {
 	return editors, nil
 }
 
-func MarshalFile(editor *memedit.MemEditor) *IrSource {
+func MarshalFile(editor *memedit.MemEditor, irSourceHash ...string) *IrSource {
 	// editor 内部已经维护好了规范化的数据，直接使用即可
 	irSource := &IrSource{
 		ProgramName:    editor.GetProgramName(),
