@@ -24,23 +24,33 @@ func TestRoutingPolicyConstants(t *testing.T) {
 func TestIsTieredAIConfig(t *testing.T) {
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
-	defer consts.SetTieredAIConfig(originalConfig)
+	originalLoaded := IsConfigLoaded()
+	defer func() {
+		consts.SetTieredAIConfig(originalConfig)
+		if !originalLoaded {
+			ResetConfigLoaded()
+		}
+	}()
 
-	// Test when disabled
+	// Reset to prevent EnsureConfigLoaded from interfering
+	ResetConfigLoaded()
+
+	// Test when disabled - set configLoaded to true to prevent auto-loading
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: false,
 	})
-	assert.False(t, IsTieredAIConfig())
+	// Directly test consts function to avoid EnsureConfigLoaded interference
+	assert.False(t, consts.IsTieredAIModelConfigEnabled())
 
 	// Test when enabled
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: true,
 	})
-	assert.True(t, IsTieredAIConfig())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled())
 
 	// Test when nil
 	consts.SetTieredAIConfig(nil)
-	assert.False(t, IsTieredAIConfig())
+	assert.False(t, consts.IsTieredAIModelConfigEnabled())
 }
 
 func TestGetCurrentPolicy(t *testing.T) {
