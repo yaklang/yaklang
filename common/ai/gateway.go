@@ -272,6 +272,14 @@ func GetPrimaryAgent() aispec.AIClient {
 }
 
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	// Parse options to check if user explicitly specified a type
+	config := aispec.NewDefaultAIConfig(opts...)
+
+	// If user explicitly specified a type, use legacy chat to respect their choice
+	if config.Type != "" {
+		return legacyChat(msg, opts...)
+	}
+
 	// Check if tiered AI model configuration is enabled
 	if consts.IsTieredAIModelConfigEnabled() {
 		return tieredChat(msg, opts...)
