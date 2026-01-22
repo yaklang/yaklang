@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -493,6 +494,115 @@ func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 		c.m.Unlock()
 		return nil
 	}
+}
+
+// WithTieredAICallback configures both quality and speed priority callbacks using tiered AI configuration
+// This automatically uses intelligent model for quality priority and lightweight model for speed priority
+func WithTieredAICallback() ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+
+		// Check if tiered AI config is enabled
+		if !consts.IsTieredAIModelConfigEnabled() {
+			log.Debugf("Tiered AI config not enabled, skipping tiered callback configuration")
+			return nil
+		}
+
+		// Configure quality priority callback (uses intelligent model)
+		intelligentConfigs := consts.GetIntelligentAIConfigs()
+		if len(intelligentConfigs) > 0 {
+			intelligentCB, err := loadCallbackFromThirdPartyConfig(intelligentConfigs[0])
+			if err == nil {
+				intelligentCB = c.wrapper(intelligentCB)
+				c.m.Lock()
+				c.QualityPriorityAICallback = intelligentCB
+				c.m.Unlock()
+				log.Debugf("Configured quality priority callback from intelligent model")
+			} else {
+				log.Warnf("Failed to load intelligent model callback: %v", err)
+			}
+		}
+
+		// Configure speed priority callback (uses lightweight model)
+		lightweightConfigs := consts.GetLightweightAIConfigs()
+		if len(lightweightConfigs) > 0 {
+			lightweightCB, err := loadCallbackFromThirdPartyConfig(lightweightConfigs[0])
+			if err == nil {
+				lightweightCB = c.wrapper(lightweightCB)
+				c.m.Lock()
+				c.SpeedPriorityAICallback = lightweightCB
+				c.m.Unlock()
+				log.Debugf("Configured speed priority callback from lightweight model")
+			} else {
+				log.Warnf("Failed to load lightweight model callback: %v", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+// WithAutoTieredAICallback automatically configures tiered AI callbacks if tiered config is enabled
+// Otherwise, it falls back to the provided default callback
+func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+
+		// Check if tiered AI config is enabled
+		if consts.IsTieredAIModelConfigEnabled() {
+			// Try to configure tiered callbacks
+			if err := WithTieredAICallback()(c); err == nil {
+				// Also set the original callback if not already set
+				if c.OriginalAICallback == nil && defaultCallback != nil {
+					c.m.Lock()
+					c.OriginalAICallback = c.wrapper(defaultCallback)
+					c.m.Unlock()
+				}
+				return nil
+			}
+		}
+
+		// Fall back to default callback for all priorities
+		if defaultCallback != nil {
+			defaultCallback = c.wrapper(defaultCallback)
+			c.m.Lock()
+			c.OriginalAICallback = defaultCallback
+			c.QualityPriorityAICallback = defaultCallback
+			c.SpeedPriorityAICallback = defaultCallback
+			c.m.Unlock()
+		}
+		return nil
+	}
+}
+
+// loadCallbackFromThirdPartyConfig creates an AICallbackType from ThirdPartyApplicationConfig
+func loadCallbackFromThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) (AICallbackType, error) {
+	if cfg == nil {
+		return nil, utils.Error("config is nil")
+	}
+
+	var opts []aispec.AIConfigOption
+	if cfg.Type != "" {
+		opts = append(opts, aispec.WithType(cfg.Type))
+	}
+	if cfg.APIKey != "" {
+		opts = append(opts, aispec.WithAPIKey(cfg.APIKey))
+	}
+	if cfg.Domain != "" {
+		opts = append(opts, aispec.WithDomain(cfg.Domain))
+	}
+	for _, param := range cfg.ExtraParams {
+		if param.Key == "model" {
+			opts = append(opts, aispec.WithModel(param.Value))
+			break
+		}
+	}
+
+	return LoadAIService(cfg.Type, opts...)
 }
 
 // AI retry / limits
