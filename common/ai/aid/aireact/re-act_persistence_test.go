@@ -139,6 +139,7 @@ LOOP:
 		t.Fatal("timeline does not contain system-question")
 	}
 	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
+		fmt.Println(tl)
 		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	fmt.Println("--------------------------------------")

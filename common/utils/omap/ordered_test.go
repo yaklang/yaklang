@@ -181,3 +181,60 @@ func TestBringKeyToLastOne(t *testing.T) {
 		t.Fatalf("expected keys %v, got %v", expectedKeys, m.Keys())
 	}
 }
+
+func TestOrderInsert_StringAscending(t *testing.T) {
+	m := NewEmptyOrderedMap[string, int]()
+
+	less := func(a, b string) bool { return a < b }
+	m.OrderInsert("b", 2, less)
+	m.OrderInsert("a", 1, less)
+	m.OrderInsert("c", 3, less)
+
+	expectedKeys := []string{"a", "b", "c"}
+	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
+		t.Fatalf("expected keys %v, got %v", expectedKeys, m.Keys())
+	}
+
+	// Existing key should be repositioned (though order unchanged for same key) and value updated.
+	m.OrderInsert("b", 20, less)
+	expectedKeys = []string{"a", "b", "c"}
+	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
+		t.Fatalf("expected keys %v after update, got %v", expectedKeys, m.Keys())
+	}
+	if m.Len() != 3 {
+		t.Fatalf("expected len 3 after update, got %d", m.Len())
+	}
+	if v, ok := m.Get("b"); !ok || v != 20 {
+		t.Fatalf("expected key b to be updated to 20, got %v (ok=%v)", v, ok)
+	}
+}
+
+func TestOrderInsert_CustomComparator(t *testing.T) {
+	m := NewEmptyOrderedMap[string, int]()
+
+	// Order by length ascending; for equal lengths, lexicographic ascending.
+	less := func(a, b string) bool {
+		if len(a) != len(b) {
+			return len(a) < len(b)
+		}
+		return a < b
+	}
+	m.OrderInsert("bb", 2, less)
+	m.OrderInsert("a", 1, less)
+	m.OrderInsert("ccc", 3, less)
+	m.OrderInsert("aa", 4, less)
+
+	expectedKeys := []string{"a", "aa", "bb", "ccc"}
+	if !reflect.DeepEqual(m.Keys(), expectedKeys) {
+		t.Fatalf("expected keys %v, got %v", expectedKeys, m.Keys())
+	}
+
+	// Updating an existing key should not create duplicates.
+	m.OrderInsert("bb", 200, less)
+	if m.Len() != 4 {
+		t.Fatalf("expected len 4 after updating existing key, got %d", m.Len())
+	}
+	if v, ok := m.Get("bb"); !ok || v != 200 {
+		t.Fatalf("expected key bb to be updated to 200, got %v (ok=%v)", v, ok)
+	}
+}

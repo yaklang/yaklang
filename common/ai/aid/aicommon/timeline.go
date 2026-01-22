@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"cmp"
 	_ "embed"
 	"fmt"
 	"io"
@@ -39,6 +40,14 @@ type Timeline struct {
 	totalDumpContentLimit int64
 
 	compressing *utils.Once
+}
+
+func (m *Timeline) OrderInsertId(id int64, item *TimelineItem) {
+	m.idToTimelineItem.OrderInsert(id, item, cmp.Less[int64])
+}
+
+func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
+	m.tsToTimelineItem.OrderInsert(ts, item, cmp.Less[int64])
 }
 
 // MaxTimelineSaveSize is the maximum size (100KB) for timeline data when saving to database
@@ -169,10 +178,10 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 		}
 		tl.idToTs.Set(id, ts)
 		if ret, ok := m.idToTimelineItem.Get(id); ok {
-			tl.idToTimelineItem.Set(id, ret)
+			tl.OrderInsertId(id, ret)
 		}
 		if ret, ok := m.tsToTimelineItem.Get(ts); ok {
-			tl.tsToTimelineItem.Set(ts, ret)
+			tl.OrderInsertTs(ts, ret)
 		}
 		if ret, ok := m.summary.Get(id); ok {
 			tl.summary.Set(id, ret)
@@ -247,8 +256,8 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 }
 
 func (m *Timeline) pushTimelineItem(ts int64, id int64, item *TimelineItem) {
-	m.tsToTimelineItem.Set(ts, item)
-	m.idToTimelineItem.Set(id, item)
+	m.OrderInsertId(id, item)
+	m.OrderInsertTs(ts, item)
 	m.dumpSizeCheck()
 
 	// Emit timeline item asynchronously to avoid blocking when EventHandler
