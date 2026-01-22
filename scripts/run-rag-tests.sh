@@ -35,6 +35,9 @@ echo
 echo "Logs will be written to: $LOG_DIR"
 echo
 
+RED='\033[31m'
+RESET='\033[0m'
+
 run_test() {
   local pkg=$1 timeout=$2 parallel=$3 run=$4 logfile=$5
   local args=("-timeout=$timeout" "-parallel=$parallel")
@@ -42,13 +45,13 @@ run_test() {
   args+=("$pkg")
   echo "==> [$(date +%H:%M:%S)] START $pkg (log: $logfile)"
   local status=0
-  if ! go test "${args[@]}" >"$logfile" 2>&1; then
+  if ! GITHUB_ACTIONS=true go test "${args[@]}" >"$logfile" 2>&1; then
     status=$?
   fi
 
   if grep -E '^(FAIL|panic:|fatal error:|--- FAIL:)' "$logfile" >/dev/null 2>&1; then
-    echo "==> [$(date +%H:%M:%S)] RESULT $pkg: failure signature detected (log: $logfile)"
-    grep -E '^(FAIL|panic:|fatal error:|--- FAIL:)' "$logfile" | head -n 10
+    echo -e "==> [$(date +%H:%M:%S)] RESULT $pkg: ${RED}failure signature detected${RESET} (log: $logfile)"
+    grep -E '^(FAIL|panic:|fatal error:|--- FAIL:)' "$logfile" | head -n 10 | sed "s/^/${RED}/;s/$/${RESET}/"
   else
     echo "==> [$(date +%H:%M:%S)] RESULT $pkg: no failure signature (log: $logfile)"
   fi
