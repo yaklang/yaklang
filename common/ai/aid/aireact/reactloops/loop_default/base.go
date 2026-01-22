@@ -34,6 +34,7 @@ func init() {
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_HTTP_DIFFER),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_PYTHON_POC),
+				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE),
 			}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）

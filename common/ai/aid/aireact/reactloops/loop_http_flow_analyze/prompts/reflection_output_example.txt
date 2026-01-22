@@ -1,0 +1,315 @@
+## 输出格式
+
+- 发现：总结匹配的流量（id、url、原因、hit_color）和关键异常。
+- 缺口：注明缺失的证据或需要收紧的过滤器。
+- 下一步：列出要调用的下一个操作（filter_and_match_http_flows/get_http_flow_detail）及具体参数。
+
+**重要提示**：当 action 输出内容过大时，系统会自动将完整结果保存到文件中，并在反馈消息中显示文件名和预览内容。此时你必须使用 `read_file` 工具读取保存的文件以获取关键信息。
+
+---
+
+## filter_and_match_http_flows 工具参数说明
+
+此工具用于过滤和匹配 HTTP 流量，支持多种过滤条件和高级匹配器。
+
+### 基础过滤参数
+
+#### keyword (string, 可选)
+- 模糊搜索关键词，在请求/响应/URL 中搜索
+- 用于快速定位包含特定文本的流量
+- 示例：`"admin"`, `"password"`, `"api/login"`
+
+#### keyword_type (string, 可选)
+- 限制关键词搜索范围
+- 允许的值：`request`（仅在请求中搜索）、`response`（仅在响应中搜索）
+- 留空则在所有内容中搜索
+- 示例：`"request"`, `"response"`
+
+#### methods (string, 可选)
+- 逗号分隔的 HTTP 方法列表
+- 用于过滤特定类型的请求
+- 示例：`"GET,POST"`, `"POST,PUT,DELETE"`
+
+#### status_code (string, 可选)
+- 状态码或状态码范围
+- 支持具体状态码、范围（如 2xx、5xx）
+- 示例：`"200,404"`, `"5xx"`, `"200,201,204"`
+
+#### tags (string, 可选)
+- 逗号或竖线分隔的标签列表
+- 用于匹配已标记的流量
+- 示例：`"重要|关键"`, `"敏感,漏洞"`
+
+#### exclude_keywords (string, 可选)
+- 要排除的关键词
+- 在请求/响应/URL 中包含这些关键词的流量将被排除
+- 示例：`"static"`, `".css,.js,.png"`
+
+#### url_contains (string, 可选)
+- URL 子串过滤器
+- 多个值用逗号分隔
+- 示例：`"/api/,/admin/"`, `"example.com"`
+
+#### runtime_id (string, 可选)
+- 运行时/会话 ID 过滤器
+- 用于过滤特定会话的流量
+- 示例：特定的运行时 ID 字符串
+
+#### source_type (string, 可选)
+- 来源类型过滤器
+- 允许的值：`mitm`（中间人代理）、`crawler`（爬虫）、`scan`（扫描）等
+- 示例：`"mitm"`, `"crawler"`
+
+#### limit (integer, 可选)
+- 最大返回结果数
+- 默认值：30
+- 最大值：500
+- 建议：从较小值开始（10-50），避免结果过多
+- 示例：`30`, `100`
+
+### 高级匹配参数
+
+#### matchers_json (string, 可选)
+- HTTPResponseMatcher 的 JSON 定义
+- **重要**：优先使用基础过滤参数，仅当基础过滤无法满足需求时才使用此参数
+- 支持三种格式：
+  1. 包装对象：`{"matchers": [matcher1, matcher2, ...]}`
+  2. 数组：`[matcher1, matcher2, ...]`
+  3. 单个对象：`{matcher_fields...}`
+
+---
+
+## HTTPResponseMatcher 字段定义
+
+所有枚举字段必须仅使用列出的允许值。不要发明或自由填写值。
+
+### MatcherType (string, 必需)
+匹配算法。允许的值：
+- `word` (也接受 `contains`) — 子串匹配。
+- `regexp` (也接受 `re`, `regex`) — 正则表达式匹配。
+- `status_code` (也接受 `status`) — HTTP 状态码匹配。
+- `content_length` (也接受 `size`, `content-length`) — 响应体长度匹配；会警告因为头部不可信。
+- `binary` — 二进制内容匹配，强制 `GroupEncoding=hex`。
+- `suffix` — 后缀匹配。
+- `glob` — glob 模式匹配。
+- `mime` — MIME glob 匹配。
+
+### Scope (string, 可选)
+匹配的目标材料。允许的值：
+- `status_code` (也接受 `status`) — 仅 HTTP 状态码。
+- `header` (也接受 `all_headers`) — 响应头。
+- `body` — 响应体。
+- `raw` — 完整的原始响应（省略或未知时的默认值）。
+- `interactsh_protocol` (也接受 `oob_protocol`) — OOB 交互协议字符串。
+- `interactsh_request` — 原始 OOB 交互请求。
+- `request_header` — 请求头。
+- `request_body` — 请求体。
+- `request_raw` — 完整的原始请求。
+- `request_url` — 请求 URL 字符串。
+
+### Condition (string, 可选)
+`Group` 的逻辑聚合。允许的值：
+- `or` (默认) — 如果任何模式匹配则匹配。
+- `and` — 仅当所有模式都匹配时才匹配。
+
+### Group ([]string, 大多数 MatcherTypes 必需)
+模式/表达式列表。除非仅使用 `SubMatchers`，否则为必需。支持通过 `GroupEncoding` 进行可选解码。
+
+### GroupEncoding (string, 可选)
+在匹配前应用于每个 `Group` 项的解码。允许的值：
+- `hex`
+- `base64`
+
+### Negative (bool, 可选)
+当为 `true` 时，反转最终匹配结果（逻辑非）。默认为 `false`。
+
+### SubMatcherCondition (string, 可选)
+`SubMatchers` 的聚合。允许的值：
+- `or` (默认) — 如果任何子匹配器为真则匹配。
+- `and` — 仅当所有子匹配器都为真时才匹配。
+
+### SubMatchers (array, 可选)
+嵌套的 HTTPResponseMatcher 定义以构建复杂逻辑。每个子匹配器遵守相同的枚举规则。
+
+### HitColor (string, 可选)
+匹配流量的视觉标记。自由文本颜色名称（例如，`red`、`yellow`、`green`、`blue`、`purple`、`orange`）。
+
+---
+
+## 使用示例
+
+### 基础过滤示例
+
+#### 示例 1 - 查询登录相关的 POST 请求
+```json
+{
+  "keyword": "login",
+  "methods": "POST",
+  "limit": 20
+}
+```
+
+#### 示例 2 - 查询错误响应
+```json
+{
+  "status_code": "5xx",
+  "limit": 30
+}
+```
+
+#### 示例 3 - 查询特定域名的 API 请求，排除静态资源
+```json
+{
+  "url_contains": "/api/",
+  "exclude_keywords": ".css,.js,.png,.jpg",
+  "limit": 50
+}
+```
+
+#### 示例 4 - 查询特定来源和方法的流量
+```json
+{
+  "source_type": "mitm",
+  "methods": "POST,PUT",
+  "status_code": "200",
+  "limit": 30
+}
+```
+
+### 高级匹配器示例
+
+#### 示例 5 - 敏感关键词的单词匹配器
+```json
+{
+  "matchers_json": {
+    "MatcherType": "word",
+    "Scope": "body",
+    "Group": ["password", "admin", "secret"],
+    "Condition": "or",
+    "HitColor": "red"
+  }
+}
+```
+
+#### 示例 6 - 状态码范围匹配器
+```json
+{
+  "matchers_json": {
+    "MatcherType": "status_code",
+    "Group": ["200", "201", "204"],
+    "HitColor": "green"
+  }
+}
+```
+
+#### 示例 7 - 正则表达式匹配器（匹配邮箱）
+```json
+{
+  "matchers_json": {
+    "MatcherType": "regexp",
+    "Scope": "body",
+    "Group": ["\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"],
+    "HitColor": "yellow"
+  }
+}
+```
+
+#### 示例 8 - 二进制内容匹配器（十六进制编码）
+```json
+{
+  "matchers_json": {
+    "MatcherType": "binary",
+    "Scope": "body",
+    "Group": ["504b0304", "ffd8ffe0"],
+    "HitColor": "blue"
+  }
+}
+```
+
+#### 示例 9 - 使用 SubMatchers 的复杂 AND 逻辑
+```json
+{
+  "matchers_json": {
+    "SubMatcherCondition": "and",
+    "SubMatchers": [
+      {
+        "MatcherType": "status_code",
+        "Group": ["200"]
+      },
+      {
+        "MatcherType": "word",
+        "Scope": "body",
+        "Group": ["success", "token"],
+        "Condition": "and"
+      }
+    ],
+    "HitColor": "green"
+  }
+}
+```
+
+#### 示例 10 - 否定匹配器（排除模式）
+```json
+{
+  "matchers_json": {
+    "MatcherType": "word",
+    "Scope": "body",
+    "Group": ["404.html", "not found"],
+    "Condition": "or",
+    "Negative": true,
+    "HitColor": "gray"
+  }
+}
+```
+
+#### 示例 11 - 多个匹配器数组
+```json
+{
+  "matchers_json": [
+    {
+      "MatcherType": "word",
+      "Scope": "body",
+      "Group": ["error", "exception", "stack trace"],
+      "Condition": "or",
+      "HitColor": "red"
+    },
+    {
+      "MatcherType": "status_code",
+      "Group": ["500", "502", "503"],
+      "HitColor": "orange"
+    }
+  ]
+}
+```
+
+#### 示例 12 - 请求 URL 匹配器
+```json
+{
+  "matchers_json": {
+    "MatcherType": "word",
+    "Scope": "request_url",
+    "Group": ["/api/", "/admin/"],
+    "Condition": "or",
+    "HitColor": "purple"
+  }
+}
+```
+
+### 组合使用示例
+
+#### 示例 13 - 基础过滤 + 高级匹配器
+```json
+{
+  "methods": "POST",
+  "status_code": "200",
+  "url_contains": "/api/",
+  "limit": 50,
+  "matchers_json": {
+    "MatcherType": "word",
+    "Scope": "body",
+    "Group": ["token", "jwt", "session"],
+    "Condition": "or",
+    "HitColor": "yellow"
+  }
+}
+```

@@ -3,6 +3,7 @@ package reactinit
 import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_differ"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_flow_analyze"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_knowledge_enhance"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"

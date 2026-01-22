@@ -1,0 +1,35 @@
+## 任务上下文
+<|USER_INPUT_{{ .Nonce }}|>
+{{ .UserInput }}
+<|USER_INPUT_END_{{ .Nonce }}|>
+
+{{ if .LastQuerySummary }}
+### 上次查询摘要
+<|LAST_QUERY_{{ .Nonce }}|>
+{{ .LastQuerySummary }}
+<|LAST_QUERY_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .LastMatchSummary }}
+### 上次匹配摘要
+<|LAST_MATCH_{{ .Nonce }}|>
+{{ .LastMatchSummary }}
+<|LAST_MATCH_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .CurrentFlow }}
+### 当前流量详情
+<|CURRENT_FLOW_{{ .Nonce }}|>
+{{ .CurrentFlow }}
+<|CURRENT_FLOW_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .FeedbackMessages }}
+### 反馈消息
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+{{ end }}
+
+---
+思考下一步：决定是细化过滤器、深入特定流量，还是运行匹配器来标记有趣的流量。请简洁回答。

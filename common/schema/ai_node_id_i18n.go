@@ -543,6 +543,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "知识分片相关性分析",
 		En: "Knowledge Chunk Relevance Analysis",
 	},
+	"http_flow_analyze": {
+		Zh: "HTTP 流量分析",
+		En: "HTTP Flow Analyze",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{
