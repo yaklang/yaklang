@@ -39,6 +39,17 @@ func assertForgeFields(t *testing.T, expected *schema.AIForge, actual *schema.AI
 	require.Equal(t, expected.Author, actual.Author)
 }
 
+func assertToolFields(t *testing.T, expected *schema.AIYakTool, actual *schema.AIYakTool) {
+	require.Equal(t, expected.Name, actual.Name)
+	require.Equal(t, expected.VerboseName, actual.VerboseName)
+	require.Equal(t, expected.Description, actual.Description)
+	require.Equal(t, expected.Keywords, actual.Keywords)
+	require.Equal(t, expected.Params, actual.Params)
+	require.Equal(t, expected.Path, actual.Path)
+	require.Equal(t, expected.Content, actual.Content)
+	require.Equal(t, expected.EnableAIOutputLog, actual.EnableAIOutputLog)
+}
+
 func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	db := newTestForgeDB(t)
 	defer db.Close()
@@ -70,7 +81,7 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	}
 
 	target := filepath.Join(t.TempDir(), "yak.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, target, WithExportProgress(progress))
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target, WithExportProgress(progress))
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 	require.NotEmpty(t, progressMsg)
@@ -115,7 +126,7 @@ func TestExportImportConfigForge_WithRenameAndOverwrite(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, forge))
 
 	target := filepath.Join(t.TempDir(), "config.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, target)
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target)
 	require.NoError(t, err)
 
 	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
@@ -163,7 +174,7 @@ func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, cfgForge))
 
 	target := filepath.Join(t.TempDir(), "multi.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{yakForge.ForgeName, cfgForge.ForgeName}, target)
+	exported, err := ExportAIForgesToZip(db, []string{yakForge.ForgeName, cfgForge.ForgeName}, nil, target)
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 
@@ -180,4 +191,49 @@ func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 	storedCfg, err := yakit.GetAIForgeByName(db, cfgForge.ForgeName)
 	require.NoError(t, err)
 	assertForgeFields(t, cfgForge, storedCfg)
+}
+
+func TestExportImportForgeWithTools(t *testing.T) {
+	db := newTestForgeDB(t)
+	defer db.Close()
+
+	forge := &schema.AIForge{
+		ForgeName:    "forge-with-tool-" + t.Name(),
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "println('forge with tool')",
+	}
+	tool := &schema.AIYakTool{
+		Name:              "tool-" + t.Name(),
+		VerboseName:       "test-tool",
+		Description:       "tool desc",
+		Keywords:          "kw1,kw2",
+		Content:           "println('tool')",
+		Params:            `{"type":"object"}`,
+		Path:              "custom/path",
+		EnableAIOutputLog: 1,
+	}
+
+	require.NoError(t, yakit.CreateAIForge(db, forge))
+	_, err := yakit.CreateAIYakTool(db, tool)
+	require.NoError(t, err)
+
+	target := filepath.Join(t.TempDir(), "forge-with-tools.tar.gz")
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, []string{tool.Name}, target)
+	require.NoError(t, err)
+	require.Equal(t, target, exported)
+
+	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
+	db.Unscoped().Where("name = ?", tool.Name).Delete(&schema.AIYakTool{})
+
+	imported, err := ImportAIForgesFromZip(db, exported, WithImportOverwrite(true))
+	require.NoError(t, err)
+	require.Len(t, imported, 1)
+
+	storedForge, err := yakit.GetAIForgeByName(db, forge.ForgeName)
+	require.NoError(t, err)
+	assertForgeFields(t, forge, storedForge)
+
+	storedTool, err := yakit.GetAIYakTool(db, tool.Name)
+	require.NoError(t, err)
+	assertToolFields(t, tool, storedTool)
 }

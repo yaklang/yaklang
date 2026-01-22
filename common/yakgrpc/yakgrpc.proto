@@ -1999,6 +1999,7 @@ message ExportAIForgeRequest {
   string TargetPath = 2;
   string OutputName = 3;
   string Password = 4;
+  repeated string ToolNames = 5;
 }
 
 message ImportAIForgeRequest {
