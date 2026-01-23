@@ -48,6 +48,10 @@ type (
 
 		ctx       context.Context
 		ctxCancel context.CancelFunc
+
+		// File extension filters
+		includeExts []string // Include only files with these extensions (e.g., [".yak", ".fs"])
+		excludeExts []string // Exclude files with these extensions
 	}
 )
 
@@ -158,6 +162,24 @@ func WithContext(ctx context.Context) Option {
 			return
 		}
 		config.ctx, config.ctxCancel = context.WithCancel(ctx)
+	}
+}
+
+// WithIncludeExts sets file extensions to include (only files with these extensions will be processed)
+// The filtering is handled in Recursive function before calling onFileStat.
+// Example: WithIncludeExts(".yak", ".fs")
+func WithIncludeExts(exts ...string) Option {
+	return func(config *Config) {
+		config.includeExts = exts
+	}
+}
+
+// WithExcludeExts sets file extensions to exclude (files with these extensions will be skipped)
+// The filtering is handled in Recursive function before calling onFileStat.
+// Example: WithExcludeExts(".tmp", ".bak")
+func WithExcludeExts(exts ...string) Option {
+	return func(config *Config) {
+		config.excludeExts = exts
 	}
 }
 

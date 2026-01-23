@@ -3,6 +3,7 @@ package filesys
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -17,6 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
+
+// ErrNoFileFound is returned when CreateEmbedFSHash finds no files to process
+var ErrNoFileFound = errors.New("no file found")
 
 type embedFs struct {
 	f embed.FS
@@ -76,9 +80,15 @@ func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
 }
 
-func CreateEmbedFSHash(f embed.FS) (string, error) {
+func CreateEmbedFSHash(f embed.FS, opts ...Option) (string, error) {
 	var hashes []string
-	err := Recursive(".", WithFileSystem(NewEmbedFS(f)), WithFileStat(func(s string, info fs.FileInfo) error {
+
+	// Build options: start with embed FS, then add our file stat handler
+	// Extension filtering (WithIncludeExts/WithExcludeExts) is handled by wrapping onFileStat
+	// in the option functions themselves, so it will be executed in Recursive
+	allOpts := make([]Option, 0, len(opts)+2)
+	allOpts = append(allOpts, WithFileSystem(NewEmbedFS(f)))
+	allOpts = append(allOpts, WithFileStat(func(s string, info fs.FileInfo) error {
 		result, err := f.ReadFile(s)
 		if err != nil {
 			return err
@@ -87,12 +97,17 @@ func CreateEmbedFSHash(f embed.FS) (string, error) {
 		hashes = append(hashes, hash)
 		return nil
 	}))
+	allOpts = append(allOpts, opts...)
+
+	err := Recursive(".", allOpts...)
 	if err != nil {
 		return "", err
 	}
 	if len(hashes) <= 0 {
-		return "", utils.Error("no file found")
+		return "", ErrNoFileFound
 	}
+
+	// Sort by path first to ensure consistent ordering
 	sort.Strings(hashes)
 	return codec.Sha256([]byte(strings.Join(hashes, "|"))), nil
 }

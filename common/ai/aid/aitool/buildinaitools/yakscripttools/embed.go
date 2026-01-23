@@ -21,7 +21,8 @@ type embedFSWithHash struct {
 }
 
 func (e *embedFSWithHash) GetHash() (string, error) {
-	return filesys.CreateEmbedFSHash(e.fs)
+	// Only calculate hash for .yak files
+	return filesys.CreateEmbedFSHash(e.fs, filesys.WithIncludeExts(".yak"))
 }
 
 func InitEmbedFS() {
