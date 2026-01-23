@@ -41,10 +41,10 @@ func (s *Server) DeleteAITask(ctx context.Context, req *ypb.AITaskDeleteRequest)
 	if req != nil {
 		filter = req.GetFilter()
 	}
+	db := s.GetProjectDatabase()
 
 	// Fast clear (drop+recreate) for the "clear all" case.
 	if filter == nil || (len(filter.GetName()) == 0 && len(filter.GetKeyword()) == 0 && len(filter.GetForgeName()) == 0 && len(filter.GetCoordinatorId()) == 0) {
-		db := s.GetProfileDatabase()
 		if err := yakit.DropAIAgentRuntimeTable(db); err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func (s *Server) DeleteAITask(ctx context.Context, req *ypb.AITaskDeleteRequest)
 		}, nil
 	}
 
-	effectCount, err := yakit.DeleteAgentRuntime(s.GetProfileDatabase(), filter)
+	effectCount, err := yakit.DeleteAgentRuntime(db, filter)
 	if err != nil {
 		return nil, err
 	}
