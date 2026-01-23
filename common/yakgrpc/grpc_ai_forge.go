@@ -110,10 +110,11 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 	if len(names) == 0 {
 		return utils.Error("forge names are required")
 	}
-	progress := func(percent float64, msg string) {
+	progress := func(percent float64, msg string, messageType string) {
 		_ = stream.Send(&ypb.GeneralProgress{
-			Percent: percent,
-			Message: msg,
+			Percent:     percent,
+			Message:     msg,
+			MessageType: messageType,
 		})
 	}
 	_, err := aiforge.ExportAIForgesToZip(
@@ -126,6 +127,11 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 		aiforge.WithExportOutputName(req.GetOutputName()),
 	)
 	if err != nil {
+		_ = stream.Send(&ypb.GeneralProgress{
+			Percent:     0,
+			Message:     err.Error(),
+			MessageType: "error",
+		})
 		return err
 	}
 	return nil

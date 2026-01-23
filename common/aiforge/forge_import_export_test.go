@@ -1,6 +1,7 @@
 package aiforge
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -76,12 +77,12 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, forge))
 
 	var progressMsg []string
-	progress := func(percent float64, msg string) {
-		progressMsg = append(progressMsg, msg)
+	exportProgress := func(percent float64, msg string, messageType string) {
+		progressMsg = append(progressMsg, fmt.Sprintf("%s:%s", messageType, msg))
 	}
 
 	target := filepath.Join(t.TempDir(), "yak.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target, WithExportProgress(progress))
+	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target, WithExportProgress(exportProgress))
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 	require.NotEmpty(t, progressMsg)
@@ -89,7 +90,10 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
 
 	progressMsg = nil
-	imported, err := ImportAIForgesFromZip(db, exported, WithImportProgress(progress))
+	importProgress := func(percent float64, msg string) {
+		progressMsg = append(progressMsg, msg)
+	}
+	imported, err := ImportAIForgesFromZip(db, exported, WithImportProgress(importProgress))
 	require.NoError(t, err)
 	require.Len(t, imported, 1)
 	require.NotEmpty(t, progressMsg)

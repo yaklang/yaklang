@@ -13,6 +13,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -23,13 +24,13 @@ import (
 type ForgeExportOption func(*forgeExportOptions)
 
 type forgeExportOptions struct {
-	progress func(percent float64, message string)
+	progress func(percent float64, message string, messageType string)
 	password string
 	output   string
 }
 
 // WithExportProgress registers a progress callback (percent 0-100) for export.
-func WithExportProgress(cb func(percent float64, message string)) ForgeExportOption {
+func WithExportProgress(cb func(percent float64, message string, messageType string)) ForgeExportOption {
 	return func(o *forgeExportOptions) {
 		o.progress = cb
 	}
@@ -126,53 +127,68 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	}
 	defer os.RemoveAll(tmpDir)
 
-	progress := func(percent float64, msg string) {
+	progress := func(percent float64, msg string, messageType string) {
 		if opt.progress != nil {
-			opt.progress(percent, msg)
+			opt.progress(percent, msg, messageType)
 		}
 	}
-	progress(0, "start export")
+	progress(0, "start export", "info")
 
 	total := len(forgeNames) + len(toolNames)
-	progressStep := func(done int, name string) {
+	progressStep := func(done int, name string, messageType string) {
 		if total == 0 {
 			return
 		}
-		progress(float64(done)/float64(total)*100, name)
+		progress(float64(done)/float64(total)*100, name, messageType)
 	}
 
 	exported := 0
+	progressErrorMsg := func(msg string) {
+		progressStep(exported, "[Error]: "+msg, "error")
+	}
 	for _, name := range forgeNames {
 		if strings.TrimSpace(name) == "" {
-			return "", utils.Error("empty forge name detected")
+			log.Errorf("empty forge name detected")
+			progressErrorMsg("empty forge name detected")
+			continue
 		}
 		forge, err := yakit.GetAIForgeByName(db, name)
 		if err != nil {
-			return "", err
+			log.Errorf("failed to get forge %s: %v", name, err)
+			progressErrorMsg(fmt.Sprintf("failed to get forge %s: %v", name, err))
+			continue
 		}
 		effectiveName := forge.ForgeName
 		forgeDir := filepath.Join(tmpDir, effectiveName)
 		if err := dumpForgeToDir(forge, forgeDir, effectiveName); err != nil {
-			return "", err
+			log.Errorf("failed to export forge %s: %v", effectiveName, err)
+			progressErrorMsg(fmt.Sprintf("failed to export forge %s: %v", effectiveName, err))
+			continue
 		}
 		exported++
-		progressStep(exported, fmt.Sprintf("exported forge %s", effectiveName))
+		progressStep(exported, fmt.Sprintf("exported forge %s", effectiveName), "info")
 	}
 
 	for _, name := range toolNames {
 		if strings.TrimSpace(name) == "" {
-			return "", utils.Error("empty tool name detected")
+			log.Errorf("empty tool name detected")
+			progressErrorMsg("empty tool name detected")
+			continue
 		}
 		tool, err := yakit.GetAIYakTool(db, name)
 		if err != nil {
-			return "", err
+			log.Errorf("failed to get tool %s: %v", name, err)
+			progressErrorMsg(fmt.Sprintf("failed to get tool %s: %v", name, err))
+			continue
 		}
 		toolDir := filepath.Join(tmpDir, "tools", tool.Name)
 		if err := dumpAIToolToDir(tool, toolDir); err != nil {
-			return "", err
+			log.Errorf("failed to dump tool %s to dir: %v", tool.Name, err)
+			progressErrorMsg(fmt.Sprintf("failed to dump tool %s to dir: %v", tool.Name, err))
+			continue
 		}
 		exported++
-		progressStep(exported, fmt.Sprintf("exported tool %s", tool.Name))
+		progressStep(exported, fmt.Sprintf("exported tool %s", tool.Name), "info")
 	}
 
 	if opt.output == "" {
@@ -210,7 +226,7 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	if err := os.WriteFile(targetPath, zipBytes, 0o644); err != nil {
 		return "", err
 	}
-	progress(100, "export completed")
+	progress(100, "export completed", "success")
 	return targetPath, nil
 }
 
