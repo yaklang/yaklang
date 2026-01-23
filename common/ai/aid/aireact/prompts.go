@@ -52,6 +52,9 @@ var changeBlueprintPromptTemplate string
 //go:embed prompts/base/base.txt
 var basePrompt string
 
+//go:embed prompts/utils/conversation_title.txt
+var conversationTitlePrompt string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	cpm           *aicommon.ContextProviderManager
@@ -678,6 +681,14 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 // GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
 	return pm.GenerateAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, nil, "")
+}
+
+func (pm *PromptManager) GenerateRequireConversationTitlePrompt(timeline string, userInput string) (string, error) {
+	data := map[string]interface{}{
+		"Timeline":     timeline,
+		"CurrentInput": userInput,
+	}
+	return pm.executeTemplate("conversation-title", conversationTitlePrompt, data)
 }
 
 // executeTemplate executes a template with the given data

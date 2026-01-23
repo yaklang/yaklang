@@ -359,13 +359,11 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			}
 		}()
 
-		prompt := fmt.Sprintf(`Generate a concise title for this session based on the user's first request.
-- Keep it short (within 15 characters).
-- Return only the key idea of the request.
-- Use the same language as the user input without translating.
-
-User request:
-%s`, trimmedInput)
+		prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
+		if err != nil {
+			log.Errorf("generate session title prompt failed: %v", err)
+			return
+		}
 
 		action, err := r.InvokeLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
 			aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
