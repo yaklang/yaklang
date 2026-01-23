@@ -29,6 +29,11 @@ on:
         description: "System to build"
         required: true
         type: string
+      build_type:
+        description: "Build type: full, yakit, or irify"
+        required: false
+        type: string
+        default: full
       ee:
         type: boolean
         description: whether to build ee version
@@ -72,7 +77,40 @@ jobs:
       - name: Get Repo tags
         run: |
           go run common/yak/cmd/yak.go repos-tag -o tags.txt
-          echo "YAK_TAG=$(cat tags.txt)" >> ${{ contains(inputs.os, 'windows') && '$env:GITHUB_ENV' || '$GITHUB_ENV' }} 
+          echo "YAK_TAG=$(cat tags.txt)" >> ${{ contains(inputs.os, 'windows') && '$env:GITHUB_ENV' || '$GITHUB_ENV' }}
+
+      - name: Determine Build Tags and Output Name
+        id: build_info
+        shell: bash
+        run: |
+          BUILD_TYPE="${{ inputs.build_type }}"
+          BUILD_TAGS="gzip_embed"
+          OUTPUT_NAME_PREFIX="yak_"
+          
+          case "$BUILD_TYPE" in
+            yakit)
+              BUILD_TAGS="gzip_embed,irify_exclude"
+              OUTPUT_NAME_PREFIX="yaklang_yakit_"
+              echo "Build type: yakit (exclude irify)"
+              ;;
+            irify)
+              BUILD_TAGS="gzip_embed,yakit_exclude"
+              OUTPUT_NAME_PREFIX="yaklang_irify_"
+              echo "Build type: irify (exclude yakit)"
+              ;;
+            full|*)
+              BUILD_TAGS="gzip_embed"
+              OUTPUT_NAME_PREFIX="yak_"
+              echo "Build type: full (default)"
+              ;;
+          esac
+          
+          echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
+          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV"
+          echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_OUTPUT"
+          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_OUTPUT"
+          echo "Final BUILD_TAGS: $BUILD_TAGS"
+          echo "Final OUTPUT_NAME_PREFIX: $OUTPUT_NAME_PREFIX" 
 
       - name: Download CrossBuild GCC(Linux x64 / MacOS x64)
         if: inputs.os == 'linux-amd64' || inputs.os == 'darwin-amd64'
@@ -109,11 +147,22 @@ jobs:
 
       - name: Build for Windows
         if: contains(inputs.os, 'windows')
+        shell: pwsh
+        env:
+          BUILD_TAGS: ${{ env.BUILD_TAGS }}
+          OUTPUT_NAME_PREFIX: ${{ env.OUTPUT_NAME_PREFIX }}
         run: |
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
-          $outputName = if ("${{ inputs.os }}" -eq "windows7") { "yak_windows_legacy_amd64.exe" } else { "yak_windows_amd64.exe" }
-          go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
+          
+          # 根据构建类型确定输出文件名
+          $baseName = if ("${{ inputs.os }}" -eq "windows7") { "windows_legacy_amd64.exe" } else { "windows_amd64.exe" }
+          $outputName = "${{ env.OUTPUT_NAME_PREFIX }}" + $baseName
+          
+          Write-Host "Building with tags: ${{ env.BUILD_TAGS }}"
+          Write-Host "Output file: $outputName"
+          
+          go build -tags "${{ env.BUILD_TAGS }}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $outputName -v common/yak/cmd/yak.go
           echo "OUTPUT_NAME=$outputName" >> $env:GITHUB_ENV
 
       - name: Validate signing secrets
@@ -168,10 +217,14 @@ jobs:
 
       - name: Build for Non-Windows
         if: ${{ !contains(inputs.os, 'windows') }}
+        shell: bash
+        env:
+          BUILD_TAGS: ${{ env.BUILD_TAGS }}
+          OUTPUT_NAME_PREFIX: ${{ env.OUTPUT_NAME_PREFIX }}
         run: |
           export GOOS=$(echo ${{ inputs.os }} | cut -d'-' -f1)
           export GOARCH=$(echo ${{ inputs.os }} | cut -d'-' -f2)
-          export OUTPUT_NAME="yak_${GOOS}_${GOARCH}"
+          export OUTPUT_NAME="${OUTPUT_NAME_PREFIX}${GOOS}_${GOARCH}"
           export CGO_ENABLED=1
           if [ "${{ inputs.os }}" = "linux-amd64" ]; then
             export CC=x86_64-linux-gnu-gcc
@@ -179,7 +232,10 @@ jobs:
             export CC=aarch64-linux-gnu-gcc
           fi
 
-          go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
+          echo "Building with tags: ${BUILD_TAGS}"
+          echo "Output file: ${OUTPUT_NAME}"
+
+          go build -tags "${BUILD_TAGS}" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o $OUTPUT_NAME -v common/yak/cmd/yak.go && ls
 
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> $GITHUB_ENV
 
