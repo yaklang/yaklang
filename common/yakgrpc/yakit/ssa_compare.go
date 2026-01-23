@@ -84,19 +84,10 @@ func NewSSARiskComparisonItem(opts ...SSAComparisonItemOption) (*ComparisonItem[
 	item.GetComparisonValue = func(ctx context.Context) <-chan *schema.SSARisk {
 		//TODO: 感觉db不应该在这里声明一个
 		db := consts.GetGormSSAProjectDataBase().Model(&schema.SSARisk{})
-		// 如果提供了 ProgramName，则使用它；否则只通过 runtime_id 查询（支持增量编译场景）
-		if s.ProgramName != "" {
-			db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
-		}
-		if s.RuntimeId != "" {
-			db = bizhelper.ExactQueryString(db, "runtime_id", s.RuntimeId)
-		}
-		if s.RuleName != "" {
-			db = bizhelper.ExactQueryString(db, "from_rule", s.RuleName)
-		}
-		if s.VariableName != "" {
-			db = bizhelper.ExactQueryString(db, "variable", s.VariableName)
-		}
+		db = bizhelper.ExactQueryString(db, "program_name", s.ProgramName)
+		db = bizhelper.ExactQueryString(db, "runtime_id", s.RuntimeId)
+		db = bizhelper.ExactQueryString(db, "from_rule", s.RuleName)
+		db = bizhelper.ExactQueryString(db, "variable", s.VariableName)
 		db = bizhelper.QueryOrder(db, "variable", "asc")
 		return bizhelper.YieldModel[*schema.SSARisk](ctx, db)
 	}
