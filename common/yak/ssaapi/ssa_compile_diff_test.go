@@ -3,7 +3,7 @@ package ssaapi_test
 import (
 	"context"
 	"fmt"
-	"os"
+	"io/fs"
 	"strings"
 	"testing"
 
@@ -15,6 +15,50 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+// DiffRefCheck 定义 diff program Ref 检查配置
+type DiffRefCheck struct {
+	ClassName     string // 类名
+	ShouldExist   bool   // 是否应该存在
+	ExpectedValue string // 预期的值（包含此字符串，空表示不检查）
+}
+
+// LayerFileCheck 定义 layer 文件检查配置
+type LayerFileCheck struct {
+	LayerIndex int      // layer 索引（1-based）
+	Files      []string // 该 layer 应该包含的文件
+}
+
+// DiffProgramFileHashMapCheck 定义每个 diff program 的 FileHashMap 检查配置
+type DiffProgramFileHashMapCheck struct {
+	DiffIndex               int            // diff program 索引（1-based，1表示第一个diff）
+	ExpectedFileHashMap     map[string]int // 预期的 FileHashMap
+	ExcludedFromFileHashMap []string       // 不应该出现在 FileHashMap 中的文件列表
+}
+
+// DiffCompileTestConfig 统一的 diff 编译测试配置结构
+type DiffCompileTestConfig struct {
+	Name                     string                        // 测试名称
+	FileSystems              []map[string]string           // 多个文件系统，第一个是基础，其他是增量修改
+	SyntaxFlowRules          []SyntaxFlowRuleCheck         // syntaxflow 规则和预期结果（针对最后一个 diff program）
+	ExpectedAggregatedFiles  []string                      // 预期的聚合文件系统文件列表（应该存在的文件）
+	ExpectedExcludedFiles    []string                      // 预期排除的文件列表（不应该存在的文件）
+	ExpectedFileHashMap      map[string]int                // 预期的 FileHashMap（最后一个 diff program，文件变更状态：-1删除，0修改，1新增）
+	ExcludedFromFileHashMap  []string                      // 不应该出现在 FileHashMap 中的文件列表（最后一个 diff program）
+	DiffProgramFileHashMaps  []DiffProgramFileHashMapCheck // 每个 diff program 的 FileHashMap 检查（支持多层）
+	ExpectedDiffFiles        []string                      // 差量程序应该包含的文件（最后一个 diff program，只包含修改和新增的文件）
+	DiffProgramFiles         map[int][]string              // 每个 diff program 应该包含的文件（key: diff index 1-based）
+	RefChecks                []DiffRefCheck                // diff program Ref 检查配置（针对最后一个 diff program）
+	OverlayRefChecks         []OverlayRefCheck             // overlay Ref 检查配置（针对最后一个 overlay）
+	LayerFileChecks          []LayerFileCheck              // layer 文件检查配置
+	ExpectedLayerCount       int                           // 预期的 layer 数量（0表示不检查）
+	TestDatabaseLoad         bool                          // 是否测试从数据库加载
+	TestOverlay              bool                          // 是否测试 overlay（从数据库加载时）
+	EnableIncrementalForBase bool                          // 是否为基础程序启用增量编译（WithEnableIncrementalCompile）
+	TestRecompile            bool                          // 是否测试重新编译（使用 WithReCompile 和 WithBaseProgramName）
+	BaseProgramIsOverlay     *bool                         // 验证 base program 的 IsOverlay 字段（nil表示不检查）
+	DiffProgramIsOverlay     *bool                         // 验证 diff program 的 IsOverlay 字段（nil表示不检查）
+}
 
 // checkDiffProgramMetadataConfig 配置结构体，用于检查差量程序的元数据
 type checkDiffProgramMetadataConfig struct {
@@ -73,148 +117,468 @@ func parseHashFromString(s string) int {
 	return hash
 }
 
-func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
-	baseProgramName := uuid.NewString()
-	diffProgramName := uuid.NewString()
+// check 统一的 diff 编译测试检查函数（简化入口）
+// 输入配置结构包含：
+// 1. 多个文件系统（默认第一个为初始化，其他的都是修改）
+// 2. syntaxflow规则
+// 3. 预期的聚合文件系统
+// 4. 预期的结果
+func checkDiff(t *testing.T, config DiffCompileTestConfig) {
+	checkDiffCompileTest(t, config)
+}
 
+// checkDiffCompileTest 统一的 diff 编译测试检查函数
+func checkDiffCompileTest(t *testing.T, config DiffCompileTestConfig) {
+	ctx := context.Background()
+
+	// 验证配置：至少需要一个文件系统（基础）
+	require.GreaterOrEqual(t, len(config.FileSystems), 1, "至少需要一个文件系统（基础）")
+	if len(config.FileSystems) == 1 && !config.TestRecompile {
+		t.Logf("警告：只有一个文件系统，将只创建基础程序，不会创建 diff program")
+	}
+
+	// 创建程序名称
+	programNames := make([]string, len(config.FileSystems))
+	for i := range programNames {
+		programNames[i] = uuid.NewString()
+	}
+
+	// 清理函数
 	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgramName)
+		for _, name := range programNames {
+			ssadb.DeleteProgram(ssadb.GetDB(), name)
+		}
 	}()
 
-	// 创建基础文件系统
+	// Step 1: 创建基础程序（第一个文件系统）
 	baseFS := filesys.NewVirtualFs()
-	baseFS.AddFile("A.java", `
+	for path, content := range config.FileSystems[0] {
+		baseFS.AddFile(path, content)
+	}
+
+	var basePrograms ssaapi.Programs
+	var err error
+	if config.EnableIncrementalForBase {
+		basePrograms, err = ssaapi.ParseProject(
+			ssaapi.WithFileSystem(baseFS),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programNames[0]),
+			ssaapi.WithEnableIncrementalCompile(true),
+		)
+	} else {
+		basePrograms, err = ssaapi.ParseProject(
+			ssaapi.WithFileSystem(baseFS),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programNames[0]),
+		)
+	}
+	require.NoError(t, err)
+	require.NotNil(t, basePrograms)
+	require.Greater(t, len(basePrograms), 0)
+
+	// 验证 base program 的 IsOverlay 字段
+	if config.BaseProgramIsOverlay != nil {
+		baseIrProg, err := ssadb.GetProgram(programNames[0], ssadb.Application)
+		require.NoError(t, err)
+		require.NotNil(t, baseIrProg)
+		require.Equal(t, *config.BaseProgramIsOverlay, baseIrProg.IsOverlay, "Base program IsOverlay should be %v", *config.BaseProgramIsOverlay)
+	}
+
+	// Step 2: 创建增量程序（如果有多个文件系统）或重新编译
+	var diffPrograms []*ssaapi.Program
+	if config.TestRecompile && len(config.FileSystems) >= 2 {
+		// 重新编译场景：使用 WithReCompile 和 WithBaseProgramName
+		diffFS := filesys.NewVirtualFs()
+		for path, content := range config.FileSystems[1] {
+			diffFS.AddFile(path, content)
+		}
+
+		diffProgs, err := ssaapi.ParseProject(
+			ssaapi.WithFileSystem(diffFS),
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramName(programNames[1]),
+			ssaapi.WithBaseProgramName(programNames[0]),
+			ssaapi.WithReCompile(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, diffProgs)
+		require.Greater(t, len(diffProgs), 0)
+		diffPrograms = append(diffPrograms, diffProgs[0])
+
+		// 验证重新编译后，base program 仍然存在
+		baseIrProg, err := ssadb.GetProgram(programNames[0], ssadb.Application)
+		require.NoError(t, err)
+		require.NotNil(t, baseIrProg, "Base program should still exist after recompile")
+	} else {
+		// 正常的增量编译场景
+		for i := 1; i < len(config.FileSystems); i++ {
+			diffFS := filesys.NewVirtualFs()
+			for path, content := range config.FileSystems[i] {
+				diffFS.AddFile(path, content)
+			}
+
+			// 使用增量编译 API
+			var baseProgName string
+			if i == 1 {
+				baseProgName = programNames[0]
+			} else {
+				baseProgName = programNames[i-1]
+			}
+
+			diffProgs, err := ssaapi.ParseProjectWithIncrementalCompile(
+				diffFS,
+				baseProgName, programNames[i],
+				ssaconfig.JAVA,
+				ssaapi.WithContext(ctx),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, diffProgs)
+			require.Greater(t, len(diffProgs), 0)
+			diffPrograms = append(diffPrograms, diffProgs[0])
+
+			// 验证每个 diff program 的 FileHashMap（如果配置了）
+			for _, fileHashMapCheck := range config.DiffProgramFileHashMaps {
+				if fileHashMapCheck.DiffIndex == i {
+					var expectedBaseProgName string
+					if i == 1 {
+						expectedBaseProgName = programNames[0]
+					} else {
+						expectedBaseProgName = programNames[i-1]
+					}
+					checkDiffProgramMetadata(t, diffProgs[0], checkDiffProgramMetadataConfig{
+						BaseProgramName: expectedBaseProgName,
+						ExpectedFiles:   fileHashMapCheck.ExpectedFileHashMap,
+						ExcludedFiles:   fileHashMapCheck.ExcludedFromFileHashMap,
+					})
+				}
+			}
+
+			// 验证每个 diff program 包含的文件（如果配置了）
+			if expectedFiles, ok := config.DiffProgramFiles[i]; ok {
+				fileCount := 0
+				foundFiles := make(map[string]bool)
+				diffProgs[0].ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
+					fileCount++
+					normalizedPath := normalizeFilePathForTest(filePath)
+					foundFiles[normalizedPath] = true
+					return true
+				})
+
+				for _, expectedFile := range expectedFiles {
+					require.True(t, foundFiles[expectedFile], "diffProgram %d should contain file %s", i, expectedFile)
+				}
+				require.Equal(t, len(expectedFiles), fileCount, "diffProgram %d should contain exactly %d files", i, len(expectedFiles))
+			}
+		}
+	}
+
+	// Step 3: 验证最后一个增量程序
+	if len(diffPrograms) > 0 {
+		lastDiffProgram := diffPrograms[len(diffPrograms)-1]
+
+		// 验证 FileHashMap
+		if len(config.ExpectedFileHashMap) > 0 || len(config.ExcludedFromFileHashMap) > 0 {
+			var baseProgName string
+			if len(diffPrograms) == 1 {
+				baseProgName = programNames[0]
+			} else {
+				baseProgName = programNames[len(programNames)-2]
+			}
+
+			checkDiffProgramMetadata(t, lastDiffProgram, checkDiffProgramMetadataConfig{
+				BaseProgramName: baseProgName,
+				ExpectedFiles:   config.ExpectedFileHashMap,
+				ExcludedFiles:   config.ExcludedFromFileHashMap,
+			})
+		}
+
+		// 验证差量程序包含的文件（只包含修改和新增的文件）
+		if len(config.ExpectedDiffFiles) > 0 {
+			fileCount := 0
+			foundFiles := make(map[string]bool)
+			lastDiffProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
+				fileCount++
+				normalizedPath := normalizeFilePathForTest(filePath)
+				foundFiles[normalizedPath] = true
+				return true
+			})
+
+			for _, expectedFile := range config.ExpectedDiffFiles {
+				require.True(t, foundFiles[expectedFile], "diffProgram should contain file %s", expectedFile)
+			}
+			require.Equal(t, len(config.ExpectedDiffFiles), fileCount, "diffProgram should contain exactly %d files", len(config.ExpectedDiffFiles))
+		}
+
+		// Step 4: 检查 Ref 查询
+		for _, refCheck := range config.RefChecks {
+			values := lastDiffProgram.Ref(refCheck.ClassName)
+			if refCheck.ShouldExist {
+				require.NotEmpty(t, values, "diffProgram should contain class %s", refCheck.ClassName)
+				if refCheck.ExpectedValue != "" {
+					require.Contains(t, values.String(), refCheck.ExpectedValue, "diffProgram should contain value %s for class %s", refCheck.ExpectedValue, refCheck.ClassName)
+				}
+			} else {
+				require.Empty(t, values, "diffProgram should not contain class %s", refCheck.ClassName)
+			}
+		}
+
+		// 验证 diff program 的 IsOverlay 字段
+		if config.DiffProgramIsOverlay != nil {
+			diffIrProg, err := ssadb.GetProgram(programNames[len(programNames)-1], ssadb.Application)
+			require.NoError(t, err)
+			require.NotNil(t, diffIrProg)
+			require.Equal(t, *config.DiffProgramIsOverlay, diffIrProg.IsOverlay, "Diff program IsOverlay should be %v", *config.DiffProgramIsOverlay)
+		}
+
+		// Step 5: 检查 syntaxflow 规则
+		for _, ruleCheck := range config.SyntaxFlowRules {
+			res, err := lastDiffProgram.SyntaxFlowWithError(ruleCheck.Rule)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+
+			var values []*ssaapi.Value
+			if ruleCheck.VariableName != "" {
+				values = res.GetValues(ruleCheck.VariableName)
+			} else {
+				values = res.GetAllValuesChain()
+			}
+
+			// 检查结果数量
+			if ruleCheck.ExpectedCount == -1 {
+				require.Empty(t, values, "Should not find values for rule: %s", ruleCheck.Rule)
+			} else if ruleCheck.ExpectedCount > 0 {
+				require.Len(t, values, ruleCheck.ExpectedCount, "Should find exactly %d values for rule: %s", ruleCheck.ExpectedCount, ruleCheck.Rule)
+			} else if ruleCheck.ExpectedCount == 0 {
+				require.NotEmpty(t, values, "Should find values for rule: %s", ruleCheck.Rule)
+			}
+
+			// 检查预期值
+			if len(ruleCheck.ExpectedValues) > 0 && len(values) > 0 {
+				for _, expectedValue := range ruleCheck.ExpectedValues {
+					found := false
+					for _, v := range values {
+						if containsDiff(v.String(), expectedValue) {
+							found = true
+							break
+						}
+					}
+					require.True(t, found, "Should find value containing '%s' in rule: %s", expectedValue, ruleCheck.Rule)
+				}
+			}
+		}
+
+		// Step 6: 检查 overlay
+		if config.TestOverlay {
+			overlay := lastDiffProgram.GetOverlay()
+			if overlay != nil {
+				// 验证 layer 数量
+				if config.ExpectedLayerCount > 0 {
+					require.Equal(t, config.ExpectedLayerCount, overlay.GetLayerCount(), "overlay should have %d layers", config.ExpectedLayerCount)
+				}
+
+				// 验证各层的文件
+				for _, layerCheck := range config.LayerFileChecks {
+					layerFiles := overlay.GetFilesInLayer(layerCheck.LayerIndex)
+					for _, expectedFile := range layerCheck.Files {
+						require.Contains(t, layerFiles, expectedFile, "Layer %d should contain file %s", layerCheck.LayerIndex, expectedFile)
+					}
+				}
+
+				// 检查聚合文件系统
+				if len(config.ExpectedAggregatedFiles) > 0 || len(config.ExpectedExcludedFiles) > 0 {
+					aggFS := overlay.GetAggregatedFileSystem()
+					require.NotNil(t, aggFS, "AggregatedFS should not be nil")
+
+					overlayFiles := make(map[string]bool)
+					filesys.Recursive(".", filesys.WithFileSystem(aggFS), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+						if !info.IsDir() {
+							normalizedPath := s
+							if len(normalizedPath) > 0 && normalizedPath[0] == '/' {
+								normalizedPath = normalizedPath[1:]
+							}
+							overlayFiles[normalizedPath] = true
+						}
+						return nil
+					}))
+
+					// 检查应该存在的文件
+					for _, expectedFile := range config.ExpectedAggregatedFiles {
+						normalizedExpected := expectedFile
+						if len(normalizedExpected) > 0 && normalizedExpected[0] == '/' {
+							normalizedExpected = normalizedExpected[1:]
+						}
+						require.True(t, overlayFiles[normalizedExpected], "Aggregated FS should contain %s", expectedFile)
+					}
+
+					// 检查不应该存在的文件
+					for _, excludedFile := range config.ExpectedExcludedFiles {
+						normalizedExcluded := excludedFile
+						if len(normalizedExcluded) > 0 && normalizedExcluded[0] == '/' {
+							normalizedExcluded = normalizedExcluded[1:]
+						}
+						require.False(t, overlayFiles[normalizedExcluded], "Aggregated FS should not contain %s", excludedFile)
+					}
+				}
+
+				// 检查 overlay Ref 查询
+				for _, overlayRefCheck := range config.OverlayRefChecks {
+					values := overlay.Ref(overlayRefCheck.ClassName)
+					if overlayRefCheck.ShouldExist {
+						require.NotEmpty(t, values, "overlay should contain class %s", overlayRefCheck.ClassName)
+						if overlayRefCheck.ExpectedValue != "" {
+							require.Contains(t, values.String(), overlayRefCheck.ExpectedValue, "overlay should contain value %s for class %s", overlayRefCheck.ExpectedValue, overlayRefCheck.ClassName)
+						}
+					} else {
+						require.Empty(t, values, "overlay should not contain class %s", overlayRefCheck.ClassName)
+					}
+				}
+			}
+		}
+
+		// Step 7: 测试从数据库加载（如果需要）
+		if config.TestDatabaseLoad {
+			reloadedDiffProgram, err := ssaapi.FromDatabase(programNames[len(programNames)-1])
+			require.NoError(t, err)
+			require.NotNil(t, reloadedDiffProgram)
+
+			// 验证数据库中的元数据
+			if len(config.ExpectedFileHashMap) > 0 || len(config.ExcludedFromFileHashMap) > 0 {
+				var baseProgName string
+				if len(diffPrograms) == 1 {
+					baseProgName = programNames[0]
+				} else {
+					baseProgName = programNames[len(programNames)-2]
+				}
+
+				irProg, err := ssadb.GetProgram(programNames[len(programNames)-1], ssadb.Application)
+				require.NoError(t, err)
+				require.NotNil(t, irProg)
+				checkDiffProgramMetadataInDB(t, irProg, checkDiffProgramMetadataConfig{
+					BaseProgramName: baseProgName,
+					ExpectedFiles:   config.ExpectedFileHashMap,
+					ExcludedFiles:   config.ExcludedFromFileHashMap,
+				})
+			}
+
+			// 如果启用了 overlay 测试，验证 overlay
+			if config.TestOverlay {
+				reloadedOverlay := reloadedDiffProgram.GetOverlay()
+				require.NotNil(t, reloadedOverlay, "overlay should be loaded from database")
+
+				// 验证 layer 数量
+				if config.ExpectedLayerCount > 0 {
+					require.Equal(t, config.ExpectedLayerCount, reloadedOverlay.GetLayerCount(), "reloaded overlay should have %d layers", config.ExpectedLayerCount)
+				}
+
+				// 验证各层的文件
+				for _, layerCheck := range config.LayerFileChecks {
+					layerFiles := reloadedOverlay.GetFilesInLayer(layerCheck.LayerIndex)
+					for _, expectedFile := range layerCheck.Files {
+						require.Contains(t, layerFiles, expectedFile, "Reloaded Layer %d should contain file %s", layerCheck.LayerIndex, expectedFile)
+					}
+				}
+
+				// 检查 overlay Ref 查询（从数据库加载后）
+				for _, overlayRefCheck := range config.OverlayRefChecks {
+					values := reloadedOverlay.Ref(overlayRefCheck.ClassName)
+					if overlayRefCheck.ShouldExist {
+						require.NotEmpty(t, values, "reloaded overlay should contain class %s", overlayRefCheck.ClassName)
+						if overlayRefCheck.ExpectedValue != "" {
+							require.Contains(t, values.String(), overlayRefCheck.ExpectedValue, "reloaded overlay should contain value %s for class %s", overlayRefCheck.ExpectedValue, overlayRefCheck.ClassName)
+						}
+					} else {
+						require.Empty(t, values, "reloaded overlay should not contain class %s", overlayRefCheck.ClassName)
+					}
+				}
+			}
+		}
+	}
+}
+
+// containsDiff 检查字符串是否包含子字符串（用于 diff 测试）
+func containsDiff(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+	if len(s) < len(substr) {
+		return false
+	}
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func TestCompileDiffProgramAndSaveToDB(t *testing.T) {
+	t.Run("test compile diff program and save to database", func(t *testing.T) {
+		checkDiff(t, DiffCompileTestConfig{
+			Name: "test compile diff program and save to database",
+			FileSystems: []map[string]string{
+				{
+					"A.java": `
 	public class A {
 		static string valueStr = "Value from Base";
 		public String getValue() {
 			return "Value from A";
 		}
-	}`)
-	baseFS.AddFile("Main.java", `
+	}`,
+					"Main.java": `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.getValue());
 		}
 	}
-	`)
-	baseFS.AddFile("Utils.java", `
+	`,
+					"Utils.java": `
 	public class Utils {
 		public static void helper() {
 			System.out.println("Helper from Utils");
 		}
 	}
-	`)
-
-	// 创建新文件系统（修改 A.java，删除 Utils.java，新增 B.java）
-	newFS := filesys.NewVirtualFs()
-	newFS.AddFile("A.java", `
+	`,
+				},
+				{
+					"A.java": `
 	public class A {
 		static string valueStr = "Value from Diff";
 		public String getValue() {
 			return "Value from Modified A";
 		}
-	}`)
-	newFS.AddFile("Main.java", `
+	}`,
+					"Main.java": `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.getValue());
 		}
 	}
-	`)
-	newFS.AddFile("B.java", `
+	`,
+					"B.java": `
 	public class B {
 		public static void process() {
 			System.out.println("Process from B");
 		}
 	}
-	`)
-
-	t.Run("Step 1: Compile base program", func(t *testing.T) {
-		t.Logf("Compiling base program: %s", baseProgramName)
-		basePrograms, err := ssaapi.ParseProject(
-			ssaapi.WithFileSystem(baseFS),
-			ssaapi.WithLanguage(ssaconfig.JAVA),
-			ssaapi.WithProgramName(baseProgramName),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, basePrograms)
-		require.Greater(t, len(basePrograms), 0, "Should have at least one program")
-	})
-
-	var diffProgram *ssaapi.Program
-	t.Run("Step 2: Compile diff program", func(t *testing.T) {
-		t.Logf("Compiling diff program: %s", diffProgramName)
-		ctx := context.Background()
-		var err error
-		diffProgram, err = ssaapi.CompileDiffProgramAndSaveToDB(
-			ctx,
-			nil, newFS,
-			baseProgramName, diffProgramName,
-			ssaconfig.JAVA,
-		)
-		require.NoError(t, err)
-		require.NotNil(t, diffProgram)
-	})
-
-	t.Run("Step 3: Verify diff program metadata in memory", func(t *testing.T) {
-		t.Logf("Checking diff program metadata in memory")
-		checkDiffProgramMetadata(t, diffProgram, checkDiffProgramMetadataConfig{
-			BaseProgramName: baseProgramName,
-			ExpectedFiles: map[string]int{
+	`,
+				},
+			},
+			ExpectedFileHashMap: map[string]int{
 				"A.java":     0,  // 修改
 				"B.java":     1,  // 新增
-				"Utils.java": -1, // 删除（注意：删除的文件不会出现在 diffProgram 中，但会在 FileHashMap 中标记为 -1）
+				"Utils.java": -1, // 删除
 			},
-			ExcludedFiles: []string{"Main.java"}, // Main.java 没有变化，不应该在 FileHashMap 中
-		})
-	})
-
-	t.Run("Step 4: Verify diff program metadata in database", func(t *testing.T) {
-		t.Logf("Loading diff program from database")
-		irProg, err := ssadb.GetProgram(diffProgramName, ssadb.Application)
-		require.NoError(t, err)
-		require.NotNil(t, irProg)
-		checkDiffProgramMetadataInDB(t, irProg, checkDiffProgramMetadataConfig{
-			BaseProgramName: baseProgramName,
-			ExpectedFiles: map[string]int{
-				"A.java":     0,
-				"B.java":     1,
-				"Utils.java": -1,
+			ExcludedFromFileHashMap: []string{"Main.java"},        // Main.java 没有变化，不应该在 FileHashMap 中
+			ExpectedDiffFiles:       []string{"A.java", "B.java"}, // 差量程序应该只包含修改和新增的文件
+			RefChecks: []DiffRefCheck{
+				{ClassName: "A", ShouldExist: true},      // 修改的文件应该存在
+				{ClassName: "B", ShouldExist: true},      // 新增的文件应该存在
+				{ClassName: "Utils", ShouldExist: false}, // 删除的文件不应该存在
 			},
-			ExcludedFiles: []string{"Main.java"},
+			TestDatabaseLoad: true, // 测试从数据库加载
 		})
-	})
-
-	t.Run("Step 5: Verify diff program contains only changed files", func(t *testing.T) {
-		t.Logf("Verifying diff program contains only changed files")
-		fileCount := 0
-		diffProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-			fileCount++
-			normalizedPath := normalizeFilePathForTest(filePath)
-			t.Logf("  Found file in diff program: %s", normalizedPath)
-			// diffProgram 应该只包含修改和新增的文件
-			require.Contains(t, []string{"A.java", "B.java"}, normalizedPath, "diffProgram should only contain modified or new files")
-			return true
-		})
-		require.Equal(t, 2, fileCount, "diffProgram should contain exactly 2 files (A.java modified, B.java new)")
-	})
-
-	t.Run("Step 6: Verify diff program compilation correctness", func(t *testing.T) {
-		t.Logf("Verifying diff program compilation correctness")
-		// 检查修改的文件
-		aClass := diffProgram.Ref("A")
-		require.NotEmpty(t, aClass, "diffProgram should contain class A (modified)")
-
-		// 检查新增的文件
-		bClass := diffProgram.Ref("B")
-		require.NotEmpty(t, bClass, "diffProgram should contain class B (new)")
-
-		// 检查删除的文件（不应该出现在 diffProgram 中）
-		utilsClass := diffProgram.Ref("Utils")
-		require.Empty(t, utilsClass, "diffProgram should not contain class Utils (deleted)")
 	})
 }
 
@@ -242,267 +606,290 @@ func normalizeFilePathForTest(filePath string) string {
 // 第一次增量编译：base program -> diff program 1
 // 第二次增量编译：diff program 1 -> diff program 2
 func TestIncrementalCompile_Twice(t *testing.T) {
-	// for i := 0; i < 50; i++ {
-	baseProgramName := uuid.NewString()
-	diffProgram1Name := uuid.NewString()
-	diffProgram2Name := uuid.NewString()
-
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgram1Name)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgram2Name)
-	}()
-
-	// ========== Step 1: 创建并编译基础程序 ==========
-	t.Logf("Step 1: Creating and compiling base program: %s", baseProgramName)
-	baseFS := filesys.NewVirtualFs()
-	baseFS.AddFile("A.java", `
+	t.Run("test incremental compile twice", func(t *testing.T) {
+		checkDiff(t, DiffCompileTestConfig{
+			Name: "test incremental compile twice",
+			FileSystems: []map[string]string{
+				{
+					"A.java": `
 	public class A {
 		static string valueStr = "Value from Base";
 		public String getValue() {
 			return "Value from A";
 		}
-	}`)
-	baseFS.AddFile("Main.java", `
+	}`,
+					"Main.java": `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.getValue());
 		}
 	}
-	`)
-	baseFS.AddFile("Utils.java", `
+	`,
+					"Utils.java": `
 	public class Utils {
 		public static void helper() {
 			System.out.println("Helper from Utils");
 		}
 	}
-	`)
-
-	basePrograms, err := ssaapi.ParseProject(
-		ssaapi.WithFileSystem(baseFS),
-		ssaapi.WithLanguage(ssaconfig.JAVA),
-		ssaapi.WithProgramName(baseProgramName),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, basePrograms)
-	require.Greater(t, len(basePrograms), 0)
-
-	// ========== Step 2: 第一次增量编译 ==========
-	t.Logf("Step 2: First incremental compile: %s -> %s", baseProgramName, diffProgram1Name)
-	// 创建第一次增量编译的新文件系统（修改 A.java，删除 Utils.java，新增 B.java）
-	diff1FS := filesys.NewVirtualFs()
-	diff1FS.AddFile("A.java", `
+	`,
+				},
+				{
+					"A.java": `
 	public class A {
 		static string valueStr = "Value from Diff1";
 		public String getValue() {
 			return "Value from Modified A in Diff1";
 		}
-	}`)
-	diff1FS.AddFile("Main.java", `
+	}`,
+					"Main.java": `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.getValue());
 		}
 	}
-	`)
-	diff1FS.AddFile("B.java", `
+	`,
+					"B.java": `
 	public class B {
 		public static void process() {
 			System.out.println("Process from B");
 		}
 	}
-	`)
-
-	diffProgram1s, err := ssaapi.ParseProjectWithIncrementalCompile(
-		diff1FS,          // 新的文件系统
-		baseProgramName,  // base program name（差量 program，系统会从数据库构建基础文件系统）
-		diffProgram1Name, // diff program name
-		ssaconfig.JAVA,   // language
-	)
-	require.NoError(t, err)
-	require.NotNil(t, diffProgram1s)
-	require.Greater(t, len(diffProgram1s), 0)
-	diffProgram1 := diffProgram1s[0]
-
-	// 验证第一次增量编译的元数据
-	t.Logf("Step 2.1: Verifying first diff program metadata")
-	checkDiffProgramMetadata(t, diffProgram1, checkDiffProgramMetadataConfig{
-		BaseProgramName: baseProgramName,
-		ExpectedFiles: map[string]int{
-			"A.java":     0,  // 修改
-			"B.java":     1,  // 新增
-			"Utils.java": -1, // 删除
-		},
-		ExcludedFiles: []string{"Main.java"},
-	})
-
-	// ========== Step 3: 从数据库加载 diff program 1，验证 overlay 自动创建 ==========
-	t.Logf("Step 3: Loading diff program 1 from database and verifying overlay")
-	reloadedDiffProgram1, err := ssaapi.FromDatabase(diffProgram1Name)
-	require.NoError(t, err)
-	require.NotNil(t, reloadedDiffProgram1)
-
-	// 验证 overlay 已从数据库加载并重建
-	overlay1 := reloadedDiffProgram1.GetOverlay()
-	require.NotNil(t, overlay1, "diff program 1 should have overlay after loading from database")
-	require.Equal(t, 2, overlay1.GetLayerCount(), "overlay should have 2 layers (base + diff1)")
-
-	// ========== Step 4: 第二次增量编译（基于 diff program 1） ==========
-	t.Logf("Step 4: Second incremental compile: %s -> %s", diffProgram1Name, diffProgram2Name)
-	// 创建第二次增量编译的新文件系统（修改 A.java，新增 C.java，删除 B.java）
-	diff2FS := filesys.NewVirtualFs()
-	diff2FS.AddFile("A.java", `
+	`,
+				},
+				{
+					"A.java": `
 	public class A {
 		static string valueStr = "Value from Diff2";
 		public String getValue() {
 			return "Value from Modified A in Diff2";
 		}
-	}`)
-	diff2FS.AddFile("Main.java", `
+	}`,
+					"Main.java": `
 	public class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			System.out.println(a.getValue());
 		}
 	}
-	`)
-	diff2FS.AddFile("C.java", `
+	`,
+					"C.java": `
 	public class C {
 		public static void compute() {
 			System.out.println("Compute from C");
 		}
 	}
-	`)
-
-	// 检查 diff2FS 创建后的文件列表
-	diff2FSFiles := make([]string, 0)
-	filesys.Recursive(".", filesys.WithFileSystem(diff2FS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-		if !isDir {
-			diff2FSFiles = append(diff2FSFiles, pathname)
-		}
-		return nil
-	}))
-	fmt.Fprintf(os.Stderr, "[TEST] diff2FS files after creation: %v (total: %d)\n", diff2FSFiles, len(diff2FSFiles))
-	t.Logf("diff2FS files after creation: %v (total: %d)", diff2FSFiles, len(diff2FSFiles))
-
-	// 检查 overlay1 的聚合文件系统
-	aggregatedFS := overlay1.GetAggregatedFileSystem()
-	if aggregatedFS != nil {
-		aggregatedFSFiles := make([]string, 0)
-		filesys.Recursive(".", filesys.WithFileSystem(aggregatedFS), filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-			if !isDir {
-				aggregatedFSFiles = append(aggregatedFSFiles, pathname)
-			}
-			return nil
-		}))
-		fmt.Fprintf(os.Stderr, "[TEST] overlay1.GetAggregatedFileSystem() files: %v (total: %d)\n", aggregatedFSFiles, len(aggregatedFSFiles))
-		t.Logf("overlay1.GetAggregatedFileSystem() files: %v (total: %d)", aggregatedFSFiles, len(aggregatedFSFiles))
-	}
-
-	// 使用 ParseProjectWithIncrementalCompile 进行第二次增量编译
-	diffProgram2s, err := ssaapi.ParseProjectWithIncrementalCompile(
-		diff2FS,          // 新的文件系统
-		diffProgram1Name, // base program name（差量 program，系统会从数据库构建基础文件系统）
-		diffProgram2Name, // diff program name
-		ssaconfig.JAVA,   // language
-	)
-	require.NoError(t, err)
-	require.NotNil(t, diffProgram2s)
-	require.Greater(t, len(diffProgram2s), 0)
-	diffProgram2 := diffProgram2s[0]
-
-	// 验证第二次增量编译的元数据
-	t.Logf("Step 4.1: Verifying second diff program metadata")
-	checkDiffProgramMetadata(t, diffProgram2, checkDiffProgramMetadataConfig{
-		BaseProgramName: diffProgram1Name, // base 应该是 diff program 1
-		ExpectedFiles: map[string]int{
-			"A.java": 0,  // 修改
-			"C.java": 1,  // 新增
-			"B.java": -1, // 删除（在 diff1 中新增，在 diff2 中删除）
-		},
-		ExcludedFiles: []string{"Main.java"},
+	`,
+				},
+			},
+			DiffProgramFileHashMaps: []DiffProgramFileHashMapCheck{
+				{
+					DiffIndex: 1,
+					ExpectedFileHashMap: map[string]int{
+						"A.java":     0,  // 修改
+						"B.java":     1,  // 新增
+						"Utils.java": -1, // 删除
+					},
+					ExcludedFromFileHashMap: []string{"Main.java"},
+				},
+				{
+					DiffIndex: 2,
+					ExpectedFileHashMap: map[string]int{
+						"A.java": 0,  // 修改
+						"C.java": 1,  // 新增
+						"B.java": -1, // 删除（在 diff1 中新增，在 diff2 中删除）
+					},
+					ExcludedFromFileHashMap: []string{"Main.java"},
+				},
+			},
+			DiffProgramFiles: map[int][]string{
+				1: {"A.java", "B.java"}, // diff1 应该包含修改和新增的文件
+				2: {"A.java", "C.java"}, // diff2 应该包含修改和新增的文件
+			},
+			ExpectedLayerCount: 3,
+			LayerFileChecks: []LayerFileCheck{
+				{
+					LayerIndex: 1,
+					Files:      []string{"Main.java", "Utils.java"},
+				},
+				{
+					LayerIndex: 2,
+					Files:      []string{"A.java", "B.java"},
+				},
+				{
+					LayerIndex: 3,
+					Files:      []string{"A.java", "C.java"},
+				},
+			},
+			OverlayRefChecks: []OverlayRefCheck{
+				{ClassName: "valueStr", ShouldExist: true, ExpectedValue: "Value from Diff2"},
+				{ClassName: "C", ShouldExist: true},
+				{ClassName: "B", ShouldExist: false},
+				{ClassName: "Utils", ShouldExist: false},
+				{ClassName: "A", ShouldExist: true},
+			},
+			TestDatabaseLoad: true,
+			TestOverlay:      true,
+		})
 	})
 
-	// ========== Step 5: 验证 diff program 2 的 overlay ==========
-	t.Logf("Step 5: Verifying diff program 2 overlay")
-	overlay2 := diffProgram2.GetOverlay()
-	require.NotNil(t, overlay2, "diff program 2 should have overlay")
-	require.Equal(t, 3, overlay2.GetLayerCount(), "overlay should have 3 layers (base + diff1 + diff2)")
-
-	// 验证各层的文件
-	layer1Files := overlay2.GetFilesInLayer(1)
-	layer2Files := overlay2.GetFilesInLayer(2)
-	layer3Files := overlay2.GetFilesInLayer(3)
-	t.Logf("Layer 1 files: %v", layer1Files)
-	t.Logf("Layer 2 files: %v", layer2Files)
-	t.Logf("Layer 3 files: %v", layer3Files)
-
-	// Layer 1 应该包含基础文件
-	require.Contains(t, layer1Files, "Main.java", "Layer 1 should contain Main.java")
-	require.Contains(t, layer1Files, "Utils.java", "Layer 1 should contain Utils.java")
-
-	// Layer 2 应该包含 diff1 的变更文件
-	require.Contains(t, layer2Files, "A.java", "Layer 2 should contain modified A.java")
-	require.Contains(t, layer2Files, "B.java", "Layer 2 should contain new B.java")
-
-	// Layer 3 应该包含 diff2 的变更文件
-	require.Contains(t, layer3Files, "A.java", "Layer 3 should contain modified A.java")
-	require.Contains(t, layer3Files, "C.java", "Layer 3 should contain new C.java")
-
-	// ========== Step 6: 从数据库加载 diff program 2，验证 overlay 自动创建 ==========
-	t.Logf("Step 6: Loading diff program 2 from database and verifying overlay")
-	reloadedDiffProgram2, err := ssaapi.FromDatabase(diffProgram2Name)
-	require.NoError(t, err)
-	require.NotNil(t, reloadedDiffProgram2)
-
-	// 验证 overlay 已从数据库加载并重建
-	reloadedOverlay2 := reloadedDiffProgram2.GetOverlay()
-	require.NotNil(t, reloadedOverlay2, "diff program 2 should have overlay after loading from database")
-	require.Equal(t, 3, reloadedOverlay2.GetLayerCount(), "reloaded overlay should have 3 layers")
-
-	// ========== Step 7: 验证 overlay 的功能（查找值） ==========
-	t.Logf("Step 7: Verifying overlay functionality (finding values)")
-	// 从 overlay 查找 valueStr 字段，应该返回最上层（diff2）的值
-	valueStrValues := reloadedOverlay2.Ref("valueStr")
-	require.NotEmpty(t, valueStrValues, "overlay should find valueStr")
-	require.Contains(t, valueStrValues.String(), "Value from Diff2", "overlay should return value from top layer (diff2)")
-
-	// 查找 C 类（只在 diff2 中），应该能找到
-	cValues := reloadedOverlay2.Ref("C")
-	require.NotEmpty(t, cValues, "overlay should find class C from diff2")
-
-	// 查找 B 类（在 diff1 中新增，在 diff2 中删除），不应该找到
-	bValues := reloadedOverlay2.Ref("B")
-	require.Empty(t, bValues, "overlay should not find class B (deleted in diff2)")
-
-	// 查找 Utils 类（在 base 中存在，在 diff1 中删除），不应该找到
-	utilsValues := reloadedOverlay2.Ref("Utils")
-	require.Empty(t, utilsValues, "overlay should not find class Utils (deleted in diff1)")
-
-	// 验证 A 类存在（应该是最上层的版本）
-	aValues := reloadedOverlay2.Ref("A")
-	require.NotEmpty(t, aValues, "overlay should find class A")
-
-	t.Logf("Test completed successfully: base -> diff1 -> diff2")
-	// }
+	t.Run("test incremental compile add then delete file", func(t *testing.T) {
+		checkDiff(t, DiffCompileTestConfig{
+			Name: "test incremental compile add then delete file",
+			FileSystems: []map[string]string{
+				{
+					"A.java": `
+	public class A {
+		public String getValue() {
+			return "Value from A";
+		}
+	}`,
+					"Main.java": `
+	public class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			System.out.println(a.getValue());
+		}
+	}
+	`,
+				},
+				{
+					"A.java": `
+	public class A {
+		public String getValue() {
+			return "Value from A";
+		}
+	}`,
+					"Main.java": `
+	public class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			System.out.println(a.getValue());
+		}
+	}
+	`,
+					"Temp.java": `
+	public class Temp {
+		public static void process() {
+			System.out.println("Process from Temp");
+		}
+	}
+	`,
+				},
+				{
+					"A.java": `
+	public class A {
+		// Modified in diff2 to ensure diffFS is not empty
+		public String getValue() {
+			return "Value from A";
+		}
+	}`,
+					"Main.java": `
+	public class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			System.out.println(a.getValue());
+		}
+	}
+	`,
+				},
+			},
+			DiffProgramFileHashMaps: []DiffProgramFileHashMapCheck{
+				{
+					DiffIndex: 1,
+					ExpectedFileHashMap: map[string]int{
+						"Temp.java": 1, // 新增
+					},
+					ExcludedFromFileHashMap: []string{"A.java", "Main.java"},
+				},
+				{
+					DiffIndex: 2,
+					ExpectedFileHashMap: map[string]int{
+						"A.java":    0,  // 修改（添加注释以确保 diffFS 不为空）
+						"Temp.java": -1, // 删除（在 diff1 中新增，在 diff2 中删除）
+					},
+					ExcludedFromFileHashMap: []string{"Main.java"},
+				},
+			},
+			DiffProgramFiles: map[int][]string{
+				1: {"Temp.java"}, // diff1 应该只包含新增的文件
+				2: {"A.java"},    // diff2 应该包含修改的文件（A.java 添加了注释）
+			},
+			ExpectedLayerCount: 3,
+			LayerFileChecks: []LayerFileCheck{
+				{
+					LayerIndex: 1,
+					Files:      []string{"A.java", "Main.java"},
+				},
+				{
+					LayerIndex: 2,
+					Files:      []string{"Temp.java"},
+				},
+				{
+					LayerIndex: 3,
+					Files:      []string{"A.java"}, // layer 3 包含修改后的 A.java
+				},
+			},
+			RefChecks: []DiffRefCheck{
+				{ClassName: "Temp", ShouldExist: false}, // diff2 中不应该找到 Temp（已删除）
+			},
+			OverlayRefChecks: []OverlayRefCheck{
+				{ClassName: "Temp", ShouldExist: false}, // overlay 中不应该找到 Temp（在 diff2 中被删除）
+				{ClassName: "A", ShouldExist: true},     // A 应该存在
+				{ClassName: "Main", ShouldExist: true},  // Main 应该存在
+			},
+			TestDatabaseLoad: true,
+			TestOverlay:      true,
+		})
+	})
 }
 
 // TestIsOverlayFieldInDatabase 测试 IsOverlay 字段在数据库中的保存和读取
 // 从编译层面验证增量编译时 IsOverlay 字段是否正确设置
 func TestIsOverlayFieldInDatabase(t *testing.T) {
-	baseProgramName := uuid.NewString()
-	diffProgramName := uuid.NewString()
+	// 测试 1: base program 不启用增量编译，IsOverlay 应该为 false
+	t.Run("test base program IsOverlay false", func(t *testing.T) {
+		checkDiff(t, DiffCompileTestConfig{
+			Name: "test base program IsOverlay false",
+			FileSystems: []map[string]string{
+				{
+					"A.java": `
+	public class A {
+		static string valueStr = "Value from Base";
+		public String getValue() {
+			return "Value from A";
+		}
+	}`,
+				},
+				{
+					"A.java": `
+	public class A {
+		static string valueStr = "Value from Diff";
+		public String getValue() {
+			return "Value from Modified A";
+		}
+	}`,
+				},
+			},
+			BaseProgramIsOverlay: boolPtr(false),
+			DiffProgramIsOverlay: boolPtr(true),
+			ExpectedFileHashMap: map[string]int{
+				"A.java": 0, // 修改
+			},
+			TestDatabaseLoad: true,
+		})
+	})
 
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgramName)
-	}()
+	// 测试 2: base program 启用增量编译，IsOverlay 应该为 true
+	t.Run("test base program IsOverlay true with incremental compile", func(t *testing.T) {
+		baseProgramName := uuid.NewString()
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
+		}()
 
-	// 创建基础文件系统
-	baseFS := filesys.NewVirtualFs()
-	baseFS.AddFile("A.java", `
+		baseFS := filesys.NewVirtualFs()
+		baseFS.AddFile("A.java", `
 	public class A {
 		static string valueStr = "Value from Base";
 		public String getValue() {
@@ -510,105 +897,6 @@ func TestIsOverlayFieldInDatabase(t *testing.T) {
 		}
 	}`)
 
-	// 创建新文件系统（修改 A.java）
-	newFS := filesys.NewVirtualFs()
-	newFS.AddFile("A.java", `
-	public class A {
-		static string valueStr = "Value from Diff";
-		public String getValue() {
-			return "Value from Modified A";
-		}
-	}`)
-
-	t.Run("Compile base program", func(t *testing.T) {
-		t.Logf("Compiling base program: %s", baseProgramName)
-		basePrograms, err := ssaapi.ParseProject(
-			ssaapi.WithFileSystem(baseFS),
-			ssaapi.WithLanguage(ssaconfig.JAVA),
-			ssaapi.WithProgramName(baseProgramName),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, basePrograms)
-		require.Len(t, basePrograms, 1)
-		require.False(t, basePrograms[0].Program.GetIrProgram().IsOverlay, "IsOverlay should be false for base program (no BaseProgramName or FileHashMap)")
-	})
-
-	t.Run("Compile diff program", func(t *testing.T) {
-		t.Logf("Compiling diff program: %s", diffProgramName)
-		ctx := context.Background()
-		diffProgram, err := ssaapi.CompileDiffProgramAndSaveToDB(
-			ctx,
-			nil, newFS,
-			baseProgramName, diffProgramName,
-			ssaconfig.JAVA,
-		)
-		require.NoError(t, err)
-		require.NotNil(t, diffProgram)
-	})
-
-	t.Run("Verify base program IsOverlay is false", func(t *testing.T) {
-		t.Logf("Verifying base program IsOverlay field")
-		baseIrProg, err := ssadb.GetProgram(baseProgramName, ssadb.Application)
-		require.NoError(t, err)
-		require.NotNil(t, baseIrProg)
-		require.False(t, baseIrProg.IsOverlay, "IsOverlay should be false for base program (no BaseProgramName or FileHashMap)")
-	})
-
-	t.Run("Verify diff program IsOverlay is true", func(t *testing.T) {
-		t.Logf("Verifying diff program IsOverlay field")
-		diffIrProg, err := ssadb.GetProgram(diffProgramName, ssadb.Application)
-		require.NoError(t, err)
-		require.NotNil(t, diffIrProg)
-		require.True(t, diffIrProg.IsOverlay, "IsOverlay should be true for diff program (has BaseProgramName and FileHashMap)")
-	})
-
-	t.Run("Compile base program with EnableIncremental", func(t *testing.T) {
-		t.Logf("Compiling base program: %s", baseProgramName)
-		basePrograms, err := ssaapi.ParseProject(
-			ssaapi.WithFileSystem(baseFS),
-			ssaapi.WithLanguage(ssaconfig.JAVA),
-			ssaapi.WithProgramName(baseProgramName),
-			ssaapi.WithEnableIncrementalCompile(true),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, basePrograms)
-		require.Len(t, basePrograms, 1)
-		require.True(t, basePrograms[0].Program.GetIrProgram().IsOverlay, "IsOverlay should be false for base program (no BaseProgramName or FileHashMap)")
-	})
-}
-
-// TestRecompileAutoDetectIncrementalCompile 测试重新编译时自动检测增量编译的逻辑
-func TestRecompileAutoDetectIncrementalCompile(t *testing.T) {
-	baseProgramName := uuid.NewString()
-	diffProgramName := uuid.NewString()
-
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgramName)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgramName)
-	}()
-
-	// 创建基础文件系统
-	baseFS := filesys.NewVirtualFs()
-	baseFS.AddFile("A.java", `
-	public class A {
-		static string valueStr = "Value from Base";
-		public String getValue() {
-			return "Value from A";
-		}
-	}`)
-
-	// 创建新文件系统（修改 A.java）
-	newFS := filesys.NewVirtualFs()
-	newFS.AddFile("A.java", `
-	public class A {
-		static string valueStr = "Value from Diff";
-		public String getValue() {
-			return "Value from Modified A";
-		}
-	}`)
-
-	t.Run("Step 1: Compile base program with incremental compile enabled", func(t *testing.T) {
-		// 第一次编译：启用增量编译，创建 base program（IsOverlay=true, BaseProgramName="")
 		basePrograms, err := ssaapi.ParseProject(
 			ssaapi.WithFileSystem(baseFS),
 			ssaapi.WithLanguage(ssaconfig.JAVA),
@@ -619,34 +907,49 @@ func TestRecompileAutoDetectIncrementalCompile(t *testing.T) {
 		require.NotNil(t, basePrograms)
 		require.Len(t, basePrograms, 1)
 
-		// 验证 base program 的 IsOverlay 为 true
 		baseIrProg, err := ssadb.GetProgram(baseProgramName, ssadb.Application)
 		require.NoError(t, err)
 		require.NotNil(t, baseIrProg)
 		require.True(t, baseIrProg.IsOverlay, "IsOverlay should be true for base program with incremental compile enabled")
-		require.Empty(t, baseIrProg.BaseProgramName, "BaseProgramName should be empty for base program")
 	})
+}
 
-	t.Run("Step 2: Recompile base program without explicit incremental compile flag", func(t *testing.T) {
-		// 重新编译 base program，不显式设置增量编译标志
-		// 应该自动检测到 IsOverlay=true，并启用增量编译逻辑
-		basePrograms, err := ssaapi.ParseProject(
-			ssaapi.WithFileSystem(newFS),
-			ssaapi.WithLanguage(ssaconfig.JAVA),
-			ssaapi.WithProgramName(diffProgramName),
-			ssaapi.WithBaseProgramName(baseProgramName),
-			ssaapi.WithReCompile(true),
-			// 注意：不设置 WithEnableIncrementalCompile(true)
-		)
-		require.NoError(t, err)
-		require.NotNil(t, basePrograms)
-		require.Len(t, basePrograms, 1)
+// boolPtr 返回 bool 指针的辅助函数
+func boolPtr(b bool) *bool {
+	return &b
+}
 
-		// 验证重新编译后，base program 仍然存在（没有被删除）
-		baseIrProg, err := ssadb.GetProgram(baseProgramName, ssadb.Application)
-		require.NoError(t, err)
-		require.NotNil(t, baseIrProg, "Base program should still exist after recompile (incremental compile keeps base program)")
-		require.True(t, baseIrProg.IsOverlay, "IsOverlay should still be true after recompile")
-		require.Empty(t, baseIrProg.BaseProgramName, "BaseProgramName should still be empty for base program")
+// TestRecompileAutoDetectIncrementalCompile 测试重新编译时自动检测增量编译的逻辑
+func TestRecompileAutoDetectIncrementalCompile(t *testing.T) {
+	t.Run("test recompile auto detect incremental compile", func(t *testing.T) {
+		checkDiff(t, DiffCompileTestConfig{
+			Name: "test recompile auto detect incremental compile",
+			FileSystems: []map[string]string{
+				{
+					"A.java": `
+	public class A {
+		static string valueStr = "Value from Base";
+		public String getValue() {
+			return "Value from A";
+		}
+	}`,
+				},
+				{
+					"A.java": `
+	public class A {
+		static string valueStr = "Value from Diff";
+		public String getValue() {
+			return "Value from Modified A";
+		}
+	}`,
+				},
+			},
+			EnableIncrementalForBase: true,
+			TestRecompile:            true,
+			BaseProgramIsOverlay:     boolPtr(true),
+			ExpectedFileHashMap: map[string]int{
+				"A.java": 0, // 修改
+			},
+		})
 	})
 }
