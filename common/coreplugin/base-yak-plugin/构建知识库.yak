@@ -20,6 +20,8 @@ chunkGrained := cli.StringSlice("chunksize", cli.setVerboseName("切片粒度"),
     cli.setSelectOption("中粒度 20k", "Medium"),
     cli.setSelectOption("粗粒度 40k", "Coarse"),
 )
+chunkSizeInput := cli.Int("chunk", cli.setVerboseName("自定义切片大小(字节)"), cli.setHelp("优先于粒度选择，未设置则使用粒度"))
+concurrency := cli.Int("concurrency", cli.setVerboseName("分析并发数"), cli.setDefault(20))
 khoplimit := cli.Int("klimit", cli.setVerboseName("实体子图数量限制"),cli.setDefault(300))
 k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
@@ -30,7 +32,9 @@ cli.check()
 
 chunkSize  := 20 * 1024
 
-if len(chunkGrained) > 0 {
+if chunkSizeInput > 0 {
+    chunkSize = chunkSizeInput
+} else if len(chunkGrained) > 0 {
     yakit.Output(chunkGrained[0])
     if grainedMap[chunkGrained[0]] != nil {
         chunkSize = grainedMap[chunkGrained[0]]
@@ -49,7 +53,8 @@ options := [
     rag.khopkMin(kmin),
     rag.khopLimit(khoplimit),
     rag.disableERM(disableERM),
-    rag.chunkSize(chunkSize)
+    rag.chunkSize(chunkSize),
+    rag.analyzeConcurrency(concurrency)
 ]
 
 if kmax > kmin {
