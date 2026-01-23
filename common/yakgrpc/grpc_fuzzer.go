@@ -554,7 +554,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		feedbackWg.Wait()
 	}()
 	feedbackLock := new(sync.Mutex)
-	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool, skipSend bool) error {
 		feedbackLock.Lock()
 		defer feedbackLock.Unlock()
 		startTime := time.Now()
@@ -569,9 +569,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			sw.WaitUntilOpen()
 		}
 
-		err := stream.Send(rsp)
-		if err != nil {
-			return err
+		if !skipSend {
+			err := stream.Send(rsp)
+			if err != nil {
+				return err
+			}
 		}
 
 		if skipPoC {
@@ -718,7 +720,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					}
 					respModel.TaskId = int64(historyID)
 					respModel.ExtractedResults = extractorResults
-					feedbackResponse(respModel, true)
+					feedbackResponse(respModel, true, false)
 				}
 
 			} else {
@@ -730,7 +732,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 							continue
 						}
-						feedbackResponse(respModel, true)
+						feedbackResponse(respModel, true, false)
 					}
 				}
 
@@ -741,7 +743,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 						continue
 					}
-					feedbackResponse(respModel, true)
+					feedbackResponse(respModel, true, false)
 				}
 			}
 		}
@@ -867,7 +869,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 					continue
 				}
-				feedbackResponse(respModel, true)
+				feedbackResponse(respModel, true, false)
 			}
 		}
 
@@ -1023,6 +1025,21 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 			nowTime = time.Now()
 
+			// For SSE streams, incremental updates are already pushed to the frontend.
+			// The final aggregated response (from normal path) can cause unnecessary UI re-render/flicker.
+			// We still keep the normal path to persist/save and run matchers/extractors, but may skip sending.
+			isSSEFinal := result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_final"] == "1"
+			sseFinalStreamID := ""
+			skipSendForSSEFinal := false
+			if isSSEFinal {
+				sseFinalStreamID = result.ExtraInfo["__yak_sse_stream_id"]
+				if sseFinalStreamID != "" {
+					if _, ok := sseMetaCache.Load(sseFinalStreamID); ok {
+						skipSendForSSEFinal = true
+					}
+				}
+			}
+
 			// SSE incremental updates (chunk-style). The final aggregated response will be handled by normal path.
 			if result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_update"] == "1" {
 				streamID := result.ExtraInfo["__yak_sse_stream_id"]
@@ -1115,19 +1132,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						rsp.RandomChunkedData = append(rsp.RandomChunkedData, chunkInfo.ToGRPCModel())
 					}
 				}
-				_ = feedbackResponse(rsp, true)
+				_ = feedbackResponse(rsp, true, false)
 				continue
-			}
-
-			// For SSE streams, incremental updates are already pushed to the frontend.
-			// The final aggregated response (from normal path) can cause unnecessary UI re-render/flicker.
-			// Skip it when we have already streamed at least one update for the same stream-id.
-			if result != nil && result.ExtraInfo != nil && result.ExtraInfo["__yak_sse_final"] == "1" {
-				if streamID := result.ExtraInfo["__yak_sse_stream_id"]; streamID != "" {
-					if _, ok := sseMetaCache.Load(streamID); ok {
-						continue
-					}
-				}
 			}
 
 			// 2M
@@ -1187,7 +1193,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				task.HTTPFlowFailedCount++
 				// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
 				yakit.SaveWebFuzzerResponseEx(int(task.ID), hiddenIndex, rsp)
-				_ = feedbackResponse(rsp, false)
+				_ = feedbackResponse(rsp, false, false)
+				if isSSEFinal && sseFinalStreamID != "" {
+					// Cleanup per-stream caches once the final aggregated response has been handled.
+					sseMetaCache.Delete(sseFinalStreamID)
+					sseBodyLenCache.Delete(sseFinalStreamID)
+				}
 				continue
 			}
 
@@ -1527,7 +1538,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
 					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
-					err := feedbackResponse(redirectRsp, false)
+					err := feedbackResponse(redirectRsp, false, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
 						continue
@@ -1542,12 +1553,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
 			rsp.Discard = discard
-			err := feedbackResponse(rsp, false)
+			err := feedbackResponse(rsp, false, skipSendForSSEFinal)
 			if du := time.Now().Sub(feedbackNormalResponseStart); du > time.Second {
 				log.Warnf("feedbackNormalResponse cost too much time, try investigate it, cost: %v", du)
 			}
 			if err != nil {
 				log.Errorf("send to client failed: %s", err)
+			}
+			if isSSEFinal && sseFinalStreamID != "" {
+				// Cleanup per-stream caches once the final aggregated response has been handled.
+				sseMetaCache.Delete(sseFinalStreamID)
+				sseBodyLenCache.Delete(sseFinalStreamID)
 			}
 		}
 		return nil
