@@ -244,6 +244,36 @@ func recursive(raw string, c Config, opts ...Option) (retErr error) {
 				return SkipAll
 			}
 
+			// Check exclude extensions first
+			if len(c.excludeExts) > 0 {
+				excluded := false
+				for _, ext := range c.excludeExts {
+					if strings.HasSuffix(path, ext) {
+						excluded = true
+						break
+					}
+				}
+				if excluded {
+					// File matches excluded extension, skip it
+					return nil
+				}
+			}
+
+			// Check include extensions
+			if len(c.includeExts) > 0 {
+				matched := false
+				for _, ext := range c.includeExts {
+					if strings.HasSuffix(path, ext) {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					// File doesn't match any included extension, skip it
+					return nil
+				}
+			}
+
 			if c.onFileStat != nil {
 				err = c.onFileStat(path, info)
 				if err != nil {

@@ -4,6 +4,7 @@ package sfbuildin
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -186,8 +187,19 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 	return utils.Wrapf(err, "init builtin rules error")
 }
 
+// SyntaxFlowRuleHash is deprecated. Use filesys.CreateEmbedFSHash(ruleFS, filesys.WithIncludeExts(".sf")) instead.
+// This function is kept for backward compatibility but should not be used in new code.
 func SyntaxFlowRuleHash() (string, error) {
-	return filesys.CreateEmbedFSHash(ruleFS)
+	// Use CreateEmbedFSHash with file extension filter to only process .sf files
+	hash, err := filesys.CreateEmbedFSHash(ruleFS, filesys.WithIncludeExts(".sf"))
+	if err != nil {
+		// Check if error is due to no .sf files found
+		if errors.Is(err, filesys.ErrNoFileFound) {
+			return "", utils.Error("no .sf file found")
+		}
+		return "", err
+	}
+	return hash, nil
 }
 
 func NeedSyncEmbedRule() bool {

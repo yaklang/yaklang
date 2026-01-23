@@ -2,6 +2,7 @@ package coreplugin
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -59,5 +60,15 @@ func GetAllCorePluginName() []string {
 }
 
 func CorePluginHash() (string, error) {
-	return filesys.CreateEmbedFSHash(basePlugin)
+	// Only calculate hash for .yak files to ensure stability
+	// This prevents hash changes when non-plugin files (like .gitkeep, .DS_Store) are added/removed
+	hash, err := filesys.CreateEmbedFSHash(basePlugin, filesys.WithIncludeExts(".yak"))
+	if err != nil {
+		// Check if error is due to no .yak files found
+		if errors.Is(err, filesys.ErrNoFileFound) {
+			return "", fmt.Errorf("no .yak file found")
+		}
+		return "", err
+	}
+	return hash, nil
 }
