@@ -130,16 +130,50 @@ jobs:
         run: |
           echo "::group::Downloading Yak binary from OSS"
           
-          # 直接使用 matrix.binary 信息，无需运行时检测
-          # matrix.binary 格式: yak_{os}_{arch} 或 yak_{os}_{arch}.exe
-          # 例如: yak_windows_amd64.exe, yak_darwin_amd64, yak_linux_amd64
-          BINARY_NAME="${{ matrix.binary }}"
+          # 检测当前 runner 的操作系统和架构
+          # 我们需要下载与 runner 匹配的二进制，而不是与目标编译平台匹配的二进制
+          RUNNER_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          RUNNER_ARCH=$(uname -m)
+          
+          # 标准化 runner 架构名称
+          if [ "$RUNNER_ARCH" = "x86_64" ]; then
+            RUNNER_ARCH_NORM="amd64"
+          elif [ "$RUNNER_ARCH" = "amd64" ]; then
+            RUNNER_ARCH_NORM="amd64"
+          elif [ "$RUNNER_ARCH" = "aarch64" ] || [ "$RUNNER_ARCH" = "arm64" ]; then
+            RUNNER_ARCH_NORM="arm64"
+          else
+            RUNNER_ARCH_NORM="$RUNNER_ARCH"
+          fi
+          
+          # 标准化 runner OS 名称并构建二进制名称
+          if [ "$RUNNER_OS" = "darwin" ]; then
+            RUNNER_OS_NORM="darwin"
+            BINARY_NAME="yak_darwin_${RUNNER_ARCH_NORM}"
+            # macOS 也尝试下载 amd64 版本（Rosetta 2 支持）
+            BINARY_NAMES=("yak_darwin_${RUNNER_ARCH_NORM}" "yak_darwin_amd64")
+          elif [ "$RUNNER_OS" = "linux" ]; then
+            RUNNER_OS_NORM="linux"
+            BINARY_NAME="yak_linux_${RUNNER_ARCH_NORM}"
+            BINARY_NAMES=("yak_linux_${RUNNER_ARCH_NORM}")
+          elif echo "$RUNNER_OS" | grep -qi "mingw\|msys\|cygwin"; then
+            RUNNER_OS_NORM="windows"
+            BINARY_NAME="yak_windows_${RUNNER_ARCH_NORM}.exe"
+            BINARY_NAMES=("yak_windows_${RUNNER_ARCH_NORM}.exe")
+          else
+            RUNNER_OS_NORM="$RUNNER_OS"
+            BINARY_NAME="yak_${RUNNER_OS_NORM}_${RUNNER_ARCH_NORM}"
+            BINARY_NAMES=("yak_${RUNNER_OS_NORM}_${RUNNER_ARCH_NORM}")
+          fi
+          
+          echo "Runner: $RUNNER_OS_NORM/$RUNNER_ARCH_NORM"
+          echo "Will try to download binaries: ${BINARY_NAMES[*]}"
           
           # 尝试多个版本源：latest -> beta -> 版本列表中的第一个可用版本
           VERSIONS_TO_TRY=("latest")
           
           # 尝试从版本列表获取可用版本
-          if VERSIONS=$(curl -sS -L "https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt" 2>/dev/null | grep -v '^$' | head -n 10); then
+          if VERSIONS=$(curl -sS -L "https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt" 2>&1 | grep -v '^$' | head -n 10); then
             # 优先选择 beta 版本
             BETA_VERSION=$(echo "$VERSIONS" | grep -E '.*-beta[0-9]+$' | head -n 1)
             if [ -n "$BETA_VERSION" ]; then
@@ -152,23 +186,110 @@ jobs:
             fi
           fi
           
-          # 依次尝试下载
-          for VERSION in "${VERSIONS_TO_TRY[@]}"; do
-            DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${VERSION}/${BINARY_NAME}"
-            echo "Trying to download from: $DOWNLOAD_URL"
-            
-            if curl -f -sS -L "$DOWNLOAD_URL" -o yak 2>/dev/null; then
-              chmod +x yak || true
-              if ./yak version >/dev/null 2>&1; then
-                echo "✅ Successfully downloaded yak from version: $VERSION"
-                echo "yak_downloaded=true" >> "$GITHUB_OUTPUT"
-                echo "yak_path=./yak" >> "$GITHUB_OUTPUT"
-                echo "yak_version=$VERSION" >> "$GITHUB_OUTPUT"
-                echo "::endgroup::"
-                exit 0
+          # 依次尝试下载每个二进制名称和版本
+          for BINARY_NAME in "${BINARY_NAMES[@]}"; do
+            for VERSION in "${VERSIONS_TO_TRY[@]}"; do
+              DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${VERSION}/${BINARY_NAME}"
+              echo "Trying to download from: $DOWNLOAD_URL"
+              
+              # 下载文件并捕获 HTTP 状态码和错误
+              TEMP_STDERR=$(mktemp)
+              HTTP_CODE=$(curl -w "%{http_code}" -sS -L "$DOWNLOAD_URL" -o yak 2>"$TEMP_STDERR")
+              CURL_ERROR=$(cat "$TEMP_STDERR")
+              rm -f "$TEMP_STDERR"
+              CURL_EXIT=$?
+              
+              # 检查 curl 是否成功
+              if [ $CURL_EXIT -ne 0 ]; then
+                echo "❌ curl failed with exit code: $CURL_EXIT"
+                if [ -n "$CURL_ERROR" ]; then
+                  echo "Error: $CURL_ERROR"
+                fi
+                rm -f yak
+                continue
               fi
-              rm -f yak
-            fi
+              
+              # 检查 HTTP 状态码
+              if [ "$HTTP_CODE" != "200" ]; then
+                echo "❌ HTTP error: $HTTP_CODE"
+                if [ -n "$CURL_ERROR" ]; then
+                  echo "Response: $CURL_ERROR"
+                fi
+                rm -f yak
+                continue
+              fi
+              
+              # 检查文件是否存在且不为空
+              if [ ! -f "yak" ]; then
+                echo "❌ Downloaded file does not exist"
+                continue
+              fi
+              
+              if [ ! -s "yak" ]; then
+                echo "❌ Downloaded file is empty"
+                rm -f yak
+                continue
+              fi
+              
+              # 检查文件大小（至少应该大于 1MB）
+              FILE_SIZE=$(stat -f%z yak 2>/dev/null || stat -c%s yak 2>/dev/null || echo "0")
+              echo "Downloaded file size: ${FILE_SIZE} bytes"
+              if [ "$FILE_SIZE" -lt 1048576 ]; then
+                echo "❌ Downloaded file is too small: ${FILE_SIZE} bytes (expected > 1MB)"
+                echo "File content (first 200 chars):"
+                head -c 200 yak | cat -A || true
+                rm -f yak
+                continue
+              fi
+              
+              # 检查文件类型（应该是可执行文件）
+              FILE_TYPE=$(file yak 2>/dev/null || echo "unknown")
+              echo "File type: $FILE_TYPE"
+              
+              # 设置执行权限
+              chmod +x yak || true
+              
+              # 验证二进制文件是否可执行
+              echo "Verifying binary..."
+              VERSION_OUTPUT=$(./yak version 2>&1)
+              VERSION_EXIT=$?
+              
+              if [ $VERSION_EXIT -ne 0 ]; then
+                echo "❌ Downloaded binary failed version check (exit code: $VERSION_EXIT)"
+                echo "Version command output: $VERSION_OUTPUT"
+                rm -f yak
+                continue
+              fi
+              
+              echo "Version output: $VERSION_OUTPUT"
+              
+              # 将 yak 移动到 PATH 中，以便后续步骤可以直接使用 `yak` 命令
+              # 参考 diff-code-check.yml 的方式
+              if command -v sudo >/dev/null 2>&1; then
+                sudo mv yak /usr/local/bin/yak || sudo mv yak /usr/bin/yak || mv yak ~/.local/bin/yak
+              else
+                mv yak /usr/local/bin/yak 2>/dev/null || mv yak /usr/bin/yak 2>/dev/null || mv yak ~/.local/bin/yak
+              fi
+              
+              # 确保 yak 在 PATH 中
+              if ! command -v yak >/dev/null 2>&1; then
+                export PATH="$HOME/.local/bin:$PATH"
+              fi
+              
+              # 最终验证
+              if ! yak version >/dev/null 2>&1; then
+                echo "❌ Yak installation verification failed after moving to PATH"
+                rm -f /usr/local/bin/yak /usr/bin/yak ~/.local/bin/yak 2>/dev/null || true
+                continue
+              fi
+              
+              echo "✅ Successfully downloaded yak from version: $VERSION (file size: ${FILE_SIZE} bytes)"
+              echo "yak_downloaded=true" >> "$GITHUB_OUTPUT"
+              echo "yak_version=$VERSION" >> "$GITHUB_OUTPUT"
+              echo "yak_binary=$BINARY_NAME" >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 0
+            done
           done
           
           echo "::warning::Failed to download yak from all attempted versions, will fallback to building"
@@ -180,10 +301,14 @@ jobs:
         shell: bash
         run: |
           # 统一使用 repos-tag 命令生成版本号，确保版本号格式一致（8位 hash）
-          # 优先使用下载的 yak，否则 fallback 到编译
+          # 优先使用下载的 yak（已在 PATH 中），否则 fallback 到编译
           if [ "${{ steps.download_yak.outputs.yak_downloaded }}" = "true" ]; then
             echo "Using downloaded yak binary for repos-tag"
-            ./yak repos-tag -o tags.txt
+            # 确保 yak 在 PATH 中
+            if ! command -v yak >/dev/null 2>&1; then
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
+            yak repos-tag -o tags.txt
           else
             echo "Building yak for repos-tag command"
             go run common/yak/cmd/yak.go repos-tag -o tags.txt
@@ -267,7 +392,13 @@ jobs:
         run: go run -gcflags=all="-N -l" common/yak/yaklib/codec/codegrpc/doc/codec_doc.go common/yak/yaklib/codec/codegrpc/codec.gob.gzip
 
       - name: Sync Embed FS Hash to Code
-        run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
+        shell: bash
+        run: |
+          # 使用下载的 yak（已在 PATH 中）
+          if ! command -v yak >/dev/null 2>&1; then
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          yak embed-fs-hash --override --all
 
       - name: Install gzip-embed tool
         run: go install ./common/utils/gzip_embed/gzip-embed
@@ -380,7 +511,11 @@ jobs:
       - name: Generate Checksums
         shell: bash
         run: |
-          go run common/yak/cmd/yak.go sha256 -f ${{ env.OUTPUT_BINARY }}
+          # 使用下载的 yak（已在 PATH 中）
+          if ! command -v yak >/dev/null 2>&1; then
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          yak sha256 -f ${{ env.OUTPUT_BINARY }}
           echo "SHA256=${{ env.OUTPUT_BINARY }}.sha256.txt" >> $GITHUB_ENV
 
       - name: debug info
@@ -412,7 +547,11 @@ jobs:
           fi
           
           echo "Uploading files: ${UPLOAD_FILES}"
-          go run common/yak/cmd/yak.go upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "${UPLOAD_FILES}"
+          # 使用下载的 yak（已在 PATH 中）
+          if ! command -v yak >/dev/null 2>&1; then
+            export PATH="$HOME/.local/bin:$PATH"
+          fi
+          yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "${UPLOAD_FILES}"
 
       # upload assets
       - name: Upload binary artifacts
