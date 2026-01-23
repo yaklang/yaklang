@@ -76,22 +76,23 @@ var RagExports = map[string]interface{}{
 	"NewTempRagDatabase":   _newTempRagDatabase,
 	"EnableMockMode":       _enableMockMode,
 
-	"ctx":             aiforge.WithAnalyzeContext,    // use for analyzeContext
-	"log":             aiforge.WithAnalyzeLog,        // use for analyzeLog
-	"statusCard":      aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
-	"extraPrompt":     aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
-	"entryLength":     aiforge.RefineWithKnowledgeEntryLength,
-	"disableIndex":    aiforge.RefineWithDisableBuildIndex, // disable building index knowledge
-	"disableERM":      aiforge.RefineWithDisableERMBuild,   // disable building entity repository model
-	"chunkSize":       chunkmaker.WithChunkSize,
-	"khopk":           rag.WithKHopK,
-	"khopLimit":       rag.WithKHopLimit,
-	"khopkMin":        rag.WithKHopKMin,
-	"khopkMax":        rag.WithKHopKMax,
-	"buildQuery":      rag.WithKHopRagQuery,
-	"buildFilter":     rag.WithKHopStartFilter,
-	"pathDepth":       rag.WithKHopPathDepth,
-	"getEntityFilter": schema.SimpleBuildEntityFilter,
+	"ctx":                aiforge.WithAnalyzeContext,     // use for analyzeContext
+	"log":                aiforge.WithAnalyzeLog,         // use for analyzeLog
+	"statusCard":         aiforge.WithAnalyzeStatusCard,  // use for analyzeStatusCard
+	"analyzeConcurrency": aiforge.WithAnalyzeConcurrency, // 控制知识构建分析并发数
+	"extraPrompt":        aiforge.WithExtraPrompt,        // use for analyzeImage and analyzeImageFile
+	"entryLength":        aiforge.RefineWithKnowledgeEntryLength,
+	"disableIndex":       aiforge.RefineWithDisableBuildIndex, // disable building index knowledge
+	"disableERM":         aiforge.RefineWithDisableERMBuild,   // disable building entity repository model
+	"chunkSize":          chunkmaker.WithChunkSize,
+	"khopk":              rag.WithKHopK,
+	"khopLimit":          rag.WithKHopLimit,
+	"khopkMin":           rag.WithKHopKMin,
+	"khopkMax":           rag.WithKHopKMax,
+	"buildQuery":         rag.WithKHopRagQuery,
+	"buildFilter":        rag.WithKHopStartFilter,
+	"pathDepth":          rag.WithKHopPathDepth,
+	"getEntityFilter":    schema.SimpleBuildEntityFilter,
 
 	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
 	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
