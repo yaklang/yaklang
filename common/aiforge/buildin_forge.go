@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -22,8 +20,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed buildinforge/**
-var buildInForge embed.FS
+var buildInForgeFS interface {
+	GetHash() (string, error)
+}
 
 var generateMetadataPrompt = `
 # AI forge 元数据生成器
@@ -128,7 +127,7 @@ func init() {
 }
 
 func BuildInForgeHash() (string, error) {
-	return filesys.CreateEmbedFSHash(buildInForge)
+	return buildInForgeFS.GetHash()
 }
 
 func getBuildInForgeYakScript(name string) (*schema.AIForge, error) {
@@ -136,7 +135,7 @@ func getBuildInForgeYakScript(name string) (*schema.AIForge, error) {
 	if !strings.HasSuffix(name, ".yak") {
 		fullName = name + ".yak"
 	}
-	codeBytes, err := buildInForge.ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
+	codeBytes, err := getBuildInForge().ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +173,11 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 	p := fmt.Sprintf("buildinforge/%v", name)
 	loadDefaultPrompt := func(promptName string) string {
-		promptBytes, _ := buildInForge.ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
+		promptBytes, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
 		return string(promptBytes)
 	}
-	codeContent, _ := buildInForge.ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
-	configBytes, _ := buildInForge.ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
+	codeContent, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
+	configBytes, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
 	return buildAIForgeFromConfig(name, configBytes, codeContent, loadDefaultPrompt)
 }
 

@@ -20,11 +20,12 @@ import (
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
-//go:embed buildin/***
-var ruleFS embed.FS
+var ruleFSWithHash interface {
+	GetHash() (string, error)
+}
 
 func GetRuleFS() *embed.FS {
-	return &ruleFS
+	return getRuleFS().(*embed.FS)
 }
 
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
@@ -190,8 +191,8 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 // SyntaxFlowRuleHash is deprecated. Use filesys.CreateEmbedFSHash(ruleFS, filesys.WithIncludeExts(".sf")) instead.
 // This function is kept for backward compatibility but should not be used in new code.
 func SyntaxFlowRuleHash() (string, error) {
-	// Use CreateEmbedFSHash with file extension filter to only process .sf files
-	hash, err := filesys.CreateEmbedFSHash(ruleFS, filesys.WithIncludeExts(".sf"))
+	// Use GetHash method to calculate hash for .sf files
+	hash, err := ruleFSWithHash.GetHash()
 	if err != nil {
 		// Check if error is due to no .sf files found
 		if errors.Is(err, filesys.ErrNoFileFound) {
