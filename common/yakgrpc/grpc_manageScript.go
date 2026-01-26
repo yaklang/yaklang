@@ -1,5 +1,3 @@
-//go:build !yakit_exclude
-
 package yakgrpc
 
 import (
