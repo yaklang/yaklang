@@ -1,0 +1,15 @@
+# Binaries
+*.a
+*.o
+*.so
+*.dll
+*.dylib
+*.exe
+*.bin
+
+# Generated headers
+# runtime/libyak.h
+# runtime/go_runtime/libyak.h
+
+# Test binaries
+*.test
