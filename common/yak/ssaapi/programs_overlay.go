@@ -313,6 +313,159 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	return overlay
 }
 
+// extendOverlayWithNewLayer 扩展一个已存在的 overlay，添加新的 layer
+// 复用 baseOverlay 的所有 layer，避免重新创建 layer1（防止更新 layer1 的 updated_at）
+func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Program) *ProgramOverLay {
+	if baseOverlay == nil || len(baseOverlay.Layers) == 0 {
+		return nil
+	}
+	if newLayerProgram == nil {
+		return nil
+	}
+
+	// 创建新的 overlay，复用 baseOverlay 的所有 layer
+	overlay := newEmptyOverlay()
+	overlay.Layers = make([]*ProgramLayer, 0, len(baseOverlay.Layers)+1)
+
+	// 复用 baseOverlay 的所有 layer（包括 layer1），避免重新创建
+	for _, layer := range baseOverlay.Layers {
+		if layer != nil {
+			overlay.Layers = append(overlay.Layers, layer)
+		}
+	}
+
+	// 创建新的 layer（layer3）的 ProgramLayer
+	layerIndex := len(overlay.Layers) + 1
+	newLayer := &ProgramLayer{
+		LayerIndex:  layerIndex,
+		Program:     newLayerProgram,
+		FileSet:     utils.NewSafeMap[struct{}](),
+		FileHashMap: utils.NewSafeMap[int](),
+	}
+
+	var fileHashMap map[string]int
+	if newLayerProgram.Program == nil {
+		log.Errorf("newLayerProgram.Program is nil for layer %d", layerIndex)
+		return nil
+	}
+
+	if len(newLayerProgram.Program.FileHashMap) == 0 {
+		log.Errorf("FileHashMap is required for diff program in layer %d, but it is empty", layerIndex)
+		return nil
+	}
+
+	fileHashMap = newLayerProgram.Program.FileHashMap
+
+	for filePath, hash := range fileHashMap {
+		if filePath != "" {
+			newLayer.FileHashMap.Set(removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName()), hash)
+		}
+	}
+
+	newLayerProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
+		if filePath == "" {
+			return true
+		}
+
+		hash := 1
+		if fileHashMap != nil {
+			if h, exists := fileHashMap[filePath]; exists {
+				hash = h
+			}
+		}
+
+		if hash != -1 {
+			normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+			newLayer.FileSet.Set(normalizedPath, struct{}{})
+			overlay.FileToLayerMap.Set(normalizedPath, layerIndex)
+		}
+		return true
+	})
+
+	overlay.Layers = append(overlay.Layers, newLayer)
+
+	// 复用 baseOverlay 的 FileToLayerMap，然后添加新的 layer 的文件映射
+	baseOverlay.FileToLayerMap.ForEach(func(normalizedPath string, layerIdx int) bool {
+		overlay.FileToLayerMap.Set(normalizedPath, layerIdx)
+		return true
+	})
+
+	// 复用 baseOverlay 的 AggregatedFS，避免重新调用 aggregateFileSystems()
+	// 这样可以避免访问 layer1 的 program，防止更新 layer1 的 updated_at
+	// 创建一个新的 VirtualFS，从 baseOverlay 的 AggregatedFS 复制所有文件，然后添加 layer3 的新文件
+	if baseOverlay.AggregatedFS != nil {
+		// 从 baseOverlay 的 AggregatedFS 复制所有文件到新的 VirtualFS
+		newAggregatedFS := filesys.NewVirtualFs()
+		err := filesys.Recursive(".", filesys.WithFileSystem(baseOverlay.AggregatedFS), filesys.WithFileStat(func(path string, info os.FileInfo) error {
+			if info.IsDir() {
+				return nil
+			}
+			// 复制文件内容
+			content, err := baseOverlay.AggregatedFS.ReadFile(path)
+			if err != nil {
+				log.Warnf("failed to read file %s from baseOverlay AggregatedFS: %v", path, err)
+				return nil
+			}
+			newAggregatedFS.AddFile(path, string(content))
+			return nil
+		}))
+		if err != nil {
+			log.Warnf("failed to copy files from baseOverlay AggregatedFS: %v", err)
+		}
+
+		// 删除 layer3 中被删除的文件（hash == -1）
+		// 这些文件在 baseOverlay 的 AggregatedFS 中存在，但在 layer3 中被删除了
+		for filePath, hash := range fileHashMap {
+			if hash == -1 {
+				normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+				// 删除文件（如果存在）
+				if exists, _ := newAggregatedFS.Exists(normalizedPath); exists {
+					newAggregatedFS.Delete(normalizedPath)
+				}
+			}
+		}
+
+		// 添加 layer3 的新文件或修改的文件
+		// 只添加 layer3 中 hash != -1 的文件（新增或修改的文件）
+		newLayerProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
+			if filePath == "" || me == nil {
+				return true
+			}
+			normalizedPath := removeProgramNamePrefix(filePath, newLayerProgram.GetProgramName())
+			// 检查这个文件是否在 layer3 中被删除
+			if hash, exists := fileHashMap[filePath]; exists && hash == -1 {
+				// 文件被删除，不需要添加到 AggregatedFS
+				return true
+			}
+			// 添加或更新文件（layer3 的文件会覆盖 baseOverlay 的文件）
+			newAggregatedFS.AddFile(normalizedPath, me.GetSourceCode())
+			return true
+		})
+
+		overlay.AggregatedFS = newAggregatedFS
+	}
+	// 如果 baseOverlay 没有 AggregatedFS，延迟到 GetAggregatedFileSystem() 时再聚合
+
+	// 确保所有 layer 的 program 都已加载
+	for _, layer := range overlay.Layers {
+		if layer != nil {
+			overlay.ensureLayerProgramLoaded(layer)
+		}
+	}
+
+	// 设置 overlay 的元数据
+	if newLayerProgram != nil {
+		overlay.programName = newLayerProgram.GetProgramName()
+		overlay.programKind = newLayerProgram.GetProgramKind()
+		overlay.language = newLayerProgram.GetLanguage()
+	}
+
+	log.Infof("ProgramOverLay: Extended with %d layers (reused base overlay), %d unique files",
+		len(overlay.Layers), overlay.FileToLayerMap.Count())
+
+	return overlay
+}
+
 func NewProgramOverLay(layers ...*Program) *ProgramOverLay {
 	validLayers := make([]*Program, 0, len(layers))
 	for _, layer := range layers {
@@ -368,17 +521,11 @@ func (p *ProgramOverLay) aggregateFileSystems() (fi.FileSystem, error) {
 		return true
 	})
 
-	layer1ProgramName := ""
-	if len(p.Layers) > 0 && p.Layers[0] != nil && p.Layers[0].Program != nil {
-		layer1ProgramName = p.Layers[0].Program.GetProgramName()
-		p.Layers[0].Program.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
-			if me == nil {
-				return true
-			}
-			if filePath == "" {
-				return true
-			}
-			normalizedPath := removeProgramNamePrefix(filePath, layer1ProgramName)
+	// 使用 layer1 的 FileSet 和 FileHashMap，而不是访问 layer1 的 program
+	// 这样可以避免访问 layer1 的 program，防止更新 layer1 的 updated_at
+	if len(p.Layers) > 0 && p.Layers[0] != nil && p.Layers[0].FileSet != nil {
+		p.Layers[0].FileSet.ForEach(func(normalizedPath string, _ struct{}) bool {
+			// 检查这个文件是否在后续 layer 中被删除
 			isDeleted := false
 			for i := 1; i < len(p.Layers); i++ {
 				if p.Layers[i] != nil && p.Layers[i].FileHashMap != nil {

@@ -34,6 +34,13 @@ func (c *Config) GetProgramName() string {
 	return c.BaseInfo.ProgramNames[0]
 }
 
+func (c *Config) GetLatestProgramName() string {
+	if c == nil || c.BaseInfo == nil || len(c.BaseInfo.ProgramNames) == 0 {
+		return ""
+	}
+	return c.BaseInfo.ProgramNames[len(c.BaseInfo.ProgramNames)-1]
+}
+
 func (c *Config) GetProgramNames() []string {
 	if c == nil || c.BaseInfo == nil {
 		return nil

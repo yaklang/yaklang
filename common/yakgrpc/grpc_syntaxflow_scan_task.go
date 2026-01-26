@@ -12,45 +12,28 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// findAllBasePrograms 递归查找所有相关的 base 程序
+// findAllBasePrograms 查找所有相关的 base 程序
 // 返回所有相关的程序名列表（包括原始程序、所有中间 base、最基础的 base）
 func findAllBasePrograms(progName string) ([]string, error) {
 	if progName == "" {
 		return nil, nil
 	}
 
-	var programs []string
-	visited := make(map[string]bool) // 防止循环引用
-
-	currentProgName := progName
-	for {
-		if visited[currentProgName] {
-			break // 防止循环引用
-		}
-		visited[currentProgName] = true
-
-		prog, err := ssadb.GetApplicationProgram(currentProgName)
-		if err != nil {
-			// 如果获取失败，至少返回已收集的程序
-			if len(programs) > 0 {
-				return programs, nil
-			}
-			return nil, err
-		}
-
-		// 添加到列表中
-		programs = append(programs, currentProgName)
-
-		// 如果这个程序有 BaseProgramName，说明它是增量编译的，继续向上查找
-		if prog.BaseProgramName != "" && prog.BaseProgramName != currentProgName {
-			currentProgName = prog.BaseProgramName
-		} else {
-			// 如果没有 BaseProgramName，说明这就是最基础的 base 程序
-			break
-		}
+	prog, err := ssadb.GetApplicationProgram(progName)
+	if err != nil {
+		return nil, err
 	}
 
-	return programs, nil
+	// 如果这个程序有 OverlayLayers，直接返回 OverlayLayers（已经包含了所有相关的程序）
+	if prog.IsOverlay && len(prog.OverlayLayers) > 0 {
+		// OverlayLayers 已经包含了所有层的程序名称（从最基础的 base 到最新的 diff）
+		// 去重并确保包含当前程序
+		programs := lo.Uniq(append([]string{progName}, prog.OverlayLayers...))
+		return programs, nil
+	}
+
+	// 如果没有 OverlayLayers，说明不是增量编译程序，只返回当前程序
+	return []string{progName}, nil
 }
 
 func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.QuerySyntaxFlowScanTaskRequest) (*ypb.QuerySyntaxFlowScanTaskResponse, error) {
@@ -65,7 +48,7 @@ func (s *Server) QuerySyntaxFlowScanTask(ctx context.Context, request *ypb.Query
 
 	var originalProgName string
 	if filter := request.GetFilter(); filter != nil {
-		if progNames := filter.GetPrograms(); len(progNames) == 1 && len(filter.GetProjectIds()) == 0 {
+		if progNames := filter.GetPrograms(); len(progNames) == 1 {
 			progName := progNames[0]
 			originalProgName = progName
 			allPrograms, err := findAllBasePrograms(progName)
