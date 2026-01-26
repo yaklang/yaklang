@@ -320,7 +320,7 @@ func newConfig(ctx context.Context) *Config {
 	id := uuid.New().String()
 
 	// Initialize ID generator
-	seq := rand.Int64N(300)
+	seq := rand.Int64N(300) + 200 // avoid zero seq number
 	var provider = utils.NewAtomicInt64IDProvider(seq)
 
 	config := &Config{
@@ -1754,7 +1754,7 @@ func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput ait
 func (c *Config) AcquireId() int64 {
 	if c.SeqIdProvider == nil {
 		// fallback: create a simple generator if missing
-		var gen = rand.Int64N(3000)
+		var gen = rand.Int64N(300) + 200
 		c.Seq = gen
 		c.SeqIdProvider = utils.NewAtomicInt64IDProvider(gen)
 	}
@@ -2118,7 +2118,7 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithPersistentSessionId(i.PersistentSessionId))
 	}
 
-	if i.Seq != 0 {
+	if i.Seq > 0 {
 		opts = append(opts, WithSequence(i.Seq))
 	}
 
