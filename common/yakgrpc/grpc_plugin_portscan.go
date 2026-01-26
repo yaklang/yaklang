@@ -1,13 +1,12 @@
-//go:build !yakit_exclude
-
 package yakgrpc
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type portScanParam struct {
