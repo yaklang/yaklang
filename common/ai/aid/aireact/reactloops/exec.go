@@ -523,7 +523,16 @@ LOOP:
 	for {
 		iterationCount++
 		if iterationCount > maxIterations {
-			r.finishIterationLoopWithError(iterationCount, task, utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations))
+			maxIterErr := utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations)
+			postOp := r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
+
+			// 检查 Hook 是否要求忽略错误
+			if postOp.ShouldIgnoreError() {
+				log.Infof("Loop exit with ignored error: max iterations reached (%d)", maxIterations)
+				needSummary.SetTo(true)
+				break LOOP // 正常退出，不返回错误
+			}
+
 			log.Warnf("Reached max iterations (%d), stopping code generation loop", maxIterations)
 			needSummary.SetTo(true)
 			break LOOP

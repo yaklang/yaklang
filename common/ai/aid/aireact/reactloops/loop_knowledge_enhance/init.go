@@ -62,6 +62,8 @@ func init() {
 					searchHistory := loop.Get("search_history")
 					nextMovementsSummary := loop.Get("next_movements_summary")
 					artifactsSummary := buildArtifactsSummary(loop)
+					// 已加载的知识库列表，用于在 prompt 中展示
+					loadedKnowledgeBases := loop.Get("knowledge_bases")
 
 					renderMap := map[string]any{
 						"UserQuery":            userQuery,
@@ -70,6 +72,7 @@ func init() {
 						"SearchHistory":        searchHistory,
 						"NextMovementsSummary": nextMovementsSummary,
 						"ArtifactsSummary":     artifactsSummary,
+						"LoadedKnowledgeBases": loadedKnowledgeBases,
 						"Nonce":                nonce,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
@@ -176,152 +179,67 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		knowledgeBases = dedupStrings(knowledgeBases)
+		log.Infof("start to get knowledge base samples: %v", knowledgeBases)
 
-		// Build attached resources info string
-		if len(knowledgeBases) > 0 {
-			resourcesInfo.WriteString("### 知识库 (Knowledge Bases)\n")
-			if includeAllKnowledgeBases {
-				resourcesInfo.WriteString("用户请求附加全部知识库，列表如下：\n")
-			}
-			for _, kb := range knowledgeBases {
-				resourcesInfo.WriteString(fmt.Sprintf("- %s\n", kb))
-			}
-			resourcesInfo.WriteString("\n")
-
-			// 获取知识库样本数据，帮助 AI 了解知识库的领域和内容
-			ctx := loop.GetConfig().GetContext()
-			if task != nil && !utils.IsNil(task.GetContext()) {
-				ctx = task.GetContext()
-			}
-			sampleData, err := r.EnhanceKnowledgeGetRandomN(ctx, DefaultKnowledgeSampleCount, knowledgeBases...)
+		if len(knowledgeBases) <= 0 {
+			allKBNames, err := yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
 			if err != nil {
-				log.Warnf("failed to get knowledge base samples: %v", err)
-			} else if sampleData != "" {
-				// 使用 LiteForge 总结核心内容（多维度，最多 5 条）
-				const maxSummaryInputSize = 12 * 1024 // 12KB
-				summaryInput := sampleData
-				if len(summaryInput) > maxSummaryInputSize {
-					summaryInput = summaryInput[:maxSummaryInputSize] + "\n\n[... 内容已截断 ...]"
-				}
-
-				summaryPrompt := utils.MustRenderTemplate(`请根据以下知识库样本内容，提炼知识库的主要核心内容，从不同维度总结。
-要求：
-1. 输出不超过 5 条
-2. 每条包含“维度”和“核心内容”
-3. 用简洁中文表达
-4. 只根据样本内容，不要编造
-
-<|KNOWLEDGE_SAMPLES_{{ .Nonce }}|>
-{{ .Samples }}
-<|KNOWLEDGE_SAMPLES_END_{{ .Nonce }}|>
-`, map[string]any{
-					"Nonce":   utils.RandStringBytes(4),
-					"Samples": summaryInput,
-				})
-
-				summaryResult, sumErr := r.InvokeLiteForge(
-					ctx,
-					"summarize-knowledge-core",
-					summaryPrompt,
-					[]aitool.ToolOption{
-						aitool.WithStructArrayParam(
-							"core_summaries",
-							[]aitool.PropertyOption{
-								aitool.WithParam_Description("知识库核心内容多维度总结，最多 5 条"),
-								aitool.WithParam_Required(true),
-							},
-							nil,
-							aitool.WithStringParam("dimension", aitool.WithParam_Description("总结维度，如领域/主题/场景/方法/概念等")),
-							aitool.WithStringParam("summary", aitool.WithParam_Description("该维度下的核心内容总结")),
-						),
-					},
-				)
-				if sumErr != nil {
-					log.Warnf("failed to summarize knowledge core content: %v", sumErr)
-				} else if summaryResult != nil {
-					coreItems := summaryResult.GetInvokeParamsArray("core_summaries")
-					if len(coreItems) > 5 {
-						coreItems = coreItems[:5]
-					}
-					if len(coreItems) > 0 {
-						var summaryBuilder strings.Builder
-						for i, item := range coreItems {
-							dimension := strings.TrimSpace(item.GetString("dimension"))
-							summary := strings.TrimSpace(item.GetString("summary"))
-							if summary == "" {
-								continue
-							}
-							if dimension == "" {
-								dimension = fmt.Sprintf("维度%d", i+1)
-							}
-							summaryBuilder.WriteString(fmt.Sprintf("- %s：%s\n", dimension, summary))
-						}
-						knowledgeCoreSummary = strings.TrimSpace(summaryBuilder.String())
-						if knowledgeCoreSummary != "" {
-							resourcesInfo.WriteString("### 知识库核心内容总结 (Knowledge Core Summary)\n")
-							resourcesInfo.WriteString("以下为基于样本数据的核心内容多维度总结\n")
-							resourcesInfo.WriteString(knowledgeCoreSummary)
-							resourcesInfo.WriteString("\n\n")
-						}
-					}
-				}
-
-				// 检查样本数据大小，控制在30k字节以内
-				const maxSampleSize = 30 * 1024 // 30KB
-				if len(sampleData) > maxSampleSize {
-					log.Infof("knowledge base samples too large (%d bytes), chunking and emitting to artifacts", len(sampleData))
-
-					// 将大内容分块处理，每块最大10k字节
-					const chunkSize = 10 * 1024 // 10KB per chunk
-					chunks := make([]string, 0)
-					currentChunk := strings.Builder{}
-					lines := strings.Split(sampleData, "\n")
-
-					for _, line := range lines {
-						// 如果添加这行会导致当前块超过限制，开始新块
-						if currentChunk.Len()+len(line)+1 > chunkSize && currentChunk.Len() > 0 {
-							chunks = append(chunks, currentChunk.String())
-							currentChunk.Reset()
-						}
-						currentChunk.WriteString(line)
-						currentChunk.WriteString("\n")
-					}
-
-					// 添加最后一块
-					if currentChunk.Len() > 0 {
-						chunks = append(chunks, currentChunk.String())
-					}
-
-					// 为每个块创建 artifacts
-					emitter := loop.GetEmitter()
-					artifactFilenames := make([]string, 0, len(chunks))
-
-					for i, chunk := range chunks {
-						filename := r.EmitFileArtifactWithExt(fmt.Sprintf("kb_samples_chunk_%d", i+1), ".txt", "")
-						emitter.EmitPinFilename(filename)
-						artifactFilenames = append(artifactFilenames, filename)
-
-						// 写入文件内容
-						err := os.WriteFile(filename, []byte(chunk), 0644)
-						if err != nil {
-							log.Warnf("failed to write knowledge base sample chunk %d: %v", i+1, err)
-						}
-					}
-
-					resourcesInfo.WriteString("### 知识库样本内容 (Knowledge Base Samples)\n")
-					resourcesInfo.WriteString(fmt.Sprintf("知识库样本数据较大（%d 字节），已分块存储到 artifacts 中：\n", len(sampleData)))
-					for i, filename := range artifactFilenames {
-						resourcesInfo.WriteString(fmt.Sprintf("- 样本块 %d: %s\n", i+1, filename))
-					}
-					resourcesInfo.WriteString("\n请根据需要查看相关 artifacts 获取完整样本内容。\n\n")
-				} else {
-					resourcesInfo.WriteString("### 知识库样本内容 (Knowledge Base Samples)\n")
-					resourcesInfo.WriteString("以下是知识库中的部分知识条目，帮助你了解知识库的领域和内容，便于后续搜索：\n\n")
-					resourcesInfo.WriteString(sampleData)
-					resourcesInfo.WriteString("\n")
-				}
+				log.Warnf("failed to load all knowledge base names: %v", err)
+				return utils.Errorf("failed to load all knowledge base names: %v", err)
 			}
+
+			buf := bytes.NewBufferString("")
+			for _, kb := range allKBNames {
+				buf.WriteString(fmt.Sprintf("- %#v\n", kb))
+			}
+
+			log.Info("no knowledge bases found, start to pick up some kb via liteforge")
+			nonce := utils.RandStringBytes(4)
+			prompt := utils.MustRenderTemplate(`
+<|INSTRUCT_{{ .nonce }}|>
+你是一个知识库样本数据收集助手。你的任务是根据用户问题从知识库中获取相关样本数据。
+<|INSTRUCT_END{{ .nonce }}|>
+
+<|ALL_EXISTED_KNOWLEDGE_BASES_{{ .nonce }}|>
+{{ .knowledgeBases }}
+<|ALL_EXISTED_KNOWLEDGE_BASES_END_{{ .nonce }}|>
+
+<|USER_QUERY_{{ .nonce }}|>
+{{ .userQuery }}
+<|USER_QUERY_END_{{ .nonce }}|>
+`, map[string]any{
+				"nonce":          nonce,
+				"knowledgeBases": buf.String(),
+				"userQuery":      userQuery,
+			})
+			log.Infof("start to pick up kb from: \n%v", prompt)
+			// pick up via liteforge
+			action, err := r.InvokeLiteForge(loop.GetConfig().GetContext(), "pick_up_knowledge_base_samples", prompt, []aitool.ToolOption{
+				aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
+			})
+			if err != nil {
+				return utils.Errorf("failed to pick up knowledge base samples: %v", err)
+			}
+			results := action.GetStringSlice("knowledge_bases")
+			if len(results) > 0 {
+				knowledgeBases = append(knowledgeBases, results...)
+			}
+			log.Infof("picked up %d knowledge base samples: %v", len(results), results)
 		}
+		knowledgeBases = dedupStrings(knowledgeBases)
+
+		if len(knowledgeBases) <= 0 {
+			return utils.Errorf("no knowledge bases found")
+		}
+
+		resourcesInfo.WriteString("### 知识库 (Knowledge Bases)\n")
+		if includeAllKnowledgeBases {
+			resourcesInfo.WriteString("用户本次回答涉及知识库，列表如下：\n")
+		}
+		for _, kb := range knowledgeBases {
+			resourcesInfo.WriteString(fmt.Sprintf("- %s\n", kb))
+		}
+		resourcesInfo.WriteString("\n")
 
 		if len(files) > 0 {
 			resourcesInfo.WriteString("### 文件 (Files)\n")

@@ -233,6 +233,10 @@ func (m *MockInvoker) EnhanceKnowledgeGetter(ctx context.Context, userQuery stri
 	return "", nil
 }
 
+func (m *MockInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
+	return "", nil
+}
+
 func (m *MockInvoker) VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*aicommon.VerifySatisfactionResult, error) {
 	return aicommon.NewVerifySatisfactionResult(true, "", ""), nil
 }

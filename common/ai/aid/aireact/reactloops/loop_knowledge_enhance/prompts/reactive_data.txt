@@ -5,6 +5,12 @@
 ### 用户问题
 {{ .UserQuery }}
 
+{{ if .LoadedKnowledgeBases }}
+### 已加载的知识库（初始化阶段确定）
+以下知识库已在初始化阶段加载，搜索时可直接使用，无需再指定 knowledge_bases 参数：
+{{ .LoadedKnowledgeBases }}
+{{ end }}
+
 ### 附加资源
 {{ .AttachedResources }}
 

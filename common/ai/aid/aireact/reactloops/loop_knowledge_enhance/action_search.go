@@ -26,7 +26,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 	}
 
 	toolOpts := []aitool.ToolOption{
-		aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
+		aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，可选参数。如未指定，将使用初始化阶段加载的知识库")),
 	}
 
 	if mode == "keyword" {
@@ -43,7 +43,14 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			loop.LoadingStatus(fmt.Sprintf("验证参数中 - search_knowledge:%s / validating parameters - mode:%s", mode, mode))
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
 			if len(knowledgeBases) == 0 {
-				return utils.Error("knowledge_bases is required and must contain at least one knowledge base name")
+				// 使用初始化阶段加载的知识库
+				loadedKBs := loop.Get("knowledge_bases")
+				if loadedKBs != "" {
+					knowledgeBases = strings.Split(loadedKBs, ",")
+				}
+			}
+			if len(knowledgeBases) == 0 {
+				return utils.Error("no knowledge_bases available: please specify knowledge_bases or ensure knowledge bases are loaded during initialization")
 			}
 
 			if mode == "keyword" {
@@ -77,6 +84,13 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			loop.LoadingStatus(fmt.Sprintf("执行搜索中 - search_knowledge:%s / executing search - mode:%s", mode, mode))
 
 			knowledgeBases := action.GetStringSlice("knowledge_bases")
+			// 如果未提供 knowledge_bases，使用初始化阶段加载的知识库
+			if len(knowledgeBases) == 0 {
+				loadedKBs := loop.Get("knowledge_bases")
+				if loadedKBs != "" {
+					knowledgeBases = strings.Split(loadedKBs, ",")
+				}
+			}
 			searchQuery := action.GetString("search_query")
 			keyword := action.GetString("keyword")
 
@@ -107,15 +121,26 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			emitter := loop.GetEmitter()
 			loop.LoadingStatus(fmt.Sprintf("查询知识库中 - querying: %s", queryToUse))
 
-			// 执行搜索
-			enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, queryToUse, knowledgeBases...)
+			// 根据搜索模式确定 EnhancePlan
+			var enhancePlans []string
+			if mode == "keyword" {
+				// 关键字模式：关键字已在 action 中提供，跳过关键字生成，仅使用精准关键词搜索
+				enhancePlans = []string{"exact_keyword_search"}
+			} else {
+				// 语义模式：使用完整增强流程（HyDE、泛化查询、拆分查询）
+				enhancePlans = []string{"hypothetical_answer", "generalize_query", "split_query"}
+			}
+
+			log.Infof("prepared for queryToUse: %s", queryToUse)
+			log.Infof("start to call invoker.EnhanceKnowledgeGetterEx with enhancePlans: %v, knowledgeBases: %v", enhancePlans, knowledgeBases)
+			// 执行搜索，使用 EnhanceKnowledgeGetterEx 支持指定 EnhancePlan
+			enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, queryToUse, enhancePlans, knowledgeBases...)
 			if err != nil {
 				log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
 				op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
 				op.Continue()
 				return
 			}
-
 			if enhanceData == "" {
 				op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
 				op.Continue()
@@ -127,8 +152,24 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			// 压缩搜索结果
 			singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
 			loop.LoadingStatus("压缩搜索结果中 - compressing search result")
+			log.Infof("query result size: %d bytes\n=====================\n%v\n=====================\n", len(enhanceData), enhanceData)
 			compressedResult := compressKnowledgeResultsWithScore(singleResult, userContext, invoker, loop, 10*1024)
+			if compressedResult == "" {
+				var searchTechDesc string
+				if mode == "keyword" {
+					searchTechDesc = "关键字精准搜索(exact_keyword_search)"
+				} else {
+					searchTechDesc = "语义搜索(hypothetical_answer, generalize_query, split_query)"
+				}
+				feedback := fmt.Sprintf("搜索条件: '%s'\n搜索技术: %s\n结果: 无法从知识库中挑选出与用户需求相关的知识片段。\n\n请 rewrite 搜索条件，尝试使用不同的关键词或表述方式重新搜索。", queryToUse, searchTechDesc)
+				op.Feedback(feedback)
+				r.AddToTimeline("knowledge_collection_failed", feedback)
+				log.Infof("knowledge collection failed: \n%v", feedback)
+				op.Continue()
+				return
+			}
 			loop.LoadingStatus("压缩完成 - compression done")
+			log.Infof("query result size: %d bytes\n=====================\n%v\n=====================\n", len(compressedResult), compressedResult)
 
 			// 将新知识记录
 			feedNewKnowledge(compressedResult, queryToUse)
@@ -197,16 +238,13 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 			// 使用 LiteForge 评估下一步行动
 			loop.LoadingStatus("评估搜索结果与下一步计划 - evaluating next movements")
-
 			evalResult := evaluateNextMovements(ctx, invoker, loop, userQuery, queryToUse, compressedResult, searchCount)
-
 			if evalResult.Finished {
 				// 知识收集已完成，保存总结并退出循环
 				log.Infof("knowledge collection finished, summary: %s", evalResult.Summary)
 
 				// 保存总结到 loop 上下文
 				loop.Set("final_summary", evalResult.Summary)
-
 				feedback := fmt.Sprintf(`=== 搜索完成 ===
 查询: %s
 模式: %s

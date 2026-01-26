@@ -398,6 +398,10 @@ func (r *testRuntime) EnhanceKnowledgeGetter(ctx context.Context, userQuery stri
 	return "", nil
 }
 
+func (r *testRuntime) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
+	return "", nil
+}
+
 func (r *testRuntime) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error) {
 	return "", nil
 }

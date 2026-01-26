@@ -92,9 +92,9 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 
 	log.Infof("memory search completed: %d memories, %d bytes content", len(selectedMemories), contentBytes)
 
-	if len(selectedMemories) > 0 {
-		log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkTextBlock(totalContent, 512), "Memory> "))
-	}
+	// if len(selectedMemories) > 0 {
+	// 	log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkTextBlock(totalContent, 512), "Memory> "))
+	// }
 
 	return &aicommon.SearchMemoryResult{
 		Memories:      selectedMemories,

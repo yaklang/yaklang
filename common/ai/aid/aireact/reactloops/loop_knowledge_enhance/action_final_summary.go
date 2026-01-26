@@ -102,7 +102,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				"",
 			)
 			emitter.EmitPinFilename(artifactFilename)
-
+			log.Infof("final report: \n%v", finalReport)
 			if err := os.WriteFile(artifactFilename, []byte(finalReport), 0644); err != nil {
 				log.Warnf("failed to write final report artifact: %v", err)
 			} else {

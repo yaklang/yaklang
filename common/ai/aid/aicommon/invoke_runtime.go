@@ -43,6 +43,12 @@ type AIInvokeRuntime interface {
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
 	EnhanceKnowledgeGetter(ctx context.Context, userQuery string, collections ...string) (string, error)
+	// EnhanceKnowledgeGetterEx 支持多种 EnhancePlan 的知识增强获取器
+	// enhancePlans 参数可选，支持：
+	//   - nil 或空切片：使用默认完整增强流程
+	//   - []string{"exact_keyword_search"}: 仅使用精准关键词搜索
+	//   - []string{"hypothetical_answer", "generalize_query"}: 指定增强策略组合
+	EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error)
 	EnhanceKnowledgeGetRandomN(ctx context.Context, n int, collections ...string) (string, error)
 	// VerifyUserSatisfaction verifies if the user is satisfied with the result
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*VerifySatisfactionResult, error)
