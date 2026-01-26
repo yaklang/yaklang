@@ -128,6 +128,7 @@ func (l *LoopActionHandlerOperator) GetReflectionData() map[string]interface{} {
 type OnPostIterationOperator struct {
 	shouldEndIteration bool
 	endReason          any
+	ignoreError        bool // 新增：忽略错误，静默退出
 }
 
 // newOnPostIterationOperator creates a new OnPostIterationOperator
@@ -135,6 +136,7 @@ func newOnPostIterationOperator() *OnPostIterationOperator {
 	return &OnPostIterationOperator{
 		shouldEndIteration: false,
 		endReason:          nil,
+		ignoreError:        false,
 	}
 }
 
@@ -155,4 +157,17 @@ func (o *OnPostIterationOperator) ShouldEndIteration() bool {
 // GetEndReason returns the reason for ending the iteration
 func (o *OnPostIterationOperator) GetEndReason() any {
 	return o.endReason
+}
+
+// IgnoreError 标记忽略错误，不报错退出
+// 用于专注模式在超出迭代次数时的优雅处理
+// 调用此方法后，即使循环因为错误（如超出最大迭代次数）而结束，
+// 也不会返回错误，而是静默退出
+func (o *OnPostIterationOperator) IgnoreError() {
+	o.ignoreError = true
+}
+
+// ShouldIgnoreError 返回是否应该忽略错误
+func (o *OnPostIterationOperator) ShouldIgnoreError() bool {
+	return o.ignoreError
 }

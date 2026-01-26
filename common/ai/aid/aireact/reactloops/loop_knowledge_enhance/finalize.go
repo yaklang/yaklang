@@ -128,6 +128,7 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Ensure total size doesn't exceed limit
 	finalContent := finalDoc.String()
+	log.Info("final content: \n%v", string(finalContent))
 	const maxTotalBytes = 50 * 1024
 	if len(finalContent) > maxTotalBytes {
 		log.Warnf("generateFinalKnowledgeDocument: final report too large (%d bytes), truncating", len(finalContent))
@@ -164,8 +165,145 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 		if isDone {
-			log.Infof("knowledge enhance loop done at iteration %d, generating final document", iteration)
-			generateFinalKnowledgeDocument(loop, invoker)
+			log.Infof("knowledge enhance loop done at iteration %d", iteration)
+
+			// 检查是否因为超出迭代次数而结束
+			if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
+				log.Infof("knowledge enhance loop ended due to max iterations, generating insufficient data report")
+				// 生成"资料不足"报告
+				generateInsufficientDataReport(loop, invoker)
+				// 忽略错误，不让专注模式报错退出
+				operator.IgnoreError()
+			} else {
+				// 正常结束，生成完整报告
+				generateFinalKnowledgeDocument(loop, invoker)
+			}
 		}
 	})
+}
+
+// generateInsufficientDataReport 生成资料不足报告
+// 当循环因超出最大迭代次数而结束时调用
+func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+	userQuery := loop.Get("user_query")
+	searchHistory := loop.Get("search_history")
+	searchResultsSummary := loop.Get("search_results_summary")
+	searchCountStr := loop.Get("search_count")
+	maxIterations := loop.GetCurrentIterationIndex()
+
+	// Collect all compressed results and artifact files
+	var allCompressedResults []string
+	var artifactFiles []string
+
+	for iteration := 1; iteration <= maxIterations+1; iteration++ {
+		for queryIdx := 1; queryIdx <= 20; queryIdx++ {
+			compressedResult := loop.Get(fmt.Sprintf("compressed_result_round_%d_%d", iteration, queryIdx))
+			artifactFile := loop.Get(fmt.Sprintf("artifact_round_%d_%d", iteration, queryIdx))
+
+			if compressedResult != "" {
+				allCompressedResults = append(allCompressedResults, compressedResult)
+			}
+			if artifactFile != "" {
+				artifactFiles = append(artifactFiles, artifactFile)
+			}
+		}
+	}
+
+	var report strings.Builder
+	report.WriteString("# 知识查询报告（资料不足）\n\n")
+
+	// User query section
+	report.WriteString("## 用户问题\n\n")
+	report.WriteString(userQuery)
+	report.WriteString("\n\n")
+
+	// Search status section
+	report.WriteString("## 搜索情况\n\n")
+	report.WriteString("⚠️ **注意**：已尝试多次搜索，但未能找到足够的相关资料来完整回答问题。\n\n")
+
+	// Metadata
+	report.WriteString("### 搜索概况\n\n")
+	report.WriteString(fmt.Sprintf("- **查询时间**: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+	report.WriteString(fmt.Sprintf("- **搜索次数**: %s 次\n", searchCountStr))
+	report.WriteString(fmt.Sprintf("- **达到最大迭代次数**: 是 (%d 次)\n", maxIterations))
+	report.WriteString(fmt.Sprintf("- **找到的文档数**: %d\n\n", len(artifactFiles)))
+
+	// Search history
+	if searchHistory != "" {
+		report.WriteString("### 搜索历史\n\n")
+		report.WriteString("```\n")
+		report.WriteString(searchHistory)
+		report.WriteString("\n```\n\n")
+	}
+
+	// Partial results
+	if searchResultsSummary != "" || len(allCompressedResults) > 0 {
+		report.WriteString("### 已找到的部分信息\n\n")
+
+		if searchResultsSummary != "" {
+			report.WriteString(searchResultsSummary)
+		} else if len(allCompressedResults) > 0 {
+			// Merge all compressed results (limit to 20KB)
+			mergedContent := strings.Join(allCompressedResults, "\n\n---\n\n")
+			const maxPartialBytes = 20 * 1024
+			if len(mergedContent) > maxPartialBytes {
+				mergedContent = mergedContent[:maxPartialBytes-100] + "\n\n...(内容已截断)"
+			}
+			report.WriteString(mergedContent)
+		}
+
+		report.WriteString("\n\n> **注意**：以上信息可能不足以完整回答问题，仅供参考。\n\n")
+	} else {
+		report.WriteString("### 搜索结果\n\n")
+		report.WriteString("未找到与问题直接相关的信息。\n\n")
+	}
+
+	// Reference files
+	if len(artifactFiles) > 0 {
+		report.WriteString("## 参考文件\n\n")
+		for i, filename := range artifactFiles {
+			report.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, filename))
+		}
+		report.WriteString("\n")
+	}
+
+	// Suggestions
+	report.WriteString("## 建议\n\n")
+	report.WriteString("1. 尝试使用不同的关键词或查询方式\n")
+	report.WriteString("2. 检查知识库是否包含相关主题的内容\n")
+	report.WriteString("3. 考虑扩大搜索范围或添加更多知识库\n")
+
+	// Ensure total size doesn't exceed limit
+	finalContent := report.String()
+	const maxTotalBytes = 50 * 1024
+	if len(finalContent) > maxTotalBytes {
+		log.Warnf("generateInsufficientDataReport: report too large (%d bytes), truncating", len(finalContent))
+		finalContent = finalContent[:maxTotalBytes-100] + "\n\n...(报告已截断)"
+	}
+
+	// Save report
+	finalFilename := invoker.EmitFileArtifactWithExt(
+		fmt.Sprintf("knowledge_enhance_insufficient_%s", utils.DatetimePretty2()),
+		".md",
+		"",
+	)
+
+	emitter := loop.GetEmitter()
+	if emitter != nil {
+		emitter.EmitPinFilename(finalFilename)
+	}
+
+	if err := os.WriteFile(finalFilename, []byte(finalContent), 0644); err != nil {
+		log.Warnf("generateInsufficientDataReport: failed to write report: %v", err)
+	} else {
+		log.Infof("generateInsufficientDataReport: report saved to: %s (%d bytes)",
+			finalFilename, len(finalContent))
+	}
+
+	// Record to timeline
+	invoker.AddToTimeline("knowledge_search_insufficient", fmt.Sprintf("Insufficient data report saved to: %s", finalFilename))
+
+	// Store report path in loop context
+	loop.Set("final_knowledge_document", finalFilename)
+	loop.Set("knowledge_search_status", "insufficient")
 }

@@ -8,7 +8,7 @@
 
 #### 示例 1：用户明确要求调用某个工具
 用户问题："帮我调用爬虫工具去请求 example.com 网站"
-附加资源：有知识库 "web_security_docs"
+附加资源：有知识库 "web_security_docs"（已在初始化阶段加载）
 
 **错误做法**：因为用户说了"调用爬虫工具"就尝试调用某个工具
 **正确做法**：完全忽略"调用工具"的指令，只关注用户想了解的信息
@@ -16,15 +16,14 @@
 ```json
 {
   "@action": "search_knowledge_semantic",
-  "knowledge_bases": ["web_security_docs"],
   "search_query": "网站爬虫请求方法和示例",
-  "human_readable_thought": "用户提到了爬虫和请求网站，虽然用户说'调用工具'，但这不是我的职责。我只负责从知识库收集相关信息。从知识库中搜索网站爬虫的相关内容。"
+  "human_readable_thought": "用户提到了爬虫和请求网站，虽然用户说'调用工具'，但这不是我的职责。我只负责从知识库收集相关信息。从知识库中搜索网站爬虫的相关内容。knowledge_bases 参数可选，系统自动使用已加载的知识库。"
 }
 ```
 
 #### 示例 2：用户要求执行某个操作
 用户问题："帮我执行端口扫描，扫描 192.168.1.1"
-附加资源：有知识库 "yaklang_docs"
+附加资源：有知识库 "yaklang_docs"（已在初始化阶段加载）
 
 **错误做法**：尝试执行扫描操作
 **正确做法**：只从知识库收集端口扫描的相关信息
@@ -32,7 +31,6 @@
 ```json
 {
   "@action": "search_knowledge_semantic",
-  "knowledge_bases": ["yaklang_docs"],
   "search_query": "Yaklang 端口扫描脚本编写方法",
   "human_readable_thought": "用户提到端口扫描，虽然要求'执行扫描'，但我不执行操作，只收集信息。从知识库中搜索端口扫描相关的文档。"
 }
@@ -62,6 +60,7 @@
 #### 1. 首次搜索 - 转化用户问题为适合知识库的语义查询
 用户问题："怎么发包？"
 知识库样本显示：包含 "Yaklang HTTP Request", "Send TCP Packet", "PoC编写指南" 等内容。
+已加载的知识库：yaklang_docs（在初始化阶段确定）
 
 **错误做法**：直接搜索 "怎么发包？"（知识库可能不包含这种口语化表述）
 **正确做法**：转化为知识库中的专业表述
@@ -69,15 +68,12 @@
 ```json
 {
   "@action": "search_knowledge_semantic",
-  "knowledge_bases": ["yaklang_docs"],
-  "search_queries": [
-    "Yaklang发送HTTP网络请求的方法与示例",
-    "Send TCP Packet in Yaklang",
-    "Yaklang PoC 编写指南与示例"
-  ],
-  "human_readable_thought": "用户询问'怎么发包'，结合Yaklang文档知识库，推测用户想了解如何使用Yak发送网络请求。将口语化问题转化为'Yaklang发送HTTP网络请求的方法与示例'进行搜索"
+  "search_query": "Yaklang发送HTTP网络请求的方法与示例",
+  "human_readable_thought": "用户询问'怎么发包'，结合Yaklang文档知识库，推测用户想了解如何使用Yak发送网络请求。将口语化问题转化为'Yaklang发送HTTP网络请求的方法与示例'进行搜索。knowledge_bases 参数可选，系统会自动使用初始化阶段加载的知识库。"
 }
 ```
+
+**注意**：`knowledge_bases` 参数现在是**可选的**。如果不指定，系统会自动使用初始化阶段确定的知识库。
 
 #### 2. 继续搜索 - 使用关键词搜索查找特定模块
 发现需要了解特定的 `poc` 模块用法：
@@ -85,9 +81,20 @@
 ```json
 {
   "@action": "search_knowledge_keyword",
-  "knowledge_bases": ["yaklang_docs"],
   "keyword": "poc.HTTP",
-  "human_readable_thought": "从样本中发现有poc模块，使用关键词精确搜索该模块的定义和用法"
+  "human_readable_thought": "从样本中发现有poc模块，使用关键词精确搜索该模块的定义和用法。关键词模式会直接使用提供的关键词进行精准搜索，跳过关键词生成步骤。"
+}
+```
+
+#### 2.1 指定特定知识库（可选）
+如果需要搜索特定的知识库，可以显式指定：
+
+```json
+{
+  "@action": "search_knowledge_semantic",
+  "knowledge_bases": ["yaklang_docs", "security_kb"],
+  "search_query": "TCP数据包发送方法",
+  "human_readable_thought": "需要同时从 yaklang_docs 和 security_kb 两个知识库中搜索，显式指定 knowledge_bases 参数"
 }
 ```
 

@@ -6,10 +6,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -60,8 +64,8 @@ func compressKnowledgeResultsWithScore(
 		return resultStr
 	}
 
-	// Skip compression for small content (< 3KB)
-	if len(resultStr) < 3000 {
+	// Skip compression for small content (< 5KB)
+	if len(resultStr) < 5000 {
 		log.Infof("compressKnowledgeResultsWithScore: content too short (%d chars), skip compression", len(resultStr))
 		return resultStr
 	}
@@ -87,6 +91,7 @@ func compressKnowledgeResultsWithScore(
 	}
 
 	// For smaller content, use single compression
+	log.Info("start to directly compress knowledge results with score")
 	return compressKnowledgeResultsSingleWithScore(ctx, resultStr, userQuery, invoker, loop, maxBytes)
 }
 
@@ -149,13 +154,6 @@ func compressKnowledgeResultsSingleWithScore(
 
 ❌ 弱相关 (0.0-0.4)：不输出
 
-【输出格式】
-返回JSON数组，每个元素包含：
-{
-  "range": "start-end", 
-  "score": 0.0-1.0的小数
-}
-
 请按相关性评分从高到低输出ranges数组。
 <|INSTRUCT_END_{{ .nonce }}|>
 `
@@ -194,6 +192,10 @@ func compressKnowledgeResultsSingleWithScore(
 		"knowledge-compress",
 		materials,
 		[]aitool.ToolOption{
+			aitool.WithStringParam(
+				"reason",
+				aitool.WithParam_Description("解释这么做的行为和理由，如果你认为提供知识增强材料与用户需求无关，说“无法从知识库中挑选出与用户需求相关的知识片段”，如果你能挑选出与用户需求相关的知识片段，说“已找到与用户需求相关的知识片段，查看`ranges`字段内容”，此时 ranges 字段内容必须不为空"),
+			),
 			aitool.WithStructArrayParam(
 				"ranges",
 				[]aitool.PropertyOption{
@@ -204,7 +206,18 @@ func compressKnowledgeResultsSingleWithScore(
 				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
 		},
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("reason", "reason"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("ranges", "ranges"),
 	)
+
+	reason := forgeResult.GetString("reason")
+	if reason == "" {
+		log.Info("compress reason: no reason provided, checking prompt or materials")
+	} else {
+		log.Infof("compress reason: %v", reason)
+		pw.WriteString(reason)
+		pw.WriteString(" ")
+	}
 
 	if err != nil {
 		log.Errorf("compressKnowledgeResultsSingleWithScore: LiteForge failed: %v", err)
@@ -217,12 +230,22 @@ func compressKnowledgeResultsSingleWithScore(
 		pw.Close()
 		return knowledgeContent
 	}
+	forgeResult.WaitStream(ctx)
 
 	rangeItems := forgeResult.GetInvokeParamsArray("ranges")
-
 	if len(rangeItems) == 0 {
+		results := forgeResult.GetAnyToString("ranges")
+		if results != "" {
+			log.Infof("compressKnowledgeResultsSingleWithScore: ranges extracted: %v", results)
+		} else {
+			log.Errorf("format error or no ranges provided, check #ranges: %#v", results)
+		}
 		log.Warnf("compressKnowledgeResultsSingleWithScore: no ranges extracted")
 		pw.Close()
+
+		if reason != "" {
+			return ""
+		}
 		return knowledgeContent
 	}
 
@@ -314,6 +337,7 @@ func compressKnowledgeResultsSingleWithScore(
 }
 
 // compressKnowledgeResultsChunkedWithScore handles compression for content > 40KB using chunked processing
+// Refactored to use aireducer for cleaner chunking logic
 func compressKnowledgeResultsChunkedWithScore(
 	ctx context.Context,
 	knowledgeContent string,
@@ -325,90 +349,77 @@ func compressKnowledgeResultsChunkedWithScore(
 	overlapLines int,
 	maxChunks int,
 ) string {
-	// Step 1: Split by lines
-	originalLines := strings.Split(knowledgeContent, "\n")
-	totalLines := len(originalLines)
-
-	log.Infof("compressKnowledgeResultsChunkedWithScore: processing %d bytes, %d lines, chunkSize=%d, overlapLines=%d, maxChunks=%d",
-		len(knowledgeContent), totalLines, chunkSize, overlapLines, maxChunks)
-
-	// Step 2: Calculate lines per chunk
+	// Calculate lines per chunk based on average line length
+	lines := strings.Split(knowledgeContent, "\n")
+	totalLines := len(lines)
 	avgLineLen := len(knowledgeContent)/totalLines + 10
 	linesPerChunk := chunkSize / avgLineLen
 	if linesPerChunk < 50 {
 		linesPerChunk = 50
 	}
 
-	// Adjust to ensure not exceeding maxChunks
-	effectiveLinesPerChunk := linesPerChunk - overlapLines
-	if effectiveLinesPerChunk <= 0 {
-		effectiveLinesPerChunk = linesPerChunk / 2
-	}
-	estimatedChunks := (totalLines + effectiveLinesPerChunk - 1) / effectiveLinesPerChunk
-	if estimatedChunks > maxChunks {
-		effectiveLinesPerChunk = (totalLines + maxChunks - 1) / maxChunks
-		linesPerChunk = effectiveLinesPerChunk + overlapLines
-		log.Infof("compressKnowledgeResultsChunkedWithScore: adjusted linesPerChunk to %d to limit chunks to %d", linesPerChunk, maxChunks)
-	}
+	log.Infof("compressKnowledgeResultsChunkedWithScore: processing %d bytes, %d lines, linesPerChunk=%d, maxChunks=%d",
+		len(knowledgeContent), totalLines, linesPerChunk, maxChunks)
 
-	// Step 3: Process chunks
+	// Use aireducer for chunking
 	var allScoredRanges []ScoredRange
-
+	var mu sync.Mutex
 	chunkIndex := 0
-	for startLineIdx := 0; startLineIdx < totalLines && chunkIndex < maxChunks; chunkIndex++ {
-		startLine := startLineIdx + 1
-		endLineIdx := startLineIdx + linesPerChunk
-		if endLineIdx > totalLines {
-			endLineIdx = totalLines
-		}
-		endLine := endLineIdx
 
-		chunkLines := originalLines[startLineIdx:endLineIdx]
-
-		// Build chunk content with line numbers
-		var chunkBuilder strings.Builder
-		for i, line := range chunkLines {
-			lineNum := startLineIdx + i + 1
-			chunkBuilder.WriteString(fmt.Sprintf("%d | %s\n", lineNum, line))
-		}
-		chunkContent := chunkBuilder.String()
-
-		// Add overlap context
-		var chunkWithOverlap string
-		if startLineIdx > 0 && overlapLines > 0 {
-			overlapStartIdx := startLineIdx - overlapLines
-			if overlapStartIdx < 0 {
-				overlapStartIdx = 0
+	reducer, err := aireducer.NewReducerFromString(
+		knowledgeContent,
+		aireducer.WithContext(ctx),
+		aireducer.WithLines(linesPerChunk),        // 按行数分块
+		aireducer.WithEnableLineNumber(true),      // 自动添加行号，格式：N | content
+		aireducer.WithChunkSize(int64(chunkSize)), // 块大小硬限制
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
+			if chunkIndex >= maxChunks {
+				return nil // 超出最大块数，跳过
 			}
-			overlapLinesContent := originalLines[overlapStartIdx:startLineIdx]
-			var overlapBuilder strings.Builder
-			overlapBuilder.WriteString("--- [上下文开始] ---\n")
-			for i, line := range overlapLinesContent {
-				lineNum := overlapStartIdx + i + 1
-				overlapBuilder.WriteString(fmt.Sprintf("%d | %s\n", lineNum, line))
+			currentChunkIndex := chunkIndex
+			chunkIndex++
+
+			chunkData := string(chunk.Data())
+			if chunkData == "" {
+				return nil
 			}
-			overlapBuilder.WriteString("--- [上下文结束] ---\n\n")
-			chunkWithOverlap = overlapBuilder.String() + chunkContent
-		} else {
-			chunkWithOverlap = chunkContent
-		}
 
-		// Process chunk
-		chunkRanges := compressKnowledgeChunkWithScore(ctx, chunkWithOverlap, userQuery, invoker, loop, startLine, endLine)
+			// 获取当前 chunk 的行范围（从 chunk 数据中解析第一行和最后一行的行号）
+			chunkStartLine, chunkEndLine := extractLineRangeFromChunk(chunkData)
 
-		if len(chunkRanges) > 0 {
-			allScoredRanges = append(allScoredRanges, chunkRanges...)
-			log.Infof("compressKnowledgeResultsChunkedWithScore: chunk %d extracted %d ranges", chunkIndex+1, len(chunkRanges))
-		}
+			log.Infof("compressKnowledgeResultsChunkedWithScore: processing chunk %d (lines %d-%d, size=%d bytes)",
+				currentChunkIndex+1, chunkStartLine, chunkEndLine, len(chunkData))
 
-		// Move to next chunk
-		startLineIdx = endLineIdx - overlapLines
-		if startLineIdx < 0 {
-			startLineIdx = 0
+			// 对当前 chunk 进行 AI 筛选
+			chunkRanges := compressKnowledgeChunkWithScore(
+				ctx, chunkData, userQuery, invoker, loop, chunkStartLine, chunkEndLine)
+
+			if len(chunkRanges) > 0 {
+				mu.Lock()
+				allScoredRanges = append(allScoredRanges, chunkRanges...)
+				mu.Unlock()
+				log.Infof("compressKnowledgeResultsChunkedWithScore: chunk %d extracted %d ranges", currentChunkIndex+1, len(chunkRanges))
+			}
+
+			return nil
+		}),
+	)
+
+	if err != nil {
+		log.Errorf("compressKnowledgeResultsChunkedWithScore: failed to create reducer: %v", err)
+		// 降级到原始内容
+		if len(knowledgeContent) > 50000 {
+			return knowledgeContent[:50000] + "\n\n[... 内容过长，已截断 ...]"
 		}
-		if startLineIdx <= (endLineIdx - linesPerChunk) {
-			startLineIdx = endLineIdx
+		return knowledgeContent
+	}
+
+	if err := reducer.Run(); err != nil {
+		log.Errorf("compressKnowledgeResultsChunkedWithScore: reducer run failed: %v", err)
+		if len(knowledgeContent) > 50000 {
+			return knowledgeContent[:50000] + "\n\n[... 内容过长，已截断 ...]"
 		}
+		return knowledgeContent
 	}
 
 	log.Infof("compressKnowledgeResultsChunkedWithScore: processed %d chunks total", chunkIndex)
@@ -461,6 +472,44 @@ func compressKnowledgeResultsChunkedWithScore(
 		len(knowledgeContent), len(finalResult), totalExtractedBytes, len(allScoredRanges))
 
 	return finalResult
+}
+
+// extractLineRangeFromChunk extracts the first and last line numbers from a chunk
+// The chunk content has line number format: "N | content"
+func extractLineRangeFromChunk(chunkData string) (startLine, endLine int) {
+	lines := strings.Split(chunkData, "\n")
+	startLine = 1
+	endLine = 1
+
+	// Parse first line
+	if len(lines) > 0 {
+		firstLine := strings.TrimSpace(lines[0])
+		if idx := strings.Index(firstLine, " |"); idx > 0 {
+			if num, err := strconv.Atoi(strings.TrimSpace(firstLine[:idx])); err == nil && num > 0 {
+				startLine = num
+			}
+		}
+	}
+
+	// Parse last non-empty line
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		if idx := strings.Index(line, " |"); idx > 0 {
+			if num, err := strconv.Atoi(strings.TrimSpace(line[:idx])); err == nil && num > 0 {
+				endLine = num
+				break
+			}
+		}
+	}
+
+	if endLine < startLine {
+		endLine = startLine
+	}
+
+	return startLine, endLine
 }
 
 // compressKnowledgeChunkWithScore processes a single chunk for AI filtering

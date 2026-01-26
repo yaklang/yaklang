@@ -32,30 +32,63 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 你是一位精通各领域知识的首席信息检索专家（Chief Information Retrieval Expert）。
 # 任务
 你的任务是分析用户的【问题】，并从中提炼出一组约10个**高价值、高信噪比**的核心搜索关键词。这组关键词将用于精准的、基于词条的检索引擎，目的是快速定位到最相关的专业文档。
+
+# ⚠️ 核心原则：聚焦主体，禁止扩散
+
+**关键词必须始终围绕问题中的【核心搜索目标】，提取该目标的不同形式、变体、别名和子类型。绝对禁止扩展到通用分类或上层概念。**
+
 # 行动准则
 **1. 核心实体优先 (Core Entity First):**
-    -   首先识别并提取问题中最重要的**核心实体、技术、专有名词、产品名或人名**。这是关键词列表的基石。
-**2. 关联与扩展 (Association & Expansion):**
-    -   不要局限于问题中的字面词汇。基于核心实体，扩展出与之紧密相关的**技术标准、替代品、核心组件或相关概念**。
-    -   *示例1:*  问题含 'gRPC'，可扩展出 'Protobuf', 'HTTP/2', '远程过程调用'。
-    -   *示例2:*  问题含 'React状态管理'，可扩展出 'Redux', 'MobX', 'useState', 'Context API'。
+    -   首先识别并提取问题中最重要的**核心搜索目标**（技术、漏洞、产品、概念等）。这是关键词列表的基石。
+
+**2. 同主体变体扩展 (Same-Subject Variant Expansion):**
+    -   扩展方向必须是核心目标的**子类型、变体形式、别名、同义词**，而非关联概念。
+    -   ✅ 正确扩展：围绕同一主体的不同表现形式
+    -   ❌ 错误扩展：扩展到上层分类、通用框架、关联技术
+
 **3. 标准化与规范 (Normalization & Canonization):**
     -   提取概念时，应同时包含其**常用缩写和完整全称**，因为两者都可能作为索引词。
-    -   *示例:*  问题含 'CSRF'，关键词中应包含 'CSRF' 和 'Cross-Site Request Forgery'。
+
 **4. 高信噪比原则 (High Signal-to-Noise Ratio):**
     -   **必须过滤掉**所有对精确搜索无意义的词：
         -   疑问词：如何、什么、为什么、哪里
         -   停用词：的、和、一个、关于、在
-        -   模糊描述：最佳实践、优缺点、性能差异（应提取具体比较对象，而非这些描述词本身）
+        -   模糊描述：最佳实践、优缺点、性能差异
+        -   ⚠️ **通用分类词**：如 MITRE、ATT&CK、CVE、OWASP（除非这些本身就是搜索目标）
+
 **5. 质量与数量 (Quality & Quantity):**
     -   生成 **8-12个** 最具代表性的关键词。
     -   **质量远比数量重要**。如果一个简单问题只能提炼出3-4个高质量关键词，这是完全可以接受的。
+
+# Few-Shot 示例
+
+## 示例1：搜索 XSS 的 ATT&CK 编号
+**问题：** "XSS 漏洞的 ATT&CK 编号是什么？"
+**核心搜索目标：** XSS（跨站脚本攻击）
+✅ **正确关键词：** XSS, Cross-Site Scripting, DOM-XSS, Reflected XSS, Stored XSS, Self-XSS, 跨站脚本, DOM型XSS, 反射型XSS, 存储型XSS
+❌ **错误关键词：** MITRE, ATT&CK, 攻击框架, 威胁情报, 安全标准
+**原因：** 用户想搜索的是 XSS 相关的文档，而非 ATT&CK 框架本身。关键词应聚焦于 XSS 的各种形式和别名。
+
+## 示例2：搜索 SQL 注入的防御方法
+**问题：** "如何防御 SQL 注入攻击？"
+**核心搜索目标：** SQL 注入
+✅ **正确关键词：** SQL注入, SQL Injection, SQLi, 盲注, Blind SQL Injection, 报错注入, 联合查询注入, 堆叠查询, 时间盲注, 布尔盲注
+❌ **错误关键词：** Web安全, 数据库安全, 输入验证, 安全编码, OWASP
+**原因：** 虽然这些通用概念相关，但会导致搜索结果过于分散，无法精准定位 SQL 注入的文档。
+
+## 示例3：搜索 Redis 未授权访问
+**问题：** "Redis 未授权访问漏洞如何利用？"
+**核心搜索目标：** Redis 未授权访问
+✅ **正确关键词：** Redis未授权访问, Redis unauthorized access, Redis RCE, Redis写SSH公钥, Redis写Webshell, Redis主从复制RCE, Redis SSRF
+❌ **错误关键词：** NoSQL, 数据库安全, 中间件漏洞, 配置不当
+**原因：** 关键词应聚焦于 Redis 漏洞的具体利用方式，而非泛化到中间件或数据库安全。
+
 ---
 <|问题_{{ .nonce }}_START|>
 {{ .query }}
 <|问题_{{ .nonce }}_END|>
 ---
-请立即开始分析，并生成最终的关键词列表。`
+请立即开始分析，严格遵循"聚焦主体，禁止扩散"原则，生成最终的关键词列表。`
 	prompt, err := utils.RenderTemplate(prompt, map[string]any{
 		"nonce": utils.RandStringBytes(4),
 		"query": query,
