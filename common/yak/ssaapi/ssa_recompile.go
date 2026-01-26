@@ -18,7 +18,7 @@ func SaveConfig(c *Config, prog *Program) {
 		}
 		return
 	}
-	irProg, err := ssadb.GetProgram(c.GetProgramName(), ssa.Application)
+	irProg, err := ssadb.GetProgram(c.GetLatestProgramName(), ssa.Application)
 	if err != nil {
 		log.Errorf("irProg is nil, save config failed: %v", err)
 		return
@@ -62,10 +62,14 @@ func (prog *Program) Recompile(inputOpt ...ssaconfig.Option) error {
 	if prog.IsIncrementalCompile() {
 		log.Infof("检测到增量编译 program，自动启用增量编译，base program: %s", prog.Program.Name)
 		opt = append(opt, WithBaseProgramName(prog.Program.Name))
+		// 增量编译时，不设置 WithProgramName，让调用者通过 inputOpt 传入新的 program name
+		// 这样可以确保每次重新编译都会创建一个新的 diff program，而不是覆盖现有的
+	} else {
+		// 非增量编译时，使用相同的 program name（重新编译会覆盖）
+		opt = append(opt, WithProgramName(prog.Program.Name))
 	}
 
 	// append other options
-	opt = append(opt, WithProgramName(prog.Program.Name))
 	opt = append(opt, WithLanguage(prog.GetLanguage()))
 	opt = append(opt, WithReCompile(true))
 	opt = append(opt, inputOpt...)

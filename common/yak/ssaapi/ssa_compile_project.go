@@ -541,9 +541,9 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
 		baseFSForDiff, c.fs, // 新文件系统
-		baseProgramName,    // 基础程序名称（系统会从数据库构建基础文件系统）
-		c.GetProgramName(), // 差量程序名称
-		c.GetLanguage(),    // 语言
+		baseProgramName,          // 基础程序名称（系统会从数据库构建基础文件系统）
+		c.GetLatestProgramName(), // 差量程序名称
+		c.GetLanguage(),          // 语言
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff program")
@@ -556,18 +556,9 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 
 	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
 		// base program 是一个 overlay，需要合并所有 layers
-		// 收集所有 base overlay 的 layers
-		allLayers := make([]*Program, 0, len(baseOverlay.Layers)+1)
-		for _, layer := range baseOverlay.Layers {
-			if layer != nil && layer.Program != nil {
-				allLayers = append(allLayers, layer.Program)
-			}
-		}
-		// 添加新的 diff program 作为最上层 layer
-		allLayers = append(allLayers, diffProgram)
-
-		// 创建包含所有 layers 的新 overlay
-		overlay = NewProgramOverLay(allLayers...)
+		// 复用 baseOverlay 的 layer1，避免重新创建（防止更新 layer1 的 updated_at）
+		// 创建新的 overlay，复用 baseOverlay 的 layer1，只创建新的 layer（layer3）的 ProgramLayer
+		overlay = extendOverlayWithNewLayer(baseOverlay, diffProgram)
 	} else {
 		// base program 不是 overlay，直接创建包含 base 和 diff 的 overlay
 		overlay = NewProgramOverLay(baseProgram, diffProgram)
@@ -590,12 +581,12 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	}
 	c.Processf(0.95, "diff program saved to database")
 
-	// Step 6: 保存所有 layer 的 program 到数据库
-	c.Processf(0.96, "saving all layer programs to database...")
+	// Step 6: 保存 overlay 信息到数据库（只更新当前 program，不更新 layer）
+	c.Processf(0.96, "saving overlay metadata to database...")
 	if err := saveOverlayToDatabase(overlay, diffProgram); err != nil {
 		return nil, utils.Wrap(err, "failed to save overlay to database")
 	}
-	c.Processf(0.98, "all layer programs saved to database")
+	c.Processf(0.98, "overlay metadata saved to database")
 
 	// Step 7: 更新缓存（在设置 overlay 后）
 	SetProgramCache(diffProgram)
@@ -649,13 +640,13 @@ func (c *Config) parseProjectWithFirstIncrementalCompile() (*Program, error) {
 	}
 }
 
-// saveOverlayToDatabase 保存 overlay 及其所有 layer 到数据库
+// saveOverlayToDatabase 保存 overlay 信息到数据库（只更新当前 program，不更新 layer）
 func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error {
 	if overlay == nil || len(overlay.Layers) == 0 {
 		return utils.Errorf("overlay is nil or has no layers")
 	}
 
-	// Step 1: 确保所有 layer 的 program 都已保存到数据库
+	// Step 1: 收集所有 layer 的 program 名称（不更新 layer，只收集名称）
 	layerNames := make([]string, 0, len(overlay.Layers))
 	for _, layer := range overlay.Layers {
 		if layer == nil || layer.Program == nil {
@@ -665,14 +656,6 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 		layerName := layerProg.GetProgramName()
 		if layerName == "" {
 			continue
-		}
-
-		// 确保 layer program 已保存到数据库
-		if layerProg.Program != nil {
-			wait := layerProg.Program.UpdateToDatabase()
-			if wait != nil {
-				wait() // 等待保存完成
-			}
 		}
 		layerNames = append(layerNames, layerName)
 	}
@@ -686,24 +669,17 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 		return utils.Errorf("diffProgram.Program is nil")
 	}
 
-	// 确保 diffProgram 的 irProgram 存在
-	if diffProgram.Program.GetIrProgram() == nil {
-		diffProgram.Program.UpdateToDatabase()
-		if wait := diffProgram.Program.UpdateToDatabase(); wait != nil {
-			wait()
-		}
-	}
-
+	// 确保 diffProgram 的 irProgram 存在（Step 5 已经保存过了，这里应该已经存在）
 	irProgram := diffProgram.Program.GetIrProgram()
 	if irProgram == nil {
-		return utils.Errorf("failed to get irProgram for diffProgram")
+		return utils.Errorf("diffProgram irProgram is nil, please save diffProgram first")
 	}
 
 	// 设置 overlay 信息
 	irProgram.IsOverlay = true
 	irProgram.OverlayLayers = layerNames
 
-	// 更新数据库
+	// 更新数据库（只更新当前 program 的 overlay 信息，不更新 layer）
 	ssadb.UpdateProgram(irProgram)
 
 	return nil
