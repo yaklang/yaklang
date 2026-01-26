@@ -194,7 +194,7 @@ func compressKnowledgeResultsSingleWithScore(
 		[]aitool.ToolOption{
 			aitool.WithStringParam(
 				"reason",
-				aitool.WithParam_Description("解释这么做的行为和理由，如果你认为提供知识增强材料与用户需求无关，说“无法从知识库中挑选出与用户需求相关的知识片段”，如果你能挑选出与用户需求相关的知识片段，说“已找到与用户需求相关的知识片段，查看`ranges`字段内容”，此时 ranges 字段内容必须不为空"),
+				aitool.WithParam_Description("解释这么做的行为和理由，如果你认为提供知识增强材料与用户需求无关，说“无法从知识库中挑选出与用户需求相关的知识片段”，如果你能挑选出与用户需求相关的知识片段，说“已找到与用户需求相关的知识片段，请查看提取出的知识增强内容”，此时 ranges 字段内容必须不为空"),
 			),
 			aitool.WithStructArrayParam(
 				"ranges",
@@ -206,8 +206,8 @@ func compressKnowledgeResultsSingleWithScore(
 				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("reason", "reason"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("ranges", "ranges"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("knowledge-compress", "reason"),
+		// aicommon.WithGeneralConfigStreamableFieldWithNodeId("knowledge-compress", "ranges"),
 	)
 
 	reason := forgeResult.GetString("reason")
