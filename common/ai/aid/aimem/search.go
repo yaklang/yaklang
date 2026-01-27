@@ -10,8 +10,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// SearchBySemantics 通过语义搜索记忆
-func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
+// SearchBySemanticsMemoryIDs 仅执行语义检索并返回命中的 memory_id（不加载数据库实体）
+func (r *AIMemoryTriage) SearchBySemanticsMemoryIDs(query string, limit int) ([]*aicommon.SearchResult, error) {
+	return r.semanticSearchMemoryIDs(query, limit)
+}
+
+func (r *AIMemoryTriage) semanticSearchMemoryIDs(query string, limit int) ([]*aicommon.SearchResult, error) {
 	// 检查 embedding 服务是否可用
 	if !r.embeddingAvailable {
 		log.Debugf("embedding service not available for session %s, returning empty semantic search results", r.sessionID)
@@ -31,6 +35,48 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 		return []*aicommon.SearchResult{}, nil
 	}
 
+	scoreByMemoryID := make(map[string]float64)
+	orderedMemoryIDs := make([]string, 0, len(ragResults))
+	seen := make(map[string]struct{})
+
+	for _, rr := range ragResults {
+		if rr == nil || rr.Document == nil {
+			continue
+		}
+		memoryID, ok := rr.Document.Metadata["memory_id"].(string)
+		if !ok || strings.TrimSpace(memoryID) == "" {
+			continue
+		}
+		if sid, ok := rr.Document.Metadata["session_id"].(string); ok && sid != "" && sid != r.sessionID {
+			continue
+		}
+
+		if old, exists := scoreByMemoryID[memoryID]; !exists || rr.Score > old {
+			scoreByMemoryID[memoryID] = rr.Score
+		}
+		if _, ok := seen[memoryID]; !ok {
+			seen[memoryID] = struct{}{}
+			orderedMemoryIDs = append(orderedMemoryIDs, memoryID)
+		}
+	}
+
+	results := make([]*aicommon.SearchResult, 0, len(orderedMemoryIDs))
+	for _, memoryID := range orderedMemoryIDs {
+		results = append(results, &aicommon.SearchResult{
+			Entity: &aicommon.MemoryEntity{Id: memoryID},
+			Score:  scoreByMemoryID[memoryID],
+		})
+	}
+	return results, nil
+}
+
+// SearchBySemantics 通过语义搜索记忆
+func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon.SearchResult, error) {
+	idResults, err := r.semanticSearchMemoryIDs(query, limit)
+	if err != nil {
+		return nil, err
+	}
+
 	db := r.GetDB()
 	if db == nil {
 		log.Debugf("database connection is nil for session %s, returning empty semantic search results", r.sessionID)
@@ -38,19 +84,14 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 	}
 
 	var results []*aicommon.SearchResult
-	processedMemoryIDs := make(map[string]bool)
-
-	for _, ragResult := range ragResults {
-		memoryID, ok := ragResult.Document.Metadata["memory_id"].(string)
-		if !ok || memoryID == "" {
+	for _, idResult := range idResults {
+		if idResult == nil || idResult.Entity == nil {
 			continue
 		}
-
-		// 避免重复
-		if processedMemoryIDs[memoryID] {
+		memoryID := strings.TrimSpace(idResult.Entity.Id)
+		if memoryID == "" {
 			continue
 		}
-		processedMemoryIDs[memoryID] = true
 
 		// 从数据库获取完整记忆条目
 		var dbEntity schema.AIMemoryEntity
@@ -81,7 +122,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*aicommon
 
 		results = append(results, &aicommon.SearchResult{
 			Entity: entity,
-			Score:  ragResult.Score,
+			Score:  idResult.Score,
 		})
 	}
 
@@ -171,6 +212,33 @@ func (r *AIMemoryTriage) SearchByScores(filter *aicommon.ScoreFilter, limit int)
 		results = append(results, entity)
 	}
 
+	return results, nil
+}
+
+// SearchByScoreVectorMemoryIDs 仅执行 HNSW 检索并返回命中的 memory_id（不加载数据库实体）
+func (r *AIMemoryTriage) SearchByScoreVectorMemoryIDs(queryVector []float32, limit int) ([]*aicommon.SearchResult, error) {
+	if r.hnswBackend == nil {
+		return nil, utils.Errorf("HNSW backend is not initialized")
+	}
+	searchResults, err := r.hnswBackend.searchKeysWithDistance(queryVector, limit)
+	if err != nil {
+		return nil, utils.Errorf("HNSW search failed: %v", err)
+	}
+	if len(searchResults) == 0 {
+		return []*aicommon.SearchResult{}, nil
+	}
+
+	results := make([]*aicommon.SearchResult, 0, len(searchResults))
+	for _, sr := range searchResults {
+		memoryID := strings.TrimSpace(sr.Key)
+		if memoryID == "" {
+			continue
+		}
+		results = append(results, &aicommon.SearchResult{
+			Entity: &aicommon.MemoryEntity{Id: memoryID},
+			Score:  1 - sr.Distance,
+		})
+	}
 	return results, nil
 }
 

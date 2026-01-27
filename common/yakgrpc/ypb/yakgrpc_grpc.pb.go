@@ -524,6 +524,11 @@ const (
 	Yak_DeleteAIEvent_FullMethodName                              = "/ypb.Yak/DeleteAIEvent"
 	Yak_GetRandomAIMaterials_FullMethodName                       = "/ypb.Yak/GetRandomAIMaterials"
 	Yak_ExportAILogs_FullMethodName                               = "/ypb.Yak/ExportAILogs"
+	Yak_CreateAIMemoryEntity_FullMethodName                       = "/ypb.Yak/CreateAIMemoryEntity"
+	Yak_UpdateAIMemoryEntity_FullMethodName                       = "/ypb.Yak/UpdateAIMemoryEntity"
+	Yak_DeleteAIMemoryEntity_FullMethodName                       = "/ypb.Yak/DeleteAIMemoryEntity"
+	Yak_GetAIMemoryEntity_FullMethodName                          = "/ypb.Yak/GetAIMemoryEntity"
+	Yak_QueryAIMemoryEntity_FullMethodName                        = "/ypb.Yak/QueryAIMemoryEntity"
 	Yak_StartAITriage_FullMethodName                              = "/ypb.Yak/StartAITriage"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
@@ -1255,6 +1260,12 @@ type YakClient interface {
 	DeleteAIEvent(ctx context.Context, in *AIEventDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(ctx context.Context, in *ExportAILogsRequest, opts ...grpc.CallOption) (*ExportAILogsResponse, error)
+	// AI Memory CRUD
+	CreateAIMemoryEntity(ctx context.Context, in *CreateAIMemoryEntityRequest, opts ...grpc.CallOption) (*Empty, error)
+	UpdateAIMemoryEntity(ctx context.Context, in *AIMemoryEntity, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteAIMemoryEntity(ctx context.Context, in *DeleteAIMemoryEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	GetAIMemoryEntity(ctx context.Context, in *GetAIMemoryEntityRequest, opts ...grpc.CallOption) (*AIMemoryEntity, error)
+	QueryAIMemoryEntity(ctx context.Context, in *QueryAIMemoryEntityRequest, opts ...grpc.CallOption) (*QueryAIMemoryEntityResponse, error)
 	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -7172,6 +7183,56 @@ func (c *yakClient) ExportAILogs(ctx context.Context, in *ExportAILogsRequest, o
 	return out, nil
 }
 
+func (c *yakClient) CreateAIMemoryEntity(ctx context.Context, in *CreateAIMemoryEntityRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_CreateAIMemoryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAIMemoryEntity(ctx context.Context, in *AIMemoryEntity, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAIMemoryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAIMemoryEntity(ctx context.Context, in *DeleteAIMemoryEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteAIMemoryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAIMemoryEntity(ctx context.Context, in *GetAIMemoryEntityRequest, opts ...grpc.CallOption) (*AIMemoryEntity, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIMemoryEntity)
+	err := c.cc.Invoke(ctx, Yak_GetAIMemoryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryAIMemoryEntity(ctx context.Context, in *QueryAIMemoryEntityRequest, opts ...grpc.CallOption) (*QueryAIMemoryEntityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAIMemoryEntityResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIMemoryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_StartAITriage_FullMethodName, cOpts...)
@@ -8753,6 +8814,12 @@ type YakServer interface {
 	DeleteAIEvent(context.Context, *AIEventDeleteRequest) (*DbOperateMessage, error)
 	GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error)
+	// AI Memory CRUD
+	CreateAIMemoryEntity(context.Context, *CreateAIMemoryEntityRequest) (*Empty, error)
+	UpdateAIMemoryEntity(context.Context, *AIMemoryEntity) (*DbOperateMessage, error)
+	DeleteAIMemoryEntity(context.Context, *DeleteAIMemoryEntityRequest) (*DbOperateMessage, error)
+	GetAIMemoryEntity(context.Context, *GetAIMemoryEntityRequest) (*AIMemoryEntity, error)
+	QueryAIMemoryEntity(context.Context, *QueryAIMemoryEntityRequest) (*QueryAIMemoryEntityResponse, error)
 	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
@@ -10369,6 +10436,21 @@ func (UnimplementedYakServer) GetRandomAIMaterials(context.Context, *GetRandomAI
 }
 func (UnimplementedYakServer) ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExportAILogs not implemented")
+}
+func (UnimplementedYakServer) CreateAIMemoryEntity(context.Context, *CreateAIMemoryEntityRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateAIMemoryEntity not implemented")
+}
+func (UnimplementedYakServer) UpdateAIMemoryEntity(context.Context, *AIMemoryEntity) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAIMemoryEntity not implemented")
+}
+func (UnimplementedYakServer) DeleteAIMemoryEntity(context.Context, *DeleteAIMemoryEntityRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIMemoryEntity not implemented")
+}
+func (UnimplementedYakServer) GetAIMemoryEntity(context.Context, *GetAIMemoryEntityRequest) (*AIMemoryEntity, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIMemoryEntity not implemented")
+}
+func (UnimplementedYakServer) QueryAIMemoryEntity(context.Context, *QueryAIMemoryEntityRequest) (*QueryAIMemoryEntityResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIMemoryEntity not implemented")
 }
 func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
@@ -18993,6 +19075,96 @@ func _Yak_ExportAILogs_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAIMemoryEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateAIMemoryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateAIMemoryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateAIMemoryEntity(ctx, req.(*CreateAIMemoryEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIMemoryEntity)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAIMemoryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAIMemoryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAIMemoryEntity(ctx, req.(*AIMemoryEntity))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAIMemoryEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAIMemoryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAIMemoryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAIMemoryEntity(ctx, req.(*DeleteAIMemoryEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIMemoryEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIMemoryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIMemoryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIMemoryEntity(ctx, req.(*GetAIMemoryEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryAIMemoryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAIMemoryEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIMemoryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIMemoryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIMemoryEntity(ctx, req.(*QueryAIMemoryEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartAITriage_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITriage(&grpc.GenericServerStream[AITriageInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -21934,6 +22106,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExportAILogs",
 			Handler:    _Yak_ExportAILogs_Handler,
+		},
+		{
+			MethodName: "CreateAIMemoryEntity",
+			Handler:    _Yak_CreateAIMemoryEntity_Handler,
+		},
+		{
+			MethodName: "UpdateAIMemoryEntity",
+			Handler:    _Yak_UpdateAIMemoryEntity_Handler,
+		},
+		{
+			MethodName: "DeleteAIMemoryEntity",
+			Handler:    _Yak_DeleteAIMemoryEntity_Handler,
+		},
+		{
+			MethodName: "GetAIMemoryEntity",
+			Handler:    _Yak_GetAIMemoryEntity_Handler,
+		},
+		{
+			MethodName: "QueryAIMemoryEntity",
+			Handler:    _Yak_QueryAIMemoryEntity_Handler,
 		},
 		{
 			MethodName: "CreateAIForge",
