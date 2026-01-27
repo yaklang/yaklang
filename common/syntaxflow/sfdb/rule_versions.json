@@ -80,8 +80,8 @@
   {
     "rule_id": "a83edb46-428e-481d-af2b-e5ac45db032e",
     "rule_name": "检测C语言SQL注入漏洞",
-    "hash": "94348ef223894dc7f382556d4c25e7a22c707bb8b92774a340c4ceac518233f2",
-    "version": "20251230.0001"
+    "hash": "ef02e1ac29930dafd675bbe5d61990f055597d9b0855d65ee324fd9bdf2dc7b0",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "b9f7e3a1-2c8d-4e6f-9b1a-7d5c8e2f4a9b",
@@ -332,56 +332,56 @@
   {
     "rule_id": "137a07c6-00e9-443a-9c2c-f892782d5176",
     "rule_name": "检测Golang SQL注入漏洞gin.Context",
-    "hash": "788cf4c2d970e19e6899e6f016aaab7fd00559112c1548cca99c642b12a7528d",
-    "version": "20251230.0001"
+    "hash": "a0ac6270bfa60edac6705a3e33e5ee936c07f39281f860ae466a5b2e0407408b",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "1c99dff2-ccc4-452a-8a95-2594dd2340d8",
     "rule_name": "检测Golang SQL注入漏洞database(sql)",
-    "hash": "b20c79263fe9fd80be6c5e7bead7e739d7a8a49eef5a651c58ad544a76c54158",
-    "version": "20251230.0001"
+    "hash": "e59fa3c64882720465cb92d2885e52d19ed1a1b4fe78b2f8e3e13faf32c9df67",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "2edbaa7b-0cfb-4d71-9e9e-0e8771ba70cb",
     "rule_name": "检测Golang SQL 注入漏洞(ent)",
-    "hash": "85179bca0ea7616907e9f9b76940310fa734204cd2fb77267c137cf42b2d11c1",
-    "version": "20251230.0001"
+    "hash": "76ad9c4053b0def08def7e07ad91030be149c198c701ed9e9a7344c678787250",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "cc9054ac-2c71-4641-84dd-ba12578093b0",
     "rule_name": "检测Golang SQL注入漏洞(GORM)",
-    "hash": "be70ee1fa44dc4e9127f7819a7d2cdd50a7b1c63c4a17144994c4f28a63e4f43",
-    "version": "20251230.0001"
+    "hash": "2f33e2c5c2831f01a2254d8e6cd46dd87e34183c76b236c21eea47f3ff84e935",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "b89f27b3-35ee-48ae-ba75-415da669f60d",
     "rule_name": "检测Golang SQL注入漏洞(Models)",
-    "hash": "0dc24b333fcd814150a88be5296fb79c1b6569f754a5326249a2d5c20dc00fb1",
-    "version": "20251230.0001"
+    "hash": "bbb41826a39d771b467baa14255cb052a0cbea78089af47a8e10094cbf7d1a88",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "56f41530-4175-41ec-96ac-198315171c10",
     "rule_name": "检测Golang SQL注入漏洞(Pop)",
-    "hash": "656267a0d8070830ae427a6c9ee6805ef9bf553455eb987ef03e0d07b8a440bf",
-    "version": "20251230.0001"
+    "hash": "a1183416ffbe63971820b56f2acffacdc9d5ff2315f779c0ad375e9a392073c3",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "b06e92a2-0ff3-40a0-966e-7f0e4fe05480",
     "rule_name": "检测Golang Reform SQL注入漏洞",
-    "hash": "99b2f0f8ca43427b9dbcb2a4b03e52bd82804a131fc62c145a52fd55237ae9d7",
-    "version": "20251230.0001"
+    "hash": "b4d299e3066930adb627b204ecdb9fdfc14c837f84df4a9f434ac4089796b2ba",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "278c2a17-1b81-49d1-a4a9-d881fba1a0e9",
     "rule_name": "检测Golang SQL注入漏洞Service",
-    "hash": "243a29f96302608823ee351ae4a8947822e6942ba97fd1bd5404e3ce8ad54c5f",
-    "version": "20251230.0001"
+    "hash": "f125a6e60d3ce62298bc07110e55082872f8041bb673a0cc87fd67bcee742cd0",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "cdc66b17-36b4-4436-813e-9d121964224b",
     "rule_name": "检测Golang Sqlx SQL注入漏洞",
-    "hash": "a674f6a8c11e46d14529ae33b9188315b33119663862fdefb8d796b1224c4645",
-    "version": "20251230.0001"
+    "hash": "e9042a01690062d2635a09c1f8197af4479d71fd05c30224dd0aa53716fe3f27",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "2b4b5d82-965c-4e2c-ac36-72d950f9143e",
@@ -1196,20 +1196,20 @@
   {
     "rule_id": "21d79f98-a435-4c84-81be-055ac21b94ef",
     "rule_name": "检测 Java SQL 语句拼接漏洞",
-    "hash": "9fa495c25765a9cb945697f2c1e51be7d40a00566b98f8939dd8b77136804f85",
-    "version": "20251230.0001"
+    "hash": "7e30067107844f6fc8bf061909ce2acf60476ee717ac1832368fa50d6a6fe950",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
     "rule_name": "检测Java SQL注入漏洞",
-    "hash": "ee78581935cdcd3e77fd853e3da8a2fa135dde4f252be940a7859e7394c60cf1",
-    "version": "20251230.0001"
+    "hash": "d481ac7a1692cdaf819c1bfd890a434a225afc16601fa29ea75392b7f40879f5",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "e53aa369-2d16-445a-a9e9-fb2155791246",
     "rule_name": "检测Java拼接SQL字符串漏洞",
-    "hash": "3f92ffe11ceef421074dfcab566c584cc755136c0e74193ab532a688a93f8a12",
-    "version": "20251230.0001"
+    "hash": "2955dfac2eeb45ac918540dcce2952d4379a5f46358af08c64d4b5a0dc16de93",
+    "version": "20260127.0001"
   },
   {
     "rule_id": "3c87f027-8ccb-487d-8183-b2773ceba895",
