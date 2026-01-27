@@ -891,6 +891,99 @@ func TestOpsKeyAuthenticationWithApiKeyCreation(t *testing.T) {
 	assert.False(t, authInfo.IsAdmin())
 }
 
+// TestOpsKeyCreateApiKeyEndToEnd tests the complete flow of creating an API key via X-Ops-Key
+func TestOpsKeyCreateApiKeyEndToEnd(t *testing.T) {
+	// Initialize test database
+	initTestDB(t)
+	defer cleanupTestDB()
+
+	// Create a test OPS user
+	testOpsKey := "ops-e2e-test-" + "12345678-1234-1234-1234-123456789012"
+	testUser := &schema.OpsUser{
+		Username:     "e2e_test_ops_user",
+		Password:     "hashed_password",
+		OpsKey:       testOpsKey,
+		Role:         "ops",
+		Active:       true,
+		DefaultLimit: 52428800,
+	}
+	err := SaveOpsUser(testUser)
+	require.NoError(t, err)
+
+	// Get the user to verify ID
+	retrievedUser, err := GetOpsUserByOpsKey(testOpsKey)
+	require.NoError(t, err)
+	require.NotNil(t, retrievedUser)
+
+	// Create middleware
+	config := DefaultAuthConfig()
+	serverConfig := NewServerConfig()
+	middleware := NewAuthMiddleware(serverConfig, config)
+
+	// Simulate a request with X-Ops-Key
+	req := httptest.NewRequest("POST", "/ops/api/create-api-key", nil)
+	req.Header.Set("X-Ops-Key", testOpsKey)
+
+	// Get auth info (this is what the handler will receive)
+	authInfo := middleware.GetAuthInfo(req)
+
+	// Verify auth info is correct
+	require.True(t, authInfo.Authenticated, "User should be authenticated")
+	require.True(t, authInfo.IsOps(), "User should be OPS role")
+	require.Equal(t, retrievedUser.ID, authInfo.UserID, "UserID should match OPS user ID")
+	require.Equal(t, retrievedUser.Username, authInfo.Username, "Username should match OPS username")
+
+	t.Logf("OPS user authenticated: ID=%d, Username=%s, Role=%s",
+		authInfo.UserID, authInfo.Username, authInfo.Role)
+
+	// Verify GetOpsUserByID works with the authInfo.UserID
+	userFromAuthInfo, err := GetOpsUserByID(authInfo.UserID)
+	require.NoError(t, err, "Should be able to get OPS user by authInfo.UserID")
+	require.Equal(t, retrievedUser.Username, userFromAuthInfo.Username)
+
+	t.Logf("Verified OPS user retrieval: ID=%d, Username=%s", userFromAuthInfo.ID, userFromAuthInfo.Username)
+}
+
+// TestLegacyFallbackOpsKeyAuth tests that legacy fallback also supports X-Ops-Key
+func TestLegacyFallbackOpsKeyAuth(t *testing.T) {
+	// Initialize test database
+	initTestDB(t)
+	defer cleanupTestDB()
+
+	// Create a test OPS user
+	testOpsKey := "ops-legacy-test-" + "12345678-1234-1234-1234-123456789012"
+	testUser := &schema.OpsUser{
+		Username:     "legacy_test_ops_user",
+		Password:     "hashed_password",
+		OpsKey:       testOpsKey,
+		Role:         "ops",
+		Active:       true,
+		DefaultLimit: 52428800,
+	}
+	err := SaveOpsUser(testUser)
+	require.NoError(t, err)
+
+	// Create server config WITHOUT AuthMiddleware (to test legacy fallback)
+	serverConfig := NewServerConfig()
+	serverConfig.AuthMiddleware = nil // Force legacy fallback
+
+	// Create a mock request with X-Ops-Key header
+	req := httptest.NewRequest("POST", "/ops/api/create-api-key", nil)
+	req.Header.Set("X-Ops-Key", testOpsKey)
+
+	// Call getAuthInfo directly (this uses legacy fallback when AuthMiddleware is nil)
+	authInfo := serverConfig.getAuthInfo(req)
+
+	// Verify authentication via legacy fallback
+	assert.True(t, authInfo.Authenticated, "Legacy fallback should authenticate via X-Ops-Key")
+	assert.Equal(t, RoleOps, authInfo.Role, "Role should be OPS")
+	assert.Equal(t, testUser.Username, authInfo.Username, "Username should match")
+	assert.True(t, authInfo.UserID > 0, "UserID should be set")
+
+	t.Logf("Legacy fallback OPS auth: ID=%d, Username=%s, Role=%s",
+		authInfo.UserID, authInfo.Username, authInfo.Role)
+}
+
 // Helper functions for test database initialization
 
 func initTestDB(t *testing.T) {
@@ -910,6 +1003,6 @@ func cleanupTestDB() {
 	db := GetDB()
 	if db != nil {
 		// Clean up test data
-		db.Exec("DELETE FROM ops_users WHERE username LIKE 'test_%' OR username LIKE 'inactive_%' OR username LIKE 'apikey_%'")
+		db.Exec("DELETE FROM ops_users WHERE username LIKE 'test_%' OR username LIKE 'inactive_%' OR username LIKE 'apikey_%' OR username LIKE 'e2e_%' OR username LIKE 'legacy_%'")
 	}
 }
