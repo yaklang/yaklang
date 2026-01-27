@@ -7,7 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 )
+
+func init() {
+	// Initialize database for tests
+	consts.InitializeYakitDatabase("", "", "")
+}
 
 // ==================== UserRole Tests ====================
 
@@ -728,4 +735,181 @@ func TestGetPublicPaths(t *testing.T) {
 	paths[0] = "/modified"
 	originalPaths := config.GetPublicPaths()
 	assert.Equal(t, "/public1", originalPaths[0])
+}
+
+// ==================== X-Ops-Key Authentication Tests ====================
+
+func TestAuthMiddlewareGetAuthInfoWithOpsKey(t *testing.T) {
+	// Initialize test database
+	initTestDB(t)
+	defer cleanupTestDB()
+
+	// Create a test OPS user
+	testOpsKey := "ops-test-" + "12345678-1234-1234-1234-123456789012"
+	testUser := &schema.OpsUser{
+		Username: "test_ops_user",
+		Password: "hashed_password",
+		OpsKey:   testOpsKey,
+		Role:     "ops",
+		Active:   true,
+	}
+	err := SaveOpsUser(testUser)
+	require.NoError(t, err)
+
+	// Create middleware
+	config := DefaultAuthConfig()
+	serverConfig := NewServerConfig()
+	middleware := NewAuthMiddleware(serverConfig, config)
+
+	tests := []struct {
+		name                string
+		opsKey              string
+		expectAuthenticated bool
+		expectRole          UserRole
+		expectUsername      string
+	}{
+		{
+			name:                "valid ops key authenticates successfully",
+			opsKey:              testOpsKey,
+			expectAuthenticated: true,
+			expectRole:          RoleOps,
+			expectUsername:      "test_ops_user",
+		},
+		{
+			name:                "invalid ops key fails authentication",
+			opsKey:              "ops-invalid-key",
+			expectAuthenticated: false,
+			expectRole:          RoleNone,
+			expectUsername:      "",
+		},
+		{
+			name:                "empty ops key does not authenticate",
+			opsKey:              "",
+			expectAuthenticated: false,
+			expectRole:          RoleNone,
+			expectUsername:      "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/ops/api/create-api-key", nil)
+			if tt.opsKey != "" {
+				req.Header.Set("X-Ops-Key", tt.opsKey)
+			}
+
+			authInfo := middleware.GetAuthInfo(req)
+
+			assert.Equal(t, tt.expectAuthenticated, authInfo.Authenticated)
+			assert.Equal(t, tt.expectRole, authInfo.Role)
+			if tt.expectAuthenticated {
+				assert.Equal(t, tt.expectUsername, authInfo.Username)
+				assert.True(t, authInfo.UserID > 0)
+			}
+		})
+	}
+}
+
+func TestAuthMiddlewareGetAuthInfoWithInactiveOpsUser(t *testing.T) {
+	// Initialize test database
+	initTestDB(t)
+	defer cleanupTestDB()
+
+	// Create an inactive OPS user
+	testOpsKey := "ops-inactive-" + "12345678-1234-1234-1234-123456789012"
+	testUser := &schema.OpsUser{
+		Username: "inactive_ops_user",
+		Password: "hashed_password",
+		OpsKey:   testOpsKey,
+		Role:     "ops",
+		Active:   true, // Create as active first
+	}
+	err := SaveOpsUser(testUser)
+	require.NoError(t, err)
+
+	// Now explicitly set Active to false using Select to force update of boolean zero value
+	err = GetDB().Model(testUser).Select("active").Updates(map[string]interface{}{"active": false}).Error
+	require.NoError(t, err)
+
+	// Create middleware
+	config := DefaultAuthConfig()
+	serverConfig := NewServerConfig()
+	middleware := NewAuthMiddleware(serverConfig, config)
+
+	req := httptest.NewRequest("POST", "/ops/api/create-api-key", nil)
+	req.Header.Set("X-Ops-Key", testOpsKey)
+
+	authInfo := middleware.GetAuthInfo(req)
+
+	// Inactive user should not be authenticated
+	assert.False(t, authInfo.Authenticated)
+	assert.Equal(t, RoleNone, authInfo.Role)
+}
+
+func TestOpsKeyAuthenticationWithApiKeyCreation(t *testing.T) {
+	// Initialize test database
+	initTestDB(t)
+	defer cleanupTestDB()
+
+	// Create a test OPS user
+	testOpsKey := "ops-apikey-test-" + "12345678-1234-1234-1234-123456789012"
+	testUser := &schema.OpsUser{
+		Username:     "apikey_test_user",
+		Password:     "hashed_password",
+		OpsKey:       testOpsKey,
+		Role:         "ops",
+		Active:       true,
+		DefaultLimit: 52428800, // 50MB
+	}
+	err := SaveOpsUser(testUser)
+	require.NoError(t, err)
+
+	// Verify we can retrieve the user by OpsKey
+	retrievedUser, err := GetOpsUserByOpsKey(testOpsKey)
+	require.NoError(t, err)
+	assert.Equal(t, testUser.Username, retrievedUser.Username)
+	assert.True(t, retrievedUser.Active)
+
+	// Create middleware and verify authentication
+	config := DefaultAuthConfig()
+	serverConfig := NewServerConfig()
+	middleware := NewAuthMiddleware(serverConfig, config)
+
+	req := httptest.NewRequest("POST", "/ops/api/create-api-key", nil)
+	req.Header.Set("X-Ops-Key", testOpsKey)
+
+	authInfo := middleware.GetAuthInfo(req)
+
+	// Verify authentication is successful and user info is correct
+	assert.True(t, authInfo.Authenticated)
+	assert.Equal(t, RoleOps, authInfo.Role)
+	assert.Equal(t, "apikey_test_user", authInfo.Username)
+	assert.Equal(t, retrievedUser.ID, authInfo.UserID)
+
+	// Verify IsOps() returns true
+	assert.True(t, authInfo.IsOps())
+	assert.False(t, authInfo.IsAdmin())
+}
+
+// Helper functions for test database initialization
+
+func initTestDB(t *testing.T) {
+	t.Helper()
+	db := GetDB()
+	if db == nil {
+		t.Skip("Database not initialized, skipping test")
+	}
+	// Auto-migrate schemas if needed
+	result := db.AutoMigrate(&schema.OpsUser{}, &schema.OpsActionLog{}, &schema.AiApiKeys{}, &schema.LoginSession{})
+	if result != nil && result.Error != nil {
+		t.Fatalf("Failed to auto-migrate schemas: %v", result.Error)
+	}
+}
+
+func cleanupTestDB() {
+	db := GetDB()
+	if db != nil {
+		// Clean up test data
+		db.Exec("DELETE FROM ops_users WHERE username LIKE 'test_%' OR username LIKE 'inactive_%' OR username LIKE 'apikey_%'")
+	}
 }
