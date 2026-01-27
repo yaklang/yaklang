@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -99,20 +100,14 @@ func ClearBlackListPlugin(blackList []string) {
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-
 		ClearBlackListPlugin(BlackListCorePlugin)
 
-		if !consts.IsDevMode() {
-			const key = "cd336beba498c97738c275f6771efca3"
-			if yakit.Get(key) == consts.ExistedCorePluginEmbedFSHash {
-				return nil
-			}
+		const key = "cd336beba498c97738c275f6771efca3"
+		return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedCorePluginEmbedFSHash).MonitorModifiedWithAction(func() string {
+			hash, _ := CorePluginHash()
+			return hash
+		}, func() error {
 			log.Debug("start to load core plugin")
-			defer func() {
-				hash, _ := CorePluginHash()
-				yakit.Set(key, hash)
-			}()
-		}
 
 		registerBuildInPlugin(
 			"mitm",
@@ -414,6 +409,7 @@ func init() {
 			withPluginIgnore(true),
 		)
 		return nil
+		})
 	}, "sync-core-plugin-for-yakit")
 
 }
