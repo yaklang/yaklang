@@ -705,6 +705,10 @@ func (c *ServerConfig) HandleOpsPortalRequest(conn net.Conn, request *http.Reque
 		c.handleOpsGetMyKeys(conn, request, authInfo)
 	case uriIns.Path == "/ops/api/delete-api-key" && request.Method == "POST":
 		c.handleOpsDeleteApiKey(conn, request, authInfo)
+	case uriIns.Path == "/ops/api/update-api-key" && request.Method == "POST":
+		c.handleOpsUpdateApiKey(conn, request, authInfo)
+	case uriIns.Path == "/ops/api/reset-traffic" && request.Method == "POST":
+		c.handleOpsResetApiKeyTraffic(conn, request, authInfo)
 
 	// ========== OPS Self-Service ==========
 	case uriIns.Path == "/ops/my-info" && request.Method == "GET":

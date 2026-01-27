@@ -17,6 +17,7 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            position: relative;
         }
         .login-card {
             background: white;
@@ -38,33 +39,6 @@
             color: #666;
             margin-bottom: 24px;
             font-size: 14px;
-        }
-        .login-tabs {
-            display: flex;
-            margin-bottom: 24px;
-            border-bottom: 2px solid #eee;
-        }
-        .login-tab {
-            flex: 1;
-            padding: 12px 16px;
-            text-align: center;
-            cursor: pointer;
-            color: #666;
-            font-weight: 500;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
-            transition: all 0.3s;
-        }
-        .login-tab:hover {
-            color: #333;
-        }
-        .login-tab.active {
-            color: #4285f4;
-            border-bottom-color: #4285f4;
-        }
-        .login-tab.ops-tab.active {
-            color: #e94560;
-            border-bottom-color: #e94560;
         }
         .login-form {
             display: none;
@@ -94,19 +68,18 @@
         }
         input[type="password"]:focus,
         input[type="text"]:focus {
-            border-color: #4285f4;
-            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
-        }
-        .ops-form input[type="password"]:focus,
-        .ops-form input[type="text"]:focus {
             border-color: #e94560;
             box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+        }
+        .admin-form input[type="password"]:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
         }
         .btn {
             display: block;
             width: 100%;
             padding: 12px 16px;
-            background-color: #4285f4;
+            background-color: #e94560;
             color: white;
             border: none;
             border-radius: 6px;
@@ -117,21 +90,21 @@
             transition: all 0.3s;
         }
         .btn:hover {
-            background-color: #3367d6;
+            background-color: #c73659;
             transform: translateY(-1px);
         }
         .btn:active {
-            background-color: #2850a7;
+            background-color: #a62d4a;
             transform: translateY(0);
         }
-        .btn-ops {
-            background-color: #e94560;
+        .btn-admin {
+            background-color: #4285f4;
         }
-        .btn-ops:hover {
-            background-color: #c73659;
+        .btn-admin:hover {
+            background-color: #3367d6;
         }
-        .btn-ops:active {
-            background-color: #a62d4a;
+        .btn-admin:active {
+            background-color: #2850a7;
         }
         .badge {
             display: inline-block;
@@ -142,13 +115,13 @@
             margin-left: 6px;
             vertical-align: middle;
         }
-        .badge-admin {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
         .badge-ops {
             background: #fce4ec;
             color: #c2185b;
+        }
+        .badge-admin {
+            background: #e3f2fd;
+            color: #1565c0;
         }
         .error-message {
             background: #ffebee;
@@ -175,35 +148,55 @@
         .help-text a:hover {
             text-decoration: underline;
         }
+        /* Admin login link - positioned at bottom right corner */
+        .admin-corner-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            color: #666;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .admin-corner-link:hover {
+            background: white;
+            border-color: #4285f4;
+            color: #4285f4;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        .admin-corner-link .badge {
+            margin-left: 4px;
+        }
+        /* Back to OPS link (shown when in admin mode) */
+        .back-to-ops {
+            text-align: center;
+            margin-top: 16px;
+        }
+        .back-to-ops a {
+            color: #666;
+            font-size: 13px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .back-to-ops a:hover {
+            color: #e94560;
+        }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h1>AIBalancer Portal</h1>
-        <p class="subtitle">Select login type</p>
-        
-        <div class="login-tabs">
-            <div class="login-tab active" data-tab="admin" onclick="switchLoginTab('admin')">
-                Admin <span class="badge badge-admin">ROOT</span>
-            </div>
-            <div class="login-tab ops-tab" data-tab="ops" onclick="switchLoginTab('ops')">
-                OPS User <span class="badge badge-ops">OPS</span>
-            </div>
-        </div>
+        <p class="subtitle" id="login-subtitle">OPS User Login <span class="badge badge-ops">OPS</span></p>
         
         <div class="error-message" id="error-message"></div>
         
-        <!-- Admin Login Form -->
-        <form action="/portal/login" method="post" class="login-form active" id="admin-form">
-            <div class="form-group">
-                <label for="admin-password">Admin Secret</label>
-                <input type="password" id="admin-password" name="password" required placeholder="Enter admin secret">
-            </div>
-            <button type="submit" class="btn">Login as Admin</button>
-        </form>
-        
-        <!-- OPS User Login Form -->
-        <form action="/ops/login" method="post" class="login-form ops-form" id="ops-form">
+        <!-- OPS User Login Form (Default) -->
+        <form action="/ops/login" method="post" class="login-form active" id="ops-form">
             <div class="form-group">
                 <label for="ops-username">Username</label>
                 <input type="text" id="ops-username" name="username" required placeholder="Enter username" autocomplete="username">
@@ -212,7 +205,19 @@
                 <label for="ops-password">Password</label>
                 <input type="password" id="ops-password" name="password" required placeholder="Enter password" autocomplete="current-password">
             </div>
-            <button type="submit" class="btn btn-ops">Login as OPS User</button>
+            <button type="submit" class="btn">Login</button>
+        </form>
+        
+        <!-- Admin Login Form -->
+        <form action="/portal/login" method="post" class="login-form admin-form" id="admin-form">
+            <div class="form-group">
+                <label for="admin-password">Admin Secret</label>
+                <input type="password" id="admin-password" name="password" required placeholder="Enter admin secret">
+            </div>
+            <button type="submit" class="btn btn-admin">Login as Admin</button>
+            <div class="back-to-ops">
+                <a onclick="switchLoginTab('ops')">Back to OPS Login</a>
+            </div>
         </form>
         
         <div class="help-text">
@@ -220,15 +225,28 @@
         </div>
     </div>
     
+    <!-- Admin login link at bottom right corner -->
+    <div class="admin-corner-link" id="admin-corner-link" onclick="switchLoginTab('admin')">
+        Admin Login <span class="badge badge-admin">ROOT</span>
+    </div>
+    
     <script>
         function switchLoginTab(tab) {
-            // Update tabs
-            document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.login-tab[data-tab="${tab}"]`).classList.add('active');
+            const subtitle = document.getElementById('login-subtitle');
+            const adminCornerLink = document.getElementById('admin-corner-link');
             
             // Update forms
             document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
             document.getElementById(tab + '-form').classList.add('active');
+            
+            // Update subtitle and corner link visibility
+            if (tab === 'admin') {
+                subtitle.innerHTML = 'Admin Login <span class="badge badge-admin">ROOT</span>';
+                adminCornerLink.style.display = 'none';
+            } else {
+                subtitle.innerHTML = 'OPS User Login <span class="badge badge-ops">OPS</span>';
+                adminCornerLink.style.display = 'block';
+            }
             
             // Clear error
             document.getElementById('error-message').classList.remove('show');
@@ -243,15 +261,15 @@
             
             switch(error) {
                 case 'invalid_password':
+                    // Admin login error - switch to admin tab
                     errorDiv.textContent = 'Invalid admin secret. Please try again.';
+                    switchLoginTab('admin');
                     break;
                 case 'invalid_credentials':
                     errorDiv.textContent = 'Invalid username or password. Please try again.';
-                    switchLoginTab('ops');
                     break;
                 case 'account_disabled':
                     errorDiv.textContent = 'Your account has been disabled. Please contact administrator.';
-                    switchLoginTab('ops');
                     break;
                 case 'server_error':
                     errorDiv.textContent = 'Server error. Please try again later.';
@@ -261,10 +279,8 @@
             }
         }
         
-        // Auto-switch to OPS tab if coming from /ops
-        if (window.location.pathname.startsWith('/ops')) {
-            switchLoginTab('ops');
-        }
+        // Default is always OPS login - Admin is only shown when explicitly clicked
+        // or when there's an admin login error (invalid_password)
     </script>
 </body>
 </html>

@@ -51,18 +51,55 @@
                     <div id="create-key-alert" class="alert hidden"></div>
                     
                     <form id="create-key-form">
+                        <!-- Model Selection -->
                         <div class="form-group">
-                            <label for="allowed-models">Allowed Models</label>
-                            <select id="allowed-models" multiple required>
-                                <option value="">Loading models...</option>
-                            </select>
-                            <p class="form-hint">Hold Ctrl/Cmd to select multiple models. At least one model is required.</p>
+                            <label>Allowed Models</label>
+                            <div class="model-selection">
+                                <div class="model-selection-header">
+                                    <span class="title">Select Models</span>
+                                    <div class="actions">
+                                        <button type="button" class="btn-text" onclick="selectAllModels()">Select All</button>
+                                        <button type="button" class="btn-text" onclick="clearAllModels()">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="model-list" id="model-list">
+                                    <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                                </div>
+                                <div class="glob-input-section">
+                                    <div class="title">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <path d="M21 21l-4.35-4.35"></path>
+                                        </svg>
+                                        Glob Patterns (Advanced)
+                                    </div>
+                                    <input type="text" id="glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*">
+                                    <div class="hint">Comma-separated glob patterns. Use <code>*</code> as wildcard. Example: <code>memfit-*</code> matches all memfit models.</div>
+                                </div>
+                                <div class="selected-preview" id="selected-preview">
+                                    <strong>Selected:</strong> <span id="selected-count">0</span> models
+                                </div>
+                            </div>
                         </div>
                         
+                        <!-- Traffic Limit Toggle -->
                         <div class="form-group">
-                            <label for="traffic-limit">Traffic Limit (bytes)</label>
-                            <input type="number" id="traffic-limit" placeholder="Leave empty to use default limit" min="0">
-                            <p class="form-hint">Default limit: <span id="default-limit-hint">--</span>. Traffic limit is always enforced for OPS-created keys.</p>
+                            <label>Traffic Settings</label>
+                            <div class="toggle-group active" id="unlimited-toggle">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="unlimited-traffic" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <div class="toggle-label">
+                                    <div class="title">Unlimited Traffic</div>
+                                    <div class="desc" id="traffic-desc">API Key will have no traffic restrictions</div>
+                                </div>
+                            </div>
+                            
+                            <div id="traffic-limit-group" style="display: none;">
+                                <input type="number" id="traffic-limit" placeholder="Enter traffic limit in bytes" min="1">
+                                <p class="form-hint">Examples: 52428800 (50 MB), 104857600 (100 MB), 1073741824 (1 GB)</p>
+                            </div>
                         </div>
                         
                         <button type="submit" class="btn btn-primary">Generate API Key</button>
@@ -259,6 +296,81 @@
                         <button type="submit" class="btn btn-primary">Change Password</button>
                     </form>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit API Key Modal -->
+    <div id="edit-key-modal" class="modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeEditKeyModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit API Key</h3>
+                <button class="modal-close" onclick="closeEditKeyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-key-api-key">
+                
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="edit-key-display" readonly class="form-control-readonly">
+                </div>
+                
+                <!-- Model Selection -->
+                <div class="form-group">
+                    <label>Allowed Models</label>
+                    <div class="model-selection">
+                        <div class="model-selection-header">
+                            <span class="title">Select Models</span>
+                            <div class="actions">
+                                <button type="button" class="btn-text" onclick="editSelectAllModels()">Select All</button>
+                                <button type="button" class="btn-text" onclick="editClearAllModels()">Clear</button>
+                            </div>
+                        </div>
+                        <div class="model-list" id="edit-model-list">
+                            <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                        </div>
+                        <div class="glob-input-section">
+                            <div class="title">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="M21 21l-4.35-4.35"></path>
+                                </svg>
+                                Glob Patterns (Advanced)
+                            </div>
+                            <input type="text" id="edit-glob-patterns" placeholder="e.g., memfit-*,qwen*,gpt-4*">
+                            <div class="hint">Comma-separated glob patterns. Use <code>*</code> as wildcard.</div>
+                        </div>
+                        <div class="selected-preview" id="edit-selected-preview">
+                            <strong>Selected:</strong> <span>0</span> models
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Traffic Settings -->
+                <div class="form-group">
+                    <label>Traffic Settings</label>
+                    <div class="toggle-group" id="edit-unlimited-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="edit-unlimited-traffic">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-label">
+                            <div class="title">Unlimited Traffic</div>
+                            <div class="desc" id="edit-traffic-desc">API Key will have no traffic restrictions</div>
+                        </div>
+                    </div>
+                    
+                    <div id="edit-traffic-limit-group" style="display: none; margin-top: 10px;">
+                        <input type="number" id="edit-traffic-limit" placeholder="Enter traffic limit in bytes" min="1">
+                        <p class="form-hint">Current usage: <span id="edit-traffic-used">0 B</span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="resetEditKeyTraffic()">Reset Traffic</button>
+                <button class="btn btn-secondary" onclick="closeEditKeyModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEditKey()">Save Changes</button>
             </div>
         </div>
     </div>

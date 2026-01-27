@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -823,7 +824,8 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 
 	var reqBody struct {
 		AllowedModels []string `json:"allowed_models"`
-		TrafficLimit  int64    `json:"traffic_limit"` // Optional, uses default if not specified
+		TrafficLimit  int64    `json:"traffic_limit"` // Optional, 0 or negative means unlimited
+		Unlimited     bool     `json:"unlimited"`     // Explicitly set unlimited traffic
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -842,28 +844,38 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		return
 	}
 
-	// Use default traffic limit if not specified
-	trafficLimit := reqBody.TrafficLimit
-	if trafficLimit <= 0 {
-		trafficLimit = user.DefaultLimit
-	}
+	// Determine traffic limit settings
+	// OPS users can now create unlimited API keys
+	var trafficLimit int64 = 0
+	var trafficLimitEnable bool = false
 
-	// OPS users cannot create API keys with unlimited traffic
-	// Traffic limit is always enforced
-	if trafficLimit <= 0 {
-		trafficLimit = 52428800 // 50MB default
+	if reqBody.Unlimited {
+		// Explicitly unlimited
+		trafficLimit = 0
+		trafficLimitEnable = false
+	} else if reqBody.TrafficLimit > 0 {
+		// Use specified traffic limit
+		trafficLimit = reqBody.TrafficLimit
+		trafficLimitEnable = true
+	} else {
+		// Default: unlimited (no traffic restriction)
+		trafficLimit = 0
+		trafficLimitEnable = false
 	}
 
 	// Generate API key
 	apiKey := "mf-" + uuid.New().String()
 
+	// Sort allowed models for consistent storage
+	sort.Strings(reqBody.AllowedModels)
+	
 	// Create API key record
 	allowedModelsStr := strings.Join(reqBody.AllowedModels, ",")
 	apiKeyRecord := &schema.AiApiKeys{
 		APIKey:             apiKey,
 		AllowedModels:      allowedModelsStr,
 		Active:             true,
-		TrafficLimitEnable: true, // Always enabled for OPS-created keys
+		TrafficLimitEnable: trafficLimitEnable,
 		TrafficLimit:       trafficLimit,
 		TrafficUsed:        0,
 		CreatedByOpsID:     user.ID,
@@ -886,13 +898,20 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 		return
 	}
 
-	log.Infof("OPS user %s created API key: %s with traffic limit: %d bytes",
-		user.Username, apiKey[:20]+"...", trafficLimit)
+	if trafficLimitEnable {
+		log.Infof("OPS user %s created API key: %s with traffic limit: %d bytes",
+			user.Username, apiKey[:20]+"...", trafficLimit)
+	} else {
+		log.Infof("OPS user %s created API key: %s with unlimited traffic",
+			user.Username, apiKey[:20]+"...")
+	}
 
 	// Log the action
 	detailJSON, _ := json.Marshal(map[string]interface{}{
-		"allowed_models": reqBody.AllowedModels,
-		"traffic_limit":  trafficLimit,
+		"allowed_models":       reqBody.AllowedModels,
+		"traffic_limit":        trafficLimit,
+		"traffic_limit_enable": trafficLimitEnable,
+		"unlimited":            !trafficLimitEnable,
 	})
 	LogOpsAction(user.ID, user.Username, "create_api_key", "api_key", fmt.Sprintf("%d", apiKeyRecord.ID), string(detailJSON), request)
 
@@ -902,11 +921,13 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 	}
 
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"success":        true,
-		"api_key":        apiKey,
-		"allowed_models": reqBody.AllowedModels,
-		"traffic_limit":  trafficLimit,
-		"message":        "API key created successfully",
+		"success":              true,
+		"api_key":              apiKey,
+		"allowed_models":       reqBody.AllowedModels,
+		"traffic_limit":        trafficLimit,
+		"traffic_limit_enable": trafficLimitEnable,
+		"unlimited":            !trafficLimitEnable,
+		"message":              "API key created successfully",
 	})
 }
 
@@ -944,13 +965,19 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 	// Format response
 	keys := make([]map[string]interface{}, 0, len(apiKeys))
 	for _, key := range apiKeys {
+		// Sort allowed models for consistent display
+		models := strings.Split(key.AllowedModels, ",")
+		sort.Strings(models)
+		
 		keys = append(keys, map[string]interface{}{
-			"id":             key.ID,
-			"api_key":        key.APIKey,
-			"allowed_models": strings.Split(key.AllowedModels, ","),
-			"traffic_used":   key.TrafficUsed,
-			"traffic_limit":  key.TrafficLimit,
-			"created_at":     key.CreatedAt.Format("2006-01-02 15:04:05"),
+			"id":                   key.ID,
+			"api_key":              key.APIKey,
+			"allowed_models":       models,
+			"traffic_used":         key.TrafficUsed,
+			"traffic_limit":        key.TrafficLimit,
+			"traffic_limit_enable": key.TrafficLimitEnable,
+			"active":               key.Active,
+			"created_at":           key.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1051,6 +1078,215 @@ func (c *ServerConfig) handleOpsDeleteApiKey(conn net.Conn, request *http.Reques
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "API key deleted successfully",
+	})
+}
+
+// handleOpsUpdateApiKey handles POST /ops/api/update-api-key
+// Allows OPS user to update their own API keys (allowed models, traffic settings)
+func (c *ServerConfig) handleOpsUpdateApiKey(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
+	c.logInfo("Handling OPS update API key request")
+
+	// Auth check - must be OPS user
+	if !authInfo.IsOps() {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "OPS user access required",
+		})
+		return
+	}
+
+	// Parse request body
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()
+
+	var reqBody struct {
+		ApiKey        string   `json:"api_key"`
+		AllowedModels []string `json:"allowed_models"`
+		TrafficLimit  int64    `json:"traffic_limit"`
+		Unlimited     bool     `json:"unlimited"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to parse request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	if reqBody.ApiKey == "" {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "API key is required",
+		})
+		return
+	}
+
+	db := GetDB()
+	if db == nil {
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Database not initialized",
+		})
+		return
+	}
+
+	// Find the API key and verify ownership
+	var apiKey schema.AiApiKeys
+	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
+		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
+			"error": "API key not found",
+		})
+		return
+	}
+
+	// Verify this key was created by the current OPS user
+	if apiKey.CreatedByOpsID != authInfo.UserID {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "You can only update API keys you created",
+		})
+		return
+	}
+
+	// Update allowed models if provided
+	if len(reqBody.AllowedModels) > 0 {
+		// Sort models for consistent ordering
+		sort.Strings(reqBody.AllowedModels)
+		apiKey.AllowedModels = strings.Join(reqBody.AllowedModels, ",")
+	}
+
+	// Update traffic settings
+	if reqBody.Unlimited {
+		apiKey.TrafficLimitEnable = false
+		apiKey.TrafficLimit = 0
+	} else if reqBody.TrafficLimit > 0 {
+		apiKey.TrafficLimitEnable = true
+		apiKey.TrafficLimit = reqBody.TrafficLimit
+	}
+
+	// Save changes
+	if err := db.Save(&apiKey).Error; err != nil {
+		c.logError("Failed to update API key: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to update API key",
+		})
+		return
+	}
+
+	// Log the action
+	detailJSON, _ := json.Marshal(map[string]interface{}{
+		"allowed_models":       reqBody.AllowedModels,
+		"traffic_limit":        apiKey.TrafficLimit,
+		"traffic_limit_enable": apiKey.TrafficLimitEnable,
+	})
+	LogOpsAction(authInfo.UserID, authInfo.Username, "update_api_key", "api_key", fmt.Sprintf("%d", apiKey.ID), string(detailJSON), request)
+
+	// Reload API keys to update in-memory cache
+	if err := c.LoadAPIKeysFromDB(); err != nil {
+		c.logError("Failed to reload API keys: %v", err)
+	}
+
+	log.Infof("OPS user %s updated API key: %s", authInfo.Username, reqBody.ApiKey[:20]+"...")
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success":              true,
+		"message":              "API key updated successfully",
+		"traffic_limit":        apiKey.TrafficLimit,
+		"traffic_limit_enable": apiKey.TrafficLimitEnable,
+		"allowed_models":       reqBody.AllowedModels,
+	})
+}
+
+// handleOpsResetApiKeyTraffic handles POST /ops/api/reset-traffic
+// Allows OPS user to reset traffic counter for their own API keys
+func (c *ServerConfig) handleOpsResetApiKeyTraffic(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
+	c.logInfo("Handling OPS reset API key traffic request")
+
+	// Auth check - must be OPS user
+	if !authInfo.IsOps() {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "OPS user access required",
+		})
+		return
+	}
+
+	// Parse request body
+	bodyBytes, err := io.ReadAll(request.Body)
+	if err != nil {
+		c.logError("Failed to read request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Failed to read request body",
+		})
+		return
+	}
+	defer request.Body.Close()
+
+	var reqBody struct {
+		ApiKey string `json:"api_key"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+		c.logError("Failed to parse request body: %v", err)
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	if reqBody.ApiKey == "" {
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
+			"error": "API key is required",
+		})
+		return
+	}
+
+	db := GetDB()
+	if db == nil {
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Database not initialized",
+		})
+		return
+	}
+
+	// Find the API key and verify ownership
+	var apiKey schema.AiApiKeys
+	if err := db.Where("api_key = ?", reqBody.ApiKey).First(&apiKey).Error; err != nil {
+		c.writeJSONResponse(conn, http.StatusNotFound, map[string]string{
+			"error": "API key not found",
+		})
+		return
+	}
+
+	// Verify this key was created by the current OPS user
+	if apiKey.CreatedByOpsID != authInfo.UserID {
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error": "You can only reset traffic for API keys you created",
+		})
+		return
+	}
+
+	// Reset traffic
+	apiKey.TrafficUsed = 0
+	if err := db.Save(&apiKey).Error; err != nil {
+		c.logError("Failed to reset API key traffic: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to reset traffic",
+		})
+		return
+	}
+
+	// Log the action
+	LogOpsAction(authInfo.UserID, authInfo.Username, "reset_api_key_traffic", "api_key", fmt.Sprintf("%d", apiKey.ID), "", request)
+
+	log.Infof("OPS user %s reset traffic for API key: %s", authInfo.Username, reqBody.ApiKey[:20]+"...")
+
+	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Traffic reset successfully",
 	})
 }
 
