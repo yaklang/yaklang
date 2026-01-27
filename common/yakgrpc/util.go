@@ -431,6 +431,20 @@ func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 			res = append(res, item)
 			continue
 		}
+		isRawHTTP := item.Key == "raw"
+
+		// 特殊处理：字符串数组中包含多行字符串，标记为需要 literal 处理
+		if strArray, ok := item.Value.([]string); ok && isRawHTTP && len(strArray) > 0 {
+			// 使用特殊前缀标记，类似 __comment__ 的处理方式
+			// 将数组编码为特殊格式：__literal_array__:hexencoded
+			var encoded []string
+			for _, str := range strArray {
+				encoded = append(encoded, codec.EncodeToHex(str))
+			}
+			// 用特殊格式存储：使用单个字符串，用 | 分隔各个元素的 hex
+			item.Value = "__literal_array__:" + strings.Join(encoded, "|")
+		}
+
 		switch ret := item.Value.(type) {
 		case *YamlMapBuilder:
 			item.Value = ret.FilterEmptyField()
@@ -531,6 +545,57 @@ func (m *YamlMapBuilder) MarshalToString() (string, error) {
 			}
 			continue
 		}
+
+		// 处理 literal array 标记（新增逻辑，参考 __comment__ 的处理方式）
+		if strings.Contains(line, "__literal_array__:") {
+			// 提取字段名和编码的数组内容
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				fieldPart := parts[0]
+				encodedPart := strings.TrimSpace(parts[1])
+
+				encodedPart = strings.Trim(encodedPart, "\"")
+				if strings.HasPrefix(encodedPart, "__literal_array__:") {
+					padding := strings.Repeat(" ", len(fieldPart)-len(strings.TrimLeft(fieldPart, " ")))
+					fieldName := strings.TrimSpace(fieldPart)
+
+					// 输出字段名
+					res += padding + fieldName + ":\n"
+
+					// 解码数组内容
+					encodedArray := strings.TrimPrefix(encodedPart, "__literal_array__:")
+					hexParts := strings.Split(encodedArray, "|")
+
+					// 输出为 literal block scalar 格式
+					for i, hexStr := range hexParts {
+						decoded, err := codec.DecodeHex(hexStr)
+						if err != nil {
+							log.Errorf("decode hex literal array failed: %s", err)
+							continue
+						}
+
+						// 输出 literal block scalar: |
+						res += padding + "  - |\n"
+						contentLines := strings.Split(string(decoded), "\n")
+						// 移除末尾的空字符串（由末尾换行符产生）
+						// 因为 | 格式会自动在末尾添加一个换行
+						for len(contentLines) > 0 && contentLines[len(contentLines)-1] == "" {
+							contentLines = contentLines[:len(contentLines)-1]
+						}
+						for _, contentLine := range contentLines {
+							res += padding + "    " + contentLine + "\n"
+						}
+
+						// 在每个请求之间添加一个空行（最后一个除外），符合 Nuclei 官方格式
+						if i < len(hexParts)-1 {
+							res += "\n"
+						}
+					}
+					continue
+				}
+			}
+		}
+
 		if strings.Contains(line, "__empty_line__") {
 			line = ""
 		}
