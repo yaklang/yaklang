@@ -24,17 +24,56 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 40px;
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
         }
         h1 {
             text-align: center;
             color: #1a1a1a;
-            margin-bottom: 24px;
+            margin-bottom: 8px;
             font-size: 24px;
             font-weight: 600;
         }
-        .form-group {
+        .subtitle {
+            text-align: center;
+            color: #666;
             margin-bottom: 24px;
+            font-size: 14px;
+        }
+        .login-tabs {
+            display: flex;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #eee;
+        }
+        .login-tab {
+            flex: 1;
+            padding: 12px 16px;
+            text-align: center;
+            cursor: pointer;
+            color: #666;
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.3s;
+        }
+        .login-tab:hover {
+            color: #333;
+        }
+        .login-tab.active {
+            color: #4285f4;
+            border-bottom-color: #4285f4;
+        }
+        .login-tab.ops-tab.active {
+            color: #e94560;
+            border-bottom-color: #e94560;
+        }
+        .login-form {
+            display: none;
+        }
+        .login-form.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
         }
         label {
             display: block;
@@ -43,51 +82,189 @@
             font-weight: 500;
             font-size: 14px;
         }
-        input[type="password"] {
+        input[type="password"],
+        input[type="text"] {
             width: 100%;
-            padding: 10px 12px;
+            padding: 12px 14px;
             border: 1px solid #d9d9d9;
-            border-radius: 4px;
-            font-size: 16px;
+            border-radius: 6px;
+            font-size: 15px;
             transition: all 0.3s;
             outline: none;
         }
-        input[type="password"]:focus {
+        input[type="password"]:focus,
+        input[type="text"]:focus {
             border-color: #4285f4;
             box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+        }
+        .ops-form input[type="password"]:focus,
+        .ops-form input[type="text"]:focus {
+            border-color: #e94560;
+            box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
         }
         .btn {
             display: block;
             width: 100%;
-            padding: 10px 16px;
+            padding: 12px 16px;
             background-color: #4285f4;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
             font-weight: 500;
             text-align: center;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
         }
         .btn:hover {
             background-color: #3367d6;
+            transform: translateY(-1px);
         }
         .btn:active {
             background-color: #2850a7;
+            transform: translateY(0);
+        }
+        .btn-ops {
+            background-color: #e94560;
+        }
+        .btn-ops:hover {
+            background-color: #c73659;
+        }
+        .btn-ops:active {
+            background-color: #a62d4a;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+        .badge-admin {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .badge-ops {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        .help-text {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+            font-size: 13px;
+        }
+        .help-text a {
+            color: #4285f4;
+            text-decoration: none;
+        }
+        .help-text a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
     <div class="login-card">
         <h1>AIBalancer Portal</h1>
-        <form action="/portal/login" method="post">
-            <div class="form-group">
-                <label for="password">Admin Secret</label>
-                <input type="password" id="password" name="password" required placeholder="请输入密钥">
+        <p class="subtitle">Select login type</p>
+        
+        <div class="login-tabs">
+            <div class="login-tab active" data-tab="admin" onclick="switchLoginTab('admin')">
+                Admin <span class="badge badge-admin">ROOT</span>
             </div>
-            <button type="submit" class="btn">Login</button>
+            <div class="login-tab ops-tab" data-tab="ops" onclick="switchLoginTab('ops')">
+                OPS User <span class="badge badge-ops">OPS</span>
+            </div>
+        </div>
+        
+        <div class="error-message" id="error-message"></div>
+        
+        <!-- Admin Login Form -->
+        <form action="/portal/login" method="post" class="login-form active" id="admin-form">
+            <div class="form-group">
+                <label for="admin-password">Admin Secret</label>
+                <input type="password" id="admin-password" name="password" required placeholder="Enter admin secret">
+            </div>
+            <button type="submit" class="btn">Login as Admin</button>
         </form>
+        
+        <!-- OPS User Login Form -->
+        <form action="/ops/login" method="post" class="login-form ops-form" id="ops-form">
+            <div class="form-group">
+                <label for="ops-username">Username</label>
+                <input type="text" id="ops-username" name="username" required placeholder="Enter username" autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="ops-password">Password</label>
+                <input type="password" id="ops-password" name="password" required placeholder="Enter password" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-ops">Login as OPS User</button>
+        </form>
+        
+        <div class="help-text">
+            Need help? Contact your administrator.
+        </div>
     </div>
+    
+    <script>
+        function switchLoginTab(tab) {
+            // Update tabs
+            document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.login-tab[data-tab="${tab}"]`).classList.add('active');
+            
+            // Update forms
+            document.querySelectorAll('.login-form').forEach(f => f.classList.remove('active'));
+            document.getElementById(tab + '-form').classList.add('active');
+            
+            // Clear error
+            document.getElementById('error-message').classList.remove('show');
+        }
+        
+        // Check for error in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.classList.add('show');
+            
+            switch(error) {
+                case 'invalid_password':
+                    errorDiv.textContent = 'Invalid admin secret. Please try again.';
+                    break;
+                case 'invalid_credentials':
+                    errorDiv.textContent = 'Invalid username or password. Please try again.';
+                    switchLoginTab('ops');
+                    break;
+                case 'account_disabled':
+                    errorDiv.textContent = 'Your account has been disabled. Please contact administrator.';
+                    switchLoginTab('ops');
+                    break;
+                case 'server_error':
+                    errorDiv.textContent = 'Server error. Please try again later.';
+                    break;
+                default:
+                    errorDiv.textContent = 'An error occurred. Please try again.';
+            }
+        }
+        
+        // Auto-switch to OPS tab if coming from /ops
+        if (window.location.pathname.startsWith('/ops')) {
+            switchLoginTab('ops');
+        }
+    </script>
 </body>
 </html>

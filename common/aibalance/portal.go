@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed templates/portal.html templates/login.html templates/index.html templates/static/*
+//go:embed templates/portal.html templates/login.html templates/index.html templates/ops_portal.html templates/static/*
 var templatesFS embed.FS
 
 // ==================== Helper Functions ====================
@@ -127,13 +127,22 @@ func NewSessionManager() *SessionManager {
 }
 
 // CreateSession creates a new session and stores it in the database
+// For backward compatibility, creates session for root admin
 func (sm *SessionManager) CreateSession() string {
+	return sm.CreateSessionWithRole(0, "root", "admin")
+}
+
+// CreateSessionWithRole creates a new session with user role information
+func (sm *SessionManager) CreateSessionWithRole(userID uint, username, role string) string {
 	sessionID := uuid.New().String()
 	expiresAt := time.Now().Add(30 * time.Minute) // 30 minutes expiration
 
 	dbSession := schema.LoginSession{
 		SessionID: sessionID,
 		ExpiresAt: expiresAt,
+		UserID:    userID,
+		Username:  username,
+		UserRole:  role,
 	}
 
 	if err := GetDB().Create(&dbSession).Error; err != nil {
@@ -141,7 +150,8 @@ func (sm *SessionManager) CreateSession() string {
 		return ""
 	}
 
-	log.Infof("Created new session %s, expires at %s", sessionID, expiresAt.Format(time.RFC3339))
+	log.Infof("Created new session %s for user %s (role: %s), expires at %s",
+		sessionID, username, role, expiresAt.Format(time.RFC3339))
 	return sessionID
 }
 
@@ -201,14 +211,40 @@ func (sm *SessionManager) CleanupExpiredSessions() {
 // ==================== Authentication ====================
 
 // checkAuth checks admin authentication using session ID from cookie
+// For backward compatibility, returns bool only
 func (c *ServerConfig) checkAuth(request *http.Request) bool {
+	authInfo := c.getAuthInfo(request)
+	return authInfo.Authenticated
+}
+
+// getAuthInfo returns detailed authentication information
+// Uses AuthMiddleware if available, otherwise falls back to legacy behavior
+func (c *ServerConfig) getAuthInfo(request *http.Request) *AuthInfo {
+	// Use AuthMiddleware if available
+	if c.AuthMiddleware != nil {
+		return c.AuthMiddleware.GetAuthInfo(request)
+	}
+
+	// Legacy fallback
+	authInfo := &AuthInfo{
+		Authenticated: false,
+		UserID:        0,
+		Username:      "",
+		Role:          RoleNone,
+		SessionID:     "",
+	}
+
 	// Get session ID from cookie
 	cookie, err := request.Cookie("admin_session")
 	if err == nil && cookie.Value != "" {
 		session := c.SessionManager.GetSession(cookie.Value)
 		if session != nil {
 			log.Debugf("Authentication successful via session cookie: %s", cookie.Value)
-			return true
+			authInfo.Authenticated = true
+			authInfo.SessionID = cookie.Value
+			authInfo.Username = "root"
+			authInfo.Role = RoleAdmin
+			return authInfo
 		}
 		log.Warnf("Invalid or expired session cookie found: %s", cookie.Value)
 	} else if err != http.ErrNoCookie {
@@ -220,11 +256,28 @@ func (c *ServerConfig) checkAuth(request *http.Request) bool {
 	password := query.Get("password")
 	if c.AdminPassword != "" && password == c.AdminPassword {
 		log.Infof("Authentication successful via query parameter password (one-time access).")
-		return true
+		authInfo.Authenticated = true
+		authInfo.Username = "root"
+		authInfo.Role = RoleAdmin
+		return authInfo
 	}
 
 	log.Debugf("Authentication failed for request: %s", request.URL.Path)
-	return false
+	return authInfo
+}
+
+// checkPermission checks if the request has permission to access the path
+// Returns: (allowed, authInfo, reason)
+func (c *ServerConfig) checkPermission(request *http.Request, path string) (bool, *AuthInfo, string) {
+	if c.AuthMiddleware != nil {
+		return c.AuthMiddleware.CheckPermission(request, path)
+	}
+	// Legacy fallback - only admin auth
+	authInfo := c.getAuthInfo(request)
+	if authInfo.Authenticated {
+		return true, authInfo, "legacy auth"
+	}
+	return false, authInfo, "not authenticated"
 }
 
 // ==================== Login/Logout Handlers ====================
@@ -424,8 +477,11 @@ func (c *ServerConfig) writeJSONResponse(conn net.Conn, statusCode int, data int
 // ==================== Main Request Router ====================
 
 // HandlePortalRequest handles the main entry point for management portal requests
+// Uses AuthMiddleware for permission checking
 func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request, uriIns *url.URL) {
-	c.logInfo("Processing portal request: %s", uriIns.Path)
+	c.logInfo("Processing portal request: %s %s", request.Method, uriIns.Path)
+
+	// ========== Public Routes (No Auth Required) ==========
 
 	// Process login POST request
 	if uriIns.Path == "/portal/login" && request.Method == "POST" {
@@ -439,13 +495,36 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		return
 	}
 
-	// Check authentication status (except for login page)
-	if !c.checkAuth(request) {
+	// ========== Permission Check via AuthMiddleware ==========
+
+	allowed, authInfo, reason := c.checkPermission(request, uriIns.Path)
+
+	// Log authentication info
+	if authInfo.Authenticated {
+		c.logDebug("Auth: user=%s, role=%s, path=%s", authInfo.Username, authInfo.Role, uriIns.Path)
+	}
+
+	// If not authenticated, redirect to login page
+	if !authInfo.Authenticated {
+		c.logInfo("Unauthenticated request to %s, redirecting to login", uriIns.Path)
 		c.serveLoginPage(conn)
 		return
 	}
 
-	// Route requests based on path
+	// If authenticated but not allowed, return 403 Forbidden
+	if !allowed {
+		c.logWarn("Permission denied for user %s (role: %s) on %s %s: %s",
+			authInfo.Username, authInfo.Role, request.Method, uriIns.Path, reason)
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error":  "Permission denied",
+			"reason": reason,
+		})
+		return
+	}
+
+	// ========== Route to Handler ==========
+	// authInfo is available for handlers that need user context
+
 	switch {
 	// ========== Portal Home ==========
 	case uriIns.Path == "/portal" || uriIns.Path == "/portal/":
@@ -533,8 +612,250 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/logout":
 		c.handleLogout(conn, request)
 
+	// ========== OPS User Management Routes (Admin Only) ==========
+	case uriIns.Path == "/portal/api/ops-users" && request.Method == "GET":
+		c.handleListOpsUsers(conn, request)
+	case uriIns.Path == "/portal/api/ops-users" && request.Method == "POST":
+		c.handleCreateOpsUser(conn, request)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/ops-users/") && request.Method == "DELETE":
+		c.handleDeleteOpsUser(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/ops-users/") && request.Method == "PUT":
+		c.handleUpdateOpsUser(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/ops-users/") && strings.HasSuffix(uriIns.Path, "/reset-password") && request.Method == "POST":
+		c.handleResetOpsUserPassword(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/ops-users/") && strings.HasSuffix(uriIns.Path, "/reset-key") && request.Method == "POST":
+		c.handleResetOpsUserKey(conn, request, uriIns.Path)
+
+	// ========== OPS Logs and Stats Routes (Admin Only) ==========
+	case uriIns.Path == "/portal/api/ops-logs" && request.Method == "GET":
+		c.handleGetOpsLogs(conn, request)
+	case uriIns.Path == "/portal/api/ops-stats" && request.Method == "GET":
+		c.handleGetOpsStats(conn, request)
+
 	// ========== Default ==========
 	default:
 		c.servePortalWithAuth(conn)
 	}
+}
+
+// ==================== OPS Portal Handlers ====================
+
+// HandleOpsPortalRequest handles the main entry point for OPS portal requests
+func (c *ServerConfig) HandleOpsPortalRequest(conn net.Conn, request *http.Request, uriIns *url.URL) {
+	c.logInfo("Processing OPS portal request: %s %s", request.Method, uriIns.Path)
+
+	// ========== Public Routes (No Auth Required) ==========
+
+	// Process OPS login POST request
+	if uriIns.Path == "/ops/login" && request.Method == "POST" {
+		c.processOpsLogin(conn, request)
+		return
+	}
+
+	// Serve OPS login page
+	if uriIns.Path == "/ops/login" && request.Method == "GET" {
+		c.serveOpsLoginPage(conn)
+		return
+	}
+
+	// Serve static files (CSS, JS) without authentication
+	if strings.HasPrefix(uriIns.Path, "/ops/static/") {
+		c.serveStaticFile(conn, uriIns.Path)
+		return
+	}
+
+	// ========== Permission Check via AuthMiddleware ==========
+
+	allowed, authInfo, reason := c.checkPermission(request, uriIns.Path)
+
+	// Log authentication info
+	if authInfo.Authenticated {
+		c.logDebug("OPS Auth: user=%s, role=%s, path=%s", authInfo.Username, authInfo.Role, uriIns.Path)
+	}
+
+	// If not authenticated, redirect to OPS login page
+	if !authInfo.Authenticated {
+		c.logInfo("Unauthenticated OPS request to %s, redirecting to login", uriIns.Path)
+		c.serveOpsLoginPage(conn)
+		return
+	}
+
+	// If authenticated but not allowed (wrong role), return 403 Forbidden
+	if !allowed {
+		c.logWarn("Permission denied for OPS user %s (role: %s) on %s %s: %s",
+			authInfo.Username, authInfo.Role, request.Method, uriIns.Path, reason)
+		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
+			"error":  "Permission denied",
+			"reason": reason,
+		})
+		return
+	}
+
+	// ========== Route to Handler ==========
+
+	switch {
+	// ========== OPS Dashboard ==========
+	case uriIns.Path == "/ops" || uriIns.Path == "/ops/" || uriIns.Path == "/ops/dashboard":
+		c.serveOpsPortal(conn)
+
+	// ========== OPS API Key Management ==========
+	case (uriIns.Path == "/ops/create-api-key" || uriIns.Path == "/ops/api/create-api-key") && request.Method == "POST":
+		c.handleOpsCreateApiKey(conn, request, authInfo)
+	case uriIns.Path == "/ops/api/my-keys" && request.Method == "GET":
+		c.handleOpsGetMyKeys(conn, request, authInfo)
+	case uriIns.Path == "/ops/api/delete-api-key" && request.Method == "POST":
+		c.handleOpsDeleteApiKey(conn, request, authInfo)
+
+	// ========== OPS Self-Service ==========
+	case uriIns.Path == "/ops/my-info" && request.Method == "GET":
+		c.handleOpsGetMyInfo(conn, request)
+	case uriIns.Path == "/ops/change-password" && request.Method == "POST":
+		c.handleOpsChangePassword(conn, request)
+	case uriIns.Path == "/ops/reset-key" && request.Method == "POST":
+		c.handleOpsResetOwnKey(conn, request)
+
+	// ========== OPS Logout ==========
+	case uriIns.Path == "/ops/logout":
+		c.handleOpsLogout(conn, request)
+
+	// ========== Default ==========
+	default:
+		c.serveOpsPortal(conn)
+	}
+}
+
+// serveOpsLoginPage displays the OPS login page
+// Uses the unified login.html template which supports both Admin and OPS login
+func (c *ServerConfig) serveOpsLoginPage(conn net.Conn) {
+	c.logInfo("Serving OPS login page (using unified login template)")
+
+	// Use the same login page as admin portal
+	// The page will auto-switch to OPS tab based on URL path
+	c.serveLoginPage(conn)
+}
+
+// processOpsLogin handles OPS user login requests
+func (c *ServerConfig) processOpsLogin(conn net.Conn, request *http.Request) {
+	err := request.ParseForm()
+	if err != nil {
+		c.logError("Failed to parse OPS login form: %v", err)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
+		return
+	}
+
+	username := request.PostForm.Get("username")
+	password := request.PostForm.Get("password")
+
+	if username == "" || password == "" {
+		log.Warnf("Received empty username or password during OPS login attempt")
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /ops/login?error=invalid_credentials\r\n" +
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
+
+	// Get OPS user from database
+	user, err := GetOpsUserByUsername(username)
+	if err != nil {
+		log.Warnf("OPS user not found: %s", username)
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /ops/login?error=invalid_credentials\r\n" +
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
+
+	// Check if user is active
+	if !user.Active {
+		log.Warnf("OPS user is inactive: %s", username)
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /ops/login?error=account_disabled\r\n" +
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
+
+	// Verify password
+	if !CheckPassword(user.Password, password) {
+		log.Warnf("Invalid password for OPS user: %s", username)
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /ops/login?error=invalid_credentials\r\n" +
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
+
+	// Create session with role
+	session := c.SessionManager.CreateSessionWithRole(user.ID, user.Username, user.Role)
+	if session == "" {
+		c.logError("Failed to create session for OPS user: %s", username)
+		header := "HTTP/1.1 303 See Other\r\n" +
+			"Location: /ops/login?error=server_error\r\n" +
+			"\r\n"
+		conn.Write([]byte(header))
+		return
+	}
+
+	log.Infof("OPS user logged in successfully: %s (ID: %d)", username, user.ID)
+
+	header := "HTTP/1.1 303 See Other\r\n" +
+		"Location: /ops/dashboard\r\n" +
+		"Set-Cookie: ops_session=" + session + "; Path=/; HttpOnly; SameSite=Strict\r\n" +
+		"\r\n"
+	conn.Write([]byte(header))
+}
+
+// serveOpsPortal serves the OPS portal dashboard page
+func (c *ServerConfig) serveOpsPortal(conn net.Conn) {
+	c.logInfo("Serving OPS portal page")
+
+	var htmlContent []byte
+	var err error
+
+	if result := utils.GetFirstExistedFile(
+		"common/aibalance/templates/ops_portal.html",
+		"templates/ops_portal.html",
+		"../templates/ops_portal.html",
+	); result != "" {
+		htmlContent, err = os.ReadFile(result)
+		if err != nil {
+			c.logError("Failed to read ops_portal.html from file: %v", err)
+			htmlContent, err = templatesFS.ReadFile("templates/ops_portal.html")
+		}
+	} else {
+		htmlContent, err = templatesFS.ReadFile("templates/ops_portal.html")
+	}
+
+	if err != nil {
+		c.logError("Failed to read ops_portal.html: %v", err)
+		errorResponse := "HTTP/1.1 500 Internal Server Error\r\n\r\nFailed to load OPS portal page"
+		conn.Write([]byte(errorResponse))
+		return
+	}
+
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: text/html; charset=utf-8\r\n"+
+		"Content-Length: %d\r\n"+
+		"\r\n", len(htmlContent))
+
+	conn.Write([]byte(header))
+	conn.Write(htmlContent)
+}
+
+// handleOpsLogout handles OPS user logout
+func (c *ServerConfig) handleOpsLogout(conn net.Conn, request *http.Request) {
+	cookies := request.Cookies()
+	for _, cookie := range cookies {
+		if cookie.Name == "ops_session" {
+			c.SessionManager.DeleteSession(cookie.Value)
+			break
+		}
+	}
+
+	header := "HTTP/1.1 303 See Other\r\n" +
+		"Location: /ops/login\r\n" +
+		"Set-Cookie: ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Strict\r\n" +
+		"\r\n"
+	conn.Write([]byte(header))
 }

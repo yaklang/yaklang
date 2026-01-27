@@ -343,12 +343,13 @@ type ServerConfig struct {
 	Logging          LogLevel
 	AdminPassword    string          // 添加管理员密码配置
 	SessionManager   *SessionManager // 会话管理器
+	AuthMiddleware   *AuthMiddleware // 认证中间件
 	forwardRule      *omap.OrderedMap[string, *aiforwarder.Rule]
 }
 
 // NewServerConfig creates a new server configuration
 func NewServerConfig() *ServerConfig {
-	return &ServerConfig{
+	config := &ServerConfig{
 		Keys:             NewKeyManager(),
 		KeyAllowedModels: NewKeyAllowedModels(),
 		Models:           NewModelManager(),
@@ -363,6 +364,9 @@ func NewServerConfig() *ServerConfig {
 		SessionManager: NewSessionManager(),
 		forwardRule:    omap.NewOrderedMap[string, *aiforwarder.Rule](make(map[string]*aiforwarder.Rule)),
 	}
+	// Initialize auth middleware with default config
+	config.AuthMiddleware = NewAuthMiddleware(config, DefaultAuthConfig())
+	return config
 }
 
 // logDebug logs a debug message if debug logging is enabled
@@ -1701,6 +1705,9 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 	case strings.HasPrefix(uriIns.Path, "/v1/memfit-totp-uuid"):
 		c.logInfo("Processing Memfit TOTP UUID request")
 		c.serveMemfitTOTPUUID(conn)
+		return
+	case strings.HasPrefix(uriIns.Path, "/ops"):
+		c.HandleOpsPortalRequest(conn, request, uriIns)
 		return
 	case strings.HasPrefix(uriIns.Path, "/portal"):
 		c.HandlePortalRequest(conn, request, uriIns)

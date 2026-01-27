@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPS Portal - AIBalancer</title>
+    <link rel="stylesheet" href="/ops/static/ops_portal.css">
+</head>
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center;">
+            <h1>AIBalancer</h1>
+            <span class="badge">OPS Portal</span>
+        </div>
+        <div class="header-right">
+            <span class="user-info">Welcome, <strong id="username-display">Loading...</strong></span>
+            <a href="/ops/logout" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>API Keys Created</h3>
+                <div class="value" id="stat-api-keys">--</div>
+            </div>
+            <div class="stat-card">
+                <h3>Default Traffic Limit</h3>
+                <div class="value" id="stat-default-limit">--</div>
+            </div>
+            <div class="stat-card">
+                <h3>Account Status</h3>
+                <div class="value" id="stat-status">--</div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" data-tab="create-key">Create API Key</div>
+                <div class="tab" data-tab="my-keys">My API Keys</div>
+                <div class="tab" data-tab="api-usage">API Usage</div>
+                <div class="tab" data-tab="my-info">My Info</div>
+                <div class="tab" data-tab="settings">Settings</div>
+            </div>
+            
+            <!-- Create API Key Tab -->
+            <div id="create-key" class="tab-content active">
+                <div class="card-body">
+                    <div id="create-key-alert" class="alert hidden"></div>
+                    
+                    <form id="create-key-form">
+                        <div class="form-group">
+                            <label for="allowed-models">Allowed Models</label>
+                            <select id="allowed-models" multiple required>
+                                <option value="">Loading models...</option>
+                            </select>
+                            <p class="form-hint">Hold Ctrl/Cmd to select multiple models. At least one model is required.</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="traffic-limit">Traffic Limit (bytes)</label>
+                            <input type="number" id="traffic-limit" placeholder="Leave empty to use default limit" min="0">
+                            <p class="form-hint">Default limit: <span id="default-limit-hint">--</span>. Traffic limit is always enforced for OPS-created keys.</p>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Generate API Key</button>
+                    </form>
+                    
+                    <div id="api-key-result" class="api-key-display">
+                        <p><strong>Your new API Key:</strong></p>
+                        <code id="generated-key"></code>
+                        <p style="margin-top: 10px; color: #666; font-size: 12px;">
+                            Please save this key securely. It will only be shown once!
+                        </p>
+                        <button class="btn btn-secondary copy-btn" onclick="copyApiKey()">Copy to Clipboard</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- My API Keys Tab -->
+            <div id="my-keys" class="tab-content">
+                <div class="card-body">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">My API Keys</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="loadMyApiKeys()">Refresh</button>
+                    </div>
+                    
+                    <div id="my-keys-loading" class="loading">Loading API Keys</div>
+                    <div id="my-keys-content" class="hidden">
+                        <div class="table-wrapper">
+                            <table class="api-keys-table">
+                                <thead>
+                                    <tr>
+                                        <th>API Key</th>
+                                        <th>Models</th>
+                                        <th>Traffic Used</th>
+                                        <th>Traffic Limit</th>
+                                        <th>Created At</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-keys-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="my-keys-empty" class="empty-state hidden">
+                            <p>You haven't created any API keys yet.</p>
+                            <button class="btn btn-primary" onclick="switchToTab('create-key')">Create Your First API Key</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API Usage Tab -->
+            <div id="api-usage" class="tab-content">
+                <div class="card-body">
+                    <h3 style="margin-bottom: 20px;">API Usage Guide</h3>
+                    
+                    <div class="api-section">
+                        <h4>1. Create API Key via HTTP API</h4>
+                        <p>You can programmatically create API keys using your OPS Key:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL Example</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample()">Copy</button>
+                            </div>
+                            <pre id="curl-example">curl -X POST '<span id="api-endpoint">http://localhost:8223</span>/ops/api/create-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span id="curl-ops-key">YOUR_OPS_KEY</span>' \
+  -d '{
+    "allowed_models": ["gpt-4", "gpt-3.5-turbo"],
+    "traffic_limit": 52428800
+  }'</pre>
+                        </div>
+                        
+                        <div class="api-params">
+                            <h5>Request Parameters:</h5>
+                            <table class="params-table">
+                                <tr>
+                                    <td><code>allowed_models</code></td>
+                                    <td>Array of model names this key can access (required)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>traffic_limit</code></td>
+                                    <td>Traffic limit in bytes (optional, uses default if not specified)</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="api-response">
+                            <h5>Response:</h5>
+                            <pre class="response-example">{
+  "success": true,
+  "api_key": "sk-xxxxxxxxxxxxxxxxxxxxxxxx",
+  "message": "API key created successfully"
+}</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>2. Use the Created API Key</h4>
+                        <p>Use the generated API key with OpenAI-compatible endpoints:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>Chat Completion Example</span>
+                            </div>
+                            <pre>curl '<span class="api-endpoint-placeholder">http://localhost:8223</span>/v1/chat/completions' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>3. Authentication Headers</h4>
+                        <table class="params-table">
+                            <tr>
+                                <td><code>X-Ops-Key</code></td>
+                                <td>Your OPS Key for management API calls (create/delete keys)</td>
+                            </tr>
+                            <tr>
+                                <td><code>Authorization: Bearer</code></td>
+                                <td>API Key for AI service calls (chat completions, etc.)</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- My Info Tab -->
+            <div id="my-info" class="tab-content">
+                <div class="card-body">
+                    <div id="my-info-loading" class="loading">Loading user info</div>
+                    <div id="my-info-content" class="hidden">
+                        <div class="info-grid">
+                            <div class="info-label">User ID</div>
+                            <div class="info-value" id="info-user-id">--</div>
+                            
+                            <div class="info-label">Username</div>
+                            <div class="info-value" id="info-username">--</div>
+                            
+                            <div class="info-label">Role</div>
+                            <div class="info-value" id="info-role">--</div>
+                            
+                            <div class="info-label">Status</div>
+                            <div class="info-value" id="info-status">--</div>
+                            
+                            <div class="info-label">OPS Key</div>
+                            <div class="info-value"><code id="info-ops-key">--</code></div>
+                            
+                            <div class="info-label">Default Limit</div>
+                            <div class="info-value" id="info-default-limit">--</div>
+                            
+                            <div class="info-label">API Keys Created</div>
+                            <div class="info-value" id="info-api-keys-count">--</div>
+                            
+                            <div class="info-label">Created At</div>
+                            <div class="info-value" id="info-created-at">--</div>
+                        </div>
+                        
+                        <div style="margin-top: 25px;">
+                            <button class="btn btn-secondary" onclick="resetOpsKey()">Reset OPS Key</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <div class="card-body">
+                    <h3 style="margin-bottom: 20px;">Change Password</h3>
+                    
+                    <div id="settings-alert" class="alert hidden"></div>
+                    
+                    <form id="change-password-form">
+                        <div class="form-group">
+                            <label for="old-password">Current Password</label>
+                            <input type="password" id="old-password" required autocomplete="current-password">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <input type="password" id="new-password" required minlength="8" autocomplete="new-password">
+                            <p class="form-hint">Minimum 8 characters</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm-password">Confirm New Password</label>
+                            <input type="password" id="confirm-password" required minlength="8" autocomplete="new-password">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/ops/static/ops_portal.js"></script>
+</body>
+</html>
