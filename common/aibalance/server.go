@@ -497,6 +497,21 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		apiKeyForStat = key.Key
 		c.logInfo("Successfully verified key: %s", key.Key)
 
+		// Check traffic limit before processing request
+		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+		if err != nil {
+			c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+		} else if !trafficAllowed {
+			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": "API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.",
+					"type":    "traffic_limit_exceeded",
+				},
+			})
+			return
+		}
+
 		// Authorization check
 		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 		if !ok {
@@ -857,12 +872,28 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 		} else {
+			// Update API key statistics
 			go func() {
 				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
 				} else {
 					c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
 						utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
+				}
+			}()
+
+			// Update traffic usage with model multiplier
+			go func() {
+				// Get the traffic multiplier for this model
+				multiplier := GetModelTrafficMultiplier(modelName)
+				totalTraffic := inputBytes + outputBytes
+				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
+				
+				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
+					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+				} else {
+					c.logInfo("Traffic usage updated: key=%s, raw=%d bytes, multiplier=%.2f, adjusted=%d bytes",
+						utils.ShrinkString(key.Key, 8), totalTraffic, multiplier, adjustedTraffic)
 				}
 			}()
 		}
@@ -1008,6 +1039,21 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 		}
 		c.logInfo("Successfully verified key: %s", key.Key)
 
+		// Check traffic limit before processing request
+		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+		if err != nil {
+			c.logError("Failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+		} else if !trafficAllowed {
+			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": "API key has exceeded traffic limit. Please contact administrator to increase limit or reset usage.",
+					"type":    "traffic_limit_exceeded",
+				},
+			})
+			return
+		}
+
 		// Authorization check
 		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 		if !ok {
@@ -1117,12 +1163,27 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 				}
 			}()
 		} else {
+			// Update API key statistics
 			go func() {
 				if err := UpdateAiApiKeyStats(key.Key, inputBytesEmbed, outputBytesEmbed, true); err != nil {
 					c.logError("Failed to update API key statistics: %v", err)
 				} else {
 					c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes",
 						utils.ShrinkString(key.Key, 8), inputBytesEmbed, outputBytesEmbed)
+				}
+			}()
+
+			// Update traffic usage with model multiplier
+			go func() {
+				multiplier := GetModelTrafficMultiplier(modelName)
+				totalTraffic := inputBytesEmbed + outputBytesEmbed
+				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
+				
+				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
+					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+				} else {
+					c.logInfo("Traffic usage updated: key=%s, raw=%d bytes, multiplier=%.2f, adjusted=%d bytes",
+						utils.ShrinkString(key.Key, 8), totalTraffic, multiplier, adjustedTraffic)
 				}
 			}()
 		}

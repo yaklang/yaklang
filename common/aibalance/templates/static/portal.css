@@ -1321,9 +1321,11 @@
             height: 100%;
             background-color: #f9f9f9; /* Match body background */
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 9999;
+            transition: opacity 0.3s ease;
             opacity: 1;
             transition: opacity 0.3s ease-out;
         }
@@ -1515,4 +1517,128 @@
         .btn-quick-add:hover {
             background-color: #bbdefb;
         }
+
+        /* ==================== 可拖拽调整列宽样式 ==================== */
+        
+        /* 表格需要关闭 table-layout: fixed 以支持动态列宽 */
+        table.resizable {
+            table-layout: auto;
+        }
+        
+        /* 表头可调整大小 */
+        th.resizable {
+            position: relative;
+            user-select: none;
+            border-right: 1px solid #ddd !important;
+        }
+        
+        /* 拖拽手柄 - 默认可见的分隔线 */
+        th.resizable .resize-handle {
+            position: absolute;
+            right: -1px;
+            top: 4px;
+            bottom: 4px;
+            width: 3px;
+            cursor: col-resize;
+            background: #ccc;
+            border-radius: 2px;
+            z-index: 10;
+            transition: background 0.15s ease, width 0.15s ease;
+        }
+        
+        th.resizable .resize-handle:hover {
+            background: #4285f4;
+            width: 4px;
+            right: -2px;
+        }
+        
+        /* 拖拽时的视觉反馈 */
+        th.resizable.resizing {
+            background-color: #e3f2fd !important;
+        }
+        
+        th.resizable.resizing .resize-handle {
+            background: #4285f4;
+            width: 4px;
+        }
+        
+        /* 拖拽时禁止文本选择 */
+        body.resizing-column {
+            cursor: col-resize !important;
+            user-select: none !important;
+        }
+        
+        body.resizing-column * {
+            cursor: col-resize !important;
+        }
+        
+        /* 列宽控制提示 */
+        .column-resize-hint {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .column-resize-hint.visible {
+            opacity: 1;
+        }
+        
+        /* 重置列宽按钮 - 更简洁的样式 */
+        .reset-column-widths-btn {
+            font-size: 12px;
+            padding: 4px 10px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        
+        .reset-column-widths-btn:hover {
+            color: #4285f4;
+        }
+        
+        /* 优化的默认列宽配置 - 供应商表格 */
+        #provider-table th:nth-child(1), #provider-table td:nth-child(1) { min-width: 30px; width: 30px; } /* 复选框 */
+        #provider-table th:nth-child(2), #provider-table td:nth-child(2) { min-width: 35px; width: 40px; } /* ID */
+        #provider-table th:nth-child(3), #provider-table td:nth-child(3) { min-width: 80px; width: 95px; } /* 健康度 */
+        #provider-table th:nth-child(4), #provider-table td:nth-child(4) { min-width: 100px; width: 140px; } /* 提供者 */
+        #provider-table th:nth-child(5), #provider-table td:nth-child(5) { min-width: 100px; width: 140px; } /* 模型 */
+        #provider-table th:nth-child(6), #provider-table td:nth-child(6) { min-width: 60px; width: 80px; } /* 类型 */
+        #provider-table th:nth-child(7), #provider-table td:nth-child(7) { min-width: 100px; width: 150px; } /* 域名 */
+        #provider-table th:nth-child(8), #provider-table td:nth-child(8) { min-width: 80px; width: 100px; } /* API Key */
+        #provider-table th:nth-child(9), #provider-table td:nth-child(9) { min-width: 50px; width: 60px; } /* 请求 */
+        #provider-table th:nth-child(10), #provider-table td:nth-child(10) { min-width: 60px; width: 70px; } /* 操作 */
+        
+        /* 优化的默认列宽配置 - API密钥表格 */
+        #api-table th:nth-child(1), #api-table td:nth-child(1) { min-width: 30px; width: 30px; } /* 复选框 */
+        #api-table th:nth-child(2), #api-table td:nth-child(2) { min-width: 35px; width: 40px; } /* ID */
+        #api-table th:nth-child(3), #api-table td:nth-child(3) { min-width: 45px; width: 50px; } /* 状态 */
+        #api-table th:nth-child(4), #api-table td:nth-child(4) { min-width: 90px; width: 100px; } /* API密钥 */
+        #api-table th:nth-child(5), #api-table td:nth-child(5) { min-width: 110px; width: 130px; } /* 允许模型 */
+        #api-table th:nth-child(6), #api-table td:nth-child(6) { min-width: 55px; width: 60px; } /* 使用统计 */
+        #api-table th:nth-child(7), #api-table td:nth-child(7) { min-width: 70px; width: 80px; } /* 成功/失败 */
+        #api-table th:nth-child(8), #api-table td:nth-child(8) { min-width: 90px; width: 100px; } /* 流量 */
+        #api-table th:nth-child(9), #api-table td:nth-child(9) { min-width: 70px; width: 80px; } /* 流量限制 */
+        #api-table th:nth-child(10), #api-table td:nth-child(10) { min-width: 80px; width: 90px; } /* 最后使用 */
+        #api-table th:nth-child(11), #api-table td:nth-child(11) { min-width: 110px; width: 120px; } /* 操作 */
+        
+        /* 优化的默认列宽配置 - 模型信息表格 */
+        #models-table th:nth-child(1), #models-table td:nth-child(1) { min-width: 100px; width: 140px; } /* 模型名 */
+        #models-table th:nth-child(2), #models-table td:nth-child(2) { min-width: 65px; width: 75px; } /* 供应商数量 */
+        #models-table th:nth-child(3), #models-table td:nth-child(3) { min-width: 65px; width: 75px; } /* 流量倍数 */
+        #models-table th:nth-child(4), #models-table td:nth-child(4) { min-width: 140px; width: 180px; } /* 描述 */
+        #models-table th:nth-child(5), #models-table td:nth-child(5) { min-width: 90px; width: 110px; } /* 标签 */
+        #models-table th:nth-child(6), #models-table td:nth-child(6) { min-width: 90px; width: 110px; } /* 操作 */
+
         /* 添加到现有样式的末尾 */
