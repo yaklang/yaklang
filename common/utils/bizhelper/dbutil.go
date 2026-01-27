@@ -174,6 +174,18 @@ func FuzzQueryArrayStringOrLike(db *gorm.DB, field string, s []string) *gorm.DB 
 	return FuzzQueryArrayOrLike(db, field, raw, false)
 }
 
+func FuzzQueryArrayStringAndLike(db *gorm.DB, field string, s []string) *gorm.DB {
+	s = utils.StringArrayFilterEmpty(s)
+	if len(s) <= 0 {
+		return db
+	}
+
+	for _, sub := range s {
+		db = FuzzQueryOrEx(db, []string{field}, []interface{}{sub}, false)
+	}
+	return db
+}
+
 // FuzzQueryArrayOrLike
 func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}, escape bool) *gorm.DB {
 	return FuzzQueryOrEx(db, []string{field}, s, escape)
@@ -914,6 +926,21 @@ func QueryByTimestampRangeP(db *gorm.DB, field string, start, end *int64) *gorm.
 	return QueryByTimestampRange(db, field, startTs, endTs)
 }
 
+func QueryByFloatRange(db *gorm.DB, field string, r *ypb.FloatRange) *gorm.DB {
+	if r == nil || !r.GetEnabled() {
+		return db
+	}
+	min := r.GetMin()
+	max := r.GetMax()
+	if max == 0 {
+		max = 1.0
+	}
+	if max < min {
+		min, max = max, min
+	}
+	return db.Where(fmt.Sprintf("%v BETWEEN ? AND ?", field), min, max)
+}
+
 func QueryByTimeRange(db *gorm.DB, field string, start, end time.Time) *gorm.DB {
 	if !start.IsZero() {
 		db = db.Where(fmt.Sprintf("%v >= ?", field), start)
@@ -923,6 +950,22 @@ func QueryByTimeRange(db *gorm.DB, field string, start, end time.Time) *gorm.DB 
 		db = db.Where(fmt.Sprintf("%v <= ?", field), end)
 	}
 
+	return db
+}
+
+func QueryByTimeRangeUnix(db *gorm.DB, field string, r *ypb.Int64Range) *gorm.DB {
+	if r == nil || !r.GetEnabled() {
+		return db
+	}
+
+	min := r.GetMin()
+	max := r.GetMax()
+	if min > 0 {
+		db = db.Where(fmt.Sprintf("%v >= ?", field), time.Unix(min, 0))
+	}
+	if max > 0 {
+		db = db.Where(fmt.Sprintf("%v <= ?", field), time.Unix(max, 0))
+	}
 	return db
 }
 

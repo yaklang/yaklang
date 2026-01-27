@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -242,4 +243,30 @@ func (a *AIMemoryEntity) BeforeSave() error {
 		return utils.Errorf("content must be set")
 	}
 	return nil
+}
+
+func (a *AIMemoryEntity) QuestionHashID(question string) string {
+	if a == nil {
+		return ""
+	}
+	question = strings.TrimSpace(question)
+	if a.MemoryID == "" || question == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s-%s", a.MemoryID, utils.CalcMd5(question))
+}
+
+func (a *AIMemoryEntity) DocumentQuestionHashIDs() []string {
+	if a == nil || len(a.PotentialQuestions) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(a.PotentialQuestions))
+	for _, q := range a.PotentialQuestions {
+		id := a.QuestionHashID(q)
+		if id == "" {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	return ids
 }
