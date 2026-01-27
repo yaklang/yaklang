@@ -319,6 +319,9 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#methodExpr.
 	VisitMethodExpr(ctx *MethodExprContext) interface{}
 
+	// Visit a parse tree produced by GoParser#ws.
+	VisitWs(ctx *WsContext) interface{}
+
 	// Visit a parse tree produced by GoParser#eos.
 	VisitEos(ctx *EosContext) interface{}
 }

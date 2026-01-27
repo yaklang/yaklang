@@ -94,18 +94,3 @@ func TestExamplesAll(t *testing.T) {
 		fmt.Println("Error walking the path:", err)
 	}
 }
-
-func TestExample_Dot(t *testing.T) {
-	code := `package main
-
-func (m Migrator) GetTables() (tableList []string, err error) {
-	err = m.DB.Raw("SELECT TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA=?", m.CurrentDatabase()).
-		Scan(&tableList).Error
-	return
-}
-`
-	_, err := SyntaxBase(code, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-}

@@ -191,8 +191,8 @@ RAW_CHAR_LIT           : '\'' (~['\\] | ESCAPED_VALUE)? '\'';
 WSI : [ \t\r]+ -> skip;
 EOS : ([\t\r\n ;]+);
 
-COMMENT      : '/*' .*? '*/' -> skip;
-LINE_COMMENT : '//' ~[\r\n]* -> skip;
+COMMENT      : '/*' .*? '*/' -> channel(HIDDEN);
+LINE_COMMENT : '//' ~[\r\n]* -> channel(HIDDEN);
 
 // Fragments
 

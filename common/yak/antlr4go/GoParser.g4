@@ -59,11 +59,11 @@ options {
 }
 
 sourceFile
-    : eos* packageClause (eos* importDecl eos*)* (( methodDecl | functionDecl | declaration) eos*)* EOF
+    : ws* packageClause (ws* importDecl ws*)* (( methodDecl | functionDecl | declaration) ws*)* EOF
     ;
 
 packageClause
-    : PACKAGE packageName eos*
+    : PACKAGE packageName ws*
     ;
 
 packageName
@@ -71,7 +71,7 @@ packageName
     ;
 
 importDecl
-    : IMPORT (importSpec | L_PAREN eos* (importSpec eos*)* R_PAREN)
+    : IMPORT (importSpec | L_PAREN ws* (importSpec ws*)* R_PAREN)
     ;
 
 importSpec
@@ -89,7 +89,7 @@ declaration
     ;
 
 constDecl
-    : CONST eos* (constSpec eos* | L_PAREN eos* (constSpec eos*)* R_PAREN)
+    : CONST ws* (constSpec ws* | L_PAREN ws* (constSpec ws*)* R_PAREN)
     ;
 
 constSpec
@@ -101,11 +101,11 @@ identifierList
     ;
 
 expressionList
-    : eos* expression eos* (COMMA eos* expression eos*)*
+    : expression (COMMA ws* expression)*
     ;
 
 typeDecl
-    : TYPE (typeSpec | L_PAREN eos* (typeSpec eos*)* eos* R_PAREN)
+    : TYPE (typeSpec | L_PAREN ws* (typeSpec ws*)* R_PAREN)
     ;
 
 typeSpec
@@ -140,11 +140,11 @@ typeTerm
 // Function declarations
 
 functionDecl
-    : FUNC IDENTIFIER typeParameters? signature eos? block?
+    : FUNC IDENTIFIER typeParameters? signature ws* block?
     ;
 
 methodDecl
-    : FUNC receiver IDENTIFIER signature eos? block?
+    : FUNC receiver IDENTIFIER signature ws* block?
     ;
 
 receiver
@@ -152,7 +152,7 @@ receiver
     ;
 
 varDecl
-    : VAR eos* (varSpec | L_PAREN eos* (varSpec eos*)* R_PAREN)
+    : VAR ws* (varSpec | L_PAREN ws* (varSpec ws*)* R_PAREN)
     ;
 
 varSpec
@@ -160,11 +160,11 @@ varSpec
     ;
 
 block
-    : L_CURLY eos* statementList? R_CURLY
+    : L_CURLY ws* statementList? ws* R_CURLY
     ;
 
 statementList
-    : (statement eos*)+
+    : (statement ws*)+
     ;
 
 statement
@@ -218,7 +218,7 @@ shortVarDecl
     ;
 
 labeledStmt
-    : IDENTIFIER COLON eos* forStmt?
+    : IDENTIFIER COLON ws* forStmt?
     ;
 
 returnStmt
@@ -246,7 +246,7 @@ deferStmt
     ;
 
 ifStmt
-    : IF eos* (expression | simpleStmt eos* expression) eos* block (ELSE eos* (ifStmt | block))?
+    : IF ws* (expression | simpleStmt (SEMI | EOS) ws? expression) ws* block (ELSE ws* (ifStmt | block))?
     ;
 
 switchStmt
@@ -255,20 +255,20 @@ switchStmt
     ;
 
 exprSwitchStmt
-    : SWITCH eos* (expression? | simpleStmt? eos* expression?) L_CURLY eos* exprCaseClause* eos* R_CURLY
+    : SWITCH ws* (expression? | simpleStmt? (SEMI | EOS) ws? expression?) L_CURLY ws* exprCaseClause* ws* R_CURLY
     ;
 
 exprCaseClause
-    : exprSwitchCase COLON eos* statementList?
+    : exprSwitchCase COLON ws* statementList?
     ;
 
 exprSwitchCase
-    : CASE expressionList
+    : CASE ws* expressionList
     | DEFAULT
     ;
 
 typeSwitchStmt
-    : SWITCH eos* (typeSwitchGuard | simpleStmt eos* typeSwitchGuard) eos* L_CURLY eos* typeCaseClause* eos* R_CURLY
+    : SWITCH ws* (typeSwitchGuard | simpleStmt (SEMI | EOS) ws? typeSwitchGuard) L_CURLY ws* typeCaseClause* ws* R_CURLY
     ;
 
 typeSwitchGuard
@@ -276,24 +276,24 @@ typeSwitchGuard
     ;
 
 typeCaseClause
-    : typeSwitchCase COLON eos* statementList?
+    : typeSwitchCase COLON ws* statementList?
     ;
 
 typeSwitchCase
-    : CASE typeList
+    : CASE ws* typeList
     | DEFAULT
     ;
 
 typeList
-    : eos* (type_ | NIL_LIT) (COMMA eos* (type_ | NIL_LIT))*
+    : (type_ | NIL_LIT) (COMMA ws* (type_ | NIL_LIT))*
     ;
 
 selectStmt
-    : SELECT L_CURLY eos* commClause* eos* R_CURLY
+    : SELECT L_CURLY ws* commClause* ws* R_CURLY
     ;
 
 commClause
-    : commCase COLON eos* statementList?
+    : commCase COLON ws* statementList?
     ;
 
 commCase
@@ -306,11 +306,11 @@ recvStmt
     ;
 
 forStmt
-    : FOR eos* (expression? | forClause | rangeClause?) eos* block
+    : FOR ws* (expression? | forClause | rangeClause?) ws* block
     ;
 
 forClause
-    : initStmt = simpleStmt? eos? expression? eos? postStmt = simpleStmt?
+    : initStmt = simpleStmt? ws* expression? ws* postStmt = simpleStmt?
     ;
 
 rangeClause
@@ -324,7 +324,7 @@ goStmt
 type_
     : typeName typeArgs?
     | typeLit
-    | L_PAREN eos? type_ eos? R_PAREN
+    | L_PAREN type_ R_PAREN
     ;
 
 typeArgs
@@ -364,7 +364,7 @@ pointerType
     ;
 
 interfaceType
-    : INTERFACE L_CURLY eos* ((methodSpec | typeElement) eos*)* eos* R_CURLY
+    : INTERFACE L_CURLY ws* ((methodSpec | typeElement) ws*)* R_CURLY
     ;
 
 sliceType
@@ -399,7 +399,7 @@ result
     ;
 
 parameters
-    : L_PAREN eos* (eos* parameterDecl eos* (eos* COMMA eos* parameterDecl eos*)* COMMA?)? eos* R_PAREN
+    : L_PAREN ws* (parameterDecl ws* (COMMA ws* parameterDecl ws*)* COMMA?)? ws* R_PAREN
     ;
 
 parameterDecl
@@ -407,9 +407,9 @@ parameterDecl
     ;
 
 expression
-    : unary_op = (PLUS | MINUS | EXCLAMATION | CARET | STAR | AMPERSAND | RECEIVE) eos* expression
-    | expression mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) eos* expression
-    | expression add_op = (PLUS | MINUS | OR | CARET) eos* expression
+    : unary_op = (PLUS | MINUS | EXCLAMATION | CARET | STAR | AMPERSAND | RECEIVE) expression
+    | expression mul_op = (STAR | DIV | MOD | LSHIFT | RSHIFT | AMPERSAND | BIT_CLEAR) ws* expression
+    | expression add_op = (PLUS | MINUS | OR | CARET) ws* expression
     | expression rel_op = (
         EQUALS
         | NOT_EQUALS
@@ -417,9 +417,9 @@ expression
         | LESS_OR_EQUALS
         | GREATER
         | GREATER_OR_EQUALS
-    ) eos* expression
-    | expression LOGICAL_AND eos* expression
-    | expression LOGICAL_OR eos* expression
+    ) ws* expression
+    | expression LOGICAL_AND ws* expression
+    | expression LOGICAL_OR ws* expression
     | primaryExpr
     ;
 
@@ -427,11 +427,11 @@ primaryExpr
     : operand
     | conversion
     | methodExpr
-    | primaryExpr (DOT eos* IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
+    | primaryExpr (DOT ws* IDENTIFIER typeArgs? | index | slice_ | typeAssertion | arguments)
     ;
 
 conversion
-    : type_ L_PAREN eos* expression eos* COMMA? eos* R_PAREN
+    : type_ L_PAREN ws* expression ws* COMMA? ws* R_PAREN
     ;
 
 operand
@@ -484,15 +484,15 @@ literalType
     ;
 
 literalValue
-    : L_CURLY eos* (elementList eos* COMMA?)? eos* R_CURLY
+    : L_CURLY ws* (elementList ws* COMMA?)? ws* R_CURLY
     ;
 
 elementList
-    : keyedElement (COMMA keyedElement)*
+    : keyedElement (COMMA ws* keyedElement)*
     ;
 
 keyedElement
-    : eos* (key eos* COLON eos*)? element eos*
+    : ws* (key ws* COLON ws*)? element ws*
     ;
 
 key
@@ -505,7 +505,7 @@ element
     ;
 
 structType
-    : STRUCT L_CURLY eos* (fieldDecl eos*)* R_CURLY
+    : STRUCT L_CURLY ws* (fieldDecl ws*)* R_CURLY
     ;
 
 fieldDecl
@@ -545,13 +545,23 @@ typeAssertion
     ;
 
 arguments
-    : L_PAREN eos* ((expressionList | type_ (COMMA expressionList)?) ELLIPSIS? eos* COMMA? eos*)? R_PAREN
+    : L_PAREN ws* ((expressionList | type_ (COMMA ws* expressionList)?) ELLIPSIS? COMMA? ws*)? ws* R_PAREN
     ;
 
 methodExpr
     : type_ DOT IDENTIFIER
     ;
 
+// ws: 匹配连续的空白和注释（用于避免 eos* 的状态爆炸）
+// 注释会被 lexer 放在 HIDDEN 通道，可以通过特殊方式访问
+// 简化规则，移除重叠分支，参考 YaklangParser 的设计
+ws
+    : EOS+
+    | COMMENT
+    | LINE_COMMENT
+    ;
+
+// eos: 单个语句结束符
 eos
     : SEMI
     | EOS

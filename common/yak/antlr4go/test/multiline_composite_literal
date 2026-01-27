@@ -1,0 +1,38 @@
+package main
+
+import "fmt"
+
+func multilineCompositeLiteral() {
+	// 测试复合字面量中的换行
+	type Body struct {
+		Reason            string
+		ThreadId          int
+		AllThreadsStopped bool
+	}
+
+	// 测试结构体字面量跨行
+	body := Body{
+		Reason:            "entry",
+		ThreadId:          0,
+		AllThreadsStopped: true,
+	}
+	fmt.Println(body)
+
+	// 测试 map 字面量跨行
+	m := map[string]int{
+		"a": 1,
+		"b": 2,
+		"c": 3,
+	}
+	fmt.Println(m)
+
+	// 测试 slice 字面量跨行
+	s := []int{
+		1,
+		2,
+		3,
+		4,
+	}
+	fmt.Println(s)
+}
+

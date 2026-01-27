@@ -1,0 +1,48 @@
+package main
+
+import "fmt"
+
+func multilineExprSwitch() {
+	var ch byte
+
+	// 测试表达式 switch 中 case 后面直接换行（类似错误信息中的情况）
+	switch ch {
+	case
+		' ',    // space
+		'\t',   // tab
+		'\v',   // verticalTab
+		'\f':   // formFeed
+		fmt.Println("whitespace")
+	case
+		'\n',   // lineFeed
+		'\r',   // carriageReturn
+		0x2028, // lineSeparator
+		0x2029: // paragraphSeparator
+		fmt.Println("line terminator")
+	default:
+		fmt.Println("other")
+	}
+
+	// 测试 case 后面换行，多个表达式
+	switch ch {
+	case 'a', 'e', 'i',
+		'o', 'u':
+		fmt.Println("vowel")
+	case '0', '1', '2',
+		'3', '4', '5',
+		'6', '7', '8', '9':
+		fmt.Println("digit")
+	default:
+		fmt.Println("other")
+	}
+
+	// 测试 case 后面换行，单个表达式
+	switch ch {
+	case
+		'a':
+		fmt.Println("a")
+	default:
+		fmt.Println("other")
+	}
+}
+

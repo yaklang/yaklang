@@ -1,0 +1,32 @@
+package main
+
+import "fmt"
+
+func multilineIfCondition() {
+	var stopEvent struct {
+		Seq                int
+		Body               struct {
+			Reason            string
+			ThreadId          int
+			AllThreadsStopped bool
+		}
+	}
+
+	// 测试 if 语句中的逻辑表达式跨行（类似 server_test.go 中的错误）
+	if stopEvent.Seq != 0 ||
+		stopEvent.Body.Reason != "entry" ||
+		stopEvent.Body.ThreadId != 0 ||
+		!stopEvent.Body.AllThreadsStopped {
+		fmt.Println("condition failed")
+	}
+
+	// 测试嵌套的条件表达式
+	if stopEvent.Seq != 0 ||
+		stopEvent.Body.Reason != "entry" {
+		if stopEvent.Body.ThreadId != 0 ||
+			!stopEvent.Body.AllThreadsStopped {
+			fmt.Println("nested condition")
+		}
+	}
+}
+

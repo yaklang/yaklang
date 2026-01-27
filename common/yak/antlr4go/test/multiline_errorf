@@ -1,0 +1,22 @@
+package main
+
+import "fmt"
+
+func multilineErrorf() {
+	var err error
+
+	// 测试 Errorf 调用中的字符串连接跨行（类似 upgrade.go 中的错误）
+	if err != nil {
+		msg := fmt.Sprintf("backup old yak-engine failed: %s, retry re-Install with \n"+
+			"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err)
+		fmt.Println(msg)
+	}
+
+	// 测试多个字符串连接跨行
+	longMsg := "This is a very long error message " +
+		"that spans multiple lines " +
+		"for better readability " +
+		"and formatting"
+	fmt.Println(longMsg)
+}
+

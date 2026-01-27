@@ -1,0 +1,30 @@
+package main
+
+import "fmt"
+
+func multilineStringConcat() {
+	// 测试字符串连接跨行
+	msg := "the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
+		"    yak grpc --host 0.0.0.0"
+	fmt.Println(msg)
+
+	// 测试多个字符串连接跨行
+	longMsg := "This is a very long string " +
+		"that spans multiple lines " +
+		"for better readability"
+	fmt.Println(longMsg)
+
+	// 测试算术表达式跨行
+	sum := 1 +
+		2 +
+		3 +
+		4
+	fmt.Println(sum)
+
+	// 测试逻辑表达式跨行
+	result := true &&
+		false &&
+		true
+	fmt.Println(result)
+}
+

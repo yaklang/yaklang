@@ -1,0 +1,50 @@
+package main
+
+import "fmt"
+
+func multilineExprSwitchComplex() {
+	var x int
+
+	// 测试复杂的表达式 switch，包含多个跨行的 case
+	switch x {
+	case 1, 2, 3,
+		4, 5, 6:
+		fmt.Println("small")
+	case 10, 20, 30,
+		40, 50, 60,
+		70, 80, 90:
+		fmt.Println("medium")
+	case 100, 200,
+		300, 400:
+		fmt.Println("large")
+	default:
+		fmt.Println("unknown")
+	}
+
+	// 测试带表达式的 case
+	var a, b, c int
+	switch {
+	case a > 0 && b > 0,
+		c > 0:
+		fmt.Println("all positive")
+	case a < 0 || b < 0,
+		c < 0:
+		fmt.Println("some negative")
+	default:
+		fmt.Println("zero")
+	}
+
+	// 测试字符串 case 跨行
+	var s string
+	switch s {
+	case "hello", "world",
+		"foo", "bar":
+		fmt.Println("greeting")
+	case "test", "example",
+		"demo":
+		fmt.Println("example")
+	default:
+		fmt.Println("other")
+	}
+}
+
