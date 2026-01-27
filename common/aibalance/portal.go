@@ -28,7 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed templates/portal.html templates/login.html templates/index.html
+//go:embed templates/portal.html templates/login.html templates/index.html templates/static/*
 var templatesFS embed.FS
 
 // formatBytes 将字节大小转换为人类可读的格式（KB、MB、GB等）
@@ -1029,6 +1029,12 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	// Process login POST request
 	if uriIns.Path == "/portal/login" && request.Method == "POST" {
 		c.processLogin(conn, request)
+		return
+	}
+
+	// Serve static files (CSS, JS) without authentication
+	if strings.HasPrefix(uriIns.Path, "/portal/static/") {
+		c.serveStaticFile(conn, uriIns.Path)
 		return
 	}
 
@@ -2569,4 +2575,74 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 		"top_goroutines": summaries[:topN],
 		"full_dump":      fullDump,
 	})
+}
+
+// serveStaticFile serves static files (CSS, JS) from the embedded filesystem or local filesystem
+func (c *ServerConfig) serveStaticFile(conn net.Conn, path string) {
+	// Extract filename from path (e.g., "/portal/static/portal.css" -> "portal.css")
+	fileName := strings.TrimPrefix(path, "/portal/static/")
+	if fileName == "" || strings.Contains(fileName, "..") {
+		c.logError("Invalid static file request: %s", path)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\nInvalid path"))
+		return
+	}
+
+	filePath := "templates/static/" + fileName
+
+	// Determine Content-Type based on file extension
+	var contentType string
+	switch {
+	case strings.HasSuffix(fileName, ".css"):
+		contentType = "text/css; charset=utf-8"
+	case strings.HasSuffix(fileName, ".js"):
+		contentType = "application/javascript; charset=utf-8"
+	case strings.HasSuffix(fileName, ".png"):
+		contentType = "image/png"
+	case strings.HasSuffix(fileName, ".jpg"), strings.HasSuffix(fileName, ".jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasSuffix(fileName, ".svg"):
+		contentType = "image/svg+xml"
+	case strings.HasSuffix(fileName, ".ico"):
+		contentType = "image/x-icon"
+	default:
+		contentType = "application/octet-stream"
+	}
+
+	var fileContent []byte
+	var err error
+
+	// Try to read from filesystem first (for development hot-reload)
+	if result := utils.GetFirstExistedFile(
+		"common/aibalance/"+filePath,
+		filePath,
+		"../"+filePath,
+	); result != "" {
+		fileContent, err = os.ReadFile(result)
+		if err != nil {
+			c.logError("Failed to read static file from filesystem '%s': %v", result, err)
+			// Fall through to try embedded FS
+		}
+	}
+
+	// If not found in filesystem, try embedded FS
+	if fileContent == nil {
+		fileContent, err = templatesFS.ReadFile(filePath)
+		if err != nil {
+			c.logError("Failed to read static file from embedded FS '%s': %v", filePath, err)
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\nFile not found"))
+			return
+		}
+	}
+
+	// Build HTTP response with caching headers
+	header := fmt.Sprintf("HTTP/1.1 200 OK\r\n"+
+		"Content-Type: %s\r\n"+
+		"Content-Length: %d\r\n"+
+		"Cache-Control: public, max-age=3600\r\n"+
+		"\r\n",
+		contentType, len(fileContent))
+
+	conn.Write([]byte(header))
+	conn.Write(fileContent)
+	c.logInfo("Served static file: %s (%d bytes)", fileName, len(fileContent))
 }
