@@ -76,6 +76,7 @@ func (c *ServerConfig) serveAddProviderPage(conn net.Conn, request *http.Request
 }
 
 // processAddProviders handles requests to add one or more providers
+// Supports both JSON and form-urlencoded formats
 func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request) {
 	c.logInfo("Processing add providers request")
 
@@ -84,34 +85,106 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		return
 	}
 
-	// Read request body
-	bodyBytes, err := io.ReadAll(request.Body)
-	if err != nil {
-		c.logError("Failed to read request body: %v", err)
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
-		return
-	}
-	defer request.Body.Close()
-
-	// Parse JSON body
-	var reqBody struct {
-		Providers []struct {
-			WrapperName  string `json:"wrapper_name"`
-			TypeName     string `json:"type_name"`
-			DomainOrURL  string `json:"domain_or_url"`
-			APIKey       string `json:"api_key"`
-			NoHTTPS      bool   `json:"no_https"`
-			ProviderMode string `json:"provider_mode"`
-		} `json:"providers"`
+	type ProviderData struct {
+		WrapperName  string
+		ModelName    string
+		TypeName     string
+		DomainOrURL  string
+		APIKey       string
+		NoHTTPS      bool
+		ProviderMode string
 	}
 
-	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
-		c.logError("Failed to parse request body: %v", err)
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
-		return
+	var providers []ProviderData
+
+	contentType := request.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
+		// Parse form data
+		if err := request.ParseForm(); err != nil {
+			c.logError("Failed to parse form: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to parse form data"})
+			return
+		}
+
+		wrapperName := request.FormValue("wrapper_name")
+		modelName := request.FormValue("model_name")
+		typeName := request.FormValue("model_type") // Frontend uses model_type
+		if typeName == "" {
+			typeName = request.FormValue("type_name")
+		}
+		domainOrURL := request.FormValue("domain_or_url")
+		providerMode := request.FormValue("provider_mode")
+		noHTTPS := request.FormValue("no_https") == "on"
+		apiKeysStr := request.FormValue("api_keys")
+
+		// If model_name is empty, use wrapper_name
+		if modelName == "" {
+			modelName = wrapperName
+		}
+
+		// Parse API keys (one per line)
+		apiKeyLines := strings.Split(apiKeysStr, "\n")
+		for _, apiKey := range apiKeyLines {
+			apiKey = strings.TrimSpace(apiKey)
+			if apiKey == "" {
+				continue
+			}
+			providers = append(providers, ProviderData{
+				WrapperName:  wrapperName,
+				ModelName:    modelName,
+				TypeName:     typeName,
+				DomainOrURL:  domainOrURL,
+				APIKey:       apiKey,
+				NoHTTPS:      noHTTPS,
+				ProviderMode: providerMode,
+			})
+		}
+	} else {
+		// Parse JSON body
+		bodyBytes, err := io.ReadAll(request.Body)
+		if err != nil {
+			c.logError("Failed to read request body: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		defer request.Body.Close()
+
+		var reqBody struct {
+			Providers []struct {
+				WrapperName  string `json:"wrapper_name"`
+				ModelName    string `json:"model_name"`
+				TypeName     string `json:"type_name"`
+				DomainOrURL  string `json:"domain_or_url"`
+				APIKey       string `json:"api_key"`
+				NoHTTPS      bool   `json:"no_https"`
+				ProviderMode string `json:"provider_mode"`
+			} `json:"providers"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+			c.logError("Failed to parse request body: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
+			return
+		}
+
+		for _, p := range reqBody.Providers {
+			modelName := p.ModelName
+			if modelName == "" {
+				modelName = p.WrapperName
+			}
+			providers = append(providers, ProviderData{
+				WrapperName:  p.WrapperName,
+				ModelName:    modelName,
+				TypeName:     p.TypeName,
+				DomainOrURL:  p.DomainOrURL,
+				APIKey:       p.APIKey,
+				NoHTTPS:      p.NoHTTPS,
+				ProviderMode: p.ProviderMode,
+			})
+		}
 	}
 
-	if len(reqBody.Providers) == 0 {
+	if len(providers) == 0 {
 		c.logError("No providers specified")
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "No providers specified"})
 		return
@@ -121,7 +194,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	var addedCount int
 	var errors []string
 
-	for _, p := range reqBody.Providers {
+	for _, p := range providers {
 		if p.WrapperName == "" || p.TypeName == "" {
 			errors = append(errors, "Provider missing wrapper_name or type_name")
 			continue
@@ -130,7 +203,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		// Create provider record
 		provider := &schema.AiProvider{
 			WrapperName:  p.WrapperName,
-			ModelName:    p.WrapperName, // Use wrapper name as model name
+			ModelName:    p.ModelName,
 			TypeName:     p.TypeName,
 			DomainOrURL:  p.DomainOrURL,
 			APIKey:       p.APIKey,
@@ -146,7 +219,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		}
 
 		addedCount++
-		c.logInfo("Successfully added provider: %s (%s)", p.WrapperName, p.TypeName)
+		c.logInfo("Successfully added provider: %s (model: %s, type: %s)", p.WrapperName, p.ModelName, p.TypeName)
 	}
 
 	// Reload providers into memory
@@ -175,25 +248,39 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Request) {
 	c.logInfo("Serving autocomplete data")
 
-	// Get unique wrapper names
+	// Get unique wrapper names, model names, and domain/URLs from existing providers
 	providers, err := GetAllAiProviders()
 	wrapperNames := make([]string, 0)
+	modelNames := make([]string, 0)
+	domainOrURLs := make([]string, 0)
 	if err == nil {
 		wrapperSet := make(map[string]bool)
+		modelSet := make(map[string]bool)
+		domainSet := make(map[string]bool)
 		for _, p := range providers {
 			if p.WrapperName != "" && !wrapperSet[p.WrapperName] {
 				wrapperSet[p.WrapperName] = true
 				wrapperNames = append(wrapperNames, p.WrapperName)
 			}
+			if p.ModelName != "" && !modelSet[p.ModelName] {
+				modelSet[p.ModelName] = true
+				modelNames = append(modelNames, p.ModelName)
+			}
+			if p.DomainOrURL != "" && !domainSet[p.DomainOrURL] {
+				domainSet[p.DomainOrURL] = true
+				domainOrURLs = append(domainOrURLs, p.DomainOrURL)
+			}
 		}
 	}
 
-	// Get AI types
+	// Get AI types from aispec (registered gateway types)
 	aiTypes := aispec.RegisteredAIGateways()
 
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"wrapper_names": wrapperNames,
-		"ai_types":      aiTypes,
+		"wrapper_names":  wrapperNames,
+		"model_names":    modelNames,
+		"model_types":    aiTypes, // Use model_types for frontend compatibility
+		"domain_or_urls": domainOrURLs,
 	})
 }
 
@@ -329,34 +416,81 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		return
 	}
 
-	// Parse request body
-	var reqBody struct {
-		TypeName    string `json:"type_name"`
-		DomainOrURL string `json:"domain_or_url"`
-		APIKey      string `json:"api_key"`
-		NoHTTPS     bool   `json:"no_https"`
+	// Parse request - support both form data and JSON
+	var typeName, domainOrURL, apiKey, modelName string
+	var noHTTPS bool
+
+	contentType := request.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
+		// Parse form data
+		if err := request.ParseForm(); err != nil {
+			c.logError("Failed to parse form: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to parse form data"})
+			return
+		}
+		typeName = request.FormValue("model_type")
+		domainOrURL = request.FormValue("domain_or_url")
+		// Use api_key_to_validate for validation (first API key from the list)
+		apiKey = request.FormValue("api_key_to_validate")
+		if apiKey == "" {
+			apiKey = request.FormValue("api_key")
+		}
+		modelName = request.FormValue("model_name")
+		noHTTPS = request.FormValue("no_https") == "on"
+	} else {
+		// Parse JSON body
+		var reqBody struct {
+			TypeName    string `json:"type_name"`
+			ModelType   string `json:"model_type"`
+			DomainOrURL string `json:"domain_or_url"`
+			APIKey      string `json:"api_key"`
+			ModelName   string `json:"model_name"`
+			NoHTTPS     bool   `json:"no_https"`
+		}
+
+		bodyBytes, err := io.ReadAll(request.Body)
+		if err != nil {
+			c.logError("Failed to read request body: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		defer request.Body.Close()
+
+		if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
+			c.logError("Failed to parse request body: %v", err)
+			c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
+			return
+		}
+
+		typeName = reqBody.TypeName
+		if typeName == "" {
+			typeName = reqBody.ModelType
+		}
+		domainOrURL = reqBody.DomainOrURL
+		apiKey = reqBody.APIKey
+		modelName = reqBody.ModelName
+		noHTTPS = reqBody.NoHTTPS
 	}
 
-	bodyBytes, err := io.ReadAll(request.Body)
-	if err != nil {
-		c.logError("Failed to read request body: %v", err)
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Failed to read request body"})
+	// Validate required fields
+	if typeName == "" || apiKey == "" {
+		c.logError("Missing required fields: type_name or api_key")
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"success": false,
+			"message": "Missing required fields: type_name and api_key are required",
+		})
 		return
 	}
-	defer request.Body.Close()
 
-	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
-		c.logError("Failed to parse request body: %v", err)
-		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{"error": "Invalid request format"})
-		return
-	}
+	c.logInfo("Validating provider: type=%s, domain=%s, model=%s", typeName, domainOrURL, modelName)
 
 	// Create a temporary provider for validation
 	provider := &Provider{
-		TypeName:    reqBody.TypeName,
-		DomainOrURL: reqBody.DomainOrURL,
-		APIKey:      reqBody.APIKey,
-		NoHTTPS:     reqBody.NoHTTPS,
+		TypeName:    typeName,
+		DomainOrURL: domainOrURL,
+		APIKey:      apiKey,
+		ModelName:   modelName,
+		NoHTTPS:     noHTTPS,
 	}
 
 	// Try to get a client and make a simple request
