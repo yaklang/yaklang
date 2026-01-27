@@ -315,11 +315,11 @@ func TestInstallMemoryUsage(t *testing.T) {
 	}
 
 	// 验证安装是否成功
-	if installer.IsInstalled(vulinboxBinary) {
+	if installer.IsInstalled(vulinboxBinary, nil) {
 		fmt.Println("✓ Vulinbox is properly installed")
 
 		// 清理安装的文件
-		installPath := installer.GetInstallPath(vulinboxBinary)
+		installPath := installer.GetInstallPath(vulinboxBinary, nil)
 		if err := os.Remove(installPath); err != nil {
 			log.Warnf("Failed to cleanup installed file: %v", err)
 		}
