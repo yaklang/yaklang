@@ -35,6 +35,11 @@ type Paginator struct {
 
 // Paging 分页
 func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
+	defer func() {
+		if r := recover(); r != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	db := p.DB
 
 	if p.ShowSQL {
@@ -63,6 +68,14 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	}
 
 	queryFunc := func(tx *gorm.DB) {
+		if tx == nil {
+			println("tx is nil")
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
 		if shouldQueryCount {
 			if tx.Count(&count); tx.Error != nil {
 				return
@@ -88,7 +101,7 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	if p.DisableTransaction {
 		queryFunc(db)
 	} else {
-		db = utils.GormTransactionReturnDb(db, queryFunc)
+		utils.GormTransactionReturnDb(db, queryFunc)
 	}
 
 	if p.Limit == -1 {
