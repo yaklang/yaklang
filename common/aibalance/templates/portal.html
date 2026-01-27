@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI-Balancer Portal Table</title>
+    <title>AI-Balancer Portal</title>
     <link rel="stylesheet" href="/portal/static/portal.css">
 </head>
 <body>
     <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="loader"></div>
+        <p style="color: #666; margin-top: 20px;">Loading portal data...</p>
     </div>
 
     <div class="header">
-        <h1>AIBalancer Portal Table</h1>
+        <h1>AIBalancer Portal</h1>
         <div style="display: flex; align-items: center;">
-            <p>当前时间: {{.CurrentTime}}</p>
+            <p>当前时间: <span id="current-time">--</span></p>
             <a href="/portal/logout" class="btn" style="margin-left: 15px;">登出</a>
         </div>
     </div>
@@ -23,23 +24,23 @@
     <div class="statistic">
         <div class="stat-card">
             <h3>AI供应商总数</h3>
-            <div class="value">{{.TotalProviders}}</div>
+            <div class="value" id="stat-total-providers">--</div>
         </div>
         <div class="stat-card">
             <h3>健康提供者数</h3>
-            <div class="value">{{.HealthyProviders}}</div>
+            <div class="value" id="stat-healthy-providers">--</div>
         </div>
         <div class="stat-card">
             <h3>总请求数</h3>
-            <div class="value">{{.TotalRequests}}</div>
+            <div class="value" id="stat-total-requests">--</div>
         </div>
         <div class="stat-card">
             <h3>成功率</h3>
-            <div class="value">{{printf "%.2f" .SuccessRate}}%</div>
+            <div class="value" id="stat-success-rate">--</div>
         </div>
         <div class="stat-card">
             <h3>流量计数</h3>
-            <div class="value">{{.TotalTrafficStr}}</div>
+            <div class="value" id="stat-total-traffic">--</div>
         </div>
         <div class="stat-card" id="memory-card" style="cursor: pointer;" onclick="showMemoryDialog()">
             <h3>内存状态</h3>
@@ -50,7 +51,7 @@
     <!-- Memory Diagnostic Dialog -->
     <div id="memory-dialog" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
         <div style="background: white; padding: 25px; border-radius: 8px; min-width: 500px; max-width: 1000px; width: 95%; max-height: 80vh; overflow-y: auto;">
-            <h2 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">🔧 内存诊断</h2>
+            <h2 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">内存诊断</h2>
             <div id="memory-stats-content" style="margin: 15px 0;">
                 <p>加载中...</p>
             </div>
@@ -78,21 +79,19 @@
         
         <div id="all" class="tab-content active">
             <div class="action-bar">
-                <div style="display: flex; align-items: center;"> <!-- New container for select all and filters -->
+                <div style="display: flex; align-items: center;">
                     <div class="select-all-container">
                         <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
                         <label for="select-all">全选</label>
                     </div>
-                    <!-- BEGIN: Filter Buttons -->
                     <div class="filter-buttons">
                         <button class="filter-btn" data-filter="all" onclick="filterProviders('all')">全部</button>
                         <button class="filter-btn active" data-filter="healthy" onclick="filterProviders('healthy')">健康</button>
                         <button class="filter-btn" data-filter="unhealthy" onclick="filterProviders('unhealthy')">异常</button>
                         <button class="filter-btn" data-filter="unknown" onclick="filterProviders('unknown')">未知</button>
                     </div>
-                    <!-- END: Filter Buttons -->
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
                     <button class="btn" onclick="checkAllProvidersHealth()" id="check-all-health-btn">
                         <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
                             <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
@@ -100,14 +99,15 @@
                         检查健康状态
                     </button>
                     <button class="btn btn-danger" id="delete-selected" onclick="confirmDeleteSelected()" disabled>删除选中项</button>
+                    <button class="reset-column-widths-btn" onclick="resetColumnWidths('provider-table')" title="Reset column widths to default">Reset columns</button>
                 </div>
             </div>
             <div class="table-container">
-                <table cellspacing="0" cellpadding="0">
+                <table cellspacing="0" cellpadding="0" id="provider-table">
                     <thead>
                         <tr>
                             <th class="checkbox-column">
-                                <input type="checkbox" id="select-all-header" onchange="toggleSelectAll()"> <!-- Renamed ID for clarity -->
+                                <input type="checkbox" id="select-all-header" onchange="toggleSelectAll()">
                             </th>
                             <th>ID</th>
                             <th class="column-name">健康度</th>
@@ -120,67 +120,8 @@
                             <th class="column-name">操作</th>
                         </tr>
                     </thead>
-                    <tbody id="provider-table-body"> <!-- Added ID for easier JS selection -->
-                        {{range .Providers}}
-                        <!-- BEGIN: Add data-status attribute -->
-                        <tr data-id="{{.ID}}" data-status="{{.HealthStatusClass}}">
-                        <!-- END: Add data-status attribute -->
-                            <td class="checkbox-column">
-                                <input type="checkbox" class="provider-checkbox">
-                            </td>
-                            <td class="text-center">{{.ID}}</td>
-                            <td class="health-cell">
-                                <div class="health-status">
-                                    <button class="refresh-btn" onclick="checkSingleProvider('{{.ID}}')" title="刷新健康状态">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-                                        </svg>
-                                    </button>
-                                    <div class="health-info">
-                                        {{if eq .HealthStatusClass "healthy"}}
-                                            <span class="health-badge healthy">健康</span>
-                                            <span class="health-latency">{{.LastLatency}}ms</span>
-                                        {{else if eq .HealthStatusClass "unhealthy"}}
-                                            <span class="health-badge unhealthy">异常</span>
-                                            <span class="health-latency">{{if gt .LastLatency 0}}{{.LastLatency}}ms{{else}}-{{end}}</span>
-                                        {{else}} <!-- unknown -->
-                                            <span class="health-badge unhealthy">未知</span>
-                                            <span class="health-latency">-</span>
-                                        {{end}}
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="copyable text-center" data-full-text="{{.WrapperName}}">{{.WrapperName}}</td>
-                            <td class="copyable" data-full-text="{{.ModelName}}">{{.ModelName}}</td>
-                            <td class="copyable text-center" data-full-text="{{.TypeName}}">{{.TypeName}}</td>
-                            <td class="copyable" data-full-text="{{.DomainOrURL}}">{{.DomainOrURL}}</td>
-                            <td class="copyable api-key-cell" data-full-text="{{.APIKey}}">
-                                <div class="api-key-container">
-                                    <span class="api-key-display">{{if .APIKey}}•••••••{{end}}</span>
-                                    <button class="btn btn-sm btn-copy" onclick="copyToClipboard('{{.APIKey}}')" title="复制 API Key">
-                                        <svg viewBox="0 0 24 24" width="14" height="14">
-                                            <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                            <td>{{.TotalRequests}}</td>
-                            <td>
-                                <div class="provider-actions">
-                                    <button class="btn btn-sm btn-quick-add" onclick="quickAddProvider('{{.ID}}')" title="快速添加">
-                                        <svg viewBox="0 0 24 24" width="14" height="14">
-                                            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-                                        </svg>
-                                    </button>
-                                    <button class="delete-btn" onclick="deleteProvider('{{.ID}}')" title="删除提供者">
-                                        <svg viewBox="0 0 24 24">
-                                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {{end}}
+                    <tbody id="provider-table-body">
+                        <!-- Data will be populated by JavaScript -->
                     </tbody>
                 </table>
             </div>
@@ -199,13 +140,12 @@
                                 生成
                             </button>
                         </div>
-                        
                     </div>
                     
                     <div class="form-group">
                         <label for="allowedModelsSelect">允许的模型 (WrapperName):</label>
                         <select id="allowedModelsSelect" class="form-control" multiple required>
-                            <!-- 模型选项将由 JavaScript 动态填充 -->
+                            <!-- Model options will be populated by JavaScript -->
                         </select>
                         <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。必须至少选择一个。</small>
                     </div>
@@ -213,16 +153,13 @@
                     <div class="action-bar" style="margin-top: 20px;">
                         <div>
                             <h4>API密钥列表</h4>
-                            <!-- BEGIN: API Filter Buttons -->
                             <div class="filter-buttons api-filter-buttons" style="margin-left: 10px; display: inline-flex;">
                                 <button class="filter-btn active" data-filter="all" onclick="filterApiKeys('all')">全部</button>
                                 <button class="filter-btn" data-filter="active" onclick="filterApiKeys('active')">激活</button>
                                 <button class="filter-btn" data-filter="inactive" onclick="filterApiKeys('inactive')">禁用</button>
                             </div>
-                            <!-- END: API Filter Buttons -->
                         </div>
-                        <div>
-                            <!-- <button class="btn btn-danger" id="delete-selected-api" onclick="confirmDeleteSelectedAPI()" disabled>删除选中项</button> -->
+                        <div style="display: flex; gap: 5px;">
                             <button class="btn btn-success btn-sm" id="enable-selected-api" onclick="confirmEnableSelectedAPI()" disabled title="启用选中的API密钥">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                                 批量启用
@@ -230,6 +167,10 @@
                             <button class="btn btn-warning btn-sm" id="disable-selected-api" onclick="confirmDisableSelectedAPI()" disabled title="禁用选中的API密钥" style="background-color: #ffc107; border-color: #ffc107; color: #212529;">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.59-13L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41z"/></svg>
                                 批量禁用
+                            </button>
+                            <button class="btn btn-danger btn-sm" id="delete-selected-api" onclick="confirmDeleteSelectedAPIKeys()" disabled title="删除选中的API密钥">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align: middle; margin-right: 4px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                                批量删除
                             </button>
                         </div>
                     </div>
@@ -242,77 +183,19 @@
                                         <input type="checkbox" id="select-all-api" onchange="toggleSelectAllAPI()">
                                     </th>
                                     <th>ID</th>
-                                    <th class="column-name">状态/操作</th> <!-- 新合并列 -->
+                                    <th class="column-name">状态</th>
                                     <th class="column-name">API密钥</th>
                                     <th class="column-name">允许模型</th>
                                     <th class="column-name">使用统计</th>
                                     <th class="column-name">成功/失败</th>
                                     <th class="column-name">流量(输入/输出)</th>
+                                    <th class="column-name">流量限制</th>
                                     <th class="column-name">最后使用</th>
-                                    <!-- <th class="column-name">状态</th> --> <!-- 移除原状态列 -->
-                                    <!-- <th class="column-name">操作</th> --> <!-- 移除原操作列 -->
+                                    <th class="column-name">操作</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {{range .APIKeys}}
-                                <!-- BEGIN: Add data-api-status attribute -->
-                                <tr data-api-id="{{.ID}}" data-api-status="{{if .Active}}active{{else}}inactive{{end}}">
-                                <!-- END: Add data-api-status attribute -->
-                                    <td class="checkbox-column">
-                                        <input type="checkbox" class="api-checkbox">
-                                    </td>
-                                    <td class="text-center">{{.ID}}</td>
-                                    <td class="text-center" style="align-items:center;gap:2px;padding:2px 4px;">
-                                        {{if .Active}}
-                                            <span class="health-badge healthy" style="flex-shrink:0;font-size:12px;">激活</span>
-                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">禁用</button>
-                                        {{else}}
-                                            <span class="health-badge unhealthy" style="flex-shrink:0;font-size:12px;">禁用</span>
-                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">激活</button>
-                                        {{end}}
-                                    </td>
-                                    <td class="copyable api-key-cell" data-full-text="{{.Key}}">{{.DisplayKey}}</td>
-                                    <td class="copyable editable-allowed-models"
-                                        data-api-id="{{.ID}}"
-                                        data-current-models="{{.AllowedModels}}"
-                                        data-full-text="{{.AllowedModels}}"
-                                        title="右键点击修改允许的模型">
-                                        {{.AllowedModels}}
-                                    </td>
-                                    <td class="text-center">{{.UsageCount}}</td>
-                                    <td class="text-center">
-                                        <span class="health-badge healthy">{{.SuccessCount}}</span>
-                                        <span class="health-badge unhealthy">{{.FailureCount}}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <div class="traffic-data">
-                                            <span title="输入流量">↓ {{.InputBytesFormatted}}</span>
-                                            <span title="输出流量">↑ {{.OutputBytesFormatted}}</span>
-                                        </div>
-                                    </td>
-                                    <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{else}}-{{end}}</td>
-                                    <!-- 原状态列 -->
-                                    <!-- <td class="text-center">
-                                        {{if .Active}}
-                                            <span class="health-badge healthy">激活</span>
-                                        {{else}}
-                                            <span class="health-badge unhealthy">禁用</span>
-                                        {{end}}
-                                    </td> -->
-                                    <!-- 原操作列 -->
-                                    <!-- <td>
-                                        {{if .Active}}
-                                            <button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('{{.ID}}', false)" title="禁用API密钥">
-                                                禁用
-                                            </button>
-                                        {{else}}
-                                            <button class="btn btn-sm" onclick="toggleAPIKeyStatus('{{.ID}}', true)" title="激活API密钥">
-                                                激活
-                                            </button>
-                                        {{end}}
-                                    </td> -->
-                                </tr>
-                                {{end}}
+                            <tbody id="api-table-body">
+                                <!-- Data will be populated by JavaScript -->
                             </tbody>
                         </table>
                     </div>
@@ -332,35 +215,24 @@
 
         <div id="models" class="tab-content">
             <div class="card">
-                <h3>模型信息管理</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">模型信息管理</h3>
+                    <button class="reset-column-widths-btn" onclick="resetColumnWidths('models-table')" title="Reset column widths to default">Reset column widths</button>
+                </div>
                 <div class="table-container">
-                    <table cellspacing="0" cellpadding="0">
+                    <table cellspacing="0" cellpadding="0" id="models-table">
                         <thead>
                             <tr>
                                 <th class="column-name">模型名 (WrapperName)</th>
                                 <th class="column-name text-center">供应商数量</th>
+                                <th class="column-name text-center">流量倍数</th>
                                 <th class="column-name">描述</th>
                                 <th class="column-name">标签</th>
                                 <th class="column-name text-center">操作</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {{range .ModelMetas}}
-                            <tr>
-                                <td class="copyable" data-full-text="{{.Name}}">{{.Name}}</td>
-                                <td class="text-center">{{.ProviderCount}}</td>
-                                <td class="copyable" data-full-text="{{.Description}}">{{if .Description}}{{.Description}}{{else}}-{{end}}</td>
-                                <td class="copyable" data-full-text="{{.Tags}}">{{if .Tags}}{{.Tags}}{{else}}-{{end}}</td>
-                                <td class="text-center">
-                                    <button class="btn btn-sm" onclick="openEditModelModal('{{.Name}}', '{{.Description}}', '{{.Tags}}')" title="编辑模型信息">
-                                        编辑
-                                    </button>
-                                    <button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand('{{.Name}}')" title="查看 curl 命令">
-                                        curl
-                                    </button>
-                                </td>
-                            </tr>
-                            {{end}}
+                        <tbody id="models-table-body">
+                            <!-- Data will be populated by JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -369,50 +241,50 @@
 
         <div id="totp" class="tab-content">
             <div class="card">
-                <h3>🔐 Memfit TOTP 认证设置</h3>
+                <h3>Memfit TOTP 认证设置</h3>
                 <p style="color: #666; margin-bottom: 20px;">
                     以 <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">memfit-</code> 开头的模型需要 TOTP 认证才能访问。
                 </p>
                 
                 <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; color: #2c3e50;">📋 当前配置</h4>
+                    <h4 style="margin-top: 0; color: #2c3e50;">当前配置</h4>
                     <div style="display: grid; gap: 15px;">
                         <div>
                             <label style="color: #666; font-size: 14px;">TOTP 密钥 (UUID)</label>
                             <div style="background: #fff; padding: 10px 15px; border-radius: 4px; border: 1px solid #e0e0e0; font-family: monospace; color: #c62828; word-break: break-all;" id="totp-secret">
-                                {{.TOTPSecret}}
+                                --
                             </div>
                         </div>
                         <div>
                             <label style="color: #666; font-size: 14px;">包装后的 UUID (客户端使用)</label>
                             <div style="background: #fff; padding: 10px 15px; border-radius: 4px; border: 1px solid #e0e0e0; font-family: monospace; word-break: break-all;" id="totp-wrapped">
-                                {{.TOTPWrapped}}
+                                --
                             </div>
                         </div>
                         <div>
                             <label style="color: #666; font-size: 14px;">当前 TOTP 验证码 (每30秒更新)</label>
                             <div style="background: #e8f5e9; padding: 10px 15px; border-radius: 4px; border: 1px solid #c8e6c9; font-family: monospace; font-size: 24px; letter-spacing: 4px; color: #2e7d32; text-align: center;" id="totp-code">
-                                {{.TOTPCode}}
+                                --
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                    <strong style="color: #e65100;">⚠️ 警告</strong>
+                    <strong style="color: #e65100;">警告</strong>
                     <p style="margin: 10px 0 0 0; color: #bf360c;">
                         刷新 TOTP 密钥将使所有使用 memfit- 模型的客户端需要重新获取密钥。请谨慎操作。
                     </p>
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <button class="btn btn-danger" onclick="refreshTOTPSecret()">🔄 刷新 TOTP 密钥</button>
-                    <button class="btn" onclick="refreshTOTPCode()">🔃 刷新验证码</button>
-                    <button class="btn" onclick="copyTOTPSecret()">📋 复制密钥</button>
+                    <button class="btn btn-danger" onclick="refreshTOTPSecret()">刷新 TOTP 密钥</button>
+                    <button class="btn" onclick="refreshTOTPCode()">刷新验证码</button>
+                    <button class="btn" onclick="copyTOTPSecret()">复制密钥</button>
                 </div>
 
                 <div style="background: #e3f2fd; border-radius: 8px; padding: 20px;">
-                    <h4 style="margin-top: 0; color: #1565c0;">📖 使用说明</h4>
+                    <h4 style="margin-top: 0; color: #1565c0;">使用说明</h4>
                     <ol style="margin: 0; padding-left: 20px; color: #333; line-height: 2;">
                         <li>客户端通过 <code style="background: #fff; padding: 2px 6px; border-radius: 4px;">/v1/memfit-totp-uuid</code> 获取包装后的 UUID</li>
                         <li>使用该 UUID 作为密钥，通过 TOTP 算法生成 6 位验证码</li>
@@ -440,6 +312,11 @@
             <div class="form-group">
                 <label>标签 (逗号分隔):</label>
                 <input type="text" id="editModelTags" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>流量消耗倍数:</label>
+                <input type="number" id="editModelTrafficMultiplier" class="form-control" min="0" step="0.1" value="1.0">
+                <small class="form-text text-muted">使用此模型时，流量消耗将乘以此倍数 (例如: 2.0 表示消耗双倍流量)</small>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeEditModelModal()">取消</button>
@@ -473,7 +350,7 @@
 
     <div id="toast-container"></div>
 
-    <!-- 新增：API Key 生成成功提示弹窗 -->
+    <!-- API Key Success Modal -->
     <div id="apiKeySuccessModal" class="delete-confirmation-modal" style="display: none;">
         <div class="modal-content">
             <span class="close-modal" onclick="closeApiKeyModal(true)">&times;</span>
@@ -490,31 +367,7 @@
         </div>
     </div>
 
-    <!-- Edit Model Meta Modal -->
-    <div id="editModelMetaModal" class="delete-confirmation-modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeEditModelModal()">&times;</span>
-            <h4>编辑模型信息</h4>
-            <div class="form-group">
-                <label>模型名:</label>
-                <input type="text" id="editModelName" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label>描述:</label>
-                <textarea id="editModelDescription" class="form-control" rows="3"></textarea>
-            </div>
-            <div class="form-group">
-                <label>标签 (逗号分隔):</label>
-                <input type="text" id="editModelTags" class="form-control">
-            </div>
-            <div class="modal-actions">
-                <button class="btn" onclick="closeEditModelModal()">取消</button>
-                <button class="btn btn-primary" onclick="saveModelMeta()">保存</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 添加编辑允许模型的模态框 -->
+    <!-- Edit Allowed Models Modal -->
     <div id="editAllowedModelsModal" class="delete-confirmation-modal" style="display: none;">
         <div class="modal-content">
             <span class="close-modal" onclick="closeEditAllowedModelsModal()">&times;</span>
@@ -522,8 +375,6 @@
             <div class="form-group">
                 <label>API Key ID: <span id="editingApiKeyIdDisplay"></span></label>
                 <input type="hidden" id="editApiKeyId">
-                <!-- 旧的textarea将被替换 -->
-                <!-- <textarea id="editAllowedModelsTextarea" class="form-control" style="height: 100px; margin: 10px 0;" placeholder="允许的模型，用逗号分隔"></textarea> -->
                 <label for="editAllowedModelsSelectModal" style="display:block; margin-top:10px;">允许的模型 (WrapperName):</label>
                 <select id="editAllowedModelsSelectModal" class="form-control" multiple style="min-height: 120px; margin: 5px 0;"></select>
                 <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。</small>
@@ -535,7 +386,7 @@
         </div>
     </div>
 
-    <!-- 新增：复制同类供应商Keys弹窗 -->
+    <!-- Copy Similar Keys Modal -->
     <div id="copySimilarKeysModal" class="delete-confirmation-modal" style="display: none;">
         <div class="modal-content" style="max-width: 600px;">
             <span class="close-modal" onclick="closeCopySimilarKeysModal()">&times;</span>
@@ -555,6 +406,32 @@
                     复制到剪贴板
                 </button>
                 <button class="btn" onclick="closeCopySimilarKeysModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Traffic Limit Dialog -->
+    <div id="trafficLimitModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeTrafficLimitDialog()">&times;</span>
+            <h4>流量限制设置</h4>
+            <input type="hidden" id="trafficLimitApiKeyId">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="trafficLimitEnabled"> 启用流量限制
+                </label>
+            </div>
+            <div class="form-group">
+                <label>流量限额 (bytes):</label>
+                <input type="number" id="trafficLimitValue" class="form-control" min="0" step="1048576" placeholder="例如: 1073741824 (1GB)">
+                <small class="form-text text-muted">已使用: <span id="trafficUsedDisplay">--</span></small>
+            </div>
+            <div class="form-group">
+                <button class="btn btn-sm" onclick="resetApiKeyTraffic()" style="background-color: #ff9800;">重置流量计数</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="saveTrafficLimit()">保存</button>
+                <button class="btn" onclick="closeTrafficLimitDialog()">取消</button>
             </div>
         </div>
     </div>

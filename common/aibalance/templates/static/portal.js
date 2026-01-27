@@ -5,6 +5,362 @@
         let contextModelsForEdit = null;         // For API key model editing
         let isHealthCheckInProgress = false;
         let isProviderConfigValidated = false; // For add provider form validation
+        
+        // 全局数据存储
+        let portalData = null;
+
+        // ==================== Portal Data Loader ====================
+        
+        const PortalDataLoader = {
+            // 加载所有页面数据
+            loadData: async function() {
+                try {
+                    const response = await fetch('/portal/api/data');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    portalData = await response.json();
+                    console.log('Portal data loaded:', portalData);
+                    return portalData;
+                } catch (error) {
+                    console.error('Failed to load portal data:', error);
+                    throw error;
+                }
+            },
+            
+            // 渲染统计卡片
+            renderStats: function(data) {
+                document.getElementById('current-time').textContent = data.current_time;
+                document.getElementById('stat-total-providers').textContent = data.total_providers;
+                document.getElementById('stat-healthy-providers').textContent = data.healthy_providers;
+                document.getElementById('stat-total-requests').textContent = data.total_requests;
+                document.getElementById('stat-success-rate').textContent = data.success_rate.toFixed(2) + '%';
+                document.getElementById('stat-total-traffic').textContent = data.total_traffic_str;
+            },
+            
+            // 渲染供应商表格
+            renderProviders: function(data) {
+                const tbody = document.getElementById('provider-table-body');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                if (!data.providers || data.providers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center">No providers found</td></tr>';
+                    return;
+                }
+                
+                data.providers.forEach(p => {
+                    const row = document.createElement('tr');
+                    row.dataset.id = p.id;
+                    row.dataset.status = p.health_status_class;
+                    
+                    let healthBadge = '';
+                    let latencyDisplay = '';
+                    if (p.health_status_class === 'healthy') {
+                        healthBadge = '<span class="health-badge healthy">健康</span>';
+                        latencyDisplay = `<span class="health-latency">${p.last_latency}ms</span>`;
+                    } else if (p.health_status_class === 'unhealthy') {
+                        healthBadge = '<span class="health-badge unhealthy">异常</span>';
+                        latencyDisplay = `<span class="health-latency">${p.last_latency > 0 ? p.last_latency + 'ms' : '-'}</span>`;
+                    } else {
+                        healthBadge = '<span class="health-badge unhealthy">未知</span>';
+                        latencyDisplay = '<span class="health-latency">-</span>';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="checkbox-column">
+                            <input type="checkbox" class="provider-checkbox">
+                        </td>
+                        <td class="text-center">${p.id}</td>
+                        <td class="health-cell">
+                            <div class="health-status">
+                                <button class="refresh-btn" onclick="checkSingleProvider('${p.id}')" title="刷新健康状态">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                                    </svg>
+                                </button>
+                                <div class="health-info">
+                                    ${healthBadge}
+                                    ${latencyDisplay}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="copyable text-center" data-full-text="${this.escapeHtml(p.wrapper_name)}">${this.escapeHtml(p.wrapper_name)}</td>
+                        <td class="copyable" data-full-text="${this.escapeHtml(p.model_name)}">${this.escapeHtml(p.model_name)}</td>
+                        <td class="copyable text-center" data-full-text="${this.escapeHtml(p.type_name)}">${this.escapeHtml(p.type_name)}</td>
+                        <td class="copyable" data-full-text="${this.escapeHtml(p.domain_or_url)}">${this.escapeHtml(p.domain_or_url)}</td>
+                        <td class="copyable api-key-cell" data-full-text="${this.escapeHtml(p.api_key)}">
+                            <div class="api-key-container">
+                                <span class="api-key-display">${p.api_key ? '•••••••' : ''}</span>
+                                <button class="btn btn-sm btn-copy" onclick="copyToClipboard('${this.escapeHtml(p.api_key)}')" title="复制 API Key">
+                                    <svg viewBox="0 0 24 24" width="14" height="14">
+                                        <path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                        <td>${p.total_requests}</td>
+                        <td>
+                            <div class="provider-actions">
+                                <button class="btn btn-sm btn-quick-add" onclick="quickAddProvider('${p.id}')" title="快速添加">
+                                    <svg viewBox="0 0 24 24" width="14" height="14">
+                                        <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                                    </svg>
+                                </button>
+                                <button class="delete-btn" onclick="deleteProvider('${p.id}')" title="删除提供者">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+                
+                // Re-apply current filter
+                const activeFilter = document.querySelector('.filter-buttons .filter-btn.active');
+                if (activeFilter) {
+                    filterProviders(activeFilter.dataset.filter);
+                }
+            },
+            
+            // 渲染 API 密钥表格
+            renderAPIKeys: function(data) {
+                const tbody = document.getElementById('api-table-body');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                if (!data.api_keys || data.api_keys.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No API keys found</td></tr>';
+                    return;
+                }
+                
+                data.api_keys.forEach(key => {
+                    const row = document.createElement('tr');
+                    row.dataset.apiId = key.id;
+                    row.dataset.apiStatus = key.active ? 'active' : 'inactive';
+                    row.dataset.trafficLimit = key.traffic_limit;
+                    row.dataset.trafficUsed = key.traffic_used;
+                    row.dataset.trafficEnabled = key.traffic_limit_enable;
+                    
+                    let statusBadge = key.active 
+                        ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
+                        : '<span class="health-badge unhealthy" style="font-size:12px;">禁用</span>';
+                    
+                    let trafficLimitCell = '';
+                    if (key.traffic_limit_enable) {
+                        const percent = key.traffic_percent;
+                        let barColor = '#4caf50';
+                        if (percent > 90) barColor = '#f44336';
+                        else if (percent > 70) barColor = '#ff9800';
+                        
+                        trafficLimitCell = `
+                            <div class="traffic-limit-info" title="已用/限额: ${key.traffic_used_formatted}/${key.traffic_limit_formatted} (${percent.toFixed(1)}%)">
+                                <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: ${Math.min(percent, 100)}%; height: 100%; background: ${barColor};"></div>
+                                </div>
+                                <small>${key.traffic_used_formatted}/${key.traffic_limit_formatted}</small>
+                            </div>
+                        `;
+                    } else {
+                        trafficLimitCell = '<span style="color: #999;">未限制</span>';
+                    }
+                    
+                    let actionButtons = key.active
+                        ? `<button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('${key.id}', false)" title="禁用" style="padding:2px 4px;font-size:11px;">禁用</button>`
+                        : `<button class="btn btn-sm" onclick="toggleAPIKeyStatus('${key.id}', true)" title="激活" style="padding:2px 4px;font-size:11px;">激活</button>`;
+                    
+                    row.innerHTML = `
+                        <td class="checkbox-column">
+                            <input type="checkbox" class="api-checkbox">
+                        </td>
+                        <td class="text-center">${key.id}</td>
+                        <td class="text-center">${statusBadge}</td>
+                        <td class="copyable api-key-cell" data-full-text="${this.escapeHtml(key.key)}">${this.escapeHtml(key.display_key)}</td>
+                        <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${this.escapeHtml(key.allowed_models)}" data-full-text="${this.escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${this.escapeHtml(key.allowed_models)}</td>
+                        <td class="text-center">${key.usage_count}</td>
+                        <td class="text-center">
+                            <span class="health-badge healthy">${key.success_count}</span>
+                            <span class="health-badge unhealthy">${key.failure_count}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="traffic-data">
+                                <span title="输入流量">↓ ${key.input_bytes_formatted}</span>
+                                <span title="输出流量">↑ ${key.output_bytes_formatted}</span>
+                            </div>
+                        </td>
+                        <td class="text-center">${trafficLimitCell}</td>
+                        <td>${key.last_used_at || '-'}</td>
+                        <td class="text-center">
+                            <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
+                                ${actionButtons}
+                                <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="流量设置" style="padding:2px 4px;font-size:11px;">流量</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
+                            </div>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            },
+            
+            // 渲染模型信息表格
+            renderModels: function(data) {
+                const tbody = document.getElementById('models-table-body');
+                if (!tbody) return;
+                
+                tbody.innerHTML = '';
+                
+                if (!data.model_metas || data.model_metas.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No models found</td></tr>';
+                    return;
+                }
+                
+                data.model_metas.forEach(model => {
+                    const row = document.createElement('tr');
+                    row.dataset.modelName = model.name;
+                    row.dataset.trafficMultiplier = model.traffic_multiplier.toFixed(2);
+                    
+                    let badgeColor = '#2196f3';
+                    if (model.traffic_multiplier > 1.5) badgeColor = '#ff9800';
+                    else if (model.traffic_multiplier > 1.0) badgeColor = '#4caf50';
+                    
+                    row.innerHTML = `
+                        <td class="copyable" data-full-text="${this.escapeHtml(model.name)}">${this.escapeHtml(model.name)}</td>
+                        <td class="text-center">${model.provider_count}</td>
+                        <td class="text-center">
+                            <span class="traffic-multiplier-badge" style="background: ${badgeColor}; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px;" title="流量消耗将乘以此倍数">
+                                x${model.traffic_multiplier.toFixed(2)}
+                            </span>
+                        </td>
+                        <td class="copyable" data-full-text="${this.escapeHtml(model.description || '')}">${model.description || '-'}</td>
+                        <td class="copyable" data-full-text="${this.escapeHtml(model.tags || '')}">${model.tags || '-'}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm" onclick="openEditModelModal('${this.escapeHtml(model.name)}', '${this.escapeHtml(model.description || '')}', '${this.escapeHtml(model.tags || '')}', ${model.traffic_multiplier})" title="编辑模型信息">
+                                编辑
+                            </button>
+                            <button class="btn btn-sm" style="background-color: #4caf50; margin-left: 5px;" onclick="showCurlCommand('${this.escapeHtml(model.name)}')" title="查看 curl 命令">
+                                curl
+                            </button>
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            },
+            
+            // 渲染 TOTP 数据
+            renderTOTP: function(data) {
+                const secretEl = document.getElementById('totp-secret');
+                const wrappedEl = document.getElementById('totp-wrapped');
+                const codeEl = document.getElementById('totp-code');
+                
+                if (secretEl) secretEl.textContent = data.totp_secret || '--';
+                if (wrappedEl) wrappedEl.textContent = data.totp_wrapped || '--';
+                if (codeEl) codeEl.textContent = data.totp_code || '--';
+            },
+            
+            // 填充模型选择下拉框
+            populateModelSelect: function(data) {
+                const select = document.getElementById('allowedModelsSelect');
+                if (!select) return;
+                
+                select.innerHTML = '';
+                
+                // 从 providers 中提取唯一的模型名
+                const modelSet = new Set();
+                if (data.providers) {
+                    data.providers.forEach(p => {
+                        const name = p.wrapper_name || p.model_name;
+                        if (name) modelSet.add(name);
+                    });
+                }
+                
+                modelSet.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+            },
+            
+            // HTML 转义
+            escapeHtml: function(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            },
+            
+            // 隐藏 loading overlay
+            hideLoading: function() {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 300);
+                }
+            },
+            
+            // 显示 loading overlay
+            showLoading: function() {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                    overlay.style.opacity = '1';
+                }
+            },
+            
+            // 初始化并渲染所有数据
+            init: async function() {
+                try {
+                    const data = await this.loadData();
+                    
+                    this.renderStats(data);
+                    this.renderProviders(data);
+                    this.renderAPIKeys(data);
+                    this.renderModels(data);
+                    this.renderTOTP(data);
+                    this.populateModelSelect(data);
+                    
+                    this.hideLoading();
+                    
+                    console.log('Portal data rendering complete');
+                } catch (error) {
+                    console.error('Failed to initialize portal:', error);
+                    this.hideLoading();
+                    showToast('Failed to load portal data: ' + error.message, 'error');
+                }
+            },
+            
+            // 刷新数据
+            refresh: async function() {
+                try {
+                    this.showLoading();
+                    await this.init();
+                } catch (error) {
+                    console.error('Failed to refresh portal data:', error);
+                }
+            }
+        };
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            PortalDataLoader.init();
+        });
+        
+        // 全局刷新函数
+        window.refreshPortalData = function() {
+            PortalDataLoader.refresh();
+        };
 
         // 初始化 Toast 容器
         if (!document.getElementById('toast-container')) {
@@ -2660,10 +3016,17 @@ curl '${metaApiUrl}?name=${modelName}'`;
         }
 
         // Model Metadata Edit Logic
-        function openEditModelModal(name, description, tags) {
+        function openEditModelModal(name, description, tags, trafficMultiplier) {
             document.getElementById('editModelName').value = name;
             document.getElementById('editModelDescription').value = description;
             document.getElementById('editModelTags').value = tags;
+            
+            // Set traffic multiplier with default value of 1.0
+            const multiplierInput = document.getElementById('editModelTrafficMultiplier');
+            if (multiplierInput) {
+                multiplierInput.value = trafficMultiplier !== undefined ? trafficMultiplier : 1.0;
+            }
+            
             document.getElementById('editModelMetaModal').style.display = 'block';
         }
 
@@ -2675,6 +3038,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const name = document.getElementById('editModelName').value;
             const description = document.getElementById('editModelDescription').value;
             const tags = document.getElementById('editModelTags').value;
+            
+            // Get traffic multiplier
+            const multiplierInput = document.getElementById('editModelTrafficMultiplier');
+            const trafficMultiplier = multiplierInput ? parseFloat(multiplierInput.value) || 1.0 : 1.0;
 
             fetch('/portal/update-model-meta', {
                 method: 'POST',
@@ -2684,7 +3051,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 body: JSON.stringify({
                     model_name: name,
                     description: description,
-                    tags: tags
+                    tags: tags,
+                    traffic_multiplier: trafficMultiplier
                 })
             })
             .then(response => response.json())
@@ -2779,3 +3147,652 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 });
             }
         }, 30000);
+
+        // ==================== API Key Delete Functions ====================
+
+        // Delete single API key
+        async function deleteAPIKey(apiKeyId) {
+            if (!confirm('确定要删除这个 API Key 吗？此操作不可恢复。')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/portal/delete-api-key/${apiKeyId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '删除API密钥失败');
+                }
+                
+                showToast('API密钥删除成功', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`删除失败: ${error.message}`, 'error');
+            }
+        }
+
+        // Delete selected API keys (batch)
+        async function confirmDeleteSelectedAPIKeys() {
+            const checkboxes = document.querySelectorAll('#api-table tbody .api-checkbox:checked');
+            if (checkboxes.length === 0) {
+                showToast('请先选择要删除的API密钥', 'warning');
+                return;
+            }
+            
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 个 API Key 吗？此操作不可恢复。`)) {
+                return;
+            }
+            
+            const ids = [];
+            checkboxes.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                const id = row.getAttribute('data-api-id');
+                if (id) {
+                    ids.push(id);
+                }
+            });
+            
+            if (ids.length === 0) {
+                showToast('未找到有效的API密钥ID', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/portal/delete-api-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: ids })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '批量删除API密钥失败');
+                }
+                
+                showToast(`成功删除 ${data.deletedCount} 个API密钥`, 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`删除失败: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== API Key Traffic Limit Functions ====================
+
+        // Show traffic limit dialog
+        function showTrafficLimitDialog(apiKeyId, currentLimit, currentUsed, enabled) {
+            const limitMB = currentLimit > 0 ? (currentLimit / 1024 / 1024).toFixed(2) : 0;
+            const usedMB = currentUsed > 0 ? (currentUsed / 1024 / 1024).toFixed(2) : 0;
+            
+            const html = `
+                <div id="trafficLimitModal" class="delete-confirmation-modal" style="display: flex;">
+                    <div class="modal-content">
+                        <span class="close-modal" onclick="closeTrafficLimitModal()">&times;</span>
+                        <h4>设置流量限制</h4>
+                        <div class="form-group">
+                            <label>API Key ID: ${apiKeyId}</label>
+                        </div>
+                        <div class="form-group">
+                            <label>当前已使用: ${usedMB} MB</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="trafficLimitInput">流量限额 (MB):</label>
+                            <input type="number" id="trafficLimitInput" class="form-control" value="${limitMB}" min="0" step="1">
+                            <small class="form-text text-muted">设置为 0 表示不限制</small>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="trafficLimitEnable" ${enabled ? 'checked' : ''}>
+                                启用流量限制
+                            </label>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-primary" onclick="saveTrafficLimit(${apiKeyId})">保存</button>
+                            <button class="btn" onclick="closeTrafficLimitModal()">取消</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function closeTrafficLimitModal() {
+            const modal = document.getElementById('trafficLimitModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        async function saveTrafficLimit(apiKeyId) {
+            const limitMB = parseFloat(document.getElementById('trafficLimitInput').value) || 0;
+            const limitBytes = Math.floor(limitMB * 1024 * 1024);
+            const enabled = document.getElementById('trafficLimitEnable').checked;
+            
+            try {
+                const response = await fetch(`/portal/api-key-traffic-limit/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        traffic_limit: limitBytes,
+                        enable: enabled
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '保存流量限制失败');
+                }
+                
+                showToast('流量限制设置成功', 'success');
+                closeTrafficLimitModal();
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`保存失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetAPIKeyTraffic(apiKeyId) {
+            if (!confirm('确定要重置这个 API Key 的流量计数吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/portal/reset-api-key-traffic/${apiKeyId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '重置流量失败');
+                }
+                
+                showToast('流量计数已重置', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`重置失败: ${error.message}`, 'error');
+            }
+        }
+
+        // ==================== API Key Pagination Functions ====================
+
+        let currentAPIKeyPage = 1;
+        let currentAPIKeyPageSize = 20;
+        let currentAPIKeySortBy = 'created_at';
+        let currentAPIKeySortOrder = 'desc';
+
+        async function loadAPIKeysPage(page, sortBy, sortOrder) {
+            if (page !== undefined) currentAPIKeyPage = page;
+            if (sortBy !== undefined) currentAPIKeySortBy = sortBy;
+            if (sortOrder !== undefined) currentAPIKeySortOrder = sortOrder;
+            
+            try {
+                const response = await fetch(
+                    `/portal/api/api-keys?page=${currentAPIKeyPage}&pageSize=${currentAPIKeyPageSize}&sortBy=${currentAPIKeySortBy}&sortOrder=${currentAPIKeySortOrder}`,
+                    {
+                        method: 'GET',
+                        credentials: 'same-origin'
+                    }
+                );
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || '加载API密钥失败');
+                }
+                
+                renderAPIKeysTable(data.data, data.pagination);
+            } catch (error) {
+                showToast(`加载失败: ${error.message}`, 'error');
+            }
+        }
+
+        function renderAPIKeysTable(keys, pagination) {
+            const tbody = document.querySelector('#api-table tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            keys.forEach(key => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-api-id', key.id);
+                row.setAttribute('data-api-status', key.active ? 'active' : 'inactive');
+                
+                // Calculate traffic percentage
+                let trafficPercent = 0;
+                let trafficDisplay = '-';
+                if (key.traffic_limit_enable && key.traffic_limit > 0) {
+                    trafficPercent = (key.traffic_used / key.traffic_limit * 100).toFixed(1);
+                    trafficDisplay = `${formatBytes(key.traffic_used)} / ${formatBytes(key.traffic_limit)} (${trafficPercent}%)`;
+                } else if (key.traffic_used > 0) {
+                    trafficDisplay = formatBytes(key.traffic_used);
+                }
+                
+                row.innerHTML = `
+                    <td class="checkbox-column">
+                        <input type="checkbox" class="api-checkbox">
+                    </td>
+                    <td class="text-center">${key.id}</td>
+                    <td class="text-center" style="align-items:center;gap:2px;padding:2px 4px;">
+                        ${key.active 
+                            ? '<span class="health-badge healthy" style="flex-shrink:0;font-size:12px;">激活</span><button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus(\'' + key.id + '\', false)" title="禁用API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">禁用</button>'
+                            : '<span class="health-badge unhealthy" style="flex-shrink:0;font-size:12px;">禁用</span><button class="btn btn-sm" onclick="toggleAPIKeyStatus(\'' + key.id + '\', true)" title="激活API密钥" style="margin-left:auto;padding:2px 4px;font-size:12px;">激活</button>'
+                        }
+                    </td>
+                    <td class="copyable api-key-cell" data-full-text="${key.api_key}">${key.display_key}</td>
+                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${key.allowed_models}" data-full-text="${key.allowed_models}" title="右键点击修改允许的模型">${key.allowed_models}</td>
+                    <td class="text-center">${key.usage_count}</td>
+                    <td class="text-center">
+                        <span class="health-badge healthy">${key.success_count}</span>
+                        <span class="health-badge unhealthy">${key.failure_count}</span>
+                    </td>
+                    <td class="text-center">
+                        <div class="traffic-data">
+                            <span title="输入流量">↓ ${formatBytes(key.input_bytes)}</span>
+                            <span title="输出流量">↑ ${formatBytes(key.output_bytes)}</span>
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <span class="traffic-info" title="${key.traffic_limit_enable ? '已启用流量限制' : '未启用流量限制'}">${trafficDisplay}</span>
+                    </td>
+                    <td>${key.last_used_time || '-'}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="设置流量限制" style="padding:2px 4px;font-size:12px;">流量</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除API密钥" style="padding:2px 4px;font-size:12px;">删除</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Update pagination controls
+            updateAPIKeyPagination(pagination);
+        }
+
+        function updateAPIKeyPagination(pagination) {
+            let paginationContainer = document.getElementById('api-key-pagination');
+            if (!paginationContainer) {
+                // Create pagination container if not exists
+                const apiTable = document.getElementById('api-table');
+                if (apiTable && apiTable.parentElement) {
+                    paginationContainer = document.createElement('div');
+                    paginationContainer.id = 'api-key-pagination';
+                    paginationContainer.className = 'pagination-controls';
+                    paginationContainer.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;';
+                    apiTable.parentElement.appendChild(paginationContainer);
+                }
+            }
+            
+            if (!paginationContainer) return;
+            
+            const { page, pageSize, total, totalPages } = pagination;
+            
+            paginationContainer.innerHTML = `
+                <div class="pagination-info">
+                    共 ${total} 条记录，第 ${page}/${totalPages} 页
+                </div>
+                <div class="pagination-buttons" style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="loadAPIKeysPage(1)">首页</button>
+                    <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="loadAPIKeysPage(${page - 1})">上一页</button>
+                    <span style="margin: 0 10px;">
+                        跳转到 <input type="number" id="apiKeyPageInput" min="1" max="${totalPages}" value="${page}" style="width: 50px; text-align: center;"> 页
+                        <button class="btn btn-sm" onclick="loadAPIKeysPage(parseInt(document.getElementById('apiKeyPageInput').value))">Go</button>
+                    </span>
+                    <button class="btn btn-sm" ${page >= totalPages ? 'disabled' : ''} onclick="loadAPIKeysPage(${page + 1})">下一页</button>
+                    <button class="btn btn-sm" ${page >= totalPages ? 'disabled' : ''} onclick="loadAPIKeysPage(${totalPages})">末页</button>
+                    <select onchange="changeAPIKeyPageSize(this.value)" style="margin-left: 10px;">
+                        <option value="10" ${pageSize === 10 ? 'selected' : ''}>10条/页</option>
+                        <option value="20" ${pageSize === 20 ? 'selected' : ''}>20条/页</option>
+                        <option value="50" ${pageSize === 50 ? 'selected' : ''}>50条/页</option>
+                        <option value="100" ${pageSize === 100 ? 'selected' : ''}>100条/页</option>
+                    </select>
+                </div>
+            `;
+        }
+
+        function changeAPIKeyPageSize(newSize) {
+            currentAPIKeyPageSize = parseInt(newSize);
+            currentAPIKeyPage = 1; // Reset to first page
+            loadAPIKeysPage();
+        }
+
+        function sortAPIKeys(column) {
+            if (currentAPIKeySortBy === column) {
+                // Toggle sort order
+                currentAPIKeySortOrder = currentAPIKeySortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentAPIKeySortBy = column;
+                currentAPIKeySortOrder = 'desc';
+            }
+            loadAPIKeysPage();
+        }
+
+        // Helper function to format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0 || bytes === undefined || bytes === null) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // ==================== 可拖拽调整列宽功能 ====================
+        
+        const ColumnResizer = {
+            // 存储键前缀
+            storageKeyPrefix: 'aibalance_table_columns_',
+            
+            // 当前正在拖拽的状态
+            resizing: null,
+            
+            // 初始化所有表格的列宽调整功能
+            init: function() {
+                const tables = document.querySelectorAll('table');
+                tables.forEach((table, index) => {
+                    const tableId = table.id || `table-${index}`;
+                    this.initTable(table, tableId);
+                });
+                
+                // 添加提示元素
+                this.createResizeHint();
+                
+                console.log('Column resizer initialized for all tables');
+            },
+            
+            // 初始化单个表格
+            initTable: function(table, tableId) {
+                const thead = table.querySelector('thead');
+                if (!thead) return;
+                
+                const headers = thead.querySelectorAll('th');
+                if (headers.length === 0) return;
+                
+                // 添加可调整大小的类
+                table.classList.add('resizable');
+                
+                // 为每个表头添加拖拽手柄
+                headers.forEach((th, colIndex) => {
+                    // 跳过复选框列（第一列通常很小）
+                    if (th.classList.contains('checkbox-column')) return;
+                    
+                    th.classList.add('resizable');
+                    
+                    // 创建拖拽手柄
+                    const handle = document.createElement('div');
+                    handle.className = 'resize-handle';
+                    handle.dataset.colIndex = colIndex;
+                    handle.dataset.tableId = tableId;
+                    th.appendChild(handle);
+                    
+                    // 绑定鼠标事件
+                    handle.addEventListener('mousedown', (e) => this.startResize(e, th, colIndex, tableId, table));
+                });
+                
+                // 从 localStorage 恢复列宽
+                this.restoreColumnWidths(table, tableId);
+            },
+            
+            // 创建提示元素
+            createResizeHint: function() {
+                if (document.querySelector('.column-resize-hint')) return;
+                
+                const hint = document.createElement('div');
+                hint.className = 'column-resize-hint';
+                hint.textContent = 'Drag to resize column. Double-click to auto-fit.';
+                document.body.appendChild(hint);
+            },
+            
+            // 开始拖拽
+            startResize: function(e, th, colIndex, tableId, table) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const startX = e.pageX;
+                const startWidth = th.offsetWidth;
+                
+                this.resizing = {
+                    th: th,
+                    colIndex: colIndex,
+                    tableId: tableId,
+                    table: table,
+                    startX: startX,
+                    startWidth: startWidth
+                };
+                
+                th.classList.add('resizing');
+                document.body.classList.add('resizing-column');
+                
+                // 显示提示
+                this.showHint(`Column width: ${startWidth}px`);
+                
+                // 绑定全局事件
+                document.addEventListener('mousemove', this.handleMouseMove);
+                document.addEventListener('mouseup', this.handleMouseUp);
+            },
+            
+            // 处理鼠标移动
+            handleMouseMove: function(e) {
+                if (!ColumnResizer.resizing) return;
+                
+                const { th, startX, startWidth, table, colIndex } = ColumnResizer.resizing;
+                const diff = e.pageX - startX;
+                const newWidth = Math.max(40, startWidth + diff); // 最小宽度 40px
+                
+                th.style.width = newWidth + 'px';
+                th.style.minWidth = newWidth + 'px';
+                
+                // 同步调整对应列的单元格宽度
+                const rows = table.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const cell = row.children[colIndex];
+                    if (cell) {
+                        cell.style.width = newWidth + 'px';
+                        cell.style.minWidth = newWidth + 'px';
+                    }
+                });
+                
+                ColumnResizer.showHint(`Column width: ${Math.round(newWidth)}px`);
+            },
+            
+            // 处理鼠标释放
+            handleMouseUp: function(e) {
+                if (!ColumnResizer.resizing) return;
+                
+                const { th, tableId, table, colIndex } = ColumnResizer.resizing;
+                
+                th.classList.remove('resizing');
+                document.body.classList.remove('resizing-column');
+                
+                // 保存列宽到 localStorage
+                ColumnResizer.saveColumnWidths(table, tableId);
+                
+                // 隐藏提示
+                ColumnResizer.hideHint();
+                
+                // 清理状态和事件
+                ColumnResizer.resizing = null;
+                document.removeEventListener('mousemove', ColumnResizer.handleMouseMove);
+                document.removeEventListener('mouseup', ColumnResizer.handleMouseUp);
+                
+                console.log(`Column ${colIndex} width saved for table ${tableId}`);
+            },
+            
+            // 保存列宽到 localStorage
+            saveColumnWidths: function(table, tableId) {
+                const headers = table.querySelectorAll('thead th');
+                const widths = {};
+                
+                headers.forEach((th, index) => {
+                    const width = th.style.width || th.offsetWidth + 'px';
+                    widths[index] = parseInt(width);
+                });
+                
+                try {
+                    localStorage.setItem(this.storageKeyPrefix + tableId, JSON.stringify(widths));
+                    console.log(`Saved column widths for ${tableId}:`, widths);
+                } catch (e) {
+                    console.warn('Failed to save column widths to localStorage:', e);
+                }
+            },
+            
+            // 从 localStorage 恢复列宽
+            restoreColumnWidths: function(table, tableId) {
+                try {
+                    const saved = localStorage.getItem(this.storageKeyPrefix + tableId);
+                    if (!saved) return;
+                    
+                    const widths = JSON.parse(saved);
+                    const headers = table.querySelectorAll('thead th');
+                    
+                    headers.forEach((th, index) => {
+                        if (widths[index]) {
+                            const width = widths[index] + 'px';
+                            th.style.width = width;
+                            th.style.minWidth = width;
+                        }
+                    });
+                    
+                    // 同步 tbody 列宽
+                    const rows = table.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        headers.forEach((th, index) => {
+                            if (widths[index]) {
+                                const cell = row.children[index];
+                                if (cell) {
+                                    const width = widths[index] + 'px';
+                                    cell.style.width = width;
+                                    cell.style.minWidth = width;
+                                }
+                            }
+                        });
+                    });
+                    
+                    console.log(`Restored column widths for ${tableId}:`, widths);
+                } catch (e) {
+                    console.warn('Failed to restore column widths from localStorage:', e);
+                }
+            },
+            
+            // 重置表格列宽
+            resetColumnWidths: function(tableId) {
+                try {
+                    localStorage.removeItem(this.storageKeyPrefix + tableId);
+                    
+                    // 移除内联样式
+                    const table = tableId ? document.getElementById(tableId) || document.querySelector(`table[data-table-id="${tableId}"]`) : null;
+                    if (table) {
+                        const headers = table.querySelectorAll('thead th');
+                        headers.forEach(th => {
+                            th.style.width = '';
+                            th.style.minWidth = '';
+                        });
+                        
+                        const cells = table.querySelectorAll('tbody td');
+                        cells.forEach(td => {
+                            td.style.width = '';
+                            td.style.minWidth = '';
+                        });
+                    }
+                    
+                    showToast('Column widths reset to default', 'success');
+                    console.log(`Reset column widths for ${tableId}`);
+                } catch (e) {
+                    console.warn('Failed to reset column widths:', e);
+                }
+            },
+            
+            // 重置所有表格列宽
+            resetAllColumnWidths: function() {
+                const keys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(this.storageKeyPrefix)) {
+                        keys.push(key);
+                    }
+                }
+                
+                keys.forEach(key => localStorage.removeItem(key));
+                
+                // 移除所有表格的内联样式
+                document.querySelectorAll('table.resizable').forEach(table => {
+                    const headers = table.querySelectorAll('thead th');
+                    headers.forEach(th => {
+                        th.style.width = '';
+                        th.style.minWidth = '';
+                    });
+                    
+                    const cells = table.querySelectorAll('tbody td');
+                    cells.forEach(td => {
+                        td.style.width = '';
+                        td.style.minWidth = '';
+                    });
+                });
+                
+                showToast('All column widths reset to default', 'success');
+                console.log('All column widths reset');
+            },
+            
+            // 显示提示
+            showHint: function(text) {
+                const hint = document.querySelector('.column-resize-hint');
+                if (hint) {
+                    hint.textContent = text;
+                    hint.classList.add('visible');
+                }
+            },
+            
+            // 隐藏提示
+            hideHint: function() {
+                const hint = document.querySelector('.column-resize-hint');
+                if (hint) {
+                    hint.classList.remove('visible');
+                }
+            }
+        };
+        
+        // 添加重置按钮到表格
+        function addResetColumnWidthsButton() {
+            // 为 API 表格添加重置按钮
+            const apiActionBar = document.querySelector('#api-table')?.closest('.table-container')?.previousElementSibling;
+            if (apiActionBar && !apiActionBar.querySelector('.reset-column-widths-btn')) {
+                const resetBtn = document.createElement('button');
+                resetBtn.className = 'reset-column-widths-btn';
+                resetBtn.textContent = 'Reset column widths';
+                resetBtn.title = 'Reset column widths to default';
+                resetBtn.onclick = () => ColumnResizer.resetColumnWidths('api-table');
+                apiActionBar.querySelector('div:last-child')?.appendChild(resetBtn);
+            }
+        }
+        
+        // 页面加载完成后初始化列宽调整功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟初始化，确保表格已渲染
+            setTimeout(() => {
+                ColumnResizer.init();
+                addResetColumnWidthsButton();
+            }, 100);
+        });
+        
+        // 暴露全局函数
+        window.resetColumnWidths = function(tableId) {
+            ColumnResizer.resetColumnWidths(tableId);
+        };
+        
+        window.resetAllColumnWidths = function() {
+            ColumnResizer.resetAllColumnWidths();
+        };

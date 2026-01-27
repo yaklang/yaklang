@@ -146,7 +146,12 @@ type AiApiKeys struct {
 	SuccessCount  int64     `json:"success_count"`              // 成功请求数
 	FailureCount  int64     `json:"failure_count"`              // 失败请求数
 	LastUsedTime  time.Time `json:"last_used_time"`             // 上次使用时间
-	Active        bool      `json:"active" gorm:"default:true"` // 新增：API Key 激活状态
+	Active        bool      `json:"active" gorm:"default:true"` // API Key 激活状态
+
+	// 流量限制相关字段
+	TrafficLimit       int64 `json:"traffic_limit" gorm:"default:0"`             // 流量限额(字节)，0表示不限制
+	TrafficUsed        int64 `json:"traffic_used" gorm:"default:0"`              // 已使用流量(经倍数计算后)
+	TrafficLimitEnable bool  `json:"traffic_limit_enable" gorm:"default:false"`  // 是否启用流量限制
 }
 
 type LoginSession struct {

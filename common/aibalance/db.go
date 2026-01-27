@@ -314,9 +314,10 @@ func UpdateAiApiKeyAllowedModels(id uint, allowedModels string) error {
 // AiModelMeta stores metadata for a model (WrapperName)
 type AiModelMeta struct {
 	gorm.Model
-	ModelName   string `gorm:"uniqueIndex;not null"` // The platform model name (WrapperName)
-	Description string `gorm:"type:text"`
-	Tags        string `gorm:"type:text"` // Comma-separated tags or JSON
+	ModelName         string  `gorm:"uniqueIndex;not null"`  // The platform model name (WrapperName)
+	Description       string  `gorm:"type:text"`
+	Tags              string  `gorm:"type:text"`             // Comma-separated tags or JSON
+	TrafficMultiplier float64 `gorm:"default:1.0"`           // Traffic consumption multiplier, default 1.0
 }
 
 // EnsureModelMetaTable ensures the AiModelMeta table exists
@@ -324,17 +325,27 @@ func EnsureModelMetaTable() error {
 	return GetDB().AutoMigrate(&AiModelMeta{}).Error
 }
 
-// SaveModelMeta saves or updates model metadata
+// SaveModelMeta saves or updates model metadata (backward compatible)
 func SaveModelMeta(modelName, description, tags string) error {
+	return SaveModelMetaWithMultiplier(modelName, description, tags, -1) // -1 means don't update multiplier
+}
+
+// SaveModelMetaWithMultiplier saves or updates model metadata with traffic multiplier
+func SaveModelMetaWithMultiplier(modelName, description, tags string, trafficMultiplier float64) error {
 	var meta AiModelMeta
 	err := GetDB().Where("model_name = ?", modelName).First(&meta).Error
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			// Create new
+			multiplier := 1.0
+			if trafficMultiplier >= 0 {
+				multiplier = trafficMultiplier
+			}
 			meta = AiModelMeta{
-				ModelName:   modelName,
-				Description: description,
-				Tags:        tags,
+				ModelName:         modelName,
+				Description:       description,
+				Tags:              tags,
+				TrafficMultiplier: multiplier,
 			}
 			return GetDB().Create(&meta).Error
 		}
@@ -344,6 +355,41 @@ func SaveModelMeta(modelName, description, tags string) error {
 	// Update existing
 	meta.Description = description
 	meta.Tags = tags
+	if trafficMultiplier >= 0 {
+		meta.TrafficMultiplier = trafficMultiplier
+	}
+	return GetDB().Save(&meta).Error
+}
+
+// GetModelTrafficMultiplier retrieves the traffic multiplier for a specific model
+// Returns 1.0 if model not found or multiplier not set
+func GetModelTrafficMultiplier(modelName string) float64 {
+	meta, err := GetModelMeta(modelName)
+	if err != nil || meta == nil {
+		return 1.0
+	}
+	if meta.TrafficMultiplier <= 0 {
+		return 1.0
+	}
+	return meta.TrafficMultiplier
+}
+
+// UpdateModelTrafficMultiplier updates only the traffic multiplier for a model
+func UpdateModelTrafficMultiplier(modelName string, multiplier float64) error {
+	var meta AiModelMeta
+	err := GetDB().Where("model_name = ?", modelName).First(&meta).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			// Create new with default values
+			meta = AiModelMeta{
+				ModelName:         modelName,
+				TrafficMultiplier: multiplier,
+			}
+			return GetDB().Create(&meta).Error
+		}
+		return err
+	}
+	meta.TrafficMultiplier = multiplier
 	return GetDB().Save(&meta).Error
 }
 
@@ -372,4 +418,180 @@ func GetAllModelMetas() (map[string]*AiModelMeta, error) {
 		result[metas[i].ModelName] = &metas[i]
 	}
 	return result, nil
+}
+
+// ==================== API Key Traffic Limit Functions ====================
+
+// UpdateAiApiKeyTrafficLimit updates the traffic limit settings for an API key
+func UpdateAiApiKeyTrafficLimit(id uint, limit int64, enable bool) error {
+	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"traffic_limit":        limit,
+		"traffic_limit_enable": enable,
+	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to update traffic limit for API key ID %d: %w", id, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	log.Infof("Successfully updated traffic limit for API key (ID: %d), limit: %d, enabled: %v", id, limit, enable)
+	return nil
+}
+
+// ResetAiApiKeyTrafficUsed resets the traffic used counter for an API key
+func ResetAiApiKeyTrafficUsed(id uint) error {
+	result := GetDB().Model(&schema.AiApiKeys{}).Where("id = ?", id).Update("traffic_used", 0)
+	if result.Error != nil {
+		return fmt.Errorf("failed to reset traffic used for API key ID %d: %w", id, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	log.Infof("Successfully reset traffic used for API key (ID: %d)", id)
+	return nil
+}
+
+// CheckAiApiKeyTrafficLimit checks if an API key has exceeded its traffic limit
+// Returns (isAllowed, error) - isAllowed is true if the key can be used
+func CheckAiApiKeyTrafficLimit(apiKey string) (bool, error) {
+	var key schema.AiApiKeys
+	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
+		return false, fmt.Errorf("failed to find API key: %v", err)
+	}
+	
+	// If traffic limit is not enabled, always allow
+	if !key.TrafficLimitEnable {
+		return true, nil
+	}
+	
+	// If limit is 0, it means unlimited
+	if key.TrafficLimit <= 0 {
+		return true, nil
+	}
+	
+	// Check if used traffic exceeds limit
+	if key.TrafficUsed >= key.TrafficLimit {
+		return false, nil
+	}
+	
+	return true, nil
+}
+
+// UpdateAiApiKeyTrafficUsed adds to the traffic used counter for an API key
+func UpdateAiApiKeyTrafficUsed(apiKey string, additionalTraffic int64) error {
+	var key schema.AiApiKeys
+	if err := GetDB().Where("api_key = ?", apiKey).First(&key).Error; err != nil {
+		return fmt.Errorf("failed to find API key: %v", err)
+	}
+	
+	key.TrafficUsed += additionalTraffic
+	return GetDB().Save(&key).Error
+}
+
+// GetAiApiKeyByID retrieves an API key by its ID
+func GetAiApiKeyByID(id uint) (*schema.AiApiKeys, error) {
+	var key schema.AiApiKeys
+	if err := GetDB().Where("id = ?", id).First(&key).Error; err != nil {
+		return nil, err
+	}
+	return &key, nil
+}
+
+// DeleteAiApiKeyByID deletes an API key by its ID
+func DeleteAiApiKeyByID(id uint) error {
+	// Get API key info first for logging
+	key, err := GetAiApiKeyByID(id)
+	if err != nil {
+		return fmt.Errorf("failed to get API key info: %v", err)
+	}
+
+	// Execute delete operation
+	if err := GetDB().Delete(&schema.AiApiKeys{}, id).Error; err != nil {
+		return fmt.Errorf("failed to delete API key: %v", err)
+	}
+
+	// Log deletion
+	displayKey := key.APIKey
+	if len(displayKey) > 8 {
+		displayKey = displayKey[:8]
+	}
+	log.Infof("Successfully deleted API key (ID: %d, Key: %s...)", id, displayKey)
+	return nil
+}
+
+// BatchDeleteAiApiKeys deletes multiple API keys by their IDs
+func BatchDeleteAiApiKeys(ids []uint) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := GetDB().Where("id IN (?)", ids).Delete(&schema.AiApiKeys{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to batch delete API keys: %w", result.Error)
+	}
+	log.Infof("Successfully deleted %d API keys", result.RowsAffected)
+	return result.RowsAffected, nil
+}
+
+// ==================== API Key Pagination Functions ====================
+
+// GetAiApiKeysPaginated retrieves API keys with pagination and sorting
+// page: 1-based page number
+// pageSize: number of items per page
+// sortBy: field to sort by (created_at, usage_count, traffic_used, etc.)
+// sortOrder: "asc" or "desc"
+// Returns: keys, total count, error
+func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*schema.AiApiKeys, int64, error) {
+	var keys []*schema.AiApiKeys
+	var total int64
+	
+	// Validate and set defaults
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100 // Max page size
+	}
+	
+	// Validate sort field to prevent SQL injection
+	allowedSortFields := map[string]bool{
+		"id":           true,
+		"created_at":   true,
+		"updated_at":   true,
+		"usage_count":  true,
+		"success_count": true,
+		"failure_count": true,
+		"input_bytes":  true,
+		"output_bytes": true,
+		"traffic_used": true,
+		"traffic_limit": true,
+		"last_used_time": true,
+		"active":       true,
+	}
+	
+	if !allowedSortFields[sortBy] {
+		sortBy = "created_at"
+	}
+	
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "desc"
+	}
+	
+	// Get total count
+	if err := GetDB().Model(&schema.AiApiKeys{}).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count API keys: %v", err)
+	}
+	
+	// Calculate offset
+	offset := (page - 1) * pageSize
+	
+	// Query with pagination and sorting
+	orderClause := fmt.Sprintf("%s %s", sortBy, sortOrder)
+	if err := GetDB().Order(orderClause).Offset(offset).Limit(pageSize).Find(&keys).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to get API keys: %v", err)
+	}
+	
+	return keys, total, nil
 }
