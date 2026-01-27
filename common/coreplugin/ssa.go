@@ -3,8 +3,10 @@ package coreplugin
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -169,9 +171,26 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 		return nil, cleanup, utils.Errorf("compiled program name is empty")
 	}
 
-	prog, err := ssaapi.FromDatabase(compiledProgramName)
+	// 添加重试机制，等待数据库保存完成
+	var prog *ssaapi.Program
+	maxRetries := 10
+	retryDelay := 100 * time.Millisecond
+	
+	for i := 0; i < maxRetries; i++ {
+		prog, err = ssaapi.FromDatabase(compiledProgramName)
+		if err == nil {
+			break
+		}
+		// 如果是 record not found 错误，等待后重试
+		if i < maxRetries-1 {
+			log.Debugf("program %s not found in database, retrying... (attempt %d/%d)", compiledProgramName, i+1, maxRetries)
+			time.Sleep(retryDelay)
+			retryDelay *= 2 // 指数退避
+		}
+	}
+	
 	if err != nil {
-		return nil, cleanup, utils.Errorf("failed to load program: %s", err)
+		return nil, cleanup, utils.Errorf("failed to load program after %d retries: %s", maxRetries, err)
 	}
 
 	return prog, cleanup, nil
