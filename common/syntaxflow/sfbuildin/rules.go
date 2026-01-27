@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -166,20 +167,26 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 }
 
 func SyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
-	if !NeedSyncEmbedRule() {
-		return nil
-	}
-	return syncEmbedRuleInternal(notifies...)
+	const key = consts.EmbedSfBuildInRuleKey
+	return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedSyntaxFlowEmbedFSHash).MonitorModifiedWithAction(func() string {
+		hash, _ := SyntaxFlowRuleHash()
+		return hash
+	}, func() error {
+		return syncEmbedRuleInternal(notifies...)
+	})
 }
 
 // ForceSyncEmbedRule 强制同步嵌入规则，忽略哈希检查
 func ForceSyncEmbedRule(notifies ...func(process float64, ruleName string)) (err error) {
-	return syncEmbedRuleInternal(notifies...)
+	err = syncEmbedRuleInternal(notifies...)
+	if err == nil {
+		DoneEmbedRule()
+	}
+	return err
 }
 
-// syncEmbedRuleInternal 内部同步实现
+// syncEmbedRuleInternal 内部同步实现（不处理 hash 更新，由调用者决定）
 func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (err error) {
-	defer DoneEmbedRule()
 	log.Infof("start sync embed rule")
 	// sfdb.DeleteBuildInRule()
 	fsInstance := filesys.NewEmbedFS(ruleFS)
