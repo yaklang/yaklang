@@ -2,7 +2,7 @@ desc(
 	title: "Check C SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -44,7 +44,7 @@ desc(
 DESC
 	rule_id: "a83edb46-428e-481d-af2b-e5ac45db032e"
 	title_zh: "检测C语言SQL注入漏洞"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 

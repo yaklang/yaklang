@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang SQL Injection Vulnerability in gin.Context"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -29,7 +29,7 @@ router.GET("/inject", func(ctx *gin.Context) {
 DESC
 	rule_id: "137a07c6-00e9-443a-9c2c-f892782d5176"
 	title_zh: "检测Golang SQL注入漏洞gin.Context"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询
@@ -91,7 +91,7 @@ $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
 
 alert $high for {
 	desc: <<<DESC
-	risk: "sqli",
+	risk: "SQL注入",
 ### 漏洞描述
 1. **漏洞原理**
 SQL注入是一种攻击技术，攻击者通过向应用程序的输入字段注入恶意的SQL代码，从而能够操纵后端数据库执行未经授权的查询。在Golang中使用`sqlx`或标准`database/sql`包时，如果直接将用户输入拼接到SQL查询中，而不进行适当的参数化查询或输入验证，就会导致SQL注入漏洞。这种漏洞允许攻击者绕过应用程序的安全控制，获取、修改或删除数据库中的数据，甚至可能完全控制数据库服务器。

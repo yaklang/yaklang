@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Sqlx SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -26,7 +26,7 @@ err = db.Select(&users, query) // 存在SQL注入风险
 DESC
 	rule_id: "cdc66b17-36b4-4436-813e-9d121964224b"
 	title_zh: "检测Golang Sqlx SQL注入漏洞"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 使用参数化查询
@@ -95,7 +95,7 @@ $unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high
 
 alert $high for {
 	solution: <<<SOLUTION
-	risk: "sqli",
+	risk: "SQL注入",
 ### 修复建议
 #### 1. 使用参数化查询
 这是防止SQL注入最有效且推荐的方法。`sqlx` 支持多种数据库驱动的参数化查询，可以通过占位符绑定用户输入，确保输入数据被视为数据值而不是SQL代码的一部分。

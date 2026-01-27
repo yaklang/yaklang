@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java SQL String Append Vulnerability"
 	type: audit
 	level: low
-	risk:sqli
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

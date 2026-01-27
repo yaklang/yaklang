@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang SQL Injection in Ent"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -37,7 +37,7 @@ log.Fatal(err)
 - 拒绝服务：通过构造恶意查询导致数据库服务器过载或崩溃。
 DESC
 	rule_id: "2edbaa7b-0cfb-4d71-9e9e-0e8771ba70cb"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **使用参数化查询（Parameterized Queries）**

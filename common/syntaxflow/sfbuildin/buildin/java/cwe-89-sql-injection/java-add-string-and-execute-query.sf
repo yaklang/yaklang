@@ -1,7 +1,7 @@
 desc(
 	title: "Check Java SQL Statement Concatenation Vulnerability"
 	title_zh: "检测 Java SQL 语句拼接漏洞"
-	risk:sqli
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
