@@ -374,7 +374,26 @@ function openEditKeyModal(apiKey) {
         trafficLimitGroup.style.display = 'block';
         unlimitedToggle.classList.remove('active');
         trafficDesc.textContent = 'Set a custom traffic limit below';
-        document.getElementById('edit-traffic-limit').value = currentEditKey.traffic_limit || '';
+        
+        // Convert bytes to value and unit
+        const trafficBytes = currentEditKey.traffic_limit || 0;
+        const valueInput = document.getElementById('edit-traffic-limit-value');
+        const unitSelect = document.getElementById('edit-traffic-limit-unit');
+        
+        if (trafficBytes >= 1073741824 && trafficBytes % 1073741824 === 0) {
+            valueInput.value = trafficBytes / 1073741824;
+            unitSelect.value = '1073741824';
+        } else if (trafficBytes >= 1048576 && trafficBytes % 1048576 === 0) {
+            valueInput.value = trafficBytes / 1048576;
+            unitSelect.value = '1048576';
+        } else if (trafficBytes >= 1024 && trafficBytes % 1024 === 0) {
+            valueInput.value = trafficBytes / 1024;
+            unitSelect.value = '1024';
+        } else {
+            valueInput.value = trafficBytes;
+            unitSelect.value = '1';
+        }
+        calculateEditTrafficBytes();
     }
     
     document.getElementById('edit-traffic-used').textContent = formatBytes(currentEditKey.traffic_used || 0);
@@ -389,11 +408,42 @@ function openEditKeyModal(apiKey) {
             trafficLimitGroup.style.display = 'block';
             unlimitedToggle.classList.remove('active');
             trafficDesc.textContent = 'Set a custom traffic limit below';
+            calculateEditTrafficBytes();
         }
     };
     
+    // Set up traffic input event listeners
+    const editValueInput = document.getElementById('edit-traffic-limit-value');
+    const editUnitSelect = document.getElementById('edit-traffic-limit-unit');
+    if (editValueInput) {
+        editValueInput.addEventListener('input', calculateEditTrafficBytes);
+    }
+    if (editUnitSelect) {
+        editUnitSelect.addEventListener('change', calculateEditTrafficBytes);
+    }
+    
     // Show modal
     document.getElementById('edit-key-modal').style.display = 'flex';
+}
+
+// Calculate edit traffic bytes
+function calculateEditTrafficBytes() {
+    const valueInput = document.getElementById('edit-traffic-limit-value');
+    const unitSelect = document.getElementById('edit-traffic-limit-unit');
+    const calculatedDisplay = document.getElementById('edit-calculated-bytes');
+    
+    if (!valueInput || !unitSelect) return 0;
+    
+    const value = parseFloat(valueInput.value) || 0;
+    const multiplier = parseInt(unitSelect.value) || 1;
+    const bytes = Math.floor(value * multiplier);
+    
+    if (calculatedDisplay) {
+        const formatted = formatBytes(bytes);
+        calculatedDisplay.textContent = `Calculated: ${bytes.toLocaleString()} bytes (${formatted})`;
+    }
+    
+    return bytes;
 }
 
 function closeEditKeyModal() {
@@ -502,9 +552,9 @@ async function saveEditKey() {
     
     // Get traffic settings
     const isUnlimited = document.getElementById('edit-unlimited-traffic').checked;
-    const trafficLimit = document.getElementById('edit-traffic-limit').value;
+    const trafficLimit = calculateEditTrafficBytes();
     
-    if (!isUnlimited && (!trafficLimit || parseInt(trafficLimit) <= 0)) {
+    if (!isUnlimited && trafficLimit <= 0) {
         showToast('Please enter a valid traffic limit or enable unlimited traffic', 'error');
         return;
     }
@@ -516,8 +566,8 @@ async function saveEditKey() {
             unlimited: isUnlimited
         };
         
-        if (!isUnlimited && trafficLimit) {
-            requestBody.traffic_limit = parseInt(trafficLimit);
+        if (!isUnlimited && trafficLimit > 0) {
+            requestBody.traffic_limit = trafficLimit;
         }
         
         const response = await fetch('/ops/api/update-api-key', {
@@ -576,6 +626,26 @@ async function resetEditKeyTraffic() {
 
 // ==================== Form Handlers ====================
 
+// Calculate traffic limit in bytes from value and unit
+function calculateTrafficBytes() {
+    const valueInput = document.getElementById('traffic-limit-value');
+    const unitSelect = document.getElementById('traffic-limit-unit');
+    const calculatedDisplay = document.getElementById('calculated-bytes');
+    
+    if (!valueInput || !unitSelect) return 0;
+    
+    const value = parseFloat(valueInput.value) || 0;
+    const multiplier = parseInt(unitSelect.value) || 1;
+    const bytes = Math.floor(value * multiplier);
+    
+    if (calculatedDisplay) {
+        const formatted = formatBytes(bytes);
+        calculatedDisplay.textContent = `Calculated: ${bytes.toLocaleString()} bytes (${formatted})`;
+    }
+    
+    return bytes;
+}
+
 function initForms() {
     // Create API Key form
     document.getElementById('create-key-form').addEventListener('submit', handleCreateApiKey);
@@ -593,15 +663,26 @@ function initForms() {
         unlimitedCheckbox.addEventListener('change', function() {
             if (this.checked) {
                 trafficLimitGroup.style.display = 'none';
-                document.getElementById('traffic-limit').value = '';
                 unlimitedToggle.classList.add('active');
                 trafficDesc.textContent = 'API Key will have no traffic restrictions';
             } else {
                 trafficLimitGroup.style.display = 'block';
                 unlimitedToggle.classList.remove('active');
                 trafficDesc.textContent = 'Set a custom traffic limit below';
+                calculateTrafficBytes();
             }
         });
+    }
+    
+    // Traffic value and unit change handlers
+    const trafficValueInput = document.getElementById('traffic-limit-value');
+    const trafficUnitSelect = document.getElementById('traffic-limit-unit');
+    
+    if (trafficValueInput) {
+        trafficValueInput.addEventListener('input', calculateTrafficBytes);
+    }
+    if (trafficUnitSelect) {
+        trafficUnitSelect.addEventListener('change', calculateTrafficBytes);
     }
     
     // Glob patterns input listener
@@ -626,10 +707,10 @@ async function handleCreateApiKey(e) {
     const allModels = [...modelArray, ...globArray];
     
     const unlimitedCheckbox = document.getElementById('unlimited-traffic');
-    const trafficLimitInput = document.getElementById('traffic-limit');
-    
     const isUnlimited = unlimitedCheckbox ? unlimitedCheckbox.checked : true;
-    const trafficLimit = trafficLimitInput ? trafficLimitInput.value : '';
+    
+    // Calculate traffic limit using new method
+    const trafficLimit = calculateTrafficBytes();
     
     if (allModels.length === 0) {
         showAlert('create-key-alert', 'Please select at least one model or enter a glob pattern', 'error');
@@ -637,7 +718,7 @@ async function handleCreateApiKey(e) {
     }
     
     // Validate traffic limit if not unlimited
-    if (!isUnlimited && (!trafficLimit || parseInt(trafficLimit) <= 0)) {
+    if (!isUnlimited && trafficLimit <= 0) {
         showAlert('create-key-alert', 'Please enter a valid traffic limit or enable unlimited traffic', 'error');
         return;
     }
@@ -648,8 +729,8 @@ async function handleCreateApiKey(e) {
             unlimited: isUnlimited
         };
         
-        if (!isUnlimited && trafficLimit) {
-            requestBody.traffic_limit = parseInt(trafficLimit);
+        if (!isUnlimited && trafficLimit > 0) {
+            requestBody.traffic_limit = trafficLimit;
         }
         
         const response = await fetch('/ops/api/create-api-key', {
@@ -776,23 +857,74 @@ function updateApiEndpoint() {
 function updateCurlExample() {
     if (!userInfo) return;
     
-    const opsKeyEl = document.getElementById('curl-ops-key');
-    if (opsKeyEl) {
-        opsKeyEl.textContent = userInfo.ops_key;
-    }
+    const opsKey = userInfo.ops_key;
+    const endpoint = window.location.origin;
+    
+    // Update all dynamic OPS key placeholders
+    document.querySelectorAll('.ops-key-dynamic').forEach(el => {
+        el.textContent = opsKey;
+    });
+    
+    // Update all dynamic endpoint placeholders
+    document.querySelectorAll('.api-endpoint-dynamic').forEach(el => {
+        el.textContent = endpoint;
+    });
 }
 
-function copyCurlExample() {
+function copyCurlExample(elementId) {
     const endpoint = window.location.origin;
     const opsKey = userInfo ? userInfo.ops_key : 'YOUR_OPS_KEY';
     
-    const curlCommand = `curl -X POST '${endpoint}/ops/api/create-api-key' \\
+    // Define curl commands for each example
+    const curlCommands = {
+        'curl-create-limited': `curl -X POST '${endpoint}/ops/api/create-api-key' \\
   -H 'Content-Type: application/json' \\
   -H 'X-Ops-Key: ${opsKey}' \\
   -d '{
     "allowed_models": ["gpt-4", "gpt-3.5-turbo"],
     "traffic_limit": 52428800
-  }'`;
+  }'`,
+        'curl-create-unlimited': `curl -X POST '${endpoint}/ops/api/create-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-Ops-Key: ${opsKey}' \\
+  -d '{
+    "allowed_models": ["gpt-4", "gpt-3.5-turbo", "claude-*"],
+    "unlimited": true
+  }'`,
+        'curl-create-glob': `curl -X POST '${endpoint}/ops/api/create-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-Ops-Key: ${opsKey}' \\
+  -d '{
+    "allowed_models": ["gpt-*", "claude-*", "memfit-*"],
+    "traffic_limit": 104857600
+  }'`,
+        'curl-list-keys': `curl -X GET '${endpoint}/ops/api/my-keys' \\
+  -H 'X-Ops-Key: ${opsKey}'`,
+        'curl-update-key': `curl -X POST '${endpoint}/ops/api/update-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-Ops-Key: ${opsKey}' \\
+  -d '{
+    "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "allowed_models": ["gpt-4", "claude-*"],
+    "traffic_limit": 209715200,
+    "unlimited": false
+  }'`,
+        'curl-delete-key': `curl -X POST '${endpoint}/ops/api/delete-api-key' \\
+  -H 'Content-Type: application/json' \\
+  -H 'X-Ops-Key: ${opsKey}' \\
+  -d '{
+    "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  }'`,
+        'curl-chat': `curl -X POST '${endpoint}/v1/chat/completions' \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer YOUR_GENERATED_API_KEY' \\
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'`
+    };
+    
+    const curlCommand = curlCommands[elementId] || curlCommands['curl-create-limited'];
     
     copyToClipboard(curlCommand).then(() => {
         showToast('cURL command copied to clipboard!', 'success');

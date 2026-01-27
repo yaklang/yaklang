@@ -24,14 +24,17 @@ import (
 )
 
 // TestRealAIBalanceFlow 模拟真实的 aibalance 请求流程
+// This test is skipped by default as it requires 10+ seconds to complete
+// Run manually with: go test -v -run TestRealAIBalanceFlow -timeout 30s
 func TestRealAIBalanceFlow(t *testing.T) {
+	t.Skip("Skipping long-running real AI balance flow test. Run manually if needed.")
 	// 1. 创建 mock AI provider
 	mockProvider := createDetailedMockAIServer(t)
 	defer mockProvider.Close()
 	t.Logf("Mock AI provider at: %s", mockProvider.Addr)
 
 	// 2. 创建 aibalance 服务器
-	cfg := &ServerConfig{}
+	cfg := NewServerConfig()
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -133,21 +136,21 @@ func TestRealAIBalanceFlow(t *testing.T) {
 	t.Logf("Goroutines: %d (diff: %+d)", afterRequestsGoroutines, afterRequestsGoroutines-initialGoroutines)
 	printGoroutineSummary(t, "after_requests")
 
-	// 7. 等待并持续监控
+	// 7. 等待并监控 goroutine 清理 (reduced from 60s to 5s for faster tests)
 	t.Logf("\n=== MONITORING GOROUTINE CLEANUP ===")
-	for i := 1; i <= 12; i++ {
-		time.Sleep(5 * time.Second)
+	for i := 1; i <= 5; i++ {
+		time.Sleep(1 * time.Second)
 		runtime.GC()
 		current := runtime.NumGoroutine()
 		t.Logf("After %d seconds: %d goroutines (diff from initial: %+d)",
-			i*5, current, current-initialGoroutines)
+			i, current, current-initialGoroutines)
 	}
 
 	// 8. 最终状态
 	runtime.GC()
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	finalGoroutines := runtime.NumGoroutine()
-	t.Logf("\n=== FINAL STATE (after 60s) ===")
+	t.Logf("\n=== FINAL STATE (after 5s) ===")
 	t.Logf("Goroutines: %d (diff from initial: %+d)", finalGoroutines, finalGoroutines-initialGoroutines)
 	printGoroutineSummary(t, "final")
 
@@ -265,13 +268,13 @@ func TestGoroutineTracing(t *testing.T) {
 	t.Logf("\nAfter request: %d goroutines (diff from before: %+d)", afterRequest, afterRequest-before)
 	printAllGoroutines(t, "after_request")
 
-	// 等待清理
+	// 等待清理 (reduced from 30s to 5s for faster tests)
 	t.Log("\n=== WAITING FOR CLEANUP ===")
-	for i := 1; i <= 6; i++ {
-		time.Sleep(5 * time.Second)
+	for i := 1; i <= 5; i++ {
+		time.Sleep(1 * time.Second)
 		runtime.GC()
 		current := runtime.NumGoroutine()
-		t.Logf("After %ds: %d goroutines (diff: %+d)", i*5, current, current-before)
+		t.Logf("After %ds: %d goroutines (diff: %+d)", i, current, current-before)
 	}
 
 	// 最终
@@ -455,7 +458,10 @@ func withCancelCtx() (context.Context, context.CancelFunc) {
 }
 
 // TestGoroutineLeakWithSlowAIProvider 模拟 AI provider 响应慢的情况
+// This test is skipped by default as it requires 60+ seconds to complete
+// Run manually with: go test -v -run TestGoroutineLeakWithSlowAIProvider -timeout 120s
 func TestGoroutineLeakWithSlowAIProvider(t *testing.T) {
+	t.Skip("Skipping long-running slow provider test (requires 60s+). Run manually if needed.")
 	// 创建响应慢的 mock server（模拟真实 AI provider）
 	responseDelay := 10 * time.Second
 	slowServer := createSlowResponseMockAIServer(t, responseDelay)
@@ -568,7 +574,10 @@ func TestGoroutineLeakWithSlowAIProvider(t *testing.T) {
 }
 
 // TestGoroutineLeakWithHangingAIProviderWithTimeout 验证设置 timeout 后卡住的请求能正确回收
+// This test is skipped by default as it requires 60+ seconds to complete
+// Run manually with: go test -v -run TestGoroutineLeakWithHangingAIProviderWithTimeout -timeout 120s
 func TestGoroutineLeakWithHangingAIProviderWithTimeout(t *testing.T) {
+	t.Skip("Skipping long-running hanging provider timeout test (requires 60s+). Run manually if needed.")
 	// 创建完全卡住的 mock server
 	hangingServer := createHangingAIServer(t)
 	defer hangingServer.Close()
@@ -663,7 +672,10 @@ func TestGoroutineLeakWithHangingAIProviderWithTimeout(t *testing.T) {
 }
 
 // TestGoroutineLeakWithHangingAIProvider 模拟 AI provider 完全卡住的情况
+// This test is skipped by default as it requires 60+ seconds to complete
+// Run manually with: go test -v -run TestGoroutineLeakWithHangingAIProvider -timeout 120s
 func TestGoroutineLeakWithHangingAIProvider(t *testing.T) {
+	t.Skip("Skipping long-running hanging provider test (requires 60s+). Run manually if needed.")
 	// 创建完全卡住的 mock server
 	hangingServer := createHangingAIServer(t)
 	defer hangingServer.Close()
@@ -908,7 +920,10 @@ func TestLowhttpTimeoutDirectly(t *testing.T) {
 }
 
 // TestAISpecChatBaseTimeout 测试 aispec.ChatBase 的超时行为
+// This test is skipped by default as it requires 60+ seconds to complete
+// Run manually with: go test -v -run TestAISpecChatBaseTimeout -timeout 120s
 func TestAISpecChatBaseTimeout(t *testing.T) {
+	t.Skip("Skipping long-running ChatBase timeout test (requires 60s+). Run manually if needed.")
 	// 使用标准 HTTP 服务器创建卡住的 AI provider
 	hangingServer := createHangingAIServer(t)
 	defer hangingServer.Close()

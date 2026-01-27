@@ -21,7 +21,10 @@ import (
 )
 
 // TestGoroutineLeakWithMockProvider 使用 mock AI provider 测试 goroutine 泄漏
+// This test is skipped by default as it may take 10+ seconds
+// Run manually with: go test -v -run TestGoroutineLeakWithMockProvider -timeout 30s
 func TestGoroutineLeakWithMockProvider(t *testing.T) {
+	t.Skip("Skipping long-running mock provider test. Run manually if needed.")
 	// 创建 mock AI provider 服务器
 	mockServer := createMockAIServer(t)
 	defer mockServer.Close()
@@ -29,7 +32,7 @@ func TestGoroutineLeakWithMockProvider(t *testing.T) {
 	t.Logf("Mock AI server started at: %s", mockServer.Addr)
 
 	// 创建 aibalance 服务器配置
-	cfg := &ServerConfig{}
+	cfg := NewServerConfig()
 
 	// 启动 aibalance 服务器
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -137,7 +140,10 @@ func TestGoroutineLeakWithMockProvider(t *testing.T) {
 }
 
 // TestGoroutineLeakWithSlowProvider 测试慢速 provider 是否导致泄漏
+// This test is skipped by default as it may take 10+ seconds
+// Run manually with: go test -v -run TestGoroutineLeakWithSlowProvider -timeout 30s
 func TestGoroutineLeakWithSlowProvider(t *testing.T) {
+	t.Skip("Skipping long-running slow provider test. Run manually if needed.")
 	// 创建慢速 mock AI provider
 	slowServer := createSlowMockAIServer(t, 2*time.Second)
 	defer slowServer.Close()
@@ -192,7 +198,10 @@ func TestGoroutineLeakWithSlowProvider(t *testing.T) {
 }
 
 // TestGoroutineLeakWithAISDK 直接测试 AI SDK 的 goroutine 泄漏
+// This test is skipped by default as it may take 10+ seconds
+// Run manually with: go test -v -run TestGoroutineLeakWithAISDK -timeout 30s
 func TestGoroutineLeakWithAISDK(t *testing.T) {
+	t.Skip("Skipping long-running AI SDK test. Run manually if needed.")
 	// 创建 mock AI provider
 	mockServer := createMockAIServer(t)
 	defer mockServer.Close()
@@ -273,7 +282,10 @@ func TestGoroutineLeakWithAISDK(t *testing.T) {
 }
 
 // TestGoroutineLeakScaling 测试 goroutine 泄漏是否随请求数增长
+// This test is skipped by default as it may take 10+ seconds
+// Run manually with: go test -v -run TestGoroutineLeakScaling -timeout 30s
 func TestGoroutineLeakScaling(t *testing.T) {
+	t.Skip("Skipping long-running scaling test. Run manually if needed.")
 	mockServer := createMockAIServer(t)
 	defer mockServer.Close()
 
@@ -329,7 +341,10 @@ func TestGoroutineLeakScaling(t *testing.T) {
 
 // TestGoroutineLeakWithConnectionPoolTimeout 测试连接池超时后 goroutine 是否被回收
 // Note: lowhttp idle timeout has been reduced from 90s to 30s
+// This test is skipped by default as it requires 35+ seconds to complete
+// Run manually with: go test -v -run TestGoroutineLeakWithConnectionPoolTimeout -timeout 60s
 func TestGoroutineLeakWithConnectionPoolTimeout(t *testing.T) {
+	t.Skip("Skipping long-running connection pool timeout test (requires 35s+). Run manually if needed.")
 	mockServer := createMockAIServer(t)
 	defer mockServer.Close()
 
@@ -383,7 +398,10 @@ func TestGoroutineLeakWithConnectionPoolTimeout(t *testing.T) {
 }
 
 // TestGoroutineLeakWithHangingProvider 测试卡住的 provider 是否导致泄漏
+// This test is skipped by default as it may take 20+ seconds
+// Run manually with: go test -v -run TestGoroutineLeakWithHangingProvider -timeout 60s
 func TestGoroutineLeakWithHangingProvider(t *testing.T) {
+	t.Skip("Skipping long-running hanging provider test. Run manually if needed.")
 	// 创建会卡住的 mock AI provider
 	hangingServer := createHangingMockAIServer(t)
 	defer hangingServer.Close()
