@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	// "github.com/ulikunitz/xz"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -54,6 +55,13 @@ func ExtractFile(archivePath, targetPath, archiveType, pick string, isDir bool) 
 		}
 		log.Infof("extracting gz archive: %s", archivePath)
 		return extractGz(archivePath, targetPath, isDir)
+	// case ".xz":
+	// if strings.HasSuffix(strings.ToLower(archivePath), ".tar.xz") {
+	// 	log.Infof("extracting tar.xz archive: %s", archivePath)
+	// 	return extractTarXz(archivePath, targetPath, pick, isDir)
+	// }
+	// log.Infof("extracting xz archive: %s", archivePath)
+	// return extractXz(archivePath, targetPath, isDir)
 	case ".tar":
 		log.Infof("extracting tar archive: %s", archivePath)
 		return extractTar(archivePath, targetPath, pick, isDir)
@@ -352,6 +360,26 @@ func extractTarGz(tarGzPath, targetPath, pick string, isDir bool) error {
 	return extractFromTar(tarReader, targetPath, pick, isDir)
 }
 
+// extractTarXz 解压tar.xz文件
+// func extractTarXz(tarXzPath, targetPath, pick string, isDir bool) error {
+// 	log.Infof("extractTarXz called, tarXzPath: %s, targetPath: %s, pick: %s, isDir: %v", tarXzPath, targetPath, pick, isDir)
+// 	file, err := os.Open(tarXzPath)
+// 	if err != nil {
+// 		log.Infof("failed to open tar.xz file: %s, error: %v", tarXzPath, err)
+// 		return err
+// 	}
+// 	defer file.Close()
+
+// 	xzReader, err := xz.NewReader(file)
+// 	if err != nil {
+// 		log.Infof("failed to create xz reader: %v", err)
+// 		return err
+// 	}
+
+// 	tarReader := tar.NewReader(xzReader)
+// 	return extractFromTar(tarReader, targetPath, pick, isDir)
+// }
+
 // extractTar 解压tar文件
 func extractTar(tarPath, targetPath, pick string, isDir bool) error {
 	file, err := os.Open(tarPath)
@@ -522,3 +550,46 @@ func extractGz(gzPath, targetPath string, isDir bool) error {
 	_, err = io.Copy(targetFile, gzReader)
 	return err
 }
+
+// extractXz 解压单个xz文件
+// func extractXz(xzPath, targetPath string, isDir bool) error {
+// 	log.Infof("extractXz called, xzPath: %s, targetPath: %s, isDir: %v", xzPath, targetPath, isDir)
+// 	if isDir {
+// 		log.Infof("cannot extract a single xz file to a directory, isDir must be false for .xz files")
+// 		return utils.Error("cannot extract a single xz file to a directory, isDir must be false for .xz files")
+// 	}
+
+// 	file, err := os.Open(xzPath)
+// 	if err != nil {
+// 		log.Infof("failed to open xz file: %s, error: %v", xzPath, err)
+// 		return err
+// 	}
+// 	defer file.Close()
+
+// 	xzReader, err := xz.NewReader(file)
+// 	if err != nil {
+// 		log.Infof("failed to create xz reader: %v", err)
+// 		return err
+// 	}
+
+// 	// 确保父目录存在
+// 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+// 		log.Infof("create parent directory failed: %v", err)
+// 		return utils.Errorf("create parent directory failed: %v", err)
+// 	}
+
+// 	targetFile, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+// 	if err != nil {
+// 		log.Infof("failed to create target file: %s, error: %v", targetPath, err)
+// 		return err
+// 	}
+// 	defer targetFile.Close()
+
+// 	written, err := io.Copy(targetFile, xzReader)
+// 	if err != nil {
+// 		log.Infof("failed to copy xz content to: %s, error: %v", targetPath, err)
+// 		return err
+// 	}
+// 	log.Infof("successfully extracted xz file: %s, bytes written: %d", targetPath, written)
+// 	return nil
+// }

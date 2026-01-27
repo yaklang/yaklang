@@ -25,15 +25,15 @@ type Installer interface {
 	// Install 安装二进制文件（包含下载）
 	Install(descriptor *BinaryDescriptor, options *InstallOptions) error
 	// Uninstall 卸载二进制文件
-	Uninstall(descriptor *BinaryDescriptor) error
+	Uninstall(descriptor *BinaryDescriptor, options *InstallOptions) error
 	// GetInstallPath 获取安装路径
-	GetInstallPath(descriptor *BinaryDescriptor) string
+	GetInstallPath(descriptor *BinaryDescriptor, options *InstallOptions) string
 	// GetTargetPath 获取目标路径
-	GetTargetPath(descriptor *BinaryDescriptor) string
+	GetTargetPath(descriptor *BinaryDescriptor, options *InstallOptions) string
 	// IsInstalled 检查是否已安装
-	IsInstalled(descriptor *BinaryDescriptor) bool
+	IsInstalled(descriptor *BinaryDescriptor, options *InstallOptions) bool
 	// GetDownloadInfo 获取下载信息
-	GetDownloadInfo(descriptor *BinaryDescriptor) (*DownloadInfo, error)
+	GetDownloadInfo(descriptor *BinaryDescriptor, options *InstallOptions) (*DownloadInfo, error)
 }
 
 // BaseInstaller 基础安装器
@@ -53,8 +53,11 @@ func NewInstaller(defaultInstallDir, downloadDir string) Installer {
 }
 
 // Uninstall 卸载二进制文件
-func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor) error {
-	installPath := bi.GetInstallPath(descriptor)
+func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor, options *InstallOptions) error {
+	if options == nil {
+		options = &InstallOptions{}
+	}
+	installPath := bi.GetInstallPath(descriptor, options)
 
 	// 未安装
 	if installPath == "" {
@@ -62,13 +65,13 @@ func (bi *BaseInstaller) Uninstall(descriptor *BinaryDescriptor) error {
 	}
 
 	// 不是通过bin manager安装的，报错
-	targetPath := bi.GetTargetPath(descriptor)
+	targetPath := bi.GetTargetPath(descriptor, options)
 	if targetPath != installPath {
 		return errors.New("not installed via yakit, cannot uninstall")
 	}
 
 	// 如果是目录安装，删除目录
-	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	downloadInfo, err := bi.GetDownloadInfo(descriptor, options)
 	if err != nil {
 		return err
 	}
@@ -105,9 +108,14 @@ func (bi *BaseInstaller) findMatchingPlatform(downloadInfoMap map[string]*Downlo
 
 	return nil, "", utils.Errorf("no download info for platform %s", platformKey)
 }
-func (bi *BaseInstaller) GetDownloadInfo(descriptor *BinaryDescriptor) (*DownloadInfo, error) {
-	sysInfo := GetCurrentSystemInfo()
-	platformKey := sysInfo.GetPlatformKey()
+func (bi *BaseInstaller) GetDownloadInfo(descriptor *BinaryDescriptor, options *InstallOptions) (*DownloadInfo, error) {
+	if options == nil {
+		options = &InstallOptions{}
+	}
+	platformKey := options.SystemType
+	if platformKey == "" {
+		platformKey = GetCurrentSystemInfo().GetPlatformKey()
+	}
 	downloadInfo, _, err := bi.findMatchingPlatform(descriptor.DownloadInfoMap, platformKey)
 	if err != nil {
 		return nil, err
@@ -117,8 +125,11 @@ func (bi *BaseInstaller) GetDownloadInfo(descriptor *BinaryDescriptor) (*Downloa
 
 // Install 安装二进制文件
 func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallOptions) error {
+	if options == nil {
+		options = &InstallOptions{}
+	}
 	log.Infof("start to get download info for binary: %s", descriptor.Name)
-	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+	downloadInfo, err := bi.GetDownloadInfo(descriptor, options)
 	if err != nil {
 		log.Infof("failed to get download info for binary: %s, error: %v", descriptor.Name, err)
 		return err
@@ -127,25 +138,25 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 
 	// 判断是否安装
 	log.Infof("checking if binary %s is already installed", descriptor.Name)
-	installed := bi.IsInstalled(descriptor)
+	installed := bi.IsInstalled(descriptor, options)
 	if installed {
 		log.Infof("binary %s is already installed", descriptor.Name)
 		if options.Force {
 			log.Infof("force option is set, uninstalling binary %s", descriptor.Name)
-			err := bi.Uninstall(descriptor)
+			err := bi.Uninstall(descriptor, options)
 			if err != nil {
 				log.Infof("failed to uninstall binary %s: %v", descriptor.Name, err)
 				return utils.Errorf("uninstall failed: %v", err)
 			}
 			log.Infof("uninstall binary %s success", descriptor.Name)
 		} else {
-			log.Infof("binary %s already installed at %s, skipping install", descriptor.Name, bi.GetInstallPath(descriptor))
+			log.Infof("binary %s already installed at %s, skipping install", descriptor.Name, bi.GetInstallPath(descriptor, options))
 			return nil
 		}
 	}
 
-	installPath := bi.GetTargetPath(descriptor)
-	installDir := bi.GetInstallDir(descriptor)
+	installPath := bi.GetTargetPath(descriptor, options)
+	installDir := bi.GetInstallDir(descriptor, options)
 	isDir := installDir != ""
 	log.Infof("install path for binary %s: %s", descriptor.Name, installPath)
 	log.Infof("install dir for binary %s: %s", descriptor.Name, installDir)
@@ -196,8 +207,12 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 		log.Infof("file checksum verified successfully for %s", filePath)
 	}
 
+	installType := descriptor.InstallType
+	if downloadInfo.InstallType != "" {
+		installType = downloadInfo.InstallType
+	}
 	var installErr error
-	switch descriptor.InstallType {
+	switch installType {
 	case "archive":
 		if isDir {
 			installErr = ExtractFile(filePath, installDir, descriptor.ArchiveType, pick, true)
@@ -207,11 +222,11 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	case "bin":
 		installErr = os.Rename(filePath, installPath)
 	default:
-		installErr = utils.Errorf("unknown install type: %s", descriptor.InstallType)
+		installErr = utils.Errorf("unknown install type: %s", installType)
 	}
 
 	// 安装完成后删除下载的文件（无论成功还是失败）
-	if descriptor.InstallType == "archive" {
+	if installType == "archive" {
 		// 对于archive类型，安装后删除下载的压缩包
 		if removeErr := os.Remove(filePath); removeErr != nil {
 			log.Warnf("failed to remove downloaded file %s: %v", filePath, removeErr)
@@ -225,8 +240,11 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 }
 
 // GetInstallDir 获取安装目录
-func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor) string {
-	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor, options *InstallOptions) string {
+	if options == nil {
+		options = &InstallOptions{}
+	}
+	downloadInfo, err := bi.GetDownloadInfo(descriptor, options)
 	if err != nil {
 		return ""
 	}
@@ -237,13 +255,19 @@ func (bi *BaseInstaller) GetInstallDir(descriptor *BinaryDescriptor) string {
 }
 
 // IsInstalled 检查是否已安装
-func (bi *BaseInstaller) IsInstalled(descriptor *BinaryDescriptor) bool {
-	return bi.GetInstallPath(descriptor) != ""
+func (bi *BaseInstaller) IsInstalled(descriptor *BinaryDescriptor, options *InstallOptions) bool {
+	if options == nil {
+		options = &InstallOptions{}
+	}
+	return bi.GetInstallPath(descriptor, options) != ""
 }
 
 // GetTargetPath 获取目标路径
-func (bi *BaseInstaller) GetTargetPath(descriptor *BinaryDescriptor) string {
-	downloadInfo, err := bi.GetDownloadInfo(descriptor)
+func (bi *BaseInstaller) GetTargetPath(descriptor *BinaryDescriptor, options *InstallOptions) string {
+	if options == nil {
+		options = &InstallOptions{}
+	}
+	downloadInfo, err := bi.GetDownloadInfo(descriptor, options)
 	if err != nil {
 		return ""
 	}
@@ -257,10 +281,13 @@ func (bi *BaseInstaller) GetTargetPath(descriptor *BinaryDescriptor) string {
 }
 
 // GetInstalledPath 获取安装路径
-func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor) string {
+func (bi *BaseInstaller) GetInstallPath(descriptor *BinaryDescriptor, options *InstallOptions) string {
+	if options == nil {
+		options = &InstallOptions{}
+	}
 	allPaths := []string{}
 
-	targetPath := bi.GetTargetPath(descriptor)
+	targetPath := bi.GetTargetPath(descriptor, options)
 
 	allPaths = append(allPaths, targetPath)
 	if runtime.GOOS == "darwin" {
@@ -450,6 +477,9 @@ func (bi *BaseInstaller) downloadFile(url, filename string, options *InstallOpti
 
 // getFileSize 获取文件大小
 func (bi *BaseInstaller) getFileSize(url string, options *InstallOptions) (int64, error) {
+	if options == nil {
+		options = &InstallOptions{}
+	}
 	ctx := context.Background()
 	if options != nil && options.Context != nil {
 		ctx = options.Context

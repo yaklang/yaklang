@@ -119,7 +119,7 @@ func (m *Manager) Install(name string, options *InstallOptions) error {
 	}
 
 	// 确保文件具有执行权限
-	installPath := m.installer.GetTargetPath(descriptor)
+	installPath := m.installer.GetTargetPath(descriptor, options)
 	if err := EnsureExecutable(installPath); err != nil {
 		log.Warnf("set executable permission failed: %v", err)
 	}
@@ -138,7 +138,7 @@ func (m *Manager) Uninstall(name string) error {
 		return utils.Errorf("binary %s not registered", name)
 	}
 
-	return m.installer.Uninstall(descriptor)
+	return m.installer.Uninstall(descriptor, nil)
 }
 
 // ListRegistered 列出所有注册的二进制文件
@@ -194,12 +194,12 @@ func (m *Manager) GetBinaryPath(name string) (string, error) {
 	}
 
 	// 检查是否已安装
-	if !m.installer.IsInstalled(descriptor) {
+	if !m.installer.IsInstalled(descriptor, nil) {
 		return "", utils.Errorf("binary %s not installed", name)
 	}
 
 	// 返回安装路径
-	installPath := m.installer.GetInstallPath(descriptor)
+	installPath := m.installer.GetInstallPath(descriptor, nil)
 	return installPath, nil
 }
 
@@ -213,8 +213,8 @@ func (m *Manager) GetStatus(name string) (*BinaryStatus, error) {
 		return nil, utils.Errorf("binary %s not registered", name)
 	}
 
-	installPath := m.installer.GetInstallPath(descriptor)
-	installed := m.installer.IsInstalled(descriptor)
+	installPath := m.installer.GetInstallPath(descriptor, nil)
+	installed := m.installer.IsInstalled(descriptor, nil)
 
 	status := &BinaryStatus{
 		Name:             name,
@@ -355,7 +355,7 @@ func (m *Manager) Start(ctx context.Context, name string, args []string, callbac
 	}
 
 	// 检查是否已安装
-	if !m.installer.IsInstalled(descriptor) {
+	if !m.installer.IsInstalled(descriptor, nil) {
 		return utils.Errorf("binary %s not installed", name)
 	}
 
@@ -368,7 +368,7 @@ func (m *Manager) Start(ctx context.Context, name string, args []string, callbac
 	m.mutex.Unlock()
 
 	// 获取可执行文件路径
-	execPath := m.installer.GetInstallPath(descriptor)
+	execPath := m.installer.GetInstallPath(descriptor, nil)
 
 	// 创建带取消功能的上下文
 	processCtx, cancel := context.WithCancel(ctx)
@@ -510,7 +510,7 @@ func (m *Manager) GetDownloadInfo(name string) (*DownloadInfo, error) {
 		return nil, utils.Errorf("binary %s not registered", name)
 	}
 
-	return m.installer.GetDownloadInfo(descriptor)
+	return m.installer.GetDownloadInfo(descriptor, nil)
 }
 
 // GetRunningProcess 获取运行中的进程信息

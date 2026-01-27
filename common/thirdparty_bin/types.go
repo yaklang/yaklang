@@ -18,6 +18,8 @@ type DownloadInfo struct {
 	BinDir string `json:"bin_dir,omitempty"`
 	// 提取文件
 	Pick string `json:"pick,omitempty"`
+	// 安装类型
+	InstallType string `json:"install_type,omitempty"`
 }
 
 // BinaryDescriptor 描述一个二进制文件的信息
@@ -69,6 +71,8 @@ type InstallOptions struct {
 	Progress ProgressCallback
 	// 上下文，用于取消下载
 	Context context.Context
+	// 系统类型
+	SystemType string
 }
 
 // SystemInfo 系统信息

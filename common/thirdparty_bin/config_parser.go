@@ -23,12 +23,13 @@ type ConfigFile struct {
 
 // ConfigDownloadInfo YAML中的下载信息结构
 type ConfigDownloadInfo struct {
-	URL     string `yaml:"url"`
-	MD5     string `yaml:"md5,omitempty"`
-	SHA256  string `yaml:"sha256,omitempty"`
-	BinPath string `yaml:"bin_path,omitempty"`
-	BinDir  string `yaml:"bin_dir,omitempty"`
-	Pick    string `yaml:"pick,omitempty"`
+	URL         string `yaml:"url"`
+	InstallType string `yaml:"install_type,omitempty"`
+	MD5         string `yaml:"md5,omitempty"`
+	SHA256      string `yaml:"sha256,omitempty"`
+	BinPath     string `yaml:"bin_path,omitempty"`
+	BinDir      string `yaml:"bin_dir,omitempty"`
+	Pick        string `yaml:"pick,omitempty"`
 }
 
 // ConfigBinaryDescriptor YAML中的二进制描述符结构
@@ -130,12 +131,13 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 			fullURL := buildFullURL(configFile.BaseURL, configDownloadInfo.URL)
 
 			binary.DownloadInfoMap[platform] = &DownloadInfo{
-				URL:     fullURL,
-				MD5:     configDownloadInfo.MD5,
-				SHA256:  configDownloadInfo.SHA256,
-				BinDir:  configDownloadInfo.BinDir,
-				BinPath: configDownloadInfo.BinPath,
-				Pick:    configDownloadInfo.Pick,
+				URL:         fullURL,
+				MD5:         configDownloadInfo.MD5,
+				SHA256:      configDownloadInfo.SHA256,
+				BinDir:      configDownloadInfo.BinDir,
+				BinPath:     configDownloadInfo.BinPath,
+				Pick:        configDownloadInfo.Pick,
+				InstallType: configDownloadInfo.InstallType,
 			}
 		}
 

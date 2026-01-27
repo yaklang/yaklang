@@ -44,6 +44,9 @@ binaries:
       windows-*:
         url: "/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
         bin_path: "ffmpeg.exe"
+      linux-amd64:
+        url: "/ffmpeg/ffmpeg-28ee7a1-linux64-gpl.tar.xz"
+        bin_path: "ffmpeg"
   - name: "llama-server"
     description: "Llama Server - A server for running Llama models"
     version: "latest"
@@ -92,13 +95,17 @@ binaries:
     install_type: "archive"
     download_info_map:
       "darwin-arm64":
-        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-darwin-arm64.zip"
+        url: "/pandoc/pandoc-darwin-arm64.zip"
         pick: "pandoc"
         bin_path: "pandoc"
       "windows-amd64":
-        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-windows-amd64.zip"
+        url: "/pandoc/pandoc-windows-amd64.zip"
         pick: "pandoc.exe"
         bin_path: "pandoc.exe"
+      "linux-amd64":
+        url: "/pandoc/pandoc-3.8.3-linux-amd64.tar.gz"
+        pick: "bin/pandoc"
+        bin_path: "pandoc"
   - name: "whisper.cpp"
     description: "Whisper.cpp - A fast and accurate speech-to-text model"
     version: "latest"
