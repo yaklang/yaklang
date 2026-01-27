@@ -812,8 +812,13 @@ func LogOpsAction(operatorID uint, operatorName, action, targetType, targetID, d
 func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
 	c.logInfo("Handling OPS create API key request")
 
+	// Debug: Log auth info
+	log.Infof("OPS create API key - authInfo: authenticated=%v, role=%s, userID=%d, username=%s",
+		authInfo.Authenticated, authInfo.Role, authInfo.UserID, authInfo.Username)
+
 	// Auth check - must be OPS user
 	if !authInfo.IsOps() {
+		c.logError("OPS user access required, but got role: %s, authenticated: %v", authInfo.Role, authInfo.Authenticated)
 		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
 			"error": "OPS user access required",
 		})

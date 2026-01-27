@@ -234,6 +234,24 @@ func (c *ServerConfig) getAuthInfo(request *http.Request) *AuthInfo {
 		SessionID:     "",
 	}
 
+	// First, check X-Ops-Key header for OPS user API authentication
+	opsKey := request.Header.Get("X-Ops-Key")
+	if opsKey != "" {
+		// Validate the OPS key and get the OPS user
+		opsUser, err := GetOpsUserByOpsKey(opsKey)
+		if err == nil && opsUser != nil && opsUser.Active {
+			authInfo.Authenticated = true
+			authInfo.UserID = opsUser.ID
+			authInfo.Username = opsUser.Username
+			authInfo.Role = RoleOps
+			log.Debugf("Auth via X-Ops-Key header for user: %s (legacy fallback)", opsUser.Username)
+			return authInfo
+		}
+		if opsKey != "" {
+			log.Warnf("Invalid or inactive X-Ops-Key: %s... (legacy fallback)", opsKey[:min(20, len(opsKey))])
+		}
+	}
+
 	// Get session ID from cookie
 	cookie, err := request.Cookie("admin_session")
 	if err == nil && cookie.Value != "" {
