@@ -64,9 +64,11 @@ var ProfileTables = []interface{}{
 	&HotPatchTemplate{},
 	&AIForge{},
 
-	&AiProvider{},   // for aibalance
-	&AiApiKeys{},    // for aibalance
-	&LoginSession{}, // for aibalance
+	&AiProvider{},    // for aibalance
+	&AiApiKeys{},     // for aibalance
+	&LoginSession{},  // for aibalance
+	&OpsUser{},       // for aibalance - operations users
+	&OpsActionLog{},  // for aibalance - operations action logs
 	&AIYakTool{},
 
 	&Snippets{}, // Snippets

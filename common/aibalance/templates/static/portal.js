@@ -446,6 +446,16 @@
             if (tabId === 'add') {
                 showAddProviderForm();
             }
+            
+            // 切换到运营用户标签时自动刷新数据
+            if (tabId === 'ops-users') {
+                refreshOpsUsers();
+            }
+            
+            // 切换到操作日志标签时自动刷新数据
+            if (tabId === 'ops-logs') {
+                refreshOpsLogs();
+            }
         }
 
         // 添加接口表单
@@ -1255,6 +1265,13 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             // If the initial tab is 'add', make sure the form is shown
             if (initialTabId === 'add') {
                 showAddProviderForm();
+            }
+            
+            // 页面加载时根据当前 Tab 自动加载数据
+            if (initialTabId === 'ops-users') {
+                refreshOpsUsers();
+            } else if (initialTabId === 'ops-logs') {
+                refreshOpsLogs();
             }
             // --- END: Tab Initialization Logic ---
 
@@ -3907,6 +3924,345 @@ curl '${metaApiUrl}?name=${modelName}'`;
             ColumnResizer.resetAllColumnWidths();
         };
         
+        // ==================== OPS 用户管理 ====================
+        
+        let opsUsersData = [];
+        let opsLogsData = [];
+        let opsLogsPage = 1;
+        let opsLogsPageSize = 20;
+        
+        // 显示创建 OPS 用户弹窗
+        function showCreateOpsUserModal() {
+            document.getElementById('createOpsUserModal').style.display = 'flex';
+            document.getElementById('newOpsUsername').value = '';
+        }
+        
+        // 关闭创建 OPS 用户弹窗
+        function closeCreateOpsUserModal() {
+            document.getElementById('createOpsUserModal').style.display = 'none';
+        }
+        
+        // 创建 OPS 用户
+        async function createOpsUser() {
+            const username = document.getElementById('newOpsUsername').value.trim();
+            
+            if (!username) {
+                showToast('Please enter a username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/portal/api/ops-users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeCreateOpsUserModal();
+                    
+                    // 显示凭据弹窗
+                    document.getElementById('createdOpsUsername').value = data.username;
+                    document.getElementById('createdOpsPassword').value = data.password;
+                    document.getElementById('createdOpsKey').value = data.ops_key;
+                    document.getElementById('opsUserCredentialsModal').style.display = 'flex';
+                    
+                    refreshOpsUsers();
+                } else {
+                    showToast(data.error || 'Failed to create user', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating OPS user:', error);
+                showToast('Network error', 'error');
+            }
+        }
+        
+        // 关闭凭据弹窗
+        function closeOpsUserCredentialsModal() {
+            document.getElementById('opsUserCredentialsModal').style.display = 'none';
+        }
+        
+        // 复制 OPS 凭据
+        function copyOpsCredentials() {
+            const username = document.getElementById('createdOpsUsername').value;
+            const password = document.getElementById('createdOpsPassword').value;
+            const opsKey = document.getElementById('createdOpsKey').value;
+            
+            const text = `Username: ${username}\nPassword: ${password}\nOPS Key: ${opsKey}`;
+            copyToClipboard(text);
+            showToast('Credentials copied to clipboard', 'success');
+        }
+        
+        // 刷新 OPS 用户列表
+        async function refreshOpsUsers() {
+            const tbody = document.getElementById('ops-users-table-body');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">加载中...</td></tr>';
+            
+            try {
+                const response = await fetch('/portal/api/ops-users');
+                const data = await response.json();
+                
+                if (data.success) {
+                    opsUsersData = data.users || [];
+                    renderOpsUsersTable();
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc3545;">加载失败: ' + (data.error || 'Unknown error') + '</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading OPS users:', error);
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc3545;">网络错误</td></tr>';
+            }
+        }
+        
+        // 渲染 OPS 用户表格
+        function renderOpsUsersTable() {
+            const tbody = document.getElementById('ops-users-table-body');
+            
+            if (!opsUsersData || opsUsersData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">暂无运营用户</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = opsUsersData.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${user.role.toUpperCase()}</span></td>
+                    <td>
+                        <span style="background: ${user.active ? '#d4edda' : '#f8d7da'}; color: ${user.active ? '#155724' : '#721c24'}; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            ${user.active ? '激活' : '禁用'}
+                        </span>
+                    </td>
+                    <td><code style="font-size: 11px;">${user.ops_key.substring(0, 20)}...</code></td>
+                    <td>${user.created_at}</td>
+                    <td>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <button class="btn btn-sm" onclick="toggleOpsUserStatus(${user.id}, ${!user.active})" style="font-size: 11px; padding: 4px 8px;">
+                                ${user.active ? '禁用' : '启用'}
+                            </button>
+                            <button class="btn btn-sm" onclick="resetOpsUserPassword(${user.id})" style="font-size: 11px; padding: 4px 8px;">重置密码</button>
+                            <button class="btn btn-sm" onclick="resetOpsUserKey(${user.id})" style="font-size: 11px; padding: 4px 8px;">重置Key</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteOpsUser(${user.id})" style="font-size: 11px; padding: 4px 8px;">删除</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // 切换 OPS 用户状态
+        async function toggleOpsUserStatus(userId, active) {
+            try {
+                const response = await fetch(`/portal/api/ops-users/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('User status updated', 'success');
+                    refreshOpsUsers();
+                } else {
+                    showToast(data.error || 'Failed to update status', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling user status:', error);
+                showToast('Network error', 'error');
+            }
+        }
+        
+        // 重置 OPS 用户密码
+        async function resetOpsUserPassword(userId) {
+            if (!confirm('Are you sure you want to reset this user\'s password?')) return;
+            
+            try {
+                const response = await fetch(`/portal/api/ops-users/${userId}/reset-password`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Password reset successfully!\n\nNew Password: ' + data.new_password);
+                    refreshOpsUsers();
+                } else {
+                    showToast(data.error || 'Failed to reset password', 'error');
+                }
+            } catch (error) {
+                console.error('Error resetting password:', error);
+                showToast('Network error', 'error');
+            }
+        }
+        
+        // 重置 OPS 用户 Key
+        async function resetOpsUserKey(userId) {
+            if (!confirm('Are you sure you want to reset this user\'s OPS Key?')) return;
+            
+            try {
+                const response = await fetch(`/portal/api/ops-users/${userId}/reset-key`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('OPS Key reset successfully!\n\nNew OPS Key: ' + data.new_ops_key);
+                    refreshOpsUsers();
+                } else {
+                    showToast(data.error || 'Failed to reset OPS Key', 'error');
+                }
+            } catch (error) {
+                console.error('Error resetting OPS Key:', error);
+                showToast('Network error', 'error');
+            }
+        }
+        
+        // 删除 OPS 用户
+        async function deleteOpsUser(userId) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+            
+            try {
+                const response = await fetch(`/portal/api/ops-users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('User deleted successfully', 'success');
+                    refreshOpsUsers();
+                } else {
+                    showToast(data.error || 'Failed to delete user', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showToast('Network error', 'error');
+            }
+        }
+        
+        // ==================== OPS 操作日志 ====================
+        
+        // 刷新 OPS 日志
+        async function refreshOpsLogs() {
+            const tbody = document.getElementById('ops-logs-table-body');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">加载中...</td></tr>';
+            
+            try {
+                const operatorName = document.getElementById('ops-log-filter-operator')?.value || '';
+                const action = document.getElementById('ops-log-filter-action')?.value || '';
+                
+                let url = `/portal/api/ops-logs?page=${opsLogsPage}&page_size=${opsLogsPageSize}`;
+                if (operatorName) url += `&operator_name=${encodeURIComponent(operatorName)}`;
+                if (action) url += `&action=${encodeURIComponent(action)}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    opsLogsData = data.logs || [];
+                    renderOpsLogsTable();
+                    renderOpsLogsPagination(data.total, data.page, data.page_size);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">加载失败: ' + (data.error || 'Unknown error') + '</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading OPS logs:', error);
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc3545;">网络错误</td></tr>';
+            }
+        }
+        
+        // 筛选 OPS 日志
+        function filterOpsLogs() {
+            opsLogsPage = 1;
+            refreshOpsLogs();
+        }
+        
+        // 渲染 OPS 日志表格
+        function renderOpsLogsTable() {
+            const tbody = document.getElementById('ops-logs-table-body');
+            
+            if (!opsLogsData || opsLogsData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">暂无操作日志</td></tr>';
+                return;
+            }
+            
+            const actionLabels = {
+                'create_api_key': '创建 API Key',
+                'reset_ops_key': '重置 OPS Key',
+                'change_password': '修改密码'
+            };
+            
+            tbody.innerHTML = opsLogsData.map(log => `
+                <tr>
+                    <td>${log.id}</td>
+                    <td>${log.operator_name}</td>
+                    <td><span style="background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${actionLabels[log.action] || log.action}</span></td>
+                    <td>${log.target_type}</td>
+                    <td>${log.target_id}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.detail}">${log.detail || '-'}</td>
+                    <td>${log.ip_address || '-'}</td>
+                    <td>${log.created_at}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // 渲染 OPS 日志分页
+        function renderOpsLogsPagination(total, page, pageSize) {
+            const container = document.getElementById('ops-logs-pagination');
+            const totalPages = Math.ceil(total / pageSize);
+            
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button class="btn btn-sm" onclick="opsLogsGoToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`;
+            
+            // Page info
+            html += `<span style="padding: 0 15px;">第 ${page} / ${totalPages} 页 (共 ${total} 条)</span>`;
+            
+            // Next button
+            html += `<button class="btn btn-sm" onclick="opsLogsGoToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>`;
+            
+            container.innerHTML = html;
+        }
+        
+        // OPS 日志跳转页面
+        window.opsLogsGoToPage = function(page) {
+            opsLogsPage = page;
+            refreshOpsLogs();
+        };
+        
+        // 格式化字节
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Tab 切换时加载数据
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.dataset.tab;
+                    if (tabId === 'ops-users') {
+                        refreshOpsUsers();
+                    } else if (tabId === 'ops-logs') {
+                        refreshOpsLogs();
+                    }
+                });
+            });
+        });
+        
         // ==================== 暴露删除和操作相关的全局函数 ====================
         // Provider 相关
         window.confirmDeleteSelected = confirmDeleteSelected;
@@ -3993,3 +4349,19 @@ curl '${metaApiUrl}?name=${modelName}'`;
         
         // 关闭 API Key 成功模态框
         if (typeof closeApiKeyModal === 'function') window.closeApiKeyModal = closeApiKeyModal;
+        
+        // OPS 用户管理相关
+        window.showCreateOpsUserModal = showCreateOpsUserModal;
+        window.closeCreateOpsUserModal = closeCreateOpsUserModal;
+        window.createOpsUser = createOpsUser;
+        window.closeOpsUserCredentialsModal = closeOpsUserCredentialsModal;
+        window.copyOpsCredentials = copyOpsCredentials;
+        window.refreshOpsUsers = refreshOpsUsers;
+        window.deleteOpsUser = deleteOpsUser;
+        window.toggleOpsUserStatus = toggleOpsUserStatus;
+        window.resetOpsUserPassword = resetOpsUserPassword;
+        window.resetOpsUserKey = resetOpsUserKey;
+        
+        // OPS 日志相关
+        window.refreshOpsLogs = refreshOpsLogs;
+        window.filterOpsLogs = filterOpsLogs;

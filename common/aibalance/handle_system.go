@@ -206,9 +206,22 @@ func (c *ServerConfig) handleGoroutineDumpAPI(conn net.Conn, request *http.Reque
 // ==================== Static File Handler ====================
 
 // serveStaticFile serves static files (CSS, JS) from the embedded filesystem or local filesystem
+// Supports both /portal/static/* and /ops/static/* paths
 func (c *ServerConfig) serveStaticFile(conn net.Conn, path string) {
-	// Extract filename from path (e.g., "/portal/static/portal.css" -> "portal.css")
-	fileName := strings.TrimPrefix(path, "/portal/static/")
+	// Extract filename from path
+	// Supports: "/portal/static/portal.css" -> "portal.css"
+	//           "/ops/static/ops_portal.css" -> "ops_portal.css"
+	var fileName string
+	if strings.HasPrefix(path, "/portal/static/") {
+		fileName = strings.TrimPrefix(path, "/portal/static/")
+	} else if strings.HasPrefix(path, "/ops/static/") {
+		fileName = strings.TrimPrefix(path, "/ops/static/")
+	} else {
+		c.logError("Invalid static file path: %s", path)
+		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\nInvalid path"))
+		return
+	}
+
 	if fileName == "" || strings.Contains(fileName, "..") {
 		c.logError("Invalid static file request: %s", path)
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\nInvalid path"))

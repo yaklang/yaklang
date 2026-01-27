@@ -149,9 +149,13 @@ type AiApiKeys struct {
 	Active        bool      `json:"active" gorm:"default:true"` // API Key 激活状态
 
 	// 流量限制相关字段
-	TrafficLimit       int64 `json:"traffic_limit" gorm:"default:0"`             // 流量限额(字节)，0表示不限制
-	TrafficUsed        int64 `json:"traffic_used" gorm:"default:0"`              // 已使用流量(经倍数计算后)
-	TrafficLimitEnable bool  `json:"traffic_limit_enable" gorm:"default:false"`  // 是否启用流量限制
+	TrafficLimit       int64 `json:"traffic_limit" gorm:"default:0"`            // 流量限额(字节)，0表示不限制
+	TrafficUsed        int64 `json:"traffic_used" gorm:"default:0"`             // 已使用流量(经倍数计算后)
+	TrafficLimitEnable bool  `json:"traffic_limit_enable" gorm:"default:false"` // 是否启用流量限制
+
+	// Creator tracking (for OPS user audit)
+	CreatedByOpsID   uint   `json:"created_by_ops_id" gorm:"index"`  // Creator OpsUser.ID (0 means admin created)
+	CreatedByOpsName string `json:"created_by_ops_name" gorm:"index"` // Creator username
 }
 
 type LoginSession struct {
@@ -159,6 +163,36 @@ type LoginSession struct {
 
 	SessionID string    `json:"session_id" gorm:"index"`
 	ExpiresAt time.Time `json:"expires_at"`
+
+	// User information for role-based access control
+	UserID   uint   `json:"user_id" gorm:"index"`          // Associated user ID (0 for root admin)
+	Username string `json:"username" gorm:"index"`         // Username for quick access
+	UserRole string `json:"user_role" gorm:"default:'admin'"` // User role: admin/ops
+}
+
+// OpsUser represents an operations user
+type OpsUser struct {
+	gorm.Model
+
+	Username     string `json:"username" gorm:"unique_index"`      // Username
+	Password     string `json:"password"`                          // Password (bcrypt encrypted)
+	OpsKey       string `json:"ops_key" gorm:"unique_index"`       // ops-{uuid} format key for API access
+	Role         string `json:"role" gorm:"default:'ops'"`         // Role: admin/ops
+	Active       bool   `json:"active" gorm:"default:true"`        // Whether the user is active
+	DefaultLimit int64  `json:"default_limit" gorm:"default:52428800"` // Default traffic limit (50MB)
+}
+
+// OpsActionLog records operations user actions
+type OpsActionLog struct {
+	gorm.Model
+
+	OperatorID   uint   `json:"operator_id" gorm:"index"`   // Operator user ID
+	OperatorName string `json:"operator_name" gorm:"index"` // Operator username
+	Action       string `json:"action" gorm:"index"`        // Action type: create_api_key, reset_ops_key, change_password
+	TargetType   string `json:"target_type"`                // Target type: api_key, ops_user
+	TargetID     string `json:"target_id"`                  // Target ID
+	Detail       string `json:"detail" gorm:"type:text"`    // Action detail (JSON)
+	IPAddress    string `json:"ip_address"`                 // Client IP address
 }
 
 // AIMemoryEntity 存储AI记忆条目

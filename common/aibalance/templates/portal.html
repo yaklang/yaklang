@@ -74,6 +74,8 @@
                 <div class="tab" data-tab="api">API管理</div>
                 <div class="tab" data-tab="models">模型信息</div>
                 <div class="tab" data-tab="totp">TOTP认证</div>
+                <div class="tab" data-tab="ops-users">运营用户</div>
+                <div class="tab" data-tab="ops-logs">操作日志</div>
             </div>
         </div>
         
@@ -293,6 +295,157 @@
                         <li>如果认证失败，客户端应重新获取 TOTP 密钥</li>
                     </ol>
                 </div>
+            </div>
+        </div>
+
+        <!-- OPS Users Management Tab -->
+        <div id="ops-users" class="tab-content">
+            <div class="card">
+                <h3>运营用户管理</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    管理运营用户账户。运营用户可以创建带有流量限制的 API Key。
+                </p>
+                
+                <div class="action-bar" style="margin-bottom: 20px;">
+                    <div>
+                        <button class="btn btn-primary" onclick="showCreateOpsUserModal()">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                                <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                            </svg>
+                            创建运营用户
+                        </button>
+                    </div>
+                    <div>
+                        <button class="btn" onclick="refreshOpsUsers()">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ops-users-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户名</th>
+                                <th>角色</th>
+                                <th>状态</th>
+                                <th>OPS Key</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ops-users-table-body">
+                            <tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- OPS Logs Tab -->
+        <div id="ops-logs" class="tab-content">
+            <div class="card">
+                <h3>操作日志</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    查看运营用户的操作记录。
+                </p>
+                
+                <div class="action-bar" style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="ops-log-filter-operator" placeholder="搜索操作者..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="ops-log-filter-action" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="">全部操作</option>
+                            <option value="create_api_key">创建 API Key</option>
+                            <option value="reset_ops_key">重置 OPS Key</option>
+                            <option value="change_password">修改密码</option>
+                        </select>
+                        <button class="btn" onclick="filterOpsLogs()">筛选</button>
+                    </div>
+                    <div>
+                        <button class="btn" onclick="refreshOpsLogs()">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ops-logs-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>操作者</th>
+                                <th>操作类型</th>
+                                <th>目标类型</th>
+                                <th>目标ID</th>
+                                <th>详情</th>
+                                <th>IP地址</th>
+                                <th>时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ops-logs-table-body">
+                            <tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="ops-logs-pagination" style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+                    <!-- Pagination will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create OPS User Modal -->
+    <div id="createOpsUserModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeCreateOpsUserModal()">&times;</span>
+            <h4>创建运营用户</h4>
+            <div class="form-group">
+                <label>用户名:</label>
+                <input type="text" id="newOpsUsername" class="form-control" placeholder="输入用户名">
+            </div>
+            <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                <p style="margin: 0; color: #1565c0; font-size: 13px;">
+                    <strong>提示:</strong> OPS 用户创建 API Key 时会自动限制流量额度，无需在此设置。
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeCreateOpsUserModal()">取消</button>
+                <button class="btn btn-primary" onclick="createOpsUser()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OPS User Credentials Modal -->
+    <div id="opsUserCredentialsModal" class="delete-confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeOpsUserCredentialsModal()">&times;</span>
+            <h4>用户创建成功</h4>
+            <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <p style="margin: 0; color: #155724;"><strong>请保存以下凭据，密码仅显示一次！</strong></p>
+            </div>
+            <div class="form-group">
+                <label>用户名:</label>
+                <input type="text" id="createdOpsUsername" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="text" id="createdOpsPassword" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label>OPS Key:</label>
+                <input type="text" id="createdOpsKey" class="form-control" readonly>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="copyOpsCredentials()">复制凭据</button>
+                <button class="btn btn-primary" onclick="closeOpsUserCredentialsModal()">确定</button>
             </div>
         </div>
     </div>
