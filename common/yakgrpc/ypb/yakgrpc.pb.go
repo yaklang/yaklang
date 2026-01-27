@@ -55338,8 +55338,13 @@ type SSAProgram struct {
 	LowRiskNumber      int64  `protobuf:"varint,12,opt,name=LowRiskNumber,proto3" json:"LowRiskNumber,omitempty"`
 	InfoRiskNumber     int64  `protobuf:"varint,14,opt,name=InfoRiskNumber,proto3" json:"InfoRiskNumber,omitempty"`
 	SSAProjectID       uint64 `protobuf:"varint,15,opt,name=SSAProjectID,proto3" json:"SSAProjectID,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// incremental compilation info
+	IsIncrementalCompile bool     `protobuf:"varint,16,opt,name=IsIncrementalCompile,proto3" json:"IsIncrementalCompile,omitempty"` // 是否是增量编译
+	IncrementalGroupId   string   `protobuf:"bytes,17,opt,name=IncrementalGroupId,proto3" json:"IncrementalGroupId,omitempty"`      // 增量编译组ID（基于最基础的base program name）
+	HeadProgramName      string   `protobuf:"bytes,18,opt,name=HeadProgramName,proto3" json:"HeadProgramName,omitempty"`            // 该增量编译组的最新（头部）program名称
+	OverlayLayers        []string `protobuf:"bytes,19,rep,name=OverlayLayers,proto3" json:"OverlayLayers,omitempty"`                // 该program所属的overlay layers（如果存在）
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *SSAProgram) Reset() {
@@ -55475,6 +55480,34 @@ func (x *SSAProgram) GetSSAProjectID() uint64 {
 		return x.SSAProjectID
 	}
 	return 0
+}
+
+func (x *SSAProgram) GetIsIncrementalCompile() bool {
+	if x != nil {
+		return x.IsIncrementalCompile
+	}
+	return false
+}
+
+func (x *SSAProgram) GetIncrementalGroupId() string {
+	if x != nil {
+		return x.IncrementalGroupId
+	}
+	return ""
+}
+
+func (x *SSAProgram) GetHeadProgramName() string {
+	if x != nil {
+		return x.HeadProgramName
+	}
+	return ""
+}
+
+func (x *SSAProgram) GetOverlayLayers() []string {
+	if x != nil {
+		return x.OverlayLayers
+	}
+	return nil
 }
 
 type SSARiskDiffItem struct {
@@ -71152,7 +71185,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eFilterRuleKind\x18\r \x01(\tR\x0eFilterRuleKind\x12,\n" +
 	"\x11FilterLibRuleKind\x18\x0e \x01(\tR\x11FilterLibRuleKind\x12\x18\n" +
 	"\aRuleIds\x18\x0f \x03(\tR\aRuleIds\x12\x10\n" +
-	"\x03Ids\x18\x10 \x03(\x04R\x03Ids\"\xf4\x03\n" +
+	"\x03Ids\x18\x10 \x03(\x04R\x03Ids\"\xa8\x05\n" +
 	"\n" +
 	"SSAProgram\x12\x1a\n" +
 	"\bCreateAt\x18\x01 \x01(\x03R\bCreateAt\x12\x1a\n" +
@@ -71170,7 +71203,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eWarnRiskNumber\x18\v \x01(\x03R\x0eWarnRiskNumber\x12$\n" +
 	"\rLowRiskNumber\x18\f \x01(\x03R\rLowRiskNumber\x12&\n" +
 	"\x0eInfoRiskNumber\x18\x0e \x01(\x03R\x0eInfoRiskNumber\x12\"\n" +
-	"\fSSAProjectID\x18\x0f \x01(\x04R\fSSAProjectID\"\x91\x01\n" +
+	"\fSSAProjectID\x18\x0f \x01(\x04R\fSSAProjectID\x122\n" +
+	"\x14IsIncrementalCompile\x18\x10 \x01(\bR\x14IsIncrementalCompile\x12.\n" +
+	"\x12IncrementalGroupId\x18\x11 \x01(\tR\x12IncrementalGroupId\x12(\n" +
+	"\x0fHeadProgramName\x18\x12 \x01(\tR\x0fHeadProgramName\x12$\n" +
+	"\rOverlayLayers\x18\x13 \x03(\tR\rOverlayLayers\"\x91\x01\n" +
 	"\x0fSSARiskDiffItem\x12 \n" +
 	"\vProgramName\x18\x01 \x01(\tR\vProgramName\x12\x1a\n" +
 	"\bRuleName\x18\x02 \x01(\tR\bRuleName\x12\x1a\n" +

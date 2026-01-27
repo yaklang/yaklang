@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"sort"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -76,6 +77,92 @@ func DeleteSSAProgram(DB *gorm.DB, filter *ypb.SSAProgramFilter) (int, error) {
 	return len(programs), result.Error
 }
 
+// analyzeIncrementalCompileGroups 分析增量编译组
+// 返回 map[groupId][]programName，其中 groupId 是最基础的 base program name
+// 每个组内的 program 按时间顺序排列，[0] 是最新的（头部）program
+func analyzeIncrementalCompileGroups(programs []*ssadb.IrProgram) map[string][]*ssadb.IrProgram {
+	groups := make(map[string][]*ssadb.IrProgram)
+	programMap := make(map[string]*ssadb.IrProgram) // program name -> program
+
+	// 第一步：建立 program name 到 program 的映射
+	for _, prog := range programs {
+		if prog.ProgramName != "" {
+			programMap[prog.ProgramName] = prog
+		}
+	}
+
+	// 第二步：确定每个 program 所属的组
+	for _, prog := range programs {
+		var groupId string
+
+		if prog.IsOverlay && len(prog.OverlayLayers) > 0 {
+			// 这是一个 overlay program，groupId 是最基础的 base program（OverlayLayers[0]）
+			groupId = prog.OverlayLayers[0]
+		} else if prog.BaseProgramName != "" {
+			// 这是一个 diff program，需要找到最基础的 base
+			groupId = findRootBaseProgram(prog.BaseProgramName, programMap)
+		} else {
+			// 普通编译的 program，自己就是一个组
+			groupId = prog.ProgramName
+		}
+
+		// 将 program 添加到对应的组
+		if groupId != "" {
+			if groups[groupId] == nil {
+				groups[groupId] = make([]*ssadb.IrProgram, 0)
+			}
+			// 检查是否已存在，避免重复
+			exists := false
+			for _, p := range groups[groupId] {
+				if p.ProgramName == prog.ProgramName {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				groups[groupId] = append(groups[groupId], prog)
+			}
+		}
+	}
+
+	// 第三步：对每个组内的 program 按更新时间排序，最新的在前（[0] 是头部）
+	for groupId, groupPrograms := range groups {
+		// 按更新时间排序，最新的在前（降序）
+		// 使用 sort.Slice 进行降序排序
+		sortedPrograms := make([]*ssadb.IrProgram, len(groupPrograms))
+		copy(sortedPrograms, groupPrograms)
+		sort.Slice(sortedPrograms, func(i, j int) bool {
+			return sortedPrograms[i].UpdatedAt.Unix() > sortedPrograms[j].UpdatedAt.Unix()
+		})
+		groups[groupId] = sortedPrograms
+	}
+
+	return groups
+}
+
+// findRootBaseProgram 递归查找最基础的 base program
+func findRootBaseProgram(baseProgramName string, programMap map[string]*ssadb.IrProgram) string {
+	if baseProgramName == "" {
+		return ""
+	}
+	prog, exists := programMap[baseProgramName]
+	if !exists {
+		// 如果不在 programMap 中，尝试从数据库查询
+		prog, err := ssadb.GetApplicationProgram(baseProgramName)
+		if err != nil {
+			return baseProgramName // 如果查询失败，返回当前名称
+		}
+		if prog.BaseProgramName == "" {
+			return baseProgramName // 没有更基础的 base，返回当前名称
+		}
+		return findRootBaseProgram(prog.BaseProgramName, programMap)
+	}
+	if prog.BaseProgramName == "" {
+		return baseProgramName // 没有更基础的 base，返回当前名称
+	}
+	return findRootBaseProgram(prog.BaseProgramName, programMap)
+}
+
 func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelper.Paginator, []*ypb.SSAProgram, error) {
 	var programs []*ssadb.IrProgram
 	p := request.Pagination
@@ -93,11 +180,65 @@ func QuerySSAProgram(db *gorm.DB, request *ypb.QuerySSAProgramRequest) (*bizhelp
 	if dbx.Error != nil {
 		return nil, nil, utils.Errorf("select ssa program fail: %s", dbx.Error)
 	}
+
+	// 分析增量编译组
+	groups := analyzeIncrementalCompileGroups(programs)
+
+	// 创建 program 到增量编译信息的映射
+	programIncrementalInfo := make(map[string]*incrementalInfo)
+	for groupId, groupPrograms := range groups {
+		if len(groupPrograms) == 0 {
+			continue
+		}
+		headProgram := groupPrograms[0] // [0] 是头部
+		for _, prog := range groupPrograms {
+			isIncremental := prog.IsOverlay || prog.BaseProgramName != ""
+			var overlayLayers []string
+			if prog.IsOverlay && len(prog.OverlayLayers) > 0 {
+				overlayLayers = prog.OverlayLayers
+			}
+			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
+				isIncremental:  isIncremental,
+				groupId:         groupId,
+				headProgramName: headProgram.ProgramName,
+				overlayLayers:   overlayLayers,
+			}
+		}
+	}
+
+	// 对于不在 groups 中的 program（普通编译），也需要设置信息
+	for _, prog := range programs {
+		if _, exists := programIncrementalInfo[prog.ProgramName]; !exists {
+			programIncrementalInfo[prog.ProgramName] = &incrementalInfo{
+				isIncremental:  false,
+				groupId:         prog.ProgramName,
+				headProgramName: prog.ProgramName,
+				overlayLayers:   nil,
+			}
+		}
+	}
+
 	progGRPCs := make([]*ypb.SSAProgram, 0, len(programs))
 	for _, prog := range programs {
-		progGRPCs = append(progGRPCs, Prog2GRPC(prog))
+		grpcProg := Prog2GRPC(prog)
+		// 填充增量编译信息
+		if info, ok := programIncrementalInfo[prog.ProgramName]; ok {
+			grpcProg.IsIncrementalCompile = info.isIncremental
+			grpcProg.IncrementalGroupId = info.groupId
+			grpcProg.HeadProgramName = info.headProgramName
+			grpcProg.OverlayLayers = info.overlayLayers
+		}
+		progGRPCs = append(progGRPCs, grpcProg)
 	}
 	return paging, progGRPCs, nil
+}
+
+// incrementalInfo 存储增量编译信息
+type incrementalInfo struct {
+	isIncremental  bool
+	groupId        string
+	headProgramName string
+	overlayLayers  []string
 }
 
 func QueryLatestSSAProgramNameByProjectId(db *gorm.DB, projectID uint64) (string, error) {
