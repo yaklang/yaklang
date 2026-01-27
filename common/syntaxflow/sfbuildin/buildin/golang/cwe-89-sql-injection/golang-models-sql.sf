@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Models SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -32,7 +32,7 @@ func SQLILoginHandler(c *gin.Context) {
 DESC
 	rule_id: "b89f27b3-35ee-48ae-ba75-415da669f60d"
 	title_zh: "检测Golang SQL注入漏洞(Models)"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 

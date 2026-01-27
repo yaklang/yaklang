@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang GORM SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -25,7 +25,7 @@ db.Raw(query).Scan(&users)
 DESC
 	rule_id: "cc9054ac-2c71-4641-84dd-ba12578093b0"
 	title_zh: "检测Golang SQL注入漏洞(GORM)"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 1. **使用参数化查询（Parameterized Queries）**

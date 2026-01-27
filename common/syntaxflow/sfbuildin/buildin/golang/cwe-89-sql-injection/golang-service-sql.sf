@@ -2,7 +2,7 @@ desc(
 	title: "Detect Golang SQL Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "sqli"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -41,7 +41,7 @@ desc(
 DESC
 	rule_id: "278c2a17-1b81-49d1-a4a9-d881fba1a0e9"
 	title_zh: "检测Golang SQL注入漏洞Service"
-	risk: "sqli"
+	risk: "SQL注入"
 	solution: <<<SOLUTION
 ### 修复建议
 
