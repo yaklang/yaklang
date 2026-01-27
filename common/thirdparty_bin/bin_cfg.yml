@@ -45,7 +45,9 @@ binaries:
         url: "/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
         bin_path: "ffmpeg.exe"
       linux-amd64:
-        url: "/ffmpeg/ffmpeg-28ee7a1-linux64-gpl.tar.xz"
+        install_type: "archive"
+        url: "/ffmpeg/ffmpeg-v6.0-linux-amd64.zip"
+        pick: "ffmpeg"
         bin_path: "ffmpeg"
   - name: "llama-server"
     description: "Llama Server - A server for running Llama models"
