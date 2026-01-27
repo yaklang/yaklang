@@ -178,8 +178,9 @@ func (c *ServerConfig) handleGenerateApiKey(conn net.Conn, request *http.Request
 }
 
 // generateAndStoreAPIKey generates a new API key and stores it with associated models
+// API Key format: mf-{uuid} (e.g., mf-2e5565d7-5045-4311-bc74-b5b1247815d7)
 func (c *ServerConfig) generateAndStoreAPIKey(allowedModels []string) (string, error) {
-	apiKey := uuid.New().String()
+	apiKey := "mf-" + uuid.New().String()
 	allowedModelsStr := strings.Join(allowedModels, ",")
 
 	newKeyData := &schema.AiApiKeys{

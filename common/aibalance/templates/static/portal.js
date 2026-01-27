@@ -125,6 +125,26 @@
                 if (activeFilter) {
                     filterProviders(activeFilter.dataset.filter);
                 }
+                
+                // 重新绑定复选框事件监听器（因为复选框是动态生成的）
+                this.bindProviderCheckboxEvents();
+            },
+            
+            // 绑定 Provider 复选框事件和右键菜单事件
+            bindProviderCheckboxEvents: function() {
+                // 绑定复选框事件
+                document.querySelectorAll('.provider-checkbox').forEach(checkbox => {
+                    // 移除旧的监听器（如果有的话）
+                    checkbox.removeEventListener('change', updateDeleteSelectedButton);
+                    // 添加新的监听器
+                    checkbox.addEventListener('change', updateDeleteSelectedButton);
+                });
+                
+                // 绑定右键菜单事件到 Provider 行
+                document.querySelectorAll('#provider-table-body tr[data-id]').forEach(row => {
+                    row.removeEventListener('contextmenu', showContextMenu);
+                    row.addEventListener('contextmenu', showContextMenu);
+                });
             },
             
             // 渲染 API 密钥表格
@@ -205,6 +225,39 @@
                     `;
                     
                     tbody.appendChild(row);
+                });
+                
+                // 重新绑定 API 复选框事件监听器（因为复选框是动态生成的）
+                this.bindAPICheckboxEvents();
+            },
+            
+            // 绑定 API Key 复选框事件和右键菜单事件
+            bindAPICheckboxEvents: function() {
+                // 绑定复选框事件
+                document.querySelectorAll('.api-checkbox').forEach(checkbox => {
+                    // 移除旧的监听器（如果有的话）
+                    checkbox.removeEventListener('change', updateDeleteSelectedAPIButton);
+                    // 添加新的监听器
+                    checkbox.addEventListener('change', updateDeleteSelectedAPIButton);
+                });
+                
+                // 绑定右键菜单事件到 "允许模型" 单元格
+                document.querySelectorAll('#api-table tbody td.editable-allowed-models').forEach(cell => {
+                    cell.removeEventListener('contextmenu', showContextMenu);
+                    cell.addEventListener('contextmenu', showContextMenu);
+                });
+                
+                // 绑定点击事件到 API Key 单元格以便复制
+                document.querySelectorAll('#api-table tbody td.api-key-cell').forEach(cell => {
+                    cell.style.cursor = 'pointer';
+                    cell.title = '点击复制完整 API Key';
+                    cell.addEventListener('click', function() {
+                        const fullKey = this.getAttribute('data-full-text');
+                        if (fullKey) {
+                            copyToClipboard(fullKey);
+                            showToast('API Key 已复制到剪贴板', 'success');
+                        }
+                    });
                 });
             },
             
@@ -559,58 +612,83 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 console.error("Could not find datalist element with ID 'domain-urls-list'"); // Debug log
             }
 
-            // 填充类型选择框
+            // 填充类型选择框 - 从后端获取所有支持的 AI 类型
             const typeNameSelect = document.getElementById('typeName');
             if (typeNameSelect) {
                 // 保留第一个空选项
-                const firstOption = typeNameSelect.querySelector('option:first-child');
                 typeNameSelect.innerHTML = '';
-                if (firstOption) {
-                    typeNameSelect.appendChild(firstOption);
-                }
+                
+                // 添加默认提示选项
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- 请选择类型 --';
+                typeNameSelect.appendChild(defaultOption);
                 
                 // 添加从服务器获取的类型选项
-                autoCompleteData.model_types.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type;
-                    option.textContent = type;
-                    typeNameSelect.appendChild(option);
-                });
-                
-                // 如果没有类型选项，添加默认选项
-                if (typeNameSelect.options.length <= 1) {
-                    // 后端未返回数据时，添加一些常见类型作为默认选项
-                    const defaultTypes = [
-                        'chat', 
-                        'completion', 
-                        'embedding'
-                    ];
+                if (autoCompleteData.model_types && autoCompleteData.model_types.length > 0) {
+                    autoCompleteData.model_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        typeNameSelect.appendChild(option);
+                    });
                     
+                    // 默认选择 openai（如果存在）
+                    if (autoCompleteData.model_types.includes('openai')) {
+                        typeNameSelect.value = 'openai';
+                    }
+                } else {
+                    // 后端未返回数据时，添加一些常见类型作为默认选项
+                    const defaultTypes = ['openai', 'siliconflow', 'tongyi', 'moonshot', 'chatglm', 'deepseek', 'gemini', 'ollama'];
                     defaultTypes.forEach(type => {
                         const option = document.createElement('option');
                         option.value = type;
                         option.textContent = type;
                         typeNameSelect.appendChild(option);
                     });
+                    // 默认选择 openai
+                    typeNameSelect.value = 'openai';
                 }
             }
             
             // 添加输入事件处理器
             const domainInput = document.getElementById('domainOrURL');
+            const providerModeSelect = document.getElementById('providerMode');
             if (domainInput) {
-                // 根据选择的类型预填充常见域名
+                // 根据选择的类型预填充常见域名和联动模式
                 document.getElementById('typeName').addEventListener('change', function() {
-                    const selectedType = this.value;
+                    const selectedType = this.value.toLowerCase();
                     let suggestedDomain = '';
                     
                     // 根据类型提供默认域名建议
-                    if (['chat', 'completion', 'embedding'].includes(selectedType.toLowerCase())) {
-                        suggestedDomain = 'api.openai.com';
+                    const domainSuggestions = {
+                        'openai': 'api.openai.com',
+                        'siliconflow': 'api.siliconflow.cn',
+                        'tongyi': '', // 通义不需要域名
+                        'moonshot': 'api.moonshot.cn',
+                        'deepseek': 'api.deepseek.com',
+                        'gemini': '', // Gemini 使用 Google API
+                        'ollama': 'localhost:11434',
+                        'chatglm': 'open.bigmodel.cn'
+                    };
+                    
+                    if (domainSuggestions[selectedType] !== undefined) {
+                        suggestedDomain = domainSuggestions[selectedType];
                     }
                     
                     // 如果域名输入框为空，则填充默认值
-                    if (!domainInput.value.trim()) {
+                    if (!domainInput.value.trim() && suggestedDomain) {
                         domainInput.value = suggestedDomain;
+                    }
+                    
+                    // 类型和模式联动：大多数类型使用 chat 模式
+                    // 如果类型名中包含 embedding 则自动选择 embedding 模式
+                    if (providerModeSelect) {
+                        if (selectedType.includes('embedding')) {
+                            providerModeSelect.value = 'embedding';
+                        } else {
+                            providerModeSelect.value = 'chat';
+                        }
                     }
                 });
             }
@@ -1974,7 +2052,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         // 新增：API Key 成功弹窗相关函数
         function showApiKeySuccessModal(apiKey) {
             document.getElementById('generatedApiKeyDisplay').value = apiKey;
-            document.getElementById('apiKeySuccessModal').style.display = 'block';
+            document.getElementById('apiKeySuccessModal').style.display = 'flex';
         }
 
         function closeApiKeyModal(reload = false) {
@@ -2220,58 +2298,83 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 console.error("Could not find datalist element with ID 'domain-urls-list'"); // Debug log
             }
 
-            // 填充类型选择框
+            // 填充类型选择框 - 从后端获取所有支持的 AI 类型
             const typeNameSelect = document.getElementById('typeName');
             if (typeNameSelect) {
                 // 保留第一个空选项
-                const firstOption = typeNameSelect.querySelector('option:first-child');
                 typeNameSelect.innerHTML = '';
-                if (firstOption) {
-                    typeNameSelect.appendChild(firstOption);
-                }
+                
+                // 添加默认提示选项
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '-- 请选择类型 --';
+                typeNameSelect.appendChild(defaultOption);
                 
                 // 添加从服务器获取的类型选项
-                autoCompleteData.model_types.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type;
-                    option.textContent = type;
-                    typeNameSelect.appendChild(option);
-                });
-                
-                // 如果没有类型选项，添加默认选项
-                if (typeNameSelect.options.length <= 1) {
-                    // 后端未返回数据时，添加一些常见类型作为默认选项
-                    const defaultTypes = [
-                        'chat', 
-                        'completion', 
-                        'embedding'
-                    ];
+                if (autoCompleteData.model_types && autoCompleteData.model_types.length > 0) {
+                    autoCompleteData.model_types.forEach(type => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        typeNameSelect.appendChild(option);
+                    });
                     
+                    // 默认选择 openai（如果存在）
+                    if (autoCompleteData.model_types.includes('openai')) {
+                        typeNameSelect.value = 'openai';
+                    }
+                } else {
+                    // 后端未返回数据时，添加一些常见类型作为默认选项
+                    const defaultTypes = ['openai', 'siliconflow', 'tongyi', 'moonshot', 'chatglm', 'deepseek', 'gemini', 'ollama'];
                     defaultTypes.forEach(type => {
                         const option = document.createElement('option');
                         option.value = type;
                         option.textContent = type;
                         typeNameSelect.appendChild(option);
                     });
+                    // 默认选择 openai
+                    typeNameSelect.value = 'openai';
                 }
             }
             
             // 添加输入事件处理器
             const domainInput = document.getElementById('domainOrURL');
+            const providerModeSelect = document.getElementById('providerMode');
             if (domainInput) {
-                // 根据选择的类型预填充常见域名
+                // 根据选择的类型预填充常见域名和联动模式
                 document.getElementById('typeName').addEventListener('change', function() {
-                    const selectedType = this.value;
+                    const selectedType = this.value.toLowerCase();
                     let suggestedDomain = '';
                     
                     // 根据类型提供默认域名建议
-                    if (['chat', 'completion', 'embedding'].includes(selectedType.toLowerCase())) {
-                        suggestedDomain = 'api.openai.com';
+                    const domainSuggestions = {
+                        'openai': 'api.openai.com',
+                        'siliconflow': 'api.siliconflow.cn',
+                        'tongyi': '', // 通义不需要域名
+                        'moonshot': 'api.moonshot.cn',
+                        'deepseek': 'api.deepseek.com',
+                        'gemini': '', // Gemini 使用 Google API
+                        'ollama': 'localhost:11434',
+                        'chatglm': 'open.bigmodel.cn'
+                    };
+                    
+                    if (domainSuggestions[selectedType] !== undefined) {
+                        suggestedDomain = domainSuggestions[selectedType];
                     }
                     
                     // 如果域名输入框为空，则填充默认值
-                    if (!domainInput.value.trim()) {
+                    if (!domainInput.value.trim() && suggestedDomain) {
                         domainInput.value = suggestedDomain;
+                    }
+                    
+                    // 类型和模式联动：大多数类型使用 chat 模式
+                    // 如果类型名中包含 embedding 则自动选择 embedding 模式
+                    if (providerModeSelect) {
+                        if (selectedType.includes('embedding')) {
+                            providerModeSelect.value = 'embedding';
+                        } else {
+                            providerModeSelect.value = 'chat';
+                        }
                     }
                 });
             }
@@ -2597,7 +2700,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 domainInput.value = domainOrURL;
                 apiKeysInput.value = apiKey || ''; // 填充 API keys
 
-                // 仔细设置 Select 的值
+                // 设置类型 - 直接使用原始类型值
+                // 如果原始类型存在于选项中，则选择它；否则尝试匹配或保持默认
                 let typeFound = false;
                 for (let i = 0; i < typeSelect.options.length; i++) {
                     if (typeSelect.options[i].value === typeName) {
@@ -2606,14 +2710,20 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                         break;
                     }
                 }
-                if (!typeFound) {
-                     console.warn(`Type "${typeName}" not found in select options. Leaving type selection unchanged.`); // Debug log
-                     typeSelect.value = ""; // 重置为默认提示选项
-                } else {
-                     console.log(`Successfully set type to "${typeName}"`); // Debug log
-                     // 触发 change 事件以处理可能的依赖逻辑（如域名建议）
-                     typeSelect.dispatchEvent(new Event('change'));
+                if (!typeFound && typeName) {
+                    // 尝试小写匹配
+                    const lowerTypeName = typeName.toLowerCase();
+                    for (let i = 0; i < typeSelect.options.length; i++) {
+                        if (typeSelect.options[i].value.toLowerCase() === lowerTypeName) {
+                            typeSelect.value = typeSelect.options[i].value;
+                            typeFound = true;
+                            break;
+                        }
+                    }
                 }
+                console.log(`Set type to "${typeSelect.value}" (original: "${typeName}", found: ${typeFound})`);
+                // 触发 change 事件以处理可能的依赖逻辑（如域名建议）
+                typeSelect.dispatchEvent(new Event('change'));
 
                 // 设置值后重新验证必填字段
                 [wrapperInput, modelInput, typeSelect].forEach(input => validateInput.call(input));
@@ -2691,7 +2801,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             
             const modalElement = document.getElementById('editAllowedModelsModal');
             if (modalElement) {
-                modalElement.style.display = 'block';
+                modalElement.style.display = 'flex';
                 console.log("[Debug] editAllowedModelsModal shown via style.display");
             } else {
                 console.error("[Debug] editAllowedModelsModal element not found!");
@@ -2850,8 +2960,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             textareaElement.value = apiKeys.join('\n');
             countElement.textContent = apiKeys.length;
 
-            // 显示弹窗
-            modal.style.display = 'block';
+            // 显示弹窗（使用 flex 以便居中）
+            modal.style.display = 'flex';
 
             console.log(`Found ${providers.length} similar providers with ${apiKeys.length} unique API keys`);
         }
@@ -2985,7 +3095,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
             document.getElementById('curlModelName').textContent = modelName;
             document.getElementById('curlCommandText').textContent = curlChatCommand;
             document.getElementById('curlMetaCommandText').textContent = curlMetaCommand;
-            modal.style.display = 'block';
+            modal.style.display = 'flex';
         }
 
         function closeCurlModal() {
@@ -3796,3 +3906,90 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.resetAllColumnWidths = function() {
             ColumnResizer.resetAllColumnWidths();
         };
+        
+        // ==================== 暴露删除和操作相关的全局函数 ====================
+        // Provider 相关
+        window.confirmDeleteSelected = confirmDeleteSelected;
+        window.deleteProvider = deleteProvider;
+        window.deleteMultipleProviders = deleteMultipleProviders;
+        window.checkSingleProvider = checkSingleProvider;
+        window.checkAllProvidersHealth = checkAllProvidersHealth;
+        window.checkSelectedProvider = checkSelectedProvider;
+        window.selectAllProviders = selectAllProviders;
+        window.updateDeleteSelectedButton = updateDeleteSelectedButton;
+        
+        // API Key 相关
+        window.confirmDeleteSelectedAPI = confirmDeleteSelectedAPI;
+        window.confirmDeleteSelectedAPIKeys = confirmDeleteSelectedAPI; // 别名，兼容 HTML 中的调用
+        window.deleteAPIKey = deleteAPIKey;
+        window.deleteMultipleAPIKeys = deleteMultipleAPIKeys;
+        window.toggleAPIKeyStatus = toggleAPIKeyStatus;
+        window.confirmDisableSelectedAPI = confirmDisableSelectedAPI;
+        window.confirmEnableSelectedAPI = confirmEnableSelectedAPI;
+        window.disableMultipleAPIKeys = disableMultipleAPIKeys;
+        window.enableMultipleAPIKeys = enableMultipleAPIKeys;
+        window.toggleSelectAllAPI = toggleSelectAllAPI;
+        window.selectAllAPIKeys = selectAllAPIKeys;
+        window.updateDeleteSelectedAPIButton = updateDeleteSelectedAPIButton;
+        
+        // 流量限制相关
+        window.showTrafficLimitDialog = showTrafficLimitDialog;
+        window.showTrafficLimitModal = showTrafficLimitDialog; // 别名
+        window.closeTrafficLimitModal = closeTrafficLimitModal;
+        window.saveTrafficLimit = saveTrafficLimit;
+        window.closeTrafficLimitDialog = closeTrafficLimitModal; // 别名
+        window.resetApiKeyTraffic = resetApiKeyTraffic;
+        
+        // 内存和系统监控相关
+        window.showMemoryDialog = showMemoryDialog;
+        window.closeMemoryDialog = closeMemoryDialog;
+        window.fetchMemoryStats = fetchMemoryStats;
+        window.forceGC = forceGC;
+        window.fetchGoroutineDump = fetchGoroutineDump;
+        
+        // 筛选相关
+        window.filterProviders = filterProviders;
+        window.filterApiKeys = filterApiKeys;
+        
+        // 其他操作函数
+        window.showToast = showToast;
+        window.hideContextMenu = hideContextMenu;
+        window.copyToClipboard = copyToClipboard;
+        window.generateNewApiKey = generateNewApiKey;
+        window.confirmAndGenerateApiKey = confirmAndGenerateApiKey;
+        window.showApiKeySuccessModal = showApiKeySuccessModal;
+        window.closeApiKeySuccessModal = closeApiKeySuccessModal;
+        window.copyGeneratedApiKey = copyGeneratedApiKey;
+        
+        // 模型相关
+        window.openEditModelModal = openEditModelModal;
+        window.showCurlCommand = showCurlCommand;
+        if (typeof closeEditModelModal === 'function') window.closeEditModelModal = closeEditModelModal;
+        if (typeof saveModelMetadata === 'function') window.saveModelMetadata = saveModelMetadata;
+        if (typeof closeCurlModal === 'function') window.closeCurlModal = closeCurlModal;
+        if (typeof copyCurlCommand === 'function') window.copyCurlCommand = copyCurlCommand;
+        
+        // 右键菜单相关（Provider）
+        window.quickAddProvider = quickAddProvider;
+        window.copySimilarProviderKeys = copySimilarProviderKeys;
+        window.deleteSelectedProvider = deleteSelectedProvider;
+        window.showContextMenu = showContextMenu;
+        window.initializeContextMenu = initializeContextMenu;
+        
+        // 同类供应商 Keys 弹窗相关
+        if (typeof showSimilarKeysModal === 'function') window.showSimilarKeysModal = showSimilarKeysModal;
+        if (typeof closeCopySimilarKeysModal === 'function') window.closeCopySimilarKeysModal = closeCopySimilarKeysModal;
+        if (typeof copySimilarKeysToClipboard === 'function') window.copySimilarKeysToClipboard = copySimilarKeysToClipboard;
+        
+        // 右键菜单相关（API Key）
+        window.triggerEditAllowedModelsFromContextMenu = triggerEditAllowedModelsFromContextMenu;
+        if (typeof showEditAllowedModelsModal === 'function') window.showEditAllowedModelsModal = showEditAllowedModelsModal;
+        if (typeof closeEditAllowedModelsModal === 'function') window.closeEditAllowedModelsModal = closeEditAllowedModelsModal;
+        if (typeof saveEditedAllowedModels === 'function') window.saveEditedAllowedModels = saveEditedAllowedModels;
+        
+        // Tab 切换
+        if (typeof openTab === 'function') window.openTab = openTab;
+        if (typeof switchTab === 'function') window.switchTab = switchTab;
+        
+        // 关闭 API Key 成功模态框
+        if (typeof closeApiKeyModal === 'function') window.closeApiKeyModal = closeApiKeyModal;
