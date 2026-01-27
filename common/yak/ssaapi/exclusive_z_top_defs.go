@@ -583,8 +583,49 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			}
 		}
 		return values
+	case *ssa.ExternLib:
+		// ExternLib represents external library references, which don't support dataflow analysis
+		// Return the current value itself
+		return Values{i}
+	case *ssa.BasicBlock:
+		// BasicBlock is a control flow structure, not a value for dataflow analysis
+		// Return the current value itself
+		return Values{i}
+	case *ssa.BinOp:
+		// Binary operations: track the operands X and Y
+		var results Values
+		if x, ok := inst.GetValueById(inst.X); ok && x != nil {
+			if xVal := i.NewValue(x); xVal != nil {
+				results = append(results, xVal.getTopDefs(actx, opt...)...)
+			}
+		}
+		if y, ok := inst.GetValueById(inst.Y); ok && y != nil {
+			if yVal := i.NewValue(y); yVal != nil {
+				results = append(results, yVal.getTopDefs(actx, opt...)...)
+			}
+		}
+		if len(results) == 0 {
+			return Values{i}
+		}
+		return results
+	case *ssa.UnOp:
+		// Unary operations: track the operand X
+		if x, ok := inst.GetValueById(inst.X); ok && x != nil {
+			if xVal := i.NewValue(x); xVal != nil {
+				return xVal.getTopDefs(actx, opt...)
+			}
+		}
+		return Values{i}
+	case *ssa.Next:
+		// Next operations: track the iterator
+		if iter, ok := inst.GetValueById(inst.Iter); ok && iter != nil {
+			if iterVal := i.NewValue(iter); iterVal != nil {
+				return iterVal.getTopDefs(actx, opt...)
+			}
+		}
+		return Values{i}
 	default:
-		log.Errorf("BUG: %T is not supported", inst)
+		log.Debugf("BUG: %T is not supported in getTopDefs, using fallback", inst)
 	}
 	// if if/loop/... control instruction, this innerValue is nil
 	if i.getValue() != nil {

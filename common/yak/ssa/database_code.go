@@ -73,9 +73,15 @@ func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, c
 	return inst
 }
 
-func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range) {
+func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range, inst Instruction) {
 	if utils.IsNil(rangeIns) || utils.IsNil(rangeIns.GetEditor()) {
-		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
+		// BasicBlock is a control flow structure and may not have a source code range
+		// This is expected behavior, so use debug level instead of warn for BasicBlock
+		if _, isBlock := ToBasicBlock(inst); isBlock {
+			log.Debugf("(DEBUG MODE) Range not found for BasicBlock %s", c.Name)
+		} else {
+			log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
+		}
 		return
 	}
 	editor := rangeIns.GetEditor()
@@ -149,7 +155,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	// inst.SetRange(codeRange)
-	fitRange(ir, codeRange)
+	fitRange(ir, codeRange, inst)
 
 	if fun := inst.GetFunc(); fun != nil {
 		ir.CurrentFunction = fun.GetId()
@@ -174,7 +180,8 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 			if fun, ok := ToFunction(currentFunc); ok {
 				inst.SetFunc(fun)
 			} else {
-				log.Errorf("BUG: set CurrentFunction[%d]: ", ir.CurrentFunction)
+				log.Warnf("BUG: set CurrentFunction[%d] failed: instruction type is %T, not Function. Instruction: %s (id: %d)",
+					ir.CurrentFunction, currentFunc, inst.GetName(), inst.GetId())
 			}
 		}
 		if !ir.IsBlock {
@@ -182,14 +189,16 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 				if block, ok := ToBasicBlock(currentBlock); ok {
 					inst.SetBlock(block)
 				} else {
-					log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
+					log.Warnf("BUG: set CurrentBlock[%d] failed: instruction type is %T, not BasicBlock. Instruction: %s (id: %d)",
+						ir.CurrentBlock, currentBlock, inst.GetName(), inst.GetId())
 				}
 			}
 		} else {
 			if block, ok := ToBasicBlock(inst); ok {
 				inst.SetBlock(block)
 			} else {
-				log.Errorf("BUG: set currentblock for block :%v", inst)
+				log.Warnf("BUG: set currentblock for block failed: instruction type is %T, not BasicBlock. Instruction: %s (id: %d)",
+					inst, inst.GetName(), inst.GetId())
 			}
 		}
 	}
@@ -217,7 +226,11 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 	var anValue *anValue
 
-	if typ := value.GetType(); utils.IsNil(typ) {
+	// BasicBlock doesn't have a meaningful type (GetType() always returns nil by design)
+	// Skip type processing for BasicBlock to avoid false warnings
+	if _, isBlock := ToBasicBlock(inst); isBlock {
+		ir.TypeID = -1
+	} else if typ := value.GetType(); utils.IsNil(typ) {
 		log.Warnf("BUG: value2IrCode called (%s)[%v] with nil type", value.String(), value.GetOpcode().String())
 		ir.TypeID = -1
 	} else {
@@ -273,7 +286,7 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	variable.ForEach(func(i string, v *Variable) bool {
 		ir.Variable = append(ir.Variable, i)
 		if v.GetValue() == nil {
-			log.Errorf("aa")
+			log.Warnf("variable %s has nil value when saving to database, instruction id: %d", i, inst.GetId())
 		}
 		return true
 	})
