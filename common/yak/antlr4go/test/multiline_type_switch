@@ -1,0 +1,62 @@
+package main
+
+import "fmt"
+
+func multilineTypeSwitch() {
+	var v interface{}
+
+	// 测试 type switch 中的 case 跨行（类似 value.go 和 value_types.go 中的错误）
+	switch v.(type) {
+	case int, int64, int8, int16, int32,
+		uint, uint8, uint16, uint32, uint64:
+		fmt.Println("integer type")
+	case float32, float64:
+		fmt.Println("float type")
+	default:
+		fmt.Println("other type")
+	}
+
+	// 测试多个 case 跨行
+	switch v.(type) {
+	case string:
+		fmt.Println("string")
+	case bool:
+		fmt.Println("bool")
+	case int, int64, int8, int16, int32,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		fmt.Println("numeric type")
+	default:
+		fmt.Println("unknown")
+	}
+
+	// 测试包含 nil 的跨行
+	switch v.(type) {
+	case *int, *string,
+		nil:
+		fmt.Println("pointer or nil")
+	default:
+		fmt.Println("other")
+	}
+
+	// 测试单个类型跨行（边界情况）
+	switch v.(type) {
+	case
+		int:
+		fmt.Println("int")
+	default:
+		fmt.Println("other")
+	}
+
+	// 测试复杂类型跨行
+	type MyType struct {
+		Value int
+	}
+	switch v.(type) {
+	case MyType,
+		*MyType:
+		fmt.Println("MyType")
+	default:
+		fmt.Println("other")
+	}
+}

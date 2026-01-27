@@ -423,6 +423,10 @@ func (v *BaseGoParserVisitor) VisitMethodExpr(ctx *MethodExprContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseGoParserVisitor) VisitWs(ctx *WsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseGoParserVisitor) VisitEos(ctx *EosContext) interface{} {
 	return v.VisitChildren(ctx)
 }

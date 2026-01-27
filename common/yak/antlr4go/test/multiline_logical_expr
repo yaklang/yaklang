@@ -1,0 +1,35 @@
+package main
+
+import "fmt"
+
+func multilineLogicalExpr() {
+	var seq int
+	var reason string
+	var threadId int
+	var allThreadsStopped bool
+
+	// 测试逻辑表达式跨行（类似 server_test.go 中的错误）
+	if seq != 0 ||
+		reason != "entry" ||
+		threadId != 0 ||
+		!allThreadsStopped {
+		fmt.Println("condition failed")
+	}
+
+	// 测试复杂的逻辑表达式跨行
+	var original, validated struct {
+		VariablesReference int
+	}
+	if original.VariablesReference == 0 && validated.VariablesReference != 0 ||
+		original.VariablesReference != 0 && validated.VariablesReference == 0 {
+		fmt.Println("mismatch")
+	}
+
+	// 测试多个逻辑运算符跨行
+	result := true &&
+		false ||
+		true &&
+		false
+	fmt.Println(result)
+}
+

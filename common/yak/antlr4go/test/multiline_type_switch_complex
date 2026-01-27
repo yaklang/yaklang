@@ -1,0 +1,51 @@
+package main
+
+import "fmt"
+
+func multilineTypeSwitchComplex() {
+	var v interface{}
+
+	// 测试复杂的 type switch，包含多个跨行的 case
+	switch v.(type) {
+	case int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		fmt.Println("numeric")
+	case string, []byte, []rune:
+		fmt.Println("string-like")
+	case bool:
+		fmt.Println("bool")
+	case nil:
+		fmt.Println("nil")
+	default:
+		fmt.Println("unknown")
+	}
+
+	// 测试带 receiver 的 type switch
+	var x interface{} = 42
+	switch x.(type) {
+	case int, int64,
+		int32, int16, int8:
+		fmt.Println("signed integer")
+	case uint, uint64,
+		uint32, uint16, uint8:
+		fmt.Println("unsigned integer")
+	default:
+		fmt.Println("other")
+	}
+
+	// 测试嵌套的 type switch
+	switch v.(type) {
+	case interface{}:
+		switch v.(type) {
+		case int, int64,
+			int32:
+			fmt.Println("nested int")
+		default:
+			fmt.Println("nested other")
+		}
+	default:
+		fmt.Println("not interface")
+	}
+}
+
