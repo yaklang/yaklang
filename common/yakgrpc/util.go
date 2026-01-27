@@ -269,7 +269,7 @@ func NewLocalClientForceNew() (ypb.YakClient, error) {
 	}, err
 }
 
-func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
+func NewLocalClientAndServerWithTempDatabase(t *testing.T) (ypb.YakClient, *Server, error) {
 	var port int
 	var addr string
 	netx.UnsetProxyFromEnv()
@@ -285,13 +285,13 @@ func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
 	s, err := newServerEx(WithInitFacadeServer(true), WithProfileDatabasePath(profileDatabasePath), WithProjectDatabasePath(projectDatabasePath))
 	if err != nil {
 		log.Errorf("build yakit server failed: %s", err)
-		return nil, err
+		return nil, nil, err
 	}
 	ypb.RegisterYakServer(grpcTrans, s)
 	var lis net.Listener
 	lis, err = net.Listen("tcp", addr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	t.Cleanup(func() {
 		os.Remove(profileDatabasePath)
@@ -315,7 +315,15 @@ func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
 		YakClient: ypb.NewYakClient(conn),
 		server:    s,
 	}
-	return client, err
+	return client, s, err
+}
+
+func NewLocalClientWithTempDatabase(t *testing.T) (ypb.YakClient, error) {
+	client, _, err := NewLocalClientAndServerWithTempDatabase(t)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func newLocalClientEx(local bool) (ypb.YakClient, error) {

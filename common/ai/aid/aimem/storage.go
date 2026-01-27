@@ -68,13 +68,13 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 		// 索引 potential_questions 到 RAG 系统
 		// 每个问题作为一个文档，关联到同一个 memory_id
 		if r.rag != nil {
-			for _, question := range entity.PotentialQuestions {
+			for _, question := range dbEntity.PotentialQuestions {
 				if strings.TrimSpace(question) == "" {
 					continue
 				}
 
 				// 使用 question + memory_id 作为文档 ID，确保唯一性
-				docID := fmt.Sprintf("%s-%s", entity.Id, utils.CalcMd5(question))
+				docID := dbEntity.QuestionHashID(question)
 
 				err := r.rag.Add(docID, question,
 					rag.WithDocumentMetadataKeyValue("memory_id", entity.Id),
@@ -88,7 +88,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*aicommon.MemoryEntity) 
 				}
 			}
 
-			log.Infof("indexed %d questions for memory entity: %s", len(entity.PotentialQuestions), entity.Id)
+			log.Infof("indexed %d questions for memory entity: %s", len(dbEntity.PotentialQuestions), entity.Id)
 		} else {
 			log.Debugf("RAG system not initialized, skipping question indexing for memory entity: %s", entity.Id)
 		}

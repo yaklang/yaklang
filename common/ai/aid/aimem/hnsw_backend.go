@@ -310,8 +310,7 @@ func (b *AIMemoryHNSWBackend) Update(entity *aicommon.MemoryEntity) error {
 	return nil
 }
 
-// Search 使用HNSW索引搜索相似的记忆实体
-func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]SearchResultWithDistance, error) {
+func (b *AIMemoryHNSWBackend) searchKeysWithDistance(queryVector []float32, limit int) ([]hnsw.SearchResult[string], error) {
 	// 获取读锁来搜索图
 	b.graphMutex.RLock()
 	graph := b.graph.Load()
@@ -328,6 +327,19 @@ func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]Search
 	// 使用HNSW搜索
 	searchResults := graph.SearchWithDistance(queryVector, limit)
 	b.graphMutex.RUnlock() // 搜索完成后立即释放读锁
+
+	if searchResults == nil {
+		return []hnsw.SearchResult[string]{}, nil
+	}
+	return searchResults, nil
+}
+
+// Search 使用HNSW索引搜索相似的记忆实体
+func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]SearchResultWithDistance, error) {
+	searchResults, err := b.searchKeysWithDistance(queryVector, limit)
+	if err != nil {
+		return nil, err
+	}
 
 	// 批量查询数据库以提高性能
 	if len(searchResults) == 0 {

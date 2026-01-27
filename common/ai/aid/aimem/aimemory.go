@@ -18,8 +18,11 @@ var memoryTriagePrompt string
 //go:embed corepact_principle.txt
 var corepactPrinciplesPrompt string
 
-// NewAIMemory 创建AI记忆管理系统
-func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
+func Session2MemoryName(sessionId string) string {
+	return fmt.Sprintf("ai-memory-%s", sessionId)
+}
+
+func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemoryTriage, error) {
 	if sessionId == "" {
 		return nil, utils.Errorf("sessionId is required")
 	}
@@ -38,6 +41,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 
 	// 使用配置中的RAG选项
 	ragOpts := config.ragOptions
+	ragCheckingOpts := append([]rag.RAGSystemConfigOption{rag.WithDB(db)}, ragOpts...)
 
 	// 检查 embedding 服务可用性，如果不可用，记录警告但继续
 	var system *rag.RAGSystem
@@ -45,10 +49,10 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	var err error
 
 	ragCheckingStart := time.Now()
-	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragOpts...)
+	embeddingAvailable = rag.CheckConfigEmbeddingAvailable(ragCheckingOpts...)
 	//  检查是否有默认的嵌入模型可用
 	if embeddingAvailable {
-		system, err = rag.GetRagSystem(name, append([]rag.RAGSystemConfigOption{rag.WithDB(db)}, ragOpts...)...)
+		system, err = rag.GetRagSystem(name, ragCheckingOpts...)
 		if err != nil {
 			log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
 			system = nil
@@ -83,11 +87,21 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		embeddingAvailable: embeddingAvailable,
 	}
 
-	if triage.invoker == nil {
+	if requireInvoker && triage.invoker == nil {
 		return nil, utils.Error("aicommon invoker in memory is need, cannot be empty.")
 	}
 
 	return triage, nil
+}
+
+// NewAIMemory 创建AI记忆管理系统
+func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
+	return newAIMemory(sessionId, true, opts...)
+}
+
+// NewAIMemoryForQuery 创建用于查询的 AI 记忆实例（不强制要求 invoker）
+func NewAIMemoryForQuery(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
+	return newAIMemory(sessionId, false, opts...)
 }
 
 // GetSessionID 获取当前会话ID
