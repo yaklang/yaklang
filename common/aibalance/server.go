@@ -82,6 +82,82 @@ func (k *KeyAllowedModels) Get(key string) (map[string]bool, bool) {
 	return v, ok
 }
 
+// IsModelAllowed checks if a model is allowed for a key, supporting glob patterns
+// Patterns can include * as wildcard (e.g., "memfit-*" matches "memfit-standard", "memfit-pro")
+func (k *KeyAllowedModels) IsModelAllowed(key string, modelName string) bool {
+	allowedModels, ok := k.allowedModels[key]
+	if !ok {
+		return false
+	}
+
+	// First, try exact match
+	if allowed, exists := allowedModels[modelName]; exists && allowed {
+		return true
+	}
+
+	// Then, try glob pattern matching
+	for pattern := range allowedModels {
+		if matchGlobPattern(pattern, modelName) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// matchGlobPattern matches a string against a glob pattern
+// Supports * as wildcard for any characters
+// Examples:
+//   - "memfit-*" matches "memfit-standard", "memfit-pro"
+//   - "*-free" matches "model1-free", "gpt-free"
+//   - "qwen*" matches "qwen2", "qwen3-max"
+func matchGlobPattern(pattern, str string) bool {
+	// If no wildcard, do exact match
+	if !strings.Contains(pattern, "*") {
+		return pattern == str
+	}
+
+	// Split pattern by *
+	parts := strings.Split(pattern, "*")
+
+	// Handle edge cases
+	if len(parts) == 0 {
+		return true
+	}
+
+	// Check if pattern starts with *
+	if pattern[0] != '*' && !strings.HasPrefix(str, parts[0]) {
+		return false
+	}
+
+	// Check if pattern ends with *
+	if pattern[len(pattern)-1] != '*' && !strings.HasSuffix(str, parts[len(parts)-1]) {
+		return false
+	}
+
+	// Check each part in sequence
+	searchStart := 0
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		idx := strings.Index(str[searchStart:], part)
+		if idx == -1 {
+			return false
+		}
+
+		// First part must be at the beginning if pattern doesn't start with *
+		if i == 0 && pattern[0] != '*' && idx != 0 {
+			return false
+		}
+
+		searchStart += idx + len(part)
+	}
+
+	return true
+}
+
 // Keys returns all keys
 func (k *KeyAllowedModels) Keys() []string {
 	keys := make([]string, 0, len(k.allowedModels))
@@ -516,7 +592,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			return
 		}
 
-		// Authorization check
+		// Authorization check with glob pattern support
 		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 		if !ok {
 			c.logError("Key[%v] has no allowed models configured", key.Key)
@@ -524,20 +600,14 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			return
 		}
 
-		isAllowed, ok := allowedModels[modelName]
-		if !ok {
+		// Use IsModelAllowed which supports glob patterns
+		if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
 			allowedModelKeys := make([]string, 0, len(allowedModels))
 			for k := range allowedModels {
 				allowedModelKeys = append(allowedModelKeys, k)
 			}
-			c.logError("Key[%v] requested model %s is not in allowed list, allowed models: %v", key.Key, modelName, allowedModelKeys)
+			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
-
-		if !isAllowed {
-			c.logError("Key[%v] requested model %s is not allowed", key.Key, modelName)
-			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
 			return
 		}
 	}
@@ -1058,7 +1128,7 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 			return
 		}
 
-		// Authorization check
+		// Authorization check with glob pattern support
 		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
 		if !ok {
 			c.logError("Key[%v] has no allowed models configured", key.Key)
@@ -1066,20 +1136,14 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 			return
 		}
 
-		isAllowed, ok := allowedModels[modelName]
-		if !ok {
+		// Use IsModelAllowed which supports glob patterns
+		if !c.KeyAllowedModels.IsModelAllowed(key.Key, modelName) {
 			allowedModelKeys := make([]string, 0, len(allowedModels))
 			for k := range allowedModels {
 				allowedModelKeys = append(allowedModelKeys, k)
 			}
-			c.logError("Key[%v] requested model %s is not in allowed list, allowed models: %v", key.Key, modelName, allowedModelKeys)
+			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-			return
-		}
-
-		if !isAllowed {
-			c.logError("Key[%v] requested model %s is not allowed", key.Key, modelName)
-			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
 			return
 		}
 	}

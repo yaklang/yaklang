@@ -8,6 +8,11 @@
         
         // 全局数据存储
         let portalData = null;
+        
+        // 模型选择相关
+        let portalAvailableModels = [];
+        let portalSelectedModels = new Set();
+        let editModalSelectedModels = new Set();
 
         // ==================== Portal Data Loader ====================
         
@@ -317,12 +322,10 @@
                 if (codeEl) codeEl.textContent = data.totp_code || '--';
             },
             
-            // 填充模型选择下拉框
+            // 填充模型选择组件
             populateModelSelect: function(data) {
-                const select = document.getElementById('allowedModelsSelect');
-                if (!select) return;
-                
-                select.innerHTML = '';
+                const modelList = document.getElementById('portalModelList');
+                if (!modelList) return;
                 
                 // 从 providers 中提取唯一的模型名
                 const modelSet = new Set();
@@ -333,12 +336,18 @@
                     });
                 }
                 
-                modelSet.forEach(name => {
-                    const option = document.createElement('option');
-                    option.value = name;
-                    option.textContent = name;
-                    select.appendChild(option);
-                });
+                // 排序并存储
+                portalAvailableModels = Array.from(modelSet).sort();
+                portalSelectedModels.clear();
+                
+                // 渲染模型列表
+                portalRenderModelList();
+                
+                // 设置 glob input 监听
+                const globInput = document.getElementById('portalGlobPatterns');
+                if (globInput) {
+                    globInput.addEventListener('input', portalUpdateSelectedPreview);
+                }
             },
             
             // HTML 转义
@@ -1770,10 +1779,90 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             }
         }
 
+        // ==================== Portal 模型选择辅助函数 ====================
+        
+        function portalRenderModelList() {
+            const modelList = document.getElementById('portalModelList');
+            if (!modelList) return;
+            
+            if (portalAvailableModels.length === 0) {
+                modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No models available</div>';
+                return;
+            }
+            
+            modelList.innerHTML = portalAvailableModels.map(model => `
+                <div class="model-item ${portalSelectedModels.has(model) ? 'selected' : ''}" onclick="portalToggleModel('${model}')">
+                    <input type="checkbox" ${portalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); portalToggleModel('${model}')">
+                    <label>${model}</label>
+                </div>
+            `).join('');
+            
+            portalUpdateSelectedPreview();
+        }
+        
+        function portalToggleModel(model) {
+            if (portalSelectedModels.has(model)) {
+                portalSelectedModels.delete(model);
+            } else {
+                portalSelectedModels.add(model);
+            }
+            portalRenderModelList();
+        }
+        
+        function portalSelectAllModels() {
+            portalAvailableModels.forEach(m => portalSelectedModels.add(m));
+            portalRenderModelList();
+        }
+        
+        function portalClearAllModels() {
+            portalSelectedModels.clear();
+            portalRenderModelList();
+        }
+        
+        function portalUpdateSelectedPreview() {
+            const preview = document.getElementById('portalSelectedPreview');
+            if (!preview) return;
+            
+            const globInput = document.getElementById('portalGlobPatterns');
+            const globPatterns = globInput ? globInput.value.trim() : '';
+            
+            let html = '<strong>已选择:</strong> ';
+            
+            const modelArray = Array.from(portalSelectedModels).sort();
+            if (modelArray.length > 0) {
+                if (modelArray.length <= 5) {
+                    html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+                } else {
+                    html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
+                    html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+                }
+            }
+            
+            if (globPatterns) {
+                const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
+                patterns.forEach(p => {
+                    html += `<span class="tag glob">${p}</span>`;
+                });
+            }
+            
+            if (modelArray.length === 0 && !globPatterns) {
+                html += '<span style="color: #888;">未选择</span>';
+            }
+            
+            preview.innerHTML = html;
+        }
+        
+        function portalGetSelectedModels() {
+            const modelArray = Array.from(portalSelectedModels);
+            const globInput = document.getElementById('portalGlobPatterns');
+            const globPatterns = globInput ? globInput.value.trim() : '';
+            const globArray = globPatterns ? globPatterns.split(',').map(p => p.trim()).filter(p => p) : [];
+            return [...modelArray, ...globArray].sort();
+        }
+
         // 新增：确认并生成 API Key 的函数
         function confirmAndGenerateApiKey() {
-            const allowedModelsSelect = document.getElementById('allowedModelsSelect');
-            const selectedModels = Array.from(allowedModelsSelect.selectedOptions).map(option => option.value);
+            const selectedModels = portalGetSelectedModels();
 
             if (selectedModels.length === 0) {
                 showToast('请至少选择一个允许的模型', 'warning');
@@ -1787,8 +1876,7 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
 
         // 添加 API Key 生成功能 (现在由 confirmAndGenerateApiKey 调用)
         async function generateNewApiKey() {
-            const allowedModelsSelect = document.getElementById('allowedModelsSelect');
-            const selectedModels = Array.from(allowedModelsSelect.selectedOptions).map(option => option.value);
+            const selectedModels = portalGetSelectedModels();
             
             // 再次检查，虽然 confirmAndGenerateApiKey 已经检查过
             if (selectedModels.length === 0) {
@@ -2760,28 +2848,21 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             hideContextMenu(); // 立即关闭右键菜单
         }
 
-        // 新增：编辑允许模型的函数 (纯 JavaScript 版本 - 使用 Select)
+        // 新增：编辑允许模型的函数 (使用新的模型选择组件)
         function editAllowedModels(id, currentAllowedModelsString) {
-            console.log("[Debug] editAllowedModels (Pure JS with Select) called with ID:", id, "Models:", currentAllowedModelsString);
+            console.log("[Debug] editAllowedModels called with ID:", id, "Models:", currentAllowedModelsString);
             
-            document.getElementById('editApiKeyId').value = id; // Hidden input to store the ID
-            document.getElementById('editingApiKeyIdDisplay').textContent = id; // Span to display the ID
+            document.getElementById('editApiKeyId').value = id;
+            document.getElementById('editingApiKeyIdDisplay').textContent = id;
             
-            const selectElement = document.getElementById('editAllowedModelsSelectModal');
-            selectElement.innerHTML = ''; // Clear existing options
-
-            // 1. 获取所有可用的 WrapperName
-            // 优先使用 autoCompleteData.wrapper_names，如果它已被填充
+            // 获取所有可用的 WrapperName
             let availableWrapperNames = new Set();
             if (autoCompleteData && autoCompleteData.wrapper_names && autoCompleteData.wrapper_names.length > 0) {
                 autoCompleteData.wrapper_names.forEach(name => availableWrapperNames.add(name));
             } else {
-                // Fallback: 从API Key列表的当前显示模型中提取，或者从Provider列表提取
-                // 这里我们简化，假设populateAllowedModelsSelector已经运行过，或者autoCompleteData会包含所需信息
-                // 或者，更可靠地，再次扫描provider表
-                const providerRows = document.querySelectorAll('#all #provider-table-body tr'); // Target provider table specifically
+                const providerRows = document.querySelectorAll('#all #provider-table-body tr');
                 providerRows.forEach(row => {
-                    const wrapperNameCell = row.cells[3]; // 第4列是提供者名称 (WrapperName)
+                    const wrapperNameCell = row.cells[3];
                     if (wrapperNameCell) {
                         const wrapperName = wrapperNameCell.getAttribute('data-full-text') || wrapperNameCell.textContent.trim();
                         if (wrapperName) {
@@ -2791,38 +2872,131 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 });
             }
             
-            if (availableWrapperNames.size === 0) {
-                const option = document.createElement('option');
-                option.textContent = '没有可用的模型提供者';
-                option.disabled = true;
-                selectElement.appendChild(option);
-                console.warn("[Debug] No available wrapper names to populate select modal.");
-            } else {
-                Array.from(availableWrapperNames).sort().forEach(name => { // Sort for better UX
-                    const option = document.createElement('option');
-                    option.value = name;
-                    option.textContent = name;
-                    selectElement.appendChild(option);
-                });
+            // 也添加 portalAvailableModels 中的模型
+            if (portalAvailableModels && portalAvailableModels.length > 0) {
+                portalAvailableModels.forEach(name => availableWrapperNames.add(name));
             }
-
-            // 2. 预选当前API Key允许的模型
+            
+            // 排序可用模型
+            const sortedAvailableModels = Array.from(availableWrapperNames).sort();
+            
+            // 解析当前允许的模型
             const currentlyAllowedModelsArray = currentAllowedModelsString ? currentAllowedModelsString.split(',').map(m => m.trim()).filter(m => m) : [];
-            for (let i = 0; i < selectElement.options.length; i++) {
-                if (currentlyAllowedModelsArray.includes(selectElement.options[i].value)) {
-                    selectElement.options[i].selected = true;
+            
+            // 分离正常模型和 glob 模式
+            editModalSelectedModels.clear();
+            const globPatterns = [];
+            currentlyAllowedModelsArray.forEach(m => {
+                if (m.includes('*')) {
+                    globPatterns.push(m);
                 } else {
-                    selectElement.options[i].selected = false; // Ensure others are not selected
+                    editModalSelectedModels.add(m);
                 }
+            });
+            
+            // 设置 glob 模式
+            const globInput = document.getElementById('editModalGlobPatterns');
+            if (globInput) {
+                globInput.value = globPatterns.join(',');
+                globInput.addEventListener('input', editModalUpdateSelectedPreview);
             }
+            
+            // 渲染模型列表
+            editModalRenderModelList(sortedAvailableModels);
             
             const modalElement = document.getElementById('editAllowedModelsModal');
             if (modalElement) {
                 modalElement.style.display = 'flex';
-                console.log("[Debug] editAllowedModelsModal shown via style.display");
-            } else {
-                console.error("[Debug] editAllowedModelsModal element not found!");
             }
+        }
+        
+        // Edit Modal 模型列表渲染
+        function editModalRenderModelList(availableModels) {
+            const modelList = document.getElementById('editModalModelList');
+            if (!modelList) return;
+            
+            if (!availableModels || availableModels.length === 0) {
+                modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No models available</div>';
+                return;
+            }
+            
+            // Store available models for this modal
+            window.editModalAvailableModels = availableModels;
+            
+            modelList.innerHTML = availableModels.map(model => `
+                <div class="model-item ${editModalSelectedModels.has(model) ? 'selected' : ''}" onclick="editModalToggleModel('${model}')">
+                    <input type="checkbox" ${editModalSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editModalToggleModel('${model}')">
+                    <label>${model}</label>
+                </div>
+            `).join('');
+            
+            editModalUpdateSelectedPreview();
+        }
+        
+        function editModalToggleModel(model) {
+            if (editModalSelectedModels.has(model)) {
+                editModalSelectedModels.delete(model);
+            } else {
+                editModalSelectedModels.add(model);
+            }
+            if (window.editModalAvailableModels) {
+                editModalRenderModelList(window.editModalAvailableModels);
+            }
+        }
+        
+        function editModalSelectAllModels() {
+            if (window.editModalAvailableModels) {
+                window.editModalAvailableModels.forEach(m => editModalSelectedModels.add(m));
+                editModalRenderModelList(window.editModalAvailableModels);
+            }
+        }
+        
+        function editModalClearAllModels() {
+            editModalSelectedModels.clear();
+            if (window.editModalAvailableModels) {
+                editModalRenderModelList(window.editModalAvailableModels);
+            }
+        }
+        
+        function editModalUpdateSelectedPreview() {
+            const preview = document.getElementById('editModalSelectedPreview');
+            if (!preview) return;
+            
+            const globInput = document.getElementById('editModalGlobPatterns');
+            const globPatterns = globInput ? globInput.value.trim() : '';
+            
+            let html = '<strong>已选择:</strong> ';
+            
+            const modelArray = Array.from(editModalSelectedModels).sort();
+            if (modelArray.length > 0) {
+                if (modelArray.length <= 5) {
+                    html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+                } else {
+                    html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
+                    html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+                }
+            }
+            
+            if (globPatterns) {
+                const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
+                patterns.forEach(p => {
+                    html += `<span class="tag glob">${p}</span>`;
+                });
+            }
+            
+            if (modelArray.length === 0 && !globPatterns) {
+                html += '<span style="color: #888;">未选择</span>';
+            }
+            
+            preview.innerHTML = html;
+        }
+        
+        function editModalGetSelectedModels() {
+            const modelArray = Array.from(editModalSelectedModels);
+            const globInput = document.getElementById('editModalGlobPatterns');
+            const globPatterns = globInput ? globInput.value.trim() : '';
+            const globArray = globPatterns ? globPatterns.split(',').map(p => p.trim()).filter(p => p) : [];
+            return [...modelArray, ...globArray].sort();
         }
 
         // 新增：关闭编辑模态框的函数
@@ -2830,20 +3004,21 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const modalElement = document.getElementById('editAllowedModelsModal');
             if (modalElement) {
                 modalElement.style.display = 'none';
-                console.log("[Debug] editAllowedModelsModal hidden via style.display");
             }
+            editModalSelectedModels.clear();
         }
 
-        // 新增：保存编辑的模型 (确保从新的 select 元素读取)
+        // 新增：保存编辑的模型
         function saveAllowedModels() {
             const id = document.getElementById('editApiKeyId').value;
-            // const allowedModels = document.getElementById('editAllowedModelsTextarea').value; // 旧代码：使用 textarea
-            const selectElement = document.getElementById('editAllowedModelsSelectModal');
-            const selectedModels = Array.from(selectElement.selectedOptions).map(option => option.value);
-            const allowedModelsString = selectedModels.join(',');
+            const selectedModels = editModalGetSelectedModels();
+            
+            if (selectedModels.length === 0) {
+                showToast('请至少选择一个模型或输入一个 glob 模式', 'warning');
+                return;
+            }
 
-
-            console.log("[Debug] saveAllowedModels called. ID:", id, "Selected Models String:", allowedModelsString);
+            console.log("[Debug] saveAllowedModels called. ID:", id, "Selected Models:", selectedModels);
 
             fetch(`/portal/update-api-key-allowed-models/${id}`, {
                 method: 'POST',
@@ -2851,16 +3026,15 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    allowed_models: allowedModelsString
+                    allowed_models: selectedModels
                 })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    closeEditAllowedModelsModal(); // Close modal on success
-                    showToast('允许的模型已更新', 'success'); // Show success toast
-                    // 刷新页面以显示更新后的数据
-                    setTimeout(() => window.location.reload(), 1500); // Delay reload slightly
+                    closeEditAllowedModelsModal();
+                    showToast('允许的模型已更新', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
                     showToast('错误: ' + (data.message || '更新失败'), 'error');
                     console.error('Error updating allowed models:', data.message);

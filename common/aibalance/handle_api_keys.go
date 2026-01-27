@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -181,6 +182,8 @@ func (c *ServerConfig) handleGenerateApiKey(conn net.Conn, request *http.Request
 // API Key format: mf-{uuid} (e.g., mf-2e5565d7-5045-4311-bc74-b5b1247815d7)
 func (c *ServerConfig) generateAndStoreAPIKey(allowedModels []string) (string, error) {
 	apiKey := "mf-" + uuid.New().String()
+	// Sort allowed models for consistent storage
+	sort.Strings(allowedModels)
 	allowedModelsStr := strings.Join(allowedModels, ",")
 
 	newKeyData := &schema.AiApiKeys{
@@ -445,6 +448,9 @@ func (c *ServerConfig) handleUpdateAPIKeyAllowedModels(conn net.Conn, request *h
 		return
 	}
 
+	// Sort allowed models for consistent storage
+	sort.Strings(reqBody.AllowedModels)
+	
 	// Update allowed models
 	allowedModelsStr := strings.Join(reqBody.AllowedModels, ",")
 	err = UpdateAiApiKeyAllowedModels(uint(id), allowedModelsStr)
@@ -832,11 +838,16 @@ func (c *ServerConfig) handleGetAPIKeysPaginated(conn net.Conn, request *http.Re
 			displayKey = displayKey[:4] + "..." + displayKey[len(displayKey)-4:]
 		}
 
+		// Sort allowed models for consistent display
+		models := strings.Split(key.AllowedModels, ",")
+		sort.Strings(models)
+		sortedAllowedModels := strings.Join(models, ",")
+
 		keyData := map[string]interface{}{
 			"id":                   key.ID,
 			"api_key":              key.APIKey,
 			"display_key":          displayKey,
-			"allowed_models":       key.AllowedModels,
+			"allowed_models":       sortedAllowedModels,
 			"input_bytes":          key.InputBytes,
 			"output_bytes":         key.OutputBytes,
 			"usage_count":          key.UsageCount,

@@ -89,8 +89,11 @@ function updateUI() {
     statusEl.textContent = userInfo.active ? 'Active' : 'Inactive';
     statusEl.style.color = userInfo.active ? '#28a745' : '#dc3545';
     
-    // Default limit hint
-    document.getElementById('default-limit-hint').textContent = formatBytes(userInfo.default_limit);
+    // Default limit hint (may not exist in new UI)
+    const defaultLimitHint = document.getElementById('default-limit-hint');
+    if (defaultLimitHint) {
+        defaultLimitHint.textContent = formatBytes(userInfo.default_limit);
+    }
     
     // My Info tab
     document.getElementById('my-info-loading').classList.add('hidden');
@@ -112,30 +115,102 @@ function updateUI() {
 
 // ==================== Models ====================
 
+let selectedModels = new Set();
+
 async function loadModels() {
+    const modelList = document.getElementById('model-list');
+    
     try {
         const response = await fetch('/v1/models');
         const data = await response.json();
         
-        const select = document.getElementById('allowed-models');
-        select.innerHTML = '';
-        
         if (data.data && data.data.length > 0) {
-            availableModels = data.data.map(m => m.id);
-            data.data.forEach(model => {
-                const option = document.createElement('option');
-                option.value = model.id;
-                option.textContent = model.id;
-                select.appendChild(option);
-            });
+            // Sort models alphabetically for consistent display
+            availableModels = data.data.map(m => m.id).sort();
+            renderModelList();
         } else {
-            select.innerHTML = '<option value="">No models available</option>';
+            modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No models available</div>';
         }
     } catch (error) {
         console.error('Error loading models:', error);
-        document.getElementById('allowed-models').innerHTML = '<option value="">Failed to load models</option>';
+        modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #dc3545;">Failed to load models</div>';
     }
 }
+
+function renderModelList() {
+    const modelList = document.getElementById('model-list');
+    
+    modelList.innerHTML = availableModels.map(model => `
+        <div class="model-item ${selectedModels.has(model) ? 'selected' : ''}" onclick="toggleModel('${model}')">
+            <input type="checkbox" id="model-${model}" ${selectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); toggleModel('${model}')">
+            <label for="model-${model}">${model}</label>
+        </div>
+    `).join('');
+    
+    updateSelectedPreview();
+}
+
+function toggleModel(model) {
+    if (selectedModels.has(model)) {
+        selectedModels.delete(model);
+    } else {
+        selectedModels.add(model);
+    }
+    renderModelList();
+}
+
+function selectAllModels() {
+    availableModels.forEach(m => selectedModels.add(m));
+    renderModelList();
+}
+
+function clearAllModels() {
+    selectedModels.clear();
+    renderModelList();
+}
+
+function updateSelectedPreview() {
+    const preview = document.getElementById('selected-preview');
+    if (!preview) return;
+    
+    const globInput = document.getElementById('glob-patterns');
+    const globPatterns = globInput ? globInput.value.trim() : '';
+    
+    let html = '<strong>Selected:</strong> ';
+    
+    // Show selected models (sorted)
+    const modelArray = Array.from(selectedModels).sort();
+    if (modelArray.length > 0) {
+        if (modelArray.length <= 5) {
+            html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+        } else {
+            html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
+            html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+        }
+    }
+    
+    // Show glob patterns
+    if (globPatterns) {
+        const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
+        patterns.forEach(p => {
+            html += `<span class="tag glob">${p}</span>`;
+        });
+    }
+    
+    if (modelArray.length === 0 && !globPatterns) {
+        html += '<span style="color: #888;">None selected</span>';
+    }
+    
+    preview.innerHTML = html;
+}
+
+// Listen for glob input changes
+document.addEventListener('DOMContentLoaded', function() {
+    const globInput = document.getElementById('glob-patterns');
+    if (globInput) {
+        globInput.addEventListener('input', updateSelectedPreview);
+    }
+});
 
 // ==================== My API Keys ====================
 
@@ -180,20 +255,34 @@ function renderApiKeysTable() {
     const tbody = document.getElementById('my-keys-tbody');
     
     tbody.innerHTML = myApiKeys.map(key => {
-        const trafficPercent = key.traffic_limit > 0 
-            ? Math.min(100, (key.traffic_used / key.traffic_limit) * 100).toFixed(1)
-            : 0;
-        const trafficColor = trafficPercent > 80 ? '#dc3545' : trafficPercent > 50 ? '#ffc107' : '#28a745';
+        const isUnlimited = !key.traffic_limit_enable || !key.traffic_limit || key.traffic_limit <= 0;
+        let trafficColor = '#28a745';
+        let trafficUsedDisplay = formatBytes(key.traffic_used || 0);
+        let trafficLimitDisplay = isUnlimited ? '<span style="color: #28a745; font-weight: 500;">Unlimited</span>' : formatBytes(key.traffic_limit);
+        
+        if (!isUnlimited && key.traffic_limit > 0) {
+            const trafficPercent = Math.min(100, ((key.traffic_used || 0) / key.traffic_limit) * 100);
+            trafficColor = trafficPercent > 80 ? '#dc3545' : trafficPercent > 50 ? '#ffc107' : '#28a745';
+        }
+        
+        // Display models (sorted)
+        const models = key.allowed_models || [];
+        const modelsDisplay = models.length > 3 
+            ? models.slice(0, 3).join(', ') + ` (+${models.length - 3})`
+            : models.join(', ');
         
         return `
             <tr>
                 <td><code>${key.api_key.substring(0, 20)}...</code></td>
-                <td>${(key.allowed_models || []).slice(0, 3).join(', ')}${(key.allowed_models || []).length > 3 ? '...' : ''}</td>
-                <td style="color: ${trafficColor}">${formatBytes(key.traffic_used)}</td>
-                <td>${formatBytes(key.traffic_limit)}</td>
+                <td title="${models.join(', ')}">${modelsDisplay || '-'}</td>
+                <td style="color: ${trafficColor}">${trafficUsedDisplay}</td>
+                <td>${trafficLimitDisplay}</td>
                 <td>${key.created_at || '--'}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger" onclick="deleteApiKey('${key.api_key}')">Delete</button>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn btn-sm" onclick="openEditKeyModal('${key.api_key}')" style="background: #4285f4;">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApiKey('${key.api_key}')">Delete</button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -229,6 +318,262 @@ async function deleteApiKey(apiKey) {
     }
 }
 
+// ==================== Edit API Key ====================
+
+let editSelectedModels = new Set();
+let currentEditKey = null;
+
+function openEditKeyModal(apiKey) {
+    // Find the key data
+    currentEditKey = myApiKeys.find(k => k.api_key === apiKey);
+    if (!currentEditKey) {
+        showToast('API Key not found', 'error');
+        return;
+    }
+    
+    // Populate modal
+    document.getElementById('edit-key-api-key').value = apiKey;
+    document.getElementById('edit-key-display').value = apiKey;
+    
+    // Load current allowed models
+    editSelectedModels.clear();
+    const currentModels = currentEditKey.allowed_models || [];
+    
+    // Separate regular models from glob patterns
+    const regularModels = [];
+    const globPatterns = [];
+    currentModels.forEach(m => {
+        if (m.includes('*')) {
+            globPatterns.push(m);
+        } else {
+            regularModels.push(m);
+            editSelectedModels.add(m);
+        }
+    });
+    
+    // Set glob patterns
+    document.getElementById('edit-glob-patterns').value = globPatterns.join(',');
+    
+    // Render model list
+    renderEditModelList();
+    updateEditSelectedPreview();
+    
+    // Set traffic settings
+    const isUnlimited = !currentEditKey.traffic_limit_enable || !currentEditKey.traffic_limit || currentEditKey.traffic_limit <= 0;
+    const unlimitedCheckbox = document.getElementById('edit-unlimited-traffic');
+    const trafficLimitGroup = document.getElementById('edit-traffic-limit-group');
+    const unlimitedToggle = document.getElementById('edit-unlimited-toggle');
+    const trafficDesc = document.getElementById('edit-traffic-desc');
+    
+    unlimitedCheckbox.checked = isUnlimited;
+    if (isUnlimited) {
+        trafficLimitGroup.style.display = 'none';
+        unlimitedToggle.classList.add('active');
+        trafficDesc.textContent = 'API Key will have no traffic restrictions';
+    } else {
+        trafficLimitGroup.style.display = 'block';
+        unlimitedToggle.classList.remove('active');
+        trafficDesc.textContent = 'Set a custom traffic limit below';
+        document.getElementById('edit-traffic-limit').value = currentEditKey.traffic_limit || '';
+    }
+    
+    document.getElementById('edit-traffic-used').textContent = formatBytes(currentEditKey.traffic_used || 0);
+    
+    // Set up toggle event
+    unlimitedCheckbox.onchange = function() {
+        if (this.checked) {
+            trafficLimitGroup.style.display = 'none';
+            unlimitedToggle.classList.add('active');
+            trafficDesc.textContent = 'API Key will have no traffic restrictions';
+        } else {
+            trafficLimitGroup.style.display = 'block';
+            unlimitedToggle.classList.remove('active');
+            trafficDesc.textContent = 'Set a custom traffic limit below';
+        }
+    };
+    
+    // Show modal
+    document.getElementById('edit-key-modal').style.display = 'flex';
+}
+
+function closeEditKeyModal() {
+    document.getElementById('edit-key-modal').style.display = 'none';
+    currentEditKey = null;
+    editSelectedModels.clear();
+}
+
+function renderEditModelList() {
+    const modelList = document.getElementById('edit-model-list');
+    
+    if (availableModels.length === 0) {
+        modelList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No models available</div>';
+        return;
+    }
+    
+    modelList.innerHTML = availableModels.map(model => `
+        <div class="model-item ${editSelectedModels.has(model) ? 'selected' : ''}" onclick="editToggleModel('${model}')">
+            <input type="checkbox" ${editSelectedModels.has(model) ? 'checked' : ''} onclick="event.stopPropagation(); editToggleModel('${model}')">
+            <label>${model}</label>
+        </div>
+    `).join('');
+}
+
+function editToggleModel(model) {
+    if (editSelectedModels.has(model)) {
+        editSelectedModels.delete(model);
+    } else {
+        editSelectedModels.add(model);
+    }
+    renderEditModelList();
+    updateEditSelectedPreview();
+}
+
+function editSelectAllModels() {
+    availableModels.forEach(m => editSelectedModels.add(m));
+    renderEditModelList();
+    updateEditSelectedPreview();
+}
+
+function editClearAllModels() {
+    editSelectedModels.clear();
+    renderEditModelList();
+    updateEditSelectedPreview();
+}
+
+function updateEditSelectedPreview() {
+    const preview = document.getElementById('edit-selected-preview');
+    if (!preview) return;
+    
+    const globInput = document.getElementById('edit-glob-patterns');
+    const globPatterns = globInput ? globInput.value.trim() : '';
+    
+    let html = '<strong>Selected:</strong> ';
+    
+    const modelArray = Array.from(editSelectedModels).sort();
+    if (modelArray.length > 0) {
+        if (modelArray.length <= 5) {
+            html += modelArray.map(m => `<span class="tag">${m}</span>`).join('');
+        } else {
+            html += modelArray.slice(0, 3).map(m => `<span class="tag">${m}</span>`).join('');
+            html += `<span class="tag">+${modelArray.length - 3} more</span>`;
+        }
+    }
+    
+    if (globPatterns) {
+        const patterns = globPatterns.split(',').map(p => p.trim()).filter(p => p);
+        patterns.forEach(p => {
+            html += `<span class="tag glob">${p}</span>`;
+        });
+    }
+    
+    if (modelArray.length === 0 && !globPatterns) {
+        html += '<span style="color: #888;">None selected</span>';
+    }
+    
+    preview.innerHTML = html;
+}
+
+// Listen for edit glob input changes
+document.addEventListener('DOMContentLoaded', function() {
+    const editGlobInput = document.getElementById('edit-glob-patterns');
+    if (editGlobInput) {
+        editGlobInput.addEventListener('input', updateEditSelectedPreview);
+    }
+});
+
+async function saveEditKey() {
+    const apiKey = document.getElementById('edit-key-api-key').value;
+    
+    // Get selected models
+    const modelArray = Array.from(editSelectedModels);
+    
+    // Get glob patterns
+    const globInput = document.getElementById('edit-glob-patterns');
+    const globPatterns = globInput ? globInput.value.trim() : '';
+    const globArray = globPatterns ? globPatterns.split(',').map(p => p.trim()).filter(p => p) : [];
+    
+    // Combine and sort
+    const allModels = [...modelArray, ...globArray].sort();
+    
+    if (allModels.length === 0) {
+        showToast('Please select at least one model or enter a glob pattern', 'error');
+        return;
+    }
+    
+    // Get traffic settings
+    const isUnlimited = document.getElementById('edit-unlimited-traffic').checked;
+    const trafficLimit = document.getElementById('edit-traffic-limit').value;
+    
+    if (!isUnlimited && (!trafficLimit || parseInt(trafficLimit) <= 0)) {
+        showToast('Please enter a valid traffic limit or enable unlimited traffic', 'error');
+        return;
+    }
+    
+    try {
+        const requestBody = {
+            api_key: apiKey,
+            allowed_models: allModels,
+            unlimited: isUnlimited
+        };
+        
+        if (!isUnlimited && trafficLimit) {
+            requestBody.traffic_limit = parseInt(trafficLimit);
+        }
+        
+        const response = await fetch('/ops/api/update-api-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('API Key updated successfully', 'success');
+            closeEditKeyModal();
+            loadMyApiKeys();
+        } else {
+            showToast(data.error || 'Failed to update API key', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating API key:', error);
+        showToast('Network error', 'error');
+    }
+}
+
+async function resetEditKeyTraffic() {
+    const apiKey = document.getElementById('edit-key-api-key').value;
+    
+    if (!confirm('Are you sure you want to reset the traffic counter for this API key?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/ops/api/reset-traffic', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Traffic reset successfully', 'success');
+            document.getElementById('edit-traffic-used').textContent = '0 B';
+            loadMyApiKeys();
+        } else {
+            showToast(data.error || 'Failed to reset traffic', 'error');
+        }
+    } catch (error) {
+        console.error('Error resetting traffic:', error);
+        showToast('Network error', 'error');
+    }
+}
+
 // ==================== Form Handlers ====================
 
 function initForms() {
@@ -237,41 +582,104 @@ function initForms() {
     
     // Change password form
     document.getElementById('change-password-form').addEventListener('submit', handleChangePassword);
+    
+    // Unlimited traffic toggle
+    const unlimitedCheckbox = document.getElementById('unlimited-traffic');
+    const trafficLimitGroup = document.getElementById('traffic-limit-group');
+    const unlimitedToggle = document.getElementById('unlimited-toggle');
+    const trafficDesc = document.getElementById('traffic-desc');
+    
+    if (unlimitedCheckbox && trafficLimitGroup) {
+        unlimitedCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                trafficLimitGroup.style.display = 'none';
+                document.getElementById('traffic-limit').value = '';
+                unlimitedToggle.classList.add('active');
+                trafficDesc.textContent = 'API Key will have no traffic restrictions';
+            } else {
+                trafficLimitGroup.style.display = 'block';
+                unlimitedToggle.classList.remove('active');
+                trafficDesc.textContent = 'Set a custom traffic limit below';
+            }
+        });
+    }
+    
+    // Glob patterns input listener
+    const globInput = document.getElementById('glob-patterns');
+    if (globInput) {
+        globInput.addEventListener('input', updateSelectedPreview);
+    }
 }
 
 async function handleCreateApiKey(e) {
     e.preventDefault();
     
-    const select = document.getElementById('allowed-models');
-    const selectedModels = Array.from(select.selectedOptions).map(opt => opt.value);
-    const trafficLimit = document.getElementById('traffic-limit').value;
+    // Get selected models from checkboxes
+    const modelArray = Array.from(selectedModels);
     
-    if (selectedModels.length === 0) {
-        showAlert('create-key-alert', 'Please select at least one model', 'error');
+    // Get glob patterns
+    const globInput = document.getElementById('glob-patterns');
+    const globPatterns = globInput ? globInput.value.trim() : '';
+    const globArray = globPatterns ? globPatterns.split(',').map(p => p.trim()).filter(p => p) : [];
+    
+    // Combine models and glob patterns
+    const allModels = [...modelArray, ...globArray];
+    
+    const unlimitedCheckbox = document.getElementById('unlimited-traffic');
+    const trafficLimitInput = document.getElementById('traffic-limit');
+    
+    const isUnlimited = unlimitedCheckbox ? unlimitedCheckbox.checked : true;
+    const trafficLimit = trafficLimitInput ? trafficLimitInput.value : '';
+    
+    if (allModels.length === 0) {
+        showAlert('create-key-alert', 'Please select at least one model or enter a glob pattern', 'error');
+        return;
+    }
+    
+    // Validate traffic limit if not unlimited
+    if (!isUnlimited && (!trafficLimit || parseInt(trafficLimit) <= 0)) {
+        showAlert('create-key-alert', 'Please enter a valid traffic limit or enable unlimited traffic', 'error');
         return;
     }
     
     try {
+        const requestBody = {
+            allowed_models: allModels,
+            unlimited: isUnlimited
+        };
+        
+        if (!isUnlimited && trafficLimit) {
+            requestBody.traffic_limit = parseInt(trafficLimit);
+        }
+        
         const response = await fetch('/ops/api/create-api-key', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                allowed_models: selectedModels,
-                traffic_limit: trafficLimit ? parseInt(trafficLimit) : 0
-            })
+            body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
         
         if (data.success) {
-            showAlert('create-key-alert', 'API Key created successfully!', 'success');
+            const limitInfo = data.unlimited ? 'Unlimited' : formatBytes(data.traffic_limit);
+            showAlert('create-key-alert', `API Key created successfully! Traffic: ${limitInfo}`, 'success');
             document.getElementById('generated-key').textContent = data.api_key;
             document.getElementById('api-key-result').classList.add('show');
             
-            // Refresh user info to update stats
-            loadUserInfo();
+            // Clear form (wrap in try-catch to not affect success message)
+            try {
+                selectedModels.clear();
+                renderModelList();
+                if (globInput) globInput.value = '';
+                updateSelectedPreview();
+            } catch (clearError) {
+                console.error('Error clearing form:', clearError);
+            }
+            
+            // Refresh user info to update stats (async, don't wait)
+            loadUserInfo().catch(err => console.error('Error refreshing user info:', err));
         } else {
             showAlert('create-key-alert', data.error || 'Failed to create API key', 'error');
         }
@@ -493,3 +901,14 @@ window.switchToTab = switchToTab;
 window.showAlert = showAlert;
 window.showToast = showToast;
 window.formatBytes = formatBytes;
+window.selectAllModels = selectAllModels;
+window.clearAllModels = clearAllModels;
+window.toggleModel = toggleModel;
+// Edit API Key functions
+window.openEditKeyModal = openEditKeyModal;
+window.closeEditKeyModal = closeEditKeyModal;
+window.editToggleModel = editToggleModel;
+window.editSelectAllModels = editSelectAllModels;
+window.editClearAllModels = editClearAllModels;
+window.saveEditKey = saveEditKey;
+window.resetEditKeyTraffic = resetEditKeyTraffic;

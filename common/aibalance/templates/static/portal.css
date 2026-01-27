@@ -1702,5 +1702,162 @@
         #models-table th:nth-child(4), #models-table td:nth-child(4) { min-width: 140px; width: 180px; } /* 描述 */
         #models-table th:nth-child(5), #models-table td:nth-child(5) { min-width: 90px; width: 110px; } /* 标签 */
         #models-table th:nth-child(6), #models-table td:nth-child(6) { min-width: 90px; width: 110px; } /* 操作 */
+}
 
-        /* 添加到现有样式的末尾 */
+/* ==================== Model Selection (Shared Styles) ==================== */
+
+.model-selection {
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.model-selection-header {
+    background: #f8f9fa;
+    padding: 12px 15px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.model-selection-header .title {
+    font-weight: 600;
+    color: #333;
+}
+
+.model-selection-header .actions {
+    display: flex;
+    gap: 8px;
+}
+
+.model-selection-header .btn-text {
+    background: none;
+    border: none;
+    color: #4285f4;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.model-selection-header .btn-text:hover {
+    text-decoration: underline;
+}
+
+.model-list {
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.model-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.model-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.model-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-item:hover {
+    background: #f0f0f0;
+}
+
+.model-item.selected {
+    background: #e8f5e9;
+}
+
+.model-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.model-item label {
+    cursor: pointer;
+    flex: 1;
+    font-size: 13px;
+}
+
+/* Glob Pattern Input */
+.glob-input-section {
+    padding: 12px 15px;
+    background: #fff8e1;
+    border-top: 1px solid #e0e0e0;
+}
+
+.glob-input-section .title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f57c00;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.glob-input-section input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ffcc80;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: 'Monaco', 'Consolas', monospace;
+    box-sizing: border-box;
+}
+
+.glob-input-section input:focus {
+    outline: none;
+    border-color: #f57c00;
+    box-shadow: 0 0 0 2px rgba(245, 124, 0, 0.2);
+}
+
+.glob-input-section .hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+}
+
+.glob-input-section .hint code {
+    background: #fff3e0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+
+/* Selected Models Preview */
+.selected-preview {
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    font-size: 12px;
+    color: #666;
+}
+
+.selected-preview strong {
+    color: #333;
+}
+
+.selected-preview .tag {
+    display: inline-block;
+    background: #4285f4;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin: 2px;
+}
+
+.selected-preview .tag.glob {
+    background: #f57c00;
+}

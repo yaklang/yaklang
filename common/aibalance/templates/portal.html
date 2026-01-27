@@ -145,11 +145,33 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="allowedModelsSelect">允许的模型 (WrapperName):</label>
-                        <select id="allowedModelsSelect" class="form-control" multiple required>
-                            <!-- Model options will be populated by JavaScript -->
-                        </select>
-                        <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。必须至少选择一个。</small>
+                        <label>允许的模型 (WrapperName):</label>
+                        <div class="model-selection">
+                            <div class="model-selection-header">
+                                <span class="title">选择模型</span>
+                                <div class="actions">
+                                    <button type="button" class="btn-text" onclick="portalSelectAllModels()">全选</button>
+                                    <button type="button" class="btn-text" onclick="portalClearAllModels()">清除</button>
+                                </div>
+                            </div>
+                            <div class="model-list" id="portalModelList">
+                                <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                            </div>
+                            <div class="glob-input-section">
+                                <div class="title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="M21 21l-4.35-4.35"></path>
+                                    </svg>
+                                    Glob 模式 (高级)
+                                </div>
+                                <input type="text" id="portalGlobPatterns" placeholder="例如: memfit-*,qwen*,gpt-4*">
+                                <div class="hint">逗号分隔的 glob 模式。使用 <code>*</code> 作为通配符。</div>
+                            </div>
+                            <div class="selected-preview" id="portalSelectedPreview">
+                                <strong>已选择:</strong> <span>0</span> 个模型
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="action-bar" style="margin-top: 20px;">
@@ -522,15 +544,39 @@
 
     <!-- Edit Allowed Models Modal -->
     <div id="editAllowedModelsModal" class="delete-confirmation-modal" style="display: none;">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 600px;">
             <span class="close-modal" onclick="closeEditAllowedModelsModal()">&times;</span>
             <h4>编辑允许的模型</h4>
             <div class="form-group">
                 <label>API Key ID: <span id="editingApiKeyIdDisplay"></span></label>
                 <input type="hidden" id="editApiKeyId">
-                <label for="editAllowedModelsSelectModal" style="display:block; margin-top:10px;">允许的模型 (WrapperName):</label>
-                <select id="editAllowedModelsSelectModal" class="form-control" multiple style="min-height: 120px; margin: 5px 0;"></select>
-                <small class="form-text text-muted">按住 Ctrl/Command 键选择多个模型。</small>
+                
+                <div class="model-selection" style="margin-top: 15px;">
+                    <div class="model-selection-header">
+                        <span class="title">选择模型</span>
+                        <div class="actions">
+                            <button type="button" class="btn-text" onclick="editModalSelectAllModels()">全选</button>
+                            <button type="button" class="btn-text" onclick="editModalClearAllModels()">清除</button>
+                        </div>
+                    </div>
+                    <div class="model-list" id="editModalModelList">
+                        <div style="padding: 20px; text-align: center; color: #888;">Loading models...</div>
+                    </div>
+                    <div class="glob-input-section">
+                        <div class="title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="M21 21l-4.35-4.35"></path>
+                            </svg>
+                            Glob 模式 (高级)
+                        </div>
+                        <input type="text" id="editModalGlobPatterns" placeholder="例如: memfit-*,qwen*,gpt-4*">
+                        <div class="hint">逗号分隔的 glob 模式。使用 <code>*</code> 作为通配符。</div>
+                    </div>
+                    <div class="selected-preview" id="editModalSelectedPreview">
+                        <strong>已选择:</strong> <span>0</span> 个模型
+                    </div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-primary" onclick="saveAllowedModels()">保存</button>
