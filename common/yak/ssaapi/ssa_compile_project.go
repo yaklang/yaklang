@@ -184,6 +184,17 @@ func ParseProject(opts ...ssaconfig.Option) (prog Programs, err error) {
 func (c *Config) parseProject() (progs Programs, err error) {
 	// 添加defer清理逻辑，确保编译失败或panic时清理已保存的数据
 	programName := c.GetProgramName()
+	// 对于增量编译，需要删除最新的 layer，而不是第一个 layer
+	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
+	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
+	var programNameToDelete string
+	if isDiffCompile {
+		// 增量编译失败时，删除最新的 layer（diff program）
+		programNameToDelete = c.GetLatestProgramName()
+	} else {
+		// 非增量编译或第一次增量编译，删除当前 program
+		programNameToDelete = programName
+	}
 	defer func() {
 		// 无论成功还是失败，都要清理临时资源（如 Git 克隆的临时目录）
 		c.Cleanup()
@@ -193,15 +204,15 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			log.Errorf("compile panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			// panic时清理已保存的Program数据
-			if programName != "" {
-				log.Infof("cleaning up program data due to panic: %s", programName)
-				ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			if programNameToDelete != "" {
+				log.Infof("cleaning up program data due to panic: %s", programNameToDelete)
+				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
 		} else if err != nil {
 			// 编译出错时清理已保存的Program数据
-			if programName != "" {
-				log.Infof("cleaning up program data due to error: %s", programName)
-				ssadb.DeleteProgram(ssadb.GetDB(), programName)
+			if programNameToDelete != "" {
+				log.Infof("cleaning up program data due to error: %s", programNameToDelete)
+				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
 		}
 	}()
@@ -212,7 +223,6 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// 如果 baseProgramName 为空，表示这是第一次增量编译（base program，全量编译但设置 IsOverlay = true）
 
 	if c.GetCompileReCompile() {
-		isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
 		if !isIncrementalCompile {
 			c.Processf(0, "recompile project, delete old data...")
 			ssadb.DeleteProgramIrCode(ssadb.GetDB(), programName)
@@ -222,9 +232,6 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
 	}
-
-	isIncrementalCompile := c.GetEnableIncrementalCompile() && c.fs != nil
-	isDiffCompile := isIncrementalCompile && c.GetBaseProgramName() != ""
 
 	c.Processf(0, "recompile project, start compile")
 
