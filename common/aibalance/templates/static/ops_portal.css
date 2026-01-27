@@ -267,6 +267,44 @@ body {
     color: #666;
 }
 
+/* Traffic Input Group */
+.traffic-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.traffic-input-group input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.traffic-input-group select {
+    width: 100px;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+}
+
+.traffic-input-group input:focus,
+.traffic-input-group select:focus {
+    outline: none;
+    border-color: #e94560;
+    box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.1);
+}
+
+.calculated-bytes {
+    font-weight: 500;
+    color: #28a745 !important;
+    margin-top: 5px !important;
+}
+
 /* ==================== Model Selection ==================== */
 
 .model-selection {

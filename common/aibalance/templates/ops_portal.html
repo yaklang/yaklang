@@ -97,8 +97,17 @@
                             </div>
                             
                             <div id="traffic-limit-group" style="display: none;">
-                                <input type="number" id="traffic-limit" placeholder="Enter traffic limit in bytes" min="1">
-                                <p class="form-hint">Examples: 52428800 (50 MB), 104857600 (100 MB), 1073741824 (1 GB)</p>
+                                <div class="traffic-input-group">
+                                    <input type="number" id="traffic-limit-value" placeholder="50" min="1" value="50">
+                                    <select id="traffic-limit-unit">
+                                        <option value="1048576" selected>MB</option>
+                                        <option value="1073741824">GB</option>
+                                        <option value="1024">KB</option>
+                                        <option value="1">Bytes</option>
+                                    </select>
+                                </div>
+                                <p class="form-hint">Enter a number and select unit. Example: 50 MB = 52428800 bytes</p>
+                                <p class="form-hint calculated-bytes" id="calculated-bytes">Calculated: 52428800 bytes (50 MB)</p>
                             </div>
                         </div>
                         
@@ -156,58 +165,127 @@
                     <h3 style="margin-bottom: 20px;">API Usage Guide</h3>
                     
                     <div class="api-section">
-                        <h4>1. Create API Key via HTTP API</h4>
-                        <p>You can programmatically create API keys using your OPS Key:</p>
+                        <h4>1. Create API Key with Traffic Limit</h4>
+                        <p>Create an API key with a specific traffic limit (e.g., 50 MB = 52428800 bytes):</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>cURL Example</span>
-                                <button class="btn btn-sm" onclick="copyCurlExample()">Copy</button>
+                                <span>cURL - Create Key with 50MB Limit</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-limited')">Copy</button>
                             </div>
-                            <pre id="curl-example">curl -X POST '<span id="api-endpoint">http://localhost:8223</span>/ops/api/create-api-key' \
+                            <pre id="curl-create-limited">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
   -H 'Content-Type: application/json' \
-  -H 'X-Ops-Key: <span id="curl-ops-key">YOUR_OPS_KEY</span>' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
   -d '{
     "allowed_models": ["gpt-4", "gpt-3.5-turbo"],
     "traffic_limit": 52428800
   }'</pre>
                         </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>2. Create API Key with Unlimited Traffic</h4>
+                        <p>Create an API key without traffic restrictions:</p>
                         
-                        <div class="api-params">
-                            <h5>Request Parameters:</h5>
-                            <table class="params-table">
-                                <tr>
-                                    <td><code>allowed_models</code></td>
-                                    <td>Array of model names this key can access (required)</td>
-                                </tr>
-                                <tr>
-                                    <td><code>traffic_limit</code></td>
-                                    <td>Traffic limit in bytes (optional, uses default if not specified)</td>
-                                </tr>
-                            </table>
-                        </div>
-                        
-                        <div class="api-response">
-                            <h5>Response:</h5>
-                            <pre class="response-example">{
-  "success": true,
-  "api_key": "sk-xxxxxxxxxxxxxxxxxxxxxxxx",
-  "message": "API key created successfully"
-}</pre>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL - Create Unlimited Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-unlimited')">Copy</button>
+                            </div>
+                            <pre id="curl-create-unlimited">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  -d '{
+    "allowed_models": ["gpt-4", "gpt-3.5-turbo", "claude-*"],
+    "unlimited": true
+  }'</pre>
                         </div>
                     </div>
                     
                     <div class="api-section">
-                        <h4>2. Use the Created API Key</h4>
+                        <h4>3. Create API Key with Glob Patterns</h4>
+                        <p>Use glob patterns to match multiple models (e.g., <code>gpt-*</code> matches all GPT models):</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL - Create Key with Glob Patterns</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-create-glob')">Copy</button>
+                            </div>
+                            <pre id="curl-create-glob">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/create-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  -d '{
+    "allowed_models": ["gpt-*", "claude-*", "memfit-*"],
+    "traffic_limit": 104857600
+  }'</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>4. List My API Keys</h4>
+                        <p>Get all API keys created by your OPS account:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL - List Keys</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-list-keys')">Copy</button>
+                            </div>
+                            <pre id="curl-list-keys">curl -X GET '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/my-keys' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>'</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>5. Update API Key Settings</h4>
+                        <p>Update allowed models or traffic settings for an existing API key:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL - Update Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-update-key')">Copy</button>
+                            </div>
+                            <pre id="curl-update-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/update-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  -d '{
+    "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "allowed_models": ["gpt-4", "claude-*"],
+    "traffic_limit": 209715200,
+    "unlimited": false
+  }'</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>6. Delete API Key</h4>
+                        <p>Delete an API key you created:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>cURL - Delete Key</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-delete-key')">Copy</button>
+                            </div>
+                            <pre id="curl-delete-key">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/ops/api/delete-api-key' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Ops-Key: <span class="ops-key-dynamic">YOUR_OPS_KEY</span>' \
+  -d '{
+    "api_key": "mf-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  }'</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>7. Use the Created API Key</h4>
                         <p>Use the generated API key with OpenAI-compatible endpoints:</p>
                         
                         <div class="code-block">
                             <div class="code-header">
-                                <span>Chat Completion Example</span>
+                                <span>cURL - Chat Completion</span>
+                                <button class="btn btn-sm" onclick="copyCurlExample('curl-chat')">Copy</button>
                             </div>
-                            <pre>curl '<span class="api-endpoint-placeholder">http://localhost:8223</span>/v1/chat/completions' \
+                            <pre id="curl-chat">curl -X POST '<span class="api-endpoint-dynamic">http://localhost:8223</span>/v1/chat/completions' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Authorization: Bearer YOUR_GENERATED_API_KEY' \
   -d '{
     "model": "gpt-4",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -216,11 +294,29 @@
                     </div>
                     
                     <div class="api-section">
-                        <h4>3. Authentication Headers</h4>
+                        <h4>Request Parameters Reference</h4>
+                        <table class="params-table">
+                            <tr>
+                                <td><code>allowed_models</code></td>
+                                <td>Array of model names or glob patterns (required). Examples: <code>["gpt-4"]</code>, <code>["gpt-*", "claude-*"]</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>traffic_limit</code></td>
+                                <td>Traffic limit in bytes (optional). Examples: 52428800 (50MB), 104857600 (100MB), 1073741824 (1GB)</td>
+                            </tr>
+                            <tr>
+                                <td><code>unlimited</code></td>
+                                <td>Set to <code>true</code> for unlimited traffic (optional, default: false)</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="api-section">
+                        <h4>Authentication Headers</h4>
                         <table class="params-table">
                             <tr>
                                 <td><code>X-Ops-Key</code></td>
-                                <td>Your OPS Key for management API calls (create/delete keys)</td>
+                                <td>Your OPS Key for management API calls (create/update/delete keys)</td>
                             </tr>
                             <tr>
                                 <td><code>Authorization: Bearer</code></td>
@@ -362,7 +458,16 @@
                     </div>
                     
                     <div id="edit-traffic-limit-group" style="display: none; margin-top: 10px;">
-                        <input type="number" id="edit-traffic-limit" placeholder="Enter traffic limit in bytes" min="1">
+                        <div class="traffic-input-group">
+                            <input type="number" id="edit-traffic-limit-value" placeholder="50" min="1" value="50">
+                            <select id="edit-traffic-limit-unit">
+                                <option value="1048576" selected>MB</option>
+                                <option value="1073741824">GB</option>
+                                <option value="1024">KB</option>
+                                <option value="1">Bytes</option>
+                            </select>
+                        </div>
+                        <p class="form-hint calculated-bytes" id="edit-calculated-bytes">Calculated: 52428800 bytes (50 MB)</p>
                         <p class="form-hint">Current usage: <span id="edit-traffic-used">0 B</span></p>
                     </div>
                 </div>

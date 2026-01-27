@@ -328,10 +328,14 @@ func (m *AuthMiddleware) IsPublicPath(path string) bool {
 // ==================== Default Configuration ====================
 
 // DefaultAuthConfig returns the default authentication configuration
+// Uses wildcard patterns for simplified permission management:
+// - /portal/** -> Admin only (except public paths)
+// - /ops/** -> OPS users (except public paths)
 func DefaultAuthConfig() *AuthConfig {
 	config := NewAuthConfig()
 
 	// ========== Public Paths (No Authentication Required) ==========
+	// These are checked BEFORE route permissions
 	config.PublicPaths = []string{
 		"/portal/login",
 		"/portal/static/*",
@@ -339,94 +343,28 @@ func DefaultAuthConfig() *AuthConfig {
 		"/ops/static/*",
 	}
 
-	// ========== Admin Only Routes ==========
-	adminOnlyRoutes := []RoutePermission{
-		// Provider management
-		{Path: "/portal/add-providers", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Add providers"},
-		{Path: "/portal/add-ai-provider", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Add provider page"},
-		{Path: "/portal/validate-provider", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Validate provider"},
-		{Path: "/portal/delete-provider/*", Method: "DELETE", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Delete provider"},
-		{Path: "/portal/delete-providers", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Delete multiple providers"},
-		{Path: "/portal/api/providers", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Get providers API"},
-		{Path: "/portal/autocomplete", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Autocomplete data"},
+	// ========== Route Permissions ==========
+	// NOTE: Routes are matched in order, first match wins!
+	// Specific routes should be defined before wildcard routes.
 
-		// Health check
-		{Path: "/portal/api/health-check", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Health check API"},
-		{Path: "/portal/check-all-health", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Check all health"},
-		{Path: "/portal/check-health/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Check single health"},
+	routes := []RoutePermission{
+		// ========== Special Routes (Multi-Role or Specific Handling) ==========
+		// OPS change password (both OPS and Admin can access)
+		{Path: "/ops/change-password", Method: "POST", AllowedRoles: []UserRole{RoleOps, RoleAdmin}, RequireAuth: true, Description: "Change password (OPS/Admin)"},
 
-		// API Key management (admin has full control)
-		{Path: "/portal/api-keys", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "API keys page"},
-		{Path: "/portal/create-api-key", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Create API key"},
-		{Path: "/portal/generate-api-key", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Generate API key"},
-		{Path: "/portal/api/api-keys", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "API keys list"},
-		{Path: "/portal/activate-api-key/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Activate API key"},
-		{Path: "/portal/deactivate-api-key/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Deactivate API key"},
-		{Path: "/portal/batch-activate-api-keys", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Batch activate API keys"},
-		{Path: "/portal/batch-deactivate-api-keys", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Batch deactivate API keys"},
-		{Path: "/portal/update-api-key-allowed-models/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Update API key allowed models"},
-		{Path: "/portal/delete-api-key/*", Method: "DELETE", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Delete API key"},
-		{Path: "/portal/delete-api-keys", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Batch delete API keys"},
-		{Path: "/portal/api-key-traffic-limit/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Set API key traffic limit"},
-		{Path: "/portal/reset-api-key-traffic/*", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Reset API key traffic"},
+		// ========== Portal Wildcard (Admin Only) ==========
+		// All /portal/** routes require Admin role
+		{Path: "/portal/*", Method: "*", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Admin Portal (all routes)"},
+		{Path: "/portal", Method: "*", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Admin Portal home"},
 
-		// Model metadata
-		{Path: "/portal/update-model-meta", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Update model metadata"},
-
-		// TOTP settings
-		{Path: "/portal/totp-settings", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "TOTP settings page"},
-		{Path: "/portal/refresh-totp", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Refresh TOTP"},
-		{Path: "/portal/get-totp-code", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Get TOTP code"},
-
-		// Portal data
-		{Path: "/portal/api/data", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Portal data API"},
-		{Path: "/portal/api/models", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Available models API"},
-
-		// System monitoring
-		{Path: "/portal/api/memory-stats", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Memory stats API"},
-		{Path: "/portal/api/force-gc", Method: "POST", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Force GC API"},
-		{Path: "/portal/api/goroutine-dump", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Goroutine dump API"},
-
-		// Portal home
-		{Path: "/portal", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Portal home"},
-		{Path: "/portal/", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Portal home"},
-
-		// OPS user management (admin only)
-		{Path: "/portal/ops-users", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "OPS users page"},
-		{Path: "/portal/api/ops-users", Method: "*", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "OPS users CRUD API"},
-		{Path: "/portal/api/ops-logs", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "OPS logs API"},
-		{Path: "/portal/api/ops-stats", Method: "GET", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "OPS stats API"},
-
-		// Logout (admin)
-		{Path: "/portal/logout", Method: "*", AllowedRoles: []UserRole{RoleAdmin}, RequireAuth: true, Description: "Admin logout"},
-	}
-
-	// ========== OPS Routes ==========
-	opsRoutes := []RoutePermission{
-		// OPS dashboard and info
-		{Path: "/ops/dashboard", Method: "GET", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS dashboard"},
-		{Path: "/ops/", Method: "GET", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS home"},
-		{Path: "/ops/my-info", Method: "GET", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS user info"},
-
-		// OPS API key management (with traffic limit enforced)
-		{Path: "/ops/create-api-key", Method: "POST", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS create API key"},
-		{Path: "/ops/api/create-api-key", Method: "POST", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS create API key API"},
-		{Path: "/ops/api/my-keys", Method: "GET", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS get my API keys"},
-		{Path: "/ops/api/delete-api-key", Method: "POST", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS delete API key"},
-
-		// OPS self-service
-		{Path: "/ops/change-password", Method: "POST", AllowedRoles: []UserRole{RoleOps, RoleAdmin}, RequireAuth: true, Description: "Change password"},
-		{Path: "/ops/reset-key", Method: "POST", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "Reset OPS key"},
-
-		// OPS logout
-		{Path: "/ops/logout", Method: "*", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS logout"},
+		// ========== OPS Wildcard (OPS Users) ==========
+		// All /ops/** routes require OPS role
+		{Path: "/ops/*", Method: "*", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS Portal (all routes)"},
+		{Path: "/ops", Method: "*", AllowedRoles: []UserRole{RoleOps}, RequireAuth: true, Description: "OPS Portal home"},
 	}
 
 	// Add all routes
-	for _, route := range adminOnlyRoutes {
-		config.AddRoute(route)
-	}
-	for _, route := range opsRoutes {
+	for _, route := range routes {
 		config.AddRoute(route)
 	}
 

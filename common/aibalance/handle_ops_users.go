@@ -17,6 +17,25 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// ==================== SQL Security Helpers ====================
+
+// escapeLikePattern escapes special characters in LIKE patterns to prevent SQL injection
+// This function escapes %, _, and \ characters which have special meaning in SQL LIKE clauses
+func escapeLikePattern(input string) string {
+	// Escape backslash first, then other special characters
+	result := strings.ReplaceAll(input, "\\", "\\\\")
+	result = strings.ReplaceAll(result, "%", "\\%")
+	result = strings.ReplaceAll(result, "_", "\\_")
+	return result
+}
+
+// safeLikePattern creates a safe LIKE pattern with wildcards
+// It escapes the input and wraps it with % wildcards for partial matching
+func safeLikePattern(input string) string {
+	escaped := escapeLikePattern(input)
+	return "%" + escaped + "%"
+}
+
 // ==================== OPS User Database Operations ====================
 
 // SaveOpsUser saves an OpsUser to the database
@@ -1334,10 +1353,11 @@ func (c *ServerConfig) handleGetOpsLogs(conn net.Conn, request *http.Request) {
 		return
 	}
 
-	// Build query
+	// Build query with safe LIKE pattern to prevent SQL injection
 	dbQuery := db.Model(&schema.OpsActionLog{})
 	if operatorName != "" {
-		dbQuery = dbQuery.Where("operator_name LIKE ?", "%"+operatorName+"%")
+		// Use safeLikePattern to escape special characters in LIKE queries
+		dbQuery = dbQuery.Where("operator_name LIKE ?", safeLikePattern(operatorName))
 	}
 	if action != "" {
 		dbQuery = dbQuery.Where("action = ?", action)
