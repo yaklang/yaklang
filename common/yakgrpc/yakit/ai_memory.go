@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"context"
+	"sort"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -86,4 +88,39 @@ func DeleteAIMemoryEntity(db *gorm.DB, filter *ypb.AIMemoryEntityFilter) (int64,
 	} else {
 		return db.RowsAffected, nil
 	}
+}
+
+func CountAIMemoryEntityTags(ctx context.Context, db *gorm.DB, sessionID string) ([]*ypb.TagsCode, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil, utils.Errorf("session_id is required")
+	}
+
+	db = db.Where("session_id = ?", sessionID)
+	var memoryTagsMap = make(map[string]int)
+
+	for i := range bizhelper.YieldModel[*schema.AIMemoryEntity](ctx, db) {
+		for _, tag := range i.Tags {
+			if _, ok := memoryTagsMap[tag]; ok {
+				memoryTagsMap[tag] = memoryTagsMap[tag] + 1
+			} else {
+				memoryTagsMap[tag] = 1
+			}
+
+		}
+	}
+
+	ret := make([]*ypb.TagsCode, 0, len(memoryTagsMap))
+	for tag, count := range memoryTagsMap {
+		ret = append(ret, &ypb.TagsCode{Value: tag, Total: int32(count)})
+	}
+
+	sort.Slice(ret, func(i, j int) bool {
+		if ret[i].Total == ret[j].Total {
+			return ret[i].Value < ret[j].Value
+		}
+		return ret[i].Total > ret[j].Total
+	})
+
+	return ret, nil
 }
