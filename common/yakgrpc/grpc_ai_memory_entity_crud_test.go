@@ -107,3 +107,42 @@ func TestAIMemoryEntity_CRUD_DBOnly(t *testing.T) {
 	})
 	require.Error(t, err)
 }
+
+func TestAIMemoryEntity_CountTags_DBOnly(t *testing.T) {
+	client, srv, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	db := srv.GetProjectDatabase()
+	sessionID := "test-session"
+
+	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+		MemoryID:  "m1",
+		SessionID: sessionID,
+		Content:   "hello yaklang",
+		Tags:      schema.StringArray{"yaklang", "grpc"},
+	}).Error)
+	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+		MemoryID:  "m2",
+		SessionID: sessionID,
+		Content:   "another memory",
+		Tags:      schema.StringArray{"grpc"},
+	}).Error)
+	require.NoError(t, db.Create(&schema.AIMemoryEntity{
+		MemoryID:  "m3",
+		SessionID: sessionID,
+		Content:   "dup tags",
+		Tags:      schema.StringArray{"grpc", "tag2"},
+	}).Error)
+
+	resp, err := client.CountAIMemoryEntityTags(ctx, &ypb.CountAIMemoryEntityTagsRequest{
+		SessionID: sessionID,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []*ypb.TagsCode{
+		{Value: "grpc", Total: 3},
+		{Value: "tag2", Total: 1},
+		{Value: "yaklang", Total: 1},
+	}, resp.GetTagsCount())
+}
