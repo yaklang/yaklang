@@ -168,6 +168,25 @@ func (s *Server) QueryAIMemoryEntity(ctx context.Context, req *ypb.QueryAIMemory
 	}, nil
 }
 
+func (s *Server) CountAIMemoryEntityTags(ctx context.Context, req *ypb.CountAIMemoryEntityTagsRequest) (*ypb.CountAIMemoryEntityTagsResponse, error) {
+	db := s.GetProjectDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database not initialized")
+	}
+	if req == nil {
+		return nil, utils.Errorf("request is nil")
+	}
+
+	tagsCount, err := yakit.CountAIMemoryEntityTags(ctx, db, req.GetSessionID())
+	if err != nil {
+		return nil, err
+	}
+
+	return &ypb.CountAIMemoryEntityTagsResponse{
+		TagsCount: tagsCount,
+	}, nil
+}
+
 func queryAIMemoryBySemantic(db *gorm.DB, paging *ypb.Paging, filter *ypb.AIMemoryEntityFilter) (*ypb.QueryAIMemoryEntityResponse, error) {
 	sessionID := strings.TrimSpace(filter.GetSessionID())
 	if sessionID == "" {
