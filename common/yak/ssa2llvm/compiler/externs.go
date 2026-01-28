@@ -5,7 +5,9 @@ import (
 )
 
 var externs = map[string]string{
-	"println": "yak_internal_print_int",
+	"println":   "yak_internal_print_int",
+	"getObject": "yak_runtime_get_object",
+	"dump":      "yak_runtime_dump_handle",
 }
 
 func getExternFunction(name string) string {
@@ -25,6 +27,16 @@ func (c *Compiler) ensureExternDeclaration(name string) llvm.Value {
 	// Create declaration
 	// Currently hardcoded for println(int64) -> void
 	if name == "println" {
+		params := []llvm.Type{c.LLVMCtx.Int64Type()}
+		retType := c.LLVMCtx.VoidType()
+		fnType := llvm.FunctionType(retType, params, false)
+		fn = llvm.AddFunction(c.Mod, externName, fnType)
+	} else if name == "getObject" {
+		params := []llvm.Type{c.LLVMCtx.Int64Type()}
+		retType := c.LLVMCtx.Int64Type()
+		fnType := llvm.FunctionType(retType, params, false)
+		fn = llvm.AddFunction(c.Mod, externName, fnType)
+	} else if name == "dump" {
 		params := []llvm.Type{c.LLVMCtx.Int64Type()}
 		retType := c.LLVMCtx.VoidType()
 		fnType := llvm.FunctionType(retType, params, false)

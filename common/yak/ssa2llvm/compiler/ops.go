@@ -139,6 +139,9 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	}
 
 	c.Values[resultID] = val
+	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -155,6 +158,9 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		val := inst.Number()
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(val), true) // Signed
 		c.Values[id] = llvmVal
+		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+			return err
+		}
 		return nil
 	} else if inst.IsBoolean() {
 		// Represent bool as i64 0 or 1 for compatibility with mixed ops,
@@ -169,6 +175,9 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		}
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.Values[id] = llvmVal
+		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -178,6 +187,9 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	fmt.Printf("WARNING: Unsupported constant type for %v (ID: %d)\n", inst.GetRawValue(), id)
 	llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 	c.Values[id] = llvmVal
+	if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+		return err
+	}
 	return nil
 }
 

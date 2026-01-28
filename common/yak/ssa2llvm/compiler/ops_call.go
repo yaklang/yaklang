@@ -50,9 +50,9 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	// 3. Prepare arguments
 	args := make([]llvm.Value, 0, len(inst.Args))
 	for _, argID := range inst.Args {
-		argVal, ok := c.Values[argID]
-		if !ok {
-			return fmt.Errorf("compileCall: argument %d not found in Values map", argID)
+		argVal, err := c.getValue(inst, argID)
+		if err != nil {
+			return fmt.Errorf("compileCall: failed to resolve argument %d: %w", argID, err)
 		}
 		args = append(args, argVal)
 	}
@@ -65,6 +65,9 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	// 5. Register result if the call has users (returns a value)
 	if inst.GetId() > 0 {
 		c.Values[inst.GetId()] = callResult
+		if err := c.maybeEmitMemberSet(inst, inst, callResult); err != nil {
+			return err
+		}
 	}
 
 	return nil
