@@ -712,6 +712,257 @@ func TestTrafficLimitEnforcementIntegration(t *testing.T) {
 
 // ==================== Error Response Tests ====================
 
+// ==================== API Keys Pagination Security Tests ====================
+
+// TestAPIKeysPaginationEndpoint tests the API keys pagination endpoint
+func TestAPIKeysPaginationEndpoint(t *testing.T) {
+	db := GetDB()
+	if db == nil {
+		t.Skip("Database not available")
+	}
+
+	// Create test API keys
+	testKeys := []string{
+		fmt.Sprintf("test-pagination-key-1-%d", time.Now().UnixNano()),
+		fmt.Sprintf("test-pagination-key-2-%d", time.Now().UnixNano()),
+		fmt.Sprintf("test-pagination-key-3-%d", time.Now().UnixNano()),
+	}
+
+	for _, key := range testKeys {
+		err := SaveAiApiKey(key, "test-model")
+		require.NoError(t, err)
+	}
+	defer func() {
+		for _, key := range testKeys {
+			DeleteAiApiKey(key)
+		}
+	}()
+
+	t.Run("Pagination returns correct page size", func(t *testing.T) {
+		keys, total, err := GetAiApiKeysPaginated(1, 2, "created_at", "desc")
+		require.NoError(t, err)
+
+		assert.LessOrEqual(t, len(keys), 2, "Should return at most 2 keys per page")
+		assert.GreaterOrEqual(t, total, int64(3), "Total should be at least 3")
+	})
+
+	t.Run("Pagination returns correct page", func(t *testing.T) {
+		// Get all keys first
+		allKeys, total, err := GetAiApiKeysPaginated(1, 100, "created_at", "desc")
+		require.NoError(t, err)
+
+		if total <= 2 {
+			t.Skip("Not enough keys for pagination test")
+		}
+
+		// Get page 1 with size 2
+		page1Keys, _, err := GetAiApiKeysPaginated(1, 2, "created_at", "desc")
+		require.NoError(t, err)
+
+		// Get page 2 with size 2
+		page2Keys, _, err := GetAiApiKeysPaginated(2, 2, "created_at", "desc")
+		require.NoError(t, err)
+
+		// Page 1 and page 2 should have different keys
+		if len(page1Keys) > 0 && len(page2Keys) > 0 {
+			assert.NotEqual(t, page1Keys[0].ID, page2Keys[0].ID,
+				"Page 1 and page 2 should have different keys")
+		}
+
+		// All paginated keys should exist in allKeys
+		for _, pk := range page1Keys {
+			found := false
+			for _, ak := range allKeys {
+				if ak.ID == pk.ID {
+					found = true
+					break
+				}
+			}
+			assert.True(t, found, "Paginated key should exist in all keys")
+		}
+	})
+
+	t.Run("Pagination with invalid page returns empty", func(t *testing.T) {
+		keys, _, err := GetAiApiKeysPaginated(9999, 10, "created_at", "desc")
+		require.NoError(t, err)
+
+		assert.Empty(t, keys, "Invalid page should return empty results")
+	})
+
+	t.Run("Pagination returns creator info", func(t *testing.T) {
+		keys, _, err := GetAiApiKeysPaginated(1, 10, "created_at", "desc")
+		require.NoError(t, err)
+
+		// Each key should have creator info fields (even if empty)
+		for _, key := range keys {
+			// CreatedByOpsID and CreatedByOpsName are optional fields
+			// They should be accessible (not cause panic)
+			_ = key.CreatedByOpsID
+			_ = key.CreatedByOpsName
+		}
+	})
+}
+
+// TestAPIKeysPaginationSorting tests sorting functionality
+func TestAPIKeysPaginationSorting(t *testing.T) {
+	db := GetDB()
+	if db == nil {
+		t.Skip("Database not available")
+	}
+
+	t.Run("Sort by created_at descending", func(t *testing.T) {
+		keys, _, err := GetAiApiKeysPaginated(1, 10, "created_at", "desc")
+		require.NoError(t, err)
+
+		if len(keys) >= 2 {
+			// First key should be newer or same as second
+			assert.True(t, keys[0].CreatedAt.After(keys[1].CreatedAt) || keys[0].CreatedAt.Equal(keys[1].CreatedAt),
+				"Keys should be sorted by created_at descending")
+		}
+	})
+
+	t.Run("Sort by created_at ascending", func(t *testing.T) {
+		keys, _, err := GetAiApiKeysPaginated(1, 10, "created_at", "asc")
+		require.NoError(t, err)
+
+		if len(keys) >= 2 {
+			// First key should be older or same as second
+			assert.True(t, keys[0].CreatedAt.Before(keys[1].CreatedAt) || keys[0].CreatedAt.Equal(keys[1].CreatedAt),
+				"Keys should be sorted by created_at ascending")
+		}
+	})
+}
+
+// TestAPIKeysPaginationSecurity tests security aspects of pagination
+func TestAPIKeysPaginationSecurity(t *testing.T) {
+	t.Run("API key value is not truncated in database", func(t *testing.T) {
+		db := GetDB()
+		if db == nil {
+			t.Skip("Database not available")
+		}
+
+		testKey := fmt.Sprintf("test-full-key-%d", time.Now().UnixNano())
+		err := SaveAiApiKey(testKey, "test-model")
+		require.NoError(t, err)
+		defer DeleteAiApiKey(testKey)
+
+		// Get the key from paginated API
+		keys, _, err := GetAiApiKeysPaginated(1, 100, "created_at", "desc")
+		require.NoError(t, err)
+
+		// Find our test key
+		var found *schema.AiApiKeys
+		for _, k := range keys {
+			if k.APIKey == testKey {
+				found = k
+				break
+			}
+		}
+		require.NotNil(t, found, "Should find the test key")
+
+		// Full key should be stored (display truncation is done in handler)
+		assert.Equal(t, testKey, found.APIKey, "Full API key should be stored in database")
+	})
+
+	t.Run("Traffic limit info is included", func(t *testing.T) {
+		db := GetDB()
+		if db == nil {
+			t.Skip("Database not available")
+		}
+
+		testKey := fmt.Sprintf("test-traffic-key-%d", time.Now().UnixNano())
+		err := SaveAiApiKey(testKey, "test-model")
+		require.NoError(t, err)
+		defer DeleteAiApiKey(testKey)
+
+		// Set traffic limit
+		key, err := GetAiApiKey(testKey)
+		require.NoError(t, err)
+		err = UpdateAiApiKeyTrafficLimit(key.ID, 10000, true)
+		require.NoError(t, err)
+
+		// Get via pagination
+		keys, _, err := GetAiApiKeysPaginated(1, 100, "created_at", "desc")
+		require.NoError(t, err)
+
+		var found *schema.AiApiKeys
+		for _, k := range keys {
+			if k.APIKey == testKey {
+				found = k
+				break
+			}
+		}
+		require.NotNil(t, found)
+
+		assert.True(t, found.TrafficLimitEnable, "Traffic limit should be enabled")
+		assert.Equal(t, int64(10000), found.TrafficLimit, "Traffic limit value should match")
+	})
+}
+
+// TestAPIKeyCreatorTracking tests that creator info is properly tracked
+func TestAPIKeyCreatorTracking(t *testing.T) {
+	db := GetDB()
+	if db == nil {
+		t.Skip("Database not available")
+	}
+
+	t.Run("API key without creator has empty creator fields", func(t *testing.T) {
+		testKey := fmt.Sprintf("test-no-creator-%d", time.Now().UnixNano())
+		err := SaveAiApiKey(testKey, "test-model")
+		require.NoError(t, err)
+		defer DeleteAiApiKey(testKey)
+
+		key, err := GetAiApiKey(testKey)
+		require.NoError(t, err)
+
+		// Creator fields should be zero/empty for keys created without OPS user
+		assert.Equal(t, uint(0), key.CreatedByOpsID, "CreatedByOpsID should be 0")
+		assert.Empty(t, key.CreatedByOpsName, "CreatedByOpsName should be empty")
+	})
+
+	t.Run("API key with creator has creator info", func(t *testing.T) {
+		// Create a test OPS user first
+		testOpsKey := fmt.Sprintf("ops-creator-test-%d", time.Now().UnixNano())
+		testUser := &schema.OpsUser{
+			Username:     "api_creator_test",
+			Password:     "hashed_password",
+			OpsKey:       testOpsKey,
+			Role:         "ops",
+			Active:       true,
+			DefaultLimit: 52428800,
+		}
+		err := SaveOpsUser(testUser)
+		require.NoError(t, err)
+		defer func() {
+			db.Exec("DELETE FROM ops_users WHERE username = 'api_creator_test'")
+		}()
+
+		// Get the user to get ID
+		user, err := GetOpsUserByUsername("api_creator_test")
+		require.NoError(t, err)
+
+		// Create API key with creator info
+		testAPIKey := fmt.Sprintf("test-with-creator-%d", time.Now().UnixNano())
+		apiKey := &schema.AiApiKeys{
+			APIKey:           testAPIKey,
+			AllowedModels:    "test-model",
+			Active:           true,
+			CreatedByOpsID:   user.ID,
+			CreatedByOpsName: user.Username,
+		}
+		err = db.Create(apiKey).Error
+		require.NoError(t, err)
+		defer DeleteAiApiKey(testAPIKey)
+
+		// Get the key and verify creator info
+		key, err := GetAiApiKey(testAPIKey)
+		require.NoError(t, err)
+
+		assert.Equal(t, user.ID, key.CreatedByOpsID, "CreatedByOpsID should match")
+		assert.Equal(t, user.Username, key.CreatedByOpsName, "CreatedByOpsName should match")
+	})
+}
+
 // TestErrorResponseFormat tests that error responses follow expected format
 func TestErrorResponseFormat(t *testing.T) {
 	cfg := NewServerConfig()

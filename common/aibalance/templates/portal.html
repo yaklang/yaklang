@@ -214,6 +214,7 @@
                                     <th class="column-name">成功/失败</th>
                                     <th class="column-name">流量(输入/输出)</th>
                                     <th class="column-name">流量限制</th>
+                                    <th class="column-name">创建者</th>
                                     <th class="column-name">最后使用</th>
                                     <th class="column-name">操作</th>
                                 </tr>
@@ -328,22 +329,24 @@
                     管理运营用户账户。运营用户可以创建带有流量限制的 API Key。
                 </p>
                 
-                <div class="action-bar" style="margin-bottom: 20px;">
-                    <div>
+                <div class="action-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
                         <button class="btn btn-primary" onclick="showCreateOpsUserModal()">
                             <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
                                 <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                             </svg>
                             创建运营用户
                         </button>
-                    </div>
-                    <div>
                         <button class="btn" onclick="refreshOpsUsers()">
                             <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
                                 <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
                             </svg>
                             刷新
                         </button>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="ops-users-search-input" placeholder="搜索用户名..." style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; width: 200px;" onkeypress="if(event.key==='Enter')searchOpsUsers()">
+                        <button class="btn" onclick="searchOpsUsers()">搜索</button>
                     </div>
                 </div>
                 
@@ -377,15 +380,19 @@
                 </p>
                 
                 <div class="action-bar" style="margin-bottom: 20px;">
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="text" id="ops-log-filter-operator" placeholder="搜索操作者..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="ops-log-filter-operator" placeholder="搜索操作者..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;" onkeypress="if(event.key==='Enter')filterOpsLogs()">
                         <select id="ops-log-filter-action" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
                             <option value="">全部操作</option>
                             <option value="create_api_key">创建 API Key</option>
+                            <option value="delete_api_key">删除 API Key</option>
+                            <option value="update_api_key">更新 API Key</option>
+                            <option value="reset_api_key_traffic">重置流量</option>
                             <option value="reset_ops_key">重置 OPS Key</option>
                             <option value="change_password">修改密码</option>
                         </select>
                         <button class="btn" onclick="filterOpsLogs()">筛选</button>
+                        <button class="btn" onclick="clearOpsLogsFilter()">清除</button>
                     </div>
                     <div>
                         <button class="btn" onclick="refreshOpsLogs()">

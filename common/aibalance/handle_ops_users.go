@@ -99,6 +99,49 @@ func GetAllOpsUsers() ([]*schema.OpsUser, error) {
 	return users, nil
 }
 
+// GetOpsUsersPaginated retrieves OpsUsers with pagination and optional username filter
+func GetOpsUsersPaginated(page, pageSize int, username string) ([]*schema.OpsUser, int64, error) {
+	db := GetDB()
+	if db == nil {
+		return nil, 0, fmt.Errorf("database not initialized")
+	}
+
+	// Validate parameters
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	// Build query
+	dbQuery := db.Model(&schema.OpsUser{})
+	if username != "" {
+		// Use LIKE for partial match with escaped special characters
+		dbQuery = dbQuery.Where("username LIKE ?", "%"+strings.ReplaceAll(strings.ReplaceAll(username, "%", "\\%"), "_", "\\_")+"%")
+	}
+
+	// Count total
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Calculate offset
+	offset := (page - 1) * pageSize
+
+	// Query with pagination
+	var users []*schema.OpsUser
+	if err := dbQuery.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
+
 // DeleteOpsUser deletes an OpsUser by ID
 func DeleteOpsUser(id uint) error {
 	db := GetDB()
@@ -137,7 +180,11 @@ func GenerateOpsKey() string {
 // ==================== HTTP Handlers ====================
 
 // handleListOpsUsers handles GET /portal/api/ops-users
-// Returns list of all OPS users (admin only)
+// Returns list of OPS users with pagination (admin only)
+// Query parameters:
+//   - page: page number (default: 1)
+//   - page_size: items per page (default: 20, max: 100)
+//   - username: filter by username (optional, partial match)
 func (c *ServerConfig) handleListOpsUsers(conn net.Conn, request *http.Request) {
 	c.logInfo("Handling list OPS users request")
 
@@ -150,7 +197,26 @@ func (c *ServerConfig) handleListOpsUsers(conn net.Conn, request *http.Request) 
 		return
 	}
 
-	users, err := GetAllOpsUsers()
+	// Parse query parameters
+	query := request.URL.Query()
+	pageStr := query.Get("page")
+	pageSizeStr := query.Get("page_size")
+	usernameFilter := query.Get("username")
+
+	page := 1
+	pageSize := 20
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if pageSizeStr != "" {
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
+			pageSize = ps
+		}
+	}
+
+	users, total, err := GetOpsUsersPaginated(page, pageSize, usernameFilter)
 	if err != nil {
 		c.logError("Failed to get OPS users: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
@@ -185,10 +251,18 @@ func (c *ServerConfig) handleListOpsUsers(conn net.Conn, request *http.Request) 
 		})
 	}
 
+	// Calculate total pages
+	totalPages := (total + int64(pageSize) - 1) / int64(pageSize)
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"users":   response,
-		"total":   len(response),
+		"pagination": map[string]interface{}{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": totalPages,
+		},
 	})
 }
 
@@ -956,7 +1030,10 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 }
 
 // handleOpsGetMyKeys handles GET /ops/api/my-keys
-// Returns all API keys created by the current OPS user
+// Returns API keys created by the current OPS user with pagination support
+// Query parameters:
+//   - page: page number (default: 1)
+//   - page_size: items per page (default: 20, max: 100)
 func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, authInfo *AuthInfo) {
 	c.logInfo("Handling OPS get my keys request")
 
@@ -976,9 +1053,40 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 		return
 	}
 
-	// Get all API keys created by this OPS user
+	// Parse pagination parameters
+	query := request.URL.Query()
+	pageStr := query.Get("page")
+	pageSizeStr := query.Get("page_size")
+
+	page := 1
+	pageSize := 20
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if pageSizeStr != "" {
+		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
+			pageSize = ps
+		}
+	}
+
+	// Count total API keys created by this OPS user
+	var total int64
+	if err := db.Model(&schema.AiApiKeys{}).Where("created_by_ops_id = ?", authInfo.UserID).Count(&total).Error; err != nil {
+		c.logError("Failed to count OPS user API keys: %v", err)
+		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to retrieve API keys",
+		})
+		return
+	}
+
+	// Calculate offset
+	offset := (page - 1) * pageSize
+
+	// Get API keys created by this OPS user with pagination
 	var apiKeys []schema.AiApiKeys
-	if err := db.Where("created_by_ops_id = ?", authInfo.UserID).Order("created_at DESC").Find(&apiKeys).Error; err != nil {
+	if err := db.Where("created_by_ops_id = ?", authInfo.UserID).Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&apiKeys).Error; err != nil {
 		c.logError("Failed to get OPS user API keys: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{
 			"error": "Failed to retrieve API keys",
@@ -1005,10 +1113,18 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 		})
 	}
 
+	// Calculate total pages
+	totalPages := (total + int64(pageSize) - 1) / int64(pageSize)
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"keys":    keys,
-		"total":   len(keys),
+		"pagination": map[string]interface{}{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": totalPages,
+		},
 	})
 }
 
