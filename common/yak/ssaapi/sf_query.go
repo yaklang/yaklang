@@ -453,6 +453,16 @@ func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOpti
 	return QuerySyntaxflow(opts...)
 }
 
+func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts,
+		QueryWithValue(p), QueryWithRule(rule),
+		QueryWithSFOption(
+			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
+		),
+	)
+	return QuerySyntaxflow(opts...)
+}
+
 func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	opts = append(opts,
 		QueryWithValue(p), QueryWithRuleContent(i),

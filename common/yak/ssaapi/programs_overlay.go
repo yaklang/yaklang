@@ -294,6 +294,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		return true
 	})
 
+	overlay.programName = layers[len(layers)-1].GetProgramName()
 	aggregatedFS, err := overlay.aggregateFileSystems()
 	if err != nil {
 		log.Errorf("failed to aggregate file systems: %v", err)
