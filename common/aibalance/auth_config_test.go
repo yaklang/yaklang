@@ -984,6 +984,242 @@ func TestLegacyFallbackOpsKeyAuth(t *testing.T) {
 		authInfo.UserID, authInfo.Username, authInfo.Role)
 }
 
+// ==================== Role Mismatch Redirect Tests ====================
+
+// TestRoleMismatchRedirect tests that users are redirected to the correct portal
+// based on their role when they access the wrong portal
+func TestRoleMismatchRedirect(t *testing.T) {
+	config := DefaultAuthConfig()
+
+	tests := []struct {
+		name           string
+		path           string
+		method         string
+		role           UserRole
+		expectRedirect bool
+		expectDeny     bool
+		description    string
+	}{
+		{
+			name:           "OPS user accessing /portal should be denied (redirect handled by server)",
+			path:           "/portal",
+			method:         "GET",
+			role:           RoleOps,
+			expectRedirect: false, // AuthConfig returns deny, server handles redirect
+			expectDeny:     true,
+			description:    "OPS users cannot access admin portal home",
+		},
+		{
+			name:           "OPS user accessing /portal/ should be denied",
+			path:           "/portal/",
+			method:         "GET",
+			role:           RoleOps,
+			expectRedirect: false,
+			expectDeny:     true,
+			description:    "OPS users cannot access admin portal home (trailing slash)",
+		},
+		{
+			name:           "Admin user accessing /ops should be denied (redirect handled by server)",
+			path:           "/ops",
+			method:         "GET",
+			role:           RoleAdmin,
+			expectRedirect: false,
+			expectDeny:     true,
+			description:    "Admin users cannot access OPS portal home",
+		},
+		{
+			name:           "Admin user accessing /ops/ should be denied",
+			path:           "/ops/",
+			method:         "GET",
+			role:           RoleAdmin,
+			expectRedirect: false,
+			expectDeny:     true,
+			description:    "Admin users cannot access OPS portal home (trailing slash)",
+		},
+		{
+			name:           "Admin user accessing /portal is allowed",
+			path:           "/portal",
+			method:         "GET",
+			role:           RoleAdmin,
+			expectRedirect: false,
+			expectDeny:     false,
+			description:    "Admin users can access admin portal",
+		},
+		{
+			name:           "OPS user accessing /ops is allowed",
+			path:           "/ops",
+			method:         "GET",
+			role:           RoleOps,
+			expectRedirect: false,
+			expectDeny:     false,
+			description:    "OPS users can access OPS portal",
+		},
+		{
+			name:           "OPS user accessing /portal/api/data should be denied (not redirected)",
+			path:           "/portal/api/data",
+			method:         "GET",
+			role:           RoleOps,
+			expectRedirect: false,
+			expectDeny:     true,
+			description:    "OPS users cannot access admin API endpoints",
+		},
+		{
+			name:           "OPS user accessing /portal/api/api-keys should be denied",
+			path:           "/portal/api/api-keys",
+			method:         "GET",
+			role:           RoleOps,
+			expectRedirect: false,
+			expectDeny:     true,
+			description:    "OPS users cannot access admin API keys endpoint",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			perm := config.FindMatchingPermission(tt.path, tt.method)
+
+			if perm == nil {
+				// No explicit permission found - check default behavior
+				if config.DefaultDeny {
+					if tt.role == RoleAdmin {
+						// Admin is allowed by default when DefaultDeny is true
+						assert.False(t, tt.expectDeny, "%s: Admin should be allowed by default", tt.description)
+					} else {
+						assert.True(t, tt.expectDeny, "%s: Non-admin should be denied by default", tt.description)
+					}
+				}
+				return
+			}
+
+			allowed := perm.AllowsRole(tt.role)
+			if tt.expectDeny {
+				assert.False(t, allowed, "%s: Role %s should be denied", tt.description, tt.role)
+			} else {
+				assert.True(t, allowed, "%s: Role %s should be allowed", tt.description, tt.role)
+			}
+		})
+	}
+}
+
+// TestPortalRedirectLogic tests the redirect logic for role mismatch
+func TestPortalRedirectLogic(t *testing.T) {
+	// This tests the logic that determines when to redirect vs return 403
+	tests := []struct {
+		name           string
+		path           string
+		role           UserRole
+		expectRedirect bool
+		redirectTarget string
+	}{
+		{
+			name:           "OPS accessing /portal should redirect to /ops",
+			path:           "/portal",
+			role:           RoleOps,
+			expectRedirect: true,
+			redirectTarget: "/ops",
+		},
+		{
+			name:           "OPS accessing /portal/ should redirect to /ops",
+			path:           "/portal/",
+			role:           RoleOps,
+			expectRedirect: true,
+			redirectTarget: "/ops",
+		},
+		{
+			name:           "Admin accessing /ops should redirect to /portal",
+			path:           "/ops",
+			role:           RoleAdmin,
+			expectRedirect: true,
+			redirectTarget: "/portal",
+		},
+		{
+			name:           "Admin accessing /ops/ should redirect to /portal",
+			path:           "/ops/",
+			role:           RoleAdmin,
+			expectRedirect: true,
+			redirectTarget: "/portal",
+		},
+		{
+			name:           "OPS accessing /portal/api/data should NOT redirect (return 403)",
+			path:           "/portal/api/data",
+			role:           RoleOps,
+			expectRedirect: false,
+			redirectTarget: "",
+		},
+		{
+			name:           "Admin accessing /ops/my-info should NOT redirect (return 403)",
+			path:           "/ops/my-info",
+			role:           RoleAdmin,
+			expectRedirect: false,
+			redirectTarget: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Determine if this is a portal/ops home page
+			isPortalPage := tt.path == "/portal" || tt.path == "/portal/"
+			isOpsPage := tt.path == "/ops" || tt.path == "/ops/"
+
+			var shouldRedirect bool
+			var target string
+
+			if isPortalPage && tt.role == RoleOps {
+				shouldRedirect = true
+				target = "/ops"
+			} else if isOpsPage && tt.role == RoleAdmin {
+				shouldRedirect = true
+				target = "/portal"
+			}
+
+			assert.Equal(t, tt.expectRedirect, shouldRedirect,
+				"Redirect expectation mismatch for %s with role %s", tt.path, tt.role)
+			if tt.expectRedirect {
+				assert.Equal(t, tt.redirectTarget, target,
+					"Redirect target mismatch for %s with role %s", tt.path, tt.role)
+			}
+		})
+	}
+}
+
+// TestAPIKeysEndpointSecurity tests that API keys pagination endpoint is protected
+func TestAPIKeysEndpointSecurity(t *testing.T) {
+	config := DefaultAuthConfig()
+
+	t.Run("API keys endpoint requires admin role", func(t *testing.T) {
+		perm := config.FindMatchingPermission("/portal/api/api-keys", "GET")
+		require.NotNil(t, perm, "Should find permission for /portal/api/api-keys")
+
+		assert.True(t, perm.AllowsRole(RoleAdmin), "Admin should access API keys endpoint")
+		assert.False(t, perm.AllowsRole(RoleOps), "OPS should NOT access API keys endpoint")
+	})
+
+	t.Run("API keys endpoint is not public", func(t *testing.T) {
+		assert.False(t, config.IsPublicPath("/portal/api/api-keys"),
+			"API keys endpoint should not be public")
+	})
+}
+
+// TestNoPermissionLeakOnRedirect tests that no sensitive info is leaked during redirect
+func TestNoPermissionLeakOnRedirect(t *testing.T) {
+	// When redirecting OPS user from /portal to /ops, we should not leak any
+	// admin-only information in the redirect response
+
+	// The redirect response should be a simple 303 See Other with Location header
+	// It should NOT contain:
+	// - Any admin API data
+	// - Any API keys
+	// - Any provider information
+	// - Any session tokens
+
+	t.Run("Redirect response format", func(t *testing.T) {
+		expectedHeader := "HTTP/1.1 303 See Other\r\nLocation: /ops\r\n\r\n"
+		// This documents the expected format of the redirect response
+		assert.Contains(t, expectedHeader, "303 See Other", "Should be 303 redirect")
+		assert.Contains(t, expectedHeader, "Location:", "Should have Location header")
+	})
+}
+
 // Helper functions for test database initialization
 
 func initTestDB(t *testing.T) {

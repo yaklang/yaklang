@@ -9,6 +9,73 @@
         // 全局数据存储
         let portalData = null;
         
+        // API Keys 分页状态
+        let apiKeysPage = 1;
+        let apiKeysPageSize = 20;
+        let apiKeysPagination = null;
+        let apiKeysData = [];
+        
+        // ==================== Authentication Error Handler ====================
+        
+        // Check if response indicates authentication error
+        function isAuthError(data) {
+            if (!data) return false;
+            // Check for permission denied errors
+            if (data.error === 'Permission denied' || 
+                data.error === 'Unauthorized' ||
+                data.reason === 'insufficient permissions' ||
+                data.error === 'Admin access required' ||
+                data.error === 'Authentication required') {
+                return true;
+            }
+            return false;
+        }
+        
+        // Clear authentication cookies and redirect to login
+        function handleAuthError() {
+            console.warn('Authentication expired or invalid, redirecting to login...');
+            // Clear admin_session cookie
+            document.cookie = 'admin_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
+            // Show a brief message before redirecting
+            alert('Session expired, please login again.');
+            // Redirect to login page
+            window.location.href = '/portal/login';
+        }
+        
+        // Wrapper for fetch that handles authentication errors
+        async function authFetch(url, options = {}) {
+            const response = await fetch(url, options);
+            
+            // Check for 401/403 status codes
+            if (response.status === 401 || response.status === 403) {
+                // Try to parse response to check error type
+                try {
+                    const data = await response.clone().json();
+                    if (isAuthError(data)) {
+                        handleAuthError();
+                        return null;
+                    }
+                } catch (e) {
+                    // If can't parse JSON, still redirect for 401
+                    if (response.status === 401) {
+                        handleAuthError();
+                        return null;
+                    }
+                }
+            }
+            
+            return response;
+        }
+        
+        // Check response data for auth errors (for successful HTTP responses with error in body)
+        function checkAuthInResponse(data) {
+            if (isAuthError(data)) {
+                handleAuthError();
+                return true;
+            }
+            return false;
+        }
+        
         // 模型选择相关
         let portalAvailableModels = [];
         let portalSelectedModels = new Set();
@@ -20,11 +87,14 @@
             // 加载所有页面数据
             loadData: async function() {
                 try {
-                    const response = await fetch('/portal/api/data');
+                    const response = await authFetch('/portal/api/data');
+                    if (!response) return null; // Auth error handled
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     portalData = await response.json();
+                    // Check for auth error in response body
+                    if (checkAuthInResponse(portalData)) return null;
                     console.log('Portal data loaded:', portalData);
                     return portalData;
                 } catch (error) {
@@ -160,7 +230,7 @@
                 tbody.innerHTML = '';
                 
                 if (!data.api_keys || data.api_keys.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="11" class="text-center">No API keys found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="12" class="text-center">No API keys found</td></tr>';
                     return;
                 }
                 
@@ -199,6 +269,9 @@
                         ? `<button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('${key.id}', false)" title="禁用" style="padding:2px 4px;font-size:11px;">禁用</button>`
                         : `<button class="btn btn-sm" onclick="toggleAPIKeyStatus('${key.id}', true)" title="激活" style="padding:2px 4px;font-size:11px;">激活</button>`;
                     
+                    // Get creator display name
+                    const creatorName = key.created_by_ops_name || (key.created_by_ops_id ? 'OPS#' + key.created_by_ops_id : 'Admin');
+                    
                     row.innerHTML = `
                         <td class="checkbox-column">
                             <input type="checkbox" class="api-checkbox">
@@ -219,6 +292,7 @@
                             </div>
                         </td>
                         <td class="text-center">${trafficLimitCell}</td>
+                        <td class="text-center">${this.escapeHtml(creatorName)}</td>
                         <td>${key.last_used_at || '-'}</td>
                         <td class="text-center">
                             <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
@@ -386,9 +460,16 @@
                 try {
                     const data = await this.loadData();
                     
+                    // Auth error was handled, data is null
+                    if (!data) {
+                        this.hideLoading();
+                        return;
+                    }
+                    
                     this.renderStats(data);
                     this.renderProviders(data);
-                    this.renderAPIKeys(data);
+                    // Use paginated API for API keys instead of bulk loading
+                    loadAPIKeysPaginated(1, apiKeysPageSize);
                     this.renderModels(data);
                     this.renderTOTP(data);
                     this.populateModelSelect(data);
@@ -423,6 +504,264 @@
         window.refreshPortalData = function() {
             PortalDataLoader.refresh();
         };
+
+        // ==================== API Keys Pagination ====================
+        
+        // Load API keys with pagination
+        async function loadAPIKeysPaginated(page = 1, pageSize = 20) {
+            try {
+                const url = `/portal/api/api-keys?page=${page}&pageSize=${pageSize}&sortBy=created_at&sortOrder=desc`;
+                const response = await authFetch(url);
+                if (!response) return; // Auth error handled
+                
+                const data = await response.json();
+                if (checkAuthInResponse(data)) return;
+                
+                if (data.success) {
+                    apiKeysData = data.data || [];
+                    apiKeysPagination = data.pagination || null;
+                    apiKeysPage = page;
+                    apiKeysPageSize = pageSize;
+                    
+                    // Render the table with paginated data
+                    renderAPIKeysTablePaginated(apiKeysData);
+                    renderAPIKeysPagination();
+                } else {
+                    console.error('Failed to load API keys:', data.message);
+                    showToast('Failed to load API keys: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error loading API keys:', error);
+                showToast('Error loading API keys', 'error');
+            }
+        }
+        
+        // Render API keys table with paginated data
+        function renderAPIKeysTablePaginated(keys) {
+            const tbody = document.getElementById('api-table-body');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            if (!keys || keys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center">No API keys found</td></tr>';
+                return;
+            }
+            
+            keys.forEach(key => {
+                const row = document.createElement('tr');
+                row.dataset.apiId = key.id;
+                row.dataset.apiStatus = key.active ? 'active' : 'inactive';
+                row.dataset.trafficLimit = key.traffic_limit;
+                row.dataset.trafficUsed = key.traffic_used;
+                row.dataset.trafficEnabled = key.traffic_limit_enable;
+                
+                let statusBadge = key.active 
+                    ? '<span class="health-badge healthy" style="font-size:12px;">激活</span>'
+                    : '<span class="health-badge unhealthy" style="font-size:12px;">禁用</span>';
+                
+                // Format traffic data
+                const inputFormatted = formatBytes(key.input_bytes || 0);
+                const outputFormatted = formatBytes(key.output_bytes || 0);
+                
+                let trafficLimitCell = '';
+                if (key.traffic_limit_enable) {
+                    const percent = key.traffic_limit > 0 ? (key.traffic_used / key.traffic_limit * 100) : 0;
+                    let barColor = '#4caf50';
+                    if (percent > 90) barColor = '#f44336';
+                    else if (percent > 70) barColor = '#ff9800';
+                    
+                    const usedFormatted = formatBytes(key.traffic_used || 0);
+                    const limitFormatted = formatBytes(key.traffic_limit || 0);
+                    
+                    trafficLimitCell = `
+                        <div class="traffic-limit-info" title="已用/限额: ${usedFormatted}/${limitFormatted} (${percent.toFixed(1)}%)">
+                            <div class="traffic-progress" style="width: 80px; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${Math.min(percent, 100)}%; height: 100%; background: ${barColor};"></div>
+                            </div>
+                            <small>${usedFormatted}/${limitFormatted}</small>
+                        </div>
+                    `;
+                } else {
+                    trafficLimitCell = '<span style="color: #999;">未限制</span>';
+                }
+                
+                let actionButtons = key.active
+                    ? `<button class="btn btn-sm btn-danger" onclick="toggleAPIKeyStatus('${key.id}', false)" title="禁用" style="padding:2px 4px;font-size:11px;">禁用</button>`
+                    : `<button class="btn btn-sm" onclick="toggleAPIKeyStatus('${key.id}', true)" title="激活" style="padding:2px 4px;font-size:11px;">激活</button>`;
+                
+                // Get creator display name
+                const creatorName = key.created_by_ops_name || (key.created_by_ops_id ? 'OPS#' + key.created_by_ops_id : 'Admin');
+                
+                row.innerHTML = `
+                    <td class="checkbox-column">
+                        <input type="checkbox" class="api-checkbox">
+                    </td>
+                    <td class="text-center">${key.id}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="copyable api-key-cell" data-full-text="${escapeHtml(key.api_key)}">${escapeHtml(key.display_key)}</td>
+                    <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${escapeHtml(key.allowed_models)}</td>
+                    <td class="text-center">${key.usage_count || 0}</td>
+                    <td class="text-center">
+                        <span class="health-badge healthy">${key.success_count || 0}</span>
+                        <span class="health-badge unhealthy">${key.failure_count || 0}</span>
+                    </td>
+                    <td class="text-center">
+                        <div class="traffic-data">
+                            <span title="输入流量">↓ ${inputFormatted}</span>
+                            <span title="输出流量">↑ ${outputFormatted}</span>
+                        </div>
+                    </td>
+                    <td class="text-center">${trafficLimitCell}</td>
+                    <td class="text-center">${escapeHtml(creatorName)}</td>
+                    <td>${key.last_used_time || key.created_at || '-'}</td>
+                    <td class="text-center">
+                        <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
+                            ${actionButtons}
+                            <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit || 0}, ${key.traffic_used || 0}, ${key.traffic_limit_enable})" title="流量设置" style="padding:2px 4px;font-size:11px;">流量</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteAPIKey(${key.id})" title="删除" style="padding:2px 4px;font-size:11px;">删除</button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Rebind events
+            bindAPIKeyEvents();
+        }
+        
+        // Bind API key events (checkboxes, context menu, copy)
+        function bindAPIKeyEvents() {
+            // Bind checkbox events
+            document.querySelectorAll('.api-checkbox').forEach(checkbox => {
+                checkbox.removeEventListener('change', updateDeleteSelectedAPIButton);
+                checkbox.addEventListener('change', updateDeleteSelectedAPIButton);
+            });
+            
+            // Bind context menu to editable-allowed-models cells
+            document.querySelectorAll('#api-table tbody td.editable-allowed-models').forEach(cell => {
+                cell.removeEventListener('contextmenu', showContextMenu);
+                cell.addEventListener('contextmenu', showContextMenu);
+            });
+            
+            // Bind click to copy API key
+            document.querySelectorAll('#api-table tbody td.api-key-cell').forEach(cell => {
+                cell.style.cursor = 'pointer';
+                cell.title = '点击复制完整 API Key';
+                cell.addEventListener('click', function() {
+                    const fullKey = this.getAttribute('data-full-text');
+                    if (fullKey) {
+                        navigator.clipboard.writeText(fullKey).then(() => {
+                            showToast('API Key copied to clipboard', 'success');
+                        }).catch(err => {
+                            console.error('Failed to copy:', err);
+                        });
+                    }
+                });
+            });
+        }
+        
+        // Render API keys pagination controls
+        function renderAPIKeysPagination() {
+            let container = document.getElementById('api-keys-pagination');
+            if (!container) {
+                // Create pagination container if not exists
+                // Find the table container that wraps #api-table
+                const apiTable = document.getElementById('api-table');
+                const tableContainer = apiTable ? apiTable.closest('.table-container') : null;
+                if (tableContainer) {
+                    container = document.createElement('div');
+                    container.id = 'api-keys-pagination';
+                    container.className = 'pagination-container';
+                    container.style.cssText = 'margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;';
+                    tableContainer.after(container);
+                }
+            }
+            
+            if (!container || !apiKeysPagination) return;
+            
+            const { page, pageSize, total, totalPages } = apiKeysPagination;
+            const startItem = (page - 1) * pageSize + 1;
+            const endItem = Math.min(page * pageSize, total);
+            
+            container.innerHTML = `
+                <div style="color: #666; font-size: 14px;">
+                    显示 ${startItem}-${endItem} 条，共 ${total} 条
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <select onchange="changeAPIKeysPageSize(this.value)" style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="10" ${pageSize == 10 ? 'selected' : ''}>10 条/页</option>
+                        <option value="20" ${pageSize == 20 ? 'selected' : ''}>20 条/页</option>
+                        <option value="50" ${pageSize == 50 ? 'selected' : ''}>50 条/页</option>
+                        <option value="100" ${pageSize == 100 ? 'selected' : ''}>100 条/页</option>
+                    </select>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn btn-sm" onclick="changeAPIKeysPage(1)" ${page <= 1 ? 'disabled' : ''}>首页</button>
+                        <button class="btn btn-sm" onclick="changeAPIKeysPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+                        <span style="padding: 5px 10px; color: #666;">第 ${page} / ${totalPages} 页</span>
+                        <button class="btn btn-sm" onclick="changeAPIKeysPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>
+                        <button class="btn btn-sm" onclick="changeAPIKeysPage(${totalPages})" ${page >= totalPages ? 'disabled' : ''}>末页</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="color: #666;">跳转</span>
+                        <input type="number" id="api-keys-page-input" min="1" max="${totalPages}" value="${page}" 
+                            style="width: 60px; padding: 5px; border: 1px solid #ddd; border-radius: 4px; text-align: center;"
+                            onkeypress="if(event.key==='Enter')jumpToAPIKeysPage()">
+                        <span style="color: #666;">页</span>
+                        <button class="btn btn-sm" onclick="jumpToAPIKeysPage()">Go</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Change API keys page
+        function changeAPIKeysPage(page) {
+            if (page < 1) page = 1;
+            if (apiKeysPagination && page > apiKeysPagination.totalPages) page = apiKeysPagination.totalPages;
+            loadAPIKeysPaginated(page, apiKeysPageSize);
+        }
+        
+        // Change API keys page size
+        function changeAPIKeysPageSize(size) {
+            apiKeysPageSize = parseInt(size) || 20;
+            loadAPIKeysPaginated(1, apiKeysPageSize);
+        }
+        
+        // Jump to specific page
+        function jumpToAPIKeysPage() {
+            const input = document.getElementById('api-keys-page-input');
+            if (input) {
+                const page = parseInt(input.value) || 1;
+                changeAPIKeysPage(page);
+            }
+        }
+        
+        // Helper: format bytes to human readable
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        // Helper: escape HTML
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
+        // Export pagination functions
+        window.loadAPIKeysPaginated = loadAPIKeysPaginated;
+        window.changeAPIKeysPage = changeAPIKeysPage;
+        window.changeAPIKeysPageSize = changeAPIKeysPageSize;
+        window.jumpToAPIKeysPage = jumpToAPIKeysPage;
 
         // 初始化 Toast 容器
         if (!document.getElementById('toast-container')) {
@@ -2005,7 +2344,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 }
                 
                 showToast(`成功删除 ${apiIds.length} 个API密钥`, 'success');
-                setTimeout(() => window.location.reload(), 1000);
+                // Refresh paginated data instead of full page reload
+                setTimeout(() => loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize), 500);
             } catch (error) {
                 showToast('删除失败: ' + error.message, 'error');
             }
@@ -2023,7 +2363,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     }
                     
                     showToast('API密钥删除成功', 'success');
-                    setTimeout(() => window.location.reload(), 1000);
+                    // Refresh paginated data instead of full page reload
+                    setTimeout(() => loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize), 500);
                 } catch (error) {
                     showToast('删除失败: ' + error.message, 'error');
                 }
@@ -2045,7 +2386,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 }
                 
                 showToast(`API密钥${activate ? '激活' : '禁用'}成功`, 'success');
-                setTimeout(() => window.location.reload(), 1000);
+                // Refresh paginated data instead of full page reload
+                setTimeout(() => loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize), 500);
             } catch (error) {
                 showToast(`操作失败: ${error.message}`, 'error');
             }
@@ -2163,7 +2505,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
         function closeApiKeyModal(reload = false) {
             document.getElementById('apiKeySuccessModal').style.display = 'none';
             if (reload) {
-                window.location.reload();
+                // Refresh paginated API keys data instead of full page reload
+                loadAPIKeysPaginated(1, apiKeysPageSize);
             }
         }
 
@@ -2261,33 +2604,16 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 document.querySelectorAll('.api-checkbox:checked').forEach(cb => cb.checked = false);
                 updateDeleteSelectedAPIButton(); // Update button states
 
-                setTimeout(() => window.location.reload(), 1000); // Refresh page
+                // Refresh paginated data instead of full page reload
+                setTimeout(() => loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize), 500);
             } catch (error) {
                 showToast('禁用失败: ' + error.message, 'error');
                 console.error('Error disabling multiple API keys:', error); // Use common/log
             }
         }
 
-        async function deleteMultipleAPIKeys(apiIds) {
-            try {
-                const response = await fetch('/portal/delete-api-keys', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ ids: apiIds })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('删除API密钥失败');
-                }
-                
-                showToast(`成功删除 ${apiIds.length} 个API密钥`, 'success');
-                setTimeout(() => window.location.reload(), 1000);
-            } catch (error) {
-                showToast('删除失败: ' + error.message, 'error');
-            }
-        }
+        // Note: deleteMultipleAPIKeys is already defined above, this duplicate definition is removed
+        // to avoid overriding the paginated refresh behavior
 
         // New function: Confirm enabling selected API keys
         function confirmEnableSelectedAPI() {
@@ -2324,7 +2650,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 document.querySelectorAll('.api-checkbox:checked').forEach(cb => cb.checked = false);
                 updateDeleteSelectedAPIButton(); // Update button states
 
-                setTimeout(() => window.location.reload(), 1000); // Refresh page
+                // Refresh paginated data instead of full page reload
+                setTimeout(() => loadAPIKeysPaginated(apiKeysPage, apiKeysPageSize), 500);
             } catch (error) {
                 showToast('启用失败: ' + error.message, 'error');
                 console.error('Error enabling multiple API keys:', error); // Use common/log
@@ -3711,6 +4038,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     <td class="text-center">
                         <span class="traffic-info" title="${key.traffic_limit_enable ? '已启用流量限制' : '未启用流量限制'}">${trafficDisplay}</span>
                     </td>
+                    <td class="text-center">${key.created_by_ops_name || 'Admin'}</td>
                     <td>${key.last_used_time || '-'}</td>
                     <td class="text-center">
                         <button class="btn btn-sm" onclick="showTrafficLimitDialog(${key.id}, ${key.traffic_limit}, ${key.traffic_used}, ${key.traffic_limit_enable})" title="设置流量限制" style="padding:2px 4px;font-size:12px;">流量</button>
@@ -4101,6 +4429,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
         // ==================== OPS 用户管理 ====================
         
         let opsUsersData = [];
+        let opsUsersPage = 1;
+        let opsUsersPageSize = 20;
+        let opsUsersPagination = null;
+        let opsUsersFilter = '';
         let opsLogsData = [];
         let opsLogsPage = 1;
         let opsLogsPageSize = 20;
@@ -4169,17 +4501,27 @@ curl '${metaApiUrl}?name=${modelName}'`;
             showToast('Credentials copied to clipboard', 'success');
         }
         
-        // 刷新 OPS 用户列表
-        async function refreshOpsUsers() {
+        // 刷新 OPS 用户列表 (支持分页)
+        async function refreshOpsUsers(page, pageSize, username) {
+            if (page !== undefined) opsUsersPage = page;
+            if (pageSize !== undefined) opsUsersPageSize = pageSize;
+            if (username !== undefined) opsUsersFilter = username;
+            
             const tbody = document.getElementById('ops-users-table-body');
             tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">加载中...</td></tr>';
             
             try {
-                const response = await fetch('/portal/api/ops-users');
+                let url = `/portal/api/ops-users?page=${opsUsersPage}&page_size=${opsUsersPageSize}`;
+                if (opsUsersFilter) {
+                    url += `&username=${encodeURIComponent(opsUsersFilter)}`;
+                }
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.success) {
                     opsUsersData = data.users || [];
+                    opsUsersPagination = data.pagination || null;
                     renderOpsUsersTable();
                 } else {
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #dc3545;">加载失败: ' + (data.error || 'Unknown error') + '</td></tr>';
@@ -4190,12 +4532,39 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }
         
+        // 切换 OPS 用户页码
+        function changeOpsUsersPage(page) {
+            if (page < 1) page = 1;
+            if (opsUsersPagination && page > opsUsersPagination.total_pages) {
+                page = opsUsersPagination.total_pages;
+            }
+            refreshOpsUsers(page);
+        }
+        
+        // 切换 OPS 用户每页数量
+        function changeOpsUsersPageSize(newSize) {
+            opsUsersPageSize = parseInt(newSize);
+            opsUsersPage = 1; // 重置到第一页
+            refreshOpsUsers();
+        }
+        
+        // 搜索 OPS 用户
+        function searchOpsUsers() {
+            const input = document.getElementById('ops-users-search-input');
+            if (input) {
+                opsUsersFilter = input.value.trim();
+                opsUsersPage = 1; // 重置到第一页
+                refreshOpsUsers();
+            }
+        }
+        
         // 渲染 OPS 用户表格
         function renderOpsUsersTable() {
             const tbody = document.getElementById('ops-users-table-body');
             
             if (!opsUsersData || opsUsersData.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">暂无运营用户</td></tr>';
+                renderOpsUsersPagination();
                 return;
             }
             
@@ -4223,6 +4592,51 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     </td>
                 </tr>
             `).join('');
+            
+            // 渲染分页控件
+            renderOpsUsersPagination();
+        }
+        
+        // 渲染 OPS 用户分页控件
+        function renderOpsUsersPagination() {
+            let paginationContainer = document.getElementById('ops-users-pagination');
+            if (!paginationContainer) {
+                // 创建分页容器
+                const table = document.getElementById('ops-users-table');
+                if (table && table.parentElement) {
+                    paginationContainer = document.createElement('div');
+                    paginationContainer.id = 'ops-users-pagination';
+                    paginationContainer.className = 'pagination-controls';
+                    paginationContainer.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;';
+                    table.parentElement.appendChild(paginationContainer);
+                }
+            }
+            
+            if (!paginationContainer || !opsUsersPagination) return;
+            
+            const { page, page_size, total, total_pages } = opsUsersPagination;
+            
+            paginationContainer.innerHTML = `
+                <div class="pagination-info">
+                    共 ${total} 条记录，第 ${page}/${total_pages || 1} 页
+                </div>
+                <div class="pagination-buttons" style="display: flex; gap: 5px; align-items: center;">
+                    <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeOpsUsersPage(1)">首页</button>
+                    <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeOpsUsersPage(${page - 1})">上一页</button>
+                    <span style="margin: 0 10px;">
+                        跳转到 <input type="number" id="opsUsersPageInput" min="1" max="${total_pages}" value="${page}" style="width: 50px; text-align: center;"> 页
+                        <button class="btn btn-sm" onclick="changeOpsUsersPage(parseInt(document.getElementById('opsUsersPageInput').value))">Go</button>
+                    </span>
+                    <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeOpsUsersPage(${page + 1})">下一页</button>
+                    <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeOpsUsersPage(${total_pages})">末页</button>
+                    <select onchange="changeOpsUsersPageSize(this.value)" style="margin-left: 10px;">
+                        <option value="10" ${page_size === 10 ? 'selected' : ''}>10条/页</option>
+                        <option value="20" ${page_size === 20 ? 'selected' : ''}>20条/页</option>
+                        <option value="50" ${page_size === 50 ? 'selected' : ''}>50条/页</option>
+                        <option value="100" ${page_size === 100 ? 'selected' : ''}>100条/页</option>
+                    </select>
+                </div>
+            `;
         }
         
         // 切换 OPS 用户状态
@@ -4354,6 +4768,17 @@ curl '${metaApiUrl}?name=${modelName}'`;
             refreshOpsLogs();
         }
         
+        // 清除 OPS 日志筛选
+        function clearOpsLogsFilter() {
+            const operatorInput = document.getElementById('ops-log-filter-operator');
+            const actionSelect = document.getElementById('ops-log-filter-action');
+            if (operatorInput) operatorInput.value = '';
+            if (actionSelect) actionSelect.value = '';
+            opsLogsPage = 1;
+            refreshOpsLogs();
+        }
+        window.clearOpsLogsFilter = clearOpsLogsFilter;
+        
         // 渲染 OPS 日志表格
         function renderOpsLogsTable() {
             const tbody = document.getElementById('ops-logs-table-body');
@@ -4365,6 +4790,9 @@ curl '${metaApiUrl}?name=${modelName}'`;
             
             const actionLabels = {
                 'create_api_key': '创建 API Key',
+                'delete_api_key': '删除 API Key',
+                'update_api_key': '更新 API Key',
+                'reset_api_key_traffic': '重置流量',
                 'reset_ops_key': '重置 OPS Key',
                 'change_password': '修改密码'
             };
@@ -4388,28 +4816,40 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const container = document.getElementById('ops-logs-pagination');
             const totalPages = Math.ceil(total / pageSize);
             
-            if (totalPages <= 1) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            let html = '';
-            
-            // Previous button
-            html += `<button class="btn btn-sm" onclick="opsLogsGoToPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`;
-            
-            // Page info
-            html += `<span style="padding: 0 15px;">第 ${page} / ${totalPages} 页 (共 ${total} 条)</span>`;
-            
-            // Next button
-            html += `<button class="btn btn-sm" onclick="opsLogsGoToPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>`;
-            
-            container.innerHTML = html;
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                    <div class="pagination-info">
+                        共 ${total} 条记录，第 ${page}/${totalPages || 1} 页
+                    </div>
+                    <div class="pagination-buttons" style="display: flex; gap: 5px; align-items: center;">
+                        <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="opsLogsGoToPage(1)">首页</button>
+                        <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="opsLogsGoToPage(${page - 1})">上一页</button>
+                        <span style="margin: 0 10px;">
+                            跳转到 <input type="number" id="opsLogsPageInput" min="1" max="${totalPages}" value="${page}" style="width: 50px; text-align: center;"> 页
+                            <button class="btn btn-sm" onclick="opsLogsGoToPage(parseInt(document.getElementById('opsLogsPageInput').value))">Go</button>
+                        </span>
+                        <button class="btn btn-sm" ${page >= totalPages ? 'disabled' : ''} onclick="opsLogsGoToPage(${page + 1})">下一页</button>
+                        <button class="btn btn-sm" ${page >= totalPages ? 'disabled' : ''} onclick="opsLogsGoToPage(${totalPages})">末页</button>
+                        <select onchange="changeOpsLogsPageSize(this.value)" style="margin-left: 10px;">
+                            <option value="20" ${pageSize === 20 ? 'selected' : ''}>20条/页</option>
+                            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50条/页</option>
+                            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100条/页</option>
+                        </select>
+                    </div>
+                </div>
+            `;
         }
         
         // OPS 日志跳转页面
         window.opsLogsGoToPage = function(page) {
             opsLogsPage = page;
+            refreshOpsLogs();
+        };
+        
+        // 改变 OPS 日志每页数量
+        window.changeOpsLogsPageSize = function(newSize) {
+            opsLogsPageSize = parseInt(newSize);
+            opsLogsPage = 1; // 重置到第一页
             refreshOpsLogs();
         };
         

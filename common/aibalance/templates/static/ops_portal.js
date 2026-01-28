@@ -5,6 +5,67 @@ let userInfo = null;
 let availableModels = [];
 let myApiKeys = [];
 
+// ==================== Authentication Error Handler ====================
+
+// Check if response indicates authentication error
+function isAuthError(data) {
+    if (!data) return false;
+    // Check for permission denied errors
+    if (data.error === 'Permission denied' || 
+        data.error === 'Unauthorized' ||
+        data.error === 'OPS user access required' ||
+        data.reason === 'insufficient permissions' ||
+        data.error === 'Authentication required') {
+        return true;
+    }
+    return false;
+}
+
+// Clear authentication cookies and redirect to login
+function handleAuthError() {
+    console.warn('Authentication expired or invalid, redirecting to login...');
+    // Clear ops_session cookie
+    document.cookie = 'ops_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT;';
+    // Show a brief message before redirecting
+    alert('Session expired, please login again.');
+    // Redirect to login page
+    window.location.href = '/ops/login';
+}
+
+// Wrapper for fetch that handles authentication errors
+async function authFetch(url, options = {}) {
+    const response = await fetch(url, options);
+    
+    // Check for 401/403 status codes
+    if (response.status === 401 || response.status === 403) {
+        // Try to parse response to check error type
+        try {
+            const data = await response.clone().json();
+            if (isAuthError(data)) {
+                handleAuthError();
+                return null;
+            }
+        } catch (e) {
+            // If can't parse JSON, still redirect for 401
+            if (response.status === 401) {
+                handleAuthError();
+                return null;
+            }
+        }
+    }
+    
+    return response;
+}
+
+// Check response data for auth errors (for successful HTTP responses with error in body)
+function checkAuthInResponse(data) {
+    if (isAuthError(data)) {
+        handleAuthError();
+        return true;
+    }
+    return false;
+}
+
 // ==================== Initialize ====================
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -56,8 +117,12 @@ function switchToTab(tabId) {
 
 async function loadUserInfo() {
     try {
-        const response = await fetch('/ops/my-info');
+        const response = await authFetch('/ops/my-info');
+        if (!response) return; // Auth error handled
         const data = await response.json();
+        
+        // Check for auth error in response body
+        if (checkAuthInResponse(data)) return;
         
         if (data.success) {
             userInfo = data;
@@ -65,10 +130,6 @@ async function loadUserInfo() {
             updateCurlExample();
         } else {
             console.error('Failed to load user info:', data.error);
-            if (data.error === 'OPS user access required') {
-                // Redirect to login
-                window.location.href = '/ops/login';
-            }
         }
     } catch (error) {
         console.error('Error loading user info:', error);
@@ -214,7 +275,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ==================== My API Keys ====================
 
-async function loadMyApiKeys() {
+let myKeysPage = 1;
+let myKeysPageSize = 20;
+let myKeysPagination = null;
+
+async function loadMyApiKeys(page, pageSize) {
+    if (page !== undefined) myKeysPage = page;
+    if (pageSize !== undefined) myKeysPageSize = pageSize;
+    
     const loading = document.getElementById('my-keys-loading');
     const content = document.getElementById('my-keys-content');
     const tbody = document.getElementById('my-keys-tbody');
@@ -224,7 +292,7 @@ async function loadMyApiKeys() {
     content.classList.add('hidden');
     
     try {
-        const response = await fetch('/ops/api/my-keys');
+        const response = await fetch(`/ops/api/my-keys?page=${myKeysPage}&page_size=${myKeysPageSize}`);
         const data = await response.json();
         
         loading.classList.add('hidden');
@@ -232,10 +300,12 @@ async function loadMyApiKeys() {
         
         if (data.success) {
             myApiKeys = data.keys || [];
+            myKeysPagination = data.pagination || null;
             
-            if (myApiKeys.length === 0) {
+            if (myApiKeys.length === 0 && myKeysPage === 1) {
                 tbody.innerHTML = '';
                 empty.classList.remove('hidden');
+                renderMyKeysPagination();
             } else {
                 empty.classList.add('hidden');
                 renderApiKeysTable();
@@ -249,6 +319,22 @@ async function loadMyApiKeys() {
         content.classList.remove('hidden');
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #dc3545;">Network error</td></tr>';
     }
+}
+
+// Change My Keys page
+function changeMyKeysPage(page) {
+    if (page < 1) page = 1;
+    if (myKeysPagination && page > myKeysPagination.total_pages) {
+        page = myKeysPagination.total_pages;
+    }
+    loadMyApiKeys(page);
+}
+
+// Change My Keys page size
+function changeMyKeysPageSize(newSize) {
+    myKeysPageSize = parseInt(newSize);
+    myKeysPage = 1; // Reset to first page
+    loadMyApiKeys();
 }
 
 function renderApiKeysTable() {
@@ -287,6 +373,56 @@ function renderApiKeysTable() {
             </tr>
         `;
     }).join('');
+    
+    // Render pagination controls
+    renderMyKeysPagination();
+}
+
+// Render My Keys pagination controls
+function renderMyKeysPagination() {
+    let paginationContainer = document.getElementById('my-keys-pagination');
+    if (!paginationContainer) {
+        // Create pagination container
+        const table = document.getElementById('my-keys-table');
+        if (table && table.parentElement) {
+            paginationContainer = document.createElement('div');
+            paginationContainer.id = 'my-keys-pagination';
+            paginationContainer.className = 'pagination-controls';
+            paginationContainer.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;';
+            table.parentElement.appendChild(paginationContainer);
+        }
+    }
+    
+    if (!paginationContainer || !myKeysPagination) {
+        if (paginationContainer) {
+            paginationContainer.innerHTML = '';
+        }
+        return;
+    }
+    
+    const { page, page_size, total, total_pages } = myKeysPagination;
+    
+    paginationContainer.innerHTML = `
+        <div class="pagination-info">
+            Total ${total} keys, Page ${page}/${total_pages || 1}
+        </div>
+        <div class="pagination-buttons" style="display: flex; gap: 5px; align-items: center;">
+            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(1)">First</button>
+            <button class="btn btn-sm" ${page <= 1 ? 'disabled' : ''} onclick="changeMyKeysPage(${page - 1})">Prev</button>
+            <span style="margin: 0 10px;">
+                Go to <input type="number" id="myKeysPageInput" min="1" max="${total_pages}" value="${page}" style="width: 50px; text-align: center;"> 
+                <button class="btn btn-sm" onclick="changeMyKeysPage(parseInt(document.getElementById('myKeysPageInput').value))">Go</button>
+            </span>
+            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${page + 1})">Next</button>
+            <button class="btn btn-sm" ${page >= total_pages ? 'disabled' : ''} onclick="changeMyKeysPage(${total_pages})">Last</button>
+            <select onchange="changeMyKeysPageSize(this.value)" style="margin-left: 10px;">
+                <option value="10" ${page_size === 10 ? 'selected' : ''}>10/page</option>
+                <option value="20" ${page_size === 20 ? 'selected' : ''}>20/page</option>
+                <option value="50" ${page_size === 50 ? 'selected' : ''}>50/page</option>
+                <option value="100" ${page_size === 100 ? 'selected' : ''}>100/page</option>
+            </select>
+        </div>
+    `;
 }
 
 async function deleteApiKey(apiKey) {
@@ -1044,3 +1180,6 @@ window.editSelectAllModels = editSelectAllModels;
 window.editClearAllModels = editClearAllModels;
 window.saveEditKey = saveEditKey;
 window.resetEditKeyTraffic = resetEditKeyTraffic;
+// My Keys pagination functions
+window.changeMyKeysPage = changeMyKeysPage;
+window.changeMyKeysPageSize = changeMyKeysPageSize;

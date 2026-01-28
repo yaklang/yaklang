@@ -492,6 +492,14 @@ func (c *ServerConfig) writeJSONResponse(conn net.Conn, statusCode int, data int
 	conn.Write(jsonData)
 }
 
+// redirectTo sends an HTTP 303 redirect response to the specified location
+func (c *ServerConfig) redirectTo(conn net.Conn, location string) {
+	header := "HTTP/1.1 303 See Other\r\n" +
+		"Location: " + location + "\r\n" +
+		"\r\n"
+	conn.Write([]byte(header))
+}
+
 // ==================== Main Request Router ====================
 
 // HandlePortalRequest handles the main entry point for management portal requests
@@ -529,10 +537,31 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		return
 	}
 
-	// If authenticated but not allowed, return 403 Forbidden
+	// If authenticated but not allowed, handle role mismatch
 	if !allowed {
 		c.logWarn("Permission denied for user %s (role: %s) on %s %s: %s",
 			authInfo.Username, authInfo.Role, request.Method, uriIns.Path, reason)
+
+		// For page requests (not API), redirect to the appropriate portal based on role
+		// This prevents infinite redirect loops when users access the wrong portal
+		isPortalPage := uriIns.Path == "/portal" || uriIns.Path == "/portal/"
+		isOpsPage := uriIns.Path == "/ops" || uriIns.Path == "/ops/"
+
+		if isPortalPage && authInfo.Role == RoleOps {
+			// OPS user trying to access admin portal, redirect to OPS portal
+			c.logInfo("Redirecting OPS user %s from /portal to /ops", authInfo.Username)
+			c.redirectTo(conn, "/ops")
+			return
+		}
+
+		if isOpsPage && authInfo.Role == RoleAdmin {
+			// Admin user trying to access OPS portal, redirect to admin portal
+			c.logInfo("Redirecting Admin user %s from /ops to /portal", authInfo.Username)
+			c.redirectTo(conn, "/portal")
+			return
+		}
+
+		// For API requests or other cases, return 403 JSON response
 		c.writeJSONResponse(conn, http.StatusForbidden, map[string]string{
 			"error":  "Permission denied",
 			"reason": reason,

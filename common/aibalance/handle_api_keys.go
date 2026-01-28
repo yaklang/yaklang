@@ -858,6 +858,8 @@ func (c *ServerConfig) handleGetAPIKeysPaginated(conn net.Conn, request *http.Re
 			"traffic_used":         key.TrafficUsed,
 			"traffic_limit_enable": key.TrafficLimitEnable,
 			"created_at":           key.CreatedAt.Format("2006-01-02 15:04:05"),
+			"created_by_ops_id":    key.CreatedByOpsID,
+			"created_by_ops_name":  key.CreatedByOpsName,
 		}
 
 		if !key.LastUsedTime.IsZero() {
