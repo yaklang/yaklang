@@ -35,13 +35,68 @@ jobs:
 
       - name: Get Yak binary Latest
         run: |
+          echo "::group::Finding and downloading Yak binary"
           BIN_VERSION="${{ inputs.update_version}}"
           if [ -z "$BIN_VERSION" ]; then
             BIN_VERSION="latest"
-          fi 
-          wget https://aliyun-oss.yaklang.com/yak/$BIN_VERSION/yak_linux_amd64
-          pwd && ls -lh && chmod +x ./yak_linux_amd64
+          fi
+          
+          echo "Input version: $BIN_VERSION"
+          
+          # 检查 BIN_VERSION 是否以 yak_ 开头（全量版本）
+          SELECTED_VERSION=""
+          
+          if echo "$BIN_VERSION" | grep -qE '^yak_'; then
+            # 如果已经是以 yak_ 开头，直接使用
+            SELECTED_VERSION="$BIN_VERSION"
+            echo "✅ Input version is full version (starts with yak_): $SELECTED_VERSION"
+          else
+            # 如果不是以 yak_ 开头，从版本列表中查找以 yak_ 开头的版本，直接拿取最新版本
+            echo "⚠️  Input version is not full version, searching for latest yak_* version..."
+            
+            VERSIONS_URL="https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt"
+            if ! VERSIONS=$(curl -sS -L "$VERSIONS_URL" 2>/dev/null | grep -v '^$'); then
+              echo "::error::Failed to fetch version list"
+              exit 1
+            fi
+            
+            echo "Debug: First 20 lines of version list:"
+            echo "$VERSIONS" | head -n 20
+            
+            # 从最新到最旧挨个匹配第一个非 -yakit- 和 -irify- 的标签
+            SELECTED_VERSION=""
+            while IFS= read -r version; do
+              # 检查是否包含 -yakit- 或 -irify-
+              if ! echo "$version" | grep -qE -- '-yakit-|-irify-'; then
+                SELECTED_VERSION="$version"
+                echo "✅ Found latest full version: $SELECTED_VERSION"
+                break
+              fi
+            done <<< "$VERSIONS"
+            
+            if [ -z "$SELECTED_VERSION" ]; then
+              echo "::error::No full version found (all versions contain -yakit- or -irify-)"
+              exit 1
+            fi
+          fi
+          
+          BINARY_NAME="yak_linux_amd64"
+          DOWNLOAD_URL="https://aliyun-oss.yaklang.com/yak/${SELECTED_VERSION}/${BINARY_NAME}"
+          echo "Downloading from: $DOWNLOAD_URL"
+          
+          if ! wget -q "$DOWNLOAD_URL" -O "$BINARY_NAME"; then
+            echo "::error::Failed to download Yak binary from: $DOWNLOAD_URL"
+            exit 1
+          fi
+          
+          chmod +x "./$BINARY_NAME"
+          echo "✅ Successfully downloaded: $BINARY_NAME"
+          echo "::endgroup::"
+          
+          echo "::group::Verifying Yak binary"
+          pwd && ls -lh yak_linux_amd64
           ./yak_linux_amd64 version
+          echo "::endgroup::"
 
       - name: Get Repo tags
         run: |

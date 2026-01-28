@@ -1,8 +1,9 @@
-//go:build !yakit_exclude
-
 package yakgrpc
 
 import (
+	"io"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -11,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"time"
 )
 
 const EXECUTEPACKET_CODE = `yakit.AutoInitYakit()
