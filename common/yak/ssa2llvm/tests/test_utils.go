@@ -129,6 +129,45 @@ func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 	}
 }
 
+// runBinary compiles the code to a native executable and returns stdout.
+func runBinary(t *testing.T, code string, entry string) string {
+	t.Helper()
+
+	// Create temporary source file
+	tmpFile, err := os.CreateTemp("", "test_run_*.yak")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(code); err != nil {
+		t.Fatalf("Failed to write code: %v", err)
+	}
+	tmpFile.Close()
+
+	tmpBin := tmpFile.Name() + ".bin"
+	defer os.Remove(tmpBin)
+
+	compOpts := compiler.CompileOptions{
+		SourceFile:        tmpFile.Name(),
+		OutputFile:        tmpBin,
+		Language:          "yak",
+		EntryFunctionName: entry,
+	}
+
+	if err := compiler.CompileToExecutable(compOpts); err != nil {
+		t.Fatalf("Binary compilation failed: %v", err)
+	}
+
+	cmd := exec.Command(tmpBin)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Binary execution failed: %v\nOutput: %s", err, output)
+	}
+
+	return string(output)
+}
+
 func compareResult(t *testing.T, expected interface{}, result int64) {
 	t.Helper()
 	switch expect := expected.(type) {

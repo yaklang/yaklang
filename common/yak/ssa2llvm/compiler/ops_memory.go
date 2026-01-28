@@ -126,83 +126,8 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 	}
 	keyStr = strings.Trim(keyStr, "\"")
 
-	// Generate GEP
-	// We need type info of parent to find index.
-	ssaParentVal, ok := fn.GetValueById(parentID)
-	if !ok {
-		return fmt.Errorf("SSA parent value %d not found", parentID)
-	}
-	ssaParentType := ssaParentVal.GetType()
-
-	var structType *ssa.ObjectType
-	if ptr, ok := ssaParentType.(*ssa.ObjectType); ok && ptr.Kind == ssa.PointerKind {
-		if st, ok := ssaParentType.(*ssa.ObjectType); ok && st.Kind == ssa.StructTypeKind {
-			structType = st
-		} else {
-			return fmt.Errorf("parent is not a struct: %v", ssaParentType)
-		}
-	} else if st, ok := ssaParentType.(*ssa.ObjectType); ok && st.Kind == ssa.StructTypeKind {
-		structType = st
-	} else {
-		return fmt.Errorf("cannot determine struct type for field access")
-	}
-
-	fieldIndex := -1
-	for i, k := range structType.Keys {
-		if strings.Trim(k.String(), "\"") == keyStr {
-			fieldIndex = i
-			break
-		}
-	}
-	if fieldIndex == -1 {
-		return fmt.Errorf("field %s not found in struct", keyStr)
-	}
-
-	// GEP
-	// Convert parentVal to StructPtr if needed (it is currently Int64)
-	llStructType := c.TypeConverter.ConvertType(structType)
-	llStructPtrType := llvm.PointerType(llStructType, 0)
-
-	// Cast i64 to T*
-	ptr := c.Builder.CreateIntToPtr(parentVal, llStructPtrType, "struct_ptr")
-
-	// GEP
-	// CreateStructGEP(type, val, idx, name)
-	fieldPtr := c.Builder.CreateStructGEP(llStructType, ptr, fieldIndex, "field_ptr")
-
-	// Load
-	// We need the type of the field
-	fieldSSAType := structType.FieldTypes[fieldIndex]
-	llFieldType := c.TypeConverter.ConvertType(fieldSSAType)
-
-	val := c.Builder.CreateLoad(llFieldType, fieldPtr, "field_val")
-
-	if llFieldType.IntTypeWidth() == 64 {
-		c.Values[inst.GetId()] = val
-	} else {
-		// Just try PtrToInt for pointers, or assume compatible for now.
-		// Since we don't have TypeKind exposed easily in llvm.go wrapper provided,
-		// we blindly try PtrToInt if it's not Int64, or just leave it.
-		// Actually, BinOp expects Int64. If we return a Pointer, BinOp fails?
-		// We should cast Ptr to Int64 if possible.
-		// A simple heuristic: if it's not an integer type, cast to int64.
-		// But Structs are also not integer types.
-		//
-		// Let's assume we cast EVERYTHING to Int64 for Phase 1/5 compatibility, except when impossible (Structs).
-		// We can check if it's integer type width 0 (void/struct/ptr).
-		if llFieldType.IntTypeWidth() == 0 {
-			// Likely Pointer or Struct.
-			// Try PtrToInt. If it fails (Struct), LLVM will error at runtime/build time?
-			// We can't know for sure without TypeKind.
-			// Let's assume Pointer for now.
-			casted := c.Builder.CreatePtrToInt(val, c.LLVMCtx.Int64Type(), "ptr_int")
-			c.Values[inst.GetId()] = casted
-		} else {
-			// Integer < 64 bit? ZExt?
-			// For now, assume 64 bit.
-			c.Values[inst.GetId()] = val
-		}
-	}
+	val := c.emitRuntimeGetField(parentVal, keyStr, inst.GetId())
+	c.Values[inst.GetId()] = val
 	return nil
 }
 
@@ -242,76 +167,113 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 	}
 	keyStr = strings.Trim(keyStr, "\"")
 
-	// 3. Determine Struct Type and Index
-	ssaParentType := obj.GetType()
-	var structType *ssa.ObjectType
-	// Handle Pointer to Struct
-	if ptr, ok := ssaParentType.(*ssa.ObjectType); ok && ptr.Kind == ssa.PointerKind {
-		if ptr.FieldType != nil {
-			if st, ok := ptr.FieldType.(*ssa.ObjectType); ok && st.Kind == ssa.StructTypeKind {
-				structType = st
-			}
+	valResult := c.emitRuntimeGetField(parentVal, keyStr, val.GetId())
+	c.Values[val.GetId()] = valResult
+	return nil
+}
+
+func (c *Compiler) getOrInsertRuntimeGetField() (llvm.Value, llvm.Type) {
+	name := "yak_runtime_get_field"
+	fn := c.Mod.NamedFunction(name)
+
+	retType := c.LLVMCtx.Int64Type()
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(retType, []llvm.Type{i8Ptr, i8Ptr}, false)
+
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeSetField() (llvm.Value, llvm.Type) {
+	name := "yak_runtime_set_field"
+	fn := c.Mod.NamedFunction(name)
+
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{i8Ptr, i8Ptr, c.LLVMCtx.Int64Type()}, false)
+
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) resolveMemberKeyString(key ssa.Value) string {
+	if cinst, ok := ssa.ToConstInst(key); ok {
+		return strings.Trim(cinst.String(), "\"")
+	}
+	return strings.Trim(key.GetName(), "\"")
+}
+
+func (c *Compiler) coerceToI8Ptr(val llvm.Value) llvm.Value {
+	i8PtrType := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	if val.Type().IntTypeWidth() > 0 {
+		return c.Builder.CreateIntToPtr(val, i8PtrType, "obj_ptr")
+	}
+	if val.Type() != i8PtrType {
+		return c.Builder.CreateBitCast(val, i8PtrType, "obj_ptr_cast")
+	}
+	return val
+}
+
+func (c *Compiler) coerceToInt64(val llvm.Value) llvm.Value {
+	if val.Type().IntTypeWidth() == 64 {
+		return val
+	}
+	if val.Type().IntTypeWidth() > 0 {
+		width := val.Type().IntTypeWidth()
+		if width == 1 {
+			return buildZExt(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
 		}
-		// Fallback: Check if the pointer type ITSELF behaves like a struct definition
-		if structType == nil && len(ptr.Keys) > 0 {
-			structType = ptr
+		if width > 64 {
+			return buildTrunc(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
 		}
-	} else if st, ok := ssaParentType.(*ssa.ObjectType); ok && st.Kind == ssa.StructTypeKind {
-		structType = st
+		return buildSExt(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
+	}
+	return c.Builder.CreatePtrToInt(val, c.LLVMCtx.Int64Type(), "ptr_i64")
+}
+
+func (c *Compiler) emitRuntimeGetField(objVal llvm.Value, keyStr string, id int64) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeGetField()
+	keyPtr := buildGlobalStringPtr(c.Builder, keyStr, fmt.Sprintf("member_key_%d", id))
+	objPtr := c.coerceToI8Ptr(objVal)
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr}, "member_get")
+}
+
+func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llvm.Value, id int64) {
+	fn, fnType := c.getOrInsertRuntimeSetField()
+	keyPtr := buildGlobalStringPtr(c.Builder, keyStr, fmt.Sprintf("member_key_%d", id))
+	objPtr := c.coerceToI8Ptr(objVal)
+	intVal := c.coerceToInt64(val)
+	c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr, intVal}, "")
+}
+
+func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value, llvmVal llvm.Value) error {
+	mc, ok := val.(ssa.MemberCall)
+	if !ok || !mc.IsMember() {
+		return nil
+	}
+	switch val.(type) {
+	case *ssa.ParameterMember, *ssa.Undefined:
+		return nil
 	}
 
-	if structType == nil {
-		return fmt.Errorf("compileMemberCall: parent is not a struct or pointer to struct: %v", ssaParentType)
+	obj := mc.GetObject()
+	key := mc.GetKey()
+	if obj == nil || key == nil {
+		return nil
 	}
 
-	fieldIndex := -1
-	for i, k := range structType.Keys {
-		if strings.Trim(k.String(), "\"") == keyStr {
-			fieldIndex = i
-			break
-		}
+	objVal, err := c.getValue(contextInst, obj.GetId())
+	if err != nil {
+		return err
 	}
-	if fieldIndex == -1 {
-		return fmt.Errorf("compileMemberCall: field %s not found in struct %s", keyStr, structType.String())
+	keyStr := c.resolveMemberKeyString(key)
+	if keyStr == "" {
+		return nil
 	}
 
-	// 4. Generate GEP
-	llStructType := c.TypeConverter.ConvertType(structType)
-
-	// If parentVal is i64 (parameter), cast to Ptr.
-	// If parentVal is Ptr (Make result), use as is.
-	var ptr llvm.Value
-	if parentVal.Type().IntTypeWidth() > 0 {
-		ptr = c.Builder.CreateIntToPtr(parentVal, llvm.PointerType(llStructType, 0), "struct_ptr")
-	} else {
-		// Assume it's already a pointer.
-		if parentVal.Type() != llvm.PointerType(llStructType, 0) {
-			ptr = c.Builder.CreateBitCast(parentVal, llvm.PointerType(llStructType, 0), "struct_ptr_cast")
-		} else {
-			ptr = parentVal
-		}
-	}
-
-	fieldPtr := c.Builder.CreateStructGEP(llStructType, ptr, fieldIndex, "field_ptr")
-
-	// 5. Load
-	fieldSSAType := structType.FieldTypes[fieldIndex]
-	llFieldType := c.TypeConverter.ConvertType(fieldSSAType)
-	valResult := c.Builder.CreateLoad(llFieldType, fieldPtr, "field_val")
-
-	// 6. Handle Type Width (Int64 compatibility)
-	if llFieldType.IntTypeWidth() == 64 {
-		c.Values[val.GetId()] = valResult
-	} else {
-		if llFieldType.IntTypeWidth() == 0 { // Pointer or other
-			casted := c.Builder.CreatePtrToInt(valResult, c.LLVMCtx.Int64Type(), "ptr_int")
-			c.Values[val.GetId()] = casted
-		} else {
-			// Integer < 64 bit? ZExt?
-			// For now, assume 64 bit.
-			c.Values[val.GetId()] = valResult
-		}
-	}
-
+	c.emitRuntimeSetField(objVal, keyStr, llvmVal, val.GetId())
 	return nil
 }

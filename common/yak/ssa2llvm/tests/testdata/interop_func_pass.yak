@@ -1,0 +1,4 @@
+func main() {
+    a = getObject(99)
+    dump(a)
+}

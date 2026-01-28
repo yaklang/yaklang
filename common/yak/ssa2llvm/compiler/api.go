@@ -223,12 +223,19 @@ func CompileToExecutable(opts CompileOptions) error {
 		}
 	}
 
-	// Rename existing @main to avoid collision with C main wrapper (which uses @main in IR)
-	mainFn := comp.Mod.NamedFunction("@main")
-	if !mainFn.IsNil() {
-		mainFn.SetName("yak_internal_main")
-		// If our entry func was @main, update it
+	// Rename existing main to avoid collision with C main wrapper
+	atMain := comp.Mod.NamedFunction("@main")
+	if !atMain.IsNil() {
+		atMain.SetName("yak_internal_atmain")
 		if entryFunc == "@main" {
+			entryFunc = "yak_internal_atmain"
+		}
+	}
+
+	plainMain := comp.Mod.NamedFunction("main")
+	if !plainMain.IsNil() {
+		plainMain.SetName("yak_internal_main")
+		if entryFunc == "main" {
 			entryFunc = "yak_internal_main"
 		}
 	}
