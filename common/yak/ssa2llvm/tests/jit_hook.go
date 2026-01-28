@@ -21,10 +21,20 @@ func yakInternalPrintInt(n int64) {
 	buffer = append(buffer, n)
 }
 
+func yakInternalMalloc(size int64) unsafe.Pointer {
+	data := make([]byte, size)
+	return unsafe.Pointer(&data[0])
+}
+
 func getHookAddr() unsafe.Pointer {
 	// Create a C-callable function pointer from the Go function using purego.
 	// This avoids using cgo's //export mechanism and C preambles.
 	cb := purego.NewCallback(yakInternalPrintInt)
+	return unsafe.Pointer(cb)
+}
+
+func getMallocHookAddr() unsafe.Pointer {
+	cb := purego.NewCallback(yakInternalMalloc)
 	return unsafe.Pointer(cb)
 }
 
