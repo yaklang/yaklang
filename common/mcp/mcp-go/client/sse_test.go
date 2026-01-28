@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -229,4 +230,325 @@ func TestSSEMCPClient(t *testing.T) {
 	// 		t.Error("Expected error when context is cancelled")
 	// 	}
 	// })
+
+	t.Run("CleanupPendingRequests notifies all waiters", func(t *testing.T) {
+		client, err := NewSSEMCPClient("http://localhost:9999/sse")
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+		defer client.Close()
+
+		// Simulate pending requests by manually adding channels to responses map
+		numRequests := 5
+		errorChans := make([]chan RPCResponse, numRequests)
+
+		client.mu.Lock()
+		for i := 0; i < numRequests; i++ {
+			id := int64(i + 1)
+			ch := make(chan RPCResponse, 1)
+			errorChans[i] = ch
+			client.responses[id] = ch
+		}
+		client.initialized = true
+		client.mu.Unlock()
+
+		t.Logf("Added %d simulated pending requests", numRequests)
+
+		// Verify pending requests exist
+		client.mu.RLock()
+		pendingBefore := len(client.responses)
+		client.mu.RUnlock()
+		if pendingBefore != numRequests {
+			t.Errorf("Expected %d pending requests, got %d", numRequests, pendingBefore)
+		}
+
+		// Call cleanup (simulating connection loss)
+		client.cleanupPendingRequests()
+
+		// Verify all requests received error notification
+		for i, ch := range errorChans {
+			select {
+			case resp := <-ch:
+				if resp.Error == nil {
+					t.Errorf("Request %d: Expected error, got nil", i+1)
+				} else if *resp.Error != "SSE connection lost" {
+					t.Errorf("Request %d: Expected 'SSE connection lost', got '%s'", i+1, *resp.Error)
+				} else {
+					t.Logf("Request %d: Got expected error", i+1)
+				}
+			case <-time.After(1 * time.Second):
+				t.Errorf("Request %d: Timeout waiting for error notification", i+1)
+			}
+		}
+
+		// Verify responses map is cleaned up
+		client.mu.RLock()
+		responsesAfter := len(client.responses)
+		client.mu.RUnlock()
+		if responsesAfter != 0 {
+			t.Errorf("Expected responses map to be empty, got %d pending requests", responsesAfter)
+		}
+
+		// Verify isDisconnected flag is set
+		if !client.isDisconnected.Load() {
+			t.Error("isDisconnected should be true after cleanup")
+		}
+	})
+
+	t.Run("Server shutdown triggers cleanup", func(t *testing.T) {
+		// Create a dedicated server for this test
+		mcpServer2 := server.NewMCPServer(
+			"test-server-shutdown",
+			"1.0.0",
+		)
+		testServer2 := server.NewTestServer(mcpServer2)
+
+		client, err := NewSSEMCPClient(testServer2.URL + "/sse")
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+		defer client.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Start client and establish connection
+		if err := client.Start(ctx); err != nil {
+			t.Fatalf("Failed to start client: %v", err)
+		}
+
+		// Initialize
+		initRequest := mcp.InitializeRequest{}
+		initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+		initRequest.Params.ClientInfo = mcp.Implementation{
+			Name:    "test-client",
+			Version: "1.0.0",
+		}
+
+		_, err = client.Initialize(ctx, initRequest)
+		if err != nil {
+			t.Fatalf("Failed to initialize: %v", err)
+		}
+
+		// Verify client is connected
+		if client.isDisconnected.Load() {
+			t.Error("Client should not be disconnected initially")
+		}
+
+		// Add a mock pending request
+		client.mu.Lock()
+		mockCh := make(chan RPCResponse, 1)
+		client.responses[999] = mockCh
+		client.mu.Unlock()
+
+		// Close the server to simulate connection loss
+		testServer2.CloseClientConnections()
+		testServer2.Close()
+
+		// Wait for the pending request to receive error
+		select {
+		case resp := <-mockCh:
+			if resp.Error == nil {
+				t.Error("Expected error from pending request")
+			} else if *resp.Error != "SSE connection lost" {
+				t.Errorf("Expected 'SSE connection lost', got '%s'", *resp.Error)
+			} else {
+				t.Log("✅ Pending request received connection lost error")
+			}
+		case <-time.After(3 * time.Second):
+			t.Error("Timeout waiting for pending request to be notified")
+		}
+
+		// Give cleanup time to complete
+		time.Sleep(200 * time.Millisecond)
+
+		// Verify isDisconnected is set
+		if !client.isDisconnected.Load() {
+			t.Error("isDisconnected should be true after server shutdown")
+		}
+
+		// Verify responses map is cleaned
+		client.mu.RLock()
+		responsesCount := len(client.responses)
+		client.mu.RUnlock()
+		if responsesCount != 0 {
+			t.Errorf("Expected responses map to be empty, got %d", responsesCount)
+		}
+
+		t.Log("✅ Server shutdown handled correctly")
+	})
+
+	t.Run("Client.Close triggers cleanup", func(t *testing.T) {
+		// Create a dedicated server for this test
+		mcpServer3 := server.NewMCPServer(
+			"test-server-close",
+			"1.0.0",
+		)
+		testServer3 := server.NewTestServer(mcpServer3)
+		defer testServer3.Close()
+
+		client, err := NewSSEMCPClient(testServer3.URL + "/sse")
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Start client and establish connection
+		if err := client.Start(ctx); err != nil {
+			t.Fatalf("Failed to start client: %v", err)
+		}
+
+		// Initialize
+		initRequest := mcp.InitializeRequest{}
+		initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+		initRequest.Params.ClientInfo = mcp.Implementation{
+			Name:    "test-client",
+			Version: "1.0.0",
+		}
+
+		_, err = client.Initialize(ctx, initRequest)
+		if err != nil {
+			t.Fatalf("Failed to initialize: %v", err)
+		}
+
+		// Verify client is connected
+		if client.isDisconnected.Load() {
+			t.Error("Client should not be disconnected initially")
+		}
+
+		// Add multiple mock pending requests
+		numRequests := 3
+		mockChannels := make([]chan RPCResponse, numRequests)
+		for i := 0; i < numRequests; i++ {
+			mockChannels[i] = make(chan RPCResponse, 1)
+			client.mu.Lock()
+			client.responses[int64(1000+i)] = mockChannels[i]
+			client.mu.Unlock()
+		}
+
+		t.Logf("Added %d mock pending requests", numRequests)
+
+		// Call Close() - this should trigger cleanup
+		err = client.Close()
+		if err != nil {
+			t.Errorf("Close() returned error: %v", err)
+		}
+
+		// Verify all pending requests received notification
+		for i, ch := range mockChannels {
+			select {
+			case resp := <-ch:
+				if resp.Error == nil {
+					t.Errorf("Request %d: Expected error, got nil", i+1)
+				} else if *resp.Error != "SSE connection lost" {
+					t.Errorf("Request %d: Expected 'SSE connection lost', got '%s'", i+1, *resp.Error)
+				} else {
+					t.Logf("✅ Request %d: Received connection lost error", i+1)
+				}
+			case <-time.After(1 * time.Second):
+				t.Errorf("Request %d: Timeout waiting for notification", i+1)
+			}
+		}
+
+		// Verify isDisconnected is set
+		if !client.isDisconnected.Load() {
+			t.Error("isDisconnected should be true after Close()")
+		}
+
+		// Verify responses map is cleaned
+		client.mu.RLock()
+		responsesCount := len(client.responses)
+		client.mu.RUnlock()
+		if responsesCount != 0 {
+			t.Errorf("Expected responses map to be empty, got %d", responsesCount)
+		}
+
+		// Verify Close() is idempotent - calling again should not error
+		err = client.Close()
+		if err != nil {
+			t.Errorf("Second Close() returned error: %v", err)
+		}
+
+		t.Log("✅ Client.Close() handled correctly")
+	})
+
+	t.Run("CleanupPendingRequests with concurrent access", func(t *testing.T) {
+		client, err := NewSSEMCPClient("http://localhost:9999/sse")
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
+		defer client.Close()
+
+		// Simulate multiple goroutines waiting for responses
+		numRequests := 10
+		errorChans := make([]chan error, numRequests)
+
+		for i := 0; i < numRequests; i++ {
+			errorChans[i] = make(chan error, 1)
+		}
+
+		// Add requests concurrently
+		for i := 0; i < numRequests; i++ {
+			go func(idx int) {
+				id := int64(idx + 1)
+				ch := make(chan RPCResponse, 1)
+
+				client.mu.Lock()
+				client.responses[id] = ch
+				client.mu.Unlock()
+
+				// Wait for response
+				resp := <-ch
+				if resp.Error != nil {
+					errorChans[idx] <- errors.New(*resp.Error)
+				} else {
+					errorChans[idx] <- nil
+				}
+			}(i)
+		}
+
+		// Wait for all requests to be registered
+		time.Sleep(100 * time.Millisecond)
+
+		client.mu.RLock()
+		pendingBefore := len(client.responses)
+		client.mu.RUnlock()
+		t.Logf("Pending requests before cleanup: %d", pendingBefore)
+
+		// Call cleanup
+		client.cleanupPendingRequests()
+
+		// Verify all goroutines received notification
+		receivedCount := 0
+		timeout := time.After(2 * time.Second)
+		for receivedCount < numRequests {
+			select {
+			case err := <-errorChans[receivedCount]:
+				if err == nil {
+					t.Errorf("Request %d: Expected error, got nil", receivedCount+1)
+				} else if err.Error() == "SSE connection lost" {
+					t.Logf("Request %d: Received expected error", receivedCount+1)
+				} else {
+					t.Errorf("Request %d: Wrong error: %v", receivedCount+1, err)
+				}
+				receivedCount++
+			case <-timeout:
+				t.Fatalf("Timeout: only %d/%d requests notified", receivedCount, numRequests)
+			}
+		}
+
+		// Verify cleanup
+		client.mu.RLock()
+		responsesAfter := len(client.responses)
+		client.mu.RUnlock()
+		if responsesAfter != 0 {
+			t.Errorf("Expected responses map to be empty, got %d", responsesAfter)
+		}
+
+		if !client.isDisconnected.Load() {
+			t.Error("isDisconnected should be true")
+		}
+	})
 }
