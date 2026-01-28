@@ -40,6 +40,12 @@ func TestInterop_Lifecycle(t *testing.T) {
 	if !strings.Contains(output, "[Go] Created object 100") {
 		t.Fatalf("Expected creation log not found. Output:\n%s", output)
 	}
+	if !strings.Contains(output, "[Yak GC] Finalizer triggered") {
+		t.Fatalf("Expected finalizer log not found. Output:\n%s", output)
+	}
+	if !strings.Contains(output, "[Go] Releasing handle") {
+		t.Fatalf("Expected handle release log not found. Output:\n%s", output)
+	}
 }
 
 // 2. Member read/write test

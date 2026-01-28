@@ -8,8 +8,9 @@ import "C"
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 	"runtime/cgo"
-	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -89,44 +90,48 @@ func yak_host_dump(handleID C.uintptr_t) {
 
 // --- Yak Runtime Simulation (Shadow Object Manager) ---
 
-var shadowStore = struct {
-	sync.Mutex
-	objects map[uintptr][]byte
-}{
-	objects: make(map[uintptr][]byte),
+type YakShadow struct {
+	HandleID C.uintptr_t
+}
+
+func finalizeShadow(s *YakShadow) {
+	fmt.Printf("[Yak GC] Finalizer triggered for Handle %d\n", s.HandleID)
+	yak_host_release_handle(s.HandleID)
 }
 
 //export yak_runtime_new_shadow
 func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
-	shadowSize := int(unsafe.Sizeof(C.uintptr_t(0)))
-	shadow := make([]byte, shadowSize)
-	*(*C.uintptr_t)(unsafe.Pointer(&shadow[0])) = handleID
-
-	ptr := unsafe.Pointer(&shadow[0])
-	shadowStore.Lock()
-	shadowStore.objects[uintptr(ptr)] = shadow
-	shadowStore.Unlock()
-
-	fmt.Printf("[Yak] Malloc Shadow for Handle %d\n", handleID)
-	return ptr
+	s := &YakShadow{HandleID: handleID}
+	runtime.SetFinalizer(s, finalizeShadow)
+	fmt.Printf("[Yak] Malloc Shadow for Handle %d with Finalizer\n", handleID)
+	return unsafe.Pointer(s)
 }
 
 //export yak_runtime_get_field
 func yak_runtime_get_field(objPtr unsafe.Pointer, name *C.char) int64 {
-	handleID := *(*C.uintptr_t)(objPtr)
-	return yak_host_get_member(handleID, name)
+	if objPtr == nil {
+		return 0
+	}
+	s := (*YakShadow)(objPtr)
+	return yak_host_get_member(s.HandleID, name)
 }
 
 //export yak_runtime_set_field
 func yak_runtime_set_field(objPtr unsafe.Pointer, name *C.char, val int64) {
-	handleID := *(*C.uintptr_t)(objPtr)
-	yak_host_set_member(handleID, name, val)
+	if objPtr == nil {
+		return
+	}
+	s := (*YakShadow)(objPtr)
+	yak_host_set_member(s.HandleID, name, val)
 }
 
 //export yak_runtime_dump
 func yak_runtime_dump(objPtr unsafe.Pointer) {
-	handleID := *(*C.uintptr_t)(objPtr)
-	yak_host_dump(handleID)
+	if objPtr == nil {
+		return
+	}
+	s := (*YakShadow)(objPtr)
+	yak_host_dump(s.HandleID)
 }
 
 //export yak_runtime_get_object
@@ -139,4 +144,11 @@ func yak_runtime_get_object(initVal int64) C.uintptr_t {
 //export yak_runtime_dump_handle
 func yak_runtime_dump_handle(objID C.uintptr_t) {
 	yak_runtime_dump(unsafe.Pointer(uintptr(objID)))
+}
+
+//export yak_runtime_force_gc
+func yak_runtime_force_gc() {
+	runtime.GC()
+	runtime.GC()
+	time.Sleep(10 * time.Millisecond)
 }
