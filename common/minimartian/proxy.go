@@ -103,6 +103,9 @@ type Proxy struct {
 	strongHostConnPool *lowhttp.LowHttpConnPool
 
 	extraIncomingConnCh chan *WrapperedConn
+
+	// SNI resolver function
+	sniResolver func(host string) *string
 }
 
 func (p *Proxy) MergeExtraIncomingConnectionChannel(ctx context.Context, ch chan *WrapperedConn) {
@@ -282,6 +285,11 @@ func (p *Proxy) SetHTTPForceClose(enable bool) {
 // SetLowhttpConfig sets the lowhttp config
 func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 	p.lowhttpConfig = config
+}
+
+// SetSNIResolver sets the SNI resolver function
+func (p *Proxy) SetSNIResolver(resolver func(host string) *string) {
+	p.sniResolver = resolver
 }
 
 // SetDownstreamProxyConfig updates the proxy routing configuration.

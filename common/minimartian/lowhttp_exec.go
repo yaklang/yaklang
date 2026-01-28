@@ -106,6 +106,12 @@ func (p *Proxy) execLowhttp(ctx *Context, req *http.Request) (*http.Response, er
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
 
+	if p.sniResolver != nil && isHttps {
+		if sni := p.sniResolver(host); sni != nil {
+			opts = append(opts, lowhttp.WithSNI(*sni))
+		}
+	}
+
 	// Use custom connection pool if available and not in strong host mode
 	// In strong host mode, connections must not be reused from pool
 
