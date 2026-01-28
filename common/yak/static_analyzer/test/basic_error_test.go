@@ -377,10 +377,6 @@ println(assignParam(p,"_method","123","当前方法"))
 // 然后又有一个 IIFE 赋值给另一个变量（例如 loadJWTSecretsFromDict = (func(a, b) {...})()），
 // SSA 分析器会错误地将 IIFE 中的匿名函数命名为前一个函数的名字（signatureAny），
 // 导致类型检查时使用错误的函数签名，报告 "Not enough arguments" 的误报。
-//
-// 修复方案：
-// 在处理括号表达式时，临时清空 MarkedFuncName，避免 IIFE 中的匿名函数
-// 错误地继承外层赋值语句的变量名。
 func TestIIFENoFalsePositive(t *testing.T) {
 	t.Run("simple IIFE with 2 params", func(t *testing.T) {
 		code := `
