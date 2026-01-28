@@ -25,18 +25,19 @@ import (
 // while sending requests over regular HTTP POST calls. The client handles
 // automatic reconnection and message routing between requests and responses.
 type SSEMCPClient struct {
-	baseURL       *url.URL
-	endpoint      *url.URL
-	httpClient    *http.Client
-	requestID     atomic.Int64
-	responses     map[int64]chan RPCResponse
-	mu            sync.RWMutex
-	done          chan struct{}
-	initialized   bool
-	notifications []func(mcp.JSONRPCNotification)
-	notifyMu      sync.RWMutex
-	endpointChan  chan struct{}
-	capabilities  mcp.ServerCapabilities
+	baseURL        *url.URL
+	endpoint       *url.URL
+	httpClient     *http.Client
+	requestID      atomic.Int64
+	responses      map[int64]chan RPCResponse
+	mu             sync.RWMutex
+	done           chan struct{}
+	initialized    bool
+	notifications  []func(mcp.JSONRPCNotification)
+	notifyMu       sync.RWMutex
+	endpointChan   chan struct{}
+	capabilities   mcp.ServerCapabilities
+	isDisconnected atomic.Bool
 }
 
 // NewSSEMCPClient creates a new SSE-based MCP client with the given base URL.
@@ -109,6 +110,7 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 // It runs until the connection is closed or an error occurs.
 func (c *SSEMCPClient) readSSE(reader io.ReadCloser) {
 	defer reader.Close()
+	defer c.cleanupPendingRequests()
 
 	var (
 		content []byte
@@ -121,9 +123,17 @@ func (c *SSEMCPClient) readSSE(reader io.ReadCloser) {
 		content, err = utils.BufioReadLine(bufReader)
 		if err != nil {
 			if err == io.EOF || errors.Is(err, io.ErrUnexpectedEOF) {
-				err = nil
+				log.Warnf("SSE connection closed")
 				break
 			}
+			// Network error or other errors
+			log.Errorf("SSE stream error: %v", err)
+			break
+		}
+		select {
+		case <-c.done:
+			return
+		default:
 		}
 		line := string(content)
 
@@ -144,15 +154,41 @@ func (c *SSEMCPClient) readSSE(reader io.ReadCloser) {
 		}
 
 	}
+}
 
-	if err != nil {
-		select {
-		case <-c.done:
-			return
-		default:
-			log.Errorf("SSE stream error: %v\n", err)
-		}
+// cleanupPendingRequests notifies all pending requests that the connection is lost
+// This function is idempotent and can be called multiple times safely
+func (c *SSEMCPClient) cleanupPendingRequests() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Already cleaned up
+	if c.isDisconnected.Load() {
+		return
 	}
+
+	if len(c.responses) == 0 {
+		c.isDisconnected.Store(true)
+		return
+	}
+
+	log.Warnf("Cleaning up %d pending requests due to connection loss", len(c.responses))
+
+	errMsg := "SSE connection lost"
+	disconnectErr := RPCResponse{
+		Error: &errMsg,
+	}
+
+	for id, ch := range c.responses {
+		select {
+		case ch <- disconnectErr:
+			log.Debugf("Notified request %d of connection loss", id)
+		default:
+			// Channel is full or closed, skip
+		}
+		delete(c.responses, id)
+	}
+	c.isDisconnected.Store(true)
 }
 
 // handleSSEEvent processes SSE events based on their type.
@@ -573,13 +609,8 @@ func (c *SSEMCPClient) Close() error {
 		close(c.done)
 	}
 
-	// Clean up any pending responses
-	c.mu.Lock()
-	for _, ch := range c.responses {
-		close(ch)
-	}
-	c.responses = make(map[int64]chan RPCResponse)
-	c.mu.Unlock()
+	// Clean up any pending responses by notifying them
+	c.cleanupPendingRequests()
 
 	return nil
 }
