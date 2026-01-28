@@ -29,11 +29,11 @@ jobs:
       - name: Check out yaklang code
         uses: actions/checkout@v4
 
-      - name: Download yak binary (1.4.5-beta7)
+      - name: Download yak binary (1.4.5-beta8)
         run: |
-          echo "Downloading yak binary version 1.4.5-beta7..."
+          echo "Downloading yak binary version 1.4.5-beta8..."
           mkdir -p $HOME/bin
-          wget -q -O $HOME/bin/yak https://yaklang.oss-accelerate.aliyuncs.com/yak/1.4.5-beta7/yak_linux_amd64
+          wget -q -O $HOME/bin/yak https://yaklang.oss-accelerate.aliyuncs.com/yak/1.4.5-beta8/yak_linux_amd64
           chmod +x $HOME/bin/yak
           export PATH=$HOME/bin:$PATH
           echo "$HOME/bin" >> $GITHUB_PATH
