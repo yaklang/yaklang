@@ -82,10 +82,15 @@ func dumpTools(t *testing.T, tools []*mcp.Tool) {
 		toolInfo := make(map[string]interface{})
 		toolInfo["description"] = tool.Description
 
-		if len(tool.InputSchema.Properties) > 0 {
+		if tool.InputSchema.Properties != nil && len(tool.InputSchema.Properties.Keys()) > 0 {
 			params := make(map[string]interface{})
 
-			for paramName, paramSchema := range tool.InputSchema.Properties {
+			for _, paramName := range tool.InputSchema.Properties.Keys() {
+				paramSchema, ok := tool.InputSchema.Properties.Get(paramName)
+				if !ok {
+					continue
+				}
+
 				paramInfo := make(map[string]interface{})
 
 				// 尝试从 paramSchema 中提取类型、描述等信息

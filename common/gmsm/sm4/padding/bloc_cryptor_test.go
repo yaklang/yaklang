@@ -1,12 +1,14 @@
-package padding
+package padding_test
 
 import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/rand"
 	"fmt"
-	"github.com/yaklang/yaklang/common/gmsm/sm4"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm4"
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 )
 
 func TestP7BlockDecrypt(t *testing.T) {
@@ -27,7 +29,7 @@ func TestP7BlockDecrypt(t *testing.T) {
 	}
 	encrypter := cipher.NewCBCEncrypter(block, iv)
 
-	err = P7BlockEnc(encrypter, srcIn, encOut)
+	err = padding.P7BlockEnc(encrypter, srcIn, encOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +38,7 @@ func TestP7BlockDecrypt(t *testing.T) {
 
 	decrypter := cipher.NewCBCDecrypter(block, iv)
 	decOut := bytes.NewBuffer(make([]byte, 0, 1024))
-	err = P7BlockDecrypt(decrypter, encOut, decOut)
+	err = padding.P7BlockDecrypt(decrypter, encOut, decOut)
 	if err != nil {
 		t.Fatal(err)
 	}

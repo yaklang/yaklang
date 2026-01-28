@@ -2,10 +2,10 @@ package tests
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -67,7 +67,7 @@ func TestCodecTest1(t *testing.T) {
 			{Key: "query", Value: "帮我解答一个CTF题目，题目类型是加解密，附件内容是：RzRaVE1PQldHVTNFR05TREdaQ0RNTUpYR1EzREtOWlRHNUJETU1SVEdRWkRJTVpUR0kyREtSUlRHRVpUTU5LR0dNWlRHTVJWSVlaVE1NWlVHNUNBPT09PQ=="},
 		},
 		aicommon.WithAgreeYOLO(),
-		aicommon.WithAiToolsSearchTool(),
+		aid.WithAiToolsSearchTool(),
 		aicommon.WithAICallback(aiforge.GetOpenRouterAICallbackWithProxy()),
 		aicommon.WithDebugPrompt(true),
 	)
