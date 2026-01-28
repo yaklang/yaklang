@@ -256,3 +256,5 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	mellium.im/sasl v0.3.1 // indirect
 )
+
+replace github.com/yaklang/go-llvm => /home/wlz/Developer/go-llvm
