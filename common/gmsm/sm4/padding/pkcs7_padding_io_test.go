@@ -1,15 +1,17 @@
-package padding
+package padding_test
 
 import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm4/padding"
 )
 
 // 测试P7填充Reader
 func TestPaddingFileReader_Read(t *testing.T) {
 	srcIn := bytes.NewBuffer(bytes.Repeat([]byte{'A'}, 16))
-	p := NewPKCSPaddingReader(srcIn, 16)
+	p := padding.NewPKCSPaddingReader(srcIn, 16)
 
 	tests := []struct {
 		name    string
@@ -45,7 +47,7 @@ func TestPKCS7PaddingWriter_Write(t *testing.T) {
 	paddedSrc := append(src, bytes.Repeat([]byte{0x08}, 8)...)
 	reader := bytes.NewReader(paddedSrc)
 	out := bytes.NewBuffer(make([]byte, 0, 64))
-	writer := NewPKCSPaddingWriter(out, 8)
+	writer := padding.NewPKCSPaddingWriter(out, 8)
 
 	for {
 		buf := make([]byte, 3)

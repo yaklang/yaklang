@@ -29,7 +29,7 @@ func TestNewScanner(t *testing.T) {
 	}
 
 	_ = scanner
-	scanner.RegisterSynAckHandler(uuid2.NewV4().String(), func(ip net.IP, port int) {
+	scanner.RegisterSynAckHandler(uuid2.New().String(), func(ip net.IP, port int) {
 		println(fmt.Sprintf("%v:%v", ip.String(), port))
 	})
 

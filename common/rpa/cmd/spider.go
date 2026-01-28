@@ -15,7 +15,6 @@ func main() {
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		semi.BruteForce,
-		semi.Test,
 	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
@@ -62,8 +61,8 @@ func main() {
 		host := c.String("host")
 		depth := c.Int("depth")
 		proxy := c.String("proxy")
-		username := c.String("username")
-		password := c.String("password")
+		username := c.String("proxy-username")
+		password := c.String("proxy-password")
 		stricturl := c.Bool("stricturl")
 		headers := c.String("headers")
 		maxurl := c.Int("maxurl")
