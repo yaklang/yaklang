@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -138,6 +139,10 @@ func (a *ToolCaller) invoke(
 				if risk != nil {
 					e.EmitYakitRisk(risk.ID, risk.Title)
 				}
+				// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
+				if shouldIgnoreExecResultForEmit(result) {
+					return nil
+				}
 				e.EmitYakitExecResult(result)
 				return nil
 			},
@@ -157,6 +162,54 @@ func (a *ToolCaller) invoke(
 	}
 
 	return execResult, execErr
+}
+
+// shouldIgnoreExecResultForEmit checks if the ExecResult should be ignored
+// to reduce gRPC pressure on the frontend.
+// It filters out high-frequency file STATUS (Stat) messages.
+func shouldIgnoreExecResultForEmit(result *ypb.ExecResult) bool {
+	if result == nil || !result.IsMessage || len(result.Message) == 0 {
+		return false
+	}
+
+	var yakitMsg yaklib.YakitMessage
+	if err := json.Unmarshal(result.Message, &yakitMsg); err != nil {
+		return false
+	}
+
+	if yakitMsg.Type != "log" {
+		return false
+	}
+
+	if len(yakitMsg.Content) == 0 {
+		return false
+	}
+
+	var logInfo yaklib.YakitLog
+	if err := json.Unmarshal(yakitMsg.Content, &logInfo); err != nil {
+		return false
+	}
+
+	// filter out file level logs with STATUS action (yakit.fileStatusAction)
+	// STATUS is called for every file during traversal in find_file.yak, grep.yak etc.
+	// This causes massive gRPC messages when scanning large directories
+	//
+	// Message structure (from YakitClient.YakitDraw -> YakitFile):
+	// YakitMessage{Type: "log", Content: YakitLog{Level: "file", Data: `{"action":"STATUS",...}`}}
+	if logInfo.Level == "file" && logInfo.Data != "" {
+		var fileData = make(map[string]any)
+		if err := json.Unmarshal([]byte(logInfo.Data), &fileData); err != nil {
+			// cannot parse Data as JSON, don't filter (safe default)
+			return false
+		}
+
+		action := utils.InterfaceToString(fileData["action"])
+		if action == "STATUS" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
