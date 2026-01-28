@@ -65,4 +65,10 @@ func TestInterop_FuncPass(t *testing.T) {
 	if !strings.Contains(output, "[Go] Dump:") {
 		t.Fatalf("Expected dump log not found. Output:\n%s", output)
 	}
+	if !strings.Contains(output, "Number:99") {
+		t.Fatalf("Expected dump to include Number:99. Output:\n%s", output)
+	}
+	if !strings.Contains(output, "Name:YakTest") {
+		t.Fatalf("Expected dump to include Name:YakTest. Output:\n%s", output)
+	}
 }

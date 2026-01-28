@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/cgo"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -99,11 +100,21 @@ func finalizeShadow(s *YakShadow) {
 	yak_host_release_handle(s.HandleID)
 }
 
+var shadowStore = struct {
+	sync.Mutex
+	objects map[uintptr]*YakShadow
+}{
+	objects: make(map[uintptr]*YakShadow),
+}
+
 //export yak_runtime_new_shadow
 func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
 	s := &YakShadow{HandleID: handleID}
 	runtime.SetFinalizer(s, finalizeShadow)
 	fmt.Printf("[Yak] Malloc Shadow for Handle %d with Finalizer\n", handleID)
+	shadowStore.Lock()
+	shadowStore.objects[uintptr(unsafe.Pointer(s))] = s
+	shadowStore.Unlock()
 	return unsafe.Pointer(s)
 }
 
@@ -146,8 +157,13 @@ func yak_runtime_dump_handle(objID C.uintptr_t) {
 	yak_runtime_dump(unsafe.Pointer(uintptr(objID)))
 }
 
-//export yak_runtime_force_gc
-func yak_runtime_force_gc() {
+//export yak_runtime_gc
+func yak_runtime_gc() {
+	shadowStore.Lock()
+	for key := range shadowStore.objects {
+		delete(shadowStore.objects, key)
+	}
+	shadowStore.Unlock()
 	runtime.GC()
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
