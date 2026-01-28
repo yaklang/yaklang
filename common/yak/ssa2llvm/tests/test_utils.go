@@ -8,8 +8,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 )
 
 func init() {
@@ -60,6 +60,7 @@ func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 		FunctionName: "check",
 		ExternalHooks: map[string]unsafe.Pointer{
 			"yak_internal_print_int": getHookAddr(),
+			"yak_internal_malloc":    getMallocHookAddr(),
 		},
 	}
 
