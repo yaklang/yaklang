@@ -32,19 +32,20 @@ var (
 	signalWithTypeMutex   = new(sync.Mutex)
 	signalTypeCallerTable = make(map[string]func(func()))
 
-	ServerPushType_Global            = "global"
-	ServerPushType_HttpFlow          = "httpflow"
-	ServerPushType_YakScript         = "yakscript"
-	ServerPushType_Risk              = "risk"
-	ServerPushType_File_Monitor      = "file_monitor"
-	ServerPushType_Error             = "error"
-	ServerPushType_Warning           = "warning"
-	ServerPushType_RPS               = "rps"
-	ServerPushType_CPS               = "cps"
-	ServerPushType_Fuzzer            = "fuzzer_server_push"
-	ServerPushType_SlowInsertSQL     = "httpflow_slow_insert_sql"
-	ServerPushType_SlowQuerySQL      = "httpflow_slow_query_sql"
-	ServerPushType_SlowRuleHook      = "mitm_slow_rule_hook"
+	ServerPushType_Global        = "global"
+	ServerPushType_HttpFlow      = "httpflow"
+	ServerPushType_YakScript     = "yakscript"
+	ServerPushType_Risk          = "risk"
+	ServerPushType_AIMemory      = "ai_memory"
+	ServerPushType_File_Monitor  = "file_monitor"
+	ServerPushType_Error         = "error"
+	ServerPushType_Warning       = "warning"
+	ServerPushType_RPS           = "rps"
+	ServerPushType_CPS           = "cps"
+	ServerPushType_Fuzzer        = "fuzzer_server_push"
+	ServerPushType_SlowInsertSQL = "httpflow_slow_insert_sql"
+	ServerPushType_SlowQuerySQL  = "httpflow_slow_query_sql"
+	ServerPushType_SlowRuleHook  = "mitm_slow_rule_hook"
 )
 
 func RegisterServerPushCallback(id string, stream ypb.Yak_DuplexConnectionServer) {

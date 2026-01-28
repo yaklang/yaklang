@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/schema"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -45,6 +46,32 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 					httpFlowsSeq, changed = WatchDatabaseTableMeta(nil, httpFlowsSeq, stream.Context(), "http_flows")
 					if changed {
 						yakit.BroadcastData(yakit.ServerPushType_HttpFlow, "create")
+					}
+					time.Sleep(time.Second)
+				}
+			}
+		}()
+	}
+
+	{
+		var aiMemorySeq int64
+		var changed bool
+		go func() {
+			for {
+				select {
+				case <-stream.Context().Done():
+					return
+				default:
+					prototype := &schema.AIMemoryEntity{}
+					if aiMemorySeq == 0 {
+						aiMemorySeq, _ = WatchDatabaseTableMeta(nil, 0, stream.Context(), prototype.TableName())
+						time.Sleep(time.Second)
+						continue
+					}
+
+					aiMemorySeq, changed = WatchDatabaseTableMeta(nil, aiMemorySeq, stream.Context(), prototype.TableName())
+					if changed {
+						yakit.BroadcastData(yakit.ServerPushType_AIMemory, "create")
 					}
 					time.Sleep(time.Second)
 				}
