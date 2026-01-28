@@ -369,3 +369,82 @@ println(assignParam(p,"_method","123","当前方法"))
 		})
 	})
 }
+
+// TestIIFENoFalsePositive 测试立即执行函数(IIFE)不会导致误报
+//
+// 问题描述：
+// 当代码中先定义了一个命名函数（例如 signatureAny，4个参数），
+// 然后又有一个 IIFE 赋值给另一个变量（例如 loadJWTSecretsFromDict = (func(a, b) {...})()），
+// SSA 分析器会错误地将 IIFE 中的匿名函数命名为前一个函数的名字（signatureAny），
+// 导致类型检查时使用错误的函数签名，报告 "Not enough arguments" 的误报。
+//
+// 修复方案：
+// 在处理括号表达式时，临时清空 MarkedFuncName，避免 IIFE 中的匿名函数
+// 错误地继承外层赋值语句的变量名。
+func TestIIFENoFalsePositive(t *testing.T) {
+	t.Run("simple IIFE with 2 params", func(t *testing.T) {
+		code := `
+var secretSource = "local"
+var dictNames = "jwt.secrets.list"
+
+loadJWTSecretsFromDict = (func(secretSource, dictNames) {
+    log.Info("Loading from: %v", secretSource)
+    log.Info("Dict names: %v", dictNames)
+})(secretSource, dictNames)
+`
+		// 不应该有任何错误
+		check(t, code, []string{})
+	})
+
+	t.Run("IIFE with function definitions before it", func(t *testing.T) {
+		code := `
+var vulType = "test"
+
+func signatureAny(isHttps, urlStr, reqStr, baseResponse) {
+    log.Info("Checking signature")
+    return false
+}
+
+loadConfig = (func(source, names) {
+    log.Info("Config: %v", source)
+})(vulType, "config")
+`
+		// 不应该有任何错误
+		check(t, code, []string{})
+	})
+
+	t.Run("IIFE with 4-param function and 2-param IIFE", func(t *testing.T) {
+		// 这个测试用例模拟 JWT 插件的结构
+		code := `
+var secretSource = "local"
+var dictNames = "jwt.secrets.list"
+
+func signatureAny(isHttps, urlStr, reqStr, baseResponse) {
+    log.Info("Check 4 params")
+    return false
+}
+
+signatureNone = func(https, urlStr, reqStr, baseResponse) {
+    log.Info("Check 4 params")
+    return false
+}
+
+loadJWTSecretsFromDict = (func(secretSource, dictNames) {
+    log.Info("Loading: %v, %v", secretSource, dictNames)
+})(secretSource, dictNames)
+
+func crackSecret(urlStr, reqStr, rspStr) {
+    log.Info("Crack: %v", urlStr)
+    return false
+}
+
+main = func(isHttps, url, request, response, vulType) {
+    signatureAny(isHttps, url, request, response)
+    signatureNone(isHttps, url, request, response)
+    crackSecret(url, request, response)
+}
+`
+		// 不应该有任何错误
+		check(t, code, []string{})
+	})
+}
