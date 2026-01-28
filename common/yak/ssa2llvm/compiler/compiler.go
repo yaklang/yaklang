@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/types"
 )
 
 // Compiler holds the LLVM context and state for compiling a YakSSA program.
@@ -24,19 +25,25 @@ type Compiler struct {
 
 	// Program is the YakSSA program being compiled.
 	Program *ssa.Program
+
+	TypeConverter *types.TypeConverter
+
+	// CurrentFunction being compiled
+	CurrentFunction *ssa.Function
 }
 
 // NewCompiler initializes a new Compiler instance.
 func NewCompiler(ctx context.Context, prog *ssa.Program) *Compiler {
 	c := llvm.NewContext()
 	return &Compiler{
-		Ctx:     ctx,
-		LLVMCtx: c,
-		Mod:     c.NewModule(prog.Name),
-		Builder: c.NewBuilder(),
-		Values:  make(map[int64]llvm.Value),
-		Blocks:  make(map[int64]llvm.BasicBlock),
-		Program: prog,
+		Ctx:           ctx,
+		LLVMCtx:       c,
+		Mod:           c.NewModule(prog.Name),
+		Builder:       c.NewBuilder(),
+		Values:        make(map[int64]llvm.Value),
+		Blocks:        make(map[int64]llvm.BasicBlock),
+		Program:       prog,
+		TypeConverter: types.NewTypeConverter(c),
 	}
 }
 
@@ -71,6 +78,7 @@ func (c *Compiler) Compile() error {
 
 // CompileFunction compiles a single YakSSA function to LLVM IR.
 func (c *Compiler) CompileFunction(fn *ssa.Function) error {
+	c.CurrentFunction = fn
 	// 1. Create function declaration
 	// Assuming int64 for all types for this phase
 	paramTypes := make([]llvm.Type, len(fn.Params))

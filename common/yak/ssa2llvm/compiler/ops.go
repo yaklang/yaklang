@@ -3,8 +3,8 @@ package compiler
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
@@ -23,6 +23,10 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileConst(op)
 	case *ssa.Call:
 		return c.compileCall(op)
+	case *ssa.Make:
+		return c.compileMake(op)
+	case *ssa.ParameterMember:
+		return c.compileParameterMember(op)
 	default:
 		// Ignore unimplemented instructions for now
 		return nil
@@ -38,9 +42,15 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	}
 
 	// 2. Not found, try to find in function and compile if it's a constant
-	fn := contextInst.GetFunc()
+	var fn *ssa.Function
+	if contextInst != nil {
+		fn = contextInst.GetFunc()
+	} else {
+		fn = c.CurrentFunction
+	}
+
 	if fn == nil {
-		return llvm.Value{}, fmt.Errorf("getValue: context instruction has no function")
+		return llvm.Value{}, fmt.Errorf("getValue: cannot determine function (contextInst is nil and CurrentFunction is nil)")
 	}
 
 	valObj, ok := fn.GetValueById(id)
@@ -60,7 +70,29 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileConst succeded but value %d not cached", id)
 	}
 
-	// 4. Return error if not found and not a constant
+	// 4. Lazy compile if ParameterMember (Value, not Instruction)
+	if pm, ok := valObj.(*ssa.ParameterMember); ok {
+		if err := c.compileParameterMember(pm); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileParameterMember succeeded but value %d not cached", id)
+	}
+
+	// 5. Generic MemberCall
+	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
+		if err := c.compileMemberCall(valObj, mc); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
+	}
+
+	// 6. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
 	return llvm.Value{}, fmt.Errorf("getValue: value %d not found (dependency missing?)", id)
