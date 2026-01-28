@@ -120,8 +120,8 @@ func GetOpsUsersPaginated(page, pageSize int, username string) ([]*schema.OpsUse
 	// Build query
 	dbQuery := db.Model(&schema.OpsUser{})
 	if username != "" {
-		// Use LIKE for partial match with escaped special characters
-		dbQuery = dbQuery.Where("username LIKE ?", "%"+strings.ReplaceAll(strings.ReplaceAll(username, "%", "\\%"), "_", "\\_")+"%")
+		// Use safeLikePattern to escape special characters and prevent SQL injection
+		dbQuery = dbQuery.Where("username LIKE ?", safeLikePattern(username))
 	}
 
 	// Count total
@@ -966,7 +966,7 @@ func (c *ServerConfig) handleOpsCreateApiKey(conn net.Conn, request *http.Reques
 
 	// Sort allowed models for consistent storage
 	sort.Strings(reqBody.AllowedModels)
-	
+
 	// Create API key record
 	allowedModelsStr := strings.Join(reqBody.AllowedModels, ",")
 	apiKeyRecord := &schema.AiApiKeys{
@@ -1100,7 +1100,7 @@ func (c *ServerConfig) handleOpsGetMyKeys(conn net.Conn, request *http.Request, 
 		// Sort allowed models for consistent display
 		models := strings.Split(key.AllowedModels, ",")
 		sort.Strings(models)
-		
+
 		keys = append(keys, map[string]interface{}{
 			"id":                   key.ID,
 			"api_key":              key.APIKey,
@@ -1569,12 +1569,12 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 	}
 
 	type UserStats struct {
-		UserID          uint   `json:"user_id"`
-		Username        string `json:"username"`
-		Active          bool   `json:"active"`
-		ApiKeysCreated  int64  `json:"api_keys_created"`
+		UserID           uint   `json:"user_id"`
+		Username         string `json:"username"`
+		Active           bool   `json:"active"`
+		ApiKeysCreated   int64  `json:"api_keys_created"`
 		TotalTrafficUsed int64  `json:"total_traffic_used"`
-		LastActivity    string `json:"last_activity"`
+		LastActivity     string `json:"last_activity"`
 	}
 
 	var stats []UserStats
@@ -1606,12 +1606,12 @@ func (c *ServerConfig) handleGetOpsStats(conn net.Conn, request *http.Request) {
 		}
 
 		stats = append(stats, UserStats{
-			UserID:          u.ID,
-			Username:        u.Username,
-			Active:          u.Active,
-			ApiKeysCreated:  keyCount,
+			UserID:           u.ID,
+			Username:         u.Username,
+			Active:           u.Active,
+			ApiKeysCreated:   keyCount,
 			TotalTrafficUsed: trafficSum.Total,
-			LastActivity:    lastActivity,
+			LastActivity:     lastActivity,
 		})
 	}
 
