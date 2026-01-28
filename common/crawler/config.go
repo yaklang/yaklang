@@ -149,6 +149,7 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 	}
 
 	var opts []lowhttp.LowhttpOpt
+	opts = append(opts, lowhttp.WithSource("crawler")) // 设置爬虫流量来源
 	opts = append(opts, lowhttp.WithProxy(c.proxies...))
 	if c.AuthUsername != "" || c.AuthPassword != "" {
 		opts = append(opts, lowhttp.WithUsername(c.AuthUsername), lowhttp.WithPassword(c.AuthPassword))
