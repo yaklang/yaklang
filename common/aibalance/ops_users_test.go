@@ -543,6 +543,109 @@ func TestMUSTPASS_OpsApiKeyManagement(t *testing.T) {
 	})
 }
 
+// ==================== SQL Injection Prevention Tests ====================
+
+func TestMUSTPASS_EscapeLikePattern(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"normal", "normal"},
+		{"test%", "test\\%"},
+		{"test_user", "test\\_user"},
+		{"test\\", "test\\\\"},
+		{"%admin%", "\\%admin\\%"},
+		{"a%b_c\\d", "a\\%b\\_c\\\\d"},
+		{"", ""},
+		{"100%", "100\\%"},
+		{"user_name%test", "user\\_name\\%test"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := escapeLikePattern(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestMUSTPASS_SafeLikePattern(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected string
+	}{
+		{"test", "%test%"},
+		{"admin%", "%admin\\%%"},
+		{"user_name", "%user\\_name%"},
+		{"a%b_c", "%a\\%b\\_c%"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			result := safeLikePattern(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestMUSTPASS_GetOpsUsersPaginatedSQLInjection(t *testing.T) {
+	setupTestDBForOps(t)
+
+	// Create test users
+	prefix := fmt.Sprintf("sqli-test-%d", time.Now().UnixNano())
+	createTestOpsUserForTest(t, prefix+"-user1")
+	createTestOpsUserForTest(t, prefix+"-user2")
+
+	// Test SQL injection attempts in username filter
+	// These should not cause errors or return unintended results
+	injectionAttempts := []string{
+		"'; DROP TABLE ops_users; --",
+		"' OR '1'='1",
+		"admin'--",
+		"' UNION SELECT * FROM ops_users --",
+		"%",
+		"_%",
+		"\\",
+		"100%",
+		"test_user",
+	}
+
+	for _, attempt := range injectionAttempts {
+		t.Run("injection_attempt_"+attempt[:min(10, len(attempt))], func(t *testing.T) {
+			// This should not panic or return error
+			users, total, err := GetOpsUsersPaginated(1, 10, attempt)
+			require.NoError(t, err, "SQL injection attempt should not cause error: %s", attempt)
+			// Results should be empty or valid (not all records due to injection)
+			assert.NotNil(t, users)
+			assert.GreaterOrEqual(t, total, int64(0))
+		})
+	}
+
+	// Test normal search still works
+	t.Run("normal_search", func(t *testing.T) {
+		users, total, err := GetOpsUsersPaginated(1, 10, prefix)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, total, int64(2), "should find at least 2 test users")
+		assert.GreaterOrEqual(t, len(users), 2)
+	})
+
+	// Test empty filter returns all users
+	t.Run("empty_filter", func(t *testing.T) {
+		users, total, err := GetOpsUsersPaginated(1, 100, "")
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, total, int64(2))
+		assert.NotEmpty(t, users)
+	})
+}
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // ==================== Edge Case Tests ====================
 
 func TestMUSTPASS_OpsUserDisabled(t *testing.T) {
@@ -621,11 +724,11 @@ func BenchmarkGetOpsUserByID(b *testing.B) {
 
 	password, _ := HashPassword("test")
 	user := &schema.OpsUser{
-		Username:     fmt.Sprintf("bench-user-%d", time.Now().UnixNano()),
-		Password:     password,
-		OpsKey:       GenerateOpsKey(),
-		Role:         "ops",
-		Active:       true,
+		Username: fmt.Sprintf("bench-user-%d", time.Now().UnixNano()),
+		Password: password,
+		OpsKey:   GenerateOpsKey(),
+		Role:     "ops",
+		Active:   true,
 	}
 	db.Create(user)
 	defer db.Delete(user)
