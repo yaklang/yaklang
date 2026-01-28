@@ -85,6 +85,13 @@ func (s *Server) GetProjectDatabase() *gorm.DB {
 	return consts.GetGormProjectDatabase()
 }
 
+func (s *Server) GetProjectDatabaseForRead() *gorm.DB {
+	if s != nil && s.projectDatabase != nil {
+		return s.projectDatabase
+	}
+	return consts.GetGormProjectDatabaseForRead()
+}
+
 func (s *Server) GetSSADatabase() *gorm.DB {
 	return ssadb.GetDB()
 }

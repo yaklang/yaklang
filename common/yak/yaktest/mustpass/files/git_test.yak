@@ -15,6 +15,8 @@ die(git.IterateCommit(localReposDir, git.handleCommit(i => {
     refCount ++
 })))
 dump(count, refCount)
+# 这里用 fake 仓库做回归，commit/ref 的数量可能因为 fixture 调整而变化；
+# 只要能遍历到至少 3 条 commit/ref，就能证明 IterateCommit / reference 回调链路正常。
 if count < 3 { die("COMMIT IS TOO LESS") }
 if refCount < 3 { die("REF IS TOO LESS") }
 
@@ -27,3 +29,9 @@ git.Clone(targetUrl, localReposDir)~
 ret := string(file.ReadFile(file.Join(localReposDir, `testdata`,`node_npm`,`positive_file`,`package.json`))~)
 dump(ret)
 assert `unopinionated, minimalist web framework` in ret
+
+checked = false
+for result in sca.ScanLocalFilesystem(file.Join(localReposDir, `testdata`))~ {
+    if result.Name == "express" && result.Version == "4.16.4" { checked = true }
+}
+if !checked { die(`SCA FileSystem Is not worked well`) }

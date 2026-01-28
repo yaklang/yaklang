@@ -169,7 +169,7 @@ jobs:
 
       - name: Build
         run: |
-          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags gzip_embed -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
+          ${{ matrix.CGO_ENABLED != '' && 'CGO_ENABLED=1' || '' }} ${{ matrix.GOOS != '' && format('GOOS={0}', matrix.GOOS) || '' }} ${{ matrix.GOARCH != '' && format('GOARCH={0}', matrix.GOARCH) || '' }} ${{ matrix.CC != '' && format('CC={0}', matrix.CC) || '' }} go build -tags "gzip_embed sqlite_fts5" -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.YAK_TAG }}'" -o ./${{ matrix.binary }} -v common/yak/cmd/yak.go && ls
 
       - name: Validate signing secrets
         if: ${{ contains(matrix.os, 'windows') && github.event_name != 'pull_request' }}

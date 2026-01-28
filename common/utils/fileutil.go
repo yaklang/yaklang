@@ -491,9 +491,9 @@ func CalcMd5(items ...interface{}) string {
 }
 
 func CalcSha1(items ...interface{}) string {
-	s := fmt.Sprintf("%v", items)
-	raw := sha1.Sum([]byte(s))
-	return hex.EncodeToString(raw[:])
+	h := sha1.New()
+	_, _ = fmt.Fprint(h, items...)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func CalcSha256(items ...interface{}) string {

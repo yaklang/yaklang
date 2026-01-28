@@ -2,7 +2,11 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,6 +15,131 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
+
+var (
+	websocketFlowUpsertOnce    sync.Once
+	websocketFlowUpsertEnabled bool
+)
+
+func ensureWebsocketFlowUpsert(db *gorm.DB) bool {
+	websocketFlowUpsertOnce.Do(func() {
+		if db == nil || !isSQLiteDialect(db) {
+			return
+		}
+		scope := db.NewScope(&schema.WebsocketFlow{})
+		indexName := scope.Dialect().BuildKeyName("uix", scope.TableName(), "hash")
+		if scope.Dialect().HasIndex(scope.TableName(), indexName) {
+			websocketFlowUpsertEnabled = true
+			return
+		}
+		if err := db.Model(&schema.WebsocketFlow{}).AddUniqueIndex(indexName, "hash").Error; err != nil {
+			log.Warnf("failed to create websocket flow unique index on hash: %v", err)
+			websocketFlowUpsertEnabled = false
+			return
+		}
+		websocketFlowUpsertEnabled = true
+	})
+	return websocketFlowUpsertEnabled
+}
+
+func extractWebsocketFlowPayload(hash string, i interface{}) (map[string]any, map[string]bool, bool) {
+	var input map[string]any
+	switch v := i.(type) {
+	case map[string]interface{}:
+		input = make(map[string]any, len(v))
+		for k, val := range v {
+			input[k] = val
+		}
+	default:
+		return nil, nil, false
+	}
+
+	now := time.Now()
+	values := map[string]any{
+		"hash":                   hash,
+		"websocket_request_hash": "",
+		"frame_index":            0,
+		"from_server":            false,
+		"quoted_data":            "",
+		"message_type":           "",
+		"tags":                   "",
+		"created_at":             now,
+		"updated_at":             now,
+	}
+	present := make(map[string]bool, len(input))
+	for k, v := range input {
+		key := strings.ToLower(k)
+		switch key {
+		case "hash":
+			if hash == "" {
+				values["hash"] = v
+				present["hash"] = true
+			}
+		case "websocket_request_hash", "frame_index", "from_server", "quoted_data", "message_type", "tags":
+			values[key] = v
+			present[key] = true
+		}
+	}
+	if values["hash"] == "" {
+		return nil, nil, false
+	}
+	return values, present, true
+}
+
+func upsertWebsocketFlowSQLite(db *gorm.DB, values map[string]any, present map[string]bool) error {
+	if db == nil {
+		return utils.Error("no set database")
+	}
+	scope := db.NewScope(&schema.WebsocketFlow{})
+	table := scope.QuotedTableName()
+	columns := []string{
+		"hash",
+		"websocket_request_hash",
+		"frame_index",
+		"from_server",
+		"quoted_data",
+		"message_type",
+		"tags",
+		"created_at",
+		"updated_at",
+	}
+
+	quotedCols := make([]string, 0, len(columns))
+	args := make([]any, 0, len(columns))
+	for _, col := range columns {
+		quotedCols = append(quotedCols, scope.Quote(col))
+		args = append(args, values[col])
+	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(columns)), ",")
+
+	updateCols := []string{"updated_at"}
+	for _, col := range []string{
+		"websocket_request_hash",
+		"frame_index",
+		"from_server",
+		"quoted_data",
+		"message_type",
+		"tags",
+	} {
+		if present[col] {
+			updateCols = append(updateCols, col)
+		}
+	}
+	updateParts := make([]string, 0, len(updateCols))
+	for _, col := range updateCols {
+		updateParts = append(updateParts, fmt.Sprintf("%s=excluded.%s", scope.Quote(col), scope.Quote(col)))
+	}
+
+	stmt := fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES (%s) ON CONFLICT(%s) DO UPDATE SET %s",
+		table,
+		strings.Join(quotedCols, ","),
+		placeholders,
+		scope.Quote("hash"),
+		strings.Join(updateParts, ","),
+	)
+	return db.Exec(stmt, args...).Error
+}
 
 func SaveToServerWebsocketFlow(db *gorm.DB, owner string, index int, data []byte) error {
 	f := &schema.WebsocketFlow{
@@ -86,12 +215,24 @@ func CreateOrUpdateWebsocketFlowEx(db *gorm.DB, hash string, i interface{}, fini
 }
 
 func CreateOrUpdateWebsocketFlow(db *gorm.DB, hash string, i interface{}) error {
-	db = db.Model(&schema.WebsocketFlow{})
+	if db == nil {
+		return utils.Error("no set database")
+	}
+	if isSQLiteDialect(db) && ensureWebsocketFlowUpsert(db) {
+		if values, present, ok := extractWebsocketFlowPayload(hash, i); ok {
+			if err := upsertWebsocketFlowSQLite(db, values, present); err == nil {
+				return nil
+			}
+		}
+	}
+	return createOrUpdateWebsocketFlowWithGorm(db, hash, i)
+}
 
+func createOrUpdateWebsocketFlowWithGorm(db *gorm.DB, hash string, i interface{}) error {
+	db = db.Model(&schema.WebsocketFlow{})
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&schema.WebsocketFlow{}); db.Error != nil {
 		return utils.Errorf("create/update WebsocketFlow failed: %s", db.Error)
 	}
-
 	return nil
 }
 
