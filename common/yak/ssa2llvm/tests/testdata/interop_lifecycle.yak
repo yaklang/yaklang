@@ -1,5 +1,4 @@
 func main() {
     a = getObject(100)
     a = 0
-    forceGC()
 }

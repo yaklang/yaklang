@@ -322,14 +322,20 @@ func addMainWrapper(ir, entryFunc string) string {
 		callTarget = "@\"@main\""
 	}
 
-	mainWrapper := fmt.Sprintf(`
+	gcDecl := ""
+	if !strings.Contains(ir, "@yak_runtime_gc") {
+		gcDecl = "\ndeclare void @yak_runtime_gc()\n"
+	}
+
+	mainWrapper := fmt.Sprintf(`%s
 define i32 @main() {
 entry:
   %%result = call i64 %s()
+  call void @yak_runtime_gc()
   %%exit_code = trunc i64 %%result to i32
   ret i32 %%exit_code
 }
-`, callTarget)
+`, gcDecl, callTarget)
 	return ir + mainWrapper
 }
 

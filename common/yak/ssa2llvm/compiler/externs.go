@@ -8,7 +8,6 @@ var externs = map[string]string{
 	"println":   "yak_internal_print_int",
 	"getObject": "yak_runtime_get_object",
 	"dump":      "yak_runtime_dump_handle",
-	"forceGC":   "yak_runtime_force_gc",
 }
 
 func getExternFunction(name string) string {
@@ -41,10 +40,6 @@ func (c *Compiler) ensureExternDeclaration(name string) llvm.Value {
 		params := []llvm.Type{c.LLVMCtx.Int64Type()}
 		retType := c.LLVMCtx.VoidType()
 		fnType := llvm.FunctionType(retType, params, false)
-		fn = llvm.AddFunction(c.Mod, externName, fnType)
-	} else if name == "forceGC" {
-		retType := c.LLVMCtx.VoidType()
-		fnType := llvm.FunctionType(retType, nil, false)
 		fn = llvm.AddFunction(c.Mod, externName, fnType)
 	}
 
