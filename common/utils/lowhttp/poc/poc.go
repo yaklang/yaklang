@@ -2208,6 +2208,18 @@ func extractContentLength(headerBytes []byte) int64 {
 	return size
 }
 
+// RemoveSession 清除指定的 session，删除其关联的 cookiejar
+// 这在完成一系列请求后清理资源时很有用
+// Example:
+// ```
+// poc.Get("https://example.com/login", poc.session("user1")) // 使用 session "user1" 登录
+// poc.Get("https://example.com/api", poc.session("user1"))   // 继续使用 session "user1"
+// poc.RemoveSession("user1") // 清除 session "user1"，释放其 cookiejar
+// ```
+func RemoveSession(session interface{}) {
+	lowhttp.RemoveCookiejar(session)
+}
+
 // Download 从指定 URL 下载文件并保存到本地，返回保存的文件路径和错误
 // 支持进度回调、完成回调、自定义文件名和保存目录等选项
 // Example:
@@ -2370,6 +2382,8 @@ var PoCExports = map[string]interface{}{
 	"DownloadWithMethod": DownloadWithMethod,
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": DoWebSocket,
+	// session 管理
+	"RemoveSession": RemoveSession,
 
 	// options
 	"host":                 WithHost,
