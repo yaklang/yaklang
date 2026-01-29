@@ -189,7 +189,7 @@ func (bi *BaseInstaller) Install(descriptor *BinaryDescriptor, options *InstallO
 	}
 	log.Infof("downloading file for binary %s from url: %s, filename: %s", descriptor.Name, downloadInfoURL, filename)
 
-	filePath, err := bi.downloadFile(downloadInfoURL, filename, options)
+	filePath, err := DownloadFile(downloadInfoURL, filename, bi.downloadDir, options)
 	if err != nil {
 		log.Infof("failed to download file for binary %s: %v", descriptor.Name, err)
 		return utils.Errorf("download failed: %v", err)
@@ -568,34 +568,4 @@ func (bi *BaseInstaller) verifyFileChecksums(filePath, md5Hash, sha256Hash strin
 	}
 
 	return nil
-}
-
-// cancelableReaderImpl 实现可取消的Reader
-type cancelableReaderImpl struct {
-	ctx context.Context
-	r   io.Reader
-}
-
-func (cr *cancelableReaderImpl) Read(p []byte) (n int, err error) {
-	select {
-	case <-cr.ctx.Done():
-		return 0, cr.ctx.Err()
-	default:
-	}
-
-	done := make(chan struct{})
-	var readN int
-	var readErr error
-
-	go func() {
-		readN, readErr = cr.r.Read(p)
-		close(done)
-	}()
-
-	select {
-	case <-cr.ctx.Done():
-		return 0, cr.ctx.Err()
-	case <-done:
-		return readN, readErr
-	}
 }
