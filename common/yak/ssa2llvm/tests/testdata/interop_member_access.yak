@@ -1,9 +1,0 @@
-func main() {
-    a = getObject(10)
-    v1 = a.Number
-    println(v1)
-
-    a.Number = 20
-    v2 = a.Number
-    println(v2)
-}

@@ -1,11 +1,11 @@
 package tests
 
 import (
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func extractIntLines(output string) []int64 {
@@ -23,52 +23,53 @@ func extractIntLines(output string) []int64 {
 	return nums
 }
 
-func loadTestdata(t *testing.T, name string) string {
-	t.Helper()
-	path := filepath.Join("testdata", name)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("Failed to read %s: %v", path, err)
-	}
-	return string(data)
-}
-
 // 1. Lifecycle test
 func TestInterop_Lifecycle(t *testing.T) {
-	code := loadTestdata(t, "interop_lifecycle.yak")
-	output := runBinary(t, code, "main")
-	if !strings.Contains(output, "[Go] Created object 100") {
-		t.Fatalf("Expected creation log not found. Output:\n%s", output)
-	}
-	if !strings.Contains(output, "[Yak GC] Finalizer triggered") {
-		t.Fatalf("Expected finalizer log not found. Output:\n%s", output)
-	}
-	if !strings.Contains(output, "[Go] Releasing handle") {
-		t.Fatalf("Expected handle release log not found. Output:\n%s", output)
-	}
+	code := `
+func main() {
+    a = getObject(100)
+    a = 0
+}
+`
+	output := checkRunBinary(t, code, "main", map[string]string{"GCLOG": "1"}, []string{
+		"[Go] Created object 100",
+		"[Yak GC] Finalizer triggered",
+		"[Go] Releasing handle",
+	})
+	require.NotEmpty(t, output)
 }
 
 // 2. Member read/write test
 func TestInterop_MemberAccess(t *testing.T) {
-	code := loadTestdata(t, "interop_member_access.yak")
-	output := runBinary(t, code, "main")
+	code := `
+func main() {
+    a = getObject(10)
+    v1 = a.Number
+    println(v1)
+
+    a.Number = 20
+    v2 = a.Number
+    println(v2)
+}
+`
+	output := checkRunBinary(t, code, "main", nil, []string{"10\n", "20\n"})
 	nums := extractIntLines(output)
-	if len(nums) != 2 || nums[0] != 10 || nums[1] != 20 {
-		t.Fatalf("Expected printed values [10 20], got %v. Output:\n%s", nums, output)
-	}
+	require.Len(t, nums, 2)
+	require.Equal(t, int64(10), nums[0])
+	require.Equal(t, int64(20), nums[1])
 }
 
 // 3. Function pass test
 func TestInterop_FuncPass(t *testing.T) {
-	code := loadTestdata(t, "interop_func_pass.yak")
-	output := runBinary(t, code, "main")
-	if !strings.Contains(output, "[Go] Dump:") {
-		t.Fatalf("Expected dump log not found. Output:\n%s", output)
-	}
-	if !strings.Contains(output, "Number:99") {
-		t.Fatalf("Expected dump to include Number:99. Output:\n%s", output)
-	}
-	if !strings.Contains(output, "Name:YakTest") {
-		t.Fatalf("Expected dump to include Name:YakTest. Output:\n%s", output)
-	}
+	code := `
+func main() {
+    a = getObject(99)
+    dump(a)
+}
+`
+	checkRunBinary(t, code, "main", nil, []string{
+		"[Go] Dump:",
+		"Number:99",
+		"Name:YakTest",
+	})
 }

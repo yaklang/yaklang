@@ -8,6 +8,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 )
@@ -131,6 +132,11 @@ func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 
 // runBinary compiles the code to a native executable and returns stdout.
 func runBinary(t *testing.T, code string, entry string) string {
+	return runBinaryWithEnv(t, code, entry, nil)
+}
+
+// runBinaryWithEnv compiles the code to a native executable and returns stdout.
+func runBinaryWithEnv(t *testing.T, code string, entry string, env map[string]string) string {
 	t.Helper()
 
 	// Create temporary source file
@@ -160,12 +166,28 @@ func runBinary(t *testing.T, code string, entry string) string {
 	}
 
 	cmd := exec.Command(tmpBin)
+	if len(env) > 0 {
+		cmd.Env = append([]string{}, os.Environ()...)
+		for k, v := range env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Binary execution failed: %v\nOutput: %s", err, output)
 	}
 
 	return string(output)
+}
+
+// checkRunBinary compiles the code, runs it, and asserts stdout contains required substrings.
+func checkRunBinary(t *testing.T, code string, entry string, env map[string]string, required []string) string {
+	t.Helper()
+	output := runBinaryWithEnv(t, code, entry, env)
+	for _, want := range required {
+		require.Contains(t, output, want)
+	}
+	return output
 }
 
 func compareResult(t *testing.T, expected interface{}, result int64) {
