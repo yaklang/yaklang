@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -39,6 +40,9 @@ type ToolCaller struct {
 	onCallToolStart func(callToolId string)
 	onCallToolEnd   func(callToolId string)
 
+	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error)
+	intervalReviewDuration time.Duration // interval duration for review, default is 10 seconds
+
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 }
@@ -58,6 +62,25 @@ func WithToolCaller_ReviewWrongParam(
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongParamHandler = handler
+	}
+}
+
+// WithToolCaller_IntervalReviewHandler sets the interval review handler for tool execution.
+// The handler is called periodically during tool execution to review the progress.
+// If the handler returns false, the tool execution will be cancelled.
+func WithToolCaller_IntervalReviewHandler(
+	handler func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.intervalReviewHandler = handler
+	}
+}
+
+// WithToolCaller_IntervalReviewDuration sets the interval duration for the review handler.
+// Default value is 10 seconds if not set.
+func WithToolCaller_IntervalReviewDuration(duration time.Duration) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.intervalReviewDuration = duration
 	}
 }
 
@@ -171,6 +194,15 @@ func (t *ToolCaller) SetEmitter(e *Emitter) {
 
 func (t *ToolCaller) GetEmitter() *Emitter {
 	return t.emitter
+}
+
+// GetIntervalReviewDuration returns the interval review duration.
+// If not set, returns the default value of 10 seconds.
+func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
+	if t.intervalReviewDuration <= 0 {
+		return time.Second * 10 // default 10 seconds
+	}
+	return t.intervalReviewDuration
 }
 
 func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string) (string, error) {
@@ -473,7 +505,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 
-	toolResult, err = t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutMultiWriter, stderrMultiWriter)
+	toolResult, err = t.invoke(
+		tool, invokeParams, handleUserCancel, handleError,
+		stdoutMultiWriter, stderrMultiWriter,
+		stdoutBuffer, stderrBuffer,
+	)
 	if err != nil {
 		if toolResult == nil {
 			toolResult = &aitool.ToolResult{

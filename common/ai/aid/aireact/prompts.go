@@ -43,6 +43,12 @@ var wrongToolPromptTemplate string
 //go:embed prompts/tool/wrong-params.txt
 var wrongParamsPromptTemplate string
 
+//go:embed prompts/tool/interval-review.txt
+var intervalReviewPromptTemplate string
+
+//go:embed prompts/tool/interval-review.json
+var intervalReviewSchemaJSON string
+
 //go:embed prompts/tool-params/blueprint-params.txt
 var blueprintParamsPromptTemplate string
 
@@ -718,4 +724,37 @@ func (pm *PromptManager) executeTemplate(name, templateContent string, data inte
 
 func (pm *PromptManager) DynamicContext() string {
 	return pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
+}
+
+// IntervalReviewPromptData contains data for interval review prompt template
+type IntervalReviewPromptData struct {
+	ToolName        string
+	ToolDescription string
+	ToolParams      string
+	ElapsedDuration string
+	StdoutSnapshot  string
+	StderrSnapshot  string
+	Schema          string
+}
+
+// GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
+func (pm *PromptManager) GenerateIntervalReviewPrompt(
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+) (string, error) {
+	data := &IntervalReviewPromptData{
+		ToolName:        tool.Name,
+		ToolDescription: tool.Description,
+		ToolParams:      params.Dump(),
+		StdoutSnapshot:  utils.ShrinkString(string(stdoutSnapshot), 2000),
+		StderrSnapshot:  utils.ShrinkString(string(stderrSnapshot), 1000),
+		Schema:          intervalReviewSchemaJSON,
+	}
+
+	// Calculate elapsed duration (approximate, since we don't have start time)
+	// The actual elapsed time is tracked by the caller
+	data.ElapsedDuration = "ongoing"
+
+	return pm.executeTemplate("interval-review", intervalReviewPromptTemplate, data)
 }

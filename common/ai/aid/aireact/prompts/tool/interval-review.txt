@@ -1,0 +1,45 @@
+# Interval Review - Tool Execution Progress Check
+
+You are monitoring a long-running tool execution. Your task is to review the current execution status and decide whether it should continue or be cancelled.
+
+## Tool Being Executed
+- **Tool Name**: {{ .ToolName }}
+- **Tool Description**: {{ .ToolDescription }}
+- **Parameters**: {{ .ToolParams }}
+
+## Execution Duration
+This tool has been running for approximately **{{ .ElapsedDuration }}**.
+
+## Current Output Snapshot
+
+### Standard Output (stdout)
+```
+{{ .StdoutSnapshot }}
+```
+
+### Standard Error (stderr)
+```
+{{ .StderrSnapshot }}
+```
+
+## Your Decision
+
+Based on the above information, you need to decide:
+
+1. **continue** - The tool is making progress and should continue executing
+2. **cancel** - The tool appears to be stuck, producing errors, or should be stopped for other reasons
+
+Consider the following when making your decision:
+- Is the tool making meaningful progress?
+- Are there any error messages that indicate a problem?
+- Is the output reasonable for the expected task?
+- Has the tool been running too long without producing useful results?
+- Are there any signs of infinite loops or resource exhaustion?
+
+## Response Format
+
+Please output a JSON object that conforms to the following schema:
+
+```schema
+{{ .Schema }}
+```
