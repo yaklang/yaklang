@@ -92,6 +92,21 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
 	)
 
+	// Add interval review handler if not disabled (enabled by default)
+	if !r.config.DisableIntervalReview {
+		intervalHandler := r.CreateIntervalReviewHandler()
+		if intervalHandler != nil {
+			toolCallerOptions = append(toolCallerOptions,
+				aicommon.WithToolCaller_IntervalReviewHandler(intervalHandler),
+			)
+			if r.config.IntervalReviewDuration > 0 {
+				toolCallerOptions = append(toolCallerOptions,
+					aicommon.WithToolCaller_IntervalReviewDuration(r.config.IntervalReviewDuration),
+				)
+			}
+		}
+	}
+
 	// Only add parameter generation builder if we need AI to generate params
 	if !skipRequire {
 		toolCallerOptions = append(toolCallerOptions,

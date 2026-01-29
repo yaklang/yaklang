@@ -1,13 +1,15 @@
 package aicommon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -23,12 +25,71 @@ const (
 	ToolCallAction_Finish        = "finish"
 )
 
+func (a *ToolCaller) intervalReviewContext(
+	ctx context.Context, reviewCancel func(),
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	onAICanceled func(any),
+) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warnf("interval review context panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	if utils.IsNil(a.intervalReviewHandler) {
+		return
+	}
+
+	reviewDuration := a.GetIntervalReviewDuration()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			time.Sleep(reviewDuration)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot, stderrSnapshot)
+				if err != nil {
+					log.Errorf("interval review handler failed: %v", err)
+					continue
+				}
+				if !shouldContinue {
+					reviewCancel()
+					if !utils.IsNil(onAICanceled) {
+						onAICanceled(fmt.Sprintf("interval review handler failed: %v", err))
+					}
+					return
+				}
+			}
+		}
+	}
+}
+
+// IntervalReviewContext is the public wrapper for intervalReviewContext.
+// This allows external packages (like tests) to call the interval review logic directly.
+func (a *ToolCaller) IntervalReviewContext(
+	ctx context.Context, reviewCancel func(),
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	onAICanceled func(any),
+) {
+	a.intervalReviewContext(ctx, reviewCancel, tool, params, stdoutSnapshot, stderrSnapshot, onAICanceled)
+}
+
 func (a *ToolCaller) invoke(
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
 	userCancel func(reason any),
 	reportError func(err any),
 	stdoutWriter, stderrWriter io.Writer,
+	stdoutSnapshotBuffer, stderrSnapshotBuffer *bytes.Buffer,
 ) (*aitool.ToolResult, error) {
 	c := a.config
 	e := a.emitter
@@ -122,6 +183,22 @@ func (a *ToolCaller) invoke(
 	stdoutWriter.Write([]byte(fmt.Sprintf("invoking tool[%v] ...\n", tool.Name))) // 确保触发执行卡片，优化体验
 
 	log.Infof("start to invoke tool[%s] with params: %v", tool.Name, params)
+
+	if !utils.IsNil(a.intervalReviewHandler) {
+		intervalStart := make(chan struct{})
+		go func() {
+			close(intervalStart)
+			a.intervalReviewContext(
+				ctx, cancel,
+				tool, params,
+				stdoutSnapshotBuffer.Bytes(),
+				stderrSnapshotBuffer.Bytes(),
+				userCancel,
+			)
+		}()
+		<-intervalStart
+	}
+
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
