@@ -211,6 +211,12 @@ type Config struct {
 	// default Task for call tool directly
 	DefaultTask AIStatefulTask
 
+	// Interval review config for long-running tool execution
+	// By default, AI will periodically review tool execution progress
+	// Set DisableIntervalReview to true to disable this feature
+	DisableIntervalReview  bool          // Disable interval review during tool execution (default: false, meaning enabled)
+	IntervalReviewDuration time.Duration // Duration between reviews (default 10s)
+
 	// iteration limit
 	MaxIterationCount int64
 
@@ -1143,6 +1149,39 @@ func WithEnablePlanAndExec(enable bool) ConfigOption {
 		}
 		c.m.Lock()
 		c.EnablePlanAndExec = enable
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithDisableToolCallerIntervalReview disables interval review during tool execution.
+// By default, interval review is ENABLED for long-running tool calls.
+// AI will periodically review tool execution progress and decide whether to continue.
+// Use this option to disable this safety feature if needed.
+func WithDisableToolCallerIntervalReview(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableIntervalReview = disable
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithToolCallerIntervalReviewDuration sets the duration between interval reviews during tool execution.
+// Default is 10 seconds if not set.
+func WithToolCallerIntervalReviewDuration(duration time.Duration) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		if duration <= 0 {
+			duration = time.Second * 10 // default 10 seconds
+		}
+		c.m.Lock()
+		c.IntervalReviewDuration = duration
 		c.m.Unlock()
 		return nil
 	}

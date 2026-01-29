@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "decision"],
+  "properties": {
+    "@action": {
+      "type": "string",
+      "enum": ["interval-toolcall-review"],
+      "description": "Action type for interval tool call review."
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["continue", "cancel"],
+      "description": "The decision for the tool execution. 'continue' means the tool should keep running, 'cancel' means the tool execution should be stopped."
+    },
+    "reason": {
+      "type": "string",
+      "description": "A brief explanation for the decision, explaining why you chose to continue or cancel."
+    },
+    "progress_summary": {
+      "type": "string",
+      "description": "A summary of what the tool has accomplished so far based on the output."
+    },
+    "estimated_remaining_time": {
+      "type": "string",
+      "description": "Your estimate of how much longer the tool might need to complete, if continuing."
+    }
+  }
+}
