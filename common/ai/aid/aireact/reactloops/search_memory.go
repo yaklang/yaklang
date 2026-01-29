@@ -1,15 +1,37 @@
 package reactloops
 
 import (
+	"context"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"time"
 )
 
 func (r *ReActLoop) fastLoadSearchMemoryWithoutAI(input string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		r._fastLoadSearchMemoryWithoutAI(input)
+	}()
+
+	select {
+	case <-done:
+		// 正常完成
+		log.Info("fast load search memory completed successfully")
+	case <-ctx.Done():
+		// 超时
+		log.Warn("fast load search memory timeout after 30 seconds")
+	}
+}
+
+func (r *ReActLoop) _fastLoadSearchMemoryWithoutAI(input string) {
 	if r.memoryTriage == nil {
 		return
 	}
