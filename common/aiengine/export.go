@@ -51,6 +51,7 @@ var Exports = map[string]interface{}{
 	"attachedAIForge":       WithAttachedAIForge,
 	"attachedResource":      WithAttachedResource,
 
+	"extendedForgeFromZip": WithExtendedForgeFromZip,
 	// ai forge
 	// "BuildAIForge":      BuildAIForge,
 	// "forgePlan":         WithForgePlan,

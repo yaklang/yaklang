@@ -115,7 +115,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	manager := r.config.AiForgeManager
 
 	// 首先检查 Forge 是否存在
-	ins, err := manager.GetAIForge(forgeName)
+	ins, err := r.getForgeByName(forgeName)
 	if err != nil {
 		// 记录详细的错误信息到 Timeline，使用明显的标识符
 		resultMsg := fmt.Sprintf("无法找到 AI 智能应用 '%s'，请检查应用名称是否正确。可用的应用可以通过工具搜索查看。", forgeName)
@@ -231,4 +231,14 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		return nil, nil, utils.Errorf("ai-forge params is nil after review")
 	}
 	return ins, forgeParams, nil
+}
+
+func (r *ReAct) getForgeByName(forgeName string) (*schema.AIForge, error) {
+	for _, forge := range r.config.ExtendedForge {
+		if forge.ForgeName == forgeName {
+			return forge, nil
+		}
+	}
+	manager := r.config.AiForgeManager
+	return manager.GetAIForge(forgeName)
 }

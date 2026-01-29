@@ -230,11 +230,14 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	return targetPath, nil
 }
 
-// ImportAIForgesFromZip imports one or more forges (and optional AI tools) from a zip package.
-func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOption) ([]*schema.AIForge, error) {
-	if db == nil {
-		return nil, utils.Error("db is required")
-	}
+type AIForgesArchiveInfo struct {
+	AIForges   []*schema.AIForge
+	AIYakTools []*schema.AIYakTool
+}
+
+// LoadAIForgesFromZip loads one or more forges (and optional AI tools) from a zip package.
+// This function only parses and returns the data without saving to database.
+func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesArchiveInfo, error) {
 	if zipPath == "" {
 		return nil, utils.Error("zip path is required")
 	}
@@ -254,7 +257,7 @@ func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOptio
 			opt.progress(percent, msg)
 		}
 	}
-	progress(0, "start import")
+	progress(0, "start loading")
 
 	fileBytes, err := os.ReadFile(zipPath)
 	if err != nil {
@@ -299,24 +302,118 @@ func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOptio
 		if opt.newName != "" && len(cfgPaths) == 1 {
 			effectiveName = opt.newName
 		}
-		forge, err := loadForgeFromDir(db, filepath.Dir(p), effectiveName, opt)
+		forge, err := parseForgeFromDir(filepath.Dir(p), effectiveName)
 		if err != nil {
 			return nil, err
 		}
 		forges = append(forges, forge)
+		progressStep(fmt.Sprintf("loaded forge %s", forge.ForgeName))
+	}
+
+	var tools []*schema.AIYakTool
+	for _, p := range toolCfgPaths {
+		tool, err := parseAIToolFromDir(filepath.Dir(p))
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, tool)
+		progressStep(fmt.Sprintf("loaded tool %s", tool.Name))
+	}
+
+	progress(100, "load completed")
+	return &AIForgesArchiveInfo{
+		AIForges:   forges,
+		AIYakTools: tools,
+	}, nil
+}
+
+// ImportAIForgesFromZip imports one or more forges (and optional AI tools) from a zip package.
+// This function loads the data and saves it to database.
+func ImportAIForgesFromZip(db *gorm.DB, zipPath string, opts ...ForgeImportOption) ([]*schema.AIForge, error) {
+	if db == nil {
+		return nil, utils.Error("db is required")
+	}
+
+	opt := applyImportOptions(opts...)
+
+	// 修改进度回调以适配 LoadAIForgesFromZip 和数据库保存阶段
+	originalProgress := opt.progress
+	loadProgress := func(percent float64, msg string) {
+		if originalProgress != nil {
+			// 加载阶段占 50%
+			originalProgress(percent*0.5, msg)
+		}
+	}
+
+	// 创建加载选项
+	loadOpts := make([]ForgeImportOption, 0, len(opts))
+	for _, optFunc := range opts {
+		loadOpts = append(loadOpts, optFunc)
+	}
+	// 替换进度回调
+	loadOpts = append(loadOpts, WithImportProgress(loadProgress))
+
+	// 加载数据
+	archiveInfo, err := LoadAIForgesFromZip(zipPath, loadOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	progress := func(percent float64, msg string) {
+		if originalProgress != nil {
+			// 数据库保存阶段占 50%，从 50% 开始
+			originalProgress(50+percent*0.5, msg)
+		}
+	}
+	progress(0, "start importing to database")
+
+	total := len(archiveInfo.AIForges) + len(archiveInfo.AIYakTools)
+	current := 0
+	progressStep := func(msg string) {
+		current++
+		progress(float64(current)/float64(total)*100, msg)
+	}
+
+	// 保存 forges 到数据库
+	var importedForges []*schema.AIForge
+	for _, forge := range archiveInfo.AIForges {
+		if !opt.overwrite {
+			if _, err := yakit.GetAIForgeByName(db, forge.ForgeName); err == nil {
+				return nil, utils.Errorf("forge %s already exists", forge.ForgeName)
+			}
+		}
+
+		if err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge); err != nil {
+			return nil, err
+		}
+		importedForges = append(importedForges, forge)
 		progressStep(fmt.Sprintf("imported forge %s", forge.ForgeName))
 	}
 
-	for _, p := range toolCfgPaths {
-		tool, err := loadAIToolFromDir(db, filepath.Dir(p), opt)
-		if err != nil {
-			return nil, err
+	// 保存 tools 到数据库
+	for _, tool := range archiveInfo.AIYakTools {
+		if !opt.overwrite {
+			if _, err := yakit.GetAIYakTool(db, tool.Name); err == nil {
+				return nil, utils.Errorf("tool %s already exists", tool.Name)
+			}
+		}
+
+		if existing, err := yakit.GetAIYakTool(db, tool.Name); err == nil {
+			tool.ID = existing.ID
+			tool.CreatedAt = existing.CreatedAt
+			if _, err := yakit.UpdateAIYakToolByID(db, tool); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := yakit.CreateAIYakTool(db, tool); err != nil {
+				return nil, err
+			}
 		}
 		progressStep(fmt.Sprintf("imported tool %s", tool.Name))
 	}
 
 	progress(100, "import completed")
-	return forges, nil
+	return importedForges, nil
 }
 
 func detectForgeType(forge *schema.AIForge) string {
@@ -517,7 +614,8 @@ func dumpAIToolToDir(tool *schema.AIYakTool, dir string) error {
 	return nil
 }
 
-func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forgeImportOptions) (*schema.AIForge, error) {
+// parseForgeFromDir parses forge configuration from directory without database operations.
+func parseForgeFromDir(cfgDir string, overrideName string) (*schema.AIForge, error) {
 	cfgPath := filepath.Join(cfgDir, "forge_cfg.json")
 	cfgBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -587,6 +685,16 @@ func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forg
 		forge.ForgeContent = cfg.ForgeContent
 	}
 
+	return forge, nil
+}
+
+// loadForgeFromDir loads forge from directory and saves to database.
+func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forgeImportOptions) (*schema.AIForge, error) {
+	forge, err := parseForgeFromDir(cfgDir, overrideName)
+	if err != nil {
+		return nil, err
+	}
+
 	if opt != nil {
 		if !opt.overwrite {
 			if _, err := yakit.GetAIForgeByName(db, forge.ForgeName); err == nil {
@@ -601,7 +709,8 @@ func loadForgeFromDir(db *gorm.DB, cfgDir string, overrideName string, opt *forg
 	return forge, nil
 }
 
-func loadAIToolFromDir(db *gorm.DB, cfgDir string, opt *forgeImportOptions) (*schema.AIYakTool, error) {
+// parseAIToolFromDir parses AI tool configuration from directory without database operations.
+func parseAIToolFromDir(cfgDir string) (*schema.AIYakTool, error) {
 	cfgPath := filepath.Join(cfgDir, "tool_cfg.json")
 	cfgBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -631,6 +740,16 @@ func loadAIToolFromDir(db *gorm.DB, cfgDir string, opt *forgeImportOptions) (*sc
 	}
 	if tool.EnableAIOutputLog == 0 {
 		tool.EnableAIOutputLog = yakscripttools.ParseAIToolEnableAIOutputLog(tool.Content)
+	}
+
+	return tool, nil
+}
+
+// loadAIToolFromDir loads AI tool from directory and saves to database.
+func loadAIToolFromDir(db *gorm.DB, cfgDir string, opt *forgeImportOptions) (*schema.AIYakTool, error) {
+	tool, err := parseAIToolFromDir(cfgDir)
+	if err != nil {
+		return nil, err
 	}
 
 	if opt != nil && !opt.overwrite {

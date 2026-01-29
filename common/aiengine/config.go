@@ -65,6 +65,8 @@ type AIEngineConfig struct {
 	ExtOptions []aicommon.ConfigOption
 
 	AttachedResources []*aicommon.AttachedResource
+
+	ExtendedForgeFromZip []*ExtendedForgeZip
 }
 
 // AIEngineConfigOption 配置选项函数
@@ -388,6 +390,20 @@ func WithAIConfig(typeName string, opts ...aispec.AIConfigOption) AIEngineConfig
 func WithExtOptions(opts ...aicommon.ConfigOption) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.ExtOptions = opts
+	}
+}
+
+// WithExtendedForgeFromZip 设置扩展 Forge 从 ZIP 文件中加载
+func WithExtendedForgeFromZip(zipPath string, password ...string) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		passwd := ""
+		if len(password) > 0 {
+			passwd = password[0]
+		}
+		c.ExtendedForgeFromZip = append(c.ExtendedForgeFromZip, &ExtendedForgeZip{
+			ZipPath:  zipPath,
+			Password: passwd,
+		})
 	}
 }
 
