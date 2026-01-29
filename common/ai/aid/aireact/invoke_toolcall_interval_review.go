@@ -54,7 +54,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 				rsp.GetOutputStreamReader("interval-review", true, r.Emitter),
 				"interval-toolcall-review",
 				aicommon.WithActionFieldStreamHandler([]string{
-					"reason", "progress_summary",
+					"reason", "progress_summary", "estimated_remaining_time",
 				}, func(key string, reader io.Reader) {
 					reader = utils.JSONStringReader(utils.UTF8Reader(reader))
 					switch key {
