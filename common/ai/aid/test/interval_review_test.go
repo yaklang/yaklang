@@ -386,4 +386,3 @@ func TestIntervalReviewIntegration_MockedAI(t *testing.T) {
 		require.True(t, toolCallCompleted, "tool call should complete normally")
 	})
 }
-
