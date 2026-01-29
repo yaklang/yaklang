@@ -7,6 +7,7 @@ package main
 import "C"
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"runtime"
 	"runtime/cgo"
@@ -33,7 +34,9 @@ func yak_internal_malloc(size int64) uintptr {
 func yak_host_release_handle(id C.uintptr_t) {
 	h := cgo.Handle(id)
 	// Verification log for tests
-	fmt.Printf("[Go] Releasing handle %d\n", id)
+	if gcLogEnabled() {
+		fmt.Printf("[Go] Releasing handle %d\n", id)
+	}
 	h.Delete()
 }
 
@@ -96,7 +99,9 @@ type YakShadow struct {
 }
 
 func finalizeShadow(s *YakShadow) {
-	fmt.Printf("[Yak GC] Finalizer triggered for Handle %d\n", s.HandleID)
+	if gcLogEnabled() {
+		fmt.Printf("[Yak GC] Finalizer triggered for Handle %d\n", s.HandleID)
+	}
 	yak_host_release_handle(s.HandleID)
 }
 
@@ -111,7 +116,9 @@ var shadowStore = struct {
 func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
 	s := &YakShadow{HandleID: handleID}
 	runtime.SetFinalizer(s, finalizeShadow)
-	fmt.Printf("[Yak] Malloc Shadow for Handle %d with Finalizer\n", handleID)
+	if gcLogEnabled() {
+		fmt.Printf("[Yak] Malloc Shadow for Handle %d with Finalizer\n", handleID)
+	}
 	shadowStore.Lock()
 	shadowStore.objects[uintptr(unsafe.Pointer(s))] = s
 	shadowStore.Unlock()
@@ -167,4 +174,9 @@ func yak_runtime_gc() {
 	runtime.GC()
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
+}
+
+func gcLogEnabled() bool {
+	v := os.Getenv("GCLOG")
+	return v != "" && v != "0"
 }
