@@ -728,13 +728,28 @@ func (pm *PromptManager) DynamicContext() string {
 
 // IntervalReviewPromptData contains data for interval review prompt template
 type IntervalReviewPromptData struct {
+	// Tool information
 	ToolName        string
 	ToolDescription string
 	ToolParams      string
+
+	// Timing information
+	CurrentTime     string
+	StartTime       string
 	ElapsedDuration string
-	StdoutSnapshot  string
-	StderrSnapshot  string
-	Schema          string
+	ReviewCount     int
+
+	// Output snapshots
+	StdoutSnapshot string
+	StderrSnapshot string
+
+	// User context
+	UserQuery   string
+	TaskGoal    string
+	TaskContext string
+
+	// Schema
+	Schema string
 }
 
 // GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
@@ -743,18 +758,68 @@ func (pm *PromptManager) GenerateIntervalReviewPrompt(
 	params aitool.InvokeParams,
 	stdoutSnapshot, stderrSnapshot []byte,
 ) (string, error) {
+	return pm.GenerateIntervalReviewPromptWithContext(tool, params, stdoutSnapshot, stderrSnapshot, time.Time{}, 0)
+}
+
+// GenerateIntervalReviewPromptWithContext generates interval review prompt with additional context
+func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
+	tool *aitool.Tool,
+	params aitool.InvokeParams,
+	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
+) (string, error) {
 	data := &IntervalReviewPromptData{
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
 		ToolParams:      params.Dump(),
-		StdoutSnapshot:  utils.ShrinkString(string(stdoutSnapshot), 2000),
-		StderrSnapshot:  utils.ShrinkString(string(stderrSnapshot), 1000),
+		CurrentTime:     time.Now().Format("2006-01-02 15:04:05"),
+		StdoutSnapshot:  utils.ShrinkString(string(stdoutSnapshot), 3000),
+		StderrSnapshot:  utils.ShrinkString(string(stderrSnapshot), 1500),
 		Schema:          intervalReviewSchemaJSON,
+		ReviewCount:     reviewCount,
 	}
 
-	// Calculate elapsed duration (approximate, since we don't have start time)
-	// The actual elapsed time is tracked by the caller
-	data.ElapsedDuration = "ongoing"
+	// Calculate elapsed duration
+	if !startTime.IsZero() {
+		elapsed := time.Since(startTime)
+		data.StartTime = startTime.Format("2006-01-02 15:04:05")
+		data.ElapsedDuration = formatDuration(elapsed)
+	} else {
+		data.ElapsedDuration = "unknown"
+		data.StartTime = "unknown"
+	}
+
+	// Get user query from current task
+	if task := pm.react.GetCurrentTask(); task != nil {
+		data.UserQuery = task.GetUserInput()
+		// TaskGoal can be derived from task name or description if available
+		data.TaskGoal = task.GetName()
+	}
+
+	// Get task context from timeline (truncated for prompt)
+	if t := pm.react.config.GetTimeline(); t != nil {
+		fullDump := t.Dump()
+		data.TaskContext = utils.ShrinkString(fullDump, 2000) // Limit to 2000 chars
+	}
 
 	return pm.executeTemplate("interval-review", intervalReviewPromptTemplate, data)
+}
+
+// formatDuration formats a duration into a human-readable string
+func formatDuration(d time.Duration) string {
+	if d < time.Second {
+		return fmt.Sprintf("%d ms", d.Milliseconds())
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1f seconds", d.Seconds())
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		return fmt.Sprintf("%d min %d sec", minutes, seconds)
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	return fmt.Sprintf("%d hour %d min", hours, minutes)
 }
