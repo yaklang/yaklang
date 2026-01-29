@@ -15,11 +15,15 @@
     },
     "reason": {
       "type": "string",
-      "description": "A brief explanation for the decision. like: '看起来工具运转正常，我决定继续等待这个任务', '结合上下文分析，看起来工具似乎卡住了，这个命令不应该执行这么长时间，决定取消，尝试新参数或者直接使用中间结果'"
+      "description": "A brief explanation for the decision, explaining why you chose to continue or cancel."
     },
     "progress_summary": {
       "type": "string",
-      "description": "A summary of the tool's progress so far."
+      "description": "A summary of what the tool has accomplished so far based on the output."
+    },
+    "estimated_remaining_time": {
+      "type": "string",
+      "description": "Your estimate of how much longer the tool might need to complete, if continuing."
     }
   }
 }

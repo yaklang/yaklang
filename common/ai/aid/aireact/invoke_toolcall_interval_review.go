@@ -1,9 +1,11 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -12,13 +14,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// _invokeToolCall_IntervalReview is called periodically during tool execution to review progress.
+// _invokeToolCall_IntervalReviewWithContext is called periodically during tool execution to review progress.
 // It returns true if the tool should continue, false if it should be cancelled.
-func (r *ReAct) _invokeToolCall_IntervalReview(
+func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	ctx context.Context,
 	tool *aitool.Tool,
 	params aitool.InvokeParams,
 	stdoutSnapshot, stderrSnapshot []byte,
+	startTime time.Time,
+	reviewCount int,
 ) (bool, error) {
 	// Check context at the beginning
 	select {
@@ -27,9 +31,13 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 	default:
 	}
 
-	log.Infof("toolcall interval review trigger, with tool: %v(%v): %v", tool.Name, tool.VerboseName, tool.Description)
-	// Generate the interval review prompt
-	prompt, err := r.promptManager.GenerateIntervalReviewPrompt(tool, params, stdoutSnapshot, stderrSnapshot)
+	elapsed := time.Since(startTime)
+	log.Infof("toolcall interval review #%d triggered for tool [%s], elapsed: %v", reviewCount, tool.Name, elapsed)
+
+	// Generate the interval review prompt with full context
+	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount,
+	)
 	if err != nil {
 		log.Errorf("failed to generate interval review prompt: %v", err)
 		// If we can't generate the prompt, continue by default
@@ -49,11 +57,20 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 					"reason", "progress_summary",
 				}, func(key string, reader io.Reader) {
 					reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-					r.Emitter.EmitDefaultStreamEvent(
-						"interval-review",
-						reader,
-						rsp.GetTaskIndex(),
-					)
+					switch key {
+					case "estimated_remaining_time":
+						r.Emitter.EmitDefaultStreamEvent(
+							"interval-review",
+							io.MultiReader(bytes.NewBufferString("预估时间："), reader),
+							rsp.GetTaskIndex(),
+						)
+					default:
+						r.Emitter.EmitDefaultStreamEvent(
+							"interval-review",
+							reader,
+							rsp.GetTaskIndex(),
+						)
+					}
 				}),
 			)
 			if err != nil {
@@ -104,13 +121,26 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 // CreateIntervalReviewHandler creates an interval review handler function for the ToolCaller.
 // This handler will be called periodically during tool execution to check if it should continue.
 // Returns nil if interval review is disabled.
+// The handler maintains its own state (start time and review count) in a closure.
 func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error) {
 	if r.config.DisableIntervalReview {
 		return nil
 	}
 
+	// State maintained in closure
+	var startTime time.Time
+	var reviewCount int32
+
 	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error) {
-		return r._invokeToolCall_IntervalReview(ctx, tool, params, stdoutSnapshot, stderrSnapshot)
+		// Initialize start time on first call
+		if startTime.IsZero() {
+			startTime = time.Now()
+		}
+
+		// Increment review count
+		count := int(atomic.AddInt32(&reviewCount, 1))
+
+		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, count)
 	}
 }
 
