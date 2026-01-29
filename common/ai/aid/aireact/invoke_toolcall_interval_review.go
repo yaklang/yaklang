@@ -3,11 +3,13 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // _invokeToolCall_IntervalReview is called periodically during tool execution to review progress.
@@ -25,6 +27,7 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 	default:
 	}
 
+	log.Infof("toolcall interval review trigger, with tool: %v(%v): %v", tool.Name, tool.VerboseName, tool.Description)
 	// Generate the interval review prompt
 	prompt, err := r.promptManager.GenerateIntervalReviewPrompt(tool, params, stdoutSnapshot, stderrSnapshot)
 	if err != nil {
@@ -42,6 +45,16 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 				ctx,
 				rsp.GetOutputStreamReader("interval-review", true, r.Emitter),
 				"interval-toolcall-review",
+				aicommon.WithActionFieldStreamHandler([]string{
+					"reason", "progress_summary",
+				}, func(key string, reader io.Reader) {
+					reader = utils.JSONStringReader(utils.UTF8Reader(reader))
+					r.Emitter.EmitDefaultStreamEvent(
+						"interval-review",
+						reader,
+						rsp.GetTaskIndex(),
+					)
+				}),
 			)
 			if err != nil {
 				log.Errorf("failed to extract interval review action: %v", err)
@@ -75,15 +88,6 @@ func (r *ReAct) _invokeToolCall_IntervalReview(
 				shouldContinue = true
 				log.Warnf("interval review: unknown decision '%s', continuing by default", decision)
 			}
-
-			// Log any concerns
-			concerns := action.GetStringSlice("concerns", nil)
-			if len(concerns) > 0 {
-				for _, concern := range concerns {
-					log.Warnf("interval review concern for tool [%s]: %s", tool.Name, concern)
-				}
-			}
-
 			return nil
 		},
 	)
