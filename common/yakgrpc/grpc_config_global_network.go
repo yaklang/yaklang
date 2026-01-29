@@ -211,6 +211,9 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			return nil, err
 		}
 		opts = append(opts, newConfigTemplate(name, verbose, "ai", hook, aiOptions...))
+		if name == "openai" {
+			opts = append(opts, newConfigTemplate(name, "自定义AI配置", "ai", hook, aiOptions...))
+		}
 	}
 
 	newSpaceEngineTmp := func(name string, verbose string, needEmail bool) *ypb.GetThirdPartyAppConfigTemplate {
