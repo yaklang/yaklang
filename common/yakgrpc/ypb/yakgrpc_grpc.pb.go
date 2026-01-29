@@ -602,6 +602,7 @@ const (
 	Yak_UpdateMCPServer_FullMethodName                            = "/ypb.Yak/UpdateMCPServer"
 	Yak_GetAllMCPServers_FullMethodName                           = "/ypb.Yak/GetAllMCPServers"
 	Yak_RAGCollectionSearch_FullMethodName                        = "/ypb.Yak/RAGCollectionSearch"
+	Yak_DownloadRAGs_FullMethodName                               = "/ypb.Yak/DownloadRAGs"
 )
 
 // YakClient is the client API for Yak service.
@@ -1344,6 +1345,8 @@ type YakClient interface {
 	GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRequest, opts ...grpc.CallOption) (*GetAllMCPServersResponse, error)
 	// RAG Collection Search
 	RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error)
+	// Download rags
+	DownloadRAGs(ctx context.Context, in *DownloadRAGsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 }
 
 type yakClient struct {
@@ -8081,6 +8084,25 @@ func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSe
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_RAGCollectionSearchClient = grpc.ServerStreamingClient[RAGCollectionSearchResponse]
 
+func (c *yakClient) DownloadRAGs(ctx context.Context, in *DownloadRAGsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[111], Yak_DownloadRAGs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadRAGsRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadRAGsClient = grpc.ServerStreamingClient[ExecResult]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -8821,6 +8843,8 @@ type YakServer interface {
 	GetAllMCPServers(context.Context, *GetAllMCPServersRequest) (*GetAllMCPServersResponse, error)
 	// RAG Collection Search
 	RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error
+	// Download rags
+	DownloadRAGs(*DownloadRAGsRequest, grpc.ServerStreamingServer[ExecResult]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -10579,6 +10603,9 @@ func (UnimplementedYakServer) GetAllMCPServers(context.Context, *GetAllMCPServer
 }
 func (UnimplementedYakServer) RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method RAGCollectionSearch not implemented")
+}
+func (UnimplementedYakServer) DownloadRAGs(*DownloadRAGsRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadRAGs not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -20250,6 +20277,17 @@ func _Yak_RAGCollectionSearch_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_RAGCollectionSearchServer = grpc.ServerStreamingServer[RAGCollectionSearchResponse]
 
+func _Yak_DownloadRAGs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadRAGsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).DownloadRAGs(m, &grpc.GenericServerStream[DownloadRAGsRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadRAGsServer = grpc.ServerStreamingServer[ExecResult]
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -22717,6 +22755,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "RAGCollectionSearch",
 			Handler:       _Yak_RAGCollectionSearch_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DownloadRAGs",
+			Handler:       _Yak_DownloadRAGs_Handler,
 			ServerStreams: true,
 		},
 	},

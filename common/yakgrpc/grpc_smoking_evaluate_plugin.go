@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
+	"google.golang.org/grpc"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -38,6 +39,7 @@ import (
 type fakeStreamInstance struct {
 	ctx     context.Context
 	handler func(*ypb.ExecResult) error
+	grpc.ServerStream
 }
 
 func (f *fakeStreamInstance) Send(result *ypb.ExecResult) error {

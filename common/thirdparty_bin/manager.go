@@ -35,6 +35,13 @@ type Manager struct {
 	mutex sync.RWMutex
 }
 
+// SetInstaller 设置安装器
+func (m *Manager) SetInstaller(installer Installer) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.installer = installer
+}
+
 // NewManager 创建新的二进制文件管理器
 func NewManager(downloadDir, installDir string) (*Manager, error) {
 	// 确保目录存在
@@ -63,9 +70,9 @@ func (m *Manager) Register(descriptor *BinaryDescriptor) error {
 		return utils.Error("binary name cannot be empty")
 	}
 
-	if len(descriptor.DownloadInfoMap) == 0 {
-		return utils.Error("download URLs cannot be empty")
-	}
+	// if len(descriptor.DownloadInfoMap) == 0 {
+	// 	return utils.Error("download URLs cannot be empty")
+	// }
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -513,6 +520,16 @@ func (m *Manager) GetDownloadInfo(name string) (*DownloadInfo, error) {
 	return m.installer.GetDownloadInfo(descriptor, nil)
 }
 
+func (m *Manager) GetDescriptor(name string) (*BinaryDescriptor, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	descriptor, exists := m.registry[name]
+	if !exists {
+		return nil, utils.Errorf("binary %s not registered", name)
+	}
+	return descriptor, nil
+}
+
 // GetRunningProcess 获取运行中的进程信息
 func (m *Manager) GetRunningProcess(name string) (*RunningProcess, error) {
 	m.mutex.RLock()
@@ -645,6 +662,12 @@ func GetDownloadInfo(name string) (*DownloadInfo, error) {
 	return DefaultManager.GetDownloadInfo(name)
 }
 
+func GetDescriptor(name string) (*BinaryDescriptor, error) {
+	if DefaultManager == nil {
+		return nil, utils.Error("default manager not initialized")
+	}
+	return DefaultManager.GetDescriptor(name)
+}
 func GetAllStatus() ([]*BinaryStatus, error) {
 	if DefaultManager == nil {
 		return nil, utils.Error("default manager not initialized")

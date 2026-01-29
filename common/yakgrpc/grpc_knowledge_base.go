@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -11,7 +12,9 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -81,6 +84,7 @@ func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBase
 			Tags:                     utils.StringSplitAndStrip(kb.Tags, ","),
 			CreatedFromUI:            kb.CreatedFromUI,
 			IsDefault:                kb.IsDefault,
+			SerialVersionID:          kb.SerialVersionUID,
 		}
 	}
 
@@ -505,4 +509,193 @@ func (s *Server) GenerateQuestionIndexForKnowledgeBase(req *ypb.GenerateQuestion
 		}
 	}
 	return nil
+}
+
+var buildInRagLink = "https://oss-qn.yaklang.com/rag/rags-latest.json"
+
+type BuildInRagInfo struct {
+	Name     string `json:"name"`
+	NameZh   string `json:"name_zh"`
+	Version  string `json:"version"`
+	File     string `json:"file"`
+	FileSize int64  `json:"file_size"`
+	HashFile string `json:"hashfile"`
+	HashType string `json:"hashtype"`
+	Hash     string `json:"hash"`
+}
+
+// RAGInstaller RAG知识库安装器
+type RAGInstaller struct {
+	*thirdparty_bin.BaseInstaller
+	stream          ypb.Yak_DownloadRAGsServer
+	downloadDir     string
+	importProgress  *int
+	downloadURLFunc func(name string) (urlStr string, filename string, hash string, err error)
+}
+
+// Install 实现RAG知识库的安装方法
+func (ri *RAGInstaller) Install(descriptor *thirdparty_bin.BinaryDescriptor, options *thirdparty_bin.InstallOptions) error {
+	// 获取下载URL和文件名
+	url, filename, hash, err := ri.downloadURLFunc(descriptor.Name)
+	if err != nil {
+		return utils.Errorf("获取知识库信息失败: %v", err)
+	}
+
+	filePath, err := thirdparty_bin.DownloadFile(url, filename, ri.downloadDir, &thirdparty_bin.InstallOptions{
+		Context: options.Context,
+		Force:   options.Force,
+		Proxy:   options.Proxy,
+		Progress: func(progress float64, downloaded, total int64, message string) {
+			ri.stream.Send(&ypb.ExecResult{
+				IsMessage: true,
+				Message:   []byte(message),
+				Progress:  float32(progress * 100 * 0.8),
+			})
+		},
+	})
+	if err != nil {
+		return utils.Errorf("下载知识库失败: %v", err)
+	}
+
+	ctx := options.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	// 导入知识库
+	ri.stream.Send(&ypb.ExecResult{
+		IsMessage: true,
+		Message:   []byte("开始导入知识库..."),
+		Progress:  80,
+	})
+
+	// 下载进度和导入进度
+	importProgress := 80
+
+	err = rag.ImportRAG(filePath,
+		rag.WithRAGCtx(ctx),
+		rag.WithName(descriptor.Name),
+		rag.WithExportOverwriteExisting(options.Force),
+		rag.WithRAGSerialVersionUID(hash),
+		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
+			ri.stream.Send(&ypb.ExecResult{
+				IsMessage: true,
+				Message:   []byte(message),
+				Progress:  float32(importProgress + int(percent*0.2)),
+			})
+		}))
+	if err != nil {
+		return utils.Errorf("导入知识库失败: %v", err)
+	}
+	ri.stream.Send(&ypb.ExecResult{
+		IsMessage: true,
+		Message:   []byte("知识库下载和导入完成"),
+		Progress:  100,
+	})
+
+	return nil
+}
+
+// getBuildInRagInfos 从远程链接获取知识库列表
+func getBuildInRagInfos() ([]BuildInRagInfo, error) {
+	// 构建 GET 请求
+	isHttps, getRequest, err := lowhttp.ParseUrlToHttpRequestRaw("GET", buildInRagLink)
+	if err != nil {
+		return nil, utils.Errorf("解析 URL 失败: %v", err)
+	}
+
+	// 发送 HTTP 请求
+	rsp, err := lowhttp.HTTPWithoutRedirect(
+		lowhttp.WithPacketBytes([]byte(getRequest)),
+		lowhttp.WithHttps(isHttps),
+		lowhttp.WithSaveHTTPFlow(false),
+	)
+	if err != nil {
+		return nil, utils.Errorf("获取知识库列表失败: %v", err)
+	}
+
+	// 从响应中提取 body
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp.RawPacket)
+
+	// 解析 JSON 响应
+	var ragInfos []BuildInRagInfo
+	err = json.Unmarshal(body, &ragInfos)
+	if err != nil {
+		return nil, utils.Errorf("解析知识库列表失败: %v", err)
+	}
+
+	return ragInfos, nil
+}
+
+// getBuildInRagInfoByName 根据名称获取指定知识库的下载信息
+func getBuildInRagInfoByName(ragName string) (urlStr string, filename string, hash string, err error) {
+	ragInfos, err := getBuildInRagInfos()
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// 根据名称匹配知识库
+	for _, info := range ragInfos {
+		// 支持英文名称或中文名称匹配
+		if info.Name == ragName || info.NameZh == ragName {
+			// 构建完整的下载 URL（基础 URL + file 路径）
+			baseURL := "https://oss-qn.yaklang.com"
+			downloadURL := baseURL + info.File
+
+			// 从文件路径中提取文件名
+			filename := filepath.Base(info.File)
+
+			return downloadURL, filename, info.Hash, nil
+		}
+	}
+
+	return "", "", "", utils.Errorf("未找到名称为 %s 的知识库", ragName)
+}
+
+func (s *Server) DownloadRAGs(req *ypb.DownloadRAGsRequest, stream ypb.Yak_DownloadRAGsServer) error {
+	ctx := stream.Context()
+	ragName := req.GetRagName()
+
+	if ragName == "" {
+		return utils.Errorf("知识库名称不能为空")
+	}
+
+	// 发送开始消息
+	stream.Send(&ypb.ExecResult{
+		IsMessage: true,
+		Message:   []byte("开始获取知识库信息..."),
+		Progress:  0,
+	})
+
+	downloadDir := filepath.Join(consts.GetDefaultYakitProjectsDir(), "libs")
+	installDir := downloadDir
+	manager, err := thirdparty_bin.NewManager(downloadDir, installDir)
+	if err != nil {
+		return utils.Errorf("创建管理器失败: %v", err)
+	}
+
+	// 4. 设置自定义installer（使用SetInstaller方法）
+	baseInstaller := thirdparty_bin.NewInstaller(installDir, downloadDir).(*thirdparty_bin.BaseInstaller)
+	ragInstaller := &RAGInstaller{
+		BaseInstaller:   baseInstaller,
+		stream:          stream,
+		downloadDir:     downloadDir,
+		downloadURLFunc: getBuildInRagInfoByName, // 获取知识库信息
+	}
+	manager.SetInstaller(ragInstaller)
+
+	ragInfos, err := getBuildInRagInfos()
+	if err != nil {
+		return utils.Errorf("获取知识库列表失败: %v", err)
+	}
+	for _, info := range ragInfos {
+		manager.Register(&thirdparty_bin.BinaryDescriptor{
+			Name: info.Name,
+		})
+	}
+
+	return manager.Install(ragName, &thirdparty_bin.InstallOptions{
+		Context: ctx,
+		Force:   req.GetForce(),
+	})
 }
