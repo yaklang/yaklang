@@ -52,6 +52,179 @@ Host: %s
 	require.Equal(t, token2, cookie.Value)
 }
 
+func TestRemoveSession(t *testing.T) {
+	sessionID := utils.RandStringBytes(10)
+	cookieName := "test_cookie"
+	cookieValue := "test_value"
+	cookieStr := fmt.Sprintf("%s=%s", cookieName, cookieValue)
+
+	// 使用计数器来控制 mock 服务器的行为
+	var requestCount int32
+	var hasCookieInRequest []bool
+
+	// 创建一个智能的 mock 服务器：只在第一次请求时返回 Set-Cookie
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := atomic.AddInt32(&requestCount, 1)
+
+		// 检查请求中是否包含 cookie
+		cookie, err := r.Cookie(cookieName)
+		hasCookie := err == nil && cookie != nil && cookie.Value == cookieValue
+		hasCookieInRequest = append(hasCookieInRequest, hasCookie)
+
+		if count == 1 {
+			// 第一次请求返回 Set-Cookie
+			w.Header().Set("Set-Cookie", cookieStr)
+			w.WriteHeader(200)
+			w.Write([]byte("First Response"))
+		} else {
+			// 后续请求不返回 Set-Cookie
+			w.WriteHeader(200)
+			if hasCookie {
+				w.Write([]byte("Has Cookie"))
+			} else {
+				w.Write([]byte("No Cookie"))
+			}
+		}
+	})
+
+	// 第一次请求：获取 cookie
+	rsp1, req1, err := HTTP(fmt.Sprintf(`GET /first HTTP/1.1
+Host: %s
+
+`, utils.HostPort(host, port)), WithSession(sessionID))
+	require.NoError(t, err)
+	require.Contains(t, string(rsp1), "First Response", "should get first response")
+	// 第一次请求不应该发送 cookie（因为还没有）
+	require.NotContains(t, string(req1), cookieStr, "first request should not contain cookie yet")
+	require.False(t, hasCookieInRequest[0], "server should not receive cookie in first request")
+
+	// 第二次请求：验证 cookie 已自动添加到请求中
+	rsp2, req2, err := HTTP(fmt.Sprintf(`GET /second HTTP/1.1
+Host: %s
+
+`, utils.HostPort(host, port)), WithSession(sessionID))
+	require.NoError(t, err)
+	// 验证第二次请求确实发送了 cookie
+	require.Contains(t, string(req2), cookieStr, "second request should contain cookie from session")
+	require.Contains(t, string(rsp2), "Has Cookie", "server should receive cookie")
+	require.True(t, hasCookieInRequest[1], "server should receive cookie in second request")
+
+	// 清除 session
+	RemoveSession(sessionID)
+
+	// 第三次请求：使用相同的 sessionID，但 session 已被清除
+	// 会创建新的空 session，不应该包含之前的 cookie
+	rsp3, req3, err := HTTP(fmt.Sprintf(`GET /third HTTP/1.1
+Host: %s
+
+`, utils.HostPort(host, port)), WithSession(sessionID))
+	require.NoError(t, err)
+	// 关键验证：清除 session 后，新请求不应该包含之前的 cookie
+	require.NotContains(t, string(req3), cookieStr, "request after RemoveSession should NOT contain old cookie")
+	require.Contains(t, string(rsp3), "No Cookie", "server should not receive any cookie after session removed")
+	require.False(t, hasCookieInRequest[2], "server should NOT receive cookie after RemoveSession")
+
+	// 最终清理
+	RemoveSession(sessionID)
+}
+
+func TestRemoveSession_EdgeCases(t *testing.T) {
+	t.Run("remove non-existent session should not panic", func(t *testing.T) {
+		// 删除不存在的 session 应该不会出错
+		require.NotPanics(t, func() {
+			RemoveSession("non_existent_session_id")
+		})
+	})
+
+	t.Run("remove session multiple times should not panic", func(t *testing.T) {
+		sessionID := "test_multiple_remove"
+		cookieStr := "test=value"
+
+		host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Set-Cookie", cookieStr)
+			w.WriteHeader(200)
+		})
+
+		// 创建 session
+		_, _, err := DoGET(fmt.Sprintf("http://%s", utils.HostPort(host, port)), WithSession(sessionID))
+		require.NoError(t, err)
+
+		// 多次删除同一个 session
+		require.NotPanics(t, func() {
+			RemoveSession(sessionID)
+			RemoveSession(sessionID)
+			RemoveSession(sessionID)
+		})
+	})
+
+	t.Run("multiple sessions should be independent", func(t *testing.T) {
+		session1 := "session_1"
+		session2 := "session_2"
+		cookie1 := "cookie1=value1"
+		cookie2 := "cookie2=value2"
+
+		var requestCount int32
+		host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			count := atomic.AddInt32(&requestCount, 1)
+			if count == 1 || count == 2 {
+				// 前两个请求分别设置不同的 cookie
+				if count == 1 {
+					w.Header().Set("Set-Cookie", cookie1)
+				} else {
+					w.Header().Set("Set-Cookie", cookie2)
+				}
+			}
+			w.WriteHeader(200)
+
+			// 返回收到的所有 cookies
+			cookies := r.Cookies()
+			if len(cookies) > 0 {
+				for _, c := range cookies {
+					w.Write([]byte(fmt.Sprintf("%s=%s;", c.Name, c.Value)))
+				}
+			} else {
+				w.Write([]byte("no-cookie"))
+			}
+		})
+
+		// session1 获取 cookie1
+		_, _, err := DoGET(fmt.Sprintf("http://%s/path1", utils.HostPort(host, port)), WithSession(session1))
+		require.NoError(t, err)
+
+		// session2 获取 cookie2
+		_, _, err = DoGET(fmt.Sprintf("http://%s/path2", utils.HostPort(host, port)), WithSession(session2))
+		require.NoError(t, err)
+
+		// 验证 session1 只有 cookie1
+		rsp1, _, err := DoGET(fmt.Sprintf("http://%s/verify1", utils.HostPort(host, port)), WithSession(session1))
+		require.NoError(t, err)
+		require.Contains(t, string(rsp1.RawPacket), "cookie1=value1")
+		require.NotContains(t, string(rsp1.RawPacket), "cookie2=value2")
+
+		// 验证 session2 只有 cookie2
+		rsp2, _, err := DoGET(fmt.Sprintf("http://%s/verify2", utils.HostPort(host, port)), WithSession(session2))
+		require.NoError(t, err)
+		require.Contains(t, string(rsp2.RawPacket), "cookie2=value2")
+		require.NotContains(t, string(rsp2.RawPacket), "cookie1=value1")
+
+		// 删除 session1
+		RemoveSession(session1)
+
+		// 验证 session1 被清除后没有 cookie
+		rsp3, _, err := DoGET(fmt.Sprintf("http://%s/after_remove1", utils.HostPort(host, port)), WithSession(session1))
+		require.NoError(t, err)
+		require.Contains(t, string(rsp3.RawPacket), "no-cookie")
+
+		// 验证 session2 仍然有效
+		rsp4, _, err := DoGET(fmt.Sprintf("http://%s/verify2_again", utils.HostPort(host, port)), WithSession(session2))
+		require.NoError(t, err)
+		require.Contains(t, string(rsp4.RawPacket), "cookie2=value2")
+
+		// 清理
+		RemoveSession(session2)
+	})
+}
+
 func TestWithPostParams(t *testing.T) {
 	tests := []struct {
 		name                string
