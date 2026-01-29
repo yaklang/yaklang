@@ -658,6 +658,11 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 		var leftVariables []*ssa.Variable
 		var rightValue []ssa.Value
 
+		// Save and clear MarkedFuncName at the beginning of each assignment statement
+		// to prevent it from leaking from previous statements
+		savedMarkedFuncName := b.MarkedFuncName
+		b.MarkedFuncName = ""
+
 		markInformation := func() func() {
 			if len(leftVariables) != 1 {
 				return func() {}
@@ -757,7 +762,11 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 
 		// check if defined-function
 		recoverMark := markInformation()
-		defer recoverMark()
+		defer func() {
+			recoverMark()
+			// Restore the saved MarkedFuncName after the assignment is complete
+			b.MarkedFuncName = savedMarkedFuncName
+		}()
 
 		// right value
 		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
@@ -1443,12 +1452,18 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	funcName := ""
+	// If this function has an explicit name, use it
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
 		b.SetMarkedFunction(funcName)
 	}
+	// For anonymous functions, use MarkedFuncName from assignment context
+	// But clear it immediately to prevent leaking to nested functions
 	if funcName == "" {
 		funcName = b.MarkedFuncName
+		// Clear MarkedFuncName right after using it to prevent it from leaking
+		// into nested anonymous functions (e.g., IIFE)
+		b.MarkedFuncName = ""
 	}
 	newFunc := b.NewFunc(funcName)
 	if funcName != "" {
