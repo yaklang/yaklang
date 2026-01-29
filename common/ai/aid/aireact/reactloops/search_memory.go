@@ -27,7 +27,7 @@ func (r *ReActLoop) fastLoadSearchMemoryWithoutAI(input string) {
 		log.Info("fast load search memory completed successfully")
 	case <-ctx.Done():
 		// 超时
-		log.Warn("fast load search memory timeout after 30 seconds")
+		log.Warn("fast load search memory timeout")
 	}
 }
 
