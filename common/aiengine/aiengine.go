@@ -530,6 +530,15 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		)
 	}
 
+	if len(config.ExtendedForgeFromZip) > 0 {
+		extendedForge, err := loadExtendedForgeFromZip(config.ExtendedForgeFromZip)
+		if err != nil {
+			log.Errorf("load extended forge from zip failed: %v", err)
+		} else {
+			options = append(options, extendedForge...)
+		}
+	}
+
 	options = append(options, config.ExtOptions...)
 
 	return options

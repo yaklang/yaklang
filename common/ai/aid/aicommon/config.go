@@ -248,6 +248,8 @@ type Config struct {
 	InitStatus *ConfigInitStatus
 	// origin options
 	originOptions []ConfigOption
+
+	ExtendedForge []*schema.AIForge
 }
 
 // NewConfig creates a new Config with options
@@ -1691,6 +1693,15 @@ func WithMemoryTriageId(id string) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
 		c.MemoryTriageId = id
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithForges(forge ...*schema.AIForge) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.ExtendedForge = append(c.ExtendedForge, forge...)
 		c.m.Unlock()
 		return nil
 	}
