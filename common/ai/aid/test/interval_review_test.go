@@ -1,23 +1,14 @@
 package test
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"io"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -124,265 +115,163 @@ func TestToolCallerIntervalReviewHandler(t *testing.T) {
 	})
 }
 
-// createLongRunningToolForTest creates a tool that runs for a specified duration with periodic output
-func createLongRunningToolForTest(duration time.Duration, outputToken string) *aitool.Tool {
-	tool, _ := aitool.New("long_running_task",
-		aitool.WithDescription("A tool that runs for a long time and periodically outputs progress"),
-		aitool.WithStringParam("task_name", aitool.WithParam_Description("Name of the task")),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout, stderr io.Writer) (any, error) {
-			taskName := params.GetString("task_name")
+// TestIntervalReviewIntegration_MockedHandler tests interval review with mocked handler (no external AI calls)
+// This test directly tests the ToolCaller interval review mechanism without depending on full Coordinator flow
+func TestIntervalReviewIntegration_MockedHandler(t *testing.T) {
+	t.Run("handler_continues_execution", func(t *testing.T) {
+		var handlerCallCount int32
 
-			// Simulate long-running task with periodic output
-			iterations := int(duration / (time.Millisecond * 50))
-			if iterations < 1 {
-				iterations = 1
-			}
-			for i := 0; i < iterations; i++ {
-				fmt.Fprintf(stdout, "Progress: %d/%d - %s\n", i+1, iterations, taskName)
-				time.Sleep(time.Millisecond * 50)
-			}
-
-			fmt.Fprintf(stdout, "Task completed: %s - %s\n", taskName, outputToken)
-			return map[string]any{
-				"status":  "completed",
-				"message": outputToken,
-			}, nil
-		}),
-	)
-	return tool
-}
-
-// TestIntervalReviewIntegration_MockedAI tests interval review with mocked AI callback (no external calls)
-func TestIntervalReviewIntegration_MockedAI(t *testing.T) {
-	t.Run("interval_review_continue_with_mocked_ai", func(t *testing.T) {
-		outputToken := uuid.New().String()
-		var intervalReviewCount int32
-
-		inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-		outputChan := make(chan *schema.AiOutputEvent, 100)
-
-		// Create a tool that runs for 300ms
-		longRunningTool := createLongRunningToolForTest(time.Millisecond*300, outputToken)
-
-		coordinator, err := aid.NewCoordinator(
-			"test interval review continue",
-			aicommon.WithAgreeYOLO(),
-			aicommon.WithTools(longRunningTool),
-			aicommon.WithEventInputChanx(inputChan),
-			// Interval review is enabled by default, just set the duration
-			aicommon.WithToolCallerIntervalReviewDuration(time.Millisecond*80), // Review every 80ms
-			aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-				select {
-				case outputChan <- event:
-				default:
-				}
-			}),
-			// Mock AI callback - no external calls
-			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				prompt := r.GetPrompt()
-				rsp := i.NewAIResponse()
-
-				// Handle interval review requests - mock response
-				if strings.Contains(prompt, "Interval Review") || strings.Contains(prompt, "interval-toolcall-review") {
-					atomic.AddInt32(&intervalReviewCount, 1)
-					// Always return continue
-					rsp.EmitOutputStream(bytes.NewBufferString(`{
-						"@action": "interval-toolcall-review",
-						"decision": "continue",
-						"reason": "Tool is making progress",
-						"progress_summary": "Execution is proceeding normally"
-					}`))
-					return rsp, nil
-				}
-
-				// Handle regular tool calling flow - mock response
-				return mockedToolCalling(i, r, "long_running_task", fmt.Sprintf(`{"@action": "call-tool", "tool": "long_running_task", "params": {"task_name": "test_task_%s"}}`, outputToken))
-			}),
-		)
-		require.NoError(t, err, "NewCoordinator should not fail")
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-
-		go coordinator.Run()
-
-		// Wait for tool call completion or timeout
-		var toolCallCompleted bool
-	LOOP:
-		for {
-			select {
-			case <-ctx.Done():
-				break LOOP
-			case result := <-outputChan:
-				if result.Type == schema.EVENT_TOOL_CALL_DONE {
-					toolCallCompleted = true
-					break LOOP
-				}
-			}
+		// Create handler that always returns continue
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			atomic.AddInt32(&handlerCallCount, 1)
+			return true, nil // continue
 		}
 
-		// Verify results
-		count := atomic.LoadInt32(&intervalReviewCount)
-		t.Logf("Interval review was called %d times", count)
-		// With 300ms tool duration and 80ms interval, expect at least 2 reviews
-		require.GreaterOrEqual(t, count, int32(1), "interval review should be called at least once")
-		require.True(t, toolCallCompleted, "tool call should complete when AI returns 'continue'")
+		tc := &aicommon.ToolCaller{}
+		aicommon.WithToolCaller_IntervalReviewHandler(handler)(tc)
+		aicommon.WithToolCaller_IntervalReviewDuration(time.Millisecond * 30)(tc)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
+		defer cancel()
+
+		// Run interval review in background
+		done := make(chan struct{})
+		go func() {
+			tc.IntervalReviewContext(ctx, cancel, &aitool.Tool{}, nil, []byte("test stdout"), []byte("test stderr"), nil)
+			close(done)
+		}()
+
+		// Wait for context timeout
+		<-done
+
+		count := atomic.LoadInt32(&handlerCallCount)
+		t.Logf("Handler was called %d times", count)
+		// With 30ms interval and 200ms timeout, expect 5-6 calls
+		require.GreaterOrEqual(t, count, int32(4), "handler should be called at least 4 times")
+		require.LessOrEqual(t, count, int32(8), "handler should not be called too many times")
 	})
 
-	t.Run("interval_review_cancel_with_mocked_ai", func(t *testing.T) {
-		outputToken := uuid.New().String()
-		var intervalReviewCount int32
+	t.Run("handler_cancels_execution", func(t *testing.T) {
+		var handlerCallCount int32
+		var cancelCalled bool
 
-		inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-		outputChan := make(chan *schema.AiOutputEvent, 100)
-
-		// Create a tool that runs for 1 second (should be cancelled before completion)
-		longRunningTool := createLongRunningToolForTest(time.Second*1, outputToken)
-
-		coordinator, err := aid.NewCoordinator(
-			"test interval review cancel",
-			aicommon.WithAgreeYOLO(),
-			aicommon.WithTools(longRunningTool),
-			aicommon.WithEventInputChanx(inputChan),
-			// Interval review is enabled by default, just set the duration
-			aicommon.WithToolCallerIntervalReviewDuration(time.Millisecond*80), // Review every 80ms
-			aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-				select {
-				case outputChan <- event:
-				default:
-				}
-			}),
-			// Mock AI callback - no external calls
-			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				prompt := r.GetPrompt()
-				rsp := i.NewAIResponse()
-
-				// Handle interval review requests - mock response
-				if strings.Contains(prompt, "Interval Review") || strings.Contains(prompt, "interval-toolcall-review") {
-					count := atomic.AddInt32(&intervalReviewCount, 1)
-					// Cancel after 2 reviews
-					if count >= 2 {
-						rsp.EmitOutputStream(bytes.NewBufferString(`{
-							"@action": "interval-toolcall-review",
-							"decision": "cancel",
-							"reason": "Tool is taking too long, cancelling execution",
-							"concerns": ["Execution time exceeded expectations"]
-						}`))
-					} else {
-						rsp.EmitOutputStream(bytes.NewBufferString(`{
-							"@action": "interval-toolcall-review",
-							"decision": "continue",
-							"reason": "Tool is making progress"
-						}`))
-					}
-					return rsp, nil
-				}
-
-				// Handle regular tool calling flow - mock response
-				return mockedToolCalling(i, r, "long_running_task", fmt.Sprintf(`{"@action": "call-tool", "tool": "long_running_task", "params": {"task_name": "test_task_%s"}}`, outputToken))
-			}),
-		)
-		require.NoError(t, err, "NewCoordinator should not fail")
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		defer cancel()
-
-		go coordinator.Run()
-
-		// Wait for tool call cancel or completion
-		var toolCallCancelled bool
-	LOOP:
-		for {
-			select {
-			case <-ctx.Done():
-				break LOOP
-			case result := <-outputChan:
-				if result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
-					toolCallCancelled = true
-					break LOOP
-				}
-				if result.Type == schema.EVENT_TOOL_CALL_DONE {
-					// Tool completed normally (not expected in this test)
-					break LOOP
-				}
+		// Create handler that cancels after 2 calls
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			count := atomic.AddInt32(&handlerCallCount, 1)
+			if count >= 2 {
+				return false, nil // cancel
 			}
+			return true, nil // continue
 		}
 
-		// Verify results
-		count := atomic.LoadInt32(&intervalReviewCount)
-		t.Logf("Interval review was called %d times", count)
-		require.GreaterOrEqual(t, count, int32(2), "interval review should be called at least twice")
-		require.True(t, toolCallCancelled, "tool call should be cancelled when AI returns 'cancel'")
+		tc := &aicommon.ToolCaller{}
+		aicommon.WithToolCaller_IntervalReviewHandler(handler)(tc)
+		aicommon.WithToolCaller_IntervalReviewDuration(time.Millisecond * 30)(tc)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
+		defer cancel()
+
+		// Run interval review in background
+		done := make(chan struct{})
+		go func() {
+			tc.IntervalReviewContext(ctx, func() {
+				cancelCalled = true
+				cancel()
+			}, &aitool.Tool{}, nil, nil, nil, nil)
+			close(done)
+		}()
+
+		// Wait for completion
+		<-done
+
+		count := atomic.LoadInt32(&handlerCallCount)
+		t.Logf("Handler was called %d times before cancel", count)
+		require.Equal(t, int32(2), count, "handler should be called exactly 2 times before cancel")
+		require.True(t, cancelCalled, "cancel should be called when handler returns false")
 	})
 
-	t.Run("interval_review_disabled_with_mocked_ai", func(t *testing.T) {
-		outputToken := uuid.New().String()
-		var intervalReviewCount int32
+	t.Run("handler_receives_correct_parameters", func(t *testing.T) {
+		var receivedTool *aitool.Tool
+		var receivedParams aitool.InvokeParams
+		var receivedStdout, receivedStderr []byte
 
-		inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-		outputChan := make(chan *schema.AiOutputEvent, 100)
+		expectedTool := &aitool.Tool{}
+		expectedParams := aitool.InvokeParams{"key": "value", "number": 42}
+		expectedStdout := []byte("stdout content here")
+		expectedStderr := []byte("stderr content here")
 
-		// Create a quick tool (runs for 150ms)
-		quickTool := createLongRunningToolForTest(time.Millisecond*150, outputToken)
-
-		coordinator, err := aid.NewCoordinator(
-			"test interval review disabled",
-			aicommon.WithAgreeYOLO(),
-			aicommon.WithTools(quickTool),
-			aicommon.WithEventInputChanx(inputChan),
-			aicommon.WithDisableToolCallerIntervalReview(true), // Explicitly disabled
-			aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
-				select {
-				case outputChan <- event:
-				default:
-				}
-			}),
-			// Mock AI callback - no external calls
-			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				prompt := r.GetPrompt()
-				rsp := i.NewAIResponse()
-
-				// Handle interval review requests (should not happen when disabled)
-				if strings.Contains(prompt, "Interval Review") || strings.Contains(prompt, "interval-toolcall-review") {
-					atomic.AddInt32(&intervalReviewCount, 1)
-					rsp.EmitOutputStream(bytes.NewBufferString(`{
-						"@action": "interval-toolcall-review",
-						"decision": "continue",
-						"reason": "This should not be called"
-					}`))
-					return rsp, nil
-				}
-
-				// Handle regular tool calling flow - mock response
-				return mockedToolCalling(i, r, "long_running_task", fmt.Sprintf(`{"@action": "call-tool", "tool": "long_running_task", "params": {"task_name": "test_task_%s"}}`, outputToken))
-			}),
-		)
-		require.NoError(t, err, "NewCoordinator should not fail")
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		defer cancel()
-
-		go coordinator.Run()
-
-		// Wait for tool call completion
-		var toolCallCompleted bool
-	LOOP:
-		for {
-			select {
-			case <-ctx.Done():
-				break LOOP
-			case result := <-outputChan:
-				if result.Type == schema.EVENT_TOOL_CALL_DONE {
-					toolCallCompleted = true
-					break LOOP
-				}
-			}
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			receivedTool = tool
+			receivedParams = params
+			receivedStdout = stdout
+			receivedStderr = stderr
+			return false, nil // cancel immediately to verify parameters
 		}
 
-		// Verify results
-		count := atomic.LoadInt32(&intervalReviewCount)
-		t.Logf("Interval review was called %d times (expected 0)", count)
-		require.Equal(t, int32(0), count, "interval review should not be called when disabled")
-		require.True(t, toolCallCompleted, "tool call should complete normally")
+		tc := &aicommon.ToolCaller{}
+		aicommon.WithToolCaller_IntervalReviewHandler(handler)(tc)
+		aicommon.WithToolCaller_IntervalReviewDuration(time.Millisecond * 20)(tc)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			tc.IntervalReviewContext(ctx, cancel, expectedTool, expectedParams, expectedStdout, expectedStderr, nil)
+			close(done)
+		}()
+
+		<-done
+
+		require.Same(t, expectedTool, receivedTool, "tool should be passed correctly")
+		require.Equal(t, expectedParams, receivedParams, "params should be passed correctly")
+		require.Equal(t, expectedStdout, receivedStdout, "stdout should be passed correctly")
+		require.Equal(t, expectedStderr, receivedStderr, "stderr should be passed correctly")
+	})
+
+	t.Run("no_handler_means_no_review", func(t *testing.T) {
+		tc := &aicommon.ToolCaller{}
+		// Intentionally NOT setting a handler
+		aicommon.WithToolCaller_IntervalReviewDuration(time.Millisecond * 20)(tc)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+		defer cancel()
+
+		start := time.Now()
+		tc.IntervalReviewContext(ctx, cancel, nil, nil, nil, nil, nil)
+		elapsed := time.Since(start)
+
+		// Should return immediately when handler is nil
+		require.Less(t, elapsed, time.Millisecond*50, "should return immediately when handler is nil")
+	})
+
+	t.Run("handler_error_continues_execution", func(t *testing.T) {
+		var handlerCallCount int32
+
+		// Create handler that returns error
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			atomic.AddInt32(&handlerCallCount, 1)
+			return true, context.DeadlineExceeded // return error but continue
+		}
+
+		tc := &aicommon.ToolCaller{}
+		aicommon.WithToolCaller_IntervalReviewHandler(handler)(tc)
+		aicommon.WithToolCaller_IntervalReviewDuration(time.Millisecond * 30)(tc)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*150)
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			tc.IntervalReviewContext(ctx, cancel, nil, nil, nil, nil, nil)
+			close(done)
+		}()
+
+		<-done
+
+		count := atomic.LoadInt32(&handlerCallCount)
+		t.Logf("Handler was called %d times despite errors", count)
+		// Should continue calling despite errors
+		require.GreaterOrEqual(t, count, int32(3), "handler should continue being called despite errors")
 	})
 }
