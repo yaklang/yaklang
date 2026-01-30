@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -12,9 +13,13 @@ func (t *ForgeBlueprint) CreateCoordinatorWithQuery(ctx context.Context, originQ
 	if err != nil {
 		return nil, err
 	}
+
 	extraOpts = append(extraOpts, aicommon.WithForgeName(t.Name))
 	extraOpts = append(extraOpts, opts...)
-	return aid.NewCoordinatorContext(ctx, firstQuery, extraOpts...)
+
+	finalOpts := slices.Clone(t.AIOptions)
+	finalOpts = append(finalOpts, extraOpts...)
+	return aid.NewCoordinatorContext(ctx, firstQuery, finalOpts...)
 }
 
 func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...aicommon.ConfigOption) (*aid.Coordinator, error) {
@@ -25,10 +30,11 @@ func (t *ForgeBlueprint) CreateCoordinator(ctx context.Context, i any, opts ...a
 	}
 
 	rawInput := ExecParams2PromptString(params)
-	finalOpts := []aicommon.ConfigOption{
+	finalOpts := slices.Clone(t.AIOptions)
+	finalOpts = append(finalOpts, []aicommon.ConfigOption{
 		aicommon.WithForgeName(t.Name),
 		aicommon.WithPlanPrompt(firstQuery),
-	}
+	}...)
 	finalOpts = append(finalOpts, extraOpts...)
 	finalOpts = append(finalOpts, opts...)
 
