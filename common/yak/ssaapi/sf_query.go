@@ -63,7 +63,11 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 	// get vm
 	vm := config.vm
 	if vm == nil {
-		vm = sfvm.NewSyntaxFlowVirtualMachine()
+		vmOpts := make([]sfvm.Option, 0)
+		for _, opt := range config.opts {
+			vmOpts = append(vmOpts, opt)
+		}
+		vm = sfvm.NewSyntaxFlowVirtualMachine(vmOpts...)
 	}
 
 	// use rule compiled
@@ -450,6 +454,16 @@ func (p *Program) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOptio
 
 func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	opts = append(opts, QueryWithPrograms(ps), QueryWithRule(rule))
+	return QuerySyntaxflow(opts...)
+}
+
+func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts,
+		QueryWithValue(p), QueryWithRule(rule),
+		QueryWithSFOption(
+			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
+		),
+	)
 	return QuerySyntaxflow(opts...)
 }
 
