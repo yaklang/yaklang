@@ -19,6 +19,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func init() {
+	aicommon.RegisterForgeYakEngineCallback(ExecuteForge)
+}
+
 var HOOK_AI_FORGE = "forgeHandle"
 var DEFAULT_INIT_PROMPT_NAME = "__INIT_PROMPT__"
 var DEFAULT_PERSISTENT_PROMPT_NAME = "__PERSISTENT_PROMPT__"

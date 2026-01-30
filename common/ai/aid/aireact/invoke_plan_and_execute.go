@@ -283,7 +283,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 
 		done()
-		result, err := aicommon.ExecuteRegisteredForge(forgeName, ctx, forgeParams, opts...)
+		result, err := aicommon.ExecuteForgeFromDB(forgeName, ctx, forgeParams, opts...)
 		if err != nil {
 			log.Errorf("Failed to execute forge: %v", err)
 			return utils.Errorf("failed to execute forge %s: %v", forgeName, err)
