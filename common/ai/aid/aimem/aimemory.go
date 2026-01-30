@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -85,6 +86,21 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 		db:                 db,
 		keywordMatcher:     NewKeywordMatcher(), // 初始化关键词匹配器
 		embeddingAvailable: embeddingAvailable,
+	}
+
+	if requireInvoker && triage.invoker == nil && config.autoLightReActInvoker {
+		lightOpts := []aicommon.ConfigOption{
+			aicommon.WithMemoryTriage(triage),
+			aicommon.WithEnableSelfReflection(false),
+			aicommon.WithDisallowMCPServers(true),
+			aicommon.WithDisableSessionTitleGeneration(true),
+		}
+		lightOpts = append(lightOpts, config.lightReActOptions...)
+		invoker, err := aicommon.LightAIRuntimeInvokerGetter(triage.ctx, lightOpts...)
+		if err != nil {
+			return nil, utils.Errorf("create light react invoker for ai-memory trigger failed: %v", err)
+		}
+		triage.invoker = invoker
 	}
 
 	if requireInvoker && triage.invoker == nil {

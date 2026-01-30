@@ -40,6 +40,10 @@ func (s *Server) UpdateAIMemoryEntity(ctx context.Context, req *ypb.AIMemoryEnti
 		return nil, utils.Errorf("database not initialized")
 	}
 
+	if req == nil {
+		return nil, utils.Errorf("request is nil")
+	}
+
 	next := schema.GRPC2AIMemoryEntity(req)
 
 	var prev schema.AIMemoryEntity
