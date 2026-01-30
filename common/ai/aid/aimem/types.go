@@ -18,6 +18,11 @@ type Config struct {
 	contextProvider func() (string, error)
 	ragOptions      []rag.RAGSystemConfigOption
 	database        *gorm.DB
+
+	// autoLightReActInvoker enables building a lightweight invoker automatically when invoker is required.
+	// It is intended for trigger/background-only scenarios.
+	autoLightReActInvoker bool
+	lightReActOptions     []aicommon.ConfigOption
 }
 
 // Option AIMemoryTriage的配置选项
@@ -74,6 +79,15 @@ func WithRAGOptions(opts ...rag.RAGSystemConfigOption) Option {
 func WithDatabase(db *gorm.DB) Option {
 	return func(config *Config) {
 		config.database = db
+	}
+}
+
+// WithDefaultLightReActInvoker enables auto-creating a lightweight ReAct invoker when invoker is required
+// but not provided. This keeps NewAIMemory() behavior unchanged unless explicitly enabled.
+func WithDefaultLightReActInvoker(opts ...aicommon.ConfigOption) Option {
+	return func(config *Config) {
+		config.autoLightReActInvoker = true
+		config.lightReActOptions = append(config.lightReActOptions, opts...)
 	}
 }
 

@@ -97,3 +97,13 @@ var AIRuntimeInvokerGetter = func(ctx context.Context, options ...ConfigOption) 
 func RegisterDefaultAIRuntimeInvoker(getter func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error)) {
 	AIRuntimeInvokerGetter = getter
 }
+
+// LightAIRuntimeInvokerGetter returns a lightweight invoker (typically without queue/event-loop),
+// intended for background/trigger-only scenarios.
+var LightAIRuntimeInvokerGetter = func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error) {
+	return nil, utils.Errorf("not registered light AI runtime invoker")
+}
+
+func RegisterLightAIRuntimeInvoker(getter func(ctx context.Context, options ...ConfigOption) (AITaskInvokeRuntime, error)) {
+	LightAIRuntimeInvokerGetter = getter
+}
