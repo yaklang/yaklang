@@ -2,6 +2,7 @@ package aibp_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"gotest.tools/v3/assert"
 
@@ -107,8 +107,7 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 		return nil, utils.Errorf("unexpected prompt: %s", prompt)
 	}
 }
-
-func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
+func runTestForgeByAICommon(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
 	db := consts.GetGormProfileDatabase()
 	forge.IsTemporary = true
 	err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge)
@@ -120,7 +119,7 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 		yakit.DeleteAIForgeByName(db, forge.ForgeName)
 	}()
 
-	result, err := yak.ExecuteForge(forge.ForgeName, map[string]any{
+	result, err := aicommon.ExecuteForgeFromDB(forge.ForgeName, context.Background(), map[string]any{
 		"query": "1+1",
 	},
 		aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
@@ -131,6 +130,31 @@ func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag 
 		return nil, err
 	}
 	return result, nil
+}
+func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
+	return runTestForgeByAICommon(t, forge, initFlag, persistentFlag)
+	// db := consts.GetGormProfileDatabase()
+	// forge.IsTemporary = true
+	// err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// defer func() {
+	// 	yakit.DeleteAIForgeByName(db, forge.ForgeName)
+	// }()
+
+	// result, err := yak.ExecuteForge(forge.ForgeName, map[string]any{
+	// 	"query": "1+1",
+	// },
+	// 	aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
+	// 	aicommon.WithAgreeYOLO(),
+	// 	aicommon.WithDebugPrompt(true),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return result, nil
 }
 
 func TestBuildForgeFromYak(t *testing.T) {
