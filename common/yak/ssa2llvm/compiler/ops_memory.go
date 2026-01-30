@@ -30,8 +30,12 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 
 // compileMakeGeneric allocates a generic object (i8*)
 func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
+	if !inst.HasUsers() {
+		c.Values[inst.GetId()] = llvm.ConstPointerNull(llvm.PointerType(c.LLVMCtx.Int8Type(), 0))
+		return nil
+	}
 	// Allocate 8 bytes (one i64) as placeholder
-	size := llvm.ConstInt(c.LLVMCtx.Int64Type(), 9, false)
+	size := llvm.ConstInt(c.LLVMCtx.Int64Type(), 8, false)
 	mallocFn, mallocType := c.getOrInsertMalloc()
 	rawVal := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{size}, "generic_alloc")
 	// Cast i64 -> i8*
@@ -44,6 +48,10 @@ func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
 func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 	// 1. Get LLVM type for the struct
 	llvmType := c.TypeConverter.ConvertType(typ)
+	if !inst.HasUsers() {
+		c.Values[inst.GetId()] = llvm.ConstPointerNull(llvm.PointerType(llvmType, 0))
+		return nil
+	}
 
 	// 2. Calculate size using GEP trick (GetElementPtr null, 1) -> PtrToInt
 	// Null pointer to the struct
