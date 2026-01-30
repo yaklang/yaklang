@@ -58,8 +58,6 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
-				reactloops.WithAllowAIForge(true),
-				reactloops.WithAllowPlanAndExec(true),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
@@ -74,7 +72,7 @@ func init() {
 					preset = append(preset, reactloops.WithEnableSelfReflection(reactConfig.GetEnableSelfReflection()))
 				}
 			}
-			preset = append(opts, preset...)
+			preset = append(preset, opts...)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
 		},
