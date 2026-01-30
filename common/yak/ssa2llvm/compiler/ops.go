@@ -17,6 +17,8 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileJump(op)
 	case *ssa.If:
 		return c.compileIf(op)
+	case *ssa.Loop:
+		return c.compileLoop(op)
 	case *ssa.Return:
 		return c.compileReturn(op)
 	case *ssa.ConstInst:

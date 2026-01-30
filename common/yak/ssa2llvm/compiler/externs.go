@@ -33,11 +33,11 @@ func (c *Compiler) ensureExternDeclaration(name string) llvm.Value {
 		fn = llvm.AddFunction(c.Mod, externName, fnType)
 	} else if name == "getObject" {
 		params := []llvm.Type{c.LLVMCtx.Int64Type()}
-		retType := c.LLVMCtx.Int64Type()
+		retType := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
 		fnType := llvm.FunctionType(retType, params, false)
 		fn = llvm.AddFunction(c.Mod, externName, fnType)
 	} else if name == "dump" {
-		params := []llvm.Type{c.LLVMCtx.Int64Type()}
+		params := []llvm.Type{llvm.PointerType(c.LLVMCtx.Int8Type(), 0)}
 		retType := c.LLVMCtx.VoidType()
 		fnType := llvm.FunctionType(retType, params, false)
 		fn = llvm.AddFunction(c.Mod, externName, fnType)

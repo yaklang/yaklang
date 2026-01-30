@@ -38,6 +38,9 @@ func (tc *TypeConverter) ConvertType(t ssa.Type) llvm.Type {
 	case ssa.StringTypeKind:
 		// String as i8*
 		llvmType = llvm.PointerType(tc.Ctx.Int8Type(), 0)
+	case ssa.AnyTypeKind, ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
+		// Opaque runtime-managed types use pointer semantics
+		llvmType = llvm.PointerType(tc.Ctx.Int8Type(), 0)
 	case ssa.PointerKind:
 		// Default to i8* for opaque pointers or if we can't determine pointee
 		llvmType = llvm.PointerType(tc.Ctx.Int8Type(), 0)

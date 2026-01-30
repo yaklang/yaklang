@@ -139,19 +139,24 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		// Then compile regular instructions
 		hasTerminator := false
 		for _, instID := range blockObj.Insts {
-			instVal, ok := fn.GetValueById(instID)
-			if !ok {
+			instVal, ok := fn.GetInstructionById(instID)
+			if !ok || instVal == nil {
 				continue
 			}
-			if inst, ok := instVal.(ssa.Instruction); ok {
-				switch inst.(type) {
-				case *ssa.Return, *ssa.Jump, *ssa.If:
-					hasTerminator = true
-				}
+			if instVal.IsLazy() {
+				instVal = instVal.Self()
+			}
+			if instVal == nil {
+				continue
+			}
+			inst := instVal
+			switch inst.(type) {
+			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop:
+				hasTerminator = true
+			}
 
-				if err := c.compileInstruction(inst); err != nil {
-					return err
-				}
+			if err := c.compileInstruction(inst); err != nil {
+				return err
 			}
 		}
 

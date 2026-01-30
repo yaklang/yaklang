@@ -1,8 +1,13 @@
 package main
 
 /*
+#cgo LDFLAGS: -L${SRCDIR}/libs -lgc
+#include "local_gc.h"
 #include <stdlib.h>
 #include <stdint.h>
+
+// Forward declaration of the proxy function defined in c_stub.c
+void yak_finalizer_proxy(void* obj, void* client_data);
 */
 import "C"
 import (
@@ -11,7 +16,6 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/cgo"
-	"sync"
 	"time"
 	"unsafe"
 )
@@ -25,7 +29,8 @@ func yak_internal_print_int(n int64) {
 
 //export yak_internal_malloc
 func yak_internal_malloc(size int64) uintptr {
-	return uintptr(C.malloc(C.size_t(size)))
+	// Use Boehm GC for internal allocations too
+	return uintptr(C.GC_malloc(C.size_t(size)))
 }
 
 // --- Handle Management ---
@@ -92,37 +97,44 @@ func yak_host_dump(handleID C.uintptr_t) {
 	fmt.Printf("[Go] Dump: %+v\n", h.Value())
 }
 
-// --- Yak Runtime Simulation (Shadow Object Manager) ---
+// --- Yak Runtime (Boehm GC Integrated) ---
 
-type YakShadow struct {
-	HandleID C.uintptr_t
-}
+//export yak_internal_release_shadow
+func yak_internal_release_shadow(ptr unsafe.Pointer) {
+	// Reconstruct the handle ID from the C memory
+	handleID := *(*C.uintptr_t)(ptr)
 
-func finalizeShadow(s *YakShadow) {
 	if gcLogEnabled() {
-		fmt.Printf("[Yak GC] Finalizer triggered for Handle %d\n", s.HandleID)
+		fmt.Printf("[Yak GC] Finalizer triggered\n")
+		fmt.Printf("[Yak GC] Releasing shadow %p -> Handle %d\n", ptr, handleID)
 	}
-	yak_host_release_handle(s.HandleID)
-}
 
-var shadowStore = struct {
-	sync.Mutex
-	objects map[uintptr]*YakShadow
-}{
-	objects: make(map[uintptr]*YakShadow),
+	// Release the Go handle
+	yak_host_release_handle(handleID)
 }
 
 //export yak_runtime_new_shadow
 func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
-	s := &YakShadow{HandleID: handleID}
-	runtime.SetFinalizer(s, finalizeShadow)
+	// 1. Allocate memory managed by Boehm GC
+	// We allocate 8 bytes to store the handleID (sizeof(uintptr_t))
+	ptr := C.GC_malloc(C.size_t(8))
+
+	// 2. Write the handleID into the allocated memory
+	*(*C.uintptr_t)(ptr) = handleID
+
+	// 3. Register Finalizer
+	// When Boehm GC determines 'ptr' is unreachable, it will call yak_finalizer_proxy(ptr, nil)
+	C.GC_register_finalizer(
+		ptr,
+		(C.GC_finalization_proc)(C.yak_finalizer_proxy),
+		nil, nil, nil,
+	)
+
 	if gcLogEnabled() {
-		fmt.Printf("[Yak] Malloc Shadow for Handle %d with Finalizer\n", handleID)
+		fmt.Printf("[Yak] GC_malloc shadow %p for Handle %d\n", ptr, handleID)
 	}
-	shadowStore.Lock()
-	shadowStore.objects[uintptr(unsafe.Pointer(s))] = s
-	shadowStore.Unlock()
-	return unsafe.Pointer(s)
+
+	return ptr
 }
 
 //export yak_runtime_get_field
@@ -130,8 +142,9 @@ func yak_runtime_get_field(objPtr unsafe.Pointer, name *C.char) int64 {
 	if objPtr == nil {
 		return 0
 	}
-	s := (*YakShadow)(objPtr)
-	return yak_host_get_member(s.HandleID, name)
+	// Retrieve HandleID from the C pointer
+	handleID := *(*C.uintptr_t)(objPtr)
+	return yak_host_get_member(handleID, name)
 }
 
 //export yak_runtime_set_field
@@ -139,8 +152,9 @@ func yak_runtime_set_field(objPtr unsafe.Pointer, name *C.char, val int64) {
 	if objPtr == nil {
 		return
 	}
-	s := (*YakShadow)(objPtr)
-	yak_host_set_member(s.HandleID, name, val)
+	// Retrieve HandleID from the C pointer
+	handleID := *(*C.uintptr_t)(objPtr)
+	yak_host_set_member(handleID, name, val)
 }
 
 //export yak_runtime_dump
@@ -148,30 +162,28 @@ func yak_runtime_dump(objPtr unsafe.Pointer) {
 	if objPtr == nil {
 		return
 	}
-	s := (*YakShadow)(objPtr)
-	yak_host_dump(s.HandleID)
+	// Retrieve HandleID from the C pointer
+	handleID := *(*C.uintptr_t)(objPtr)
+	yak_host_dump(handleID)
 }
 
 //export yak_runtime_get_object
-func yak_runtime_get_object(initVal int64) C.uintptr_t {
+func yak_runtime_get_object(initVal int64) unsafe.Pointer {
 	handleID := yak_host_get_object(initVal)
-	shadow := yak_runtime_new_shadow(handleID)
-	return C.uintptr_t(uintptr(shadow))
+	// Return the pointer to the shadow object
+	return yak_runtime_new_shadow(handleID)
 }
 
 //export yak_runtime_dump_handle
-func yak_runtime_dump_handle(objID C.uintptr_t) {
-	yak_runtime_dump(unsafe.Pointer(uintptr(objID)))
+func yak_runtime_dump_handle(objPtr unsafe.Pointer) {
+	// objPtr is the pointer to the shadow object
+	yak_runtime_dump(objPtr)
 }
 
 //export yak_runtime_gc
 func yak_runtime_gc() {
-	shadowStore.Lock()
-	for key := range shadowStore.objects {
-		delete(shadowStore.objects, key)
-	}
-	shadowStore.Unlock()
-	runtime.GC()
+	// Manual GC trigger if needed
+	C.GC_gcollect()
 	runtime.GC()
 	time.Sleep(10 * time.Millisecond)
 }
