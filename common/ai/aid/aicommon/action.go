@@ -181,6 +181,72 @@ type FieldStreamItem struct {
 	Handler   func(key string, reader io.Reader)
 }
 
+type aitagResolvedUpdate struct {
+	fullKey string
+	leafKey string
+	value   string
+}
+
+func resolveAITagPlaceholderString(raw string, tagValues map[string]string) (string, bool) {
+	if tagValues == nil {
+		return "", false
+	}
+	if v, ok := tagValues[raw]; ok && v != "" {
+		return v, true
+	}
+	// Support wrapped placeholder, e.g. "{{__aitag__script}}"
+	if strings.HasPrefix(raw, "{{") && strings.HasSuffix(raw, "}}") {
+		inner := strings.TrimSpace(raw[2 : len(raw)-2])
+		if v, ok := tagValues[inner]; ok && v != "" {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+func resolveAITagPlaceholdersInMap(root map[string]any, tagValues map[string]string) []aitagResolvedUpdate {
+	if root == nil || len(tagValues) == 0 {
+		return nil
+	}
+	var updates []aitagResolvedUpdate
+
+	var walk func(node any, path []string) any
+	walk = func(node any, path []string) any {
+		switch v := node.(type) {
+		case map[string]any:
+			for k, child := range v {
+				v[k] = walk(child, append(path, k))
+			}
+			return v
+		case []any:
+			for i := range v {
+				// We still resolve placeholders inside arrays, but do not emit action key updates
+				// because the jsonextractor key-path convention for arrays is not guaranteed.
+				v[i] = walk(v[i], path)
+			}
+			return v
+		case string:
+			resolved, ok := resolveAITagPlaceholderString(v, tagValues)
+			if !ok {
+				return node
+			}
+			if len(path) > 0 {
+				updates = append(updates, aitagResolvedUpdate{
+					fullKey: strings.Join(path, "."),
+					leafKey: path[len(path)-1],
+					value:   resolved,
+				})
+			}
+			return resolved
+		default:
+			return node
+		}
+	}
+
+	_ = walk(root, nil)
+	return updates
+}
+
 type ActionMakerOption func(maker *ActionMaker)
 
 func WithActionAlias(alias ...string) ActionMakerOption {
@@ -430,7 +496,70 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		}
 
 		parserWG.Wait() // wait tag parsers finished
-		parseFinish()   // signal parse finish
+
+		// Resolve JSON placeholders and merge tool param AITAG values back into the JSON map.
+		// This is used to avoid complex escaping in JSON strings by using AITAG for raw content.
+		if len(m.tagToKey) > 0 {
+			// Snapshot AITAG key->value from action params (written by AITAG parser)
+			tagValues := make(map[string]string)
+			action.mu.Lock()
+			for _, fieldName := range m.tagToKey {
+				if raw, ok := action.params[fieldName]; ok {
+					if s, ok := raw.(string); ok && s != "" {
+						tagValues[fieldName] = s
+					}
+				}
+			}
+			// Update the JSON object maps in-place (if present). Note: jsonextractor may store
+			// object values as standalone maps in action.params (e.g. "params") which are not
+			// guaranteed to share identity with the full object stored at generalParamsKey.
+			var updates []aitagResolvedUpdate
+			if generalAny, ok := action.params[generalParamsKey]; ok {
+				if generalMap, ok := generalAny.(map[string]any); ok && generalMap != nil {
+					updates = append(updates, resolveAITagPlaceholdersInMap(generalMap, tagValues)...)
+				}
+			}
+			if paramsAny, ok := action.params["params"]; ok {
+				if paramsMap, ok := paramsAny.(map[string]any); ok && paramsMap != nil {
+					updates = append(updates, resolveAITagPlaceholdersInMap(paramsMap, tagValues)...)
+
+					// Special case for tool params: if AITAG is stored as "__aitag__{param}",
+					// merge it back into the JSON "params" object as "{param}".
+					for tagName, fieldName := range m.tagToKey {
+						if !strings.HasPrefix(tagName, "TOOL_PARAM_") {
+							continue
+						}
+						if !strings.HasPrefix(fieldName, "__aitag__") {
+							continue
+						}
+						val := tagValues[fieldName]
+						if val == "" {
+							continue
+						}
+						paramName := strings.TrimPrefix(fieldName, "__aitag__")
+						paramsMap[paramName] = val
+						updates = append(updates, aitagResolvedUpdate{
+							fullKey: "params." + paramName,
+							leafKey: paramName,
+							value:   val,
+						})
+					}
+				}
+			}
+			action.mu.Unlock()
+
+			// Sync resolved values back into action params so GetString/GetInvokeParams see the final values.
+			for _, u := range updates {
+				if u.fullKey != "" {
+					action.ForceSet(u.fullKey, u.value)
+				}
+				if u.leafKey != "" {
+					action.ForceSet(u.leafKey, u.value)
+				}
+			}
+		}
+
+		parseFinish() // signal parse finish
 
 		streamWg.Wait() // wait all stream handlers finished
 		streamFinish()  // signal stream finish
