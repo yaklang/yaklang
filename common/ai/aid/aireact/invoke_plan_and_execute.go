@@ -213,6 +213,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 		stdOut := new(bytes.Buffer)
 		eventHandler := func(e *schema.AiOutputEvent) {
+			e.CoordinatorId = uid
 			if e.Type == schema.EVENT_TYPE_YAKIT_EXEC_RESULT && e.IsJson {
 				var execResult ypb.ExecResult
 				if err := json.Unmarshal(e.Content, &execResult); err != nil {
