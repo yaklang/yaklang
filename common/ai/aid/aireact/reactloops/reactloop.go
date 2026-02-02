@@ -294,6 +294,14 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		r.actions.Set(toolcall.ActionType, toolcall)
 	}
 
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE); !ok {
+		if toolCompose, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE); !ok {
+			log.Warn("loop action 'tool_compose' not found")
+		} else {
+			r.actions.Set(toolCompose.ActionType, toolCompose)
+		}
+	}
+
 	if r.allowRAG == nil || r.allowRAG() {
 		// allow tool call, must have tools
 		ins, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)

@@ -30,6 +30,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 
 	if r.allowToolCall != nil && !r.allowToolCall() {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE)
 	}
 
 	filterFunc := func(action *LoopAction) bool {
