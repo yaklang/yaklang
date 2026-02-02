@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -1021,12 +1020,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		var extName string
 		u, _ := url.Parse(urlStr)
-		if ret := path.Ext(u.EscapedPath()); ret != "" {
-			extName = ret
-			if !strings.HasPrefix(extName, ".") {
-				extName = "." + extName
-			}
-		}
+		extName = normalizeExtFromEscapedPath(u.EscapedPath())
 
 		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
@@ -1165,12 +1159,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			urlStr = urlRaw.String()
 			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
-			if ret := path.Ext(urlRaw.EscapedPath()); ret != "" {
-				extName = ret
-				if !strings.HasPrefix(extName, ".") {
-					extName = "." + extName
-				}
-			}
+			extName = normalizeExtFromEscapedPath(urlRaw.EscapedPath())
 			if strings.ToUpper(method) == "CONNECT" {
 				urlStr = hostname
 			}
