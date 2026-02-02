@@ -148,17 +148,56 @@ var UpgradeCommand = cli.Command{
 
 		version := c.String("version")
 		if version == "" {
-			rsp, _, err := poc.DoGET(`https://aliyun-oss.yaklang.com/yak/latest/version.txt`, poc.WithTimeout(10), poc.WithSave(false))
+			// 从 active_versions.txt 获取版本，排除包含 -yakit- 或 -irify- 的版本
+			rsp, _, err := poc.DoGET(activeVersions, poc.WithTimeout(10), poc.WithSave(false))
 			if err != nil {
-				log.Warnf("fetch latest yak version failed: %v", err)
-				return err
+				log.Warnf("fetch active versions failed: %v, trying latest/version.txt", err)
+				// 回退到 latest/version.txt
+				rsp, _, err := poc.DoGET(`https://aliyun-oss.yaklang.com/yak/latest/version.txt`, poc.WithTimeout(10), poc.WithSave(false))
+				if err != nil {
+					log.Warnf("fetch latest yak version failed: %v", err)
+					version = "latest"
+				} else {
+					raw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+					version = strings.TrimSpace(string(raw))
+				}
+			} else {
+				versions := utils.PrettifyListFromStringSplitEx(string(rsp.GetBody()), "\n")
+				if len(versions) == 0 {
+					log.Warnf("no active versions found, trying latest/version.txt")
+					rsp, _, err := poc.DoGET(`https://aliyun-oss.yaklang.com/yak/latest/version.txt`, poc.WithTimeout(10), poc.WithSave(false))
+					if err != nil {
+						log.Warnf("fetch latest yak version failed: %v", err)
+						version = "latest"
+					} else {
+						raw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+						version = strings.TrimSpace(string(raw))
+					}
+				} else {
+					// 从最新到最旧挨个匹配第一个非 -yakit- 和 -irify- 的标签
+					for _, ver := range versions {
+						ver = strings.TrimSpace(ver)
+						if ver == "" {
+							continue
+						}
+						// 排除包含 -yakit- 或 -irify- 的版本
+						if strings.Contains(ver, "-yakit-") || strings.Contains(ver, "-irify-") {
+							continue
+						}
+						version = ver
+						log.Infof("selected version from active_versions.txt: %s", version)
+						break
+					}
+					if version == "" {
+						log.Warnf("no suitable version found (all contain -yakit- or -irify-), using latest")
+						version = "latest"
+					}
+				}
 			}
-			raw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
-			version = strings.TrimSpace(string(raw))
 		}
 
 		if version == "" {
-			log.Warnf("fetch latest yak version failed: %v use latest", err)
+			log.Warnf("version is empty, using latest")
 			version = "latest"
 		}
 
