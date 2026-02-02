@@ -294,6 +294,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		return true
 	})
 
+	overlay.programName = layers[len(layers)-1].GetProgramName()
 	aggregatedFS, err := overlay.aggregateFileSystems()
 	if err != nil {
 		log.Errorf("failed to aggregate file systems: %v", err)
@@ -302,7 +303,11 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	}
 
 	for _, layer := range overlay.Layers {
-		if layer != nil {
+		if layer != nil && layer.Program != nil {
+			// 设置 overlay，这样 Value.ParentProgram.GetOverlay() 可以返回 overlay
+			if layer.Program.overlay == nil {
+				layer.Program.overlay = overlay
+			}
 			overlay.ensureLayerProgramLoaded(layer)
 		}
 	}
