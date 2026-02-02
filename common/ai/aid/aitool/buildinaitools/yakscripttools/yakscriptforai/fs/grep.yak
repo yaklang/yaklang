@@ -159,7 +159,7 @@ handle = (patternSubstr, targetFile, content) => {
 processPath = (singlePath) => {
     if file.IsDir(singlePath) {
         filesys.Recursive(singlePath, filesys.onFileStat((fileToCheck, info) => {
-            yakit.File(fileToCheck, yakit.fileStatusAction(info))
+            // yakit.File(fileToCheck, yakit.fileStatusAction(info))
             defer recover()
             if end { return }
 
