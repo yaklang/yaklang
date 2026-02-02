@@ -22,11 +22,11 @@ func (s *Server) CreateAIMemoryEntity(ctx context.Context, req *ypb.CreateAIMemo
 		return nil, utils.Errorf("database not initialized")
 	}
 
-	memory, err := aimem.NewAIMemory(req.GetSessionID())
+	memory, err := aimem.NewAIMemory(req.GetSessionID(), aimem.WithAutoReActInvoker(aicommon.WithContext(ctx)))
 	if err != nil {
 		return nil, err
 	}
-	_, err = memory.AddRawText(req.GetFreeInput())
+	err = memory.HandleMemory(req.GetFreeInput())
 	if err != nil {
 		return nil, err
 	}

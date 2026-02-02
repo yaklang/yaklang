@@ -197,7 +197,10 @@ func CheckConfigEmbeddingAvailable(opts ...RAGSystemConfigOption) bool {
 
 	checkerAny, _ := embeddingAvailableCache.LoadOrStore(modelName, newEmbeddingAvailableChecker(modelName))
 	checker := checkerAny.(*embeddingAvailableChecker)
-	return checker.check()
+	if checker.check() {
+		return true
+	}
+	return vectorstore.IsAIBalanceFreeServiceAvailable() // fallback to ai balance free service
 }
 
 func NewVectorStoreDatabase(path string) (*gorm.DB, error) {

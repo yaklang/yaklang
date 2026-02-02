@@ -88,17 +88,17 @@ func newAIMemory(sessionId string, requireInvoker bool, opts ...Option) (*AIMemo
 		embeddingAvailable: embeddingAvailable,
 	}
 
-	if requireInvoker && triage.invoker == nil && config.autoLightReActInvoker {
+	if requireInvoker && triage.invoker == nil && config.autoReActInvoker {
 		lightOpts := []aicommon.ConfigOption{
 			aicommon.WithMemoryTriage(triage),
 			aicommon.WithEnableSelfReflection(false),
 			aicommon.WithDisallowMCPServers(true),
 			aicommon.WithDisableSessionTitleGeneration(true),
 		}
-		lightOpts = append(lightOpts, config.lightReActOptions...)
-		invoker, err := aicommon.LightAIRuntimeInvokerGetter(triage.ctx, lightOpts...)
+		lightOpts = append(lightOpts, config.reActOptions...)
+		invoker, err := aicommon.AIRuntimeInvokerGetter(triage.ctx, lightOpts...)
 		if err != nil {
-			return nil, utils.Errorf("create light react invoker for ai-memory trigger failed: %v", err)
+			return nil, utils.Errorf("create react invoker for ai-memory trigger failed: %v", err)
 		}
 		triage.invoker = invoker
 	}
