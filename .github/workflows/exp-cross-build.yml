@@ -172,21 +172,14 @@ jobs:
           # 尝试多个版本源：latest -> 从版本列表中获取第一个非 -yakit- 和 -irify- 的版本
           VERSIONS_TO_TRY=("latest")
           
-          # 尝试从版本列表获取可用版本
-          if VERSIONS=$(curl -sS -L "https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt" 2>&1 | grep -v '^$'); then
-            # 从最新到最旧挨个匹配第一个非 -yakit- 和 -irify- 的标签
-            SELECTED_VERSION=""
-            while IFS= read -r version; do
-              # 检查是否包含 -yakit- 或 -irify-
-              if ! echo "$version" | grep -qE -- '-yakit-|-irify-'; then
-                SELECTED_VERSION="$version"
-                echo "✅ Found suitable version: $SELECTED_VERSION"
-                break
-              fi
-            done <<< "$VERSIONS"
-            
+          # 确保脚本有执行权限
+          chmod +x ./scripts/get-yak-version.sh
+          
+          # 尝试从版本列表获取可用版本（排除 -yakit- 和 -irify-）
+          if SELECTED_VERSION=$(./scripts/get-yak-version.sh --quiet 2>/dev/null); then
             # 如果找到合适的版本，添加到尝试列表
             if [ -n "$SELECTED_VERSION" ]; then
+              echo "✅ Found suitable version: $SELECTED_VERSION"
               VERSIONS_TO_TRY+=("$SELECTED_VERSION")
             fi
           fi
