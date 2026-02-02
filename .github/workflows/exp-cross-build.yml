@@ -169,22 +169,29 @@ jobs:
           echo "Runner: $RUNNER_OS_NORM/$RUNNER_ARCH_NORM"
           echo "Will try to download binaries: ${BINARY_NAMES[*]}"
           
-          # 尝试多个版本源：latest -> beta -> 版本列表中的第一个可用版本
+          # 尝试多个版本源：latest -> 从版本列表中获取第一个非 -yakit- 和 -irify- 的版本
           VERSIONS_TO_TRY=("latest")
           
           # 尝试从版本列表获取可用版本
-          if VERSIONS=$(curl -sS -L "https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt" 2>&1 | grep -v '^$' | head -n 10); then
-            # 优先选择 beta 版本
-            BETA_VERSION=$(echo "$VERSIONS" | grep -E '.*-beta[0-9]+$' | head -n 1)
-            if [ -n "$BETA_VERSION" ]; then
-              VERSIONS_TO_TRY+=("$BETA_VERSION")
-            fi
-            # 添加版本列表中的第一个版本作为备选
-            FIRST_VERSION=$(echo "$VERSIONS" | head -n 1)
-            if [ -n "$FIRST_VERSION" ] && [ "$FIRST_VERSION" != "latest" ]; then
-              VERSIONS_TO_TRY+=("$FIRST_VERSION")
+          if VERSIONS=$(curl -sS -L "https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt" 2>&1 | grep -v '^$'); then
+            # 从最新到最旧挨个匹配第一个非 -yakit- 和 -irify- 的标签
+            SELECTED_VERSION=""
+            while IFS= read -r version; do
+              # 检查是否包含 -yakit- 或 -irify-
+              if ! echo "$version" | grep -qE -- '-yakit-|-irify-'; then
+                SELECTED_VERSION="$version"
+                echo "✅ Found suitable version: $SELECTED_VERSION"
+                break
+              fi
+            done <<< "$VERSIONS"
+            
+            # 如果找到合适的版本，添加到尝试列表
+            if [ -n "$SELECTED_VERSION" ]; then
+              VERSIONS_TO_TRY+=("$SELECTED_VERSION")
             fi
           fi
+          
+          echo "Will try versions: ${VERSIONS_TO_TRY[*]}"
           
           # 依次尝试下载每个二进制名称和版本
           for BINARY_NAME in "${BINARY_NAMES[@]}"; do
@@ -292,9 +299,13 @@ jobs:
             done
           done
           
-          echo "::warning::Failed to download yak from all attempted versions, will fallback to building"
+          echo "::error::Failed to download yak from all attempted versions"
+          echo "Tried ${#BINARY_NAMES[@]} binary name(s) and ${#VERSIONS_TO_TRY[@]} version(s)"
+          echo "Binary names: ${BINARY_NAMES[*]}"
+          echo "Versions: ${VERSIONS_TO_TRY[*]}"
           echo "yak_downloaded=false" >> "$GITHUB_OUTPUT"
           echo "::endgroup::"
+          exit 1
 
       - name: Get Repo tags
         id: get_tag
