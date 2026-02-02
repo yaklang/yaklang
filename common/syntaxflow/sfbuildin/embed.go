@@ -54,6 +54,11 @@ func GetRuleFileSystem() filesys_interface.FileSystem {
 	return ruleFSWithHash.(*embedFSWithHash).FileSystem
 }
 
+// InitEmbedFSWithNotify 带进度通知的初始化（非 gzip 版本不需要，但保持接口一致）
+func InitEmbedFSWithNotify(notify func(process float64, ruleName string)) {
+	// 非 gzip 版本已经在 init() 中初始化完成，无需额外操作
+}
+
 // CheckDuplicateTitles 检查规则中的 title 和 title_zh 是否重复（仅非 gzip 版本）
 func CheckDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
 	// 用于检查 title 和 title_zh 重复

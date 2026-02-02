@@ -135,7 +135,17 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 	log.Infof("start sync embed rule")
 	// sfdb.DeleteBuildInRule()
 
+	var notify func(process float64, ruleName string)
+	if len(notifies) > 0 {
+		notify = notifies[0]
+	}
+
+	// 对于 gzip 版本，设置进度通知回调，以便在解压过程中显示进度
+	// 注意：这需要在 GetRuleFileSystem() 之前调用
+	InitEmbedFSWithNotify(notify)
+
 	// 通过统一的接口获取文件系统实例，具体实现由 gzip_embed.go 或 embed.go 提供
+	// 对于 gzip 版本，这里会触发延迟解压，可能需要一些时间
 	fsInstance := GetRuleFileSystem()
 
 	err = SyncRuleFromFileSystem(fsInstance, true, notifies...)
