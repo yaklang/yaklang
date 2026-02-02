@@ -22,7 +22,7 @@ total = 0
 end = false
 buf = bufio.NewBuffer()
 filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
-    yakit.File(name, yakit.fileStatusAction(info))
+    // yakit.File(name, yakit.fileStatusAction(info))
     total ++
     if end {
         return

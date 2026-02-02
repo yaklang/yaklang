@@ -32,7 +32,7 @@ func FileReadAction(offset int, length int, unit string, content []byte) *YakitF
 			"offset":  offset,
 			"length":  length,
 			"unit":    unit,
-			"content": utils.InterfaceToString(content),
+			"content": utils.ShrinkTextBlock(utils.InterfaceToString(content), 4096),
 		},
 	}
 }

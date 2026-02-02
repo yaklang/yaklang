@@ -31,8 +31,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var notifyEmtpyVirtualClientOnce = utils.NewOnce()
+
 var emptyVirtualClient = NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-	return fmt.Errorf("empty virtual client")
+	notifyEmtpyVirtualClientOnce.Do(func() {
+		log.Warn("empty yakit client (VirtualYakitClient)")
+	})
+	log.Info(i.String())
+	return nil
 })
 
 var YakitExports = map[string]interface{}{
