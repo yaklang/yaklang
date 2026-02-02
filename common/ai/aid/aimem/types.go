@@ -19,10 +19,10 @@ type Config struct {
 	ragOptions      []rag.RAGSystemConfigOption
 	database        *gorm.DB
 
-	// autoLightReActInvoker enables building a lightweight invoker automatically when invoker is required.
+	// autoReActInvoker enables building a lightweight invoker automatically when invoker is required.
 	// It is intended for trigger/background-only scenarios.
-	autoLightReActInvoker bool
-	lightReActOptions     []aicommon.ConfigOption
+	autoReActInvoker bool
+	reActOptions     []aicommon.ConfigOption
 }
 
 // Option AIMemoryTriage的配置选项
@@ -82,12 +82,12 @@ func WithDatabase(db *gorm.DB) Option {
 	}
 }
 
-// WithDefaultLightReActInvoker enables auto-creating a lightweight ReAct invoker when invoker is required
+// WithAutoReActInvoker enables auto-creating a lightweight ReAct invoker when invoker is required
 // but not provided. This keeps NewAIMemory() behavior unchanged unless explicitly enabled.
-func WithDefaultLightReActInvoker(opts ...aicommon.ConfigOption) Option {
+func WithAutoReActInvoker(opts ...aicommon.ConfigOption) Option {
 	return func(config *Config) {
-		config.autoLightReActInvoker = true
-		config.lightReActOptions = append(config.lightReActOptions, opts...)
+		config.autoReActInvoker = true
+		config.reActOptions = append(config.reActOptions, opts...)
 	}
 }
 
