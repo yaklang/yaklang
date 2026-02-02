@@ -63,16 +63,11 @@ jobs:
             echo "Debug: First 20 lines of version list:"
             echo "$VERSIONS" | head -n 20
             
-            # 从最新到最旧挨个匹配第一个非 -yakit- 和 -irify- 的标签
-            SELECTED_VERSION=""
-            while IFS= read -r version; do
-              # 检查是否包含 -yakit- 或 -irify-
-              if ! echo "$version" | grep -qE -- '-yakit-|-irify-'; then
-                SELECTED_VERSION="$version"
-                echo "✅ Found latest full version: $SELECTED_VERSION"
-                break
-              fi
-            done <<< "$VERSIONS"
+            # 确保脚本有执行权限
+            chmod +x ./scripts/get-yak-version.sh
+            
+            # 使用脚本获取合适的版本（排除 -yakit- 和 -irify-）
+            SELECTED_VERSION=$(./scripts/get-yak-version.sh)
             
             if [ -z "$SELECTED_VERSION" ]; then
               echo "::error::No full version found (all versions contain -yakit- or -irify-)"

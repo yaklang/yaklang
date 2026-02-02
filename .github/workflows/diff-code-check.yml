@@ -10,6 +10,7 @@ on:
       - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "scripts/ssa-risk-tools/**"
+      - "scripts/get-yak-version.sh"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -116,44 +117,11 @@ jobs:
         run: |
           echo "::group::Finding latest Yak version"
           
-          # 获取所有可用版本列表（已按从新到旧排序）
-          VERSIONS_URL="https://aliyun-oss.yaklang.com/yak/version-info/active_versions.txt"
-          echo "Fetching versions from: $VERSIONS_URL"
+          # 确保脚本有执行权限
+          chmod +x ./scripts/get-yak-version.sh
           
-          if ! VERSIONS=$(curl -sS -L "$VERSIONS_URL" | grep -v '^$'); then
-            echo "::error::Failed to fetch version list"
-            exit 1
-          fi
-          
-          echo "Available versions (newest first):"
-          echo "$VERSIONS" | head -n 5
-          echo "..."
-          
-          # 从上到下遍历，找到第一个符合条件的版本（*-alpha*-diff-check / *-alpha*-code-scan / *-beta*）
-          # 同时排除包含 -yakit- 或 -irify- 的版本
-          SELECTED_VERSION=""
-          
-          while IFS= read -r version; do
-            # 首先排除包含 -yakit- 或 -irify- 的版本
-            if echo "$version" | grep -qE -- '-yakit-|-irify-'; then
-              continue
-            fi
-            
-            # 检查是否为 alpha-diff-check / alpha-code-scan / beta
-            if echo "$version" | grep -qE '.*-alpha.*-diff-check'; then
-              SELECTED_VERSION="$version"
-              echo "✅ Found alpha-diff-check version: $SELECTED_VERSION"
-              break
-            elif echo "$version" | grep -qE '.*-alpha.*-code-scan'; then
-              SELECTED_VERSION="$version"
-              echo "✅ Found alpha-code-scan version: $SELECTED_VERSION"
-              break
-            elif echo "$version" | grep -qE '.*-beta[0-9]+$'; then
-              SELECTED_VERSION="$version"
-              echo "✅ Found beta version: $SELECTED_VERSION"
-              break
-            fi
-          done <<< "$VERSIONS"
+          # 使用脚本获取合适的版本（匹配 alpha-diff-check / alpha-code-scan / beta，排除 -yakit- 和 -irify-）
+          SELECTED_VERSION=$(./scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$')
           
           if [ -z "$SELECTED_VERSION" ]; then
             echo "::error::No suitable version found (alpha-diff-check / alpha-code-scan / beta)"
