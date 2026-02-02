@@ -47,65 +47,10 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 		return nil
 	}))
 
-	// 用于检查 title 和 title_zh 重复
-	titleMap := make(map[string][]string)   // title -> []filePath
-	titleZhMap := make(map[string][]string) // title_zh -> []filePath
-
-	// 第一遍：收集所有规则的 title 和 title_zh
-	err = filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-		_, name := fsInstance.PathSplit(s)
-		if !strings.HasSuffix(name, ".sf") {
-			return nil
-		}
-		raw, err := fsInstance.ReadFile(s)
-		if err != nil {
-			return utils.Wrapf(err, "read file[%s] error", s)
-		}
-
-		content := string(raw)
-		// 解析规则内容获取 title 和 title_zh
-		rule, err := sfdb.CheckSyntaxFlowRuleContent(content)
-		if err != nil {
-			// 如果解析失败，跳过重复检查，但会在后续导入时处理错误
-			return nil
-		}
-
-		// 收集 title 重复
-		if rule.Title != "" {
-			titleMap[rule.Title] = append(titleMap[rule.Title], s)
-		}
-		// 收集 title_zh 重复
-		if rule.TitleZh != "" {
-			titleZhMap[rule.TitleZh] = append(titleZhMap[rule.TitleZh], s)
-		}
-
-		return nil
-	}))
-
+	// 第一遍：检查 title 和 title_zh 重复（具体实现由 embed.go 或 gzip_embed.go 提供）
+	err = CheckDuplicateTitles(fsInstance)
 	if err != nil {
 		return err
-	}
-
-	// 检查 title 重复
-	var duplicateErrors []string
-	for title, paths := range titleMap {
-		if len(paths) > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("重复的 title '%s' 出现在以下文件中:\n  %s", title, strings.Join(paths, "\n  ")))
-		}
-	}
-
-	// 检查 title_zh 重复
-	for titleZh, paths := range titleZhMap {
-		if len(paths) > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("重复的 title_zh '%s' 出现在以下文件中:\n  %s", titleZh, strings.Join(paths, "\n  ")))
-		}
-	}
-
-	// 如果有重复，返回错误
-	if len(duplicateErrors) > 0 {
-		errorMsg := "发现重复的 title 或 title_zh:\n" + strings.Join(duplicateErrors, "\n\n")
-		log.Errorf(errorMsg)
-		return utils.Errorf(errorMsg)
 	}
 
 	// 第二遍：实际导入规则
@@ -189,7 +134,10 @@ func ForceSyncEmbedRule(notifies ...func(process float64, ruleName string)) (err
 func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (err error) {
 	log.Infof("start sync embed rule")
 	// sfdb.DeleteBuildInRule()
-	fsInstance := filesys.NewEmbedFS(ruleFS)
+
+	// 通过统一的接口获取文件系统实例，具体实现由 gzip_embed.go 或 embed.go 提供
+	fsInstance := GetRuleFileSystem()
+
 	err = SyncRuleFromFileSystem(fsInstance, true, notifies...)
 
 	return utils.Wrapf(err, "init builtin rules error")
