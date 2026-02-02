@@ -17,6 +17,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "进度检查",
 		En: "Progress Check",
 	},
+	"tool_compose_progress": {
+		Zh: "工具编排",
+		En: "Tool Compose",
+	},
 	"knowledge-compress": {
 		Zh: "知识压缩",
 		En: "Knowledge Compress",
