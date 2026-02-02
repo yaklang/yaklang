@@ -114,7 +114,13 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		// 执行规则查询
 		var err error
 		var res *ssaapi.SyntaxFlowResult
-		if res, err = prog.SyntaxFlowRule(rule, option...); err == nil {
+		if overlay := prog.GetOverlay(); overlay != nil {
+			res, err = overlay.SyntaxFlowRule(rule, option...)
+		} else {
+			res, err = prog.SyntaxFlowRule(rule, option...)
+		}
+
+		if err == nil {
 			m.StatusTask(res)
 			m.markRuleSuccess()
 		} else {
