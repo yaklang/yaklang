@@ -7,6 +7,7 @@ WORKDIR /app
 
 # Always fetch version from active_versions.txt (excluding -yakit- and -irify- versions)
 # VERSION build arg is ignored, version is always determined from active_versions.txt
+# Note: This logic matches scripts/get-yak-version.sh (from latest to oldest, exclude -yakit- and -irify-)
 RUN apt-get update -y && apt-get install -y wget curl iputils-ping libpcap0.8=1.9.1-3 && \
     mkdir -p /app/ && \
     ARCH=$(if [ "$(uname -m)" = "aarch64" ]; then echo "arm64"; else echo "amd64"; fi) && \
