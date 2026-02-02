@@ -203,10 +203,17 @@ func WithReflectionOutputExample(example string) ReActLoopOption {
 			return "", err
 		}
 
-		// Append loop-specific output examples from registered loops
+		// Append loop-specific output examples from registered loops and actions
 		var loopExamples string
 		for _, actionName := range loop.loopActions.Keys() {
-			if meta, ok := GetLoopMetadata(actionName); ok && meta.OutputExamplePrompt != "" {
+			// First, try to get OutputExamples from the registered LoopAction
+			if action, ok := GetLoopAction(actionName); ok && action.OutputExamples != "" {
+				rendered, err := utils.RenderTemplate(action.OutputExamples, result)
+				if err == nil && rendered != "" {
+					loopExamples += "\n" + rendered
+				}
+			} else if meta, ok := GetLoopMetadata(actionName); ok && meta.OutputExamplePrompt != "" {
+				// Fallback to LoopMetadata if LoopAction doesn't have OutputExamples
 				rendered, err := utils.RenderTemplate(meta.OutputExamplePrompt, result)
 				if err == nil && rendered != "" {
 					loopExamples += "\n" + rendered

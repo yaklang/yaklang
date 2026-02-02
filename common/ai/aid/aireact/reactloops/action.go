@@ -20,6 +20,10 @@ type LoopAction struct {
 	ActionHandler     LoopActionHandlerFunc
 	StreamFields      []*LoopStreamField
 	AITagStreamFields []*LoopAITagField
+
+	// OutputExamples provides usage examples for this action, describing when and how to use it.
+	// This field helps AI understand the appropriate scenarios for selecting this action.
+	OutputExamples string `json:"output_examples,omitempty"`
 }
 
 func buildSchema(actions ...*LoopAction) string {
