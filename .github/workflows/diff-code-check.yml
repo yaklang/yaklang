@@ -130,9 +130,15 @@ jobs:
           echo "..."
           
           # 从上到下遍历，找到第一个符合条件的版本（*-alpha*-diff-check / *-alpha*-code-scan / *-beta*）
+          # 同时排除包含 -yakit- 或 -irify- 的版本
           SELECTED_VERSION=""
           
           while IFS= read -r version; do
+            # 首先排除包含 -yakit- 或 -irify- 的版本
+            if echo "$version" | grep -qE -- '-yakit-|-irify-'; then
+              continue
+            fi
+            
             # 检查是否为 alpha-diff-check / alpha-code-scan / beta
             if echo "$version" | grep -qE '.*-alpha.*-diff-check'; then
               SELECTED_VERSION="$version"
