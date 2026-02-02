@@ -22,30 +22,27 @@ var loopAction_toolCompose = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_compose_payload",
-			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'tool_compose'. Provide a complexity AITAG like '<|WORKFLOW_DAG_...|>..[json-array]..<|WORKFLOW_DAG_END_...|>' or JSON array of tool call nodes, each with 'call_id', 'tool_name', 'call_intent', and 'depends_on' fields. Example: [{\"call_id\":\"step1_search\",\"tool_name\":\"search\",\"call_intent\":\"search for data\",\"depends_on\":[]}]"),
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'tool_compose'. Provide a JSON array of tool call nodes, each with 'call_id', 'tool_name', 'call_intent', and 'depends_on' fields. Example: [{\"call_id\":\"step1_search\",\"tool_name\":\"search\",\"call_intent\":\"search for data\",\"depends_on\":[]}]"),
 		),
 	},
-	OutputExamples: `Example - Sequential file operations(With AI-Tag tags):
+	OutputExamples: `
+# tool-compose description
 在命名是工具调用节点时，call_id 需要以 _ 结尾，例如 "step1_search"，"step2_write"，"step3_combine" 等，如无法确定第几步，可以使用直接使用 "search_material" 等简明扼要的 identifier 来命名。
 注意，工具之间如果有依赖关系，一定要通过 depends_on 来指定
 
-{
-  "@action": "tool_compose",
-  "human_readable_thought": "Need to read a file, process its content, and write the result",
-}
-<|WORKFLOW_DAG_{{.Nonce}}|>
-[
-	{"call_id":"read","tool_name":"read-file","call_intent":"Read source file"},
-	{"call_id":"write","tool_name":"write-file","call_intent":"Write processed result","depends_on":["read"]}
-]
-<|WORKFLOW_DAG_END_{{.Nonce}}|>
+Example - Sequential file operations(With AI-Tag tags):
 
-Example 2 - Parallel data gathering with final aggregation:
-{
-  "@action": "tool_compose",
-  "human_readable_thought": "Gather data from multiple sources and combine results",
-  "tool_compose_payload": "[{\"call_id\":\"fetch1\",\"tool_name\":\"search\",\"call_intent\":\"Search first source\",\"depends_on\":[]},{\"call_id\":\"fetch2\",\"tool_name\":\"search\",\"call_intent\":\"Search second source\",\"depends_on\":[]},{\"call_id\":\"combine\",\"tool_name\":\"aggregate\",\"call_intent\":\"Combine all results\",\"depends_on\":[\"fetch1\",\"fetch2\"]}]"
-}`,
+	{
+	"@action": "tool_compose",
+	"human_readable_thought": "Need to read a file, process its content, and write the result",
+	}
+	<|WORKFLOW_DAG_{{.Nonce}}|>
+	[
+		{"call_id":"read","tool_name":"read-file","call_intent":"Read source file"},
+		{"call_id":"write","tool_name":"write-file","call_intent":"Write processed result","depends_on":["read"]}
+	]
+	<|WORKFLOW_DAG_END_{{.Nonce}}|>
+`,
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		emitter := loop.GetEmitter()
 		isDone := utils.NewBool(false)

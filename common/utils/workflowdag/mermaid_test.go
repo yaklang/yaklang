@@ -402,8 +402,8 @@ func TestMUSTPASS_GenerateMermaidFlowChart_SimpleChain(t *testing.T) {
 	assert.Contains(t, result, `A["A"]`)
 	assert.Contains(t, result, `B["B"]`)
 	assert.Contains(t, result, `C["C"]`)
-	assert.Contains(t, result, "A --> B")
-	assert.Contains(t, result, "B --> C")
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "B -->|DependsOn| C")
 }
 
 func TestMUSTPASS_GenerateMermaidFlowChart_DiamondPattern(t *testing.T) {
@@ -424,10 +424,10 @@ func TestMUSTPASS_GenerateMermaidFlowChart_DiamondPattern(t *testing.T) {
 	result, err := dag.GenerateMermaidFlowChart()
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "A --> B")
-	assert.Contains(t, result, "A --> C")
-	assert.Contains(t, result, "B --> D")
-	assert.Contains(t, result, "C --> D")
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "A -->|DependsOn| C")
+	assert.Contains(t, result, "B -->|DependsOn| D")
+	assert.Contains(t, result, "C -->|DependsOn| D")
 }
 
 func TestMUSTPASS_GenerateMermaidFlowChart_Cycle(t *testing.T) {
@@ -443,9 +443,9 @@ func TestMUSTPASS_GenerateMermaidFlowChart_Cycle(t *testing.T) {
 	result, err := dag.GenerateMermaidFlowChart()
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "C --> A")
-	assert.Contains(t, result, "A --> B")
-	assert.Contains(t, result, "B --> C")
+	assert.Contains(t, result, "C -->|DependsOn| A")
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "B -->|DependsOn| C")
 }
 
 func TestMUSTPASS_GenerateMermaidFlowChart_SpecialCharacterNodeIDs(t *testing.T) {
@@ -581,8 +581,8 @@ func TestMUSTPASS_GenerateMermaidFlowChart_NoDuplicateEdges(t *testing.T) {
 	result, err := dag.GenerateMermaidFlowChart()
 	require.NoError(t, err)
 
-	// Count occurrences of the edge
-	edgeCount := strings.Count(result, "A --> B")
+	// Count occurrences of the edge (with DependsOn label)
+	edgeCount := strings.Count(result, "A -->|DependsOn| B")
 	assert.Equal(t, 1, edgeCount, "should have exactly one edge from A to B")
 }
 
@@ -603,8 +603,8 @@ func TestMUSTPASS_GenerateMermaidFlowChart_DisconnectedComponents(t *testing.T) 
 	result, err := dag.GenerateMermaidFlowChart()
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "A --> B")
-	assert.Contains(t, result, "X --> Y")
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "X -->|DependsOn| Y")
 }
 
 func TestMUSTPASS_GenerateMermaidFlowChart_MissingDependency(t *testing.T) {
@@ -1080,16 +1080,16 @@ func TestMUSTPASS_GenerateMermaidFlowChart_OutputExample(t *testing.T) {
 	result, err := dag.GenerateMermaidFlowChart()
 	require.NoError(t, err)
 
-	// Expected output format:
+	// Expected output format (with DependsOn labels):
 	// flowchart TB
 	//     A["A"]
 	//     B["B"]
-	//     A --> B
+	//     A -->|DependsOn| B
 	//     C["C"]
-	//     A --> C
+	//     A -->|DependsOn| C
 	//     D["D"]
-	//     B --> D
-	//     C --> D
+	//     B -->|DependsOn| D
+	//     C -->|DependsOn| D
 
 	// Verify structure
 	assert.Contains(t, result, "flowchart TB")
@@ -1097,10 +1097,10 @@ func TestMUSTPASS_GenerateMermaidFlowChart_OutputExample(t *testing.T) {
 	assert.Contains(t, result, `B["B"]`)
 	assert.Contains(t, result, `C["C"]`)
 	assert.Contains(t, result, `D["D"]`)
-	assert.Contains(t, result, "A --> B")
-	assert.Contains(t, result, "A --> C")
-	assert.Contains(t, result, "B --> D")
-	assert.Contains(t, result, "C --> D")
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "A -->|DependsOn| C")
+	assert.Contains(t, result, "B -->|DependsOn| D")
+	assert.Contains(t, result, "C -->|DependsOn| D")
 
 	// Log the output for documentation purposes
 	t.Logf("Generated Mermaid Flowchart:\n%s", result)
@@ -1683,4 +1683,343 @@ func TestMUSTPASS_GenerateMermaidFlowChart_ComplexRealWorld(t *testing.T) {
 	assert.Equal(t, 6, edgeCount, "should have 6 edges")
 
 	t.Logf("Complex real-world flowchart:\n%s", result)
+}
+
+// ==================== Edge Label Tests ====================
+
+func TestMUSTPASS_GenerateMermaidFlowChart_EdgeLabelsEnabled(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("C", "B")))
+	require.NoError(t, dag.Build())
+
+	// Default options should have edge labels enabled
+	result, err := dag.GenerateMermaidFlowChart()
+	require.NoError(t, err)
+
+	// Should contain "DependsOn" labels on edges
+	assert.Contains(t, result, "-->|DependsOn|", "should have DependsOn label on edges")
+	// Should have 2 edges with labels
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 2, labelCount, "should have 2 DependsOn labels")
+
+	t.Logf("Flowchart with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_EdgeLabelsDisabled(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("C", "B")))
+	require.NoError(t, dag.Build())
+
+	opts := &MermaidFlowChartOptions{
+		ShowEdgeLabels: false,
+	}
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	// Should NOT contain "DependsOn" labels
+	assert.NotContains(t, result, "-->|", "should not have edge labels")
+	// Should have plain edges
+	assert.Contains(t, result, "A --> B", "should have plain edge A --> B")
+
+	t.Logf("Flowchart without edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_CustomEdgeLabel(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("C", "B")))
+	require.NoError(t, dag.Build())
+
+	opts := &MermaidFlowChartOptions{
+		ShowEdgeLabels: true,
+		EdgeLabelFunc: func(fromNodeID, toNodeID string) string {
+			return fromNodeID + " -> " + toNodeID
+		},
+	}
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	// Should contain custom labels (-> is escaped to -#gt;)
+	assert.Contains(t, result, "-->|A -#gt; B|", "should have custom label for A->B")
+	assert.Contains(t, result, "-->|B -#gt; C|", "should have custom label for B->C")
+
+	t.Logf("Flowchart with custom edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_EdgeLabelWithSpecialChars(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.Build())
+
+	opts := &MermaidFlowChartOptions{
+		ShowEdgeLabels: true,
+		EdgeLabelFunc: func(fromNodeID, toNodeID string) string {
+			return "依赖|Depends<On>"
+		},
+	}
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	// Special characters should be escaped
+	assert.Contains(t, result, "#124;", "pipe should be escaped")
+	assert.Contains(t, result, "#lt;", "< should be escaped")
+	assert.Contains(t, result, "#gt;", "> should be escaped")
+	assert.Contains(t, result, "依赖", "Chinese should be preserved")
+
+	t.Logf("Flowchart with special char edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_DiamondWithEdgeLabels(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	//     D
+	//    / \
+	//   B   C
+	//    \ /
+	//     A
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("C", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("D", "B", "C")))
+	require.NoError(t, dag.Build())
+
+	result, err := dag.GenerateMermaidFlowChart()
+	require.NoError(t, err)
+
+	// All 4 edges should have DependsOn labels
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 4, labelCount, "should have 4 DependsOn labels for diamond pattern")
+
+	// Verify all dependency relationships are represented
+	assert.Contains(t, result, "A -->|DependsOn| B")
+	assert.Contains(t, result, "A -->|DependsOn| C")
+	assert.Contains(t, result, "B -->|DependsOn| D")
+	assert.Contains(t, result, "C -->|DependsOn| D")
+
+	t.Logf("Diamond pattern with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_CycleWithEdgeLabels(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	// A -> B -> C -> A (cycle)
+	require.NoError(t, dag.AddNode(NewTestNode("A", "C")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.AddNode(NewTestNode("C", "B")))
+	require.NoError(t, dag.Build())
+
+	result, err := dag.GenerateMermaidFlowChart()
+	require.NoError(t, err)
+
+	// All 3 edges should have DependsOn labels
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 3, labelCount, "should have 3 DependsOn labels for cycle")
+
+	t.Logf("Cycle with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChartWithStyles_HasEdgeLabels(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	nodeA := NewTestNode("A")
+	nodeB := NewTestNode("B", "A")
+	nodeC := NewTestNode("C", "B")
+
+	require.NoError(t, dag.AddNode(nodeA))
+	require.NoError(t, dag.AddNode(nodeB))
+	require.NoError(t, dag.AddNode(nodeC))
+	require.NoError(t, dag.Build())
+
+	result, err := dag.GenerateMermaidFlowChartWithStyles()
+	require.NoError(t, err)
+
+	// Should contain DependsOn labels
+	assert.Contains(t, result, "-->|DependsOn|", "styled flowchart should have DependsOn labels")
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 2, labelCount, "should have 2 DependsOn labels")
+
+	t.Logf("Styled flowchart with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_ComplexWorkflowWithEdgeLabels(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	// Simulate a CI/CD pipeline
+	require.NoError(t, dag.AddNode(NewTestNode("checkout")))
+	require.NoError(t, dag.AddNode(NewTestNode("install_deps", "checkout")))
+	require.NoError(t, dag.AddNode(NewTestNode("lint", "install_deps")))
+	require.NoError(t, dag.AddNode(NewTestNode("unit_test", "install_deps")))
+	require.NoError(t, dag.AddNode(NewTestNode("build", "lint", "unit_test")))
+	require.NoError(t, dag.AddNode(NewTestNode("integration_test", "build")))
+	require.NoError(t, dag.AddNode(NewTestNode("deploy", "integration_test")))
+	require.NoError(t, dag.Build())
+
+	result, err := dag.GenerateMermaidFlowChart()
+	require.NoError(t, err)
+
+	// Count edges (should be 7)
+	// checkout -> install_deps
+	// install_deps -> lint
+	// install_deps -> unit_test
+	// lint -> build
+	// unit_test -> build
+	// build -> integration_test
+	// integration_test -> deploy
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 7, labelCount, "should have 7 DependsOn labels for CI/CD pipeline")
+
+	t.Logf("CI/CD pipeline with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_EscapeMermaidEdgeLabel_Basic(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"DependsOn", "DependsOn"},
+		{"依赖", "依赖"},
+		{"A|B", "A#124;B"},
+		{"<tag>", "#lt;tag#gt;"},
+		{"a & b", "a #amp; b"},
+		{"[test]", "#91;test#93;"},
+		{`"quoted"`, "#quot;quoted#quot;"},
+		{"line1\nline2", "line1 line2"},
+		{"tab\there", "tab here"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := escapeMermaidEdgeLabel(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMUSTPASS_EscapeMermaidEdgeLabel_Empty(t *testing.T) {
+	result := escapeMermaidEdgeLabel("")
+	assert.Equal(t, "", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_ToolCallDAGWithEdgeLabels(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	// Simulate AI tool call dependencies
+	require.NoError(t, dag.AddNode(NewTestNode("tc_001_search")))
+	require.NoError(t, dag.AddNode(NewTestNode("tc_002_read", "tc_001_search")))
+	require.NoError(t, dag.AddNode(NewTestNode("tc_003_analyze", "tc_002_read")))
+	require.NoError(t, dag.AddNode(NewTestNode("tc_004_write", "tc_003_analyze")))
+	require.NoError(t, dag.Build())
+
+	opts := &MermaidFlowChartOptions{
+		Direction:      MermaidDirectionLR,
+		ShowEdgeLabels: true,
+		Title:          "Tool Call DAG",
+	}
+
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "%% Tool Call DAG")
+	assert.Contains(t, result, "flowchart LR")
+	assert.Contains(t, result, "-->|DependsOn|")
+
+	// 3 edges in chain
+	labelCount := strings.Count(result, "-->|DependsOn|")
+	assert.Equal(t, 3, labelCount)
+
+	t.Logf("Tool Call DAG with edge labels:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_EdgeLabelWithChinesePunctuation(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B", "A")))
+	require.NoError(t, dag.Build())
+
+	opts := &MermaidFlowChartOptions{
+		ShowEdgeLabels: true,
+		EdgeLabelFunc: func(fromNodeID, toNodeID string) string {
+			return "依赖关系：" + fromNodeID + "→" + toNodeID
+		},
+	}
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "依赖关系")
+	assert.Contains(t, result, "→")
+
+	t.Logf("Edge label with Chinese punctuation:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_MultipleEdgesToSameNode(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	// D depends on A, B, C
+	require.NoError(t, dag.AddNode(NewTestNode("A")))
+	require.NoError(t, dag.AddNode(NewTestNode("B")))
+	require.NoError(t, dag.AddNode(NewTestNode("C")))
+	require.NoError(t, dag.AddNode(NewTestNode("D", "A", "B", "C")))
+	require.NoError(t, dag.Build())
+
+	result, err := dag.GenerateMermaidFlowChart()
+	require.NoError(t, err)
+
+	// All 3 edges to D should have DependsOn labels
+	labelCount := strings.Count(result, "-->|DependsOn| D")
+	assert.Equal(t, 3, labelCount, "should have 3 edges pointing to D")
+
+	t.Logf("Multiple edges to same node:\n%s", result)
+}
+
+func TestMUSTPASS_GenerateMermaidFlowChart_EdgeLabelPreservesDependencyInfo(t *testing.T) {
+	ctx := context.Background()
+	dag := New[*TestNode](ctx)
+
+	// Create a complex dependency structure
+	require.NoError(t, dag.AddNode(NewTestNode("DataSource")))
+	require.NoError(t, dag.AddNode(NewTestNode("Parser", "DataSource")))
+	require.NoError(t, dag.AddNode(NewTestNode("Validator", "Parser")))
+	require.NoError(t, dag.AddNode(NewTestNode("Transformer", "Validator")))
+	require.NoError(t, dag.AddNode(NewTestNode("Output", "Transformer")))
+	require.NoError(t, dag.Build())
+
+	// Use custom edge label to show exact dependency relationship
+	opts := &MermaidFlowChartOptions{
+		ShowEdgeLabels: true,
+		EdgeLabelFunc: func(fromNodeID, toNodeID string) string {
+			return toNodeID + " depends on " + fromNodeID
+		},
+	}
+	result, err := dag.GenerateMermaidFlowChartWithOptions(opts)
+	require.NoError(t, err)
+
+	// Verify dependency relationships are clearly visible
+	assert.Contains(t, result, "Parser depends on DataSource")
+	assert.Contains(t, result, "Validator depends on Parser")
+	assert.Contains(t, result, "Transformer depends on Validator")
+	assert.Contains(t, result, "Output depends on Transformer")
+
+	t.Logf("Edge labels showing dependency info:\n%s", result)
 }
