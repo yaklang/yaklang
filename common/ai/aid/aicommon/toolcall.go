@@ -41,7 +41,7 @@ type ToolCaller struct {
 	onCallToolEnd   func(callToolId string)
 
 	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error)
-	intervalReviewDuration time.Duration // interval duration for review, default is 10 seconds
+	intervalReviewDuration time.Duration // interval duration for review, default is 20 seconds
 
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
@@ -77,7 +77,7 @@ func WithToolCaller_IntervalReviewHandler(
 }
 
 // WithToolCaller_IntervalReviewDuration sets the interval duration for the review handler.
-// Default value is 10 seconds if not set.
+// Default value is 20 seconds if not set.
 func WithToolCaller_IntervalReviewDuration(duration time.Duration) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.intervalReviewDuration = duration
@@ -197,10 +197,10 @@ func (t *ToolCaller) GetEmitter() *Emitter {
 }
 
 // GetIntervalReviewDuration returns the interval review duration.
-// If not set, returns the default value of 10 seconds.
+// If not set, returns the default value of 20 seconds.
 func (t *ToolCaller) GetIntervalReviewDuration() time.Duration {
 	if t.intervalReviewDuration <= 0 {
-		return time.Second * 10 // default 10 seconds
+		return time.Second * 20
 	}
 	return t.intervalReviewDuration
 }

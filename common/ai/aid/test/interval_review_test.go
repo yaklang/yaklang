@@ -36,7 +36,7 @@ func TestIntervalReviewConfig(t *testing.T) {
 
 	t.Run("default_interval_review_duration", func(t *testing.T) {
 		config := aicommon.NewConfig(context.Background())
-		// Default should be 0 (will be interpreted as 10 seconds in GetIntervalReviewDuration)
+		// Default should be 0 (will be interpreted as 20 seconds in GetIntervalReviewDuration)
 		require.Equal(t, time.Duration(0), config.IntervalReviewDuration, "default IntervalReviewDuration should be 0")
 	})
 }
