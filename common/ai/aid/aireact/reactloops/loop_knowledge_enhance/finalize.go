@@ -56,14 +56,14 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 	if len(mergedContent) > maxFinalDocBytes {
 		log.Infof("generateFinalKnowledgeDocument: merged content too large (%d bytes), compressing to %d bytes",
 			len(mergedContent), maxFinalDocBytes)
-		mergedContent = invoker.CompressLongTextWithDestination(
-
-			mergedContent,
-			userQuery,
-			invoker,
-			loop,
-			maxFinalDocBytes,
-		)
+		ctx := loop.GetConfig().GetContext()
+		compressedContent, err := invoker.CompressLongTextWithDestination(ctx, mergedContent, userQuery, int64(maxFinalDocBytes))
+		if err != nil {
+			log.Warnf("generateFinalKnowledgeDocument: failed to compress merged content: %v", err)
+			// keep original if compression fails
+		} else {
+			mergedContent = compressedContent
+		}
 	}
 
 	// Get search history for metadata
@@ -129,7 +129,7 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Ensure total size doesn't exceed limit
 	finalContent := finalDoc.String()
-	log.Info("final content: \n%v", string(finalContent))
+	log.Infof("final content: \n%v", string(finalContent))
 	const maxTotalBytes = 50 * 1024
 	if len(finalContent) > maxTotalBytes {
 		log.Warnf("generateFinalKnowledgeDocument: final report too large (%d bytes), truncating", len(finalContent))

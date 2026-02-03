@@ -11,7 +11,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -127,7 +126,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 		return fallbackResult, nil
 	}
 
-	if len(allScoredRanges) > 0 {
+	if len(allScoredRanges) == 0 {
 		// no result
 		return "", nil
 	}
@@ -138,7 +137,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 	// Deduplicate
 	allScoredRanges = deduplicateScoredRanges(allScoredRanges)
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("【AI 智能筛选】从 %d 字节内容中提取的 %d 个最相关知识片段：\n\n", len(knowledgeContent), len(allScoredRanges)))
+	result.WriteString(fmt.Sprintf("【AI 智能筛选】从 %d 字节内容中提取的 %d 个最相关知识片段：\n\n", len(rawText), len(allScoredRanges)))
 
 	totalExtractedBytes := 0
 
