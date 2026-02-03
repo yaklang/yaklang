@@ -91,26 +91,15 @@ jobs:
             yakit)
               BUILD_TAGS="gzip_embed,irify_exclude"
               OUTPUT_NAME_PREFIX="yaklang_yakit_"
-              echo "Build type: yakit (exclude irify)"
               ;;
             irify)
               BUILD_TAGS="gzip_embed,yakit_exclude"
               OUTPUT_NAME_PREFIX="yaklang_irify_"
-              echo "Build type: irify (exclude yakit)"
-              ;;
-            full|*)
-              BUILD_TAGS="gzip_embed"
-              OUTPUT_NAME_PREFIX="yak_"
-              echo "Build type: full (default)"
               ;;
           esac
           
           echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
-          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV"
-          echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_OUTPUT"
-          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_OUTPUT"
-          echo "Final BUILD_TAGS: $BUILD_TAGS"
-          echo "Final OUTPUT_NAME_PREFIX: $OUTPUT_NAME_PREFIX" 
+          echo "OUTPUT_NAME_PREFIX=$OUTPUT_NAME_PREFIX" >> "$GITHUB_ENV" 
 
       - name: Download CrossBuild GCC(Linux x64 / MacOS x64)
         if: inputs.os == 'linux-amd64' || inputs.os == 'darwin-amd64'
