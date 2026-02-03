@@ -34,6 +34,34 @@ func (c *Config) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) {
 	c.SyntaxFlowRule.RuleFilter = filter
 }
 
+// SetRuleGroups 设置规则组（便捷方法）
+func (c *Config) SetRuleGroups(groupNames ...string) {
+	if c == nil {
+		return
+	}
+	if c.Mode&ModeSyntaxFlowRule == 0 {
+		return
+	}
+	if c.SyntaxFlowRule == nil {
+		c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+	}
+	if c.SyntaxFlowRule.RuleFilter == nil {
+		c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
+	}
+	c.SyntaxFlowRule.RuleFilter.GroupNames = groupNames
+}
+
+// GetRuleGroups 获取规则组（便捷方法）
+func (c *Config) GetRuleGroups() []string {
+	if c == nil || c.Mode&ModeSyntaxFlowRule == 0 || c.SyntaxFlowRule == nil {
+		return nil
+	}
+	if c.SyntaxFlowRule.RuleFilter == nil {
+		return nil
+	}
+	return c.SyntaxFlowRule.RuleFilter.GroupNames
+}
+
 func (c *Config) GetRuleNames() []string {
 	if c == nil || c.Mode&ModeSyntaxFlowRule == 0 || c.SyntaxFlowRule == nil {
 		return nil
