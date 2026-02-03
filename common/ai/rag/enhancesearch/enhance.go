@@ -2,6 +2,7 @@ package enhancesearch
 
 import (
 	"context"
+	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -15,7 +16,13 @@ type SearchHandler interface {
 	GeneralizeQuery(ctx context.Context, query string) ([]string, error)
 }
 
+// EnhanceQueryStreamCallback is a callback function for streaming enhance query output
+// method: the enhance method name (extract_keywords, hypothetical_answer, split_query, generalize_query)
+// reader: the streaming reader for AI generated content
+type EnhanceQueryStreamCallback func(method string, reader io.Reader)
+
 type LiteForgeSearchHandler struct {
+	streamCallback EnhanceQueryStreamCallback
 }
 
 func NewDefaultSearchHandler() *LiteForgeSearchHandler {
@@ -24,6 +31,14 @@ func NewDefaultSearchHandler() *LiteForgeSearchHandler {
 
 func NewSearchHandler() *LiteForgeSearchHandler {
 	return &LiteForgeSearchHandler{}
+}
+
+// NewSearchHandlerWithCallback creates a new LiteForgeSearchHandler with a stream callback
+// The callback will be called for each enhance method with the method name and streaming reader
+func NewSearchHandlerWithCallback(callback EnhanceQueryStreamCallback) *LiteForgeSearchHandler {
+	return &LiteForgeSearchHandler{
+		streamCallback: callback,
+	}
 }
 
 // ExtractKeywords 从问题中提取核心关键词，用于精确的词条搜索。
@@ -97,8 +112,8 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 		return nil, err
 	}
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+	var opts []any
+	opts = append(opts,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
@@ -107,6 +122,12 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 			),
 		),
 	)
+	if h.streamCallback != nil {
+		opts = append(opts, aicommon.WithLiteForgeFieldStreamCallback("search_keywords", func(fieldKey string, reader io.Reader) {
+			h.streamCallback("extract_keywords", reader)
+		}))
+	}
+	result, err := aicommon.InvokeLiteForge(inputPrompt, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -140,8 +161,8 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 	}
 
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+	var opts []any
+	opts = append(opts,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringParam(
@@ -150,6 +171,12 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 			),
 		),
 	)
+	if h.streamCallback != nil {
+		opts = append(opts, aicommon.WithLiteForgeFieldStreamCallback("hypothetical_answer", func(fieldKey string, reader io.Reader) {
+			h.streamCallback("hypothetical_answer", reader)
+		}))
+	}
+	result, err := aicommon.InvokeLiteForge(inputPrompt, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -195,8 +222,8 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 	})
 
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+	var opts []any
+	opts = append(opts,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
@@ -205,6 +232,12 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 			),
 		),
 	)
+	if h.streamCallback != nil {
+		opts = append(opts, aicommon.WithLiteForgeFieldStreamCallback("sub_questions", func(fieldKey string, reader io.Reader) {
+			h.streamCallback("split_query", reader)
+		}))
+	}
+	result, err := aicommon.InvokeLiteForge(inputPrompt, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -242,16 +275,22 @@ func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query stri
 		"query": query,
 	})
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
-		inputPrompt,
+	var opts []any
+	opts = append(opts,
+		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
 				"generalized_query",
 				aitool.WithParam_Description("泛化后的主题级问题，若无法泛化则返回原问题"),
 			),
 		),
-		aicommon.WithContext(ctx),
 	)
+	if h.streamCallback != nil {
+		opts = append(opts, aicommon.WithLiteForgeFieldStreamCallback("generalized_query", func(fieldKey string, reader io.Reader) {
+			h.streamCallback("generalize_query", reader)
+		}))
+	}
+	result, err := aicommon.InvokeLiteForge(inputPrompt, opts...)
 	if err != nil {
 		return nil, err
 	}

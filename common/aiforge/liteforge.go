@@ -46,6 +46,11 @@ type streamableField struct {
 	FieldKey string
 }
 
+// LiteForgeFieldStreamCallback is a callback function for streaming specific field content from LiteForge output
+// fieldKey: the JSON field name being streamed (e.g., "hypothetical_answer", "search_keywords")
+// reader: the streaming reader for the field's content (already extracted from JSON)
+type LiteForgeFieldStreamCallback func(fieldKey string, reader io.Reader)
+
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
 	ForgeName        string
@@ -55,8 +60,10 @@ type LiteForge struct {
 	OutputActionName string
 	ExtendAIDOptions []aicommon.ConfigOption
 
-	streamFields *omap.OrderedMap[string, *streamableField]
-	emitter      *aicommon.Emitter
+	streamFields        *omap.OrderedMap[string, *streamableField]
+	emitter             *aicommon.Emitter
+	fieldStreamCallback LiteForgeFieldStreamCallback
+	streamFieldKey      string // the field key to stream
 
 	OutputJsonHook []jsonextractor.CallbackOption
 }
@@ -64,6 +71,17 @@ type LiteForge struct {
 func WithLiteForge_Emitter(emitter *aicommon.Emitter) LiteForgeOption {
 	return func(l *LiteForge) error {
 		l.emitter = emitter
+		return nil
+	}
+}
+
+// WithLiteForge_FieldStreamCallback sets a callback to receive the streaming content of a specific field
+// fieldKey: the JSON field name to extract and stream (e.g., "hypothetical_answer")
+// callback: called with the field key and a reader containing the field's content
+func WithLiteForge_FieldStreamCallback(fieldKey string, callback LiteForgeFieldStreamCallback) LiteForgeOption {
+	return func(l *LiteForge) error {
+		l.streamFieldKey = fieldKey
+		l.fieldStreamCallback = callback
 		return nil
 	}
 }
@@ -255,6 +273,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 				l.ForgeName = "LiteForge"
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetEmitter())
+
 			var mirrored bytes.Buffer
 			var actionOpts = []aicommon.ActionMakerOption{
 				aicommon.WithActionJSONCallback(l.OutputJsonHook...),
@@ -278,6 +297,17 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 				}))
 			}
 
+			// Add field stream callback handler if configured
+			if l.fieldStreamCallback != nil && l.streamFieldKey != "" {
+				fieldKey := l.streamFieldKey
+				callback := l.fieldStreamCallback
+				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler([]string{fieldKey}, func(key string, r io.Reader) {
+					// Use JSONStringReader to properly extract string content from JSON
+					r = utils.JSONStringReader(r)
+					callback(fieldKey, r)
+				}))
+			}
+
 			actionNames := []string{}
 			if l.OutputActionName == "" {
 				actionNames = append(actionNames, "call-tool", "object")
@@ -287,6 +317,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			actionOpts = append(actionOpts, aicommon.WithActionAlias(actionNames...))
 
 			action, err = aicommon.ExtractValidActionFromStream(ctx, io.TeeReader(result, &mirrored), "object", actionOpts...)
+
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

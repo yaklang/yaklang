@@ -303,6 +303,11 @@ type CollectionQueryConfig struct {
 
 	EnhanceSearchHandler enhancesearch.SearchHandler
 
+	// EnhanceQueryStreamCallback is called when AI generates enhance query conditions
+	// method: the enhance method name (extract_keywords, hypothetical_answer, split_query, generalize_query)
+	// reader: the streaming reader for AI generated content
+	EnhanceQueryStreamCallback enhancesearch.EnhanceQueryStreamCallback
+
 	LoadConfig []CollectionConfigFunc
 }
 
@@ -351,6 +356,14 @@ func WithRAGDocumentType(documentType ...string) CollectionQueryOption {
 func WithRAGEnhanceSearchHandler(handler enhancesearch.SearchHandler) CollectionQueryOption {
 	return func(config *CollectionQueryConfig) {
 		config.EnhanceSearchHandler = handler
+	}
+}
+
+// WithEnhanceQueryStreamCallback sets a callback to receive streaming output when AI generates enhance query conditions
+// The callback is called for each enhance method with the method name and streaming reader
+func WithEnhanceQueryStreamCallback(callback enhancesearch.EnhanceQueryStreamCallback) CollectionQueryOption {
+	return func(config *CollectionQueryConfig) {
+		config.EnhanceQueryStreamCallback = callback
 	}
 }
 
@@ -487,7 +500,7 @@ func NewRAGQueryConfig(opts ...CollectionQueryOption) *CollectionQueryConfig {
 		CollectionScoreLimit: 0.3,
 		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery, EnhancePlanExactKeywordSearch},
 		Ctx:                  context.Background(),
-		EnhanceSearchHandler: enhancesearch.NewDefaultSearchHandler(),
+		// EnhanceSearchHandler is not set here; it will be created in _query() with stream callback support
 	}
 	for _, opt := range opts {
 		opt(config)
@@ -738,7 +751,15 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 		Query:  query,
 	})
 
+	// Create enhance handler with stream callback if configured
 	enhanceHandler := config.EnhanceSearchHandler
+	if enhanceHandler == nil {
+		if config.EnhanceQueryStreamCallback != nil {
+			enhanceHandler = enhancesearch.NewSearchHandlerWithCallback(config.EnhanceQueryStreamCallback)
+		} else {
+			enhanceHandler = enhancesearch.NewDefaultSearchHandler()
+		}
+	}
 	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanHypotheticalAnswer) {
 		wg.Add(1)
 		go func() {

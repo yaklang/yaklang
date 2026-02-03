@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"sync"
 	"sync/atomic"
@@ -247,8 +248,10 @@ type Config struct {
 
 	// output schema
 	// worked for liteforge
-	LiteForgeActionName   string
-	LiteForgeOutputSchema string
+	LiteForgeActionName          string
+	LiteForgeOutputSchema        string
+	LiteForgeFieldStreamCallback func(fieldKey string, reader io.Reader) // Field-level stream callback for liteforge output
+	LiteForgeStreamFieldKey      string                                  // The JSON field key to stream
 
 	// init status
 	InitStatus *ConfigInitStatus
@@ -384,6 +387,16 @@ func newConfig(ctx context.Context) *Config {
 	})
 
 	return config
+}
+
+// NewMinimalConfigForOptionExtraction creates a minimal Config instance that can safely
+// have ConfigOptions applied to extract specific values like LiteForgeFieldStreamCallback.
+// This is useful when you need to extract callback info from ConfigOptions without
+// triggering the full initialization logic.
+func NewMinimalConfigForOptionExtraction() *Config {
+	return &Config{
+		m: new(sync.Mutex),
+	}
 }
 
 /*
@@ -1723,6 +1736,19 @@ func WithLiteForgeActionName(i string) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
 		c.LiteForgeActionName = i
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithLiteForgeFieldStreamCallback sets a callback to receive the streaming content of a specific JSON field
+// fieldKey: the JSON field name to extract and stream (e.g., "hypothetical_answer", "search_keywords")
+// callback: called with the field key and a reader containing the extracted field content
+func WithLiteForgeFieldStreamCallback(fieldKey string, callback func(fieldKey string, reader io.Reader)) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.LiteForgeStreamFieldKey = fieldKey
+		c.LiteForgeFieldStreamCallback = callback
 		c.m.Unlock()
 		return nil
 	}

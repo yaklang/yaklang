@@ -19,7 +19,10 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: `rewrite_user_query_for_knowledge_enhance`},
+		{
+			FieldName: `rewrite_user_query_for_knowledge_enhance`,
+			AINodeId:  "rewrite-user-query-for-knowledge-enhance",
+		},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		query := action.GetString("rewrite_user_query_for_knowledge_enhance")

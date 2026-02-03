@@ -67,6 +67,8 @@ type RAGSystemConfig struct {
 	filterCallback           func(key string, getDoc func() *vectorstore.Document) bool
 	documentTypes            []string
 
+	enhanceQueryStreamCallback enhancesearch.EnhanceQueryStreamCallback
+
 	// KHop configuration fields
 	kHopK              int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
 	kHopKMin           int // default 2 (minimum 2-hop paths)
@@ -595,6 +597,9 @@ func (config *RAGSystemConfig) ConvertToRAGQueryOptions() []vectorstore.Collecti
 	if config.enhanceSearchHandler != nil {
 		options = append(options, vectorstore.WithRAGEnhanceSearchHandler(config.enhanceSearchHandler))
 	}
+	if config.enhanceQueryStreamCallback != nil {
+		options = append(options, vectorstore.WithEnhanceQueryStreamCallback(config.enhanceQueryStreamCallback))
+	}
 	if config.similarityThreshold > 0 {
 		options = append(options, vectorstore.WithRAGSimilarityThreshold(config.similarityThreshold))
 	}
@@ -738,6 +743,16 @@ func WithRAGEnhance(enhance ...string) RAGSystemConfigOption {
 func WithRAGEnhanceSearchHandler(handler enhancesearch.SearchHandler) RAGSystemConfigOption {
 	return func(config *RAGSystemConfig) {
 		config.enhanceSearchHandler = handler
+	}
+}
+
+// WithEnhanceQueryCondition sets a callback to receive streaming output when AI generates enhance query conditions
+// The callback is called for each enhance method with the method name and streaming reader
+// method: the enhance method name (extract_keywords, hypothetical_answer, split_query, generalize_query)
+// reader: the streaming reader for AI generated content
+func WithEnhanceQueryCondition(callback func(method string, reader io.Reader)) RAGSystemConfigOption {
+	return func(config *RAGSystemConfig) {
+		config.enhanceQueryStreamCallback = callback
 	}
 }
 

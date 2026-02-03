@@ -29,17 +29,18 @@ var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
 	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
-	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
-	"analyzeLog":        WithAnalyzeLog,        // use for analyzeLog
-	"analyzeStatusCard": WithAnalyzeStatusCard, // use for analyzeStatusCard
-	"output":            WithOutputJSONSchema,
-	"action":            WithOutputAction,
-	"image":             _withImage,
-	"imageFile":         _withImageFile,
-	"id":                _withID,
-	"context":           LiteForgeExecWithContext,
-	"verboseName":       _withVerboseName,
-	"forceImage":        _withForceImage,
+	"analyzeCtx":          WithAnalyzeContext,    // use for analyzeContext
+	"analyzeLog":          WithAnalyzeLog,        // use for analyzeLog
+	"analyzeStatusCard":   WithAnalyzeStatusCard, // use for analyzeStatusCard
+	"output":              WithOutputJSONSchema,
+	"action":              WithOutputAction,
+	"image":               _withImage,
+	"imageFile":           _withImageFile,
+	"id":                  _withID,
+	"context":             LiteForgeExecWithContext,
+	"verboseName":         _withVerboseName,
+	"forceImage":          _withForceImage,
+	"fieldStreamCallback": WithLiteForgeExec_FieldStreamCallback,
 
 	"knowledgeBaseName":    RefineWithKnowledgeBaseName,
 	"knowledgeBaseDesc":    RefineWithKnowledgeBaseDesc,
@@ -61,6 +62,10 @@ type liteforgeConfig struct {
 	aidOptions []aicommon.ConfigOption
 
 	jsonExtractHook []jsonextractor.CallbackOption
+
+	// fieldStreamCallback is called with the streaming content of a specific field
+	fieldStreamCallback LiteForgeFieldStreamCallback
+	streamFieldKey      string // the JSON field key to stream
 }
 
 type LiteForgeExecOption func(*liteforgeConfig)
@@ -68,6 +73,16 @@ type LiteForgeExecOption func(*liteforgeConfig)
 func WithJsonExtractHook(opts ...jsonextractor.CallbackOption) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.jsonExtractHook = append(cfg.jsonExtractHook, opts...)
+	}
+}
+
+// WithLiteForgeExec_FieldStreamCallback sets a callback to receive the streaming content of a specific JSON field
+// fieldKey: the JSON field name to extract and stream (e.g., "hypothetical_answer", "search_keywords")
+// callback: called with the field key and a reader containing the extracted field content
+func WithLiteForgeExec_FieldStreamCallback(fieldKey string, callback LiteForgeFieldStreamCallback) LiteForgeExecOption {
+	return func(cfg *liteforgeConfig) {
+		cfg.streamFieldKey = fieldKey
+		cfg.fieldStreamCallback = callback
 	}
 }
 
@@ -255,6 +270,44 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	if cfg.output != "" {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output))
 	}
+	if cfg.fieldStreamCallback != nil && cfg.streamFieldKey != "" {
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_FieldStreamCallback(cfg.streamFieldKey, cfg.fieldStreamCallback))
+	}
+
+	// Check if LiteForgeFieldStreamCallback is set via aicommon.ConfigOption
+	// Safely extract callback info by applying options to a minimal config with panic recovery
+	if cfg.fieldStreamCallback == nil && len(cfg.aidOptions) > 0 {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Warnf("failed to extract liteforge stream callback from config options: %v", r)
+				}
+			}()
+			// Create a minimal config with required fields initialized
+			tempConfig := aicommon.NewMinimalConfigForOptionExtraction()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Warnf("panic recovered while applying config options to minimal config: %v", r)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
+				for _, opt := range cfg.aidOptions {
+					if opt != nil {
+						opt(tempConfig)
+					}
+				}
+			}()
+
+			if tempConfig.LiteForgeFieldStreamCallback != nil && tempConfig.LiteForgeStreamFieldKey != "" {
+				liteForgeOpts = append(liteForgeOpts, WithLiteForge_FieldStreamCallback(
+					tempConfig.LiteForgeStreamFieldKey,
+					tempConfig.LiteForgeFieldStreamCallback,
+				))
+			}
+		}()
+	}
+
 	liteforgeIns, err := NewLiteForge(cfg.id, liteForgeOpts...)
 	if err != nil {
 		return nil, utils.Errorf("new liteforge failed: %s", err)

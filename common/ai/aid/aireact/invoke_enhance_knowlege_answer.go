@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/jsonextractor"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -421,7 +423,7 @@ func (r *ReAct) compressKnowledgeResultsChunked(ctx context.Context, knowledgeCo
 			chunkIndex+1, maxChunks, startLine, endLine, len(chunkLines), len(chunkContent), chunkPreview)
 
 		// 对当前 chunk 进行 AI 筛选
-		chunkRanges := r.compressKnowledgeChunk(ctx, chunkWithOverlap, "", userQuery, maxRanges/2+1, startLine, endLine)
+		chunkRanges := r.compressKnowledgeChunk(ctx, chunkWithOverlap, "", userQuery, maxRanges/2+1, startLine, endLine, knowledgeContent)
 
 		if len(chunkRanges) > 0 {
 			allChunkResults = append(allChunkResults, ChunkResult{
@@ -544,7 +546,7 @@ func deduplicateRanges(ranges []RankedRange) []RankedRange {
 }
 
 // compressKnowledgeChunk 对单个 chunk 进行 AI 筛选
-func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLineNum string, overlapContext string, userQuery string, maxRanges int, chunkStartLine int, chunkEndLine int) []RankedRange {
+func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLineNum string, overlapContext string, userQuery string, maxRanges int, chunkStartLine int, chunkEndLine int, originalContent string) []RankedRange {
 	dNonce := utils.RandStringBytes(4)
 	minLines := 3
 	maxLines := 20
@@ -602,21 +604,14 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		return nil
 	}
 
-	// Create pipe for streaming output
-	pr, pw := utils.NewPipe()
-
 	// Get task index for emit
 	var taskIndex string
 	if r.GetCurrentTask() != nil {
 		taskIndex = r.GetCurrentTask().GetIndex()
 	}
 
-	// Start streaming output with unified nodeId
-	r.Emitter.EmitDefaultStreamEvent(
-		"knowledge-compress",
-		pr,
-		taskIndex,
-	)
+	// Create MemEditor for extracting text from original content
+	resultEditor := memedit.NewMemEditor(originalContent)
 
 	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
@@ -636,10 +631,47 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 		aiforge.WithExtendLiteForge_AIOption(
 			aicommon.WithContext(ctx),
 		),
+		aiforge.WithLiteForge_FieldStreamCallback("ranges", func(fieldKey string, reader io.Reader) {
+			jsonextractor.ExtractStructuredJSONFromStream(
+				reader,
+				jsonextractor.WithObjectCallback(func(data map[string]any) {
+					if utils.IsNil(data) {
+						return
+					}
+					var score float64
+					var start, end int
+					if _, ok := data["score"]; ok {
+						score = utils.MapGetFloat64(data, "score")
+					}
+					if _, ok := data["range"]; ok {
+						parts := strings.Split(utils.MapGetString(data, "range"), "-")
+						if len(parts) == 2 {
+							start, _ = strconv.Atoi(strings.TrimSpace(parts[0]))
+							end, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+						}
+					}
+
+					if score < 0.4 || start <= 0 || end <= 0 {
+						return
+					}
+
+					streamPr, streamPw := utils.NewPipe()
+					streamPw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, start, end))
+					if event, _ := r.Emitter.EmitDefaultStreamEvent(
+						"knowledge-compress",
+						streamPr,
+						taskIndex,
+					); !utils.IsNil(event) {
+						text := resultEditor.GetTextFromPositionInt(start, 1, end, 1)
+						r.Emitter.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), text)
+					}
+					streamPw.Close()
+				}),
+			)
+		}),
 	)
 	if err != nil {
 		log.Errorf("compressKnowledgeChunk: NewLiteForge failed: %v", err)
-		pw.Close()
 		return nil
 	}
 
@@ -649,12 +681,10 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 
 	if err != nil {
 		log.Errorf("compressKnowledgeChunk: LiteForge.Execute failed: %v", err)
-		pw.Close()
 		return nil
 	}
 
 	if forgeResult == nil || forgeResult.Action == nil {
-		pw.Close()
 		return nil
 	}
 
@@ -686,9 +716,6 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 			continue
 		}
 
-		// Write to stream: 片段：[Score: 0.x] startLine-endLine
-		pw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, startLine, endLine))
-
 		results = append(results, RankedRange{
 			Range:     rangeStr,
 			StartLine: startLine,
@@ -696,8 +723,6 @@ func (r *ReAct) compressKnowledgeChunk(ctx context.Context, chunkContentWithLine
 			Score:     score,
 		})
 	}
-
-	pw.Close()
 	return results
 }
 
@@ -780,21 +805,11 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		return knowledgeContent
 	}
 
-	// Create pipe for streaming output
-	pr, pw := utils.NewPipe()
-
 	// Get task index for emit
 	var taskIndex string
 	if r.GetCurrentTask() != nil {
 		taskIndex = r.GetCurrentTask().GetIndex()
 	}
-
-	// Start streaming output with unified nodeId
-	r.Emitter.EmitDefaultStreamEvent(
-		"knowledge-compress",
-		pr,
-		taskIndex,
-	)
 
 	// Create LiteForge instance
 	liteForgeIns, err := aiforge.NewLiteForge(
@@ -814,10 +829,54 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 		aiforge.WithExtendLiteForge_AIOption(
 			aicommon.WithContext(ctx),
 		),
+		aiforge.WithLiteForge_FieldStreamCallback("ranges", func(fieldKey string, reader io.Reader) {
+			jsonextractor.ExtractStructuredJSONFromStream(
+				reader,
+				jsonextractor.WithObjectCallback(func(data map[string]any) {
+					if utils.IsNil(data) {
+						return
+					}
+					var score float64
+					var start, end int
+					if _, ok := data["score"]; ok {
+						score = utils.MapGetFloat64(data, "score")
+					}
+					if _, ok := data["range"]; ok {
+						parts := strings.Split(utils.MapGetString(data, "range"), "-")
+						if len(parts) == 2 {
+							start, err = strconv.Atoi(parts[0])
+							if err != nil {
+								return
+							}
+							end, err = strconv.Atoi(parts[1])
+							if err != nil {
+								return
+							}
+						}
+					}
+
+					if score < 0.4 || start <= 0 || end <= 0 {
+						return
+					}
+
+					pr, pw := utils.NewPipe()
+					pw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, start, end))
+					if event, _ := r.Emitter.EmitDefaultStreamEvent(
+						"knowledge-compress",
+						pr,
+						taskIndex,
+					); !utils.IsNil(event) {
+						text := resultEditor.GetTextFromPositionInt(start, 1, end, 1)
+						r.Emitter.EmitTextReferenceMaterial(event.GetStreamEventWriterId(), text)
+					}
+					_ = err
+					pw.Close()
+				}),
+			)
+		}),
 	)
 	if err != nil {
 		log.Errorf("compressKnowledgeResultsSingle: NewLiteForge failed: %v", err)
-		pw.Close()
 		return knowledgeContent
 	}
 
@@ -827,13 +886,11 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 
 	if err != nil {
 		log.Errorf("compressKnowledgeResultsSingle: LiteForge.Execute failed: %v", err)
-		pw.Close()
 		return knowledgeContent
 	}
 
 	if forgeResult == nil || forgeResult.Action == nil {
 		log.Warnf("compressKnowledgeResultsSingle: forge result is nil")
-		pw.Close()
 		return knowledgeContent
 	}
 
@@ -841,7 +898,6 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 
 	if len(rangeItems) == 0 {
 		log.Warnf("compressKnowledgeResultsSingle: no ranges extracted")
-		pw.Close()
 		return knowledgeContent
 	}
 
@@ -887,9 +943,6 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 			continue
 		}
 
-		// Write to stream: 片段：[Score: 0.x] startLine-endLine
-		pw.WriteString(fmt.Sprintf("片段：[Score: %.2f] %d-%d\n", score, startLine, endLine))
-
 		rankedRanges = append(rankedRanges, RankedRange{
 			Range:     rangeStr,
 			StartLine: startLine,
@@ -900,8 +953,6 @@ func (r *ReAct) compressKnowledgeResultsSingle(ctx context.Context, knowledgeCon
 
 		totalBytes += len(text)
 	}
-
-	pw.Close()
 
 	if len(rankedRanges) == 0 {
 		log.Warnf("compressKnowledgeResultsSingle: no valid ranges extracted")

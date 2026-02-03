@@ -210,6 +210,14 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "知识增强",
 		En: "Knowledge Enhancement",
 	},
+	"rewrite-user-query-for-knowledge-enhance": {
+		Zh: "重写用户查询",
+		En: "Rewrite User Query",
+	},
+	"rewrite_user_query_for_knowledge_enhance": {
+		Zh: "重写用户查询",
+		En: "Rewrite User Query",
+	},
 
 	// 从代码中找到的其他 nodeId
 	"action": {
