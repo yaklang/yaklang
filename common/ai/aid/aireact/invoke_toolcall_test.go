@@ -59,6 +59,137 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
+func TestReAct_ToolUse_Timing(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	toolCalled := false
+	timingTool, err := aitool.New(
+		"sleep_test",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			toolCalled = true
+			// No sleep needed - just return immediately
+			return "done", nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "sleep_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(timingTool),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test timing",
+		}
+	}()
+
+	after := time.After(10 * time.Second)
+
+	var startTime, endTime int64
+	var durationMs int64
+	toolStartReceived := false
+	toolDoneReceived := false
+	reviewed := false
+	var iid string
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				toolStartReceived = true
+				if st := jsonpath.FindFirst(string(e.Content), "$.start_time"); st != nil {
+					startTime = int64(utils.InterfaceToInt(st))
+				}
+				if stms := jsonpath.FindFirst(string(e.Content), "$.start_time_ms"); stms != nil {
+					startTimeMs := int64(utils.InterfaceToInt(stms))
+					require.Greater(t, startTimeMs, int64(0), "start_time_ms should be greater than 0")
+					fmt.Printf("Tool call started at: %d (unix timestamp), %d (ms)\n", startTime, startTimeMs)
+				}
+				if startTime > 0 {
+					require.Greater(t, startTime, int64(0), "start_time should be greater than 0")
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
+				toolDoneReceived = true
+				if et := jsonpath.FindFirst(string(e.Content), "$.end_time"); et != nil {
+					endTime = int64(utils.InterfaceToInt(et))
+				}
+				if etms := jsonpath.FindFirst(string(e.Content), "$.end_time_ms"); etms != nil {
+					endTimeMs := int64(utils.InterfaceToInt(etms))
+					require.Greater(t, endTimeMs, int64(0), "end_time_ms should be greater than 0")
+					fmt.Printf("Tool call ended at: %d (unix timestamp), %d (ms)\n", endTime, endTimeMs)
+				}
+				if dm := jsonpath.FindFirst(string(e.Content), "$.duration_ms"); dm != nil {
+					durationMs = int64(utils.InterfaceToInt(dm))
+					require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should be >= 0")
+					// Duration should be reasonable (tool executes immediately, but should still take some time)
+					require.LessOrEqual(t, durationMs, int64(5000), "duration should be less than 5000ms")
+				}
+				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
+					durationSeconds := utils.InterfaceToFloat64(ds)
+					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0")
+					fmt.Printf("Tool call duration: %d ms (%.3f seconds)\n", durationMs, durationSeconds)
+				}
+
+				if endTime > 0 {
+					require.Greater(t, endTime, int64(0), "end_time should be greater than 0")
+					if startTime > 0 {
+						require.GreaterOrEqual(t, endTime, startTime, "end_time should be >= start_time")
+					}
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				reviewed = true
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					if toolStartReceived && toolDoneReceived {
+						break LOOP
+					}
+				}
+			}
+
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	require.True(t, toolStartReceived, "Expected to receive tool_call_start event")
+	require.True(t, toolDoneReceived, "Expected to receive tool_call_done event")
+	require.True(t, reviewed, "Expected to have at least one review event")
+	require.True(t, toolCalled, "Tool was not called")
+	require.Greater(t, startTime, int64(0), "start_time should have been set")
+	require.Greater(t, endTime, int64(0), "end_time should have been set")
+	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set")
+}
+
 func TestReAct_ToolUse(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
@@ -779,4 +910,236 @@ LOOP:
 	if !hasFlag {
 		t.Fatalf("call tool result flag not found in ai process events")
 	}
+}
+
+func TestReAct_ToolCallError_Timing(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	errorTool, err := aitool.New(
+		"error_test",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			// Return error immediately without sleep
+			return nil, fmt.Errorf("intentional error for testing")
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "error_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(errorTool),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test error timing",
+		}
+	}()
+
+	after := time.After(10 * time.Second)
+
+	var startTime, endTime int64
+	var durationMs int64
+	toolStartReceived := false
+	toolErrorReceived := false
+	reviewed := false
+	var iid string
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				toolStartReceived = true
+				if st := jsonpath.FindFirst(string(e.Content), "$.start_time"); st != nil {
+					startTime = int64(utils.InterfaceToInt(st))
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_ERROR) {
+				toolErrorReceived = true
+				if et := jsonpath.FindFirst(string(e.Content), "$.end_time"); et != nil {
+					endTime = int64(utils.InterfaceToInt(et))
+				}
+				if etms := jsonpath.FindFirst(string(e.Content), "$.end_time_ms"); etms != nil {
+					endTimeMs := int64(utils.InterfaceToInt(etms))
+					require.Greater(t, endTimeMs, int64(0), "end_time_ms should be greater than 0 in error event")
+					fmt.Printf("Tool call error at: %d (unix timestamp), %d (ms)\n", endTime, endTimeMs)
+				}
+				if dm := jsonpath.FindFirst(string(e.Content), "$.duration_ms"); dm != nil {
+					durationMs = int64(utils.InterfaceToInt(dm))
+					require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should be >= 0 in error event")
+					require.LessOrEqual(t, durationMs, int64(5000), "duration should be less than 5000ms in error event")
+					fmt.Printf("Tool call error duration: %d ms\n", durationMs)
+				}
+				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
+					durationSeconds := utils.InterfaceToFloat64(ds)
+					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0 in error event")
+				}
+
+				if endTime > 0 {
+					require.Greater(t, endTime, int64(0), "end_time should be greater than 0 in error event")
+					if startTime > 0 {
+						require.GreaterOrEqual(t, endTime, startTime, "end_time should be >= start_time in error event")
+					}
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				reviewed = true
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					if toolStartReceived && toolErrorReceived {
+						break LOOP
+					}
+				}
+			}
+
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	require.True(t, toolStartReceived, "Expected to receive tool_call_start event")
+	require.True(t, toolErrorReceived, "Expected to receive tool_call_error event")
+	require.True(t, reviewed, "Expected to have at least one review event")
+	require.Greater(t, startTime, int64(0), "start_time should have been set in error case")
+	require.Greater(t, endTime, int64(0), "end_time should have been set in error case")
+	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set in error case")
+}
+
+func TestReAct_ToolCallUserCancel_Timing(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	cancelTool, err := aitool.New(
+		"cancel_test",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			// Tool won't actually be executed when direct_answer is chosen
+			return "done", nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "cancel_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(cancelTool),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test cancel timing",
+		}
+	}()
+
+	after := time.After(10 * time.Second)
+
+	var startTime, endTime int64
+	var durationMs int64
+	toolStartReceived := false
+	toolCancelReceived := false
+	var iid string
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				toolStartReceived = true
+				if st := jsonpath.FindFirst(string(e.Content), "$.start_time"); st != nil {
+					startTime = int64(utils.InterfaceToInt(st))
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_USER_CANCEL) {
+				toolCancelReceived = true
+				if et := jsonpath.FindFirst(string(e.Content), "$.end_time"); et != nil {
+					endTime = int64(utils.InterfaceToInt(et))
+				}
+				if etms := jsonpath.FindFirst(string(e.Content), "$.end_time_ms"); etms != nil {
+					endTimeMs := int64(utils.InterfaceToInt(etms))
+					require.Greater(t, endTimeMs, int64(0), "end_time_ms should be greater than 0 in cancel event")
+					fmt.Printf("Tool call cancelled at: %d (unix timestamp), %d (ms)\n", endTime, endTimeMs)
+				}
+				if dm := jsonpath.FindFirst(string(e.Content), "$.duration_ms"); dm != nil {
+					durationMs = int64(utils.InterfaceToInt(dm))
+					require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should be >= 0 in cancel event")
+					require.LessOrEqual(t, durationMs, int64(5000), "duration should be less than 5000ms in cancel event")
+					fmt.Printf("Tool call cancel duration: %d ms\n", durationMs)
+				}
+				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
+					durationSeconds := utils.InterfaceToFloat64(ds)
+					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0 in cancel event")
+				}
+
+				if endTime > 0 {
+					require.Greater(t, endTime, int64(0), "end_time should be greater than 0 in cancel event")
+					if startTime > 0 {
+						require.GreaterOrEqual(t, endTime, startTime, "end_time should be >= start_time in cancel event")
+					}
+				}
+
+				// Once we receive the cancel event with all timing info, we can exit
+				if toolStartReceived && toolCancelReceived && startTime > 0 && endTime > 0 {
+					break LOOP
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				// Simulate user cancellation by requesting direct answer (which triggers userCancelHandler)
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveJSONInput: `{"suggestion": "direct_answer"}`,
+				}
+			}
+
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	require.True(t, toolStartReceived, "Expected to receive tool_call_start event")
+	require.True(t, toolCancelReceived, "Expected to receive tool_call_user_cancel event")
+	require.Greater(t, startTime, int64(0), "start_time should have been set in cancel case")
+	require.Greater(t, endTime, int64(0), "end_time should have been set in cancel case")
+	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set in cancel case")
 }
