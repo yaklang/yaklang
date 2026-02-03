@@ -16,6 +16,43 @@ import (
 	"github.com/yaklang/yaklang/common/utils/workflowdag"
 )
 
+const toolComposeSchema = `
+## WORKFLOW_DAG JSON Schema
+
+每个工具调用节点是一个 JSON 对象，包含以下字段：
+
+| 字段名        | 类型       | 必填 | 说明                                                                                     |
+|---------------|------------|------|------------------------------------------------------------------------------------------|
+| call_id       | string     | 是   | 节点唯一标识符，应简要表达节点含义：第几步、用什么工具、做什么事。如 "step1_read_config"、"fetch_user_data"、"第2步_解析响应" 等，中英文均可 |
+| tool_name     | string     | 是   | 要调用的工具名称，必须是当前上下文中实际存在的工具，请根据可用工具列表选择                 |
+| call_intent   | string     | 否   | 调用意图声明：由于工具参数在执行时动态生成，此字段应说明参数侧重点、调用理由、以及遇到特殊情况的处理策略。用一段有意义的话描述，帮助执行器理解如何正确调用 |
+| depends_on    | []string   | 否   | 依赖信息：指定本节点依赖的其他节点 call_id 列表，用于控制执行顺序。依赖其他工具时，本节点将在被依赖节点完成后执行（默认: []） |
+| allow_failed  | bool       | 否   | 容错标志：当依赖的节点执行失败时，是否仍继续执行本节点（默认: false，即严格模式）          |
+
+### JSON 格式示例
+
+**1. 顺序执行链（推荐格式）：**
+[
+  {"call_id":"step1_read_file","tool_name":"read-file","call_intent":"读取配置文件，参数侧重文件路径，若文件不存在应返回明确错误"},
+  {"call_id":"step2_parse_json","tool_name":"json-parse","call_intent":"解析上一步读取的内容为JSON对象，若格式错误需给出行号提示","depends_on":["step1_read_file"]},
+  {"call_id":"step3_save_result","tool_name":"write-file","call_intent":"将解析结果保存到目标路径，覆盖写入模式","depends_on":["step2_parse_json"]}
+]
+
+**2. 菱形依赖（并行分支后合并）：**
+[
+  {"call_id":"init_env","tool_name":"setup"},
+  {"call_id":"fetch_api_a","tool_name":"http-get","call_intent":"并行获取A接口数据","depends_on":["init_env"]},
+  {"call_id":"fetch_api_b","tool_name":"http-get","call_intent":"并行获取B接口数据","depends_on":["init_env"]},
+  {"call_id":"merge_results","tool_name":"combine","call_intent":"合并两个分支的数据，按优先级A>B处理冲突","depends_on":["fetch_api_a","fetch_api_b"]}
+]
+
+**3. 带容错的可选步骤：**
+[
+  {"call_id":"core_task","tool_name":"critical-operation","call_intent":"执行核心任务，失败则整个流程终止"},
+  {"call_id":"optional_notify","tool_name":"send-notification","call_intent":"发送通知，即使失败也不影响主流程","depends_on":["core_task"],"allow_failed":true}
+]
+`
+
 var loopAction_toolCompose = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE,
 	Description: "Compose multiple tool calls into a workflow DAG for complex multi-step operations",
@@ -28,7 +65,9 @@ var loopAction_toolCompose = &reactloops.LoopAction{
 	OutputExamples: `
 # tool-compose description
 在命名是工具调用节点时，call_id 需要以 _ 结尾，例如 "step1_search"，"step2_write"，"step3_combine" 等，如无法确定第几步，可以使用直接使用 "search_material" 等简明扼要的 identifier 来命名。
-注意，工具之间如果有依赖关系，一定要通过 depends_on 来指定
+注意，工具之间如果有依赖关系，一定要通过 depends_on 来指定。
+
+` + toolComposeSchema + `
 
 Example - Sequential file operations(With AI-Tag tags):
 
