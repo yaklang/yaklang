@@ -2,13 +2,11 @@ package aireact
 
 import (
 	"context"
-	"io"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -28,72 +26,51 @@ func (r *ReAct) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, 
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
 
-	// 构建 RAG 查询选项
-	ragOpts := []rag.RAGSystemConfigOption{
-		rag.WithRAGCtx(ctx),
-		rag.WithEveryQueryResultCallback(func(data *rag.ScoredResult) {
-			r.EmitKnowledge(enhanceID, data)
-			if currentTask != nil && r.config.EnhanceKnowledgeManager != nil {
-				r.config.EnhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), data)
-			}
-		}),
+	// Get or create EnhanceKnowledgeManager
+	// If user configured a custom manager (e.g., for testing), use it
+	// Otherwise, create a default RAG-based manager with the specified options
+	ekm := r.config.EnhanceKnowledgeManager
+	if ekm == nil {
+		log.Warnf("EnhanceKnowledgeManager is not configured, using default RAG knowledge manager")
+		// Create RAG manager with options for enhancePlans and collections
+		var ragOpts []rag.RAGSystemConfigOption
+		if len(enhancePlans) > 0 {
+			ragOpts = append(ragOpts, rag.WithRAGEnhance(enhancePlans...))
+		}
+		if len(collections) > 0 {
+			ragOpts = append(ragOpts, rag.WithRAGCollectionNames(collections...))
+		}
+		ekm = rag.NewRagEnhanceKnowledgeManagerWithOptions(ragOpts...)
+		ekm.SetEmitter(r.Emitter)
 	}
 
-	// 设置集合名称限制
-	if len(collections) > 0 {
-		ragOpts = append(ragOpts, rag.WithRAGCollectionNames(collections...))
-	}
-
-	// 设置 EnhancePlan
-	if len(enhancePlans) > 0 {
-		ragOpts = append(ragOpts, rag.WithRAGEnhance(enhancePlans...))
-	}
-	// 如果 enhancePlans 为空，使用 RAG 默认的完整增强流程
-
-	// 配置日志输出
-	if r.Emitter != nil {
-		ragOpts = append(ragOpts, rag.WithRAGLogReaderWithInfo(func(reader io.Reader, info *vectorstore.SubQueryLogInfo, referenceMaterialCallback func(content string)) {
-			var event *schema.AiOutputEvent
-			var err error
-			event, err = r.Emitter.EmitDefaultStreamEvent(
-				"enhance-query",
-				reader,
-				"",
-				func() {
-					if info.ResultBuffer != nil && info.ResultBuffer.Len() > 0 {
-						streamId := ""
-						if event != nil {
-							streamId = event.GetContentJSONPath(`$.event_writer_id`)
-						}
-						if streamId != "" {
-							_, emitErr := r.Emitter.EmitTextReferenceMaterial(streamId, info.ResultBuffer.String())
-							if emitErr != nil {
-								log.Warnf("failed to emit reference material: %v", emitErr)
-							}
-						}
-					}
-				},
-			)
-			if err != nil {
-				log.Warnf("failed to emit enhance-query stream event: %v", err)
-				return
-			}
-		}))
-	}
-
-	// 执行 RAG 查询，返回的 channel 包含查询结果
-	resultCh, err := rag.QueryYakitProfile(userQuery, ragOpts...)
+	// Fetch knowledge through the manager
+	knowledgeCh, err := ekm.FetchKnowledgeWithCollections(ctx, collections, userQuery)
 	if err != nil {
-		return "", utils.Errorf("RAG QueryYakitProfile(%s) failed: %v", userQuery, err)
+		return "", utils.Errorf("EnhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
 	}
 
-	// 消费结果 channel，等待查询完成
-	// channel 关闭时表示查询完成
-	for range resultCh {
-		// 结果已通过 WithEveryQueryResultCallback 处理，这里只是等待 channel 关闭
+	// Collect all knowledge items for summary artifact
+	var knowledgeList []aicommon.EnhanceKnowledge
+
+	// Process knowledge from the manager
+	for knowledge := range knowledgeCh {
+		// Emit knowledge event
+		r.EmitKnowledge(enhanceID, knowledge)
+		// Collect for artifact generation
+		knowledgeList = append(knowledgeList, knowledge)
+		// Append to manager's knowledge map for current task
+		if currentTask != nil {
+			ekm.AppendKnowledge(currentTask.GetId(), knowledge)
+		}
 	}
 
-	// 获取增强数据
+	// Save all knowledge to a single artifact file
+	if len(knowledgeList) > 0 {
+		r.EmitKnowledgeReferenceArtifact(knowledgeList, userQuery)
+	}
+
+	// Get enhanced data
 	enhance := r.DumpCurrentEnhanceData()
 	if enhance != "" {
 		enhancePayload, err := utils.RenderTemplate(`<|ENHANCE_DATA_{{ .Nonce }}|>
