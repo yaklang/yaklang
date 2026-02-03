@@ -22,7 +22,7 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 	if fs == nil {
 		return nil
 	}
-	
+
 	// 如果已经是 UnifiedFS 且分隔符匹配，直接返回，避免重复包装
 	if unifiedFS, ok := fs.(*filesys.UnifiedFS); ok {
 		if unifiedFS.GetSeparators() == ssadb.IrSourceFsSeparators {
@@ -31,7 +31,7 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 		// 如果分隔符不匹配，提取底层文件系统重新包装
 		fs = unifiedFS.GetFileSystem()
 	}
-	
+
 	return filesys.NewUnifiedFS(fs,
 		filesys.WithUnifiedFsSeparator(ssadb.IrSourceFsSeparators),
 	)
@@ -131,7 +131,7 @@ var Exports = map[string]any{
 	"ParseLocalProject":  ParseProjectFromPath,
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
-	"NewProgramFromDB":   FromDatabase,
+	"NewProgramFromDB":   NewProgramFromDB,
 	// "NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
 	// "NewRiskCompareItem": NewSSARiskComparisonItem,
 
@@ -173,7 +173,7 @@ var Exports = map[string]any{
 	"GetSSAProjectByID":         ssaproject.LoadSSAProjectByID,
 	"GetSSAProjectByNameAndURL": ssaproject.LoadSSAProjectByNameAndURL,
 	"NewSSAProject":             ssaproject.NewSSAProject,
-	
+
 	// Query latest program name by project name
 	"GetLatestProgramNameByProjectName": func(projectName string) (string, error) {
 		if projectName == "" {
