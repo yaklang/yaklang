@@ -75,8 +75,14 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 					finalKnowledge = knowledge
 				} else {
 					newKnowledge := oldKnowledges + "\n\n" + knowledge
-					compressNewKnowledge := compressKnowledgeResultsWithScore(newKnowledge, query, loop.GetInvoker(), loop, 10*1024)
-					finalKnowledge = compressNewKnowledge
+					ctx := loop.GetCurrentTask().GetContext()
+					compressNewKnowledge, err := loop.GetInvoker().CompressLongTextWithDestination(ctx, newKnowledge, query, 10*1024)
+					if err != nil {
+						log.Warnf("failed to compress accumulated knowledge: %v", err)
+						finalKnowledge = newKnowledge
+					} else {
+						finalKnowledge = compressNewKnowledge
+					}
 				}
 				loop.Set("search_results_summary", finalKnowledge)
 			}
@@ -102,7 +108,7 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			}
 
 			userQuery := loop.Get("user_query")
-			userContext := fmt.Sprintf("用户需求：%s", userQuery)
+			// userContext := fmt.Sprintf("用户需求：%s", userQuery)
 
 			// 确定本次搜索的查询条件（只搜索一个）
 			var queryToUse string
@@ -151,9 +157,16 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 
 			// 压缩搜索结果
 			singleResult := fmt.Sprintf("=== 查询: %s ===\n%s", queryToUse, enhanceData)
+			_ = singleResult
+
 			loop.LoadingStatus("压缩搜索结果中 - compressing search result")
 			log.Infof("query result size: %d bytes\n=====================\n%v\n=====================\n", len(enhanceData), enhanceData)
-			compressedResult := compressKnowledgeResultsWithScore(singleResult, userContext, invoker, loop, 10*1024)
+			compressedResult, err := invoker.CompressLongTextWithDestination(ctx, enhanceData, queryToUse, 10*1024)
+			if err != nil {
+				op.Feedback(fmt.Sprintf(`搜索结果压缩失败：%v`, err))
+				op.Continue()
+				return
+			}
 			if compressedResult == "" {
 				var searchTechDesc string
 				if mode == "keyword" {

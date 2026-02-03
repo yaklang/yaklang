@@ -15,11 +15,11 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"rewrite_user_query_for_knowledge_enhance",
-			aitool.WithParam_Description(`The user query to enhance the knowledge answer. If not provided, the system will use the original user input as the query.`),
+			aitool.WithParam_Description(`MUST be set if 'knowledge_enhance_answer' @action is set. The user query to enhance the knowledge answer. If not provided, the system will use the original user input as the query.`),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: `rewrite_user_query_for_knowledge_enhance`},
+		{FieldName: `rewrite_user_query_for_knowledge_enhance`, AINodeId: `rewrite_user_query_for_knowledge_enhance`},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		query := action.GetString("rewrite_user_query_for_knowledge_enhance")
@@ -50,12 +50,20 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		if task != nil && !utils.IsNil(task.GetContext()) {
 			ctx = task.GetContext()
 		}
-		enhancedAnswer, err := invoker.EnhanceKnowledgeAnswer(ctx, rewriteQuery)
+
+		enhancedAnswer, err := invoker.EnhanceKnowledgeGetterEx(ctx, rewriteQuery, nil)
 		if err != nil {
 			op.Fail(err.Error())
 			return
 		}
 
+		result, err := invoker.CompressLongTextWithDestination(ctx, enhancedAnswer, rewriteQuery, 10*1024) // Compress to 10KB
+		if err != nil {
+			op.Fail(err.Error())
+			return
+		}
+
+		enhancedAnswer = result
 		verifyResult, err := invoker.VerifyUserSatisfaction(
 			ctx,
 			rewriteQuery,

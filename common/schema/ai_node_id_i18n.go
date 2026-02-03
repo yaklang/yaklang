@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"rewrite_user_query_for_knowledge_enhance": {
+		Zh: "知识增强：重写用户查询",
+		En: "Knowledge Enhance: Rewrite User Query",
+	},
 	"interval-review": {
 		Zh: "进度检查",
 		En: "Progress Check",
