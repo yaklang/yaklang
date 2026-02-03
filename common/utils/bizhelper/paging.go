@@ -33,6 +33,91 @@ type Paginator struct {
 	param       *Param      `json:"-"`
 }
 
+// NewPaginatorFromTotal builds a paginator from a known total record count.
+// Useful when the caller wants to avoid running an extra Find just to compute paging metadata.
+func NewPaginatorFromTotal(page, limit, total int) *Paginator {
+	if page < 1 {
+		page = 1
+	}
+	if limit == 0 {
+		limit = 10
+	}
+
+	p := &Paginator{
+		TotalRecord: total,
+		Page:        page,
+		Limit:       limit,
+	}
+
+	if limit == -1 {
+		p.TotalPage = 1
+		p.Offset = 0
+		p.PrevPage = page
+		p.NextPage = page
+		return p
+	}
+
+	if limit < 0 {
+		limit = 10
+		p.Limit = limit
+	}
+
+	p.TotalPage = int(math.Ceil(float64(total) / float64(limit)))
+	if p.TotalPage < 1 {
+		p.TotalPage = 1
+	}
+	if page == 1 {
+		p.Offset = 0
+	} else {
+		p.Offset = (page - 1) * limit
+	}
+	if page > 1 {
+		p.PrevPage = page - 1
+	} else {
+		p.PrevPage = page
+	}
+	if page >= p.TotalPage {
+		p.NextPage = page
+	} else {
+		p.NextPage = page + 1
+	}
+	return p
+}
+
+// NewPaginatorWithoutTotal builds a paginator when total count is skipped/unknown.
+// TotalRecord/TotalPage are set to -1 to signal "unknown".
+func NewPaginatorWithoutTotal(page, limit int) *Paginator {
+	if page < 1 {
+		page = 1
+	}
+	if limit == 0 {
+		limit = 10
+	}
+
+	p := &Paginator{
+		TotalRecord: -1,
+		TotalPage:   -1,
+		Page:        page,
+		Limit:       limit,
+	}
+
+	if limit > 0 {
+		p.Offset = (page - 1) * limit
+	} else {
+		p.Offset = 0
+	}
+
+	if page > 1 {
+		p.PrevPage = page - 1
+	} else {
+		p.PrevPage = page
+	}
+
+	// Unknown total -> keep NextPage at current page.
+	p.NextPage = page
+	return p
+}
+
 // Paging 分页
 func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 	defer func() {

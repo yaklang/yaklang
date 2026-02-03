@@ -1,7 +1,10 @@
 package schema
 
 import (
+	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
+	"io"
 	"strconv"
 	"strings"
 
@@ -40,6 +43,7 @@ type HTTPFlow struct {
 	SourceType         string `json:"source_type,omitempty"`
 	Request            string `json:"request,omitempty"`
 	Response           string `json:"response,omitempty"`
+	ResponseLength     int64  `json:"response_length,omitempty"`
 	Duration           int64  `json:"duration,omitempty"`
 	GetParamsTotal     int    `json:"get_params_total,omitempty"`
 	PostParamsTotal    int    `json:"post_params_total,omitempty"`
@@ -195,7 +199,35 @@ func (f *HTTPFlow) ColorSharp(rgbHex string) {
 }
 
 func (f *HTTPFlow) CalcHash() string {
-	return utils.CalcSha1(f.IsHTTPS, f.Url, f.Path, f.Method, f.BodyLength, f.ContentType, f.StatusCode, f.SourceType, f.Tags, f.Request, f.HiddenIndex, f.RuntimeId, f.FromPlugin)
+	h := sha1.New()
+	write := func(s string) {
+		_, _ = io.WriteString(h, s)
+	}
+	write("[")
+	first := true
+	add := func(s string) {
+		if first {
+			first = false
+		} else {
+			write(" ")
+		}
+		write(s)
+	}
+	add(strconv.FormatBool(f.IsHTTPS))
+	add(f.Url)
+	add(f.Path)
+	add(f.Method)
+	add(strconv.FormatInt(f.BodyLength, 10))
+	add(f.ContentType)
+	add(strconv.FormatInt(f.StatusCode, 10))
+	add(f.SourceType)
+	add(f.Tags)
+	add(f.Request)
+	add(f.HiddenIndex)
+	add(f.RuntimeId)
+	add(f.FromPlugin)
+	write("]")
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (f *HTTPFlow) CalcCacheHash(full bool) string {
@@ -209,6 +241,12 @@ func (f *HTTPFlow) BeforeSave() error {
 }
 
 func (f *HTTPFlow) fixURL() {
+	if f.Url == "" {
+		return
+	}
+	if !shouldFixURLWithPort(f.Url) {
+		return
+	}
 	urlIns := utils.ParseStringToUrl(f.Url)
 	if f.IsHTTPS {
 		urlIns.Scheme = "https"
@@ -220,6 +258,22 @@ func (f *HTTPFlow) fixURL() {
 			f.Url = urlIns.String()
 		}
 	}
+}
+
+func shouldFixURLWithPort(raw string) bool {
+	schemeIdx := strings.Index(raw, "://")
+	if schemeIdx == -1 {
+		// Keep the old behavior for non-standard URLs.
+		return true
+	}
+	hostStart := schemeIdx + len("://")
+	hostEnd := strings.IndexByte(raw[hostStart:], '/')
+	host := raw[hostStart:]
+	if hostEnd >= 0 {
+		host = raw[hostStart : hostStart+hostEnd]
+	}
+	// Fast path: only parse if the host portion carries an explicit port.
+	return strings.Contains(host, ":")
 }
 
 func (f *HTTPFlow) AfterCreate(tx *gorm.DB) (err error) {

@@ -36,6 +36,7 @@ var (
 	CONST_YAK_EXTRA_DNS_SERVERS             = "YAK_EXTRA_DNS_SERVERS"
 	CONST_YAK_OVERRIDE_DNS_SERVERS          = "YAK_OVERRIDE_DNS_SERVERS"
 	CONST_YAK_SAVE_HTTPFLOW                 = "YAK_SAVE_HTTPFLOW"
+	CONST_YAK_HTTPFLOW_FTS_ASYNC            = "YAK_HTTPFLOW_FTS_ASYNC"
 
 	// 全局网络配置
 	GLOBAL_NETWORK_CONFIG      = "GLOBAL_NETWORK_CONFIG"
@@ -57,6 +58,9 @@ var (
 	// tls global config
 	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
 	GLOBAL_TLS_MAX_VERSION uint16 = gmtls.VersionTLS13
+
+	httpFlowFTSAsyncOnce    sync.Once
+	httpFlowFTSAsyncEnabled bool
 )
 
 func SimpleYakGlobalConfig() {
@@ -124,6 +128,18 @@ func GetCurrentYakitPluginID() string {
 func GetDefaultSaveHTTPFlowFromEnv() bool {
 	ok, _ := strconv.ParseBool(os.Getenv(CONST_YAK_SAVE_HTTPFLOW))
 	return ok
+}
+
+func IsHTTPFlowFTSAsyncEnabled() bool {
+	httpFlowFTSAsyncOnce.Do(func() {
+		raw, ok := os.LookupEnv(CONST_YAK_HTTPFLOW_FTS_ASYNC)
+		if !ok {
+			httpFlowFTSAsyncEnabled = true
+			return
+		}
+		httpFlowFTSAsyncEnabled, _ = strconv.ParseBool(raw)
+	})
+	return httpFlowFTSAsyncEnabled
 }
 
 func GetProjectDatabaseNameFromEnv() string {

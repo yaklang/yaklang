@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -324,6 +325,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		SourceType:                 source,
 		Request:                    requestRaw,
 		Response:                   responseRaw,
+		ResponseLength:             int64(len(responseRaw)),
 		RemoteAddr:                 remoteAddr,
 		HiddenIndex:                uuid.NewString(),
 		RuntimeId:                  runtimeID,
@@ -505,6 +507,9 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 			return db.Error
 		}
 	}
+	if i.ID > 0 {
+		enqueueHTTPFlowFTSUpdate(i)
+	}
 	return nil
 }
 
@@ -523,6 +528,7 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
+	enqueueHTTPFlowFTSUpdate(i)
 
 	return nil
 }
@@ -549,6 +555,7 @@ func SaveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
 	if db := db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return db.Error
 	}
+	enqueueHTTPFlowFTSUpdate(i)
 
 	return nil
 }
@@ -568,16 +575,8 @@ func UpdateHTTPFlowTagsEx(i *schema.HTTPFlow) error {
 func InsertHTTPFlowEx(i *schema.HTTPFlow, forceSync bool, finishHandler ...func()) error {
 	if consts.GLOBAL_DB_SAVE_SYNC.IsSet() || forceSync {
 		return InsertHTTPFlow(consts.GetGormProjectDatabase(), i)
-	} else {
-		DBSaveAsyncChannel <- func(db *gorm.DB) error {
-			err := InsertHTTPFlow(db, i)
-			for _, h := range finishHandler {
-				h()
-			}
-			return err
-		}
-		return nil
 	}
+	return enqueueHTTPFlowInsertAsync(i, finishHandler)
 }
 
 func CreateOrUpdateHTTPFlowExg(hash string, i *schema.HTTPFlow) error {
@@ -770,7 +769,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.GetKeyword() != "" {
 		params.Keyword = strings.Trim(strconv.Quote(params.Keyword), "\"")
 	}
-	db = bizhelper.FuzzSearchEx(db, keywordFields, params.GetKeyword(), false)
+	db = applyHTTPFlowKeywordFilter(db, keywordFields, params)
 	if params.GetPayloadKeyword() != "" {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "payload", []string{params.GetPayloadKeyword()})
 	}
@@ -989,6 +988,82 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	return db
 }
 
+func applyHTTPFlowKeywordFilter(db *gorm.DB, keywordFields []string, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
+	keyword := strings.TrimSpace(params.GetKeyword())
+	if keyword == "" || len(keywordFields) == 0 {
+		return db
+	}
+
+	// Prefer FTS (trigram) as a prefilter, then apply LIKE to preserve exact semantics.
+	if ok, createSQL := canUseHTTPFlowFTS(db, keyword); ok {
+		ftsQuery := buildHTTPFlowFTSQuery(strings.ToLower(params.GetKeywordType()), keyword, ftsSupportsPhraseQuery(createSQL))
+		if ftsQuery != "" {
+			db = db.Where(`id IN (SELECT rowid FROM "http_flows_fts" WHERE "http_flows_fts" MATCH ?)`, ftsQuery)
+		}
+	}
+
+	return bizhelper.FuzzSearchEx(db, keywordFields, keyword, false)
+}
+
+func canUseHTTPFlowFTS(db *gorm.DB, keyword string) (bool, string) {
+	if db == nil || db.Dialect() == nil {
+		return false, ""
+	}
+	if utf8.RuneCountInString(keyword) < 3 {
+		return false, ""
+	}
+	name := strings.ToLower(db.Dialect().GetName())
+	if !strings.Contains(name, "sqlite") {
+		return false, ""
+	}
+
+	// Ensure FTS table exists and uses trigram tokenizer.
+	var tableName string
+	if err := db.New().Raw(`SELECT name FROM sqlite_master WHERE type='table' AND name='http_flows_fts';`).Row().Scan(&tableName); err != nil {
+		return false, ""
+	}
+	if tableName == "" {
+		return false, ""
+	}
+	var createSQL string
+	if err := db.New().Raw(`SELECT sql FROM sqlite_master WHERE type='table' AND name='http_flows_fts';`).Row().Scan(&createSQL); err != nil {
+		return false, ""
+	}
+	return strings.Contains(strings.ToLower(createSQL), "trigram"), createSQL
+}
+
+func ftsSupportsPhraseQuery(createSQL string) bool {
+	if createSQL == "" {
+		return false
+	}
+	return !strings.Contains(strings.ToLower(createSQL), "detail=none")
+}
+
+func buildHTTPFlowFTSQuery(keywordType, keyword string, phrase bool) string {
+	escaped := strings.ReplaceAll(keyword, `"`, `""`)
+	token := escaped
+	if phrase {
+		token = `"` + escaped + `"`
+	}
+	if !phrase {
+		// detail!=full lacks positional data; avoid column-restricted phrase queries.
+		return token
+	}
+	switch keywordType {
+	case "request":
+		return "request:" + token
+	case "response":
+		return "response:" + token
+	default:
+		fields := []string{"tags", "url", "path", "request", "response", "remote_addr"}
+		parts := make([]string, 0, len(fields))
+		for _, field := range fields {
+			parts = append(parts, field+":"+token)
+		}
+		return strings.Join(parts, " OR ")
+	}
+}
+
 func QuickSearchHTTPFlowCount(token string) int {
 	db := consts.GetGormProjectDatabase()
 	var count int
@@ -1037,6 +1112,7 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 		db = db.Select(fmt.Sprintf(`id,created_at,updated_at,hidden_index,%s -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
 request_length, -- request body length
+response_length, -- response raw length (cached)
 
 -- metainfo
 is_http_s, -- legacy
@@ -1049,12 +1125,16 @@ process_name,
 is_read_too_slow_response,
 
 -- request is larger than 200K, return empty string
-LENGTH(request) > 204800 as is_request_oversize,
-CASE WHEN LENGTH(request) > 204800 THEN '' ELSE request END as request,
+(CASE WHEN request_length > 0 THEN request_length ELSE LENGTH(request) END) > 204800 as is_request_oversize,
+CASE
+  WHEN (CASE WHEN request_length > 0 THEN request_length ELSE LENGTH(request) END) > 204800 THEN '' ELSE request
+END as request,
 
 -- response is larger than 500K, return empty string
-LENGTH(response) > 512000 as is_response_oversize,
-CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
+(CASE WHEN response_length > 0 THEN response_length ELSE LENGTH(response) END) > 512000 as is_response_oversize,
+CASE
+  WHEN (CASE WHEN response_length > 0 THEN response_length ELSE LENGTH(response) END) > 512000 THEN '' ELSE response
+END as response,
 
 -- is response too large
 is_too_large_response, 
@@ -1096,26 +1176,69 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 }
 
 func SelectHTTPFlowFromDB(queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*schema.HTTPFlow, err error) {
-	var limitFlows, fullFlows []*schema.HTTPFlow
-
-	if params.OffsetId > 0 {
-		offsetDB := queryDB
-		if params.Pagination.Order == "desc" {
-			offsetDB = offsetDB.Where("id < ?", params.OffsetId)
-		} else {
-			offsetDB = offsetDB.Where("id > ?", params.OffsetId)
+	if params == nil {
+		params = &ypb.QueryHTTPFlowRequest{}
+	}
+	if params.Pagination == nil {
+		params.Pagination = &ypb.Paging{
+			Page:    1,
+			Limit:   30,
+			OrderBy: "updated_at",
+			Order:   "desc",
 		}
-		offsetDB.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&limitFlows)
-		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &fullFlows)
+	}
+
+	page := int(params.Pagination.Page)
+	if page < 1 {
+		page = 1
+	}
+	limit := int(params.Pagination.Limit)
+	if limit == 0 {
+		limit = 10
+	}
+
+	if params.GetSkipTotalCount() {
+		paging = bizhelper.NewPaginatorWithoutTotal(page, limit)
 	} else {
-		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &limitFlows)
+		// COUNT should not pay for custom SELECT expressions or an unused data fetch.
+		// Especially in OffsetId mode, the old implementation ran an extra Find into fullFlows that was discarded.
+		var total int
+		countDB := queryDB
+		if err := countDB.Count(&total).Error; err != nil {
+			return nil, nil, utils.Errorf("paging count failed: %s", err)
+		}
+		paging = bizhelper.NewPaginatorFromTotal(page, limit, total)
 	}
 
-	if queryDB.Error != nil {
-		return nil, nil, utils.Errorf("paging failed: %s", queryDB.Error)
+	var flows []*schema.HTTPFlow
+	dataDB := queryDB
+	if params.OffsetId > 0 {
+		if strings.EqualFold(params.Pagination.Order, "desc") {
+			dataDB = dataDB.Where("id < ?", params.OffsetId)
+		} else {
+			dataDB = dataDB.Where("id > ?", params.OffsetId)
+		}
+		if err := dataDB.Limit(limit).Offset(0).Find(&flows).Error; err != nil {
+			return nil, nil, utils.Errorf("paging find failed: %s", err)
+		}
+		return paging, flows, nil
 	}
 
-	return paging, limitFlows, nil
+	if limit == -1 {
+		if err := dataDB.Find(&flows).Error; err != nil {
+			return nil, nil, utils.Errorf("paging find failed: %s", err)
+		}
+		return paging, flows, nil
+	}
+
+	offset := 0
+	if page > 1 {
+		offset = (page - 1) * limit
+	}
+	if err := dataDB.Limit(limit).Offset(offset).Find(&flows).Error; err != nil {
+		return nil, nil, utils.Errorf("paging find failed: %s", err)
+	}
+	return paging, flows, nil
 }
 
 type HTTPFlowUrl struct {

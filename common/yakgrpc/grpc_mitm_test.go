@@ -1883,12 +1883,14 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 		}
 	})
 
-	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(2), client, &ypb.QueryHTTPFlowRequest{
+	// CI can be slow (DB insert/flush sometimes >2s), so give this query more time.
+	flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(10), client, &ypb.QueryHTTPFlowRequest{
 		Keyword: token2,
 		Pagination: &ypb.Paging{
 			Page:  1,
 			Limit: 1,
 		},
+		SourceType: "mitm",
 	}, 1)
 	require.NoError(t, err)
 	flow := flows.Data[0]
