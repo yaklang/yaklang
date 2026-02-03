@@ -315,6 +315,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		IsHTTPS:                    isHttps,
 		Url:                        url,
 		Path:                       requestUri,
+		PathSuffix:                 lowhttp.GetPathSuffix(requestUri),
 		Method:                     method,
 		BodyLength:                 int64(len(body)),
 		RequestLength:              int64(len(requestRaw)),
@@ -516,6 +517,9 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	}()
 
 	i.ID = 0
+	if i.PathSuffix == "" && i.Path != "" {
+		i.PathSuffix = lowhttp.GetPathSuffix(i.Path)
+	}
 	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
@@ -530,6 +534,9 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 		}
 	}()
 
+	if i.PathSuffix == "" && i.Path != "" {
+		i.PathSuffix = lowhttp.GetPathSuffix(i.Path)
+	}
 	var flowCopy schema.HTTPFlow
 	if db := db.Model(&flowCopy).Where("hash = ?", hash).Assign(i).FirstOrCreate(&flowCopy); db.Error != nil {
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
@@ -934,8 +941,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			}
 			suffixes = append(suffixes, suffix)
 		}
-		// 使用精确后缀匹配，避免 .js 匹配 .json 或 .jsp
-		db = bizhelper.FuzzQueryStringArrayOrSuffixLike(db, "path", suffixes)
+		db = bizhelper.ExactQueryStringArrayOr(db, "path_suffix", suffixes)
 	}
 	if len(params.GetExcludeSuffix()) > 0 {
 		var suffixes []string
@@ -945,8 +951,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 			}
 			suffixes = append(suffixes, suffix)
 		}
-		// 使用精确后缀匹配，避免 .js 匹配 .json 或 .jsp
-		db = bizhelper.FuzzQueryStringArrayOrSuffixLikeExclude(db, "path", suffixes)
+		db = bizhelper.ExactQueryExcludeStringArrayOr(db, "path_suffix", suffixes)
 	}
 	if len(params.GetExcludeContentType()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.GetExcludeContentType())

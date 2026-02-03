@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -24,6 +25,34 @@ const (
 	CRLF       = "\r\n"
 	DoubleCRLF = "\r\n\r\n"
 )
+
+// pathExtModifierChars 是 CDN/图片服务在 path 扩展名后常加的修饰符字符。
+// 例如 a.png!cc_218x300 中的 !、.jpg@100w 中的 @。提取“真实扩展名”时需在此类字符处截断，
+// 只保留如 .png、.jpg 这样的后缀。
+const pathExtModifierChars = "!@"
+
+// GetPathSuffix 从 path 中提取文件扩展名（含前导点），供过滤、匹配等使用。
+// 会先去掉 query 部分，再用 path.Ext 取扩展名，去掉 pathExtModifierChars 修饰符后，
+// 保证返回形如 ".png"、".js" 的字符串（无扩展名或无效时返回 ""）。
+func GetPathSuffix(pathStr string) string {
+	if idx := strings.IndexByte(pathStr, '?'); idx != -1 {
+		pathStr = pathStr[:idx]
+	}
+	ret := path.Ext(pathStr)
+	if ret == "" {
+		return ""
+	}
+	if idx := strings.IndexAny(ret, pathExtModifierChars); idx != -1 {
+		ret = ret[:idx]
+	}
+	if ret == "" || ret == "." {
+		return ""
+	}
+	if !strings.HasPrefix(ret, ".") {
+		ret = "." + ret
+	}
+	return ret
+}
 
 // ExtractURLFromHTTPRequestRaw 从原始 HTTP 请求报文中提取 URL，返回URL结构体与错误
 // Example:

@@ -167,7 +167,6 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	// 测试后缀过滤的精确性：过滤 .js 不应该过滤 .json 和 .jsp
 	token := utils.RandString(10)
 
-	// 创建测试数据
 	jsFlow := &schema.HTTPFlow{
 		Url:  fmt.Sprintf("https://example.com/%s.js", token),
 		Path: fmt.Sprintf("/%s.js", token),
@@ -186,10 +185,16 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jspFlow)
 
-	// 清理测试数据
+	// 带查询串的 .js path：/xxx.js?param=a 也应被 .js 排除
+	jsWithQueryFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.js?param=a", token),
+		Path: fmt.Sprintf("/%s.js?param=a", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsWithQueryFlow)
+
 	defer func() {
 		DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
-			Id: []int64{int64(jsFlow.ID), int64(jsonFlow.ID), int64(jspFlow.ID)},
+			Id: []int64{int64(jsFlow.ID), int64(jsonFlow.ID), int64(jspFlow.ID), int64(jsWithQueryFlow.ID)},
 		})
 	}()
 
@@ -199,8 +204,7 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// 验证结果
-	var foundJs, foundJson, foundJsp bool
+	var foundJs, foundJson, foundJsp, foundJsWithQuery bool
 	for _, flow := range flows {
 		if flow.ID == jsFlow.ID {
 			foundJs = true
@@ -211,14 +215,64 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 		if flow.ID == jspFlow.ID {
 			foundJsp = true
 		}
+		if flow.ID == jsWithQueryFlow.ID {
+			foundJsWithQuery = true
+		}
 	}
 
 	// .js 应该被过滤掉（不应该找到）
 	assert.False(t, foundJs, "过滤 .js 时，.js 文件应该被过滤掉")
+	// .js?param=a 也应被过滤掉
+	assert.False(t, foundJsWithQuery, "过滤 .js 时，.js?param=a 路径应该被过滤掉")
 	// .json 不应该被过滤（应该找到）
 	assert.True(t, foundJson, "过滤 .js 时，.json 文件不应该被过滤")
 	// .jsp 不应该被过滤（应该找到）
 	assert.True(t, foundJsp, "过滤 .js 时，.jsp 文件不应该被过滤")
+
+	pngNormalFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.png", token),
+		Path: fmt.Sprintf("/%s.png", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), pngNormalFlow)
+
+	pngWithParamFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.png?foo=bar", token),
+		Path: fmt.Sprintf("/%s.png?foo=bar", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), pngWithParamFlow)
+
+	// CDN 修饰符 path：/item/428.png!cc_216x216 应按 .png 排除（与 MITM normalizeExtFromEscapedPath 一致）
+	pngWithModifierFlow := &schema.HTTPFlow{
+		Url:  "https://example.com/item/assets/428.png!cc_216x216",
+		Path: "/item/assets/428.png!cc_216x216",
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), pngWithModifierFlow)
+
+	defer func() {
+		DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
+			Id: []int64{int64(pngNormalFlow.ID), int64(pngWithParamFlow.ID), int64(pngWithModifierFlow.ID)},
+		})
+	}()
+
+	_, flowsPng, errPng := QueryHTTPFlow(consts.GetGormProjectDatabase().Debug(), &ypb.QueryHTTPFlowRequest{
+		ExcludeSuffix: []string{".png"},
+	})
+	require.NoError(t, errPng)
+	var foundPngModifierWhenExcludePng, foundPngNormal, foundPngWithParam bool
+	for _, flow := range flowsPng {
+		if flow.ID == pngWithModifierFlow.ID {
+			foundPngModifierWhenExcludePng = true
+		}
+		if flow.ID == pngNormalFlow.ID {
+			foundPngNormal = true
+		}
+		if flow.ID == pngWithParamFlow.ID {
+			foundPngWithParam = true
+		}
+	}
+	assert.False(t, foundPngNormal, "过滤 .png 时，普通 .png 文件应该被过滤掉")
+	assert.False(t, foundPngWithParam, "过滤 .png 时，带参数的 .png 文件应该被过滤掉")
+	assert.False(t, foundPngModifierWhenExcludePng, "过滤 .png 时，/428.png!cc_216x216 路径应该被过滤掉")
 }
 
 func TestCreateOrUpdateHTTPFlow(t *testing.T) {
