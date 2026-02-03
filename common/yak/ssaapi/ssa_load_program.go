@@ -205,6 +205,28 @@ func GetAggregatedFileSystemForProgramName(programName string) filesys_interface
 	return overlay.GetAggregatedFileSystem()
 }
 
+// NewProgramFromDB 从数据库加载程序，返回 SyntaxFlowQueryInstance 接口
+// 如果程序有 overlay（已保存的 overlay 或增量编译的 diff program），返回 *ProgramOverLay
+// 否则返回 *Program
+func NewProgramFromDB(programName string) (SyntaxFlowQueryInstance, error) {
+	program, err := FromDatabase(programName)
+	if err != nil {
+		return nil, err
+	}
+	if program == nil {
+		return nil, utils.Errorf("program %s is nil", programName)
+	}
+
+	// 如果程序有 overlay，返回 overlay
+	overlay := program.GetOverlay()
+	if overlay != nil {
+		return overlay, nil
+	}
+
+	// 否则返回 program
+	return program, nil
+}
+
 func init() {
 	// 注册函数到 ssadb 包，避免循环导入
 	ssadb.SetGetAggregatedFileSystemFunc(GetAggregatedFileSystemForProgramName)
