@@ -172,11 +172,8 @@ jobs:
           # 尝试多个版本源：latest -> 从版本列表中获取第一个非 -yakit- 和 -irify- 的版本
           VERSIONS_TO_TRY=("latest")
           
-          # 确保脚本有执行权限
-          chmod +x ./scripts/get-yak-version.sh
-          
           # 尝试从版本列表获取可用版本（排除 -yakit- 和 -irify-）
-          if SELECTED_VERSION=$(./scripts/get-yak-version.sh --quiet 2>/dev/null); then
+          if SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --quiet 2>/dev/null); then
             # 如果找到合适的版本，添加到尝试列表
             if [ -n "$SELECTED_VERSION" ]; then
               echo "✅ Found suitable version: $SELECTED_VERSION"
@@ -335,30 +332,16 @@ jobs:
           BUILD_TAGS="gzip_embed"
           OUTPUT_BINARY="${{ matrix.binary }}"
           
-          # Check if tag contains -yakit-* (exclude irify) or -irify-* (exclude yakit)
           if [[ "$YAK_TAG" == *"-yakit-"* ]]; then
             BUILD_TAGS="gzip_embed,irify_exclude"
-            # Replace "yak_" with "yaklang_yakit_" in binary name
             OUTPUT_BINARY="${OUTPUT_BINARY/yak_/yaklang_yakit_}"
-            echo "Detected yakit version ($YAK_TAG), adding irify_exclude build tag"
-            echo "Output binary renamed to: $OUTPUT_BINARY"
           elif [[ "$YAK_TAG" == *"-irify-"* ]]; then
             BUILD_TAGS="gzip_embed,yakit_exclude"
-            # Replace "yak_" with "yaklang_irify_" in binary name
             OUTPUT_BINARY="${OUTPUT_BINARY/yak_/yaklang_irify_}"
-            echo "Detected irify version ($YAK_TAG), adding yakit_exclude build tag"
-            echo "Output binary renamed to: $OUTPUT_BINARY"
-          else
-            echo "Standard version ($YAK_TAG), using default build tags"
-            echo "Output binary: $OUTPUT_BINARY"
           fi
           
           echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_ENV"
-          echo "BUILD_TAGS=$BUILD_TAGS" >> "$GITHUB_OUTPUT"
           echo "OUTPUT_BINARY=$OUTPUT_BINARY" >> "$GITHUB_ENV"
-          echo "OUTPUT_BINARY=$OUTPUT_BINARY" >> "$GITHUB_OUTPUT"
-          echo "Final BUILD_TAGS: $BUILD_TAGS"
-          echo "Final OUTPUT_BINARY: $OUTPUT_BINARY"
 
       - name: Go Patch for Win7
         if: matrix.os == 'windows7'

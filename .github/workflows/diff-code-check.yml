@@ -117,11 +117,8 @@ jobs:
         run: |
           echo "::group::Finding latest Yak version"
           
-          # 确保脚本有执行权限
-          chmod +x ./scripts/get-yak-version.sh
-          
           # 使用脚本获取合适的版本（匹配 alpha-diff-check / alpha-code-scan / beta，排除 -yakit- 和 -irify-）
-          SELECTED_VERSION=$(./scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$')
+          SELECTED_VERSION=$(bash ./scripts/get-yak-version.sh --pattern '.*-alpha.*-diff-check|.*-alpha.*-code-scan|.*-beta[0-9]+$')
           
           if [ -z "$SELECTED_VERSION" ]; then
             echo "::error::No suitable version found (alpha-diff-check / alpha-code-scan / beta)"
