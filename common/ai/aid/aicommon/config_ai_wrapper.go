@@ -62,20 +62,23 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			outConfig.EmitInfo("prepare to retry call ai, with an existed seq: %v", seq)
 		}
 		//log.Infof("start to check uuid:%v seq:%v", c.id, seq)
-		if ret, ok := yakit.GetAIInteractiveCheckpoint(c.GetDB(), c.id, seq); ok && ret.Finished {
-			// checkpoint is finished, return the result
-			var rsp *AIResponse
-			if config != nil {
-				rsp = NewAIResponse(config)
-			} else {
-				rsp = NewUnboundAIResponse()
+		db := c.GetDB()
+		if db != nil {
+			if ret, ok := yakit.GetAIInteractiveCheckpoint(db, c.id, seq); ok && ret.Finished {
+				// checkpoint is finished, return the result
+				var rsp *AIResponse
+				if config != nil {
+					rsp = NewAIResponse(config)
+				} else {
+					rsp = NewUnboundAIResponse()
+				}
+				rsp.SetTaskIndex(request.GetTaskIndex())
+				rspParams := aiddb.AiCheckPointGetResponseParams(ret)
+				rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
+				rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
+				rsp.Close()
+				return rsp, nil
 			}
-			rsp.SetTaskIndex(request.GetTaskIndex())
-			rspParams := aiddb.AiCheckPointGetResponseParams(ret)
-			rsp.EmitReasonStream(bytes.NewBufferString(rspParams.GetString("reason")))
-			rsp.EmitOutputStream(bytes.NewBufferString(rspParams.GetString("output")))
-			rsp.Close()
-			return rsp, nil
 		}
 
 		// create or update a new checkpoint

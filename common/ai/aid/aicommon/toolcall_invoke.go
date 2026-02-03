@@ -95,9 +95,12 @@ func (a *ToolCaller) invoke(
 	e := a.emitter
 
 	seq := c.AcquireId()
-	if ret, ok := yakit.GetToolCallCheckpoint(c.GetDB(), c.GetRuntimeId(), seq); ok {
-		if ret.Finished {
-			return aiddb.AiCheckPointGetToolResult(ret), nil
+	db := c.GetDB()
+	if db != nil {
+		if ret, ok := yakit.GetToolCallCheckpoint(db, c.GetRuntimeId(), seq); ok {
+			if ret.Finished {
+				return aiddb.AiCheckPointGetToolResult(ret), nil
+			}
 		}
 	}
 	toolCheckpoint := c.CreateToolCallCheckpoint(seq)

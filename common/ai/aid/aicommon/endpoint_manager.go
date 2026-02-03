@@ -2,13 +2,14 @@ package aicommon
 
 import (
 	"context"
+	"sync"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"sync"
 )
 
 type EndpointManager struct {
@@ -82,9 +83,14 @@ func (e *EndpointManager) CreateEndpointWithEventType(typeName schema.EventType)
 	e.results.Store(id, endpoint)
 	if c := e.config; c != nil {
 		endpoint.seq = c.AcquireId()
-		if ret, ok := yakit.GetReviewCheckpoint(c.GetDB(), c.GetRuntimeId(), endpoint.seq); ok {
-			endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
-			endpoint.checkpoint = ret
+		db := c.GetDB()
+		if db != nil {
+			if ret, ok := yakit.GetReviewCheckpoint(db, c.GetRuntimeId(), endpoint.seq); ok {
+				endpoint.SetParams(aiddb.AiCheckPointGetResponseParams(ret))
+				endpoint.checkpoint = ret
+			} else {
+				endpoint.checkpoint = e.config.CreateReviewCheckpoint(endpoint.seq)
+			}
 		} else {
 			endpoint.checkpoint = e.config.CreateReviewCheckpoint(endpoint.seq)
 		}

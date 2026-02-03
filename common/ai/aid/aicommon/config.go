@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/google/uuid"
@@ -1776,6 +1777,16 @@ func WithForges(forge ...*schema.AIForge) ConfigOption {
 	implement methods
 */
 
+// GetDB returns the database connection, safely handling nil BaseCheckpointableStorage.
+// This method overrides the embedded BaseCheckpointableStorage.GetDB() to prevent
+// nil pointer dereference when BaseCheckpointableStorage is not initialized.
+func (c *Config) GetDB() *gorm.DB {
+	if c.BaseCheckpointableStorage == nil {
+		return nil
+	}
+	return c.BaseCheckpointableStorage.GetDB()
+}
+
 func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
 	for _, cb := range []AICallbackType{
 		c.QualityPriorityAICallback,
@@ -1968,7 +1979,13 @@ func (c *Config) restorePersistentSession() {
 		return
 	}
 
-	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(c.GetDB(), c.PersistentSessionId)
+	db := c.GetDB()
+	if db == nil {
+		log.Warnf("database connection is nil, cannot restore persistent session [%s]", c.PersistentSessionId)
+		return
+	}
+
+	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(db, c.PersistentSessionId)
 	if err != nil {
 		log.Warnf("failed to fetch AI runtime for session [%s]: %v", c.PersistentSessionId, err)
 		return
