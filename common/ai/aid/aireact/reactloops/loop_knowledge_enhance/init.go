@@ -135,8 +135,8 @@ func buildArtifactsSummary(loop *reactloops.ReActLoop) string {
 }
 
 // buildInitTask creates the initial task for the knowledge enhance loop
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		// Get user input from task
 		userQuery := task.GetUserInput()
 
@@ -185,7 +185,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			allKBNames, err := yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
 			if err != nil {
 				log.Warnf("failed to load all knowledge base names: %v", err)
-				return utils.Errorf("failed to load all knowledge base names: %v", err)
+				operator.Failed(utils.Errorf("failed to load all knowledge base names: %v", err))
+				return
 			}
 
 			buf := bytes.NewBufferString("")
@@ -218,7 +219,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
 			})
 			if err != nil {
-				return utils.Errorf("failed to pick up knowledge base samples: %v", err)
+				operator.Failed(utils.Errorf("failed to pick up knowledge base samples: %v", err))
+				return
 			}
 			results := action.GetStringSlice("knowledge_bases")
 			if len(results) > 0 {
@@ -229,7 +231,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		knowledgeBases = dedupStrings(knowledgeBases)
 
 		if len(knowledgeBases) <= 0 {
-			return utils.Errorf("no knowledge bases found")
+			operator.Failed(utils.Errorf("no knowledge bases found"))
+			return
 		}
 
 		resourcesInfo.WriteString("### 知识库 (Knowledge Bases)\n")
@@ -296,7 +299,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("search_history", "")
 
 		r.AddToTimeline("task_initialized", fmt.Sprintf("Knowledge enhance task initialized with %d attached resources: %s", len(attachedDatas), userQuery))
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }
 

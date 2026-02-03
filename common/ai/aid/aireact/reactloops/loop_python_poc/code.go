@@ -79,9 +79,10 @@ func init() {
 }
 
 // buildInitTask creates the initialization task handler
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		log.Infof("[*] React: Python PoC loop initialized, waiting for AI to generate code")
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }

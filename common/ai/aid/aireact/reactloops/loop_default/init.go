@@ -8,8 +8,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		config := r.GetConfig()
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
 
@@ -22,6 +22,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 				loop.GetInvoker().AddToTimeline("error", fmt.Sprintf("failed to process attached data: %v", err))
 			}
 		}
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }

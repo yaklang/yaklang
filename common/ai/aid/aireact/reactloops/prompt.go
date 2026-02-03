@@ -33,6 +33,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE)
 	}
 
+	// Apply init handler action constraints (if not yet applied)
+	// These constraints are only applied once after init
+	if !r.initActionApplied && len(r.initActionDisabled) > 0 {
+		disableActionList = append(disableActionList, r.initActionDisabled...)
+		log.Infof("applied init action disabled list: %v", r.initActionDisabled)
+	}
+
 	filterFunc := func(action *LoopAction) bool {
 		if r.actionFilters == nil {
 			return true
@@ -50,8 +57,31 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
 			filteredValues = append(filteredValues, v)
 		} else {
-			log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
+			log.Infof("action[%s] is removed from schema because loop exit is disallowed or init disabled", v.ActionType)
 		}
+	}
+
+	// Apply init handler must-use action constraints
+	// If must-use actions are specified, only keep those actions
+	if !r.initActionApplied && len(r.initActionMustUse) > 0 {
+		var mustUseFiltered []*LoopAction
+		for _, v := range filteredValues {
+			if slices.Contains(r.initActionMustUse, v.ActionType) {
+				mustUseFiltered = append(mustUseFiltered, v)
+			}
+		}
+		if len(mustUseFiltered) > 0 {
+			log.Infof("applied init action must-use list: %v, filtered from %d to %d actions",
+				r.initActionMustUse, len(filteredValues), len(mustUseFiltered))
+			filteredValues = mustUseFiltered
+		} else {
+			log.Warnf("init action must-use list %v did not match any available actions, keeping all", r.initActionMustUse)
+		}
+	}
+
+	// Mark init constraints as applied after first schema generation
+	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
+		r.initActionApplied = true
 	}
 
 	schema := buildSchema(filteredValues...)

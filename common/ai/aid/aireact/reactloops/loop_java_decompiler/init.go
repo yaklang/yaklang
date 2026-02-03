@@ -89,8 +89,8 @@ func init() {
 }
 
 // buildInitTask creates the initial task for the Java decompiler loop
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		// Get user input from task
 		userQuery := task.GetUserInput()
 
@@ -102,6 +102,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("rewritten_files", 0) // New counter for rewrite action
 
 		r.AddToTimeline("task_initialized", "Java decompiler task initialized: "+userQuery)
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }

@@ -171,3 +171,101 @@ func (o *OnPostIterationOperator) IgnoreError() {
 func (o *OnPostIterationOperator) ShouldIgnoreError() bool {
 	return o.ignoreError
 }
+
+// InitTaskOperator allows init task callbacks to control loop behavior
+// This enables the callback to:
+// - Done(): Signal that initialization completed and loop should exit (early routing)
+// - Failed(): Signal initialization failed with an error
+// - Continue(): Continue with normal loop execution (default)
+// - NextAction(): Specify which actions MUST be used in next iteration
+// - RemoveNextAction(): Specify which actions should be DISABLED in next iteration
+type InitTaskOperator struct {
+	operateOnce *utils.Once
+
+	isDone   bool
+	isFailed bool
+	failErr  error
+
+	// Action control for next iteration
+	nextActionMustUse   []string // Actions that MUST be used
+	nextActionDisabled  []string // Actions that are DISABLED
+}
+
+// newInitTaskOperator creates a new InitTaskOperator
+// Default state is Continue (no special behavior)
+func newInitTaskOperator() *InitTaskOperator {
+	return &InitTaskOperator{
+		operateOnce:        utils.NewOnce(),
+		isDone:             false,
+		isFailed:           false,
+		nextActionMustUse:  []string{},
+		nextActionDisabled: []string{},
+	}
+}
+
+// Done signals that initialization is complete and the loop should exit immediately
+// This is used for "early routing" scenarios where init directly handles the request
+func (o *InitTaskOperator) Done() {
+	o.operateOnce.Do(func() {
+		o.isDone = true
+	})
+}
+
+// Failed signals that initialization failed with an error
+// The loop will exit with this error
+func (o *InitTaskOperator) Failed(err any) {
+	o.operateOnce.Do(func() {
+		o.isFailed = true
+		o.failErr = utils.Error(err)
+	})
+}
+
+// Continue signals that the loop should continue with normal execution
+// This is the default behavior, calling this explicitly is optional
+func (o *InitTaskOperator) Continue() {
+	// No-op, this is the default behavior
+	// Explicitly call this for clarity in init handlers
+}
+
+// NextAction specifies which actions MUST be used in the next iteration
+// Multiple calls will accumulate the required actions
+func (o *InitTaskOperator) NextAction(actions ...string) {
+	o.nextActionMustUse = append(o.nextActionMustUse, actions...)
+}
+
+// RemoveNextAction specifies which actions should be DISABLED in the next iteration
+// These actions will be filtered out from available actions
+func (o *InitTaskOperator) RemoveNextAction(actions ...string) {
+	o.nextActionDisabled = append(o.nextActionDisabled, actions...)
+}
+
+// IsDone returns whether the init handler signaled completion (early exit)
+func (o *InitTaskOperator) IsDone() bool {
+	return o.isDone
+}
+
+// IsFailed returns whether the init handler signaled failure
+func (o *InitTaskOperator) IsFailed() (bool, error) {
+	return o.isFailed, o.failErr
+}
+
+// IsContinued returns whether the init handler wants to continue with normal loop
+// This is true when neither Done() nor Failed() was called
+func (o *InitTaskOperator) IsContinued() bool {
+	return !o.isDone && !o.isFailed
+}
+
+// GetNextActionMustUse returns the list of actions that must be used
+func (o *InitTaskOperator) GetNextActionMustUse() []string {
+	return o.nextActionMustUse
+}
+
+// GetNextActionDisabled returns the list of actions that are disabled
+func (o *InitTaskOperator) GetNextActionDisabled() []string {
+	return o.nextActionDisabled
+}
+
+// HasActionConstraints returns true if any action constraints are set
+func (o *InitTaskOperator) HasActionConstraints() bool {
+	return len(o.nextActionMustUse) > 0 || len(o.nextActionDisabled) > 0
+}
