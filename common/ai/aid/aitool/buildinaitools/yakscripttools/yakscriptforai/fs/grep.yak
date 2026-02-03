@@ -170,7 +170,6 @@ processPath = (singlePath) => {
 
             // Read file once and cache the content
             fileContent := file.ReadFile(fileToCheck)~
-            yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
             fileContentStr := string(fileContent)
 
             allpattern := str.Split(pattern, ",")
@@ -186,7 +185,6 @@ processPath = (singlePath) => {
     } else {
         // Read file once and cache the content
         fileContent := file.ReadFile(singlePath)~
-        yakit.File(singlePath, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
         fileContentStr := string(fileContent)
 
         allpattern := str.Split(pattern, ",")

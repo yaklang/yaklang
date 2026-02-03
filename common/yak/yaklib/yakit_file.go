@@ -14,6 +14,15 @@ type YakitFileAction struct {
 	Message map[string]any
 }
 
+const (
+	// Keep file-level action payload small to avoid hitting gRPC message size limits.
+	// These actions are primarily used for logging/preview in yakit, not bulk transfer.
+	yakitFileActionMaxContentBytes   = 8 * 1024
+	yakitFileActionMaxMessagePreview = 512
+	yakitFileActionMaxFindItems      = 64
+	yakitFileActionMaxFindItemBytes  = 512
+)
+
 var (
 	Read_Action   = "READ"
 	Write_Action  = "WRITE"
@@ -24,27 +33,92 @@ var (
 	Find_Action   = "FIND"
 )
 
+func shrinkBytesPreview(b []byte, max int) (preview string, truncated bool) {
+	if max <= 0 {
+		max = yakitFileActionMaxContentBytes
+	}
+	if len(b) <= max {
+		return string(b), false
+	}
+	half := max / 2
+	if half <= 0 {
+		half = 1
+	}
+	buf := make([]byte, 0, max+3)
+	buf = append(buf, b[:half]...)
+	buf = append(buf, []byte("...")...)
+	buf = append(buf, b[len(b)-half:]...)
+	return string(buf), true
+}
+
+func shrinkStringPreview(s string, maxBytes int) (preview string, truncated bool) {
+	if maxBytes <= 0 {
+		maxBytes = yakitFileActionMaxFindItemBytes
+	}
+	if len(s) <= maxBytes {
+		return s, false
+	}
+	half := maxBytes / 2
+	if half <= 0 {
+		half = 1
+	}
+	return s[:half] + "..." + s[len(s)-half:], true
+}
+
+func shrinkStringSlicePreview(in []string, maxItems int, maxItemBytes int) (out []string, truncated bool) {
+	if maxItems <= 0 {
+		maxItems = yakitFileActionMaxFindItems
+	}
+	if maxItemBytes <= 0 {
+		maxItemBytes = yakitFileActionMaxFindItemBytes
+	}
+
+	n := len(in)
+	if n > maxItems {
+		n = maxItems
+		truncated = true
+	}
+
+	out = make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		p, t := shrinkStringPreview(in[i], maxItemBytes)
+		if t {
+			truncated = true
+		}
+		out = append(out, p)
+	}
+	return out, truncated
+}
+
 func FileReadAction(offset int, length int, unit string, content []byte) *YakitFileAction {
+	preview, truncated := shrinkBytesPreview(content, yakitFileActionMaxContentBytes)
+	preview = utils.ShrinkTextBlock(preview, yakitFileActionMaxContentBytes)
 	return &YakitFileAction{
 		Action: Read_Action,
 		Message: map[string]any{
-			"message": fmt.Sprintf("read file with offset %d, length %d, unit %s", offset, length, unit),
-			"offset":  offset,
-			"length":  length,
-			"unit":    unit,
-			"content": utils.ShrinkTextBlock(utils.InterfaceToString(content), 4096),
+			"message":          fmt.Sprintf("read file with offset %d, length %d, unit %s", offset, length, unit),
+			"offset":           offset,
+			"length":           length,
+			"unit":             unit,
+			"content":          preview,
+			"contentSize":      len(content),
+			"contentTruncated": truncated,
 		},
 	}
 }
 
 func FileWriteAction(length int, mode string, content []byte) *YakitFileAction {
+	preview, truncated := shrinkBytesPreview(content, yakitFileActionMaxContentBytes)
+	preview = utils.ShrinkTextBlock(preview, yakitFileActionMaxContentBytes)
 	return &YakitFileAction{
 		Action: Write_Action,
 		Message: map[string]any{
-			"message": fmt.Sprintf("write file with length %d, mode %s", length, mode),
-			"length":  length,
-			"mode":    mode, // append | cover
-			"content": utils.InterfaceToString(content),
+			"message":          fmt.Sprintf("write file with length %d, mode %s", length, mode),
+			"length":           length,
+			"mode":             mode, // append | cover
+			"content":          preview,
+			"contentSize":      len(content),
+			"contentTruncated": truncated,
 		},
 	}
 }
@@ -82,10 +156,11 @@ func FileStatusAction(status any) *YakitFileAction {
 	} else {
 		statusMap = utils.InterfaceToGeneralMap(status)
 	}
+	msgPreview := utils.ShrinkString(fmt.Sprintf("get file status: %+v", statusMap), yakitFileActionMaxMessagePreview)
 	return &YakitFileAction{
 		Action: Status_Action,
 		Message: map[string]any{
-			"message": fmt.Sprintf("get file status: %+v", statusMap),
+			"message": msgPreview,
 			"status":  statusMap,
 		},
 	}
@@ -102,13 +177,17 @@ func FileChmodAction(chmodMode uint32) *YakitFileAction {
 }
 
 func FileFindAction(findMode string, findCondition string, findContent ...string) *YakitFileAction {
+	findConditionPreview := utils.ShrinkString(findCondition, yakitFileActionMaxFindItemBytes)
+	shrunkContent, contentTruncated := shrinkStringSlicePreview(findContent, yakitFileActionMaxFindItems, yakitFileActionMaxFindItemBytes)
 	return &YakitFileAction{
 		Action: Find_Action,
 		Message: map[string]any{
-			"message":   fmt.Sprintf("find file [mode:%s] [condition:%s]", findMode, findCondition),
-			"mode":      findMode, // name | content | all
-			"content":   findContent,
-			"condition": findCondition,
+			"message":          fmt.Sprintf("find file [mode:%s] [condition:%s]", findMode, findConditionPreview),
+			"mode":             findMode, // name | content | all
+			"content":          shrunkContent,
+			"condition":        findConditionPreview,
+			"contentTotal":     len(findContent),
+			"contentTruncated": contentTruncated,
 		},
 	}
 }

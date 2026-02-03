@@ -16,6 +16,12 @@ minSize = cli.Int("min-size", cli.setHelp("limit show file size min, unit: byte"
 maxSize = cli.Int("max-size", cli.setHelp("limit show file size max, unit: byte"))
 cli.check()
 
+MAX_RESULT_HARD = 200
+if limit > MAX_RESULT_HARD {
+    yakit.Warn("max too large (%v), capped to %v to reduce output", limit, MAX_RESULT_HARD)
+    limit = MAX_RESULT_HARD
+}
+
 findRes = []
 count = 0
 total = 0
@@ -88,7 +94,6 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
     }
 }))
 println(buf.String())
-yakit.Info(buf.String())
 yakit.Info("total: %v", total)
 
 yakit.File(dirname, yakit.fileFindAction("find-name", sprintf("patternmode:[%s] | pattern:[%s]", patternMode,pattern), findRes...))

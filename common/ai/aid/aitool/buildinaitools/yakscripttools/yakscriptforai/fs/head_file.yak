@@ -96,7 +96,7 @@ if mode == "bytes" {
     raw, _ := io.ReadAll(io.LimitReader(fp, limit))
     if hexdumped {
         dump(raw)
-        yakit.Info(sdump(raw))
+        println(sdump(raw))
         return
     }
 
