@@ -20,9 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-var buildInForgeFS interface {
-	GetHash() (string, error)
-}
+var buildInForgeFS resources_monitor.ResourceMonitor
 
 var generateMetadataPrompt = `
 # AI forge 元数据生成器
@@ -135,7 +133,7 @@ func getBuildInForgeYakScript(name string) (*schema.AIForge, error) {
 	if !strings.HasSuffix(name, ".yak") {
 		fullName = name + ".yak"
 	}
-	codeBytes, err := getBuildInForge().ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
+	codeBytes, err := buildInForgeFS.ReadFile(fmt.Sprintf("buildinforge/%v", fullName))
 	if err != nil {
 		return nil, err
 	}
@@ -173,11 +171,11 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 	p := fmt.Sprintf("buildinforge/%v", name)
 	loadDefaultPrompt := func(promptName string) string {
-		promptBytes, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
+		promptBytes, _ := buildInForgeFS.ReadFile(fmt.Sprintf("%v/%v.txt", p, promptName))
 		return string(promptBytes)
 	}
-	codeContent, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
-	configBytes, _ := getBuildInForge().ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
+	codeContent, _ := buildInForgeFS.ReadFile(fmt.Sprintf("%v/%v.yak", p, name))
+	configBytes, _ := buildInForgeFS.ReadFile(fmt.Sprintf("%v/forge_cfg.json", p))
 	return buildAIForgeFromConfig(name, configBytes, codeContent, loadDefaultPrompt)
 }
 

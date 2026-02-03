@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 )
 
 //go:embed buildin/***
@@ -24,45 +25,12 @@ var (
 	checkErr  error
 )
 
-// embedFSWithHash 包装 embed.FS 并添加 GetHash 方法
-type embedFSWithHash struct {
-	filesys_interface.FileSystem
-	fs embed.FS
-}
-
-func (e *embedFSWithHash) GetHash() (string, error) {
-	// Only calculate hash for .sf files
-	return filesys.CreateEmbedFSHash(e.fs, filesys.WithIncludeExts(".sf"))
-}
-
 func InitEmbedFS() {
-	ruleFSWithHash = &embedFSWithHash{
-		FileSystem: filesys.NewEmbedFS(ruleFS),
-		fs:         ruleFS,
-	}
+	ruleFSWithHash = resources_monitor.NewStandardResourceMonitor(ruleFS, ".sf")
 }
 
 func init() {
 	InitEmbedFS()
-}
-
-// getRuleFS returns the ruleFS embed.FS
-func getRuleFS() interface {
-	ReadFile(name string) ([]byte, error)
-	ReadDir(name string) ([]fs.DirEntry, error)
-} {
-	return ruleFS
-}
-
-// GetRuleFileSystem 返回规则文件系统实例（非 gzip 版本）
-// 如果重复标题检查失败，会返回一个包装的文件系统，在第一次使用时 panic
-func GetRuleFileSystem() filesys_interface.FileSystem {
-	// 如果检查失败，返回一个包装的文件系统，在第一次使用时 panic
-	if checkErr != nil {
-		panic(checkErr) // 在同步规则前检查失败，应该立即失败
-	}
-	// ruleFSWithHash 在非 gzip 版本中是 embedFSWithHash，其 FileSystem 字段已实现接口
-	return ruleFSWithHash.(*embedFSWithHash).FileSystem
 }
 
 // InitEmbedFSWithNotify 带进度通知的初始化（非 gzip 版本不需要，但保持接口一致）
@@ -71,7 +39,7 @@ func InitEmbedFSWithNotify(notify func(process float64, ruleName string)) {
 	// 非 gzip 版本已经在 init() 中初始化完成
 	// 首次调用时自动执行重复标题检查
 	checkOnce.Do(func() {
-		fsInstance := ruleFSWithHash.(*embedFSWithHash).FileSystem
+		fsInstance := ruleFSWithHash
 		checkErr = checkDuplicateTitles(fsInstance)
 		if checkErr != nil {
 			log.Errorf("check duplicate titles failed: %v", checkErr)

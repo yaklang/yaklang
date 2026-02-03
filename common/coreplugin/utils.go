@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -18,15 +18,7 @@ type PlugInfo struct {
 	BinDataPath string
 }
 
-// FileSystemWithHash 是一个带有 GetHash 方法的文件系统接口
-type FileSystemWithHash interface {
-	fi.FileSystem
-	GetHash() (string, error)
-}
-
-var basePluginFS interface {
-	GetHash() (string, error)
-}
+var basePluginFS resources_monitor.ResourceMonitor
 
 var initDB = sync.Once{}
 var LoadCorePluginHooks = []func(name string, source string) string{}
@@ -43,7 +35,7 @@ func GetCorePluginDataWithHook(name string) []byte {
 	return codeBytes
 }
 func GetCorePluginData(name string) []byte {
-	codeBytes, err := getBasePlugin().ReadFile(fmt.Sprintf("base-yak-plugin/%v.yak", name))
+	codeBytes, err := basePluginFS.ReadFile(fmt.Sprintf("base-yak-plugin/%v.yak", name))
 	if err != nil {
 		log.Errorf("%v不是core plugin", name)
 		return nil
@@ -53,7 +45,7 @@ func GetCorePluginData(name string) []byte {
 
 func GetAllCorePluginName() []string {
 	var corePluginNames []string
-	dir, err := getBasePlugin().ReadDir("base-yak-plugin")
+	dir, err := basePluginFS.ReadDir("base-yak-plugin")
 	if err != nil {
 		log.Errorf("读取core plugin目录失败")
 		return nil
