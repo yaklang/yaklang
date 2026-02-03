@@ -385,6 +385,10 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 
 	r.SetCurrentTask(task)
 	r.ensureLoopDirectory(task)
+
+	// Initialize action constraints from init handler
+	var initOperator *InitTaskOperator
+
 	if r.initHandler != nil {
 		r.loadingStatus("执行初始化函数 / execute init handler...")
 		utils.Debug(func() {
@@ -392,27 +396,46 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 			fmt.Printf("re-act loop [%v] task init handler start to execute\n", r.loopName)
 			fmt.Println("================================================")
 		})
-		initErr := r.initHandler(r, task)
-		if initErr != nil {
-			r.loadingStatus("init handler done with err: " + initErr.Error())
-		} else {
-			r.loadingStatus("init handler done")
+
+		initOperator = newInitTaskOperator()
+		r.initHandler(r, task, initOperator)
+
+		// Check operator status
+		if initOperator.IsDone() {
+			// Init handler completed the task, exit immediately (early routing)
+			r.loadingStatus("init handler done (early exit)")
+			log.Infof("ReactLoop[%v] init handler signaled Done, exiting early", r.loopName)
+			r.GetInvoker().AddToTimeline("init_done", fmt.Sprintf("ReActLoop[%v] init handler completed task early", r.loopName))
+			return nil
 		}
 
-		if initErr != nil {
+		if failed, failErr := initOperator.IsFailed(); failed {
+			r.loadingStatus("init handler failed: " + failErr.Error())
 			inv := r.GetInvoker()
-			inv.AddToTimeline("error", fmt.Sprintf("ReActLoop[%v] task init handler execute failed: %v", r.loopName, initErr))
-			query := "Task initialization failed: " + initErr.Error() + "\n\n Origin INPUT: " + task.GetUserInput() + "\n\n Please give some practical advice for fix this issue or help user"
+			inv.AddToTimeline("error", fmt.Sprintf("ReActLoop[%v] task init handler execute failed: %v", r.loopName, failErr))
+			query := "Task initialization failed: " + failErr.Error() + "\n\n Origin INPUT: " + task.GetUserInput() + "\n\n Please give some practical advice for fix this issue or help user"
 			ctx := inv.GetConfig().GetContext()
 			if !utils.IsNil(task.GetContext()) {
 				ctx = task.GetContext()
 			}
 			result, err := inv.DirectlyAnswer(ctx, query, nil)
 			if err != nil {
-				return utils.Errorf("re-act loop [%v] task init handler execute failed: %v; additionally, failed to get direct answer: %v", r.loopName, initErr, err)
+				return utils.Errorf("re-act loop [%v] task init handler execute failed: %v; additionally, failed to get direct answer: %v", r.loopName, failErr, err)
 			}
 			inv.EmitFileArtifactWithExt("init_error_advice.txt", ".md", result)
-			return utils.Errorf("re-act loop [%v] task init handler execute failed: %v", r.loopName, initErr)
+			return utils.Errorf("re-act loop [%v] task init handler execute failed: %v", r.loopName, failErr)
+		}
+
+		// Continue with normal execution
+		r.loadingStatus("init handler done")
+
+		// Apply action constraints from init handler
+		if initOperator.HasActionConstraints() {
+			r.initActionMustUse = initOperator.GetNextActionMustUse()
+			r.initActionDisabled = initOperator.GetNextActionDisabled()
+			r.initActionApplied = false // Will be applied in first iteration
+			log.Infof("ReactLoop[%v] init set action constraints: must_use=%v, disabled=%v",
+				r.loopName, r.initActionMustUse, r.initActionDisabled)
 		}
 	}
 

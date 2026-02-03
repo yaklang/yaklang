@@ -1039,3 +1039,243 @@ func TestMemorySearch_MultipleCallsConsistency(t *testing.T) {
 
 	log.Infof("Consistency test passed: multiple calls returned consistent results, call_count=%d", mockMemory.callCount)
 }
+
+// ============================================================================
+// InitTaskOperator Tests
+// ============================================================================
+
+// TestInitTaskOperator_DefaultContinue tests that default behavior is Continue
+func TestInitTaskOperator_DefaultContinue(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	// Default state should be Continue
+	if !operator.IsContinued() {
+		t.Error("InitTaskOperator should default to continued state")
+	}
+
+	if operator.IsDone() {
+		t.Error("InitTaskOperator should not be done by default")
+	}
+
+	failed, err := operator.IsFailed()
+	if failed {
+		t.Error("InitTaskOperator should not be failed by default")
+	}
+	if err != nil {
+		t.Error("InitTaskOperator error should be nil by default")
+	}
+
+	log.Infof("TestInitTaskOperator_DefaultContinue passed")
+}
+
+// TestInitTaskOperator_Done tests the Done() functionality
+func TestInitTaskOperator_Done(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	operator.Done()
+
+	if !operator.IsDone() {
+		t.Error("InitTaskOperator should be done after Done()")
+	}
+
+	if operator.IsContinued() {
+		t.Error("InitTaskOperator should not be continued after Done()")
+	}
+
+	failed, _ := operator.IsFailed()
+	if failed {
+		t.Error("InitTaskOperator should not be failed after Done()")
+	}
+
+	log.Infof("TestInitTaskOperator_Done passed")
+}
+
+// TestInitTaskOperator_Failed tests the Failed() functionality
+func TestInitTaskOperator_Failed(t *testing.T) {
+	operator := newInitTaskOperator()
+	testErr := "test error message"
+
+	operator.Failed(testErr)
+
+	if operator.IsDone() {
+		t.Error("InitTaskOperator should not be done after Failed()")
+	}
+
+	if operator.IsContinued() {
+		t.Error("InitTaskOperator should not be continued after Failed()")
+	}
+
+	failed, err := operator.IsFailed()
+	if !failed {
+		t.Error("InitTaskOperator should be failed after Failed()")
+	}
+	if err == nil {
+		t.Error("InitTaskOperator error should not be nil after Failed()")
+	}
+	if !strings.Contains(err.Error(), testErr) {
+		t.Errorf("InitTaskOperator error should contain '%s', got: %v", testErr, err)
+	}
+
+	log.Infof("TestInitTaskOperator_Failed passed")
+}
+
+// TestInitTaskOperator_NextAction tests the NextAction() functionality
+func TestInitTaskOperator_NextAction(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	// Initially no constraints
+	if operator.HasActionConstraints() {
+		t.Error("InitTaskOperator should have no action constraints initially")
+	}
+
+	// Add must-use actions
+	operator.NextAction("action1", "action2")
+
+	if !operator.HasActionConstraints() {
+		t.Error("InitTaskOperator should have action constraints after NextAction()")
+	}
+
+	mustUse := operator.GetNextActionMustUse()
+	if len(mustUse) != 2 {
+		t.Errorf("expected 2 must-use actions, got %d", len(mustUse))
+	}
+
+	if mustUse[0] != "action1" || mustUse[1] != "action2" {
+		t.Errorf("must-use actions should be ['action1', 'action2'], got %v", mustUse)
+	}
+
+	// Add more actions
+	operator.NextAction("action3")
+	mustUse = operator.GetNextActionMustUse()
+	if len(mustUse) != 3 {
+		t.Errorf("expected 3 must-use actions after second call, got %d", len(mustUse))
+	}
+
+	log.Infof("TestInitTaskOperator_NextAction passed")
+}
+
+// TestInitTaskOperator_RemoveNextAction tests the RemoveNextAction() functionality
+func TestInitTaskOperator_RemoveNextAction(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	// Add disabled actions
+	operator.RemoveNextAction("finish", "directly_answer")
+
+	if !operator.HasActionConstraints() {
+		t.Error("InitTaskOperator should have action constraints after RemoveNextAction()")
+	}
+
+	disabled := operator.GetNextActionDisabled()
+	if len(disabled) != 2 {
+		t.Errorf("expected 2 disabled actions, got %d", len(disabled))
+	}
+
+	if disabled[0] != "finish" || disabled[1] != "directly_answer" {
+		t.Errorf("disabled actions should be ['finish', 'directly_answer'], got %v", disabled)
+	}
+
+	log.Infof("TestInitTaskOperator_RemoveNextAction passed")
+}
+
+// TestInitTaskOperator_CombinedConstraints tests combining NextAction and RemoveNextAction
+func TestInitTaskOperator_CombinedConstraints(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	operator.NextAction("tool_call")
+	operator.RemoveNextAction("finish")
+
+	if !operator.HasActionConstraints() {
+		t.Error("InitTaskOperator should have action constraints")
+	}
+
+	mustUse := operator.GetNextActionMustUse()
+	disabled := operator.GetNextActionDisabled()
+
+	if len(mustUse) != 1 || mustUse[0] != "tool_call" {
+		t.Errorf("must-use should be ['tool_call'], got %v", mustUse)
+	}
+
+	if len(disabled) != 1 || disabled[0] != "finish" {
+		t.Errorf("disabled should be ['finish'], got %v", disabled)
+	}
+
+	log.Infof("TestInitTaskOperator_CombinedConstraints passed")
+}
+
+// TestInitTaskOperator_OnlyOnce tests that Done/Failed can only be called once
+func TestInitTaskOperator_OnlyOnce(t *testing.T) {
+	// Test Done then Failed - Failed should be ignored
+	operator1 := newInitTaskOperator()
+	operator1.Done()
+	operator1.Failed("this should be ignored")
+
+	if !operator1.IsDone() {
+		t.Error("InitTaskOperator should still be done after trying Failed")
+	}
+	failed, err := operator1.IsFailed()
+	if failed || err != nil {
+		t.Error("Failed should be ignored after Done was called")
+	}
+
+	// Test Failed then Done - Done should be ignored
+	operator2 := newInitTaskOperator()
+	operator2.Failed("test error")
+	operator2.Done()
+
+	failed2, err2 := operator2.IsFailed()
+	if !failed2 || err2 == nil {
+		t.Error("InitTaskOperator should still be failed after trying Done")
+	}
+	if operator2.IsDone() {
+		t.Error("Done should be ignored after Failed was called")
+	}
+
+	log.Infof("TestInitTaskOperator_OnlyOnce passed")
+}
+
+// TestInitTaskOperator_Continue tests explicit Continue() call
+func TestInitTaskOperator_Continue(t *testing.T) {
+	operator := newInitTaskOperator()
+
+	// Explicitly call Continue (should be no-op, just for clarity)
+	operator.Continue()
+
+	// Should still be in continued state
+	if !operator.IsContinued() {
+		t.Error("InitTaskOperator should be continued after Continue()")
+	}
+
+	if operator.IsDone() {
+		t.Error("InitTaskOperator should not be done after Continue()")
+	}
+
+	failed, _ := operator.IsFailed()
+	if failed {
+		t.Error("InitTaskOperator should not be failed after Continue()")
+	}
+
+	log.Infof("TestInitTaskOperator_Continue passed")
+}
+
+// TestWithInitTask_Option tests the WithInitTask option function
+func TestWithInitTask_Option(t *testing.T) {
+	initCalled := false
+	taskFromInit := ""
+
+	opt := WithInitTask(func(loop *ReActLoop, task aicommon.AIStatefulTask, operator *InitTaskOperator) {
+		initCalled = true
+		taskFromInit = task.GetUserInput()
+		operator.Continue()
+	})
+
+	if opt == nil {
+		t.Error("WithInitTask should return a valid option")
+	}
+
+	// Note: We cannot fully test the option without a complete runtime,
+	// but we can verify it returns a non-nil option function
+
+	log.Infof("TestWithInitTask_Option passed (option created successfully)")
+	_ = initCalled
+	_ = taskFromInit
+}

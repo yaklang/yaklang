@@ -89,7 +89,8 @@ type ReActLoop struct {
 	onLoopInstanceCreated func(loop *ReActLoop)
 
 	// 启动这个 loop 的时候马上要执行的事情
-	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error
+	// operator 用于控制 init 后的行为：Done/Failed/Continue/NextAction/RemoveNextAction
+	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask, operator *InitTaskOperator)
 
 	// 自我反思功能开关
 	enableSelfReflection bool
@@ -108,6 +109,12 @@ type ReActLoop struct {
 	// SPIN detection thresholds
 	sameActionTypeSpinThreshold int // 相同任务自旋阈值
 	sameLogicSpinThreshold      int // 相同逻辑自旋阈值
+
+	// Init handler action constraints
+	// These are set by the init handler and cleared after first iteration
+	initActionMustUse   []string // Actions that MUST be used (set by init)
+	initActionDisabled  []string // Actions that are DISABLED (set by init)
+	initActionApplied   bool     // Whether the init constraints have been applied
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {

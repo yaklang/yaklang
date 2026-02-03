@@ -75,8 +75,8 @@ AI 会追踪数据流、分析过滤函数、判断可利用性，最终给出�
 }
 
 // buildInitTask 创建初始化任务
-func buildInitTask(r aicommon.AIInvokeRuntime, state *VerifyState) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime, state *VerifyState) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		log.Infof("[*] VulnVerify loop initialized, waiting for vulnerability context")
 
 		// 解析用户输入，尝试提取漏洞信息
@@ -85,7 +85,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, state *VerifyState) func(loop *re
 			r.AddToTimeline("init", "漏洞验证任务开始，用户输入: "+utils.ShrinkTextBlock(userInput, 200))
 		}
 
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }
 

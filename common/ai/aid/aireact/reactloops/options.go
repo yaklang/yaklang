@@ -283,7 +283,16 @@ func WithOnPostIteraction(fn func(loop *ReActLoop, iteration int, task aicommon.
 	}
 }
 
-func WithInitTask(initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error) ReActLoopOption {
+// WithInitTask sets a callback function that is called when the loop task initializes.
+// The operator parameter allows the callback to control loop behavior:
+//   - operator.Done(): Exit the loop immediately (early routing, init handled everything)
+//   - operator.Failed(err): Exit the loop with an error
+//   - operator.Continue(): Continue with normal loop execution (default)
+//   - operator.NextAction(actions...): Require specific actions for next iteration
+//   - operator.RemoveNextAction(actions...): Disable specific actions for next iteration
+//
+// If nothing is called on operator, it defaults to Continue() behavior.
+func WithInitTask(initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask, operator *InitTaskOperator)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.initHandler = initHandler
 	}

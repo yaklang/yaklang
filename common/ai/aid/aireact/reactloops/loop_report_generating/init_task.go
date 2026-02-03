@@ -72,8 +72,8 @@ func analyzeUserIntent(ctx context.Context, r aicommon.AIInvokeRuntime, userInpu
 }
 
 // buildInitTask creates the initialization task handler for report generating loop
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 		userInput := task.GetUserInput()
 
@@ -160,7 +160,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		if isNewFile {
 			if err := os.WriteFile(outputFilename, []byte(""), 0644); err != nil {
 				log.Errorf("report_generating: failed to create output file: %v", err)
-				return utils.Errorf("cannot create output file: %v", err)
+				operator.Failed(utils.Errorf("cannot create output file: %v", err))
+				return
 			}
 			// 新创建的文件也要 emit artifact
 			emitter.EmitPinFilename(outputFilename)
@@ -214,6 +215,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		log.Infof("report_generating init completed: filename=%s, is_modify=%v, existing_content=%d bytes, references=%d, kbs=%d",
 			outputFilename, isModifyExisting, len(existingContent), len(referenceFiles), len(knowledgeBases))
 
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }

@@ -16,8 +16,8 @@ import (
 )
 
 // buildInitTask creates the initialization task handler with file detection and initial code search
-func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher, ragSearcher *rag.RAGSystem) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher, ragSearcher *rag.RAGSystem) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 
 		// Step 1: 分析用户需求，生成搜索关键字和判断文件路径
@@ -124,7 +124,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		)
 		if err != nil {
 			log.Errorf("failed to invoke liteforge step 1: %v", err)
-			return utils.Errorf("failed to analyze requirement: %v", err)
+			operator.Failed(utils.Errorf("failed to analyze requirement: %v", err))
+			return
 		}
 
 		createNewFile := step1Result.GetBool("create_new_file")
@@ -388,7 +389,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 				// 文件不存在，创建新文件
 				createFileErr := os.WriteFile(targetPath, []byte(""), 0644)
 				if createFileErr != nil {
-					return utils.Errorf("cannot create file to disk, failed: %v", createFileErr)
+					operator.Failed(utils.Errorf("cannot create file to disk, failed: %v", createFileErr))
+					return
 				}
 				filename = targetPath
 			}
@@ -400,13 +402,15 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			}
 			emitter.EmitPinFilename(filename)
 			loop.Set("filename", filename)
-			return nil
+			operator.Continue()
+			return
 		}
 
 		// 如果没有提供 existed 路径，创建新文件（无论 createNewFile 是什么）
 		filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 		emitter.EmitPinFilename(filename)
 		loop.Set("filename", filename)
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }

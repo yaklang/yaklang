@@ -89,8 +89,8 @@ func init() {
 var defaultSecurityKBCollectionName = "security_testing_kb"
 
 // buildInitTask creates the initialization task handler
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 		config := r.GetConfig()
 
@@ -159,7 +159,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		if err != nil {
 			log.Warnf("failed to analyze user requirements: %v", err)
-			return nil
+			operator.Continue()
+			return
 		}
 
 		searchKeywords := result.GetStringSlice("search_keywords")
@@ -217,7 +218,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		log.Infof("http_differ loop initialized successfully")
-		return nil
+		// Default: Continue with normal loop execution
+		operator.Continue()
 	}
 }
 
