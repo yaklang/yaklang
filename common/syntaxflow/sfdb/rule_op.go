@@ -122,7 +122,52 @@ func DeleteRuleByRuleName(name string) error {
 
 func DeleteBuildInRule() error {
 	db := consts.GetGormProfileDatabase()
-	return db.Where("is_build_in_rule = ?", true).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		// 1. 查询所有内置规则
+		var rules []*schema.SyntaxFlowRule
+		if err := tx.Preload("Groups").Where("is_build_in_rule = ?", true).Find(&rules).Error; err != nil {
+			return err
+		}
+
+		// 2. 清除规则与分组的关联
+		for _, r := range rules {
+			if err := tx.Model(r).Association("Groups").Clear().Error; err != nil {
+				return err
+			}
+		}
+
+		// 3. 删除所有内置规则
+		if err := tx.Where("is_build_in_rule = ?", true).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error; err != nil {
+			return err
+		}
+
+		// 4. 清理空的内置分组
+		// 查找所有内置分组中没有关联任何规则的分组
+		var emptyBuiltInGroups []schema.SyntaxFlowGroup
+		if err := tx.Table("syntax_flow_groups").
+			Joins("LEFT JOIN syntax_flow_rule_and_group ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
+			Where("syntax_flow_groups.is_build_in = ? AND syntax_flow_rule_and_group.syntax_flow_group_id IS NULL", true).
+			Find(&emptyBuiltInGroups).Error; err != nil {
+			log.Errorf("查询空内置分组失败: %v", err)
+			// 不中断事务，继续执行
+		} else if len(emptyBuiltInGroups) > 0 {
+			// 删除空的内置分组
+			emptyGroupIDs := make([]uint, len(emptyBuiltInGroups))
+			groupNames := make([]string, len(emptyBuiltInGroups))
+			for i, g := range emptyBuiltInGroups {
+				emptyGroupIDs[i] = g.ID
+				groupNames[i] = g.GroupName
+			}
+			if err := tx.Where("id IN (?)", emptyGroupIDs).Unscoped().Delete(&schema.SyntaxFlowGroup{}).Error; err != nil {
+				log.Errorf("删除空内置分组失败: %v", err)
+				// 不中断事务，继续执行
+			} else {
+				log.Infof("清理了 %d 个空内置分组: %v", len(emptyBuiltInGroups), groupNames)
+			}
+		}
+
+		return nil
+	})
 }
 
 func DeleteRuleByLibName(name string) error {
@@ -139,6 +184,12 @@ func DeleteRuleByTitle(name string) error {
 }
 
 func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	return CreateRuleByContentEx(ruleFileName, content, "", buildIn, tags...)
+}
+
+// CreateRuleByContentEx 创建规则（扩展版本，支持元数据增强）
+// filePath: 规则文件的相对路径，用于元数据增强
+func CreateRuleByContentEx(ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
 	languageRaw, _, _ := strings.Cut(ruleFileName, "-")
 	language, err := ssaconfig.ValidateLanguage(languageRaw)
 	if err != nil {
@@ -198,12 +249,21 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
-	addGroupsForRule(consts.GetGormProfileDatabase(), rule, true)
+	
+	// ⭐ 使用元数据增强器自动生成分组，同时添加默认的语言/严重性/目的分组
+	enrichedGroups := enrichRuleGroups(rule, filePath)
+	addGroupsForRule(consts.GetGormProfileDatabase(), rule, true, enrichedGroups...)
 	return rule, nil
 }
 
 func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	rule, err := CreateRuleByContent(ruleName, content, buildin, tags...)
+	return ImportRuleWithoutValidEx(ruleName, content, "", buildin, tags...)
+}
+
+// ImportRuleWithoutValidEx 导入规则（扩展版本，支持文件路径）
+// filePath: 规则文件的相对路径，用于元数据增强（匹配框架分组）
+func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	rule, err := CreateRuleByContentEx(ruleName, content, filePath, buildin, tags...)
 	if err != nil {
 		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
