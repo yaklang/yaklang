@@ -274,6 +274,7 @@ jobs:
                 {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
                 {"package": "./common/fp/...", "timeout": "60s"},
                 {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
+                {"package": "./common/utils/resources_monitor/...", "timeout": "30s"},
                 {"package": "./common/yak/cmd/...", "timeout": "30s"},
                 {"package": "./common/javaclassparser/tests/...", "timeout": "30s"},
                 {"package": "./common/suricata/...", "timeout": "20s", "run": "TestMUSTPASS"},

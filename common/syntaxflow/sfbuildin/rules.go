@@ -10,23 +10,20 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/resources_monitor"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
+	"github.com/yaklang/yaklang/common/utils/resources_monitor"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-var ruleFSWithHash interface {
-	GetHash() (string, error)
-}
+var ruleFSWithHash resources_monitor.ResourceMonitor
 
 func GetRuleFS() *embed.FS {
-	return getRuleFS().(*embed.FS)
+	return nil
 }
 
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
@@ -138,11 +135,7 @@ func syncEmbedRuleInternal(notifies ...func(process float64, ruleName string)) (
 	// 注意：这需要在 GetRuleFileSystem() 之前调用
 	InitEmbedFSWithNotify(notify)
 
-	// 通过统一的接口获取文件系统实例，具体实现由 gzip_embed.go 或 embed.go 提供
-	// 对于 gzip 版本，这里会触发延迟解压，可能需要一些时间
-	fsInstance := GetRuleFileSystem()
-
-	err = SyncRuleFromFileSystem(fsInstance, true, notifies...)
+	err = SyncRuleFromFileSystem(ruleFSWithHash, true, notifies...)
 
 	return utils.Wrapf(err, "init builtin rules error")
 }

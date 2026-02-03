@@ -53,3 +53,10 @@ gen
 common/xlic/*.gzip
 .go-version
 .gocache
+
+# gzip_embed generated archives (built by scripts/workflows, do not commit)
+common/ai/aid/aitool/buildinaitools/yakscripttools/*.tar.gz
+common/aiforge/*.tar.gz
+common/coreplugin/*.tar.gz
+common/syntaxflow/sfbuildin/*.tar.gz
+common/yso/resources/*.tar.gz
