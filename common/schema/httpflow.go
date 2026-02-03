@@ -31,6 +31,7 @@ type HTTPFlow struct {
 	IsHTTPS            bool   `json:"is_https,omitempty"`
 	Url                string `gorm:"index" json:"url,omitempty"`
 	Path               string `json:"path,omitempty"`
+	PathSuffix         string `gorm:"index" json:"path_suffix,omitempty"`
 	Method             string `json:"method,omitempty"`
 	RequestLength      int64  `json:"request_length,omitempty"`
 	BodyLength         int64  `json:"body_length,omitempty"`

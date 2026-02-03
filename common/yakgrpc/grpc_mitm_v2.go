@@ -1020,7 +1020,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		var extName string
 		u, _ := url.Parse(urlStr)
-		extName = normalizeExtFromEscapedPath(u.EscapedPath())
+		extName = lowhttp.GetPathSuffix(u.EscapedPath())
 
 		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
@@ -1159,7 +1159,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			urlStr = urlRaw.String()
 			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
-			extName = normalizeExtFromEscapedPath(urlRaw.EscapedPath())
+			extName = lowhttp.GetPathSuffix(urlRaw.EscapedPath())
 			if strings.ToUpper(method) == "CONNECT" {
 				urlStr = hostname
 			}

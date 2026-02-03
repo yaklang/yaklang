@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -52,10 +51,6 @@ var (
 	finishHijack hijackStatusCode = 1
 	autoFoward   hijackStatusCode = 2
 )
-
-// CDNPathExtModifierChars CDN/图片服务在 path 扩展名后常加的修饰符（如 a.png!cc_218x300 的 !、.jpg@100w 的 @），
-// 提取“真实扩展名”时需在此类字符处截断，与 normalizeExtFromEscapedPath 等配合使用。
-const CDNPathExtModifierChars = "!@"
 
 var enabledHooks = yak.MITMAndPortScanHooks
 
@@ -103,25 +98,6 @@ var constClujore = func(i interface{}) func() interface{} {
 	return func() interface{} {
 		return i
 	}
-}
-
-// normalizeExtFromEscapedPath 从 path 中提取扩展名，并去掉 CDN/图片服务在扩展名后加的修饰符（如 a.png!cc_218x300 中的 !cc_218x300），只保留真实后缀如 .png
-func normalizeExtFromEscapedPath(escapedPath string) string {
-	ret := path.Ext(escapedPath)
-	if ret == "" {
-		return ""
-	}
-	// 去掉扩展名中的修饰符：如 .png!cc_218x300 -> .png，.jpg@100w -> .jpg
-	if idx := strings.IndexAny(ret, CDNPathExtModifierChars); idx != -1 {
-		ret = ret[:idx]
-	}
-	if ret == "" || ret == "." {
-		return ""
-	}
-	if !strings.HasPrefix(ret, ".") {
-		ret = "." + ret
-	}
-	return ret
 }
 
 func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
@@ -1090,7 +1066,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		var extName string
 		u, _ := url.Parse(urlStr)
-		extName = normalizeExtFromEscapedPath(u.EscapedPath())
+		extName = lowhttp.GetPathSuffix(u.EscapedPath())
 
 		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
@@ -1291,7 +1267,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			urlStr = utils.Url2UnEscapeString(urlRaw)
 			urlPath = urlRaw.EscapedPath()
 			hostname = urlRaw.Host
-			extName = normalizeExtFromEscapedPath(urlRaw.EscapedPath())
+			extName = lowhttp.GetPathSuffix(urlRaw.EscapedPath())
 			if strings.ToUpper(method) == "CONNECT" {
 				urlStr = hostname
 			}
