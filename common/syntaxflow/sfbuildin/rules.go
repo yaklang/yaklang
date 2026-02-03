@@ -47,13 +47,7 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 		return nil
 	}))
 
-	// 第一遍：检查 title 和 title_zh 重复（具体实现由 embed.go 或 gzip_embed.go 提供）
-	err = CheckDuplicateTitles(fsInstance)
-	if err != nil {
-		return err
-	}
-
-	// 第二遍：实际导入规则
+	// 导入规则
 	err = filesys.Recursive(".", filesys.WithFileSystem(fsInstance), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		dirName, name := fsInstance.PathSplit(s)
 		if !strings.HasSuffix(name, ".sf") {

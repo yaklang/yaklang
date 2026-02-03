@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -17,6 +18,11 @@ import (
 
 //go:embed buildin/***
 var ruleFS embed.FS
+
+var (
+	checkOnce sync.Once
+	checkErr  error
+)
 
 // embedFSWithHash 包装 embed.FS 并添加 GetHash 方法
 type embedFSWithHash struct {
@@ -49,18 +55,32 @@ func getRuleFS() interface {
 }
 
 // GetRuleFileSystem 返回规则文件系统实例（非 gzip 版本）
+// 如果重复标题检查失败，会返回一个包装的文件系统，在第一次使用时 panic
 func GetRuleFileSystem() filesys_interface.FileSystem {
+	// 如果检查失败，返回一个包装的文件系统，在第一次使用时 panic
+	if checkErr != nil {
+		panic(checkErr) // 在同步规则前检查失败，应该立即失败
+	}
 	// ruleFSWithHash 在非 gzip 版本中是 embedFSWithHash，其 FileSystem 字段已实现接口
 	return ruleFSWithHash.(*embedFSWithHash).FileSystem
 }
 
 // InitEmbedFSWithNotify 带进度通知的初始化（非 gzip 版本不需要，但保持接口一致）
+// 在这里自动执行重复标题检查
 func InitEmbedFSWithNotify(notify func(process float64, ruleName string)) {
-	// 非 gzip 版本已经在 init() 中初始化完成，无需额外操作
+	// 非 gzip 版本已经在 init() 中初始化完成
+	// 首次调用时自动执行重复标题检查
+	checkOnce.Do(func() {
+		fsInstance := ruleFSWithHash.(*embedFSWithHash).FileSystem
+		checkErr = checkDuplicateTitles(fsInstance)
+		if checkErr != nil {
+			log.Errorf("check duplicate titles failed: %v", checkErr)
+		}
+	})
 }
 
-// CheckDuplicateTitles 检查规则中的 title 和 title_zh 是否重复（仅非 gzip 版本）
-func CheckDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
+// checkDuplicateTitles 检查规则中的 title 和 title_zh 是否重复（仅非 gzip 版本）
+func checkDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
 	// 用于检查 title 和 title_zh 重复
 	titleMap := make(map[string][]string)   // title -> []filePath
 	titleZhMap := make(map[string][]string) // title_zh -> []filePath
@@ -124,4 +144,3 @@ func CheckDuplicateTitles(fsInstance filesys_interface.FileSystem) error {
 
 	return nil
 }
-
