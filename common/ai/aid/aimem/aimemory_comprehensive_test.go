@@ -159,6 +159,13 @@ func (m *AdvancedMockInvoker) DirectlyAnswer(ctx context.Context, query string, 
 	return "", nil
 }
 
+func (m *AdvancedMockInvoker) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
+	if s, ok := i.(string); ok {
+		return s, nil
+	}
+	return "", nil
+}
+
 func (m *AdvancedMockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }

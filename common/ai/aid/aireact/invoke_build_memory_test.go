@@ -515,6 +515,13 @@ func (m *mockInvokerForMemoryTest) DirectlyAnswer(ctx context.Context, query str
 	return "", nil
 }
 
+func (m *mockInvokerForMemoryTest) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
+	if s, ok := i.(string); ok {
+		return s, nil
+	}
+	return "", nil
+}
+
 func (m *mockInvokerForMemoryTest) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }
