@@ -22,10 +22,10 @@ const (
 
 // TestGetIntervalReviewDuration tests the GetIntervalReviewDuration method
 func TestGetIntervalReviewDuration(t *testing.T) {
-	t.Run("default duration is 10 seconds", func(t *testing.T) {
+	t.Run("default duration is 20 seconds", func(t *testing.T) {
 		tc := &ToolCaller{}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*10, duration, "default duration should be 10 seconds")
+		require.Equal(t, time.Second*20, duration, "default duration should be 20 seconds")
 	})
 
 	t.Run("zero duration returns default", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestGetIntervalReviewDuration(t *testing.T) {
 			intervalReviewDuration: 0,
 		}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*10, duration, "zero duration should return default 10 seconds")
+		require.Equal(t, time.Second*20, duration, "zero duration should return default 20 seconds")
 	})
 
 	t.Run("negative duration returns default", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestGetIntervalReviewDuration(t *testing.T) {
 			intervalReviewDuration: -time.Second,
 		}
 		duration := tc.GetIntervalReviewDuration()
-		require.Equal(t, time.Second*10, duration, "negative duration should return default 10 seconds")
+		require.Equal(t, time.Second*20, duration, "negative duration should return default 20 seconds")
 	})
 
 	t.Run("custom duration is preserved", func(t *testing.T) {

@@ -151,7 +151,7 @@ func (r *ReAct) GetIntervalReviewDuration() time.Duration {
 		return 0
 	}
 	if r.config.IntervalReviewDuration <= 0 {
-		return time.Second * 10 // default 10 seconds
+		return time.Second * 20 // default 20 seconds
 	}
 	return r.config.IntervalReviewDuration
 }
