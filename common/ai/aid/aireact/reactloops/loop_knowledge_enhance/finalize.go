@@ -56,7 +56,8 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 	if len(mergedContent) > maxFinalDocBytes {
 		log.Infof("generateFinalKnowledgeDocument: merged content too large (%d bytes), compressing to %d bytes",
 			len(mergedContent), maxFinalDocBytes)
-		mergedContent = compressKnowledgeResultsWithScore(
+		mergedContent = invoker.CompressLongTextWithDestination(
+
 			mergedContent,
 			userQuery,
 			invoker,

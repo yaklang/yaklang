@@ -48,7 +48,7 @@ var searchKnowledgeAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			}
 
 			// 使用 EnhanceKnowledgeGetter 进行知识库搜索
-			enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, query, kbs...)
+			enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, query, nil, kbs...)
 			if err != nil {
 				log.Errorf("search_knowledge: failed to search knowledge base: %v", err)
 				op.Feedback(fmt.Sprintf("Knowledge search failed: %v", err))

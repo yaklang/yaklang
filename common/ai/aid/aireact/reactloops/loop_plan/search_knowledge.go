@@ -38,7 +38,7 @@ var searchKnowledge = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			if task != nil && !utils.IsNil(task.GetContext()) {
 				ctx = task.GetContext()
 			}
-			enhanceData, err := invoker.EnhanceKnowledgeGetter(ctx, input)
+			enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, input, nil)
 			if err != nil {
 				return
 			}
