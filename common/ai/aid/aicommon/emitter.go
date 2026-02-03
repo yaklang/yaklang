@@ -557,6 +557,15 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 		e.contentType = "default"
 	}
 
+	if e.isReason {
+		e.isSystem = false
+		e.nodeId = "re-act-loop-thought"
+	}
+
+	if e.nodeId == "thought" {
+		e.nodeId = "re-act-loop-thought"
+	}
+
 	if e.startTime.IsZero() {
 		e.startTime = time.Now()
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -254,7 +255,14 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
-		stream := rsp.GetOutputStreamReader("call-tools", false, emitter)
+		pr, pw := utils.NewPipe()
+
+		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
+
+		var response bytes.Buffer
+		stream = io.TeeReader(stream, &response)
+
+		var paramNames []string
 
 		// Build action maker options for AITAG support
 		var actionOpts []ActionMakerOption
@@ -262,12 +270,45 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			actionOpts = append(actionOpts, WithActionNonce(promptMeta.Nonce))
 			// Register AITAG handlers for each parameter
 			for _, paramName := range promptMeta.ParamNames {
+				paramNames = append(paramNames, paramName)
 				tagName := fmt.Sprintf("TOOL_PARAM_%s", paramName)
 				// Map the tag to a special key in params that we'll merge later
-				actionOpts = append(actionOpts, WithActionTagToKey(tagName, fmt.Sprintf("__aitag__%s", paramName)))
+				tagParamName := fmt.Sprintf("__aitag__%s", paramName)
+				paramNames = append(paramNames, tagParamName)
+				actionOpts = append(actionOpts, WithActionTagToKey(tagName, tagParamName))
 			}
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
+
+		event, err := emitter.EmitDefaultStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		if err != nil {
+			emitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
+		}
+		_ = event
+
+		pw.WriteString("[开始处理参数] → ")
+
+		start := time.Now()
+		actionOpts = append(
+			actionOpts,
+			WithActionOnReaderFinished(func() {
+				cost := time.Since(start)
+				pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
+				emitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), response.String())
+				pw.Close()
+			}),
+			WithActionFieldStreamHandler(paramNames, func(key string, r io.Reader) {
+				if !strings.HasPrefix(key, "__aitag__") {
+					pw.WriteString(key + ": ")
+					io.Copy(pw, r)
+				} else {
+					actKey := strings.TrimPrefix(key, "__aitag__")
+					pw.WriteString(actKey + "(BLOCK)")
+					io.Copy(pw, r)
+				}
+				pw.WriteString(" → ")
+			}),
+		)
 
 		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool", actionOpts...)
 		if err != nil {

@@ -3,13 +3,14 @@ package aicommon
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 type AIResponseOutputStream struct {

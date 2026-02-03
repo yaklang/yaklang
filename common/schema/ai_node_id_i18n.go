@@ -114,6 +114,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "工具调用",
 		En: "Tool Call",
 	},
+	"generating-tool-call-params": {
+		Zh: "生成工具参数",
+		En: "Generating Params",
+	},
 	"review": {
 		Zh: "审查系统",
 		En: "Review System",

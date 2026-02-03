@@ -1,7 +1,10 @@
 package aireact
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -153,10 +156,50 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	err = aicommon.CallAITransaction(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			stream := rsp.GetOutputStreamReader("call-forge", false, r.config.GetEmitter())
+			emitter := r.config.GetEmitter()
+			stream := rsp.GetOutputStreamReader("call-forge", true, emitter)
+
+			var response bytes.Buffer
+			stream = io.TeeReader(stream, &response)
+
+			pr, pw := utils.NewPipe()
+			event, err := emitter.EmitDefaultStreamEvent(
+				"call-forge",
+				pr, rsp.GetTaskIndex(),
+			)
+
+			pw.WriteString("生成智能应用参数中...")
 			action, err := aicommon.ExtractActionFromStream(
 				r.config.GetContext(),
 				stream, "call-ai-blueprint",
+				aicommon.WithActionOnReaderFinished(func() {
+					if event != nil {
+						streamId := event.GetStreamEventWriterId()
+						if streamId != "" {
+							emitter.EmitTextReferenceMaterial(streamId, response.String())
+						}
+					}
+					pw.Close()
+				}),
+				aicommon.WithActionFieldStreamHandler([]string{
+					"params",
+				}, func(key string, r io.Reader) {
+					jsonextractor.ExtractStructuredJSONFromStream(
+						r,
+						jsonextractor.WithRegisterRegexpFieldStreamHandler(
+							`(?i)\w+`,
+							func(key string, reader io.Reader, parents []string) {
+								key = strings.TrimSpace(key)
+								if strings.ToLower(key) == "query" || strings.ToLower(key) == `"query"` {
+									io.Copy(pw, utils.UTF8Reader(reader))
+									pw.WriteString(" \n")
+								} else {
+									pw.WriteString("" + key + ": ")
+									io.Copy(pw, utils.UTF8Reader(reader))
+									pw.WriteString(" \n")
+								}
+							}))
+				}),
 			)
 			if err != nil {
 				r.AddToTimeline("[BLUEPRINT_PARAM_EXTRACT_FAILED]",
