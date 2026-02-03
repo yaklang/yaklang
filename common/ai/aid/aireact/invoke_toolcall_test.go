@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -1142,4 +1144,184 @@ LOOP:
 	require.Greater(t, startTime, int64(0), "start_time should have been set in cancel case")
 	require.Greater(t, endTime, int64(0), "end_time should have been set in cancel case")
 	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set in cancel case")
+}
+
+func TestReAct_ToolUse_WithToolCallResult_WithBoolParam(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	toolName := "test_bool_param_" + ksuid.New().String()
+
+	// 创建 yak 脚本类型的工具
+	yakTool := &schema.AIYakTool{
+		Name:        toolName,
+		Description: "A test tool that tests bool parameter",
+		Keywords:    "test,bool",
+		Content: `# Test Bool Tool
+yakit.AutoInitYakit()
+
+cli.Bool("enable", cli.setDefault(false), cli.setHelp("enable operation"))
+enableValue = cli.Bool("enable")
+yakit.Info("Enable: %v", enableValue)
+`,
+		Params: `{"type":"object","properties":{"enable":{"type":"boolean","description":"enable operation","default":false}}}`,
+		Path:   "test/bool",
+	}
+
+	tools := yak.YakTool2AITool([]*schema.AIYakTool{yakTool})
+	if len(tools) == 0 {
+		t.Fatal("failed to convert yak tool to aitool")
+	}
+	boolTool := tools[0]
+
+	// 自定义 mocked AI callback 来返回 bool 参数为 false
+	mockedBoolCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		prompt := req.GetPrompt()
+		if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
+`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			rsp := i.NewAIResponse()
+			// 明确设置 enable 参数为 false
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "bool_test", "params": { "enable": false }}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "review the tool call", "approve_tool_call") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "approve_tool_call"}, "human_readable_thought": "approve", "cumulative_summary": "..cumulative-mocked for approve.."}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": { "type": "directly_answer", "directly_answer_payload": "general mocked response" }}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	_, err := NewTestReAct(
+		aicommon.WithAICallback(mockedBoolCallback),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(boolTool),
+		aicommon.WithAgreeYOLO(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 发送输入事件
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "please use " + toolName + " with enable=false",
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+	toolCallResult := false
+	foundBoolOutput := false
+	receivedBoolValue := ""
+	foundYakExecResult := false
+	var callToolID string
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			t.Logf("event: %s", e.String())
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				if callToolID == "" {
+					callToolID = e.CallToolID
+				} else if callToolID != e.CallToolID {
+					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
+				}
+			}
+
+			// 检查 yakit.Info 输出（从 IsStream 事件中）
+			if e.IsStream {
+				content := string(e.GetStreamDelta())
+				if strings.Contains(content, "Enable:") {
+					foundBoolOutput = true
+					// 提取 Enable: 后面的值
+					if strings.Contains(content, "Enable: false") || strings.Contains(content, "Enable:false") {
+						receivedBoolValue = "false"
+						t.Logf("✓ Found yakit.Info output: Enable: false")
+					} else if strings.Contains(content, "Enable: true") || strings.Contains(content, "Enable:true") {
+						receivedBoolValue = "true"
+						t.Logf("Found yakit.Info output: Enable: true")
+					}
+				}
+			}
+
+			// 也检查 yak_exec_result 事件（更可靠的方式）
+			if e.Type == string(schema.EVENT_TYPE_YAKIT_EXEC_RESULT) {
+				foundYakExecResult = true
+				// 解析 yakit 执行结果中的日志
+				var result map[string]interface{}
+				if err := json.Unmarshal(e.Content, &result); err == nil {
+					if msg, ok := result["Message"].(string); ok {
+						// Message 是 base64 编码的
+						if decoded, err := base64.StdEncoding.DecodeString(msg); err == nil {
+							decodedStr := string(decoded)
+							t.Logf("Decoded yak_exec_result message: %s", decodedStr)
+							if strings.Contains(decodedStr, "Enable") && strings.Contains(decodedStr, "false") {
+								foundBoolOutput = true
+								receivedBoolValue = "false"
+								t.Logf("✓ Found bool param in yak_exec_result: Enable: false")
+							}
+						}
+					}
+				}
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_RESULT) {
+				if e.CallToolID != callToolID {
+					t.Fatalf("call tool id mismatch: should only have one callToolID, but got %s and %s", callToolID, e.CallToolID)
+				}
+				toolCallResult = true
+				break LOOP
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+
+	close(in)
+
+	if !toolCallResult {
+		t.Fatal("tool call result not found")
+	}
+
+	// 验证是否找到了 yakit.Info 的输出（通过 stream 或 yak_exec_result）
+	if !foundBoolOutput {
+		if foundYakExecResult {
+			t.Log("Warning: yakit.Info output not found in stream events, but yak_exec_result was present")
+			// 在CI环境下，由于时序问题，可能只能从 yak_exec_result 中检测到
+			// 这是可以接受的
+		} else {
+			t.Fatal("yakit.Info output not found in event stream (neither in stream events nor yak_exec_result)")
+		}
+	}
+
+	// 验证接收到的 enable 值是否为 false
+	if receivedBoolValue != "false" {
+		t.Fatalf("expected enable param to be false, but got: %s", receivedBoolValue)
+	}
+
+	t.Logf("✓ Test passed: enable param correctly received as false in yak script")
 }
