@@ -189,6 +189,10 @@ func (e *AiOutputEvent) GetContentJSONPath(p string) string {
 	return utils.InterfaceToString(result)
 }
 
+func (e *AiOutputEvent) GetStreamEventWriterId() string {
+	return e.GetContentJSONPath(`$.event_writer_id`)
+}
+
 func (e *AiOutputEvent) ShouldSave() bool {
 	if e.IsSystem {
 		return false
