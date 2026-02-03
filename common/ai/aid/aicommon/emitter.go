@@ -339,14 +339,19 @@ func (r *Emitter) EmitToolCallWatcher(toolCallID string, id string, tool *aitool
 	return r.EmitInteractiveJSON(id, schema.EVENT_TYPE_TOOL_CALL_WATCHER, "review-require", reqs)
 }
 
-func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool) (*schema.AiOutputEvent, error) {
-	return r.EmitJSON(schema.EVENT_TOOL_CALL_START, callToolId, map[string]any{
+func (r *Emitter) EmitToolCallStart(callToolId string, tool *aitool.Tool, startTime ...time.Time) (*schema.AiOutputEvent, error) {
+	data := map[string]any{
 		"call_tool_id": callToolId,
 		"tool": map[string]any{
 			"name":        tool.Name,
 			"description": tool.Description,
 		},
-	})
+	}
+	if len(startTime) > 0 && !startTime[0].IsZero() {
+		data["start_time"] = startTime[0].Unix()
+		data["start_time_ms"] = startTime[0].UnixMilli()
+	}
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_START, callToolId, data)
 }
 
 func (r *Emitter) EmitToolCallStatus(callToolId string, status string) (*schema.AiOutputEvent, error) {
@@ -356,23 +361,65 @@ func (r *Emitter) EmitToolCallStatus(callToolId string, status string) (*schema.
 	})
 }
 
-func (r *Emitter) EmitToolCallDone(callToolId string) (*schema.AiOutputEvent, error) {
-	return r.EmitJSON(schema.EVENT_TOOL_CALL_DONE, callToolId, map[string]any{
+func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+	data := map[string]any{
 		"call_tool_id": callToolId,
-	})
+	}
+	if !endTime.IsZero() {
+		data["end_time"] = endTime.Unix()
+		data["end_time_ms"] = endTime.UnixMilli()
+	}
+	if !startTime.IsZero() {
+		data["start_time"] = startTime.Unix()
+		data["start_time_ms"] = startTime.UnixMilli()
+	}
+	if !startTime.IsZero() && !endTime.IsZero() {
+		duration := endTime.Sub(startTime)
+		data["duration_ms"] = duration.Milliseconds()
+		data["duration_seconds"] = duration.Seconds()
+	}
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_DONE, callToolId, data)
 }
 
-func (r *Emitter) EmitToolCallError(callToolId string, err any) (*schema.AiOutputEvent, error) {
-	return r.EmitJSON(schema.EVENT_TOOL_CALL_ERROR, callToolId, map[string]any{
+func (r *Emitter) EmitToolCallError(callToolId string, err any, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+	data := map[string]any{
 		"call_tool_id": callToolId,
 		"error":        fmt.Sprintf("%v", err),
-	})
+	}
+	if !endTime.IsZero() {
+		data["end_time"] = endTime.Unix()
+		data["end_time_ms"] = endTime.UnixMilli()
+	}
+	if !startTime.IsZero() {
+		data["start_time"] = startTime.Unix()
+		data["start_time_ms"] = startTime.UnixMilli()
+	}
+	if !startTime.IsZero() && !endTime.IsZero() {
+		duration := endTime.Sub(startTime)
+		data["duration_ms"] = duration.Milliseconds()
+		data["duration_seconds"] = duration.Seconds()
+	}
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_ERROR, callToolId, data)
 }
 
-func (r *Emitter) EmitToolCallUserCancel(callToolId string) (*schema.AiOutputEvent, error) {
-	return r.EmitJSON(schema.EVENT_TOOL_CALL_USER_CANCEL, callToolId, map[string]any{
+func (r *Emitter) EmitToolCallUserCancel(callToolId string, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+	data := map[string]any{
 		"call_tool_id": callToolId,
-	})
+	}
+	if !endTime.IsZero() {
+		data["end_time"] = endTime.Unix()
+		data["end_time_ms"] = endTime.UnixMilli()
+	}
+	if !startTime.IsZero() {
+		data["start_time"] = startTime.Unix()
+		data["start_time_ms"] = startTime.UnixMilli()
+	}
+	if !startTime.IsZero() && !endTime.IsZero() {
+		duration := endTime.Sub(startTime)
+		data["duration_ms"] = duration.Milliseconds()
+		data["duration_seconds"] = duration.Seconds()
+	}
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_USER_CANCEL, callToolId, data)
 }
 
 func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) (*schema.AiOutputEvent, error) {

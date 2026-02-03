@@ -30,6 +30,7 @@ type ToolCaller struct {
 	start      *sync.Once
 	done       *sync.Once
 	callToolId string
+	startTime  time.Time // Track tool call start time
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -396,10 +397,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	t.start.Do(func() {
 		t.m.Lock()
 		defer t.m.Unlock()
+		t.startTime = time.Now() // Record start time
 		if t.onCallToolStart != nil {
 			t.onCallToolStart(callToolId)
 		}
-		t.emitter.EmitToolCallStart(callToolId, tool) // should emit after call tool start callback , this call will bind call tool id for emitter
+		t.emitter.EmitToolCallStart(callToolId, tool, t.startTime) // should emit after call tool start callback , this call will bind call tool id for emitter
 	})
 
 	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
@@ -407,8 +409,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.done.Do(func() {
 			t.m.Lock()
 			defer t.m.Unlock()
+			endTime := time.Now() // Record end time
 			t.emitter.EmitToolCallStatus(t.callToolId, "done")
-			t.emitter.EmitToolCallDone(callToolId)
+			t.emitter.EmitToolCallDone(callToolId, endTime, t.startTime)
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
 			}
@@ -417,10 +420,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	handleUserCancel := func(reason any) {
 		t.done.Do(func() {
-			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
-			t.emitter.EmitToolCallUserCancel(callToolId)
 			t.m.Lock()
 			defer t.m.Unlock()
+			endTime := time.Now() // Record end time
+			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
+			t.emitter.EmitToolCallUserCancel(callToolId, endTime, t.startTime)
 
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
@@ -430,9 +434,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	handleError := func(err any) {
 		t.done.Do(func() {
-			t.emitter.EmitToolCallError(callToolId, err)
 			t.m.Lock()
 			defer t.m.Unlock()
+			endTime := time.Now() // Record end time
+			t.emitter.EmitToolCallError(callToolId, err, endTime, t.startTime)
 
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
