@@ -390,6 +390,13 @@ func (r *testRuntime) DirectlyAnswer(ctx context.Context, query string, tools []
 	return "", nil
 }
 
+func (r *testRuntime) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
+	if s, ok := i.(string); ok {
+		return s, nil
+	}
+	return "", nil
+}
+
 func (r *testRuntime) EnhanceKnowledgeAnswer(ctx context.Context, query string) (string, error) {
 	return "", nil
 }
