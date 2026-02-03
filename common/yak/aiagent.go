@@ -69,7 +69,15 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 
 				var args []string
 				for k, v := range params {
-					args = append(args, "--"+k, fmt.Sprint(v))
+					switch ret := v.(type) {
+					case bool:
+						if ret {
+							args = append(args, "--"+k)
+						}
+					default:
+						args = append(args, "--"+k, fmt.Sprint(ret))
+					}
+
 				}
 				cliApp := GetHookCliApp(args)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
