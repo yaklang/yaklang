@@ -51,24 +51,41 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			ctx = task.GetContext()
 		}
 
+		// Step 1: Get enhanced knowledge data
 		enhancedAnswer, err := invoker.EnhanceKnowledgeGetterEx(ctx, rewriteQuery, nil)
 		if err != nil {
 			op.Fail(err.Error())
 			return
 		}
 
+		// Step 2: Compress if needed
 		result, err := invoker.CompressLongTextWithDestination(ctx, enhancedAnswer, rewriteQuery, 10*1024) // Compress to 10KB
 		if err != nil {
 			op.Fail(err.Error())
 			return
 		}
-
 		enhancedAnswer = result
+
+		// Step 3: Add enhanced knowledge to timeline for DirectlyAnswer prompt
+		invoker.AddToTimeline("enhanced_knowledge_content", enhancedAnswer)
+
+		// Step 4: Call DirectlyAnswer to emit result BEFORE verify (like the old EnhanceKnowledgeAnswer did)
+		// This is the key difference: DirectlyAnswer is called first, then verify checks if satisfied
+		directlyAnswerResult, err := invoker.DirectlyAnswer(ctx, rewriteQuery, nil)
+		if err != nil {
+			log.Warnf("DirectlyAnswer failed after knowledge enhancement: %v", err)
+			// Fallback: emit the enhanced answer directly
+			invoker.EmitFileArtifactWithExt("directly_answer", ".md", enhancedAnswer)
+			invoker.EmitResultAfterStream(enhancedAnswer)
+			directlyAnswerResult = enhancedAnswer
+		}
+
+		// Step 5: Verify user satisfaction with the directly answer result
 		verifyResult, err := invoker.VerifyUserSatisfaction(
 			ctx,
 			rewriteQuery,
 			false,
-			enhancedAnswer,
+			directlyAnswerResult,
 		)
 		if err != nil {
 			op.Fail(utils.Wrap(err, "knowledge_enhance action enhanced knowledge answer"))
@@ -77,8 +94,6 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements)
 
 		if verifyResult.Satisfied {
-			// Only emit result once - EnhanceKnowledgeAnswer has already handled the stream output
-			// Just add a status message to timeline instead of duplicate emit
 			invoker.AddToTimeline("knowledge_enhance_satisfied", `** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)
 			op.Exit()
 			return
