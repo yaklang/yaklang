@@ -55,8 +55,9 @@ type LiteForge struct {
 	OutputActionName string
 	ExtendAIDOptions []aicommon.ConfigOption
 
-	streamFields *omap.OrderedMap[string, *streamableField]
-	emitter      *aicommon.Emitter
+	streamFields         *omap.OrderedMap[string, *streamableField]
+	fieldStreamCallbacks []*fieldStreamCallbackItem // user-defined callbacks for streaming fields
+	emitter              *aicommon.Emitter
 
 	OutputJsonHook []jsonextractor.CallbackOption
 }
@@ -80,6 +81,30 @@ func WithLiteForge_StreamableFieldWithAINodeId(aiNodeId string, fieldKey string)
 
 func WithLiteForge_StreamableField(fieldKey string) LiteForgeOption {
 	return WithLiteForge_StreamableFieldWithAINodeId("thought", fieldKey)
+}
+
+// FieldStreamCallback is a callback for handling streaming field data
+type FieldStreamCallback func(key string, r io.Reader)
+
+// fieldStreamCallbackItem stores callback info for streaming fields
+type fieldStreamCallbackItem struct {
+	FieldKeys []string
+	Callback  FieldStreamCallback
+}
+
+// WithLiteForge_FieldStreamCallback registers a callback to be invoked when specified fields stream data.
+// This enables extensibility for processing streaming JSON field data in real-time during LiteForge execution.
+func WithLiteForge_FieldStreamCallback(fieldKeys []string, callback FieldStreamCallback) LiteForgeOption {
+	return func(l *LiteForge) error {
+		if l.fieldStreamCallbacks == nil {
+			l.fieldStreamCallbacks = make([]*fieldStreamCallbackItem, 0)
+		}
+		l.fieldStreamCallbacks = append(l.fieldStreamCallbacks, &fieldStreamCallbackItem{
+			FieldKeys: fieldKeys,
+			Callback:  callback,
+		})
+		return nil
+	}
 }
 
 type LiteForgeOption func(*LiteForge) error
@@ -276,6 +301,12 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 					})
 					l.emitter.EmitDefaultStreamEvent(i.AINodeId, r, response.GetTaskIndex())
 				}))
+			}
+
+			// add user-defined field stream callbacks
+			for _, item := range l.fieldStreamCallbacks {
+				item := item
+				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler(item.FieldKeys, item.Callback))
 			}
 
 			actionNames := []string{}

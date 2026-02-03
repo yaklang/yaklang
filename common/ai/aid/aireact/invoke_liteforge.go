@@ -28,6 +28,10 @@ func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt s
 	for _, i := range gconfig.GetStreamableFields() {
 		fopts = append(fopts, aiforge.WithLiteForge_StreamableFieldWithAINodeId(i.AINodeId(), i.FieldKey()))
 	}
+	// add user-defined field stream callbacks from GeneralKVConfig
+	for _, item := range gconfig.GetStreamableFieldCallbacks() {
+		fopts = append(fopts, aiforge.WithLiteForge_FieldStreamCallback(item.FieldKeys, aiforge.FieldStreamCallback(item.Callback)))
+	}
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
 	f, err := aiforge.NewLiteForge(actionName, fopts...)

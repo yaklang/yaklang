@@ -56,3 +56,16 @@ func (g *GeneralKVConfig) GetStreamableFields() []interface {
 	}
 	return res
 }
+
+// GetStreamableFieldCallbacks returns all registered streaming field callback items
+func (g *GeneralKVConfig) GetStreamableFieldCallbacks() []*StreamableFieldCallbackItem {
+	result, ok := g.config.Get("streamFieldCallbacks")
+	if !ok {
+		return nil
+	}
+	callbacks, ok := result.([]*StreamableFieldCallbackItem)
+	if !ok {
+		return nil
+	}
+	return callbacks
+}

@@ -225,6 +225,14 @@ func (m *MockInvoker) DirectlyAnswer(ctx context.Context, query string, tools []
 	return "", nil
 }
 
+func (m *MockInvoker) CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error) {
+	// Mock implementation - return the input as-is if it's a string, otherwise return empty
+	if s, ok := i.(string); ok {
+		return s, nil
+	}
+	return "", nil
+}
+
 func (m *MockInvoker) EnhanceKnowledgeAnswer(ctx context.Context, s string) (string, error) {
 	return "", nil
 }

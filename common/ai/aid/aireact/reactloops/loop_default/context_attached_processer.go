@@ -27,6 +27,19 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 		opts = append(opts, option)
 	}
 
+	haveKnowledgeBase := false
+	attachedResult := task.GetAttachedDatas()
+	for _, data := range attachedResult {
+		if data.Type == aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE {
+			haveKnowledgeBase = true
+			break
+		}
+	}
+
+	if !haveKnowledgeBase {
+		return nil
+	}
+
 	var knowledgeEnhanceLoop *reactloops.ReActLoop
 	opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
 		knowledgeEnhanceLoop = loop
