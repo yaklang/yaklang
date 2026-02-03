@@ -2,12 +2,14 @@ package sfdb
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 var buildInGroupsMap map[string]struct{}
@@ -82,8 +84,14 @@ func GetOrCreateGroups(db *gorm.DB, groupNames []string) []*schema.SyntaxFlowGro
 }
 
 func isBuildInGroup(groupName string) bool {
+	// 首先检查旧的 buildInGroupsMap（向后兼容）
 	_, ok := buildInGroupsMap[groupName]
-	return ok
+	if ok {
+		return true
+	}
+	
+	// 使用 YAML 配置中定义的标准组名
+	return ssaconfig.IsStandardGroupName(groupName)
 }
 
 // QueryGroupByName 根据组名查询组

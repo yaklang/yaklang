@@ -1,0 +1,389 @@
+# SAST 规则标准映射配置
+# 用于将 CWE 编号映射到行业标准分类（OWASP Top 10 等）
+# 以及定义框架/组件特定的规则分组
+
+version: "1.0"
+updated_at: "2026-01-29"
+
+# ==================== CWE 到 OWASP Top 10 的映射 ====================
+# 基于 OWASP 官方映射关系：https://owasp.org/www-project-top-ten/
+
+cwe_to_owasp_2021:
+  # A01:2021 - Broken Access Control (访问控制失效)
+  "CWE-22":  ["OWASP 2021 A01:Broken Access Control"]  # Path Traversal
+  "CWE-23":  ["OWASP 2021 A01:Broken Access Control"]  # Relative Path Traversal
+  "CWE-35":  ["OWASP 2021 A01:Broken Access Control"]  # Path Traversal: '.../...//'
+  "CWE-59":  ["OWASP 2021 A01:Broken Access Control"]  # Link Following
+  "CWE-200": ["OWASP 2021 A01:Broken Access Control"]  # Information Exposure
+  "CWE-201": ["OWASP 2021 A01:Broken Access Control"]  # Information Exposure Through Sent Data
+  "CWE-219": ["OWASP 2021 A01:Broken Access Control"]  # Sensitive Data Storage in Publicly Accessible Directory
+  "CWE-264": ["OWASP 2021 A01:Broken Access Control"]  # Permissions, Privileges, and Access Controls
+  "CWE-275": ["OWASP 2021 A01:Broken Access Control"]  # Permission Issues
+  "CWE-276": ["OWASP 2021 A01:Broken Access Control"]  # Incorrect Default Permissions
+  "CWE-284": ["OWASP 2021 A01:Broken Access Control"]  # Improper Access Control
+  "CWE-285": ["OWASP 2021 A01:Broken Access Control"]  # Improper Authorization
+  "CWE-352": ["OWASP 2021 A01:Broken Access Control"]  # CSRF
+  "CWE-377": ["OWASP 2021 A01:Broken Access Control"]  # Insecure Temporary File
+  "CWE-379": ["OWASP 2021 A01:Broken Access Control"]  # Creation of Temporary File in Directory with Insecure Permissions
+  "CWE-425": ["OWASP 2021 A01:Broken Access Control"]  # Direct Request ('Forced Browsing')
+  "CWE-441": ["OWASP 2021 A01:Broken Access Control"]  # Unintended Proxy or Intermediary
+  "CWE-497": ["OWASP 2021 A01:Broken Access Control"]  # Exposure of System Data to an Unauthorized Control Sphere
+  "CWE-538": ["OWASP 2021 A01:Broken Access Control"]  # File and Directory Information Exposure
+  "CWE-540": ["OWASP 2021 A01:Broken Access Control"]  # Information Exposure Through Source Code
+  "CWE-548": ["OWASP 2021 A01:Broken Access Control"]  # Information Exposure Through Directory Listing
+  "CWE-552": ["OWASP 2021 A01:Broken Access Control"]  # Files or Directories Accessible to External Parties
+  "CWE-566": ["OWASP 2021 A01:Broken Access Control"]  # Authorization Bypass Through User-Controlled SQL Primary Key
+  "CWE-601": ["OWASP 2021 A01:Broken Access Control"]  # Open Redirect
+  "CWE-639": ["OWASP 2021 A01:Broken Access Control"]  # Authorization Bypass Through User-Controlled Key
+  "CWE-651": ["OWASP 2021 A01:Broken Access Control"]  # Information Exposure Through WSDL File
+  "CWE-668": ["OWASP 2021 A01:Broken Access Control"]  # Exposure of Resource to Wrong Sphere
+  "CWE-706": ["OWASP 2021 A01:Broken Access Control"]  # Use of Incorrectly-Resolved Name or Reference
+  "CWE-862": ["OWASP 2021 A01:Broken Access Control"]  # Missing Authorization
+  "CWE-863": ["OWASP 2021 A01:Broken Access Control"]  # Incorrect Authorization
+  "CWE-913": ["OWASP 2021 A01:Broken Access Control"]  # Improper Control of Dynamically-Managed Code Resources
+  "CWE-922": ["OWASP 2021 A01:Broken Access Control"]  # Insecure Storage of Sensitive Information
+  "CWE-1275": ["OWASP 2021 A01:Broken Access Control"] # Sensitive Cookie with Improper SameSite Attribute
+
+  # A02:2021 - Cryptographic Failures (加密机制失效)
+  "CWE-259": ["OWASP 2021 A02:Cryptographic Failures"]  # Hard-coded Password
+  "CWE-261": ["OWASP 2021 A02:Cryptographic Failures"]  # Weak Cryptography for Passwords
+  "CWE-296": ["OWASP 2021 A02:Cryptographic Failures"]  # Improper Following of Chain of Trust for Certificate Validation
+  "CWE-310": ["OWASP 2021 A02:Cryptographic Failures"]  # Cryptographic Issues
+  "CWE-319": ["OWASP 2021 A02:Cryptographic Failures"]  # Cleartext Transmission of Sensitive Information
+  "CWE-321": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of Hard-coded Cryptographic Key
+  "CWE-322": ["OWASP 2021 A02:Cryptographic Failures"]  # Key Exchange without Entity Authentication
+  "CWE-323": ["OWASP 2021 A02:Cryptographic Failures"]  # Reusing a Nonce, Key Pair in Encryption
+  "CWE-324": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of a Key Past its Expiration Date
+  "CWE-325": ["OWASP 2021 A02:Cryptographic Failures"]  # Missing Required Cryptographic Step
+  "CWE-326": ["OWASP 2021 A02:Cryptographic Failures"]  # Inadequate Encryption Strength
+  "CWE-327": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of a Broken or Risky Cryptographic Algorithm
+  "CWE-328": ["OWASP 2021 A02:Cryptographic Failures"]  # Reversible One-Way Hash
+  "CWE-329": ["OWASP 2021 A02:Cryptographic Failures"]  # Not Using a Random IV with CBC Mode
+  "CWE-330": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of Insufficiently Random Values
+  "CWE-331": ["OWASP 2021 A02:Cryptographic Failures"]  # Insufficient Entropy
+  "CWE-335": ["OWASP 2021 A02:Cryptographic Failures"]  # PRNG Seed Error
+  "CWE-336": ["OWASP 2021 A02:Cryptographic Failures"]  # Same Seed in PRNG
+  "CWE-337": ["OWASP 2021 A02:Cryptographic Failures"]  # Predictable Seed in PRNG
+  "CWE-338": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of Cryptographically Weak PRNG
+  "CWE-340": ["OWASP 2021 A02:Cryptographic Failures"]  # Predictability Issues
+  "CWE-347": ["OWASP 2021 A02:Cryptographic Failures"]  # Improper Verification of Cryptographic Signature
+  "CWE-523": ["OWASP 2021 A02:Cryptographic Failures"]  # Unprotected Transport of Credentials
+  "CWE-720": ["OWASP 2021 A02:Cryptographic Failures"]  # OWASP Top Ten 2007 Category A9 - Insecure Communications
+  "CWE-757": ["OWASP 2021 A02:Cryptographic Failures"]  # Selection of Less-Secure Algorithm During Negotiation
+  "CWE-759": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of a One-Way Hash without a Salt
+  "CWE-760": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of a One-Way Hash with a Predictable Salt
+  "CWE-780": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of RSA Algorithm without OAEP
+  "CWE-818": ["OWASP 2021 A02:Cryptographic Failures"]  # Insufficient Transport Layer Protection
+  "CWE-916": ["OWASP 2021 A02:Cryptographic Failures"]  # Use of Password Hash With Insufficient Computational Effort
+
+  # A03:2021 - Injection (注入)
+  "CWE-20":  ["OWASP 2021 A03:Injection"]  # Improper Input Validation
+  "CWE-74":  ["OWASP 2021 A03:Injection"]  # Improper Neutralization of Special Elements
+  "CWE-75":  ["OWASP 2021 A03:Injection"]  # Failure to Sanitize Special Elements into a Different Plane
+  "CWE-77":  ["OWASP 2021 A03:Injection"]  # Command Injection
+  "CWE-78":  ["OWASP 2021 A03:Injection"]  # OS Command Injection
+  "CWE-79":  ["OWASP 2021 A03:Injection"]  # XSS
+  "CWE-80":  ["OWASP 2021 A03:Injection"]  # Basic XSS
+  "CWE-83":  ["OWASP 2021 A03:Injection"]  # XSS in Attributes
+  "CWE-87":  ["OWASP 2021 A03:Injection"]  # Improper Neutralization of Alternate XSS Syntax
+  "CWE-88":  ["OWASP 2021 A03:Injection"]  # Argument Injection
+  "CWE-89":  ["OWASP 2021 A03:Injection"]  # SQL Injection
+  "CWE-90":  ["OWASP 2021 A03:Injection"]  # LDAP Injection
+  "CWE-91":  ["OWASP 2021 A03:Injection"]  # XML Injection
+  "CWE-93":  ["OWASP 2021 A03:Injection"]  # CRLF Injection
+  "CWE-94":  ["OWASP 2021 A03:Injection"]  # Code Injection
+  "CWE-95":  ["OWASP 2021 A03:Injection"]  # Eval Injection
+  "CWE-96":  ["OWASP 2021 A03:Injection"]  # Stored XSS
+  "CWE-97":  ["OWASP 2021 A03:Injection"]  # Server-Side Includes (SSI) Injection
+  "CWE-98":  ["OWASP 2021 A03:Injection"]  # PHP File Inclusion
+  "CWE-99":  ["OWASP 2021 A03:Injection"]  # Resource Injection
+  "CWE-100": ["OWASP 2021 A03:Injection"]  # Deprecated: Technology-Specific Input Validation Problems
+  "CWE-113": ["OWASP 2021 A03:Injection"]  # HTTP Response Splitting
+  "CWE-116": ["OWASP 2021 A03:Injection"]  # Improper Encoding or Escaping of Output
+  "CWE-138": ["OWASP 2021 A03:Injection"]  # Improper Neutralization of Special Elements
+  "CWE-184": ["OWASP 2021 A03:Injection"]  # Incomplete Blacklist
+  "CWE-470": ["OWASP 2021 A03:Injection"]  # Use of Externally-Controlled Input to Select Classes or Code
+  "CWE-471": ["OWASP 2021 A03:Injection"]  # Modification of Assumed-Immutable Data
+  "CWE-564": ["OWASP 2021 A03:Injection"]  # SQL Injection: Hibernate
+  "CWE-610": ["OWASP 2021 A03:Injection"]  # Externally Controlled Reference to a Resource in Another Sphere
+  "CWE-643": ["OWASP 2021 A03:Injection"]  # XPath Injection
+  "CWE-644": ["OWASP 2021 A03:Injection"]  # HTTP Header Injection
+  "CWE-652": ["OWASP 2021 A03:Injection"]  # XQuery Injection
+  "CWE-917": ["OWASP 2021 A03:Injection"]  # Expression Language Injection
+  "CWE-1236": ["OWASP 2021 A03:Injection"] # CSV Injection
+
+  # A04:2021 - Insecure Design (不安全设计)
+  "CWE-73":  ["OWASP 2021 A04:Insecure Design"]  # External Control of File Name or Path
+  "CWE-183": ["OWASP 2021 A04:Insecure Design"]  # Permissive Whitelist
+  "CWE-209": ["OWASP 2021 A04:Insecure Design"]  # Information Exposure Through an Error Message
+  "CWE-213": ["OWASP 2021 A04:Insecure Design"]  # Intentional Information Exposure
+  "CWE-235": ["OWASP 2021 A04:Insecure Design"]  # Improper Handling of Extra Parameters
+  "CWE-256": ["OWASP 2021 A04:Insecure Design"]  # Unprotected Storage of Credentials
+  "CWE-257": ["OWASP 2021 A04:Insecure Design"]  # Storing Passwords in a Recoverable Format
+  "CWE-266": ["OWASP 2021 A04:Insecure Design"]  # Incorrect Privilege Assignment
+  "CWE-269": ["OWASP 2021 A04:Insecure Design"]  # Improper Privilege Management
+  "CWE-280": ["OWASP 2021 A04:Insecure Design"]  # Improper Handling of Insufficient Permissions
+  "CWE-311": ["OWASP 2021 A04:Insecure Design"]  # Missing Encryption of Sensitive Data
+  "CWE-312": ["OWASP 2021 A04:Insecure Design"]  # Cleartext Storage of Sensitive Information
+  "CWE-313": ["OWASP 2021 A04:Insecure Design"]  # Cleartext Storage in a File or on Disk
+  "CWE-316": ["OWASP 2021 A04:Insecure Design"]  # Cleartext Storage of Sensitive Information in Memory
+  "CWE-419": ["OWASP 2021 A04:Insecure Design"]  # Unprotected Primary Channel
+  "CWE-430": ["OWASP 2021 A04:Insecure Design"]  # Deployment of Wrong Handler
+  "CWE-434": ["OWASP 2021 A04:Insecure Design"]  # Unrestricted Upload of File with Dangerous Type
+  "CWE-444": ["OWASP 2021 A04:Insecure Design"]  # HTTP Request Smuggling
+  "CWE-451": ["OWASP 2021 A04:Insecure Design"]  # User Interface (UI) Misrepresentation of Critical Information
+  "CWE-472": ["OWASP 2021 A04:Insecure Design"]  # External Control of Assumed-Immutable Web Parameter
+  "CWE-501": ["OWASP 2021 A04:Insecure Design"]  # Trust Boundary Violation
+  "CWE-522": ["OWASP 2021 A04:Insecure Design"]  # Insufficiently Protected Credentials
+  "CWE-525": ["OWASP 2021 A04:Insecure Design"]  # Information Exposure Through Browser Caching
+  "CWE-539": ["OWASP 2021 A04:Insecure Design"]  # Information Exposure Through Persistent Cookies
+  "CWE-579": ["OWASP 2021 A04:Insecure Design"]  # J2EE Bad Practices: Non-serializable Object Stored in Session
+  "CWE-598": ["OWASP 2021 A04:Insecure Design"]  # Information Exposure Through Query Strings in GET Request
+  "CWE-602": ["OWASP 2021 A04:Insecure Design"]  # Client-Side Enforcement of Server-Side Security
+  "CWE-642": ["OWASP 2021 A04:Insecure Design"]  # External Control of Critical State Data
+  "CWE-646": ["OWASP 2021 A04:Insecure Design"]  # Reliance on File Name or Extension of Externally-Supplied File
+  "CWE-650": ["OWASP 2021 A04:Insecure Design"]  # Trusting HTTP Permission Methods on the Server Side
+  "CWE-653": ["OWASP 2021 A04:Insecure Design"]  # Insufficient Compartmentalization
+  "CWE-656": ["OWASP 2021 A04:Insecure Design"]  # Reliance on Security Through Obscurity
+  "CWE-657": ["OWASP 2021 A04:Insecure Design"]  # Violation of Secure Design Principles
+  "CWE-799": ["OWASP 2021 A04:Insecure Design"]  # Improper Control of Interaction Frequency
+  "CWE-807": ["OWASP 2021 A04:Insecure Design"]  # Reliance on Untrusted Inputs in a Security Decision
+  "CWE-840": ["OWASP 2021 A04:Insecure Design"]  # Business Logic Errors
+  "CWE-841": ["OWASP 2021 A04:Insecure Design"]  # Improper Enforcement of Behavioral Workflow
+  "CWE-927": ["OWASP 2021 A04:Insecure Design"]  # Use of Implicit Intent for Sensitive Communication
+  "CWE-1021": ["OWASP 2021 A04:Insecure Design"] # Improper Restriction of Rendered UI Layers or Frames
+  "CWE-1173": ["OWASP 2021 A04:Insecure Design"] # Improper Use of Validation Framework
+
+  # A05:2021 - Security Misconfiguration (安全配置错误)
+  "CWE-2":   ["OWASP 2021 A05:Security Misconfiguration"]  # 7PK - Environment
+  "CWE-11":  ["OWASP 2021 A05:Security Misconfiguration"]  # ASP.NET Misconfiguration: Creating Debug Binary
+  "CWE-13":  ["OWASP 2021 A05:Security Misconfiguration"]  # ASP.NET Misconfiguration: Password in Configuration File
+  "CWE-15":  ["OWASP 2021 A05:Security Misconfiguration"]  # External Control of System or Configuration Setting
+  "CWE-16":  ["OWASP 2021 A05:Security Misconfiguration"]  # Configuration
+  "CWE-260": ["OWASP 2021 A05:Security Misconfiguration"]  # Password in Configuration File
+  "CWE-315": ["OWASP 2021 A05:Security Misconfiguration"]  # Cleartext Storage of Sensitive Information in a Cookie
+  "CWE-520": ["OWASP 2021 A05:Security Misconfiguration"]  # .NET Misconfiguration: Use of Impersonation
+  "CWE-526": ["OWASP 2021 A05:Security Misconfiguration"]  # Information Exposure Through Environment Variables
+  "CWE-537": ["OWASP 2021 A05:Security Misconfiguration"]  # Information Exposure Through Java Runtime Error Message
+  "CWE-541": ["OWASP 2021 A05:Security Misconfiguration"]  # Information Exposure Through Include Source Code
+  "CWE-547": ["OWASP 2021 A05:Security Misconfiguration"]  # Use of Hard-coded, Security-relevant Constants
+  "CWE-611": ["OWASP 2021 A05:Security Misconfiguration"]  # XXE
+  "CWE-614": ["OWASP 2021 A05:Security Misconfiguration"]  # Sensitive Cookie in HTTPS Session Without 'Secure' Attribute
+  "CWE-756": ["OWASP 2021 A05:Security Misconfiguration"]  # Missing Custom Error Page
+  "CWE-776": ["OWASP 2021 A05:Security Misconfiguration"]  # Improper Restriction of Recursive Entity References in DTDs ('XML Bomb')
+  "CWE-942": ["OWASP 2021 A05:Security Misconfiguration"]  # Overly Permissive Cross-domain Whitelist
+  "CWE-1004": ["OWASP 2021 A05:Security Misconfiguration"] # Sensitive Cookie Without 'HttpOnly' Flag
+  "CWE-1032": ["OWASP 2021 A05:Security Misconfiguration"] # OWASP Top Ten 2017 Category A6 - Security Misconfiguration
+  "CWE-1174": ["OWASP 2021 A05:Security Misconfiguration"] # ASP.NET Misconfiguration: Improper Model Validation
+
+  # A06:2021 - Vulnerable and Outdated Components (易受攻击和过时的组件)
+  "CWE-937": ["OWASP 2021 A06:Vulnerable and Outdated Components"]  # OWASP Top Ten 2013 Category A9 - Using Components with Known Vulnerabilities
+  "CWE-1035": ["OWASP 2021 A06:Vulnerable and Outdated Components"] # OWASP Top Ten 2017 Category A9 - Using Components with Known Vulnerabilities
+  "CWE-1104": ["OWASP 2021 A06:Vulnerable and Outdated Components"] # Use of Unmaintained Third Party Components
+
+  # A07:2021 - Identification and Authentication Failures (身份识别与认证失效)
+  "CWE-287": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Improper Authentication
+  "CWE-288": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Authentication Bypass Using an Alternate Path or Channel
+  "CWE-290": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Authentication Bypass by Spoofing
+  "CWE-294": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Authentication Bypass by Capture-replay
+  "CWE-295": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Improper Certificate Validation
+  "CWE-297": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Improper Validation of Certificate with Host Mismatch
+  "CWE-300": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Channel Accessible by Non-Endpoint
+  "CWE-302": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Authentication Bypass by Assumed-Immutable Data
+  "CWE-304": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Missing Critical Step in Authentication
+  "CWE-306": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Missing Authentication for Critical Function
+  "CWE-307": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Improper Restriction of Excessive Authentication Attempts
+  "CWE-346": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Origin Validation Error
+  "CWE-384": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Session Fixation
+  "CWE-521": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Weak Password Requirements
+  "CWE-613": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Insufficient Session Expiration
+  "CWE-620": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Unverified Password Change
+  "CWE-640": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Weak Password Recovery Mechanism for Forgotten Password
+  "CWE-798": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Use of Hard-coded Credentials
+  "CWE-940": ["OWASP 2021 A07:Identification and Authentication Failures"]  # Improper Verification of Source of a Communication Channel
+  "CWE-1216": ["OWASP 2021 A07:Identification and Authentication Failures"] # Lockout Mechanism Errors
+
+  # A08:2021 - Software and Data Integrity Failures (软件和数据完整性失效)
+  "CWE-345": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Insufficient Verification of Data Authenticity
+  "CWE-353": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Missing Support for Integrity Check
+  "CWE-426": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Untrusted Search Path
+  "CWE-494": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Download of Code Without Integrity Check
+  "CWE-502": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Deserialization of Untrusted Data
+  "CWE-565": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Reliance on Cookies without Validation and Integrity Checking
+  "CWE-784": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Reliance on Cookies without Validation and Integrity Checking in a Security Decision
+  "CWE-829": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Inclusion of Functionality from Untrusted Control Sphere
+  "CWE-830": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Inclusion of Web Functionality from an Untrusted Source
+  "CWE-915": ["OWASP 2021 A08:Software and Data Integrity Failures"]  # Improperly Controlled Modification of Dynamically-Determined Object Attributes
+
+  # A09:2021 - Security Logging and Monitoring Failures (安全日志记录和监控失效)
+  "CWE-117": ["OWASP 2021 A09:Security Logging and Monitoring Failures"]  # Improper Output Neutralization for Logs
+  "CWE-223": ["OWASP 2021 A09:Security Logging and Monitoring Failures"]  # Omission of Security-relevant Information
+  "CWE-532": ["OWASP 2021 A09:Security Logging and Monitoring Failures"]  # Information Exposure Through Log Files
+  "CWE-778": ["OWASP 2021 A09:Security Logging and Monitoring Failures"]  # Insufficient Logging
+
+  # A10:2021 - Server-Side Request Forgery (SSRF) (服务器端请求伪造)
+  "CWE-918": ["OWASP 2021 A10:Server-Side Request Forgery"]  # Server-Side Request Forgery (SSRF)
+
+# OWASP Top 10 2017 映射（向后兼容）
+cwe_to_owasp_2017:
+  "CWE-89":  ["OWASP 2017 A1:Injection"]
+  "CWE-79":  ["OWASP 2017 A7:Cross-Site Scripting (XSS)"]
+  "CWE-259": ["OWASP 2017 A2:Broken Authentication"]
+  "CWE-502": ["OWASP 2017 A8:Insecure Deserialization"]
+  "CWE-601": ["OWASP 2017 A10:Insufficient Logging & Monitoring"]
+  # ... 更多映射（按需补充）
+
+# ==================== CWE 标准名称（用于前端展示）====================
+cwe_names:
+  "CWE-20":  "Improper Input Validation"
+  "CWE-22":  "Path Traversal"
+  "CWE-73":  "External Control of File Name or Path"
+  "CWE-77":  "Command Injection"
+  "CWE-78":  "OS Command Injection"
+  "CWE-79":  "Cross-site Scripting (XSS)"
+  "CWE-89":  "SQL Injection"
+  "CWE-90":  "LDAP Injection"
+  "CWE-91":  "XML Injection"
+  "CWE-94":  "Code Injection"
+  "CWE-95":  "Eval Injection"
+  "CWE-98":  "PHP File Inclusion"
+  "CWE-116": "Improper Encoding or Escaping of Output"
+  "CWE-119": "Buffer Overflow"
+  "CWE-200": "Information Exposure"
+  "CWE-259": "Hard-coded Password"
+  "CWE-287": "Improper Authentication"
+  "CWE-310": "Cryptographic Issues"
+  "CWE-319": "Cleartext Transmission of Sensitive Information"
+  "CWE-327": "Use of a Broken or Risky Cryptographic Algorithm"
+  "CWE-352": "Cross-Site Request Forgery (CSRF)"
+  "CWE-434": "Unrestricted Upload of File with Dangerous Type"
+  "CWE-502": "Deserialization of Untrusted Data"
+  "CWE-564": "SQL Injection: Hibernate"
+  "CWE-601": "Open Redirect"
+  "CWE-611": "XML External Entity (XXE)"
+  "CWE-643": "XPath Injection"
+  "CWE-683": "Function Call With Incorrect Order of Arguments"
+  "CWE-798": "Use of Hard-coded Credentials"
+  "CWE-862": "Missing Authorization"
+  "CWE-863": "Incorrect Authorization"
+  "CWE-918": "Server-Side Request Forgery (SSRF)"
+  # ... 更多 CWE 名称（按需补充）
+
+# ==================== 框架/组件特定分组 ====================
+framework_groups:
+  - group_name: "Framework - Apache Shiro"
+    description: "Apache Shiro 安全框架相关漏洞"
+    path_patterns:
+      - "**/components/shiro/**"
+      - "**/shiro/**"
+    tags: ["framework", "java"]
+
+  - group_name: "Framework - Spring"
+    description: "Spring 框架相关漏洞"
+    path_patterns:
+      - "**/components/spring/**"
+      - "**/spring/**"
+    tags: ["framework", "java"]
+
+  - group_name: "Framework - Struts"
+    description: "Apache Struts 框架相关漏洞"
+    path_patterns:
+      - "**/components/struts/**"
+      - "**/struts/**"
+    tags: ["framework", "java"]
+
+  - group_name: "Framework - Laravel"
+    description: "Laravel 框架相关漏洞"
+    path_patterns:
+      - "**/components/laravel/**"
+      - "**/laravel/**"
+    tags: ["framework", "php"]
+
+  - group_name: "Framework - ThinkPHP"
+    description: "ThinkPHP 框架相关漏洞"
+    path_patterns:
+      - "**/components/thinkphp/**"
+      - "**/thinkphp/**"
+    tags: ["framework", "php"]
+
+  - group_name: "Framework - Django"
+    description: "Django 框架相关漏洞"
+    path_patterns:
+      - "**/components/django/**"
+      - "**/django/**"
+    tags: ["framework", "python"]
+
+  - group_name: "SCA - Dependency Check"
+    description: "软件成分分析相关规则"
+    path_patterns:
+      - "**/sca/**"
+    tags: ["sca", "dependency"]
+
+  - group_name: "Language Library - Golang"
+    description: "Golang 标准库和常用库相关规则"
+    path_patterns:
+      - "**/golang/**"
+      - "**/go/**"
+    tags: ["language", "golang"]
+
+  - group_name: "Language Library - Java"
+    description: "Java 标准库和常用库相关规则"
+    path_patterns:
+      - "**/java/**"
+    tags: ["language", "java"]
+
+  - group_name: "Language Library - PHP"
+    description: "PHP 内置函数和常用库相关规则"
+    path_patterns:
+      - "**/php/**"
+    tags: ["language", "php"]
+
+  - group_name: "Language Library - Python"
+    description: "Python 标准库和常用库相关规则"
+    path_patterns:
+      - "**/python/**"
+    tags: ["language", "python"]
+
+  - group_name: "Language Library - JavaScript"
+    description: "JavaScript/Node.js 相关规则"
+    path_patterns:
+      - "**/javascript/**"
+      - "**/js/**"
+      - "**/nodejs/**"
+    tags: ["language", "javascript"]
+
+  - group_name: "Code Style"
+    description: "代码风格和最佳实践检查"
+    path_patterns:
+      - "**/code-style/**"
+      - "**/*-code-style/**"
+    tags: ["style", "audit"]
+
+# ==================== CWE Top 25 (2023) ====================
+# 基于 MITRE 的 CWE Top 25 Most Dangerous Software Weaknesses
+cwe_top_25_2023:
+  - "CWE-787"  # Out-of-bounds Write
+  - "CWE-79"   # Cross-site Scripting
+  - "CWE-89"   # SQL Injection
+  - "CWE-416"  # Use After Free
+  - "CWE-78"   # OS Command Injection
+  - "CWE-20"   # Improper Input Validation
+  - "CWE-125"  # Out-of-bounds Read
+  - "CWE-22"   # Path Traversal
+  - "CWE-352"  # CSRF
+  - "CWE-434"  # Unrestricted Upload of File with Dangerous Type
+  - "CWE-862"  # Missing Authorization
+  - "CWE-476"  # NULL Pointer Dereference
+  - "CWE-287"  # Improper Authentication
+  - "CWE-190"  # Integer Overflow or Wraparound
+  - "CWE-502"  # Deserialization of Untrusted Data
+  - "CWE-77"   # Command Injection
+  - "CWE-119"  # Improper Restriction of Operations within Memory Buffer
+  - "CWE-798"  # Use of Hard-coded Credentials
+  - "CWE-918"  # SSRF
+  - "CWE-306"  # Missing Authentication for Critical Function
+  - "CWE-362"  # Race Condition
+  - "CWE-269"  # Improper Privilege Management
+  - "CWE-94"   # Code Injection
+  - "CWE-863"  # Incorrect Authorization
+  - "CWE-276"  # Incorrect Default Permissions
