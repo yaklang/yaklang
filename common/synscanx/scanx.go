@@ -143,7 +143,7 @@ func (s *Scannerx) initEssentialInfo() error {
 			return utils.Errorf("iface: %s has no addrs", iface.Name)
 		}
 		// 通过网卡名获取到网卡的 IP 地址后，再通过路由获取网关 IP 地址，网关 IP 地址用于获取网关的 MAC 地址，用于外网扫描
-		_, gatewayIP, _, err = getRoute(srcIP.String())
+		_, gatewayIP, _, err = getRoute(s.sampleIP)
 		if err != nil {
 			return utils.Errorf("get gateway failed: %s", err)
 		}
