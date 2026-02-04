@@ -395,7 +395,7 @@ func _dbQueryKnowledgeExists(keyword string, opts ...DBQueryOption) (*DBQueryKno
 	ctx, cancel := context.WithCancel(config.ctx)
 	defer cancel()
 
-	for range yakit.YieldVectorDocument(ctx, db, filter) {
+	for range yakit.SearchVectorStoreDocumentBM25Yield(ctx, db, filter) {
 		vectorCount++
 		// 限制最大计数，避免过多遍历
 		if vectorCount >= 100 {
@@ -460,7 +460,7 @@ func _dbQueryCountVectorsByEntryID(entryID string, opts ...DBQueryOption) (int, 
 	ctx, cancel := context.WithCancel(config.ctx)
 	defer cancel()
 
-	for range yakit.YieldVectorDocument(ctx, db, filter) {
+	for range yakit.SearchVectorStoreDocumentBM25Yield(ctx, db, filter) {
 		count++
 		if count >= 1000 {
 			break
@@ -782,7 +782,7 @@ func _dbQueryVectorDocument(keyword string, opts ...DBQueryOption) ([]*schema.Ve
 	defer cancel()
 
 	count := 0
-	for doc := range yakit.YieldVectorDocument(ctx, db, filter) {
+	for doc := range yakit.SearchVectorStoreDocumentBM25Yield(ctx, db, filter) {
 		if count >= config.offset {
 			documents = append(documents, doc)
 		}
