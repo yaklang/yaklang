@@ -1159,7 +1159,6 @@ func (p *ProgramOverLay) queryMatch(
 
 					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
 					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
-
 					if p.isFileDeleted(normalizedPath, i) {
 						return nil
 					}
@@ -1219,7 +1218,7 @@ func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.Valu
 }
 
 func (p *ProgramOverLay) GetFields() (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ProgramOverLay does not support GetFields")
+	return sfvm.NewEmptyValues(), nil
 }
 
 func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {

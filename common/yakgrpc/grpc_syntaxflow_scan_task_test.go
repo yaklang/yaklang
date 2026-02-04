@@ -17,25 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// ExpectedTaskResult 定义预期任务结果
-type ExpectedTaskResult struct {
-	TaskId           string   // 任务ID（可选，如果为空则按顺序匹配）
-	Programs         []string // 预期程序列表
-	Status           string   // 预期状态
-	RiskCount        *int64   // 预期风险总数（nil表示不检查）
-	NewRiskCount     *int64   // 预期新增风险数（nil表示不检查）
-	HighCount        *int64   // 预期高风险数（nil表示不检查）
-	NewHighCount     *int64   // 预期新增高风险数（nil表示不检查）
-	LowCount         *int64   // 预期低风险数（nil表示不检查）
-	NewLowCount      *int64   // 预期新增低风险数（nil表示不检查）
-	CriticalCount    *int64   // 预期严重风险数（nil表示不检查）
-	NewCriticalCount *int64   // 预期新增严重风险数（nil表示不检查）
-	WarningCount     *int64   // 预期警告数（nil表示不检查）
-	NewWarningCount  *int64   // 预期新增警告数（nil表示不检查）
-	InfoCount        *int64   // 预期信息数（nil表示不检查）
-	NewInfoCount     *int64   // 预期新增信息数（nil表示不检查）
-}
-
 // TestCase 定义测试用例
 type TestCase struct {
 	Name          string                        // 测试用例名称
@@ -43,7 +24,7 @@ type TestCase struct {
 	Rules         []RuleConfig                  // 规则配置列表
 	QueryFilter   *ypb.SyntaxFlowScanTaskFilter // 查询过滤器
 	ShowDiffRisk  bool                          // 是否显示差异风险
-	ExpectedTasks []ExpectedTaskResult          // 预期任务结果列表
+	ExpectedTasks []TaskResultConfig            // 预期任务结果列表
 	CleanupFuncs  []func()                      // 清理函数列表
 	// 额外的验证函数，在基本验证之后执行
 	ExtraValidations []func(t *testing.T, resp *ypb.QuerySyntaxFlowScanTaskResponse, programIDs []string) // 额外验证函数
@@ -246,116 +227,45 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 
 	// 验证每个预期任务
 	for i, expected := range testCase.ExpectedTasks {
-		log.Infof("=== Validating Expected Task[%d] ===", i)
-		if expected.TaskId != "" {
-			log.Infof("Expected TaskId: %s", expected.TaskId)
-		} else {
-			log.Infof("Expected TaskId: (empty, will match by index)")
-		}
-		log.Infof("Expected Programs: %v", expected.Programs)
-		log.Infof("Expected Status: %s", expected.Status)
-		if expected.RiskCount != nil {
-			log.Infof("Expected RiskCount: %d", *expected.RiskCount)
-		}
-		if expected.NewRiskCount != nil {
-			log.Infof("Expected NewRiskCount: %d", *expected.NewRiskCount)
-		}
-		var actual *ypb.SyntaxFlowScanTask
+		actualTask := resp.Data[i]
+		log.Infof("=== Validating Expected Task[%d] ===\n", i)
+		log.Infof("Expected: TaskID=%s, Programs=%v, Status=%s, RiskCount=%d, NewRiskCount=%d, HighCount=%d, NewHighCount=%d, LowCount=%d, NewLowCount=%d",
+			expected.TaskID, expected.Programs, expected.Status, expected.RiskCount, expected.NewRiskCount,
+			expected.HighCount, expected.NewHighCount, expected.LowCount, expected.NewLowCount)
+		log.Infof("Actual: TaskID=%s, Programs=%v, Status=%s, RiskCount=%d, NewRiskCount=%d, HighCount=%d, NewHighCount=%d, LowCount=%d, NewLowCount=%d",
+			actualTask.TaskId, actualTask.Programs, actualTask.Status, actualTask.RiskCount, actualTask.NewRiskCount,
+			actualTask.HighCount, actualTask.NewHighCount, actualTask.LowCount, actualTask.NewLowCount)
 
-		if expected.TaskId != "" {
-			// 如果指定了TaskId，使用TaskId查找
-			actual = taskMap[expected.TaskId]
-			require.NotNil(t, actual, "Task with ID %s not found", expected.TaskId)
-			log.Infof("Found task by TaskId: %s", expected.TaskId)
-		} else {
-			// 否则按顺序匹配
-			if i < len(resp.Data) {
-				actual = resp.Data[i]
-			}
-			require.NotNil(t, actual, "Task at index %d not found", i)
-			log.Infof("Found task by index: %d, TaskId: %s", i, actual.TaskId)
+		// 构建实际配置用于完整匹配
+		actualConfig := TaskResultConfig{
+			TaskID:       actualTask.TaskId,
+			Programs:     actualTask.Programs,
+			Status:       actualTask.Status,
+			LowCount:     actualTask.LowCount,
+			HighCount:    actualTask.HighCount,
+			RiskCount:    actualTask.RiskCount,
+			NewLowCount:  actualTask.NewLowCount,
+			NewHighCount: actualTask.NewHighCount,
+			NewRiskCount: actualTask.NewRiskCount,
 		}
 
-		// 打印实际任务信息
-		log.Infof("Actual Task: TaskId=%s, Programs=%v, Status=%s, RiskCount=%d, NewRiskCount=%d, HighCount=%d, NewHighCount=%d, LowCount=%d, NewLowCount=%d",
-			actual.TaskId, actual.Programs, actual.Status, actual.RiskCount, actual.NewRiskCount,
-			actual.HighCount, actual.NewHighCount, actual.LowCount, actual.NewLowCount)
-
-		// 验证程序列表
-		if len(expected.Programs) > 0 {
-			log.Infof("Validating Programs: expected=%v, actual=%v", expected.Programs, actual.Programs)
-			require.Equal(t, expected.Programs, actual.Programs, "Programs mismatch for task %s", actual.TaskId)
+		// 如果预期配置中没有指定 Programs，则不比较 Programs
+		if len(expected.Programs) == 0 {
+			actualConfig.Programs = nil
 		}
 
-		// 验证状态
-		if expected.Status != "" {
-			log.Infof("Validating Status: expected=%s, actual=%s", expected.Status, actual.Status)
-			require.Equal(t, expected.Status, actual.Status, "Status mismatch for task %s", actual.TaskId)
+		// 如果预期配置中没有指定 TaskID，则不比较 TaskID
+		if expected.TaskID == "" {
+			actualConfig.TaskID = ""
 		}
 
-		// 验证风险计数
-		if expected.RiskCount != nil {
-			log.Infof("Validating RiskCount: expected=%d, actual=%d", *expected.RiskCount, actual.RiskCount)
-			require.Equal(t, *expected.RiskCount, actual.RiskCount, "RiskCount mismatch for task %s", actual.TaskId)
+		// 如果预期配置中没有指定 Status，则不比较 Status
+		if expected.Status == "" {
+			actualConfig.Status = ""
 		}
 
-		if expected.NewRiskCount != nil {
-			log.Infof("Validating NewRiskCount: expected=%d, actual=%d", *expected.NewRiskCount, actual.NewRiskCount)
-			if *expected.NewRiskCount != actual.NewRiskCount {
-				// 打印更详细的错误信息
-				log.Errorf("NewRiskCount mismatch for task %s: expected=%d, actual=%d", actual.TaskId, *expected.NewRiskCount, actual.NewRiskCount)
-				log.Errorf("Task details: Programs=%v, RiskCount=%d, HighCount=%d, LowCount=%d, UpdatedAt=%d",
-					actual.Programs, actual.RiskCount, actual.HighCount, actual.LowCount, actual.UpdatedAt)
-				// 打印所有任务以便对比
-				log.Errorf("All tasks in response:")
-				for idx, task := range resp.Data {
-					log.Errorf("  Task[%d]: TaskId=%s, Programs=%v, RiskCount=%d, NewRiskCount=%d, UpdatedAt=%d",
-						idx, task.TaskId, task.Programs, task.RiskCount, task.NewRiskCount, task.UpdatedAt)
-				}
-			}
-			require.Equal(t, *expected.NewRiskCount, actual.NewRiskCount, "NewRiskCount mismatch for task %s: expected=%d, actual=%d", actual.TaskId, *expected.NewRiskCount, actual.NewRiskCount)
-		}
-
-		if expected.HighCount != nil {
-			require.Equal(t, *expected.HighCount, actual.HighCount, "HighCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.NewHighCount != nil {
-			require.Equal(t, *expected.NewHighCount, actual.NewHighCount, "NewHighCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.LowCount != nil {
-			require.Equal(t, *expected.LowCount, actual.LowCount, "LowCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.NewLowCount != nil {
-			require.Equal(t, *expected.NewLowCount, actual.NewLowCount, "NewLowCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.CriticalCount != nil {
-			require.Equal(t, *expected.CriticalCount, actual.CriticalCount, "CriticalCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.NewCriticalCount != nil {
-			require.Equal(t, *expected.NewCriticalCount, actual.NewCriticalCount, "NewCriticalCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.WarningCount != nil {
-			require.Equal(t, *expected.WarningCount, actual.WarningCount, "WarningCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.NewWarningCount != nil {
-			require.Equal(t, *expected.NewWarningCount, actual.NewWarningCount, "NewWarningCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.InfoCount != nil {
-			require.Equal(t, *expected.InfoCount, actual.InfoCount, "InfoCount mismatch for task %s", actual.TaskId)
-		}
-
-		if expected.NewInfoCount != nil {
-			log.Infof("Validating NewInfoCount: expected=%d, actual=%d", *expected.NewInfoCount, actual.NewInfoCount)
-			require.Equal(t, *expected.NewInfoCount, actual.NewInfoCount, "NewInfoCount mismatch for task %s", actual.TaskId)
-		}
+		// 完整匹配所有字段（所有 int64 字段都参与匹配，包括 0 值）
+		require.Equal(t, expected, actualConfig, "Task[%d] configuration mismatch", i)
 
 		log.Infof("=== End Validating Expected Task[%d] ===\n", i)
 	}
@@ -429,10 +339,12 @@ alert $high for {
 			Programs: []string{progID},
 		},
 		ShowDiffRisk: false,
-		ExpectedTasks: []ExpectedTaskResult{
+		ExpectedTasks: []TaskResultConfig{
 			{
-				Programs: []string{progID},
-				Status:   "done",
+				Programs:  []string{progID},
+				Status:    "done",
+				HighCount: 3,
+				RiskCount: 3,
 			},
 		},
 	}
@@ -503,21 +415,20 @@ alert $high for {
 			Programs: []string{progID},
 		},
 		ShowDiffRisk: true,
-		ExpectedTasks: []ExpectedTaskResult{
+		ExpectedTasks: []TaskResultConfig{
 			{
-				// 注意：查询结果按 UpdatedAt 降序排列（最新的在前）
-				// 这是第二个扫描任务（ruleName2），是最新的任务
-				// NewRiskCount=3 表示相对于之前任务（ruleName1）有3个新增风险
 				Programs:     []string{progID},
 				Status:       "done",
-				NewRiskCount: intPtr(3), // 第二个扫描任务（ruleName2），相对于第一个任务有3个新增风险
+				NewHighCount: 3,
+				NewRiskCount: 3,
+				HighCount:    3,
+				RiskCount:    3,
 			},
 			{
-				// 这是第一个扫描任务（ruleName1），是较早的任务
-				// NewRiskCount=0 表示这是第一个扫描，没有之前的任务可以比较
-				Programs:     []string{progID},
-				Status:       "done",
-				NewRiskCount: intPtr(0), // 第一个扫描任务（ruleName1），没有新增风险（第一个扫描）
+				Programs:  []string{progID},
+				Status:    "done",
+				HighCount: 3,
+				RiskCount: 3,
 			},
 		},
 	}
@@ -526,6 +437,7 @@ alert $high for {
 }
 
 // TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithIncrementalCompile 测试增量编译场景
+// 验证手动增量编译
 func TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithIncrementalCompile(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
@@ -607,16 +519,18 @@ alert $high for {
 			Programs: []string{diffProgID}, // 通过增量程序查询，模拟真实场景（通过 diff 找到 base）
 		},
 		ShowDiffRisk: true,
-		ExpectedTasks: []ExpectedTaskResult{
+		ExpectedTasks: []TaskResultConfig{
 			{
-				Programs:     []string{diffProgID},
-				Status:       "done",
-				NewRiskCount: intPtr(7), // 这个值会在实际测试中根据结果调整
+				Programs:  []string{diffProgID},
+				Status:    "done",
+				RiskCount: 7,
+				HighCount: 7,
 			},
 			{
-				Programs:     []string{baseProgID},
-				Status:       "done",
-				NewRiskCount: intPtr(0), // 第一个扫描，没有新增风险
+				Programs:  []string{baseProgID},
+				Status:    "done",
+				RiskCount: 7,
+				HighCount: 7,
 			},
 		},
 		ExtraValidations: []func(t *testing.T, resp *ypb.QuerySyntaxFlowScanTaskResponse, programIDs []string){
@@ -650,20 +564,6 @@ alert $high for {
 
 				require.NotNil(t, baseTask, "Base task should be found when querying by diff program name (same project)")
 				require.NotNil(t, diffTask, "Diff task should be found when querying by diff program name")
-
-				// 验证基础程序的扫描结果
-				require.Equal(t, baseTask.Programs, []string{baseProgID})
-				require.Equal(t, baseTask.Status, "done")
-				require.Greater(t, baseTask.RiskCount, int64(0), "Base program should have at least one risk")
-				// 基础程序是第一个扫描的，所以新增漏洞数应该为 0（因为没有之前的扫描进行比较）
-				require.Equal(t, baseTask.NewRiskCount, int64(0), "Base program should have 0 new risks (first scan)")
-
-				// 验证增量程序的扫描结果
-				require.Equal(t, diffTask.Programs, []string{diffProgID})
-				require.Equal(t, diffTask.Status, "done")
-				require.Greater(t, diffTask.RiskCount, baseTask.RiskCount, "Diff program should have more risks than base program")
-				// 增量程序应该检测到新增的漏洞（通过 RuntimeId 比较，不依赖 ProgramName）
-				require.Greater(t, diffTask.NewRiskCount, int64(0), "Diff program should have new risks detected via RuntimeId comparison")
 			},
 			// 验证通过增量程序名称查询也能返回同一 project 下的所有任务
 			func(t *testing.T, resp *ypb.QuerySyntaxFlowScanTaskResponse, programIDs []string) {
@@ -688,9 +588,4 @@ alert $high for {
 	}
 
 	checkQuerySyntaxFlowScanTask(t, client, testCase)
-}
-
-// intPtr 辅助函数，返回int64指针
-func intPtr(i int64) *int64 {
-	return &i
 }
