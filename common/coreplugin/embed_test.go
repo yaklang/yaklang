@@ -1,15 +1,16 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/coreplugin"
 )
 
 func TestInitEmbedFS(t *testing.T) {
-	InitEmbedFS()
+	coreplugin.InitEmbedFS()
 
-	hash, err := CorePluginHash()
+	hash, err := coreplugin.CorePluginHash()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, hash)
 }

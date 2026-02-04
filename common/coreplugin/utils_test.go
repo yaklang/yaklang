@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	. "github.com/bytedance/mockey"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 
@@ -41,9 +42,21 @@ type VulInfo struct {
 	MaxRetries     int // 最大重试次数
 }
 
+// msg is used for parsing JSON messages from plugin execution
+type msg struct {
+	Type    string `json:"type"`
+	Content struct {
+		Level   string  `json:"level"`
+		Data    string  `json:"data"`
+		ID      string  `json:"id"`
+		Process float64 `json:"progress"`
+	}
+}
+
 var (
-	vulAddr string
-	server  VulServerInfo
+	vulAddr  string
+	server   VulServerInfo
+	mockOnce sync.Once
 )
 
 func init() {
@@ -59,15 +72,15 @@ func init() {
 }
 
 func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
-	initDB.Do(func() {
-		yakit.InitialDatabase()
+	coreplugin.InitDBForTest()
 
-		// mock DNSLog server
-		var mockMutex sync.Mutex
-		mockDomainToTokenMap := make(map[string]string, 0)
-		mockTokenToResultMapLock := sync.Mutex{}
-		mockTokenToResultMap := make(map[string]*tpb.DNSLogEvent, 0)
+	// mock DNSLog server
+	var mockMutex sync.Mutex
+	mockDomainToTokenMap := make(map[string]string, 0)
+	mockTokenToResultMapLock := sync.Mutex{}
+	mockTokenToResultMap := make(map[string]*tpb.DNSLogEvent, 0)
 
+	mockOnce.Do(func() {
 		Mock(yakit.NewDNSLogDomain).To(func() (domain string, token string, _ error) {
 			mockToken := utils.RandStringBytes(16)
 			host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
@@ -84,6 +97,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 			log.Infof("mock domain: %v, token: %v", mockDomain, mockToken)
 			return mockDomain, mockToken, nil
 		}).Build()
+
 		Mock(yakit.CheckDNSLogByToken).When(func(token string, yakitInfo yakit.YakitPluginInfo, timeout ...float64) bool {
 			mockTokenToResultMapLock.Lock()
 			_, ok := mockTokenToResultMap[token]
@@ -101,7 +115,7 @@ func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInf
 		}).Build()
 	})
 
-	codeBytes := GetCorePluginDataWithHook(pluginName)
+	codeBytes := coreplugin.GetCorePluginDataWithHook(pluginName)
 	if codeBytes == nil {
 		t.Errorf("无法从bindata获取: %v", pluginName)
 		return false
@@ -226,8 +240,8 @@ func Must(condition bool, errMsg ...string) {
 }
 
 func TestCorePluginAstCompileTime(t *testing.T) {
-	for _, pluginName := range GetAllCorePluginName() {
-		bytes := GetCorePluginData(pluginName)
+	for _, pluginName := range coreplugin.GetAllCorePluginName() {
+		bytes := coreplugin.GetCorePluginData(pluginName)
 		avgDur := time.Duration(0)
 		times := 3
 		for i := 0; i < times; i++ {

@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -21,7 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -125,10 +125,8 @@ func NewSfSearch(fs filesys_interface.FileSystem, t *testing.T, opt ...ssaconfig
 	require.NoError(t, err)
 
 	pluginName := "SyntaxFlow Searcher"
-	initDB.Do(func() {
-		yakit.InitialDatabase()
-	})
-	codeBytes := GetCorePluginData(pluginName)
+	coreplugin.InitDBForTest()
+	codeBytes := coreplugin.GetCorePluginData(pluginName)
 	require.NotNilf(t, codeBytes, "无法从bindata获取: %v", pluginName)
 
 	return &sfSearch{

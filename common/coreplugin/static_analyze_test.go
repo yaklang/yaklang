@@ -1,10 +1,11 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -28,7 +29,7 @@ func staticCheck(code, pluginType string, t *testing.T) {
 func TestAnalyzeMustPASSCorePlugin(t *testing.T) {
 	// for i := 0; i < 20; i++ {
 	yakit.CallPostInitDatabase()
-	for _, plugin := range buildInPlugin {
+	for _, plugin := range coreplugin.GetAllCorePluginWithType() {
 		t.Run(fmt.Sprintf("plugin(%s) %s", plugin.Type, plugin.ScriptName), func(t *testing.T) {
 			staticCheck(plugin.Content, plugin.Type, t)
 		})
@@ -43,7 +44,7 @@ func TestAnalyzeMustPASSCorePlugin_Debug(t *testing.T) {
 	}
 	target := "SSA 项目探测"
 	yakit.CallPostInitDatabase()
-	for _, plugin := range buildInPlugin {
+	for _, plugin := range coreplugin.GetAllCorePluginWithType() {
 		if plugin.ScriptName != target {
 			continue
 		}

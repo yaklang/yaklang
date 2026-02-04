@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -41,7 +42,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		token := strings.TrimSuffix(domain, ".dnslog.cn")
 		record.Set(token, true)
 	}
-	RegisterLoadCorePluginHook(func(name string, source string) string {
+	coreplugin.RegisterLoadCorePluginHook(func(name string, source string) string {
 		if name == "Fastjson 综合检测" {
 			source = strings.Replace(source, `risk.NewDNSLogDomain`, `test.callhook("NewDNSLogDomain")`, -1)
 			source = strings.Replace(source, `risk.CheckDNSLogByToken`, `test.callhook("CheckDNSLogByToken")`, -1)
