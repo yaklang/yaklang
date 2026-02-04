@@ -568,6 +568,31 @@ func (s *ScoredResult) GetKnowledgeTitle() string {
 	return ""
 }
 
+// GetKnowledgeDetails 获取知识详情（名称、显示名称、类型、功能描述、关键词等）
+// 通过 KnowledgeEntryUUID 动态查询数据库获取
+func (s *ScoredResult) GetKnowledgeDetails() string {
+	entryUUID := s.GetKnowledgeEntryUUID()
+	if entryUUID == "" {
+		return ""
+	}
+
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return ""
+	}
+
+	entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(db, entryUUID)
+	if err != nil || entry == nil {
+		return ""
+	}
+
+	// return knowledge details or summary
+	if entry.KnowledgeDetails != "" {
+		return entry.KnowledgeDetails
+	}
+	return entry.Summary
+}
+
 func (s *ScoredResult) GetSource() string {
 	return s.Source
 }

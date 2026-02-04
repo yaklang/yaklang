@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -72,6 +73,11 @@ func (r *ReAct) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, 
 
 	// Get enhanced data
 	enhance := r.DumpCurrentEnhanceData()
+	fmt.Println("----------------------------------------------------------------")
+	fmt.Println("----------------------------------------------------------------")
+	fmt.Println(enhance)
+	fmt.Println("----------------------------------------------------------------")
+	fmt.Println("----------------------------------------------------------------")
 	if enhance != "" {
 		enhancePayload, err := utils.RenderTemplate(`<|ENHANCE_DATA_{{ .Nonce }}|>
 {{ .EnhanceData }}

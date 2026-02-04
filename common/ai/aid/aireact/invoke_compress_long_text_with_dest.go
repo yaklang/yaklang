@@ -142,7 +142,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 	totalExtractedBytes := 0
 
 	for i, item := range allScoredRanges {
-		text := editor.GetTextFromPositionInt(item.StartLine, 1, item.EndLine, 1)
+		text := editor.GetTextFromPositionInt(item.StartLine, 1, item.EndLine+1, 1)
 		if text == "" {
 			continue
 		}

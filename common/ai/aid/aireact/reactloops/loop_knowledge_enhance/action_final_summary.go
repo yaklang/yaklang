@@ -2,6 +2,7 @@ package loop_knowledge_enhance
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"strconv"
 	"time"
 
@@ -106,6 +107,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				nil,
 			)
 			_ = result
+			log.Infof("Final summary direct answer result: %s", utils.ShrinkTextBlock(result, 2048))
 			if err != nil {
 				op.Continue()
 			} else {
