@@ -11,6 +11,10 @@ func (v *BaseCParserVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitStringLiteralExpression(ctx *StringLiteralExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitGenericSelection(ctx *GenericSelectionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -27,11 +31,23 @@ func (v *BaseCParserVisitor) VisitPostfixExpression(ctx *PostfixExpressionContex
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitPostfixSuffix(ctx *PostfixSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitPostfixExpressionLvalue(ctx *PostfixExpressionLvalueContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitPostfixSuffixLvalue(ctx *PostfixSuffixLvalueContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitArgumentExpressionList(ctx *ArgumentExpressionListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitMacroArgument(ctx *MacroArgumentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -163,6 +179,18 @@ func (v *BaseCParserVisitor) VisitDirectDeclarator(ctx *DirectDeclaratorContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitDeclaratorSuffix(ctx *DeclaratorSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitArraySuffix(ctx *ArraySuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitFunctionSuffix(ctx *FunctionSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitVcSpecificModifer(ctx *VcSpecificModiferContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -223,6 +251,18 @@ func (v *BaseCParserVisitor) VisitDirectAbstractDeclarator(ctx *DirectAbstractDe
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitAbstractDeclaratorSuffix(ctx *AbstractDeclaratorSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitAbstractArraySuffix(ctx *AbstractArraySuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitAbstractFunctionSuffix(ctx *AbstractFunctionSuffixContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitTypedefName(ctx *TypedefNameContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -252,6 +292,10 @@ func (v *BaseCParserVisitor) VisitStaticAssertDeclaration(ctx *StaticAssertDecla
 }
 
 func (v *BaseCParserVisitor) VisitStatement(ctx *StatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitMacroCallStatement(ctx *MacroCallStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -327,10 +371,26 @@ func (v *BaseCParserVisitor) VisitExternalDeclaration(ctx *ExternalDeclarationCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitMacroCallExpression(ctx *MacroCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitMacroArgumentList(ctx *MacroArgumentListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseCParserVisitor) VisitDeclarationList(ctx *DeclarationListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitWs(ctx *WsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitEos(ctx *EosContext) interface{} {
 	return v.VisitChildren(ctx)
 }

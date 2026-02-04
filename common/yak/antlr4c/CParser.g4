@@ -67,20 +67,29 @@ options {
 primaryExpression
     : Identifier
     | Constant
-    | StringLiteral+
-    | '(' expression ')'
+    | stringLiteralExpression
+    | '(' eos* expression eos* ')'
     | genericSelection
-    | '__extension__'? '(' compoundStatement ')'
-    | '__builtin_va_arg' '(' unaryExpression ',' typeName ')'
-    | '__builtin_offsetof' '(' typeName ',' unaryExpression ')'
+    | '__extension__'? '(' eos* compoundStatement eos* ')'
+    | '__builtin_va_arg' '(' eos* unaryExpression eos* ',' eos* typeName eos* ')'
+    | '__builtin_offsetof' '(' eos* typeName eos* ',' eos* unaryExpression eos* ')'
+    | macroCallExpression  // Support macro calls in expressions (e.g., INTERLEAVE_OUTPUT(16))
+    ;
+
+// String literal concatenation: supports both "str1" "str2" and "str" Identifier patterns
+// The Identifier pattern handles cases like "%"PRId64 where PRId64 is a macro that expands to a string
+// Pattern: StringLiteral followed by zero or more (StringLiteral | Identifier StringLiteral)
+// This ensures Identifier is only allowed between two StringLiterals or at the end
+stringLiteralExpression
+    : StringLiteral (StringLiteral | (Identifier StringLiteral))* Identifier?
     ;
 
 genericSelection
-    : '_Generic' '(' assignmentExpression ',' genericAssocList ')'
+    : '_Generic' '(' eos* assignmentExpression eos* ',' eos* genericAssocList eos* ')'
     ;
 
 genericAssocList
-    : genericAssociation (',' genericAssociation)*
+    : genericAssociation (',' eos* genericAssociation)*
     ;
 
 genericAssociation
@@ -88,44 +97,69 @@ genericAssociation
     ;
 
 // --- Postfix/Unary/Cast Expressions ---
+// Optimized: Use postfixSuffix to support chained operations and reduce recursion depth
 postfixExpression
-    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}')
-    | postfixExpression '[' expression ']'
-    | postfixExpression '(' argumentExpressionList? ')'
-    | postfixExpression ('.' | '->') Identifier
+    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}') postfixSuffix*
     | leftExpression '++'
     | leftExpression '--'
     ;
 
+// Postfix suffix operations: supports chained operations like func()[0].field
+// This reduces recursion depth and improves parsing performance for complex expressions
+// Note: Using * quantifier instead of recursion to avoid left recursion issues
+postfixSuffix
+    : '[' eos* expression eos* ']'
+    | '(' eos* argumentExpressionList? eos* ')'
+    | ('.' | '->') Identifier
+    ;
+
 // Postfix expression that can be used as lvalue (excluding function calls)
 postfixExpressionLvalue
-    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}')
-    | postfixExpressionLvalue '[' expression ']'
-    | postfixExpressionLvalue ('.' | '->') Identifier
+    : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}') postfixSuffixLvalue*
+    ;
+
+// Postfix suffix for lvalue expressions (no function calls)
+// Note: Using * quantifier instead of recursion to avoid left recursion issues
+postfixSuffixLvalue
+    : '[' eos* expression eos* ']'
+    | ('.' | '->') Identifier
     ;
 
 argumentExpressionList
-    : expression (',' expression)*
+    : macroArgument (',' eos* macroArgument)*
+    ;
+
+// Macro argument: can be an expression, a type name, a single operator, or any token sequence
+// This handles cases like:
+// - FUN(fmin, double, <) where < is passed as a macro parameter
+// - ARRAY_RENAME(3d_array) where 3d_array starts with a digit
+// - DECLARE_ALIGNED(SBC_ALIGN, int32_t, name) where int32_t is a type name
+macroArgument
+    : expression
+    | typeName  // Support type names as macro arguments (e.g., int32_t in DECLARE_ALIGNED)
+    | DigitSequence Identifier?  // Support identifiers starting with digits (e.g., 3d_array)
+    | (Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual | Plus | Minus | Star | Div | Mod | LeftShift | RightShift | And | Or | Caret | AndAnd | OrOr | Tilde | Not | PlusPlus | MinusMinus)
     ;
 
 unaryExpression
-    : ('++' | '--') leftExpression
-    | '*' unaryExpression
-    | '&' leftExpression
-    | ('sizeof' | '_Alignof') '(' '*'* typeName ')'
-    | '&&' unaryExpression
+    : ('++' | '--') eos* leftExpression
+    | '*' eos* unaryExpression
+    | '&' eos* leftExpression
+    | ('sizeof' | '_Alignof') eos* unaryExpression
+    | ('sizeof' | '_Alignof') '(' eos* ('*'* eos* typeName | unaryExpression) eos* ')'
+    | '&&' eos* unaryExpression
     | postfixExpression
     ;
 
 castExpression
-    : '__extension__'? '(' typeName ')' castExpression
+    : '__extension__'? '(' eos* typeName eos* ')' eos* castExpression
     | unaryExpression
     | DigitSequence
     ;
 
 // --- Binary Expressions ---
 assignmentExpression
-    : leftExpression assignmentOperator expression
+    : leftExpression eos* assignmentOperator eos* expression
     | castExpression
     | DigitSequence
     ;
@@ -145,29 +179,30 @@ assignmentOperator
     ;
 
 expressionList
-    : expression (',' expression)*
+    : expression (',' eos* expression)*
     ;
 
 statementsExpression
-    : '(' '{' statement* expression? ';'? '}' ')'
+    : '(' '{' statement* expression? Semi? '}' ')'
     ;
 
 // --- Left Value Expressions ---
 leftExpression
-    : '*' unaryExpression
+    : '*' eos* unaryExpression
+    | '*' eos* castExpression
     | postfixExpressionLvalue
-    | '(' leftExpression ')'
+    | '(' eos* leftExpression eos* ')'
     ;
 
 expression
-    : unary_op = (Tilde | Plus | Minus | Not | Caret | Star | And) expression
-    | expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) expression
-    | expression add_op = (Plus | Minus | Or | Caret) expression
-    | expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) expression
-    | expression AndAnd expression
-    | expression OrOr expression
-    | '(' expression ')'
-    | expression ('?' expression ':' expression)
+    : unary_op = (Tilde | Plus | Minus | Not | Caret | Star | And) eos* expression
+    | expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) eos* expression
+    | expression add_op = (Plus | Minus | Or | Caret) eos* expression
+    | expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) eos* expression
+    | expression AndAnd eos* expression
+    | expression OrOr eos* expression
+    | '(' eos* expression eos* ')'
+    | expression ('?' eos* expression ':' eos* expression)
     | castExpression
     | assignmentExpression
     | statementsExpression
@@ -176,28 +211,29 @@ expression
 
 // --- Declarations ---
 declaration
-    : declarationSpecifier initDeclaratorList? ';'
+    : declarationSpecifier eos* initDeclaratorList? eos* Semi
+    | macroCallExpression declaratorSuffix* eos* ('=' initializer)? eos* Semi  // Support macro calls as declarations, e.g., DECLARE_ALIGNED(...)[8] = {...}
     | staticAssertDeclaration
     ;
 
 declarationSpecifiers
-    : declarationSpecifier (',' declarationSpecifier)?
+    : declarationSpecifier (',' eos* declarationSpecifier)?
     ;
 
 declarationSpecifiers2
-    : declarationSpecifier (',' declarationSpecifier)?
+    : declarationSpecifier (',' eos* declarationSpecifier)?
     ;
 
 declarationSpecifier
     : (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
         typeSpecifier
         | Identifier
-    ) '*'*
+    ) typeQualifier*
     | alignmentSpecifier
     ;
 
 initDeclaratorList
-    : initDeclarator (',' initDeclarator)*
+    : initDeclarator (',' eos* initDeclarator)*
     ;
 
 initDeclarator
@@ -229,6 +265,8 @@ typeSpecifier
     | '__m128d'
     | '__m128i'
     | '__extension__' '(' ('__m128' | '__m128d' | '__m128i') ')'
+    | 'signed'
+    | 'unsigned'
     | atomicTypeSpecifier
     | structOrUnionSpecifier
     | enumSpecifier
@@ -237,7 +275,7 @@ typeSpecifier
     ;
 
 structOrUnionSpecifier
-    : structOrUnion Identifier? '{' structDeclarationList '}' Identifier?
+    : structOrUnion eos* Identifier? '{' eos* structDeclarationList eos* '}' eos* Identifier?
     ;
 
 structOrUnion
@@ -246,12 +284,12 @@ structOrUnion
     ;
 
 structDeclarationList
-    : structDeclaration+
+    : (structDeclaration ws*)+
     ;
 
 structDeclaration
-    : specifierQualifierList structDeclaratorList ';'
-    | specifierQualifierList ';'
+    : specifierQualifierList eos* structDeclaratorList eos* Semi
+    | specifierQualifierList eos* Semi
     | staticAssertDeclaration
     ;
 
@@ -260,30 +298,30 @@ specifierQualifierList
     ;
 
 structDeclaratorList
-    : structDeclarator (',' structDeclarator)*
+    : structDeclarator (',' eos* structDeclarator)*
     ;
 
 structDeclarator
     : declarator
-    | declarator? ':' expression
+    | declarator? ':' eos* expression
     ;
 
 enumSpecifier
-    : 'enum' Identifier? '{' enumeratorList ','? '}'
-    | 'enum' Identifier
+    : 'enum' eos* Identifier? '{' eos* enumeratorList eos* ','? eos* '}'
+    | 'enum' eos* Identifier
     ;
 
 enumeratorList
-    : enumerator (',' enumerator)*
+    : enumerator (',' eos* enumerator)*
     ;
 
 enumerator
-    : Identifier gccAttributeSpecifier ('=' expression)?
-    | Identifier ('=' expression)?
+    : Identifier eos* gccAttributeSpecifier ('=' eos* expression)?
+    | Identifier ('=' eos* expression)?
     ;
 
 atomicTypeSpecifier
-    : '_Atomic' '(' typeName ')'
+    : '_Atomic' '(' eos* typeName eos* ')'
     ;
 
 typeQualifier
@@ -305,25 +343,44 @@ functionSpecifier
     ;
 
 alignmentSpecifier
-    : '_Alignas' '(' (typeName | expression) ')'
+    : '_Alignas' '(' eos* (typeName | expression) eos* ')'
     ;
 
 declarator
     : pointer? directDeclarator gccDeclaratorExtension*
     ;
 
+// Optimized: Use arraySuffix and functionSuffix to reduce recursion depth
+// This significantly improves performance for multi-dimensional arrays like int arr[2][32][32][2]
 directDeclarator
-    : Identifier
-    | '(' declarator ')'
-    | directDeclarator '[' typeQualifierList? expression? ']'
-    | directDeclarator '[' 'static' typeQualifierList? expression ']'
-    | directDeclarator '[' typeQualifierList 'static' expression ']'
-    | directDeclarator '[' typeQualifierList? '*' ']'
-    | directDeclarator '(' parameterTypeList ')'
-    | directDeclarator '(' identifierList? ')'
-    | Identifier ':' DigitSequence
-    | vcSpecificModifer Identifier
-    | '(' vcSpecificModifer declarator ')'
+    : Identifier declaratorSuffix*
+    | macroCallExpression declaratorSuffix*  // Support macro calls as function names, e.g., ARRAY_RENAME(3d_array)(...)
+    | '(' eos* declarator eos* ')' declaratorSuffix*
+    | Identifier ':' eos* DigitSequence
+    | vcSpecificModifer eos* Identifier declaratorSuffix*
+    | '(' eos* vcSpecificModifer eos* declarator eos* ')' declaratorSuffix*
+    ;
+
+// Declarator suffix: array dimensions or function parameters
+// This allows matching multiple array dimensions in one pass, reducing recursion depth
+declaratorSuffix
+    : arraySuffix
+    | functionSuffix
+    ;
+
+// Array suffix: matches one or more array dimensions
+// Optimized to handle multi-dimensional arrays efficiently
+arraySuffix
+    : '[' eos* typeQualifierList? eos* expression? eos* ']'
+    | '[' eos* 'static' eos* typeQualifierList? eos* expression eos* ']'
+    | '[' eos* typeQualifierList eos* 'static' eos* expression eos* ']'
+    | '[' eos* typeQualifierList? eos* '*' eos* ']'
+    ;
+
+// Function suffix: matches function parameters
+functionSuffix
+    : '(' eos* parameterTypeList eos* ')'
+    | '(' eos* identifierList? eos* ')'
     ;
 
 vcSpecificModifer
@@ -342,11 +399,11 @@ gccDeclaratorExtension
     ;
 
 gccAttributeSpecifier
-    : Attribute__ '(' '(' gccAttributeList? ')' ')'
+    : Attribute__ '(' eos* '(' eos* gccAttributeList? eos* ')' eos* ')'
     ;
 
 gccAttributeList
-    : gccAttribute (',' gccAttribute)*
+    : gccAttribute (',' eos* gccAttribute)*
     ;
 
 gccAttribute
@@ -367,11 +424,11 @@ typeQualifierList
     ;
 
 parameterTypeList
-    : parameterList (',' '...'?)?
+    : parameterList (',' eos* '...'? eos*)?
     ;
 
 parameterList
-    : parameterDeclaration (',' parameterDeclaration)*
+    : parameterDeclaration (',' eos* parameterDeclaration)*
     ;
 
 parameterDeclaration
@@ -380,7 +437,7 @@ parameterDeclaration
     ;
 
 identifierList
-    : Identifier (',' Identifier)*
+    : Identifier (',' eos* Identifier)*
     ;
 
 typeName
@@ -393,18 +450,29 @@ abstractDeclarator
     | pointer? directAbstractDeclarator gccDeclaratorExtension*
     ;
 
+// Optimized: Use abstractDeclaratorSuffix to reduce recursion depth
 directAbstractDeclarator
-    : '(' abstractDeclarator ')' gccDeclaratorExtension*
-    | '[' typeQualifierList? assignmentExpression? ']'
-    | '[' 'static' typeQualifierList? assignmentExpression ']'
-    | '[' typeQualifierList 'static' assignmentExpression ']'
-    | '[' '*' ']'
-    | '(' parameterTypeList? ')' gccDeclaratorExtension*
-    | directAbstractDeclarator '[' typeQualifierList? assignmentExpression? ']'
-    | directAbstractDeclarator '[' 'static' typeQualifierList? assignmentExpression ']'
-    | directAbstractDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
-    | directAbstractDeclarator '[' '*' ']'
-    | directAbstractDeclarator '(' parameterTypeList? ')' gccDeclaratorExtension*
+    : '(' eos* abstractDeclarator eos* ')' gccDeclaratorExtension* abstractDeclaratorSuffix*
+    | abstractDeclaratorSuffix+
+    ;
+
+// Abstract declarator suffix: array dimensions or function parameters
+abstractDeclaratorSuffix
+    : abstractArraySuffix
+    | abstractFunctionSuffix
+    ;
+
+// Abstract array suffix: matches array dimensions in abstract declarators
+abstractArraySuffix
+    : '[' eos* typeQualifierList? eos* assignmentExpression? eos* ']'
+    | '[' eos* 'static' eos* typeQualifierList? eos* assignmentExpression eos* ']'
+    | '[' eos* typeQualifierList eos* 'static' eos* assignmentExpression eos* ']'
+    | '[' eos* '*' eos* ']'
+    ;
+
+// Abstract function suffix: matches function parameters in abstract declarators
+abstractFunctionSuffix
+    : '(' eos* parameterTypeList? eos* ')' gccDeclaratorExtension*
     ;
 
 typedefName
@@ -413,15 +481,15 @@ typedefName
 
 initializer
     : expression
-    | '{' initializerList? ','? '}'
+    | '{' eos* initializerList? eos* ','? eos* '}'
     ;
 
 initializerList
-    : designation? initializer (',' designation? initializer)*
+    : designation? initializer (',' eos* designation? initializer)*
     ;
 
 designation
-    : designatorList '='
+    : designatorList eos* '='
     ;
 
 designatorList
@@ -429,17 +497,17 @@ designatorList
     ;
 
 designator
-    : '[' expression ']'
-    | '.' Identifier
+    : '[' eos* expression eos* ']'
+    | '.' eos* Identifier
     ;
 
 staticAssertDeclaration
-    : '_Static_assert' '(' expression ',' StringLiteral+ ')' ';'
+    : '_Static_assert' eos* '(' eos* expression eos* ',' eos* StringLiteral+ eos* ')' eos* Semi
     ;
 
 // --- Statements ---
 statement
-    : Identifier ':' statement?
+    : Identifier ':' eos* statement?  // Labeled statement
     | compoundStatement
     | expressionStatement
     | statementsExpression
@@ -447,22 +515,30 @@ statement
     | iterationStatement
     | jumpStatement
     | asmStatement
-    | ';'
+    | macroCallStatement  // Support macro calls as statements (e.g., FF_DISABLE_DEPRECATION_WARNINGS)
+    | Semi
+    ;
+
+// Macro call as a statement (identifier without parentheses, possibly followed by semicolon)
+// This handles cases like FF_DISABLE_DEPRECATION_WARNINGS which are macros that expand to nothing or pragmas
+// Note: These macros typically don't have semicolons and are followed by other statements
+macroCallStatement
+    : Identifier eos*
     ;
 
 asmStatement
-    : Asm ('volatile' | '__volatile__')? '(' asmExprList? (
-        ':' asmExprList? (':' asmExprList? (':' asmExprList?)?)?
-    )? ')' ';'
+    : Asm eos* ('volatile' | '__volatile__')? eos* '(' eos* asmExprList? eos* (
+        ':' eos* asmExprList? eos* (':' eos* asmExprList? eos* (':' eos* asmExprList? eos*)?)? eos*
+    )? ')' eos* Semi
     ;
 
 asmExprList
-    : expression (',' expression)*
+    : expression (',' eos* expression)*
     ;
 
 labeledStatement
-    : 'case' expression ':' statement*
-    | 'default' ':' statement*
+    : 'case' expression ':' eos* statement*
+    | 'default' ':' eos* statement*
     ;
 
 compoundStatement
@@ -470,7 +546,7 @@ compoundStatement
     ;
 
 blockItemList
-    : blockItem+
+    : (blockItem ws*)+
     ;
 
 blockItem
@@ -479,30 +555,30 @@ blockItem
     ;
 
 expressionStatement
-    : assignmentExpressions ';'
+    : assignmentExpressions eos* Semi
     ;
 
 selectionStatement
-    : 'if' '(' expression ')' statement ('else' statement)?
-    | 'switch' '(' expression ')' '{' labeledStatement* '}'
+    : 'if' '(' eos* expression eos* ')' eos* statement ('else' eos* statement)?
+    | 'switch' '(' eos* expression eos* ')' '{' eos* labeledStatement* eos* '}'
     ;
 
 iterationStatement
-    : 'while' '(' expression ')' ';'? statement
-    | 'do' statement 'while' '(' expression ')' ';'?
-    | 'for' '(' forCondition ')' statement
+    : 'while' '(' eos* expression eos* ')' Semi? eos* statement
+    | 'do' eos* statement 'while' '(' eos* expression eos* ')' Semi?
+    | 'for' '(' eos* forCondition eos* ')' eos* statement
     ;
 
 forCondition
-    : (forDeclarations | assignmentExpressions?) ';' forExpression? ';' forExpression?
+    : (forDeclarations | assignmentExpressions?) Semi forExpression? Semi forExpression?
     ;
 
 assignmentExpressions
-    : assignmentExpression (',' assignmentExpression)*
+    : assignmentExpression (',' eos* assignmentExpression)*
     ;
 
 forDeclarations
-    : forDeclaration (',' forDeclaration)*
+    : forDeclaration (',' eos* forDeclaration)*
     ;
 
 forDeclaration
@@ -510,26 +586,39 @@ forDeclaration
     ;
 
 forExpression
-    : expression (',' expression)*
+    : expression (',' eos* expression)*
     ;
 
 jumpStatement
-    : ('goto' '*'* Identifier | 'continue' | 'break' | 'return' expression?) ';'
+    : ('goto' '*'* Identifier | 'continue' | 'break' | 'return' eos* expression?) eos* Semi
     ;
 
 compilationUnit
-    : translationUnit? EOF
+    : ws* translationUnit? EOF
     ;
 
 translationUnit
-    : externalDeclaration+
+    : (externalDeclaration ws*)+
     ;
 
 externalDeclaration
     : declarationSpecifier
     | functionDefinition
     | declaration
-    | ';'
+    | macroCallExpression  // Allow macro calls like FUN(fmin, double, <) at top level
+    | macroCallStatement  // Allow macro calls without parentheses at top level (e.g., FF_DISABLE_DEPRECATION_WARNINGS)
+    | Semi
+    ;
+
+// Macro call expression: function call that may contain operators as arguments
+// This handles cases like FUN(fmin, double, <) where operators are passed as macro parameters
+// Optimized: Support macro calls followed by array subscripts, e.g., DECLARE_ALIGNED(32, float, spec1)[256]
+macroCallExpression
+    : Identifier '(' eos* macroArgumentList? eos* ')' postfixSuffix*
+    ;
+
+macroArgumentList
+    : macroArgument (',' eos* macroArgument)*
     ;
 
 functionDefinition
@@ -537,5 +626,17 @@ functionDefinition
     ;
 
 declarationList
-    : declaration+
+    : (declaration ws*)+
+    ;
+
+ws
+    : EOS+
+    | BlockComment
+    | LineComment
+    ;
+
+// eos: 单个语句结束符
+eos
+    : Semi
+    | EOS
     ;
