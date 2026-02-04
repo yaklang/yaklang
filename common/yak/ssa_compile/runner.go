@@ -1,4 +1,4 @@
-package coreplugin
+package ssa_compile
 
 import (
 	"context"
@@ -7,29 +7,16 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type SSADetectConfig struct {
-	Target             string
-	Language           string
-	CompileImmediately bool
-	Params             map[string]any
-}
-
-type SSADetectResult struct {
-	Info    *AutoDetectInfo
-	Program *ssaapi.Program
-	Cleanup func()
-}
-
+// ParseProjectWithAutoDetective 调「SSA 项目探测」再可选调「SSA 项目编译」，返回探测信息与（若编译）Program。
+// 插件由 coreplugin 注册，本包仅负责执行与结果组装。
 func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (*SSADetectResult, error) {
 	info, err := detectProject(ctx, conf)
 	if err != nil {
@@ -71,7 +58,7 @@ func detectProject(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo,
 				return nil
 			}
 			rawMsg := exec.GetMessage()
-			var msg msg
+			var msg execMsg
 			json.Unmarshal(rawMsg, &msg)
 			if msg.Type == "log" && msg.Content.Level == "code" {
 				err := json.Unmarshal([]byte(msg.Content.Data), &info)
@@ -149,7 +136,7 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 				return nil
 			}
 			rawMsg := exec.GetMessage()
-			var msg msg
+			var msg execMsg
 			json.Unmarshal(rawMsg, &msg)
 			if msg.Type == "log" && msg.Content.Level == "code" {
 				var result struct {
@@ -171,24 +158,22 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 		return nil, cleanup, utils.Errorf("compiled program name is empty")
 	}
 
-	// 添加重试机制，等待数据库保存完成
 	var prog *ssaapi.Program
 	maxRetries := 10
 	retryDelay := 100 * time.Millisecond
-	
+
 	for i := 0; i < maxRetries; i++ {
 		prog, err = ssaapi.FromDatabase(compiledProgramName)
 		if err == nil {
 			break
 		}
-		// 如果是 record not found 错误，等待后重试
 		if i < maxRetries-1 {
 			log.Debugf("program %s not found in database, retrying... (attempt %d/%d)", compiledProgramName, i+1, maxRetries)
 			time.Sleep(retryDelay)
-			retryDelay *= 2 // 指数退避
+			retryDelay *= 2
 		}
 	}
-	
+
 	if err != nil {
 		return nil, cleanup, utils.Errorf("failed to load program after %d retries: %s", maxRetries, err)
 	}
@@ -196,7 +181,7 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 	return prog, cleanup, nil
 }
 
-type msg struct {
+type execMsg struct {
 	Type    string `json:"type"`
 	Content struct {
 		Level   string  `json:"level"`
@@ -204,15 +189,4 @@ type msg struct {
 		ID      string  `json:"id"`
 		Process float64 `json:"progress"`
 	}
-}
-
-type AutoDetectInfo struct {
-	*ssaconfig.Config
-	FileCount          int  `json:"file_Count"`
-	CompileImmediately bool `json:"compile_immediately"`
-	ProjectExists      bool `json:"project_exists"` // 项目是否已存在
-	Error              struct {
-		Kind string `json:"kind"`
-		Msg  string `json:"msg"`
-	} `json:"error"`
 }
