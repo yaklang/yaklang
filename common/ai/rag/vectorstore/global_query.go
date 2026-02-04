@@ -477,6 +477,44 @@ func WithRAGOnQueryFinish(callback func([]*ScoredResult)) CollectionQueryOption 
 	}
 }
 
+// HandleLogReader handles the log reader with proper goroutine and error recovery.
+// It supports both OnLogReaderWithInfo and OnLogReader callbacks.
+// Returns the writer part of the pipe for the caller to write to.
+func (config *CollectionQueryConfig) HandleLogReader(info *SubQueryLogInfo) io.WriteCloser {
+	logReader, logWriter := utils.NewPipe()
+
+	if config.OnLogReaderWithInfo != nil {
+		go func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("[OnLogReaderWithInfo] panic: %v", err)
+				}
+				close(info.ReaderDone)
+			}()
+			config.OnLogReaderWithInfo(logReader, info, func(content string) {
+				log.Debugf("Reference material content generated for method: %s", info.Method)
+			})
+		}()
+	} else if config.OnLogReader != nil {
+		go func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("[OnLogReader] panic: %v", err)
+				}
+				close(info.ReaderDone)
+			}()
+			config.OnLogReader(logReader)
+		}()
+	} else {
+		go func() {
+			io.Copy(io.Discard, logReader)
+			close(info.ReaderDone)
+		}()
+	}
+
+	return logWriter
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...CollectionQueryOption) *CollectionQueryConfig {
 	config := &CollectionQueryConfig{
@@ -894,6 +932,47 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 		var enhanceSubQuery int64 = 0
 		var resultRecorder = map[string]struct{}{}
 
+		defer func() {
+			if len(allResults) <= 0 {
+				return
+			}
+
+			var kbMap = make(map[string]string)
+			var count int
+			var bytesCount int
+			for _, i := range allResults {
+				uid := i.GetKnowledgeEntryUUID()
+				if _, ok := kbMap[uid]; !ok {
+					result := i.GetKnowledgeTitle() + i.GetKnowledgeDetails() + i.GetContent()
+					bytesCount += len(result)
+					count++
+					kbMap[uid] = result
+				}
+			}
+
+			// Create summary info for the final results
+			summaryInfo := &SubQueryLogInfo{
+				Method:       "summary",
+				Query:        "RAG Query Summary",
+				ResultCount:  int64(count),
+				Results:      allResults,
+				ReaderDone:   make(chan struct{}),
+				ResultBuffer: &strings.Builder{},
+			}
+
+			// Use the common HandleLogReader method
+			resultWt := config.HandleLogReader(summaryInfo)
+
+			// Write summary information
+			resultWt.Write([]byte(fmt.Sprintf("\n[RAG 查询总结] 共找到 %d 条知识条目，总大小 %v \n", count, utils.ByteSize(uint64(bytesCount)))))
+			resultWt.Close()
+
+			// Wait for reader to finish
+			<-summaryInfo.ReaderDone
+
+			log.Infof("RAG query completed: found %d knowledge entries, total %d bytes", count, bytesCount)
+		}()
+
 		var nodesRecorder = make(map[string]struct{})
 
 		storeResults := func(source string, result SearchResult, query *subQuery) (int64, bool) {
@@ -965,40 +1044,11 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 			var subQueryResults []*ScoredResult
 			var subQueryResultsMutex sync.Mutex
 
-			logReader, logWriter := utils.NewPipe()
+			// Use the common HandleLogReader method
+			logWriter := config.HandleLogReader(subQueryInfo)
 
-			if config.OnLogReaderWithInfo != nil {
-				go func() {
-					defer func() {
-						if err := recover(); err != nil {
-							log.Warnf("[OnLogReaderWithInfo] panic: %v", err)
-						}
-						close(subQueryInfo.ReaderDone)
-					}()
-					config.OnLogReaderWithInfo(logReader, subQueryInfo, func(content string) {
-						// This callback can be used by the caller to emit reference material
-						log.Debugf("Reference material content generated for method: %s", subquery.Method)
-					})
-				}()
-			} else if config.OnLogReader != nil {
-				go func() {
-					defer func() {
-						if err := recover(); err != nil {
-							log.Warnf("[OnLogReader] panic: %v", err)
-						}
-						close(subQueryInfo.ReaderDone)
-					}()
-					config.OnLogReader(logReader)
-				}()
-			} else {
-				go func() {
-					io.Copy(io.Discard, logReader)
-					close(subQueryInfo.ReaderDone)
-				}()
-			}
-
-			logWriter.WriteString(fmt.Sprintf("[增强方案:%v]：", MethodVerboseName(subquery.Method)))
-			logWriter.WriteString(fmt.Sprintf("%v", subquery.Query))
+			logWriter.Write([]byte(fmt.Sprintf("[增强方案:%v]：", MethodVerboseName(subquery.Method))))
+			logWriter.Write([]byte(fmt.Sprintf("%v", subquery.Query)))
 
 			currentSearchCount := int64(0)
 			var queryWg sync.WaitGroup
@@ -1161,7 +1211,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...CollectionQueryOp
 				subQueryInfo.ResultBuffer.WriteString("*语义搜索无法覆盖该查询内容*\n")
 			}
 
-			logWriter.WriteString("\n\n查询完成，结果数：" + fmt.Sprint(actualResultCount) + "\n")
+			logWriter.Write([]byte("\n\n查询完成，结果数：" + fmt.Sprint(actualResultCount) + "\n"))
 			logWriter.Close()
 
 			// Wait for reader to finish before proceeding (to ensure reference material callback can be used)

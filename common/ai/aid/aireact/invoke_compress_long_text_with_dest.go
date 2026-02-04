@@ -93,6 +93,11 @@ func (r *ReAct) CompressLongTextWithDestination(
 	isOversize := false
 	_ = isOversize
 	currentBlockSize := 0
+
+	// alreadyExtractedContent stores content that has been extracted, max 8KB
+	const maxAlreadyExtractedSize = 8 * 1024
+	var alreadyExtractedContent strings.Builder
+
 	reducer, err := aireducer.NewReducerFromString(
 		rawText,
 		aireducer.WithContext(ctx),
@@ -113,11 +118,30 @@ func (r *ReAct) CompressLongTextWithDestination(
 				fmt.Println("--------------------------------chunk--------------------------------")
 			})
 
+			// Get already extracted content for deduplication hint
+			mu.Lock()
+			alreadyExtracted := alreadyExtractedContent.String()
+			mu.Unlock()
+
 			// 对当前 chunk 进行 AI 筛选
-			chunkRanges := compressKnowledgeChunkWithScore(editor, ctx, dumpped, destination, r)
+			chunkRanges := compressKnowledgeChunkWithScore(editor, ctx, dumpped, destination, r, alreadyExtracted)
 			if len(chunkRanges) > 0 {
 				mu.Lock()
 				allScoredRanges = append(allScoredRanges, chunkRanges...)
+				// Update already extracted content (max 8KB)
+				for _, item := range chunkRanges {
+					if alreadyExtractedContent.Len() >= maxAlreadyExtractedSize {
+						break
+					}
+					text := editor.GetTextFromPositionInt(item.StartLine, 1, item.EndLine+1, 1)
+					if text != "" {
+						remaining := maxAlreadyExtractedSize - alreadyExtractedContent.Len()
+						if len(text) > remaining {
+							text = text[:remaining]
+						}
+						alreadyExtractedContent.WriteString(fmt.Sprintf("--- [Score: %.2f, Line %d-%d] ---\n%s\n", item.Score, item.StartLine, item.EndLine, text))
+					}
+				}
 				mu.Unlock()
 			}
 			return nil
@@ -172,23 +196,35 @@ func (r *ReAct) CompressLongTextWithDestination(
 }
 
 // compressKnowledgeChunkWithScore processes a single chunk for AI filtering
+// alreadyExtracted contains previously extracted content (max 8KB) to avoid duplicate extraction
 func compressKnowledgeChunkWithScore(
 	editor *memedit.MemEditor,
 	ctx context.Context,
 	chunkContentWithLineNum string,
 	userQuery string,
 	invoker aicommon.AIInvokeRuntime,
+	alreadyExtracted string,
 ) []ScoredRange {
 	dNonce := utils.RandStringBytes(4)
 	minLines := 3
 	maxLines := 20
 	maxRanges := 8
 
+	// Build already extracted section if available
+	alreadyExtractedSection := ""
+	if alreadyExtracted != "" {
+		alreadyExtractedSection = fmt.Sprintf(`<|ALREADY_EXTRACTED_%s|>
+%s
+<|ALREADY_EXTRACTED_END_%s|>
+
+`, dNonce, alreadyExtracted, dNonce)
+	}
+
 	promptTemplate := `<|USER_QUERY_{{ .nonce }}|>
 {{ .userQuery }}
 <|USER_QUERY_END_{{ .nonce }}|>
 
-<|KNOWLEDGE_CHUNK_{{ .nonce }}|>
+{{ .alreadyExtractedSection }}<|KNOWLEDGE_CHUNK_{{ .nonce }}|>
 {{ .samples }}
 <|KNOWLEDGE_CHUNK_END_{{ .nonce }}|>
 
@@ -197,7 +233,13 @@ func compressKnowledgeChunkWithScore(
 
 【核心任务】
 从上述带行号的知识内容中，提取与用户问题直接相关的片段。
-
+{{ if .hasAlreadyExtracted }}
+【重要：去重要求】
+ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
+- 如果当前分片中的内容与已提取内容完全相同或高度重复，应大幅降低评分或不提取
+- 如果内容仅部分重复但有新的补充信息，可以适当降低评分后提取
+- 优先提取与已提取内容不重复的新信息
+{{ end }}
 【输出要求】
 1. 最多提取 %d 个片段
 2. 每个片段 %d-%d 行
@@ -205,10 +247,10 @@ func compressKnowledgeChunkWithScore(
 4. 给出 0.00-1.00 的相关性评分（score），越高越相关
 
 【评分标准】
-- 0.80-1.00: 直接回答用户问题的核心内容
-- 0.60-0.80: 相关背景/技术细节
-- 0.40-0.60: 补充性信息
-- 0.00-0.40: 弱相关或无关内容（不输出）
+- 0.80-1.00: 直接回答用户问题的核心内容（且未被提取过）
+- 0.60-0.80: 相关背景/技术细节（且未被提取过）
+- 0.40-0.60: 补充性信息（或与已提取内容部分重复但有新信息）
+- 0.00-0.40: 弱相关、无关内容、或与已提取内容完全重复（不输出）
 
 尽量使用，精确到小数点后两位来表示
 
@@ -217,9 +259,11 @@ func compressKnowledgeChunkWithScore(
 `
 
 	materials, err := utils.RenderTemplate(fmt.Sprintf(promptTemplate, maxRanges, minLines, maxLines), map[string]any{
-		"nonce":     dNonce,
-		"samples":   chunkContentWithLineNum,
-		"userQuery": userQuery,
+		"nonce":                   dNonce,
+		"samples":                 chunkContentWithLineNum,
+		"userQuery":               userQuery,
+		"alreadyExtractedSection": alreadyExtractedSection,
+		"hasAlreadyExtracted":     alreadyExtracted != "",
 	})
 
 	if err != nil {
@@ -269,7 +313,7 @@ func compressKnowledgeChunkWithScore(
 				}
 				pr, pw := utils.NewPipe()
 				text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
-				pw.WriteString(fmt.Sprintf("[权重：%v]: %v-%v(%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
+				pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
 				// Start streaming output with unified nodeId
 				if invoker != nil {
 					emitter := invoker.GetConfig().GetEmitter()
