@@ -2,6 +2,7 @@ package regen
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,4 +34,66 @@ func Test_expandBigRepeat(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, re.MatchString(s), "generated %q should match expanded pattern", s)
 	require.Len(t, s, 9999, "generated length should be 9999; expanded was: %s", got)
+}
+
+func Test_expandBigRepeat_EdgeCases(t *testing.T) {
+	// escaped '{' should not be treated as quantifier
+	pattern := `\{1001}`
+	expanded := expandBigRepeat(pattern)
+	require.Equal(t, pattern, expanded)
+
+	// escaped sequences like \d should expand correctly
+	pattern = `\d{1001}`
+	expanded = expandBigRepeat(pattern)
+	re, err := regexp.Compile(expanded)
+	require.NoError(t, err)
+	s, err := GenerateOne(expanded)
+	require.NoError(t, err)
+	require.True(t, re.MatchString(s))
+	require.Len(t, s, 1001)
+
+	// divisible case: no remainder and no {0}
+	pattern = `a{2000}`
+	expanded = expandBigRepeat(pattern)
+	require.False(t, strings.Contains(expanded, "{0}"), "expanded: %s", expanded)
+	require.Equal(t, 2, strings.Count(expanded, "{1000}"), "expanded: %s", expanded)
+	s, err = GenerateOne(expanded)
+	require.NoError(t, err)
+	require.Len(t, s, 2000)
+
+	// nested groups
+	pattern = `(abc){1500}`
+	expanded = expandBigRepeat(pattern)
+	re, err = regexp.Compile(expanded)
+	require.NoError(t, err)
+	s, err = GenerateOne(expanded)
+	require.NoError(t, err)
+	require.True(t, re.MatchString(s))
+	require.Len(t, s, 4500)
+
+	// char class with leading ']' literal
+	pattern = `[]a]{1001}`
+	expanded = expandBigRepeat(pattern)
+	re, err = regexp.Compile(expanded)
+	require.NoError(t, err)
+	s, err = GenerateOne(expanded)
+	require.NoError(t, err)
+	require.True(t, re.MatchString(s))
+	require.Len(t, s, 1001)
+	for _, r := range s {
+		require.True(t, r == ']' || r == 'a')
+	}
+
+	// escaped backslash inside char class
+	pattern = `[\\]{1001}`
+	expanded = expandBigRepeat(pattern)
+	re, err = regexp.Compile(expanded)
+	require.NoError(t, err)
+	s, err = GenerateOne(expanded)
+	require.NoError(t, err)
+	require.True(t, re.MatchString(s))
+	require.Len(t, s, 1001)
+	for _, r := range s {
+		require.Equal(t, '\\', r)
+	}
 }

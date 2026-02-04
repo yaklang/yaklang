@@ -1,6 +1,7 @@
 package regen
 
 import (
+	"bytes"
 	"strconv"
 	"unicode/utf8"
 )
@@ -13,6 +14,12 @@ func expandBigRepeat(pattern string) string {
 	i := 0
 	for i < len(pattern) {
 		if pattern[i] != '{' {
+			out = append(out, pattern[i])
+			i++
+			continue
+		}
+		// 转义的 '{'，按普通字符处理
+		if isEscaped(pattern, i) {
 			out = append(out, pattern[i])
 			i++
 			continue
@@ -30,8 +37,16 @@ func expandBigRepeat(pattern string) string {
 			i = start + 1
 			continue
 		}
-		n, _ := strconv.Atoi(pattern[numStart:i])
-		i++ // skip '}'
+		end := i + 1
+		n64, err := strconv.ParseInt(pattern[numStart:i], 10, 0)
+		if err != nil {
+			// 溢出或其他解析错误：回退为原始 {n} 输出
+			out = append(out, pattern[start:end]...)
+			i = end
+			continue
+		}
+		n := int(n64)
+		i = end // skip '}'
 		if n <= maxRepeat {
 			out = append(out, pattern[start:i]...)
 			continue
@@ -44,9 +59,12 @@ func expandBigRepeat(pattern string) string {
 		}
 		atom := pattern[atomStart:start]
 		// 主循环已把 atom 逐个字符追加到 out，需先撤掉，再写展开
-		if len(out) >= len(atom) && string(out[len(out)-len(atom):]) == atom {
-			out = out[:len(out)-len(atom)]
+		if len(out) < len(atom) || !bytes.Equal(out[len(out)-len(atom):], []byte(atom)) {
+			// 无法在 out 末尾找到 atom，无法安全展开，保持原样
+			out = append(out, pattern[start:i]...)
+			continue
 		}
+		out = out[:len(out)-len(atom)]
 		// 展开为 (atom{1000})*q + atom{rem}，其中 n = 1000*q + rem, 0 <= rem < 1000
 		q := n / maxRepeat
 		rem := n % maxRepeat
@@ -79,35 +97,41 @@ func findAtomStart(pattern string, braceStart int) int {
 	if lastStart < 0 {
 		return -1
 	}
+	if lastStart > 0 && pattern[lastStart-1] == '\\' && !isEscaped(pattern, lastStart-1) {
+		// 转义：原子是 \ 及其后一个字符（可能多字节）
+		return lastStart - 1
+	}
 	switch pattern[lastStart] {
 	case ']':
 		return findMatchingBracket(pattern, end-1, '[', ']')
 	case ')':
 		return findMatchingParen(pattern, end-1)
-	case '\\':
-		// 转义：原子是 \ 及其后一个字符（可能多字节）
-		if lastStart > 0 {
-			return lastStart
-		}
-		return -1
 	default:
 		return lastStart
 	}
 }
 
 func findMatchingBracket(pattern string, from int, open, close byte) int {
-	if from < 0 || pattern[from] != close {
+	if from < 0 || pattern[from] != close || isEscaped(pattern, from) {
+		return -1
+	}
+	for i := from - 1; i >= 0; i-- {
+		if pattern[i] == open && !isEscaped(pattern, i) {
+			return i
+		}
+	}
+	return -1
+}
+
+func findMatchingParen(pattern string, from int) int {
+	if from < 0 || pattern[from] != ')' || isEscaped(pattern, from) {
 		return -1
 	}
 	count := 1
 	for i := from - 1; i >= 0; i-- {
-		if pattern[i] == '\\' {
-			i--
-			continue
-		}
-		if pattern[i] == close {
+		if pattern[i] == ')' && !isEscaped(pattern, i) {
 			count++
-		} else if pattern[i] == open {
+		} else if pattern[i] == '(' && !isEscaped(pattern, i) {
 			count--
 			if count == 0 {
 				return i
@@ -117,24 +141,14 @@ func findMatchingBracket(pattern string, from int, open, close byte) int {
 	return -1
 }
 
-func findMatchingParen(pattern string, from int) int {
-	if from < 0 || pattern[from] != ')' {
-		return -1
+// isEscaped 判断 pattern[idx] 是否被反斜杠转义（前缀连续反斜杠数量为奇数）
+func isEscaped(pattern string, idx int) bool {
+	if idx <= 0 {
+		return false
 	}
-	count := 1
-	for i := from - 1; i >= 0; i-- {
-		if pattern[i] == '\\' {
-			i--
-			continue
-		}
-		if pattern[i] == ')' {
-			count++
-		} else if pattern[i] == '(' {
-			count--
-			if count == 0 {
-				return i
-			}
-		}
+	count := 0
+	for i := idx - 1; i >= 0 && pattern[i] == '\\'; i-- {
+		count++
 	}
-	return -1
+	return count%2 == 1
 }
