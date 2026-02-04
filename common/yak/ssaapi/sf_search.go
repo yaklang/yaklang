@@ -19,6 +19,25 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 		return memberMap
 	}
 
+	// 首先尝试直接使用当前 value 的 instruction 来获取成员
+	// 如果当前 value 的 instruction 有成员，直接使用（这是最快的路径）
+	currentInst := value.getValue()
+	if currentInst != nil {
+		currentAllMember := currentInst.GetAllMember()
+		for k, v := range currentAllMember {
+			keyName := k.String()
+			if keyName == "" {
+				continue
+			}
+			// 创建新的 Value，使用当前 value 的 ParentProgram
+			newValVal, err := value.ParentProgram.NewValue(v)
+			if err == nil && newValVal != nil {
+				memberMap[keyName] = newValVal
+			}
+		}
+	}
+
+	// 如果当前 instruction 没有成员，或者需要跨 layer 查找，则通过名称查找
 	// 获取当前 value 的名称，用于在所有 layer 中查找相同类型的值
 	valueName := value.GetName()
 	if valueName == "" {
@@ -162,6 +181,8 @@ func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(*Value
 		return
 	}
 
+	searchMembersFromInst(value, inst, check, add)
+
 	if value.ParentProgram != nil && value.ParentProgram.overlay != nil {
 		overlay := value.ParentProgram.GetOverlay()
 		// 只有当 overlay 存在且至少有 2 个 layer 时，才考虑使用 overlay 逻辑
@@ -185,14 +206,9 @@ func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(*Value
 						add(memberVal)
 					}
 				}
-				return
 			}
 		}
 	}
-
-	// 没有 overlay 或只有一个 layer，或者 value 不是来自 overlay 的查询
-	// 使用原来的逻辑：直接从当前 instruction 获取成员
-	searchMembersFromInst(value, inst, check, add)
 }
 
 func SearchWithValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
