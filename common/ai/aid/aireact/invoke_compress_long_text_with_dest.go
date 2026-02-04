@@ -106,6 +106,13 @@ func (r *ReAct) CompressLongTextWithDestination(
 			}
 
 			dumpped := chunk.DumpWithOverlap(128)
+
+			utils.Debug(func() {
+				fmt.Println("--------------------------------chunk--------------------------------")
+				fmt.Println(dumpped)
+				fmt.Println("--------------------------------chunk--------------------------------")
+			})
+
 			// 对当前 chunk 进行 AI 筛选
 			chunkRanges := compressKnowledgeChunkWithScore(editor, ctx, dumpped, destination, r)
 			if len(chunkRanges) > 0 {
