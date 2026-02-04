@@ -152,13 +152,23 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledge(taskID string) string {
 	return m.DumpTaskAboutKnowledgeWithTop(taskID, 0)
 }
 
+// aggregatedKnowledge is used for grouping knowledge entries by knowledge title
+type aggregatedKnowledge struct {
+	KnowledgeTitle   string   // knowledge title for grouping
+	Source           string   // knowledge source
+	HitQueries       []string // all search queries that hit this knowledge
+	KnowledgeDetails string   // knowledge details (name, display name, type, description, keywords)
+	SearchType       string   // search type
+	SearchTarget     string   // search target
+}
+
 func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, top int) string {
 	knowledges := m.GetKnowledgeByTaskID(taskID)
 	if len(knowledges) == 0 {
 		return ""
 	}
 
-	// 去重：使用 UUID 去重
+	// deduplicate by UUID
 	seen := make(map[string]bool)
 	var uniqueKnowledges []EnhanceKnowledge
 	for _, ek := range knowledges {
@@ -173,7 +183,7 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, t
 	}
 	knowledges = uniqueKnowledges
 
-	// 分类：知识条目 vs 直接搜索结果
+	// classify: knowledge entries vs direct search results
 	var knowledgeEntries []EnhanceKnowledge
 	var directSearchResults []EnhanceKnowledge
 	for _, ek := range knowledges {
@@ -184,12 +194,12 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, t
 		}
 	}
 
-	// 限制总数
+	// limit total count
 	if top > 0 {
 		totalKnowledge := len(knowledgeEntries)
 		totalDirect := len(directSearchResults)
 		if totalKnowledge+totalDirect > top {
-			// 优先保留知识条目
+			// prioritize knowledge entries
 			if totalKnowledge >= top {
 				knowledgeEntries = knowledgeEntries[:top]
 				directSearchResults = nil
@@ -204,63 +214,156 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, t
 
 	var sb strings.Builder
 
-	// 先输出知识条目
+	// output aggregated knowledge entries
 	if len(knowledgeEntries) > 0 {
-		sb.WriteString("=== 关联知识 ===\n")
-		for _, ek := range knowledgeEntries {
-			m.dumpSingleKnowledge(&sb, ek)
-		}
+		sb.WriteString("=== 关联知识 ===\n\n")
+		m.dumpAggregatedKnowledge(&sb, knowledgeEntries)
 	}
 
-	// 再输出直接搜索结果
+	// output aggregated direct search results
 	if len(directSearchResults) > 0 {
 		if sb.Len() > 0 {
 			sb.WriteString("\n")
 		}
-		sb.WriteString("=== 搜索结果 ===\n")
-		for _, ek := range directSearchResults {
-			m.dumpSingleKnowledge(&sb, ek)
-		}
+		sb.WriteString("=== 搜索结果 ===\n\n")
+		m.dumpAggregatedKnowledge(&sb, directSearchResults)
 	}
 
 	return sb.String()
 }
 
-// dumpSingleKnowledge 输出单个知识条目的详细信息
-func (m *EnhanceKnowledgeManager) dumpSingleKnowledge(sb *strings.Builder, ek EnhanceKnowledge) {
-	// 标题行
-	title := ek.GetTitle()
-	if title == "" {
-		title = "[无标题]"
+// dumpAggregatedKnowledge aggregates knowledge by knowledge title and outputs
+func (m *EnhanceKnowledgeManager) dumpAggregatedKnowledge(sb *strings.Builder, knowledges []EnhanceKnowledge) {
+	// aggregate by knowledge title (or title if knowledge title is empty)
+	aggregated := make(map[string]*aggregatedKnowledge)
+	var orderedKeys []string
+
+	for _, ek := range knowledges {
+		// use knowledge title as group key, fallback to title
+		groupKey := ek.GetKnowledgeTitle()
+		if groupKey == "" {
+			groupKey = ek.GetTitle()
+		}
+		if groupKey == "" {
+			groupKey = "[untitled]"
+		}
+
+		if existing, ok := aggregated[groupKey]; ok {
+			// aggregate hit queries (the search questions that matched)
+			hitQuery := ek.GetTitle()
+			if hitQuery != "" && hitQuery != groupKey {
+				// avoid duplicate hit queries
+				found := false
+				for _, q := range existing.HitQueries {
+					if q == hitQuery {
+						found = true
+						break
+					}
+				}
+				if !found {
+					existing.HitQueries = append(existing.HitQueries, hitQuery)
+				}
+			}
+			// update knowledge details if not set yet
+			if existing.KnowledgeDetails == "" {
+				if details := ek.GetKnowledgeDetails(); details != "" {
+					existing.KnowledgeDetails = details
+				}
+			}
+		} else {
+			agg := &aggregatedKnowledge{
+				KnowledgeTitle: groupKey,
+				Source:         ek.GetSource(),
+				SearchType:     ek.GetSearchType(),
+				SearchTarget:   ek.GetSearchTarget(),
+			}
+			// add hit query if different from group key
+			hitQuery := ek.GetTitle()
+			if hitQuery != "" && hitQuery != groupKey {
+				agg.HitQueries = append(agg.HitQueries, hitQuery)
+			}
+			// get knowledge details (the real content: name, type, description, keywords)
+			agg.KnowledgeDetails = ek.GetKnowledgeDetails()
+			aggregated[groupKey] = agg
+			orderedKeys = append(orderedKeys, groupKey)
+		}
 	}
 
-	// 构建标识信息
+	// output aggregated knowledge
+	for idx, key := range orderedKeys {
+		agg := aggregated[key]
+		m.dumpSingleAggregatedKnowledge(sb, idx+1, agg)
+	}
+}
+
+// dumpSingleAggregatedKnowledge outputs a single aggregated knowledge entry
+func (m *EnhanceKnowledgeManager) dumpSingleAggregatedKnowledge(sb *strings.Builder, index int, agg *aggregatedKnowledge) {
+	// format: {index}. [{source}/{knowledge_title}] (hit: query1, query2, ...)
+	source := agg.Source
+	if source == "" {
+		source = "unknown"
+	}
+
+	// title line with hit queries inline (compact format)
+	sb.WriteString(fmt.Sprintf("%d. [%s/%s]", index, source, agg.KnowledgeTitle))
+	if len(agg.HitQueries) > 0 {
+		// limit hit queries display to avoid too long line
+		displayQueries := agg.HitQueries
+		if len(displayQueries) > 3 {
+			displayQueries = append(displayQueries[:3], fmt.Sprintf("...+%d", len(agg.HitQueries)-3))
+		}
+		sb.WriteString(fmt.Sprintf(" (hit: %s)", strings.Join(displayQueries, "; ")))
+	}
+	sb.WriteString("\n")
+
+	// output knowledge details (the real content: name, type, description, keywords)
+	if agg.KnowledgeDetails != "" {
+		lines := strings.Split(agg.KnowledgeDetails, "\n")
+		for _, line := range lines {
+			if line != "" {
+				sb.WriteString(fmt.Sprintf("   %s\n", line))
+			}
+		}
+	}
+
+	sb.WriteString("\n")
+}
+
+// dumpSingleKnowledge outputs a single knowledge entry (legacy method, kept for compatibility)
+func (m *EnhanceKnowledgeManager) dumpSingleKnowledge(sb *strings.Builder, ek EnhanceKnowledge) {
+	// title line
+	title := ek.GetTitle()
+	if title == "" {
+		title = "[untitled]"
+	}
+
+	// build identifiers
 	var identifiers []string
 	if searchType := ek.GetSearchType(); searchType != "" {
-		identifiers = append(identifiers, fmt.Sprintf("类型:%s", searchType))
+		identifiers = append(identifiers, fmt.Sprintf("type:%s", searchType))
 	}
 	if searchTarget := ek.GetSearchTarget(); searchTarget != "" {
-		identifiers = append(identifiers, fmt.Sprintf("目标:%s", searchTarget))
+		identifiers = append(identifiers, fmt.Sprintf("target:%s", searchTarget))
 	}
 
 	if len(identifiers) > 0 {
-		sb.WriteString(fmt.Sprintf("【%s】", strings.Join(identifiers, " | ")))
+		sb.WriteString(fmt.Sprintf("[%s]", strings.Join(identifiers, " | ")))
 	}
 	sb.WriteString(fmt.Sprintf(" %s\n", title))
 
-	// 知识标题（如果有关联知识）
+	// knowledge title (if linked to knowledge)
 	if knowledgeTitle := ek.GetKnowledgeTitle(); knowledgeTitle != "" {
-		sb.WriteString(fmt.Sprintf("  └─ 知识标题: %s\n", knowledgeTitle))
+		sb.WriteString(fmt.Sprintf("  -> Knowledge: %s\n", knowledgeTitle))
 	}
 
-	// 内容
+	// content
 	content := ek.GetContent()
 	if content != "" {
 		sb.WriteString(fmt.Sprintf("%s\n", content))
 	}
 
-	// 来源和相关性
-	sb.WriteString(fmt.Sprintf("(来源: %s, 相关性: %.2f)\n\n", ek.GetSource(), ek.GetScore()))
+	// source info
+	sb.WriteString(fmt.Sprintf("(source: %s)\n\n", ek.GetSource()))
 }
 
 func NewEnhanceKnowledgeManager(knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
@@ -295,6 +398,7 @@ type EnhanceKnowledge interface {
 	GetSearchType() string         // 搜索类型（如 AI工具、Yak插件 等）
 	GetKnowledgeTitle() string     // 关联知识的标题
 	GetKnowledgeEntryUUID() string // 关联知识条目的 UUID，用于动态查询详情
+	GetKnowledgeDetails() string   // 获取知识详情（名称、显示名称、类型、功能描述、关键词等）
 }
 
 type BasicEnhanceKnowledge struct {
@@ -385,5 +489,9 @@ func (e *BasicEnhanceKnowledge) GetKnowledgeTitle() string {
 }
 
 func (e *BasicEnhanceKnowledge) GetKnowledgeEntryUUID() string {
+	return ""
+}
+
+func (e *BasicEnhanceKnowledge) GetKnowledgeDetails() string {
 	return ""
 }
