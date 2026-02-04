@@ -587,7 +587,7 @@ func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, li
 	var results = chanx.NewUnlimitedChan[SearchResult](ctx, 100)
 	go func() {
 		defer results.Close()
-		for doc := range yakit.YieldVectorDocument(ctx, s.db, filter, bizhelper.WithYieldModel_Limit(limit)) {
+		for doc := range yakit.SearchVectorStoreDocumentBM25Yield(ctx, s.db, filter, bizhelper.WithYieldModel_Limit(limit)) {
 			results.SafeFeed(SearchResult{
 				Document: s.toDocument(doc),
 				Score:    0,
