@@ -2,12 +2,24 @@ package regen
 
 import (
 	"context"
+	"fmt"
 	"regexp/syntax"
 
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/pkg/errors"
 )
+
+// wrapParseErr 对 "invalid repeat count" 等解析错误增加说明：Go 正则 {n} 重复次数上限为 1000
+func wrapParseErr(pattern string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if e, ok := err.(*syntax.Error); ok && e.Code == syntax.ErrInvalidRepeatSize {
+		return fmt.Errorf("%w（regen 基于 Go 正则，{n}/{n,m} 重复次数上限为 1000，请将 %q 中的数字改为 ≤1000 或分段生成）", err, pattern)
+	}
+	return err
+}
 
 type CaptureGroupHandler func(index int, name string, group *syntax.Regexp, generator Generator, args *GeneratorArgs) []string
 
@@ -255,10 +267,11 @@ func NewGenerator(pattern string, inputArgs *GeneratorArgs) (generator Generator
 		return nil, err
 	}
 
+	pattern = expandBigRepeat(pattern)
 	var regexp *syntax.Regexp
 	regexp, err = syntax.Parse(pattern, args.Flags)
 	if err != nil {
-		return
+		return nil, wrapParseErr(pattern, err)
 	}
 
 	var gen *internalGenerator
@@ -281,10 +294,11 @@ func NewGeneratorOne(pattern string, inputArgs *GeneratorArgs) (geneator Generat
 		return nil, err
 	}
 
+	pattern = expandBigRepeat(pattern)
 	var regexp *syntax.Regexp
 	regexp, err = syntax.Parse(pattern, args.Flags)
 	if err != nil {
-		return
+		return nil, wrapParseErr(pattern, err)
 	}
 
 	var gen *internalGenerator
@@ -307,10 +321,11 @@ func NewGeneratorVisibleOne(pattern string, inputArgs *GeneratorArgs) (geneator 
 		return nil, err
 	}
 
+	pattern = expandBigRepeat(pattern)
 	var regexp *syntax.Regexp
 	regexp, err = syntax.Parse(pattern, args.Flags)
 	if err != nil {
-		return
+		return nil, wrapParseErr(pattern, err)
 	}
 
 	var gen *internalGenerator

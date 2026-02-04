@@ -81,6 +81,24 @@ func Test_Smoke_GenerateVisibleOne(t *testing.T) {
 	testVisibleOneAndStream(t, `(?:ATGPlatform/([\d.]+))?`)
 }
 
+// Test_BigRepeat_Over1000 验证用户写 {9999} 等 >1000 时能正确展开并生成
+func Test_BigRepeat_Over1000(t *testing.T) {
+	// expandBigRepeat 会把 [0-9a-z]{9999} 展开为多个 ≤1000 的重复，生成结果长度应为 9999
+	result, err := GenerateOne(`[0-9a-z]{9999}`)
+	require.NoError(t, err)
+	require.Len(t, result, 9999)
+	for _, r := range result {
+		require.True(t, (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z'), "rune %q not in [0-9a-z]", r)
+	}
+	// 小一点再测一发，确保 1001 也会被展开
+	result2, err := GenerateOne(`a{1001}`)
+	require.NoError(t, err)
+	require.Len(t, result2, 1001)
+	for _, r := range result2 {
+		require.Equal(t, 'a', r)
+	}
+}
+
 func Test_ExampleGenerateStream(t *testing.T) {
 	pattern := `(1|2){2,3}`
 	ch, cancel, err := GenerateStream(pattern)
