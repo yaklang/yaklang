@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -222,7 +222,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		if config.GetCompileFilePerformanceLog() {
 			para["filePerformanceLog"] = true
 		}
-		res, err := coreplugin.ParseProjectWithAutoDetective(ctx, &coreplugin.SSADetectConfig{
+		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
 			Target:             targetPath,
 			Language:           language,
 			CompileImmediately: true,
