@@ -20829,9 +20829,11 @@ func (x *YaklangShellResponse) GetScope() []*YaklangShellKVPair {
 }
 
 type ResetAndInvalidUserDataRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 若为 true，仅清理缓存（GeneralStorage 等），不删库、不退出进程；默认 false 为原有「清理数据库并退出」行为。
+	OnlyClearCache bool `protobuf:"varint,1,opt,name=OnlyClearCache,proto3" json:"OnlyClearCache,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ResetAndInvalidUserDataRequest) Reset() {
@@ -20862,6 +20864,13 @@ func (x *ResetAndInvalidUserDataRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ResetAndInvalidUserDataRequest.ProtoReflect.Descriptor instead.
 func (*ResetAndInvalidUserDataRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{279}
+}
+
+func (x *ResetAndInvalidUserDataRequest) GetOnlyClearCache() bool {
+	if x != nil {
+		return x.OnlyClearCache
+	}
+	return false
 }
 
 type RegisterFacadesHTTPRequest struct {
@@ -33813,13 +33822,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -43368,8 +43377,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -68135,8 +68144,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bSymbolId\x18\x04 \x01(\x03R\bSymbolId\"t\n" +
 	"\x14YaklangShellResponse\x12-\n" +
 	"\tRawResult\x18\x01 \x01(\v2\x0f.ypb.ExecResultR\tRawResult\x12-\n" +
-	"\x05Scope\x18\x02 \x03(\v2\x17.ypb.YaklangShellKVPairR\x05Scope\" \n" +
-	"\x1eResetAndInvalidUserDataRequest\"r\n" +
+	"\x05Scope\x18\x02 \x03(\v2\x17.ypb.YaklangShellKVPairR\x05Scope\"H\n" +
+	"\x1eResetAndInvalidUserDataRequest\x12&\n" +
+	"\x0eOnlyClearCache\x18\x01 \x01(\bR\x0eOnlyClearCache\"r\n" +
 	"\x1aRegisterFacadesHTTPRequest\x12\x1e\n" +
 	"\n" +
 	"HTTPFlowID\x18\x01 \x01(\x03R\n" +
