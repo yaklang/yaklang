@@ -56,6 +56,32 @@ var UtilsCommands = []*cli.Command{
 	createYakToolMetadataCommand(),
 	createBuildInForgeMetadataCommand(),
 	{
+		Name:  "sync-coreplugin",
+		Usage: "force sync built-in core plugin from embed to database (ignore hash check)",
+		Action: func(c *cli.Context) error {
+			log.Infof("force sync core plugin from embed to database ...")
+			if err := coreplugin.ForceSyncCorePlugin(); err != nil {
+				log.Errorf("force sync core plugin failed: %v", err)
+				return err
+			}
+			log.Infof("force sync core plugin done")
+			return nil
+		},
+	},
+	{
+		Name:  "sync-aiforge",
+		Usage: "force sync built-in AI forge from embed to database (ignore hash check)",
+		Action: func(c *cli.Context) error {
+			log.Infof("force sync built-in AI forge from embed to database ...")
+			if err := aiforge.ForceSyncBuildInForge(); err != nil {
+				log.Errorf("force sync built-in AI forge failed: %v", err)
+				return err
+			}
+			log.Infof("force sync built-in AI forge done")
+			return nil
+		},
+	},
+	{
 		Name:  "embed-fs-hash", // 此命令会被CI调用，用于自动生成hash.go文件。如果希望在提交代码时自动更新静态资源的哈希值，需要在.github/workflows/update-embed-fs.yml中添加对应的静态资源路径
 		Usage: `Generate Current Embed File System(yak/syntaxflow/aiforge/aitool) Hash`,
 		Flags: []cli.Flag{
