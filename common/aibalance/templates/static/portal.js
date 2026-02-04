@@ -2935,7 +2935,11 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 const result = await response.json(); // Expecting JSON: { "success": true/false, "message": "..." }
 
                 if (response.ok && result.success) {
-                    validationResultDiv.textContent = `验证成功: ${result.message || '配置有效。现在可以添加提供者。'}`;
+                    let successMsg = `验证成功: ${result.message || 'Provider validated successfully'}`;
+                    if (result.latency !== undefined && result.latency > 0) {
+                        successMsg += ` (延迟: ${result.latency}ms)`;
+                    }
+                    validationResultDiv.textContent = successMsg;
                     validationResultDiv.className = 'validation-message success';
                     submitBtn.disabled = false;
                     submitBtn.style.backgroundColor = '#4caf50'; // 绿色，表示成功

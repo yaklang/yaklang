@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
@@ -403,6 +404,7 @@ func (c *ServerConfig) handleDeleteMultipleProviders(conn net.Conn, request *htt
 // ==================== Provider Validation Handler ====================
 
 // handleValidateProvider validates a provider configuration
+// It uses the same validation logic as health check - waiting for actual AI response (first byte)
 func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Request) {
 	c.logInfo("Processing validate provider request")
 
@@ -417,7 +419,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 	}
 
 	// Parse request - support both form data and JSON
-	var typeName, domainOrURL, apiKey, modelName string
+	var typeName, domainOrURL, apiKey, modelName, providerMode string
 	var noHTTPS bool
 
 	contentType := request.Header.Get("Content-Type")
@@ -437,15 +439,17 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		}
 		modelName = request.FormValue("model_name")
 		noHTTPS = request.FormValue("no_https") == "on"
+		providerMode = request.FormValue("provider_mode")
 	} else {
 		// Parse JSON body
 		var reqBody struct {
-			TypeName    string `json:"type_name"`
-			ModelType   string `json:"model_type"`
-			DomainOrURL string `json:"domain_or_url"`
-			APIKey      string `json:"api_key"`
-			ModelName   string `json:"model_name"`
-			NoHTTPS     bool   `json:"no_https"`
+			TypeName     string `json:"type_name"`
+			ModelType    string `json:"model_type"`
+			DomainOrURL  string `json:"domain_or_url"`
+			APIKey       string `json:"api_key"`
+			ModelName    string `json:"model_name"`
+			NoHTTPS      bool   `json:"no_https"`
+			ProviderMode string `json:"provider_mode"`
 		}
 
 		bodyBytes, err := io.ReadAll(request.Body)
@@ -470,6 +474,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		apiKey = reqBody.APIKey
 		modelName = reqBody.ModelName
 		noHTTPS = reqBody.NoHTTPS
+		providerMode = reqBody.ProviderMode
 	}
 
 	// Validate required fields
@@ -482,41 +487,87 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		return
 	}
 
-	c.logInfo("Validating provider: type=%s, domain=%s, model=%s", typeName, domainOrURL, modelName)
+	// Default provider mode to "chat" if not specified
+	if providerMode == "" {
+		providerMode = "chat"
+	}
+
+	c.logInfo("Validating provider: type=%s, domain=%s, model=%s, mode=%s", typeName, domainOrURL, modelName, providerMode)
 
 	// Create a temporary provider for validation
 	provider := &Provider{
-		TypeName:    typeName,
-		DomainOrURL: domainOrURL,
-		APIKey:      apiKey,
-		ModelName:   modelName,
-		NoHTTPS:     noHTTPS,
+		TypeName:     typeName,
+		DomainOrURL:  domainOrURL,
+		APIKey:       apiKey,
+		ModelName:    modelName,
+		NoHTTPS:      noHTTPS,
+		ProviderMode: providerMode,
 	}
 
-	// Try to get a client and make a simple request
-	client, err := provider.GetAIClient(nil, nil)
-	if err != nil {
-		c.logError("Failed to create client for validation: %v", err)
+	// Validate by actually calling the AI and checking for valid response content
+	// We need to wait for the complete response and verify it's not an error response
+	startTime := time.Now()
+	var response string
+	var validationErr error
+
+	if providerMode == "embedding" {
+		// Embedding mode validation
+		embClient, err := provider.GetEmbeddingClient()
+		if err != nil {
+			c.logError("Failed to create embedding client for validation: %v", err)
+			c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+				"success": false,
+				"message": fmt.Sprintf("Failed to create embedding client: %v", err),
+			})
+			return
+		}
+
+		_, validationErr = embClient.Embedding("validation test")
+	} else {
+		// Chat mode validation - wait for actual AI response content
+		client, err := provider.GetAIClient(nil, nil)
+		if err != nil {
+			c.logError("Failed to create client for validation: %v", err)
+			c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
+				"success": false,
+				"message": fmt.Sprintf("Failed to create client: %v", err),
+			})
+			return
+		}
+
+		// Call Chat and wait for complete response
+		// Use timeout to prevent hanging
+		response, validationErr = client.Chat("Hello, please respond with OK", aispec.WithTimeout(20))
+	}
+
+	// Calculate latency from request start to response complete
+	latencyMs := time.Since(startTime).Milliseconds()
+
+	// Check for errors
+	if validationErr != nil {
+		c.logError("Provider validation failed with error: %v", validationErr)
 		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 			"success": false,
-			"message": fmt.Sprintf("Failed to create client: %v", err),
+			"message": fmt.Sprintf("Validation failed: %v", validationErr),
 		})
 		return
 	}
 
-	// Try a simple chat completion
-	_, err = client.Chat("Hello", aispec.WithTimeout(10))
-	if err != nil {
+	// For chat mode, check if we got a valid response (not empty)
+	if providerMode != "embedding" && strings.TrimSpace(response) == "" {
+		c.logError("Provider validation failed: empty response from AI")
 		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 			"success": false,
-			"message": fmt.Sprintf("Validation failed: %v", err),
+			"message": "Validation failed: empty response from AI (model may not exist or API key invalid)",
 		})
 		return
 	}
 
+	c.logInfo("Provider validation successful, latency: %dms, response length: %d", latencyMs, len(response))
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Provider validated successfully",
+		"latency": latencyMs,
 	})
 }
 
