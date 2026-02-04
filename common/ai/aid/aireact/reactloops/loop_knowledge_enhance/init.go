@@ -41,7 +41,7 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithMaxIterations(4), // 支持多轮单条搜索
+				reactloops.WithMaxIterations(3), // 支持多轮单条搜索
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					allowActionNames := []string{
 						"search_knowledge_semantic",
@@ -179,7 +179,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		}
 
 		knowledgeBases = dedupStrings(knowledgeBases)
-		log.Infof("start to get knowledge base samples: %v", knowledgeBases)
+		log.Infof("start to get knowledge base selected: %v", knowledgeBases)
 
 		if len(knowledgeBases) <= 0 {
 			allKBNames, err := yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())

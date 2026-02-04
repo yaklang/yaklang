@@ -5,11 +5,12 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) error {
+func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) error {
 	// 新建任务 让 ai 根据用户输入和提及信息进行增强知识回答
 
 	newTask := aicommon.NewStatefulTaskBase(
@@ -36,36 +37,40 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 		}
 	}
 
-	if !haveKnowledgeBase {
+	if haveKnowledgeBase {
+		var knowledgeEnhanceLoop *reactloops.ReActLoop
+		opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
+			knowledgeEnhanceLoop = loop
+		}))
+
+		ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
+
+		log.Infof("knowledge enhance loop completed: ok=%v, err=%v, exit next loop", ok, err)
+		operator.Done()
+
+		var searchResultsSummary string
+		finalSummary := knowledgeEnhanceLoop.Get("final_summary")
+		if finalSummary != "" {
+			searchResultsSummary = finalSummary
+		} else {
+			searchResultsSummary = loop.Get("search_results_summary")
+		}
+
+		if searchResultsSummary != "" {
+			loop.GetInvoker().AddToTimeline("knowledge_search_result_summary", searchResultsSummary)
+			loop.GetInvoker().AddToTimeline("import notice", "knowledge_search_result_summary has been set, no need to search the knowledge base again as it has already been queried")
+		}
+
+		if err != nil {
+			return utils.Wrap(err, "failed to execute loop task")
+		}
+		if !ok {
+			return utils.Errorf("failed to execute loop task")
+		}
 		return nil
 	}
 
-	var knowledgeEnhanceLoop *reactloops.ReActLoop
-	opts = append(opts, reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE), reactloops.WithOnLoopInstanceCreated(func(loop *reactloops.ReActLoop) {
-		knowledgeEnhanceLoop = loop
-	}))
-
-	ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
-
-	var searchResultsSummary string
-
-	finalSummary := knowledgeEnhanceLoop.Get("final_summary")
-	if finalSummary != "" {
-		searchResultsSummary = finalSummary
-	} else {
-		searchResultsSummary = loop.Get("search_results_summary")
-	}
-
-	if searchResultsSummary != "" {
-		loop.GetInvoker().AddToTimeline("knowledge_search_result_summary", searchResultsSummary)
-		loop.GetInvoker().AddToTimeline("import notice", "knowledge_search_result_summary has been set, no need to search the knowledge base again as it has already been queried")
-	}
-
-	if err != nil {
-		return utils.Wrap(err, "failed to execute loop task")
-	}
-	if !ok {
-		return utils.Errorf("failed to execute loop task")
-	}
+	operator.Continue()
 	return nil
+
 }

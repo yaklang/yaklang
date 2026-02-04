@@ -16,13 +16,11 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		attachedDatas := task.GetAttachedDatas()
 
 		if mustProcessMentionedInfo && len(attachedDatas) > 0 {
-			err := ProcessAttachedData(r, loop, task)
+			err := ProcessAttachedData(r, loop, task, operator)
 			if err != nil {
 				log.Errorf("failed to process attached data: %v", err)
 				loop.GetInvoker().AddToTimeline("error", fmt.Sprintf("failed to process attached data: %v", err))
 			}
 		}
-		// Default: Continue with normal loop execution
-		operator.Continue()
 	}
 }
