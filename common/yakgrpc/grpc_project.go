@@ -143,8 +143,24 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 
 	// check this name exist
 	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
-	if pro != nil {
-		return nil, utils.Errorf("Project or directory name can not be duplicated in the same directory")
+	onlineTask := req.OnlineTask
+	if onlineTask {
+		if !CheckDefault(pro.ProjectName, pro.Type, pro.FolderID, pro.ChildFolderID) {
+			err := consts.DeleteDatabaseFile(pro.DatabasePath)
+			if err != nil {
+				log.Errorf("delete local database error: %v", err)
+			}
+
+			err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(pro.ID))
+			if err != nil {
+				log.Errorf("delete project error: %v", err)
+			}
+		}
+
+	} else {
+		if pro != nil {
+			return nil, utils.Errorf("Project or directory name can not be duplicated in the same directory")
+		}
 	}
 
 	// check is default project
@@ -170,6 +186,7 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		Type:          req.Type,
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
+		OnlineTask:    onlineTask,
 	}
 	if req.ExternalProjectCode != "" {
 		projectData.ExternalProjectCode = req.ExternalProjectCode

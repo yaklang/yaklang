@@ -25,6 +25,7 @@ type Project struct {
 	// 企业版 项目模块及项目编号
 	ExternalModule      string
 	ExternalProjectCode string
+	OnlineTask          bool
 }
 
 type BackProject struct {
