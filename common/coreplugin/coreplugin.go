@@ -98,320 +98,331 @@ func ClearBlackListPlugin(blackList []string) {
 	}
 }
 
+// corePluginEmbedKey 用于 yakit 存储 core plugin embed 同步状态，与 init 中 MonitorModifiedWithAction 一致
+const corePluginEmbedKey = "cd336beba498c97738c275f6771efca3"
+
+// syncCorePluginEmbedInternal 将内置 core plugin 从 embed 同步到数据库，不更新 hash（由调用方决定）
+func syncCorePluginEmbedInternal() error {
+	log.Debug("start to load core plugin")
+	registerBuildInPlugin(
+		"mitm",
+		"HTTP请求走私",
+		withPluginAuthors("V1ll4n"),
+		withPluginHelp("HTTP请求走私漏洞检测，通过设置畸形的 Content-Length(CL) 和 Transfer-Encoding(TE) 来检测服务器是否会对畸形数据包产生不安全的反应。"),
+	)
+	registerBuildInPlugin(
+		"mitm", "CSRF 表单保护与 CORS 配置不当检测",
+		withPluginHelp("检测应用是否存在 CSRF 表单保护，以及 CORS 配置不当"),
+		withPluginAuthors("Rookie"),
+	)
+	registerBuildInPlugin(
+		"mitm", "Fastjson 综合检测",
+		withPluginHelp("综合 FastJSON 反序列化漏洞检测"),
+		withPluginAuthors("z3"),
+	)
+	registerBuildInPlugin(
+		"mitm", "Shiro 指纹识别 + 弱密码检测",
+		withPluginHelp("识别应用是否是 Shiro 应用，尝试检测默认 KEY (CBC/GCM 模式均支持)，当发现默认KEY之后进行一次利用链检测"),
+		withPluginAuthors("z3", "go0p"),
+	)
+	registerBuildInPlugin(
+		"mitm", "Shiro 自定义检测",
+		withPluginHelp("识别Shiro应用，用户可以自行指定密钥，gadget，加密模式进行检测"),
+		withPluginAuthors("z3", "go0p"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"mitm", "SSRF HTTP Public",
+		withPluginHelp("检测参数中的 SSRF 漏洞"),
+	)
+	registerBuildInPlugin(
+		"mitm", "SQL注入-UNION注入-MD5函数",
+		withPluginHelp("Union 注入，使用 md5 函数检测特征输出（mysql/postgres）"),
+		withPluginAuthors("V1ll4n"),
+	)
+	registerBuildInPlugin(
+		"mitm", "SQL注入-MySQL-ErrorBased",
+		withPluginHelp("MySQL 报错注入（使用 MySQL 十六进制字符串特征检测）"),
+		withPluginAuthors("V1ll4n"),
+	)
+	registerBuildInPlugin(
+		"mitm", "SQL注入-时间盲注-Sleep",
+		withPluginHelp("SQL 时间盲注"),
+		withPluginAuthors("WAY"),
+	)
+	registerBuildInPlugin(
+		"mitm", "SQL注入-堆叠注入",
+		withPluginHelp("SQL 堆叠注入（带回显），使用 md5 函数检测特征输出（mysql/postgres）"),
+		withPluginAuthors("WAY"),
+	)
+	registerBuildInPlugin(
+		"mitm",
+		"SSTI Expr 服务器模版表达式注入",
+		withPluginHelp("SSTI 服务器模版表达式注入漏洞（通用漏洞检测）"),
+		withPluginAuthors("V1ll4n"),
+	)
+	registerBuildInPlugin(
+		"mitm", "Swagger JSON 泄漏",
+		withPluginHelp("检查网站是否开放 Swagger JSON 的 API 信息"),
+		withPluginAuthors("V1ll4n"),
+	)
+	//registerBuildInPlugin(
+	//	"mitm", "启发式SQL注入检测",
+	//	withPluginHelp("请求包中各种情况参数进行sql注入检测"),
+	//	withPluginAuthors("雨过天晴&伞落人离"),
+	//)
+	registerBuildInPlugin(
+		"mitm", "基础 XSS 检测",
+		withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
+		withPluginAuthors("WaY"),
+	)
+	registerBuildInPlugin(
+		"mitm", "文件包含",
+		withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
+		withPluginAuthors("V1ll4n"),
+	)
+	registerBuildInPlugin(
+		"mitm", "开放 URL 重定向漏洞",
+		withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
+		withPluginAuthors("Rookie"),
+	)
+	registerBuildInPlugin(
+		"mitm", "回显命令注入",
+		withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
+		withPluginAuthors("V1ll4n"),
+	)
+	registerBuildInPlugin(
+		"mitm", "修改 HTTP 请求 Header",
+		withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+	)
+	registerBuildInPlugin(
+		"mitm", "修改 HTTP 请求 Cookie",
+		withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+	)
+	registerBuildInPlugin(
+		"mitm", "修改 HTTP 请求",
+		withPluginHelp("允许用户加载该插件修改/增加/删除请求的 Header/Cookie/GetParams/PostParams，可以设置 URL 关键字作为前提条件"),
+		withPluginAuthors("WaY"),
+		withPluginEnableGenerateParam(true),
+		withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+	)
+	registerBuildInPlugin(
+		"mitm", "多认证综合越权测试",
+		withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "简易意图识别",
+		withPluginHelp("使用ai对用户的意图进行简易识别"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "Tun劫持服务",
+		withPluginHelp("通过Tun设备劫持流量并转发到MITM进行处理"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "路由表查询",
+		withPluginHelp("查询当前tun劫持的路由信息"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "TCP Kill服务",
+		withPluginHelp("监控网络栈，触发式向目标发送TCP RST包以终止连接"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "路由表增加",
+		withPluginHelp("增加tun劫持的路由"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "路由表删除",
+		withPluginHelp("删除tun劫持的路由"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "劫持进程",
+		withPluginHelp("劫持指定进程的流量到tun设备"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	//registerBuildInPlugin(
+	//	"mitm", "MITM 请求修改",
+	//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
+	//	withPluginAuthors("WaY"),
+	//	withPluginEnableGenerateParam(true),
+	//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+	//)
+	//registerBuildInPlugin(
+	//	"mitm", "MITM 响应修改",
+	//	withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
+	//	withPluginAuthors("WaY"),
+	//	withPluginEnableGenerateParam(true),
+	//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
+	//)
+	registerBuildInPlugin(
+		"yak", "核心引擎性能采样",
+		withPluginHelp("动态开启PPROF采样，用于性能调优"),
+		withPluginAuthors("V1ll4n,Q16G"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "崩溃日志收集",
+		withPluginHelp("收集本地项目日志中的崩溃信息，保存成 zip 以便分析"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "SSA 项目编译",
+		withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
+		withPluginAuthors("令则"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "SSA 项目重编译",
+		withPluginHelp("将以编译项目使用当前引擎重新编译。用于引擎编译策略更新或代码有变动时使用。"),
+		withPluginAuthors("令则"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "SyntaxFlow 规则执行",
+		withPluginHelp("执行 SyntaxFlow 规则"),
+		withPluginAuthors("令则"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "引擎性能采样自动分析",
+		withPluginHelp("自动分析PPROF文件，生成可阅读文件。"),
+		withPluginAuthors("intSheep"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak", "SSA 项目探测",
+		withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
+		withPluginAuthors("Q16G"),
+		withPluginEnableGenerateParam(true))
+	registerBuildInPlugin(
+		"yak", "SSA 项目更新",
+		withPluginHelp("更新SSA项目信息，包括项目名称、描述、语言、配置等"),
+		withPluginAuthors("intSheep"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin("yak", "SyntaxFlow Searcher",
+		withPluginHelp(`代码审计项目管理中，支持文件名、函数名、变量名、常量等搜索`),
+		withPluginAuthors("Q16G"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"yak",
+		"SyntaxFlow 查询项目信息",
+		withPluginHelp("使用SyntaxFlow查询项目信息，如项目的过滤函数。"),
+		withPluginAuthors("intSheep"),
+		withPluginEnableGenerateParam(true),
+	)
+	registerBuildInPlugin(
+		"mitm",
+		"SQL注入-Path参数注入",
+		withPluginAuthors("intSheep"),
+		withPluginHelp("SQL注入检测，针对RESTful API风格设计的Path参数进行SQL注入检测"),
+	)
+	registerBuildInPlugin(
+		"mitm",
+		"SQL注入-高危Header注入",
+		withPluginAuthors("intSheep"),
+		withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
+	)
+
+	registerBuildInPlugin(
+		"yak", "构建知识库",
+		withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
+		withPluginEnableGenerateParam(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "检索知识",
+		withPluginHelp("从知识库中语义检索相关知识，返回相关内容"),
+		withPluginEnableGenerateParam(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "构建知识条目",
+		withPluginHelp("从实体库中构建知识条目，支持目的性的知识条目构建"),
+		withPluginEnableGenerateParam(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "证书生成",
+		withPluginHelp("通过各种选项生成所需的证书文件"),
+		withPluginEnableGenerateParam(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "重置知识库",
+		withPluginHelp("删除所有知识库及其关联的RAG内容，包括向量库、集合综述库、知识库条目库等"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+
+	registerBuildInPlugin(
+		"yak", "知识库可用性诊断",
+		withPluginHelp("检测AI图像识别能力和向量化服务是否正常工作，用于知识库功能的可用性诊断"),
+		withPluginAuthors("V1ll4n"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+	registerBuildInPlugin("yak", "导入默认知识库",
+		withPluginHelp("导入默认知识库，支持多个知识库，使用逗号分隔，格式如 /path/a.rag:kb-name:<uid>,/path/b.rag:another-name:<uid>"),
+		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
+	)
+	return nil
+}
+
+// ForceSyncCorePlugin 强制同步内置 core plugin 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
+func ForceSyncCorePlugin() error {
+	if err := syncCorePluginEmbedInternal(); err != nil {
+		return err
+	}
+	yakit.Set(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash)
+	return nil
+}
+
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		ClearBlackListPlugin(BlackListCorePlugin)
-
-		const key = "cd336beba498c97738c275f6771efca3"
-		return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedCorePluginEmbedFSHash).MonitorModifiedWithAction(func() string {
+		return resources_monitor.NewEmbedResourcesMonitor(corePluginEmbedKey, consts.ExistedCorePluginEmbedFSHash).MonitorModifiedWithAction(func() string {
 			hash, _ := CorePluginHash()
 			return hash
-		}, func() error {
-			log.Debug("start to load core plugin")
-
-		registerBuildInPlugin(
-			"mitm",
-			"HTTP请求走私",
-			withPluginAuthors("V1ll4n"),
-			withPluginHelp("HTTP请求走私漏洞检测，通过设置畸形的 Content-Length(CL) 和 Transfer-Encoding(TE) 来检测服务器是否会对畸形数据包产生不安全的反应。"),
-		)
-		registerBuildInPlugin(
-			"mitm", "CSRF 表单保护与 CORS 配置不当检测",
-			withPluginHelp("检测应用是否存在 CSRF 表单保护，以及 CORS 配置不当"),
-			withPluginAuthors("Rookie"),
-		)
-		registerBuildInPlugin(
-			"mitm", "Fastjson 综合检测",
-			withPluginHelp("综合 FastJSON 反序列化漏洞检测"),
-			withPluginAuthors("z3"),
-		)
-		registerBuildInPlugin(
-			"mitm", "Shiro 指纹识别 + 弱密码检测",
-			withPluginHelp("识别应用是否是 Shiro 应用，尝试检测默认 KEY (CBC/GCM 模式均支持)，当发现默认KEY之后进行一次利用链检测"),
-			withPluginAuthors("z3", "go0p"),
-		)
-		registerBuildInPlugin(
-			"mitm", "Shiro 自定义检测",
-			withPluginHelp("识别Shiro应用，用户可以自行指定密钥，gadget，加密模式进行检测"),
-			withPluginAuthors("z3", "go0p"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"mitm", "SSRF HTTP Public",
-			withPluginHelp("检测参数中的 SSRF 漏洞"),
-		)
-		registerBuildInPlugin(
-			"mitm", "SQL注入-UNION注入-MD5函数",
-			withPluginHelp("Union 注入，使用 md5 函数检测特征输出（mysql/postgres）"),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "SQL注入-MySQL-ErrorBased",
-			withPluginHelp("MySQL 报错注入（使用 MySQL 十六进制字符串特征检测）"),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "SQL注入-时间盲注-Sleep",
-			withPluginHelp("SQL 时间盲注"),
-			withPluginAuthors("WAY"),
-		)
-		registerBuildInPlugin(
-			"mitm", "SQL注入-堆叠注入",
-			withPluginHelp("SQL 堆叠注入（带回显），使用 md5 函数检测特征输出（mysql/postgres）"),
-			withPluginAuthors("WAY"),
-		)
-		registerBuildInPlugin(
-			"mitm",
-			"SSTI Expr 服务器模版表达式注入",
-			withPluginHelp("SSTI 服务器模版表达式注入漏洞（通用漏洞检测）"),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "Swagger JSON 泄漏",
-			withPluginHelp("检查网站是否开放 Swagger JSON 的 API 信息"),
-			withPluginAuthors("V1ll4n"),
-		)
-		//registerBuildInPlugin(
-		//	"mitm", "启发式SQL注入检测",
-		//	withPluginHelp("请求包中各种情况参数进行sql注入检测"),
-		//	withPluginAuthors("雨过天晴&伞落人离"),
-		//)
-		registerBuildInPlugin(
-			"mitm", "基础 XSS 检测",
-			withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
-			withPluginAuthors("WaY"),
-		)
-		registerBuildInPlugin(
-			"mitm", "文件包含",
-			withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "开放 URL 重定向漏洞",
-			withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
-			withPluginAuthors("Rookie"),
-		)
-		registerBuildInPlugin(
-			"mitm", "回显命令注入",
-			withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
-			withPluginAuthors("V1ll4n"),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求 Header",
-			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求 Cookie",
-			withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "修改 HTTP 请求",
-			withPluginHelp("允许用户加载该插件修改/增加/删除请求的 Header/Cookie/GetParams/PostParams，可以设置 URL 关键字作为前提条件"),
-			withPluginAuthors("WaY"),
-			withPluginEnableGenerateParam(true),
-			withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		)
-		registerBuildInPlugin(
-			"mitm", "多认证综合越权测试",
-			withPluginHelp("可以设置 Cookie 和 Header 的多个认证信息进行越权测试，结果包含相似度"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "简易意图识别",
-			withPluginHelp("使用ai对用户的意图进行简易识别"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "Tun劫持服务",
-			withPluginHelp("通过Tun设备劫持流量并转发到MITM进行处理"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表查询",
-			withPluginHelp("查询当前tun劫持的路由信息"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "TCP Kill服务",
-			withPluginHelp("监控网络栈，触发式向目标发送TCP RST包以终止连接"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表增加",
-			withPluginHelp("增加tun劫持的路由"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "路由表删除",
-			withPluginHelp("删除tun劫持的路由"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "劫持进程",
-			withPluginHelp("劫持指定进程的流量到tun设备"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		//registerBuildInPlugin(
-		//	"mitm", "MITM 请求修改",
-		//	withPluginHelp("允许用户操作请求：增加/删除/替换请求参数，支持请求头，GET参数，POST参数，Cookie，支持匹配到请求再操作，支持多个操作"),
-		//	withPluginAuthors("WaY"),
-		//	withPluginEnableGenerateParam(true),
-		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		//)
-		//registerBuildInPlugin(
-		//	"mitm", "MITM 响应修改",
-		//	withPluginHelp("允许用户修改响应：支持正则，支持匹配到响应再操作，支持多个操作"),
-		//	withPluginAuthors("WaY"),
-		//	withPluginEnableGenerateParam(true),
-		//	withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
-		//)
-		registerBuildInPlugin(
-			"yak", "核心引擎性能采样",
-			withPluginHelp("动态开启PPROF采样，用于性能调优"),
-			withPluginAuthors("V1ll4n,Q16G"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "崩溃日志收集",
-			withPluginHelp("收集本地项目日志中的崩溃信息，保存成 zip 以便分析"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "SSA 项目编译",
-			withPluginHelp("将选择的项目编译到 SSA 数据库内，用于后续的代码查询和分析。"),
-			withPluginAuthors("令则"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "SSA 项目重编译",
-			withPluginHelp("将以编译项目使用当前引擎重新编译。用于引擎编译策略更新或代码有变动时使用。"),
-			withPluginAuthors("令则"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "SyntaxFlow 规则执行",
-			withPluginHelp("执行 SyntaxFlow 规则"),
-			withPluginAuthors("令则"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "引擎性能采样自动分析",
-			withPluginHelp("自动分析PPROF文件，生成可阅读文件。"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak", "SSA 项目探测",
-			withPluginHelp("代码扫描默认规则探测，根据传入的url来提供代码扫描的默认参数"),
-			withPluginAuthors("Q16G"),
-			withPluginEnableGenerateParam(true))
-		registerBuildInPlugin(
-			"yak", "SSA 项目更新",
-			withPluginHelp("更新SSA项目信息，包括项目名称、描述、语言、配置等"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin("yak", "SyntaxFlow Searcher",
-			withPluginHelp(`代码审计项目管理中，支持文件名、函数名、变量名、常量等搜索`),
-			withPluginAuthors("Q16G"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"yak",
-			"SyntaxFlow 查询项目信息",
-			withPluginHelp("使用SyntaxFlow查询项目信息，如项目的过滤函数。"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
-		registerBuildInPlugin(
-			"mitm",
-			"SQL注入-Path参数注入",
-			withPluginAuthors("intSheep"),
-			withPluginHelp("SQL注入检测，针对RESTful API风格设计的Path参数进行SQL注入检测"),
-		)
-		registerBuildInPlugin(
-			"mitm",
-			"SQL注入-高危Header注入",
-			withPluginAuthors("intSheep"),
-			withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
-		)
-
-		registerBuildInPlugin(
-			"yak", "构建知识库",
-			withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "检索知识",
-			withPluginHelp("从知识库中语义检索相关知识，返回相关内容"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "构建知识条目",
-			withPluginHelp("从实体库中构建知识条目，支持目的性的知识条目构建"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "证书生成",
-			withPluginHelp("通过各种选项生成所需的证书文件"),
-			withPluginEnableGenerateParam(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "重置知识库",
-			withPluginHelp("删除所有知识库及其关联的RAG内容，包括向量库、集合综述库、知识库条目库等"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-
-		registerBuildInPlugin(
-			"yak", "知识库可用性诊断",
-			withPluginHelp("检测AI图像识别能力和向量化服务是否正常工作，用于知识库功能的可用性诊断"),
-			withPluginAuthors("V1ll4n"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-		registerBuildInPlugin("yak", "导入默认知识库",
-			withPluginHelp("导入默认知识库，支持多个知识库，使用逗号分隔，格式如 /path/a.rag:kb-name:<uid>,/path/b.rag:another-name:<uid>"),
-			withPluginEnableGenerateParam(true),
-			withPluginIgnore(true),
-		)
-		return nil
-		})
+		}, syncCorePluginEmbedInternal)
 	}, "sync-core-plugin-for-yakit")
-
 }
 
 // only use for test

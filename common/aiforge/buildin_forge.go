@@ -89,38 +89,51 @@ type GenerateMetadataResult struct {
 	Keywords    []string `json:"keywords"`
 }
 
+// buildInForgeEmbedKey 用于 yakit 存储 buildin forge 同步状态，与 init 中 MonitorModifiedWithAction 一致
+const buildInForgeEmbedKey = "6ef3c850244a2b26ed0b163d1fda9600"
+
+// syncBuildInForgeInternal 将内置 AI forge 从 embed 同步到数据库，不更新 hash（由调用方决定）
+func syncBuildInForgeInternal() error {
+	registerBuildInForge("fragment_summarizer")
+	registerBuildInForge("long_text_summarizer")
+	registerBuildInForge("xss")
+	registerBuildInForge("sqlinject")
+	registerBuildInForge("travelmaster")
+	registerBuildInForge("pimatrix")
+	registerBuildInForge("netscan")
+	registerBuildInForge("recon")
+	registerBuildInForge("biography")
+	registerBuildInForge("intent_recognition")
+	registerBuildInForge("entity_identify")
+	registerBuildInForge("log_event_formatter")
+	registerBuildInForge("event_analyzer")
+	registerBuildInForge("web_log_monitor")
+	registerBuildInForge("vulscan")
+	registerBuildInForge("hostscan")
+	registerBuildInForge("ssapoc")
+	registerBuildInForge("flow_report")
+	registerBuildInForge("ssa_vulnerability_analyzer")
+	registerBuildInForge("mock_forge")
+	registerBuildInForge("alert_denoising")
+	registerBuildInForge("code_audit")
+	return nil
+}
+
+// ForceSyncBuildInForge 强制同步内置 AI forge 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
+func ForceSyncBuildInForge() error {
+	if err := syncBuildInForgeInternal(); err != nil {
+		return err
+	}
+	yakit.Set(buildInForgeEmbedKey, consts.ExistedBuildInForgeEmbedFSHash)
+	return nil
+}
+
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		const key = "6ef3c850244a2b26ed0b163d1fda9600"
-
-		return resources_monitor.NewEmbedResourcesMonitor(key, consts.ExistedBuildInForgeEmbedFSHash).MonitorModifiedWithAction(func() string {
+		return resources_monitor.NewEmbedResourcesMonitor(buildInForgeEmbedKey, consts.ExistedBuildInForgeEmbedFSHash).MonitorModifiedWithAction(func() string {
 			buildinHash, _ := BuildInForgeHash()
 			return buildinHash
-		}, func() error {
-			registerBuildInForge("fragment_summarizer")
-			registerBuildInForge("long_text_summarizer")
-			registerBuildInForge("xss")
-			registerBuildInForge("sqlinject")
-			registerBuildInForge("travelmaster")
-			registerBuildInForge("pimatrix")
-			registerBuildInForge("netscan")
-			registerBuildInForge("recon")
-			registerBuildInForge("biography")
-			registerBuildInForge("intent_recognition")
-			registerBuildInForge("entity_identify")
-			registerBuildInForge("log_event_formatter")
-			registerBuildInForge("event_analyzer")
-			registerBuildInForge("web_log_monitor")
-			registerBuildInForge("vulscan")
-			registerBuildInForge("hostscan")
-			registerBuildInForge("ssapoc")
-			registerBuildInForge("flow_report")
-			registerBuildInForge("ssa_vulnerability_analyzer")
-			registerBuildInForge("mock_forge")
-			registerBuildInForge("alert_denoising")
-			registerBuildInForge("code_audit")
-			return nil
-		})
+		}, syncBuildInForgeInternal)
 	}, "sync-buildin-ai-forge")
 }
 
