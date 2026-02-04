@@ -19862,6 +19862,7 @@ type NewProjectRequest struct {
 	Database            string                 `protobuf:"bytes,7,opt,name=Database,proto3" json:"Database,omitempty"`
 	ExternalModule      string                 `protobuf:"bytes,8,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
 	ExternalProjectCode string                 `protobuf:"bytes,9,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	OnlineTask          bool                   `protobuf:"varint,10,opt,name=OnlineTask,proto3" json:"OnlineTask,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -19957,6 +19958,13 @@ func (x *NewProjectRequest) GetExternalProjectCode() string {
 		return x.ExternalProjectCode
 	}
 	return ""
+}
+
+func (x *NewProjectRequest) GetOnlineTask() bool {
+	if x != nil {
+		return x.OnlineTask
+	}
+	return false
 }
 
 type NewProjectResponse struct {
@@ -20147,6 +20155,7 @@ type ProjectDescription struct {
 	FileSize            string `protobuf:"bytes,12,opt,name=FileSize,proto3" json:"FileSize,omitempty"`
 	ExternalModule      string `protobuf:"bytes,13,opt,name=ExternalModule,proto3" json:"ExternalModule,omitempty"`
 	ExternalProjectCode string `protobuf:"bytes,14,opt,name=ExternalProjectCode,proto3" json:"ExternalProjectCode,omitempty"`
+	OnlineTask          bool   `protobuf:"varint,15,opt,name=OnlineTask,proto3" json:"OnlineTask,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -20277,6 +20286,13 @@ func (x *ProjectDescription) GetExternalProjectCode() string {
 		return x.ExternalProjectCode
 	}
 	return ""
+}
+
+func (x *ProjectDescription) GetOnlineTask() bool {
+	if x != nil {
+		return x.OnlineTask
+	}
+	return false
 }
 
 type GetProjectsResponse struct {
@@ -68132,7 +68148,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12\x1a\n" +
 	"\bFolderId\x18\x02 \x01(\x03R\bFolderId\x12$\n" +
 	"\rChildFolderId\x18\x03 \x01(\x03R\rChildFolderId\x12\x12\n" +
-	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xb3\x02\n" +
+	"\x04Type\x18\x04 \x01(\tR\x04Type\"\xd3\x02\n" +
 	"\x11NewProjectRequest\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x1a\n" +
@@ -68142,7 +68158,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x02Id\x18\x06 \x01(\x03R\x02Id\x12\x1a\n" +
 	"\bDatabase\x18\a \x01(\tR\bDatabase\x12&\n" +
 	"\x0eExternalModule\x18\b \x01(\tR\x0eExternalModule\x120\n" +
-	"\x13ExternalProjectCode\x18\t \x01(\tR\x13ExternalProjectCode\"F\n" +
+	"\x13ExternalProjectCode\x18\t \x01(\tR\x13ExternalProjectCode\x12\x1e\n" +
+	"\n" +
+	"OnlineTask\x18\n" +
+	" \x01(\bR\n" +
+	"OnlineTask\"F\n" +
 	"\x12NewProjectResponse\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12 \n" +
 	"\vProjectName\x18\x02 \x01(\tR\vProjectName\"\x81\x03\n" +
@@ -68159,7 +68179,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eAfterUpdatedAt\x18\b \x01(\x03R\x0eAfterUpdatedAt\x12&\n" +
 	"\x0eExternalModule\x18\t \x01(\tR\x0eExternalModule\x120\n" +
 	"\x13ExternalProjectCode\x18\n" +
-	" \x01(\tR\x13ExternalProjectCode\"\xdc\x03\n" +
+	" \x01(\tR\x13ExternalProjectCode\"\xfc\x03\n" +
 	"\x12ProjectDescription\x12 \n" +
 	"\vProjectName\x18\x01 \x01(\tR\vProjectName\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x0e\n" +
@@ -68177,7 +68197,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fChildFolderName\x18\v \x01(\tR\x0fChildFolderName\x12\x1a\n" +
 	"\bFileSize\x18\f \x01(\tR\bFileSize\x12&\n" +
 	"\x0eExternalModule\x18\r \x01(\tR\x0eExternalModule\x120\n" +
-	"\x13ExternalProjectCode\x18\x0e \x01(\tR\x13ExternalProjectCode\"\xcf\x01\n" +
+	"\x13ExternalProjectCode\x18\x0e \x01(\tR\x13ExternalProjectCode\x12\x1e\n" +
+	"\n" +
+	"OnlineTask\x18\x0f \x01(\bR\n" +
+	"OnlineTask\"\xcf\x01\n" +
 	"\x13GetProjectsResponse\x123\n" +
 	"\bProjects\x18\x01 \x03(\v2\x17.ypb.ProjectDescriptionR\bProjects\x12+\n" +
 	"\n" +

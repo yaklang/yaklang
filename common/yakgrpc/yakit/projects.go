@@ -232,7 +232,7 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 		p.OrderBy = "updated_at"
 	}
 	if params.GetProjectName() != "" {
-		db = bizhelper.FuzzQueryLike(db, "project_name", params.GetProjectName())
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "project_name", utils.PrettifyListFromStringSplited(params.GetProjectName(), ","))
 	} else {
 		if params.FolderId > 0 {
 			db = db.Where("folder_id = ? ", params.FolderId)
