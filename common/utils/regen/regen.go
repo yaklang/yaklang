@@ -10,13 +10,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// wrapParseErr 对 "invalid repeat count" 等解析错误增加说明：Go 正则 {n} 重复次数上限为 1000
+// wrapParseErr 对 "invalid repeat count" 等解析错误增加说明：精确 {n} 已支持超大重复
 func wrapParseErr(pattern string, err error) error {
 	if err == nil {
 		return nil
 	}
 	if e, ok := err.(*syntax.Error); ok && e.Code == syntax.ErrInvalidRepeatSize {
-		return fmt.Errorf("%w（regen 基于 Go 正则，{n}/{n,m} 重复次数上限为 1000，请将 %q 中的数字改为 ≤1000 或分段生成）", err, pattern)
+		return fmt.Errorf("%w（regen 基于 Go 正则。已通过内部展开支持 {n} 形式且 n>1000 的精确重复；如果仍出现该错误，通常表示使用了当前尚未支持的大范围重复（例如 {n,m} 且上限值>1000），或模式 %q 触发了内部展开逻辑的缺陷，请尝试简化/拆分该模式并反馈问题。）", err, pattern)
 	}
 	return err
 }
