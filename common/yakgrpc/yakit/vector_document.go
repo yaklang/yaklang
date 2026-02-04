@@ -77,7 +77,7 @@ func SearchVectorStoreDocumentBM25(db *gorm.DB, filter *VectorDocumentFilter, li
 		match = strings.TrimSpace(filter.Keywords)
 	}
 	var res = make([]*schema.VectorStoreDocument, 0)
-	if len(match) < 3 || !isSQLite(db) || db.HasTable(VectorDocumentVTableName()) {
+	if len(match) < 3 || !isSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		if err := FilterVectorDocuments(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -95,7 +95,7 @@ func SearchVectorStoreDocumentBM25Yield(ctx context.Context, db *gorm.DB, filter
 	if filter != nil {
 		match = strings.TrimSpace(filter.Keywords)
 	}
-	if len(match) < 3 {
+	if len(match) < 3 || !isSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		return YieldVectorDocument(ctx, db, filter, options...)
 	}
 	filter.Keywords = "" // if use FTS5, clear keywords in filter to avoid double filtering
