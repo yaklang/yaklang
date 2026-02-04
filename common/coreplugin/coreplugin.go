@@ -403,6 +403,12 @@ func syncCorePluginEmbedInternal() error {
 		withPluginEnableGenerateParam(true),
 		withPluginIgnore(true),
 	)
+
+	registerBuildInPlugin(
+		"yak", "强制同步内置规则",
+		withPluginHelp("强制同步内置规则，包括 SyntaxFlow 规则、Core 插件、AI Forge"),
+		withPluginEnableGenerateParam(true),
+	)
 	return nil
 }
 

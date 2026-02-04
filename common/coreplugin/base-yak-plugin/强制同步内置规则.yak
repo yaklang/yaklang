@@ -1,0 +1,79 @@
+yakit.AutoInitYakit()
+
+coreplugin = cli.Bool("coreplugin", cli.setHelp("是否同步内置插件"), cli.setDefault(true)) 
+syntaxflowrule = cli.Bool("syntaxflow", cli.setHelp("是否同步代码扫描规则"), cli.setDefault(false))
+aiforge = cli.Bool("aiforge", cli.setHelp("是否同步aiforge"),cli.setDefault(false))
+cli.check()
+
+// 强制同步三类内置资源到数据库（忽略 hash，用于版本更新后修复导入失败等场景）：
+// 1. SyntaxFlow 内置规则  2. Core 插件  3. 内置 AI Forge
+// 供前端「强制更新」按钮或手动执行，带进度与日志。
+yakit.SetProgress(0)
+yakit.Info("开始强制同步内置规则（SyntaxFlow 规则 / Core 插件 / AI Forge）...")
+
+defer fn {
+    err := recover()
+    if err != nil {
+        yakit.Error("强制同步失败: %v", err)
+        yakit.SetProgress(0)
+    }
+}
+
+
+// Core 插件（带进度：0~1 映射到 0/3~1/3）
+if coreplugin {
+    notifyCore := (percent, msg) => {
+        yakit.SetProgress(percent/3.0)
+        if msg != "" {
+            yakit.Info("%s", msg)
+        }
+    }
+    err = yakit.ForceSyncCorePlugin(notifyCore)
+    if err != nil {
+        yakit.Error("Core 插件同步失败: %v", err)
+        yakit.Error("可能原因：数据库被占用、权限不足或数据损坏，请检查数据库后重试。")
+        return
+    } else {
+        yakit.Info("内置插件同步完成")
+    }
+}
+
+yakit.SetProgress(1.0 / 3.0)
+
+
+//  SyntaxFlow 内置规则（带进度与日志 进度0~1映射到1/3~2/3）
+if syntaxflowrule {
+yakit.Info("正在同步 SyntaxFlow 内置规则...")
+    notifySF := (percent, msg) => {
+        yakit.SetProgress(percent / 3.0 + 1.0/3.0)
+        if msg != "" {
+            yakit.Info("%s", msg)
+        }
+    }
+    err := yakit.ForceSyncSyntaxFlowRule(notifySF)
+    if err != nil {
+        yakit.Warn("SyntaxFlow 规则同步失败（当前构建可能未包含 SyntaxFlow）: %v", err)
+    } else {
+        yakit.Info("SyntaxFlow 内置规则同步完成")
+    }
+}
+yakit.SetProgress(2.0 / 3.0)
+
+//  内置 AI Forge（带进度：0~1 映射到 2/3~1）
+if aiforge {
+    notifyForge := (percent, msg) => {
+        yakit.SetProgress(percent/3.0 + 2.0/3.0)
+        if msg != "" {
+            yakit.Info("%s", msg)
+        }
+    }
+    err = yakit.ForceSyncBuildInForge(notifyForge)
+    if err != nil {
+        yakit.Error("内置 AI Forge 同步失败: %v", err)
+        yakit.Error("可能原因：数据库被占用、权限不足或 AI Forge 数据异常，请检查后重试。")
+        return
+    }
+}
+
+yakit.SetProgress(1.0)
+yakit.Info("全部内置规则同步完成")
