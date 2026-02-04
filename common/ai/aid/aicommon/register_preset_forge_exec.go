@@ -12,6 +12,8 @@ var execRegisteredForgeCallback RegisteredForgeExecutor
 var execForgeYakEngineCallback func(forgeName string, i any, iopts ...any) (any, error)
 
 func RegisterForgeYakEngineCallback(f func(forgeName string, i any, iopts ...any) (any, error)) {
+	registerMutex.Lock()
+	defer registerMutex.Unlock()
 	execForgeYakEngineCallback = f
 }
 
