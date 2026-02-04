@@ -266,7 +266,12 @@ func (m *EnhanceKnowledgeManager) dumpAggregatedKnowledge(sb *strings.Builder, k
 			}
 			// update knowledge details if not set yet
 			if existing.KnowledgeDetails == "" {
-				if details := ek.GetKnowledgeDetails(); details != "" {
+				details := ek.GetKnowledgeDetails()
+				if details == "" {
+					// fallback to content if no knowledge details
+					details = ek.GetContent()
+				}
+				if details != "" {
 					existing.KnowledgeDetails = details
 				}
 			}
@@ -283,7 +288,12 @@ func (m *EnhanceKnowledgeManager) dumpAggregatedKnowledge(sb *strings.Builder, k
 				agg.HitQueries = append(agg.HitQueries, hitQuery)
 			}
 			// get knowledge details (the real content: name, type, description, keywords)
-			agg.KnowledgeDetails = ek.GetKnowledgeDetails()
+			// fallback to content if no knowledge details available
+			details := ek.GetKnowledgeDetails()
+			if details == "" {
+				details = ek.GetContent()
+			}
+			agg.KnowledgeDetails = details
 			aggregated[groupKey] = agg
 			orderedKeys = append(orderedKeys, groupKey)
 		}
