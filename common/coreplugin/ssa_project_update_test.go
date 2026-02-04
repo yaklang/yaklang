@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"context"
@@ -11,18 +11,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestSSAProjectUpdate(t *testing.T) {
-	initDB.Do(func() {
-		yakit.InitialDatabase()
-	})
+	coreplugin.InitDBForTest()
 
 	t.Run("update SSA project via yak script", func(t *testing.T) {
 		// 1. 创建一个临时目录和测试文件

@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"testing"

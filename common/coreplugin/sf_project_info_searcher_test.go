@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -52,10 +52,8 @@ func NewSfProjectInfoSearcher(fs filesys_interface.FileSystem, t *testing.T, opt
 	require.NoError(t, err)
 
 	pluginName := "SyntaxFlow 查询项目信息"
-	initDB.Do(func() {
-		yakit.InitialDatabase()
-	})
-	codeBytes := GetCorePluginData(pluginName)
+	coreplugin.InitDBForTest()
+	codeBytes := coreplugin.GetCorePluginData(pluginName)
 	require.NotNilf(t, codeBytes, "无法从bindata获取: %v", pluginName)
 
 	return &sfProjectInfoSearcher{

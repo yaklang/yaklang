@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -210,11 +211,9 @@ func TestGRPCMUSTPASS_Smuggle_Plugin_Positive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	initDB.Do(func() {
-		yakit.InitialDatabase()
-	})
+	coreplugin.InitDBForTest()
 
-	codeBytes := GetCorePluginData("HTTP请求走私")
+	codeBytes := coreplugin.GetCorePluginData("HTTP请求走私")
 	if codeBytes == nil {
 		t.Errorf("无法从bindata获取%v", "HTTP请求走私.yak")
 		return

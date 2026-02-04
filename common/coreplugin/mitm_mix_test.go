@@ -1,4 +1,4 @@
-package coreplugin
+package coreplugin_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
@@ -22,7 +23,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start mitm local client failed: %s", err)
 	}
-	OverWriteCorePluginToLocal()
+	coreplugin.OverWriteCorePluginToLocal()
 
 	var vulinboxPort = utils.GetRandomAvailableTCPPort()
 	var vulinboxAddr = utils.HostPort("127.0.0.1", vulinboxPort)
@@ -174,7 +175,7 @@ func TestDEBUG_MITM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start mitm local client failed: %s", err)
 	}
-	OverWriteCorePluginToLocal()
+	coreplugin.OverWriteCorePluginToLocal()
 
 	var vulinboxPort = utils.GetRandomAvailableTCPPort()
 	var vulinboxAddr = utils.HostPort("127.0.0.1", vulinboxPort)
