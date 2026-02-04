@@ -22,7 +22,6 @@ func TestGRPCMUSTPASS_ExportAILogs(t *testing.T) {
 	// Generate random IDs
 	sessionID := uuid.NewString()
 	coordinatorID := uuid.NewString()
-	memoryID := uuid.NewString()     // This will be used as session_id in AIMemoryEntity query
 	testMemoryID := uuid.NewString() // This is the unique ID for the memory entity itself
 
 	// Prepare test data
@@ -37,6 +36,7 @@ func TestGRPCMUSTPASS_ExportAILogs(t *testing.T) {
 
 	event := &schema.AiOutputEvent{
 		CoordinatorId: coordinatorID,
+		SessionId:     sessionID, // Add SessionId to link with the sessionID
 		Type:          schema.EVENT_TYPE_STREAM,
 		EventUUID:     uuid.NewString(),
 		Content:       []byte("test content"),
@@ -45,7 +45,7 @@ func TestGRPCMUSTPASS_ExportAILogs(t *testing.T) {
 
 	memory := &schema.AIMemoryEntity{
 		MemoryID:  testMemoryID,
-		SessionID: memoryID, // Note: ExportAILogs queries by session_id using the passed memoryID
+		SessionID: sessionID, // Use sessionID to match the request's SessionID field
 		Content:   "test memory content",
 	}
 	require.NoError(t, db.Create(memory).Error)
@@ -60,8 +60,8 @@ func TestGRPCMUSTPASS_ExportAILogs(t *testing.T) {
 	// Cleanup function
 	defer func() {
 		db.Where("coordinator_uuid = ?", coordinatorID).Delete(&schema.AiCheckpoint{})
-		db.Where("coordinator_id = ?", coordinatorID).Delete(&schema.AiOutputEvent{})
-		db.Where("session_id = ?", memoryID).Delete(&schema.AIMemoryEntity{})
+		db.Where("session_id = ?", sessionID).Delete(&schema.AiOutputEvent{})
+		db.Where("session_id = ?", sessionID).Delete(&schema.AIMemoryEntity{})
 		db.Where("persistent_session = ?", sessionID).Delete(&schema.AIAgentRuntime{})
 	}()
 
@@ -85,7 +85,6 @@ func TestGRPCMUSTPASS_ExportAILogs(t *testing.T) {
 	req := &ypb.ExportAILogsRequest{
 		SessionID:       sessionID,
 		CoordinatorIDs:  []string{coordinatorID},
-		MemoryID:        memoryID,
 		ExportDataTypes: []string{"checkpoints", "output_event", "memory", "timeline"},
 	}
 
