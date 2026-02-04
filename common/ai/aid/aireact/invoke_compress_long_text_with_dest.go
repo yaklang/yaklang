@@ -261,7 +261,8 @@ func compressKnowledgeChunkWithScore(
 					return
 				}
 				pr, pw := utils.NewPipe()
-				pw.WriteString(fmt.Sprintf("[权重：%v]: %v-%v", score, startLine, endLine))
+				text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
+				pw.WriteString(fmt.Sprintf("[权重：%v]: %v-%v(%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
 				// Start streaming output with unified nodeId
 				if invoker != nil {
 					emitter := invoker.GetConfig().GetEmitter()
@@ -271,7 +272,6 @@ func compressKnowledgeChunkWithScore(
 						taskIndex,
 					); event != nil {
 						streamId := event.GetStreamEventWriterId()
-						text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
 						emitter.EmitTextReferenceMaterial(streamId, text)
 					}
 				}

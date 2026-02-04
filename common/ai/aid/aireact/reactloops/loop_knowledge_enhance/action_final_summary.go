@@ -2,14 +2,12 @@ package loop_knowledge_enhance
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -95,20 +93,24 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			loop.Set("final_summary", finalReport)
 
 			emitter := loop.GetEmitter()
-
-			artifactFilename := loop.GetInvoker().EmitFileArtifactWithExt(
+			_ = emitter
+			loop.GetInvoker().EmitFileArtifactWithExt(
 				fmt.Sprintf("knowledge_final_report_%s_%s", utils.DatetimePretty2(), utils.RandStringBytes(4)),
 				".md",
-				"",
+				finalReport,
 			)
-			emitter.EmitPinFilename(artifactFilename)
-			log.Infof("final report: \n%v", finalReport)
-			if err := os.WriteFile(artifactFilename, []byte(finalReport), 0644); err != nil {
-				log.Warnf("failed to write final report artifact: %v", err)
+
+			result, err := loop.GetInvoker().DirectlyAnswer(
+				loop.GetCurrentTask().GetContext(),
+				finalReport,
+				nil,
+			)
+			_ = result
+			if err != nil {
+				op.Continue()
 			} else {
-				log.Infof("final report artifact saved to: %s", artifactFilename)
+				op.Exit()
 			}
-			op.Exit()
 		},
 	)
 }
