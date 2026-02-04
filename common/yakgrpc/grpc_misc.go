@@ -2,15 +2,33 @@ package yakgrpc
 
 import (
 	"context"
+	"os"
+	"runtime"
+
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"runtime"
 )
 
 func (s *Server) ResetAndInvalidUserData(ctx context.Context, req *ypb.ResetAndInvalidUserDataRequest) (*ypb.Empty, error) {
+	if req != nil && req.GetOnlyClearCache() {
+		// 仅清理缓存：持久化 KV/缓存 存在于两处——
+		// 1. Profile 库 GeneralStorage：yakit.Get/Set、embed 同步 hash、全局配置、MITM 替换规则等
+		// 2. Project 库 ProjectGeneralStorage：项目内 KV，如 fuzzer-list-cache、BARE_REQUEST 等
+		profileDB := s.GetProfileDatabase()
+		if profileDB != nil {
+			profileDB.Unscoped().DropTableIfExists(&schema.GeneralStorage{})
+		}
+		projectDB := s.GetProjectDatabase()
+		if projectDB != nil {
+			projectDB.Unscoped().DropTableIfExists(&schema.ProjectGeneralStorage{})
+		}
+		os.RemoveAll(consts.GetDefaultYakitBaseTempDir())
+		return &ypb.Empty{}, nil
+	}
+	// 原有行为：清理临时目录、删除所有表并退出进程
 	os.RemoveAll(consts.GetDefaultYakitBaseTempDir())
 	for _, table := range YakitAllTables {
 		s.GetProjectDatabase().Unscoped().DropTableIfExists(table)
