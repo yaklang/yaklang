@@ -10,6 +10,9 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#primaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#stringLiteralExpression.
+	VisitStringLiteralExpression(ctx *StringLiteralExpressionContext) interface{}
+
 	// Visit a parse tree produced by CParser#genericSelection.
 	VisitGenericSelection(ctx *GenericSelectionContext) interface{}
 
@@ -22,11 +25,20 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#postfixExpression.
 	VisitPostfixExpression(ctx *PostfixExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#postfixSuffix.
+	VisitPostfixSuffix(ctx *PostfixSuffixContext) interface{}
+
 	// Visit a parse tree produced by CParser#postfixExpressionLvalue.
 	VisitPostfixExpressionLvalue(ctx *PostfixExpressionLvalueContext) interface{}
 
+	// Visit a parse tree produced by CParser#postfixSuffixLvalue.
+	VisitPostfixSuffixLvalue(ctx *PostfixSuffixLvalueContext) interface{}
+
 	// Visit a parse tree produced by CParser#argumentExpressionList.
 	VisitArgumentExpressionList(ctx *ArgumentExpressionListContext) interface{}
+
+	// Visit a parse tree produced by CParser#macroArgument.
+	VisitMacroArgument(ctx *MacroArgumentContext) interface{}
 
 	// Visit a parse tree produced by CParser#unaryExpression.
 	VisitUnaryExpression(ctx *UnaryExpressionContext) interface{}
@@ -124,6 +136,15 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#directDeclarator.
 	VisitDirectDeclarator(ctx *DirectDeclaratorContext) interface{}
 
+	// Visit a parse tree produced by CParser#declaratorSuffix.
+	VisitDeclaratorSuffix(ctx *DeclaratorSuffixContext) interface{}
+
+	// Visit a parse tree produced by CParser#arraySuffix.
+	VisitArraySuffix(ctx *ArraySuffixContext) interface{}
+
+	// Visit a parse tree produced by CParser#functionSuffix.
+	VisitFunctionSuffix(ctx *FunctionSuffixContext) interface{}
+
 	// Visit a parse tree produced by CParser#vcSpecificModifer.
 	VisitVcSpecificModifer(ctx *VcSpecificModiferContext) interface{}
 
@@ -169,6 +190,15 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#directAbstractDeclarator.
 	VisitDirectAbstractDeclarator(ctx *DirectAbstractDeclaratorContext) interface{}
 
+	// Visit a parse tree produced by CParser#abstractDeclaratorSuffix.
+	VisitAbstractDeclaratorSuffix(ctx *AbstractDeclaratorSuffixContext) interface{}
+
+	// Visit a parse tree produced by CParser#abstractArraySuffix.
+	VisitAbstractArraySuffix(ctx *AbstractArraySuffixContext) interface{}
+
+	// Visit a parse tree produced by CParser#abstractFunctionSuffix.
+	VisitAbstractFunctionSuffix(ctx *AbstractFunctionSuffixContext) interface{}
+
 	// Visit a parse tree produced by CParser#typedefName.
 	VisitTypedefName(ctx *TypedefNameContext) interface{}
 
@@ -192,6 +222,9 @@ type CParserVisitor interface {
 
 	// Visit a parse tree produced by CParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
+
+	// Visit a parse tree produced by CParser#macroCallStatement.
+	VisitMacroCallStatement(ctx *MacroCallStatementContext) interface{}
 
 	// Visit a parse tree produced by CParser#asmStatement.
 	VisitAsmStatement(ctx *AsmStatementContext) interface{}
@@ -247,9 +280,21 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#externalDeclaration.
 	VisitExternalDeclaration(ctx *ExternalDeclarationContext) interface{}
 
+	// Visit a parse tree produced by CParser#macroCallExpression.
+	VisitMacroCallExpression(ctx *MacroCallExpressionContext) interface{}
+
+	// Visit a parse tree produced by CParser#macroArgumentList.
+	VisitMacroArgumentList(ctx *MacroArgumentListContext) interface{}
+
 	// Visit a parse tree produced by CParser#functionDefinition.
 	VisitFunctionDefinition(ctx *FunctionDefinitionContext) interface{}
 
 	// Visit a parse tree produced by CParser#declarationList.
 	VisitDeclarationList(ctx *DeclarationListContext) interface{}
+
+	// Visit a parse tree produced by CParser#ws.
+	VisitWs(ctx *WsContext) interface{}
+
+	// Visit a parse tree produced by CParser#eos.
+	VisitEos(ctx *EosContext) interface{}
 }

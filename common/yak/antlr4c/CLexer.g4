@@ -737,10 +737,26 @@ Newline
     : ('\r' '\n'? | '\n') -> channel(HIDDEN)
     ;
 
+// Block comment: matches /* ... */ including line continuations inside
+// Note: This must come before LineContinuation to prevent comments from being broken
+// The .*? pattern matches any character including backslash-newline sequences
+// We use a more explicit pattern to ensure it matches everything including backslash-newline
 BlockComment
-    : '/*' .*? '*/' -> channel(HIDDEN)
+    : '/*' (BlockComment | ~[*] | '*' ~[/])* '*/' -> channel(HIDDEN)
     ;
 
 LineComment
     : '//' ~[\r\n]* -> channel(HIDDEN)
+    ;
+
+// Line continuation: backslash followed by newline
+// This handles cases like: some_code \
+//                          continued_code
+// Note: This must come after BlockComment and LineComment to avoid breaking comments
+LineContinuation
+    : '\\' [ \t]* ('\r'? '\n' | '\r') -> channel(HIDDEN)
+    ;
+
+EOS
+    : [\t\r\n]+
     ;
