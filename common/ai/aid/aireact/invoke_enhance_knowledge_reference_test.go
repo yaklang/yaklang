@@ -9,16 +9,57 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// createTestKnowledgeBase creates a test knowledge base for testing SelectKnowledgeBase
+// Returns a cleanup function that should be deferred
+func createTestKnowledgeBase(t *testing.T, name string) func() {
+	db := consts.GetGormProfileDatabase()
+	kb := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        name,
+		KnowledgeBaseDescription: "Test knowledge base for unit tests",
+		KnowledgeBaseType:        "test",
+	}
+	err := yakit.CreateKnowledgeBase(db, kb)
+	if err != nil {
+		// If already exists, just log and continue
+		log.Infof("knowledge base may already exist: %v", err)
+	}
+	return func() {
+		// Delete by name using direct GORM operation
+		db.Where("knowledge_base_name = ?", name).Unscoped().Delete(&schema.KnowledgeBaseInfo{})
+	}
+}
+
+// mockSelectKnowledgeBaseResponse handles the SelectKnowledgeBase liteforge call in AI callback
+// Returns true if the prompt was handled, false otherwise
+func mockSelectKnowledgeBaseResponse(i aicommon.AICallerConfigIf, prompt string) (*aicommon.AIResponse, bool) {
+	// Detect SelectKnowledgeBase liteforge call by checking for the knowledge bases prompt
+	if utils.MatchAllOfSubString(prompt, "ALL_EXISTED_KNOWLEDGE_BASES_", "USER_QUERY_") {
+		rsp := i.NewAIResponse()
+		// Include @action field which is required by InvokeLiteForge
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "select_knowledge_base", "knowledge_bases": [], "reason": "test mode - no knowledge bases selected"}`))
+		rsp.Close()
+		return rsp, true
+	}
+	return nil, false
+}
 
 // TestReAct_EnhanceKnowledge_WithArtifact tests that knowledge enhancement
 // produces summary result and saves knowledge reference to artifacts
 func TestReAct_EnhanceKnowledge_WithArtifact(t *testing.T) {
+	// Create test knowledge base for SelectKnowledgeBase to work
+	testKBName := "test_kb_" + utils.RandStringBytes(8)
+	cleanup := createTestKnowledgeBase(t, testKBName)
+	defer cleanup()
+
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 100)
 
@@ -26,6 +67,11 @@ func TestReAct_EnhanceKnowledge_WithArtifact(t *testing.T) {
 
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
+
+		// Handle SelectKnowledgeBase liteforge call
+		if rsp, handled := mockSelectKnowledgeBaseResponse(i, prompt); handled {
+			return rsp, nil
+		}
 
 		// First call: AI chooses knowledge enhancement
 		if utils.MatchAllOfSubString(prompt, string(ActionDirectlyAnswer), string(ActionRequireTool), string(ActionKnowledgeEnhanceAnswer)) {
@@ -192,6 +238,11 @@ LOOP:
 
 // TestReAct_EnhanceKnowledge_ArtifactContent verifies artifact file content structure
 func TestReAct_EnhanceKnowledge_ArtifactContent(t *testing.T) {
+	// Create test knowledge base for SelectKnowledgeBase to work
+	testKBName := "test_kb_" + utils.RandStringBytes(8)
+	cleanup := createTestKnowledgeBase(t, testKBName)
+	defer cleanup()
+
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 100)
 
@@ -199,6 +250,11 @@ func TestReAct_EnhanceKnowledge_ArtifactContent(t *testing.T) {
 
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
+
+		// Handle SelectKnowledgeBase liteforge call
+		if rsp, handled := mockSelectKnowledgeBaseResponse(i, prompt); handled {
+			return rsp, nil
+		}
 
 		if utils.MatchAllOfSubString(prompt, string(ActionDirectlyAnswer), string(ActionRequireTool), string(ActionKnowledgeEnhanceAnswer)) {
 			rsp := i.NewAIResponse()
