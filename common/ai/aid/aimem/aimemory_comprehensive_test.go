@@ -213,6 +213,21 @@ func (m *AdvancedMockInvoker) EmitResult(any) {
 func (m *AdvancedMockInvoker) EmitStreamResult(any) {
 }
 
+func (m *AdvancedMockInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
+	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
+}
+
+func (m *AdvancedMockInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
+}
+
+func (m *AdvancedMockInvoker) GetCurrentTask() aicommon.AIStatefulTask {
+	return nil
+}
+
+func (m *AdvancedMockInvoker) GetCurrentTaskId() string {
+	return ""
+}
+
 type EmptyEmbedding struct {
 }
 

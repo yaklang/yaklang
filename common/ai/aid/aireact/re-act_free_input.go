@@ -92,6 +92,14 @@ func (r *ReAct) GetCurrentTask() aicommon.AIStatefulTask {
 	return r.currentTask
 }
 
+func (r *ReAct) GetCurrentTaskId() string {
+	currentTask := r.GetCurrentTask()
+	if currentTask == nil {
+		return ""
+	}
+	return currentTask.GetId()
+}
+
 func (r *ReAct) GetCurrentLoop() *reactloops.ReActLoop {
 	currentTask := r.GetCurrentTask()
 	if currentTask == nil {

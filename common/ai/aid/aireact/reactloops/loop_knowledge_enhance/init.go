@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -95,7 +94,7 @@ AI会根据用户问题从附加资源中尽可能多地收集相关信息，这
 * 当需要从附加资源中收集信息时：
   {"@action": "knowledge_enhance", "human_readable_thought": "需要从用户附加的资源中收集与问题相关的信息"}
 `),
-		reactloops.WithLoopIsHidden(true),
+		reactloops.WithLoopIsHidden(false),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, err)
@@ -147,6 +146,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		var resourcesInfo strings.Builder
 		var knowledgeBases []string
 		includeAllKnowledgeBases := false
+		autoSelectAllKnowledgeBases := false
 		var files []string
 		var aiTools []string
 		var aiForges []string
@@ -155,9 +155,23 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		for _, data := range attachedDatas {
 			switch data.Type {
 			case aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
-				if data.Key == aicommon.CONTEXT_PROVIDER_KEY_SYSTEM_FLAG && data.Value == aicommon.CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE {
-					includeAllKnowledgeBases = true
-					continue
+				if data.Key == aicommon.CONTEXT_PROVIDER_KEY_SYSTEM_FLAG {
+					if data.Value == aicommon.CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE {
+						includeAllKnowledgeBases = true
+						if autoSelectAllKnowledgeBases {
+							autoSelectAllKnowledgeBases = false
+							log.Warn("@auto_select_knowledge_base is already set, override")
+						}
+						continue
+					}
+					if strings.HasPrefix(data.Value, aicommon.CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE) {
+						autoSelectAllKnowledgeBases = true
+						if includeAllKnowledgeBases {
+							includeAllKnowledgeBases = false
+							log.Warn("@all_knowledge_base is already set, override")
+							continue
+						}
+					}
 				}
 				knowledgeBases = append(knowledgeBases, data.Value)
 			case aicommon.CONTEXT_PROVIDER_TYPE_FILE:
@@ -178,55 +192,26 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 
+		if autoSelectAllKnowledgeBases {
+			knowledgeBases = []string{}
+		}
+
 		knowledgeBases = dedupStrings(knowledgeBases)
 		log.Infof("start to get knowledge base selected: %v", knowledgeBases)
 
 		if len(knowledgeBases) <= 0 {
-			allKBNames, err := yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
+			log.Info("no knowledge bases found, start to select via invoker")
+			// Use the invoker to select knowledge bases
+			selectResult, err := r.SelectKnowledgeBase(loop.GetConfig().GetContext(), userQuery)
 			if err != nil {
-				log.Warnf("failed to load all knowledge base names: %v", err)
-				operator.Failed(utils.Errorf("failed to load all knowledge base names: %v", err))
+				log.Warnf("failed to select knowledge bases: %v", err)
+				operator.Failed(utils.Errorf("failed to select knowledge bases: %v", err))
 				return
 			}
-
-			buf := bytes.NewBufferString("")
-			for _, kb := range allKBNames {
-				buf.WriteString(fmt.Sprintf("- %#v\n", kb))
+			if len(selectResult.KnowledgeBases) > 0 {
+				knowledgeBases = append(knowledgeBases, selectResult.KnowledgeBases...)
 			}
-
-			log.Info("no knowledge bases found, start to pick up some kb via liteforge")
-			nonce := utils.RandStringBytes(4)
-			prompt := utils.MustRenderTemplate(`
-<|INSTRUCT_{{ .nonce }}|>
-你是一个知识库样本数据收集助手。你的任务是根据用户问题从知识库中获取相关样本数据。
-<|INSTRUCT_END{{ .nonce }}|>
-
-<|ALL_EXISTED_KNOWLEDGE_BASES_{{ .nonce }}|>
-{{ .knowledgeBases }}
-<|ALL_EXISTED_KNOWLEDGE_BASES_END_{{ .nonce }}|>
-
-<|USER_QUERY_{{ .nonce }}|>
-{{ .userQuery }}
-<|USER_QUERY_END_{{ .nonce }}|>
-`, map[string]any{
-				"nonce":          nonce,
-				"knowledgeBases": buf.String(),
-				"userQuery":      userQuery,
-			})
-			log.Infof("start to pick up kb from: \n%v", prompt)
-			// pick up via liteforge
-			action, err := r.InvokeLiteForge(loop.GetConfig().GetContext(), "pick_up_knowledge_base_samples", prompt, []aitool.ToolOption{
-				aitool.WithStringArrayParam("knowledge_bases", aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"), aitool.WithParam_Required(true)),
-			})
-			if err != nil {
-				operator.Failed(utils.Errorf("failed to pick up knowledge base samples: %v", err))
-				return
-			}
-			results := action.GetStringSlice("knowledge_bases")
-			if len(results) > 0 {
-				knowledgeBases = append(knowledgeBases, results...)
-			}
-			log.Infof("picked up %d knowledge base samples: %v", len(results), results)
+			log.Infof("selected %d knowledge bases: %v, reason: %s", len(selectResult.KnowledgeBases), selectResult.KnowledgeBases, selectResult.Reason)
 		}
 		knowledgeBases = dedupStrings(knowledgeBases)
 

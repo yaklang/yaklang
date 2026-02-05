@@ -34,8 +34,25 @@ func NewVerifySatisfactionResultWithNextMovements(satisfied bool, reasoning stri
 	}
 }
 
+// SelectedKnowledgeBaseResult represents the result of knowledge base selection
+type SelectedKnowledgeBaseResult struct {
+	Reason         string   `json:"reason"`          // The reasoning for the selection
+	KnowledgeBases []string `json:"knowledge_bases"` // The selected knowledge base names/IDs
+}
+
+// NewSelectedKnowledgeBaseResult creates a new SelectedKnowledgeBaseResult
+func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *SelectedKnowledgeBaseResult {
+	return &SelectedKnowledgeBaseResult{
+		Reason:         reason,
+		KnowledgeBases: knowledgeBases,
+	}
+}
+
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
+	SetCurrentTask(task AIStatefulTask)
+	GetCurrentTask() AIStatefulTask
+	GetCurrentTaskId() string
 
 	ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error)
 	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error)
@@ -53,6 +70,9 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
+	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query
+	// It uses AI to analyze the query and match it with available knowledge bases
+	SelectKnowledgeBase(ctx context.Context, originQuery string) (*SelectedKnowledgeBaseResult, error)
 
 	ExecuteLoopTaskIF(taskTypeName string, task AIStatefulTask, options ...any) (bool, error)
 	// timeline operator
