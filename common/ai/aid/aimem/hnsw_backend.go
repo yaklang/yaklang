@@ -123,7 +123,7 @@ func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error)
 		sessionID:  sessionID,
 		db:         db,
 		collection: &collection,
-		autoSave:   true,
+		autoSave:   config.autoSave,
 	}
 
 	// 加载或创建HNSW Graph

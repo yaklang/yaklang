@@ -710,12 +710,24 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(ids) == 0 {
+		return nil
+	}
+
 	s.hnsw.Delete(ids...)
 
+	const deleteBatchSize = 200
 	utils.GormTransactionReturnDb(s.db, func(tx *gorm.DB) {
-		for _, id := range ids {
-			if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-				log.Errorf("删除文档 %s 失败: %v", id, err)
+		for start := 0; start < len(ids); start += deleteBatchSize {
+			end := start + deleteBatchSize
+			if end > len(ids) {
+				end = len(ids)
+			}
+			if err := tx.Model(&schema.VectorStoreDocument{}).
+				Where("collection_id = ? AND document_id IN (?)", s.collection.ID, ids[start:end]).
+				Unscoped().
+				Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+				log.Errorf("删除文档批次失败: %v", err)
 			}
 		}
 	})
