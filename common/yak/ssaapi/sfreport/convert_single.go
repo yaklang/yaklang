@@ -7,10 +7,10 @@ import (
 )
 
 func ConvertSingleResultToJSON(result *ssaapi.SyntaxFlowResult, showDataflowPath bool) (string, error) {
-	return ConvertSingleResultToJSONWithOptions(result, IRifyFullReportType, showDataflowPath, true)
+	return ConvertSingleResultToJSONWithOptions(result, IRifyFullReportType, showDataflowPath, true, true)
 }
 
-func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflowPath bool, showFileContent bool) (string, error) {
+func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflowPath bool, showFileContent bool, withFile bool) (string, error) {
 	if result == nil {
 		return "", nil
 	}
@@ -24,6 +24,11 @@ func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, repor
 	}
 
 	report.AddSyntaxFlowResult(result)
+	if !withFile {
+		report.File = nil
+		report.IrSourceHashes = make(map[string]struct{})
+		report.FileCount = 0
+	}
 
 	if len(report.Risks) == 0 {
 		return "", nil

@@ -16,8 +16,8 @@ var Exports = map[string]interface{}{
 	"ConvertSingleResultToJSON": func(result *ssaapi.SyntaxFlowResult, showDataflow bool) (string, error) {
 		return ConvertSingleResultToJSON(result, showDataflow)
 	},
-	"ConvertSingleResultToJSONWithOptions": func(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflow bool, showFileContent bool) (string, error) {
-		return ConvertSingleResultToJSONWithOptions(result, reportType, showDataflow, showFileContent)
+	"ConvertSingleResultToJSONWithOptions": func(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool) (string, error) {
+		return ConvertSingleResultToJSONWithOptions(result, reportType, showDataflow, showFileContent, withFile)
 	},
 
 	"ImportSSARiskFromJSON": ImportSSARiskFromJSON,
