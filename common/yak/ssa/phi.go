@@ -108,7 +108,11 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			if index := slices.Index(phi2.Edge, phiValue.GetId()); index != -1 {
 				phi2.Edge[index] = header.GetId()
 				ret[name] = phi2
-				ReplaceAllValue(phiValue, phi2)
+				// phi2 的 Edge 已在上方把 phiValue 替换为 header，不能再对 phi2 调用 ReplaceValue(v, to)，
+				// 否则 Phi.ReplaceValue 里会找不到 v（即 phiValue）在 Edge 中而打 "phi not use this value"。
+				// 因此替换时跳过 phi2，并手动从 phiValue 的 users 中移除 phi2。
+				ReplaceValue(phiValue, phi2, func(i Instruction) bool { return i == phi2 })
+				phiValue.RemoveUser(phi2)
 				for name, v := range ReplaceMemberCall(phiValue, phi2) {
 					ret[name] = v
 				}

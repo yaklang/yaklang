@@ -70,7 +70,11 @@ func (c *Config) parseFile() (ret *Program, err error) {
 		wait = prog.UpdateToDatabase()
 	}
 	total := prog.Cache.CountInstruction()
-	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
+	if prog.DatabaseKind != ssa.ProgramCacheMemory {
+		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total)
+	} else {
+		prog.ProcessInfof("program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
+	}
 	prog.Cache.SaveToDatabase()
 	wait()
 	p := NewProgram(prog, c)
