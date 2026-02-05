@@ -133,10 +133,8 @@ func (s *Server) DeletePluginByUserID(ctx context.Context, req *ypb.DeletePlugin
 }
 
 func (s *Server) DeleteAllLocalPlugins(ctx context.Context, req *ypb.Empty) (*ypb.Empty, error) {
-	if db := s.GetProfileDatabase().DropTableIfExists(&schema.YakScript{}); db.Error == nil {
-		if db := s.GetProfileDatabase().AutoMigrate(&schema.YakScript{}); db.Error == nil {
-			return &ypb.Empty{}, nil
-		}
+	if err := schema.DropRecreateTable(s.GetProfileDatabase(), &schema.YakScript{}); err == nil {
+		return &ypb.Empty{}, nil
 	}
 
 	err := yakit.DeleteYakScriptAll(s.GetProfileDatabase())

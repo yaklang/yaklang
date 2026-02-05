@@ -224,15 +224,10 @@ func DeleteGeneralRuleByFilter(outDb *gorm.DB, filter *ypb.FingerprintFilter) (r
 }
 
 func ClearGeneralRule(db *gorm.DB) {
-	db.DropTableIfExists(&schema.GeneralRule{})
-	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='general_rules';`); db.Error != nil {
-		log.Errorf("update sqlite sequence failed: %s", db.Error)
+	if err := schema.DropRecreateTable(db, &schema.GeneralRule{}); err != nil {
+		log.Errorf("drop recreate general_rules failed: %s", err)
+		return
 	}
-	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='general_rule_and_group';`); db.Error != nil {
-		log.Errorf("update sqlite sequence failed: %s", db.Error)
-	}
-	db.AutoMigrate(&schema.GeneralRule{})
-	return
 }
 
 func InsertBuiltinGeneralRules(db *gorm.DB) error {

@@ -1,8 +1,6 @@
 package yakit
 
 import (
-	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -55,16 +53,7 @@ func CreateHotPatchTemplate(db *gorm.DB, name, content, typ string) error {
 }
 
 func DeleteAllHotPatchTemplate(db *gorm.DB) error {
-	if ndb := db.DropTableIfExists(&schema.HotPatchTemplate{}); ndb.Error != nil {
-		return ndb.Error
-	}
-	if ndb := db.Exec(fmt.Sprintf(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='%s';`, schema.HotPatchTemplateTableName)); ndb.Error != nil {
-		return ndb.Error
-	}
-	if ndb := db.AutoMigrate(&schema.HotPatchTemplate{}); ndb.Error != nil {
-		return ndb.Error
-	}
-	return nil
+	return schema.DropRecreateTable(db, &schema.HotPatchTemplate{})
 }
 
 func DeleteHotPatchTemplate(db *gorm.DB, filter *ypb.HotPatchTemplateRequest) (int64, error) {
