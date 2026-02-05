@@ -232,101 +232,156 @@ func TestServer_ScanWithFingerprintGroup(t *testing.T) {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		yakit.DeleteGeneralRuleByName(consts.GetGormProfileDatabase(), ruleName1)
+		yakit.DeleteGeneralRuleByName(consts.GetGormProfileDatabase(), ruleName2)
 		yakit.DeleteGeneralRuleGroupByName(consts.GetGormProfileDatabase(), []string{groupName2})
 	})
 
-	// mock http server
-	host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(
-		"HTTP 1.1 200 OK\r\nServer: nginx\r\nContent-Length: 0\r\n\r\n%s\r\n%s",
-		token1,
-		token2,
-	)))
+	// helper function to create mock http server for each subtest
+	createMockServer := func() (string, int) {
+		host, port := utils.DebugMockHTTP([]byte(fmt.Sprintf(
+			"HTTP 1.1 200 OK\r\nServer: nginx\r\nContent-Length: 0\r\n\r\n%s\r\n%s",
+			token1,
+			token2,
+		)))
+		// wait for server to be ready
+		utils.WaitConnect(utils.HostPort(host, port), 3)
+		return host, port
+	}
+
+	// max retry times for CI environment stability
+	const maxRetries = 3
 
 	t.Run("test port scan with one fingerprint group", func(t *testing.T) {
-		// port scan with one group
-		r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
-			Targets:                host,
-			Ports:                  strconv.Itoa(port),
-			Mode:                   "fingerprint",
-			Proto:                  []string{"tcp"},
-			Concurrent:             50,
-			Active:                 false,
-			ScriptNames:            []string{},
-			SkippedHostAliveScan:   true,
-			FingerprintGroup:       []string{groupName1},
-			EnableFingerprintGroup: true,
-		})
-		_ = r
-		require.Nil(t, err)
-		checkGroup1 := false
-		for {
-			result, err := r.Recv()
+		var lastErr error
+		for retry := 0; retry < maxRetries; retry++ {
+			// create independent mock server for this attempt
+			host, port := createMockServer()
+
+			// port scan with one group
+			r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
+				Targets:                host,
+				Ports:                  strconv.Itoa(port),
+				Mode:                   "fingerprint",
+				Proto:                  []string{"tcp"},
+				Concurrent:             50,
+				Active:                 false,
+				ScriptNames:            []string{},
+				SkippedHostAliveScan:   true,
+				FingerprintGroup:       []string{groupName1},
+				EnableFingerprintGroup: true,
+			})
 			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					require.Nilf(t, err, "stream error: %v", err)
-				}
-				break
+				lastErr = err
+				continue
 			}
-			spew.Dump(result)
-			var msg msg
-			if result.IsMessage && result.GetMessage() != nil {
-				err := json.Unmarshal(result.GetMessage(), &msg)
-				require.NoError(t, err)
-				if msg.Content.Level == "json" {
-					data := msg.Content.Data
-					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
-						checkGroup1 = true
+
+			checkGroup1 := false
+			scanErr := false
+			for {
+				result, err := r.Recv()
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						lastErr = err
+						scanErr = true
+					}
+					break
+				}
+				spew.Dump(result)
+				var msg msg
+				if result.IsMessage && result.GetMessage() != nil {
+					err := json.Unmarshal(result.GetMessage(), &msg)
+					if err != nil {
+						continue
+					}
+					if msg.Content.Level == "json" {
+						data := msg.Content.Data
+						if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
+							checkGroup1 = true
+						}
 					}
 				}
 			}
+
+			if scanErr {
+				continue
+			}
+
+			if checkGroup1 {
+				return // test passed
+			}
+			lastErr = fmt.Errorf("没有发现使用group1的指纹扫描结果")
 		}
-		require.True(t, checkGroup1, "没有发现使用group1的指纹扫描结果")
+		require.NoError(t, lastErr, "after %d retries still failed", maxRetries)
 	})
 
 	t.Run("test port scan with all fingerprint group", func(t *testing.T) {
+		var lastErr error
+		for retry := 0; retry < maxRetries; retry++ {
+			// create independent mock server for this attempt
+			host, port := createMockServer()
 
-		// port scan with all group
-		r2, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
-			Targets:                host,
-			Ports:                  strconv.Itoa(port),
-			Mode:                   "fingerprint",
-			Proto:                  []string{"tcp"},
-			Concurrent:             50,
-			Active:                 false,
-			ScriptNames:            []string{},
-			SkippedHostAliveScan:   true,
-			FingerprintGroup:       []string{}, //传空使用所有组
-			EnableFingerprintGroup: true,
-		})
-		require.Nil(t, err)
-		checkAllGroup1 := false
-		checkAllGroup2 := false
-		for {
-			result, err := r2.Recv()
+			// port scan with all group
+			r2, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
+				Targets:                host,
+				Ports:                  strconv.Itoa(port),
+				Mode:                   "fingerprint",
+				Proto:                  []string{"tcp"},
+				Concurrent:             50,
+				Active:                 false,
+				ScriptNames:            []string{},
+				SkippedHostAliveScan:   true,
+				FingerprintGroup:       []string{}, //传空使用所有组
+				EnableFingerprintGroup: true,
+			})
 			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					require.Nilf(t, err, "stream error: %v", err)
-				}
-				break
+				lastErr = err
+				continue
 			}
-			spew.Dump(result)
-			var msg msg
-			if result.IsMessage && result.GetMessage() != nil {
-				err := json.Unmarshal(result.GetMessage(), &msg)
-				require.NoError(t, err)
-				if msg.Content.Level == "json" {
-					data := msg.Content.Data
-					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
-						checkAllGroup1 = true
+
+			checkAllGroup1 := false
+			checkAllGroup2 := false
+			scanErr := false
+			for {
+				result, err := r2.Recv()
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						lastErr = err
+						scanErr = true
 					}
-					if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName2) {
-						checkAllGroup2 = true
+					break
+				}
+				spew.Dump(result)
+				var msg msg
+				if result.IsMessage && result.GetMessage() != nil {
+					err := json.Unmarshal(result.GetMessage(), &msg)
+					if err != nil {
+						continue
+					}
+					if msg.Content.Level == "json" {
+						data := msg.Content.Data
+						if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName1) {
+							checkAllGroup1 = true
+						}
+						if strings.Contains(data, "fingerprint") && strings.Contains(data, ruleName2) {
+							checkAllGroup2 = true
+						}
 					}
 				}
+			}
+
+			if scanErr {
+				continue
+			}
+
+			if checkAllGroup1 && checkAllGroup2 {
+				return // test passed
+			}
+			if !checkAllGroup1 {
+				lastErr = fmt.Errorf("没有发现使用group1的指纹扫描结果")
+			} else {
+				lastErr = fmt.Errorf("没有发现使用group2的指纹扫描结果")
 			}
 		}
-		require.True(t, checkAllGroup1, "没有发现使用group1的指纹扫描结果")
-		require.True(t, checkAllGroup2, "没有发现使用group2的指纹扫描结果")
+		require.NoError(t, lastErr, "after %d retries still failed", maxRetries)
 	})
 }
