@@ -8,12 +8,25 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
+	// Create test knowledge base for SelectKnowledgeBase to work
+	testKBName := "test_kb_" + utils.RandStringBytes(8)
+	db := consts.GetGormProfileDatabase()
+	kb := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        testKBName,
+		KnowledgeBaseDescription: "Test knowledge base",
+		KnowledgeBaseType:        "test",
+	}
+	yakit.CreateKnowledgeBase(db, kb)
+	defer db.Where("knowledge_base_name = ?", testKBName).Unscoped().Delete(&schema.KnowledgeBaseInfo{})
+
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 	manager, token := aicommon.NewMockEKManagerAndToken()
@@ -24,6 +37,15 @@ func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
 
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
+
+		// Handle SelectKnowledgeBase liteforge call
+		if utils.MatchAllOfSubString(prompt, "ALL_EXISTED_KNOWLEDGE_BASES_", "USER_QUERY_") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "select_knowledge_base", "knowledge_bases": [], "reason": "test mode - no knowledge bases selected"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
 		if utils.MatchAllOfSubString(prompt, string(ActionDirectlyAnswer), string(ActionRequireTool), string(ActionKnowledgeEnhanceAnswer)) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`

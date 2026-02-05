@@ -38,6 +38,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		originalInput := loop.GetCurrentTask().GetUserInput()
 		rewriteQuery := loop.Get("enhance_user_query")
 		if rewriteQuery == "" {
 			op.Fail("knowledge_enhance action must have 'rewrite_user_query_for_knowledge_enhance' field")
@@ -46,13 +47,34 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 
 		invoker := loop.GetInvoker()
 		ctx := loop.GetConfig().GetContext()
+
+		selectKBResults, err := invoker.SelectKnowledgeBase(ctx, utils.MustRenderTemplate(`
+<|ORIGINAL_USER_INPUT_{{.nonce}}|>
+{{ .original_input }}
+<|ORIGINAL_USER_INPUT_END_{{.nonce}}|>
+
+<|REWRITE_QUERY_{{.nonce}}|>
+{{ .rewrite_query }}
+<|REWRITE_QUERY_END_{{.nonce}}|>
+`, map[string]interface{}{
+			"original_input": originalInput,
+			"rewrite_query":  rewriteQuery,
+			"nonce":          utils.RandBytes(4),
+		}))
+		if err != nil {
+			log.Errorf("knowledge_enhance action error: %v", err)
+			invoker.AddToTimeline("knowledge_enhance_error", "Cannot select existed kb base: "+err.Error())
+			op.Exit()
+			return
+		}
+
 		task := loop.GetCurrentTask()
 		if task != nil && !utils.IsNil(task.GetContext()) {
 			ctx = task.GetContext()
 		}
 
 		// Step 1: Get enhanced knowledge data
-		enhancedAnswer, err := invoker.EnhanceKnowledgeGetterEx(ctx, rewriteQuery, nil)
+		enhancedAnswer, err := invoker.EnhanceKnowledgeGetterEx(ctx, rewriteQuery, nil, selectKBResults.KnowledgeBases...)
 		if err != nil {
 			op.Fail(err.Error())
 			return
