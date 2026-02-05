@@ -115,7 +115,7 @@ func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(60 * time.Second)
+	after := time.After(15 * time.Second)
 
 	endforge := false
 	reActFinished := false

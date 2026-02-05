@@ -93,7 +93,7 @@ func TestReAct_RequireBlueprint(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(60 * time.Second)
+	after := time.After(15 * time.Second)
 
 	endforge := false
 	reActFinished := false
@@ -197,7 +197,7 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(60 * time.Second)
+	after := time.After(15 * time.Second)
 
 	forgeStarted := false
 	reActProcessing := false

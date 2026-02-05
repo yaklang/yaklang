@@ -10,11 +10,13 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	_ "github.com/yaklang/yaklang/common/aiforge" // register liteforge callback
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/yak" // import for init() to register LiteForgeExecuteCallback
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -181,7 +183,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 		}
 	}()
 
-	after := time.After(30 * time.Second)
+	after := time.After(15 * time.Second)
 
 LOOP:
 	for {
@@ -316,7 +318,7 @@ func TestReAct_CancelTask_InLoop(t *testing.T) {
 		}
 	}()
 
-	after := time.After(30000 * time.Second)
+	after := time.After(15 * time.Second)
 
 	var taskAborted bool
 

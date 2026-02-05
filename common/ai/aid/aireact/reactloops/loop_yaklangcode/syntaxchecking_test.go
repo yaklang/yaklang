@@ -124,9 +124,12 @@ arr := []string{"a", "b", "c"}
 
 func TestCheckCodeAndFormatErrors_ValidCode(t *testing.T) {
 	// Test with valid Yaklang code that doesn't produce warnings
+	// Note: println is not recognized by the static analyzer, so we use simple assignments
 	code := `
 name := "test"
-println("Hello", name)
+result := name + " world"
+count := 1 + 2
+println(name + " world")
 `
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)

@@ -120,7 +120,7 @@ func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(60 * time.Second)
+	after := time.After(15 * time.Second)
 
 	endforge := false
 	reActFinished := false
@@ -259,7 +259,7 @@ func TestReAct_RequireBlueprint_InputParams(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(60 * time.Second)
+	after := time.After(15 * time.Second)
 
 	endforge := false
 	reActFinished := false

@@ -78,7 +78,7 @@ func TestReAct_PlanLoop_Basic(t *testing.T) {
 
 		t.Log("✓ Plan Loop prompt correctly excludes prohibited actions")
 
-	case <-time.After(30 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("timeout waiting for prompt")
 	}
 
@@ -86,7 +86,7 @@ func TestReAct_PlanLoop_Basic(t *testing.T) {
 	select {
 	case <-finished:
 		t.Log("✓ Test completed successfully")
-	case <-time.After(30 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("timeout waiting for task completion")
 	}
 }

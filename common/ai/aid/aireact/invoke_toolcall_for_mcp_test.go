@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/yak" // import for init() to register YakScriptAiToolsCovertHandle
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
