@@ -82,11 +82,78 @@ func GetAIMemoryEntity(db *gorm.DB, sessionID, memoryID string) (*schema.AIMemor
 }
 
 func DeleteAIMemoryEntity(db *gorm.DB, filter *ypb.AIMemoryEntityFilter) (int64, error) {
-	db = FilterAIMemoryEntity(db, filter).Model(&schema.AIMemoryEntity{})
-	if db := db.Unscoped().Delete(&schema.AIMemoryEntity{}); db.Error != nil {
-		return 0, db.Error
-	} else {
-		return db.RowsAffected, nil
+	return DeleteAIMemoryEntityBatched(context.Background(), db, filter, defaultAIMemoryEntityDeleteBatchSize, nil)
+}
+
+const (
+	defaultAIMemoryEntityDeleteBatchSize = 200
+)
+
+type DeleteAIMemoryEntityBatchHook func(ctx context.Context, db *gorm.DB, entities []schema.AIMemoryEntity) error
+
+// DeleteAIMemoryEntityBatched hard-deletes AIMemoryEntity rows in small batches to avoid large-range query+delete stalls.
+// If hook is provided, it is called once per batch (before deleting the entities).
+func DeleteAIMemoryEntityBatched(ctx context.Context, db *gorm.DB, filter *ypb.AIMemoryEntityFilter, batchSize int, hook DeleteAIMemoryEntityBatchHook) (deletedEntities int64, err error) {
+	if db == nil {
+		return 0, utils.Errorf("database not initialized")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if batchSize <= 0 {
+		batchSize = defaultAIMemoryEntityDeleteBatchSize
+	}
+
+	var lastID uint
+	for {
+		select {
+		case <-ctx.Done():
+			return deletedEntities, ctx.Err()
+		default:
+		}
+
+		var entities []schema.AIMemoryEntity
+		q := FilterAIMemoryEntity(db, filter).
+			Select("id, memory_id, session_id, potential_questions").
+			Order("id asc").
+			Limit(batchSize)
+		if lastID > 0 {
+			q = q.Where("id > ?", lastID)
+		}
+		if err := q.Find(&entities).Error; err != nil {
+			return deletedEntities, err
+		}
+		if len(entities) == 0 {
+			return deletedEntities, nil
+		}
+
+		entityIDs := make([]uint, 0, len(entities))
+		for _, entity := range entities {
+			entityIDs = append(entityIDs, entity.ID)
+			lastID = entity.ID
+		}
+
+		var batchDeletedEntities int64
+		if hook != nil {
+			if err := hook(ctx, db, entities); err != nil {
+				return deletedEntities, err
+			}
+		}
+		if err := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			res := tx.Model(&schema.AIMemoryEntity{}).
+				Where("id IN (?)", entityIDs).
+				Unscoped().
+				Delete(&schema.AIMemoryEntity{})
+			if res.Error != nil {
+				return res.Error
+			}
+			batchDeletedEntities = res.RowsAffected
+			return nil
+		}); err != nil {
+			return deletedEntities, err
+		}
+
+		deletedEntities += batchDeletedEntities
 	}
 }
 

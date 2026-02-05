@@ -85,6 +85,14 @@ func (s *Server) GetProjectDatabase() *gorm.DB {
 	return consts.GetGormProjectDatabase()
 }
 
+func (s *Server) getAIMemoryVectorSingleton() *aiMemoryVectorSessionSingleton {
+	if s == nil {
+		return newAIMemoryVectorSessionSingleton(consts.GetGormProjectDatabase())
+	}
+
+	return newAIMemoryVectorSessionSingleton(consts.GetGormProjectDatabase())
+}
+
 func (s *Server) GetSSADatabase() *gorm.DB {
 	return ssadb.GetDB()
 }
