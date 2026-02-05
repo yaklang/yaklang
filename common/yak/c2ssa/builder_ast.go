@@ -63,6 +63,12 @@ func (b *astbuilder) buildExternalDeclaration(ast *cparser.ExternalDeclarationCo
 		b.buildDeclaration(d.(*cparser.DeclarationContext))
 	} else if ds := ast.DeclarationSpecifier(); ds != nil {
 		b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
+	} else if mce := ast.MacroCallExpression(); mce != nil {
+		// 处理宏调用表达式（如 FUN(fmin, double, <)）
+		b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+	} else if mcs := ast.MacroCallStatement(); mcs != nil {
+		// 处理宏调用语句（如 FF_DISABLE_DEPRECATION_WARNINGS）
+		b.buildMacroCallStatement(mcs.(*cparser.MacroCallStatementContext))
 	}
 }
 
@@ -124,7 +130,7 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 				if ds := ast.DeclarationSpecifier(); ds != nil {
 					retType = b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
 				}
-				_, _, paramTypes = b.buildDeclarator(de.(*cparser.DeclaratorContext), PARAM_KIND)
+				_, _, paramTypes = b.buildDeclarator(de.(*cparser.DeclaratorContext), FUNC_KIND)
 
 				handleFunctionType(b.Function)
 
@@ -151,7 +157,6 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	var base ssa.Value
 	var ssatypes ssa.Types
 
 	kind := NORMAL_KIND
@@ -159,23 +164,62 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		kind = kinds[0]
 	}
 
-	// directDeclarator: Identifier
+	// directDeclarator: Identifier declaratorSuffix*
 	if id := ast.Identifier(); id != nil {
-		switch kind {
-		case VARIABLE_KIND:
-			return b.CreateLocalVariable(id.GetText()), nil, nil
-		case NORMAL_KIND:
-			return nil, b.EmitConstInst(id.GetText()), nil
-		case PARAM_KIND:
-			return nil, b.NewParam(id.GetText()), nil
-		case FUNC_KIND:
-			return nil, b.NewFunc(id.GetText()), nil
+		// Identifier 本身只是一个名字，不根据 kind 创建值
+		// 根据 declaratorSuffix 的类型来决定如何构建
+		identifierName := id.GetText()
+		var variable *ssa.Variable
+		var value ssa.Value
+
+		// 先处理基础 Identifier，根据是否有 suffix 来决定初始值
+		suffixes := ast.AllDeclaratorSuffix()
+		if len(suffixes) == 0 {
+			// 没有 suffix，直接根据 kind 创建
+			return b.buildIdentifierDeclarator(identifierName, kind)
 		}
+
+		// 有 suffix，先创建基础标识符，然后逐个处理 suffix
+		// 第一个 suffix 决定基础类型
+		firstSuffix := suffixes[0].(*cparser.DeclaratorSuffixContext)
+		if firstSuffix.ArraySuffix() != nil {
+			// 数组类型：先创建变量名，然后处理数组维度
+			if kind == VARIABLE_KIND {
+				variable = b.CreateLocalVariable(identifierName)
+			}
+			value = b.EmitConstInst(identifierName)
+		} else if firstSuffix.FunctionSuffix() != nil {
+			// 函数类型：根据 kind 创建函数
+			// 重用 buildIdentifierDeclarator 的逻辑，只取 value 部分
+			_, value, _ = b.buildIdentifierDeclarator(identifierName, kind)
+		} else {
+			// 未知类型，使用默认处理
+			value = b.EmitConstInst(identifierName)
+		}
+
+		// 逐个处理 declaratorSuffix*
+		for _, suffix := range suffixes {
+			variable, value, ssatypes = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, ssatypes, PARAM_KIND)
+		}
+		return variable, value, ssatypes
 	}
 
-	// directDeclarator: '(' declarator ')'
-	// 注意：这里直接处理内部的 declarator，避免通过 buildDeclarator 的完整流程
-	// 因为 buildDeclarator 会调用 buildDirectDeclarator，形成循环
+	// directDeclarator: macroCallExpression declaratorSuffix*
+	if mce := ast.MacroCallExpression(); mce != nil {
+		// 处理宏调用表达式（暂时作为普通标识符处理）
+		value := b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+		var variable *ssa.Variable
+		if kind == VARIABLE_KIND {
+			variable = b.CreateLocalVariable(value.GetName())
+		}
+		// 逐个处理 declaratorSuffix*
+		for _, suffix := range ast.AllDeclaratorSuffix() {
+			variable, value, ssatypes = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, ssatypes, kind)
+		}
+		return variable, value, ssatypes
+	}
+
+	// directDeclarator: '(' declarator ')' declaratorSuffix*
 	if d := ast.Declarator(); d != nil {
 		declCtx := d.(*cparser.DeclaratorContext)
 		// 先处理内部的 directDeclarator
@@ -183,7 +227,7 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		var value ssa.Value
 		var types ssa.Types
 		if innerDirect := declCtx.DirectDeclarator(); innerDirect != nil {
-			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kinds...)
+			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kind)
 		}
 		// 然后应用指针修饰符（如果有）
 		if p := declCtx.Pointer(); p != nil {
@@ -193,22 +237,89 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		for _, g := range declCtx.AllGccDeclaratorExtension() {
 			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
 		}
+		// 处理 declaratorSuffix*
+		for _, suffix := range ast.AllDeclaratorSuffix() {
+			variable, value, types = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, types, kind)
+		}
 		return variable, value, types
 	}
 
-	// directDeclarator: directDeclarator '[' ... ']'
-	if dd := ast.DirectDeclarator(); dd != nil && ast.LeftBracket() != nil && ast.RightBracket() != nil {
-		// 处理数组声明
-		// 1. directDeclarator '[' typeQualifierList? assignmentExpression? ']'
-		// 2. directDeclarator '[' 'static' typeQualifierList? assignmentExpression ']'
-		// 3. directDeclarator '[' typeQualifierList 'static' assignmentExpression ']'
-		// 4. directDeclarator '[' typeQualifierList? '*' ']'
+	// directDeclarator: Identifier ':' DigitSequence
+	if id := ast.Identifier(); id != nil && ast.DigitSequence() != nil {
+		return nil, b.EmitConstInst("bitfield"), nil
+	}
 
-		if a := ast.Expression(); a != nil {
-			base, _ = b.buildExpression(a.(*cparser.ExpressionContext), false)
+	// directDeclarator: vcSpecificModifer Identifier declaratorSuffix*
+	if vcm := ast.VcSpecificModifer(); vcm != nil && ast.Identifier() != nil {
+		b.buildVcSpecificModifer(vcm.(*cparser.VcSpecificModiferContext))
+		var value ssa.Value = b.EmitConstInst("vcSpecific")
+		var variable *ssa.Variable
+		// 逐个处理 declaratorSuffix*
+		for _, suffix := range ast.AllDeclaratorSuffix() {
+			variable, value, ssatypes = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, ssatypes, kind)
 		}
-		variable, index, _ := b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
-		if c1, ok := ssa.ToConstInst(index); ok {
+		return variable, value, ssatypes
+	}
+
+	// directDeclarator: '(' vcSpecificModifer declarator ')' declaratorSuffix*
+	if vcm := ast.VcSpecificModifer(); vcm != nil && ast.Declarator() != nil {
+		b.buildVcSpecificModifer(vcm.(*cparser.VcSpecificModiferContext))
+		declCtx := ast.Declarator().(*cparser.DeclaratorContext)
+		// 先处理内部的 directDeclarator
+		var variable *ssa.Variable
+		var value ssa.Value
+		var types ssa.Types
+		if innerDirect := declCtx.DirectDeclarator(); innerDirect != nil {
+			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kind)
+		}
+		// 然后应用指针修饰符（如果有）
+		if p := declCtx.Pointer(); p != nil {
+			b.applyPointerModifiers(p.(*cparser.PointerContext), value)
+		}
+		// 处理 gccDeclaratorExtension
+		for _, g := range declCtx.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		// 处理 declaratorSuffix*
+		for _, suffix := range ast.AllDeclaratorSuffix() {
+			variable, value, types = b.buildDeclaratorSuffix(suffix.(*cparser.DeclaratorSuffixContext), variable, value, types, kind)
+		}
+		return variable, value, types
+	}
+
+	b.NewError(ssa.Error, TAG, Unreachable())
+	return b.CreateVariable(""), b.EmitConstInst(0), nil
+}
+
+// buildIdentifierDeclarator 处理没有 suffix 的简单标识符声明
+func (b *astbuilder) buildIdentifierDeclarator(name string, kind ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
+	switch kind {
+	case VARIABLE_KIND:
+		return b.CreateLocalVariable(name), nil, nil
+	case NORMAL_KIND:
+		return nil, b.EmitConstInst(name), nil
+	case PARAM_KIND:
+		return nil, b.NewParam(name), nil
+	case FUNC_KIND:
+		return nil, b.NewFunc(name), nil
+	default:
+		return nil, b.EmitConstInst(name), nil
+	}
+}
+
+// buildDeclaratorSuffix 处理声明符后缀（数组维度或函数参数）
+func (b *astbuilder) buildDeclaratorSuffix(ast *cparser.DeclaratorSuffixContext, variable *ssa.Variable, value ssa.Value, ssatypes ssa.Types, kind ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 处理数组后缀: arraySuffix
+	if as := ast.ArraySuffix(); as != nil {
+		arraySuffix := as.(*cparser.ArraySuffixContext)
+		var base ssa.Value
+		if e := arraySuffix.Expression(); e != nil {
+			base, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
+		}
+		if c1, ok := ssa.ToConstInst(value); ok {
 			if c2, ok := ssa.ToConstInst(base); ok {
 				i1, _ := strconv.Atoi(c1.String())
 				i2, _ := strconv.Atoi(c2.String())
@@ -221,71 +332,127 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 		return variable, base, nil
 	}
 
-	// directDeclarator: directDeclarator '(' parameterTypeList ')'
-	if dd := ast.DirectDeclarator(); dd != nil && ast.LeftParen() != nil && ast.ParameterTypeList() != nil {
-		switch kind {
-		case VARIABLE_KIND:
-			_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), FUNC_KIND)
-			return b.CreateLocalVariable(base.GetName()), nil, nil
-		case FUNC_KIND:
-			_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
-		case PARAM_KIND:
-			_, ssatypes = b.buildParameterTypeList(ast.ParameterTypeList().(*cparser.ParameterTypeListContext))
-		}
-		if utils.IsNil(base) {
-			base = b.EmitConstInst(0)
-		}
-		return nil, base, ssatypes
+	// 处理函数后缀: functionSuffix
+	if fs := ast.FunctionSuffix(); fs != nil {
+		return b.buildFunctionSuffixDeclarator(fs.(*cparser.FunctionSuffixContext), variable, value, ssatypes, kind)
 	}
 
-	// directDeclarator: directDeclarator '(' identifierList? ')'
-	if dd := ast.DirectDeclarator(); dd != nil && ast.LeftParen() != nil && ast.RightParen() != nil {
-		_, base, _ = b.buildDirectDeclarator(dd.(*cparser.DirectDeclaratorContext), kinds...)
-		if idl := ast.IdentifierList(); idl != nil {
-			b.buildIdentifierList(idl.(*cparser.IdentifierListContext))
-		}
-		if utils.IsNil(base) {
-			base = b.EmitConstInst(0)
-		}
-		return nil, base, nil
+	return variable, value, ssatypes
+}
+
+// buildFunctionSuffixDeclarator 处理函数后缀声明符
+func (b *astbuilder) buildFunctionSuffixDeclarator(functionSuffix *cparser.FunctionSuffixContext, variable *ssa.Variable, value ssa.Value, ssatypes ssa.Types, kind ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
+	// 提取参数类型列表（如果有）
+	if ptl := functionSuffix.ParameterTypeList(); ptl != nil {
+		_, ssatypes = b.buildParameterTypeList(ptl.(*cparser.ParameterTypeListContext))
+	} else if idl := functionSuffix.IdentifierList(); idl != nil {
+		b.buildIdentifierList(idl.(*cparser.IdentifierListContext))
 	}
 
-	// directDeclarator: Identifier ':' DigitSequence
-	if id := ast.Identifier(); id != nil && ast.DigitSequence() != nil {
-		return nil, b.EmitConstInst("bitfield"), nil
+	// 根据 kind 决定返回值
+	switch kind {
+	case VARIABLE_KIND:
+		// 函数类型的变量：优先使用 variable 的名字，如果没有则使用 value 的名字
+		var varName string
+		if variable != nil {
+			varName = variable.GetName()
+		} else if value != nil {
+			varName = value.GetName()
+		}
+		// 如果仍然没有名字，使用默认值
+		if varName == "" {
+			varName = "unknown"
+		}
+		return b.CreateLocalVariable(varName), nil, nil
+	case FUNC_KIND:
+		// 函数定义：保持 value（应该是函数）
+		if utils.IsNil(value) {
+			value = b.EmitConstInst(0)
+		}
+		return variable, value, ssatypes
+	case PARAM_KIND:
+		// 参数声明：已经提取了参数类型，返回 value 和类型
+		if utils.IsNil(value) {
+			value = b.EmitConstInst(0)
+		}
+		return variable, value, ssatypes
+	default:
+		// 其他情况：保持原值
+		if utils.IsNil(value) {
+			value = b.EmitConstInst(0)
+		}
+		return variable, value, ssatypes
+	}
+}
+
+// buildMacroCallExpression 处理宏调用表达式
+// macroCallExpression: Identifier '(' macroArgumentList? ')' postfixSuffix*
+func (b *astbuilder) buildMacroCallExpression(ast *cparser.MacroCallExpressionContext) ssa.Value {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var right ssa.Value
+
+	// 获取宏名称
+	if id := ast.Identifier(); id != nil {
+		macroName := id.GetText()
+		// 处理宏参数列表
+		var args ssa.Values
+		if mal := ast.MacroArgumentList(); mal != nil {
+			args = b.buildMacroArgumentList(mal.(*cparser.MacroArgumentListContext))
+		}
+		// 暂时作为函数调用处理（如果宏展开为函数调用）
+		// 或者作为普通标识符处理
+		if len(args) > 0 {
+			// 尝试作为函数调用处理
+			if fun, ok := b.GetFunc(macroName, ""); ok {
+				right = b.EmitCall(b.NewCall(fun, args))
+			} else {
+				// 无法找到函数，作为常量处理
+				right = b.EmitConstInst(macroName)
+			}
+		} else {
+			right = b.EmitConstInst(macroName)
+		}
 	}
 
-	// directDeclarator: vcSpecificModifer Identifier
-	if vcm := ast.VcSpecificModifer(); vcm != nil && ast.Identifier() != nil {
-		b.buildVcSpecificModifer(vcm.(*cparser.VcSpecificModiferContext))
-		return nil, b.EmitConstInst("vcSpecific"), nil
+	// 处理 postfixSuffix*（如数组下标）
+	for _, suffix := range ast.AllPostfixSuffix() {
+		right, _ = b.buildPostfixSuffix(suffix.(*cparser.PostfixSuffixContext), right, nil, false)
 	}
 
-	// directDeclarator: '(' vcSpecificModifer declarator ')'
-	// 注意：这里直接处理内部的 declarator，避免通过 buildDeclarator 的完整流程
-	if vcm := ast.VcSpecificModifer(); vcm != nil && ast.Declarator() != nil {
-		b.buildVcSpecificModifer(vcm.(*cparser.VcSpecificModiferContext))
-		declCtx := ast.Declarator().(*cparser.DeclaratorContext)
-		// 先处理内部的 directDeclarator
-		var variable *ssa.Variable
-		var value ssa.Value
-		var types ssa.Types
-		if innerDirect := declCtx.DirectDeclarator(); innerDirect != nil {
-			variable, value, types = b.buildDirectDeclarator(innerDirect.(*cparser.DirectDeclaratorContext), kinds...)
-		}
-		// 然后应用指针修饰符（如果有）
-		if p := declCtx.Pointer(); p != nil {
-			b.applyPointerModifiers(p.(*cparser.PointerContext), value)
-		}
-		// 处理 gccDeclaratorExtension
-		for _, g := range declCtx.AllGccDeclaratorExtension() {
-			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
-		}
-		return variable, value, types
+	if utils.IsNil(right) {
+		right = b.EmitConstInst(0)
 	}
+	return right
+}
 
-	b.NewError(ssa.Error, TAG, Unreachable())
-	return b.CreateVariable(""), b.EmitConstInst(0), nil
+// buildMacroArgumentList 处理宏参数列表
+func (b *astbuilder) buildMacroArgumentList(ast *cparser.MacroArgumentListContext) ssa.Values {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+	var ret ssa.Values
+	for _, a := range ast.AllMacroArgument() {
+		right := b.buildMacroArgument(a.(*cparser.MacroArgumentContext))
+		if right != nil {
+			ret = append(ret, right)
+		}
+	}
+	return ret
+}
+
+// buildMacroCallStatement 处理宏调用语句
+// macroCallStatement: Identifier eos*
+func (b *astbuilder) buildMacroCallStatement(ast *cparser.MacroCallStatementContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 宏调用语句通常不产生值，只是用于预处理指令或副作用
+	// 这里可以记录宏调用，但不做实际处理
+	if id := ast.Identifier(); id != nil {
+		_ = id.GetText()
+		// 可以在这里添加宏展开逻辑（如果需要）
+	}
 }
 
 // applyPointerModifiers 应用指针修饰符到类型上
@@ -322,11 +489,11 @@ func (b *astbuilder) applyPointerModifiers(pointer *cparser.PointerContext, valu
 }
 
 // buildDeclaratorCore 处理声明符的核心逻辑（不含指针修饰和扩展）
-func (b *astbuilder) buildDeclaratorCore(directDeclarator *cparser.DirectDeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
+func (b *astbuilder) buildDeclaratorCore(directDeclarator *cparser.DirectDeclaratorContext, kind ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
 	if directDeclarator == nil {
 		return nil, nil, nil
 	}
-	return b.buildDirectDeclarator(directDeclarator, kinds...)
+	return b.buildDirectDeclarator(directDeclarator, kind)
 }
 
 // buildDeclarator 处理完整的声明符：pointer? directDeclarator gccDeclaratorExtension*
@@ -339,8 +506,12 @@ func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...Co
 	var value ssa.Value
 	var types ssa.Types
 
+	kind := NORMAL_KIND
+	if len(kinds) > 0 {
+		kind = kinds[0]
+	}
 	if d := ast.DirectDeclarator(); d != nil {
-		variable, value, types = b.buildDeclaratorCore(d.(*cparser.DirectDeclaratorContext), kinds...)
+		variable, value, types = b.buildDeclaratorCore(d.(*cparser.DirectDeclaratorContext), kind)
 	}
 
 	if p := ast.Pointer(); p != nil {
@@ -461,26 +632,59 @@ func (b *astbuilder) buildDirectAbstractDeclarator(ast *cparser.DirectAbstractDe
 
 	resultType := baseType
 
-	// 1. '(' abstractDeclarator ')' - 括号中的抽象声明符
+	// 1. '(' abstractDeclarator ')' abstractDeclaratorSuffix*
 	if ast.LeftParen() != nil && ast.RightParen() != nil {
 		if a := ast.AbstractDeclarator(); a != nil {
 			resultType = b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext), resultType)
 		}
+		// 处理 abstractDeclaratorSuffix*
+		for _, suffix := range ast.AllAbstractDeclaratorSuffix() {
+			resultType = b.buildAbstractDeclaratorSuffix(suffix.(*cparser.AbstractDeclaratorSuffixContext), resultType)
+		}
+		// 处理 gccDeclaratorExtension
+		for _, g := range ast.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		return resultType
 	}
 
-	// 2. '[' ... ']' - 数组维度
-	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
+	// 2. abstractDeclaratorSuffix+ - 必须以至少一个后缀开始
+	suffixes := ast.AllAbstractDeclaratorSuffix()
+	if len(suffixes) > 0 {
+		for _, suffix := range suffixes {
+			resultType = b.buildAbstractDeclaratorSuffix(suffix.(*cparser.AbstractDeclaratorSuffixContext), resultType)
+		}
+		// 处理 gccDeclaratorExtension
+		for _, g := range ast.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		return resultType
+	}
+
+	return resultType
+}
+
+// buildAbstractDeclaratorSuffix 处理抽象声明符后缀（数组维度或函数参数）
+func (b *astbuilder) buildAbstractDeclaratorSuffix(ast *cparser.AbstractDeclaratorSuffixContext, baseType ssa.Type) ssa.Type {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	resultType := baseType
+
+	// 处理数组后缀: abstractArraySuffix
+	if aas := ast.AbstractArraySuffix(); aas != nil {
+		abstractArraySuffix := aas.(*cparser.AbstractArraySuffixContext)
 		var arraySize int64 = -1 // -1 表示未指定大小或可变长度数组
 
 		// 处理数组大小表达式
-		if a := ast.AssignmentExpression(); a != nil {
+		if a := abstractArraySuffix.AssignmentExpression(); a != nil {
 			expr := b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
 			if c, ok := ssa.ToConstInst(expr); ok {
 				if size, err := strconv.ParseInt(c.String(), 10, 64); err == nil {
 					arraySize = size
 				}
 			}
-		} else if ast.Star() != nil {
+		} else if abstractArraySuffix.Star() != nil {
 			// '[' '*' ']' - 可变长度数组
 			arraySize = -1
 		}
@@ -494,23 +698,23 @@ func (b *astbuilder) buildDirectAbstractDeclarator(ast *cparser.DirectAbstractDe
 			sliceType := ssa.NewSliceType(resultType)
 			resultType = sliceType
 		}
+		return resultType
 	}
 
-	// 3. '(' parameterTypeList? ')' - 函数类型
-	if ast.LeftParen() != nil && ast.RightParen() != nil && ast.ParameterTypeList() != nil {
-		_, paramTypes := b.buildParameterTypeList(ast.ParameterTypeList().(*cparser.ParameterTypeListContext))
+	// 处理函数后缀: abstractFunctionSuffix
+	if afs := ast.AbstractFunctionSuffix(); afs != nil {
+		abstractFunctionSuffix := afs.(*cparser.AbstractFunctionSuffixContext)
+		var paramTypes ssa.Types
+		if ptl := abstractFunctionSuffix.ParameterTypeList(); ptl != nil {
+			_, paramTypes = b.buildParameterTypeList(ptl.(*cparser.ParameterTypeListContext))
+		}
 		funcType := ssa.NewFunctionType("", paramTypes, resultType, false)
 		resultType = funcType
-	}
-
-	// 递归处理 directAbstractDeclarator（支持多维数组、函数指针等）
-	if d := ast.DirectAbstractDeclarator(); d != nil {
-		resultType = b.buildDirectAbstractDeclarator(d.(*cparser.DirectAbstractDeclaratorContext), resultType)
-	}
-
-	// 处理 gccDeclaratorExtension
-	for _, g := range ast.AllGccDeclaratorExtension() {
-		b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		// 处理 gccDeclaratorExtension
+		for _, g := range abstractFunctionSuffix.AllGccDeclaratorExtension() {
+			b.buildGccDeclaratorExtension(g.(*cparser.GccDeclaratorExtensionContext))
+		}
+		return resultType
 	}
 
 	return resultType
@@ -540,6 +744,19 @@ func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
 					b.AssignVariable(l, right)
 				}
 			}
+		}
+	} else if mce := ast.MacroCallExpression(); mce != nil {
+		// 处理宏调用作为声明，如 DECLARE_ALIGNED(...)[8] = {...}
+		_ = b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+		// 处理可能的 declaratorSuffix*（如数组下标）
+		for _, suffix := range ast.AllDeclaratorSuffix() {
+			// 这里需要处理后缀，但通常宏调用作为声明时，后缀已经在 macroCallExpression 中处理了
+			_ = suffix
+		}
+		// 处理初始化器（如果有）
+		if init := ast.Initializer(); init != nil {
+			_ = b.buildInitializer(init.(*cparser.InitializerContext))
+			// 可以将初始值赋给变量（如果需要）
 		}
 	} else if s := ast.StaticAssertDeclaration(); s != nil {
 		b.buildStaticAssertDeclaration(s.(*cparser.StaticAssertDeclarationContext))
@@ -655,27 +872,6 @@ func (b *astbuilder) buildDeclarationSpecifier(ast *cparser.DeclarationSpecifier
 			} else {
 				ret = ssa.CreateAnyType()
 			}
-		}
-	}
-
-	// 处理多个 '*' (指针)
-	// 根据语法: '*'* 表示可以有多个星号
-	starCount := len(ast.AllStar())
-	for i := 0; i < starCount; i++ {
-		if ret == nil {
-			ret = ssa.CreateAnyType()
-		}
-		// 应用指针类型
-		pointerType := ssa.NewPointerType()
-		// 如果当前类型已经是指针，创建多级指针
-		if ret.GetTypeKind() == ssa.PointerKind {
-			// 多级指针：保持为指针类型
-			pointerType.FieldType = ret
-			ret = pointerType
-		} else {
-			// 单级指针：将基础类型包装为指针
-			pointerType.FieldType = ret
-			ret = pointerType
 		}
 	}
 
@@ -1044,6 +1240,9 @@ func (b *astbuilder) buildStatement(ast *cparser.StatementContext) {
 		b.buildIterationStatement(i.(*cparser.IterationStatementContext))
 	} else if a := ast.AsmStatement(); a != nil {
 		b.buildAsmStatement(a.(*cparser.AsmStatementContext))
+	} else if mcs := ast.MacroCallStatement(); mcs != nil {
+		// 处理宏调用语句（如 FF_DISABLE_DEPRECATION_WARNINGS）
+		b.buildMacroCallStatement(mcs.(*cparser.MacroCallStatementContext))
 	} else if id := ast.Identifier(); id != nil {
 		b.buildLabeledStatement(ast, id.GetText())
 	}
