@@ -57,6 +57,19 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 		return rsp, nil
 	}
 
+	// Handle knowledge-compress (for compressing long search results)
+	if utils.MatchAllOfSubString(prompt, "KNOWLEDGE_CHUNK", "ranges", "score") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "knowledge-compress",
+  "ranges": [
+    {"range": "1-3", "score": 0.9}
+  ]
+}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -69,7 +82,14 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+		// First verify-satisfaction after write_code should return false to continue modifying
+		// Second verify-satisfaction after modify_code should return true to complete
+		if !stat.verifyCalled {
+			stat.verifyCalled = true
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need to modify code"}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+		}
 		rsp.Close()
 		return rsp, nil
 	}

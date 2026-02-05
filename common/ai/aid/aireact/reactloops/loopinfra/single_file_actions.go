@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -138,17 +137,10 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 
 			invoker := loop.GetInvoker()
 
-			fullCode := loop.Get(fullCodeVar)
-			partialCode := loop.Get(codeVar)
+		fullCode := loop.Get(fullCodeVar)
+		partialCode := loop.Get(codeVar)
 
-			fmt.Println("******************************************************")
-			fmt.Println("******************************************************")
-			fmt.Println(fullCode)
-			fmt.Println("******************************************************")
-			fmt.Println("******************************************************")
-			time.Sleep(100 * time.Second)
-
-			editor := memedit.NewMemEditor(fullCode)
+		editor := memedit.NewMemEditor(fullCode)
 			modifyStartLine := action.GetInt("modify_start_line")
 			modifyEndLine := action.GetInt("modify_end_line")
 
