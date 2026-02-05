@@ -344,7 +344,11 @@ func (c *Config) parseProjectWithFS(
 	f5 := func() error {
 		total := prog.Cache.CountInstruction()
 		process = 0.9
-		prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
+		if prog.DatabaseKind != ssa.ProgramCacheMemory {
+			prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total)
+		} else {
+			prog.ProcessInfof("program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, total)
+		}
 
 		var index int
 		prevProcess := 0.9
