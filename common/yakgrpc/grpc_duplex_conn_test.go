@@ -13,6 +13,54 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+func TestUniqueDatabasePaths(t *testing.T) {
+	t.Run("nil_items", func(t *testing.T) {
+		got := uniqueDatabasePaths(nil)
+		require.Empty(t, got)
+	})
+	t.Run("empty_items", func(t *testing.T) {
+		got := uniqueDatabasePaths([]*yakit.LongSQLDescription{})
+		require.Empty(t, got)
+	})
+	t.Run("single_item_empty_path", func(t *testing.T) {
+		items := []*yakit.LongSQLDescription{{DatabasePath: ""}}
+		got := uniqueDatabasePaths(items)
+		require.Empty(t, got, "empty path should not appear, len should be 0")
+	})
+	t.Run("single_item_with_path", func(t *testing.T) {
+		items := []*yakit.LongSQLDescription{{DatabasePath: "/data/project.db"}}
+		got := uniqueDatabasePaths(items)
+		require.ElementsMatch(t, []string{"/data/project.db"}, got)
+	})
+	t.Run("duplicate_paths", func(t *testing.T) {
+		items := []*yakit.LongSQLDescription{
+			{DatabasePath: "/a.db"},
+			{DatabasePath: "/a.db"},
+			{DatabasePath: "/a.db"},
+		}
+		got := uniqueDatabasePaths(items)
+		require.ElementsMatch(t, []string{"/a.db"}, got)
+	})
+	t.Run("multiple_distinct_paths", func(t *testing.T) {
+		items := []*yakit.LongSQLDescription{
+			{DatabasePath: "/a.db"},
+			{DatabasePath: "/b.db"},
+			{DatabasePath: "/c.db"},
+		}
+		got := uniqueDatabasePaths(items)
+		require.ElementsMatch(t, []string{"/a.db", "/b.db", "/c.db"}, got)
+	})
+	t.Run("mix_empty_and_non_empty", func(t *testing.T) {
+		items := []*yakit.LongSQLDescription{
+			{DatabasePath: ""},
+			{DatabasePath: "/x.db"},
+			{DatabasePath: ""},
+		}
+		got := uniqueDatabasePaths(items)
+		require.ElementsMatch(t, []string{"/x.db"}, got, "empty path skipped, only non-empty path")
+	})
+}
+
 func TestDuplexConnection(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.Nil(t, err, "create local client error")
@@ -127,11 +175,18 @@ func TestGRPCMUSTPASS_HTTPFlowSlowSQL(t *testing.T) {
 				err := json.Unmarshal([]byte(rsp.GetData()), &data)
 				require.NoError(t, err, "unmarshal slow SQL data error")
 
-				// 验证数据格式
+				// 验证数据格式（含 database_path_groups 路径列表，便于前端按 sqlite 文件清理）
 				require.Contains(t, data, "avg_cost", "should have avg_cost")
 				require.Contains(t, data, "avg_cost_ms", "should have avg_cost_ms")
 				require.Contains(t, data, "count", "should have count")
 				require.Contains(t, data, "items", "should have items")
+				require.Contains(t, data, "database_path_groups", "should have database_path_groups for frontend cleanup by sqlite file")
+
+				paths, ok := data["database_path_groups"].([]interface{})
+				require.True(t, ok, "database_path_groups should be array")
+				require.Greater(t, len(paths), 0, "database_path_groups should have at least one path")
+				_, ok = paths[0].(string)
+				require.True(t, ok, "database_path_groups elements should be string")
 
 				count, ok := data["count"].(float64)
 				require.True(t, ok, "count should be number")
