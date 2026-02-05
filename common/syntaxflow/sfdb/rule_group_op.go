@@ -2,7 +2,6 @@ package sfdb
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
