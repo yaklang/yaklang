@@ -835,18 +835,24 @@ LOOP:
 func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) *OnPostIterationOperator {
 	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
-		r.onPostIteration(r, current, task, false, nil, operator)
+		r.callOnPostIteration(current, task, false, nil, operator)
 	}
 	return operator
+}
+
+func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator) {
+	for _, fn := range r.onPostIteration {
+		fn(r, current, task, isDone, reason, operator)
+	}
 }
 
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
 	operator := newOnPostIterationOperator()
 	if r.onPostIteration != nil {
 		if err != nil {
-			r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err), operator)
+			r.callOnPostIteration(current, task, true, utils.Errorf("reason: %v", err), operator)
 		} else {
-			r.onPostIteration(r, current, task, true, nil, operator)
+			r.callOnPostIteration(current, task, true, nil, operator)
 		}
 	}
 	return operator

@@ -24,6 +24,7 @@ func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
+
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -46,6 +47,8 @@ func init() {
 				}),
 				getHTTPFlowDetailAction(r),
 				filterAndMatchHTTPFlowsAction(r),
+				matchHTTPFlowsWithSimpleMatcherAction(r),
+				BuildOnPostIterationHook(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE, r, preset...)

@@ -277,9 +277,9 @@ func WithOnAsyncTaskFinished(fn func(task aicommon.AIStatefulTask)) ReActLoopOpt
 
 // WithOnPostIteraction sets a callback function that is called after each iteration of the ReAct loop.
 // The operator parameter allows the callback to control whether the loop should end by calling operator.EndIteration().
-func WithOnPostIteraction(fn func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)) ReActLoopOption {
+func WithOnPostIteraction(fn ...func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator)) ReActLoopOption {
 	return func(r *ReActLoop) {
-		r.onPostIteration = fn
+		r.onPostIteration = append(r.onPostIteration, fn...)
 	}
 }
 

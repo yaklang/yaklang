@@ -32,4 +32,9 @@
 {{ end }}
 
 ---
+## 工具选择指南
+1. **filter_and_match_http_flows**: 需要多个匹配器或复杂嵌套逻辑时使用（通过 matchers_json 传入数组）
+2. **match_http_flows_with_matcher**: 只需单个简单匹配条件时使用（参数更直观，无需构造 JSON）
+3. **get_http_flow_detail**: 查看特定流量的完整请求/响应内容
+
 思考下一步：决定是细化过滤器、深入特定流量，还是运行匹配器来标记有趣的流量。请简洁回答。

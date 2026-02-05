@@ -2,9 +2,27 @@
 
 - 发现：总结匹配的流量（id、url、原因、hit_color）和关键异常。
 - 缺口：注明缺失的证据或需要收紧的过滤器。
-- 下一步：列出要调用的下一个操作（filter_and_match_http_flows/get_http_flow_detail）及具体参数。
+- 下一步：列出要调用的下一个操作（filter_and_match_http_flows/match_http_flows_with_matcher/get_http_flow_detail）及具体参数。
 
 **重要提示**：当 action 输出内容过大时，系统会自动将完整结果保存到文件中，并在反馈消息中显示文件名和预览内容。此时你必须使用 `read_file` 工具读取保存的文件以获取关键信息。
+
+## 工具选择建议
+
+### filter_and_match_http_flows
+- 用于：复杂的多匹配器逻辑、嵌套条件、需要同时使用多个 HTTPResponseMatcher
+- 参数：通过 `matchers_json` 传入 JSON 格式的匹配器数组或单个匹配器
+- 优势：功能强大，支持复杂逻辑
+- 劣势：需要构造 JSON 字符串，参数复杂
+
+### match_http_flows_with_matcher（推荐用于简单场景）
+- 用于：单一简单的匹配条件
+- 参数：直接使用字段参数（matcher_type、scope、group 等），无需构造 JSON
+- 优势：参数直观，易于使用
+- 劣势：仅支持单个匹配器
+
+### get_http_flow_detail
+- 用于：查看特定流量的完整请求和响应详情
+- 参数：flow_id（必需）
 
 ---
 
@@ -79,6 +97,69 @@
 
 ---
 
+## match_http_flows_with_matcher 工具参数说明
+
+此工具用于过滤 HTTP 流量并应用单个简单匹配器。与 filter_and_match_http_flows 相比，它不需要构造 JSON，参数更直观。
+
+### 基础过滤参数（与 filter_and_match_http_flows 相同）
+
+- **keyword** (string, 可选) - 模糊搜索关键词
+- **keyword_type** (string, 可选) - 限制关键词搜索范围：request/response
+- **methods** (string, 可选) - 逗号分隔的 HTTP 方法，如 `"GET,POST"`
+- **status_code** (string, 可选) - 状态码或范围，如 `"200,404"` 或 `"5xx"`
+- **tags** (string, 可选) - 逗号或竖线分隔的标签
+- **exclude_keywords** (string, 可选) - 要排除的关键词
+- **url_contains** (string, 可选) - URL 子串过滤器
+- **runtime_id** (string, 可选) - 运行时/会话 ID
+- **source_type** (string, 可选) - 来源类型：mitm/crawler/scan
+- **limit** (integer, 可选) - 最大返回结果数（默认 30，最大 500）
+
+### 匹配器参数（直接字段形式）
+
+#### matcher_type (string, 必需)
+匹配算法。允许的值：
+- `word` - 子串匹配
+- `regexp` (也接受 `re`, `regex`) - 正则表达式匹配
+- `status_code` - HTTP 状态码匹配
+- `binary` - 二进制内容匹配
+- `dsl` - DSL 表达式
+- `nuclei-dsl` - Nuclei DSL 表达式
+
+#### scope (string, 可选)
+匹配的目标范围。允许的值：
+- `raw` - 完整的原始响应（默认值）
+- `header` - 响应头
+- `body` - 响应体
+- `status_code` - 状态码
+- `request_header` - 请求头
+- `request_body` - 请求体
+- `request_raw` - 完整的原始请求
+- `request_url` - 请求 URL
+
+#### group (string, 可选)
+匹配模式/值，多个值用逗号分隔。
+- 示例：`"password,admin,secret"` 或 `"200,201,204"`
+
+#### condition (string, 可选)
+`group` 中多个值的逻辑关系：
+- `or` (默认) - 任何一个匹配即可
+- `and` - 所有都必须匹配
+
+#### group_encoding (string, 可选)
+`group` 值的编码方式：
+- `hex` - 十六进制编码
+- `base64` - Base64 编码
+
+#### negative (boolean, 可选)
+反向匹配，设为 `true` 时反转匹配结果。默认为 `false`。
+
+#### expr_type (string, 可选)
+表达式类型：
+- 留空 - 标准表达式
+- `nuclei-dsl` - Nuclei DSL 表达式
+
+---
+
 ## HTTPResponseMatcher 字段定义
 
 所有枚举字段必须仅使用列出的允许值。不要发明或自由填写值。
@@ -138,97 +219,24 @@
 
 ## 使用示例
 
-### 基础过滤示例
+### filter_and_match_http_flows 工具示例
 
-#### 示例 1 - 查询登录相关的 POST 请求
-```json
-{
-  "keyword": "login",
-  "methods": "POST",
-  "limit": 20
-}
-```
-
-#### 示例 2 - 查询错误响应
-```json
-{
-  "status_code": "5xx",
-  "limit": 30
-}
-```
-
-#### 示例 3 - 查询特定域名的 API 请求，排除静态资源
-```json
-{
-  "url_contains": "/api/",
-  "exclude_keywords": ".css,.js,.png,.jpg",
-  "limit": 50
-}
-```
-
-#### 示例 4 - 查询特定来源和方法的流量
+#### 示例 1 - 基础过滤：多参数组合
 ```json
 {
   "source_type": "mitm",
   "methods": "POST,PUT",
   "status_code": "200",
+  "url_contains": "/api/",
+  "exclude_keywords": ".css,.js,.png",
   "limit": 30
 }
 ```
 
-### 高级匹配器示例
-
-#### 示例 5 - 敏感关键词的单词匹配器
+#### 示例 2 - 复杂逻辑：SubMatchers 嵌套条件
 ```json
 {
-  "matchers_json": {
-    "MatcherType": "word",
-    "Scope": "body",
-    "Group": ["password", "admin", "secret"],
-    "Condition": "or",
-    "HitColor": "red"
-  }
-}
-```
-
-#### 示例 6 - 状态码范围匹配器
-```json
-{
-  "matchers_json": {
-    "MatcherType": "status_code",
-    "Group": ["200", "201", "204"],
-    "HitColor": "green"
-  }
-}
-```
-
-#### 示例 7 - 正则表达式匹配器（匹配邮箱）
-```json
-{
-  "matchers_json": {
-    "MatcherType": "regexp",
-    "Scope": "body",
-    "Group": ["\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"],
-    "HitColor": "yellow"
-  }
-}
-```
-
-#### 示例 8 - 二进制内容匹配器（十六进制编码）
-```json
-{
-  "matchers_json": {
-    "MatcherType": "binary",
-    "Scope": "body",
-    "Group": ["504b0304", "ffd8ffe0"],
-    "HitColor": "blue"
-  }
-}
-```
-
-#### 示例 9 - 使用 SubMatchers 的复杂 AND 逻辑
-```json
-{
+  "methods": "POST",
   "matchers_json": {
     "SubMatcherCondition": "and",
     "SubMatchers": [
@@ -248,23 +256,10 @@
 }
 ```
 
-#### 示例 10 - 否定匹配器（排除模式）
+#### 示例 3 - 多匹配器数组：同时应用多个规则
 ```json
 {
-  "matchers_json": {
-    "MatcherType": "word",
-    "Scope": "body",
-    "Group": ["404.html", "not found"],
-    "Condition": "or",
-    "Negative": true,
-    "HitColor": "gray"
-  }
-}
-```
-
-#### 示例 11 - 多个匹配器数组
-```json
-{
+  "limit": 50,
   "matchers_json": [
     {
       "MatcherType": "word",
@@ -282,27 +277,13 @@
 }
 ```
 
-#### 示例 12 - 请求 URL 匹配器
-```json
-{
-  "matchers_json": {
-    "MatcherType": "word",
-    "Scope": "request_url",
-    "Group": ["/api/", "/admin/"],
-    "Condition": "or",
-    "HitColor": "purple"
-  }
-}
-```
-
-### 组合使用示例
-
-#### 示例 13 - 基础过滤 + 高级匹配器
+#### 示例 4 - 完整组合：过滤 + 匹配器
 ```json
 {
   "methods": "POST",
   "status_code": "200",
   "url_contains": "/api/",
+  "exclude_keywords": "static",
   "limit": 50,
   "matchers_json": {
     "MatcherType": "word",
@@ -313,3 +294,65 @@
   }
 }
 ```
+
+---
+
+## match_http_flows_with_matcher 工具示例（简化版）
+
+以下示例展示如何使用 match_http_flows_with_matcher 工具，参数更直观，无需构造 JSON。
+
+#### 示例 5 - 简单匹配：多参数组合
+```json
+{
+  "methods": "POST",
+  "url_contains": "/api/",
+  "matcher_type": "word",
+  "scope": "body",
+  "group": "password,admin,secret",
+  "condition": "or",
+  "limit": 30
+}
+```
+
+#### 示例 6 - 完整过滤：排除静态资源后查找错误
+```json
+{
+  "exclude_keywords": ".css,.js,.png,.jpg",
+  "source_type": "mitm",
+  "matcher_type": "word",
+  "scope": "body",
+  "group": "error,exception,failed",
+  "condition": "or",
+  "limit": 50
+}
+```
+
+#### 示例 7 - 反向匹配：排除特定内容
+```json
+{
+  "status_code": "200",
+  "methods": "GET,POST",
+  "matcher_type": "word",
+  "scope": "body",
+  "group": "404.html,not found",
+  "condition": "or",
+  "negative": true,
+  "limit": 30
+}
+```
+
+---
+
+## 工具使用决策树
+
+1. **需要查看特定流量的完整内容？**
+   → 使用 `get_http_flow_detail`（传入 flow_id）
+
+2. **需要应用单个简单的匹配条件？**
+   → 使用 `match_http_flows_with_matcher`（参数直观）
+
+3. **需要复杂的多匹配器逻辑或嵌套条件？**
+   → 使用 `filter_and_match_http_flows`（通过 matchers_json 传入数组）
+
+4. **只需要基础过滤，不需要高级匹配？**
+   → 使用 `filter_and_match_http_flows`（不传 matchers_json 参数）

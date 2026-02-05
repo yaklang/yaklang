@@ -187,8 +187,8 @@ type InitTaskOperator struct {
 	failErr  error
 
 	// Action control for next iteration
-	nextActionMustUse   []string // Actions that MUST be used
-	nextActionDisabled  []string // Actions that are DISABLED
+	nextActionMustUse  []string // Actions that MUST be used
+	nextActionDisabled []string // Actions that are DISABLED
 }
 
 // newInitTaskOperator creates a new InitTaskOperator
