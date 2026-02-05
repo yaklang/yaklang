@@ -7,13 +7,20 @@ import (
 )
 
 func ConvertSingleResultToJSON(result *ssaapi.SyntaxFlowResult, showDataflowPath bool) (string, error) {
+	return ConvertSingleResultToJSONWithOptions(result, IRifyFullReportType, showDataflowPath, true)
+}
+
+func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflowPath bool, showFileContent bool) (string, error) {
 	if result == nil {
 		return "", nil
 	}
 
-	report := NewReport(IRifyFullReportType)
+	report := NewReport(reportType)
 	if showDataflowPath {
 		report.config.showDataflowPath = true
+	}
+	if showFileContent {
+		report.config.showFileContent = true
 	}
 
 	report.AddSyntaxFlowResult(result)
@@ -22,7 +29,7 @@ func ConvertSingleResultToJSON(result *ssaapi.SyntaxFlowResult, showDataflowPath
 		return "", nil
 	}
 	buf := bytes.NewBuffer(nil)
-	if err := report.PrettyWrite(buf); err != nil {
+	if err := report.Write(buf); err != nil {
 		return "", err
 	}
 

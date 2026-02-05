@@ -309,6 +309,13 @@ func (m *ImportSSARiskManager) SaveToDB(jsonData []byte) error {
 	if err := json.Unmarshal(jsonData, &report); err != nil {
 		return utils.Wrapf(err, "failed to parse JSON data")
 	}
+	return m.SaveReportToDB(report)
+}
+
+func (m *ImportSSARiskManager) SaveReportToDB(report *Report) error {
+	if report == nil {
+		return nil
+	}
 	if m.programName == "" {
 		m.programName = report.ProgramName
 	}
