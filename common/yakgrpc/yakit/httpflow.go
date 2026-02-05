@@ -692,11 +692,9 @@ func DeleteHTTPFlowByID(db *gorm.DB, id int64) error {
 
 func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 	if req.GetDeleteAll() {
-		db.DropTableIfExists(&schema.HTTPFlow{})
-		if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='http_flows';`); db.Error != nil {
-			log.Errorf("update sqlite sequence failed: %s", db.Error)
+		if err := schema.DropRecreateTable(db, &schema.HTTPFlow{}); err != nil {
+			log.Errorf("drop recreate http_flows failed: %s", err)
 		}
-		db.AutoMigrate(&schema.HTTPFlow{})
 		DeleteProjectKeyBareRequestAndResponse(db)
 		return nil
 	}

@@ -196,9 +196,7 @@ func DeleteExtractedDataByTraceId(db *gorm.DB, hiddenIndex string) error {
 }
 
 func DropExtractedDataTable(db *gorm.DB) {
-	db.DropTableIfExists(&schema.ExtractedData{})
-	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='extracted_data';`); db.Error != nil {
-		log.Errorf("update sqlite sequence failed: %s", db.Error)
+	if err := schema.DropRecreateTable(db, &schema.ExtractedData{}); err != nil {
+		log.Errorf("drop recreate extracted_data failed: %s", err)
 	}
-	db.AutoMigrate(&schema.ExtractedData{})
 }

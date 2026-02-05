@@ -173,11 +173,9 @@ func DeleteWebsocketFlowAll(db *gorm.DB) error {
 }
 
 func DropWebsocketFlowTable(db *gorm.DB) {
-	db.DropTableIfExists(&schema.WebsocketFlow{})
-	if db := db.Exec(`UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='websocket_flows';`); db.Error != nil {
-		log.Errorf("update sqlite sequence failed: %s", db.Error)
+	if err := schema.DropRecreateTable(db, &schema.WebsocketFlow{}); err != nil {
+		log.Errorf("drop recreate websocket_flows failed: %s", err)
 	}
-	db.AutoMigrate(&schema.WebsocketFlow{})
 }
 
 func DeleteWebsocketFlowsByHTTPFlowHashList(db *gorm.DB, hash []string) error {

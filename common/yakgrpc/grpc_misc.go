@@ -19,11 +19,11 @@ func (s *Server) ResetAndInvalidUserData(ctx context.Context, req *ypb.ResetAndI
 		// 2. Project 库 ProjectGeneralStorage：项目内 KV，如 fuzzer-list-cache、BARE_REQUEST 等
 		profileDB := s.GetProfileDatabase()
 		if profileDB != nil {
-			profileDB.Unscoped().DropTableIfExists(&schema.GeneralStorage{})
+			_ = schema.DropRecreateTable(profileDB, &schema.GeneralStorage{})
 		}
 		projectDB := s.GetProjectDatabase()
 		if projectDB != nil {
-			projectDB.Unscoped().DropTableIfExists(&schema.ProjectGeneralStorage{})
+			_ = schema.DropRecreateTable(projectDB, &schema.ProjectGeneralStorage{})
 		}
 		os.RemoveAll(consts.GetDefaultYakitBaseTempDir())
 		return &ypb.Empty{}, nil
