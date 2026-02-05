@@ -11,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/thirdparty_bin"
@@ -116,6 +117,26 @@ func init() {
 				docSearcherByRag = nil // 明确设置为 nil，语义搜索将不可用
 			}
 
+			// 创建单文件修改工厂
+			modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
+				r,
+				loopinfra.WithLoopVarsPrefix("yak"),
+				loopinfra.WithActionSuffix("code"), // 生成 write_code, modify_code, insert_code, delete_code
+				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+				loopinfra.WithFileExtension(".yak"),
+				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
+					return checkCodeAndFormatErrors(content)
+				}),
+				loopinfra.WithSpinDetection(func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string) {
+					record := ModifyRecord{StartLine: startLine, EndLine: endLine}
+					return detectSpinning(loop, record)
+				}),
+				loopinfra.WithReflectionPrompt(func(startLine, endLine int, reason string) string {
+					record := ModifyRecord{StartLine: startLine, EndLine: endLine}
+					return generateReflectionPrompt(record, reason)
+				}),
+			)
+
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
@@ -123,7 +144,7 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r, docSearcher, docSearcherByRag)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithAITagFieldWithAINodeId("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
+				modSuite.GetAITagOption(),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
@@ -143,18 +164,15 @@ func init() {
 				// queryDocumentAction(r, docSearcher), // DEPRECATED: 已被 grepYaklangSamplesAction 替代
 				grepYaklangSamplesAction(r, docSearcher),                // 快速 grep 代码样例（精确文本搜索）
 				semanticSearchYaklangSamplesAction(r, docSearcherByRag), // 语义搜索 Yaklang 代码样例（基于向量相似度）
-				writeCode(r),
-				modifyCode(r),
-				insertLines(r),
-				deleteLines(r),
-				// batchRegexReplace(r),
 			}
+			// 添加工厂生成的 actions (write_code, modify_code, insert_code, delete_code)
+			preset = append(preset, modSuite.GetActions()...)
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},
 		// Register metadata for better AI understanding
 		reactloops.WithLoopDescription("Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking"),
-		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: grep_yaklang_samples, write_code, modify_code, insert_code, delete_code  and soon with real-time syntax validation"),
+		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: grep_yaklang_samples, write_code, modify_code, insert_code, delete_code with real-time syntax validation"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write Yaklang code:
   {"@action": "write_yaklang_code", "human_readable_thought": "I need to write Yaklang code with proper syntax and access to code examples"}

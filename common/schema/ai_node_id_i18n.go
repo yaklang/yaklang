@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"semantic_search_yaklang_samples": {
+		Zh: "Yaklang样本语义搜索",
+		En: "Yaklang Samples Semantic Search",
+	},
 	"search-relative-knowledge-base": {
 		Zh: "选择相关知识库",
 		En: "Search Relative Knowledge Base",
