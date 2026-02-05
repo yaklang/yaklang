@@ -582,21 +582,6 @@ func syncAIMemoryVectors(ctx context.Context, db *gorm.DB, entity *schema.AIMemo
 	return nil
 }
 
-func deleteAIMemoryVectors(ctx context.Context, db *gorm.DB, entity *schema.AIMemoryEntity) error {
-	if entity == nil {
-		return nil
-	}
-
-	hnswBackend, err := aimem.NewAIMemoryHNSWBackend(aimem.WithHNSWSessionID(entity.SessionID), aimem.WithHNSWDatabase(db))
-	if err == nil {
-		_ = hnswBackend.Delete(entity.MemoryID)
-	} else {
-		log.Warnf("AIMemory HNSW delete skipped: %v", err)
-	}
-
-	return deleteAIMemorySemanticDocs(ctx, db, entity)
-}
-
 func syncAIMemorySemanticIndex(ctx context.Context, db *gorm.DB, entity *schema.AIMemoryEntity, prev *schema.AIMemoryEntity) error {
 	sessionID := entity.SessionID
 	collectionName := aimem.Session2MemoryName(sessionID)
@@ -648,24 +633,6 @@ func syncAIMemorySemanticIndex(ctx context.Context, db *gorm.DB, entity *schema.
 		}
 	}
 	return nil
-}
-
-func deleteAIMemorySemanticDocs(_ context.Context, db *gorm.DB, entity *schema.AIMemoryEntity) error {
-	collectionName := aimem.Session2MemoryName(entity.SessionID)
-	if !vectorstore.HasCollection(db, collectionName) {
-		return nil
-	}
-
-	store, err := vectorstore.LoadCollection(db, collectionName, vectorstore.WithEmbeddingClient(rag.NewEmptyMockEmbedding()))
-	if err != nil {
-		return err
-	}
-
-	var ids = entity.DocumentQuestionHashIDs()
-	if len(ids) == 0 {
-		return nil
-	}
-	return store.Delete(ids...)
 }
 
 func toAIMemoryEntity(entity *schema.AIMemoryEntity) *aicommon.MemoryEntity {
