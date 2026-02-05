@@ -36,7 +36,7 @@ func ConvertReActLoopFactoryToActionFactory(
 			},
 			ActionHandler: func(oldLoop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 				var err error
-				loop, err := factory(r, WithOnPostIteraction(oldLoop.onPostIteration))
+				loop, err := factory(r, WithOnPostIteraction(oldLoop.onPostIteration...))
 				if err != nil {
 					operator.Fail(err.Error())
 					return

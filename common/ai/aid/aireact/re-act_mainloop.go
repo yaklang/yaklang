@@ -208,10 +208,10 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			r.wg.Add(1)
 
-			if isDone && reason != nil {
+			if isDone && reason != nil && !operator.ShouldIgnoreError() {
 				r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
 			} else {
 				r.Emitter.EmitReActSuccess("ReAct task execution success")
