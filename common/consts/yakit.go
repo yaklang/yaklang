@@ -12,12 +12,14 @@ import (
 )
 
 var (
-	initYakitDatabaseRetError error
-	initYakitDatabaseOnce     = new(sync.Once)
-	projectDataBase           *gorm.DB
-	profileDatabase           *gorm.DB
-	debugProjectDatabase      = false
-	debugProfileDatabase      = false
+	initYakitDatabaseRetError   error
+	initYakitDatabaseOnce       = new(sync.Once)
+	projectDataBase            *gorm.DB
+	profileDatabase            *gorm.DB
+	debugProjectDatabase       = false
+	debugProfileDatabase       = false
+	currentProjectDatabasePath string // 当前项目 SQLite 路径，在设置/初始化时写入，供慢 SQL 等在各创建处使用
+	currentProfileDatabasePath string // 当前 profile SQLite 路径，在初始化时写入，供非 project 的慢 SQL 在各创建处使用
 )
 
 func DebugProjectDatabase() {
@@ -54,6 +56,7 @@ func SetGormProjectDatabase(path string) error {
 		return err
 	}
 	projectDataBase = d
+	currentProjectDatabasePath = path
 	schema.AutoMigrate(d, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	schema.SetGormProjectDatabase(d)
 	return nil
@@ -73,6 +76,24 @@ func GetGormProjectDatabase() *gorm.DB {
 		return projectDataBase.Debug()
 	}
 	return projectDataBase
+}
+
+// GetCurrentProjectDatabasePath 返回当前项目 SQLite 数据库文件路径；仅在慢 SQL 等使用 project DB 的创建处调用
+func GetCurrentProjectDatabasePath() string {
+	initYakitDatabase()
+	if currentProjectDatabasePath != "" {
+		return currentProjectDatabasePath
+	}
+	return GetDefaultYakitProjectDatabase(GetDefaultYakitBaseDir())
+}
+
+// GetCurrentProfileDatabasePath 返回当前 profile SQLite 数据库文件路径；仅在慢 SQL 等使用 profile DB 的创建处调用
+func GetCurrentProfileDatabasePath() string {
+	initYakitDatabase()
+	if currentProfileDatabasePath != "" {
+		return currentProfileDatabasePath
+	}
+	return GetDefaultYakitPluginDatabase(GetDefaultYakitBaseDir())
 }
 
 func InitializeYakitDatabase(projectDB string, profileDB string, ssaDB string) error {
@@ -132,6 +153,7 @@ func initYakitDatabase() error {
 			log.Errorf("%s", err)
 			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
 		}
+		currentProfileDatabasePath = profileDatabaseName
 		schema.SetGormProfileDatabase(profileDatabase)
 
 		/* 再创建项目数据库 */
@@ -141,6 +163,7 @@ func initYakitDatabase() error {
 			log.Errorf("%s", err)
 			initYakitDatabaseRetError = utils.JoinErrors(initYakitDatabaseRetError, err)
 		}
+		currentProjectDatabasePath = projectDatabaseName
 		schema.SetGormProjectDatabase(projectDataBase)
 
 		/* 创建SSA数据库 */

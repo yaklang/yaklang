@@ -120,10 +120,9 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		}()
 	}
 
-	// HTTPFlow slow insert SQL monitoring
+	// HTTPFlow slow insert SQL monitoring（dbpath 在 items[].database_path，由各创建处按实际使用的 DB 设置）
 	{
 		yakit.RegisterHTTPFlowSlowInsertCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
-			// 广播慢插入 SQL 事件给前端
 			log.Infof("broadcast slow insert SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
 			yakit.BroadcastData(yakit.ServerPushType_SlowInsertSQL, map[string]any{
 				"avg_cost":    avgCost.String(),
@@ -134,10 +133,9 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		})
 	}
 
-	// HTTPFlow slow query SQL monitoring
+	// HTTPFlow slow query SQL monitoring（dbpath 在 items[].database_path，由各创建处按实际使用的 DB 设置）
 	{
 		yakit.RegisterHTTPFlowSlowQueryCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
-			// 广播慢查询 SQL 事件给前端
 			log.Infof("broadcast slow query SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
 			yakit.BroadcastData(yakit.ServerPushType_SlowQuerySQL, map[string]any{
 				"avg_cost":    avgCost.String(),

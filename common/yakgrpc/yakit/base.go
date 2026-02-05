@@ -49,6 +49,7 @@ type LongSQLDescription struct {
 	LastSQL       string        `json:"last_sql"`       // 最后执行的 SQL
 	Timestamp     time.Time     `json:"timestamp"`      // 时间戳
 	TimestampUnix int64         `json:"timestamp_unix"` // 时间戳（Unix 秒）
+	DatabasePath  string        `json:"database_path"`  // 当前项目 SQLite 数据库文件路径
 }
 
 // HTTPFlowSQLCallback 慢 SQL 回调函数类型
@@ -135,7 +136,7 @@ func init() {
 					log.Warnf("SQL execution took too long: %v, func_ptr:%p, func_name:%s, queue_len:%d, last_sql:%s",
 						elapsed, f, fnName, len(DBSaveAsyncChannel), tracer.Last())
 
-					// 收集慢 SQL 信息
+					// 收集慢 SQL 信息（此处为 project DB，在此设置 dbpath）
 					now := time.Now()
 					slowSQLItem := &LongSQLDescription{
 						Duration:      elapsed,
@@ -147,6 +148,7 @@ func init() {
 						LastSQL:       tracer.Last(),
 						Timestamp:     now,
 						TimestampUnix: now.Unix(),
+						DatabasePath:  consts.GetCurrentProjectDatabasePath(),
 					}
 
 					// 添加到收集列表（慢插入）
@@ -260,7 +262,7 @@ func MockHTTPFlowSlowInsertSQL(duration time.Duration) {
 		duration = 2*time.Second + 100*time.Millisecond // 确保超过阈值
 	}
 
-	// 创建一个模拟的慢插入 SQL 项
+	// 创建一个模拟的慢插入 SQL 项（模拟 project DB，在此设置 dbpath）
 	now := time.Now()
 	slowSQLItem := &LongSQLDescription{
 		Duration:      duration,
@@ -272,6 +274,7 @@ func MockHTTPFlowSlowInsertSQL(duration time.Duration) {
 		LastSQL:       "MOCK SQL: INSERT INTO http_flows ...",
 		Timestamp:     now,
 		TimestampUnix: now.Unix(),
+		DatabasePath:  consts.GetCurrentProjectDatabasePath(),
 	}
 
 	// 添加到收集列表
@@ -304,7 +307,7 @@ func MockHTTPFlowSlowQuerySQL(duration time.Duration) {
 		duration = 2*time.Second + 100*time.Millisecond // 确保超过阈值
 	}
 
-	// 创建一个模拟的慢查询 SQL 项
+	// 创建一个模拟的慢查询 SQL 项（模拟 project DB，在此设置 dbpath）
 	now := time.Now()
 	slowSQLItem := &LongSQLDescription{
 		Duration:      duration,
@@ -316,6 +319,7 @@ func MockHTTPFlowSlowQuerySQL(duration time.Duration) {
 		LastSQL:       "MOCK SQL: SELECT * FROM http_flows ...",
 		Timestamp:     now,
 		TimestampUnix: now.Unix(),
+		DatabasePath:  consts.GetCurrentProjectDatabasePath(),
 	}
 
 	// 添加到收集列表

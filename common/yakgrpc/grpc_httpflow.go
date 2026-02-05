@@ -255,7 +255,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 
 	// 如果查询超过2秒，记录慢查询
 	if queryElapsed > 2*time.Second {
-		// 收集慢查询信息
+		// 收集慢查询信息（此处为 project DB，在此设置 dbpath）
 		now := time.Now()
 		slowQueryItem := &yakit.LongSQLDescription{
 			Duration:      queryElapsed,
@@ -267,6 +267,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 			LastSQL:       tracer.Last(),
 			Timestamp:     now,
 			TimestampUnix: now.Unix(),
+			DatabasePath:  consts.GetCurrentProjectDatabasePath(),
 		}
 
 		// 添加到收集列表（慢查询）
