@@ -569,6 +569,18 @@ func (m *mockInvokerForMemoryTest) SetCurrentTask(task aicommon.AIStatefulTask) 
 	// no-op for testing
 }
 
+func (m *mockInvokerForMemoryTest) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
+	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
+}
+
+func (m *mockInvokerForMemoryTest) GetCurrentTask() aicommon.AIStatefulTask {
+	return nil
+}
+
+func (m *mockInvokerForMemoryTest) GetCurrentTaskId() string {
+	return ""
+}
+
 // createTestMemoryForBuildTest 创建用于构建测试的 memory 实例（简化版本）
 func createTestMemoryForBuildTest(sessionID string, invoker aicommon.AIInvokeRuntime) (*aimem.AIMemoryTriage, error) {
 	// 这个函数在真实测试中应该创建真实的 memory，但为了简化，我们返回 nil

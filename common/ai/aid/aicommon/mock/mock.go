@@ -271,3 +271,18 @@ func (m *MockInvoker) EmitResultAfterStream(any) {
 
 func (m *MockInvoker) EmitResult(any) {
 }
+
+func (m *MockInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
+	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
+}
+
+func (m *MockInvoker) SetCurrentTask(task aicommon.AIStatefulTask) {
+}
+
+func (m *MockInvoker) GetCurrentTask() aicommon.AIStatefulTask {
+	return nil
+}
+
+func (m *MockInvoker) GetCurrentTaskId() string {
+	return ""
+}

@@ -32,7 +32,8 @@ const (
 
 	CONTEXT_PROVIDER_KEY_SYSTEM_FLAG = "system_flag"
 
-	CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE = "all_knowledge_base"
+	CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE         = "all_knowledge_base"
+	CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE = "auto_select_knowledge_base"
 )
 
 type ContextProviderEntry struct {

@@ -436,3 +436,18 @@ func (r *testRuntime) EmitResultAfterStream(result any) {
 
 func (r *testRuntime) EmitResult(result any) {
 }
+
+func (r *testRuntime) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
+	return aicommon.NewSelectedKnowledgeBaseResult("mock selection", []string{}), nil
+}
+
+func (r *testRuntime) SetCurrentTask(task aicommon.AIStatefulTask) {
+}
+
+func (r *testRuntime) GetCurrentTask() aicommon.AIStatefulTask {
+	return nil
+}
+
+func (r *testRuntime) GetCurrentTaskId() string {
+	return ""
+}
