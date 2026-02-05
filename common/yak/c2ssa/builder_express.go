@@ -331,22 +331,17 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	// 3. 指针解引用: '*' unaryExpression
 	if len(ast.AllStar()) > 0 {
 		if u := ast.UnaryExpression(); u != nil {
-			if isLeft {
-				right, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			} else {
-				right, _ = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
-			}
+			right, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
 			if right != nil {
 				if right.GetType().GetTypeKind() == ssa.PointerKind {
-					if isLeft {
-						left = b.GetAndCreateOriginPointer(right)
-					}
-					right = b.GetOriginValue(right)
-				} else if param, ok := ssa.ToParameter(right); ok && !param.IsFreeValue {
-					if isLeft {
-						if _, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), true); left != nil {
-							b.ReferenceParameter(left.GetName(), param.FormalParameterIndex, ssa.PointerSideEffect)
+					if param, ok := ssa.ToParameter(right); ok && !param.IsFreeValue {
+						b.ReferenceParameter(right.GetName(), param.FormalParameterIndex, ssa.PointerSideEffect)
+						// left = b.GetAndCreateOriginPointer(b.EmitConstPointer(left))
+					} else {
+						if isLeft {
+							left = b.GetAndCreateOriginPointer(right)
 						}
+						right = b.GetOriginValue(right)
 					}
 				}
 			}
@@ -401,90 +396,31 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 
 	// log.Infof("exp = %s\n", ast.GetText())
 
-	// 1. primaryExpression | malloc
+	// 1. primaryExpression postfixSuffix*
 	if p := ast.PrimaryExpression(); p != nil {
 		right, left = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
+		// 处理 postfixSuffix*
+		for _, suffix := range ast.AllPostfixSuffix() {
+			right, left = b.buildPostfixSuffix(suffix.(*cparser.PostfixSuffixContext), right, left, isLeft)
+		}
 		return right, left
 	}
 
-	// 2. '__extension__'? '(' typeName ')' '{' initializerList ','? '}'
-	if right == nil {
-		if t := ast.TypeName(); t != nil {
-			ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
-			_ = ssatype
-			if i := ast.InitializerList(); i != nil {
-				right = b.buildInitializerList(i.(*cparser.InitializerListContext))
-			}
-			return right, left
+	// 2. '__extension__'? '(' typeName ')' '{' initializerList ','? '}' postfixSuffix*
+	if t := ast.TypeName(); t != nil {
+		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
+		_ = ssatype
+		if i := ast.InitializerList(); i != nil {
+			right = b.buildInitializerList(i.(*cparser.InitializerListContext))
 		}
-	}
-
-	if p := ast.PostfixExpression(); p != nil {
-		right, left = b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), isLeft)
-	}
-
-	// 3. 数组下标：postfixExpression '[' expression ']'
-	if right != nil {
-		if e := ast.Expression(); e != nil {
-			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
-			right = b.ReadMemberCallValue(right, index)
-			return right, left
+		// 处理 postfixSuffix*
+		for _, suffix := range ast.AllPostfixSuffix() {
+			right, left = b.buildPostfixSuffix(suffix.(*cparser.PostfixSuffixContext), right, left, isLeft)
 		}
-	}
-
-	// 4. 函数调用：postfixExpression '(' argumentExpressionList? ')'
-	if right != nil && ast.LeftParen() != nil {
-		var args ssa.Values
-		if a := ast.ArgumentExpressionList(); a != nil {
-			args = b.buildArgumentExpressionList(a.(*cparser.ArgumentExpressionListContext))
-		}
-
-		if right != nil && right.GetName() == "malloc" {
-			if tv, ok := ssa.ToTypeValue(args[0]); ok {
-				right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
-			} else if c, ok := ssa.ToConstInst(args[0]); ok {
-				index, _ := strconv.Atoi(c.String())
-				newtype := ssa.NewSliceType(ssa.CreateByteType())
-				newtype.Len = index
-				right = b.EmitMakeBuildWithType(newtype, nil, nil)
-			}
-			return right, left
-		}
-		right = b.EmitCall(b.NewCall(right, args))
 		return right, left
 	}
 
-	// 5. 结构体成员：postfixExpression '.' Identifier 或 '->' Identifier
-	buildDotArrow := func(isPointer bool) {
-		if id := ast.Identifier(); id != nil {
-			key := id.GetText()
-			if right != nil {
-				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					right = b.GetOriginValue(right)
-				}
-				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
-			}
-			if left != nil {
-				member := b.ReadValue(left.GetName())
-				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					member = b.GetOriginValue(member)
-				} else if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
-					left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
-					b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-					return
-				}
-				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
-			}
-		}
-	}
-	if ast.Dot() != nil {
-		buildDotArrow(false)
-	}
-	if ast.Arrow() != nil {
-		buildDotArrow(true)
-	}
-
-	// 6. 后缀 ++/--: leftExpression '++' | leftExpression '--'
+	// 3. leftExpression '++' | leftExpression '--'
 	if ast.PlusPlus() != nil || ast.MinusMinus() != nil {
 		if leftExpr := ast.LeftExpression(); leftExpr != nil {
 			right, left = b.buildLeftExpression(leftExpr.(*cparser.LeftExpressionContext), true)
@@ -502,6 +438,76 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 				b.AssignVariable(left, right)
 				// 后缀操作符返回旧值
 				return oldRight, left
+			}
+		}
+	}
+
+	return right, left
+}
+
+// buildPostfixSuffix 处理后缀操作（数组下标、函数调用、成员访问）
+func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 1. 数组下标：'[' expression ']'
+	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
+		if e := ast.Expression(); e != nil {
+			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			right = b.ReadMemberCallValue(right, index)
+			return right, left
+		}
+	}
+
+	// 2. 函数调用：'(' argumentExpressionList? ')'
+	if ast.LeftParen() != nil && ast.RightParen() != nil {
+		var args ssa.Values
+		if a := ast.ArgumentExpressionList(); a != nil {
+			args = b.buildArgumentExpressionList(a.(*cparser.ArgumentExpressionListContext))
+		}
+
+		if right != nil && right.GetName() == "malloc" {
+			if len(args) > 0 {
+				if tv, ok := ssa.ToTypeValue(args[0]); ok {
+					right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
+				} else if c, ok := ssa.ToConstInst(args[0]); ok {
+					index, _ := strconv.Atoi(c.String())
+					newtype := ssa.NewSliceType(ssa.CreateByteType())
+					newtype.Len = index
+					right = b.EmitMakeBuildWithType(newtype, nil, nil)
+				}
+			}
+			return right, left
+		}
+		right = b.EmitCall(b.NewCall(right, args))
+		return right, left
+	}
+
+	// 3. 结构体成员：'.' Identifier 或 '->' Identifier
+	if ast.Dot() != nil || ast.Arrow() != nil {
+		isPointer := ast.Arrow() != nil
+		if id := ast.Identifier(); id != nil {
+			key := id.GetText()
+			if right != nil {
+				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+					right = b.GetOriginValue(right)
+				}
+				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
+			}
+			if left != nil {
+				member := b.ReadValue(left.GetName())
+				// 处理指针类型的解引用
+				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+					member = b.GetOriginValue(member)
+				}
+				// 创建成员访问变量
+				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+				// 如果是通过指针访问参数成员，注册副作用
+				if isPointer {
+					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
+						b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+					}
+				}
 			}
 		}
 	}
@@ -642,12 +648,14 @@ func (b *astbuilder) buildLeftExpression(ast *cparser.LeftExpressionContext, isL
 		if u := ast.UnaryExpression(); u != nil {
 			right, left := b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), false)
 			if right != nil && right.GetType().GetTypeKind() == ssa.PointerKind {
-				if isLeft {
-					left = b.GetAndCreateOriginPointer(right)
+				if p, ok := ssa.ToParameter(right); ok {
+					b.ReferenceParameter(right.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+				} else {
+					if isLeft {
+						left = b.GetAndCreateOriginPointer(right)
+					}
+					right = b.GetOriginValue(right)
 				}
-				right = b.GetOriginValue(right)
-			} else if p, ok := ssa.ToParameter(right); ok {
-				b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
 			}
 			return right, left
 		}
@@ -675,29 +683,40 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 	var right ssa.Value
 	var left *ssa.Variable
 
-	// 1. primaryExpression | malloc
+	// 1. primaryExpression postfixSuffixLvalue*
 	if p := ast.PrimaryExpression(); p != nil {
 		right, left = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
+		// 处理 postfixSuffixLvalue*
+		for _, suffix := range ast.AllPostfixSuffixLvalue() {
+			right, left = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
+		}
 		return right, left
 	}
 
-	// 2. '__extension__'? '(' typeName ')' '{' initializerList ','? '}'
+	// 2. '__extension__'? '(' typeName ')' '{' initializerList ','? '}' postfixSuffixLvalue*
 	if t := ast.TypeName(); t != nil {
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
 		_ = ssatype
 		if i := ast.InitializerList(); i != nil {
 			right = b.buildInitializerList(i.(*cparser.InitializerListContext))
 		}
+		// 处理 postfixSuffixLvalue*
+		for _, suffix := range ast.AllPostfixSuffixLvalue() {
+			right, left = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
+		}
 		return right, left
 	}
 
-	// 递归处理 postfixExpressionLvalue
-	if p := ast.PostfixExpressionLvalue(); p != nil {
-		right, left = b.buildPostfixExpressionLvalue(p.(*cparser.PostfixExpressionLvalueContext), isLeft)
-	}
+	return right, left
+}
 
-	// 3. 数组下标：postfixExpressionLvalue '[' expression ']'
-	if right != nil {
+// buildPostfixSuffixLvalue 处理左值后缀操作（数组下标、成员访问，不包括函数调用）
+func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 1. 数组下标：'[' expression ']'
+	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
 		if e := ast.Expression(); e != nil {
 			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
 			right = b.ReadMemberCallValue(right, index)
@@ -708,8 +727,9 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 		}
 	}
 
-	// 4. 结构体成员：postfixExpressionLvalue '.' Identifier 或 '->' Identifier
-	buildDotArrow := func(isPointer bool) {
+	// 2. 结构体成员：'.' Identifier 或 '->' Identifier
+	if ast.Dot() != nil || ast.Arrow() != nil {
+		isPointer := ast.Arrow() != nil
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			if right != nil {
@@ -720,22 +740,24 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 			}
 			if left != nil {
 				member := b.ReadValue(left.GetName())
+				// 处理指针类型的解引用
 				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					member = b.GetOriginValue(member)
-				} else if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
+					// 如果是指针类型的参数，先不解引用，直接用于创建成员变量
+					if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
+						// 对于指针参数，直接使用 member（参数本身）创建成员变量
+						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+						b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+					} else {
+						// 非参数的指针类型，需要解引用
+						member = b.GetOriginValue(member)
+						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+					}
+				} else {
+					// 非指针类型，直接创建成员变量
 					left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
-					b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-					return
 				}
-				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 			}
 		}
-	}
-	if ast.Dot() != nil {
-		buildDotArrow(false)
-	}
-	if ast.Arrow() != nil {
-		buildDotArrow(true)
 	}
 
 	return right, left
@@ -785,11 +807,12 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 			}
 		}
 	}
-	// 3. StringLiteral+
-	if n := len(ast.AllStringLiteral()); n > 0 {
+	// 3. stringLiteralExpression
+	if sle := ast.StringLiteralExpression(); sle != nil {
+		stringLitExpr := sle.(*cparser.StringLiteralExpressionContext)
 		var sb strings.Builder
-		for i := 0; i < n; i++ {
-			lit := ast.StringLiteral(i).GetText()
+		for _, litNode := range stringLitExpr.AllStringLiteral() {
+			lit := litNode.GetText()
 			if len(lit) >= 2 && lit[0] == '"' && lit[len(lit)-1] == '"' {
 				unquoted, err := strconv.Unquote(lit)
 				if err == nil {
@@ -826,6 +849,11 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 	if ast.BuiltinOffsetof() != nil {
 
 	}
+	// 9. macroCallExpression
+	if mce := ast.MacroCallExpression(); mce != nil {
+		right := b.buildMacroCallExpression(mce.(*cparser.MacroCallExpressionContext))
+		return right, nil
+	}
 
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
@@ -834,13 +862,116 @@ func (b *astbuilder) buildArgumentExpressionList(ast *cparser.ArgumentExpression
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 	var ret ssa.Values
-	for _, a := range ast.AllExpression() {
-		right, _ := b.buildExpression(a.(*cparser.ExpressionContext), false)
+	// 新语法使用 macroArgument 而不是 expression
+	for _, a := range ast.AllMacroArgument() {
+		right := b.buildMacroArgument(a.(*cparser.MacroArgumentContext))
 		if right != nil {
 			ret = append(ret, right)
 		}
 	}
 	return ret
+}
+
+// buildMacroArgument 处理宏参数（可以是表达式、类型名、数字序列或操作符）
+func (b *astbuilder) buildMacroArgument(ast *cparser.MacroArgumentContext) ssa.Value {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	// 1. expression
+	if e := ast.Expression(); e != nil {
+		right, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+		return right
+	}
+
+	// 2. typeName
+	if t := ast.TypeName(); t != nil {
+		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
+		return ssa.NewTypeValue(ssatype)
+	}
+
+	// 3. DigitSequence Identifier?
+	if d := ast.DigitSequence(); d != nil {
+		text := d.GetText()
+		if id := ast.Identifier(); id != nil {
+			// 处理像 3d_array 这样的标识符
+			text = text + id.GetText()
+		}
+		if val, err := strconv.ParseInt(text, 10, 64); err == nil {
+			return b.EmitConstInst(val)
+		}
+		return b.EmitConstInst(text)
+	}
+
+	// 4. 单个操作符
+	// 操作符作为宏参数时，通常作为字符串常量处理
+	if ast.Less() != nil {
+		return b.EmitConstInst("<")
+	}
+	if ast.Greater() != nil {
+		return b.EmitConstInst(">")
+	}
+	if ast.LessEqual() != nil {
+		return b.EmitConstInst("<=")
+	}
+	if ast.GreaterEqual() != nil {
+		return b.EmitConstInst(">=")
+	}
+	if ast.Equal() != nil {
+		return b.EmitConstInst("==")
+	}
+	if ast.NotEqual() != nil {
+		return b.EmitConstInst("!=")
+	}
+	if ast.Plus() != nil {
+		return b.EmitConstInst("+")
+	}
+	if ast.Minus() != nil {
+		return b.EmitConstInst("-")
+	}
+	if ast.Star() != nil {
+		return b.EmitConstInst("*")
+	}
+	if ast.Div() != nil {
+		return b.EmitConstInst("/")
+	}
+	if ast.Mod() != nil {
+		return b.EmitConstInst("%")
+	}
+	if ast.LeftShift() != nil {
+		return b.EmitConstInst("<<")
+	}
+	if ast.RightShift() != nil {
+		return b.EmitConstInst(">>")
+	}
+	if ast.And() != nil {
+		return b.EmitConstInst("&")
+	}
+	if ast.Or() != nil {
+		return b.EmitConstInst("|")
+	}
+	if ast.Caret() != nil {
+		return b.EmitConstInst("^")
+	}
+	if ast.AndAnd() != nil {
+		return b.EmitConstInst("&&")
+	}
+	if ast.OrOr() != nil {
+		return b.EmitConstInst("||")
+	}
+	if ast.Tilde() != nil {
+		return b.EmitConstInst("~")
+	}
+	if ast.Not() != nil {
+		return b.EmitConstInst("!")
+	}
+	if ast.PlusPlus() != nil {
+		return b.EmitConstInst("++")
+	}
+	if ast.MinusMinus() != nil {
+		return b.EmitConstInst("--")
+	}
+
+	return b.EmitConstInst(0)
 }
 
 func parseCChar(text string) int32 {
