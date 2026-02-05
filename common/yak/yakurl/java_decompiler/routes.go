@@ -2,12 +2,13 @@ package java_decompiler
 
 import (
 	"archive/zip"
-	"bytes"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/javaclassparser/decompiler/jar"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -243,9 +244,21 @@ func (a *Action) registerClassRoutes() {
 			return nil, err
 		}
 
-		// Create an in-memory buffer for the zip file
-		var buf bytes.Buffer
-		zipWriter := zip.NewWriter(&buf)
+		// Create zip file on disk and write directly (avoids large memory buffer)
+		_, jarFileName := filepath.Split(jarPath)
+		exportedFileName := strings.TrimSuffix(jarFileName, ".jar") + "-decompiled.zip"
+		exportDir := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "java-decompiled")
+		if err := os.MkdirAll(exportDir, 0o755); err != nil {
+			return nil, utils.Wrapf(err, "failed to create export dir: %s", exportDir)
+		}
+		zipFilePath := filepath.Join(exportDir, exportedFileName)
+		zipFile, err := os.Create(zipFilePath)
+		if err != nil {
+			return nil, utils.Wrapf(err, "failed to create zip file: %s", zipFilePath)
+		}
+		defer zipFile.Close()
+
+		zipWriter := zip.NewWriter(zipFile)
 
 		// Walk through all files in the JAR and add them to the zip
 		err = filesys.Recursive(".", filesys.WithFileSystem(jarFs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
@@ -310,9 +323,10 @@ func (a *Action) registerClassRoutes() {
 			return nil, utils.Wrapf(err, "failed to close zip writer")
 		}
 
-		// Create a resource for the exported zip
-		_, jarFileName := filepath.Split(jarPath)
-		exportedFileName := strings.TrimSuffix(jarFileName, ".jar") + "-decompiled.zip"
+		zipSize := int64(0)
+		if fi, err := zipFile.Stat(); err == nil {
+			zipSize = fi.Size()
+		}
 
 		resourceURL := &ypb.YakURL{
 			Schema: "javaDec",
@@ -327,15 +341,15 @@ func (a *Action) registerClassRoutes() {
 			VerboseName:       exportedFileName,
 			ResourceType:      "file",
 			VerboseType:       "decompiled-jar-zip",
-			Size:              int64(buf.Len()),
-			SizeVerbose:       utils.ByteSize(uint64(buf.Len())),
+			Size:              zipSize,
+			SizeVerbose:       utils.ByteSize(uint64(zipSize)),
 			ModifiedTimestamp: time.Now().Unix(),
-			Path:              exportedFileName,
+			Path:              zipFilePath,
 			Url:               resourceURL,
 			Extra: []*ypb.KVPair{
 				{
-					Key:   "content",
-					Value: codec.EncodeToHex(buf.Bytes()),
+					Key:   "path",
+					Value: zipFilePath,
 				},
 			},
 		}
