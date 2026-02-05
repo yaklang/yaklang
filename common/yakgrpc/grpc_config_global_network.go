@@ -168,6 +168,10 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			verbose = "OpenAI"
 			extTag["model"] = "default:gpt-3.5-turbo"
 			extTag["domain"] = "default:api.openai.com"
+		case "custom":
+			verbose = "自定义AI配置"
+			extTag["model"] = "default:gpt-3.5-turbo"
+			extTag["domain"] = "default:api.openai.com"
 		case "chatglm":
 			verbose = "ChatGLM"
 			extTag["model"] = "default:glm-4-flash"
@@ -211,9 +215,6 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			return nil, err
 		}
 		opts = append(opts, newConfigTemplate(name, verbose, "ai", hook, aiOptions...))
-		if name == "openai" {
-			opts = append(opts, newConfigTemplate(name, "自定义AI配置", "ai", hook, aiOptions...))
-		}
 	}
 
 	newSpaceEngineTmp := func(name string, verbose string, needEmail bool) *ypb.GetThirdPartyAppConfigTemplate {
