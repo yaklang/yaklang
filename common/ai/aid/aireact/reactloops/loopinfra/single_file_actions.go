@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -19,7 +20,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 	actionName := f.GetActionName("write")
 	return reactloops.WithRegisterLoopAction(
 		actionName,
-		"If there is NO CODE, you need to create a new file, then use 'write_code'. If there is already code, it is forbidden to use 'write_code' as it will forcibly overwrite the previous code. You must use 'modify_code' to modify the code.",
+		"If there is NO CODE, you need to create a new file, then use this. If there is already code, it is forbidden to use this action as it will forcibly overwrite the previous code. You must use 'modify_...' to modify the content.",
 		nil,
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			return nil
@@ -43,6 +44,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
 			code := loop.Get(codeVar)
+
 			log.Infof("write_code: extracted code length=%d", len(code))
 			loop.Set(fullCodeVar, code)
 			if code == "" {
@@ -61,6 +63,8 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			errMsg, blocking := f.OnFileChanged(code, operator)
 			if blocking {
 				operator.DisallowNextLoopExit()
+			} else {
+				operator.Exit()
 			}
 
 			msg := utils.ShrinkTextBlock(code, 256)
@@ -70,7 +74,16 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			} else {
 				msg += "\n\n--[linter]--\nNo issues found in the code."
 			}
-			runtime.AddToTimeline("initial-code", msg)
+			runtime.AddToTimeline("lint-message", msg)
+
+			//fmt.Println("**********************CODE***************************")
+			//fmt.Println(code)
+			//fmt.Println("***********************LINT MSG****************************")
+			//fmt.Println(msg)
+			//fmt.Println("***********************BLOCKED???****************************")
+			//fmt.Println("msg", errMsg, blocking)
+			//os.Exit(1)
+
 			log.Infof("write_code done: hasBlockingErrors=%v", blocking)
 			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 		},
@@ -127,6 +140,14 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 
 			fullCode := loop.Get(fullCodeVar)
 			partialCode := loop.Get(codeVar)
+
+			fmt.Println("******************************************************")
+			fmt.Println("******************************************************")
+			fmt.Println(fullCode)
+			fmt.Println("******************************************************")
+			fmt.Println("******************************************************")
+			time.Sleep(100 * time.Second)
+
 			editor := memedit.NewMemEditor(fullCode)
 			modifyStartLine := action.GetInt("modify_start_line")
 			modifyEndLine := action.GetInt("modify_end_line")
