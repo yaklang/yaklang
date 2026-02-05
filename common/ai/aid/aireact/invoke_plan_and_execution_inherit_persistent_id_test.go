@@ -682,7 +682,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 		}
 	}()
 
-	after := time.After(500 * time.Second)
+	after := time.After(15 * time.Second)
 
 	forgeStarted := false
 

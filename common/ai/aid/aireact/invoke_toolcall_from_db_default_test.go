@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/yak" // import for init() to register YakScriptAiToolsCovertHandle
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 // TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig tests invoking a tool stored in the database

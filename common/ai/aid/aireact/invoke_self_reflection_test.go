@@ -19,6 +19,8 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+
+	_ "github.com/yaklang/yaklang/common/yak" // import for init() to register YakScriptAiToolsCovertHandle
 )
 
 // Track iteration count for self-reflection triggering
