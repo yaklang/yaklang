@@ -136,14 +136,17 @@ func WithDialConfig(c amqp.Config) BrokerConfigHandler {
 }
 
 type ConsumingParam struct {
-	Queue     string
-	Consumer  string
-	AutoACK   bool
-	Exclusive bool
-	NoLocal   bool
-	NoWait    bool
-	Args      amqp.Table
-	Handler   func(b *Broker, conn *amqp.Connection, channel *amqp.Channel, msg amqp.Delivery)
+	Queue          string
+	Consumer       string
+	AutoACK        bool
+	Exclusive      bool
+	NoLocal        bool
+	NoWait         bool
+	Args           amqp.Table
+	PrefetchCount  int
+	PrefetchSize   int
+	PrefetchGlobal bool
+	Handler        func(b *Broker, conn *amqp.Connection, channel *amqp.Channel, msg amqp.Delivery)
 }
 
 func WithConsumingParam(p *ConsumingParam) BrokerConfigHandler {
