@@ -739,21 +739,21 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
 			}
 			if left != nil {
-				member := b.ReadValue(left.GetName())
-				// 处理指针类型的解引用
+				member := b.PeekValue(left.GetName())
+				if member == nil {
+					// 这里是为了处理结构体指针名称不同的问题，暂时加了一个保底以获取正确的值
+					object, _ := left.GetMemberCall()
+					member = b.GetOriginValue(object)
+				}
 				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					// 如果是指针类型的参数，先不解引用，直接用于创建成员变量
 					if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
-						// 对于指针参数，直接使用 member（参数本身）创建成员变量
 						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 						b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
 					} else {
-						// 非参数的指针类型，需要解引用
 						member = b.GetOriginValue(member)
 						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 					}
 				} else {
-					// 非指针类型，直接创建成员变量
 					left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 				}
 			}

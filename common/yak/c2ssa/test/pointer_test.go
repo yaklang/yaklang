@@ -515,7 +515,6 @@ func Test_Pointer_SideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with struct", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`#include <stdio.h>
 
 	struct Data {
