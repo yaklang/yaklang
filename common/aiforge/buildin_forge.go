@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -170,6 +171,11 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 		return nil, utils.Errorf("generate yak script parameters failed: %v", err)
 	}
 
+	// Remove outer quotes from uiParamsConfig if present
+	// GenerateParameterFromProgram uses strconv.Quote which adds outer quotes
+	// But frontend expects raw JSON array string without outer quotes
+	uiParamsConfig = unquote(uiParamsConfig)
+
 	return &schema.AIForge{
 		ForgeName:        scriptMetadata.Name,
 		ForgeVerboseName: scriptMetadata.VerboseName,
@@ -250,7 +256,36 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 		forge.Tags = cfg.Tags
 		forge.Params = cfg.CLIParameterRuleYaklangCode
 	}
+
+	// Generate ParamsUIConfig from code content if available
+	// This is critical for frontend to display UI parameters correctly
+	if len(codeContent) > 0 && forge.ForgeContent != "" {
+		prog, err := static_analyzer.SSAParse(forge.ForgeContent, "yak")
+		if err == nil {
+			uiParamsConfig, _, err := information.GenerateParameterFromProgram(prog)
+			if err == nil && uiParamsConfig != "" {
+				// Remove outer quotes to match frontend format
+				forge.ParamsUIConfig = unquote(uiParamsConfig)
+			} else if err != nil {
+				log.Warnf("generate params UI config for forge %s failed: %v", name, err)
+			}
+		} else {
+			log.Warnf("parse forge content for %s failed: %v", name, err)
+		}
+	}
+
 	return string(configBytes), forge, nil
+}
+
+func unquote(s string) string {
+	if s == "" {
+		return s
+	}
+	// Try to unquote, if it fails (not quoted), return original
+	if unquoted, err := strconv.Unquote(s); err == nil {
+		return unquoted
+	}
+	return s
 }
 
 func getBuildInForgeFromFS(name string) (*schema.AIForge, error) {
