@@ -631,12 +631,9 @@ func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventT
 		log.Errorf("stream marshal envelope failed: %v", err)
 		return
 	}
-	// Batch only small non-chunk events. Chunk events should remain one-per-message to preserve
-	// consumer parallelism and avoid a single oversized batch becoming a head-of-line blocker.
-	allowBatch := eventType != spec.StreamEventTaskStart &&
-		eventType != spec.StreamEventTaskEnd &&
-		eventType != spec.StreamEventFileChunk &&
-		eventType != spec.StreamEventDataflowChunk
+	// Only batch risk events. Meta events may carry inline file/dataflow payloads and can become
+	// large enough to regress latency or hit message size limits.
+	allowBatch := eventType == spec.StreamEventRisk
 	e.sendEnvelopeRaw(taskId, runtimeId, subTaskId, envRaw, allowBatch)
 }
 
