@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,6 +155,9 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	state.emitStartOnce(e, taskId, runtimeId, subTaskId, &report)
 
 	fileIndex := make(map[string]*sfreport.File, len(report.File))
+	fileHashByPath := make(map[string]string, len(report.File))
+	fileHashByBase := make(map[string]string, len(report.File))
+	allFileHashes := make([]string, 0, len(report.File))
 	riskFiles := make(map[string][]string)
 	for _, f := range report.File {
 		if f == nil {
@@ -164,6 +168,23 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 			continue
 		}
 		fileIndex[fileHash] = f
+		allFileHashes = append(allFileHashes, fileHash)
+
+		// Best-effort path index: used when File.Risks is missing in some report variants.
+		if f.Path != "" {
+			fp := normalizeCodePath(f.Path)
+			if fp != "" {
+				if _, ok := fileHashByPath[fp]; !ok {
+					fileHashByPath[fp] = fileHash
+				}
+				base := path.Base(fp)
+				if base != "" && base != "." && base != "/" {
+					if _, ok := fileHashByBase[base]; !ok {
+						fileHashByBase[base] = fileHash
+					}
+				}
+			}
+		}
 		for _, riskHash := range f.Risks {
 			riskFiles[riskHash] = append(riskFiles[riskHash], fileHash)
 		}
@@ -175,6 +196,10 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	for _, risk := range report.Risks {
 		if risk == nil || len(risk.DataFlowPaths) == 0 {
 			continue
+		}
+		riskHash := risk.Hash
+		if riskHash == "" {
+			riskHash = calcFallbackRiskHash(risk)
 		}
 		for _, path := range risk.DataFlowPaths {
 			if path == nil {
@@ -190,7 +215,7 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 				continue
 			}
 			flowPayloads[hash] = raw
-			riskFlows[risk.Hash] = append(riskFlows[risk.Hash], hash)
+			riskFlows[riskHash] = append(riskFlows[riskHash], hash)
 		}
 	}
 
@@ -218,15 +243,29 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		riskCopy := *risk
 		riskCopy.DataFlowPaths = nil
 		if riskCopy.Hash == "" {
-			riskCopy.Hash = codec.Sha256(fmt.Sprintf("%s|%s|%s|%s|%s",
-				riskCopy.Title,
-				riskCopy.CodeSourceURL,
-				riskCopy.CodeRange,
-				riskCopy.ProgramName,
-				riskCopy.RiskType,
-			))
+			riskCopy.Hash = calcFallbackRiskHash(&riskCopy)
 		}
 		baseHash := riskCopy.Hash
+
+		// Some report variants don't populate File.Risks; recover file references from CodeSourceURL / filename.
+		filesForRisk := riskFiles[risk.Hash]
+		if len(filesForRisk) == 0 {
+			filesForRisk = riskFiles[riskCopy.Hash]
+		}
+		if len(filesForRisk) == 0 {
+			if h := resolveRiskFileHash(risk, fileHashByPath, fileHashByBase); h != "" {
+				filesForRisk = []string{h}
+			} else if len(report.Risks) == 1 && len(allFileHashes) > 0 {
+				// Single-risk incremental report: treat all files as related to that one risk.
+				filesForRisk = append([]string(nil), allFileHashes...)
+			}
+		}
+		if len(filesForRisk) > 0 {
+			riskFiles[riskCopy.Hash] = filesForRisk
+			if risk.Hash != "" {
+				riskFiles[risk.Hash] = filesForRisk
+			}
+		}
 		riskRaw, err := json.Marshal(&riskCopy)
 		if err != nil {
 			log.Errorf("stream marshal risk failed: %v", err)
@@ -238,8 +277,8 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 			ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
 			ReportType:     string(report.ReportType),
 			RiskJSON:       riskRaw,
-			FileHashes:     riskFiles[risk.Hash],
-			DataflowHashes: riskFlows[risk.Hash],
+			FileHashes:     riskFiles[riskCopy.Hash],
+			DataflowHashes: riskFlows[riskCopy.Hash],
 		}
 		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, ev)
 
@@ -273,8 +312,8 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 					ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
 					ReportType:     string(report.ReportType),
 					RiskJSON:       mockRaw,
-					FileHashes:     riskFiles[risk.Hash],
-					DataflowHashes: riskFlows[risk.Hash],
+					FileHashes:     riskFiles[riskCopy.Hash],
+					DataflowHashes: riskFlows[riskCopy.Hash],
 				}
 				e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, mockEv)
 			}
@@ -282,6 +321,66 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	}
 
 	return nil
+}
+
+func calcFallbackRiskHash(risk *sfreport.Risk) string {
+	if risk == nil {
+		return ""
+	}
+	return codec.Sha256(fmt.Sprintf("%s|%s|%s|%s|%s",
+		risk.Title,
+		risk.CodeSourceURL,
+		risk.CodeRange,
+		risk.ProgramName,
+		risk.RiskType,
+	))
+}
+
+func normalizeCodePath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return ""
+	}
+	p = strings.TrimPrefix(p, "file://")
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		p = p[:i]
+	}
+	p = strings.ReplaceAll(p, "\\", "/")
+	p = strings.TrimPrefix(p, "/")
+	return p
+}
+
+func resolveRiskFileHash(risk *sfreport.Risk, byPath map[string]string, byBase map[string]string) string {
+	if risk == nil {
+		return ""
+	}
+	cp := normalizeCodePath(risk.CodeSourceURL)
+	if cp != "" {
+		if h := byPath[cp]; h != "" {
+			return h
+		}
+		base := path.Base(cp)
+		if base != "" && base != "." && base != "/" {
+			if h := byBase[base]; h != "" {
+				return h
+			}
+		}
+	}
+	// Fallback: parse basename from code range like "xxx.java[123]" if present.
+	if risk.CodeRange != "" {
+		seg := risk.CodeRange
+		if i := strings.Index(seg, "["); i > 0 {
+			seg = seg[:i]
+		}
+		seg = strings.TrimSpace(seg)
+		seg = path.Base(normalizeCodePath(seg))
+		if seg != "" && seg != "." && seg != "/" {
+			if h := byBase[seg]; h != "" {
+				return h
+			}
+		}
+	}
+	return ""
 }
 
 func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, subTaskId string, report *sfreport.Report) {
