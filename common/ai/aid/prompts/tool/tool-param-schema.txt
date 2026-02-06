@@ -8,7 +8,10 @@
 ## 工具详情
 工具名称: {{ .Tool.Name }}
 工具描述: {{ .Tool.Description }}
-
+{{ if .Tool.Usage }}
+## 工具使用说明
+{{ .Tool.Usage }}
+{{ end }}
 ## 工具参数Schema
 
 作为JSON工具调用引擎，请依据以下原则生成符合Schema的参数：

@@ -40,10 +40,31 @@ You are now in HTTP fuzzing mode, specialized for testing HTTP request parameter
 - **Timeout or delay**: May indicate time-based blind injection
 - **Error messages**: May reveal technology stack or vulnerable code
 
+### XSS Verification Without Browser (Critical)
+
+Since there is **no browser environment** available, XSS must be verified through **static analysis of raw HTTP response**. The following are definitive indicators of successful XSS / DOM breakage:
+
+1. **Unescaped HTML tag injection**: If injected HTML tags (e.g., `<img src=x onerror=alert(1)>`, `<script>alert(1)</script>`, `<svg onload=alert(1)>`) appear **unescaped** (not encoded as `&lt;`, `&gt;`) in the response body, the DOM structure is broken and XSS is confirmed.
+
+2. **Event handler reflection**: If injected event handlers like `onerror=`, `onload=`, `onmouseover=` appear in the raw response within an HTML tag context, XSS is confirmed.
+
+3. **Payload reflection check**: Compare the injected payload with the raw response body. If the payload containing `<` and `>` characters appears verbatim (not HTML-encoded), the server does not sanitize input and XSS is exploitable.
+
+4. **Tool output signals**: The HTTP request tools will output `[XSS_DETECTION]` or `[XSS_ANALYSIS]` markers when they detect unescaped injection indicators. **Trust these signals** - they are reliable static XSS detection results.
+
+**Example**: Sending `name='><img src=x onerror=alert(1)>` and receiving response body containing `Hello '><img src=x onerror=alert(1)>` means:
+- The `'>` broke out of the existing HTML attribute/context
+- The `<img src=x onerror=alert(1)>` is parsed as a new HTML element by browsers
+- **XSS is confirmed** even without executing in a browser
+- DOM structure is definitively broken
+
+**Do NOT** require browser-based proof (popup, script execution) to confirm XSS. Static analysis of unescaped payload reflection in raw HTML response is sufficient and industry-standard evidence.
+
 ### Important Notes
 
 - Always analyze the diff results carefully
 - Look for patterns in successful vs failed payloads
 - Consider encoding requirements (URL encoding, Base64, etc.)
 - Test one parameter at a time for accurate attribution
+- When tools report `[XSS_DETECTION]` or `[XSS_VERDICT]`, use this as strong evidence for vulnerability confirmation
 

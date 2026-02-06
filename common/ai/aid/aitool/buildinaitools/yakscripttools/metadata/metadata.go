@@ -25,6 +25,8 @@ type YakScriptMetadata struct {
 	VerboseName string
 	Description string
 	Keywords    []string
+	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
+	Usage string
 }
 
 func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMetadata, error) {
@@ -65,11 +67,26 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 			verboseName = data
 		}
 	})
+
+	// __USAGE__ - 工具使用说明，在参数生成阶段(第2阶段)披露
+	var usage []string
+	prog.Ref("__USAGE__").ForEach(func(value *ssaapi.Value) {
+		if !value.IsConstInst() {
+			return
+		}
+		data, err := strconv.Unquote(value.String())
+		if err != nil {
+			data = value.String()
+		}
+		usage = append(usage, data)
+	})
+
 	return &YakScriptMetadata{
 		Name:        name,
 		VerboseName: verboseName,
 		Description: strings.Join(desc, "; "),
 		Keywords:    keywords,
+		Usage:       strings.Join(usage, "; "),
 	}, nil
 }
 
