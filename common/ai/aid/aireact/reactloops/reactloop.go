@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -115,6 +116,9 @@ type ReActLoop struct {
 	initActionMustUse  []string // Actions that MUST be used (set by init)
 	initActionDisabled []string // Actions that are DISABLED (set by init)
 	initActionApplied  bool     // Whether the init constraints have been applied
+
+	// 工具和 forge 推荐管理器
+	toolRecommender *ToolRecommender
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -155,14 +159,56 @@ func (r *ReActLoop) GetMaxIterations() int {
 	return r.maxIterations
 }
 
-func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
-	var tools []*aitool.Tool
-	if r.toolsGetter == nil {
-		tools = []*aitool.Tool{}
-	} else {
-		tools = r.toolsGetter()
+// GetRecommendedToolsAndForges 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
+func (r *ReActLoop) GetRecommendedToolsAndForges() ([]*aitool.Tool, []*schema.AIForge) {
+	var userInput string
+	if task := r.GetCurrentTask(); task != nil {
+		userInput = task.GetUserInput()
 	}
-	temp, info, err := r.invoker.GetBasicPromptInfo(tools)
+	return r.toolRecommender.GetRecommendedToolsAndForges(userInput, r.config)
+}
+
+// GetRecommendedToolsAndForgesAsync 异步搜索推荐的 tools 和 forges
+// 使用 AiToolManager 进行异步搜索，搜索成功后更新缓存
+// onFinished: 可选的回调函数，在搜索完成后调用
+func (r *ReActLoop) GetRecommendedToolsAndForgesAsync(onFinished ...func()) {
+	var userInput string
+	if task := r.GetCurrentTask(); task != nil {
+		userInput = task.GetUserInput()
+	}
+	r.toolRecommender.GetRecommendedToolsAndForgesAsync(userInput, r.config, onFinished...)
+}
+
+// WaitRecommendTask 等待所有推荐任务完成
+func (r *ReActLoop) WaitRecommendTask() {
+	r.toolRecommender.WaitRecommendTask()
+}
+
+func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
+	// 获取推荐的 tools 和 forges（基于关键词匹配）
+	r.GetRecommendedToolsAndForges()
+
+	// 启动异步搜索，并等待最多1秒
+	done := make(chan struct{}, 1)
+	r.GetRecommendedToolsAndForgesAsync(func() {
+		select {
+		case done <- struct{}{}:
+		default:
+		}
+	})
+
+	// 等待1秒，如果异步搜索完成则使用更新后的缓存，否则继续使用当前缓存
+	select {
+	case <-done:
+		log.Debug("async tools search completed within 1 second")
+	case <-time.After(1 * time.Second):
+		log.Debug("async tools search timeout, continue with current cache")
+	}
+
+	// 获取缓存的工具和 forges
+	tools, forges := r.toolRecommender.GetCachedToolsAndForges()
+
+	temp, info, err := r.invoker.GetBasicPromptInfo(tools, forges)
 	if err != nil {
 		return "", nil, err
 	}
@@ -272,6 +318,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 	}
+
+	// 初始化工具推荐管理器
+	r.toolRecommender = NewToolRecommender(r)
 
 	for _, action := range []*LoopAction{
 		loopAction_DirectlyAnswer,

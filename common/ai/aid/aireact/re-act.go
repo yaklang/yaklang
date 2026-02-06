@@ -103,8 +103,8 @@ func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
 	r.setCurrentTask(task)
 }
 
-func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return r.promptManager.GetBasicPromptInfo(tools)
+func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error) {
+	return r.promptManager.GetBasicPromptInfo(tools, forges)
 }
 
 var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)

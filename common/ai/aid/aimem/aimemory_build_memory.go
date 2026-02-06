@@ -11,7 +11,7 @@ import (
 
 // AddRawText 从原始文本生成记忆条目
 func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) {
-	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
+	temp, infos, err := r.invoker.GetBasicPromptInfo(nil, nil)
 	if err != nil {
 		return nil, utils.Errorf("GetBasicPromptInfo failed: %v", err)
 	}

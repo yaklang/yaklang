@@ -48,7 +48,7 @@ func (m *MockMemoryTriageForBuildMemory) AddRawText(text string) ([]*aicommon.Me
 	// 我们在这里模拟整个流程，验证 memory triage 系统工作
 	if m.invoker != nil {
 		// 获取 basic prompt info 来模拟真实流程
-		basicTemplate, infos, err := m.invoker.GetBasicPromptInfo(nil)
+		basicTemplate, infos, err := m.invoker.GetBasicPromptInfo(nil, nil)
 		if err == nil && basicTemplate != "" {
 			// 如果能获取到 basic prompt，说明集成是正常的
 			log.Infof("Basic prompt info obtained successfully: %v", infos)
@@ -467,7 +467,7 @@ func (m *mockInvokerForMemoryTest) GetConfig() aicommon.AICallerConfigIf {
 	return m.config
 }
 
-func (m *mockInvokerForMemoryTest) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+func (m *mockInvokerForMemoryTest) GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error) {
 	return "Basic system prompt for testing", map[string]any{}, nil
 }
 

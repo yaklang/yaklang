@@ -141,7 +141,7 @@ func NewMockInvoker(ctx context.Context) *MockInvoker {
 	}
 }
 
-func (m *MockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+func (m *MockInvoker) GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error) {
 	return "Mock Basic Prompt Template: {{ .Query }}", map[string]any{
 		"Query": "test query",
 	}, nil
