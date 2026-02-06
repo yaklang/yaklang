@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/snappy"
+	"github.com/klauspost/compress/zstd"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,13 +24,15 @@ import (
 type StreamEmitter struct {
 	agent              *ScanNode
 	enabled            bool
-	gzipEnabled        bool
+	codec              string // "", gzip, zstd, snappy
 	chunkSize          int
 	inlineMax          int
 	mockRiskMultiplier int
 	disableSeq         bool
 	dropInfo           bool
 	perTask            sync.Map
+
+	zstdEncPool sync.Pool
 }
 
 type taskStreamState struct {
@@ -46,9 +50,46 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if raw := os.Getenv("SCANNODE_STREAM_LAYERED"); raw != "" {
 		enabled = raw == "1" || raw == "true" || raw == "TRUE"
 	}
-	gzipEnabled := true
-	if raw := os.Getenv("SCANNODE_STREAM_GZIP"); raw != "" {
-		gzipEnabled = raw == "1" || raw == "true" || raw == "TRUE"
+
+	codecName := ""
+	codecExplicit := false
+	if raw := strings.TrimSpace(os.Getenv("SCANNODE_STREAM_CODEC")); raw != "" {
+		codecName = strings.ToLower(raw)
+		codecExplicit = true
+	} else if raw := strings.TrimSpace(os.Getenv("SCANNODE_STREAM_ENCODING")); raw != "" {
+		codecName = strings.ToLower(raw)
+		codecExplicit = true
+	}
+	switch codecName {
+	case "none", "off", "0", "false":
+		codecName = ""
+	case "", "gzip", "zstd", "snappy", "auto":
+	default:
+		// Invalid codec: ignore only if not explicit; if explicit, treat as none.
+		if codecExplicit {
+			codecName = ""
+		} else {
+			codecName = ""
+		}
+	}
+	if codecName == "" && !codecExplicit {
+		// Backward compatible default: gzip enabled unless explicitly disabled.
+		gzipEnabled := true
+		if raw := os.Getenv("SCANNODE_STREAM_GZIP"); raw != "" {
+			gzipEnabled = raw == "1" || raw == "true" || raw == "TRUE"
+		}
+		if gzipEnabled {
+			codecName = "gzip"
+		}
+	}
+	if codecName == "auto" {
+		// Heuristic: localhost / loopback => disable compression (CPU > bandwidth).
+		// Otherwise prefer zstd (fast + good ratio).
+		if isLocalAddress(agent) {
+			codecName = ""
+		} else {
+			codecName = "zstd"
+		}
 	}
 	chunkSize := 256 * 1024
 	if raw := os.Getenv("SCANNODE_STREAM_CHUNK_SIZE"); raw != "" {
@@ -82,16 +123,29 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if mockRiskMultiplier > 1 {
 		log.Infof("stream mock risk multiplier enabled: %d", mockRiskMultiplier)
 	}
-	return &StreamEmitter{
+	e := &StreamEmitter{
 		agent:              agent,
 		enabled:            enabled,
-		gzipEnabled:        gzipEnabled,
+		codec:              codecName,
 		chunkSize:          chunkSize,
 		inlineMax:          inlineMax,
 		mockRiskMultiplier: mockRiskMultiplier,
 		disableSeq:         disableSeq,
 		dropInfo:           dropInfo,
 	}
+	e.zstdEncPool = sync.Pool{
+		New: func() any {
+			enc, err := zstd.NewWriter(nil,
+				zstd.WithEncoderLevel(zstd.SpeedFastest),
+				zstd.WithEncoderConcurrency(1),
+			)
+			if err != nil {
+				return nil
+			}
+			return enc
+		},
+	}
+	return e
 }
 
 func (e *StreamEmitter) Enabled() bool {
@@ -615,23 +669,62 @@ func coalesceString(values ...string) string {
 	return ""
 }
 
-func (e *StreamEmitter) maybeCompress(raw []byte) ([]byte, string) {
-	if !e.gzipEnabled || len(raw) < 1024 {
-		return raw, ""
+func isLocalAddress(agent *ScanNode) bool {
+	if agent == nil {
+		return false
 	}
-	var buf bytes.Buffer
-	zw, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
-	if err != nil {
-		return raw, ""
+	ip := strings.TrimSpace(strings.ToLower(agent.serverIp))
+	if ip == "" {
+		return false
 	}
-	_, _ = zw.Write(raw)
-	_ = zw.Close()
+	if ip == "127.0.0.1" || ip == "localhost" || ip == "::1" {
+		return true
+	}
+	if strings.HasPrefix(ip, "127.") {
+		return true
+	}
+	return false
+}
 
-	enc := buf.Bytes()
-	// Keep gzip only when it helps enough (avoid wasting CPU for tiny wins).
-	// Source code and JSON are usually highly compressible, so this triggers often.
-	if len(enc) >= len(raw)-(len(raw)/10) { // <10% gain
+func (e *StreamEmitter) maybeCompress(raw []byte) ([]byte, string) {
+	if e == nil || e.codec == "" || len(raw) < 1024 {
 		return raw, ""
 	}
-	return append([]byte(nil), enc...), "gzip"
+
+	codecName := e.codec
+	var enc []byte
+	switch codecName {
+	case "gzip":
+		var buf bytes.Buffer
+		zw, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+		if err != nil {
+			return raw, ""
+		}
+		_, _ = zw.Write(raw)
+		_ = zw.Close()
+		enc = buf.Bytes()
+	case "zstd":
+		v := e.zstdEncPool.Get()
+		encWriter, _ := v.(*zstd.Encoder)
+		if encWriter == nil {
+			return raw, ""
+		}
+		enc = encWriter.EncodeAll(raw, nil)
+		e.zstdEncPool.Put(encWriter)
+	case "snappy":
+		enc = snappy.Encode(nil, raw)
+	default:
+		return raw, ""
+	}
+
+	// Keep compression only when it helps enough (avoid wasting CPU for tiny wins).
+	// Source code and JSON are usually highly compressible.
+	threshold := len(raw) / 10 // 10% gain
+	if codecName == "snappy" {
+		threshold = len(raw) / 20 // 5% gain (snappy is very fast)
+	}
+	if len(enc) >= len(raw)-threshold {
+		return raw, ""
+	}
+	return append([]byte(nil), enc...), codecName
 }
