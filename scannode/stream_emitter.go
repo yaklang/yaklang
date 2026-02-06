@@ -1,10 +1,13 @@
 package scannode
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,10 +21,12 @@ import (
 type StreamEmitter struct {
 	agent              *ScanNode
 	enabled            bool
+	gzipEnabled        bool
 	chunkSize          int
 	inlineMax          int
 	mockRiskMultiplier int
 	disableSeq         bool
+	dropInfo           bool
 	perTask            sync.Map
 }
 
@@ -39,6 +44,10 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if raw := os.Getenv("SCANNODE_STREAM_LAYERED"); raw != "" {
 		enabled = raw == "1" || raw == "true" || raw == "TRUE"
 	}
+	gzipEnabled := true
+	if raw := os.Getenv("SCANNODE_STREAM_GZIP"); raw != "" {
+		gzipEnabled = raw == "1" || raw == "true" || raw == "TRUE"
+	}
 	chunkSize := 256 * 1024
 	if raw := os.Getenv("SCANNODE_STREAM_CHUNK_SIZE"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
@@ -55,6 +64,10 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if raw := os.Getenv("SCANNODE_STREAM_DISABLE_SEQ"); raw != "" {
 		disableSeq = raw == "1" || raw == "true" || raw == "TRUE"
 	}
+	dropInfo := false
+	if raw := os.Getenv("SCANNODE_STREAM_DROP_INFO"); raw != "" {
+		dropInfo = raw == "1" || raw == "true" || raw == "TRUE"
+	}
 	mockRiskMultiplier := 1
 	if raw := os.Getenv("SCANNODE_STREAM_MOCK_RISK_MULTIPLIER"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 1 {
@@ -70,10 +83,12 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	return &StreamEmitter{
 		agent:              agent,
 		enabled:            enabled,
+		gzipEnabled:        gzipEnabled,
 		chunkSize:          chunkSize,
 		inlineMax:          inlineMax,
 		mockRiskMultiplier: mockRiskMultiplier,
 		disableSeq:         disableSeq,
+		dropInfo:           dropInfo,
 	}
 }
 
@@ -156,6 +171,9 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		if risk == nil {
 			continue
 		}
+		if e.dropInfo && strings.EqualFold(risk.Severity, "info") {
+			continue
+		}
 		riskCopy := *risk
 		riskCopy.DataFlowPaths = nil
 		if riskCopy.Hash == "" {
@@ -226,14 +244,16 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 }
 
 func (e *StreamEmitter) emitFile(fileHash string, file *sfreport.File, taskId, runtimeId, subTaskId string) {
-	content := []byte(file.Content)
+	rawContent := []byte(file.Content)
+	content, encoding := e.maybeCompress(rawContent)
 	meta := &spec.StreamFileMetaEvent{
 		FileHash:    fileHash,
 		Path:        file.Path,
 		Length:      file.Length,
 		LineCount:   file.LineCount,
 		Hash:        file.Hash,
-		ContentSize: int64(len(content)),
+		ContentSize: int64(len(rawContent)),
+		Encoding:    encoding,
 	}
 	if e.inlineMax > 0 && len(content) > 0 && len(content) <= e.inlineMax {
 		meta.InlineContent = content
@@ -245,9 +265,12 @@ func (e *StreamEmitter) emitFile(fileHash string, file *sfreport.File, taskId, r
 }
 
 func (e *StreamEmitter) emitDataflow(flowHash string, payload []byte, taskId, runtimeId, subTaskId string) {
+	rawPayload := payload
+	payload, encoding := e.maybeCompress(rawPayload)
 	meta := &spec.StreamDataflowMetaEvent{
 		DataflowHash: flowHash,
-		Size:         int64(len(payload)),
+		Size:         int64(len(rawPayload)),
+		Encoding:     encoding,
 	}
 	if e.inlineMax > 0 && len(payload) > 0 && len(payload) <= e.inlineMax {
 		meta.InlineContent = payload
@@ -397,4 +420,25 @@ func coalesceString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func (e *StreamEmitter) maybeCompress(raw []byte) ([]byte, string) {
+	if !e.gzipEnabled || len(raw) < 1024 {
+		return raw, ""
+	}
+	var buf bytes.Buffer
+	zw, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if err != nil {
+		return raw, ""
+	}
+	_, _ = zw.Write(raw)
+	_ = zw.Close()
+
+	enc := buf.Bytes()
+	// Keep gzip only when it helps enough (avoid wasting CPU for tiny wins).
+	// Source code and JSON are usually highly compressible, so this triggers often.
+	if len(enc) >= len(raw)-(len(raw)/10) { // <10% gain
+		return raw, ""
+	}
+	return append([]byte(nil), enc...), "gzip"
 }
