@@ -33,14 +33,31 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 
 	deleteInst := make([]User, 0)
+	invalidUsers := make([]User, 0) // 记录不再使用 v 的 users（如 Phi 节点）
 	for _, user := range v.GetUsers() {
 		if skip(user) {
 			continue
 		}
+
+		// 对于 Phi 节点，先检查它是否真的使用 v
+		// 如果 v 不在 Phi 的 Edge 中，说明这个 Phi 已经不再使用 v（可能因为之前的优化）
+		// 这种情况下应该跳过，并从 user 列表中移除
+		if phi, ok := ToPhi(user); ok {
+			if !slices.Contains(phi.Edge, v.GetId()) {
+				// Phi 节点不再使用 v，记录为无效 user
+				invalidUsers = append(invalidUsers, user)
+				continue
+			}
+		}
+
 		user.ReplaceValue(v, to)
 
 		to.AddUser(user)
 		deleteInst = append(deleteInst, user)
+	}
+	// 移除不再使用 v 的无效 users
+	for _, invalidUser := range invalidUsers {
+		v.RemoveUser(invalidUser)
 	}
 	for _, user := range deleteInst {
 		v.RemoveUser(user)

@@ -3,6 +3,9 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -869,5 +872,76 @@ func TestBasic_CFG_Defer(t *testing.T) {
 		`, []string{
 			"2", "1",
 		}, t)
+	})
+}
+
+func TestPhiWarningReproduce(t *testing.T) {
+	// 模拟 UnsafeSqlQuery 中的循环模式
+	code := `package main
+
+import "fmt"
+
+type Rows struct{}
+
+func (r *Rows) Next() bool { return false }
+func (r *Rows) Scan(dest ...interface{}) error { return nil }
+func (r *Rows) Err() error { return nil }
+func (r *Rows) Close() error { return nil }
+
+func UnsafeSqlQuery() ([]map[string]interface{}, error) {
+	rows := &Rows{}
+	defer rows.Close()
+	
+	var results []map[string]interface{}
+	var err error
+	
+	// 这个循环模式会导致 Phi 节点创建
+	for rows.Next() {
+		// err 在循环中可能被多次赋值
+		if err = rows.Scan(); err != nil {
+			return nil, err
+		}
+		
+		// results 在循环中被 append，SSA 会创建 Phi 节点
+		rowMap := make(map[string]interface{})
+		results = append(results, rowMap)
+	}
+	
+	// err 在循环后再次被赋值
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	
+	return results, nil
+}
+
+func main() {
+	_, _ = UnsafeSqlQuery()
+}
+`
+
+	// 解析代码 - 这会触发完整的编译和优化过程
+	prog, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaconfig.GO))
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	// 确保所有函数都已完成构建和优化
+	if prog.Program != nil {
+		prog.Program.EachFunction(func(f *ssa.Function) {
+			_ = f.GetName()
+		})
+	}
+
+	// 分析循环中的变量
+	t.Log("=== 分析循环中的变量 ===")
+	prog.Ref("err").ForEach(func(v *ssaapi.Value) {
+		users := v.GetUsers()
+		t.Logf("err variable: %s has %d users", v.String(), len(users))
+	})
+
+	prog.Ref("results").ForEach(func(v *ssaapi.Value) {
+		users := v.GetUsers()
+		t.Logf("results variable: %s has %d users", v.String(), len(users))
 	})
 }
