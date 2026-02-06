@@ -170,8 +170,8 @@ func (s *Server) GetThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empt
 			extTag["domain"] = "default:api.openai.com"
 		case "custom":
 			verbose = "自定义AI配置"
-			extTag["model"] = "default:gpt-3.5-turbo"
-			extTag["domain"] = "default:api.openai.com"
+			extTag["model"] = "default:memfit-light-free "
+			extTag["domain"] = "default:aibalance.yaklang.com"
 		case "chatglm":
 			verbose = "ChatGLM"
 			extTag["model"] = "default:glm-4-flash"
