@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -20,7 +21,7 @@ func (s *Server) QueryAIEvent(ctx context.Context, req *ypb.AIEventQueryRequest)
 	db := s.GetProjectDatabase()
 
 	queryAll := func() []*schema.AiOutputEvent {
-		eventCh := yakit.YieldAIEvent(ctx, db, filter)
+		eventCh := yakit.YieldAIEvent(ctx, db, filter, bizhelper.WithYieldModel_PageSize(50))
 		var events []*schema.AiOutputEvent
 		for event := range eventCh {
 			events = append(events, event)
@@ -31,7 +32,7 @@ func (s *Server) QueryAIEvent(ctx context.Context, req *ypb.AIEventQueryRequest)
 	// 不带分页查询
 	if paging == nil || lo.IsEmpty(paging) {
 		if req.GetProcessID() != "" {
-			eventIDs, err := yakit.QueryAIEventIDByProcessID(db, req.GetProcessID())
+			eventIDs, err := yakit.QueryAIEventIDByProcessID(db.Debug(), req.GetProcessID())
 			if err != nil {
 				return nil, err
 			}

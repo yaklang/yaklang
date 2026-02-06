@@ -122,6 +122,8 @@ func normalPagination[T any](cfg *YieldModelConfig, ctx context.Context, db *gor
 				break
 			}
 
+			currentPageSize := len(items)
+
 			for _, d := range items {
 				select {
 				case <-ctx.Done():
@@ -132,6 +134,9 @@ func normalPagination[T any](cfg *YieldModelConfig, ctx context.Context, db *gor
 						return
 					}
 				}
+			}
+			if currentPageSize < cfg.Size {
+				return
 			}
 		}
 	}()
