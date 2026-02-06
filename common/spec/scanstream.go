@@ -61,7 +61,10 @@ type StreamFileMetaEvent struct {
 	Length        int64             `json:"length"`
 	LineCount     int               `json:"line_count"`
 	Hash          map[string]string `json:"hash"`
-	ContentSize   int64             `json:"content_size"`
+	// ContentSize is the size of the original (decoded) content in bytes.
+	ContentSize int64 `json:"content_size"`
+	// Encoding indicates how InlineContent / chunk Data is encoded (e.g. "gzip").
+	Encoding string `json:"encoding,omitempty"`
 	InlineContent []byte            `json:"inline_content,omitempty"`
 }
 
@@ -74,7 +77,10 @@ type StreamFileChunkEvent struct {
 
 type StreamDataflowMetaEvent struct {
 	DataflowHash  string `json:"dataflow_hash"`
+	// Size is the size of the original (decoded) payload in bytes.
 	Size          int64  `json:"size"`
+	// Encoding indicates how InlineContent / chunk Data is encoded (e.g. "gzip").
+	Encoding      string `json:"encoding,omitempty"`
 	InlineContent []byte `json:"inline_content,omitempty"`
 }
 
