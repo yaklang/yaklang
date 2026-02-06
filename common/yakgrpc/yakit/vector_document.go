@@ -3,7 +3,6 @@ package yakit
 import (
 	"context"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -29,28 +28,28 @@ var defaultVectorStoreDocumentFTS5 = &bizhelper.SQLiteFTS5Config{
 	Tokenize:  "trigram",
 }
 
-func init() {
-	// Setup FTS5 index for rag_vector_document_v1 in SQLite profile DB to accelerate searching.
-	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_PROFILE_DATABASE, func(db *gorm.DB) {
-		if db == nil {
-			return
-		}
-		if !isSQLite(db) {
-			return
-		}
-		baseTable := (&schema.VectorStoreDocument{}).TableName()
-		if !db.HasTable(baseTable) {
-			// Base table is gone, but the FTS virtual table may remain; clean it up.
-			if err := bizhelper.SQLiteFTS5Drop(db, defaultVectorStoreDocumentFTS5); err != nil {
-				log.Warnf("failed to drop orphan %s fts5 index: %v", baseTable, err)
-			}
-			return
-		}
-		if err := EnsureVectorStoreDocumentFTS5(db); err != nil {
-			log.Warnf("failed to setup %s fts5 index: %v", (&schema.VectorStoreDocument{}).TableName(), err)
-		}
-	})
-}
+//func init() {
+//	// Setup FTS5 index for rag_vector_document_v1 in SQLite profile DB to accelerate searching.
+//	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_PROFILE_DATABASE, func(db *gorm.DB) {
+//		if db == nil {
+//			return
+//		}
+//		if !isSQLite(db) {
+//			return
+//		}
+//		baseTable := (&schema.VectorStoreDocument{}).TableName()
+//		if !db.HasTable(baseTable) {
+//			// Base table is gone, but the FTS virtual table may remain; clean it up.
+//			if err := bizhelper.SQLiteFTS5Drop(db, defaultVectorStoreDocumentFTS5); err != nil {
+//				log.Warnf("failed to drop orphan %s fts5 index: %v", baseTable, err)
+//			}
+//			return
+//		}
+//		if err := EnsureVectorStoreDocumentFTS5(db); err != nil {
+//			log.Warnf("failed to setup %s fts5 index: %v", (&schema.VectorStoreDocument{}).TableName(), err)
+//		}
+//	})
+//}
 
 func EnsureVectorStoreDocumentFTS5(db *gorm.DB) error {
 	if db == nil {

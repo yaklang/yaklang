@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -46,28 +45,28 @@ var defaultAIYakToolFTS5 = &bizhelper.SQLiteFTS5Config{
 	Tokenize:     "trigram",
 }
 
-func init() {
-	// Ensure AIYakTool has a proper FTS index in SQLite profile DB to accelerate searching.
-	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_PROFILE_DATABASE, func(db *gorm.DB) {
-		if db == nil {
-			return
-		}
-		if !isSQLite(db) {
-			return
-		}
-		baseTable := (&schema.AIYakTool{}).TableName()
-		if !db.HasTable(baseTable) {
-			// Base table is gone, but the FTS virtual table may remain; clean it up.
-			if err := bizhelper.SQLiteFTS5Drop(db, defaultAIYakToolFTS5); err != nil {
-				log.Warnf("failed to drop orphan ai_yak_tools fts5 index: %v", err)
-			}
-			return
-		}
-		if err := EnsureAIYakToolFTS5(db); err != nil {
-			log.Warnf("failed to setup ai_yak_tools fts5 index: %v", err)
-		}
-	})
-}
+//func init() {
+//	// Ensure AIYakTool has a proper FTS index in SQLite profile DB to accelerate searching.
+//	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_PROFILE_DATABASE, func(db *gorm.DB) {
+//		if db == nil {
+//			return
+//		}
+//		if !isSQLite(db) {
+//			return
+//		}
+//		baseTable := (&schema.AIYakTool{}).TableName()
+//		if !db.HasTable(baseTable) {
+//			// Base table is gone, but the FTS virtual table may remain; clean it up.
+//			if err := bizhelper.SQLiteFTS5Drop(db, defaultAIYakToolFTS5); err != nil {
+//				log.Warnf("failed to drop orphan ai_yak_tools fts5 index: %v", err)
+//			}
+//			return
+//		}
+//		if err := EnsureAIYakToolFTS5(db); err != nil {
+//			log.Warnf("failed to setup ai_yak_tools fts5 index: %v", err)
+//		}
+//	})
+//}
 
 func EnsureAIYakToolFTS5(db *gorm.DB) error {
 	if db == nil {
