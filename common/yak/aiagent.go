@@ -43,6 +43,7 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			aitool.WithDescription(aiTool.Description),
 			aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
 			aitool.WithVerboseName(aiTool.VerboseName),
+			aitool.WithUsage(aiTool.Usage),
 			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()

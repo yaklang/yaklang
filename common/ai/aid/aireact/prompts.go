@@ -113,6 +113,7 @@ type LoopPromptData struct {
 type ToolParamsPromptData struct {
 	ToolName          string
 	ToolDescription   string
+	ToolUsage         string   // Usage instructions disclosed at param generation stage (2-phase disclosure)
 	ToolSchema        string
 	OriginalQuery     string
 	CumulativeSummary string
@@ -380,6 +381,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	data := &ToolParamsPromptData{
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
+		ToolUsage:       tool.Usage,
 		DynamicContext:  pm.DynamicContext(),
 		Nonce:           generatedNonce, // Generate nonce for AITAG format
 	}

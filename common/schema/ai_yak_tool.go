@@ -14,6 +14,8 @@ type AIYakTool struct {
 	VerboseName string `json:"verbose_name"`
 	Description string `json:"description" gorm:"type:text;index"`
 	Keywords    string `json:"keywords" gorm:"type:text;index"`
+	// 工具使用说明，在参数生成阶段披露给 AI（2阶段披露），帮助 AI 更好地使用参数
+	Usage       string `json:"usage" gorm:"type:text"`
 	Content     string `json:"content" gorm:"type:text"`
 	Params      string `json:"params" gorm:"type:text"`
 	Path        string `json:"path" gorm:"type:text;index"`
@@ -41,7 +43,7 @@ func (*AIYakTool) TableName() string {
 }
 
 func (d *AIYakTool) CalcHash() string {
-	return utils.CalcSha1(d.Name, d.Content, d.Params, d.Path, d.Description, d.Keywords)
+	return utils.CalcSha1(d.Name, d.Content, d.Params, d.Path, d.Description, d.Keywords, d.Usage)
 }
 
 func (d *AIYakTool) BeforeSave() error {

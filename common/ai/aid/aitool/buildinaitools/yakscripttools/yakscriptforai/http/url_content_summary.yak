@@ -12,21 +12,29 @@ cli.check()
 
 rsp, req, err := poc.Do(method, urlStr, poc.save(true))
 if err != nil {
-    yakit.Error("err: %v", err)
+    yakit.Error("request failed: %v", err)
     return
 }
+
+statusCode = rsp.GetStatusCode()
+yakit.Info("[StatusCode]: %v", statusCode)
+
 header, body = poc.Split(rsp.RawPacket)
 yakit.Info("Headers: %#v", header)
 if len(body) > 0 {
-    yakit.Info("[BodySize]: %v", len(body))
+    yakit.Info("[BodySize]: %v bytes", len(body))
 } else {
-    yakit.Info("NO HTTP Body")
+    yakit.Info("NO HTTP Body (empty response body)")
+    yakit.Info("[EXTRACTION_STATUS]: content extraction complete, page has no body content")
+    return
 }
 ct := rsp.GetContentType().Lower()
 if str.Contains(ct, "html") {
-    title := str.ExtractTitle(ct)
+    title := str.ExtractTitle(string(body))
     if str.TrimSpace(title) != "" {
         yakit.Info("[Title]: %v", title)
+    } else {
+        yakit.Info("[Title]: (empty, page has no <title> tag)")
     }
     txt := make([]string)
     xhtml.Walker(body, node => {
@@ -42,5 +50,16 @@ if str.Contains(ct, "html") {
     result = str.Join(txt, " ")
     if len(result) > 0 {
         yakit.Info("[TEXT(Size:%v)]: \n%v", len(result), string(result))
+    } else {
+        yakit.Info("[TEXT]: (no visible text content in HTML)")
     }
+    yakit.Info("[EXTRACTION_STATUS]: content extraction complete, total text: %v chars, title: '%v'", len(result), str.TrimSpace(title))
+} else {
+    yakit.Info("[ContentType]: %v (non-HTML content)", ct)
+    if len(body) <= 4096 {
+        yakit.Info("[RawBody(Size:%v)]: \n%v", len(body), string(body))
+    } else {
+        yakit.Info("[RawBody(Size:%v)]: (content too large, showing first 4096 bytes)\n%v", len(body), string(body[:4096]))
+    }
+    yakit.Info("[EXTRACTION_STATUS]: content extraction complete, non-HTML response, body size: %v bytes", len(body))
 }

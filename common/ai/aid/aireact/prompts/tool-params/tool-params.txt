@@ -3,7 +3,10 @@
 You need to generate parameters for the tool '{{ .ToolName }}'.
 
 Tool Description: {{ .ToolDescription }}
-
+{{ if .ToolUsage }}
+## Tool Usage Guide
+{{ .ToolUsage }}
+{{ end }}
 {{ if .ToolSchema }}Tool Schema:
 ```json
 {{ .ToolSchema }}

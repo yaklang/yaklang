@@ -30,7 +30,10 @@ type Tool struct {
 	// A list of keywords for tool indexing and searching.
 	Keywords    []string       `json:"keywords,omitempty"`
 	VerboseName string         `json:"verbose_name,omitempty"`
-	Callback    InvokeCallback // 添加回调函数字段
+	// Usage 工具使用说明，在参数生成阶段(第2阶段)才披露给 AI，
+	// 包含使用原则、参数建议、关联使用等信息，帮助 AI 更好地使用工具参数。
+	Usage    string         `json:"usage,omitempty"`
+	Callback InvokeCallback // 添加回调函数字段
 }
 
 // ToolOption 定义工具选项函数的类型
@@ -87,6 +90,13 @@ func WithDescription(description string) ToolOption {
 func WithVerboseName(verboseName string) ToolOption {
 	return func(t *Tool) {
 		t.VerboseName = verboseName
+	}
+}
+
+// WithUsage 设置工具的使用说明（在参数生成阶段披露）
+func WithUsage(usage string) ToolOption {
+	return func(t *Tool) {
+		t.Usage = usage
 	}
 }
 
@@ -551,6 +561,10 @@ func (t *Tool) GetVerboseName() string {
 
 func (t *Tool) GetKeywords() []string {
 	return t.Keywords
+}
+
+func (t *Tool) GetUsage() string {
+	return t.Usage
 }
 
 func (t *Tool) Params() *omap.OrderedMap[string, any] {
