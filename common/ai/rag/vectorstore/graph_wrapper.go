@@ -396,7 +396,11 @@ func (gw *GraphWrapper[K]) GetQuantizer() *pq.Quantizer {
 
 // exportHNSWGraphToBinaryInLock exports the HNSW graph to binary format under a lock.
 func (gw *GraphWrapper[K]) exportHNSWGraphToBinaryInLock() (io.Reader, error) {
-	pers, err := hnsw.ExportHNSWGraph(gw.graph)
+	g := gw.graph
+	if g == nil || len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
+		return nil, graphNodesIsEmpty
+	}
+	pers, err := hnsw.ExportHNSWGraph(g)
 	if err != nil {
 		return nil, err
 	}
