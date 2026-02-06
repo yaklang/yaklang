@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,27 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// VacuumSQLiteJSONBoundary 是 vacuum-sqlite 命令 JSON 输出的边界标记。
+// 该值为 md5("vacuum-sqlite")，前端可以通过搜索 `<VacuumSQLiteJSONBoundary>` 来定位 JSON 片段。
+const VacuumSQLiteJSONBoundary = "52ed804604e783e3b12860e8676f78a1"
+
+// VacuumSQLiteDatabaseResult 记录单个数据库 vacuum 结果，给前端 JSON 使用。
+type VacuumSQLiteDatabaseResult struct {
+	Path       string `json:"path"`
+	Success    bool   `json:"success"`
+	SavedBytes int64  `json:"saved_bytes"`
+	Error      string `json:"error,omitempty"`
+}
+
+// VacuumSQLiteJSONResult 为 vacuum-sqlite 的整体 JSON 输出结构。
+type VacuumSQLiteJSONResult struct {
+	Databases       []VacuumSQLiteDatabaseResult `json:"databases"`
+	TotalDatabases  int                          `json:"total_databases"`
+	Successful      int                          `json:"successful"`
+	Failed          int                          `json:"failed"`
+	TotalSavedBytes int64                        `json:"total_saved_bytes"`
+}
 
 // VacuumSQLiteCommand is the CLI command for vacuuming SQLite databases
 var VacuumSQLiteCommand = &cli.Command{
@@ -48,6 +70,11 @@ var VacuumSQLiteCommand = &cli.Command{
 			Name:  "skip-default",
 			Usage: "Skip default databases (project, profile, ssa) when using --all",
 		},
+		cli.BoolFlag{
+			Name:   "json",
+			Usage:  "Output machine-readable JSON summary with boundary for frontend integration",
+			EnvVar: "YAK_VACUUM_SQLITE_JSON",
+		},
 		cli.IntFlag{
 			Name:  "busy-timeout",
 			Usage: "SQLite busy timeout in milliseconds (default 5000ms)",
@@ -62,6 +89,7 @@ var VacuumSQLiteCommand = &cli.Command{
 		forceTruncateWAL := c.Bool("force-truncate-wal")
 		noForceTruncateWAL := c.Bool("no-force-truncate-wal")
 		skipDefault := c.Bool("skip-default")
+		jsonOutput := c.Bool("json")
 		busyTimeout := c.Int("busy-timeout")
 
 		// Auto-detect mode: will be set per-database based on WAL existence
@@ -171,6 +199,7 @@ var VacuumSQLiteCommand = &cli.Command{
 
 		var totalSavedBytes int64
 		var successCount, failCount int
+		var dbResults []VacuumSQLiteDatabaseResult
 
 		for i, dbPath := range databasesToVacuum {
 			fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
@@ -182,22 +211,47 @@ var VacuumSQLiteCommand = &cli.Command{
 				log.Errorf("failed to vacuum %s: %v", dbPath, err)
 				failCount++
 				fmt.Printf("  [FAILED] Status: FAILED - %v\n\n", err)
+				dbResults = append(dbResults, VacuumSQLiteDatabaseResult{
+					Path:       dbPath,
+					Success:    false,
+					SavedBytes: 0,
+					Error:      err.Error(),
+				})
 			} else {
 				totalSavedBytes += saved
 				successCount++
 				fmt.Printf("  [OK] Status: SUCCESS\n\n")
+				dbResults = append(dbResults, VacuumSQLiteDatabaseResult{
+					Path:       dbPath,
+					Success:    true,
+					SavedBytes: saved,
+				})
 			}
 		}
 
-		// Summary
-		fmt.Printf("\n╔══════════════════════════════════════════════════════════════════════════════╗\n")
-		fmt.Printf("║                                   Summary                                    ║\n")
-		fmt.Printf("╠══════════════════════════════════════════════════════════════════════════════╣\n")
-		fmt.Printf("║  Total databases processed: %-50d║\n", len(databasesToVacuum))
-		fmt.Printf("║  Successful: %-65d║\n", successCount)
-		fmt.Printf("║  Failed: %-69d║\n", failCount)
-		fmt.Printf("║  Total space saved: %-58s║\n", utils.ByteSize(uint64(totalSavedBytes)))
-		fmt.Printf("╚══════════════════════════════════════════════════════════════════════════════╝\n")
+		// Summary：人类可读模式与 JSON 模式二选一
+		if jsonOutput {
+			jsonResult := VacuumSQLiteJSONResult{
+				Databases:       dbResults,
+				TotalDatabases:  len(databasesToVacuum),
+				Successful:      successCount,
+				Failed:          failCount,
+				TotalSavedBytes: totalSavedBytes,
+			}
+			data, _ := json.Marshal(jsonResult)
+			// 单行输出：<边界> JSON <边界>，供前端解析
+			fmt.Println()
+			fmt.Printf("<%s> %s <%s>\n", VacuumSQLiteJSONBoundary, string(data), VacuumSQLiteJSONBoundary)
+		} else {
+			fmt.Printf("\n╔══════════════════════════════════════════════════════════════════════════════╗\n")
+			fmt.Printf("║                                   Summary                                    ║\n")
+			fmt.Printf("╠══════════════════════════════════════════════════════════════════════════════╣\n")
+			fmt.Printf("║  Total databases processed: %-50d║\n", len(databasesToVacuum))
+			fmt.Printf("║  Successful: %-65d║\n", successCount)
+			fmt.Printf("║  Failed: %-69d║\n", failCount)
+			fmt.Printf("║  Total space saved: %-58s║\n", utils.ByteSize(uint64(totalSavedBytes)))
+			fmt.Printf("╚══════════════════════════════════════════════════════════════════════════════╝\n")
+		}
 
 		return nil
 	},
