@@ -34,7 +34,7 @@ var defaultVectorStoreDocumentFTS5 = &bizhelper.SQLiteFTS5Config{
 //		if db == nil {
 //			return
 //		}
-//		if !isSQLite(db) {
+//		if !schema.IsSQLite(db) {
 //			return
 //		}
 //		baseTable := (&schema.VectorStoreDocument{}).TableName()
@@ -55,7 +55,7 @@ func EnsureVectorStoreDocumentFTS5(db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
-	if !isSQLite(db) {
+	if !schema.IsSQLite(db) {
 		return nil
 	}
 	if err := bizhelper.SQLiteFTS5Setup(db, defaultVectorStoreDocumentFTS5); err != nil {
@@ -76,7 +76,7 @@ func SearchVectorStoreDocumentBM25(db *gorm.DB, filter *VectorDocumentFilter, li
 		match = strings.TrimSpace(filter.Keywords)
 	}
 	var res = make([]*schema.VectorStoreDocument, 0)
-	if len(match) < 3 || !isSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		if err := FilterVectorDocuments(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func SearchVectorStoreDocumentBM25Yield(ctx context.Context, db *gorm.DB, filter
 	if filter != nil {
 		match = strings.TrimSpace(filter.Keywords)
 	}
-	if len(match) < 3 || !isSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		return YieldVectorDocument(ctx, db, filter, options...)
 	}
 	filter.Keywords = "" // if use FTS5, clear keywords in filter to avoid double filtering

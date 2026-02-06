@@ -51,7 +51,7 @@ var defaultAIYakToolFTS5 = &bizhelper.SQLiteFTS5Config{
 //		if db == nil {
 //			return
 //		}
-//		if !isSQLite(db) {
+//		if !schema.IsSQLite(db) {
 //			return
 //		}
 //		baseTable := (&schema.AIYakTool{}).TableName()
@@ -72,7 +72,7 @@ func EnsureAIYakToolFTS5(db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
-	if !isSQLite(db) {
+	if !schema.IsSQLite(db) {
 		return nil
 	}
 	if err := bizhelper.SQLiteFTS5Setup(db, defaultAIYakToolFTS5); err != nil {
@@ -105,7 +105,7 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 	}
 
 	var res = make([]*schema.AIYakTool, 0)
-	if len(match) < 3 || !isSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
+	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
 		if err := FilterAIYakTools(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
