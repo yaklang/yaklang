@@ -34,6 +34,7 @@ type taskStreamState struct {
 	mu           sync.Mutex
 	seq          int64
 	started      bool
+	ended        bool
 	sentFiles    map[string]struct{}
 	sentFlows    map[string]struct{}
 	lastActivity time.Time
@@ -96,6 +97,45 @@ func (e *StreamEmitter) Enabled() bool {
 	return e != nil && e.enabled
 }
 
+// EmitTaskEnd should be called when the Yak script/task truly finishes (process exit / ReturnData),
+// not per streamed SSA report chunk. Otherwise the server may finalize a task prematurely.
+func (e *StreamEmitter) EmitTaskEnd(taskId, runtimeId, subTaskId string, totalRisks, totalFiles, totalFlows int64) {
+	if !e.Enabled() || taskId == "" {
+		return
+	}
+	v, ok := e.perTask.Load(taskId)
+	if !ok {
+		return
+	}
+	state := v.(*taskStreamState)
+
+	state.mu.Lock()
+	started := state.started
+	alreadyEnded := state.ended
+	if started && !alreadyEnded {
+		state.ended = true
+	}
+	state.mu.Unlock()
+
+	if !started || alreadyEnded {
+		return
+	}
+
+	ev := &spec.StreamTaskEndEvent{
+		TaskId:      taskId,
+		TotalRisks:  totalRisks,
+		TotalFiles:  totalFiles,
+		TotalFlows:  totalFlows,
+		FinishedAt:  time.Now().Unix(),
+		FinalStatus: "done",
+	}
+	// Force seq for task_end to preserve ordering even when disableSeq is enabled.
+	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.StreamEventTaskEnd, ev)
+
+	// Best-effort cleanup to avoid per-task state leaking forever.
+	time.AfterFunc(2*time.Minute, func() { e.perTask.Delete(taskId) })
+}
+
 func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJSON string) error {
 	if !e.Enabled() {
 		return nil
@@ -111,6 +151,7 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 
 	state := e.getTaskState(taskId)
 	state.lastActivity = time.Now()
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, &report)
 
 	fileIndex := make(map[string]*sfreport.File, len(report.File))
 	riskFiles := make(map[string][]string)
@@ -243,6 +284,27 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	return nil
 }
 
+func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, subTaskId string, report *sfreport.Report) {
+	if s == nil || e == nil || report == nil {
+		return
+	}
+	s.mu.Lock()
+	if s.started {
+		s.mu.Unlock()
+		return
+	}
+	s.started = true
+	s.mu.Unlock()
+
+	ev := &spec.StreamTaskStartEvent{
+		TaskId:     taskId,
+		Program:    report.ProgramName,
+		ReportType: string(report.ReportType),
+	}
+	// Force seq for task_start to preserve ordering relative to risk/file/flow events.
+	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.StreamEventTaskStart, ev)
+}
+
 func (e *StreamEmitter) emitFile(fileHash string, file *sfreport.File, taskId, runtimeId, subTaskId string) {
 	rawContent := []byte(file.Content)
 	content, encoding := e.maybeCompress(rawContent)
@@ -349,6 +411,38 @@ func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventT
 	}
 	if e.disableSeq {
 		env.Seq = 0
+	}
+	envRaw, err := json.Marshal(env)
+	if err != nil {
+		log.Errorf("stream marshal envelope failed: %v", err)
+		return
+	}
+	e.agent.feedback(&spec.ScanResult{
+		Type:      spec.ScanResult_StreamEvent,
+		Content:   envRaw,
+		TaskId:    taskId,
+		RuntimeId: runtimeId,
+		SubTaskId: subTaskId,
+	})
+}
+
+func (e *StreamEmitter) emitEnvelopeForceSeq(taskId, runtimeId, subTaskId string, eventType spec.StreamEventType, payload any) {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		log.Errorf("stream marshal payload failed: %v", err)
+		return
+	}
+	env := &spec.StreamEnvelope{
+		TaskId:      taskId,
+		RuntimeId:   runtimeId,
+		SubTaskId:   subTaskId,
+		EventId:     utils.RandStringBytes(20),
+		Seq:         e.nextSeq(taskId),
+		Timestamp:   time.Now().Unix(),
+		Type:        eventType,
+		Payload:     raw,
+		PayloadHash: codec.Md5(raw),
+		PayloadSize: int64(len(raw)),
 	}
 	envRaw, err := json.Marshal(env)
 	if err != nil {
