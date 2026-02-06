@@ -33,6 +33,13 @@ type StreamEmitter struct {
 	perTask            sync.Map
 
 	zstdEncPool sync.Pool
+
+	// Envelope batching reduces per-message overhead in MQ by sending a JSON array of
+	// StreamEnvelope objects in one ScanResult message. Disabled by default.
+	batchEnabled  bool
+	batchMax      int
+	batchMaxBytes int
+	batchFlushDur time.Duration
 }
 
 type taskStreamState struct {
@@ -43,6 +50,13 @@ type taskStreamState struct {
 	sentFiles    map[string]struct{}
 	sentFlows    map[string]struct{}
 	lastActivity time.Time
+
+	// Envelope batching state (per task).
+	lastRuntimeId string
+	lastSubTaskId string
+	batchRaws     [][]byte
+	batchBytes    int
+	batchTimer    *time.Timer
 }
 
 func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
@@ -123,6 +137,27 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if mockRiskMultiplier > 1 {
 		log.Infof("stream mock risk multiplier enabled: %d", mockRiskMultiplier)
 	}
+
+	batchMax := 0
+	if raw := os.Getenv("SCANNODE_STREAM_ENVELOPE_BATCH_MAX"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			batchMax = v
+		}
+	}
+	batchMaxBytes := 256 * 1024
+	if raw := os.Getenv("SCANNODE_STREAM_ENVELOPE_BATCH_BYTES"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			batchMaxBytes = v
+		}
+	}
+	flushMs := 10
+	if raw := os.Getenv("SCANNODE_STREAM_ENVELOPE_BATCH_FLUSH_MS"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+			flushMs = v
+		}
+	}
+	batchEnabled := batchMax > 0 && batchMaxBytes > 0
+
 	e := &StreamEmitter{
 		agent:              agent,
 		enabled:            enabled,
@@ -132,6 +167,10 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 		mockRiskMultiplier: mockRiskMultiplier,
 		disableSeq:         disableSeq,
 		dropInfo:           dropInfo,
+		batchEnabled:       batchEnabled,
+		batchMax:           batchMax,
+		batchMaxBytes:      batchMaxBytes,
+		batchFlushDur:      time.Duration(flushMs) * time.Millisecond,
 	}
 	e.zstdEncPool = sync.Pool{
 		New: func() any {
@@ -176,6 +215,9 @@ func (e *StreamEmitter) EmitTaskEnd(taskId, runtimeId, subTaskId string, totalRi
 		return
 	}
 	state := v.(*taskStreamState)
+
+	// Flush any buffered envelopes first, so task_end won't be delayed by batch timer.
+	e.flushTaskBatch(taskId)
 
 	state.mu.Lock()
 	started := state.started
@@ -589,13 +631,9 @@ func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventT
 		log.Errorf("stream marshal envelope failed: %v", err)
 		return
 	}
-	e.agent.feedback(&spec.ScanResult{
-		Type:      spec.ScanResult_StreamEvent,
-		Content:   envRaw,
-		TaskId:    taskId,
-		RuntimeId: runtimeId,
-		SubTaskId: subTaskId,
-	})
+	// Batch only non-control events. Task start/end should be sent immediately to reduce latency.
+	allowBatch := eventType != spec.StreamEventTaskStart && eventType != spec.StreamEventTaskEnd
+	e.sendEnvelopeRaw(taskId, runtimeId, subTaskId, envRaw, allowBatch)
 }
 
 func (e *StreamEmitter) emitEnvelopeForceSeq(taskId, runtimeId, subTaskId string, eventType spec.StreamEventType, payload any) {
@@ -621,9 +659,121 @@ func (e *StreamEmitter) emitEnvelopeForceSeq(taskId, runtimeId, subTaskId string
 		log.Errorf("stream marshal envelope failed: %v", err)
 		return
 	}
+	// Force-send control envelopes (never batch).
+	e.sendEnvelopeRaw(taskId, runtimeId, subTaskId, envRaw, false)
+}
+
+func (e *StreamEmitter) sendEnvelopeRaw(taskId, runtimeId, subTaskId string, envRaw []byte, allowBatch bool) {
+	if e == nil || e.agent == nil || taskId == "" || len(envRaw) == 0 {
+		return
+	}
+	if !allowBatch || !e.batchEnabled || e.batchMax <= 0 || e.batchMaxBytes <= 0 {
+		e.agent.feedback(&spec.ScanResult{
+			Type:      spec.ScanResult_StreamEvent,
+			Content:   envRaw,
+			TaskId:    taskId,
+			RuntimeId: runtimeId,
+			SubTaskId: subTaskId,
+		})
+		return
+	}
+
+	// Very large envelopes should never be batched (avoid oversized messages).
+	if len(envRaw) >= e.batchMaxBytes/2 {
+		e.flushTaskBatch(taskId)
+		e.agent.feedback(&spec.ScanResult{
+			Type:      spec.ScanResult_StreamEvent,
+			Content:   envRaw,
+			TaskId:    taskId,
+			RuntimeId: runtimeId,
+			SubTaskId: subTaskId,
+		})
+		return
+	}
+
+	state := e.getTaskState(taskId)
+	var flushRaws [][]byte
+	var flushRuntime, flushSub string
+	state.mu.Lock()
+	state.lastRuntimeId = runtimeId
+	state.lastSubTaskId = subTaskId
+	state.batchRaws = append(state.batchRaws, envRaw)
+	state.batchBytes += len(envRaw)
+	if state.batchTimer == nil && e.batchFlushDur > 0 {
+		state.batchTimer = time.AfterFunc(e.batchFlushDur, func() { e.flushTaskBatch(taskId) })
+	}
+	shouldFlush := len(state.batchRaws) >= e.batchMax || state.batchBytes >= e.batchMaxBytes
+	if shouldFlush {
+		flushRaws = state.batchRaws
+		flushRuntime = state.lastRuntimeId
+		flushSub = state.lastSubTaskId
+		state.batchRaws = nil
+		state.batchBytes = 0
+		if state.batchTimer != nil {
+			state.batchTimer.Stop()
+			state.batchTimer = nil
+		}
+	}
+	state.mu.Unlock()
+
+	if len(flushRaws) > 0 {
+		e.sendEnvelopeBatch(taskId, flushRuntime, flushSub, flushRaws)
+	}
+}
+
+func (e *StreamEmitter) flushTaskBatch(taskId string) {
+	if e == nil || !e.batchEnabled || taskId == "" {
+		return
+	}
+	state := e.getTaskState(taskId)
+	var flushRaws [][]byte
+	var flushRuntime, flushSub string
+	state.mu.Lock()
+	if len(state.batchRaws) == 0 {
+		if state.batchTimer != nil {
+			state.batchTimer.Stop()
+			state.batchTimer = nil
+		}
+		state.mu.Unlock()
+		return
+	}
+	flushRaws = state.batchRaws
+	flushRuntime = state.lastRuntimeId
+	flushSub = state.lastSubTaskId
+	state.batchRaws = nil
+	state.batchBytes = 0
+	if state.batchTimer != nil {
+		state.batchTimer.Stop()
+		state.batchTimer = nil
+	}
+	state.mu.Unlock()
+
+	e.sendEnvelopeBatch(taskId, flushRuntime, flushSub, flushRaws)
+}
+
+func (e *StreamEmitter) sendEnvelopeBatch(taskId, runtimeId, subTaskId string, envRaws [][]byte) {
+	if e == nil || e.agent == nil || taskId == "" || len(envRaws) == 0 {
+		return
+	}
+	// Build JSON array without re-marshalling each envelope.
+	var buf bytes.Buffer
+	buf.Grow(2 + len(envRaws))
+	buf.WriteByte('[')
+	first := true
+	for _, raw := range envRaws {
+		if len(raw) == 0 {
+			continue
+		}
+		if !first {
+			buf.WriteByte(',')
+		}
+		first = false
+		buf.Write(raw)
+	}
+	buf.WriteByte(']')
 	e.agent.feedback(&spec.ScanResult{
 		Type:      spec.ScanResult_StreamEvent,
-		Content:   envRaw,
+		Content:   buf.Bytes(),
 		TaskId:    taskId,
 		RuntimeId: runtimeId,
 		SubTaskId: subTaskId,
