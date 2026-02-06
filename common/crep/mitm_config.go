@@ -428,11 +428,19 @@ func MITM_SetDownstreamProxyRoutes(routes map[string][]string) MITMConfig {
 			if pattern == "" {
 				continue
 			}
+			// Support bypass rules for specific hosts/domains even when a default downstream proxy is configured.
+			// A bypass rule is expressed as a pattern with a leading '!': e.g. "!example.com" or "!*.example.com".
+			// Bypass rules do not require any proxy endpoints, so keep them even if `proxies` is empty.
+			isBypass := strings.HasPrefix(pattern, "!")
 			candidates := utils.StringArrayFilterEmpty(proxies)
-			if len(candidates) == 0 {
+			if len(candidates) == 0 && !isBypass {
 				continue
 			}
-			server.proxyRouteMap[pattern] = append([]string(nil), candidates...)
+			if isBypass {
+				server.proxyRouteMap[pattern] = nil
+			} else {
+				server.proxyRouteMap[pattern] = append([]string(nil), candidates...)
+			}
 		}
 		if len(server.proxyRouteMap) > 0 {
 			keys := make([]string, 0, len(server.proxyRouteMap))
