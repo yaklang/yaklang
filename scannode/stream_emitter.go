@@ -138,6 +138,17 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 		log.Infof("stream mock risk multiplier enabled: %d", mockRiskMultiplier)
 	}
 
+	// If stream mode is minimizing dataflow payload, also minimize dataflow generation to avoid
+	// paying for source snippets/dot graph that won't be persisted for audit anyway.
+	// This only affects this process (yak mq scannode) and can be overridden by explicitly setting SSA_DATAFLOW_MINIMAL.
+	if enabled && strings.TrimSpace(os.Getenv("SSA_DATAFLOW_MINIMAL")) == "" {
+		raw := strings.TrimSpace(os.Getenv("SCANNODE_STREAM_FLOW_MINIMAL"))
+		flowMinimal := raw == "" || raw == "1" || strings.EqualFold(raw, "true")
+		if flowMinimal {
+			_ = os.Setenv("SSA_DATAFLOW_MINIMAL", "1")
+		}
+	}
+
 	batchMax := 0
 	if raw := os.Getenv("SCANNODE_STREAM_ENVELOPE_BATCH_MAX"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
