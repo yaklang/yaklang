@@ -30,6 +30,18 @@ func (f *File) SaveToDB(db *gorm.DB, programName string) error {
 	if db == nil {
 		return utils.Error("Save File to DB failed: db is nil")
 	}
+	// 若 content 为空且已有完整内容，避免覆盖导致审计缺失
+	if f != nil && f.Content == "" && f.IrSourceHash != "" {
+		var existing ssadb.IrSource
+		err := db.Where("source_code_hash = ?", f.IrSourceHash).First(&existing).Error
+		if err == nil {
+			if existing.QuotedCode != "" && existing.QuotedCode != "\"\"" {
+				return nil
+			}
+		} else if !gorm.IsRecordNotFoundError(err) {
+			return utils.Wrapf(err, "Save File to DB failed")
+		}
+	}
 	editor, err := file2Editor(f, programName)
 	if err != nil {
 		return err

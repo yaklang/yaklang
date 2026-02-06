@@ -2,6 +2,7 @@ package scannode
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -15,11 +16,13 @@ import (
 )
 
 type StreamEmitter struct {
-	agent     *ScanNode
-	enabled   bool
-	chunkSize int
-	inlineMax int
-	perTask   sync.Map
+	agent              *ScanNode
+	enabled            bool
+	chunkSize          int
+	inlineMax          int
+	mockRiskMultiplier int
+	disableSeq         bool
+	perTask            sync.Map
 }
 
 type taskStreamState struct {
@@ -36,7 +39,7 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 	if raw := os.Getenv("SCANNODE_STREAM_LAYERED"); raw != "" {
 		enabled = raw == "1" || raw == "true" || raw == "TRUE"
 	}
-	chunkSize := 64 * 1024
+	chunkSize := 256 * 1024
 	if raw := os.Getenv("SCANNODE_STREAM_CHUNK_SIZE"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
 			chunkSize = v
@@ -48,11 +51,29 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 			inlineMax = v
 		}
 	}
+	disableSeq := false
+	if raw := os.Getenv("SCANNODE_STREAM_DISABLE_SEQ"); raw != "" {
+		disableSeq = raw == "1" || raw == "true" || raw == "TRUE"
+	}
+	mockRiskMultiplier := 1
+	if raw := os.Getenv("SCANNODE_STREAM_MOCK_RISK_MULTIPLIER"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 1 {
+			if v > 1000 {
+				v = 1000
+			}
+			mockRiskMultiplier = v
+		}
+	}
+	if mockRiskMultiplier > 1 {
+		log.Infof("stream mock risk multiplier enabled: %d", mockRiskMultiplier)
+	}
 	return &StreamEmitter{
-		agent:     agent,
-		enabled:   enabled,
-		chunkSize: chunkSize,
-		inlineMax: inlineMax,
+		agent:              agent,
+		enabled:            enabled,
+		chunkSize:          chunkSize,
+		inlineMax:          inlineMax,
+		mockRiskMultiplier: mockRiskMultiplier,
+		disableSeq:         disableSeq,
 	}
 }
 
@@ -137,6 +158,16 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		}
 		riskCopy := *risk
 		riskCopy.DataFlowPaths = nil
+		if riskCopy.Hash == "" {
+			riskCopy.Hash = codec.Sha256(fmt.Sprintf("%s|%s|%s|%s|%s",
+				riskCopy.Title,
+				riskCopy.CodeSourceURL,
+				riskCopy.CodeRange,
+				riskCopy.ProgramName,
+				riskCopy.RiskType,
+			))
+		}
+		baseHash := riskCopy.Hash
 		riskRaw, err := json.Marshal(&riskCopy)
 		if err != nil {
 			log.Errorf("stream marshal risk failed: %v", err)
@@ -144,7 +175,7 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		}
 
 		ev := &spec.StreamRiskEvent{
-			RiskHash:       risk.Hash,
+			RiskHash:       riskCopy.Hash,
 			ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
 			ReportType:     string(report.ReportType),
 			RiskJSON:       riskRaw,
@@ -152,6 +183,43 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 			DataflowHashes: riskFlows[risk.Hash],
 		}
 		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, ev)
+
+		if e.mockRiskMultiplier > 1 {
+			for i := 1; i < e.mockRiskMultiplier; i++ {
+				mockRisk := riskCopy
+				mockRisk.Hash = fmt.Sprintf("%s-mock-%d", baseHash, i)
+				if mockRisk.Title != "" {
+					mockRisk.Title = fmt.Sprintf("%s [mock-%d]", riskCopy.Title, i)
+				}
+				if mockRisk.TitleVerbose != "" {
+					mockRisk.TitleVerbose = fmt.Sprintf("%s [mock-%d]", riskCopy.TitleVerbose, i)
+				}
+				if mockRisk.CodeRange != "" {
+					mockRisk.CodeRange = fmt.Sprintf("%s;mock-%d", riskCopy.CodeRange, i)
+				} else {
+					mockRisk.CodeRange = fmt.Sprintf("mock-%d", i)
+				}
+				if mockRisk.CodeSourceURL != "" {
+					mockRisk.CodeSourceURL = fmt.Sprintf("%s?mock=%d", riskCopy.CodeSourceURL, i)
+				} else {
+					mockRisk.CodeSourceURL = fmt.Sprintf("/mock/%d", i)
+				}
+				mockRaw, err := json.Marshal(&mockRisk)
+				if err != nil {
+					log.Errorf("stream marshal mock risk failed: %v", err)
+					continue
+				}
+				mockEv := &spec.StreamRiskEvent{
+					RiskHash:       mockRisk.Hash,
+					ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
+					ReportType:     string(report.ReportType),
+					RiskJSON:       mockRaw,
+					FileHashes:     riskFiles[risk.Hash],
+					DataflowHashes: riskFlows[risk.Hash],
+				}
+				e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, mockEv)
+			}
+		}
 	}
 
 	return nil
@@ -255,6 +323,9 @@ func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventT
 		Payload:     raw,
 		PayloadHash: codec.Md5(raw),
 		PayloadSize: int64(len(raw)),
+	}
+	if e.disableSeq {
+		env.Seq = 0
 	}
 	envRaw, err := json.Marshal(env)
 	if err != nil {

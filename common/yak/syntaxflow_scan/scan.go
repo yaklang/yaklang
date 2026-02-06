@@ -17,9 +17,13 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 	}
 	var taskId string
 	var m *scanManager
+	var success bool
 
 	runningID := uuid.NewString()
 	defer func() {
+		if success && m != nil {
+			m.SetFinishedQuery(m.GetTotalQuery())
+		}
 		m.SaveTask()
 		m.StatusTask()
 		m.Stop(runningID)
@@ -75,11 +79,14 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 	case err, ok := <-errC:
 		if ok {
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
+			success = false
 			return err
 		}
+		success = true
 		return nil
 	case <-ctx.Done():
 		m.status = schema.SYNTAXFLOWSCAN_DONE
+		success = false
 		return utils.Error("client canceled")
 	}
 }

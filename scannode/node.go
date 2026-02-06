@@ -21,6 +21,8 @@ type ScanNode struct {
 	manager  *TaskManager
 	serverIp string
 
+	streamer *StreamEmitter
+
 	feedbackCount uint64
 	feedbackBytes uint64
 
@@ -85,6 +87,7 @@ func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp stri
 	)
 	agent.startFeedbackStats()
 	node.initScanRPC()
+	node.streamer = NewStreamEmitter(node)
 	return node, nil
 }
 
