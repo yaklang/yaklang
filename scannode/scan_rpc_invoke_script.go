@@ -135,6 +135,18 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		return nil, utils.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 	}
 
+	// If stream-layered SSA events were emitted, send a final task_end marker after the script truly finishes.
+	// This allows the server to finalize without relying on idle timeouts, while preserving audit completeness.
+	if s.streamer != nil && s.streamer.Enabled() {
+		var totalRisks, totalFiles, totalFlows int64
+		if m, ok := res.Data.(map[string]interface{}); ok && m != nil {
+			totalRisks = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "risk_count", "riskCount", "RiskCount")))
+			totalFiles = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "file_count", "fileCount", "FileCount")))
+			totalFlows = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "flow_count", "flowCount", "FlowCount")))
+		}
+		s.streamer.EmitTaskEnd(req.TaskId, req.RuntimeId, req.SubTaskId, totalRisks, totalFiles, totalFlows)
+	}
+
 	return res, nil
 }
 
