@@ -6,7 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-func isSQLite(db *gorm.DB) bool {
+func IsSQLite(db *gorm.DB) bool {
 	if db == nil || db.Dialect() == nil {
 		return false
 	}
@@ -15,7 +15,7 @@ func isSQLite(db *gorm.DB) bool {
 
 // ResetSQLiteSequence 仅重置 SQLite 自增序列（表名需与 SQLITE_SEQUENCE 中一致）。非 SQLite、无表记录或 sqlite_sequence 表不存在时忽略。
 func ResetSQLiteSequence(db *gorm.DB, tableName string) error {
-	if db == nil || tableName == "" || !isSQLite(db) {
+	if db == nil || tableName == "" || !IsSQLite(db) {
 		return nil
 	}
 	err := db.Exec("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME=?", tableName).Error
