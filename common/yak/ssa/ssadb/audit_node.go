@@ -3,6 +3,7 @@ package ssadb
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -49,11 +50,14 @@ type AuditNode struct {
 // 你需要一个熵源 (entropy source)
 // 在你的应用启动时初始化一次即可
 var ulidEntropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+var ulidEntropyMu sync.Mutex
 
 // 生成一个新的 ULID 字符串的辅助函数
 func NewULID() string {
 	// Monotonic 确保了即使在同一毫秒内快速连续调用，ID 也是递增的
+	ulidEntropyMu.Lock()
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), ulidEntropy)
+	ulidEntropyMu.Unlock()
 	return id.String()
 }
 
