@@ -152,7 +152,17 @@ func SetGlobalProxyRulesConfig(cfg *ypb.GlobalProxyRulesConfig) (*ypb.GlobalProx
 		})
 		filteredEndpointIDs = lo.Uniq(filteredEndpointIDs)
 		disabled := route.GetDisabled()
-		if len(filteredEndpointIDs) == 0 {
+		// If a route only contains bypass patterns (patterns starting with '!'), it is still meaningful
+		// even without any enabled proxy endpoints.
+		hasBypassPattern := lo.ContainsBy(filteredPatterns, func(item string) bool {
+			item = strings.TrimSpace(item)
+			if !strings.HasPrefix(item, "!") {
+				return false
+			}
+			// Ignore invalid pattern like just "!".
+			return strings.TrimSpace(strings.TrimPrefix(item, "!")) != ""
+		})
+		if len(filteredEndpointIDs) == 0 && !hasBypassPattern {
 			disabled = true
 		}
 		normalized.Routes = append(normalized.Routes, &ypb.ProxyRoute{

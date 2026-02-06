@@ -239,17 +239,30 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					}
 				}
 				ruleProxies = lo.Uniq(ruleProxies)
-				if len(ruleProxies) > 0 {
-					for _, pattern := range rule.GetPatterns() {
-						pattern = strings.TrimSpace(pattern)
-						if pattern == "" {
-							continue
-						}
+				for _, pattern := range rule.GetPatterns() {
+					pattern = strings.TrimSpace(pattern)
+					if pattern == "" {
+						continue
+					}
+
+					// Support bypass rule pattern with a leading '!': e.g. "!example.com" / "!*.example.com".
+					// Bypass patterns do not require any proxy endpoints and are handled by minimartian.Proxy.
+					if strings.HasPrefix(pattern, "!") {
 						if routeMap == nil {
 							routeMap = make(map[string][]string)
 						}
-						routeMap[pattern] = append(routeMap[pattern], ruleProxies...)
+						routeMap[pattern] = nil
+						continue
 					}
+
+					// Normal route pattern requires valid proxy endpoints.
+					if len(ruleProxies) == 0 {
+						continue
+					}
+					if routeMap == nil {
+						routeMap = make(map[string][]string)
+					}
+					routeMap[pattern] = append(routeMap[pattern], ruleProxies...)
 				}
 			}
 		}

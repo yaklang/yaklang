@@ -85,10 +85,14 @@ type Proxy struct {
 	proxyPassword string
 
 	// lowhttp config
-	lowhttpConfig       []lowhttp.LowhttpOpt
-	proxyUrlStrings     []string
-	proxyExactRoutes    map[string][]string
-	proxyWildcardRoutes []compiledProxyRoute
+	lowhttpConfig   []lowhttp.LowhttpOpt
+	proxyUrlStrings []string
+	// proxyBypassExact contains hosts that must bypass downstream proxies even when a default proxy is set.
+	// The key is a normalized host (lowercase, no surrounding spaces).
+	proxyBypassExact          map[string]struct{}
+	proxyExactRoutes          map[string][]string
+	proxyWildcardRoutes       []compiledProxyRoute
+	proxyBypassWildcardRoutes []compiledProxyBypassRoute
 
 	maxContentLength int
 	maxReadWaitTime  time.Duration
@@ -157,6 +161,11 @@ type compiledProxyRoute struct {
 	proxies []string
 }
 
+type compiledProxyBypassRoute struct {
+	pattern string
+	matcher *ProxyHostMatcher
+}
+
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
 	if p == nil {
 		return
@@ -202,6 +211,7 @@ func NewProxy() *Proxy {
 		ctxCacheInitOnce:    new(sync.Once),
 		ctxCacheLock:        new(sync.Mutex),
 		ctxCache:            utils.NewTTLCache[*Context](5 * time.Minute),
+		proxyBypassExact:    make(map[string]struct{}),
 		proxyExactRoutes:    make(map[string][]string),
 		extraIncomingConnCh: make(chan *WrapperedConn),
 	}
@@ -300,6 +310,14 @@ func (p *Proxy) SetDownstreamProxyConfig(defaultProxies []string, routeMap map[s
 		p.proxyUrlStrings = append([]string(nil), defaultProxies...)
 	}
 
+	if p.proxyBypassExact == nil {
+		p.proxyBypassExact = make(map[string]struct{})
+	}
+	for k := range p.proxyBypassExact {
+		delete(p.proxyBypassExact, k)
+	}
+	p.proxyBypassWildcardRoutes = nil
+
 	if p.proxyExactRoutes == nil {
 		p.proxyExactRoutes = make(map[string][]string)
 	}
@@ -319,33 +337,81 @@ func (p *Proxy) SetDownstreamProxyConfig(defaultProxies []string, routeMap map[s
 	}
 	var wildcardRoutes []wildcardEntry
 
+	type wildcardBypassEntry struct {
+		pattern string
+		matcher *ProxyHostMatcher
+	}
+	var wildcardBypassRoutes []wildcardBypassEntry
+
 	for pattern, proxies := range routeMap {
 		pattern = strings.TrimSpace(pattern)
 		if pattern == "" {
 			continue
 		}
+		isBypass := false
+		compiledPattern := pattern
+		if strings.HasPrefix(compiledPattern, "!") {
+			isBypass = true
+			compiledPattern = strings.TrimSpace(strings.TrimPrefix(compiledPattern, "!"))
+			if compiledPattern == "" {
+				continue
+			}
+		}
+
+		lowerPattern := strings.ToLower(compiledPattern)
+
+		isWildcard := strings.Contains(compiledPattern, "*") || strings.HasPrefix(compiledPattern, ".")
+		if isBypass {
+			if !isWildcard {
+				p.proxyBypassExact[lowerPattern] = struct{}{}
+				continue
+			}
+			matcher := NewProxyHostMatcher([]string{compiledPattern})
+			if matcher == nil {
+				continue
+			}
+			wildcardBypassRoutes = append(wildcardBypassRoutes, wildcardBypassEntry{
+				pattern: compiledPattern,
+				matcher: matcher,
+			})
+			continue
+		}
+
 		proxies = utils.StringArrayFilterEmpty(proxies)
 		if len(proxies) == 0 {
 			continue
 		}
 		proxyCopy := append([]string(nil), proxies...)
-		lowerPattern := strings.ToLower(pattern)
 
-		isWildcard := strings.Contains(pattern, "*") || strings.HasPrefix(pattern, ".")
 		if !isWildcard {
 			p.proxyExactRoutes[lowerPattern] = proxyCopy
 			continue
 		}
 
-		matcher := NewProxyHostMatcher([]string{pattern})
+		matcher := NewProxyHostMatcher([]string{compiledPattern})
 		if matcher == nil {
 			continue
 		}
 		wildcardRoutes = append(wildcardRoutes, wildcardEntry{
-			pattern: pattern,
+			pattern: compiledPattern,
 			matcher: matcher,
 			proxies: proxyCopy,
 		})
+	}
+
+	if len(wildcardBypassRoutes) > 0 {
+		sort.SliceStable(wildcardBypassRoutes, func(i, j int) bool {
+			if wildcardBypassRoutes[i].pattern == wildcardBypassRoutes[j].pattern {
+				return i < j
+			}
+			return wildcardBypassRoutes[i].pattern < wildcardBypassRoutes[j].pattern
+		})
+		for _, route := range wildcardBypassRoutes {
+			p.proxyBypassWildcardRoutes = append(p.proxyBypassWildcardRoutes, compiledProxyBypassRoute{
+				pattern: route.pattern,
+				matcher: route.matcher,
+			})
+		}
 	}
 
 	if len(wildcardRoutes) > 0 {
@@ -371,6 +437,15 @@ func (p *Proxy) selectProxiesForHost(host string) []string {
 	}
 	normalized := strings.ToLower(strings.TrimSpace(host))
 	if normalized != "" {
+		if _, ok := p.proxyBypassExact[normalized]; ok {
+			return nil
+		}
+		for _, route := range p.proxyBypassWildcardRoutes {
+			if route.matcher != nil && route.matcher.Match(normalized) {
+				return nil
+			}
+		}
+
 		if proxies, ok := p.proxyExactRoutes[normalized]; ok && len(proxies) > 0 {
 			return proxies
 		}
