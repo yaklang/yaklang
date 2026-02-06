@@ -395,6 +395,9 @@ func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema
 	case uint64:
 		err = db.Where("id = ?", ret).First(&doc).Error
 	}
+	if err != nil {
+		return nil, err
+	}
 	return &doc, err
 }
 
