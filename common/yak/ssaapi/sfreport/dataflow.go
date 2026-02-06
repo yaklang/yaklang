@@ -64,15 +64,21 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 	// 这儿行为图的产生是GraphKindShow而不是GraphKindDump
 	// 因此产生的图数据而直接存数据库的行为是不一致的
 	// 但是好像又不影响最后查看结果
+	minimal := false
+	if raw := strings.TrimSpace(os.Getenv("SSA_DATAFLOW_MINIMAL")); raw != "" {
+		minimal = raw == "1" || strings.EqualFold(raw, "true")
+	}
 	dotGraph := ssaapi.NewDotGraph()
 	value.GenerateGraph(dotGraph)
-	nodes, edges, irSourceHashes := coverNodeAndEdgeInfos(dotGraph, value)
+	nodes, edges, irSourceHashes := coverNodeAndEdgeInfos(dotGraph, value, minimal)
 
 	path := &DataFlowPath{
 		Description: generatePathDescription(risk),
 		Nodes:       nodes,
 		Edges:       edges,
-		DotGraph:    dotGraph.String(),
+	}
+	if !minimal {
+		path.DotGraph = dotGraph.String()
 	}
 	return path, irSourceHashes, nil
 }
@@ -81,7 +87,7 @@ func generatePathDescription(risk *schema.SSARisk) string {
 	return fmt.Sprintf("Data flow path for %s vulnerability in %s", risk.RiskType, risk.ProgramName)
 }
 
-func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]*NodeInfo, []*EdgeInfo, []string) {
+func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value, minimal bool) ([]*NodeInfo, []*EdgeInfo, []string) {
 	nodes := make([]*NodeInfo, 0, graph.NodeCount())
 	edges := make([]*EdgeInfo, 0)
 	irSourceHashes := make([]string, 0)
@@ -90,16 +96,18 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]
 		if rng == nil {
 			return
 		}
-		codeRange, source := ssaapi.CoverCodeRange(rng)
 		nodeInfo := &NodeInfo{
-			NodeID:          s,
-			IRCode:          v.String(),
-			SourceCode:      source,
-			SourceCodeStart: 0,
-			CodeRange:       codeRange,
-			StartOffset:     rng.GetStartOffset(),
-			EndOffset:       rng.GetEndOffset(),
-			IsEntryNode:     entryValue != nil && v == entryValue,
+			NodeID:      s,
+			IRCode:      v.String(),
+			StartOffset: rng.GetStartOffset(),
+			EndOffset:   rng.GetEndOffset(),
+			IsEntryNode: entryValue != nil && v == entryValue,
+		}
+		if !minimal {
+			codeRange, source := ssaapi.CoverCodeRange(rng)
+			nodeInfo.SourceCode = source
+			nodeInfo.SourceCodeStart = 0
+			nodeInfo.CodeRange = codeRange
 		}
 		irSourceHash := rng.GetEditor().GetIrSourceHash()
 		nodeInfo.IRSourceHash = irSourceHash
@@ -163,10 +171,8 @@ func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 	an.IRCodeID = -1
 	an.TmpValue = n.IRCode
 	an.TmpValueFileHash = n.IRSourceHash
-	if n.CodeRange != nil {
-		an.TmpStartOffset = n.StartOffset
-		an.TmpEndOffset = n.EndOffset
-	}
+	an.TmpStartOffset = n.StartOffset
+	an.TmpEndOffset = n.EndOffset
 	return an
 }
 
