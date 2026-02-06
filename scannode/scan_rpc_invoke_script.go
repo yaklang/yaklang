@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,6 +23,33 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 )
+
+var riskDebugCount int32
+
+func parseChunkDesc(desc string) (string, int, int, bool) {
+	parts := strings.Fields(desc)
+	if len(parts) < 5 {
+		return "", 0, 0, false
+	}
+	if parts[0] != "SSA" || parts[1] != "Risk" || parts[2] != "Chunk" {
+		return "", 0, 0, false
+	}
+	key := parts[3]
+	if key == "" {
+		return "", 0, 0, false
+	}
+	idxTotal := parts[4]
+	seg := strings.Split(idxTotal, "/")
+	if len(seg) != 2 {
+		return "", 0, 0, false
+	}
+	idx, err1 := strconv.Atoi(seg[0])
+	total, err2 := strconv.Atoi(seg[1])
+	if err1 != nil || err2 != nil || total <= 0 {
+		return "", 0, 0, false
+	}
+	return key, idx, total, true
+}
 
 func (s *ScanNode) rpc_startScript(ctx context.Context, node string, req *scanrpc.SCAN_StartScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_StartScriptResponse, error) {
 	if req.Content == "" {
@@ -143,13 +171,15 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 // createLogHandler creates a log handler for processing various types of scan results
 func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) func(string, string) {
 	return func(level string, info string) {
+		level = strings.TrimSpace(level)
+		lowerLevel := strings.ToLower(level)
 		shrink := info
 		if len(info) > 256 {
 			shrink = string([]rune(info)[:100]) + "..."
 		}
 		log.Infof("LEVEL: %v INFO: %v", level, shrink)
 
-		switch strings.ToLower(level) {
+		switch lowerLevel {
 		case "fingerprint":
 			s.handleFingerprintLog(reporter, info)
 
@@ -197,6 +227,54 @@ func (s *ScanNode) handleRiskLog(reporter *ScannerAgentReporter, info string) {
 	if err := json.Unmarshal([]byte(info), &rawData); err != nil {
 		log.Errorf("unmarshal risk failed: %s", err)
 		return
+	}
+	if atomic.AddInt32(&riskDebugCount, 1) <= 1 {
+		keys := make([]string, 0, len(rawData))
+		for k := range rawData {
+			keys = append(keys, k)
+		}
+		detailRaw := utils.MapGetFirstRaw(rawData, "Details", "Detail", "details", "detail")
+		log.Infof("risk_log_debug keys=%v RiskType=%v DetailsType=%T DetailsLen=%d", keys, rawData["RiskType"], detailRaw, len(utils.InterfaceToString(detailRaw)))
+	}
+
+	if reporter != nil && reporter.agent != nil && reporter.agent.streamer != nil && reporter.agent.streamer.Enabled() {
+		detailRaw := utils.MapGetFirstRaw(rawData, "Details", "Detail", "details", "detail")
+		var detailMap map[string]interface{}
+		switch t := detailRaw.(type) {
+		case map[string]interface{}:
+			detailMap = t
+		case string:
+			rawStr := strings.TrimSpace(t)
+			if rawStr != "" {
+				if strings.HasPrefix(rawStr, "\"") && strings.HasSuffix(rawStr, "\"") {
+					if unq, err := strconv.Unquote(rawStr); err == nil {
+						rawStr = unq
+					}
+				}
+				_ = json.Unmarshal([]byte(rawStr), &detailMap)
+			}
+		}
+		chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(detailMap)
+		if chunkKey == "" {
+			chunkData = utils.InterfaceToString(utils.MapGetFirstRaw(detailMap, "chunk_data", "chunkData", "ChunkData"))
+			if chunkData != "" {
+				desc := utils.InterfaceToString(utils.MapGetFirstRaw(rawData, "Description", "description"))
+				if k, idx, total, ok2 := parseChunkDesc(desc); ok2 {
+					chunkKey, chunkIndex, chunkTotal, ok = k, idx, total, true
+				}
+			}
+		}
+		if chunkKey != "" {
+			if !ok {
+				log.Warnf("stream ssa chunk skipped: missing fields task=%s key=%s idx=%d total=%d", reporter.TaskId, chunkKey, chunkIndex, chunkTotal)
+				return
+			}
+			if atomic.AddInt32(&chunkDebugCount, 1) <= 3 {
+				log.Infof("stream ssa chunk fastpath task=%s key=%s idx=%d/%d len=%d", reporter.TaskId, chunkKey, chunkIndex, chunkTotal, len(chunkData))
+			}
+			_ = emitSSAChunk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, reporter.agent.streamer, chunkKey, chunkIndex, chunkTotal, chunkData)
+			return
+		}
 	}
 
 	// Extract risk title with fallback
