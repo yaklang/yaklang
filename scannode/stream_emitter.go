@@ -156,7 +156,12 @@ func NewStreamEmitter(agent *ScanNode) *StreamEmitter {
 			flushMs = v
 		}
 	}
-	batchEnabled := batchMax > 0 && batchMaxBytes > 0
+	unsafeBatch := strings.TrimSpace(os.Getenv("SCANNODE_STREAM_ENVELOPE_BATCH_UNSAFE"))
+	batchEnabled := (unsafeBatch == "1" || strings.EqualFold(unsafeBatch, "true")) && batchMax > 0 && batchMaxBytes > 0
+	if batchEnabled {
+		log.Warnf("stream envelope batching enabled (experimental/unsafe): max=%d bytes=%d flush_ms=%d",
+			batchMax, batchMaxBytes, flushMs)
+	}
 
 	e := &StreamEmitter{
 		agent:              agent,
