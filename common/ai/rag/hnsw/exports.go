@@ -69,9 +69,16 @@ func getKeyType[K cmp.Ordered](key K) string {
 	}
 }
 
+func (g *Graph[K]) IsEmpty() bool {
+	if g == nil || len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
+		return true
+	}
+	return false
+}
+
 func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
-	if i == nil || len(i.Layers) == 0 || len(i.Layers[0].Nodes) == 0 {
-		return nil, utils.Errorf("graph is nil")
+	if i.IsEmpty() {
+		return nil, utils.Errorf("empty HNSW graph")
 	}
 
 	keyType := ""
