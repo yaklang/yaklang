@@ -152,6 +152,19 @@ func (e *StreamEmitter) Enabled() bool {
 	return e != nil && e.enabled
 }
 
+func (e *StreamEmitter) shouldMinimizeDataflow() bool {
+	if e == nil {
+		return false
+	}
+	// Default on: dataflow JSON contains a lot of redundant fields (source snippets/dot graph),
+	// but the server only needs node/edge ids + ir_source_hash + offsets to persist audit graph.
+	raw := strings.TrimSpace(os.Getenv("SCANNODE_STREAM_FLOW_MINIMAL"))
+	if raw == "" {
+		return true
+	}
+	return raw == "1" || strings.EqualFold(raw, "true")
+}
+
 // EmitTaskEnd should be called when the Yak script/task truly finishes (process exit / ReturnData),
 // not per streamed SSA report chunk. Otherwise the server may finalize a task prematurely.
 func (e *StreamEmitter) EmitTaskEnd(taskId, runtimeId, subTaskId string, totalRisks, totalFiles, totalFlows int64) {
@@ -259,7 +272,13 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 			if path == nil {
 				continue
 			}
-			raw, err := json.Marshal(path)
+			var raw []byte
+			var err error
+			if e.shouldMinimizeDataflow() {
+				raw, err = sfreport.MarshalStreamMinimalDataFlowPath(path)
+			} else {
+				raw, err = json.Marshal(path)
+			}
 			if err != nil {
 				log.Errorf("stream marshal dataflow failed: %v", err)
 				continue
