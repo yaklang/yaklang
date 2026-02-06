@@ -226,6 +226,35 @@ func (sc *SaveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
 	}
 }
 
+func (sc *SaveDataFlowCtx) SaveMinimalDataFlow(dp *StreamMinimalDataFlowPath) {
+	if sc == nil || dp == nil || len(dp.Nodes) == 0 {
+		return
+	}
+	tx := sc.db.Begin()
+	if tx == nil || tx.Error != nil {
+		_ = sc.saveAuditNodesMinimal(sc.db, dp.Nodes, defaultDataflowBatchSize())
+		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
+		return
+	}
+	if err := sc.saveAuditNodesMinimal(tx, dp.Nodes, defaultDataflowBatchSize()); err != nil {
+		_ = tx.Rollback().Error
+		log.Errorf("save minimal dataflow nodes failed: %v", err)
+		_ = sc.saveAuditNodesMinimal(sc.db, dp.Nodes, defaultDataflowBatchSize())
+		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
+		return
+	}
+	if err := sc.saveAuditEdgesMinimal(tx, dp.Edges, defaultDataflowBatchSize()); err != nil {
+		_ = tx.Rollback().Error
+		log.Errorf("save minimal dataflow edges failed: %v", err)
+		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		_ = tx.Rollback().Error
+		log.Errorf("save minimal dataflow commit failed: %v", err)
+	}
+}
+
 func defaultDataflowBatchSize() int {
 	// Allow tuning without code changes.
 	// Example: SSA_STREAM_DATAFLOW_BATCH_SIZE=500
@@ -305,6 +334,74 @@ func (sc *SaveDataFlowCtx) saveAuditEdges(db *gorm.DB, edges []*EdgeInfo, batchS
 	}
 
 	// Fallback to row-by-row.
+	for _, ae := range toInsert {
+		if ae == nil {
+			continue
+		}
+		if e := db.Create(ae).Error; e != nil {
+			log.Errorf("save audit edge failed: %v", e)
+		}
+	}
+	return nil
+}
+
+func (sc *SaveDataFlowCtx) saveAuditNodesMinimal(db *gorm.DB, nodes []*StreamMinimalNodeInfo, batchSize int) error {
+	if len(nodes) == 0 {
+		return nil
+	}
+	toInsert := make([]*ssadb.AuditNode, 0, len(nodes))
+	for _, n := range nodes {
+		if n == nil {
+			continue
+		}
+		if sc.nodeMap[n.NodeID] != "" {
+			continue
+		}
+		auditNode := n.ToAuditNode(sc.riskHash)
+		if auditNode == nil {
+			continue
+		}
+		sc.nodeMap[n.NodeID] = auditNode.NodeID
+		toInsert = append(toInsert, auditNode)
+	}
+	if len(toInsert) == 0 {
+		return nil
+	}
+	if err := insertAuditNodesMultiValues(db, toInsert, batchSize); err == nil {
+		return nil
+	}
+	for _, an := range toInsert {
+		if an == nil {
+			continue
+		}
+		if e := db.Create(an).Error; e != nil {
+			log.Errorf("save audit node failed: %v", e)
+		}
+	}
+	return nil
+}
+
+func (sc *SaveDataFlowCtx) saveAuditEdgesMinimal(db *gorm.DB, edges []*StreamMinimalEdgeInfo, batchSize int) error {
+	if len(edges) == 0 {
+		return nil
+	}
+	toInsert := make([]*ssadb.AuditEdge, 0, len(edges))
+	for _, e := range edges {
+		if e == nil {
+			continue
+		}
+		auditEdge := e.ToAuditEdge(sc.nodeMap)
+		if auditEdge == nil || auditEdge.FromNode == "" || auditEdge.ToNode == "" {
+			continue
+		}
+		toInsert = append(toInsert, auditEdge)
+	}
+	if len(toInsert) == 0 {
+		return nil
+	}
+	if err := insertAuditEdgesMultiValues(db, toInsert, batchSize); err == nil {
+		return nil
+	}
 	for _, ae := range toInsert {
 		if ae == nil {
 			continue

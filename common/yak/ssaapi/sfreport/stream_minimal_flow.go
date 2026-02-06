@@ -2,6 +2,8 @@ package sfreport
 
 import (
 	"encoding/json"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 // StreamMinimalDataFlowPath is a reduced dataflow payload used for streaming.
@@ -68,4 +70,34 @@ func MarshalStreamMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
 		})
 	}
 	return json.Marshal(min)
+}
+
+func (n *StreamMinimalNodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
+	if n == nil {
+		return nil
+	}
+	an := ssadb.NewAuditNode()
+	an.AuditNodeStatus = ssadb.AuditNodeStatus{
+		RiskHash: riskHash,
+	}
+	an.IsEntryNode = n.IsEntryNode
+	an.IRCodeID = -1
+	an.TmpValue = n.IRCode
+	an.TmpValueFileHash = n.IRSourceHash
+	an.TmpStartOffset = n.StartOffset
+	an.TmpEndOffset = n.EndOffset
+	return an
+}
+
+func (e *StreamMinimalEdgeInfo) ToAuditEdge(m map[string]string) *ssadb.AuditEdge {
+	if e == nil {
+		return nil
+	}
+	return &ssadb.AuditEdge{
+		FromNode:      m[e.FromNodeID],
+		ToNode:        m[e.ToNodeID],
+		EdgeType:      ssadb.ValidEdgeType(e.EdgeType),
+		AnalysisLabel: e.AnalysisLabel,
+		AnalysisStep:  e.AnalysisStep,
+	}
 }
