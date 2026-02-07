@@ -2,6 +2,7 @@ package loop_http_flow_analyze
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -102,6 +103,21 @@ func generateFinalSummaryAndAnswer(loop *reactloops.ReActLoop, invoker aicommon.
 				aitool.WithParam_Required(true),
 			),
 		},
+		aicommon.WithGeneralConfigStreamableFieldCallback([]string{
+			"summary",
+		}, func(key string, r io.Reader) {
+			if event, _ := loop.GetEmitter().EmitStreamEventWithContentType(
+				"re-act-loop-answer-payload",
+				utils.JSONStringReader(r),
+				loop.GetCurrentTask().GetId(),
+				aicommon.TypeTextMarkdown,
+				func() {
+				},
+			); event != nil {
+				streamId := event.GetStreamEventWriterId()
+				loop.GetEmitter().EmitTextReferenceMaterial(streamId, contextInfo)
+			}
+		}),
 	)
 
 	if err != nil {
@@ -120,14 +136,14 @@ func generateFinalSummaryAndAnswer(loop *reactloops.ReActLoop, invoker aicommon.
 
 	log.Infof("AI generated summary length: %d", len(summary))
 
-	loop.GetEmitter().EmitStreamEventWithContentType(
-		"re-act-loop-answer-payload",
-		strings.NewReader(summary),
-		loop.GetCurrentTask().GetId(),
-		aicommon.TypeTextMarkdown,
-		func() {
-		},
-	)
+	//loop.GetEmitter().EmitStreamEventWithContentType(
+	//	"re-act-loop-answer-payload",
+	//	strings.NewReader(summary),
+	//	loop.GetCurrentTask().GetId(),
+	//	aicommon.TypeTextMarkdown,
+	//	func() {
+	//	},
+	//)
 
 	// 将 summary 设置到 loop context 中（directly_answer handler 会从这里读取）
 	loop.Set("directly_answer_payload", summary)
