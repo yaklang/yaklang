@@ -421,6 +421,7 @@ type ServerConfig struct {
 	SessionManager   *SessionManager // 会话管理器
 	AuthMiddleware   *AuthMiddleware // 认证中间件
 	forwardRule      *omap.OrderedMap[string, *aiforwarder.Rule]
+	WebSearchProxy   string // Global proxy for web search requests
 }
 
 // NewServerConfig creates a new server configuration
@@ -1754,6 +1755,9 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/embeddings"):
 		c.serveEmbeddings(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/v1/web-search"):
+		c.serveWebSearch(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
 		c.logInfo("Processing models list request")

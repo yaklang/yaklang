@@ -629,6 +629,28 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case strings.HasPrefix(uriIns.Path, "/portal/reset-api-key-traffic/") && request.Method == "POST":
 		c.handleResetAPIKeyTraffic(conn, request, uriIns.Path)
 
+	// ========== Web Search API Key Routes ==========
+	case uriIns.Path == "/portal/api/web-search-keys" && request.Method == "GET":
+		c.handleGetWebSearchApiKeys(conn, request)
+	case uriIns.Path == "/portal/api/web-search-keys" && request.Method == "POST":
+		c.handleCreateWebSearchApiKey(conn, request)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/web-search-keys/") && request.Method == "DELETE":
+		c.handleDeleteWebSearchApiKey(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/web-search-keys/") && request.Method == "PUT":
+		c.handleUpdateWebSearchApiKey(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/activate-web-search-key/") && request.Method == "POST":
+		c.handleToggleWebSearchApiKeyStatus(conn, request, uriIns.Path, true)
+	case strings.HasPrefix(uriIns.Path, "/portal/deactivate-web-search-key/") && request.Method == "POST":
+		c.handleToggleWebSearchApiKeyStatus(conn, request, uriIns.Path, false)
+	case strings.HasPrefix(uriIns.Path, "/portal/reset-web-search-key-health/") && request.Method == "POST":
+		c.handleResetWebSearchApiKeyHealth(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/test-web-search-key/") && request.Method == "POST":
+		c.handleTestWebSearchApiKey(conn, request, uriIns.Path)
+	case uriIns.Path == "/portal/api/web-search-config" && request.Method == "GET":
+		c.handleGetWebSearchConfig(conn, request)
+	case uriIns.Path == "/portal/api/web-search-config" && request.Method == "POST":
+		c.handleSetWebSearchConfig(conn, request)
+
 	// ========== Model Metadata Routes ==========
 	case uriIns.Path == "/portal/update-model-meta" && request.Method == "POST":
 		c.handleUpdateModelMeta(conn, request)

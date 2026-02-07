@@ -74,6 +74,7 @@
                 <div class="tab" data-tab="api">API管理</div>
                 <div class="tab" data-tab="models">模型信息</div>
                 <div class="tab" data-tab="totp">TOTP认证</div>
+                <div class="tab" data-tab="web-search">Web Search</div>
                 <div class="tab" data-tab="ops-users">运营用户</div>
                 <div class="tab" data-tab="ops-logs">操作日志</div>
             </div>
@@ -211,6 +212,7 @@
                                     <th class="column-name">API密钥</th>
                                     <th class="column-name">允许模型</th>
                                     <th class="column-name">使用统计</th>
+                                    <th class="column-name">Web Search</th>
                                     <th class="column-name">成功/失败</th>
                                     <th class="column-name">流量(输入/输出)</th>
                                     <th class="column-name">流量限制</th>
@@ -322,6 +324,164 @@
         </div>
 
         <!-- OPS Users Management Tab -->
+        <div id="web-search" class="tab-content">
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>Web Search 全局配置</h3>
+                <p style="color: #666; margin-bottom: 15px;">
+                    配置全局代理，适用于所有未单独设置代理的 Web Search API Key。
+                </p>
+                <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 250px;">
+                        <label>全局代理:</label>
+                        <input type="text" id="ws-global-proxy" class="form-control" placeholder="例如: http://127.0.0.1:7890 (留空不使用代理)" style="font-family: monospace; font-size: 13px;">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveWebSearchConfig()" style="height: 36px;">
+                        保存配置
+                    </button>
+                </div>
+                <small style="color: #888; margin-top: 8px; display: block;">
+                    优先级：Key 单独设置的代理 > 全局代理。全局代理仅在 Key 未设置代理时生效。
+                </small>
+            </div>
+
+            <div class="card">
+                <h3>Web Search API Key 管理</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    管理 Brave、Tavily 和 ChatGLM 搜索引擎的 API Key。配置多个 Key 后，系统会随机选择可用 Key 进行搜索，失败时自动切换到下一个。
+                </p>
+
+                <div class="action-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="showAddWebSearchKeyModal()">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                                <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                            </svg>
+                            添加 Key
+                        </button>
+                        <button class="btn" onclick="refreshWebSearchKeys()">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;">
+                                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="ws-type-filter" onchange="refreshWebSearchKeys()" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="">全部类型</option>
+                            <option value="brave">Brave</option>
+                            <option value="tavily">Tavily</option>
+                            <option value="chatglm">ChatGLM</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Brave Keys Section -->
+                <h4 style="margin-top: 20px; margin-bottom: 10px; color: #e67e22;">Brave Search Keys</h4>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ws-brave-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>API Key</th>
+                                <th>Base URL</th>
+                                <th>状态</th>
+                                <th>健康</th>
+                                <th>成功/失败</th>
+                                <th>总请求</th>
+                                <th>延迟(ms)</th>
+                                <th>最后使用</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ws-brave-tbody">
+                            <tr><td colspan="10" style="text-align: center; color: #888; padding: 20px;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Tavily Keys Section -->
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: #3498db;">Tavily Search Keys</h4>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ws-tavily-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>API Key</th>
+                                <th>Base URL</th>
+                                <th>状态</th>
+                                <th>健康</th>
+                                <th>成功/失败</th>
+                                <th>总请求</th>
+                                <th>延迟(ms)</th>
+                                <th>最后使用</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ws-tavily-tbody">
+                            <tr><td colspan="10" style="text-align: center; color: #888; padding: 20px;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ChatGLM Keys Section -->
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: #2ecc71;">ChatGLM Search Keys</h4>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ws-chatglm-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>API Key</th>
+                                <th>Base URL</th>
+                                <th>状态</th>
+                                <th>健康</th>
+                                <th>成功/失败</th>
+                                <th>总请求</th>
+                                <th>延迟(ms)</th>
+                                <th>最后使用</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ws-chatglm-tbody">
+                            <tr><td colspan="10" style="text-align: center; color: #888; padding: 20px;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Web Search Key Modal -->
+        <div id="addWebSearchKeyModal" class="delete-confirmation-modal" style="display: none;">
+            <div class="modal-content" style="max-width: 500px;">
+                <span class="close-modal" onclick="closeAddWebSearchKeyModal()">&times;</span>
+                <h4>添加 Web Search API Key</h4>
+                <div class="form-group">
+                    <label>搜索引擎类型:</label>
+                    <select id="ws-new-type" class="form-control">
+                        <option value="brave">Brave</option>
+                        <option value="tavily">Tavily</option>
+                        <option value="chatglm">ChatGLM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>API Keys (每行一个，支持批量添加):</label>
+                    <textarea id="ws-new-api-keys" class="form-control" rows="5" placeholder="每行一个 API Key&#10;BSA7pk2iUp6t2Em3VA9Vrb...&#10;tvly-xxxxxxxxxxxxxxxxxx..." style="font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                    <small style="color: #888;">支持一次粘贴多个 Key，以换行分隔</small>
+                </div>
+                <div class="form-group">
+                    <label>Base URL (可选):</label>
+                    <input type="text" id="ws-new-base-url" class="form-control" placeholder="留空使用默认 URL">
+                </div>
+                <div class="form-group">
+                    <label>Proxy (可选):</label>
+                    <input type="text" id="ws-new-proxy" class="form-control" placeholder="例如: http://127.0.0.1:7890">
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="submitAddWebSearchKey()">添加</button>
+                    <button class="btn" onclick="closeAddWebSearchKeyModal()">取消</button>
+                </div>
+            </div>
+        </div>
+
         <div id="ops-users" class="tab-content">
             <div class="card">
                 <h3>运营用户管理</h3>

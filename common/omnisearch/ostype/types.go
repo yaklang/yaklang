@@ -3,8 +3,10 @@ package ostype
 type SearcherType string
 
 const (
-	SearcherTypeBrave  SearcherType = "brave"
-	SearcherTypeTavily SearcherType = "tavily"
+	SearcherTypeBrave     SearcherType = "brave"
+	SearcherTypeTavily    SearcherType = "tavily"
+	SearcherTypeAiBalance SearcherType = "aibalance"
+	SearcherTypeChatGLM   SearcherType = "chatglm"
 )
 
 func (s SearcherType) String() string {

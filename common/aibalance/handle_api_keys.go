@@ -853,6 +853,7 @@ func (c *ServerConfig) handleGetAPIKeysPaginated(conn net.Conn, request *http.Re
 			"usage_count":          key.UsageCount,
 			"success_count":        key.SuccessCount,
 			"failure_count":        key.FailureCount,
+			"web_search_count":     key.WebSearchCount,
 			"active":               key.Active,
 			"traffic_limit":        key.TrafficLimit,
 			"traffic_used":         key.TrafficUsed,

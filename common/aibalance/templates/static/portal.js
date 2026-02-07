@@ -281,6 +281,7 @@
                         <td class="copyable api-key-cell" data-full-text="${this.escapeHtml(key.key)}">${this.escapeHtml(key.display_key)}</td>
                         <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${this.escapeHtml(key.allowed_models)}" data-full-text="${this.escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${this.escapeHtml(key.allowed_models)}</td>
                         <td class="text-center">${key.usage_count}</td>
+                        <td class="text-center">${key.web_search_count || 0}</td>
                         <td class="text-center">
                             <span class="health-badge healthy">${key.success_count}</span>
                             <span class="health-badge unhealthy">${key.failure_count}</span>
@@ -602,6 +603,7 @@
                     <td class="copyable api-key-cell" data-full-text="${escapeHtml(key.api_key)}">${escapeHtml(key.display_key)}</td>
                     <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${escapeHtml(key.allowed_models)}" data-full-text="${escapeHtml(key.allowed_models)}" title="右键点击修改允许的模型">${escapeHtml(key.allowed_models)}</td>
                     <td class="text-center">${key.usage_count || 0}</td>
+                    <td class="text-center">${key.web_search_count || 0}</td>
                     <td class="text-center">
                         <span class="health-badge healthy">${key.success_count || 0}</span>
                         <span class="health-badge unhealthy">${key.failure_count || 0}</span>
@@ -803,6 +805,11 @@
             // 切换到操作日志标签时自动刷新数据
             if (tabId === 'ops-logs') {
                 refreshOpsLogs();
+            }
+            
+            // 切换到 Web Search 标签时自动刷新数据和全局配置
+            if (tabId === 'web-search') {
+                refreshWebSearchKeys();
             }
         }
 
@@ -1620,6 +1627,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 refreshOpsUsers();
             } else if (initialTabId === 'ops-logs') {
                 refreshOpsLogs();
+            } else if (initialTabId === 'web-search') {
+                refreshWebSearchKeys();
             }
             // --- END: Tab Initialization Logic ---
 
@@ -4029,6 +4038,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     <td class="copyable api-key-cell" data-full-text="${key.api_key}">${key.display_key}</td>
                     <td class="copyable editable-allowed-models" data-api-id="${key.id}" data-current-models="${key.allowed_models}" data-full-text="${key.allowed_models}" title="右键点击修改允许的模型">${key.allowed_models}</td>
                     <td class="text-center">${key.usage_count}</td>
+                    <td class="text-center">${key.web_search_count || 0}</td>
                     <td class="text-center">
                         <span class="health-badge healthy">${key.success_count}</span>
                         <span class="health-badge unhealthy">${key.failure_count}</span>
@@ -4876,10 +4886,289 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         refreshOpsUsers();
                     } else if (tabId === 'ops-logs') {
                         refreshOpsLogs();
+                    } else if (tabId === 'web-search') {
+                        refreshWebSearchKeys();
                     }
                 });
             });
         });
+        
+        // ==================== Web Search Keys 管理 ====================
+        
+        let webSearchKeysData = [];
+        
+        async function loadWebSearchConfig() {
+            try {
+                const response = await fetch('/portal/api/web-search-config');
+                if (!response.ok) throw new Error('Failed to fetch web search config');
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success && data.config) {
+                    const proxyInput = document.getElementById('ws-global-proxy');
+                    if (proxyInput) {
+                        proxyInput.value = data.config.proxy || '';
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching web search config:', error);
+            }
+        }
+        
+        async function saveWebSearchConfig() {
+            const proxy = document.getElementById('ws-global-proxy')?.value.trim() || '';
+            
+            try {
+                const response = await fetch('/portal/api/web-search-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proxy: proxy })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    showToast('全局代理配置已保存' + (proxy ? ': ' + proxy : ' (已清除)'), 'success');
+                } else {
+                    showToast(data.error || data.message || '保存失败', 'error');
+                }
+            } catch (error) {
+                showToast('保存失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function refreshWebSearchKeys() {
+            // Also load global config when refreshing
+            loadWebSearchConfig();
+            
+            try {
+                const response = await fetch('/portal/api/web-search-keys');
+                if (!response.ok) throw new Error('Failed to fetch web search keys');
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                webSearchKeysData = data.keys || [];
+                renderWebSearchKeysTable();
+            } catch (error) {
+                console.error('Error fetching web search keys:', error);
+                const braveTbody = document.getElementById('ws-brave-tbody');
+                const tavilyTbody = document.getElementById('ws-tavily-tbody');
+                const chatglmTbody = document.getElementById('ws-chatglm-tbody');
+                if (braveTbody) braveTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
+                if (tavilyTbody) tavilyTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
+                if (chatglmTbody) chatglmTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
+            }
+        }
+        
+        function renderWebSearchKeysTable() {
+            const filter = document.getElementById('ws-type-filter')?.value || '';
+            const braveKeys = webSearchKeysData.filter(k => k.searcher_type === 'brave');
+            const tavilyKeys = webSearchKeysData.filter(k => k.searcher_type === 'tavily');
+            const chatglmKeys = webSearchKeysData.filter(k => k.searcher_type === 'chatglm');
+            
+            const showBrave = !filter || filter === 'brave';
+            const showTavily = !filter || filter === 'tavily';
+            const showChatglm = !filter || filter === 'chatglm';
+            
+            renderWebSearchTypeTable('ws-brave-tbody', showBrave ? braveKeys : []);
+            renderWebSearchTypeTable('ws-tavily-tbody', showTavily ? tavilyKeys : []);
+            renderWebSearchTypeTable('ws-chatglm-tbody', showChatglm ? chatglmKeys : []);
+            
+            // Show/hide table sections based on filter
+            const braveSection = document.getElementById('ws-brave-table');
+            const tavilySection = document.getElementById('ws-tavily-table');
+            const chatglmSection = document.getElementById('ws-chatglm-table');
+            if (braveSection) braveSection.closest('.table-container').style.display = showBrave ? '' : 'none';
+            if (tavilySection) tavilySection.closest('.table-container').style.display = showTavily ? '' : 'none';
+            if (chatglmSection) chatglmSection.closest('.table-container').style.display = showChatglm ? '' : 'none';
+            
+            // Also show/hide the section headers
+            if (braveSection) braveSection.closest('.table-container').previousElementSibling.style.display = showBrave ? '' : 'none';
+            if (tavilySection) tavilySection.closest('.table-container').previousElementSibling.style.display = showTavily ? '' : 'none';
+            if (chatglmSection) chatglmSection.closest('.table-container').previousElementSibling.style.display = showChatglm ? '' : 'none';
+        }
+        
+        function renderWebSearchTypeTable(tbodyId, keys) {
+            const tbody = document.getElementById(tbodyId);
+            if (!tbody) return;
+            
+            if (keys.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #888; padding: 20px;">暂无数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = keys.map(k => `
+                <tr>
+                    <td>${k.id}</td>
+                    <td style="font-family: monospace; font-size: 12px;" title="${k.api_key}">${k.api_key}</td>
+                    <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${k.base_url || '默认'}">${k.base_url || '<span style="color:#999">默认</span>'}</td>
+                    <td>
+                        <span style="background: ${k.active ? '#e8f5e9' : '#fce4ec'}; color: ${k.active ? '#2e7d32' : '#c62828'}; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            ${k.active ? '启用' : '停用'}
+                        </span>
+                    </td>
+                    <td>
+                        <span style="background: ${k.is_healthy ? '#e8f5e9' : '#fff3e0'}; color: ${k.is_healthy ? '#2e7d32' : '#e65100'}; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            ${k.is_healthy ? '健康' : '异常'}
+                        </span>
+                    </td>
+                    <td><span style="color: #2e7d32">${k.success_count}</span> / <span style="color: #c62828">${k.failure_count}</span></td>
+                    <td>${k.total_requests}</td>
+                    <td>${k.last_latency > 0 ? k.last_latency + 'ms' : '-'}</td>
+                    <td style="font-size: 12px;">${k.last_used_time && k.last_used_time !== '0001-01-01 00:00:00' ? k.last_used_time : '-'}</td>
+                    <td>
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn btn-sm" id="ws-test-btn-${k.id}" onclick="testWebSearchKey(${k.id})" style="background: #9c27b0; font-size: 11px; padding: 2px 6px;">测试</button>
+                            ${k.active 
+                                ? `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${k.id}, false)" style="background: #ff9800; font-size: 11px; padding: 2px 6px;">停用</button>`
+                                : `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${k.id}, true)" style="background: #4caf50; font-size: 11px; padding: 2px 6px;">启用</button>`
+                            }
+                            ${!k.is_healthy 
+                                ? `<button class="btn btn-sm" onclick="resetWebSearchKeyHealth(${k.id})" style="background: #2196f3; font-size: 11px; padding: 2px 6px;">重置健康</button>`
+                                : ''
+                            }
+                            <button class="btn btn-sm" onclick="deleteWebSearchKey(${k.id})" style="background: #f44336; font-size: 11px; padding: 2px 6px;">删除</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function showAddWebSearchKeyModal() {
+            document.getElementById('addWebSearchKeyModal').style.display = 'flex';
+            document.getElementById('ws-new-type').value = 'brave';
+            document.getElementById('ws-new-api-keys').value = '';
+            document.getElementById('ws-new-base-url').value = '';
+            document.getElementById('ws-new-proxy').value = '';
+        }
+        
+        function closeAddWebSearchKeyModal() {
+            document.getElementById('addWebSearchKeyModal').style.display = 'none';
+        }
+        
+        async function submitAddWebSearchKey() {
+            const searcherType = document.getElementById('ws-new-type').value;
+            const apiKeys = document.getElementById('ws-new-api-keys').value.trim();
+            const baseUrl = document.getElementById('ws-new-base-url').value.trim();
+            const proxy = document.getElementById('ws-new-proxy').value.trim();
+            
+            if (!apiKeys) {
+                showToast('请输入至少一个 API Key', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/portal/api/web-search-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        searcher_type: searcherType,
+                        api_keys: apiKeys,
+                        base_url: baseUrl,
+                        proxy: proxy
+                    })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    const msg = data.added > 1 
+                        ? `批量添加成功，共添加 ${data.added} 个 Key` 
+                        : 'Web Search API Key 添加成功';
+                    showToast(msg, 'success');
+                    closeAddWebSearchKeyModal();
+                    refreshWebSearchKeys();
+                } else {
+                    showToast(data.error || data.message || '添加失败', 'error');
+                }
+            } catch (error) {
+                showToast('添加失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function toggleWebSearchKeyStatus(id, activate) {
+            const action = activate ? 'activate' : 'deactivate';
+            const url = `/portal/${action}-web-search-key/${id}`;
+            try {
+                const response = await fetch(url, { method: 'POST' });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    showToast(`Web Search Key ${activate ? '启用' : '停用'}成功`, 'success');
+                    refreshWebSearchKeys();
+                } else {
+                    showToast(data.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function resetWebSearchKeyHealth(id) {
+            try {
+                const response = await fetch(`/portal/reset-web-search-key-health/${id}`, { method: 'POST' });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    showToast('健康状态已重置', 'success');
+                    refreshWebSearchKeys();
+                } else {
+                    showToast(data.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteWebSearchKey(id) {
+            if (!confirm('确定要删除此 Web Search API Key 吗？')) return;
+            
+            try {
+                const response = await fetch(`/portal/api/web-search-keys/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    showToast('Web Search API Key 已删除', 'success');
+                    refreshWebSearchKeys();
+                } else {
+                    showToast(data.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+        
+        async function testWebSearchKey(id) {
+            const btn = document.getElementById(`ws-test-btn-${id}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '测试中...';
+                btn.style.background = '#757575';
+            }
+            
+            try {
+                const response = await fetch(`/portal/test-web-search-key/${id}`, { method: 'POST' });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                
+                if (data.success) {
+                    showToast(`测试通过! 返回 ${data.result_count} 条结果, 延迟 ${data.latency_ms}ms`, 'success');
+                    if (btn) { btn.style.background = '#4caf50'; btn.textContent = '通过'; }
+                } else {
+                    showToast(`测试失败: ${data.message}`, 'error');
+                    if (btn) { btn.style.background = '#f44336'; btn.textContent = '失败'; }
+                }
+                // Refresh to update stats
+                setTimeout(() => refreshWebSearchKeys(), 1500);
+            } catch (error) {
+                showToast('测试失败: ' + error.message, 'error');
+                if (btn) { btn.style.background = '#f44336'; btn.textContent = '失败'; }
+                setTimeout(() => refreshWebSearchKeys(), 1500);
+            }
+        }
         
         // ==================== 暴露删除和操作相关的全局函数 ====================
         // Provider 相关
@@ -4983,3 +5272,15 @@ curl '${metaApiUrl}?name=${modelName}'`;
         // OPS 日志相关
         window.refreshOpsLogs = refreshOpsLogs;
         window.filterOpsLogs = filterOpsLogs;
+        
+        // Web Search Keys 相关
+        window.refreshWebSearchKeys = refreshWebSearchKeys;
+        window.showAddWebSearchKeyModal = showAddWebSearchKeyModal;
+        window.closeAddWebSearchKeyModal = closeAddWebSearchKeyModal;
+        window.submitAddWebSearchKey = submitAddWebSearchKey;
+        window.toggleWebSearchKeyStatus = toggleWebSearchKeyStatus;
+        window.resetWebSearchKeyHealth = resetWebSearchKeyHealth;
+        window.deleteWebSearchKey = deleteWebSearchKey;
+        window.testWebSearchKey = testWebSearchKey;
+        window.saveWebSearchConfig = saveWebSearchConfig;
+        window.loadWebSearchConfig = loadWebSearchConfig;
