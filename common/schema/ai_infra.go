@@ -149,6 +149,9 @@ type AiApiKeys struct {
 	LastUsedTime  time.Time `json:"last_used_time"`             // 上次使用时间
 	Active        bool      `json:"active" gorm:"default:true"` // API Key 激活状态
 
+	// Web Search 使用统计
+	WebSearchCount int64 `json:"web_search_count" gorm:"default:0"` // Web Search 使用次数
+
 	// 流量限制相关字段
 	TrafficLimit       int64 `json:"traffic_limit" gorm:"default:0"`            // 流量限额(字节)，0表示不限制
 	TrafficUsed        int64 `json:"traffic_used" gorm:"default:0"`             // 已使用流量(经倍数计算后)
@@ -194,6 +197,36 @@ type OpsActionLog struct {
 	TargetID     string `json:"target_id"`                  // Target ID
 	Detail       string `json:"detail" gorm:"type:text"`    // Action detail (JSON)
 	IPAddress    string `json:"ip_address"`                 // Client IP address
+}
+
+// WebSearchConfig stores global configuration for web search (singleton row, ID=1)
+type WebSearchConfig struct {
+	gorm.Model
+
+	Proxy string `json:"proxy"` // Global proxy for all web search requests
+}
+
+func (w *WebSearchConfig) TableName() string {
+	return "web_search_configs"
+}
+
+// WebSearchApiKey stores API keys for web search providers (Brave, Tavily)
+type WebSearchApiKey struct {
+	gorm.Model
+
+	SearcherType string `json:"searcher_type" gorm:"index"` // "brave" or "tavily"
+	APIKey       string `json:"api_key"`
+	BaseURL      string `json:"base_url"`                     // Optional custom base URL
+	Proxy        string `json:"proxy"`                        // Optional proxy
+	Active       bool   `json:"active" gorm:"default:true"`   // Whether the key is active
+
+	// Statistics
+	SuccessCount  int64     `json:"success_count"`
+	FailureCount  int64     `json:"failure_count"`
+	TotalRequests int64     `json:"total_requests"`
+	LastUsedTime  time.Time `json:"last_used_time"`
+	LastLatency   int64     `json:"last_latency"` // Milliseconds
+	IsHealthy     bool      `json:"is_healthy" gorm:"default:true"`
 }
 
 // AIMemoryEntity 存储AI记忆条目

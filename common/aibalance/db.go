@@ -209,6 +209,12 @@ func UpdateAiApiKeyStats(apiKey string, inputBytes, outputBytes int64, success b
 	return GetDB().Save(&key).Error
 }
 
+// IncrementAiApiKeyWebSearchCount increments the web search usage count for an API key
+func IncrementAiApiKeyWebSearchCount(apiKey string) error {
+	return GetDB().Model(&schema.AiApiKeys{}).Where("api_key = ?", apiKey).
+		UpdateColumn("web_search_count", gorm.Expr("web_search_count + ?", 1)).Error
+}
+
 // UpdateFreeUserStats 更新免费用户的使用统计信息
 // 如果 free-user 记录不存在，会自动创建
 // inputBytes：本次请求的输入字节数

@@ -165,6 +165,19 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Warnf("Failed to ensure AiModelMeta table exists: %v", err)
 	}
 
+	// Ensure web search API key table exists
+	if err := EnsureWebSearchApiKeyTable(); err != nil {
+		log.Warnf("Failed to ensure WebSearchApiKey table exists: %v", err)
+	}
+
+	// Load global web search config (proxy, etc.)
+	if wsConfig, err := GetWebSearchConfig(); err != nil {
+		log.Warnf("Failed to load WebSearchConfig: %v", err)
+	} else if wsConfig.Proxy != "" {
+		config.WebSearchProxy = wsConfig.Proxy
+		log.Infof("Loaded global web search proxy: %s", wsConfig.Proxy)
+	}
+
 	// Get all providers from the database
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {
