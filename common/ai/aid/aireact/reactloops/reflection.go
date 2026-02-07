@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -281,17 +282,25 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 				actionOptions = append(actionOptions, aicommon.WithActionFieldStreamHandler(
 					[]string{"suggestions"},
 					func(key string, reader io.Reader) {
-						// 流式输出到前端
-						nodeId := "self-reflection-" + key
-						emitter.EmitStreamEvent(
-							nodeId,
-							time.Now(),
-							reader,
-							task.GetIndex(),
-							func() {
-								log.Debugf("self-reflection field[%s] stream finished", key)
-							},
-						)
+
+						r.loadingStatus("AI 自我反省中 / Loading Self-Reflection Suggestions Stream...")
+						raw, err := io.ReadAll(reader)
+						if err != nil {
+							log.Warnf("failed to read suggestions stream: %v", err)
+							return
+						}
+						var sgs = make([]string, 0)
+						json.Unmarshal(raw, &sgs)
+						for _, i := range sgs {
+							pr, pw := utils.NewPipe()
+							emitter.EmitDefaultStreamEvent(
+								"thought",
+								pr,
+								task.GetId(),
+							)
+							pw.WriteString("- [Self-Reflection]: " + i + "\n")
+							pw.Close()
+						}
 					},
 				))
 			}

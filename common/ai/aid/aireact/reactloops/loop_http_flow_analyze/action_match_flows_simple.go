@@ -31,7 +31,7 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			aitool.WithStringParam("runtime_id", aitool.WithParam_Description("Filter flows by runtime/session id")),
 			aitool.WithStringParam("source_type", aitool.WithParam_Description("Filter by source type, e.g. mitm/crawler/scan")),
 			aitool.WithIntegerParam("limit", aitool.WithParam_Description("Max result count (default 30, max 500)")),
-			
+
 			// HTTPResponseMatcher 字段
 			aitool.WithStringParam("matcher_type", aitool.WithParam_Description("Matcher type: word/regex/status_code/binary/dsl/nuclei-dsl")),
 			aitool.WithStringParam("scope", aitool.WithParam_Description("Match scope: raw(default)/header/body/all/request/response/all_headers/all_bodies")),
@@ -46,13 +46,13 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			if limit < 0 {
 				return utils.Errorf("limit must be non-negative")
 			}
-			
+
 			// 检查是否提供了 matcher 参数
 			matcherType := strings.TrimSpace(action.GetString("matcher_type"))
 			if matcherType == "" {
 				return utils.Errorf("matcher_type is required")
 			}
-			
+
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
@@ -110,6 +110,21 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d); applying matcher (type=%s, scope=%s)\n",
 				total, len(flows), matcher.MatcherType, matcher.Scope))
 
+			pr, pw := utils.NewPipe()
+			defer pw.Close()
+
+			emitter := loop.GetEmitter()
+			var streamId string
+			if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, loop.GetCurrentTask().GetId()); event != nil {
+				streamId = event.GetStreamEventWriterId()
+			}
+
+			pw.WriteString(fmt.Sprintf("Found [%v] HTTP flows...", len(flows)))
+
+			if len(flows) <= 0 {
+				pw.WriteString(fmt.Sprintf("[DONE]"))
+			}
+
 			for _, flow := range flows {
 				matched, err := executeMatchers(
 					localMatchers,
@@ -144,6 +159,10 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()
 			summary := fullSummary
+
+			if streamId != "" {
+				emitter.EmitTextReferenceMaterial(streamId, fullSummary)
+			}
 
 			// 总是保存到文件
 			var filename string
