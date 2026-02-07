@@ -39,6 +39,8 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			var flow *schema.HTTPFlow
 			var err error
 
+			invoker := loop.GetInvoker()
+
 			switch {
 			case action.GetInt("id") > 0:
 				flow, err = yakit.GetHTTPFlow(db, int64(action.GetInt("id")))
@@ -49,8 +51,9 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			}
 
 			if err != nil || flow == nil {
+				invoker.AddToTimeline("get_http_flow_detail", fmt.Sprintf("Failed to load HTTP flow: %v", err))
 				log.Errorf("get_http_flow_detail failed: %v", err)
-				operator.Fail(fmt.Sprintf("failed to load http flow: %v", err))
+				operator.Continue()
 				return
 			}
 
