@@ -330,6 +330,17 @@
                 <p style="color: #666; margin-bottom: 15px;">
                     配置全局代理，适用于所有未单独设置代理的 Web Search API Key。
                 </p>
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 12px 16px; margin-bottom: 15px;">
+                    <p style="color: #495057; margin: 0 0 8px 0; font-weight: 600; font-size: 13px;">CURL 调用示例:</p>
+                    <pre style="background: #2d2d2d; color: #f8f8f2; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: 0; white-space: pre-wrap; word-break: break-all;">curl -X POST https://aibalance.yaklang.com/v1/web-search \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Yaklang", "searcher_type": "chatglm", "max_results": 10}'</pre>
+                    <p style="color: #868e96; margin: 8px 0 0 0; font-size: 12px;">
+                        <strong>注意:</strong> API Key 的"允许模型"中必须包含 <code style="background:#fff3cd;padding:1px 4px;border-radius:3px;">web-search</code> 才能使用此接口。
+                        searcher_type 支持: <code>brave</code>, <code>tavily</code>, <code>chatglm</code>
+                    </p>
+                </div>
                 <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                     <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 250px;">
                         <label>全局代理:</label>

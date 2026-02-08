@@ -378,6 +378,12 @@ func (c *ServerConfig) LoadAPIKeysFromDB() error {
 		}
 	}
 
+	// Virtual models are permission-only entries that are not real AI providers
+	// but are used for access control (e.g., "web-search" controls access to /v1/web-search)
+	virtualModels := map[string]bool{
+		"web-search": true,
+	}
+
 	// 清空当前内存中的配置
 	c.KeyAllowedModels.allowedModels = make(map[string]map[string]bool)
 	c.Keys.keys = make(map[string]*Key) // 同时清空 Keys 结构
@@ -389,7 +395,15 @@ func (c *ServerConfig) LoadAPIKeysFromDB() error {
 		modelMap := make(map[string]bool)
 		for _, model := range modelNames {
 			model = strings.TrimSpace(model)
-			if model != "" && wrapperNames[model] {
+			if model == "" {
+				continue
+			}
+			// Allow the model if:
+			// 1. It's a known provider wrapper name (exact match)
+			// 2. It's a recognized virtual model (e.g., "web-search")
+			// 3. It contains glob wildcards (e.g., "*", "memfit-*") - these are patterns
+			//    used for matching and should be preserved for IsModelAllowed() to evaluate
+			if wrapperNames[model] || virtualModels[model] || strings.Contains(model, "*") {
 				modelMap[model] = true
 			}
 		}
