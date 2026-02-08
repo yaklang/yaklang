@@ -7,6 +7,7 @@ const (
 	SearcherTypeTavily    SearcherType = "tavily"
 	SearcherTypeAiBalance SearcherType = "aibalance"
 	SearcherTypeChatGLM   SearcherType = "chatglm"
+	SearcherTypeBocha     SearcherType = "bocha"
 )
 
 func (s SearcherType) String() string {
