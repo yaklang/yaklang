@@ -98,12 +98,12 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 	}
 
 	// Validate searcher type (empty string means "auto-select")
-	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "": true}
+	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "": true}
 	if !validTypes[reqBody.SearcherType] {
 		c.logError("invalid searcher type: %s", reqBody.SearcherType)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"error": map[string]string{
-				"message": "searcher_type must be 'brave', 'tavily', 'chatglm' or empty (auto-select)",
+				"message": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha' or empty (auto-select)",
 				"type":    "invalid_request_error",
 			},
 		})
@@ -328,6 +328,9 @@ func (c *ServerConfig) doWebSearch(sk *schema.WebSearchApiKey, req *WebSearchReq
 		return client.Search(req.Query, config)
 	case "chatglm":
 		client := searchers.NewOmniChatGLMSearchClient()
+		return client.Search(req.Query, config)
+	case "bocha":
+		client := searchers.NewOmniBochaSearchClient()
 		return client.Search(req.Query, config)
 	default:
 		return nil, utils.Errorf("unsupported searcher type: %s", req.SearcherType)
