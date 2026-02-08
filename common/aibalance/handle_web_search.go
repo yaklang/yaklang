@@ -19,7 +19,7 @@ import (
 // WebSearchRequest represents the request body for /v1/web-search
 type WebSearchRequest struct {
 	Query        string `json:"query"`
-	SearcherType string `json:"searcher_type"` // "brave", "tavily" or "chatglm", default "brave"
+	SearcherType string `json:"searcher_type"` // "brave", "tavily", "chatglm" or "" (auto-select), default ""
 	MaxResults   int    `json:"max_results"`   // default 10
 	Page         int    `json:"page"`          // default 1
 	PageSize     int    `json:"page_size"`     // default 10
@@ -87,9 +87,6 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 	}
 
 	// Set defaults
-	if reqBody.SearcherType == "" {
-		reqBody.SearcherType = "brave"
-	}
 	if reqBody.MaxResults <= 0 {
 		reqBody.MaxResults = 10
 	}
@@ -100,13 +97,13 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		reqBody.PageSize = 10
 	}
 
-	// Validate searcher type
-	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true}
+	// Validate searcher type (empty string means "auto-select")
+	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "": true}
 	if !validTypes[reqBody.SearcherType] {
 		c.logError("invalid searcher type: %s", reqBody.SearcherType)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"error": map[string]string{
-				"message": "searcher_type must be 'brave', 'tavily' or 'chatglm'",
+				"message": "searcher_type must be 'brave', 'tavily', 'chatglm' or empty (auto-select)",
 				"type":    "invalid_request_error",
 			},
 		})
@@ -168,40 +165,22 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
-	// Get active web search API keys for the requested searcher type
-	searchKeys, err := GetActiveWebSearchApiKeysByType(reqBody.SearcherType)
-	if err != nil || len(searchKeys) == 0 {
-		// Fallback: try all keys of this type (including unhealthy but active ones)
-		allKeys, fallbackErr := GetWebSearchApiKeysByType(reqBody.SearcherType)
-		if fallbackErr != nil || len(allKeys) == 0 {
-			c.logError("no web search api keys configured for type: %s", reqBody.SearcherType)
-			c.writeJSONResponse(conn, http.StatusServiceUnavailable, map[string]interface{}{
-				"error": map[string]string{
-					"message": "no search api keys available for type: " + reqBody.SearcherType,
-					"type":    "service_unavailable",
-				},
-			})
-			return
-		}
-		// Filter only active ones
-		activeKeys := make([]*schema.WebSearchApiKey, 0, len(allKeys))
-		for _, sk := range allKeys {
-			if sk.Active {
-				activeKeys = append(activeKeys, sk)
-			}
-		}
-		if len(activeKeys) == 0 {
-			c.logError("no active web search api keys for type: %s", reqBody.SearcherType)
-			c.writeJSONResponse(conn, http.StatusServiceUnavailable, map[string]interface{}{
-				"error": map[string]string{
-					"message": "no active search api keys available for type: " + reqBody.SearcherType,
-					"type":    "service_unavailable",
-				},
-			})
-			return
-		}
-		searchKeys = activeKeys
+	// Resolve search keys: find active keys for the requested type,
+	// or auto-select any available type if searcher_type is empty or has no keys
+	searchKeys, resolvedType, resolveErr := c.resolveWebSearchKeys(reqBody.SearcherType)
+	if resolveErr != nil {
+		c.logError("failed to resolve web search keys: %v", resolveErr)
+		c.writeJSONResponse(conn, http.StatusServiceUnavailable, map[string]interface{}{
+			"error": map[string]string{
+				"message": resolveErr.Error(),
+				"type":    "service_unavailable",
+			},
+		})
+		return
 	}
+	// Update the request with the resolved searcher type
+	reqBody.SearcherType = resolvedType
+	c.logInfo("resolved searcher type: %s (keys: %d)", resolvedType, len(searchKeys))
 
 	// Try search with random selection + failover
 	results, searchErr := c.tryWebSearchWithKeys(searchKeys, &reqBody)
@@ -217,6 +196,70 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 	}
 
 	c.sendWebSearchResponse(conn, results, reqBody.SearcherType, key.Key)
+}
+
+// resolveWebSearchKeys finds active search API keys for the given searcher type.
+// If searcherType is empty or has no available keys, it auto-selects any type that has active keys.
+// Returns: active keys, resolved searcher type, error
+func (c *ServerConfig) resolveWebSearchKeys(searcherType string) ([]*schema.WebSearchApiKey, string, error) {
+	// If a specific type is requested, try to find keys for that type first
+	if searcherType != "" {
+		keys, err := GetActiveWebSearchApiKeysByType(searcherType)
+		if err == nil && len(keys) > 0 {
+			return keys, searcherType, nil
+		}
+		// Also try active-but-unhealthy keys for the specified type
+		allKeys, err := GetWebSearchApiKeysByType(searcherType)
+		if err == nil {
+			activeKeys := filterActiveKeys(allKeys)
+			if len(activeKeys) > 0 {
+				return activeKeys, searcherType, nil
+			}
+		}
+		c.logInfo("no keys available for requested type '%s', falling back to auto-select", searcherType)
+	}
+
+	// Auto-select: find any type that has active keys
+	allActiveKeys, err := GetAllActiveWebSearchApiKeys()
+	if err != nil {
+		return nil, "", utils.Errorf("failed to query active web search keys: %v", err)
+	}
+	if len(allActiveKeys) == 0 {
+		if searcherType != "" {
+			return nil, "", utils.Errorf("no search api keys available for type '%s' and no other types have keys either", searcherType)
+		}
+		return nil, "", utils.Errorf("no active web search api keys configured on this server")
+	}
+
+	// Group active keys by type, pick the type with the most keys
+	typeKeys := map[string][]*schema.WebSearchApiKey{}
+	for _, k := range allActiveKeys {
+		typeKeys[k.SearcherType] = append(typeKeys[k.SearcherType], k)
+	}
+
+	// Select the type with the most active keys
+	bestType := ""
+	bestCount := 0
+	for t, keys := range typeKeys {
+		if len(keys) > bestCount {
+			bestType = t
+			bestCount = len(keys)
+		}
+	}
+
+	c.logInfo("auto-selected searcher type '%s' with %d active keys", bestType, bestCount)
+	return typeKeys[bestType], bestType, nil
+}
+
+// filterActiveKeys returns only active keys from the given list
+func filterActiveKeys(keys []*schema.WebSearchApiKey) []*schema.WebSearchApiKey {
+	active := make([]*schema.WebSearchApiKey, 0, len(keys))
+	for _, k := range keys {
+		if k.Active {
+			active = append(active, k)
+		}
+	}
+	return active
 }
 
 // tryWebSearchWithKeys attempts to perform a web search using the provided keys

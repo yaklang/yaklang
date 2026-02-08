@@ -3,6 +3,7 @@ package searchers
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -14,7 +15,7 @@ type AiBalanceSearchConfig struct {
 	BaseURL string
 	// APIKey is the Bearer token for AiBalance authentication
 	APIKey string
-	// BackendSearcherType specifies which backend searcher to use via AiBalance ("brave" or "tavily")
+	// BackendSearcherType specifies which backend searcher to use via AiBalance ("brave", "tavily" or "chatglm")
 	BackendSearcherType string
 	// Proxy is an optional proxy for connecting to AiBalance
 	Proxy string
@@ -26,7 +27,7 @@ type AiBalanceSearchConfig struct {
 func NewDefaultAiBalanceConfig() *AiBalanceSearchConfig {
 	return &AiBalanceSearchConfig{
 		BaseURL:             "https://aibalance.yaklang.com",
-		BackendSearcherType: "brave",
+		BackendSearcherType: "", // empty means "auto" - let the server choose based on available keys
 		Timeout:             30,
 	}
 }
@@ -95,7 +96,11 @@ func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBal
 	}
 
 	// Build the full URL for the web search endpoint
-	searchURL := c.Config.BaseURL + "/v1/web-search"
+	// Strip trailing /v1/web-search from BaseURL to avoid double path
+	// (user may pass "https://host/v1/web-search" as baseurl)
+	baseURL := strings.TrimSuffix(c.Config.BaseURL, "/v1/web-search")
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	searchURL := baseURL + "/v1/web-search"
 
 	// Prepare HTTP request options
 	opts := []lowhttp.LowhttpOpt{}

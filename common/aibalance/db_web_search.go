@@ -73,6 +73,15 @@ func GetActiveWebSearchApiKeysByType(searcherType string) ([]*schema.WebSearchAp
 	return keys, nil
 }
 
+// GetAllActiveWebSearchApiKeys returns all active web search API keys regardless of type
+func GetAllActiveWebSearchApiKeys() ([]*schema.WebSearchApiKey, error) {
+	var keys []*schema.WebSearchApiKey
+	if err := GetDB().Where("active = ?", true).Find(&keys).Error; err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
 // GetWebSearchApiKeyByID returns a web search API key by its ID
 func GetWebSearchApiKeyByID(id uint) (*schema.WebSearchApiKey, error) {
 	var key schema.WebSearchApiKey
