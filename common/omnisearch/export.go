@@ -55,9 +55,21 @@ func Search(query string, options ...ostype.SearchOption) ([]*ostype.OmniSearchR
 		apikeys = utils.InterfaceToStringSlice(iapikeys)
 	}
 
+	// Auto-detect searcher type if not explicitly set:
+	// - If user provides apikeys → default to aibalance (the aggregation layer)
+	// - If no apikeys and no type → default to aibalance as well
+	searcherType := config.SearcherType
+	if searcherType == "" {
+		if len(apikeys) > 0 {
+			searcherType = ostype.SearcherTypeAiBalance
+		} else {
+			searcherType = ostype.SearcherTypeAiBalance
+		}
+	}
+
 	searchKeys := []*SearchKeyInfo{}
 	for _, key := range apikeys {
-		searchKeys = append(searchKeys, &SearchKeyInfo{ApiKey: key, Type: config.SearcherType})
+		searchKeys = append(searchKeys, &SearchKeyInfo{ApiKey: key, Type: searcherType})
 	}
 
 	// omnisearch 配置
@@ -72,7 +84,11 @@ func Search(query string, options ...ostype.SearchOption) ([]*ostype.OmniSearchR
 			opts = append(opts, WithExtSearcher(customSearcher))
 		}
 	}
-	res, err := NewOmniSearchClient(opts...).Search(query, options...)
+
+	// Override searcher type in options to use the resolved type
+	finalOptions := append([]ostype.SearchOption{ostype.WithSearchType(searcherType)}, options...)
+
+	res, err := NewOmniSearchClient(opts...).Search(query, finalOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,5 +110,8 @@ var Exports = map[string]interface{}{
 	},
 	"apikey": func(keys ...string) ostype.SearchOption {
 		return ostype.WithExtra("apikeys", keys)
+	},
+	"backendType": func(backendType string) ostype.SearchOption {
+		return ostype.WithExtra("backend_searcher_type", backendType)
 	},
 }

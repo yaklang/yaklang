@@ -67,9 +67,11 @@ func WithExtra(name string, val any) SearchOption {
 
 func NewSearchConfig(options ...SearchOption) *SearchConfig {
 	config := &SearchConfig{
-		Page:         1,
-		PageSize:     10,
-		SearcherType: SearcherTypeBrave,
+		Page:     1,
+		PageSize: 10,
+		// SearcherType defaults to empty, meaning "auto-select"
+		// The caller should resolve it based on available apikeys and searchers
+		SearcherType: "",
 		Extra:        map[string]interface{}{},
 	}
 	for _, option := range options {
