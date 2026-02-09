@@ -12,7 +12,6 @@ yakmisc-*
 *.out
 *.exe~
 ./yak
-/yak
 build/
 releases/*
 releases/
