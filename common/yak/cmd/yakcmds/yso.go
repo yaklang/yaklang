@@ -2,7 +2,7 @@ package yakcmds
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yso"

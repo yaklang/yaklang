@@ -2,7 +2,7 @@ package spec
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"runtime"
 )
 

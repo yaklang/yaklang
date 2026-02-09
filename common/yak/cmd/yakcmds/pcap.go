@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gopacket/gopacket"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/pcap"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"

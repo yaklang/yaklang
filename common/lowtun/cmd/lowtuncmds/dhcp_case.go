@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/buffer"

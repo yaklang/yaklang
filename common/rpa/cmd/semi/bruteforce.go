@@ -4,7 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa/implement/bruteforce"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 )
 
 var BruteForce = cli.Command{

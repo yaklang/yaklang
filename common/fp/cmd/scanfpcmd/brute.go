@@ -3,7 +3,7 @@ package scanfpcmd
 import (
 	"context"
 	"github.com/olekukonko/tablewriter"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
