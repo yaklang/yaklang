@@ -14,6 +14,9 @@ type Report struct {
 	mu     sync.RWMutex `json:"-"`
 	config Config       `json:"-"`
 	writer io.Writer    `json:"-"`
+	// fileByHash accelerates FirstOrCreateFile* and allows adding risks to existing files.
+	// It must not be serialized into JSON.
+	fileByHash map[string]*File `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -53,6 +56,7 @@ func NewReport(reportType ReportType, opts ...Option) *Report {
 		Risks:          make(map[string]*Risk),
 		IrSourceHashes: make(map[string]struct{}),
 		File:           make([]*File, 0),
+		fileByHash:     make(map[string]*File),
 	}
 	for _, o := range opts {
 		o(&report.config)
@@ -135,6 +139,19 @@ func (r *Report) GetRisk(hash string) *Risk {
 }
 
 func (r *Report) AddFile(file *File) {
+	if file != nil && file.IrSourceHash != "" {
+		if r.fileByHash == nil {
+			r.fileByHash = make(map[string]*File)
+		}
+		// Keep the first seen file instance for this hash to avoid duplicates.
+		if _, ok := r.fileByHash[file.IrSourceHash]; !ok {
+			r.fileByHash[file.IrSourceHash] = file
+		}
+		if r.IrSourceHashes == nil {
+			r.IrSourceHashes = make(map[string]struct{})
+		}
+		r.IrSourceHashes[file.IrSourceHash] = struct{}{}
+	}
 	r.File = append(r.File, file)
 }
 
