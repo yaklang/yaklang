@@ -108,3 +108,28 @@ value
 		require.NoError(t, err)
 	})
 }
+
+func TestCsrfPOCAutoSubmitOption(t *testing.T) {
+	raw := `POST /post HTTP/1.1
+Host: httpbin.org
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
+
+foo=bar
+`
+	t.Run("auto submit disabled (default)", func(t *testing.T) {
+		poc, err := GenerateCSRFPoc(raw)
+		require.NoError(t, err)
+		require.NotContains(t, poc, `document.forms['form1']`)
+	})
+
+	t.Run("auto submit enabled", func(t *testing.T) {
+		poc, err := GenerateCSRFPoc(raw, CsrfOptWithAutoSubmit(true))
+		require.NoError(t, err)
+		require.Contains(t, poc, `document.forms['form1']`)
+		require.Contains(t, poc, `HTMLFormElement.prototype.submit.call(f)`)
+		// should still contain the form and foo field (value may include trailing newline from raw packet)
+		require.Contains(t, poc, `name="foo"`)
+		require.Contains(t, poc, `<form `)
+	})
+}

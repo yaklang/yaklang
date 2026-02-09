@@ -72,6 +72,7 @@ type _csrfTemplateConfig struct {
 type _csrfConfig struct {
 	MultipartDefaultValue bool
 	https                 bool
+	autoSubmit            bool
 }
 
 func newDefaultCsrfConfig() *_csrfConfig {
@@ -196,7 +197,18 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		return "", err
 	}
 
-	return builder.String(), nil
+	poc := builder.String()
+	// AutoSubmit 为 true 时，在返回 HTML 中注入自动提交脚本
+	if config.autoSubmit {
+		const autoSubmitScript = `<script>(function(){var f=document.forms['form1'];if(f)HTMLFormElement.prototype.submit.call(f);})();</script>`
+		if idx := strings.LastIndex(poc, "</body>"); idx != -1 {
+			poc = poc[:idx] + autoSubmitScript + "\n" + poc[idx:]
+		} else {
+			poc += autoSubmitScript
+		}
+	}
+
+	return poc, nil
 }
 
 // multipartDefaultValue 手动设置请求报文是否为multipart/form-data类型
@@ -222,8 +234,17 @@ func CsrfOptWithHTTPS(b bool) csrfConfig {
 	}
 }
 
+// CsrfOptWithAutoSubmit 在生成的 HTML 中注入自动提交脚本（页面加载后自动提交表单）
+// 当 b 为 true 时，在第一个 form 渲染完成后自动调用 submit
+func CsrfOptWithAutoSubmit(b bool) csrfConfig {
+	return func(c *_csrfConfig) {
+		c.autoSubmit = b
+	}
+}
+
 var CSRFExports = map[string]interface{}{
 	"Generate":              GenerateCSRFPoc,
 	"multipartDefaultValue": CsrfOptWithMultipartDefaultValue,
 	"https":                 CsrfOptWithHTTPS,
+	"autoSubmit":            CsrfOptWithAutoSubmit,
 }

@@ -27786,6 +27786,7 @@ type GenerateCSRFPocByPacketRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IsHttps       bool                   `protobuf:"varint,1,opt,name=IsHttps,proto3" json:"IsHttps,omitempty"`
 	Request       []byte                 `protobuf:"bytes,2,opt,name=Request,proto3" json:"Request,omitempty"`
+	AutoSubmit    bool                   `protobuf:"varint,3,opt,name=AutoSubmit,proto3" json:"AutoSubmit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -27832,6 +27833,13 @@ func (x *GenerateCSRFPocByPacketRequest) GetRequest() []byte {
 		return x.Request
 	}
 	return nil
+}
+
+func (x *GenerateCSRFPocByPacketRequest) GetAutoSubmit() bool {
+	if x != nil {
+		return x.AutoSubmit
+	}
+	return false
 }
 
 type GenerateCSRFPocByPacketResponse struct {
@@ -68690,10 +68698,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fCodeTemplate\x18\x03 \x01(\x0e2,.ypb.GenerateYakCodeByPacketRequest.TemplateR\fCodeTemplate\"#\n" +
 	"\bTemplate\x12\f\n" +
 	"\bOrdinary\x10\x00\x12\t\n" +
-	"\x05Batch\x10\x01\"T\n" +
+	"\x05Batch\x10\x01\"t\n" +
 	"\x1eGenerateCSRFPocByPacketRequest\x12\x18\n" +
 	"\aIsHttps\x18\x01 \x01(\bR\aIsHttps\x12\x18\n" +
-	"\aRequest\x18\x02 \x01(\fR\aRequest\"5\n" +
+	"\aRequest\x18\x02 \x01(\fR\aRequest\x12\x1e\n" +
+	"\n" +
+	"AutoSubmit\x18\x03 \x01(\bR\n" +
+	"AutoSubmit\"5\n" +
 	"\x1fGenerateCSRFPocByPacketResponse\x12\x12\n" +
 	"\x04Code\x18\x01 \x01(\fR\x04Code\"5\n" +
 	"\x1fGenerateYakCodeByPacketResponse\x12\x12\n" +

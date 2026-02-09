@@ -223,7 +223,11 @@ if YAK_MAIN {
 `)
 
 func (s *Server) GenerateCSRFPocByPacket(ctx context.Context, req *ypb.GenerateCSRFPocByPacketRequest) (*ypb.GenerateCSRFPocByPacketResponse, error) {
-	poc, err := yaklib.GenerateCSRFPoc(req.GetRequest(), yaklib.CsrfOptWithHTTPS(req.IsHttps))
+	poc, err := yaklib.GenerateCSRFPoc(
+		req.GetRequest(),
+		yaklib.CsrfOptWithHTTPS(req.IsHttps),
+		yaklib.CsrfOptWithAutoSubmit(req.GetAutoSubmit()),
+	)
 	if err != nil {
 		return nil, err
 	}
