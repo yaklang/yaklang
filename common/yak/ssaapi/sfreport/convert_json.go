@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -143,16 +144,16 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	r.RiskNums = len(r.Risks)
 
 	// create report.file
-	file, ok := r.FirstOrCreateFile(editor)
-	if ok {
+	file, _ := r.FirstOrCreateFile(editor)
+	if file != nil {
 		file.AddRisk(risk)
 	}
 	// }}
 
 	// add ir source from data flow paths
 	for _, irSourceHash := range toAddIrSourceHashes {
-		file, ok := r.FirstOrCreateFileByHash(irSourceHash)
-		if ok {
+		file, _ := r.FirstOrCreateFileByHash(irSourceHash)
+		if file != nil {
 			file.AddRisk(risk)
 		}
 	}
@@ -174,19 +175,40 @@ func (r *Report) FirstOrCreateRule(rule *schema.SyntaxFlowRule) *Rule {
 }
 
 func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) (*File, bool) {
-	irsourceHash := editor.GetIrSourceHash()
-	if _, ok := r.IrSourceHashes[irsourceHash]; ok {
+	irsourceHash := strings.TrimSpace(editor.GetIrSourceHash())
+	if irsourceHash == "" {
 		return nil, false
+	}
+	if r.fileByHash != nil {
+		if existing := r.fileByHash[irsourceHash]; existing != nil {
+			return existing, false
+		}
+	}
+	if r.IrSourceHashes == nil {
+		r.IrSourceHashes = make(map[string]struct{})
 	}
 	r.IrSourceHashes[irsourceHash] = struct{}{}
 	ret := NewFile(editor, r)
 	r.File = append(r.File, ret)
+	if r.fileByHash == nil {
+		r.fileByHash = make(map[string]*File)
+	}
+	r.fileByHash[irsourceHash] = ret
 	return ret, true
 }
 
 func (r *Report) FirstOrCreateFileByHash(irSourceHash string) (*File, bool) {
-	if _, ok := r.IrSourceHashes[irSourceHash]; ok {
+	irSourceHash = strings.TrimSpace(irSourceHash)
+	if irSourceHash == "" {
 		return nil, false
+	}
+	if r.fileByHash != nil {
+		if existing := r.fileByHash[irSourceHash]; existing != nil {
+			return existing, false
+		}
+	}
+	if r.IrSourceHashes == nil {
+		r.IrSourceHashes = make(map[string]struct{})
 	}
 	r.IrSourceHashes[irSourceHash] = struct{}{}
 	editor, err := ssadb.GetEditorByHash(irSourceHash)
@@ -196,6 +218,10 @@ func (r *Report) FirstOrCreateFileByHash(irSourceHash string) (*File, bool) {
 	}
 	ret := NewFile(editor, r)
 	r.File = append(r.File, ret)
+	if r.fileByHash == nil {
+		r.fileByHash = make(map[string]*File)
+	}
+	r.fileByHash[irSourceHash] = ret
 	return ret, true
 }
 

@@ -19,6 +19,13 @@ var Exports = map[string]interface{}{
 	"ConvertSingleResultToJSONWithOptions": func(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool) (string, error) {
 		return ConvertSingleResultToJSONWithOptions(result, reportType, showDataflow, showFileContent, withFile)
 	},
+	"ConvertSingleResultToStreamJSONWithOptions": func(result *ssaapi.SyntaxFlowResult, streamKey string, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool, dedupFileContent bool) (string, int, error) {
+		return ConvertSingleResultToStreamJSONWithOptions(result, streamKey, reportType, showDataflow, showFileContent, withFile, dedupFileContent)
+	},
+	"ConvertSingleResultToStreamPayload": func(result *ssaapi.SyntaxFlowResult, streamKey string, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool, dedupFileContent bool) (map[string]any, error) {
+		return ConvertSingleResultToStreamPayload(result, streamKey, reportType, showDataflow, showFileContent, withFile, dedupFileContent)
+	},
+	"ResetStreamFileDedup": ResetStreamFileDedup,
 
 	"ImportSSARiskFromJSON": ImportSSARiskFromJSON,
 }
