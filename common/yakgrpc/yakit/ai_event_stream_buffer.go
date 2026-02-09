@@ -205,9 +205,8 @@ func (b *streamEventBuffer) flushDue() {
 		return
 	}
 
-	for _, key := range b.entries.Keys() {
-		entry, ok := b.entries.Get(key)
-		if !ok || entry == nil {
+	for _, entry := range b.entries.Values() {
+		if entry == nil {
 			continue
 		}
 		entry.mu.Lock()
@@ -252,9 +251,8 @@ func (b *streamEventBuffer) flushAll() error {
 	}
 	var firstErr error
 	if b.entries != nil {
-		for _, key := range b.entries.Keys() {
-			entry, ok := b.entries.Get(key)
-			if !ok || entry == nil {
+		for _, entry := range b.entries.Values() {
+			if entry == nil {
 				continue
 			}
 			if err := b.flushEntry(entry, true); err != nil && firstErr == nil {
