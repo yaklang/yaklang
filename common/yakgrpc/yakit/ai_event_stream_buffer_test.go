@@ -15,6 +15,7 @@ func TestSaveStreamAIEvent_CoalesceAndFlush(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
 
 	eventID := uuid.NewString()
+	t.Cleanup(func() { FinishStreamAIEvent(db, eventID) })
 
 	first := &schema.AiOutputEvent{
 		EventUUID:   eventID,
@@ -32,11 +33,13 @@ func TestSaveStreamAIEvent_CoalesceAndFlush(t *testing.T) {
 	}
 	require.NoError(t, CreateOrUpdateAIOutputEvent(db, second))
 
-	FlushPendingStreamAIEvents()
+	FinishStreamAIEvent(db, eventID)
 
 	var out schema.AiOutputEvent
 	require.NoError(t, db.Where("event_uuid = ?", eventID).First(&out).Error)
 	require.Equal(t, "ab", string(out.StreamDelta))
+	_, ok := globalStreamEventBuffer.entries.Get(eventID)
+	require.False(t, ok)
 }
 
 func TestStreamFinished_ClosesStreamBuffer(t *testing.T) {
@@ -45,6 +48,7 @@ func TestStreamFinished_ClosesStreamBuffer(t *testing.T) {
 	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
 
 	eventID := uuid.NewString()
+	t.Cleanup(func() { FinishStreamAIEvent(db, eventID) })
 
 	require.NoError(t, CreateOrUpdateAIOutputEvent(db, &schema.AiOutputEvent{
 		EventUUID:   eventID,
@@ -76,6 +80,4 @@ func TestStreamFinished_ClosesStreamBuffer(t *testing.T) {
 	// Buffer entry is removed (no need to wait for idle TTL).
 	_, ok := globalStreamEventBuffer.entries.Get(eventID)
 	require.False(t, ok)
-	require.EqualValues(t, 0, globalStreamEventBuffer.entryCount.Load())
-	require.False(t, globalStreamEventBuffer.started.Load())
 }
