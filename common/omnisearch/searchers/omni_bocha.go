@@ -20,7 +20,7 @@ func (c *OmniBochaSearchClient) Search(query string, config *ostype.SearchConfig
 		bochaConfig.APIKey = config.ApiKey
 	}
 	if config.Timeout != 0 {
-		bochaConfig.Timeout = float64(config.Timeout)
+		bochaConfig.Timeout = config.Timeout.Seconds()
 	}
 	if config.BaseURL != "" {
 		bochaConfig.BaseURL = config.BaseURL

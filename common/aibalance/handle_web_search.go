@@ -40,8 +40,13 @@ type WebSearchResponse struct {
 //   - Has Trace-ID only: check AllowFreeUserWebSearch → rate limit → TOTP → search (no billing)
 //   - Neither: return 502
 func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
-	// Increment cumulative web search counter
+	// Increment cumulative web search counter (both in-memory and persistent DB)
 	atomic.AddInt64(&c.totalWebSearchCount, 1)
+	go func() {
+		if err := IncrementWebSearchConfigTotalRequests(); err != nil {
+			log.Errorf("failed to increment persistent web search counter: %v", err)
+		}
+	}()
 
 	c.logInfo("starting to handle new web search request")
 
@@ -127,9 +132,33 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		utils.ShrinkString(reqBody.Query, 50), reqBody.SearcherType, reqBody.MaxResults, reqBody.Page, utils.ShrinkString(traceID, 12))
 
 	// Determine authentication mode: API Key vs Trace-ID vs neither
-	apiKeyValue := strings.TrimPrefix(auth, "Bearer ")
-	hasApiKey := apiKeyValue != ""
+	// Parse Authorization header defensively: only treat as API key when "Bearer" prefix matches
+	var apiKeyValue string
+	hasApiKey := false
+	if auth != "" {
+		parts := strings.SplitN(auth, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			token := strings.TrimSpace(parts[1])
+			if token != "" {
+				apiKeyValue = token
+				hasApiKey = true
+			}
+		}
+	}
 	hasTraceID := traceID != ""
+
+	// Enforce a reasonable maximum length on Trace-ID to protect in-memory rate limiter
+	const maxTraceIDLen = 128
+	if hasTraceID && len(traceID) > maxTraceIDLen {
+		c.logError("trace id too long: length=%d", len(traceID))
+		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
+			"error": map[string]string{
+				"message": "trace_id too long",
+				"type":    "invalid_request_error",
+			},
+		})
+		return
+	}
 
 	// Branch: neither API Key nor Trace-ID
 	if !hasApiKey && !hasTraceID {

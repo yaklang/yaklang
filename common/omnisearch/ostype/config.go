@@ -69,9 +69,9 @@ func NewSearchConfig(options ...SearchOption) *SearchConfig {
 	config := &SearchConfig{
 		Page:     1,
 		PageSize: 10,
-		// SearcherType defaults to empty, meaning "auto-select"
-		// The caller should resolve it based on available apikeys and searchers
-		SearcherType: "",
+		// Default SearcherType to "aibalance" to avoid empty searcher lookup failure
+		// in OmniSearchClient.Search which does not implement auto-selection
+		SearcherType: "aibalance",
 		Extra:        map[string]interface{}{},
 	}
 	for _, option := range options {

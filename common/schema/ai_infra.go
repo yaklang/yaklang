@@ -205,6 +205,7 @@ type WebSearchConfig struct {
 
 	Proxy                  string `json:"proxy"`                      // Global proxy for all web search requests
 	AllowFreeUserWebSearch bool   `json:"allow_free_user_web_search"` // Allow free users (Trace-ID only, no API key) to use web-search
+	TotalWebSearchRequests int64  `json:"total_web_search_requests"`  // Persistent cumulative web-search request count (survives restarts)
 }
 
 func (w *WebSearchConfig) TableName() string {
@@ -222,12 +223,13 @@ type WebSearchApiKey struct {
 	Active       bool   `json:"active" gorm:"default:true"`   // Whether the key is active
 
 	// Statistics
-	SuccessCount  int64     `json:"success_count"`
-	FailureCount  int64     `json:"failure_count"`
-	TotalRequests int64     `json:"total_requests"`
-	LastUsedTime  time.Time `json:"last_used_time"`
-	LastLatency   int64     `json:"last_latency"` // Milliseconds
-	IsHealthy     bool      `json:"is_healthy" gorm:"default:true"`
+	SuccessCount         int64     `json:"success_count"`
+	FailureCount         int64     `json:"failure_count"`
+	ConsecutiveFailures  int64     `json:"consecutive_failures"`  // Reset to 0 on success, incremented on failure
+	TotalRequests        int64     `json:"total_requests"`
+	LastUsedTime         time.Time `json:"last_used_time"`
+	LastLatency          int64     `json:"last_latency"` // Milliseconds
+	IsHealthy            bool      `json:"is_healthy" gorm:"default:true"`
 }
 
 // AIMemoryEntity 存储AI记忆条目

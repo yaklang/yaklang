@@ -20,7 +20,7 @@ func (c *OmniChatGLMSearchClient) Search(query string, config *ostype.SearchConf
 		glmConfig.APIKey = config.ApiKey
 	}
 	if config.Timeout != 0 {
-		glmConfig.Timeout = float64(config.Timeout)
+		glmConfig.Timeout = config.Timeout.Seconds()
 	}
 	if config.BaseURL != "" {
 		glmConfig.BaseURL = config.BaseURL
