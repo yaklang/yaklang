@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
+
+// traceID is a process-unique identifier sent as the Trace-ID header
+// It is generated once at process startup and reused for all web search requests
+var traceID = uuid.New().String()
 
 // AiBalanceSearchConfig contains the configuration for the AiBalance web search relay client
 type AiBalanceSearchConfig struct {
@@ -143,10 +148,7 @@ func isTOTPAuthError(err error) bool {
 // Search performs a search through the AiBalance web search relay
 // Supports TOTP authentication with automatic secret refresh and retry on auth failure
 func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBalanceSearchResponse, error) {
-	if c.Config.APIKey == "" {
-		return nil, fmt.Errorf("aibalance api key (bearer token) is required")
-	}
-
+	// Note: APIKey is optional now; free users can use Trace-ID only
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
 	}
@@ -194,8 +196,13 @@ func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBal
 func (c *AiBalanceSearchClient) doSearchRequest(searchURL string, bodyBytes []byte, opts []lowhttp.LowhttpOpt) (*AiBalanceSearchResponse, error) {
 	headers := map[string]string{
 		"Content-Type":  "application/json",
-		"Authorization": "Bearer " + c.Config.APIKey,
 		"User-Agent":    "Yaklang-AiBalance-OmniSearch/1.0",
+		"Trace-ID":      traceID,
+	}
+
+	// Add Authorization header only if API key is configured
+	if c.Config.APIKey != "" {
+		headers["Authorization"] = "Bearer " + c.Config.APIKey
 	}
 
 	// Add TOTP header for aibalance authentication

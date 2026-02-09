@@ -436,6 +436,14 @@ type ServerConfig struct {
 	AuthMiddleware   *AuthMiddleware // 认证中间件
 	forwardRule      *omap.OrderedMap[string, *aiforwarder.Rule]
 	WebSearchProxy   string // Global proxy for web search requests
+
+	// Concurrent request counters (atomic)
+	concurrentChatRequests      int64 // current number of in-flight chat/completions requests
+	concurrentEmbeddingRequests int64 // current number of in-flight embedding requests
+	totalWebSearchCount         int64 // cumulative web-search request count (process lifetime)
+
+	// Rate limiter for free web-search users (Trace-ID based)
+	webSearchRateLimiter *WebSearchRateLimiter
 }
 
 // NewServerConfig creates a new server configuration
@@ -457,6 +465,8 @@ func NewServerConfig() *ServerConfig {
 	}
 	// Initialize auth middleware with default config
 	config.AuthMiddleware = NewAuthMiddleware(config, DefaultAuthConfig())
+	// Initialize web search rate limiter for free users
+	config.webSearchRateLimiter = NewWebSearchRateLimiter()
 	return config
 }
 
@@ -499,6 +509,8 @@ func (c *ServerConfig) getKeyFromRawRequest(req []byte) *Key {
 }
 
 func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
+	atomic.AddInt64(&c.concurrentChatRequests, 1)
+	defer atomic.AddInt64(&c.concurrentChatRequests, -1)
 	c.logInfo("Starting to handle new chat completion request")
 	// handle ai request
 	auth := ""
@@ -1024,6 +1036,8 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 // serveEmbeddings handles embedding requests
 func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
+	atomic.AddInt64(&c.concurrentEmbeddingRequests, 1)
+	defer atomic.AddInt64(&c.concurrentEmbeddingRequests, -1)
 	c.logInfo("Starting to handle new embedding request")
 
 	// Extract authorization header

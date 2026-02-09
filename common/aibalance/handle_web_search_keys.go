@@ -429,7 +429,8 @@ func (c *ServerConfig) handleGetWebSearchConfig(conn net.Conn, request *http.Req
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"config": map[string]interface{}{
-			"proxy": config.Proxy,
+			"proxy":                      config.Proxy,
+			"allow_free_user_web_search": config.AllowFreeUserWebSearch,
 		},
 	})
 }
@@ -452,7 +453,8 @@ func (c *ServerConfig) handleSetWebSearchConfig(conn net.Conn, request *http.Req
 	defer request.Body.Close()
 
 	var reqBody struct {
-		Proxy string `json:"proxy"`
+		Proxy                  string `json:"proxy"`
+		AllowFreeUserWebSearch *bool  `json:"allow_free_user_web_search,omitempty"` // pointer to distinguish absent from false
 	}
 
 	if err := json.Unmarshal(bodyBytes, &reqBody); err != nil {
@@ -469,6 +471,9 @@ func (c *ServerConfig) handleSetWebSearchConfig(conn net.Conn, request *http.Req
 	}
 
 	config.Proxy = strings.TrimSpace(reqBody.Proxy)
+	if reqBody.AllowFreeUserWebSearch != nil {
+		config.AllowFreeUserWebSearch = *reqBody.AllowFreeUserWebSearch
+	}
 	if err := SaveWebSearchConfig(config); err != nil {
 		c.logError("failed to save web search config: %v", err)
 		c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]string{"error": "failed to save web search config"})
@@ -478,7 +483,7 @@ func (c *ServerConfig) handleSetWebSearchConfig(conn net.Conn, request *http.Req
 	// Update in-memory config
 	c.WebSearchProxy = config.Proxy
 
-	c.logInfo("successfully updated web search config, proxy=%s", config.Proxy)
+	c.logInfo("successfully updated web search config, proxy=%s, allow_free_user=%v", config.Proxy, config.AllowFreeUserWebSearch)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "web search config updated successfully",
