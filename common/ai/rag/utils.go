@@ -244,23 +244,20 @@ func autoMigrateRAGSystem(db *gorm.DB) error {
 	).Error
 }
 
-// description: 创建一个 Mock AI 服务，用于测试和开发环境。
+// 创建一个 Mock AI 服务，用于测试和开发环境。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - handle(func(message string) string`): 处理消息的回调函数
 //
-// Returns:
+// 返回值：
 // - r1(aicommon.AICallbackType`): Mock AI 服务实例
 //
 // Example:
 // ```go
 // // 创建 Mock 服务
-//
-//	mockAI = ai.MockAIService(fn(msg) {
-//	    return sprintf("Mock 回复: 收到消息 '%s'", msg)
-//	})
+// mockAI = ai.MockAIService(fn(msg) {
+//  return sprintf("Mock 回复: 收到消息 '%s'", msg)
+// })
 //
 // // 使用 Mock 服务进行测试
 // response = mockAI("测试消息")
