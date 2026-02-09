@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -101,6 +102,18 @@ func TestServer_QueryAIEvent_StreamAggregation(t *testing.T) {
 	}
 	if err := yakit.CreateOrUpdateAIOutputEvent(db, second); err != nil {
 		t.Fatalf("CreateOrUpdateAIOutputEvent (second fragment) failed: %v", err)
+	}
+
+	// With stream coalescing, deltas may be buffered and flushed in batches.
+	// Emulate emitter's finish signal to force-flush the pending buffer and close the stream.
+	if err := yakit.CreateOrUpdateAIOutputEvent(db, &schema.AiOutputEvent{
+		NodeId:    "stream-finished",
+		Type:      schema.EVENT_TYPE_STRUCTURED,
+		IsJson:    true,
+		Content:   utils.Jsonify(map[string]any{"event_writer_id": eventID}),
+		Timestamp: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("CreateOrUpdateAIOutputEvent (stream-finished) failed: %v", err)
 	}
 
 	client, err := NewLocalClient()
