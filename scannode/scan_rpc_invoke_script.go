@@ -95,9 +95,8 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	reporter := NewScannerAgentReporter(req.TaskId, req.SubTaskId, req.RuntimeId, s)
 	res := &scanrpc.SCAN_InvokeScriptResponse{}
 
-	// Setup local callback server for receiving callbacks from script execution.
-	// Default transport is HTTP webhook, but gRPC can be enabled to reduce per-message overhead.
-	yakitServer := s.createYakitCallbackServer(reporter, res)
+	// Setup Yakit server for receiving callbacks from script execution
+	yakitServer := s.createYakitServer(reporter, res)
 	yakitServer.Start()
 	defer yakitServer.Shutdown()
 
@@ -170,31 +169,14 @@ func extractErrorFromResponse(res *scanrpc.SCAN_InvokeScriptResponse) string {
 	return errMsg
 }
 
-type yakitCallbackServer interface {
-	Start()
-	Addr() string
-	Shutdown()
-}
-
-// createYakitCallbackServer initializes a callback server with progress and log handlers.
-// Transport can be switched via SCANNODE_YAKIT_WEBHOOK_TRANSPORT=http|grpc.
-func (s *ScanNode) createYakitCallbackServer(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) yakitCallbackServer {
-	transport := strings.ToLower(strings.TrimSpace(os.Getenv("SCANNODE_YAKIT_WEBHOOK_TRANSPORT")))
-	progressHandler := func(id string, progress float64) {
-		reporter.ReportProcess(progress)
-	}
-	logHandler := s.createLogHandler(reporter, res)
-	if transport == "grpc" {
-		return yaklib.NewYakitGRPCServer(
-			0,
-			yaklib.SetYakitGRPCServer_ProgressHandler(progressHandler),
-			yaklib.SetYakitGRPCServer_LogHandler(logHandler),
-		)
-	}
+// createYakitServer initializes a Yakit server with progress and log handlers
+func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) *yaklib.YakitServer {
 	return yaklib.NewYakitServer(
 		0,
-		yaklib.SetYakitServer_ProgressHandler(progressHandler),
-		yaklib.SetYakitServer_LogHandler(logHandler),
+		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) {
+			reporter.ReportProcess(progress)
+		}),
+		yaklib.SetYakitServer_LogHandler(s.createLogHandler(reporter, res)),
 	)
 }
 

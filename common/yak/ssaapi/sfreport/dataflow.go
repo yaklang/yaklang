@@ -93,13 +93,6 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value, min
 	nodes := make([]*NodeInfo, 0, graph.NodeCount())
 	edges := make([]*EdgeInfo, 0)
 	irSourceHashes := make([]string, 0)
-	entryNodeID := ""
-	if graph != nil && entryValue != nil {
-		// In some graph constructions, the entryValue pointer may not be present in DotGraph's node map
-		// (e.g. when values are rebuilt/normalized). Prefer node-id comparison when possible.
-		entryNodeID = graph.NodeName(entryValue)
-	}
-	markedEntry := false
 	graph.ForEach(func(s string, v *ssaapi.Value) {
 		rng := v.GetRange()
 		if rng == nil {
@@ -110,10 +103,7 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value, min
 			IRCode:      v.String(),
 			StartOffset: rng.GetStartOffset(),
 			EndOffset:   rng.GetEndOffset(),
-			IsEntryNode: (entryNodeID != "" && s == entryNodeID) || (entryNodeID == "" && !markedEntry),
-		}
-		if nodeInfo.IsEntryNode {
-			markedEntry = true
+			IsEntryNode: entryValue != nil && v == entryValue,
 		}
 		if !minimal {
 			codeRange, source := ssaapi.CoverCodeRange(rng)
