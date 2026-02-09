@@ -42,6 +42,14 @@
             <h3>流量计数</h3>
             <div class="value" id="stat-total-traffic">--</div>
         </div>
+        <div class="stat-card">
+            <h3>AI并发数</h3>
+            <div class="value" id="stat-concurrent-requests">--</div>
+        </div>
+        <div class="stat-card">
+            <h3>Web搜索次数</h3>
+            <div class="value" id="stat-web-search-count">--</div>
+        </div>
         <div class="stat-card" id="memory-card" style="cursor: pointer;" onclick="showMemoryDialog()">
             <h3>内存状态</h3>
             <div class="value" id="memory-display">点击查看</div>
@@ -335,11 +343,20 @@
                     <pre style="background: #2d2d2d; color: #f8f8f2; padding: 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; margin: 0; white-space: pre-wrap; word-break: break-all;">curl -X POST https://aibalance.yaklang.com/v1/web-search \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"query": "Yaklang", "searcher_type": "chatglm", "max_results": 10}'</pre>
+  -d '{"query": "Yaklang", "max_results": 10}'</pre>
                     <p style="color: #868e96; margin: 8px 0 0 0; font-size: 12px;">
-                        <strong>注意:</strong> API Key 的"允许模型"中必须包含 <code style="background:#fff3cd;padding:1px 4px;border-radius:3px;">web-search</code> 才能使用此接口。
-                        searcher_type 支持: <code>brave</code>, <code>tavily</code>, <code>chatglm</code>, <code>bocha</code>
+                        <strong>说明:</strong> 付费用户使用 API Key 认证并计费；免费用户通过 Trace-ID 使用（需开启免费用户开关）。
+                        searcher_type 支持: <code>brave</code>, <code>tavily</code>, <code>chatglm</code>, <code>bocha</code>（留空自动选择）
                     </p>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; padding: 12px; background: #f0f7ff; border: 1px solid #d0e3ff; border-radius: 6px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-weight: 600; font-size: 14px; color: #333;">
+                        <input type="checkbox" id="ws-allow-free-user" style="width: 18px; height: 18px; cursor: pointer;">
+                        允许免费用户 Web Search
+                    </label>
+                    <span style="color: #666; font-size: 12px;">
+                        开启后，没有 API Key 的用户可通过 Trace-ID 免费使用 Web Search（限频：1秒/次，成功后3秒冷却）
+                    </span>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                     <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 250px;">

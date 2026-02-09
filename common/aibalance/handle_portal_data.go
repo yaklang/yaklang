@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -12,19 +13,21 @@ import (
 
 // PortalDataResponse is the JSON response structure for portal data API
 type PortalDataResponse struct {
-	CurrentTime      string             `json:"current_time"`
-	TotalProviders   int                `json:"total_providers"`
-	HealthyProviders int                `json:"healthy_providers"`
-	TotalRequests    int64              `json:"total_requests"`
-	SuccessRate      float64            `json:"success_rate"`
-	TotalTraffic     int64              `json:"total_traffic"`
-	TotalTrafficStr  string             `json:"total_traffic_str"`
-	Providers        []ProviderDataJSON `json:"providers"`
-	APIKeys          []APIKeyDataJSON   `json:"api_keys"`
-	ModelMetas       []ModelInfoJSON    `json:"model_metas"`
-	TOTPSecret       string             `json:"totp_secret"`
-	TOTPWrapped      string             `json:"totp_wrapped"`
-	TOTPCode         string             `json:"totp_code"`
+	CurrentTime        string             `json:"current_time"`
+	TotalProviders     int                `json:"total_providers"`
+	HealthyProviders   int                `json:"healthy_providers"`
+	TotalRequests      int64              `json:"total_requests"`
+	SuccessRate        float64            `json:"success_rate"`
+	TotalTraffic       int64              `json:"total_traffic"`
+	TotalTrafficStr    string             `json:"total_traffic_str"`
+	ConcurrentRequests int64              `json:"concurrent_requests"` // Current in-flight AI requests (chat + embedding)
+	WebSearchCount     int64              `json:"web_search_count"`    // Cumulative web-search request count (process lifetime)
+	Providers          []ProviderDataJSON `json:"providers"`
+	APIKeys            []APIKeyDataJSON   `json:"api_keys"`
+	ModelMetas         []ModelInfoJSON    `json:"model_metas"`
+	TOTPSecret         string             `json:"totp_secret"`
+	TOTPWrapped        string             `json:"totp_wrapped"`
+	TOTPCode           string             `json:"totp_code"`
 }
 
 // ProviderDataJSON is the JSON representation of provider data
@@ -228,6 +231,12 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 
 	data.TotalTraffic = totalTraffic
 	data.TotalTrafficStr = formatBytes(totalTraffic)
+
+	// Fill concurrent request stats
+	chatReqs := atomic.LoadInt64(&c.concurrentChatRequests)
+	embeddingReqs := atomic.LoadInt64(&c.concurrentEmbeddingRequests)
+	data.ConcurrentRequests = chatReqs + embeddingReqs
+	data.WebSearchCount = atomic.LoadInt64(&c.totalWebSearchCount)
 
 	// Fill TOTP data
 	data.TOTPSecret = GetTOTPSecret()

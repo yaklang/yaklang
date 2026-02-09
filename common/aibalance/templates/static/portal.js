@@ -111,6 +111,8 @@
                 document.getElementById('stat-total-requests').textContent = data.total_requests;
                 document.getElementById('stat-success-rate').textContent = data.success_rate.toFixed(2) + '%';
                 document.getElementById('stat-total-traffic').textContent = data.total_traffic_str;
+                document.getElementById('stat-concurrent-requests').textContent = data.concurrent_requests || 0;
+                document.getElementById('stat-web-search-count').textContent = data.web_search_count || 0;
             },
             
             // 渲染供应商表格
@@ -4909,6 +4911,10 @@ curl '${metaApiUrl}?name=${modelName}'`;
                     if (proxyInput) {
                         proxyInput.value = data.config.proxy || '';
                     }
+                    const freeUserCheckbox = document.getElementById('ws-allow-free-user');
+                    if (freeUserCheckbox) {
+                        freeUserCheckbox.checked = !!data.config.allow_free_user_web_search;
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching web search config:', error);
@@ -4917,18 +4923,22 @@ curl '${metaApiUrl}?name=${modelName}'`;
         
         async function saveWebSearchConfig() {
             const proxy = document.getElementById('ws-global-proxy')?.value.trim() || '';
+            const allowFreeUser = document.getElementById('ws-allow-free-user')?.checked || false;
             
             try {
                 const response = await fetch('/portal/api/web-search-config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ proxy: proxy })
+                    body: JSON.stringify({
+                        proxy: proxy,
+                        allow_free_user_web_search: allowFreeUser
+                    })
                 });
                 const data = await response.json();
                 if (isAuthError(data)) { handleAuthError(); return; }
                 
                 if (data.success) {
-                    showToast('全局代理配置已保存' + (proxy ? ': ' + proxy : ' (已清除)'), 'success');
+                    showToast('Web Search 配置已保存', 'success');
                 } else {
                     showToast(data.error || data.message || '保存失败', 'error');
                 }

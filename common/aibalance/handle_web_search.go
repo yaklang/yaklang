@@ -2,10 +2,12 @@ package aibalance
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -33,11 +35,19 @@ type WebSearchResponse struct {
 }
 
 // serveWebSearch handles web search relay requests at /v1/web-search
+// Authentication flow:
+//   - Has API Key: validate key → traffic limit → TOTP → search → billing
+//   - Has Trace-ID only: check AllowFreeUserWebSearch → rate limit → TOTP → search (no billing)
+//   - Neither: return 502
 func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
+	// Increment cumulative web search counter
+	atomic.AddInt64(&c.totalWebSearchCount, 1)
+
 	c.logInfo("starting to handle new web search request")
 
-	// Extract authorization header
+	// Extract authorization and Trace-ID headers
 	auth := ""
+	traceID := ""
 	_, body := lowhttp.SplitHTTPPacket(rawPacket, func(method string, requestUri string, proto string) error {
 		c.logInfo("web search request method: %s, URI: %s, Protocol: %s", method, requestUri, proto)
 		return nil
@@ -47,6 +57,9 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		if k == "Authorization" || k == "authorization" {
 			auth = v
+		}
+		if k == "Trace-ID" || k == "Trace-Id" || k == "trace-id" {
+			traceID = v
 		}
 		return line
 	})
@@ -110,47 +123,98 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
-	c.logInfo("web search request: query=%s, type=%s, max_results=%d, page=%d",
-		utils.ShrinkString(reqBody.Query, 50), reqBody.SearcherType, reqBody.MaxResults, reqBody.Page)
+	c.logInfo("web search request: query=%s, type=%s, max_results=%d, page=%d, traceID=%s",
+		utils.ShrinkString(reqBody.Query, 50), reqBody.SearcherType, reqBody.MaxResults, reqBody.Page, utils.ShrinkString(traceID, 12))
 
-	// Authenticate: extract Bearer token and validate against AiApiKeys
-	value := strings.TrimPrefix(auth, "Bearer ")
-	if value == "" {
-		c.logError("no valid authentication info provided for web search")
-		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+	// Determine authentication mode: API Key vs Trace-ID vs neither
+	apiKeyValue := strings.TrimPrefix(auth, "Bearer ")
+	hasApiKey := apiKeyValue != ""
+	hasTraceID := traceID != ""
+
+	// Branch: neither API Key nor Trace-ID
+	if !hasApiKey && !hasTraceID {
+		c.logError("web search request has neither API key nor Trace-ID")
+		c.writeJSONResponse(conn, http.StatusBadGateway, map[string]interface{}{
 			"error": map[string]string{
-				"message": "authentication required",
+				"message": "must have trace id or apikey",
 				"type":    "authentication_error",
 			},
 		})
 		return
 	}
 
-	key, ok := c.Keys.Get(value)
-	if !ok {
-		c.logError("no matching key configuration found for web search: %s", utils.ShrinkString(value, 8))
-		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
-			"error": map[string]string{
-				"message": "invalid api key",
-				"type":    "authentication_error",
-			},
-		})
-		return
-	}
+	// isFreeUser indicates this is a free user (Trace-ID only, no API key)
+	isFreeUser := !hasApiKey && hasTraceID
 
-	// Check traffic limit
-	trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
-	if err != nil {
-		c.logError("failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
-	} else if !trafficAllowed {
-		c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
-		c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
-			"error": map[string]string{
-				"message": "API key has exceeded traffic limit",
-				"type":    "traffic_limit_exceeded",
-			},
-		})
-		return
+	var apiKey *Key
+
+	if hasApiKey {
+		// Branch: has API Key — validate key and check traffic limit
+		key, ok := c.Keys.Get(apiKeyValue)
+		if !ok {
+			c.logError("no matching key configuration found for web search: %s", utils.ShrinkString(apiKeyValue, 8))
+			c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+				"error": map[string]string{
+					"message": "invalid api key",
+					"type":    "authentication_error",
+				},
+			})
+			return
+		}
+		apiKey = key
+
+		// Check traffic limit for API key users
+		trafficAllowed, err := CheckAiApiKeyTrafficLimit(key.Key)
+		if err != nil {
+			c.logError("failed to check traffic limit for key %s: %v", utils.ShrinkString(key.Key, 8), err)
+		} else if !trafficAllowed {
+			c.logError("API key %s has exceeded traffic limit", utils.ShrinkString(key.Key, 8))
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": "API key has exceeded traffic limit",
+					"type":    "traffic_limit_exceeded",
+				},
+			})
+			return
+		}
+	} else {
+		// Branch: free user (Trace-ID only, no API key)
+		// Check if free user web search is allowed
+		wsConfig, err := GetWebSearchConfig()
+		if err != nil {
+			c.logError("failed to get web search config: %v", err)
+			c.writeJSONResponse(conn, http.StatusInternalServerError, map[string]interface{}{
+				"error": map[string]string{
+					"message": "internal server error",
+					"type":    "server_error",
+				},
+			})
+			return
+		}
+
+		if !wsConfig.AllowFreeUserWebSearch {
+			c.logError("free user web search is disabled, traceID=%s", utils.ShrinkString(traceID, 12))
+			c.writeJSONResponse(conn, http.StatusForbidden, map[string]interface{}{
+				"error": map[string]string{
+					"message": "free user web search is currently disabled",
+					"type":    "forbidden",
+				},
+			})
+			return
+		}
+
+		// Rate limiting for free users
+		allowed, retryAfter := c.webSearchRateLimiter.CheckRateLimit(traceID)
+		if !allowed {
+			c.logError("rate limit exceeded for traceID=%s, retry after %d seconds", utils.ShrinkString(traceID, 12), retryAfter)
+			c.writeJSONResponse(conn, http.StatusTooManyRequests, map[string]interface{}{
+				"error": map[string]string{
+					"message": fmt.Sprintf("rate limit exceeded, please retry after %d seconds", retryAfter),
+					"type":    "rate_limit_exceeded",
+				},
+			})
+			return
+		}
 	}
 
 	// TOTP verification for web-search (same mechanism as memfit models)
@@ -209,7 +273,16 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
-	c.sendWebSearchResponse(conn, results, reqBody.SearcherType, key.Key, int64(len(body)))
+	// Record success for free users (triggers 3-second cooldown)
+	if isFreeUser {
+		c.webSearchRateLimiter.RecordSuccess(traceID)
+		c.logInfo("web search succeeded for free user traceID=%s (no billing)", utils.ShrinkString(traceID, 12))
+		// Free user: send response without billing
+		c.sendWebSearchResponseNoBilling(conn, results, reqBody.SearcherType)
+	} else {
+		// Paid user: send response with billing
+		c.sendWebSearchResponse(conn, results, reqBody.SearcherType, apiKey.Key, int64(len(body)))
+	}
 }
 
 // resolveWebSearchKeys finds active search API keys for the given searcher type.
@@ -382,5 +455,15 @@ func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.Om
 		}
 	}()
 
+	c.writeJSONResponse(conn, http.StatusOK, resp)
+}
+
+// sendWebSearchResponseNoBilling sends the web search response without any billing (for free users)
+func (c *ServerConfig) sendWebSearchResponseNoBilling(conn net.Conn, results []*ostype.OmniSearchResult, searcherType string) {
+	resp := &WebSearchResponse{
+		Results:      results,
+		Total:        len(results),
+		SearcherType: searcherType,
+	}
 	c.writeJSONResponse(conn, http.StatusOK, resp)
 }

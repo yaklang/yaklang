@@ -203,7 +203,8 @@ type OpsActionLog struct {
 type WebSearchConfig struct {
 	gorm.Model
 
-	Proxy string `json:"proxy"` // Global proxy for all web search requests
+	Proxy                  string `json:"proxy"`                      // Global proxy for all web search requests
+	AllowFreeUserWebSearch bool   `json:"allow_free_user_web_search"` // Allow free users (Trace-ID only, no API key) to use web-search
 }
 
 func (w *WebSearchConfig) TableName() string {
