@@ -85,7 +85,7 @@ stringLiteralExpression
     ;
 
 genericSelection
-    : '_Generic' '(' eos* assignmentExpression eos* ',' eos* genericAssocList eos* ')'
+    : '_Generic' '(' eos* coreExpression eos* ',' eos* genericAssocList eos* ')'
     ;
 
 genericAssocList
@@ -93,7 +93,7 @@ genericAssocList
     ;
 
 genericAssociation
-    : (typeName | 'default') ':' assignmentExpression
+    : (typeName | 'default') ':' coreExpression
     ;
 
 // --- Postfix/Unary/Cast Expressions ---
@@ -116,12 +116,14 @@ postfixSuffix
 // Postfix expression that can be used as lvalue (excluding function calls)
 postfixExpressionLvalue
     : (primaryExpression | '__extension__'? '(' typeName ')' '{' initializerList ','? '}') postfixSuffixLvalue*
+    | postfixSuffixLvalue
     ;
 
 // Postfix suffix for lvalue expressions (no function calls)
 // Note: Using * quantifier instead of recursion to avoid left recursion issues
 postfixSuffixLvalue
     : '[' eos* expression eos* ']'
+    | postfixSuffixLvalue ('.' | '->') Identifier
     | ('.' | '->') Identifier
     ;
 
@@ -158,10 +160,17 @@ castExpression
     ;
 
 // --- Binary Expressions ---
+coreExpression
+    : assignmentExpression
+    | castExpression
+    ;
+
 assignmentExpression
     : leftExpression eos* assignmentOperator eos* expression
-    | castExpression
-    | DigitSequence
+    ;
+
+assignmentExpressions
+    : assignmentExpression (',' eos* assignmentExpression)*
     ;
 
 assignmentOperator
@@ -204,7 +213,6 @@ expression
     | '(' eos* expression eos* ')'
     | expression ('?' eos* expression ':' eos* expression)
     | castExpression
-    | assignmentExpression
     | statementsExpression
     | declarationSpecifier
     ;
@@ -464,9 +472,9 @@ abstractDeclaratorSuffix
 
 // Abstract array suffix: matches array dimensions in abstract declarators
 abstractArraySuffix
-    : '[' eos* typeQualifierList? eos* assignmentExpression? eos* ']'
-    | '[' eos* 'static' eos* typeQualifierList? eos* assignmentExpression eos* ']'
-    | '[' eos* typeQualifierList eos* 'static' eos* assignmentExpression eos* ']'
+    : '[' eos* typeQualifierList? eos* coreExpression? eos* ']'
+    | '[' eos* 'static' eos* typeQualifierList? eos* coreExpression eos* ']'
+    | '[' eos* typeQualifierList eos* 'static' eos* coreExpression eos* ']'
     | '[' eos* '*' eos* ']'
     ;
 
@@ -555,7 +563,7 @@ blockItem
     ;
 
 expressionStatement
-    : assignmentExpressions eos* Semi
+    : coreExpressions eos* Semi
     ;
 
 selectionStatement
@@ -573,8 +581,8 @@ forCondition
     : (forDeclarations | assignmentExpressions?) Semi forExpression? Semi forExpression?
     ;
 
-assignmentExpressions
-    : assignmentExpression (',' eos* assignmentExpression)*
+coreExpressions
+    : coreExpression (',' eos* coreExpression)*
     ;
 
 forDeclarations

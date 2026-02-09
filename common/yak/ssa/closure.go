@@ -45,19 +45,27 @@ type FunctionSideEffect struct {
 
 func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int, kind SideEffectKind) {
 	if variable.IsMemberCall() {
-		para, ok := ToParameter(variable.object)
-		if !ok {
-			return
+		if para, ok := ToParameter(variable.object); ok {
+			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+				Name:                 variable.GetName(),
+				VerboseName:          getMemberVerboseName(variable.object, variable.key),
+				Modify:               value.GetId(),
+				Variable:             variable,
+				forceCreate:          false,
+				Kind:                 kind,
+				parameterMemberInner: newParameterMember(para, variable.key),
+			})
+		} else if param, ok := ToParameterMember(variable.object); ok {
+			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+				Name:                 variable.GetName(),
+				VerboseName:          getMemberVerboseName(variable.object, variable.key),
+				Modify:               value.GetId(),
+				Variable:             variable,
+				forceCreate:          false,
+				Kind:                 kind,
+				parameterMemberInner: newMoreParameterMember(param, variable.key),
+			})
 		}
-		f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-			Name:                 variable.GetName(),
-			VerboseName:          getMemberVerboseName(variable.object, variable.key),
-			Modify:               value.GetId(),
-			Variable:             variable,
-			forceCreate:          false,
-			Kind:                 kind,
-			parameterMemberInner: newParameterMember(para, variable.key),
-		})
 	} else {
 		f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
 			Name:        variable.GetName(),
