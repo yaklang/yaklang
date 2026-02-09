@@ -60,6 +60,9 @@ type Command struct {
 	// i.e. foobar -o -v -> foobar -ov
 	UseShortOptionHandling bool
 
+	// Boolean to enable ignoring of unknown flags
+	IgnoreUnknownFlags bool
+
 	// Full name of command for help, defaults to full command name, including parent commands.
 	HelpName        string
 	commandNamePath []string
@@ -114,6 +117,9 @@ func (c Command) Run(ctx *Context) (err error) {
 
 	if ctx.App.UseShortOptionHandling {
 		c.UseShortOptionHandling = true
+	}
+	if ctx.App.IgnoreUnknownFlags {
+		c.IgnoreUnknownFlags = true
 	}
 
 	set, err := c.parseFlags(ctx.Args().Tail(), ctx.shellComplete)
@@ -218,6 +224,10 @@ func (c *Command) newFlagSet() (*flag.FlagSet, error) {
 
 func (c *Command) useShortOptionHandling() bool {
 	return c.UseShortOptionHandling
+}
+
+func (c *Command) ignoreUnknownFlags() bool {
+	return c.IgnoreUnknownFlags
 }
 
 // reorderArgs moves all flags (via reorderedArgs) before the rest of
@@ -349,6 +359,7 @@ func (c Command) startApp(ctx *Context) error {
 	app.Writer = ctx.App.Writer
 	app.ErrWriter = ctx.App.ErrWriter
 	app.UseShortOptionHandling = ctx.App.UseShortOptionHandling
+	app.IgnoreUnknownFlags = ctx.App.IgnoreUnknownFlags
 
 	app.categories = CommandCategories{}
 	for _, command := range c.Subcommands {

@@ -8,6 +8,7 @@ import (
 type iterativeParser interface {
 	newFlagSet() (*flag.FlagSet, error)
 	useShortOptionHandling() bool
+	ignoreUnknownFlags() bool
 }
 
 // To enable short-option handling (e.g., "-it" vs "-i -t") we have to
@@ -19,7 +20,7 @@ type iterativeParser interface {
 func parseIter(set *flag.FlagSet, ip iterativeParser, args []string, shellComplete bool) error {
 	for {
 		err := set.Parse(args)
-		if !ip.useShortOptionHandling() || err == nil {
+		if (!ip.useShortOptionHandling() && !ip.ignoreUnknownFlags()) || err == nil {
 			if shellComplete {
 				return nil
 			}
@@ -32,21 +33,42 @@ func parseIter(set *flag.FlagSet, ip iterativeParser, args []string, shellComple
 			return err
 		}
 
-		// regenerate the initial args with the split short opts
 		argsWereSplit := false
 		for i, arg := range args {
-			// skip args that are not part of the error message
 			if name := strings.TrimLeft(arg, "-"); name != trimmed {
 				continue
 			}
 
-			// if we can't split, the error was accurate
-			shortOpts := splitShortOptions(set, arg)
+			if ip.useShortOptionHandling() && ip.ignoreUnknownFlags() && isSplittable(arg) {
+				unconditionalSplit := splitShortOptionsUnconditionally(arg)
+				validShortOpts := []string{}
+				for _, opt := range unconditionalSplit {
+					flagName := strings.TrimLeft(opt, "-")
+					if set.Lookup(flagName) != nil {
+						validShortOpts = append(validShortOpts, opt)
+					}
+				}
+				args = append(args[:i], append(validShortOpts, args[i+1:]...)...)
+				argsWereSplit = true
+				break
+			}
+
+			var shortOpts []string
+			if ip.useShortOptionHandling() {
+				shortOpts = splitShortOptions(set, arg)
+			} else {
+				shortOpts = []string{arg}
+			}
+
 			if len(shortOpts) == 1 {
+				if ip.ignoreUnknownFlags() {
+					args = append(args[:i], args[i+1:]...)
+					argsWereSplit = true
+					break
+				}
 				return err
 			}
 
-			// swap current argument with the split version
 			args = append(args[:i], append(shortOpts, args[i+1:]...)...)
 			argsWereSplit = true
 			break
@@ -78,6 +100,19 @@ func splitShortOptions(set *flag.FlagSet, arg string) []string {
 	}
 
 	if !isSplittable(arg) || !shortFlagsExist(arg) {
+		return []string{arg}
+	}
+
+	separated := make([]string, 0, len(arg)-1)
+	for _, flagChar := range arg[1:] {
+		separated = append(separated, "-"+string(flagChar))
+	}
+
+	return separated
+}
+
+func splitShortOptionsUnconditionally(arg string) []string {
+	if !isSplittable(arg) {
 		return []string{arg}
 	}
 
